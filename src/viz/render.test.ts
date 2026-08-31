@@ -87,6 +87,10 @@ describe('static markup', () => {
     expect(markup).not.toContain('class="rmf-s-traced1 rmf-flow"');
   });
 
+  it('carries no tour toggle: playback belongs to the live component', () => {
+    expect(markup).not.toContain('data-kind="play-toggle"');
+  });
+
   it('carries no viewport machinery: the static export is a picture, not a widget', () => {
     // Zoom is viewBox arithmetic, so nothing about it reaches the emitted file:
     // no controls, no wrapper <g>, no transform, no inline sizing on the root.
@@ -97,9 +101,9 @@ describe('static markup', () => {
     expect(markup.slice(0, markup.indexOf('>'))).not.toContain('style=');
     // The window shown is the whole diagram, at its intrinsic size.
     const root = markup.slice(0, markup.indexOf('>'));
-    expect(root).toContain('width="1135" height="1046" viewBox="0 0 1135 1046"');
+    expect(root).toContain('width="1135" height="1172" viewBox="0 0 1135 1172"');
     // The ground is exactly diagram-sized, not the grown interactive one.
-    expect(markup).toContain('data-kind="background" class="rmf-f-bg" x="0" y="0" width="1135" height="1046"');
+    expect(markup).toContain('data-kind="background" class="rmf-f-bg" x="0" y="0" width="1135" height="1172"');
   });
 
   it('scales to its container only when asked', () => {
@@ -107,7 +111,7 @@ describe('static markup', () => {
     expect(responsive).toContain('min-width:820px');
     expect(responsive).toContain('width:100%');
     // The intrinsic width/height stay put as the aspect-ratio fallback.
-    expect(responsive).toContain('width="1135" height="1046"');
+    expect(responsive).toContain('width="1135" height="1172"');
   });
 
   it('shows the window a caller asks for, without touching the element tree', () => {
@@ -196,7 +200,9 @@ describe('a second diagram, from a second definition', () => {
     expect(example1).not.toContain('data-module="catalog"');
     expect(count(example1, /data-kind="decision-dot"/gu)).toBe(7);
     expect(count(example1, /data-kind="chord"/gu)).toBe(0);
-    expect(example1).toContain('One decision, three reaches');
+    // No drawn title: the page's heading introduces the example.
+    expect(example1).not.toContain('One decision, three reaches');
+    expect(example1).not.toContain('data-kind="title"');
   });
 
   it('shows the shipping handshake: a type flowing down, a function flowing up', () => {
@@ -208,6 +214,18 @@ describe('a second diagram, from a second definition', () => {
     expect(example1).toContain(
       'id="node-routingOptimization-exposed-to-it-ShipmentPlan-label" data-kind="node-row-label" class="rmf-f-traced4"',
     );
+  });
+
+  it('defines every chevron marker it references', () => {
+    for (const svg of [markup, example1]) {
+      const referenced = new Set(
+        [...svg.matchAll(/url\(#(rmf-chevron-[a-z0-9]+)\)/gu)].map((match) => match[1] as string),
+      );
+      expect(referenced.size).toBeGreaterThan(0);
+      for (const id of referenced) {
+        expect(svg).toContain(`id="${id}"`);
+      }
+    }
   });
 
   it('never says denied: non-allowed imports are absence, not prose', () => {
@@ -249,8 +267,8 @@ describe('a second diagram, from a second definition', () => {
 
 describe('affordances', () => {
   it('makes traced chips, lanes and rows clickable', () => {
-    expect(markup).toContain('data-kind="legend-entry" data-symbol="ProductId"');
-    expect(markup).toContain('data-kind="legend-entry" data-symbol="CartApi"');
+    expect(markup).toContain('data-kind="header-chip" data-symbol="ProductId"');
+    expect(markup).toContain('data-kind="header-chip" data-symbol="CartApi"');
     expect(count(markup, /rmf-clickable/gu)).toBeGreaterThanOrEqual(6);
   });
 

@@ -125,7 +125,47 @@ export const LAYOUT = {
     fontSize: 14,
     height: 26,
   },
+
+  /**
+   * The traced-contracts panel at the top left: the diagram's selection
+   * control, promoted out of the legend. A caption row, then one row per
+   * traced contract — `swatch symbol — role` — stacked vertically. The band's
+   * height depends only on how many contracts a diagram traces, never on the
+   * selection, so selecting never reflows the tree.
+   */
+  header: {
+    captionHeight: 27,
+    // Integer, deliberately: a fractional pitch lands consecutive rows on
+    // alternating half-pixels, so every other swatch rasterizes visibly
+    // off-centre from its neighbour.
+    rowHeight: 26,
+    fontSize: 18,
+    charWidth: 9.9,
+    captionFontSize: 18,
+    /** Length of a row's colored swatch line. */
+    swatchWidth: 39,
+    /** Gap between a row's swatch and its text. */
+    swatchGap: 10.5,
+    /**
+     * How far above the row's text anchor the swatch sits. Text is
+     * middle-anchored, so 0 = the anchor itself; a small lift reads as
+     * centred on the name. Tune this one number to move every swatch.
+     */
+    swatchLift: 1.5,
+    /** Air between the panel's last row and the tree. */
+    bottomGap: 21,
+    /** Space reserved after the caption for the live play/stop toggle. */
+    toggleWidth: 84,
+  },
 } as const;
+
+/** Height of the traced-contracts band above the tree; zero when nothing is traced. */
+export function headerBandHeight(tracedCount: number): number {
+  if (tracedCount === 0) {
+    return 0;
+  }
+  return LAYOUT.header.captionHeight + tracedCount * LAYOUT.header.rowHeight + LAYOUT.header.bottomGap;
+}
 
 /** Round to a stable number of decimals so emitted SVG is byte-identical run to run. */
 export function r(value: number): number {

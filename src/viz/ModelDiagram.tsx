@@ -40,12 +40,12 @@ import {
   type TracedSymbol,
 } from './diagram-definition.js';
 import { shopDiagram } from './diagrams/shop.js';
-import { LAYOUT } from './geometry.js';
+import { LAYOUT, textWidth } from './geometry.js';
 import type { ChordLayout } from './layout-chords.js';
 import type { DecisionDot, LaneChip, LanePath, TreeEdgeLayout } from './layout-lanes.js';
 import type { Compartment, NodeLayout, SymbolRow } from './layout-nodes.js';
 import type { LegendGroupLayout } from './layout-legend.js';
-import { diagramLayout, type DiagramLayout } from './layout.js';
+import { diagramLayout, type DiagramLayout, type HeaderLayout } from './layout.js';
 import type { SymbolName } from './model-access.js';
 import { ROOT_CLASS, diagramStylesheet, fillClass, strokeClass, type Theme } from './theme.js';
 import {
@@ -96,6 +96,16 @@ export interface ModelDiagramProps {
   readonly onPointerDown?: (event: ReactPointerEvent<SVGSVGElement>) => void;
   readonly onPointerMove?: (event: ReactPointerEvent<SVGSVGElement>) => void;
   readonly onPointerUp?: (event: ReactPointerEvent<SVGSVGElement>) => void;
+
+  // --- the traced-contract tour, driven by the interactive wrapper.
+
+  /** Whether the tour is running; drawn on the play/stop toggle. */
+  readonly playing?: boolean;
+  /**
+   * Renders the play/stop toggle on the selectable legend group's caption
+   * row. The static export passes nothing and stays a picture.
+   */
+  readonly onTogglePlay?: () => void;
 }
 
 export interface ModelDiagramInteractiveProps extends ModelDiagramProps {
@@ -108,13 +118,26 @@ export interface ModelDiagramInteractiveProps extends ModelDiagramProps {
    * anything more. Zoom is for magnification.
    */
   readonly maxWidth?: number | string;
+  /**
+   * Start with the traced-contract tour running: each traced symbol is
+   * selected in turn, forever, until the reader takes over. On by default
+   * for uncontrolled selection; a controlled component never plays.
+   */
+  readonly autoPlay?: boolean;
 }
 
 /** §3.9: legible down to ~820 CSS px; narrower than that, the container scrolls. */
 const DEFAULT_MIN_WIDTH = 820;
 
+/**
+ * How long the tour holds each traced contract: five ~1s animation cycles —
+ * enough to follow the longest chain twice, not so long the one-hop contracts
+ * drag. Uniform on purpose: a steady rhythm reads as a guided tour.
+ */
+export const TOUR_DWELL_MS = 5000;
+
 /** Marker colors are defined once per palette slot, not once per diagram. */
-const CHEVRON_COLORS: readonly ColorKey[] = ['neutral', 'traced1', 'traced2', 'traced3'];
+const CHEVRON_COLORS: readonly ColorKey[] = ['neutral', 'traced1', 'traced2', 'traced3', 'traced4'];
 
 /** Join class names, collapsing "nothing to say" to an omitted attribute. */
 function classes(...values: readonly (string | false | undefined)[]): string | undefined {
@@ -150,6 +173,7 @@ export function ModelDiagram(props: ModelDiagramInteractiveProps): ReactElement 
     interactive = true,
     maxWidth,
     minWidth = DEFAULT_MIN_WIDTH,
+    autoPlay,
     ...rest
   } = props;
 
@@ -159,6 +183,11 @@ export function ModelDiagram(props: ModelDiagramInteractiveProps): ReactElement 
   const [internal, setInternal] = useState<SymbolName | null>(defaultSelectedSymbol);
   const isControlled = selectedSymbol !== undefined;
   const current = isControlled ? selectedSymbol : internal;
+
+  const tourSymbols = layout.definition.tracedSymbols.map((entry) => entry.symbol);
+  const [playing, setPlaying] = useState(
+    (autoPlay ?? !isControlled) && interactive && tourSymbols.length > 0,
+  );
 
   const [view, setView] = useState<ViewRect>(base);
   const [dragging, setDragging] = useState(false);
@@ -182,6 +211,48 @@ export function ModelDiagram(props: ModelDiagramInteractiveProps): ReactElement 
     },
     [isControlled, onSelectSymbol],
   );
+
+  /** The reader taking the wheel — any manual selection — stops the tour. */
+  const userSelect = useCallback(
+    (next: SymbolName | null) => {
+      setPlaying(false);
+      select(next);
+    },
+    [select],
+  );
+
+  const currentRef = useRef(current);
+  currentRef.current = current;
+  const selectRef = useRef(select);
+  selectRef.current = select;
+
+  // The tour: hold each traced contract for TOUR_DWELL_MS, forever. It rides
+  // the ordinary selection state, so what it shows is exactly what a hand
+  // selection shows. Play begins at the current selection when that is a
+  // traced contract (restarting its dwell), else at the first.
+  useEffect(() => {
+    const symbols = layout.definition.tracedSymbols.map((entry) => entry.symbol);
+    if (!playing || symbols.length === 0) {
+      return undefined;
+    }
+    // Each lap ends on a none-selected beat: every layer back at full
+    // strength, the whole picture for one dwell, then round again.
+    const stops: (SymbolName | null)[] = [...symbols, null];
+    // The tour keeps its own cursor: rendered state lags inside a batch, and
+    // any manual selection stops the tour anyway, so the two cannot diverge.
+    let index = symbols.indexOf(currentRef.current ?? ('' as SymbolName));
+    if (index === -1) {
+      index = 0;
+      selectRef.current(symbols[0] as SymbolName);
+    }
+    const timer = setInterval(() => {
+      index = (index + 1) % stops.length;
+      selectRef.current(stops[index] as SymbolName | null);
+    }, TOUR_DWELL_MS);
+    return () => {
+      clearInterval(timer);
+    };
+  }, [playing, layout]);
 
   /**
    * The rendered size of the SVG, for converting pointer pixels into diagram
@@ -328,6 +399,12 @@ export function ModelDiagram(props: ModelDiagramInteractiveProps): ReactElement 
     width: '100%',
     maxWidth: maxWidth ?? base.width,
     marginInline: 'auto',
+    // A drag is also the browser's text-selection gesture, and the diagram's
+    // labels are ordinary <text>. Panning wins: nothing in the live component
+    // is selectable. The static export has no drag, so its text stays
+    // selectable.
+    userSelect: 'none',
+    WebkitUserSelect: 'none',
   };
 
   return (
@@ -336,7 +413,7 @@ export function ModelDiagram(props: ModelDiagramInteractiveProps): ReactElement 
         <ModelDiagramSvg
           {...rest}
           selectedSymbol={current}
-          onSelectSymbol={select}
+          onSelectSymbol={userSelect}
           view={view}
           responsive
           minWidth={minWidth}
@@ -348,6 +425,9 @@ export function ModelDiagram(props: ModelDiagramInteractiveProps): ReactElement 
                 onPointerMove,
                 onPointerUp,
               }
+            : {})}
+          {...(interactive && tourSymbols.length > 0
+            ? { playing, onTogglePlay: () => setPlaying((was) => !was) }
             : {})}
         />
       </div>
@@ -461,6 +541,8 @@ export function ModelDiagramSvg(props: ModelDiagramProps): ReactElement {
     onPointerDown,
     onPointerMove,
     onPointerUp,
+    playing = false,
+    onTogglePlay,
   } = props;
 
   const { viewBox } = layout;
@@ -533,17 +615,23 @@ export function ModelDiagramSvg(props: ModelDiagramProps): ReactElement {
         onClick={() => select(null)}
       />
 
-      <text
-        id={`${idPrefix}-title`}
-        data-kind="title"
-        className={fillClass('text')}
-        x={layout.title.at.x}
-        y={layout.title.at.y}
-        fontSize={LAYOUT.title.fontSize}
-        fontWeight={600}
-      >
-        {layout.title.text}
-      </text>
+      {layout.title === undefined ? null : (
+        <text
+          id={`${idPrefix}-title`}
+          data-kind="title"
+          className={fillClass('text')}
+          x={layout.title.at.x}
+          y={layout.title.at.y}
+          fontSize={LAYOUT.title.fontSize}
+          fontWeight={600}
+        >
+          {layout.title.text}
+        </text>
+      )}
+
+      {layout.header === undefined
+        ? null
+        : renderHeader(layout.header, idPrefix, traced, selectedSymbol, toggle, playing, onTogglePlay)}
 
       <Layer
         id={`${idPrefix}-layer-tree`}
@@ -1091,12 +1179,13 @@ function renderRow(
         </text>
       )}
       {/* Arrivals are italic: the definition lives where the symbol is owned,
-          and everywhere else the name is a reference. */}
+          and everywhere else the name is a reference. The label clears the
+          marker column per glyph: `▲▼` is two glyphs wide, not one. */}
       <text
         id={`${row.id}-label`}
         data-kind="node-row-label"
         className={fillClass(labelColor)}
-        x={box.x + LAYOUT.node.paddingX + 12}
+        x={box.x + LAYOUT.node.paddingX + (row.marker?.length ?? 1) * 10 + 2}
         y={y}
         fontSize={12}
         {...(row.kind === 'owns' ? {} : { fontStyle: 'italic' })}
@@ -1116,6 +1205,115 @@ function renderRow(
           {row.provenance}
         </text>
       )}
+    </g>
+  );
+}
+
+/**
+ * The traced-contracts panel at the top left — the diagram's selection
+ * control, promoted out of the legend but keeping its vertical row form:
+ * `swatch symbol — role`, one row per contract. Rows select exactly as the
+ * legend chips used to. The play/stop toggle is live-only: the static export
+ * gets no handler and therefore no toggle.
+ */
+function renderHeader(
+  header: HeaderLayout,
+  idPrefix: string,
+  traced: readonly TracedSymbol[],
+  selectedSymbol: SymbolName | null,
+  toggle: (symbol: SymbolName) => void,
+  playing: boolean,
+  onTogglePlay?: () => void,
+): ReactElement {
+  return (
+    <g id={`${idPrefix}-header`} data-kind="header">
+      <text
+        id={`${idPrefix}-header-caption`}
+        data-kind="header-caption"
+        className={fillClass('text')}
+        x={header.captionAt.x}
+        y={header.captionAt.y}
+        fontSize={LAYOUT.header.captionFontSize}
+        fontWeight={700}
+      >
+        Traced contracts
+      </text>
+      {onTogglePlay === undefined ? null : (
+        <g
+          id={`${idPrefix}-header-play`}
+          data-kind="play-toggle"
+          data-playing={playing ? 'true' : 'false'}
+          role="button"
+          aria-label={playing ? 'Stop the tour' : 'Play the tour'}
+          className="rmf-clickable"
+          onClick={onTogglePlay}
+        >
+          <rect
+            data-kind="play-toggle-hit"
+            fill="transparent"
+            x={header.toggleAt.x - 6}
+            y={header.toggleAt.y - 18}
+            width={LAYOUT.header.toggleWidth}
+            height={27}
+          />
+          <text
+            data-kind="play-toggle-label"
+            className={fillClass('muted')}
+            x={header.toggleAt.x}
+            y={header.toggleAt.y}
+            fontSize={16.5}
+          >
+            {playing ? '■ stop' : '▶ play'}
+          </text>
+        </g>
+      )}
+      {header.chips.map((chip) => {
+        const entry = traced.find((candidate) => candidate.symbol === chip.symbol);
+        const selected = chip.symbol === selectedSymbol;
+        const dim = selectedSymbol !== null && !selected ? 'rmf-dim-soft' : undefined;
+        return (
+          <g
+            key={chip.symbol}
+            id={`${idPrefix}-header-chip-${chip.symbol}`}
+            data-kind="header-chip"
+            data-symbol={chip.symbol}
+            data-selected={selected ? 'true' : 'false'}
+            className={classes(dim, 'rmf-clickable')}
+            onClick={() => toggle(chip.symbol as SymbolName)}
+          >
+            <rect
+              data-kind="header-chip-hit"
+              fill="transparent"
+              x={chip.hitBox.x}
+              y={chip.hitBox.y}
+              width={chip.hitBox.width}
+              height={chip.hitBox.height}
+            />
+            <line
+              className={strokeClass(entry?.color ?? 'text')}
+              strokeWidth={4.5}
+              strokeLinecap="round"
+              x1={chip.swatchFrom.x}
+              y1={chip.swatchFrom.y}
+              x2={chip.swatchTo.x}
+              y2={chip.swatchTo.y}
+            />
+            <text
+              data-kind="header-chip-label"
+              className={fillClass('text')}
+              x={chip.textAt.x}
+              y={chip.textAt.y}
+              fontSize={LAYOUT.header.fontSize}
+              {...(selected ? { fontWeight: 600 } : {})}
+            >
+              {chip.symbol}
+              <tspan className={fillClass('muted')} fontWeight={400}>
+                {` — ${entry?.role ?? ''}`}
+              </tspan>
+            </text>
+          </g>
+        );
+      })}
     </g>
   );
 }

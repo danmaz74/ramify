@@ -171,8 +171,11 @@ export interface DiagramDefinition {
   /** Stable identifier, used in error messages and by the static emitter. */
   readonly id: string;
   readonly declaration: ModuleDeclaration;
-  /** Title drawn above the tree. */
-  readonly title: string;
+  /**
+   * Title drawn above the tree. Omit it when the page around the diagram
+   * already carries the heading — the picture then starts at the tree.
+   */
+  readonly title?: string;
   /** The `<svg>`'s accessible name. */
   readonly ariaLabel: string;
   readonly tracedSymbols: readonly TracedSymbol[];

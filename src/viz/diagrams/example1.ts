@@ -22,10 +22,10 @@
 import type {
   DecisionPolicy,
   DiagramDefinition,
-  LegendGroup,
   TracedSymbol,
 } from '../diagram-definition.js';
 import type { ModuleDeclaration } from '../model-access.js';
+import { seriesLegendGroups, seriesNodeContent } from './series.js';
 
 /**
  * ```text
@@ -159,51 +159,11 @@ export const example1DecisionPolicies: readonly DecisionPolicy[] = [
   },
 ];
 
-export const example1LegendGroups: readonly LegendGroup[] = [
-  {
-    id: 'node',
-    title: 'Node',
-    entries: [
-      { id: 'to-parent', glyph: { kind: 'marker', text: '▲' }, text: 'exposed to parent' },
-      { id: 'to-descendants', glyph: { kind: 'marker', text: '▼' }, text: 'exposed to descendants' },
-      {
-        id: 'gray',
-        glyph: { kind: 'marker', text: '·', muted: true },
-        text: 'goes no further; nothing gray moves',
-      },
-      {
-        id: 'granted',
-        glyph: { kind: 'granted' },
-        text: 'no marker: exposed to it by a proper ancestor',
-      },
-      {
-        id: 'owns-exposed',
-        glyph: { kind: 'compartment', text: 'owns / exposed to it' },
-        text: 'owned here / exposed to this module',
-      },
-    ],
-  },
-  {
-    id: 'edges',
-    title: 'Along the edges',
-    entries: [
-      { id: 'up-hop', glyph: { kind: 'up-hop' }, text: 'up-hop: one edge, one decision' },
-      { id: 'grant', glyph: { kind: 'grant' }, text: 'grant flow: one decision, a subtree' },
-      { id: 'dot', glyph: { kind: 'dot' }, text: 'filled dot = somebody decided here' },
-      { id: 'head', glyph: { kind: 'arrowhead' }, text: 'arrowhead = this module may import it' },
-    ],
-  },
-  {
-    id: 'traced',
-    title: 'Traced contracts',
-    entries: example1TracedSymbols.map((traced) => ({
-      id: `traced-${traced.symbol}`,
-      glyph: { kind: 'traced', symbol: traced.symbol } as const,
-      text: `${traced.symbol} — ${traced.role}`,
-      selects: traced.symbol,
-    })),
-  },
-];
+// The legend and node-content conventions are the series', declared once in
+// `./series.js`. The traced contracts live in the header strip above the
+// tree (rendered from `tracedSymbols`), not in the legend: one selector, and
+// it sits where the eyes are.
+export const example1LegendGroups = seriesLegendGroups;
 
 /** The lessons of the doc, in the glossary's vocabulary. */
 export const example1LegendNotes: readonly string[] = [
@@ -213,13 +173,11 @@ export const example1LegendNotes: readonly string[] = [
   'Files inside one module import each other freely; those imports are not drawn.',
 ];
 
-export const example1Title =
-  'One decision, three reaches — where the chain above turns downward decides how far a symbol goes';
-
 export const example1Diagram: DiagramDefinition = {
   id: 'example1',
   declaration: example1Declaration,
-  title: example1Title,
+  // No drawn title: the page's own heading introduces the example, so the
+  // picture starts at the tree.
   ariaLabel:
     'Example 1: three modules expose a symbol to their parent, and the decisions above them produce three different reaches; a fourth symbol is exposed only downward and never leaves its subtree',
   tracedSymbols: example1TracedSymbols,
@@ -230,5 +188,5 @@ export const example1Diagram: DiagramDefinition = {
   legendGroups: example1LegendGroups,
   legendNotes: example1LegendNotes,
   footnote: [],
-  nodeContent: { receivedCompartmentTitle: 'exposed to it', includeAncestorGrants: true },
+  nodeContent: seriesNodeContent,
 };

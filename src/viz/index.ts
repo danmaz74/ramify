@@ -14,7 +14,13 @@
  * historical names.
  */
 
-export { ModelDiagram, ModelDiagramSvg, accessPolicyStatements, accessPolicyStatementsOf } from './ModelDiagram.js';
+export {
+  ModelDiagram,
+  ModelDiagramSvg,
+  TOUR_DWELL_MS,
+  accessPolicyStatements,
+  accessPolicyStatementsOf,
+} from './ModelDiagram.js';
 export type { ModelDiagramInteractiveProps, ModelDiagramProps } from './ModelDiagram.js';
 
 export {
@@ -64,6 +70,8 @@ export {
 } from './diagrams/shop.js';
 
 export { example1Declaration, example1Diagram } from './diagrams/example1.js';
+export { example2Declaration, example2Diagram } from './diagrams/example2.js';
+export { seriesLegendGroups, seriesNodeContent } from './diagrams/series.js';
 
 export { buildDiagramLayout, coreModelLayout, diagramLayout } from './layout.js';
 export type { DiagramLayout } from './layout.js';

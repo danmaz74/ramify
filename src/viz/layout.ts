@@ -12,12 +12,34 @@
 
 import { createDiagramContext, type DiagramDefinition } from './diagram-definition.js';
 import { shopDiagram } from './diagrams/shop.js';
-import { LAYOUT, textWidth, type Point } from './geometry.js';
+import { LAYOUT, textWidth, type Box, type Point } from './geometry.js';
 import { layoutChords, type ChordsLayout } from './layout-chords.js';
 import { layoutLegend, type LegendLayout } from './layout-legend.js';
 import { layoutPropagation, type PropagationLayout } from './layout-lanes.js';
 import { layoutTree, type TreeGeometry } from './layout-nodes.js';
 import { validateDiagram } from './validate.js';
+
+/** One row of the traced-contracts panel: swatch, text, and its hit area. */
+export interface HeaderChip {
+  readonly symbol: string;
+  /** The colored swatch line, drawn from `swatchFrom` to `swatchTo`. */
+  readonly swatchFrom: Point;
+  readonly swatchTo: Point;
+  readonly textAt: Point;
+  readonly hitBox: Box;
+}
+
+/**
+ * The traced-contracts panel at the top left — the diagram's selection
+ * control: a caption row, then one row per traced contract, stacked
+ * vertically in the band `layoutTree` reserved.
+ */
+export interface HeaderLayout {
+  readonly captionAt: Point;
+  /** Where the live play/stop toggle sits; the static export leaves it empty. */
+  readonly toggleAt: Point;
+  readonly chips: readonly HeaderChip[];
+}
 
 export interface DiagramLayout {
   /** The diagram this geometry belongs to. A layout is self-describing. */
@@ -26,9 +48,47 @@ export interface DiagramLayout {
   readonly propagation: PropagationLayout;
   readonly chords: ChordsLayout;
   readonly legend: LegendLayout;
-  readonly title: { readonly text: string; readonly at: Point };
+  /** Absent when the definition declares no title: the picture starts at the tree. */
+  readonly title?: { readonly text: string; readonly at: Point };
+  /** Absent when the definition traces nothing. */
+  readonly header?: HeaderLayout;
   /** `x y width height` for the `<svg>`, computed from real content extents. */
   readonly viewBox: { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
+}
+
+const HEADER_CAPTION = 'Traced contracts';
+
+/** The traced-contracts panel, laid out in the band `layoutTree` reserved. */
+function layoutHeader(definition: DiagramDefinition, left: number): HeaderLayout | undefined {
+  if (definition.tracedSymbols.length === 0) {
+    return undefined;
+  }
+  const { header } = LAYOUT;
+  const top = LAYOUT.margin + (definition.title === undefined ? 0 : LAYOUT.title.height);
+  const captionY = top + header.fontSize;
+  const captionAt = { x: left, y: captionY };
+  const toggleAt = { x: left + textWidth(HEADER_CAPTION, header.charWidth) + 12, y: captionY };
+
+  const chips: HeaderChip[] = definition.tracedSymbols.map((traced, index) => {
+    const rowY = top + header.captionHeight + index * header.rowHeight + header.fontSize;
+    const textWidthChars = textWidth(`${traced.symbol} — ${traced.role}`, header.charWidth);
+    return {
+      symbol: traced.symbol,
+      // The stylesheet middle-anchors every text (`dominant-baseline:middle`),
+      // so `rowY` is the name's anchor; `swatchLift` is the one tunable knob.
+      swatchFrom: { x: left, y: rowY - header.swatchLift },
+      swatchTo: { x: left + header.swatchWidth, y: rowY - header.swatchLift },
+      textAt: { x: left + header.swatchWidth + header.swatchGap, y: rowY },
+      hitBox: {
+        x: left - 4,
+        y: rowY - header.rowHeight / 2,
+        width: header.swatchWidth + header.swatchGap + textWidthChars + 8,
+        height: header.rowHeight,
+      },
+    };
+  });
+
+  return { captionAt, toggleAt, chips };
 }
 
 interface Bounds {
@@ -100,12 +160,24 @@ export function buildDiagramLayout(definition: DiagramDefinition = shopDiagram):
     include(bounds, note.at.x, note.at.y - 6);
     include(bounds, note.at.x + textWidth(note.text, LAYOUT.legend.charWidth), note.at.y + 6);
   }
-  const title = {
-    text: definition.title,
-    at: { x: treeGeometry.left, y: LAYOUT.margin + LAYOUT.title.fontSize / 2 },
-  };
-  include(bounds, title.at.x, title.at.y - LAYOUT.title.fontSize / 2);
-  include(bounds, title.at.x + textWidth(title.text, 7.2), title.at.y);
+  const title =
+    definition.title === undefined
+      ? undefined
+      : {
+          text: definition.title,
+          at: { x: treeGeometry.left, y: LAYOUT.margin + LAYOUT.title.fontSize / 2 },
+        };
+  if (title !== undefined) {
+    include(bounds, title.at.x, title.at.y - LAYOUT.title.fontSize / 2);
+    include(bounds, title.at.x + textWidth(title.text, 7.2), title.at.y);
+  }
+  const header = layoutHeader(definition, treeGeometry.left);
+  if (header !== undefined) {
+    include(bounds, header.captionAt.x, header.captionAt.y - LAYOUT.header.fontSize);
+    for (const chip of header.chips) {
+      include(bounds, chip.hitBox.x + chip.hitBox.width, chip.hitBox.y + chip.hitBox.height);
+    }
+  }
 
   const pad = LAYOUT.margin;
   const viewBox = {
@@ -115,7 +187,16 @@ export function buildDiagramLayout(definition: DiagramDefinition = shopDiagram):
     height: Math.ceil(bounds.maxY - bounds.minY + 2 * pad),
   };
 
-  return { definition, tree: treeGeometry, propagation, chords, legend, title, viewBox };
+  return {
+    definition,
+    tree: treeGeometry,
+    propagation,
+    chords,
+    legend,
+    ...(title === undefined ? {} : { title }),
+    ...(header === undefined ? {} : { header }),
+    viewBox,
+  };
 }
 
 const cache = new Map<DiagramDefinition, DiagramLayout>();

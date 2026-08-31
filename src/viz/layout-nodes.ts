@@ -24,7 +24,7 @@
 import { hierarchy, tree as d3Tree, type HierarchyNode } from 'd3-hierarchy';
 
 import type { ColorKey, DiagramContext } from './diagram-definition.js';
-import { LAYOUT, wrapText, type Box } from './geometry.js';
+import { LAYOUT, headerBandHeight, wrapText, type Box } from './geometry.js';
 import {
   explainImport,
   requireModuleRecord,
@@ -529,7 +529,10 @@ export function layoutTree(context: DiagramContext): TreeGeometry {
   }
 
   const levels: LevelGeometry[] = [];
-  let top = LAYOUT.margin + LAYOUT.title.height;
+  let top =
+    LAYOUT.margin +
+    (context.definition.title === undefined ? 0 : LAYOUT.title.height) +
+    headerBandHeight(context.definition.tracedSymbols.length);
   for (let depth = 0; depth <= maxDepth; depth += 1) {
     const bottom = top + (levelHeights[depth] ?? 0);
     levels.push({

@@ -12,10 +12,10 @@
 
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { example1Diagram } from './diagrams/example1.js';
-import { ModelDiagram } from './ModelDiagram.js';
+import { ModelDiagram, TOUR_DWELL_MS } from './ModelDiagram.js';
 
 declare global {
   // eslint-disable-next-line no-var
@@ -39,9 +39,14 @@ afterEach(() => {
   container.remove();
 });
 
+/**
+ * Mounts with the tour off so every test starts from a quiet diagram; the
+ * tour's own tests pass `autoPlay: true` (or render directly, to prove the
+ * default).
+ */
 function mount(props: Parameters<typeof ModelDiagram>[0] = {}): void {
   act(() => {
-    root.render(createElement(ModelDiagram, props));
+    root.render(createElement(ModelDiagram, { autoPlay: false, ...props }));
   });
 }
 
@@ -116,7 +121,7 @@ describe('clicking a symbol', () => {
     expect(layerClass('ProductId')).not.toContain('rmf-dim');
     expect(layerClass('neutral')).not.toContain('rmf-dim');
 
-    click('[data-kind="legend-entry"][data-symbol="ProductId"]');
+    click('[data-kind="header-chip"][data-symbol="ProductId"]');
 
     expect(layerClass('ProductId')).not.toContain('rmf-dim');
     expect(layerClass('neutral')).toContain('rmf-dim');
@@ -132,13 +137,13 @@ describe('clicking a symbol', () => {
     mount();
     expect(flowing()).toEqual([]);
 
-    click('[data-kind="legend-entry"][data-symbol="ProductId"]');
+    click('[data-kind="header-chip"][data-symbol="ProductId"]');
     // Both of ProductId's decisions animate, over every edge they travel.
     expect(flowing()).toHaveLength(lanesOf('ProductId'));
     expect(new Set(flowing())).toEqual(new Set(['ProductId']));
 
     // CartApi's ribbon is one hop; the absent second hop cannot animate.
-    click('[data-kind="legend-entry"][data-symbol="CartApi"]');
+    click('[data-kind="header-chip"][data-symbol="CartApi"]');
     expect(flowing()).toEqual(['CartApi']);
   });
 
@@ -146,21 +151,21 @@ describe('clicking a symbol', () => {
     mount();
     expect(blinking()).toEqual([]);
 
-    click('[data-kind="legend-entry"][data-symbol="ProductId"]');
+    click('[data-kind="header-chip"][data-symbol="ProductId"]');
     // `shop` holds it; `catalog` owns it, and ownership is not an arrival.
     expect(blinking()).toEqual(['shop/ProductId']);
 
-    click('[data-kind="legend-entry"][data-symbol="PaymentApi"]');
+    click('[data-kind="header-chip"][data-symbol="PaymentApi"]');
     expect(blinking()).toEqual(['checkout/PaymentApi']);
   });
 
   it('deselects when the same symbol is clicked again', () => {
     mount();
-    click('[data-kind="legend-entry"][data-symbol="PaymentApi"]');
+    click('[data-kind="header-chip"][data-symbol="PaymentApi"]');
     expect(layerClass('neutral')).toContain('rmf-dim');
     expect(flowing()).not.toEqual([]);
 
-    click('[data-kind="legend-entry"][data-symbol="PaymentApi"]');
+    click('[data-kind="header-chip"][data-symbol="PaymentApi"]');
     expect(layerClass('neutral')).not.toContain('rmf-dim');
     // Both animations stop with the selection that started them.
     expect(flowing()).toEqual([]);
@@ -191,7 +196,7 @@ describe('clicking a symbol', () => {
     mount({ selectedSymbol: 'PaymentApi', onSelectSymbol: (symbol) => seen.push(symbol) });
     expect(layerClass('neutral')).toContain('rmf-dim');
 
-    click('[data-kind="legend-entry"][data-symbol="PaymentApi"]');
+    click('[data-kind="header-chip"][data-symbol="PaymentApi"]');
     // Controlled: the component reports the intent and leaves the state alone.
     expect(seen).toEqual([null]);
     expect(layerClass('neutral')).toContain('rmf-dim');
@@ -223,7 +228,7 @@ describe('a second diagram', () => {
     expect(container.querySelector('[data-module="invoiceComputation"]')).not.toBeNull();
     expect(layerClass('computeTotal')).not.toContain('rmf-dim');
 
-    click('[data-kind="legend-entry"][data-symbol="InvoiceModel"]');
+    click('[data-kind="header-chip"][data-symbol="InvoiceModel"]');
     expect(find('svg').getAttribute('data-selected-symbol')).toBe('InvoiceModel');
     expect(layerClass('computeTotal')).toContain('rmf-dim');
     // One up-hop and a grant down three edges, all marching.
@@ -255,9 +260,16 @@ describe('a second diagram', () => {
     expect(blinking()).not.toContain('moneyUtils/computeTotal');
   });
 
+  it('writes each contract’s role in its header row', () => {
+    mount({ definition: example1Diagram });
+    expect(find('[data-kind="header-chip"][data-symbol="computeTotal"]').textContent).toBe(
+      'computeTotal — owner → parent → root → everywhere',
+    );
+  });
+
   it('shows a downward-only exposure as one flow and one arrival', () => {
     mount({ definition: example1Diagram });
-    click('[data-kind="legend-entry"][data-symbol="ShipmentPlan"]');
+    click('[data-kind="header-chip"][data-symbol="ShipmentPlan"]');
     expect(find('svg').getAttribute('data-selected-symbol')).toBe('ShipmentPlan');
     // One decision, one marching grant flow, one blinking arrival — nothing
     // above `shipping` ever moves, because nothing above was ever involved.
@@ -275,7 +287,86 @@ describe('a second diagram', () => {
   });
 });
 
+describe('the traced-contract tour', () => {
+  const selected = (): string => find('svg').getAttribute('data-selected-symbol') ?? '';
+  const dwell = (steps = 1): void => {
+    act(() => {
+      vi.advanceTimersByTime(steps * TOUR_DWELL_MS);
+    });
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('plays by default: first contract selected at mount, and the toggle says stop', () => {
+    act(() => {
+      root.render(createElement(ModelDiagram, { definition: example1Diagram }));
+    });
+    expect(selected()).toBe('computeTotal');
+    expect(find('[data-kind="play-toggle"]').getAttribute('data-playing')).toBe('true');
+  });
+
+  it('holds each contract for the dwell, ends the lap on none selected, forever', () => {
+    mount({ definition: example1Diagram, autoPlay: true });
+    expect(selected()).toBe('computeTotal');
+    dwell();
+    expect(selected()).toBe('InvoiceModel');
+    dwell();
+    expect(selected()).toBe('optimizeRoute');
+    dwell();
+    expect(selected()).toBe('ShipmentPlan');
+    // The lap ends on a none-selected beat: the whole picture, one dwell.
+    dwell();
+    expect(selected()).toBe('');
+    // Then the loop wraps and keeps going.
+    dwell();
+    expect(selected()).toBe('computeTotal');
+    dwell(5);
+    expect(selected()).toBe('computeTotal');
+  });
+
+  it('stops the moment the reader selects anything, and stays stopped', () => {
+    mount({ definition: example1Diagram, autoPlay: true });
+    click('[data-kind="header-chip"][data-symbol="optimizeRoute"]');
+    expect(selected()).toBe('optimizeRoute');
+    expect(find('[data-kind="play-toggle"]').getAttribute('data-playing')).toBe('false');
+    dwell(4);
+    expect(selected()).toBe('optimizeRoute');
+  });
+
+  it('the toggle stops holding the current selection, and play resumes from it', () => {
+    mount({ definition: example1Diagram, autoPlay: true });
+    dwell();
+    expect(selected()).toBe('InvoiceModel');
+    click('[data-kind="play-toggle"]');
+    dwell(3);
+    expect(selected()).toBe('InvoiceModel');
+    click('[data-kind="play-toggle"]');
+    // Resuming restarts the current contract's dwell rather than skipping on.
+    expect(selected()).toBe('InvoiceModel');
+    dwell();
+    expect(selected()).toBe('optimizeRoute');
+  });
+
+  it('does not run when mounted with the tour off', () => {
+    mount({ definition: example1Diagram });
+    expect(selected()).toBe('');
+    dwell(4);
+    expect(selected()).toBe('');
+  });
+});
+
 describe('pan and zoom', () => {
+  it('makes the live component unselectable, so a drag never selects label text', () => {
+    mount();
+    const root = find('[data-kind="diagram-root"]') as HTMLElement;
+    expect(root.style.userSelect).toBe('none');
+  });
+
   it('pans on a real drag, and does not change the selection', () => {
     mount();
     const before = viewBox();
@@ -303,7 +394,7 @@ describe('pan and zoom', () => {
   it('does not swallow the click after the drag that follows it', () => {
     mount();
     gesture('[data-kind="background"]', [[60, 0]]);
-    click('[data-kind="legend-entry"][data-symbol="CartApi"]');
+    click('[data-kind="header-chip"][data-symbol="CartApi"]');
     expect(layerClass('neutral')).toContain('rmf-dim');
   });
 
@@ -324,7 +415,7 @@ describe('pan and zoom', () => {
     await new Promise((resolve) => {
       setTimeout(resolve, 0);
     });
-    click('[data-kind="legend-entry"][data-symbol="ProductId"]');
+    click('[data-kind="header-chip"][data-symbol="ProductId"]');
     expect(find('svg').getAttribute('data-selected-symbol')).toBe('ProductId');
   });
 

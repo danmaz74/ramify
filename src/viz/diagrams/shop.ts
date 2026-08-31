@@ -271,16 +271,8 @@ export const legendGroups: readonly LegendGroup[] = [
       { id: 'denied', glyph: { kind: 'chord-denied' }, text: '✗ denied import, with its reason' },
     ],
   },
-  {
-    id: 'traced',
-    title: 'Traced contracts',
-    entries: tracedSymbols.map((traced) => ({
-      id: `traced-${traced.symbol}`,
-      glyph: { kind: 'traced', symbol: traced.symbol } as const,
-      text: `${traced.symbol} — ${traced.role}`,
-      selects: traced.symbol,
-    })),
-  },
+  // The traced contracts themselves live in the header strip above the tree
+  // (rendered from `tracedSymbols`), not in the legend.
 ];
 
 /** The two standing notes under the legend (§3.8, group 4). */

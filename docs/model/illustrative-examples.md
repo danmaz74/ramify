@@ -128,5 +128,64 @@ ever carry a symbol out of its subtree.
   measured in decisions, not boxes.
 - The `shipping` box shows the handshake both ways: `owns ▼ ShipmentPlan`
   above `exposed to it · optimizeRoute`.
+
+## Example 2: Both channels at once
+
+One owner, one symbol, both exposure decisions — and the ceiling that even
+both together cannot break.
+
+### Tree
+
+```text
+app
+├── pricing              owns PriceModel
+│   ├── discounts
+│   └── taxes
+└── checkout             owns submitOrder
+```
+
+### Decisions
+
+| # | Module | Decision |
+| --- | --- | --- |
+| 1 | `pricing` | exposes `PriceModel` to descendants |
+| 2 | `pricing` | exposes `PriceModel` to parent |
+| 3 | `checkout` | exposes `submitOrder` to parent |
+
+### Resulting availability
+
+`PriceModel` shows as `▲▼` in `pricing`'s box — the first occurrence of that
+marker in the series: two independent one-hop decisions sharing a row. It is
+granted to `discounts` and `taxes`, and received and stopped at `app` (gray,
+no dot). Reach: the `pricing` subtree plus `app` — one subtree down, one hop
+up, nothing more.
+
+`submitOrder` is furniture, not a lesson: a known specimen from Example 1
+(exposed up, composed, stopped) that keeps `checkout` a real module and gives
+`app` two stopped rows side by side.
+
+### Non-allowed imports
+
+- `checkout` ✗ `PriceModel` — the sibling that would most plausibly want the
+  type doesn't get it, even though the owner used **both** channels: crossing
+  to a sibling was never the owner's decision to make, and `app` made none.
+
+### Lessons
+
+1. `▲▼` is not a third channel — two independent one-hop decisions that
+   happen to share a row.
+2. The ceiling on unilateral reach: both channels at once buy exactly the
+   owner's subtree plus its parent. That is structurally the most any owner
+   can reach alone.
+3. Reach ends where decisions end: `app` has no dot, and both symbols stop
+   there — the default at every module is "goes no further".
+
+### Diagram notes
+
+- Two consumers under `pricing` per the grant-needs-two-arrivals convention.
+- Five modules, three dots, two traced colors — the smallest diagram in the
+  series.
+- Selecting `PriceModel` animates both flows out of a single row: up one hop
+  and down one subtree at once.
 - Candidate interactivity: click a decision dot to toggle it off and watch
   every downstream arrowhead vanish — each hop is load-bearing.

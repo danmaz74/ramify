@@ -9,7 +9,8 @@
  *   propagation) and Panel B (import chords) of `docs/site/diagram1-spec.md`
  *   §4, composited;
  * - `site/static/diagrams/example1.svg` — Example 1 of
- *   `docs/model/illustrative-examples.md`: one decision, three reaches.
+ *   `docs/model/illustrative-examples.md`: one decision, three reaches;
+ * - `site/static/diagrams/example2.svg` — Example 2: both channels at once.
  *
  * Output is deterministic: no ids are generated at render time, ordering comes
  * from the declaration, coordinates are rounded, and each file ends with a
@@ -26,7 +27,13 @@ import { fileURLToPath } from 'node:url';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-import { ModelDiagramSvg, example1Diagram, shopDiagram, type DiagramDefinition } from '../src/viz/index.js';
+import {
+  ModelDiagramSvg,
+  example1Diagram,
+  example2Diagram,
+  shopDiagram,
+  type DiagramDefinition,
+} from '../src/viz/index.js';
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -39,6 +46,7 @@ interface Emission {
 const emissions: readonly Emission[] = [
   { definition: shopDiagram, file: 'site/static/diagrams/model-core.svg' },
   { definition: example1Diagram, file: 'site/static/diagrams/example1.svg' },
+  { definition: example2Diagram, file: 'site/static/diagrams/example2.svg' },
 ];
 
 async function main(): Promise<void> {

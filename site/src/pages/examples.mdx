@@ -8,7 +8,7 @@ description: Small example universes, each built to teach one lesson about reach
 hide_table_of_contents: true
 ---
 
-import { ModelDiagram, example1Diagram } from '@ramify/viz';
+import { ModelDiagram, example1Diagram, example2Diagram } from '@ramify/viz';
 
 # Illustrative examples
 
@@ -71,6 +71,33 @@ its subtree. So `app` is not allowed to import `ShipmentPlan` while
 `shipping`'s descendants are: the **parent** is the outsider here, root
 included. Select `ShipmentPlan` and the whole story is one short flow and a
 single blinking arrival.
+
+## Example 2: Both channels at once
+
+One owner, one symbol, both exposure decisions. `pricing` owns `PriceModel`
+and exposes it to its descendants *and* to its parent — the first `▲▼`
+marker in the series, and it is not a third channel: two independent one-hop
+decisions that happen to share a row. The grant reaches `discounts` and
+`taxes`; the upward exposure reaches `app`, which composes the type and
+stops it.
+
+<div className="wide-figure">
+  <ModelDiagram definition={example2Diagram} />
+</div>
+
+The lesson is the ceiling. Both channels at once buy exactly the owner's
+subtree plus its parent — structurally the most any owner can reach alone.
+`checkout`, the sibling that would most plausibly want `PriceModel`, is not
+allowed to import it: crossing to a sibling was never `pricing`'s decision
+to make, and `app` made none. Select `PriceModel` and both flows march out
+of a single row — up one hop, down one subtree — and stop.
+
+Reach ends where decisions end. There are three dots in this picture, all of
+them on `pricing` and `checkout`; `app` has none, and both symbols stop
+there. The default at every module, everywhere in the model, is "goes no
+further" — every hop beyond it is somebody's explicit decision.
+(`submitOrder` is a specimen already known from Example 1 — exposed up,
+composed, stopped — wearing the same color there and here.)
 
 ## Where the precision lives
 
