@@ -26,6 +26,41 @@ in the host repository at
   with the project).
 - `docs/plans/` — ramify's own planning artifacts.
 - `src/` — toolkit source; tests co-located as `src/**/*.test.ts`.
+- `site/` — the documentation website (its own npm package).
+
+## Documentation site
+
+The site is a separate npm package under `site/`, so its framework never
+enters this package's dependencies. Run it from here:
+
+```bash
+npm run site:dev      # dev server with live reload (Docusaurus default port)
+npm run site:build    # static build into site/build/
+npm run site:serve    # serve a previously built site
+```
+
+The first run installs the site's own dependencies: `npm --prefix site install`.
+Build output (`site/build/`, `site/.docusaurus/`) is git-ignored.
+
+### URL map
+
+| URL | Page |
+| --- | --- |
+| `/` | Landing: what ramify.ts is, the model's one question, the scope statement |
+| `/model` | The core tree model — the live diagram plus the R1–R6 walkthrough |
+| `/examples` | Illustrative examples — Example 1, "one decision, three reaches", with its own live diagram |
+
+The normative specification is not rendered as a site page; it ships with the
+repository at `docs/model/cross-module-importability-rules.md`, and every page
+points readers there.
+
+### Portability discipline
+
+`site/` is a thin shell: configuration and MDX/Markdown pages only. Every
+component, all logic and all data are imported from `src/` (webpack alias
+`@ramify` → `../src`, set in `site/docusaurus.config.ts`); nothing is
+swizzled and no page body depends on theme-specific CSS class names, so
+switching site frameworks stays mechanical config work.
 
 ## Conventions
 

@@ -1,0 +1,66 @@
+---
+title: Illustrative examples
+description: Small example universes, each built to teach one lesson about reach cleanly.
+# Same reasoning as the model page: the diagram wants the page's width, and a
+# table-of-contents column would both narrow the column it widens out of and
+# sit under the figure's right-hand side. Frontmatter only — no theme
+# swizzling.
+hide_table_of_contents: true
+---
+
+import { ModelDiagram, example1Diagram } from '@ramify/viz';
+
+# Illustrative examples
+
+Small, self-contained example universes for explaining the model — each one
+built to teach a small set of lessons cleanly, rather than everything at once.
+Top-level modules describe their role (`globalLibrary`) or imply a plausible
+one (`invoicing`, `shipping`); symbols are self-explanatory, with `PascalCase`
+for types and `camelCase` for values.
+
+## Example 1: One decision, three reaches
+
+Three leaf modules make the identical decision — expose one symbol to their
+parent — and end up with three different reaches. `computeTotal` is passed up
+again and turned downward at `app`, so every module may import it.
+`InvoiceModel` is turned downward one level lower, at `invoicing`, so its two
+consumers share it and nothing outside that subtree can. `optimizeRoute` is
+composed by `shipping` and exposed no further, so it goes one hop and stops.
+None of the three owners decided that; the modules above them did. Exposing a
+symbol to the parent cedes its onward routing.
+
+<div className="wide-figure">
+  <ModelDiagram definition={example1Diagram} />
+</div>
+
+Read the boxes and the dots. Each box lists what it **owns** and what is
+**exposed to it** — by a direct child, named `from`, or by a proper ancestor,
+named `granted by` — so the reach of a symbol can be scanned box by box. Each
+filled dot is one module's decision, and there are only six of them for nine
+modules: complexity is measured in decisions, not boxes. **Click any traced
+symbol**, in the legend or on the row that lists it, to isolate its chain and
+reveal every import it permits.
+
+A "global library" and a "domain library" are the same mechanism at different
+altitudes. `app` exposes `computeTotal` to its descendants and `invoicing`
+exposes `InvoiceModel` to its descendants; the difference between
+application-wide and domain-wide reach is which module made the identical
+decision, and nothing is ever declared global. The root is an ordinary module
+whose subtree happens to be everything — it owns no code at all here, and
+still carries the application's vocabulary.
+
+There is no sibling channel, and the one drawn non-allowed import is where
+that becomes visible. `shipping` may not import `InvoiceModel`: a grant never leaves the
+granter's subtree, and `invoicing` exposed the symbol to no parent, so nothing
+outside its subtree ever sees it. The mirror case is the same rule read the
+other way — `invoicing` may not import `optimizeRoute` either, because
+`shipping` exposed it nowhere. Sharing between siblings is never the exposer's
+decision; the route runs through the parent, and the parent decides.
+
+## Where the precision lives
+
+The examples on this page are teaching material. The normative document is the
+cross-module importability rules specification, which ships with the
+repository at `docs/model/cross-module-importability-rules.md`, with the
+vocabulary defined in `docs/model/glossary.md`. Where a page and the
+specification appear to disagree, the specification is right.

@@ -1,0 +1,160 @@
+---
+title: The core tree model
+description: An interactive walkthrough of the cross-module importability model, one use case at a time.
+# The diagram wants the page's width, and a table-of-contents column would
+# both narrow the column it widens out of and sit under the figure's right-hand
+# side. The walkthrough is linear and its sections are short, so the room is
+# worth more to this page than the index would be. Frontmatter only — no theme
+# swizzling.
+hide_table_of_contents: true
+---
+
+import { ModelDiagram } from '@ramify/viz';
+
+# The core tree model
+
+This page walks through the **tree rules only** — ownership, the two exposure
+channels, availability, and the rule that a file may import exactly what is
+available in its module. Importer contexts and exposure tags (testing,
+browser) are a separate subject and appear nowhere here.
+
+The example is a small online shop: `shop` at the root, with `catalog`
+(`search`, `inventory`), `checkout` (`cart`, `payment`) and `shipping`
+underneath. Eight modules, eight symbols, and five decisions that between them
+are the entire access policy of the application.
+
+## The diagram
+
+<div className="wide-figure">
+  <ModelDiagram />
+</div>
+
+Two things to learn before reading anything else:
+
+- **An arrowhead landing on a module means that module may import that
+  symbol.** Reach is shown, never labelled.
+- **A filled dot means somebody decided.** One dot per decision, however many
+  arrivals it produces — so counting the dots along a symbol's path counts the
+  consents that made it legal.
+
+Three symbols are traced in their own color, because their reach was decided
+by a module other than their owner: `ProductId`, `PaymentApi` and `CartApi`.
+**Click any of them** — in the legend, or on the row inside a node that lists
+them — to isolate that symbol's chain, dim everything else, and reveal every
+import it permits. Click the background to clear the selection.
+
+The diagram is dense on purpose, so it also pans and zooms: **drag** to move
+around it, **Ctrl/Cmd + scroll** (or a trackpad pinch) to zoom about the
+pointer, and the buttons in its top-right corner to step the zoom or return to
+the whole picture. Plain scrolling is left alone, so the page still scrolls
+normally under the pointer.
+
+## R1 — Parent composes a direct child
+
+`inventory` exposes `reserveStock` to its parent, so `catalog` may import it;
+`cart` exposes `CartApi` to its parent, so `checkout` may import it. That is
+rule 2, and it buys the parent exactly what the child offered.
+
+It is not reciprocal and it does not spill sideways. `search` may not import
+`reserveStock`, `payment` may not import `CartApi`, and `checkout` may not
+import `retryQueue` at all — `payment` never exposed it, so it never entered
+the exposure system. There is no implicit public surface that a parent can
+always reach into.
+
+## R2 — Domain helpers and concepts
+
+`catalog` exposes `SkuRules` to its descendants, so `search` and `inventory`
+may import it. That is rule 3, with the grant made by the symbol's own owner.
+
+A grant is bounded by the granter's own subtree, in every direction:
+`checkout` may not import `SkuRules`, and neither may `shop`. Exposing
+downward and exposing upward are independent channels, and doing one is never
+doing the other.
+
+## R3 — Application-wide contracts
+
+`shop` exposes `Money` and `formatDate` to its descendants, and since `shop`'s
+subtree is the whole application, every other module may import them. This is
+the same rule as R2, applied at a different altitude.
+
+Nothing is out of reach here, and that is the lesson: the root has no special
+power. It is an ordinary module whose subtree happens to be everything. Note
+also that both symbols ride one lane — a lane is a decision, not a symbol.
+
+## R4 — Cross-branch (sibling, cousin) import
+
+`payment` exposes `PaymentApi` up to `checkout`; `checkout` re-exposes it to
+its own subtree; `cart`, a sibling of `payment`, may now import it. A sibling
+import is not a channel — it is two ordinary hops, one up and one down, each
+decided by the module that made it.
+
+So the familiar "lowest common ancestor" rule is a consequence, not a rule: the
+ancestor is simply where the up-chain turns into a down-grant. `shipping` sits
+outside `checkout`'s subtree, so the same symbol is refused there.
+
+## R5 — Closed sibling families
+
+`shipping` owns nothing and exports nothing. It receives `shop`'s grants, gives
+nobody anything, and its existence changes no other module's ceiling — growing
+the tree never widens anybody's access.
+
+Siblings are strangers by default. `search` and `inventory` sit in one family
+and still cannot import each other's symbols, because `inventory` exposed
+`reserveStock` upward only and `catalog` did not pass it back down. `payment`
+keeps `retryQueue` closed even to its own parent.
+
+## R6 — App-wide child-owned library
+
+`catalog` exposes `ProductId` to `shop`, and `shop` re-exposes it to its whole
+subtree. Two decisions, seven arrivals, application-wide reach — earned hop by
+hop rather than declared anywhere.
+
+`shop`'s node lists `ProductId` under **holds**, not **owns**. Routing a
+symbol never transfers ownership, and `shop` could have declined: `checkout` is
+the exact counter-image, holding `CartApi` and passing it nowhere. Holding is
+not granting.
+
+Compare `ProductId` with `reserveStock`. Their owners made the *same* decision
+— expose to parent, and nothing else — and their reaches ended up maximally
+different. Neither owner decided that outcome; the parent did. Exposing a
+symbol upward is a single channel that cedes its onward routing.
+
+:::note[Why `search` may import `ProductId`]
+
+`catalog` owns `ProductId` and exposed it **only to its parent** — so `catalog`
+never gave its own children anything. `search` may import it anyway, because
+`shop` sent it back down into *every* branch, including the branch it came up
+through.
+
+This is deliberate. A descendant grant is uniform: it reaches the whole
+subtree, with no exclusion for the providing branch and no provenance carried
+on routed symbols. A family that does not want a symbol reachable from inside
+itself resolves that by not exposing it upward at all — which is exactly what
+`inventory` and `cart` did with `reserveStock` and `CartApi`.
+
+It is the one permission whose answer surprises people, which is why the
+diagram draws it as an explicit allowed arc rather than leaving it to be read
+off the flow.
+
+:::
+
+## Two properties worth naming
+
+**Subdivision invariance.** Descendant grants address subtrees, not shapes.
+The dashed what-if note inside `shipping` says it: splitting that module into
+`rates` and `labels` would change nothing either of them may import.
+
+**Locality.** Every decision in the picture was made by a module the symbol
+was available in, about exactly one hop — its parent — or about its own subtree. No
+arrow names a module outside the decider's immediate family, and there is no
+sibling channel, no root privilege and no depth-limited audience.
+
+## Where the precision lives
+
+This page is a walkthrough. The normative document is the cross-module
+importability rules specification, which ships with the repository at
+`docs/model/cross-module-importability-rules.md`. It states the rule exactly,
+defines availability, adds the contextual rules for test and browser
+contexts that this page leaves out, and records the features deliberately
+rejected. Where this page and the specification appear to disagree, the
+specification is right.

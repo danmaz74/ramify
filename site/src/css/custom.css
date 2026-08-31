@@ -1,0 +1,73 @@
+/**
+ * The scaffold's single stylesheet, kept near-default on purpose.
+ *
+ * It sets theme variables, plus one generic full-bleed utility. No selector
+ * here targets a framework class or a page's markup, so no page depends on
+ * this file's existence beyond opting into `.full-bleed` — see the
+ * portability discipline in `docusaurus.config.ts`.
+ */
+
+:root {
+  --ifm-color-primary: #3b5bdb;
+  --ifm-color-primary-dark: #3552c5;
+  --ifm-color-primary-darker: #324dba;
+  --ifm-color-primary-darkest: #294099;
+  --ifm-color-primary-light: #4f6ce0;
+  --ifm-color-primary-lighter: #5a75e2;
+  --ifm-color-primary-lightest: #7c91e9;
+  --ifm-code-font-size: 95%;
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #8da2fb;
+  --ifm-color-primary-dark: #6d88f9;
+  --ifm-color-primary-darker: #5d7bf9;
+  --ifm-color-primary-darkest: #2e53f6;
+  --ifm-color-primary-light: #adbcfd;
+  --ifm-color-primary-lighter: #bdc9fd;
+  --ifm-color-primary-lightest: #edf1fe;
+}
+
+/**
+ * Reading measure.
+ *
+ * A page that hides its table of contents gets the full content column, which
+ * is far too wide to read. Holding the article to a comfortable measure and
+ * centring it also puts its mid-line on the page's mid-line, which is what
+ * makes the symmetric full-bleed below land symmetrically.
+ *
+ * A plain element selector, not a framework class, so it survives a move to a
+ * different site generator.
+ */
+article {
+  max-width: 52rem;
+  margin-inline: auto;
+}
+
+/**
+ * Wide figure: let one block out of the reading measure and into the page.
+ *
+ * Not a full bleed — the page keeps its side padding. The block is offered the
+ * viewport minus a comfortable margin and is centred on the article's mid-line
+ * (which, since the article is centred, is the page's mid-line). What it does
+ * with that room is the figure's business: the diagram caps itself at its own
+ * natural width rather than magnifying to fill.
+ *
+ * Prose stays in the normal measure. Only figures opt in.
+ */
+.wide-figure {
+  width: calc(100vw - 4rem);
+  max-width: none;
+  position: relative;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+@media (max-width: 996px) {
+  /* On narrow screens the measure is already the page; widening gains nothing. */
+  .wide-figure {
+    width: 100%;
+    left: 0;
+    transform: none;
+  }
+}
