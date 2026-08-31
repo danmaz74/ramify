@@ -29,6 +29,11 @@ composed by `shipping` and exposed no further, so it goes one hop and stops.
 None of the three owners decided that; the modules above them did. Exposing a
 symbol to the parent cedes its onward routing.
 
+A fourth symbol goes the other way. `shipping` owns `ShipmentPlan` and
+exposes it to its descendants: `routingOptimization` consumes a
+`ShipmentPlan` and exposes `optimizeRoute` back up, so one edge carries a
+type flowing down and a function flowing up — each its own decision.
+
 <div className="wide-figure">
   <ModelDiagram definition={example1Diagram} />
 </div>
@@ -36,10 +41,11 @@ symbol to the parent cedes its onward routing.
 Read the boxes and the dots. Each box lists what it **owns** and what is
 **exposed to it** — by a direct child, named `from`, or by a proper ancestor,
 named `granted by` — so the reach of a symbol can be scanned box by box. Each
-filled dot is one module's decision, and there are only six of them for nine
+filled dot is one module's decision, and there are only seven of them for nine
 modules: complexity is measured in decisions, not boxes. **Click any traced
-symbol**, in the legend or on the row that lists it, to isolate its chain and
-reveal every import it permits.
+symbol**, in the legend or on the row that lists it, to isolate its chain:
+everything else dims, the symbol's flows move the way its exposures travel,
+and its arrivals blink in every box it reached.
 
 A "global library" and a "domain library" are the same mechanism at different
 altitudes. `app` exposes `computeTotal` to its descendants and `invoicing`
@@ -49,13 +55,22 @@ decision, and nothing is ever declared global. The root is an ordinary module
 whose subtree happens to be everything — it owns no code at all here, and
 still carries the application's vocabulary.
 
-There is no sibling channel, and the one drawn non-allowed import is where
-that becomes visible. `shipping` may not import `InvoiceModel`: a grant never leaves the
-granter's subtree, and `invoicing` exposed the symbol to no parent, so nothing
-outside its subtree ever sees it. The mirror case is the same rule read the
-other way — `invoicing` may not import `optimizeRoute` either, because
-`shipping` exposed it nowhere. Sharing between siblings is never the exposer's
-decision; the route runs through the parent, and the parent decides.
+There is no sibling channel. `shipping` may not import `InvoiceModel`: a
+grant never leaves the granter's subtree, and `invoicing` exposed the symbol
+to no parent, so nothing outside its subtree ever sees it. The mirror case is
+the same rule read the other way — `invoicing` may not import `optimizeRoute`
+either, because `shipping` exposed it nowhere. Select either symbol and the
+absence is the picture: the flow stops, and no arrival ever blinks in the
+sibling's branch. Sharing between siblings is never the exposer's decision;
+the route runs through the parent, and the parent decides.
+
+The two channels are asymmetric, and `ShipmentPlan` is the witness. Exposing
+down is final and bounded: one decision, whole subtree, nothing ceded — and
+no way out, because only an upward exposure could ever carry a symbol out of
+its subtree. So `app` is not allowed to import `ShipmentPlan` while
+`shipping`'s descendants are: the **parent** is the outsider here, root
+included. Select `ShipmentPlan` and the whole story is one short flow and a
+single blinking arrival.
 
 ## Where the precision lives
 

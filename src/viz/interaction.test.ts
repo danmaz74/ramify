@@ -255,6 +255,16 @@ describe('a second diagram', () => {
     expect(blinking()).not.toContain('moneyUtils/computeTotal');
   });
 
+  it('shows a downward-only exposure as one flow and one arrival', () => {
+    mount({ definition: example1Diagram });
+    click('[data-kind="legend-entry"][data-symbol="ShipmentPlan"]');
+    expect(find('svg').getAttribute('data-selected-symbol')).toBe('ShipmentPlan');
+    // One decision, one marching grant flow, one blinking arrival — nothing
+    // above `shipping` ever moves, because nothing above was ever involved.
+    expect(flowing()).toHaveLength(lanesOf('ShipmentPlan'));
+    expect(blinking()).toEqual(['routingOptimization/ShipmentPlan']);
+  });
+
   it('pans and zooms its own viewBox', () => {
     mount({ definition: example1Diagram });
     const base = viewBox();

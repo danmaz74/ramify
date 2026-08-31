@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
+import { createDiagramContext } from './diagram-definition.js';
 import { example1Diagram } from './diagrams/example1.js';
 import { chordSpecs, decisionPolicies, shopTree } from './diagrams/shop.js';
 import { LAYOUT, type Point } from './geometry.js';
 import { buildDiagramLayout } from './layout.js';
 import { descendantsOf } from './layout-nodes.js';
+import { mayImport } from './model-access.js';
 
 const layout = buildDiagramLayout();
 const example1 = buildDiagramLayout(example1Diagram);
@@ -344,9 +346,9 @@ describe('canvas', () => {
 });
 
 /**
- * Example 1 of `docs/model/illustrative-examples.md`: nine modules, three
- * symbols, six decisions, three different reaches. The doc is normative for
- * everything asserted here.
+ * Example 1 of `docs/model/illustrative-examples.md`: nine modules, four
+ * symbols, seven decisions, three different reaches — plus one symbol exposed
+ * only downward. The doc is normative for everything asserted here.
  */
 describe('example 1 — one decision, three reaches', () => {
   const rowsOf = (id: string): string[] =>
@@ -397,6 +399,7 @@ describe('example 1 — one decision, three reaches', () => {
     expect(rowsOf('routingOptimization')).toEqual([
       '▲ optimizeRoute',
       '_ computeTotal   granted by app',
+      '_ ShipmentPlan   granted by shipping',
     ]);
     // Above them: passed on, turned downward, or stopped.
     expect(rowsOf('globalLibrary')).toEqual(['▲ computeTotal   from moneyUtils']);
@@ -405,6 +408,7 @@ describe('example 1 — one decision, three reaches', () => {
       '_ computeTotal   granted by app',
     ]);
     expect(rowsOf('shipping')).toEqual([
+      '▼ ShipmentPlan',
       '· optimizeRoute   from routingOptimization',
       '_ computeTotal   granted by app',
     ]);
@@ -430,23 +434,24 @@ describe('example 1 — one decision, three reaches', () => {
     }
   });
 
-  it('draws exactly six decision dots, partitioned by the six policy statements', () => {
-    expect(example1Diagram.decisionPolicies).toHaveLength(6);
-    expect(example1.propagation.dots).toHaveLength(6);
+  it('draws exactly seven decision dots, partitioned by the seven policy statements', () => {
+    expect(example1Diagram.decisionPolicies).toHaveLength(7);
+    expect(example1.propagation.dots).toHaveLength(7);
     expect(example1.propagation.dots).toHaveLength(example1.propagation.decisions.length);
 
     const byPolicy = new Map<string, string[]>();
     for (const dot of example1.propagation.dots) {
       byPolicy.set(dot.policyId, [...(byPolicy.get(dot.policyId) ?? []), dot.decider]);
     }
-    expect([...byPolicy.keys()].sort()).toEqual(['P1', 'P2', 'P3', 'P4', 'P5', 'P6']);
+    expect([...byPolicy.keys()].sort()).toEqual(['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7']);
     expect(byPolicy.get('P1')).toEqual(['moneyUtils']);
     expect(byPolicy.get('P2')).toEqual(['globalLibrary']);
     expect(byPolicy.get('P3')).toEqual(['app']);
     expect(byPolicy.get('P4')).toEqual(['invoicingLibrary']);
     expect(byPolicy.get('P5')).toEqual(['invoicing']);
     expect(byPolicy.get('P6')).toEqual(['routingOptimization']);
-    // Nine modules, six decisions: complexity is measured in decisions, not boxes.
+    expect(byPolicy.get('P7')).toEqual(['shipping']);
+    // Nine modules, seven decisions: complexity is measured in decisions, not boxes.
     expect(example1.tree.nodes).toHaveLength(9);
   });
 
@@ -470,23 +475,29 @@ describe('example 1 — one decision, three reaches', () => {
     ).toHaveLength(1);
   });
 
-  it('draws exactly one denial, cross-checked against the evaluator', () => {
-    expect(example1.chords.all).toHaveLength(1);
-    const [denial] = example1.chords.all;
-    expect(`${String(denial?.importer)} → ${String(denial?.symbol)} @ ${String(denial?.owner)}`).toBe(
-      'shipping → InvoiceModel @ invoicingLibrary',
-    );
-    expect(denial?.verdict).toBe('denied');
-    expect(denial?.expectDenial).toBe('no-exposure-chain');
-    expect(denial?.stopBar).toBeDefined();
-    expect(denial?.head).toBe('none');
-    expect(denial?.reason).toBe("grant covers invoicing's subtree");
+  it('exposes ShipmentPlan downward only: descendants allowed, the parent not', () => {
+    const tree = createDiagramContext(example1Diagram).tree;
+    expect(mayImport(tree, 'routingOptimization', 'shipping', 'ShipmentPlan')).toBe(true);
+    // The parent is not allowed while descendants are: a downward exposure
+    // never leaves the subtree, root included.
+    expect(mayImport(tree, 'app', 'shipping', 'ShipmentPlan')).toBe(false);
+    expect(mayImport(tree, 'invoicing', 'shipping', 'ShipmentPlan')).toBe(false);
+    // One decision, one lane, one arrival.
+    const arrivals = example1.propagation.lanes
+      .filter((lane) => lane.decisionId === 'grant-shipping-ShipmentPlan')
+      .map((lane) => lane.reaches);
+    expect(arrivals).toEqual(['routingOptimization']);
   });
 
-  it('spends one chord row on that denial and nothing more', () => {
-    expect(example1.chords.rowCount).toBe(1);
-    expect(example1.chords.bottom - example1.chords.top).toBe(18);
-    // The legend follows the chord band directly: no reserved rows in between.
-    expect(example1.legend.top).toBe(example1.chords.bottom + 10);
+  it('draws nothing across the tree: non-allowed imports are read from absence', () => {
+    expect(example1.chords.all).toHaveLength(0);
+  });
+
+  it('collapses the chord band entirely when no chords are declared', () => {
+    expect(example1.chords.rowCount).toBe(0);
+    expect(example1.chords.bottom - example1.chords.top).toBe(0);
+    expect(example1.chords.bottom).toBe(example1.tree.bottom);
+    // The legend follows the tree directly: no empty band in between.
+    expect(example1.legend.top).toBe(example1.tree.bottom + 10);
   });
 });

@@ -16,7 +16,12 @@ self-explanatory (`computeTotal`, `InvoiceModel`); `PascalCase` = types,
 - Node boxes show two compartments: **owns** and **exposed to it**, the
   latter naming each arrival's provenance (`from <child>`, `granted by
   <ancestor>`). Availability is the union of the two, read box by box.
-- One drawn non-allowed import per static diagram.
+- Non-allowed imports are not drawn: absence is the statement, and selecting
+  a symbol makes the absence visible.
+- Every exposure path is traced — its own color, its own selectable layer.
+  (The old criterion "traced iff reach was decided by a module other than
+  its owner" was a density workaround for the retired composite diagram.) A
+  symbol exposed nowhere has no path to trace; it stays gray.
 - **Selecting a traced symbol** (adopted 2026-08-31, works well): the other
   layers dim, the symbol's propagation lines turn dashed and animate in the
   direction the exposure flows, and its rows in every "exposed to it"
@@ -32,7 +37,10 @@ self-explanatory (`computeTotal`, `InvoiceModel`); `PascalCase` = types,
 How far a symbol reaches is decided not by its owner, but by where the chain
 of exposures above it turns downward — or doesn't. Three leaf modules make
 the identical decision, expose a symbol to their parent, and end up with
-three different reaches: application-wide, domain-wide, parent-only.
+three different reaches: application-wide, domain-wide, parent-only. A
+fourth symbol goes the other way — its owner exposes it to its descendants —
+and shows the asymmetry: a downward exposure is complete in one decision and
+can never leave the subtree.
 
 ### Tree
 
@@ -44,9 +52,13 @@ app
 │   ├── invoicingLibrary      owns InvoiceModel
 │   ├── invoiceComputation
 │   └── invoicePDF
-└── shipping
+└── shipping                  owns ShipmentPlan
     └── routingOptimization   owns optimizeRoute
 ```
+
+`routingOptimization` consumes a `ShipmentPlan` and exposes `optimizeRoute`
+back up: the `shipping` ↔ `routingOptimization` edge carries a type flowing
+down and a function flowing up, each its own decision.
 
 ### Decisions
 
@@ -58,6 +70,7 @@ app
 | 4 | `invoicingLibrary` | exposes `InvoiceModel` to parent |
 | 5 | `invoicing` | re-exposes `InvoiceModel` to descendants |
 | 6 | `routingOptimization` | exposes `optimizeRoute` to parent |
+| 7 | `shipping` | exposes `ShipmentPlan` to descendants |
 
 ### Resulting reach
 
@@ -66,19 +79,25 @@ app
 | `computeTotal` | expose to parent | passed up again, turned downward at `app` | every module |
 | `InvoiceModel` | expose to parent | turned downward at `invoicing` | the `invoicing` subtree |
 | `optimizeRoute` | expose to parent | `shipping` composed it and stopped | `shipping` only |
+| `ShipmentPlan` | expose to descendants | nothing — no one above was ever involved | the `shipping` subtree |
 
-The three owners made the **same** decision. The three reaches were decided
-entirely by the ancestors — exposing upward cedes onward routing.
+The three up-exposing owners made the **same** decision. The three reaches
+were decided entirely by the ancestors — exposing upward cedes onward
+routing. `ShipmentPlan`'s reach, by contrast, was decided entirely by its
+owner: a downward exposure cedes nothing, and only an upward exposure could
+ever carry a symbol out of its subtree.
 
 ### Non-allowed imports
 
 - `shipping` ✗ `InvoiceModel` — a grant never leaves the granter's subtree;
   nor is the symbol available in `routingOptimization`, for the same reason.
 - `invoicing` ✗ `optimizeRoute` — **there is no sibling channel**: exposing a
-  symbol to the parent gives siblings nothing. Not drawn in the static
-  diagram (one drawn non-allowed import per diagram); interactively,
-  selecting `optimizeRoute` shows a single one-hop flow and a single
-  blinking arrival in `shipping` — the sibling's absence is the point.
+  symbol to the parent gives siblings nothing. Interactively, selecting
+  `optimizeRoute` shows a single one-hop flow and a single blinking arrival
+  in `shipping` — the sibling's absence is the point.
+- `app` ✗ `ShipmentPlan` — the **parent** is not allowed while descendants
+  are: `shipping` exposed the type only downward, so nothing above it, root
+  included, ever sees it.
 
 ### Lessons
 
@@ -97,12 +116,17 @@ entirely by the ancestors — exposing upward cedes onward routing.
    `optimizeRoute`, so its sibling sees nothing.
 6. The root routes without owning: `app` has no code of its own and still
    carries the application's vocabulary.
+7. The two channels are asymmetric. Exposing down is final and bounded — one
+   decision, whole subtree, nothing ceded, no way out. Exposing up hands
+   onward routing to the ancestors.
 
 ### Diagram notes
 
 - Two consumers under `invoicing` are deliberate: a grant needs at least two
   arrivals to read as a grant rather than a private handoff.
-- Nine modules but only six decision dots and one theme; complexity is
+- Nine modules but only seven decision dots and one theme; complexity is
   measured in decisions, not boxes.
+- The `shipping` box shows the handshake both ways: `owns ▼ ShipmentPlan`
+  above `exposed to it · optimizeRoute`.
 - Candidate interactivity: click a decision dot to toggle it off and watch
   every downstream arrowhead vanish — each hop is load-bearing.

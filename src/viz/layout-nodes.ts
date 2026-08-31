@@ -258,10 +258,14 @@ function markerFor(toParent: boolean, toDescendants: boolean): ExposureMarker {
   return '·';
 }
 
-/** A row's width in characters: marker column, symbol, and the provenance. */
-function rowChars(row: { marker?: string; symbol: string; provenance?: string }): number {
-  const left = `${row.marker ?? ' '} ${row.symbol}`;
-  return row.provenance === undefined ? left.length : `${left}   ${row.provenance}`.length;
+/**
+ * A row's width in characters: marker column, symbol, and the provenance.
+ * Arrival names render italic, which stays within the shared per-character
+ * estimate — only the slant differs, not the advance width.
+ */
+function rowChars(row: { kind?: string; marker?: string; symbol: string; provenance?: string }): number {
+  const left = (row.marker ?? ' ').length + 1 + row.symbol.length;
+  return row.provenance === undefined ? left : left + 3 + row.provenance.length;
 }
 
 /** A row before layout has placed it. */

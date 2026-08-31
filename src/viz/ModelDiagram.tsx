@@ -1090,6 +1090,8 @@ function renderRow(
           {row.marker}
         </text>
       )}
+      {/* Arrivals are italic: the definition lives where the symbol is owned,
+          and everywhere else the name is a reference. */}
       <text
         id={`${row.id}-label`}
         data-kind="node-row-label"
@@ -1097,6 +1099,7 @@ function renderRow(
         x={box.x + LAYOUT.node.paddingX + 12}
         y={y}
         fontSize={12}
+        {...(row.kind === 'owns' ? {} : { fontStyle: 'italic' })}
       >
         {row.symbol}
       </text>
@@ -1168,12 +1171,30 @@ function renderLegendGroup(
               y={entry.textAt.y}
               fontSize={LAYOUT.legend.fontSize}
             >
-              {entry.entry.text}
+              {renderLegendEntryText(entry.entry)}
             </text>
           </g>
         );
       })}
     </g>
+  );
+}
+
+/**
+ * The compartment entry demonstrates the difference it describes: its
+ * "exposed to this module" half is italic, exactly as arrival names are in
+ * the boxes.
+ */
+function renderLegendEntryText(entry: LegendEntry): ReactNode {
+  if (entry.glyph.kind !== 'compartment' || !entry.text.includes(' / ')) {
+    return entry.text;
+  }
+  const separatorAt = entry.text.indexOf(' / ') + ' / '.length;
+  return (
+    <>
+      {entry.text.slice(0, separatorAt)}
+      <tspan fontStyle="italic">{entry.text.slice(separatorAt)}</tspan>
+    </>
   );
 }
 

@@ -43,6 +43,8 @@ export const lightPalette: Palette = {
   traced2: '#C2255C',
   /** amber */
   traced3: '#B45309',
+  /** teal */
+  traced4: '#0F766E',
   denial: '#DC2626',
 };
 
@@ -59,6 +61,7 @@ export const darkPalette: Palette = {
   traced1: '#8DA2FB',
   traced2: '#F783AC',
   traced3: '#FBBF24',
+  traced4: '#2DD4BF',
   denial: '#F87171',
 };
 

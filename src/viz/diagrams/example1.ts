@@ -1,11 +1,14 @@
 /**
  * Example 1 — "One decision, three reaches".
  *
- * The universe, the decisions and the drawn denial come from
+ * The universe and the decisions come from
  * `docs/model/illustrative-examples.md`, which is normative for this diagram:
- * nine modules, three symbols, six decisions. Three leaf modules make the
+ * nine modules, four symbols, seven decisions. Three leaf modules make the
  * identical decision — expose a symbol to their parent — and end up with three
- * different reaches, because the reach was decided above them.
+ * different reaches, because the reach was decided above them. A fourth symbol
+ * goes the other way — its owner exposes it to its descendants — and shows the
+ * asymmetry: a downward exposure is complete in one decision and can never
+ * leave the subtree.
  *
  * Where diagram 1 (`./shop.ts`) teaches the two exposure channels one at a
  * time, this one teaches *reach*. Its second compartment is therefore titled
@@ -17,7 +20,6 @@
  */
 
 import type {
-  ChordSpec,
   DecisionPolicy,
   DiagramDefinition,
   LegendGroup,
@@ -34,7 +36,7 @@ import type { ModuleDeclaration } from '../model-access.js';
  * │   ├── invoicingLibrary       owns InvoiceModel
  * │   ├── invoiceComputation
  * │   └── invoicePDF
- * └── shipping
+ * └── shipping                   owns ShipmentPlan
  *     └── routingOptimization    owns optimizeRoute
  * ```
  *
@@ -66,9 +68,13 @@ export const example1Declaration: ModuleDeclaration = {
     },
     // `shipping` composes `optimizeRoute` and exposes it no further: the
     // degenerate case of the same spectrum, and the contrast that makes the
-    // absence of a sibling channel visible.
+    // absence of a sibling channel visible. Its own `ShipmentPlan` goes the
+    // other way — down to its descendants and nowhere else, so the edge to
+    // `routingOptimization` carries a type flowing down and a function
+    // flowing up, each its own decision.
     {
       id: 'shipping',
+      owns: [{ symbol: 'ShipmentPlan', exposeToDescendants: true }],
       children: [
         { id: 'routingOptimization', owns: [{ symbol: 'optimizeRoute', exposeToParent: true }] },
       ],
@@ -77,9 +83,8 @@ export const example1Declaration: ModuleDeclaration = {
 };
 
 /**
- * All three symbols qualify: every one of them had its reach decided by a
- * module other than its owner. That is the whole subject of the diagram, so
- * every symbol is traced and the neutral bundle stays empty.
+ * Every exposure path is traced — the series convention: each path gets its
+ * own color and its own selectable layer, and the neutral bundle stays empty.
  */
 export const example1TracedSymbols: readonly TracedSymbol[] = [
   {
@@ -100,28 +105,15 @@ export const example1TracedSymbols: readonly TracedSymbol[] = [
     color: 'traced3',
     role: 'exposed up, composed, stopped: parent only',
   },
-];
-
-/**
- * One drawn denial, per the doc's policy for a static diagram.
- *
- * `invoicing` ✗ `optimizeRoute` — the other half of the lesson — is left to
- * the interactive view: selecting `optimizeRoute` reveals exactly how far it
- * got, and the empty canvas beyond `shipping` is the answer.
- */
-export const example1ChordSpecs: readonly ChordSpec[] = [
   {
-    id: 'D1',
-    importer: 'shipping',
-    owner: 'invoicingLibrary',
-    symbol: 'InvoiceModel',
-    verdict: 'denied',
-    reason: "grant covers invoicing's subtree",
-    expectDenial: 'no-exposure-chain',
+    symbol: 'ShipmentPlan',
+    owner: 'shipping',
+    color: 'traced4',
+    role: 'owner → descendants: never leaves the subtree',
   },
 ];
 
-/** Six decisions, six dots — nine modules and one theme. */
+/** Seven decisions, seven dots — nine modules and one theme. */
 export const example1DecisionPolicies: readonly DecisionPolicy[] = [
   {
     id: 'P1',
@@ -158,6 +150,12 @@ export const example1DecisionPolicies: readonly DecisionPolicy[] = [
     text: 'routingOptimization exposes optimizeRoute to its parent.',
     deciders: ['routingOptimization'],
     channel: 'toParent',
+  },
+  {
+    id: 'P7',
+    text: 'shipping exposes ShipmentPlan to its descendants.',
+    deciders: ['shipping'],
+    channel: 'toDescendants',
   },
 ];
 
@@ -196,14 +194,6 @@ export const example1LegendGroups: readonly LegendGroup[] = [
     ],
   },
   {
-    id: 'across',
-    title: 'Across the tree',
-    entries: [
-      { id: 'allowed', glyph: { kind: 'chord-allowed' }, text: '✓ allowed import' },
-      { id: 'denied', glyph: { kind: 'chord-denied' }, text: '✗ denied import, with its reason' },
-    ],
-  },
-  {
     id: 'traced',
     title: 'Traced contracts',
     entries: example1TracedSymbols.map((traced) => ({
@@ -217,15 +207,10 @@ export const example1LegendGroups: readonly LegendGroup[] = [
 
 /** The lessons of the doc, in the glossary's vocabulary. */
 export const example1LegendNotes: readonly string[] = [
-  'The three owners made the same decision; the three reaches were decided entirely above them.',
+  'The three up-exposing owners made the same decision; the three reaches were decided entirely above them.',
+  'Exposing down is final and bounded: one decision, whole subtree, no way out. Exposing up cedes onward routing.',
   'There is no sibling channel: exposing a symbol to the parent gives siblings nothing.',
   'Files inside one module import each other freely; those imports are not drawn.',
-];
-
-/** The drawn denial, spelled out under the chord row it belongs to. */
-export const example1Footnote: readonly string[] = [
-  'D1 — shipping may not import InvoiceModel. invoicing exposed it to its descendants, and that',
-  'reaches its own subtree and nothing else; invoicing exposed it to no parent, so no sibling sees it.',
 ];
 
 export const example1Title =
@@ -236,12 +221,14 @@ export const example1Diagram: DiagramDefinition = {
   declaration: example1Declaration,
   title: example1Title,
   ariaLabel:
-    'Example 1: three modules expose a symbol to their parent, and the decisions above them produce three different reaches',
+    'Example 1: three modules expose a symbol to their parent, and the decisions above them produce three different reaches; a fourth symbol is exposed only downward and never leaves its subtree',
   tracedSymbols: example1TracedSymbols,
-  chordSpecs: example1ChordSpecs,
+  // Nothing is drawn across the tree: non-allowed imports are read from
+  // absence, and selecting a symbol makes that absence visible.
+  chordSpecs: [],
   decisionPolicies: example1DecisionPolicies,
   legendGroups: example1LegendGroups,
   legendNotes: example1LegendNotes,
-  footnote: example1Footnote,
+  footnote: [],
   nodeContent: { receivedCompartmentTitle: 'exposed to it', includeAncestorGrants: true },
 };

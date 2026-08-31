@@ -45,19 +45,19 @@ export type ColorKey =
   | 'traced1'
   | 'traced2'
   | 'traced3'
+  | 'traced4'
   | 'denial';
 
-/** The color slots a traced symbol may claim. At most three per diagram. */
-export type TracedColorKey = 'traced1' | 'traced2' | 'traced3';
+/** The color slots a traced symbol may claim. At most four per diagram. */
+export type TracedColorKey = 'traced1' | 'traced2' | 'traced3' | 'traced4';
 
 /**
  * A traced symbol: given its own color slot and its own `<g>` layer.
  *
- * The criterion — *a symbol is traced iff its reach was decided by a module
- * other than its owner* — picks the symbols whose legality is a chain rather
- * than a single decision, and the ones worth following with a finger. A symbol
- * whose chain stops at the first hop qualifies too: a colored ribbon halting
- * dead beside one that continues is the lesson.
+ * The series convention is to trace *every exposure path* — each one gets its
+ * own color and its own selectable layer, because following the path is the
+ * whole point of the picture. A symbol exposed nowhere has no path to trace
+ * and stays gray; that absence is itself the statement.
  */
 export interface TracedSymbol {
   readonly symbol: SymbolName;

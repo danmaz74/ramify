@@ -194,9 +194,25 @@ describe('a second diagram, from a second definition', () => {
       expect(example1).toContain(`data-module="${id}"`);
     }
     expect(example1).not.toContain('data-module="catalog"');
-    expect(count(example1, /data-kind="decision-dot"/gu)).toBe(6);
-    expect(count(example1, /data-kind="chord"/gu)).toBe(1);
+    expect(count(example1, /data-kind="decision-dot"/gu)).toBe(7);
+    expect(count(example1, /data-kind="chord"/gu)).toBe(0);
     expect(example1).toContain('One decision, three reaches');
+  });
+
+  it('shows the shipping handshake: a type flowing down, a function flowing up', () => {
+    expect(example1).toContain(
+      'id="node-shipping-owns-ShipmentPlan" data-kind="node-row" data-compartment="owns" ' +
+        'data-symbol="ShipmentPlan" data-owner="shipping" data-marker="▼" data-gray="false"',
+    );
+    expect(example1).toContain('>granted by shipping</text>');
+    expect(example1).toContain(
+      'id="node-routingOptimization-exposed-to-it-ShipmentPlan-label" data-kind="node-row-label" class="rmf-f-traced4"',
+    );
+  });
+
+  it('never says denied: non-allowed imports are absence, not prose', () => {
+    const withoutStylesheet = example1.replace(/<style[\s\S]*?<\/style>/u, '');
+    expect(withoutStylesheet).not.toMatch(/deni|deny/iu);
   });
 
   it('titles the arrival compartment “exposed to it” and never says holds', () => {
@@ -220,7 +236,7 @@ describe('a second diagram, from a second definition', () => {
   });
 
   it('keeps its own traced layers and its own accessible name', () => {
-    for (const layer of ['neutral', 'computeTotal', 'InvoiceModel', 'optimizeRoute']) {
+    for (const layer of ['neutral', 'computeTotal', 'InvoiceModel', 'optimizeRoute', 'ShipmentPlan']) {
       expect(example1).toContain(`data-layer="propagation" data-symbol="${layer}"`);
     }
     expect(example1).toContain('aria-label="Example 1: three modules expose a symbol to their parent');

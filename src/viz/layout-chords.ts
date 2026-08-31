@@ -274,11 +274,15 @@ function fromSpec(spec: ChordSpec): ChordInput {
  * Lay out the chords a diagram declares.
  *
  * The band is sized to those chords and nothing else: no rows are held in
- * reserve, so a diagram that asks one question spends one row on it.
+ * reserve, so a diagram that asks one question spends one row on it — and a
+ * diagram that draws none has no band at all.
  */
 export function layoutChords(context: DiagramContext, geometry: TreeGeometry): ChordsLayout {
   const rowTop = geometry.bottom + LAYOUT.chord.topGap;
   const all = buildChords(context, context.definition.chordSpecs.map(fromSpec), geometry, rowTop);
+  if (all.length === 0) {
+    return { all, top: geometry.bottom, bottom: geometry.bottom, rowCount: 0 };
+  }
   const rowCount = Math.max(1, ...all.map((chord) => chord.row + 1));
   return {
     all,
