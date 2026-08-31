@@ -41,6 +41,11 @@ It deliberately does **not** cover:
   concerns. Export tags appear below only insofar as they change who may
   import a symbol; how tagged symbols are grouped, spelled or emitted does
   not.
+- **Same-owner imports.** This project concerns cross-module imports only.
+  Files inside one owner import each other freely, and whether they
+  internally respect platform or test/production separation is the owner's
+  business — build tooling or separate lints may cover it; this model does
+  not.
 
 The goal is the smallest rule set that covers the access relationships
 cucumber-viz actually needs, so that every later feature is judged as an
@@ -52,7 +57,7 @@ addition to this core rather than a peer of it.
   explicit application root; every other module has exactly one parent.
 - Every source file has exactly one deepest owning module.
 - Files inside one owner import each other freely. No module boundary is
-  crossed, and nothing in this document applies.
+  crossed and, per the scope above, nothing in this document applies.
 - Everything else is **closed by default**. A cross-owner import is legal only
   if some chain of the exposure rules below authorizes it.
 
@@ -242,7 +247,9 @@ context-tags:
 - `browser` on an export is a falsifiable promise about the symbol's entire
   transitive runtime closure, including the owner's private files. The
   importability decision consults only the declared tag; the daemon proves
-  the promise separately and reports a false tag at the owning module.
+  the promise separately and reports a false tag at the owning module. The
+  closure walk enters private files only as evidence for this cross-module
+  promise; it imposes no rule on same-owner imports.
 - The browser line is drawn per symbol, not per file: a module never has to
   split files to separate browser-safe from Node-only code.
 
