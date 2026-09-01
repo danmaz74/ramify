@@ -3,14 +3,14 @@
  * React SVG view.
  *
  * Everything under `src/viz/` except this barrel's `ModelDiagram` export is
- * framework-free and browser-safe. File I/O happens in one place only —
- * `scripts/emit-diagrams.ts` — so the whole visualization can be embedded in
+ * framework-free and browser-safe. File I/O happens in one place only -
+ * `scripts/emit-diagrams.ts` - so the whole visualization can be embedded in
  * any React host without dragging Node along.
  *
  * The pipeline is parameterized by a {@link DiagramDefinition}: no layout
  * module knows which universe it is drawing. `diagrams/shop.ts` is the
  * core-model diagram and the default everywhere; `diagrams/example1.ts` to
- * `diagrams/example4.ts` are the illustrative-examples series — the last two of
+ * `diagrams/example4.ts` are the illustrative-examples series - the last two of
  * them the tag examples, whose chips, contexts and blink sets are derived from
  * their declarations exactly like everything else. The shop's pieces are
  * re-exported here under their historical names.
@@ -81,7 +81,6 @@ export { buildDiagramLayout, coreModelLayout, diagramLayout } from './layout.js'
 export type { DiagramLayout } from './layout.js';
 
 export {
-  bindingNoteText,
   descendantsOf,
   derivedGrants,
   derivedHoldings,

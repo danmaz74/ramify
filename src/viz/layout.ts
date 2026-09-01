@@ -4,7 +4,7 @@
  * Order matters: content and positions first, then propagation (which needs
  * positions), then chords (which need the tree's extent), then the legend
  * (which needs the chords' extent). The last step before anything is handed to
- * a renderer is `validateDiagram` — the picture proves itself against the
+ * a renderer is `validateDiagram` - the picture proves itself against the
  * evaluator, or nothing is drawn.
  *
  * Pure and framework-free. The output is plain serializable geometry.
@@ -30,7 +30,7 @@ export interface HeaderChip {
 }
 
 /**
- * The traced-contracts panel at the top left — the diagram's selection
+ * The traced-contracts panel at the top left - the diagram's selection
  * control: a caption row, then one row per traced contract, stacked
  * vertically in the band `layoutTree` reserved.
  */
@@ -71,7 +71,7 @@ function layoutHeader(definition: DiagramDefinition, left: number): HeaderLayout
 
   const chips: HeaderChip[] = definition.tracedSymbols.map((traced, index) => {
     const rowY = top + header.captionHeight + index * header.rowHeight + header.fontSize;
-    const textWidthChars = textWidth(`${traced.symbol} — ${traced.role}`, header.charWidth);
+    const textWidthChars = textWidth(`${traced.symbol} - ${traced.role}`, header.charWidth);
     return {
       symbol: traced.symbol,
       // The stylesheet middle-anchors every text (`dominant-baseline:middle`),
@@ -209,7 +209,7 @@ const cache = new Map<DiagramDefinition, DiagramLayout>();
 
 /**
  * A diagram's layout, built once per definition. Validation therefore runs at
- * first use — a diagram that contradicts the model fails loudly the first time
+ * first use - a diagram that contradicts the model fails loudly the first time
  * anything asks for it, not in a reader's browser.
  */
 export function diagramLayout(definition: DiagramDefinition = shopDiagram): DiagramLayout {

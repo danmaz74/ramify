@@ -1,6 +1,6 @@
 # Illustrative Examples
 
-Small, self-contained example universes for explaining the model — each one
+Small, self-contained example universes for explaining the model - each one
 built to teach a small set of lessons cleanly, rather than everything at
 once. Site diagrams derive from these. Vocabulary per the
 [Glossary](glossary.md); rules per
@@ -15,11 +15,11 @@ self-explanatory (`computeTotal`, `InvoiceModel`); `PascalCase` = types,
 
 - Node boxes show two compartments: **owns** and **exposed to it**, the
   latter naming each arrival's provenance (`from <child>`, `granted by
-  <ancestor>`). Visibility is the union of the two, read box by box —
+  <ancestor>`). Visibility is the union of the two, read box by box -
   and with no tags declared, what is visible is exactly what is available.
 - Non-allowed imports are not drawn: absence is the statement, and selecting
   a symbol makes the absence visible.
-- Every exposure path is traced — its own color, its own selectable layer.
+- Every exposure path is traced - its own color, its own selectable layer.
   (The old criterion "traced iff reach was decided by a module other than
   its owner" was a density workaround for the retired composite diagram.) A
   symbol exposed nowhere has no path to trace; it stays gray.
@@ -28,7 +28,7 @@ self-explanatory (`computeTotal`, `InvoiceModel`); `PascalCase` = types,
   direction the exposure flows, and its rows in every "exposed to it"
   compartment blink. Nothing is overlaid: reach is read off the moving
   mechanism and the blinking arrivals. (A derived fan of ✓ chords from each
-  permitted importer to the owner was tried first and rejected — it only
+  permitted importer to the owner was tried first and rejected - it only
   restated what the flows already say.) Pure CSS, with a
   `prefers-reduced-motion` fallback (static dashes, steady highlight). Use
   this pattern for every diagram in the series.
@@ -38,22 +38,25 @@ self-explanatory (`computeTotal`, `InvoiceModel`); `PascalCase` = types,
 - **A tag is written behind the glyph of the availability rule it carries**,
   everywhere the diagram mentions it. The glyphs are a mirror-arrow pair
   drawing the direction of the rule's demand: `⇥` is the required-module-tag
-  rule — the demand rides out with the symbol and is checked where it lands,
+  rule - the demand rides out with the symbol and is checked where it lands,
   so it is available only in modules carrying the same tag; `⇤` is the
-  required-symbol-tag rule — the demand faces in at the module's door and is
+  required-symbol-tag rule - the demand faces in at the module's door and is
   checked on everything arriving, so the module value-imports only symbols
   carrying the same tag. So the chip on a tagged symbol's row reads
   `⇥ testing`, and a tagged module's dashed box is labeled `⇤ browser`. The
   chip sits on a filled pill and travels with the symbol to every arrival; a
   tagged module's dashed box fills its node. (Miniatures of the part that
-  must match — a box, a pill — were tried first and dropped: the two outlines
+  must match - a box, a pill - were tried first and dropped: the two outlines
   were indistinguishable at chip size.)
-- **Visible but not available is struck through**: when no file of a module
-  may import an arrival in any binding, the row is drawn — the exposure chain
-  really does put the symbol there — with its name struck. A row whose two
-  bindings disagree is not struck; it carries the note instead
-  (`type ✓ · value ✗`).
-- Selecting a tagged symbol blinks only the arrivals where it is available —
+- **Visible but not available is struck through**: when a module's files may
+  not import an arrival, the row is drawn - the exposure chain really does
+  put the symbol there - with its name struck. The diagrams tell the
+  availability (value-import) story; the type story leaves exactly one mark:
+  a struck name followed by an unstruck `∗` is still type-available, while a
+  bare struck name is blocked in both import forms. The asterisk is a
+  footnote mark - the footnote is the type-imports explanation, not another
+  row affordance.
+- Selecting a tagged symbol blinks only the arrivals where it is available -
   tagged modules light up, production compartments stay dark. A tag-refused
   arrival is also dimmed, not merely un-pulsed, so the refusal survives
   `prefers-reduced-motion` (its strike states the same thing statically).
@@ -61,10 +64,10 @@ self-explanatory (`computeTotal`, `InvoiceModel`); `PascalCase` = types,
 ## Example 1: One decision, three reaches
 
 How far a symbol reaches is decided not by its owner, but by where the chain
-of exposures above it turns downward — or doesn't. Three leaf modules make
+of exposures above it turns downward - or doesn't. Three leaf modules make
 the identical decision, expose a symbol to their parent, and end up with
 three different reaches: application-wide, domain-wide, parent-only. A
-fourth symbol goes the other way — its owner exposes it to its descendants —
+fourth symbol goes the other way - its owner exposes it to its descendants -
 and shows the asymmetry: a downward exposure is complete in one decision and
 can never leave the subtree.
 
@@ -105,23 +108,23 @@ down and a function flowing up, each its own decision.
 | `computeTotal` | expose to parent | passed up again, turned downward at `app` | every module |
 | `InvoiceModel` | expose to parent | turned downward at `invoicing` | the `invoicing` subtree |
 | `optimizeRoute` | expose to parent | `shipping` composed it and stopped | `shipping` only |
-| `ShipmentPlan` | expose to descendants | nothing — no one above was ever involved | the `shipping` subtree |
+| `ShipmentPlan` | expose to descendants | nothing - no one above was ever involved | the `shipping` subtree |
 
 The three up-exposing owners made the **same** decision. The three reaches
-were decided entirely by the ancestors — exposing upward cedes onward
+were decided entirely by the ancestors - exposing upward cedes onward
 routing. `ShipmentPlan`'s reach, by contrast, was decided entirely by its
 owner: a downward exposure cedes nothing, and only an upward exposure could
 ever carry a symbol out of its subtree.
 
 ### Non-allowed imports
 
-- `shipping` ✗ `InvoiceModel` — a grant never leaves the granter's subtree;
+- `shipping` ✗ `InvoiceModel` - a grant never leaves the granter's subtree;
   nor is the symbol available in `routingOptimization`, for the same reason.
-- `invoicing` ✗ `optimizeRoute` — **there is no sibling channel**: exposing a
+- `invoicing` ✗ `optimizeRoute` - **there is no sibling channel**: exposing a
   symbol to the parent gives siblings nothing. Interactively, selecting
   `optimizeRoute` shows a single one-hop flow and a single blinking arrival
-  in `shipping` — the sibling's absence is the point.
-- `app` ✗ `ShipmentPlan` — the **parent** is not allowed while descendants
+  in `shipping` - the sibling's absence is the point.
+- `app` ✗ `ShipmentPlan` - the **parent** is not allowed while descendants
   are: `shipping` exposed the type only downward, so nothing above it, root
   included, ever sees it.
 
@@ -136,13 +139,13 @@ ever carry a symbol out of its subtree.
 4. Composition without routing is the degenerate case of the same spectrum:
    `optimizeRoute` stops at the parent.
 5. Siblings are strangers by default. Sharing between siblings is never the
-   exposer's decision — the route is through the parent, and the parent
+   exposer's decision - the route is through the parent, and the parent
    decides. The contrast is drawn: `invoicing` turned `InvoiceModel`
    downward, so its two consumers share it; `shipping` stopped
    `optimizeRoute`, so its sibling sees nothing.
 6. The root routes without owning: `app` has no code of its own and still
    carries the application's vocabulary.
-7. The two channels are asymmetric. Exposing down is final and bounded — one
+7. The two channels are asymmetric. Exposing down is final and bounded - one
    decision, whole subtree, nothing ceded, no way out. Exposing up hands
    onward routing to the ancestors.
 
@@ -157,7 +160,7 @@ ever carry a symbol out of its subtree.
 
 ## Example 2: Both channels at once
 
-One owner, one symbol, both exposure decisions — and the ceiling that even
+One owner, one symbol, both exposure decisions - and the ceiling that even
 both together cannot break.
 
 ### Tree
@@ -180,10 +183,10 @@ app
 
 ### Resulting availability
 
-`PriceModel` shows as `▲▼` in `pricing`'s box — the first occurrence of that
+`PriceModel` shows as `▲▼` in `pricing`'s box - the first occurrence of that
 marker in the series: two independent one-hop decisions sharing a row. It is
 granted to `discounts` and `taxes`, and received and stopped at `app` (gray,
-no dot). Reach: the `pricing` subtree plus `app` — one subtree down, one hop
+no dot). Reach: the `pricing` subtree plus `app` - one subtree down, one hop
 up, nothing more.
 
 `submitOrder` is furniture, not a lesson: a known specimen from Example 1
@@ -192,34 +195,34 @@ up, nothing more.
 
 ### Non-allowed imports
 
-- `checkout` ✗ `PriceModel` — the sibling that would most plausibly want the
+- `checkout` ✗ `PriceModel` - the sibling that would most plausibly want the
   type doesn't get it, even though the owner used **both** channels: crossing
   to a sibling was never the owner's decision to make, and `app` made none.
 
 ### Lessons
 
-1. `▲▼` is not a third channel — two independent one-hop decisions that
+1. `▲▼` is not a third channel - two independent one-hop decisions that
    happen to share a row.
 2. The ceiling on unilateral reach: both channels at once buy exactly the
    owner's subtree plus its parent. That is structurally the most any owner
    can reach alone.
 3. Reach ends where decisions end: `app` has no dot, and both symbols stop
-   there — the default at every module is "goes no further".
+   there - the default at every module is "goes no further".
 
 ### Diagram notes
 
 - Two consumers under `pricing` per the grant-needs-two-arrivals convention.
-- Five modules, three dots, two traced colors — the smallest diagram in the
+- Five modules, three dots, two traced colors - the smallest diagram in the
   series.
 - Selecting `PriceModel` animates both flows out of a single row: up one hop
   and down one subtree at once.
 - Candidate interactivity: click a decision dot to toggle it off and watch
-  every downstream arrowhead vanish — each hop is load-bearing.
+  every downstream arrowhead vanish - each hop is load-bearing.
 
 ## Example 3: The tag is the entire difference (testing)
 
 Two symbols with identical exposures; one wears `testing`. The tree setup is
-one sentence — everything is granted everywhere, and none of it is the
+one sentence - everything is granted everywhere, and none of it is the
 lesson. The lesson is the required-module-tag rule (`⇥`) that `testing`
 carries: both symbols are visible everywhere, and the tagged one is available
 only in modules carrying the same tag.
@@ -240,7 +243,7 @@ Visibility is identical in every column; only the tag differs.
 
 | Importer | `OrderService` | `resetOrderStore` (tagged `⇥ testing`) |
 | --- | --- | --- |
-| `billing` (production) | ✓ | ✗ — available only in testing modules |
+| `billing` (production) | ✓ | ✗ - available only in testing modules |
 | `integration-tests` (testing module) | ✓ | ✓ |
 
 ### Lessons
@@ -252,7 +255,7 @@ Visibility is identical in every column; only the tag differs.
    because it is tagged.
 3. Test support is curated, symbol by symbol: `orders` chose exactly what
    tests may touch; tests never receive blanket private access.
-4. Exclusivity: `testing` removes a symbol from the default contract — a
+4. Exclusivity: `testing` removes a symbol from the default contract - a
    symbol is real contract or test support, never both.
 5. Grant breadth is safe at any width: blanket-granting received test
    support is harmless, because the availability rule travels with the
@@ -261,16 +264,16 @@ Visibility is identical in every column; only the tag differs.
 
 ### Diagram notes
 
-- The integration tests are their own module, a child of `app` — the lowest
+- The integration tests are their own module, a child of `app` - the lowest
   common ancestor whose composition they exercise, per the spec's
-  recommendation — and the whole module is tagged `testing`, so the dashed
+  recommendation - and the whole module is tagged `testing`, so the dashed
   box fills its node.
-- `resetOrderStore`'s name is struck in `billing` and in `app` — visible
-  there, not available — and drawn plainly in the testing module. The static
+- `resetOrderStore`'s name is struck in `billing` and in `app` - visible
+  there, not available - and drawn plainly in the testing module. The static
   picture already states the verdict table.
 - Selecting `resetOrderStore`: the testing module blinks; `billing` stays
-  dark, and so does `app`'s own row — routing a grant earns no right to
-  import it. Selecting `OrderService`: both blink — the contrast is the
+  dark, and so does `app`'s own row - routing a grant earns no right to
+  import it. Selecting `OrderService`: both blink - the contrast is the
   picture.
 
 ## Example 4: A promise about the closure (browser)
@@ -278,7 +281,7 @@ Visibility is identical in every column; only the tag differs.
 The other availability rule, pointing the other way: `testing` constrains
 where a tagged symbol may go; `browser` carries the required-symbol-tag rule
 (`⇤`), constraining what a tagged module may take. Two symbols with identical
-exposures; one wears `browser` — a falsifiable promise that the symbol's
+exposures; one wears `browser` - a falsifiable promise that the symbol's
 entire transitive runtime closure is browser-safe.
 
 ### Tree
@@ -296,31 +299,37 @@ app                      grants everything it receives to its subtree
 | Importer | `formatMoney` (tagged `⇤ browser`) | `queryDb` |
 | --- | --- | --- |
 | `server` | ✓ | ✓ |
-| `ui` (value import) | ✓ | ✗ — a browser module value-imports only browser symbols |
-| `ui` (type-only import) | ✓ | ✓ — erased at runtime |
+| `ui` | ✓ | ✗ - a browser module value-imports only browser symbols |
 
 ### Lessons
 
 1. The browser line is drawn per symbol, not per file or module: `shared`
    never splits to separate browser-safe from Node-only code.
-2. Type-only imports pass freely: the requirement applies to value imports,
-   and a type is erased before any runtime exists.
-3. The tag is a promise, not a proof: importability consults only the
+2. The tag is a promise, not a proof: importability consults only the
    declared `browser`; verification walks the closure separately, and a
-   false claim is reported at the owner — never at the importer.
-4. The two availability rules point in opposite directions, and the two
+   false claim is reported at the owner - never at the importer.
+3. The two availability rules point in opposite directions, and the two
    examples show both: `testing` requires something of the importing module
    (`⇥`); `browser` on a module requires something of the imported symbol
    (`⇤`).
 
+### Type imports (separate concern)
+
+The browser rule covers value imports only, so `queryDb` remains
+**type-available** in `ui`: a type-only import is erased before any runtime
+exists, and the closure the tag protects never enters the bundle. The
+`testing` rule, by contrast, covers both bindings - a type import of a test
+fake is still test-only coupling. The chain is
+available ⊆ type-available ⊆ visible, and no rule is ever type-only
+(spec, Decided). None of this is drawn: the diagrams tell the availability
+story, and type-availability lives in prose.
+
 ### Diagram notes
 
-- `ui` is a whole module tagged `browser` — the same shape example 3's
+- `ui` is a whole module tagged `browser` - the same shape example 3's
   testing module wears.
-- Nothing is struck: the one refused import is value-only, and a row whose
-  bindings disagree carries the note, not the strike.
-- The type-vs-value contrast is the one new row affordance this diagram
-  needs beyond example 3's chips: `queryDb`'s arrival in `ui` shows a
-  type-only ✓ beside a value ✗.
-- Selecting `queryDb`: `server` blinks, `ui` stays dark — the mirror image
+- `queryDb`'s name is struck in `ui` - visible there, not available - with
+  an unstruck `∗` after it: still type-available. Example 3's struck rows
+  are bare, and the contrast is the two rules' asymmetry made visible.
+- Selecting `queryDb`: `server` blinks, `ui` stays dark - the mirror image
   of example 3's selection story.

@@ -9,10 +9,10 @@ const example2 = buildDiagramLayout(example2Diagram);
 
 /**
  * Example 2 of `docs/model/illustrative-examples.md`: five modules, two
- * symbols, three decisions — one owner exposing one symbol through both
+ * symbols, three decisions - one owner exposing one symbol through both
  * channels at once. The doc is normative for everything asserted here.
  */
-describe('example 2 — both channels at once', () => {
+describe('example 2 - both channels at once', () => {
   const rowsOf = (id: string): string[] =>
     (example2.tree.nodeById.get(id)?.rows ?? []).map(
       (row) =>

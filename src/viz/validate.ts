@@ -6,18 +6,18 @@
  * evaluator:
  *
  * - every row drawn in a node box claims the symbol is available in that
- *   module, for a stated reason and by a named module's decision —
+ *   module, for a stated reason and by a named module's decision -
  *   `explainAvailability`'s clause and `via` must agree;
  * - every arrowhead and chevron that *lands* on a module claims the symbol is
- *   available there — `isAvailable` must agree;
- * - every decision dot claims a particular module decided —
+ *   available there - `isAvailable` must agree;
+ * - every decision dot claims a particular module decided -
  *   `explainAvailability`'s `via` must name that module, and its clause must be
  *   the channel the lane is drawn in;
  * - every ✓ chord must be legal and every ✗ chord must be illegal, for the
  *   precise reason its label gives;
  * - nothing gray ever moves: a symbol drawn as stopping must have no lane;
- * - every tag claim — the chip on a row, the binding note, the contexts drawn
- *   inside a node, and every blink a selection would produce — is re-derived
+ * - every tag claim - the chip on a row, the strike, the contexts drawn
+ *   inside a node, and every blink a selection would produce - is re-derived
  *   through `mayImport` with the importer the picture is talking about.
  *
  * The structure is checked against **availability** and the tags against
@@ -45,7 +45,6 @@ import type { TracedSymbol } from './diagram-definition.js';
 import type { ChordLayout } from './layout-chords.js';
 import type { DecisionDot, PropagationDecision, PropagationLayout } from './layout-lanes.js';
 import {
-  bindingNoteText,
   descendantsOf,
   tagChipText,
   type DrawnContext,
@@ -68,7 +67,7 @@ function describe(importer: ModuleId, owner: ModuleId, symbol: SymbolName): stri
 }
 
 /**
- * Every head that lands on a node asserts an arrival. Check all of them — the
+ * Every head that lands on a node asserts an arrival. Check all of them - the
  * reading rule of §3.1 is "an arrowhead landing on a module means that symbol
  * is available there", and it has to be true.
  *
@@ -147,7 +146,7 @@ export function validateDecisionDots(
         }
         if (verdict.clause !== 'ancestor-grant') {
           // The reached module owns the symbol (a uniform grant landing back on
-          // the provider is harmless) — nothing to attribute.
+          // the provider is harmless) - nothing to attribute.
           continue;
         }
         const nearestGranter = ancestorChain(tree, reached).find((ancestor) => granters.has(ancestor));
@@ -176,7 +175,7 @@ function ancestorChain(tree: ModuleTree, id: ModuleId): ModuleId[] {
   return chain;
 }
 
-/** Every ✓ must be legal, every ✗ illegal — and for the reason its label gives. */
+/** Every ✓ must be legal, every ✗ illegal - and for the reason its label gives. */
 export function validateChords(tree: ModuleTree, chords: readonly ChordLayout[]): void {
   for (const chord of chords) {
     const verdict = explainImport(tree, chord.importer, chord.owner, chord.symbol);
@@ -206,14 +205,14 @@ export function validateChords(tree: ModuleTree, chords: readonly ChordLayout[])
 /**
  * Every row of every node box, checked against the clause that put it there.
  *
- * A node box is a claim about availability — "this symbol is available here,
+ * A node box is a claim about availability - "this symbol is available here,
  * and here is why". The three row kinds are the three clauses of the rule, and
  * the provenance a row prints names the module the evaluator credits, so both
  * are checkable and both are checked. A row whose stated provenance is not the
  * evaluator's `via` is the diagram inventing a chain.
  *
- * What a row says about *importing* — its chip, its binding note and whether it
- * blinks — is checked by {@link validateTagClaims}.
+ * What a row says about *importing* - its chip, its strike and whether it
+ * blinks - is checked by {@link validateTagClaims}.
  */
 export function validateNodeRows(tree: ModuleTree, nodes: readonly NodeLayout[]): void {
   const expectedClause = {
@@ -252,7 +251,7 @@ export function validateNodeRows(tree: ModuleTree, nodes: readonly NodeLayout[])
  * Gray means *stops here*: nothing gray may have a lane leaving its node.
  *
  * `granted` rows are exempt in both directions. They record an arrival, not a
- * decision — re-exposing an ancestor-granted symbol is a no-op — so such a row
+ * decision - re-exposing an ancestor-granted symbol is a no-op - so such a row
  * neither claims the symbol stopped nor promises a lane leaving the node.
  */
 export function validateGrayRows(
@@ -288,14 +287,15 @@ function drawnContextsOf(node: NodeLayout): DrawnContext[] {
  * Everything the picture says about tags, re-derived through the evaluator.
  *
  * Four claims, and each is checked with the importer the drawing is talking
- * about — which is the whole difficulty of a tag diagram, because the same
+ * about - which is the whole difficulty of a tag diagram, because the same
  * symbol in the same box has different answers for a production file, for a
  * declared context, and for a type-only import:
  *
  * - **the chip.** A row wears exactly the exposure tags `symbolTagsOf` gives
- *   for its symbol, asked at the owner — never at whoever routed it.
- * - **the binding note.** Drawn exactly where the two bindings disagree, in the
- *   words those two verdicts produce.
+ *   for its symbol, asked at the owner - never at whoever routed it.
+ * - **the strike.** A row is struck exactly when it is not available - the
+ *   diagrams tell the value-import story, and type-availability is never a
+ *   row affordance.
  * - **the blink.** `importable` on a row and `imports` on a context are the
  *   blink sets, so checking them is checking every pulse a selection can
  *   produce: an arrival a tag refuses stays dark, and a context lights up only
@@ -310,7 +310,7 @@ export function validateTagClaims(
 ): void {
   const annotation = (
     row: NodeLayout['rows'][number],
-    kind: 'tags' | 'binding',
+    kind: 'tags',
   ): string | undefined => (row.annotations ?? []).find((entry) => entry.kind === kind)?.text;
 
   for (const node of nodes) {
@@ -337,12 +337,17 @@ export function validateTagClaims(
             `but the model ${value ? 'allows' : 'does not allow'} that import.`,
         );
       }
-      const type = mayImport(tree, { module: node.id, binding: 'type' }, row.owner, row.symbol);
-      const note = bindingNoteText(type, value);
-      if (annotation(row, 'binding') !== note) {
+      if (row.struck !== !value) {
         fail(
-          `"${node.id}" annotates ${row.symbol} with "${String(annotation(row, 'binding'))}", ` +
-            `but the model's verdicts read "${String(note)}".`,
+          `"${node.id}" ${row.struck ? 'strikes' : 'does not strike'} ${row.symbol}, ` +
+            `but the symbol is ${value ? '' : 'not '}available there.`,
+        );
+      }
+      const type = mayImport(tree, { module: node.id, binding: 'type' }, row.owner, row.symbol);
+      if (row.typeAvailable !== type) {
+        fail(
+          `"${node.id}" ${row.typeAvailable ? 'marks' : 'does not mark'} ${row.symbol} ` +
+            `as type-available, but the model ${type ? 'allows' : 'does not allow'} the type import.`,
         );
       }
     }

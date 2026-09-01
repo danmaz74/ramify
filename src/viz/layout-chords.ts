@@ -2,14 +2,14 @@
  * Import chords (§3.6): curved arcs between two arbitrary modules that answer
  * "may this specific module import that specific symbol?".
  *
- * Chords are deliberately unlike propagation lanes in every respect — curved
+ * Chords are deliberately unlike propagation lanes in every respect - curved
  * rather than straight, crossing open canvas rather than hugging edges,
- * thinner, and ending in a badge rather than a chevron — because they answer a
+ * thinner, and ending in a badge rather than a chevron - because they answer a
  * different kind of question. Propagation shows what the rules *did*; a chord
  * interrogates one pair.
  *
  * Drawing policy: every denial gets a chord (a refusal has no flow to ride),
- * and exactly one allowed import does — A1, the permission that surprises.
+ * and exactly one allowed import does - A1, the permission that surprises.
  * A diagram draws the chords it declares and no others: an allowed import a
  * reader has to go looking for is answered by the propagation flow, which
  * animates on selection, not by a fan of arcs across the canvas.
@@ -274,7 +274,7 @@ function fromSpec(spec: ChordSpec): ChordInput {
  * Lay out the chords a diagram declares.
  *
  * The band is sized to those chords and nothing else: no rows are held in
- * reserve, so a diagram that asks one question spends one row on it — and a
+ * reserve, so a diagram that asks one question spends one row on it - and a
  * diagram that draws none has no band at all.
  */
 export function layoutChords(context: DiagramContext, geometry: TreeGeometry): ChordsLayout {

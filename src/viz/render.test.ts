@@ -77,7 +77,7 @@ describe('static markup', () => {
 
   it('carries no animation: selection is interactive-only', () => {
     // The keyframes ship with the stylesheet, so the same markup animates the
-    // moment a host selects something — but nothing in the export wears the
+    // moment a host selects something - but nothing in the export wears the
     // classes, so the emitted picture is still.
     expect(markup).toContain('@keyframes rmf-march');
     expect(markup).toContain('@keyframes rmf-pulse');

@@ -1,12 +1,12 @@
 /**
- * Example 1 — "One decision, three reaches".
+ * Example 1 - "One decision, three reaches".
  *
  * The universe and the decisions come from
  * `docs/model/illustrative-examples.md`, which is normative for this diagram:
  * nine modules, four symbols, seven decisions. Three leaf modules make the
- * identical decision — expose a symbol to their parent — and end up with three
+ * identical decision - expose a symbol to their parent - and end up with three
  * different reaches, because the reach was decided above them. A fourth symbol
- * goes the other way — its owner exposes it to its descendants — and shows the
+ * goes the other way - its owner exposes it to its descendants - and shows the
  * asymmetry: a downward exposure is complete in one decision and can never
  * leave the subtree.
  *
@@ -29,7 +29,7 @@ import { seriesLegendGroups, seriesNodeContent } from './series.js';
 
 /**
  * ```text
- * app                            (root — owns nothing, and routes anyway)
+ * app                            (root - owns nothing, and routes anyway)
  * ├── globalLibrary
  * │   └── moneyUtils             owns computeTotal
  * ├── invoicing
@@ -69,7 +69,7 @@ export const example1Declaration: ModuleDeclaration = {
     // `shipping` composes `optimizeRoute` and exposes it no further: the
     // degenerate case of the same spectrum, and the contrast that makes the
     // absence of a sibling channel visible. Its own `ShipmentPlan` goes the
-    // other way — down to its descendants and nowhere else, so the edge to
+    // other way - down to its descendants and nowhere else, so the edge to
     // `routingOptimization` carries a type flowing down and a function
     // flowing up, each its own decision.
     {
@@ -83,7 +83,7 @@ export const example1Declaration: ModuleDeclaration = {
 };
 
 /**
- * Every exposure path is traced — the series convention: each path gets its
+ * Every exposure path is traced - the series convention: each path gets its
  * own color and its own selectable layer, and the neutral bundle stays empty.
  */
 export const example1TracedSymbols: readonly TracedSymbol[] = [
@@ -113,7 +113,7 @@ export const example1TracedSymbols: readonly TracedSymbol[] = [
   },
 ];
 
-/** Seven decisions, seven dots — nine modules and one theme. */
+/** Seven decisions, seven dots - nine modules and one theme. */
 export const example1DecisionPolicies: readonly DecisionPolicy[] = [
   {
     id: 'P1',
@@ -129,7 +129,7 @@ export const example1DecisionPolicies: readonly DecisionPolicy[] = [
   },
   {
     id: 'P3',
-    text: 'app exposes computeTotal to its descendants — which is every module.',
+    text: 'app exposes computeTotal to its descendants - which is every module.',
     deciders: ['app'],
     channel: 'toDescendants',
   },

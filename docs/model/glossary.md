@@ -13,7 +13,7 @@ the rules document uses these terms and does not redefine them.
 
 A Ramify Module is a unit of code ownership, declared by marking a directory as a module root. Ramify Modules form a tree: a module's parent is the innermost module whose directory contains its directory, and a single root module covers the whole application.
 
-In these documents, "module" always means Ramify Module — not a TypeScript/ES module, which is a single file.
+In these documents, "module" always means Ramify Module - not a TypeScript/ES module, which is a single file.
 
 ## Files belonging to a module
 
@@ -25,6 +25,10 @@ directory, excluding all directories of its sub-modules.
 Typescript files export symbols, and they import symbols from other files. We aren't
 altering what these two verbs mean, but we're limiting the importability of symbols
 which are exported by files which sit in a different module.
+
+TypeScript imports come in two forms: ordinary **value imports**, and **type-only
+imports** (`import type`), which are erased at compile time and carry no runtime
+dependency.
 
 ## Module-owned symbol
 
@@ -83,8 +87,12 @@ By default, no tag is assigned to a module.
 **Tag based availability rules** define which combinations of module and symbol tags make
 a symbol available in a module. Currently there are two kinds of rules:
 
-- Required symbol tag: if the module has the tag, then the only symbols visible from exposure that are available in that module are those associated with the same tag
-- Required module tag: if the symbol has the tag, then the symbol is only available from exposure if the module has the same tag
+- Required symbol tag: if the module has the tag, then the only symbols visible from exposure that are available in that module are those associated with the same tag. This rule never blocks type-availability: type-only imports pass it.
+- Required module tag: if the symbol has the tag, then the symbol is only available from exposure if the module has the same tag. This rule blocks type-availability too: type-only imports must satisfy it.
+
+The two rules are mirror images for availability, but not for type-availability - only
+the required module tag reaches type-only imports. This is inherent to each rule, not a
+parameter of it.
 
 When several rules apply to the same symbol and module, all of them must be satisfied.
 
@@ -96,10 +104,22 @@ So, when a tag is associated with a symbol or module, it carries its availabilit
 ## Module-available symbol
 
 Saying that symbol S is **available** in module M means that all files belonging to M
-can import S.
+can import S as a value - the ordinary import. Being able to import as a value implies
+that it can also be imported as a type.
 
 All symbols owned by M are available in M, because ramify modules don't affect intra-module
 imports in any way.
 
 The only other symbols available in M are those which other modules expose to it, subject
 to their tag based availability rules.
+
+At times we can use "fully available" as a synonym of "available" to underline that it implies
+both value and type availability.
+
+## Type-availability
+
+S is **type-available** in module M when all files belonging to M can import S as a
+type-only import. A symbol coming from a different module could be type-available, but not
+value-available.
+
+Whether a rule blocks availability entirely or blocks only value imports - leaving the symbol type-available - is part of the rule's definition. Of the two current rules, the required module tag does the former and the required symbol tag the latter.

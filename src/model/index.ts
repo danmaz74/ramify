@@ -29,7 +29,7 @@ export type {
   SymbolRef,
 } from './tree.js';
 
-export { MODULE_TAGS, SYMBOL_TAGS, appliesToBinding, defaultSymbolTag } from './tags.js';
+export { MODULE_TAGS, SYMBOL_TAGS, defaultSymbolTag } from './tags.js';
 export type {
   Tag,
   ModuleTag,
@@ -37,7 +37,6 @@ export type {
   SymbolTag,
   SymbolTagDefinition,
   ImportBinding,
-  RequirementScope,
 } from './tags.js';
 
 export { explainAvailability, explainImport, isAvailable, mayImport } from './availability.js';

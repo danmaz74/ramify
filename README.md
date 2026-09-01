@@ -22,11 +22,11 @@ in the host repository at
 
 ## Layout
 
-- `docs/model/` — the model specification (application-agnostic; travels
+- `docs/model/` - the model specification (application-agnostic; travels
   with the project).
-- `docs/plans/` — ramify's own planning artifacts.
-- `src/` — toolkit source; tests co-located as `src/**/*.test.ts`.
-- `site/` — the documentation website (its own npm package).
+- `docs/plans/` - ramify's own planning artifacts.
+- `src/` - toolkit source; tests co-located as `src/**/*.test.ts`.
+- `site/` - the documentation website (its own npm package).
 
 ## Documentation site
 
@@ -47,9 +47,9 @@ Build output (`site/build/`, `site/.docusaurus/`) is git-ignored.
 | URL | Page |
 | --- | --- |
 | `/` | Landing: what ramify.ts is, the model's one question, the scope statement |
-| `/model` | The core tree model — the live diagram plus the R1–R6 walkthrough |
-| `/examples` | Illustrative examples — the tree-rule universes ("one decision, three reaches"; "both channels at once"), each with its own live diagram |
-| `/tags` | Tags — the other half of the rule: the two availability rules (`▢` required module tag, `▭` required symbol tag) and the `testing` and `browser` tags that carry them |
+| `/model` | The core tree model - the live diagram plus the R1–R6 walkthrough |
+| `/examples` | Illustrative examples - the tree-rule universes ("one decision, three reaches"; "both channels at once"), each with its own live diagram |
+| `/tags` | Tags - the other half of the rule: the two availability rules (`▢` required module tag, `▭` required symbol tag) and the `testing` and `browser` tags that carry them |
 
 The normative specification is not rendered as a site page; it ships with the
 repository at `docs/model/cross-module-importability-rules.md`, and every page

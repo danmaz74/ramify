@@ -4,15 +4,15 @@ import path from 'node:path';
 
 /**
  * Portability discipline (plan Design decision 3): this directory is a thin
- * shell. It holds configuration and pages only — every component, every piece
+ * shell. It holds configuration and pages only - every component, every piece
  * of logic and every piece of data is imported from `../src`. Nothing here is
  * swizzled, and page bodies avoid framework-specific syntax wherever plain
  * MDX works.
  *
  * There is deliberately no docs plugin. The normative specification lives at
  * `ramify/docs/model/cross-module-importability-rules.md` and ships with the
- * repository; the site references that path rather than rendering — and
- * thereby risking a divergent second copy of — the document itself.
+ * repository; the site references that path rather than rendering - and
+ * thereby risking a divergent second copy of - the document itself.
  */
 
 const RAMIFY_SRC = path.resolve(__dirname, '..', 'src');
@@ -20,7 +20,7 @@ const RAMIFY_SRC = path.resolve(__dirname, '..', 'src');
 /**
  * Teach webpack to read ramify's source directly.
  *
- * Two adjustments, both purely about resolution — no transform is added, and
+ * Two adjustments, both purely about resolution - no transform is added, and
  * no code lives here:
  *
  * - `@ramify/*` points at `../src`, so pages never spell a `../../..` path.
@@ -66,7 +66,7 @@ const config: Config = {
   plugins: [ramifySourcePlugin],
 
   // Keeps the CSS anchor-target highlight working across the SPA router's
-  // client-side navigations — see the comment in the module itself.
+  // client-side navigations - see the comment in the module itself.
   clientModules: ['./src/client/anchor-target.ts'],
 
   presets: [
@@ -86,14 +86,15 @@ const config: Config = {
     navbar: {
       title: 'ramify.ts',
       items: [
-        { to: '/model', label: 'The model', position: 'left' },
+        { to: '/modularity', label: 'Why', position: 'left' },
+        { to: '/model', label: 'The core model', position: 'left' },
         { to: '/tags', label: 'Tags', position: 'left' },
         { to: '/glossary', label: 'Glossary', position: 'left' },
       ],
     },
     footer: {
       style: 'light',
-      copyright: 'ramify.ts — a toolkit for cross-module importability.',
+      copyright: 'ramify.ts - a toolkit for cross-module importability.',
     },
   } satisfies Preset.ThemeConfig,
 };

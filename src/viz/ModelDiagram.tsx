@@ -136,7 +136,7 @@ export interface ModelDiagramInteractiveProps extends ModelDiagramProps {
 const DEFAULT_MIN_WIDTH = 820;
 
 /**
- * How long the tour holds each traced contract: five ~1s animation cycles —
+ * How long the tour holds each traced contract: five ~1s animation cycles -
  * enough to follow the longest chain twice, not so long the one-hop contracts
  * drag. Uniform on purpose: a steady rhythm reads as a guided tour.
  */
@@ -168,7 +168,7 @@ function classes(...values: readonly (string | false | undefined)[]): string | u
  *   working: past it the gesture pans and the trailing click is swallowed.
  *
  * §3.9 still holds underneath: the SVG scales to whatever width its container
- * offers, up to its own natural size and never below `minWidth` — past which
+ * offers, up to its own natural size and never below `minWidth` - past which
  * the container scrolls rather than shrinking the picture below legibility.
  */
 export function ModelDiagram(props: ModelDiagramInteractiveProps): ReactElement {
@@ -218,7 +218,7 @@ export function ModelDiagram(props: ModelDiagramInteractiveProps): ReactElement 
     [isControlled, onSelectSymbol],
   );
 
-  /** The reader taking the wheel — any manual selection — stops the tour. */
+  /** The reader taking the wheel - any manual selection - stops the tour. */
   const userSelect = useCallback(
     (next: SymbolName | null) => {
       setPlaying(false);
@@ -302,8 +302,8 @@ export function ModelDiagram(props: ModelDiagramInteractiveProps): ReactElement 
 
     // The wheel zooms whenever the pointer is over the diagram, modifier or
     // not: requiring one made zooming undiscoverable, and a reader who has
-    // aimed at the figure means the figure. Ctrl/Cmd + wheel — a trackpad
-    // pinch, among other things — does the same, so pinch works for free.
+    // aimed at the figure means the figure. Ctrl/Cmd + wheel - a trackpad
+    // pinch, among other things - does the same, so pinch works for free.
     //
     // React registers `wheel` passively, so this listener has to be a native
     // one: only a non-passive listener may cancel the page scroll, and the
@@ -314,7 +314,7 @@ export function ModelDiagram(props: ModelDiagramInteractiveProps): ReactElement 
     };
 
     // The click a drag leaves behind must not select anything. Swallowing it
-    // here — in the capture phase, at the root of the diagram — stops it before
+    // here - in the capture phase, at the root of the diagram - stops it before
     // React's delegated handlers ever see it, and clears the flag whatever the
     // click landed on. A flag checked inside the select handler would instead
     // stay armed when a drag ends over empty canvas, and would then eat the
@@ -342,7 +342,7 @@ export function ModelDiagram(props: ModelDiagramInteractiveProps): ReactElement 
     }
     swallowClickRef.current = false;
     // Deliberately *not* capturing the pointer yet. Capturing on pointerdown
-    // retargets the whole gesture — including the `click` — to the capturing
+    // retargets the whole gesture - including the `click` - to the capturing
     // element, so every click would land on the <svg> and nothing inside it
     // would ever be selectable. Capture is taken below, once the gesture has
     // proved itself a drag.
@@ -391,7 +391,7 @@ export function ModelDiagram(props: ModelDiagramInteractiveProps): ReactElement 
     }
     // Arm the swallow for exactly this gesture. The browser synthesizes the
     // click immediately after `pointerup`, so anything that arrives later is a
-    // new gesture and must be allowed through — including a drag that ended
+    // new gesture and must be allowed through - including a drag that ended
     // over empty canvas and produced no click at all.
     swallowClickRef.current = true;
     setTimeout(() => {
@@ -568,7 +568,7 @@ export function ModelDiagramSvg(props: ModelDiagramProps): ReactElement {
   const propagationLayers = [NEUTRAL_LAYER, ...traced.map((entry) => entry.symbol)];
 
   // Responsive: fill the container's width and take the height from the
-  // viewBox's ratio, but never render narrower than legibility allows — below
+  // viewBox's ratio, but never render narrower than legibility allows - below
   // that the wrapper scrolls, which is what §3.9 asks for. `touch-action:
   // pan-y` leaves vertical page scrolling to the page.
   const style: CSSProperties | undefined = responsive
@@ -866,7 +866,7 @@ function renderChip(chip: LaneChip): ReactElement {
  * Chords in two passes: every arc first, then every badge and reason label.
  *
  * A chord crossing another passes *under* it (§3.6), which means a lower row's
- * arc is painted over the row above — and would be painted over that row's
+ * arc is painted over the row above - and would be painted over that row's
  * label too. Drawing all the text last, with a knockout halo, keeps every
  * reason readable no matter how the arcs cross.
  */
@@ -1073,8 +1073,8 @@ function renderNode(
 }
 
 /**
- * A declared importer context: a dashed box, its `name` label, and — for a
- * named context — the line that says what its files are.
+ * A declared importer context: a dashed box, its `name` label, and - for a
+ * named context - the line that says what its files are.
  *
  * The box pulses when the selected symbol is one its files may actually import,
  * so a selection separates the contexts that may take a tagged symbol from the
@@ -1260,7 +1260,7 @@ function renderRow(
   const granted = row.kind === 'granted';
   const selected = selectedSymbol !== null && row.layer === selectedSymbol;
   // Selecting a symbol pulses every row that says "it is available here *and*
-  // this module's files may import it" — the arrivals a reader could act on.
+  // this module's files may import it" - the arrivals a reader could act on.
   // The owner's own row does not pulse: ownership is not an arrival, and it is
   // where the animated lanes start.
   const blink = selected && row.kind !== 'owns' && row.importable ? 'rmf-blink' : undefined;
@@ -1323,7 +1323,7 @@ function renderRow(
           and everywhere else the name is a reference. The label clears the
           marker column per glyph: `▲▼` is two glyphs wide, not one. A struck
           name is the static statement "visible here, not available": the row
-          is drawn — the exposure chain really does put the symbol here — but
+          is drawn - the exposure chain really does put the symbol here - but
           no file of this module may import it. */}
       <text
         id={`${row.id}-label`}
@@ -1337,6 +1337,28 @@ function renderRow(
       >
         {row.symbol}
       </text>
+      {/*
+        The one mark the type story leaves in the picture: a struck row that is
+        still type-available wears an unstruck `*` after its name - a footnote
+        mark, decoded in the legend and expanded in the page's type-imports
+        section. Its own element, because SVG draws a parent's line-through
+        across every tspan: a child cannot opt out of the strike.
+      */}
+      {row.struck && row.typeAvailable ? (
+        /* U+2217, the math operator: unlike the typographic `*` it sits
+           centered on the line, like a multiplication sign. */
+        <text
+          id={`${row.id}-type-available`}
+          data-kind="node-row-type-available"
+          className={fillClass(labelColor)}
+          x={box.x + rowLabelDx(row.marker) + row.symbol.length * LAYOUT.node.nameCharWidth - 2}
+          y={y}
+          fontSize={13}
+          {...(row.kind === 'owns' ? {} : { fontStyle: 'italic' })}
+        >
+          ∗
+        </text>
+      ) : null}
       {/*
         The tag chip, and the binding note where the two bindings disagree.
         The chip writes each tag behind the glyph of the rule it carries
@@ -1388,9 +1410,9 @@ function renderRow(
 }
 
 /**
- * The traced-contracts panel at the top left — the diagram's selection
+ * The traced-contracts panel at the top left - the diagram's selection
  * control, promoted out of the legend but keeping its vertical row form:
- * `swatch symbol — role`, one row per contract. Rows select exactly as the
+ * `swatch symbol - role`, one row per contract. Rows select exactly as the
  * legend chips used to. The play/stop toggle is live-only: the static export
  * gets no handler and therefore no toggle.
  */
@@ -1486,7 +1508,7 @@ function renderHeader(
             >
               {chip.symbol}
               <tspan className={fillClass('muted')} fontWeight={400}>
-                {` — ${entry?.role ?? ''}`}
+                {` - ${entry?.role ?? ''}`}
               </tspan>
             </text>
           </g>
@@ -1578,19 +1600,39 @@ function renderLegendEntryText(entry: LegendEntry): ReactNode {
 const RULE_GLYPH_CHARS: ReadonlySet<string> = new Set(Object.values(TAG_GLYPHS));
 
 /**
- * A text run in which every rule glyph (`⇥`, `⇤`) is enlarged to the full
- * height the surrounding text occupies. The arrows' font glyphs are drawn
- * small — barely above the x-height — so at chip size they read as specks; a
- * larger tspan on the same baseline lets them span the run's full height
- * without touching the measured layout, which counts characters.
+ * Measured on the diagram's font stack (canvas `actualBoundingBox`, em units):
+ * the arrows span 0.442em, floating 0.095em above the baseline, while a
+ * capital spans 0.726em from the baseline. Scaling by 0.726 / 0.442 and
+ * shifting the floated bottom down onto the baseline renders the arrow at
+ * exactly a capital's height. Other platforms' fonts will differ a little;
+ * arrows sit near the x-height in every mainstream sans, so the correction
+ * stays directionally right.
+ */
+const RULE_GLYPH_SCALE = 1.64;
+const RULE_GLYPH_DROP_EM = 0.155;
+
+/**
+ * A text run in which every rule glyph (`⇥`, `⇤`) is enlarged to the height
+ * of an uppercase character and seated on the baseline. The arrows' own font
+ * glyphs are drawn small - under the x-height, lifted off the baseline - so
+ * at chip size they read as specks. A larger tspan with a `dy` drop fixes
+ * both without touching the measured layout, which counts characters; the
+ * character after each glyph carries the compensating `dy` because SVG text
+ * shifts are cumulative.
  */
 function withFullHeightRuleGlyphs(text: string, fontSize: number): ReactNode {
   if (![...RULE_GLYPH_CHARS].some((glyph) => text.includes(glyph))) {
     return text;
   }
-  return [...text].map((character, index) =>
+  const drop = Math.round(fontSize * RULE_GLYPH_DROP_EM * 100) / 100;
+  const characters = [...text];
+  return characters.map((character, index) =>
     RULE_GLYPH_CHARS.has(character) ? (
-      <tspan key={index} fontSize={Math.round(fontSize * 1.4 * 10) / 10}>
+      <tspan key={index} fontSize={Math.round(fontSize * RULE_GLYPH_SCALE * 10) / 10} dy={drop}>
+        {character}
+      </tspan>
+    ) : characters[index - 1] !== undefined && RULE_GLYPH_CHARS.has(characters[index - 1] ?? '') ? (
+      <tspan key={index} dy={-drop}>
         {character}
       </tspan>
     ) : (
@@ -1623,18 +1665,32 @@ function renderLegendGlyph(
       );
     case 'struck':
       return (
-        <text
-          data-kind="legend-glyph"
-          className={fillClass('muted')}
-          x={cx}
-          y={cy}
-          textAnchor="middle"
-          fontSize={10}
-          fontStyle="italic"
-          textDecoration="line-through"
-        >
-          {glyph.text}
-        </text>
+        <g data-kind="legend-glyph">
+          <text
+            className={fillClass('muted')}
+            x={cx}
+            y={cy}
+            textAnchor="middle"
+            fontSize={10}
+            fontStyle="italic"
+            textDecoration="line-through"
+          >
+            {glyph.text}
+          </text>
+          {glyph.suffix === undefined ? null : (
+            /* Unstruck, like the mark it reproduces - clear of the struck
+               sample's tail, a size up so it reads at legend scale. */
+            <text
+              className={fillClass('muted')}
+              x={cx + (glyph.text.length * 5) / 2 + 4}
+              y={cy}
+              fontSize={11}
+              fontStyle="italic"
+            >
+              {glyph.suffix}
+            </text>
+          )}
+        </g>
       );
     case 'compartment':
       return (

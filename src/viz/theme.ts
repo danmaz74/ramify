@@ -3,9 +3,9 @@
  *
  * The light values of §3.7 are the *base* definitions, so a standalone
  * `model-core.svg` opened on its own renders correctly with no host stylesheet.
- * Dark values are layered on twice — once under `prefers-color-scheme: dark`
+ * Dark values are layered on twice - once under `prefers-color-scheme: dark`
  * (skipped when the host pinned light) and once under an explicit
- * `data-theme="dark"` — so a host page can either follow the system or force a
+ * `data-theme="dark"` - so a host page can either follow the system or force a
  * theme, and the same emitted markup serves both.
  *
  * Colors reach elements through classes rather than presentation attributes,
@@ -118,8 +118,8 @@ export function diagramStylesheet(): string {
     //
     // Marching dashes: the pattern's start is placed at `-dashoffset` along the
     // path, so driving the offset *negative* walks the dashes toward the path's
-    // end. Every lane is drawn from its origin to its head — the arrowhead is
-    // `marker-end` — so "toward the end" is always "the way the exposure
+    // end. Every lane is drawn from its origin to its head - the arrowhead is
+    // `marker-end` - so "toward the end" is always "the way the exposure
     // travels", and the offset step is one full dash cycle, which loops
     // seamlessly.
     `@keyframes rmf-march{from{stroke-dashoffset:0}to{stroke-dashoffset:-12}}`,

@@ -19,7 +19,7 @@
  * the rule they take part in is in `./availability.ts`.
  *
  * This module is pure and browser-compatible: no I/O, no Node built-ins, no
- * side effects. It contains no availability logic — that lives in
+ * side effects. It contains no availability logic - that lives in
  * `./availability.ts`.
  */
 
@@ -49,7 +49,7 @@ export interface SymbolRef {
 }
 
 /**
- * The two exposure channels. Both default to `false` — the model is closed by
+ * The two exposure channels. Both default to `false` - the model is closed by
  * default, so a symbol travels only where a decision sent it.
  */
 export interface ExposureDeclaration {
@@ -64,19 +64,19 @@ export interface ExposureDeclaration {
  *
  * Ownership needs no separate "exported" flag: a module owns a symbol because
  * a file belonging to it exports that symbol. An owned symbol with neither
- * channel set is simply available nowhere else — its owner uses it, and no
+ * channel set is simply available nowhere else - its owner uses it, and no
  * other module can ever reach it. There is no implicit public surface.
  */
 export interface OwnedSymbolDeclaration extends ExposureDeclaration {
   readonly symbol: SymbolName;
   /**
-   * The exposure tags this symbol's exposure carries. Omitted — or empty — is
+   * The exposure tags this symbol's exposure carries. Omitted - or empty - is
    * the default contract channel.
    *
    * Tags are declared once, by the owner, and travel with the symbol through
    * every channel and every re-exposure: they restrict who may import the
    * symbol wherever the exposure chain takes it. That is why only this
-   * declaration — never a {@link ReExposureDeclaration} — can carry them.
+   * declaration - never a {@link ReExposureDeclaration} - can carry them.
    *
    * More than one is meaningful: a browser-safe test fake is
    * `['testing', 'browser']`, and satisfies a browser test context on both
@@ -94,8 +94,8 @@ export interface OwnedSymbolDeclaration extends ExposureDeclaration {
  * A named importer context: a subtree of the declaring module's own files,
  * classified by context tags.
  *
- * A context classifies importing code only. It owns no symbols — ownership is
- * per module — so a context never changes what its module exposes; it changes
+ * A context classifies importing code only. It owns no symbols - ownership is
+ * per module - so a context never changes what its module exposes; it changes
  * what the files inside it may import.
  *
  * A context with no tags is representable and inert: it classifies its files as
@@ -135,7 +135,7 @@ export interface ModuleDeclaration {
   /** Symbols received from a direct child that this module passes on. */
   readonly reExposes?: readonly ReExposureDeclaration[];
   /**
-   * Context tags classifying this module's files — and, because a module is
+   * Context tags classifying this module's files - and, because a module is
    * declared about its whole subtree, its submodules' files too.
    *
    * This is how a whole module is classified: `moduleTags: ['browser']` states
@@ -150,8 +150,8 @@ export interface ModuleDeclaration {
    */
   readonly moduleTags?: readonly ModuleTag[];
   /**
-   * Importer contexts declared over subtrees of this module's own files — a
-   * co-located test tree, a feature-test tree — each with its own tags on top
+   * Importer contexts declared over subtrees of this module's own files - a
+   * co-located test tree, a feature-test tree - each with its own tags on top
    * of {@link moduleTags}.
    */
   readonly contexts?: readonly ImporterContextDeclaration[];
@@ -231,7 +231,7 @@ export function buildTree(root: ModuleDeclaration): ModuleTree {
         // The module's classification tags everything it exposes, and that tag
         // is exclusive with the default contract channel. Declaring tags puts
         // the symbol back in that channel unless the implied tag is among them
-        // — which is exactly what exclusivity forbids. Adding tags is fine;
+        // - which is exactly what exclusivity forbids. Adding tags is fine;
         // dropping this one is not.
         throw new Error(
           `Module "${id}" is classified as a context whose exposures are implicitly ` +
@@ -330,7 +330,7 @@ export function ancestorsOf(tree: ModuleTree, id: ModuleId): ModuleId[] {
  * importer context named by `context` declares, plus those the module and every
  * one of its ancestors declare about their subtrees.
  *
- * Omit `context` for the module's own files — the context every file belonging
+ * Omit `context` for the module's own files - the context every file belonging
  * to the module is in unless a declared context covers it.
  *
  * Tags accumulate from the file outward and are never dropped: a module may add
@@ -387,7 +387,7 @@ export function requireImporterContext(
  * The owner's own declaration wins; with none, the tags come from the owner's
  * classification, because symbols exposed from a context default to that
  * context's exposure tag. This is the whole of "everything a declared test
- * module exposes is implicitly `testing`" — and it holds for every symbol
+ * module exposes is implicitly `testing`" - and it holds for every symbol
  * such a module can expose, since a module can only pass on symbols owned
  * inside its own subtree, which its classification reaches too.
  *

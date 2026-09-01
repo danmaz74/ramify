@@ -78,7 +78,7 @@ const example3Declaration: ModuleDeclaration = {
 const example3 = buildTree(example3Declaration);
 
 describe('Example 3: the tag is the entire difference (testing)', () => {
-  it('billing may import OrderService — the ordinary contract', () => {
+  it('billing may import OrderService - the ordinary contract', () => {
     expect(explainImport(example3, 'billing', 'orders', 'OrderService')).toEqual({
       allowed: true,
       clause: 'ancestor-grant',
@@ -86,7 +86,7 @@ describe('Example 3: the tag is the entire difference (testing)', () => {
     });
   });
 
-  it('billing may not import resetOrderStore — the tag requires a test context', () => {
+  it('billing may not import resetOrderStore - the tag requires a test context', () => {
     expect(explainImport(example3, 'billing', 'orders', 'resetOrderStore')).toEqual({
       allowed: false,
       reason: 'symbol-tag-requires-module-tag',
@@ -111,7 +111,7 @@ describe('Example 3: the tag is the entire difference (testing)', () => {
     });
   });
 
-  it('the declaring module outside that context may not — the context is the difference', () => {
+  it('the declaring module outside that context may not - the context is the difference', () => {
     // `app` declares the test context and still may not import test support
     // into its production files: a context classifies files, not the module
     // that declared it.
@@ -119,7 +119,7 @@ describe('Example 3: the tag is the entire difference (testing)', () => {
     expect(mayImport(example3, 'app', 'orders', 'resetOrderStore')).toBe(false);
   });
 
-  it('applies to type imports too — a testing requirement exempts no binding', () => {
+  it('applies to type imports too - a testing requirement exempts no binding', () => {
     expect(
       explainImport(example3, { module: 'billing', binding: 'type' }, 'orders', 'resetOrderStore'),
     ).toEqual({
@@ -129,7 +129,7 @@ describe('Example 3: the tag is the entire difference (testing)', () => {
     });
   });
 
-  it('routes both symbols identically — only the tag differs', () => {
+  it('routes both symbols identically - only the tag differs', () => {
     for (const symbol of ['OrderService', 'resetOrderStore']) {
       expect(explainAvailability(example3, 'billing', 'orders', symbol)).toEqual({
         allowed: true,
@@ -175,7 +175,7 @@ const uiValue: Importer = { module: 'ui', binding: 'value' };
 const uiType: Importer = { module: 'ui', binding: 'type' };
 
 describe('Example 4: a promise about the closure (browser)', () => {
-  it('server may import both — it carries no context tag to satisfy', () => {
+  it('server may import both - it carries no context tag to satisfy', () => {
     expect(explainImport(example4, 'server', 'shared', 'formatMoney')).toEqual({
       allowed: true,
       clause: 'ancestor-grant',
@@ -189,7 +189,7 @@ describe('Example 4: a promise about the closure (browser)', () => {
     });
   });
 
-  it('ui may value-import formatMoney — the symbol carries the promise', () => {
+  it('ui may value-import formatMoney - the symbol carries the promise', () => {
     expect(explainImport(example4, uiValue, 'shared', 'formatMoney')).toEqual({
       allowed: true,
       clause: 'ancestor-grant',
@@ -198,7 +198,7 @@ describe('Example 4: a promise about the closure (browser)', () => {
     });
   });
 
-  it('ui may not value-import queryDb — a browser context requires the tag', () => {
+  it('ui may not value-import queryDb - a browser context requires the tag', () => {
     expect(explainImport(example4, uiValue, 'shared', 'queryDb')).toEqual({
       allowed: false,
       reason: 'module-tag-requires-symbol-tag',
@@ -206,7 +206,7 @@ describe('Example 4: a promise about the closure (browser)', () => {
     });
   });
 
-  it('ui may type-import queryDb — erased at runtime', () => {
+  it('ui may type-import queryDb - erased at runtime', () => {
     expect(explainImport(example4, uiType, 'shared', 'queryDb')).toEqual({
       allowed: true,
       clause: 'ancestor-grant',
@@ -220,7 +220,7 @@ describe('Example 4: a promise about the closure (browser)', () => {
     });
   });
 
-  it('reads a bare module id as a value import — the exemption is claimed, not assumed', () => {
+  it('reads a bare module id as a value import - the exemption is claimed, not assumed', () => {
     expect(mayImport(example4, 'ui', 'shared', 'queryDb')).toBe(false);
   });
 
@@ -235,7 +235,7 @@ describe('Example 4: a promise about the closure (browser)', () => {
 
 /**
  * A `testing` symbol routed two hops up and granted application-wide,
- * beside two the tree stops earlier — a tree refusal and a tag refusal on the
+ * beside two the tree stops earlier - a tree refusal and a tag refusal on the
  * same symbols.
  *
  * ```text
@@ -331,7 +331,7 @@ describe('tags never grant', () => {
 // --- A tag travels with its symbol ----------------------------------------
 
 describe('a tag travels with its symbol', () => {
-  it('survives every re-exposure — a route can neither strip nor change it', () => {
+  it('survives every re-exposure - a route can neither strip nor change it', () => {
     // `resetOrderStore` crossed two re-exposures and one grant on its way to
     // `shipping`, and arrives still tagged.
     expect(explainImport(routed, 'shipping', 'orders', 'resetOrderStore')).toEqual({
@@ -407,7 +407,7 @@ describe('a declared test module', () => {
     expect(symbolTagsOf(withTestModule, 'testSupport', 'fakeClock')).toEqual(['testing']);
   });
 
-  it('tags what its submodules own too — test infrastructure all the way down', () => {
+  it('tags what its submodules own too - test infrastructure all the way down', () => {
     expect(symbolTagsOf(withTestModule, 'testSupportInternals', 'stubTimer')).toEqual([
       'testing',
     ]);
@@ -494,7 +494,7 @@ describe('exclusivity', () => {
     ).toThrow(/which is exclusive/);
   });
 
-  it('accepts more tags alongside it — exclusivity is about the default channel', () => {
+  it('accepts more tags alongside it - exclusivity is about the default channel', () => {
     const tree = buildTree({
       id: 'app',
       children: [

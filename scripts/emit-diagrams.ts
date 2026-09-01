@@ -5,15 +5,15 @@
  * the same React component the site embeds, with no selection, once per
  * checked-in diagram definition:
  *
- * - `site/static/diagrams/model-core.svg` — the shop: Panel A (structure and
+ * - `site/static/diagrams/model-core.svg` - the shop: Panel A (structure and
  *   propagation) and Panel B (import chords) of `docs/site/diagram1-spec.md`
  *   §4, composited;
- * - `site/static/diagrams/example1.svg` — Example 1 of
+ * - `site/static/diagrams/example1.svg` - Example 1 of
  *   `docs/model/illustrative-examples.md`: one decision, three reaches;
- * - `site/static/diagrams/example2.svg` — Example 2: both channels at once;
- * - `site/static/diagrams/example3.svg` — Example 3: the tag is the entire
+ * - `site/static/diagrams/example2.svg` - Example 2: both channels at once;
+ * - `site/static/diagrams/example3.svg` - Example 3: the tag is the entire
  *   difference (testing);
- * - `site/static/diagrams/example4.svg` — Example 4: a promise about the
+ * - `site/static/diagrams/example4.svg` - Example 4: a promise about the
  *   closure (browser).
  *
  * Output is deterministic: no ids are generated at render time, ordering comes

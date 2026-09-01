@@ -18,7 +18,7 @@ const uiType = { module: 'ui', binding: 'type' } as const;
  * module. The doc is normative for everything asserted
  * here.
  */
-describe('example 4 — a promise about the closure', () => {
+describe('example 4 - a promise about the closure', () => {
   const rowsOf = (id: string): string[] =>
     (example4.tree.nodeById.get(id)?.rows ?? []).map(
       (row) =>
@@ -70,10 +70,10 @@ describe('example 4 — a promise about the closure', () => {
     // | server                | ✓ | ✓ |
     expect(mayImport(tree, 'server', 'shared', 'formatMoney')).toBe(true);
     expect(mayImport(tree, 'server', 'shared', 'queryDb')).toBe(true);
-    // | ui (value import)     | ✓ | ✗ — a browser module value-imports only browser symbols |
+    // | ui (value import)     | ✓ | ✗ - a browser module value-imports only browser symbols |
     expect(mayImport(tree, uiValue, 'shared', 'formatMoney')).toBe(true);
     expect(mayImport(tree, uiValue, 'shared', 'queryDb')).toBe(false);
-    // | ui (type-only import) | ✓ | ✓ — erased at runtime |
+    // | ui (type-only import) | ✓ | ✓ - erased at runtime |
     expect(mayImport(tree, uiType, 'shared', 'formatMoney')).toBe(true);
     expect(mayImport(tree, uiType, 'shared', 'queryDb')).toBe(true);
   });
@@ -94,37 +94,31 @@ describe('example 4 — a promise about the closure', () => {
     expect((ui?.compartments ?? []).map((compartment) => compartment.kind)).toEqual(['received']);
   });
 
-  it('shows the type-versus-value contrast on queryDb’s arrival in ui, and nowhere else', () => {
+  it('strikes queryDb in ui, with the type-available asterisk', () => {
     expect(rowsOf('ui')).toEqual([
       '_ formatMoney ⇤ browser   granted by app',
-      '_ queryDb type ✓ · value ✗   granted by app',
+      '_ queryDb   granted by app',
     ]);
 
-    const annotated = example4.tree.nodes.flatMap((node) =>
-      node.rows
-        .filter((row) => (row.annotations ?? []).some((annotation) => annotation.kind === 'binding'))
-        .map((row) => `${node.id}/${row.symbol}`),
+    // The strike is the value-import verdict, exactly; the unstruck `*` after
+    // the struck name is the one mark the type story leaves in the picture.
+    const struckRows = example4.tree.nodes.flatMap((node) =>
+      node.rows.filter((row) => row.struck).map((row) => `${node.id}/${row.symbol}`),
     );
-    expect(annotated).toEqual(['ui/queryDb']);
+    expect(struckRows).toEqual(['ui/queryDb']);
+    const struck = (example4.tree.nodeById.get('ui')?.rows ?? []).find(
+      (row) => row.symbol === 'queryDb',
+    );
+    expect(struck?.typeAvailable).toBe(true);
+    expect(mayImport(tree, uiValue, 'shared', 'queryDb')).toBe(false);
+    expect(mayImport(tree, uiType, 'shared', 'queryDb')).toBe(true);
 
-    // Nothing is struck: the one refused import is value-only, and a row whose
-    // bindings disagree carries the note instead of the strike.
+    // Every other row is available, hence type-available, hence unmarked.
     for (const node of example4.tree.nodes) {
       for (const row of node.rows) {
-        expect(row.struck).toBe(false);
+        expect(row.typeAvailable).toBe(true);
       }
     }
-
-    // Derived, not written: the note reports the two verdicts the evaluator
-    // gives for the two bindings.
-    const row = (example4.tree.nodeById.get('ui')?.rows ?? []).find(
-      (candidate) => candidate.symbol === 'queryDb',
-    );
-    expect(mayImport(tree, uiType, 'shared', 'queryDb')).toBe(true);
-    expect(mayImport(tree, uiValue, 'shared', 'queryDb')).toBe(false);
-    expect(row?.annotations?.find((annotation) => annotation.kind === 'binding')?.text).toBe(
-      'type ✓ · value ✗',
-    );
   });
 
   it('blinks only the arrivals that may really import the selection', () => {
@@ -141,7 +135,7 @@ describe('example 4 — a promise about the closure', () => {
       ),
     ];
 
-    // Selecting queryDb: server blinks, ui stays dark — the mirror image of
+    // Selecting queryDb: server blinks, ui stays dark - the mirror image of
     // example 3's selection story.
     expect(blinkingFor('queryDb')).toEqual(['app/queryDb', 'server/queryDb']);
     // Selecting formatMoney: both blink, and the ui box lights up with its row.

@@ -3,7 +3,7 @@
  *
  * It sets theme variables, plus one generic full-bleed utility. No selector
  * here targets a framework class or a page's markup, so no page depends on
- * this file's existence beyond opting into `.full-bleed` — see the
+ * this file's existence beyond opting into `.full-bleed` - see the
  * portability discipline in `docusaurus.config.ts`.
  */
 
@@ -47,7 +47,7 @@ article {
 /**
  * Wide figure: let one block out of the reading measure and into the page.
  *
- * Not a full bleed — the page keeps its side padding. The block is offered the
+ * Not a full bleed - the page keeps its side padding. The block is offered the
  * viewport minus a comfortable margin and is centred on the article's mid-line
  * (which, since the article is centred, is the page's mid-line). What it does
  * with that room is the figure's business: the diagram caps itself at its own
@@ -77,8 +77,8 @@ article {
  *
  * The pages link a term to its glossary entry where they introduce it, and
  * painting every such term link-blue speckles the prose. A term link is a
- * lookup, so it wears the conventional defined-term cue instead — ink-colored
- * text over a fine dotted underline — and only announces itself as a link on
+ * lookup, so it wears the conventional defined-term cue instead - ink-colored
+ * text over a fine dotted underline - and only announces itself as a link on
  * hover, turning solid primary. Links to the glossary *page* (no fragment)
  * are ordinary navigation and keep the ordinary look.
  *

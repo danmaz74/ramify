@@ -14,7 +14,7 @@ import {
  * exactly as the spec's decision table states it.
  *
  * ```text
- * shop                      (application root — an ordinary module)
+ * shop                      (application root - an ordinary module)
  * ├── catalog
  * │   ├── search
  * │   └── inventory
@@ -50,7 +50,7 @@ const shopDeclaration: ModuleDeclaration = {
       id: 'checkout',
       // `checkout` has both `PaymentApi` and `CartApi` available and treats
       // them differently. Receiving is not exposing: `CartApi` needs no
-      // declaration at all — it is available by consequence and exposed
+      // declaration at all - it is available by consequence and exposed
       // nowhere.
       reExposes: [{ symbol: 'PaymentApi', from: 'payment', exposeToDescendants: true }],
       children: [
@@ -174,7 +174,7 @@ const COLUMNS: readonly SymbolRef[] = [
 ];
 
 /**
- * The spec's §1.3 table verbatim — the acceptance fixture for this evaluator.
+ * The spec's §1.3 table verbatim - the acceptance fixture for this evaluator.
  * `own` = owned, `2` = a child exposed to parent, `3` = an ancestor exposed to
  * descendants, `-` = not available.
  */
@@ -223,49 +223,49 @@ describe('the full ceiling (spec §1.3)', () => {
 // --- The denied examples (spec §1.4) --------------------------------------
 
 describe('the denied examples (spec §1.4)', () => {
-  it('D1: checkout may not import SkuRules — a grant never leaves the granter subtree', () => {
+  it('D1: checkout may not import SkuRules - a grant never leaves the granter subtree', () => {
     expect(explainImport(shop, 'checkout', 'catalog', 'SkuRules')).toEqual({
       allowed: false,
       reason: 'no-exposure-chain',
     });
   });
 
-  it('D2: search may not import reserveStock — there is no sibling channel', () => {
+  it('D2: search may not import reserveStock - there is no sibling channel', () => {
     expect(explainImport(shop, 'search', 'inventory', 'reserveStock')).toEqual({
       allowed: false,
       reason: 'no-exposure-chain',
     });
   });
 
-  it('D3: shipping may not import PaymentApi — it is outside checkout subtree', () => {
+  it('D3: shipping may not import PaymentApi - it is outside checkout subtree', () => {
     expect(explainImport(shop, 'shipping', 'payment', 'PaymentApi')).toEqual({
       allowed: false,
       reason: 'no-exposure-chain',
     });
   });
 
-  it('D4: payment may not import CartApi — available in checkout, exposed no further', () => {
+  it('D4: payment may not import CartApi - available in checkout, exposed no further', () => {
     expect(explainImport(shop, 'payment', 'cart', 'CartApi')).toEqual({
       allowed: false,
       reason: 'no-exposure-chain',
     });
   });
 
-  it('D5: checkout may not import retryQueue — there is no implicit public surface', () => {
+  it('D5: checkout may not import retryQueue - there is no implicit public surface', () => {
     expect(explainImport(shop, 'checkout', 'payment', 'retryQueue')).toEqual({
       allowed: false,
       reason: 'never-exposed',
     });
   });
 
-  it('undrawn: shop may not import SkuRules — the two channels are independent', () => {
+  it('undrawn: shop may not import SkuRules - the two channels are independent', () => {
     expect(explainImport(shop, 'shop', 'catalog', 'SkuRules')).toEqual({
       allowed: false,
       reason: 'no-exposure-chain',
     });
   });
 
-  it('undrawn: shop may not import CartApi — available in checkout, exposed nowhere', () => {
+  it('undrawn: shop may not import CartApi - available in checkout, exposed nowhere', () => {
     expect(explainImport(shop, 'shop', 'cart', 'CartApi')).toEqual({
       allowed: false,
       reason: 'no-exposure-chain',
@@ -460,7 +460,7 @@ describe('an owner that does not export', () => {
 });
 
 describe('asking about a symbol at a module that does not own it', () => {
-  it('is denied even though ProductId is available in shop — routing is not ownership', () => {
+  it('is denied even though ProductId is available in shop - routing is not ownership', () => {
     expect(mayImport(shop, 'search', 'catalog', 'ProductId')).toBe(true);
     expect(explainImport(shop, 'search', 'shop', 'ProductId')).toEqual({
       allowed: false,
@@ -475,7 +475,7 @@ describe('asking about a symbol at a module that does not own it', () => {
     });
   });
 
-  it('throws for an unknown module id — a typo is an error, not a denial', () => {
+  it('throws for an unknown module id - a typo is an error, not a denial', () => {
     expect(() => mayImport(shop, 'warehouse', 'shop', 'Money')).toThrow(/Unknown module/);
     expect(() => mayImport(shop, 'shop', 'warehouse', 'Money')).toThrow(/Unknown module/);
   });

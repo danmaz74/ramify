@@ -4,7 +4,7 @@
  * Two jobs, in this order:
  *
  * 1. **Content.** Every row of every node box is *derived* from the
- *    declaration through the evaluator — including the whole received
+ *    declaration through the evaluator - including the whole received
  *    compartment and its provenance, which is exactly what
  *    `explainAvailability(...).via` reports. Nothing about receiving is
  *    declared anywhere, and that is the point: `CartApi` is available in
@@ -12,11 +12,11 @@
  *    `checkout` made. Which of the two arrival channels a diagram lists is the
  *    one editorial choice here (`nodeContent.includeAncestorGrants`).
  *
- *    Structure asks the *availability* question, never the importability one:
+ *    Structure asks the *visibility* question, never the availability one:
  *    a box lists what the exposure chain put within the module's reach, and a
  *    tag restricts who may take it rather than where it arrives. The tags then
- *    enter as content of their own — the chip a tagged symbol wears on every
- *    row, the binding note a row carries where the two bindings disagree, and
+ *    enter as content of their own - the chip a tagged symbol wears on every
+ *    row, the strike on a visible-not-available arrival, and
  *    the declared importer contexts drawn inside the node that declares them.
  * 2. **Position.** `d3-hierarchy`'s tidy tree, with a separation function that
  *    already knows each box's width, followed by a relaxation pass that
@@ -54,9 +54,9 @@ export type ExposureMarker = '▲' | '▼' | '▲▼' | '·';
 /**
  * Why a symbol appears in a node box.
  *
- * - `owns` — a file belonging to the module exports it.
- * - `received` — a direct child exposed it to its parent.
- * - `granted` — a proper ancestor exposed it to its descendants.
+ * - `owns` - a file belonging to the module exports it.
+ * - `received` - a direct child exposed it to its parent.
+ * - `granted` - a proper ancestor exposed it to its descendants.
  *
  * The three are exactly the clauses of the rule, so a row's kind is checkable
  * against `explainImport(...).clause` and `./validate.ts` checks it.
@@ -66,16 +66,12 @@ export type RowKind = 'owns' | 'received' | 'granted';
 /**
  * A muted label a row carries after its symbol name.
  *
- * - `tags` — the exposure tags the symbol's owner declared, in the doc's
- *   notation (`testing`). The chip travels with the symbol, so it is
+ * - `tags` - the tags the symbol's owner declared, each behind the glyph of
+ *   its rule (`⇥ testing`). The chip travels with the symbol, so it is
  *   drawn on the owner's row and on every arrival alike.
- * - `binding` — drawn only where the two import bindings disagree
- *   (`type ✓ · value ✗`), because a platform requirement exempts type-only
- *   imports and a testing requirement does not. Nothing but the evaluator's two
- *   verdicts decides its words.
  */
 export interface RowAnnotation {
-  readonly kind: 'tags' | 'binding';
+  readonly kind: 'tags';
   readonly text: string;
   /** x of the annotation's start, relative to the node box's left edge. */
   readonly dx: number;
@@ -86,7 +82,7 @@ export interface RowAnnotation {
  * named context over some of its files, or the whole module classified at once.
  *
  * A context classifies importing code, so what it says about a diagram is which
- * of the traced symbols its files may actually import — {@link imports}, the
+ * of the traced symbols its files may actually import - {@link imports}, the
  * set that lights up when one of them is selected.
  */
 export interface DrawnContext {
@@ -97,10 +93,10 @@ export interface DrawnContext {
   readonly label: string;
   /** The context tags in force for these files, most specific first. */
   readonly tags: readonly ModuleTag[];
-  /** The line under the label: `test context`. */
+  /** The line under the label: `testing module`. */
   readonly caption: string;
   /**
-   * The traced symbols these files may value-import, owned elsewhere — the
+   * The traced symbols these files may value-import, owned elsewhere - the
    * arrivals a selection lights up here. Derived through `mayImport` with this
    * context as the importer, so a tag that refuses the import keeps the box
    * dark.
@@ -112,10 +108,10 @@ export interface DrawnContext {
 export interface SymbolRow {
   readonly id: string;
   readonly kind: RowKind;
-  /** Slug of the compartment the row is drawn in — the element-id stem. */
+  /** Slug of the compartment the row is drawn in - the element-id stem. */
   readonly compartment: string;
   readonly symbol: SymbolName;
-  /** The module that owns the symbol — for an arrival row, never this node. */
+  /** The module that owns the symbol - for an arrival row, never this node. */
   readonly owner: ModuleId;
   /**
    * Absent on `granted` rows: a module can only re-expose what it owns or was
@@ -135,23 +131,32 @@ export interface SymbolRow {
   readonly y: number;
   /** The exposure tags the symbol carries. Omitted for the default channel. */
   readonly tags?: readonly SymbolTag[];
-  /** Muted labels after the name: the tag chip, then the binding note. */
+  /** Muted labels after the name: the tag chip. */
   readonly annotations?: readonly RowAnnotation[];
   /**
    * Whether a file of this module's own context may *value-import* the symbol.
    *
    * Availability put the row here; this says whether the tags let this module
-   * take it. False rows are drawn exactly like the others — absence is not the
-   * statement here, the chip is — but they never blink when the symbol is
+   * take it. False rows are drawn exactly like the others - absence is not the
+   * statement here, the chip is - but they never blink when the symbol is
    * selected, which is what "production compartments stay dark" means.
    */
   readonly importable: boolean;
   /**
-   * Visible here, not available: no file of this module may import the symbol
-   * in any binding, so the name is drawn struck through. A row whose bindings
-   * disagree is not struck — its binding note reports the split instead.
+   * Visible here, not available: this module's files may not import the
+   * symbol, so the name is drawn struck through. The strike tells the
+   * availability (value-import) story.
    */
   readonly struck: boolean;
+  /**
+   * The evaluator's type-import verdict. On a struck row that is still
+   * type-available, the name is followed by an unstruck `∗` - the one mark
+   * the type story leaves in the main diagrams; the footnote it points at is
+   * the page's type-imports section. Available rows are always
+   * type-available (the glossary's invariant), so the mark never appears on
+   * an unstruck row.
+   */
+  readonly typeAvailable: boolean;
 }
 
 export type Compartment =
@@ -256,7 +261,7 @@ function slugify(title: string): string {
 
 /**
  * The symbols available in a module that it does not own, with the direct child
- * that exposed each to it — read straight off the evaluator's child-exposure
+ * that exposed each to it - read straight off the evaluator's child-exposure
  * explanation. An availability question, so no tag is consulted: an arrival is
  * an arrival whether or not the importing files may take it.
  */
@@ -270,7 +275,7 @@ export function derivedHoldings(
 
 /**
  * The symbols a proper ancestor granted to a module, with the granting
- * ancestor — the evaluator's `ancestor-grant` clause, and the second way a
+ * ancestor - the evaluator's `ancestor-grant` clause, and the second way a
  * symbol becomes available somewhere its owner never named.
  */
 export function derivedGrants(
@@ -357,7 +362,7 @@ function markerFor(toParent: boolean, toDescendants: boolean): ExposureMarker {
 /**
  * A row's width in characters: marker column, symbol, any annotations, and the
  * provenance. Arrival names render italic, which stays within the shared
- * per-character estimate — only the slant differs, not the advance width.
+ * per-character estimate - only the slant differs, not the advance width.
  *
  * The annotations are measured in their own smaller font and converted into
  * this budget's character unit, rounded up: a row must be *wider* than its ink,
@@ -370,7 +375,10 @@ function rowChars(row: {
   symbol: string;
   provenance?: string;
   annotations?: readonly RowAnnotation[];
+  struck?: boolean;
+  typeAvailable?: boolean;
 }): number {
+  const star = row.struck === true && row.typeAvailable === true ? 1 : 0;
   const annotations = (row.annotations ?? []).reduce(
     (total, annotation) =>
       total + LAYOUT.node.annotationGap + annotation.text.length * LAYOUT.node.annotationCharWidth,
@@ -387,7 +395,7 @@ function rowChars(row: {
             row.symbol.length * (LAYOUT.node.nameCharWidth - LAYOUT.node.charWidth)) /
             LAYOUT.node.charWidth,
         );
-  const left = (row.marker ?? ' ').length + 1 + row.symbol.length + extra;
+  const left = (row.marker ?? ' ').length + 1 + row.symbol.length + star + extra;
   return row.provenance === undefined ? left : left + 3 + row.provenance.length;
 }
 
@@ -395,21 +403,21 @@ function rowChars(row: {
 type DraftRow = Omit<SymbolRow, 'id' | 'compartment' | 'layer' | 'color' | 'y'>;
 
 /**
- * The glyph of the availability rule each tag carries — a mirror-arrow pair
+ * The glyph of the availability rule each tag carries - a mirror-arrow pair
  * drawing the direction of the rule's demand:
  *
- * - `⇥` — required module tag: the demand travels out with the symbol and is
- *   checked where it lands — available only in modules carrying the same tag.
+ * - `⇥` - required module tag: the demand travels out with the symbol and is
+ *   checked where it lands - available only in modules carrying the same tag.
  *   Carried by `testing`.
- * - `⇤` — required symbol tag: the demand faces inward at the module's door
- *   and is checked on everything arriving — the module value-imports only
+ * - `⇤` - required symbol tag: the demand faces inward at the module's door
+ *   and is checked on everything arriving - the module value-imports only
  *   symbols carrying the same tag. Carried by `browser`.
  *
- * (An earlier pair drew miniatures of the part that must match — `▢` the
- * module box, `▭` the symbol pill — but the two outlines were barely
+ * (An earlier pair drew miniatures of the part that must match - `▢` the
+ * module box, `▭` the symbol pill - but the two outlines were barely
  * distinguishable at chip size.)
  *
- * A tag is not just a name — it always carries its availability rule — so the
+ * A tag is not just a name - it always carries its availability rule - so the
  * glyph accompanies the tag wherever the diagram mentions it.
  */
 export const TAG_GLYPHS: Readonly<Record<Tag, string>> = {
@@ -431,29 +439,13 @@ export function tagChipText(tags: readonly SymbolTag[]): string | undefined {
   return tags.length === 0 ? undefined : tags.map(tagWithGlyph).join(' · ');
 }
 
-/**
- * The note a row carries when the two import bindings disagree — the whole of
- * the type-versus-value affordance, and it is spelled out in words rather than
- * added to the legend.
- *
- * Both verdicts are the evaluator's, and the note simply reports them, so the
- * only universe that grows a note is one where a tag actually treats the two
- * bindings differently.
- */
-export function bindingNoteText(typeAllowed: boolean, valueAllowed: boolean): string | undefined {
-  if (typeAllowed === valueAllowed) {
-    return undefined;
-  }
-  return `type ${typeAllowed ? '✓' : '✗'} · value ${valueAllowed ? '✓' : '✗'}`;
-}
-
-/** Place a row's annotations after its name, left to right. */
+/** Place a row's annotations after its name (and any `*`), left to right. */
 function placeAnnotations(
   marker: string | undefined,
-  symbol: SymbolName,
+  nameChars: number,
   texts: readonly { readonly kind: RowAnnotation['kind']; readonly text: string }[],
 ): RowAnnotation[] {
-  let dx = rowLabelDx(marker) + symbol.length * LAYOUT.node.nameCharWidth;
+  let dx = rowLabelDx(marker) + nameChars * LAYOUT.node.nameCharWidth;
   return texts.map(({ kind, text }) => {
     dx += LAYOUT.node.annotationGap;
     const placed: RowAnnotation = { kind, text, dx };
@@ -463,41 +455,46 @@ function placeAnnotations(
 }
 
 /**
- * Everything the tags say about one drawn row: the chip its symbol carries, the
- * note its bindings need, and whether this module's own files may take it.
+ * Everything the tags say about one drawn row: the chip its symbol carries and
+ * whether this module's own files may take it.
+ *
+ * The diagrams tell the availability story - the value-import story. A symbol
+ * that is only type-available draws exactly like one that is not available at
+ * all: type-availability is a separate concern, explained in prose, never a
+ * row affordance.
  */
 function tagFacts(
   tree: ModuleTree,
   moduleId: ModuleId,
   row: { readonly marker?: string; readonly symbol: SymbolName; readonly owner: ModuleId },
-): Pick<SymbolRow, 'tags' | 'annotations' | 'importable' | 'struck'> {
+): Pick<SymbolRow, 'tags' | 'annotations' | 'importable' | 'struck' | 'typeAvailable'> {
   const tags = symbolTagsOf(tree, row.owner, row.symbol);
   const importable = mayImport(tree, { module: moduleId, binding: 'value' }, row.owner, row.symbol);
-  const typeImportable = mayImport(
+  const typeAvailable = mayImport(
     tree,
     { module: moduleId, binding: 'type' },
     row.owner,
     row.symbol,
   );
-  const note = bindingNoteText(typeImportable, importable);
+  const starred = !importable && typeAvailable;
 
   const chip = tagChipText(tags);
-  const annotations = placeAnnotations(row.marker, row.symbol, [
+  const annotations = placeAnnotations(row.marker, row.symbol.length + (starred ? 1 : 0), [
     ...(chip === undefined ? [] : [{ kind: 'tags' as const, text: chip }]),
-    ...(note === undefined ? [] : [{ kind: 'binding' as const, text: note }]),
   ]);
 
   return {
     ...(tags.length === 0 ? {} : { tags }),
     ...(annotations.length === 0 ? {} : { annotations }),
     importable,
-    struck: !importable && !typeImportable,
+    struck: !importable,
+    typeAvailable,
   };
 }
 
 /**
  * The importer contexts drawn inside one module: each context it declares, and
- * — when its own files are classified — the module itself.
+ * - when its own files are classified - the module itself.
  *
  * The tags of a whole-module context are the *effective* ones, so a submodule of
  * a browser module states the classification it inherited rather than pretending
@@ -605,7 +602,7 @@ function buildContent(context: DiagramContext): Map<ModuleId, NodeContent> {
 
     // An ancestor-granted symbol arrives with no decision for this module to
     // make: re-exposing it is a no-op, so the row carries no marker and is
-    // never gray — gray means *stops here*, and nothing stopped.
+    // never gray - gray means *stops here*, and nothing stopped.
     const grantedRows = nodeContent.includeAncestorGrants
       ? derivedGrants(tree, id, allRefs).map(
           (granted): DraftRow => ({
@@ -639,8 +636,8 @@ function buildContent(context: DiagramContext): Map<ModuleId, NodeContent> {
 
     const contexts = drawnContexts(tree, id, definition.tracedSymbols);
 
-    // The header carries the module's name, the root badge, and — when the
-    // module itself is a context — the tag label that says so.
+    // The header carries the module's name, the root badge, and - when the
+    // module itself is a context - the tag label that says so.
     const headerChars = [
       id,
       ...(isRoot ? [APP_ROOT_BADGE] : []),
@@ -648,7 +645,7 @@ function buildContent(context: DiagramContext): Map<ModuleId, NodeContent> {
     ].join('   ').length;
     // A named context's box has two lines of its own, drawn inside its own
     // inset: measured in that font, then converted into the row budget. A
-    // whole-module context adds nothing here — its label rides the header.
+    // whole-module context adds nothing here - its label rides the header.
     const contextChars = contexts.named.map((context) =>
       Math.ceil(
         (2 * LAYOUT.node.contextInset +
@@ -911,7 +908,7 @@ export function layoutTree(context: DiagramContext): TreeGeometry {
   };
 }
 
-/** Centre of a node box's bottom edge — where propagation and chords attach. */
+/** Centre of a node box's bottom edge - where propagation and chords attach. */
 export function bottomCenter(node: NodeLayout): { x: number; y: number } {
   return { x: node.box.x + node.box.width / 2, y: node.box.y + node.box.height };
 }

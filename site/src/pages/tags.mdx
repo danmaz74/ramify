@@ -1,9 +1,9 @@
 ---
 title: Tags
-description: What a tag is — a name carrying an availability rule — the two rules that exist, and how the diagrams write them.
+description: What a tag is - a name carrying an availability rule - the two rules that exist, and how the diagrams write them.
 # Same reasoning as the model and examples pages: the diagram wants the page's
 # width, and a table-of-contents column would both narrow the column it widens
-# out of and sit under the figure's right-hand side. Frontmatter only — no
+# out of and sit under the figure's right-hand side. Frontmatter only - no
 # theme swizzling.
 hide_table_of_contents: true
 ---
@@ -21,8 +21,8 @@ export const TagRef = ({ rule, name }) => (
 
 The tree rules decide [**visibility**](/glossary#module-visible-symbol):
 which symbols the exposure chains put within a module's reach. Two real needs are not expressible with visibility
-alone. Tests need deliberately selected internals of a module — fakes,
-in-memory stores, reset hooks — that production code must never be able to
+alone. Tests need deliberately selected internals of a module - fakes,
+in-memory stores, reset hooks - that production code must never be able to
 import. Code that runs in a browser must only import symbols whose entire
 runtime closure is browser-safe. Both are the same shape: a fact about the
 **importing module** and a fact about the **exposed symbol** have to be
@@ -40,16 +40,16 @@ and it always carries it.** Assign the tag, and the rule comes along.
 
 An [availability rule](/glossary#tag-based-availability-rules) defines which
 combinations of module and symbol tags make an exposed symbol
-[**available**](/glossary#module-available-symbol) — importable by the
-module's files — out of the symbols that are merely **visible** there. (Everything on this page, and
+[**available**](/glossary#module-available-symbol) - importable by the
+module's files - out of the symbols that are merely **visible** there. (Everything on this page, and
 everything the diagrams draw, is about the ordinary **value import**; the
 type-only import is a separate concern with [its own section](#type-imports)
 at the end.) Two rules exist, and they are mirror images:
 
-- **Required module tag** — written <TagRef rule="⇥" />: the demand rides out
+- **Required module tag** - written <TagRef rule="⇥" />: the demand rides out
   with the symbol, checked where it lands. If the *symbol* has the tag, it is
   available from exposure only in modules carrying the same tag.
-- **Required symbol tag** — written <TagRef rule="⇤" />: the demand faces in
+- **Required symbol tag** - written <TagRef rule="⇤" />: the demand faces in
   at the module's door, checked on everything arriving. If the *module* has
   the tag, the only symbols visible from exposure that are available in it are
   those carrying the same tag.
@@ -57,52 +57,52 @@ at the end.) Two rules exist, and they are mirror images:
 When several rules apply to the same symbol and module, all of them must be
 satisfied. And **tags never grant**: no rule makes an import possible that the
 exposure chain did not already allow. A tag can only *withhold* a symbol that
-is visible — which is why the two universes below deliberately re-show nothing
-from the [illustrative examples](/examples): both trees are two hops deep,
+is visible - which is why the two universes below deliberately re-show nothing
+from the [core model examples](/model): both trees are two hops deep,
 everything is exposed up to the root and granted back down, and visibility is
 therefore identical in every box by construction. The tag is the only variable
 in the picture.
 
 ## How the diagrams write it
 
-- **A tag always appears behind the glyph of its rule** —
-  <TagRef rule="⇥" name="testing" />, <TagRef rule="⇤" name="browser" /> —
+- **A tag always appears behind the glyph of its rule** -
+  <TagRef rule="⇥" name="testing" />, <TagRef rule="⇤" name="browser" /> -
   because the name and the rule are one thing. On a symbol the
   tag is a chip on a filled pill, drawn on the owner's row and on every
   arrival alike: tags travel with the symbol, and no module along the route
   can add, remove or change one. On a module the tag labels a dashed box
   filling the node.
 - **Visible but not available is struck through.** A withheld arrival is still
-  drawn — the exposure chain really does put the symbol there — but its name
+  drawn - the exposure chain really does put the symbol there - but its name
   wears a strike: you can see it, you cannot have it. One refinement: a
-  struck name followed by an unstruck `∗` is still *type-available* — the
+  struck name followed by an unstruck `∗` is still *type-available* - the
   asterisk is a footnote mark, and the footnote is the
   [type imports](#type-imports) section.
 - **Selecting a tagged symbol** blinks exactly the arrivals where it is
   available; withheld rows stay dark. The strike and the blink state the same
-  verdicts — one statically, one in motion.
+  verdicts - one statically, one in motion.
 
 ## The `testing` tag
 
 **Why it exists:** tests legitimately need internals that must never become
-production dependencies. Without a tag, an owner faces a false choice — expose
+production dependencies. Without a tag, an owner faces a false choice - expose
 a reset hook to everyone or to no one. `testing` resolves it: the owner
 exposes exactly the internals tests may touch, tagged, through the ordinary
 channels.
 
 **On a symbol,** `testing` marks test support and carries the
 required-module-tag rule (<TagRef rule="⇥" />): the symbol is available only in modules tagged
-`testing`, for imports of either binding — a type import of a test fake is
+`testing`, for imports of either binding - a type import of a test fake is
 still test-only coupling. It is also *exclusive*: a symbol is real contract or
 test support, never ambiguously both. **On a module,** `testing` classifies
 the files as tests, and everything such a module exposes is implicitly tagged
-`testing` — test infrastructure can never leak into a production contract.
+`testing` - test infrastructure can never leak into a production contract.
 
 `orders` owns two symbols and exposes both to its parent; `app` grants both to
 its subtree; `integration-tests` is a testing module beside the production
-consumers. Identical chains, identical arrivals — and one symbol wears
+consumers. Identical chains, identical arrivals - and one symbol wears
 <TagRef rule="⇥" name="testing" />. Read `billing`'s box: `resetOrderStore` is listed, provenance and
-all, with its name struck — visible there, not available. The same strike
+all, with its name struck - visible there, not available. The same strike
 appears in `app`'s own box, because routing a grant earns no right to import
 it. In the testing module the name is plain: both rules of the verdict table
 are in the static picture.
@@ -129,7 +129,7 @@ mechanism enough:
 
 **Why it exists:** browser code must not pull in Node-only dependencies, and
 the line between browser-safe and Node-only runs *through* modules, not
-between them — a `shared` module can own both `formatMoney` and `queryDb`.
+between them - a `shared` module can own both `formatMoney` and `queryDb`.
 Splitting every such module in two would multiply modules to encode one fact.
 `browser` states the fact per symbol instead.
 
@@ -139,14 +139,14 @@ the required-symbol-tag rule (<TagRef rule="⇤" />): the module may import only
 `browser` is a falsifiable promise that the symbol's entire transitive runtime
 closure is browser-safe, the owner's private files included. It carries no
 rule of its own; it is what the module-side rule asks for. The promise is
-verified separately, and a false claim is reported at the owner — never at the
+verified separately, and a false claim is reported at the owner - never at the
 importer, which did nothing wrong by believing it.
 
 The mirror image of example 3: here the *module* wears the tag, and the rule
-asks the *symbols* for a match. `ui` is a browser module — the same dashed box
-as the testing module, labeled <TagRef rule="⇤" name="browser" /> — and `queryDb`'s row in it is
+asks the *symbols* for a match. `ui` is a browser module - the same dashed box
+as the testing module, labeled <TagRef rule="⇤" name="browser" /> - and `queryDb`'s row in it is
 struck: visible there, not available, exactly like example 3's struck rows.
-Selecting `queryDb` shows the dynamic version — `server` lights up and `ui`
+Selecting `queryDb` shows the dynamic version - `server` lights up and `ui`
 stays dark.
 
 <div className="wide-figure">
@@ -161,14 +161,14 @@ stays dark.
 
 ## Type imports
 
-Everything above is about value imports — the ordinary import, the one that
+Everything above is about value imports - the ordinary import, the one that
 puts another module's code in your bundle. TypeScript's other form,
 `import type`, is erased at compile time and carries no runtime dependency,
 and it gets one refinement of its own: a symbol is
 [**type-available**](/glossary#type-availability) in a module when the
 module's files may import it as a type.
 
-The two verdicts can only differ one way — **available always implies
+The two verdicts can only differ one way - **available always implies
 type-available**, never the reverse (the specification decides "no rule is
 type-only"). So the full chain is:
 
@@ -176,13 +176,13 @@ type-only"). So the full chain is:
 
 Whether a rule exempts type imports follows from what its claim is about:
 
-- **`browser`'s claim is about runtime** — "this closure is safe to
+- **`browser`'s claim is about runtime** - "this closure is safe to
   *execute* in a browser." An erased import executes nothing, so the rule
   covers value imports only. `queryDb` is therefore struck in `ui` (not
-  available) yet still type-available there — the unstruck `∗` after its
-  struck name is this fact: `ui` may reference its signature —
-  `runQuery: typeof queryDb` — without ever bundling the implementation.
-- **`testing`'s claim is about coupling** — "this is not part of the
+  available) yet still type-available there - the unstruck `∗` after its
+  struck name is this fact: `ui` may reference its signature -
+  `runQuery: typeof queryDb` - without ever bundling the implementation.
+- **`testing`'s claim is about coupling** - "this is not part of the
   production contract." A production function typed in terms of a test
   fake violates that at the type level just as thoroughly as at runtime, so
   the rule covers both forms: `resetOrderStore` in `billing` is not even
@@ -190,14 +190,14 @@ Whether a rule exempts type imports follows from what its claim is about:
 
 The diagrams give all of this exactly one character: the strike means "not
 available", and an unstruck `∗` after a struck name marks the middle band of
-the chain — type-available but not available. Everything else about type
+the chain - type-available but not available. Everything else about type
 imports lives here in prose, where it can be explained rather than notated.
 
 ## Where the precision lives
 
 The examples on this page are teaching material. The normative document is the
 cross-module importability rules specification, which ships with the
-repository at `docs/model/cross-module-importability-rules.md` — the tag rules
-are its "Contextual rules" section — with the vocabulary defined in the
+repository at `docs/model/cross-module-importability-rules.md` - the tag rules
+are its "Contextual rules" section - with the vocabulary defined in the
 [glossary](/glossary). Where a page and the specification appear to disagree,
 the specification is right.

@@ -5,7 +5,7 @@
  * said they had to be. They are hard-coded for this one example universe on
  * purpose: the plan scopes out a generic layout engine ("the renderer may
  * hard-code this example's geometry"). What is *not* hard-coded is any
- * position — every coordinate in the diagram is computed from the declaration.
+ * position - every coordinate in the diagram is computed from the declaration.
  *
  * Pure: numbers and strings only.
  */
@@ -40,7 +40,7 @@ export const LAYOUT = {
     charWidth: 7,
     paddingX: 11,
     paddingBottom: 9,
-    /** §3.9: 22 px header — 24 here, so the "app root" badge is not cramped. */
+    /** §3.9: 22 px header - 24 here, so the "app root" badge is not cramped. */
     headerHeight: 24,
     /** §3.9: 18 px per symbol row. */
     rowHeight: 18,
@@ -53,7 +53,7 @@ export const LAYOUT = {
     /** Width of one glyph of a row's marker column: `▲▼` is two glyphs wide. */
     markerGlyphWidth: 10,
     /**
-     * Advance width of a row's 12 px symbol name — a deliberate upper bound.
+     * Advance width of a row's 12 px symbol name - a deliberate upper bound.
      * The annotations that follow a name are placed from this estimate, and a
      * generous gap reads as a column while a negative one reads as a typo, so
      * the number is chosen to over-shoot the widest realistic name rather than
@@ -62,7 +62,7 @@ export const LAYOUT = {
     nameCharWidth: 7.5,
     /**
      * Advance width of the 9.5 px muted annotations a row carries after its
-     * name — the exposure-tag chip, and the binding note. Generous on purpose:
+     * name - the exposure-tag chip, and the binding note. Generous on purpose:
      * ``, `✓` and `·` are wider than the letters around them, and a row's
      * width budget must over-reserve rather than let two labels touch.
      */
@@ -144,7 +144,7 @@ export const LAYOUT = {
     columnGap: 20,
     titleHeight: 19,
     rowHeight: 16,
-    glyphWidth: 40,
+    glyphWidth: 50,
     fontSize: 10.5,
     charWidth: 5.3,
     noteFontSize: 10,
@@ -158,7 +158,7 @@ export const LAYOUT = {
   /**
    * The traced-contracts panel at the top left: the diagram's selection
    * control, promoted out of the legend. A caption row, then one row per
-   * traced contract — `swatch symbol — role` — stacked vertically. The band's
+   * traced contract - `swatch symbol - role` - stacked vertically. The band's
    * height depends only on how many contracts a diagram traces, never on the
    * selection, so selecting never reflows the tree.
    */

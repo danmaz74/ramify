@@ -103,7 +103,7 @@ describe('buildTree', () => {
     );
   });
 
-  it('accepts an importer context with no tags — representable and inert', () => {
+  it('accepts an importer context with no tags - representable and inert', () => {
     const tree = buildTree({ id: 'a', contexts: [{ name: 'scratch', tags: [] }] });
     expect(tree.modules.get('a')?.contexts).toEqual([{ name: 'scratch', tags: [] }]);
   });

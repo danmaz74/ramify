@@ -6,7 +6,7 @@
  *
  * Everything else about the view is asserted against static markup. This file
  * exists because "click a symbol to see its propagation" is behaviour, not
- * markup — the component owns the selection state, and a controlled-prop test
+ * markup - the component owns the selection state, and a controlled-prop test
  * would not prove that the handlers are wired to it.
  */
 
@@ -216,7 +216,7 @@ describe('clicking a symbol', () => {
   it('takes the room it is given, with a legibility floor and a scrolling wrapper', () => {
     mount();
     const root = find('[data-kind="diagram-root"]') as HTMLElement;
-    // Takes whatever room the container offers, up to its own natural width —
+    // Takes whatever room the container offers, up to its own natural width -
     // magnifying past 1:1 would only make the figure taller.
     expect(root.style.width).toBe('100%');
     expect(root.style.maxWidth).toBe('1135px');
@@ -274,7 +274,7 @@ describe('a second diagram', () => {
   it('writes each contract’s role in its header row', () => {
     mount({ definition: example1Diagram });
     expect(find('[data-kind="header-chip"][data-symbol="computeTotal"]').textContent).toBe(
-      'computeTotal — owner → parent → root → everywhere',
+      'computeTotal - owner → parent → root → everywhere',
     );
   });
 
@@ -282,7 +282,7 @@ describe('a second diagram', () => {
     mount({ definition: example1Diagram });
     click('[data-kind="header-chip"][data-symbol="ShipmentPlan"]');
     expect(find('svg').getAttribute('data-selected-symbol')).toBe('ShipmentPlan');
-    // One decision, one marching grant flow, one blinking arrival — nothing
+    // One decision, one marching grant flow, one blinking arrival - nothing
     // above `shipping` ever moves, because nothing above was ever involved.
     expect(flowing()).toHaveLength(lanesOf('ShipmentPlan'));
     expect(blinking()).toEqual(['routingOptimization/ShipmentPlan']);
@@ -313,7 +313,7 @@ describe('selecting a symbol in a tag universe', () => {
     click('[data-kind="header-chip"][data-symbol="resetOrderStore"]');
     expect(blinking()).toEqual(['integration-tests/resetOrderStore']);
     expect(litContexts()).toEqual(['integration-tests/module']);
-    // The row is still drawn in `billing`, and still says where it came from —
+    // The row is still drawn in `billing`, and still says where it came from -
     // it just goes dark, which is a contrast that survives reduced motion.
     const dark = find('#node-billing-exposed-to-it-resetOrderStore');
     expect(dark.getAttribute('data-importable')).toBe('false');
@@ -332,7 +332,7 @@ describe('selecting a symbol in a tag universe', () => {
       'rmf-dim-soft',
     );
 
-    // "Selecting OrderService: both blink — the contrast is the picture."
+    // "Selecting OrderService: both blink - the contrast is the picture."
     click('[data-kind="header-chip"][data-symbol="OrderService"]');
     expect(blinking()).toEqual([
       'app/OrderService',
@@ -342,16 +342,21 @@ describe('selecting a symbol in a tag universe', () => {
     expect(litContexts()).toEqual(['integration-tests/module']);
   });
 
-  it('mirrors it for the browser module, per binding', () => {
+  it('mirrors it for the browser module', () => {
     mount({ definition: example4Diagram });
 
     // "Selecting queryDb: server blinks, ui stays dark."
     click('[data-kind="header-chip"][data-symbol="queryDb"]');
     expect(blinking()).toEqual(['app/queryDb', 'server/queryDb']);
     expect(litContexts()).toEqual([]);
-    // …and the row says why, in words: the type import is the one that passes.
-    expect(find('#node-ui-exposed-to-it-queryDb-binding').textContent).toBe('type ✓ · value ✗');
-    expect(container.querySelectorAll('[data-kind="node-row-binding"]')).toHaveLength(1);
+    // …and the strike states the same verdict statically, with the unstruck
+    // asterisk saying the type import still passes. No binding note exists.
+    expect(
+      find('#node-ui-exposed-to-it-queryDb-label').getAttribute('text-decoration'),
+    ).toBe('line-through');
+    expect(find('#node-ui-exposed-to-it-queryDb-type-available').textContent).toBe('∗');
+    expect(container.querySelectorAll('[data-kind="node-row-type-available"]')).toHaveLength(1);
+    expect(container.querySelectorAll('[data-kind="node-row-binding"]')).toHaveLength(0);
 
     // "Selecting formatMoney: both blink."
     click('[data-kind="header-chip"][data-symbol="formatMoney"]');
@@ -579,7 +584,7 @@ describe('pan and zoom', () => {
   });
 
   /**
-   * Pointer capture retargets the whole gesture — including the `click` — to
+   * Pointer capture retargets the whole gesture - including the `click` - to
    * the capturing element. Taking it on pointerdown therefore makes every
    * click land on the <svg>, and nothing inside the diagram is selectable
    * again. jsdom implements no pointer capture, so the only way to catch that

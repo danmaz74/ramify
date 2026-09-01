@@ -1,5 +1,5 @@
 /**
- * Diagram 1 — the core tree model, drawn on a small online shop.
+ * Diagram 1 - the core tree model, drawn on a small online shop.
  *
  * This is the complete declaration of `docs/site/diagram1-spec.md` §1.1–§1.2
  * (eight modules, eight symbols, and the exposure decision each owner made)
@@ -8,7 +8,7 @@
  * words on the legend.
  *
  * Everything the diagram draws beyond the declaration is *derived* from it by
- * the evaluator — including the `holds` compartments, which need no
+ * the evaluator - including the `holds` compartments, which need no
  * declaration at all: `CartApi` is available in `checkout` purely as a
  * consequence of `cart` exposing it to its parent.
  *
@@ -30,7 +30,7 @@ import type { ModuleDeclaration, ModuleId, ModuleTree } from '../model-access.js
  * A small online shop. Three levels, eight modules, one leaf branch.
  *
  * ```text
- * shop                      (application root — an ordinary module)
+ * shop                      (application root - an ordinary module)
  * ├── catalog
  * │   ├── search
  * │   └── inventory
@@ -87,8 +87,8 @@ export const shopDeclaration: ModuleDeclaration = {
 };
 
 /**
- * §3.7's criterion — *a symbol is traced iff its reach was decided by a module
- * other than its owner* — picks exactly these three. `CartApi` is traced even
+ * §3.7's criterion - *a symbol is traced iff its reach was decided by a module
+ * other than its owner* - picks exactly these three. `CartApi` is traced even
  * though its chain stops at the first hop: the colored ribbon halting dead at
  * `checkout`, beside `PaymentApi`'s ribbon continuing down, is the lesson
  * (§5.2).
@@ -177,7 +177,7 @@ export const chordSpecs: readonly ChordSpec[] = [
  * surprises people.
  */
 export const uniformGrantFootnote: readonly string[] = [
-  'A1 — search may import ProductId. catalog exposed it only to its parent, so catalog gave',
+  'A1 - search may import ProductId. catalog exposed it only to its parent, so catalog gave',
   'its own children nothing; shop sent it back down into every branch, including the branch it',
   'came up through. A descendant grant is uniform: no backflow exclusion, no provenance carried.',
 ];
@@ -185,13 +185,13 @@ export const uniformGrantFootnote: readonly string[] = [
 /**
  * The what-if annotation (X4, kept at §5.1): a dashed in-node note on
  * `shipping`, the only witness for subdivision invariance. It is explicitly
- * hypothetical — `rates` and `labels` are not declared modules and never
+ * hypothetical - `rates` and `labels` are not declared modules and never
  * become nodes.
  */
 export const whatIfNote: WhatIfNote = {
   moduleId: 'shipping',
   title: 'what-if',
-  text: 'split into rates + labels: both keep exactly these imports — grants address subtrees, not shapes',
+  text: 'split into rates + labels: both keep exactly these imports - grants address subtrees, not shapes',
 };
 
 /**
@@ -277,13 +277,13 @@ export const legendGroups: readonly LegendGroup[] = [
 
 /** The two standing notes under the legend (§3.8, group 4). */
 export const legendNotes: readonly string[] = [
-  'A symbol is traced — its own color, its own layer — iff its reach was decided by a module other than its owner.',
+  'A symbol is traced - its own color, its own layer - iff its reach was decided by a module other than its owner.',
   'Files inside one module import each other freely; those imports are not drawn.',
   'There is no sibling channel and no root privilege. Every arrow here is either one edge long, or covers one whole subtree.',
 ];
 
 /** Title drawn above the tree. */
-export const diagramTitle = 'The core tree model — who may import what, and who decided';
+export const diagramTitle = 'The core tree model - who may import what, and who decided';
 
 /**
  * The shop diagram.

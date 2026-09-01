@@ -1,4 +1,4 @@
-// ramify.ts — toolkit for the cross-module importability model.
+// ramify.ts - toolkit for the cross-module importability model.
 // See docs/model/cross-module-importability-rules.md for the model definition
 // and docs/model/glossary.md for its vocabulary.
 
@@ -31,12 +31,11 @@ export type {
 } from './model/index.js';
 
 // The contextual half: the declared classifications that restrict who may
-// import what — the exposure tags a symbol carries, the importer contexts a
+// import what - the exposure tags a symbol carries, the importer contexts a
 // module declares, and the importer descriptor the complete rule reads.
 export {
   MODULE_TAGS,
   SYMBOL_TAGS,
-  appliesToBinding,
   moduleTagsOf,
   defaultSymbolTag,
   symbolTagsOf,
@@ -52,7 +51,6 @@ export type {
   Importer,
   ImporterContextDeclaration,
   ImporterDescriptor,
-  RequirementScope,
   UnmetTagRequirement,
 } from './model/index.js';
 

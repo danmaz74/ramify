@@ -80,8 +80,8 @@ describe('node boxes', () => {
   });
 
   /**
-   * A row is a line of several labels — marker, name, chip, binding note,
-   * provenance — and the ones in the middle are new. Every diagram of the
+   * A row is a line of several labels - marker, name, chip, binding note,
+   * provenance - and the ones in the middle are new. Every diagram of the
    * series is checked, because the width budget that keeps them apart is
    * shared: a row must be wider than its own ink, whatever it carries.
    */
@@ -166,7 +166,7 @@ describe('propagation lanes', () => {
     }
     // §4.4 finding 1 names `catalog->inventory` and `checkout->payment` as the
     // four-lane edges. `checkout->cart` is a third: it carries the same three
-    // grant lanes plus `CartApi`'s up-hop. The ceiling of four still holds — the
+    // grant lanes plus `CartApi`'s up-hop. The ceiling of four still holds - the
     // spec's count of *which* edges reach it was one short.
     const worst = [...perEdge.entries()].filter(([, count]) => count === 4).map(([key]) => key);
     expect(worst.sort()).toEqual(['catalog->inventory', 'checkout->cart', 'checkout->payment']);
@@ -251,7 +251,7 @@ describe('decision dots', () => {
   });
 
   /**
-   * §4.1 reads the picture as five statements — "the entire access policy of
+   * §4.1 reads the picture as five statements - "the entire access policy of
    * the application". The three bottom-row up-hops are one of those statements
    * and three separate dots, so the checkable invariant is the partition: every
    * dot belongs to exactly one statement, and no statement is unwitnessed.
@@ -387,10 +387,10 @@ describe('canvas', () => {
 
 /**
  * Example 1 of `docs/model/illustrative-examples.md`: nine modules, four
- * symbols, seven decisions, three different reaches — plus one symbol exposed
+ * symbols, seven decisions, three different reaches - plus one symbol exposed
  * only downward. The doc is normative for everything asserted here.
  */
-describe('example 1 — one decision, three reaches', () => {
+describe('example 1 - one decision, three reaches', () => {
   const rowsOf = (id: string): string[] =>
     (example1.tree.nodeById.get(id)?.rows ?? []).map(
       (row) =>

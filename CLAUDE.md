@@ -1,4 +1,4 @@
-# CLAUDE.md — ramify.ts
+# CLAUDE.md - ramify.ts
 
 ramify.ts is a self-contained sub-project that will eventually be extracted
 into its own repository. cucumber-viz will become a *consumer* of it.
@@ -9,7 +9,7 @@ When working under `ramify/`, ignore the usual cucumber-viz rules:
 
 - Do **not** check `docs/architecture/key-decisions.md`,
   `docs/architecture/modularization/`, or any other cucumber-viz
-  architecture doc — none of them bind this sub-project.
+  architecture doc - none of them bind this sub-project.
 - cucumber-viz conventions (barrel/vocabulary surfaces, BEM/plain-CSS UI
   rules, dependency-cruiser rules, audit semantics, feature-test tiers) do
   not apply.
@@ -24,5 +24,5 @@ When working under `ramify/`, ignore the usual cucumber-viz rules:
   ramify to the host repo's build, test, or enforcement tooling.
 - ESM with `.js` extensions in source imports; strict TypeScript;
   vitest tests co-located as `src/**/*.test.ts`.
-- Documentation and examples must stay generic — no cucumber-viz domains or
+- Documentation and examples must stay generic - no cucumber-viz domains or
   references in ramify docs or the site.

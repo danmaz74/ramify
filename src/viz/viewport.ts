@@ -33,7 +33,7 @@ export interface Anchor {
   readonly v: number;
 }
 
-/** The centre of the viewport — the anchor the +/- buttons zoom about. */
+/** The centre of the viewport - the anchor the +/- buttons zoom about. */
 export const CENTER: Anchor = { u: 0.5, v: 0.5 };
 
 function clamp(value: number, low: number, high: number): number {
@@ -100,7 +100,7 @@ export function isReset(base: ViewRect, view: ViewRect): boolean {
 /**
  * A wheel notch is not a fixed number: `deltaY` is only in pixels when
  * `deltaMode` says so. Firefox, and Chrome with some mice, report
- * `DOM_DELTA_LINE` with a `deltaY` of about 3 per notch instead of about 100 —
+ * `DOM_DELTA_LINE` with a `deltaY` of about 3 per notch instead of about 100 -
  * so a zoom step computed from the raw number comes out around 0.7% and reads
  * to the user as "scrolling does nothing at all". Normalising first is what
  * makes the wheel behave the same on every browser.

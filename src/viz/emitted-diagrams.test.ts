@@ -16,7 +16,7 @@ import { ModelDiagramSvg } from './ModelDiagram.js';
  * them honest: it renders exactly what `scripts/emit-diagrams.ts` renders and
  * compares the result to the file on disk, byte for byte.
  *
- * Two things are therefore checked at once — that a diagram still emits what is
+ * Two things are therefore checked at once - that a diagram still emits what is
  * checked in, and that a change to the shared pipeline (the tag chips, the
  * context boxes, the row geometry they moved) leaves the diagrams that declare
  * no tag *exactly* as they were.
@@ -94,15 +94,17 @@ describe('a universe that declares no tag', () => {
     }
   });
 
-  it('grows no tag markup either — the affordances cost the old diagrams nothing', () => {
+  it('grows no tag markup either - the affordances cost the old diagrams nothing', () => {
     for (const definition of untagged) {
       const markup = emitted(definition);
       for (const affordance of [
         'node-row-tags',
         'node-row-binding',
+        'node-row-type-available',
         'node-context',
         'data-tags',
         'data-importable',
+        'data-struck',
       ]) {
         expect(markup).not.toContain(affordance);
       }
@@ -127,9 +129,14 @@ describe('a universe that declares no tag', () => {
       expect(markup).toContain('data-kind="node-row-tags"');
       expect(markup).toContain('data-kind="node-row-tags-pill"');
     }
-    // The binding note is example 4's alone: a testing requirement exempts no
-    // binding, so example 3 has no disagreement to report.
-    expect(emitted(example4Diagram)).toContain('data-kind="node-row-binding"');
-    expect(emitted(example3Diagram)).not.toContain('data-kind="node-row-binding"');
+    // No diagram draws a binding note: the pictures tell the availability
+    // story, and the type story leaves exactly one mark - the asterisk on a
+    // struck-but-type-available name, which only example 4 has (the testing
+    // rule blocks both import forms, so example 3's struck rows are bare).
+    for (const definition of tagged) {
+      expect(emitted(definition)).not.toContain('data-kind="node-row-binding"');
+    }
+    expect(emitted(example4Diagram)).toContain('data-kind="node-row-type-available"');
+    expect(emitted(example3Diagram)).not.toContain('data-kind="node-row-type-available"');
   });
 });

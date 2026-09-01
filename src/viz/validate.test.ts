@@ -164,7 +164,7 @@ describe('node rows are checked row by row', () => {
   });
 
   it('refuses a granted row that names the wrong ancestor', () => {
-    // `computeTotal` reaches `invoiceComputation` because `app` granted it —
+    // `computeTotal` reaches `invoiceComputation` because `app` granted it -
     // `invoicing` never had it to grant.
     const nodes = nodesWithRow(example1Context, 'invoiceComputation', (row) =>
       row.kind === 'granted' && row.symbol === 'computeTotal' ? { ...row, from: 'invoicing' } : row,
@@ -289,14 +289,12 @@ describe('tag claims are checked against the evaluator', () => {
     );
   });
 
-  it('refuses a binding note the two verdicts do not produce', () => {
+  it('refuses a strike the availability verdict does not produce', () => {
     const nodes = tamper(example4Context, 'server', (row) =>
-      row.symbol === 'queryDb'
-        ? { ...row, annotations: [{ kind: 'binding', text: 'type ✓ · value ✗', dx: 100 }] }
-        : row,
+      row.symbol === 'queryDb' ? { ...row, struck: true } : row,
     );
     expect(() => validateTagClaims(example4Context.tree, nodes, traced4)).toThrow(
-      /annotates queryDb with "type ✓ · value ✗", but the model's verdicts read "undefined"/u,
+      /strikes queryDb, but the symbol is available there/u,
     );
   });
 

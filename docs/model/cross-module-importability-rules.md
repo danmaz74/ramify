@@ -1,6 +1,6 @@
 # Cross-Module Importability Rules
 
-**Status:** Analysis — minimal importability core
+**Status:** Analysis - minimal importability core
 
 **Date:** 2026-08-31
 
@@ -14,12 +14,12 @@ ramify.ts. It extracts and simplifies the access model in
 newer decision direction). Named surfaces, routing syntax and enforcement
 architecture remain in those earlier documents; tags appear here only
 insofar as they restrict who may import a symbol. The application of this
-model to cucumber-viz — coverage of the current enforcement rules, required
-restructurings and migration consequences — lives in
+model to cucumber-viz - coverage of the current enforcement rules, required
+restructurings and migration consequences - lives in
 [Importability Rules: cucumber-viz Coverage](../../../docs/analysis/2026-08-31-importability-rules-cucumber-viz-coverage.md);
 this document stays application-agnostic. Vocabulary is defined in the
-[Glossary](glossary.md): module, file, own, available, expose. This document
-uses those terms and does not redefine them.
+[Glossary](glossary.md): module, file, own, visible, available, expose. This
+document uses those terms and does not redefine them.
 
 ## What this document is not about
 
@@ -40,13 +40,13 @@ It deliberately does **not** cover:
   mechanism.
 - **Grouping and surface mechanics.** Named surfaces, generated facades and
   any tag-driven grouping of exposed symbols into importable views are
-  mechanism concerns. Exposure tags appear below only insofar as they change who may
+  mechanism concerns. Tags appear below only insofar as they change who may
   import a symbol; how tagged symbols are grouped, spelled or emitted does
   not.
 - **Same-owner imports.** This project concerns cross-module imports only.
   Files inside one owner import each other freely, and whether they
   internally respect platform or test/production separation is the owner's
-  business — build tooling or separate lints may cover it; this model does
+  business - build tooling or separate lints may cover it; this model does
   not.
 
 The goal is the smallest rule set that covers the access relationships
@@ -65,11 +65,11 @@ addition to this core rather than a peer of it.
 
 ## Exposure primitives
 
-A module can expose **any symbol available in it** — owned or received —
+A module can expose **any symbol visible in it** - owned or received -
 through exactly two channels:
 
-1. **Expose to parent.** The symbol becomes available in the direct parent.
-2. **Expose to descendants.** The symbol becomes available in every module
+1. **Expose to parent.** The symbol becomes visible in the direct parent.
+2. **Expose to descendants.** The symbol becomes visible in every module
    of the exposing module's subtree.
 
 That is the entire mechanism. There is no sibling channel, no root privilege,
@@ -99,18 +99,18 @@ its own children. That was rejected for two reasons. First, it contradicts
 the single-channel decision above: exposing a symbol upward cedes its further
 routing entirely; a residual veto over one region of the tree would claw part
 of that authority back. Second, the only configuration where the rules
-diverge — a symbol both application-wide and sibling-restricted inside its
-own family — is rare and low-stakes (app-wide symbols are vocabulary;
+diverge - a symbol both application-wide and sibling-restricted inside its
+own family - is rare and low-stakes (app-wide symbols are vocabulary;
 sibling restrictions target machinery), and does not justify provenance
 tracking on routed symbols. A family that wants that combination resolves it
 by not exposing the symbol upward.
 
 ### Redundant exposure
 
-Because exposure is gated on availability rather than on a chain-of-custody
+Because exposure is gated on visibility rather than on a chain-of-custody
 concept, some exposures are legal but inert: they change no module's
-availability. Re-exposing a symbol received through an ancestor's grant is
-always redundant — the exposer's own subtree is already covered by that
+visibility. Re-exposing a symbol received through an ancestor's grant is
+always redundant - the exposer's own subtree is already covered by that
 grant, every module on the upward path lies inside the granter's subtree and
 already has the symbol, and carrying it above the granter always requires
 the granter's own expose-to-parent decision, which nobody below can make for
@@ -119,14 +119,18 @@ it. Redundant exposures deserve a diagnostic, never an error.
 ## The importability rule
 
 > A file may import a symbol iff the symbol is **available** in the file's
-> module. A symbol is available in a module if the module owns it, or it is
-> exposed to it — by a direct child exposing it to its parent, or by a
-> proper ancestor exposing it to its descendants.
+> module: **visible** there, and withheld by no tag based availability rule.
+> A symbol is visible in a module if the module owns it, or it is exposed to
+> it - by a direct child exposing it to its parent, or by a proper ancestor
+> exposing it to its descendants.
 
-Nothing else grants availability. Expanded, a file belonging to module `S`
-may import symbol `c` owned by module `T` iff:
+Nothing else creates visibility, and with no tags declared, available and
+visible coincide (the tag based availability rules are the "Contextual
+rules" section below). Expanded, a file belonging to module `S` may import
+symbol `c` owned by module `T` iff every applicable availability rule is
+satisfied and:
 
-1. `S = T` (same owner — no boundary crossed); or
+1. `S = T` (same owner - no boundary crossed); or
 2. a direct child of `S` exposed `c` to `S`; or
 3. a proper ancestor of `S` exposed `c` to its descendants.
 
@@ -165,7 +169,7 @@ Two real use cases are not expressible with the tree rules alone:
 Both reduce to the same shape: a fact about the **importing module** and a
 fact about the **exposed symbol** must be compatible, in addition to the
 tree rules. The core therefore gains one mechanism: **tags**. A tag is not
-just a name — when a tag is defined, it is associated with its availability
+just a name - when a tag is defined, it is associated with its availability
 rule, and it always carries it (glossary: "Tag-associated availability
 rule"). The same tag names are assigned in two positions:
 
@@ -176,7 +180,7 @@ rule"). The same tag names are assigned in two positions:
   symbol through every exposure and re-exposure, and no module along the
   route can add, remove or change one.
 - **Module tagging.** A module may assign tags to itself in its module
-  definition, classifying its files — a **testing module**'s files are
+  definition, classifying its files - a **testing module**'s files are
   tests, a **browser module**'s files run in a browser. A module may also
   classify file subtrees the same way (declared importer contexts:
   co-located tests, a domain's feature-test tree). Classification is always
@@ -190,19 +194,26 @@ symbol tags make an exposed symbol available (glossary: "Tag based
 availability rules"). There are two kinds, and each tag's definition says
 which it carries:
 
-- **Required module tag** (`⇥`) — if the symbol has the tag, it is available
-  from exposure only in modules carrying the same tag.
-- **Required symbol tag** (`⇤`) — if the module has the tag, the only
+- **Required module tag** (`⇥`) - if the symbol has the tag, it is available
+  from exposure only in modules carrying the same tag. In force for both
+  import forms: the rule polices coupling, and a type-only import creates the
+  dependency just as surely as a value import.
+- **Required symbol tag** (`⇤`) - if the module has the tag, the only
   symbols visible from exposure that are available in it are those carrying
-  the same tag.
+  the same tag. In force for value imports only: the rule polices the
+  module's runtime, and a type-only import is erased before any runtime
+  exists.
 
-When several rules apply to the same symbol and module, all of them must be
-satisfied. A tag definition may set only these parameters:
+The import-form scope is intrinsic to the rule kind, not a parameter: a
+rule's scope follows from its claim - coupling claims cover both forms,
+runtime claims cover value imports only. (Future tags may force other
+combinations; none of the built-ins does.) When several rules apply to the
+same symbol and module, all of them must be satisfied. A tag definition may
+set only these parameters:
 
 | Parameter | Meaning |
 | --- | --- |
 | `requires` | The tag's availability rule: tags required on the other side of the import. In symbol position this is a required module tag; in module position, a required symbol tag. |
-| `applies-to` | Whether the rule applies to all imports or only to value imports (type-only imports are erased at runtime). |
 | `exclusive` | Whether the tag may be combined with the default contract channel. |
 | `symbols-default-to` | Module position only: symbols owned by this module default to the given symbol tag. |
 | `verify` | An externally checked proof obligation attached to the tag's factual claim. Verification is not an importability rule; a false claim is the owner's error, reported at the owner. |
@@ -211,8 +222,8 @@ satisfied. A tag definition may set only these parameters:
 change what is visible. The complete rule:
 
 > An exposed symbol is available in a module iff the tree rules make it
-> visible there AND every availability rule of every tag involved — on the
-> symbol and on the importing module — is satisfied.
+> visible there AND every availability rule of every tag involved - on the
+> symbol and on the importing module - is satisfied.
 
 This adds one term to the core vocabulary: an import binding is a **type**
 import or a **value** import, because platform requirements exempt erased
@@ -223,7 +234,7 @@ type-only imports while testing requirements do not.
 ```yaml
 tags:
   testing:
-    on-symbols: { requires: [testing], applies-to: all, exclusive: true }
+    on-symbols: { requires: [testing], exclusive: true }
     on-modules: { symbols-default-to: testing }
 ```
 
@@ -233,14 +244,14 @@ tags:
   the real contract or test support, never ambiguously both.
 - `testing` symbols travel through the ordinary exposure channels. Any
   grant breadth is safe, because the availability rule withholds the symbol
-  from untagged modules everywhere the grant reaches — so a parent may
+  from untagged modules everywhere the grant reaches - so a parent may
   blanket-grant received test support to its whole subtree without risk,
   while a domain keeps its fakes domain-internal by simply not routing them
   higher.
 - Everything a testing module exposes is implicitly `testing`; test
   infrastructure can never enter a production ceiling.
 - Integration tests belong under the lowest common ancestor whose
-  composition they exercise — as a test context owned by that module, or as
+  composition they exercise - as a test context owned by that module, or as
   a testing module directly beneath it. Rule 2 (with the ancestor's grants)
   then provides exactly the composition surfaces they need, with no further
   mechanism. The child-module form additionally needs the ancestor to grant
@@ -254,7 +265,7 @@ tags:
 tags:
   browser:
     on-symbols: { verify: browser-closure }
-    on-modules: { requires: [browser], applies-to: value-imports }
+    on-modules: { requires: [browser] }
 ```
 
 - A browser module may value-import only `browser` symbols, among those the
@@ -277,7 +288,7 @@ chains. It was rejected: it would puncture the consent-chain principle for
 one case, create a second kind of tag semantics (granting rather than
 restricting) and silently make every test fake application-wide test API,
 coupling distant tests to internals their owners never routed to them. Tree
-routing costs one re-exposure line per hop — the same ceremony as any
+routing costs one re-exposure line per hop - the same ceremony as any
 cross-branch contract, surfaced by the same diagnostics.
 
 ### Built-ins only
@@ -295,8 +306,8 @@ Rejected for the core, with the reasoning recorded so they are not
 accidentally reintroduced:
 
 - **Direct-children-only exposure.** No significant use case survived
-  examination. The candidate — parent-defined contracts that direct children
-  implement to participate in composition — does not need it, because
+  examination. The candidate - parent-defined contracts that direct children
+  implement to participate in composition - does not need it, because
   importing a type confers no ability to participate: participation flows
   upward through exposure to parent, which the intermediate child still
   controls. Depth-1 grants are also subdivision-variant (reorganizing a
@@ -327,6 +338,12 @@ the declaration.
 - **Uniform descendant grants.** A descendant grant reaches the whole
   subtree; there is no backflow exclusion and no provenance tracking on routed
   symbols.
+- **No rule is type-only.** The import-form scope is intrinsic to the rule
+  kind - required module tags cover both forms, required symbol tags cover
+  value imports only - so nothing can ever forbid a type import while
+  allowing the value import. Available therefore always implies
+  type-available, by construction, and the unqualified "available" safely
+  means the strong (value) form.
 - **Tags are purely restrictive.** A tag's availability rules gate imports
   on top of the tree rules; no tag ever grants reach (`reach: global`
   rejected), and no tag ever changes what is visible.

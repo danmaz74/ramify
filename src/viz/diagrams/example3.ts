@@ -1,18 +1,18 @@
 /**
- * Example 3 — "The tag is the entire difference (testing)".
+ * Example 3 - "The tag is the entire difference (testing)".
  *
  * The universe, the verdicts and the lessons come from
  * `docs/model/illustrative-examples.md`, which is normative for this diagram:
  * four modules, two symbols, one testing module. Everything is exposed upward
- * and granted back down, so both symbols are visible in every box — and then
+ * and granted back down, so both symbols are visible in every box - and then
  * one symbol is tagged `testing` and its availability rule decides where it is
  * actually available.
  *
  * The lesson is the required-module-tag rule (`⇥`): a symbol tagged `testing`
  * is available only in modules carrying the same tag. Visibility is uniform
  * here by construction, so the tag is the only variable in the picture. The
- * struck name in `billing` states it statically — visible there, not
- * available — and selecting `resetOrderStore` shows it in motion: the testing
+ * struck name in `billing` states it statically - visible there, not
+ * available - and selecting `resetOrderStore` shows it in motion: the testing
  * module blinks and `billing` stays dark.
  *
  * Nothing about the tags is declared to the renderer. The chip, the context box
@@ -42,8 +42,8 @@ import { seriesNodeContent, seriesTagLegendGroups } from './series.js';
  *
  * The tree is deliberately trivial: two hops, no interesting reach, nothing
  * examples 1 and 2 already taught. The integration tests are their own module,
- * a child of `app` — the lowest common ancestor whose composition they
- * exercise, per the specification's recommendation — and the whole module is
+ * a child of `app` - the lowest common ancestor whose composition they
+ * exercise, per the specification's recommendation - and the whole module is
  * tagged `testing`, so the dashed box fills its node.
  */
 export const example3Declaration: ModuleDeclaration = {
@@ -72,7 +72,7 @@ export const example3Declaration: ModuleDeclaration = {
 };
 
 /**
- * Every exposure path is traced — the series convention. The two symbols travel
+ * Every exposure path is traced - the series convention. The two symbols travel
  * the identical chain, so the slots are chosen for contrast rather than for
  * meaning: indigo for the ordinary contract, magenta for the one wearing a tag.
  */
@@ -91,7 +91,7 @@ export const example3TracedSymbols: readonly TracedSymbol[] = [
   },
 ];
 
-/** Two statements, four dots — one exposure decision each way, per symbol. */
+/** Two statements, four dots - one exposure decision each way, per symbol. */
 export const example3DecisionPolicies: readonly DecisionPolicy[] = [
   {
     id: 'P1',
@@ -110,7 +110,7 @@ export const example3DecisionPolicies: readonly DecisionPolicy[] = [
 /** The lessons of the doc, in the glossary's vocabulary. */
 export const example3LegendNotes: readonly string[] = [
   'Both symbols are visible everywhere; the ⇥ testing chip alone decides where the tagged one is available.',
-  'Tags never grant: the testing module imports nothing the tree did not route to it — it sees OrderService because the chain reaches it.',
+  'Tags never grant: the testing module imports nothing the tree did not route to it - it sees OrderService because the chain reaches it.',
   'Test support is curated symbol by symbol, and a symbol is real contract or test support, never both.',
   'Grant breadth is safe at any width: the availability rule travels with the symbol, so it is not available in untagged modules anywhere the grant reaches.',
 ];
@@ -120,7 +120,7 @@ export const example3Diagram: DiagramDefinition = {
   declaration: example3Declaration,
   // No drawn title: the page's own heading introduces the example.
   ariaLabel:
-    'Example 3: two symbols with identical exposures, one of them tagged testing — an exposed symbol is available in a module only if every availability rule of its tags is satisfied, so both are available in the testing module integration-tests while in the production module billing the tagged one is visible but not available, its name struck through',
+    'Example 3: two symbols with identical exposures, one of them tagged testing - an exposed symbol is available in a module only if every availability rule of its tags is satisfied, so both are available in the testing module integration-tests while in the production module billing the tagged one is visible but not available, its name struck through',
   tracedSymbols: example3TracedSymbols,
   // Nothing is drawn across the tree: imports that are not allowed are read
   // from absence, and selecting a symbol makes that absence visible.

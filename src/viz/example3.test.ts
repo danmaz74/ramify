@@ -9,7 +9,7 @@ import { moduleTagsOf, symbolTagsOf, isAvailable, mayImport } from './model-acce
 const example3 = buildDiagramLayout(example3Diagram);
 const { tree } = createDiagramContext(example3Diagram);
 
-/** The test module — the importer the doc's second row is about. */
+/** The test module - the importer the doc's second row is about. */
 const integrationTests = 'integration-tests';
 
 /**
@@ -17,7 +17,7 @@ const integrationTests = 'integration-tests';
  * symbols with identical exposures, one of them tagged `testing`. The
  * doc is normative for everything asserted here.
  */
-describe('example 3 — the tag is the entire difference', () => {
+describe('example 3 - the tag is the entire difference', () => {
   const rowsOf = (id: string): string[] =>
     (example3.tree.nodeById.get(id)?.rows ?? []).map(
       (row) =>
@@ -50,7 +50,7 @@ describe('example 3 — the tag is the entire difference', () => {
         expect(isAvailable(tree, consumer, 'orders', symbol)).toBe(true);
       }
     }
-    // Same chain, same rows, same provenance — twice.
+    // Same chain, same rows, same provenance - twice.
     expect(rowsOf('billing')).toEqual([
       '_ OrderService   granted by app',
       '_ resetOrderStore ⇥ testing   granted by app',
@@ -89,7 +89,7 @@ describe('example 3 — the tag is the entire difference', () => {
   });
 
   it('reproduces the doc’s verdict table through the evaluator', () => {
-    // | billing (production)  | ✓ | ✗ — available only in testing modules |
+    // | billing (production)  | ✓ | ✗ - available only in testing modules |
     expect(mayImport(tree, 'billing', 'orders', 'OrderService')).toBe(true);
     expect(mayImport(tree, 'billing', 'orders', 'resetOrderStore')).toBe(false);
     // | integration-tests (test module) | ✓ | ✓ |
@@ -119,7 +119,7 @@ describe('example 3 — the tag is the entire difference', () => {
   });
 
   it('blinks only the arrivals that may really import the selection', () => {
-    // Selecting resetOrderStore: the test module blinks, billing stays dark —
+    // Selecting resetOrderStore: the test module blinks, billing stays dark -
     // and so does app's own row, for exactly the same reason.
     const blinkingFor = (symbol: string): string[] => [
       ...example3.tree.nodes.flatMap((node) =>
@@ -153,12 +153,18 @@ describe('example 3 — the tag is the entire difference', () => {
       'resetOrderStore:false',
     ]);
 
-    // …and struck: the testing rule covers both bindings, so the row is
-    // visible-not-available outright, everywhere but the testing module.
+    // …and struck: the testing rule covers both import forms, so the row is
+    // visible-not-available outright, everywhere but the testing module - and
+    // never wears the type-available asterisk.
     const struckRows = example3.tree.nodes.flatMap((node) =>
       node.rows.filter((row) => row.struck).map((row) => `${node.id}/${row.symbol}`),
     );
     expect(struckRows).toEqual(['app/resetOrderStore', 'billing/resetOrderStore']);
+    for (const node of example3.tree.nodes) {
+      for (const row of node.rows) {
+        expect(row.struck && row.typeAvailable).toBe(false);
+      }
+    }
   });
 
   it('annotates no binding: a testing requirement exempts none', () => {

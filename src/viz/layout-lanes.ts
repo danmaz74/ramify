@@ -9,13 +9,13 @@
  *
  * What is derived, not declared:
  *
- * - **which decisions exist** — a module grants to its descendants iff some
+ * - **which decisions exist** - a module grants to its descendants iff some
  *   descendant's `explainImport` says `ancestor-grant via <module>`, and
  *   exposes to its parent iff the parent's says `child-exposure via <module>`.
  *   Reach is a consequence, so it is read out of the evaluator rather than out
  *   of the declaration;
- * - **which nodes a grant reaches** — every strict descendant, one chevron each;
- * - **lane stacking** — shallowest origin nearest the edge, so a symbol's lane
+ * - **which nodes a grant reaches** - every strict descendant, one chevron each;
+ * - **lane stacking** - shallowest origin nearest the edge, so a symbol's lane
  *   keeps a stable distance from the trunk all the way down its subtree.
  *
  * Pure and framework-free.
@@ -49,7 +49,7 @@ export interface PropagationDecision {
   readonly symbols: readonly SymbolRef[];
   readonly layer: string;
   readonly color: ColorKey;
-  /** `Money · formatDate` — a lane is a decision, not a symbol. */
+  /** `Money · formatDate` - a lane is a decision, not a symbol. */
   readonly chipText: string;
   /** Which of the diagram's policy statements this decision belongs to. */
   readonly policyId: string;
@@ -81,7 +81,7 @@ export interface LanePath {
   /** `chevron` where a grant flow meets a reached node; `arrow` where an up-hop lands. */
   readonly head: 'chevron' | 'arrow';
   readonly headAt: Point;
-  /** The module the head lands on — the module that may therefore import it. */
+  /** The module the head lands on - the module that may therefore import it. */
   readonly reaches: ModuleId;
   readonly symbols: readonly SymbolRef[];
 }
@@ -119,7 +119,7 @@ export interface PropagationLayout {
   readonly chips: readonly LaneChip[];
 }
 
-/** Every declared symbol, pre-order by module — the canonical iteration order. */
+/** Every declared symbol, pre-order by module - the canonical iteration order. */
 export function allSymbolRefs(context: DiagramContext): SymbolRef[] {
   return context.moduleOrder.flatMap((id) =>
     requireModuleRecord(context.tree, id).owns.map((owned) => ({ owner: id, name: owned.symbol })),
@@ -153,7 +153,7 @@ function policyFor(context: DiagramContext, decider: ModuleId, kind: 'grant' | '
  * Enumerate the exposure decisions of the universe.
  *
  * Symbols opened by the same decision with the same reach share one lane and
- * one dot (§3.4 bundling) — except traced symbols, which always get a lane of
+ * one dot (§3.4 bundling) - except traced symbols, which always get a lane of
  * their own so that a `<g>` layer can isolate them.
  */
 export function enumerateDecisions(context: DiagramContext): PropagationDecision[] {
@@ -220,7 +220,7 @@ function treeEdges(context: DiagramContext): EdgeKey[] {
 /**
  * Signed lane offsets on one edge.
  *
- * Grants sit right of the edge, up-hops left — an absolute assignment, so
+ * Grants sit right of the edge, up-hops left - an absolute assignment, so
  * direction stays readable even where a chip is clipped. Within a side, lanes
  * are ordered by the depth of their origin: shallowest nearest the edge.
  */

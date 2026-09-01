@@ -64,7 +64,7 @@ describe('zoom', () => {
     const oneNotchInLines = wheelFactor(-3, 1);
     const oneNotchInPixels = wheelFactor(-100, 0);
     // Both units produce a step a reader can see, within the same order of
-    // magnitude of each other — not the same number, since 3 lines and 100
+    // magnitude of each other - not the same number, since 3 lines and 100
     // pixels are not the same distance.
     expect(oneNotchInLines).toBeGreaterThan(1.1);
     expect(oneNotchInPixels).toBeGreaterThan(1.1);

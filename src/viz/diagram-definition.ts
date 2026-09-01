@@ -2,14 +2,14 @@
  * What a diagram *is*: one module declaration plus every editorial choice that
  * turns it into a picture.
  *
- * The pipeline below this file — node content, lanes, chords, legend,
- * validation, the React view — reads a {@link DiagramDefinition} and nothing
+ * The pipeline below this file - node content, lanes, chords, legend,
+ * validation, the React view - reads a {@link DiagramDefinition} and nothing
  * else. No layout module knows which universe it is drawing, so a second
  * example costs a definition file rather than a fork of the renderer.
  *
  * Nothing declared here changes what is *true*: every ✓ and ✗ a definition
  * claims is re-derived from the evaluator by `./validate.ts` before a single
- * element is drawn. These are editorial choices — which symbols are traced and
+ * element is drawn. These are editorial choices - which symbols are traced and
  * in what color, which questions get an explicit chord, and the words on the
  * legend.
  *
@@ -54,7 +54,7 @@ export type TracedColorKey = 'traced1' | 'traced2' | 'traced3' | 'traced4';
 /**
  * A traced symbol: given its own color slot and its own `<g>` layer.
  *
- * The series convention is to trace *every exposure path* — each one gets its
+ * The series convention is to trace *every exposure path* - each one gets its
  * own color and its own selectable layer, because following the path is the
  * whole point of the picture. A symbol exposed nowhere has no path to trace
  * and stays gray; that absence is itself the statement.
@@ -68,7 +68,7 @@ export interface TracedSymbol {
 }
 
 /**
- * A drawn import chord — a question about one specific module and one specific
+ * A drawn import chord - a question about one specific module and one specific
  * symbol, answered across open canvas rather than along the tree.
  *
  * The drawing policy: every denial worth drawing gets a chord, because a
@@ -97,7 +97,7 @@ export interface ChordSpec {
  *
  * A statement may cover several dots (three sibling up-hops read as one
  * sentence), but every dot the layout produces must belong to exactly one
- * statement — that partition is what "count the dots and you have counted the
+ * statement - that partition is what "count the dots and you have counted the
  * decisions" actually means, and `layout.test.ts` checks it.
  */
 export interface DecisionPolicy {
@@ -113,8 +113,12 @@ export interface LegendEntry {
   readonly id: string;
   readonly glyph:
     | { readonly kind: 'marker'; readonly text: string; readonly muted?: boolean }
-    /** A sample struck name, drawn exactly as a visible-not-available row is. */
-    | { readonly kind: 'struck'; readonly text: string }
+    /**
+     * A sample struck name, drawn exactly as a visible-not-available row is.
+     * An optional unstruck suffix reproduces the `*` a still-type-available
+     * row wears after its name.
+     */
+    | { readonly kind: 'struck'; readonly text: string; readonly suffix?: string }
     | { readonly kind: 'compartment'; readonly text: string }
     | { readonly kind: 'up-hop' }
     | { readonly kind: 'grant' }
@@ -153,8 +157,8 @@ export interface WhatIfNote {
  * Both channels of the model make a symbol available in a module without that
  * module owning it, and a diagram may show either one or both:
  *
- * - a direct child exposing to its parent — always shown, with the child named;
- * - a proper ancestor exposing to its descendants — shown only when
+ * - a direct child exposing to its parent - always shown, with the child named;
+ * - a proper ancestor exposing to its descendants - shown only when
  *   `includeAncestorGrants`, with the granting ancestor named.
  *
  * A diagram teaching the two channels separately wants the first alone; one
@@ -175,7 +179,7 @@ export interface DiagramDefinition {
   readonly declaration: ModuleDeclaration;
   /**
    * Title drawn above the tree. Omit it when the page around the diagram
-   * already carries the heading — the picture then starts at the tree.
+   * already carries the heading - the picture then starts at the tree.
    */
   readonly title?: string;
   /** The `<svg>`'s accessible name. */

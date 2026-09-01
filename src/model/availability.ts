@@ -6,7 +6,7 @@
  * `docs/model/glossary.md`. The rule has two conjuncts, and this file keeps
  * them apart.
  *
- * The tree conjunct — the ceiling:
+ * The tree conjunct - the ceiling:
  *
  * > A file may import a symbol iff that symbol is **available** in the file's
  * > module.
@@ -15,11 +15,11 @@
  * > module exposed it there: a direct child exposing to its parent, or a
  * > proper ancestor exposing to its descendants.
  *
- * The contextual conjunct — the tags:
+ * The contextual conjunct - the tags:
  *
  * > A file may import a symbol iff the tree rules allow it AND every
- * > cross-requirement of every tag involved — on the exposed symbol and on the
- * > importer's context — is satisfied.
+ * > cross-requirement of every tag involved - on the exposed symbol and on the
+ * > importer's context - is satisfied.
  *
  * {@link isAvailable} and {@link explainAvailability} answer the first,
  * module-level question: what the exposure structure puts within a module's
@@ -29,7 +29,7 @@
  *
  * **Availability is tag-free, and importability is not.** A tag restricts
  * *importing*, per context; it changes nobody's availability, and it is
- * consulted only after the tree rules have already said yes — which is how the
+ * consulted only after the tree rules have already said yes - which is how the
  * model's promise that tags never grant is kept structurally rather than
  * argued. In a universe that declares no tag the two questions coincide, as the
  * glossary's definition says; where tags are declared, availability is the
@@ -42,7 +42,6 @@
 import {
   MODULE_TAGS,
   SYMBOL_TAGS,
-  appliesToBinding,
   type ModuleTag,
   type SymbolTag,
   type ImportBinding,
@@ -61,7 +60,7 @@ import {
   type SymbolRef,
 } from './tree.js';
 
-/** Why a symbol is available — which sentence of the rule answered. */
+/** Why a symbol is available - which sentence of the rule answered. */
 export type ImportClause =
   /** The module owns the symbol; no boundary is crossed. */
   | 'same-module'
@@ -77,7 +76,7 @@ export type ImportClause =
  * the importing module. The last two are the tags': the symbol is available,
  * and a cross-requirement of the import is unmet. Which side stated the
  * requirement is the whole difference between them, and `requires` has a
- * direction — so the two reasons name it.
+ * direction - so the two reasons name it.
  */
 export type DenialReason =
   /** The named owner declares no symbol by that name. */
@@ -91,12 +90,12 @@ export type DenialReason =
   | 'no-exposure-chain'
   /**
    * An exposure tag of the symbol requires a context tag the importing file's
-   * context does not carry — `testing` outside a test context.
+   * context does not carry - `testing` outside a test context.
    */
   | 'symbol-tag-requires-module-tag'
   /**
    * A context tag of the importing file requires an exposure tag the symbol
-   * does not carry — a browser context value-importing an untagged symbol.
+   * does not carry - a browser context value-importing an untagged symbol.
    */
   | 'module-tag-requires-symbol-tag';
 
@@ -135,7 +134,7 @@ export interface ImportDenied {
 export type ImportDecision = ImportAllowed | ImportDenied;
 
 /**
- * Where an importing file sits, and how it binds what it imports — everything
+ * Where an importing file sits, and how it binds what it imports - everything
  * about the importer the complete rule reads.
  *
  * `context` names an importer context the module declares; omit it for the
@@ -150,7 +149,7 @@ export interface ImporterDescriptor {
 
 /**
  * An importing file. A bare module id is shorthand for a value import from a
- * file in that module's own context — the reading every importer had before
+ * file in that module's own context - the reading every importer had before
  * contexts and bindings existed.
  */
 export type Importer = ModuleId | ImporterDescriptor;
@@ -173,7 +172,7 @@ interface UnmetRequirementFinding extends UnmetTagRequirement {
  *
  * The module-level question: what the exposure structure puts within the
  * module's reach. Availability is a property of a module, so it is asked of a
- * module — no context, no binding — and it is tag-free: a tag restricts who may
+ * module - no context, no binding - and it is tag-free: a tag restricts who may
  * import a symbol, not where the symbol arrives.
  *
  * In a universe that declares no tag, availability and importability are one
@@ -196,7 +195,7 @@ export function isAvailable(
  * reason nothing did.
  *
  * The clauses are tried in the rule's own order, so a symbol several of them
- * would allow is attributed to the earliest — ownership first, even when an
+ * would allow is attributed to the earliest - ownership first, even when an
  * ancestor grant also reaches the module.
  *
  * Throws if either module id is unknown; a typo in a declaration is an error,
@@ -270,7 +269,7 @@ export function mayImport(
 
 /**
  * {@link mayImport} with its reasoning: how the symbol became available and
- * which module's decision made it so, or the reason the import is not allowed —
+ * which module's decision made it so, or the reason the import is not allowed -
  * a tree reason, or the tag cross-requirement that was unmet.
  *
  * The two conjuncts are evaluated in the rule's own order. The tree rules go
@@ -333,9 +332,11 @@ function resolveImporter(importer: Importer): ResolvedImporter {
  *
  * Both directions are checked, in the order the specification introduces them:
  * what each tag of the exposed symbol requires of the importing context, then
- * what each tag of the context requires of the symbol. A requirement scoped to
- * value imports is simply not in force for a type-only import, which is erased
- * before any runtime exists.
+ * what each tag of the context requires of the symbol. The scope of each check
+ * is intrinsic to the rule kind: a required-module-tag rule polices coupling
+ * and is in force for both import forms, while a required-symbol-tag rule
+ * polices the module's runtime and is not in force for a type-only import,
+ * which is erased before any runtime exists.
  */
 function firstUnmetRequirement(
   tags: readonly SymbolTag[],
@@ -344,9 +345,6 @@ function firstUnmetRequirement(
 ): UnmetRequirementFinding | undefined {
   for (const tag of tags) {
     const definition = SYMBOL_TAGS[tag];
-    if (!appliesToBinding(definition.appliesTo, binding)) {
-      continue;
-    }
     for (const required of definition.requires) {
       if (!moduleTags.includes(required)) {
         return { reason: 'symbol-tag-requires-module-tag', tag, requires: required };
@@ -354,14 +352,14 @@ function firstUnmetRequirement(
     }
   }
 
-  for (const contextTag of moduleTags) {
-    const definition = MODULE_TAGS[contextTag];
-    if (!appliesToBinding(definition.appliesTo, binding)) {
-      continue;
-    }
-    for (const required of definition.requires) {
-      if (!tags.includes(required)) {
-        return { reason: 'module-tag-requires-symbol-tag', tag: contextTag, requires: required };
+  // A required-symbol-tag rule never reaches a type-only import.
+  if (binding === 'value') {
+    for (const contextTag of moduleTags) {
+      const definition = MODULE_TAGS[contextTag];
+      for (const required of definition.requires) {
+        if (!tags.includes(required)) {
+          return { reason: 'module-tag-requires-symbol-tag', tag: contextTag, requires: required };
+        }
       }
     }
   }
@@ -374,7 +372,7 @@ function firstUnmetRequirement(
  * exposed it upward.
  *
  * A module may expose any symbol available in it, so this is narrower than
- * availability — it omits symbols an ancestor granted. Nothing is lost by the
+ * availability - it omits symbols an ancestor granted. Nothing is lost by the
  * omission: re-exposing a symbol received from an ancestor is always
  * redundant. Its own subtree already lies inside the granting ancestor's
  * subtree, every module on the path upward to that ancestor does too, and
@@ -389,7 +387,7 @@ function ownedOrReceived(tree: ModuleTree, moduleId: ModuleId, ref: SymbolRef): 
 }
 
 /**
- * The direct children of `moduleId` that exposed `ref` to their parent — the
+ * The direct children of `moduleId` that exposed `ref` to their parent - the
  * children from which `moduleId` received the symbol.
  */
 function providingChildren(tree: ModuleTree, moduleId: ModuleId, ref: SymbolRef): ModuleId[] {
@@ -399,7 +397,7 @@ function providingChildren(tree: ModuleTree, moduleId: ModuleId, ref: SymbolRef)
 }
 
 /**
- * Whether `moduleId` exposes `ref` through the given channel — as the symbol's
+ * Whether `moduleId` exposes `ref` through the given channel - as the symbol's
  * owner, or by exposing a symbol a child passed up to it.
  *
  * An exposure of a symbol the module never received is inert rather than
