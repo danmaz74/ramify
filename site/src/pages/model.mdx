@@ -13,9 +13,11 @@ import { ModelDiagram } from '@ramify/viz';
 
 # The core tree model
 
-This page walks through the **tree rules only** — ownership, the two exposure
-channels, availability, and the rule that a file may import exactly what is
-available in its module. Importer contexts and exposure tags (testing,
+This page walks through the **tree rules only** —
+[ownership](/glossary#module-owned-symbol), the two
+[exposure](/glossary#module-exposed-symbol) channels,
+[availability](/glossary#module-available-symbol), and the rule that a file
+may import exactly what is available in its module. Importer contexts and exposure tags (testing,
 browser) are a separate subject and appear nowhere here.
 
 The example is a small online shop: `shop` at the root, with `catalog`
@@ -153,8 +155,9 @@ sibling channel, no root privilege and no depth-limited audience.
 
 This page is a walkthrough. The normative document is the cross-module
 importability rules specification, which ships with the repository at
-`docs/model/cross-module-importability-rules.md`. It states the rule exactly,
-defines availability, adds the contextual rules for test and browser
-contexts that this page leaves out, and records the features deliberately
-rejected. Where this page and the specification appear to disagree, the
-specification is right.
+`docs/model/cross-module-importability-rules.md`, with the vocabulary defined
+in the [glossary](/glossary). It states the rule exactly, defines
+availability, adds the contextual rules for test and browser contexts that
+this page leaves out, and records the features deliberately rejected. Where
+this page and the specification appear to disagree, the specification is
+right.

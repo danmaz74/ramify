@@ -10,10 +10,17 @@ hide_table_of_contents: true
 
 import { ModelDiagram, example3Diagram, example4Diagram } from '@ramify/viz';
 
+export const TagRef = ({ rule, name }) => (
+  <code>
+    <span className="rule-glyph">{rule}</span>
+    {name === undefined ? null : ` ${name}`}
+  </code>
+);
+
 # Tags
 
-The tree rules decide **visibility**: which symbols the exposure chains put
-within a module's reach. Two real needs are not expressible with visibility
+The tree rules decide [**visibility**](/glossary#module-visible-symbol):
+which symbols the exposure chains put within a module's reach. Two real needs are not expressible with visibility
 alone. Tests need deliberately selected internals of a module — fakes,
 in-memory stores, reset hooks — that production code must never be able to
 import. Code that runs in a browser must only import symbols whose entire
@@ -21,26 +28,31 @@ runtime closure is browser-safe. Both are the same shape: a fact about the
 **importing module** and a fact about the **exposed symbol** have to be
 compatible, on top of everything the tree already decided.
 
-Tags carry those facts. Every symbol has a tag set, assigned once by its owner
-and immutable from then on; a module can carry tags too, declared in its own
-definition. And a tag is not just a name: **when a tag is defined, it is
-associated with its availability rule, and it always carries it.** Assign the
-tag, and the rule comes along.
+Tags carry those facts. Every symbol has a
+[tag set](/glossary#symbol-tagging), assigned once by its owner and immutable
+from then on; a [module can carry tags too](/glossary#module-tagging),
+declared in its own definition. And a tag is not just a name: **when a tag is
+defined, it is
+[associated with its availability rule](/glossary#tag-associated-availability-rule),
+and it always carries it.** Assign the tag, and the rule comes along.
 
 ## The two availability rules
 
-An availability rule defines which combinations of module and symbol tags make
-an exposed symbol **available** — importable by the module's files — out of
-the symbols that are merely **visible** there. Two rules exist, and they are
-mirror images:
+An [availability rule](/glossary#tag-based-availability-rules) defines which
+combinations of module and symbol tags make an exposed symbol
+[**available**](/glossary#module-available-symbol) — importable by the
+module's files — out of the symbols that are merely **visible** there. (Everything on this page, and
+everything the diagrams draw, is about the ordinary **value import**; the
+type-only import is a separate concern with [its own section](#type-imports)
+at the end.) Two rules exist, and they are mirror images:
 
-- **Required module tag** — written **`⇥`**: the demand rides out with the
-  symbol, checked where it lands. If the *symbol* has the tag, it is available
-  from exposure only in modules carrying the same tag.
-- **Required symbol tag** — written **`⇤`**: the demand faces in at the
-  module's door, checked on everything arriving. If the *module* has the tag,
-  the only symbols visible from exposure that are available in it are those
-  carrying the same tag.
+- **Required module tag** — written <TagRef rule="⇥" />: the demand rides out
+  with the symbol, checked where it lands. If the *symbol* has the tag, it is
+  available from exposure only in modules carrying the same tag.
+- **Required symbol tag** — written <TagRef rule="⇤" />: the demand faces in
+  at the module's door, checked on everything arriving. If the *module* has
+  the tag, the only symbols visible from exposure that are available in it are
+  those carrying the same tag.
 
 When several rules apply to the same symbol and module, all of them must be
 satisfied. And **tags never grant**: no rule makes an import possible that the
@@ -53,17 +65,19 @@ in the picture.
 
 ## How the diagrams write it
 
-- **A tag always appears behind the glyph of its rule** — `⇥ testing`,
-  `⇤ browser` — because the name and the rule are one thing. On a symbol the
+- **A tag always appears behind the glyph of its rule** —
+  <TagRef rule="⇥" name="testing" />, <TagRef rule="⇤" name="browser" /> —
+  because the name and the rule are one thing. On a symbol the
   tag is a chip on a filled pill, drawn on the owner's row and on every
   arrival alike: tags travel with the symbol, and no module along the route
   can add, remove or change one. On a module the tag labels a dashed box
   filling the node.
 - **Visible but not available is struck through.** A withheld arrival is still
   drawn — the exposure chain really does put the symbol there — but its name
-  wears a strike: you can see it, you cannot have it. A row is struck only
-  when *no* binding may import; where the two bindings disagree, the row says
-  so in words instead (`type ✓ · value ✗`).
+  wears a strike: you can see it, you cannot have it. One refinement: a
+  struck name followed by an unstruck `∗` is still *type-available* — the
+  asterisk is a footnote mark, and the footnote is the
+  [type imports](#type-imports) section.
 - **Selecting a tagged symbol** blinks exactly the arrivals where it is
   available; withheld rows stay dark. The strike and the blink state the same
   verdicts — one statically, one in motion.
@@ -77,7 +91,7 @@ exposes exactly the internals tests may touch, tagged, through the ordinary
 channels.
 
 **On a symbol,** `testing` marks test support and carries the
-required-module-tag rule (`⇥`): the symbol is available only in modules tagged
+required-module-tag rule (<TagRef rule="⇥" />): the symbol is available only in modules tagged
 `testing`, for imports of either binding — a type import of a test fake is
 still test-only coupling. It is also *exclusive*: a symbol is real contract or
 test support, never ambiguously both. **On a module,** `testing` classifies
@@ -87,7 +101,7 @@ the files as tests, and everything such a module exposes is implicitly tagged
 `orders` owns two symbols and exposes both to its parent; `app` grants both to
 its subtree; `integration-tests` is a testing module beside the production
 consumers. Identical chains, identical arrivals — and one symbol wears
-`⇥ testing`. Read `billing`'s box: `resetOrderStore` is listed, provenance and
+<TagRef rule="⇥" name="testing" />. Read `billing`'s box: `resetOrderStore` is listed, provenance and
 all, with its name struck — visible there, not available. The same strike
 appears in `app`'s own box, because routing a grant earns no right to import
 it. In the testing module the name is plain: both rules of the verdict table
@@ -120,9 +134,8 @@ Splitting every such module in two would multiply modules to encode one fact.
 `browser` states the fact per symbol instead.
 
 **On a module,** `browser` classifies files that run in a browser and carries
-the required-symbol-tag rule (`⇤`): the module may value-import only symbols
-tagged `browser`. The rule covers value imports only — a type is erased before
-any runtime exists, so type-only imports pass freely. **On a symbol,**
+the required-symbol-tag rule (<TagRef rule="⇤" />): the module may import only symbols tagged
+`browser`. **On a symbol,**
 `browser` is a falsifiable promise that the symbol's entire transitive runtime
 closure is browser-safe, the owner's private files included. It carries no
 rule of its own; it is what the module-side rule asks for. The promise is
@@ -131,9 +144,8 @@ importer, which did nothing wrong by believing it.
 
 The mirror image of example 3: here the *module* wears the tag, and the rule
 asks the *symbols* for a match. `ui` is a browser module — the same dashed box
-as the testing module, labeled `⇤ browser`. Nothing is struck in this
-universe: the one refused import (`queryDb` into `ui`) is refused for value
-imports only, so its row carries the binding note instead of the strike.
+as the testing module, labeled <TagRef rule="⇤" name="browser" /> — and `queryDb`'s row in it is
+struck: visible there, not available, exactly like example 3's struck rows.
 Selecting `queryDb` shows the dynamic version — `server` lights up and `ui`
 stays dark.
 
@@ -144,18 +156,48 @@ stays dark.
 - **The line is drawn per symbol, not per file or module.** `shared` never
   splits to keep browser-safe and Node-only code apart; one module, one file
   tree, two different answers.
-- **Type-only imports pass freely.** A platform requirement exempts erased
-  imports; a testing requirement does not. That is the one extra thing
-  `queryDb`'s row in `ui` has to say, and it says it in words:
-  `type ✓ · value ✗`.
 - **The tag is a promise, not a proof.** Importability consults only the
   declared `browser`; the closure is verified separately, at the owner.
+
+## Type imports
+
+Everything above is about value imports — the ordinary import, the one that
+puts another module's code in your bundle. TypeScript's other form,
+`import type`, is erased at compile time and carries no runtime dependency,
+and it gets one refinement of its own: a symbol is
+[**type-available**](/glossary#type-availability) in a module when the
+module's files may import it as a type.
+
+The two verdicts can only differ one way — **available always implies
+type-available**, never the reverse (the specification decides "no rule is
+type-only"). So the full chain is:
+
+> available ⊆ type-available ⊆ visible
+
+Whether a rule exempts type imports follows from what its claim is about:
+
+- **`browser`'s claim is about runtime** — "this closure is safe to
+  *execute* in a browser." An erased import executes nothing, so the rule
+  covers value imports only. `queryDb` is therefore struck in `ui` (not
+  available) yet still type-available there — the unstruck `∗` after its
+  struck name is this fact: `ui` may reference its signature —
+  `runQuery: typeof queryDb` — without ever bundling the implementation.
+- **`testing`'s claim is about coupling** — "this is not part of the
+  production contract." A production function typed in terms of a test
+  fake violates that at the type level just as thoroughly as at runtime, so
+  the rule covers both forms: `resetOrderStore` in `billing` is not even
+  type-available.
+
+The diagrams give all of this exactly one character: the strike means "not
+available", and an unstruck `∗` after a struck name marks the middle band of
+the chain — type-available but not available. Everything else about type
+imports lives here in prose, where it can be explained rather than notated.
 
 ## Where the precision lives
 
 The examples on this page are teaching material. The normative document is the
 cross-module importability rules specification, which ships with the
 repository at `docs/model/cross-module-importability-rules.md` — the tag rules
-are its "Contextual rules" section — with the vocabulary defined in
-`docs/model/glossary.md`. Where a page and the specification appear to
-disagree, the specification is right.
+are its "Contextual rules" section — with the vocabulary defined in the
+[glossary](/glossary). Where a page and the specification appear to disagree,
+the specification is right.

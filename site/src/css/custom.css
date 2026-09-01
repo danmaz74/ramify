@@ -71,3 +71,74 @@ article {
     transform: none;
   }
 }
+
+/**
+ * Anchor-target highlight.
+ *
+ * Following an in-page link near the end of a page cannot scroll the heading
+ * to the top (there is no page left below it), and a short definition among
+ * ten look-alike headings gives the eye nothing to lock onto. So the target
+ * marks itself instead of relying on scroll position: on arrival the heading
+ * flashes a primary-colored tint that fades to a faint resting one, and a
+ * left accent bar stays until another anchor is followed.
+ *
+ * Plain element selectors (any targeted heading, site-wide), same portability
+ * reasoning as `article` above. The bar's width is absorbed by a negative
+ * margin so the heading's text does not shift when it becomes the target.
+ *
+ * `:target` only recomputes on real navigations, so client-side route
+ * changes never match it; the `.anchor-target` class is the same state set
+ * by `src/client/anchor-target.ts` from the router's lifecycle hook.
+ */
+:root {
+  --target-flash: rgba(59, 91, 219, 0.25);
+  --target-rest: rgba(59, 91, 219, 0.07);
+}
+
+[data-theme='dark'] {
+  --target-flash: rgba(141, 162, 251, 0.3);
+  --target-rest: rgba(141, 162, 251, 0.12);
+}
+
+:is(h1, h2, h3, h4):is(:target, .anchor-target) {
+  background-color: var(--target-rest);
+  border-left: 4px solid var(--ifm-color-primary);
+  padding-left: 0.75rem;
+  margin-left: calc(-0.75rem - 4px);
+  border-radius: 0 4px 4px 0;
+  animation: target-flash 1.8s ease-out;
+}
+
+@keyframes target-flash {
+  0%,
+  25% {
+    background-color: var(--target-flash);
+  }
+  100% {
+    background-color: var(--target-rest);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(h1, h2, h3, h4):is(:target, .anchor-target) {
+    animation: none;
+  }
+}
+
+/**
+ * The rule-arrow glyphs (⇥ ⇤) in running text.
+ *
+ * The font draws the arrows under the x-height and lifted off the baseline,
+ * so at body size they read as specks (the diagrams correct the same way in
+ * SVG, with measured constants). Sized to the height of the *prose*'s
+ * uppercase: the arrows span 0.442em against a 0.726em cap height (measured),
+ * and the code chip the glyph sits in runs at 95% of the prose
+ * (--ifm-code-font-size), so 0.726 / 0.442 / 0.95 ≈ 1.73em. The negative
+ * vertical-align seats the lifted glyph back on the baseline, and
+ * line-height 0 stops the bigger glyph from opening up the line box.
+ */
+.rule-glyph {
+  font-size: 1.73em;
+  line-height: 0;
+  vertical-align: -0.095em;
+}

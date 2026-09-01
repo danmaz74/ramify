@@ -65,6 +65,10 @@ const config: Config = {
 
   plugins: [ramifySourcePlugin],
 
+  // Keeps the CSS anchor-target highlight working across the SPA router's
+  // client-side navigations — see the comment in the module itself.
+  clientModules: ['./src/client/anchor-target.ts'],
+
   presets: [
     [
       'classic',
@@ -81,7 +85,11 @@ const config: Config = {
   themeConfig: {
     navbar: {
       title: 'ramify.ts',
-      items: [{ to: '/model', label: 'The model', position: 'left' }],
+      items: [
+        { to: '/model', label: 'The model', position: 'left' },
+        { to: '/tags', label: 'Tags', position: 'left' },
+        { to: '/glossary', label: 'Glossary', position: 'left' },
+      ],
     },
     footer: {
       style: 'light',
