@@ -12,7 +12,7 @@ ramify.ts. It extracts and simplifies the access model in
 [Parent-Governed Recursive Module Access](../../../docs/analysis/2026-08-30-parent-governed-recursive-module-access.md)
 (host-repository history; where the two disagree, this document reflects the
 newer decision direction). Named surfaces, routing syntax and enforcement
-architecture remain in those earlier documents; exposure tags appear here only
+architecture remain in those earlier documents; tags appear here only
 insofar as they restrict who may import a symbol. The application of this
 model to cucumber-viz — coverage of the current enforcement rules, required
 restructurings and migration consequences — lives in
@@ -152,7 +152,7 @@ Two structural properties worth preserving through every later refinement:
   available in, about exactly one hop (its parent) or its own subtree. No decision
   ever names a module outside the decider's immediate family.
 
-## Contextual rules: importer contexts and exposure tags
+## Contextual rules: tags and their availability rules
 
 Two real use cases are not expressible with the tree rules alone:
 
@@ -162,44 +162,57 @@ Two real use cases are not expressible with the tree rules alone:
 - **Browser compatibility.** Code that runs in the browser must only import
   symbols whose runtime closure is browser-safe.
 
-Both reduce to the same shape: a fact about the **importing context** and a
+Both reduce to the same shape: a fact about the **importing module** and a
 fact about the **exposed symbol** must be compatible, in addition to the
-tree rules. The core therefore gains one mechanism built on two
-classification primitives.
+tree rules. The core therefore gains one mechanism: **tags**. A tag is not
+just a name — when a tag is defined, it is associated with its availability
+rule, and it always carries it (glossary: "Tag-associated availability
+rule"). The same tag names are assigned in two positions:
 
-### Importer contexts
+### Tags on symbols and on modules
 
-An importer context is a declared, structural classification of importing
-code, carrying context tags:
+- **Symbol tagging.** The owner assigns a tag set to each symbol it owns
+  (empty by default). The assignment is immutable: the tags travel with the
+  symbol through every exposure and re-exposure, and no module along the
+  route can add, remove or change one.
+- **Module tagging.** A module may assign tags to itself in its module
+  definition, classifying its files — a **testing module**'s files are
+  tests, a **browser module**'s files run in a browser. A module may also
+  classify file subtrees the same way (declared importer contexts:
+  co-located tests, a domain's feature-test tree). Classification is always
+  declared; a file never gains privileges because its name matches a
+  test-like or client-like pattern.
 
-- a module may declare file subtrees as **test contexts** (co-located tests,
-  a domain's feature-test tree), and a module may itself be a declared test
-  module; and
-- modules or file subtrees are classified by **execution platform** — for
-  example, an application's UI trees are browser contexts.
+### Availability rules
 
-Classification is always declared. A file never gains privileges because its
-name matches a test-like or client-like pattern.
+The tag based availability rules define which combinations of module and
+symbol tags make an exposed symbol available (glossary: "Tag based
+availability rules"). There are two kinds, and each tag's definition says
+which it carries:
 
-### Exposure tags
+- **Required module tag** (`⇥`) — if the symbol has the tag, it is available
+  from exposure only in modules carrying the same tag.
+- **Required symbol tag** (`⇤`) — if the module has the tag, the only
+  symbols visible from exposure that are available in it are those carrying
+  the same tag.
 
-A symbol a module exposes may carry tags. A tag definition may set only
-these parameters:
+When several rules apply to the same symbol and module, all of them must be
+satisfied. A tag definition may set only these parameters:
 
 | Parameter | Meaning |
 | --- | --- |
-| `requires` | Tags required on the other side of the import. The direction is determined by the declaring side: an exposure tag can only require context tags, and a context tag can only require exposure tags. |
-| `applies-to` | Whether the requirement applies to all imports or only to value imports (type-only imports are erased at runtime). |
+| `requires` | The tag's availability rule: tags required on the other side of the import. In symbol position this is a required module tag; in module position, a required symbol tag. |
+| `applies-to` | Whether the rule applies to all imports or only to value imports (type-only imports are erased at runtime). |
 | `exclusive` | Whether the tag may be combined with the default contract channel. |
-| `exposures-default-to` | Context tags only: symbols exposed from this context default to the given exposure tag. |
+| `symbols-default-to` | Module position only: symbols owned by this module default to the given symbol tag. |
 | `verify` | An externally checked proof obligation attached to the tag's factual claim. Verification is not an importability rule; a false claim is the owner's error, reported at the owner. |
 
-**Tags are purely restrictive.** They never grant access. The complete
-importability rule is one conjunction:
+**Tags are purely restrictive.** They never grant access, and they never
+change what is visible. The complete rule:
 
-> A file may import a symbol iff the tree rules allow it AND every
-> cross-requirement of every tag involved — on the exposed symbol and on the
-> importer's context — is satisfied.
+> An exposed symbol is available in a module iff the tree rules make it
+> visible there AND every availability rule of every tag involved — on the
+> symbol and on the importing module — is satisfied.
 
 This adds one term to the core vocabulary: an import binding is a **type**
 import or a **value** import, because platform requirements exempt erased
@@ -208,47 +221,44 @@ type-only imports while testing requirements do not.
 ### Instance: testing
 
 ```yaml
-exposure-tags:
-  testing_only: { exclusive: true, requires: [test], applies-to: all }
-
-context-tags:
-  test: { exposures-default-to: testing_only }
+tags:
+  testing:
+    on-symbols: { requires: [testing], applies-to: all, exclusive: true }
+    on-modules: { symbols-default-to: testing }
 ```
 
 - A module curates its test-support exposures by exposing selected internals
-  tagged `testing_only`; tests never receive blanket private access.
-- `testing_only` is exclusive with the default channel: a symbol is part of
+  tagged `testing`; tests never receive blanket private access.
+- `testing` is exclusive with the default channel: a symbol is part of
   the real contract or test support, never ambiguously both.
-- `testing_only` symbols travel through the ordinary exposure channels. Any
-  grant breadth is safe, because the cross-requirement blocks production
-  importers everywhere the grant reaches — so a parent may blanket-grant
-  received test support to its whole subtree without risk, while a domain keeps its
-  fakes domain-internal by simply not routing them higher.
-- Everything a declared test module exposes is implicitly `testing_only`;
-  test infrastructure can never enter a production ceiling.
-- Integration tests belong to the lowest common ancestor whose composition
-  they exercise, as a test context owned by that module. Rule 2 then provides
-  exactly the composition surfaces they need, with no further mechanism. A
-  declared child test module under that ancestor is possible but strictly
-  weaker: the ancestor can grant its received `testing_only` symbols downward
-  (safe at any breadth), but it cannot hand the child its default-channel
-  composition surfaces without granting them to every descendant branch — and
-  exclusivity forbids re-tagging real contracts as test support. Ancestor-owned
-  test contexts are therefore the recommended structure for integration
-  tests.
+- `testing` symbols travel through the ordinary exposure channels. Any
+  grant breadth is safe, because the availability rule withholds the symbol
+  from untagged modules everywhere the grant reaches — so a parent may
+  blanket-grant received test support to its whole subtree without risk,
+  while a domain keeps its fakes domain-internal by simply not routing them
+  higher.
+- Everything a testing module exposes is implicitly `testing`; test
+  infrastructure can never enter a production ceiling.
+- Integration tests belong under the lowest common ancestor whose
+  composition they exercise — as a test context owned by that module, or as
+  a testing module directly beneath it. Rule 2 (with the ancestor's grants)
+  then provides exactly the composition surfaces they need, with no further
+  mechanism. The child-module form additionally needs the ancestor to grant
+  its default-channel composition surfaces to its subtree, which examples
+  keep safe by granting everything received; exclusivity forbids re-tagging
+  real contracts as test support either way.
 
 ### Instance: browser compatibility
 
 ```yaml
-exposure-tags:
-  browser: { verify: browser-closure }
-
-context-tags:
-  browser: { requires: [browser], applies-to: value-imports }
+tags:
+  browser:
+    on-symbols: { verify: browser-closure }
+    on-modules: { requires: [browser], applies-to: value-imports }
 ```
 
-- A browser context may value-import only browser-tagged symbols, among
-  those the tree rules already allow. Type-only imports pass freely because
+- A browser module may value-import only `browser` symbols, among those the
+  tree rules already make visible. Type-only imports pass freely because
   they are erased at runtime.
 - `browser` on an exposed symbol is a falsifiable promise about the symbol's entire
   transitive runtime closure, including the owner's private files. The
@@ -261,8 +271,8 @@ context-tags:
 
 ### Rejected: global reach
 
-An earlier draft gave `testing_only` a `reach: global` parameter so that
-every test context could import every test-support symbol without exposure
+An earlier draft gave `testing` a `reach: global` parameter so that
+every testing module could import every test-support symbol without exposure
 chains. It was rejected: it would puncture the consent-chain principle for
 one case, create a second kind of tag semantics (granting rather than
 restricting) and silently make every test fake application-wide test API,
@@ -317,12 +327,12 @@ the declaration.
 - **Uniform descendant grants.** A descendant grant reaches the whole
   subtree; there is no backflow exclusion and no provenance tracking on routed
   symbols.
-- **Tags are purely restrictive cross-requirements.** Exposure tags and
-  importer-context tags gate imports on top of the tree rules; no tag ever
-  grants reach (`reach: global` rejected).
-- **Test access is tree-routed and context-gated.** There is no global test
-  channel: `testing_only` support travels the ordinary exposure channels,
-  and only declared test contexts may import it.
+- **Tags are purely restrictive.** A tag's availability rules gate imports
+  on top of the tree rules; no tag ever grants reach (`reach: global`
+  rejected), and no tag ever changes what is visible.
+- **Test access is tree-routed and tag-gated.** There is no global test
+  channel: `testing` support travels the ordinary exposure channels, and it
+  is available only in testing modules and declared test contexts.
 
 All decisions follow one meta-rule: maximum simplicity unless a very
 concrete case forces a complication.

@@ -6,11 +6,18 @@
  * 1. **Content.** Every row of every node box is *derived* from the
  *    declaration through the evaluator — including the whole received
  *    compartment and its provenance, which is exactly what
- *    `explainImport(...).via` reports. Nothing about receiving is declared
- *    anywhere, and that is the point: `CartApi` is available in `checkout` as
- *    a consequence of `cart`'s decision, not of any decision `checkout` made.
- *    Which of the two arrival channels a diagram lists is the one editorial
- *    choice here (`nodeContent.includeAncestorGrants`).
+ *    `explainAvailability(...).via` reports. Nothing about receiving is
+ *    declared anywhere, and that is the point: `CartApi` is available in
+ *    `checkout` as a consequence of `cart`'s decision, not of any decision
+ *    `checkout` made. Which of the two arrival channels a diagram lists is the
+ *    one editorial choice here (`nodeContent.includeAncestorGrants`).
+ *
+ *    Structure asks the *availability* question, never the importability one:
+ *    a box lists what the exposure chain put within the module's reach, and a
+ *    tag restricts who may take it rather than where it arrives. The tags then
+ *    enter as content of their own — the chip a tagged symbol wears on every
+ *    row, the binding note a row carries where the two bindings disagree, and
+ *    the declared importer contexts drawn inside the node that declares them.
  * 2. **Position.** `d3-hierarchy`'s tidy tree, with a separation function that
  *    already knows each box's width, followed by a relaxation pass that
  *    guarantees the §3.9 clearance at every level (d3 compares sub-tree
@@ -23,11 +30,18 @@
 
 import { hierarchy, tree as d3Tree, type HierarchyNode } from 'd3-hierarchy';
 
-import type { ColorKey, DiagramContext } from './diagram-definition.js';
-import { LAYOUT, headerBandHeight, wrapText, type Box } from './geometry.js';
+import type { ColorKey, DiagramContext, TracedSymbol } from './diagram-definition.js';
+import { LAYOUT, headerBandHeight, rowLabelDx, wrapText, type Box } from './geometry.js';
 import {
-  explainImport,
+  moduleTagsOf,
+  explainAvailability,
+  symbolTagsOf,
+  mayImport,
   requireModuleRecord,
+  type ContextName,
+  type Tag,
+  type ModuleTag,
+  type SymbolTag,
   type ModuleDeclaration,
   type ModuleId,
   type ModuleTree,
@@ -48,6 +62,51 @@ export type ExposureMarker = '▲' | '▼' | '▲▼' | '·';
  * against `explainImport(...).clause` and `./validate.ts` checks it.
  */
 export type RowKind = 'owns' | 'received' | 'granted';
+
+/**
+ * A muted label a row carries after its symbol name.
+ *
+ * - `tags` — the exposure tags the symbol's owner declared, in the doc's
+ *   notation (`testing`). The chip travels with the symbol, so it is
+ *   drawn on the owner's row and on every arrival alike.
+ * - `binding` — drawn only where the two import bindings disagree
+ *   (`type ✓ · value ✗`), because a platform requirement exempts type-only
+ *   imports and a testing requirement does not. Nothing but the evaluator's two
+ *   verdicts decides its words.
+ */
+export interface RowAnnotation {
+  readonly kind: 'tags' | 'binding';
+  readonly text: string;
+  /** x of the annotation's start, relative to the node box's left edge. */
+  readonly dx: number;
+}
+
+/**
+ * A declared importer context, drawn inside the module that declares it: a
+ * named context over some of its files, or the whole module classified at once.
+ *
+ * A context classifies importing code, so what it says about a diagram is which
+ * of the traced symbols its files may actually import — {@link imports}, the
+ * set that lights up when one of them is selected.
+ */
+export interface DrawnContext {
+  readonly module: ModuleId;
+  /** The declared context's name; absent when the whole module is the context. */
+  readonly name?: ContextName;
+  /** As drawn: `integration-tests` for a named context, `browser` for a module. */
+  readonly label: string;
+  /** The context tags in force for these files, most specific first. */
+  readonly tags: readonly ModuleTag[];
+  /** The line under the label: `test context`. */
+  readonly caption: string;
+  /**
+   * The traced symbols these files may value-import, owned elsewhere — the
+   * arrivals a selection lights up here. Derived through `mayImport` with this
+   * context as the importer, so a tag that refuses the import keeps the box
+   * dark.
+   */
+  readonly imports: readonly SymbolName[];
+}
 
 /** One symbol line inside a node box. */
 export interface SymbolRow {
@@ -74,6 +133,25 @@ export interface SymbolRow {
   readonly color: ColorKey;
   /** y of the row's centre, relative to the node box's top. */
   readonly y: number;
+  /** The exposure tags the symbol carries. Omitted for the default channel. */
+  readonly tags?: readonly SymbolTag[];
+  /** Muted labels after the name: the tag chip, then the binding note. */
+  readonly annotations?: readonly RowAnnotation[];
+  /**
+   * Whether a file of this module's own context may *value-import* the symbol.
+   *
+   * Availability put the row here; this says whether the tags let this module
+   * take it. False rows are drawn exactly like the others — absence is not the
+   * statement here, the chip is — but they never blink when the symbol is
+   * selected, which is what "production compartments stay dark" means.
+   */
+  readonly importable: boolean;
+  /**
+   * Visible here, not available: no file of this module may import the symbol
+   * in any binding, so the name is drawn struck through. A row whose bindings
+   * disagree is not struck — its binding note reports the split instead.
+   */
+  readonly struck: boolean;
 }
 
 export type Compartment =
@@ -97,6 +175,16 @@ export type Compartment =
       readonly lines: readonly string[];
       readonly y: number;
       readonly height: number;
+    }
+  | {
+      /** A named importer context: a dashed sub-box over part of the module. */
+      readonly kind: 'context';
+      readonly id: string;
+      readonly slug: string;
+      readonly title: string;
+      readonly context: DrawnContext;
+      readonly y: number;
+      readonly height: number;
     };
 
 export interface NodeLayout {
@@ -108,6 +196,12 @@ export interface NodeLayout {
   readonly box: Box;
   readonly compartments: readonly Compartment[];
   readonly rows: readonly SymbolRow[];
+  /**
+   * Set when the module itself is a declared importer context: the dashed
+   * treatment then frames the whole node, because a context can be a subtree of
+   * a module's files or an entire module.
+   */
+  readonly moduleContext?: DrawnContext;
 }
 
 export interface LevelGeometry {
@@ -143,6 +237,7 @@ interface NodeContent {
   readonly height: number;
   readonly compartments: readonly Compartment[];
   readonly rows: readonly SymbolRow[];
+  readonly moduleContext?: DrawnContext;
 }
 
 /** The provenance a row states, in the words the box draws. */
@@ -162,7 +257,8 @@ function slugify(title: string): string {
 /**
  * The symbols available in a module that it does not own, with the direct child
  * that exposed each to it — read straight off the evaluator's child-exposure
- * explanation.
+ * explanation. An availability question, so no tag is consulted: an arrival is
+ * an arrival whether or not the importing files may take it.
  */
 export function derivedHoldings(
   tree: ModuleTree,
@@ -196,7 +292,7 @@ function arrivals(
     if (ref.owner === moduleId) {
       continue;
     }
-    const decision = explainImport(tree, moduleId, ref.owner, ref.name);
+    const decision = explainAvailability(tree, moduleId, ref.owner, ref.name);
     if (decision.allowed && decision.clause === clause && decision.via !== null) {
       found.push({ owner: ref.owner, name: ref.name, from: decision.via });
     }
@@ -212,7 +308,7 @@ export function reExposesToDescendants(
   symbol: SymbolName,
 ): boolean {
   return descendantsOf(tree, moduleId).some((descendant) => {
-    const decision = explainImport(tree, descendant, owner, symbol);
+    const decision = explainAvailability(tree, descendant, owner, symbol);
     return decision.allowed && decision.clause === 'ancestor-grant' && decision.via === moduleId;
   });
 }
@@ -228,7 +324,7 @@ export function reExposesToParent(
   if (parent === null) {
     return false;
   }
-  const decision = explainImport(tree, parent, owner, symbol);
+  const decision = explainAvailability(tree, parent, owner, symbol);
   return decision.allowed && decision.clause === 'child-exposure' && decision.via === moduleId;
 }
 
@@ -259,17 +355,205 @@ function markerFor(toParent: boolean, toDescendants: boolean): ExposureMarker {
 }
 
 /**
- * A row's width in characters: marker column, symbol, and the provenance.
- * Arrival names render italic, which stays within the shared per-character
- * estimate — only the slant differs, not the advance width.
+ * A row's width in characters: marker column, symbol, any annotations, and the
+ * provenance. Arrival names render italic, which stays within the shared
+ * per-character estimate — only the slant differs, not the advance width.
+ *
+ * The annotations are measured in their own smaller font and converted into
+ * this budget's character unit, rounded up: a row must be *wider* than its ink,
+ * because the provenance is drawn against the box's right edge and a chip that
+ * ran into it would be worse than no chip.
  */
-function rowChars(row: { kind?: string; marker?: string; symbol: string; provenance?: string }): number {
-  const left = (row.marker ?? ' ').length + 1 + row.symbol.length;
+function rowChars(row: {
+  kind?: string;
+  marker?: string;
+  symbol: string;
+  provenance?: string;
+  annotations?: readonly RowAnnotation[];
+}): number {
+  const annotations = (row.annotations ?? []).reduce(
+    (total, annotation) =>
+      total + LAYOUT.node.annotationGap + annotation.text.length * LAYOUT.node.annotationCharWidth,
+    0,
+  );
+  // The budget models a name at `charWidth`, and annotations are placed from
+  // the wider `nameCharWidth`; the difference is added back here so that a row
+  // carrying annotations is measured exactly where they are drawn.
+  const extra =
+    annotations === 0
+      ? 0
+      : Math.ceil(
+          (annotations +
+            row.symbol.length * (LAYOUT.node.nameCharWidth - LAYOUT.node.charWidth)) /
+            LAYOUT.node.charWidth,
+        );
+  const left = (row.marker ?? ' ').length + 1 + row.symbol.length + extra;
   return row.provenance === undefined ? left : left + 3 + row.provenance.length;
 }
 
 /** A row before layout has placed it. */
 type DraftRow = Omit<SymbolRow, 'id' | 'compartment' | 'layer' | 'color' | 'y'>;
+
+/**
+ * The glyph of the availability rule each tag carries — a mirror-arrow pair
+ * drawing the direction of the rule's demand:
+ *
+ * - `⇥` — required module tag: the demand travels out with the symbol and is
+ *   checked where it lands — available only in modules carrying the same tag.
+ *   Carried by `testing`.
+ * - `⇤` — required symbol tag: the demand faces inward at the module's door
+ *   and is checked on everything arriving — the module value-imports only
+ *   symbols carrying the same tag. Carried by `browser`.
+ *
+ * (An earlier pair drew miniatures of the part that must match — `▢` the
+ * module box, `▭` the symbol pill — but the two outlines were barely
+ * distinguishable at chip size.)
+ *
+ * A tag is not just a name — it always carries its availability rule — so the
+ * glyph accompanies the tag wherever the diagram mentions it.
+ */
+export const TAG_GLYPHS: Readonly<Record<Tag, string>> = {
+  testing: '⇥',
+  browser: '⇤',
+};
+
+/** A tag as the diagram always writes it: rule glyph, then name. */
+export function tagWithGlyph(tag: Tag): string {
+  return `${TAG_GLYPHS[tag]} ${tag}`;
+}
+
+/**
+ * The chip a tagged symbol wears. Each tag is written with the glyph of the
+ * rule it carries; the pill the chip sits on is the delimiter, so no bracket
+ * notation is needed. Empty tags, no chip.
+ */
+export function tagChipText(tags: readonly SymbolTag[]): string | undefined {
+  return tags.length === 0 ? undefined : tags.map(tagWithGlyph).join(' · ');
+}
+
+/**
+ * The note a row carries when the two import bindings disagree — the whole of
+ * the type-versus-value affordance, and it is spelled out in words rather than
+ * added to the legend.
+ *
+ * Both verdicts are the evaluator's, and the note simply reports them, so the
+ * only universe that grows a note is one where a tag actually treats the two
+ * bindings differently.
+ */
+export function bindingNoteText(typeAllowed: boolean, valueAllowed: boolean): string | undefined {
+  if (typeAllowed === valueAllowed) {
+    return undefined;
+  }
+  return `type ${typeAllowed ? '✓' : '✗'} · value ${valueAllowed ? '✓' : '✗'}`;
+}
+
+/** Place a row's annotations after its name, left to right. */
+function placeAnnotations(
+  marker: string | undefined,
+  symbol: SymbolName,
+  texts: readonly { readonly kind: RowAnnotation['kind']; readonly text: string }[],
+): RowAnnotation[] {
+  let dx = rowLabelDx(marker) + symbol.length * LAYOUT.node.nameCharWidth;
+  return texts.map(({ kind, text }) => {
+    dx += LAYOUT.node.annotationGap;
+    const placed: RowAnnotation = { kind, text, dx };
+    dx += text.length * LAYOUT.node.annotationCharWidth;
+    return placed;
+  });
+}
+
+/**
+ * Everything the tags say about one drawn row: the chip its symbol carries, the
+ * note its bindings need, and whether this module's own files may take it.
+ */
+function tagFacts(
+  tree: ModuleTree,
+  moduleId: ModuleId,
+  row: { readonly marker?: string; readonly symbol: SymbolName; readonly owner: ModuleId },
+): Pick<SymbolRow, 'tags' | 'annotations' | 'importable' | 'struck'> {
+  const tags = symbolTagsOf(tree, row.owner, row.symbol);
+  const importable = mayImport(tree, { module: moduleId, binding: 'value' }, row.owner, row.symbol);
+  const typeImportable = mayImport(
+    tree,
+    { module: moduleId, binding: 'type' },
+    row.owner,
+    row.symbol,
+  );
+  const note = bindingNoteText(typeImportable, importable);
+
+  const chip = tagChipText(tags);
+  const annotations = placeAnnotations(row.marker, row.symbol, [
+    ...(chip === undefined ? [] : [{ kind: 'tags' as const, text: chip }]),
+    ...(note === undefined ? [] : [{ kind: 'binding' as const, text: note }]),
+  ]);
+
+  return {
+    ...(tags.length === 0 ? {} : { tags }),
+    ...(annotations.length === 0 ? {} : { annotations }),
+    importable,
+    struck: !importable && !typeImportable,
+  };
+}
+
+/**
+ * The importer contexts drawn inside one module: each context it declares, and
+ * — when its own files are classified — the module itself.
+ *
+ * The tags of a whole-module context are the *effective* ones, so a submodule of
+ * a browser module states the classification it inherited rather than pretending
+ * to be unclassified.
+ */
+function drawnContexts(
+  tree: ModuleTree,
+  moduleId: ModuleId,
+  traced: readonly TracedSymbol[],
+): { readonly named: DrawnContext[]; readonly module?: DrawnContext } {
+  const importsOf = (context?: ContextName): SymbolName[] =>
+    traced
+      .filter(
+        (entry) =>
+          entry.owner !== moduleId &&
+          mayImport(
+            tree,
+            { module: moduleId, ...(context === undefined ? {} : { context }), binding: 'value' },
+            entry.owner,
+            entry.symbol,
+          ),
+      )
+      .map((entry) => entry.symbol);
+
+  const caption = (tags: readonly ModuleTag[], scope: 'context' | 'module'): string =>
+    tags.length === 0 ? scope : `${tags.join(' · ')} ${scope}`;
+
+  const named = (requireModuleRecord(tree, moduleId).contexts ?? []).map((declared): DrawnContext => {
+    const tags = moduleTagsOf(tree, moduleId, declared.name);
+    return {
+      module: moduleId,
+      name: declared.name,
+      label: declared.name,
+      tags,
+      caption: caption(tags, 'context'),
+      imports: importsOf(declared.name),
+    };
+  });
+
+  const moduleTags = moduleTagsOf(tree, moduleId);
+  const module =
+    moduleTags.length === 0
+      ? undefined
+      : {
+          // A tag always travels with its rule, so the label writes each tag
+          // behind its rule's glyph; the caption states the scope in plain
+          // words.
+          module: moduleId,
+          label: moduleTags.map(tagWithGlyph).join(' · '),
+          tags: moduleTags,
+          caption: caption(moduleTags, 'module'),
+          imports: importsOf(),
+        };
+
+  return { named, ...(module === undefined ? {} : { module }) };
+}
 
 /** Build every node's content and measure it. Positions come later. */
 function buildContent(context: DiagramContext): Map<ModuleId, NodeContent> {
@@ -292,7 +576,14 @@ function buildContent(context: DiagramContext): Map<ModuleId, NodeContent> {
       // No separate "exported" flag exists: an owned symbol with neither
       // channel set is gray, meaning it goes no further than its owner.
       const marker = markerFor(owned.exposeToParent === true, owned.exposeToDescendants === true);
-      return { kind: 'owns', symbol: owned.symbol, owner: id, marker, gray: marker === '·' };
+      return {
+        kind: 'owns',
+        symbol: owned.symbol,
+        owner: id,
+        marker,
+        gray: marker === '·',
+        ...tagFacts(tree, id, { marker, symbol: owned.symbol, owner: id }),
+      };
     });
 
     const receivedRows = derivedHoldings(tree, id, allRefs).map((held): DraftRow => {
@@ -308,6 +599,7 @@ function buildContent(context: DiagramContext): Map<ModuleId, NodeContent> {
         gray: marker === '·',
         from: held.from,
         provenance: provenanceText('received', held.from),
+        ...tagFacts(tree, id, { marker, symbol: held.name, owner: held.owner }),
       };
     });
 
@@ -323,6 +615,7 @@ function buildContent(context: DiagramContext): Map<ModuleId, NodeContent> {
             gray: false,
             from: granted.from,
             provenance: provenanceText('granted', granted.from),
+            ...tagFacts(tree, id, { symbol: granted.name, owner: granted.owner }),
           }),
         )
       : [];
@@ -344,11 +637,30 @@ function buildContent(context: DiagramContext): Map<ModuleId, NodeContent> {
     // compartment says so; one with arrivals to list needs no empty box.
     const showPlaceholder = owns.length === 0 && received.length === 0;
 
-    const headerChars = isRoot ? `${id}   ${APP_ROOT_BADGE}`.length : id.length;
+    const contexts = drawnContexts(tree, id, definition.tracedSymbols);
+
+    // The header carries the module's name, the root badge, and — when the
+    // module itself is a context — the tag label that says so.
+    const headerChars = [
+      id,
+      ...(isRoot ? [APP_ROOT_BADGE] : []),
+      ...(contexts.module === undefined ? [] : [contexts.module.label]),
+    ].join('   ').length;
+    // A named context's box has two lines of its own, drawn inside its own
+    // inset: measured in that font, then converted into the row budget. A
+    // whole-module context adds nothing here — its label rides the header.
+    const contextChars = contexts.named.map((context) =>
+      Math.ceil(
+        (2 * LAYOUT.node.contextInset +
+          Math.max(context.label.length, context.caption.length) * LAYOUT.node.contextCharWidth) /
+          LAYOUT.node.charWidth,
+      ),
+    );
     const contentChars = [
       headerChars,
       ...(showPlaceholder ? [PLACEHOLDER.length] : []),
       ...[...owns, ...received].map((row) => rowChars(row)),
+      ...contextChars,
     ];
     const width = Math.max(
       LAYOUT.node.minWidth,
@@ -403,6 +715,23 @@ function buildContent(context: DiagramContext): Map<ModuleId, NodeContent> {
       addSymbolCompartment('received', receivedSlug, nodeContent.receivedCompartmentTitle, received);
     }
 
+    // A declared context is part of the node's content, not an overlay: it
+    // takes its own band at the bottom of the box, and the box grew for it.
+    for (const context of contexts.named) {
+      const height =
+        2 * LAYOUT.node.contextPadding + 2 * LAYOUT.node.contextLineHeight;
+      compartments.push({
+        kind: 'context',
+        id: `node-${id}-compartment-context-${context.name ?? ''}`,
+        slug: `context-${context.name ?? ''}`,
+        title: context.label,
+        context,
+        y,
+        height,
+      });
+      y += height;
+    }
+
     if (whatIfNote !== undefined && id === whatIfNote.moduleId) {
       const maxChars = Math.floor((width - 2 * LAYOUT.node.paddingX) / LAYOUT.lane.chipCharWidth);
       const lines = wrapText(whatIfNote.text, maxChars);
@@ -429,6 +758,7 @@ function buildContent(context: DiagramContext): Map<ModuleId, NodeContent> {
       height: y + LAYOUT.node.paddingBottom,
       compartments,
       rows: finishedRows,
+      ...(contexts.module === undefined ? {} : { moduleContext: contexts.module }),
     });
   }
 
@@ -565,6 +895,7 @@ export function layoutTree(context: DiagramContext): TreeGeometry {
       },
       compartments: content.compartments,
       rows: content.rows,
+      ...(content.moduleContext === undefined ? {} : { moduleContext: content.moduleContext }),
     };
   });
 

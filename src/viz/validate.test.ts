@@ -2,21 +2,32 @@ import { describe, expect, it } from 'vitest';
 
 import { createDiagramContext } from './diagram-definition.js';
 import { example1Diagram } from './diagrams/example1.js';
+import { example2Diagram } from './diagrams/example2.js';
+import { example3Diagram } from './diagrams/example3.js';
+import { example4Diagram } from './diagrams/example4.js';
 import { shopDiagram, shopTree } from './diagrams/shop.js';
 import { buildDiagramLayout } from './layout.js';
 import type { ChordLayout } from './layout-chords.js';
 import { layoutPropagation } from './layout-lanes.js';
-import { layoutTree, type NodeLayout, type SymbolRow } from './layout-nodes.js';
+import {
+  layoutTree,
+  type Compartment,
+  type NodeLayout,
+  type SymbolRow,
+} from './layout-nodes.js';
 import {
   DiagramModelMismatch,
   validateChords,
   validateGrayRows,
   validateLandings,
   validateNodeRows,
+  validateTagClaims,
 } from './validate.js';
 
 const shopContext = createDiagramContext(shopDiagram);
 const example1Context = createDiagramContext(example1Diagram);
+const example3Context = createDiagramContext(example3Diagram);
+const example4Context = createDiagramContext(example4Diagram);
 const layout = buildDiagramLayout();
 
 /** A chord with the given claim, borrowing an existing one's geometry. */
@@ -42,7 +53,13 @@ describe('the diagram checks itself against the evaluator', () => {
   });
 
   it('builds every checked-in diagram without complaint', () => {
-    for (const definition of [shopDiagram, example1Diagram]) {
+    for (const definition of [
+      shopDiagram,
+      example1Diagram,
+      example2Diagram,
+      example3Diagram,
+      example4Diagram,
+    ]) {
       expect(() => buildDiagramLayout(definition)).not.toThrow();
     }
   });
@@ -181,6 +198,15 @@ describe('node rows are checked row by row', () => {
     );
   });
 
+  it('checks a row against availability, not against importability', () => {
+    // `billing` lists `resetOrderStore` and may not import it: the row states
+    // that the exposure chain arrived, and the chip states the rest. A row
+    // check that asked the importability question would refuse this diagram.
+    expect(() =>
+      validateNodeRows(example3Context.tree, layoutTree(example3Context).nodes),
+    ).not.toThrow();
+  });
+
   it('leaves granted rows out of the gray check: they are arrivals, not stops', () => {
     // Nothing leaves `invoiceComputation`, and its two granted rows are not
     // gray. Only a `granted` exemption makes that consistent.
@@ -192,5 +218,151 @@ describe('node rows are checked row by row', () => {
     expect(granted).toHaveLength(2);
     expect(granted.every((row) => !row.gray)).toBe(true);
     expect(() => validateGrayRows(geometry.nodes, propagation)).not.toThrow();
+  });
+});
+
+/**
+ * The tag claims are the diagram's riskiest statements: a chip, a note and a
+ * blink each name an importer the picture is talking about, and getting the
+ * importer wrong is exactly how a tag diagram would quietly lie. Every one of
+ * them is therefore re-derived before anything is drawn.
+ */
+describe('tag claims are checked against the evaluator', () => {
+  const tamper = (
+    context: typeof example3Context,
+    moduleId: string,
+    rewrite: (row: SymbolRow) => SymbolRow,
+  ): NodeLayout[] =>
+    layoutTree(context).nodes.map((node) =>
+      node.id === moduleId ? { ...node, rows: node.rows.map(rewrite) } : node,
+    );
+
+  const traced3 = example3Diagram.tracedSymbols;
+  const traced4 = example4Diagram.tracedSymbols;
+
+  it('accepts every claim the two tag diagrams draw', () => {
+    expect(() =>
+      validateTagClaims(example3Context.tree, layoutTree(example3Context).nodes, traced3),
+    ).not.toThrow();
+    expect(() =>
+      validateTagClaims(example4Context.tree, layoutTree(example4Context).nodes, traced4),
+    ).not.toThrow();
+  });
+
+  it('refuses a chip the owner never declared', () => {
+    const nodes = tamper(example3Context, 'billing', (row) =>
+      row.symbol === 'OrderService' ? { ...row, tags: ['testing'] } : row,
+    );
+    expect(() => validateTagClaims(example3Context.tree, nodes, traced3)).toThrow(
+      DiagramModelMismatch,
+    );
+    expect(() => validateTagClaims(example3Context.tree, nodes, traced3)).toThrow(
+      /draws OrderService with tags \[testing\], but its owner declares \[\]/u,
+    );
+  });
+
+  it('refuses a chip whose text is not the one the tags spell', () => {
+    const nodes = tamper(example3Context, 'billing', (row) =>
+      row.symbol === 'resetOrderStore'
+        ? {
+            ...row,
+            annotations: (row.annotations ?? []).map((annotation) => ({
+              ...annotation,
+              text: 'test',
+            })),
+          }
+        : row,
+    );
+    expect(() => validateTagClaims(example3Context.tree, nodes, traced3)).toThrow(
+      /draws the chip test on resetOrderStore/u,
+    );
+  });
+
+  it('refuses a blink a tag does not allow', () => {
+    // The whole selection story: `billing` lists the symbol and may not import
+    // it, so its row must stay dark.
+    const nodes = tamper(example3Context, 'billing', (row) =>
+      row.symbol === 'resetOrderStore' ? { ...row, importable: true } : row,
+    );
+    expect(() => validateTagClaims(example3Context.tree, nodes, traced3)).toThrow(
+      /would blink resetOrderStore, but the model does not allow that import/u,
+    );
+  });
+
+  it('refuses a binding note the two verdicts do not produce', () => {
+    const nodes = tamper(example4Context, 'server', (row) =>
+      row.symbol === 'queryDb'
+        ? { ...row, annotations: [{ kind: 'binding', text: 'type ✓ · value ✗', dx: 100 }] }
+        : row,
+    );
+    expect(() => validateTagClaims(example4Context.tree, nodes, traced4)).toThrow(
+      /annotates queryDb with "type ✓ · value ✗", but the model's verdicts read "undefined"/u,
+    );
+  });
+
+  it('refuses a context the declaration does not declare', () => {
+    const nodes = layoutTree(example3Context).nodes.map((node) =>
+      node.id === 'billing'
+        ? {
+            ...node,
+            compartments: [
+              ...node.compartments,
+              {
+                kind: 'context',
+                id: 'node-billing-compartment-context-smoke-tests',
+                slug: 'context-smoke-tests',
+                title: 'smoke-tests',
+                context: {
+                  module: 'billing',
+                  name: 'smoke-tests',
+                  label: 'smoke-tests',
+                  tags: ['testing'],
+                  caption: 'test context',
+                  imports: ['OrderService', 'resetOrderStore'],
+                },
+                y: 0,
+                height: 0,
+              } satisfies Compartment,
+            ],
+          }
+        : node,
+    );
+    expect(() => validateTagClaims(example3Context.tree, nodes, traced3)).toThrow(
+      /draws the contexts \[smoke-tests\], but declares \[\]/u,
+    );
+  });
+
+  it('refuses a context that would blink for more than it may import', () => {
+    const nodes = layoutTree(example4Context).nodes.map((node) =>
+      node.id === 'ui' && node.moduleContext !== undefined
+        ? {
+            ...node,
+            moduleContext: { ...node.moduleContext, imports: ['formatMoney', 'queryDb'] },
+          }
+        : node,
+    );
+    expect(() => validateTagClaims(example4Context.tree, nodes, traced4)).toThrow(
+      /would blink for \[formatMoney, queryDb\], but the model lets it import \[formatMoney\]/u,
+    );
+  });
+
+  it('refuses a whole-module context the declaration does not classify', () => {
+    const nodes = layoutTree(example4Context).nodes.map((node) =>
+      node.id === 'server'
+        ? {
+            ...node,
+            moduleContext: {
+              module: 'server',
+              label: 'browser',
+              tags: ['browser'] as const,
+              caption: 'browser context',
+              imports: [],
+            },
+          }
+        : node,
+    );
+    expect(() => validateTagClaims(example4Context.tree, nodes, traced4)).toThrow(
+      /"server" draws a whole-module context, but its files carry \[\]/u,
+    );
   });
 });

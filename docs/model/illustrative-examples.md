@@ -15,7 +15,8 @@ self-explanatory (`computeTotal`, `InvoiceModel`); `PascalCase` = types,
 
 - Node boxes show two compartments: **owns** and **exposed to it**, the
   latter naming each arrival's provenance (`from <child>`, `granted by
-  <ancestor>`). Availability is the union of the two, read box by box.
+  <ancestor>`). Visibility is the union of the two, read box by box —
+  and with no tags declared, what is visible is exactly what is available.
 - Non-allowed imports are not drawn: absence is the statement, and selecting
   a symbol makes the absence visible.
 - Every exposure path is traced — its own color, its own selectable layer.
@@ -31,6 +32,31 @@ self-explanatory (`computeTotal`, `InvoiceModel`); `PascalCase` = types,
   restated what the flows already say.) Pure CSS, with a
   `prefers-reduced-motion` fallback (static dashes, steady highlight). Use
   this pattern for every diagram in the series.
+- **Tag examples keep the tree trivial**: visibility is uniform by
+  construction and stated in one sentence; nothing examples 1–2 already
+  taught is re-shown, and the tag is the only variable.
+- **A tag is written behind the glyph of the availability rule it carries**,
+  everywhere the diagram mentions it. The glyphs are a mirror-arrow pair
+  drawing the direction of the rule's demand: `⇥` is the required-module-tag
+  rule — the demand rides out with the symbol and is checked where it lands,
+  so it is available only in modules carrying the same tag; `⇤` is the
+  required-symbol-tag rule — the demand faces in at the module's door and is
+  checked on everything arriving, so the module value-imports only symbols
+  carrying the same tag. So the chip on a tagged symbol's row reads
+  `⇥ testing`, and a tagged module's dashed box is labeled `⇤ browser`. The
+  chip sits on a filled pill and travels with the symbol to every arrival; a
+  tagged module's dashed box fills its node. (Miniatures of the part that
+  must match — a box, a pill — were tried first and dropped: the two outlines
+  were indistinguishable at chip size.)
+- **Visible but not available is struck through**: when no file of a module
+  may import an arrival in any binding, the row is drawn — the exposure chain
+  really does put the symbol there — with its name struck. A row whose two
+  bindings disagree is not struck; it carries the note instead
+  (`type ✓ · value ✗`).
+- Selecting a tagged symbol blinks only the arrivals where it is available —
+  tagged modules light up, production compartments stay dark. A tag-refused
+  arrival is also dimmed, not merely un-pulsed, so the refusal survives
+  `prefers-reduced-motion` (its strike states the same thing statically).
 
 ## Example 1: One decision, three reaches
 
@@ -189,3 +215,112 @@ up, nothing more.
   and down one subtree at once.
 - Candidate interactivity: click a decision dot to toggle it off and watch
   every downstream arrowhead vanish — each hop is load-bearing.
+
+## Example 3: The tag is the entire difference (testing)
+
+Two symbols with identical exposures; one wears `testing`. The tree setup is
+one sentence — everything is granted everywhere, and none of it is the
+lesson. The lesson is the required-module-tag rule (`⇥`) that `testing`
+carries: both symbols are visible everywhere, and the tagged one is available
+only in modules carrying the same tag.
+
+### Tree
+
+```text
+app                      grants everything it receives to its subtree
+├── orders               owns OrderService, resetOrderStore (tagged testing)
+│                        (both exposed to parent)
+├── billing              production consumer
+└── integration-tests    testing module: carries the ⇥ testing tag
+```
+
+### Verdicts
+
+Visibility is identical in every column; only the tag differs.
+
+| Importer | `OrderService` | `resetOrderStore` (tagged `⇥ testing`) |
+| --- | --- | --- |
+| `billing` (production) | ✓ | ✗ — available only in testing modules |
+| `integration-tests` (testing module) | ✓ | ✓ |
+
+### Lessons
+
+1. Visible is not available: both symbols share the same exposure chain,
+   and the tag's availability rule alone flips the verdict.
+2. Tags never grant: the testing module imports nothing the tree did not
+   route to it. It sees `OrderService` because the chain reaches it, not
+   because it is tagged.
+3. Test support is curated, symbol by symbol: `orders` chose exactly what
+   tests may touch; tests never receive blanket private access.
+4. Exclusivity: `testing` removes a symbol from the default contract — a
+   symbol is real contract or test support, never both.
+5. Grant breadth is safe at any width: blanket-granting received test
+   support is harmless, because the availability rule travels with the
+   symbol and withholds it from untagged modules everywhere the grant
+   reaches.
+
+### Diagram notes
+
+- The integration tests are their own module, a child of `app` — the lowest
+  common ancestor whose composition they exercise, per the spec's
+  recommendation — and the whole module is tagged `testing`, so the dashed
+  box fills its node.
+- `resetOrderStore`'s name is struck in `billing` and in `app` — visible
+  there, not available — and drawn plainly in the testing module. The static
+  picture already states the verdict table.
+- Selecting `resetOrderStore`: the testing module blinks; `billing` stays
+  dark, and so does `app`'s own row — routing a grant earns no right to
+  import it. Selecting `OrderService`: both blink — the contrast is the
+  picture.
+
+## Example 4: A promise about the closure (browser)
+
+The other availability rule, pointing the other way: `testing` constrains
+where a tagged symbol may go; `browser` carries the required-symbol-tag rule
+(`⇤`), constraining what a tagged module may take. Two symbols with identical
+exposures; one wears `browser` — a falsifiable promise that the symbol's
+entire transitive runtime closure is browser-safe.
+
+### Tree
+
+```text
+app                      grants everything it receives to its subtree
+├── shared               owns formatMoney (tagged browser), queryDb
+│                        (both exposed to parent)
+├── ui                   browser module: carries the ⇤ browser tag
+└── server               plain module
+```
+
+### Verdicts
+
+| Importer | `formatMoney` (tagged `⇤ browser`) | `queryDb` |
+| --- | --- | --- |
+| `server` | ✓ | ✓ |
+| `ui` (value import) | ✓ | ✗ — a browser module value-imports only browser symbols |
+| `ui` (type-only import) | ✓ | ✓ — erased at runtime |
+
+### Lessons
+
+1. The browser line is drawn per symbol, not per file or module: `shared`
+   never splits to separate browser-safe from Node-only code.
+2. Type-only imports pass freely: the requirement applies to value imports,
+   and a type is erased before any runtime exists.
+3. The tag is a promise, not a proof: importability consults only the
+   declared `browser`; verification walks the closure separately, and a
+   false claim is reported at the owner — never at the importer.
+4. The two availability rules point in opposite directions, and the two
+   examples show both: `testing` requires something of the importing module
+   (`⇥`); `browser` on a module requires something of the imported symbol
+   (`⇤`).
+
+### Diagram notes
+
+- `ui` is a whole module tagged `browser` — the same shape example 3's
+  testing module wears.
+- Nothing is struck: the one refused import is value-only, and a row whose
+  bindings disagree carries the note, not the strike.
+- The type-vs-value contrast is the one new row affordance this diagram
+  needs beyond example 3's chips: `queryDb`'s arrival in `ui` shows a
+  type-only ✓ beside a value ✗.
+- Selecting `queryDb`: `server` blinks, `ui` stays dark — the mirror image
+  of example 3's selection story.

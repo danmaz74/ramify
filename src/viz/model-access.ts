@@ -9,15 +9,27 @@
 export {
   ancestorsOf,
   buildTree,
+  moduleTagsOf,
+  explainAvailability,
   explainImport,
+  symbolTagsOf,
   isAvailable,
   mayImport,
+  requireImporterContext,
 } from '../model/index.js';
 
 export type {
+  ContextName,
+  Tag,
+  ModuleTag,
   DenialReason,
+  SymbolTag,
+  ImportBinding,
   ImportClause,
   ImportDecision,
+  Importer,
+  ImporterContextDeclaration,
+  ImporterDescriptor,
   ModuleDeclaration,
   ModuleId,
   ModuleRecord,

@@ -1,0 +1,161 @@
+---
+title: Tags
+description: What a tag is — a name carrying an availability rule — the two rules that exist, and how the diagrams write them.
+# Same reasoning as the model and examples pages: the diagram wants the page's
+# width, and a table-of-contents column would both narrow the column it widens
+# out of and sit under the figure's right-hand side. Frontmatter only — no
+# theme swizzling.
+hide_table_of_contents: true
+---
+
+import { ModelDiagram, example3Diagram, example4Diagram } from '@ramify/viz';
+
+# Tags
+
+The tree rules decide **visibility**: which symbols the exposure chains put
+within a module's reach. Two real needs are not expressible with visibility
+alone. Tests need deliberately selected internals of a module — fakes,
+in-memory stores, reset hooks — that production code must never be able to
+import. Code that runs in a browser must only import symbols whose entire
+runtime closure is browser-safe. Both are the same shape: a fact about the
+**importing module** and a fact about the **exposed symbol** have to be
+compatible, on top of everything the tree already decided.
+
+Tags carry those facts. Every symbol has a tag set, assigned once by its owner
+and immutable from then on; a module can carry tags too, declared in its own
+definition. And a tag is not just a name: **when a tag is defined, it is
+associated with its availability rule, and it always carries it.** Assign the
+tag, and the rule comes along.
+
+## The two availability rules
+
+An availability rule defines which combinations of module and symbol tags make
+an exposed symbol **available** — importable by the module's files — out of
+the symbols that are merely **visible** there. Two rules exist, and they are
+mirror images:
+
+- **Required module tag** — written **`⇥`**: the demand rides out with the
+  symbol, checked where it lands. If the *symbol* has the tag, it is available
+  from exposure only in modules carrying the same tag.
+- **Required symbol tag** — written **`⇤`**: the demand faces in at the
+  module's door, checked on everything arriving. If the *module* has the tag,
+  the only symbols visible from exposure that are available in it are those
+  carrying the same tag.
+
+When several rules apply to the same symbol and module, all of them must be
+satisfied. And **tags never grant**: no rule makes an import possible that the
+exposure chain did not already allow. A tag can only *withhold* a symbol that
+is visible — which is why the two universes below deliberately re-show nothing
+from the [illustrative examples](/examples): both trees are two hops deep,
+everything is exposed up to the root and granted back down, and visibility is
+therefore identical in every box by construction. The tag is the only variable
+in the picture.
+
+## How the diagrams write it
+
+- **A tag always appears behind the glyph of its rule** — `⇥ testing`,
+  `⇤ browser` — because the name and the rule are one thing. On a symbol the
+  tag is a chip on a filled pill, drawn on the owner's row and on every
+  arrival alike: tags travel with the symbol, and no module along the route
+  can add, remove or change one. On a module the tag labels a dashed box
+  filling the node.
+- **Visible but not available is struck through.** A withheld arrival is still
+  drawn — the exposure chain really does put the symbol there — but its name
+  wears a strike: you can see it, you cannot have it. A row is struck only
+  when *no* binding may import; where the two bindings disagree, the row says
+  so in words instead (`type ✓ · value ✗`).
+- **Selecting a tagged symbol** blinks exactly the arrivals where it is
+  available; withheld rows stay dark. The strike and the blink state the same
+  verdicts — one statically, one in motion.
+
+## The `testing` tag
+
+**Why it exists:** tests legitimately need internals that must never become
+production dependencies. Without a tag, an owner faces a false choice — expose
+a reset hook to everyone or to no one. `testing` resolves it: the owner
+exposes exactly the internals tests may touch, tagged, through the ordinary
+channels.
+
+**On a symbol,** `testing` marks test support and carries the
+required-module-tag rule (`⇥`): the symbol is available only in modules tagged
+`testing`, for imports of either binding — a type import of a test fake is
+still test-only coupling. It is also *exclusive*: a symbol is real contract or
+test support, never ambiguously both. **On a module,** `testing` classifies
+the files as tests, and everything such a module exposes is implicitly tagged
+`testing` — test infrastructure can never leak into a production contract.
+
+`orders` owns two symbols and exposes both to its parent; `app` grants both to
+its subtree; `integration-tests` is a testing module beside the production
+consumers. Identical chains, identical arrivals — and one symbol wears
+`⇥ testing`. Read `billing`'s box: `resetOrderStore` is listed, provenance and
+all, with its name struck — visible there, not available. The same strike
+appears in `app`'s own box, because routing a grant earns no right to import
+it. In the testing module the name is plain: both rules of the verdict table
+are in the static picture.
+
+<div className="wide-figure">
+  <ModelDiagram definition={example3Diagram} />
+</div>
+
+Three properties are worth naming, because they are what makes this small
+mechanism enough:
+
+- **Test support is curated, symbol by symbol.** `orders` chose exactly what
+  tests may touch. Tests never receive blanket private access, and there is no
+  global test channel: `resetOrderStore` reaches the testing module because
+  the chain routed it there, not because the importer is a test.
+- **Exclusivity.** `testing` removes a symbol from the default contract, and
+  no declaration can re-tag a real contract as test support later.
+- **Grant breadth is safe at any width.** `app` blanket-grants what it
+  received to its whole subtree without risk, because the availability rule
+  travels with the symbol and withholds it from untagged modules everywhere
+  the grant reaches.
+
+## The `browser` tag
+
+**Why it exists:** browser code must not pull in Node-only dependencies, and
+the line between browser-safe and Node-only runs *through* modules, not
+between them — a `shared` module can own both `formatMoney` and `queryDb`.
+Splitting every such module in two would multiply modules to encode one fact.
+`browser` states the fact per symbol instead.
+
+**On a module,** `browser` classifies files that run in a browser and carries
+the required-symbol-tag rule (`⇤`): the module may value-import only symbols
+tagged `browser`. The rule covers value imports only — a type is erased before
+any runtime exists, so type-only imports pass freely. **On a symbol,**
+`browser` is a falsifiable promise that the symbol's entire transitive runtime
+closure is browser-safe, the owner's private files included. It carries no
+rule of its own; it is what the module-side rule asks for. The promise is
+verified separately, and a false claim is reported at the owner — never at the
+importer, which did nothing wrong by believing it.
+
+The mirror image of example 3: here the *module* wears the tag, and the rule
+asks the *symbols* for a match. `ui` is a browser module — the same dashed box
+as the testing module, labeled `⇤ browser`. Nothing is struck in this
+universe: the one refused import (`queryDb` into `ui`) is refused for value
+imports only, so its row carries the binding note instead of the strike.
+Selecting `queryDb` shows the dynamic version — `server` lights up and `ui`
+stays dark.
+
+<div className="wide-figure">
+  <ModelDiagram definition={example4Diagram} />
+</div>
+
+- **The line is drawn per symbol, not per file or module.** `shared` never
+  splits to keep browser-safe and Node-only code apart; one module, one file
+  tree, two different answers.
+- **Type-only imports pass freely.** A platform requirement exempts erased
+  imports; a testing requirement does not. That is the one extra thing
+  `queryDb`'s row in `ui` has to say, and it says it in words:
+  `type ✓ · value ✗`.
+- **The tag is a promise, not a proof.** Importability consults only the
+  declared `browser`; the closure is verified separately, at the owner.
+
+## Where the precision lives
+
+The examples on this page are teaching material. The normative document is the
+cross-module importability rules specification, which ships with the
+repository at `docs/model/cross-module-importability-rules.md` — the tag rules
+are its "Contextual rules" section — with the vocabulary defined in
+`docs/model/glossary.md`. Where a page and the specification appear to
+disagree, the specification is right.

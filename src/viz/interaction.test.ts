@@ -15,6 +15,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { example1Diagram } from './diagrams/example1.js';
+import { example3Diagram } from './diagrams/example3.js';
+import { example4Diagram } from './diagrams/example4.js';
 import { ModelDiagram, TOUR_DWELL_MS } from './ModelDiagram.js';
 
 declare global {
@@ -114,6 +116,15 @@ const blinking = (): string[] =>
 /** How many lanes a symbol has, selected or not. */
 const lanesOf = (symbol: string): number =>
   container.querySelectorAll(`[data-kind="lane"][data-symbol="${symbol}"]`).length;
+
+/** Every declared importer context currently pulsing, as `<module>/<context>`. */
+const litContexts = (): string[] =>
+  [...container.querySelectorAll('[data-kind="node-context"].rmf-blink')].map(
+    (element) =>
+      `${element.getAttribute('data-module') ?? '?'}/${
+        element.getAttribute('data-context') ?? element.getAttribute('data-context-scope') ?? '?'
+      }`,
+  );
 
 describe('clicking a symbol', () => {
   it('lights its layer and dims the rest', () => {
@@ -284,6 +295,91 @@ describe('a second diagram', () => {
     expect(viewBox()[2]).toBeLessThan(base[2] as number);
     click('[data-kind="zoom-reset"]');
     expect(viewBox()).toEqual(base);
+  });
+});
+
+/**
+ * The two selection stories of `docs/model/illustrative-examples.md` examples 3
+ * and 4, in the live component: selecting a tagged symbol must light exactly
+ * the arrivals that may actually import it, and leave the rest dark.
+ */
+describe('selecting a symbol in a tag universe', () => {
+  it('lights the test context and leaves production dark', () => {
+    mount({ definition: example3Diagram });
+    expect(blinking()).toEqual([]);
+    expect(litContexts()).toEqual([]);
+
+    // "Selecting resetOrderStore: the test module blinks, billing stays dark."
+    click('[data-kind="header-chip"][data-symbol="resetOrderStore"]');
+    expect(blinking()).toEqual(['integration-tests/resetOrderStore']);
+    expect(litContexts()).toEqual(['integration-tests/module']);
+    // The row is still drawn in `billing`, and still says where it came from —
+    // it just goes dark, which is a contrast that survives reduced motion.
+    const dark = find('#node-billing-exposed-to-it-resetOrderStore');
+    expect(dark.getAttribute('data-importable')).toBe('false');
+    expect(dark.getAttribute('class')).toContain('rmf-dim-soft');
+    expect(dark.getAttribute('class')).not.toContain('rmf-blink');
+    expect(find('#node-billing-exposed-to-it-resetOrderStore-tags').textContent).toBe(
+      '⇥ testing',
+    );
+    // The strike is the static version of the same statement.
+    expect(
+      find('#node-billing-exposed-to-it-resetOrderStore-label').getAttribute('text-decoration'),
+    ).toBe('line-through');
+    // `app` routed the grant and its own production files are dark all the
+    // same: routing a symbol earns no right to import it.
+    expect(find('#node-app-exposed-to-it-resetOrderStore').getAttribute('class')).toContain(
+      'rmf-dim-soft',
+    );
+
+    // "Selecting OrderService: both blink — the contrast is the picture."
+    click('[data-kind="header-chip"][data-symbol="OrderService"]');
+    expect(blinking()).toEqual([
+      'app/OrderService',
+      'billing/OrderService',
+      'integration-tests/OrderService',
+    ]);
+    expect(litContexts()).toEqual(['integration-tests/module']);
+  });
+
+  it('mirrors it for the browser module, per binding', () => {
+    mount({ definition: example4Diagram });
+
+    // "Selecting queryDb: server blinks, ui stays dark."
+    click('[data-kind="header-chip"][data-symbol="queryDb"]');
+    expect(blinking()).toEqual(['app/queryDb', 'server/queryDb']);
+    expect(litContexts()).toEqual([]);
+    // …and the row says why, in words: the type import is the one that passes.
+    expect(find('#node-ui-exposed-to-it-queryDb-binding').textContent).toBe('type ✓ · value ✗');
+    expect(container.querySelectorAll('[data-kind="node-row-binding"]')).toHaveLength(1);
+
+    // "Selecting formatMoney: both blink."
+    click('[data-kind="header-chip"][data-symbol="formatMoney"]');
+    expect(blinking()).toEqual(['app/formatMoney', 'ui/formatMoney', 'server/formatMoney']);
+    expect(litContexts()).toEqual(['ui/module']);
+  });
+
+  it('draws the whole module as the context box, and nothing extra', () => {
+    mount({ definition: example4Diagram });
+    // The dashed box *fills* the node: a context can be a subtree of a
+    // module's files or an entire module, and here it is the module.
+    const attr = (selector: string, name: string): number =>
+      Number(find(selector).getAttribute(name));
+    for (const [name, inset] of [
+      ['x', 3],
+      ['y', 3],
+      ['width', -6],
+      ['height', -6],
+    ] as const) {
+      expect(attr('#node-ui-context-frame', name)).toBeCloseTo(
+        attr('#node-ui-box', name) + inset,
+        6,
+      );
+    }
+    expect(find('#node-ui-context-label').textContent).toBe('⇤ browser');
+    // One context in the diagram, and it belongs to `ui`.
+    expect(container.querySelectorAll('[data-kind="node-context"]')).toHaveLength(1);
+    expect(find('[data-kind="node-context"]').getAttribute('data-module')).toBe('ui');
   });
 });
 

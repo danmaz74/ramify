@@ -127,7 +127,13 @@ export function buildDiagramLayout(definition: DiagramDefinition = shopDiagram):
     chords.bottom + 10,
   );
 
-  validateDiagram(context.tree, treeGeometry.nodes, propagation, [...chords.all]);
+  validateDiagram(
+    context.tree,
+    treeGeometry.nodes,
+    propagation,
+    [...chords.all],
+    definition.tracedSymbols,
+  );
 
   const bounds = emptyBounds();
   for (const node of treeGeometry.nodes) {

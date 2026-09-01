@@ -10,7 +10,11 @@
  *   §4, composited;
  * - `site/static/diagrams/example1.svg` — Example 1 of
  *   `docs/model/illustrative-examples.md`: one decision, three reaches;
- * - `site/static/diagrams/example2.svg` — Example 2: both channels at once.
+ * - `site/static/diagrams/example2.svg` — Example 2: both channels at once;
+ * - `site/static/diagrams/example3.svg` — Example 3: the tag is the entire
+ *   difference (testing);
+ * - `site/static/diagrams/example4.svg` — Example 4: a promise about the
+ *   closure (browser).
  *
  * Output is deterministic: no ids are generated at render time, ordering comes
  * from the declaration, coordinates are rounded, and each file ends with a
@@ -31,6 +35,8 @@ import {
   ModelDiagramSvg,
   example1Diagram,
   example2Diagram,
+  example3Diagram,
+  example4Diagram,
   shopDiagram,
   type DiagramDefinition,
 } from '../src/viz/index.js';
@@ -47,6 +53,8 @@ const emissions: readonly Emission[] = [
   { definition: shopDiagram, file: 'site/static/diagrams/model-core.svg' },
   { definition: example1Diagram, file: 'site/static/diagrams/example1.svg' },
   { definition: example2Diagram, file: 'site/static/diagrams/example2.svg' },
+  { definition: example3Diagram, file: 'site/static/diagrams/example3.svg' },
+  { definition: example4Diagram, file: 'site/static/diagrams/example4.svg' },
 ];
 
 async function main(): Promise<void> {

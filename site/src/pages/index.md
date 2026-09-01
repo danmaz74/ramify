@@ -51,6 +51,10 @@ shop, walked through one use case at a time.
 [**Illustrative examples**](/examples) — smaller universes, each built to
 teach one lesson about reach cleanly.
 
+[**Tags**](/tags) — the other half of the rule: a tag carries an availability
+rule, deciding where a visible symbol is actually available — and no tag can
+ever grant.
+
 The normative document is the model specification, which ships with the
 repository at `docs/model/cross-module-importability-rules.md`. Everything on
 this site derives from it; where they disagree, the specification is right.

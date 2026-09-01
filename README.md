@@ -48,7 +48,8 @@ Build output (`site/build/`, `site/.docusaurus/`) is git-ignored.
 | --- | --- |
 | `/` | Landing: what ramify.ts is, the model's one question, the scope statement |
 | `/model` | The core tree model — the live diagram plus the R1–R6 walkthrough |
-| `/examples` | Illustrative examples — Example 1, "one decision, three reaches", with its own live diagram |
+| `/examples` | Illustrative examples — the tree-rule universes ("one decision, three reaches"; "both channels at once"), each with its own live diagram |
+| `/tags` | Tags — the other half of the rule: the two availability rules (`▢` required module tag, `▭` required symbol tag) and the `testing` and `browser` tags that carry them |
 
 The normative specification is not rendered as a site page; it ships with the
 repository at `docs/model/cross-module-importability-rules.md`, and every page

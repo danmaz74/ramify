@@ -9,9 +9,11 @@
  *
  * The pipeline is parameterized by a {@link DiagramDefinition}: no layout
  * module knows which universe it is drawing. `diagrams/shop.ts` is the
- * core-model diagram and the default everywhere; `diagrams/example1.ts` is the
- * illustrative example. The shop's pieces are re-exported here under their
- * historical names.
+ * core-model diagram and the default everywhere; `diagrams/example1.ts` to
+ * `diagrams/example4.ts` are the illustrative-examples series — the last two of
+ * them the tag examples, whose chips, contexts and blink sets are derived from
+ * their declarations exactly like everything else. The shop's pieces are
+ * re-exported here under their historical names.
  */
 
 export {
@@ -71,13 +73,31 @@ export {
 
 export { example1Declaration, example1Diagram } from './diagrams/example1.js';
 export { example2Declaration, example2Diagram } from './diagrams/example2.js';
+export { example3Declaration, example3Diagram } from './diagrams/example3.js';
+export { example4Declaration, example4Diagram } from './diagrams/example4.js';
 export { seriesLegendGroups, seriesNodeContent } from './diagrams/series.js';
 
 export { buildDiagramLayout, coreModelLayout, diagramLayout } from './layout.js';
 export type { DiagramLayout } from './layout.js';
 
-export { layoutTree, descendantsOf, derivedGrants, derivedHoldings, provenanceText } from './layout-nodes.js';
-export type { Compartment, NodeLayout, RowKind, SymbolRow, TreeGeometry } from './layout-nodes.js';
+export {
+  bindingNoteText,
+  descendantsOf,
+  derivedGrants,
+  derivedHoldings,
+  layoutTree,
+  provenanceText,
+  tagChipText,
+} from './layout-nodes.js';
+export type {
+  Compartment,
+  DrawnContext,
+  NodeLayout,
+  RowAnnotation,
+  RowKind,
+  SymbolRow,
+  TreeGeometry,
+} from './layout-nodes.js';
 
 export { enumerateDecisions, layoutPropagation } from './layout-lanes.js';
 export type {
@@ -103,10 +123,11 @@ export {
   validateGrayRows,
   validateLandings,
   validateNodeRows,
+  validateTagClaims,
 } from './validate.js';
 
 export { darkPalette, diagramStylesheet, lightPalette } from './theme.js';
 export type { Palette, Theme } from './theme.js';
 
-export { LAYOUT } from './geometry.js';
+export { LAYOUT, rowLabelDx } from './geometry.js';
 export type { Box, Point } from './geometry.js';

@@ -49,6 +49,35 @@ export const LAYOUT = {
     /** The dashed what-if note wraps to several short lines. */
     whatIfLineHeight: 13,
     cornerRadius: 5,
+
+    /** Width of one glyph of a row's marker column: `▲▼` is two glyphs wide. */
+    markerGlyphWidth: 10,
+    /**
+     * Advance width of a row's 12 px symbol name — a deliberate upper bound.
+     * The annotations that follow a name are placed from this estimate, and a
+     * generous gap reads as a column while a negative one reads as a typo, so
+     * the number is chosen to over-shoot the widest realistic name rather than
+     * to average them.
+     */
+    nameCharWidth: 7.5,
+    /**
+     * Advance width of the 9.5 px muted annotations a row carries after its
+     * name — the exposure-tag chip, and the binding note. Generous on purpose:
+     * ``, `✓` and `·` are wider than the letters around them, and a row's
+     * width budget must over-reserve rather than let two labels touch.
+     */
+    annotationCharWidth: 5.9,
+    /** Gap before each annotation that follows a row's name. */
+    annotationGap: 6,
+
+    /** Inset of a declared context's dashed box from its node's edges. */
+    contextInset: 6,
+    /** Air above and below a context box's two lines. */
+    contextPadding: 6,
+    /** Line height inside a context box. */
+    contextLineHeight: 13,
+    /** Advance width of a context box's 10.5 px label and caption. */
+    contextCharWidth: 5.9,
   },
 
   /**
@@ -184,6 +213,17 @@ export function polyline(points: readonly Point[]): string {
 /** Approximate rendered width of a line of text at the given per-character width. */
 export function textWidth(text: string, charWidth: number): number {
   return text.length * charWidth;
+}
+
+/**
+ * x of a row's symbol name, relative to its node box's left edge.
+ *
+ * The name clears the marker column per glyph, because `▲▼` is two glyphs wide
+ * and `▲` is one; a marker-less `granted` row keeps the one-glyph column so
+ * that every name in a compartment starts at the same x.
+ */
+export function rowLabelDx(marker: string | undefined): number {
+  return LAYOUT.node.paddingX + (marker?.length ?? 1) * LAYOUT.node.markerGlyphWidth + 2;
 }
 
 /**

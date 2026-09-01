@@ -40,10 +40,16 @@ import {
   type TracedSymbol,
 } from './diagram-definition.js';
 import { shopDiagram } from './diagrams/shop.js';
-import { LAYOUT, textWidth } from './geometry.js';
+import { LAYOUT, rowLabelDx, textWidth } from './geometry.js';
 import type { ChordLayout } from './layout-chords.js';
 import type { DecisionDot, LaneChip, LanePath, TreeEdgeLayout } from './layout-lanes.js';
-import type { Compartment, NodeLayout, SymbolRow } from './layout-nodes.js';
+import {
+  TAG_GLYPHS,
+  type Compartment,
+  type DrawnContext,
+  type NodeLayout,
+  type SymbolRow,
+} from './layout-nodes.js';
 import type { LegendGroupLayout } from './layout-legend.js';
 import { diagramLayout, type DiagramLayout, type HeaderLayout } from './layout.js';
 import type { SymbolName } from './model-access.js';
@@ -994,7 +1000,14 @@ function renderNode(
   toggle: (symbol: SymbolName) => void,
   live: boolean,
 ): ReactElement {
-  const { box } = node;
+  const { box, moduleContext } = node;
+  // A whole-module context is drawn as the dashed sub-box that fills its node:
+  // the same treatment a named context gets, at the size of the module, because
+  // a context can be a subtree of a module's files or an entire module.
+  const badgeShift =
+    moduleContext === undefined
+      ? 0
+      : moduleContext.label.length * LAYOUT.node.contextCharWidth + 8;
   return (
     <g key={node.id} id={`node-${node.id}`} data-kind="node" data-module={node.id} data-depth={node.depth}>
       <rect
@@ -1008,6 +1021,26 @@ function renderNode(
         rx={LAYOUT.node.cornerRadius}
         strokeWidth={1.2}
       />
+      {moduleContext === undefined
+        ? null
+        : renderContext(
+            moduleContext,
+            `node-${node.id}-context`,
+            {
+              x: box.x + 3,
+              y: box.y + 3,
+              width: box.width - 6,
+              height: box.height - 6,
+            },
+            {
+              label: {
+                x: box.x + box.width - LAYOUT.node.paddingX,
+                y: box.y + LAYOUT.node.headerHeight / 2,
+                anchor: 'end',
+              },
+            },
+            selectedSymbol,
+          )}
       <text
         id={`node-${node.id}-name`}
         data-kind="node-name"
@@ -1024,7 +1057,7 @@ function renderNode(
           id={`node-${node.id}-badge`}
           data-kind="node-badge"
           className={fillClass('muted')}
-          x={box.x + box.width - LAYOUT.node.paddingX}
+          x={box.x + box.width - LAYOUT.node.paddingX - badgeShift}
           y={box.y + LAYOUT.node.headerHeight / 2}
           textAnchor="end"
           fontSize={9.5}
@@ -1039,6 +1072,78 @@ function renderNode(
   );
 }
 
+/**
+ * A declared importer context: a dashed box, its `name` label, and — for a
+ * named context — the line that says what its files are.
+ *
+ * The box pulses when the selected symbol is one its files may actually import,
+ * so a selection separates the contexts that may take a tagged symbol from the
+ * production compartments that may not.
+ */
+function renderContext(
+  context: DrawnContext,
+  id: string,
+  frame: { x: number; y: number; width: number; height: number },
+  text: {
+    label: { x: number; y: number; anchor?: 'start' | 'end' };
+    caption?: { x: number; y: number };
+  },
+  selectedSymbol: SymbolName | null,
+): ReactElement {
+  const lit = selectedSymbol !== null && context.imports.includes(selectedSymbol);
+  const dim = selectedSymbol !== null && !lit ? 'rmf-dim-soft' : undefined;
+  return (
+    <g
+      key={id}
+      id={id}
+      data-kind="node-context"
+      data-module={context.module}
+      {...(context.name === undefined ? {} : { 'data-context': context.name })}
+      data-context-scope={context.name === undefined ? 'module' : 'named'}
+      data-tags={context.tags.join(' ')}
+      className={classes(dim, lit ? 'rmf-blink' : undefined)}
+    >
+      <rect
+        id={`${id}-frame`}
+        data-kind="node-context-frame"
+        className={strokeClass('muted')}
+        fill="none"
+        strokeWidth={1}
+        strokeDasharray="4 3"
+        x={frame.x}
+        y={frame.y}
+        width={frame.width}
+        height={frame.height}
+        rx={LAYOUT.node.cornerRadius - 1}
+      />
+      <text
+        id={`${id}-label`}
+        data-kind="node-context-label"
+        className={fillClass('muted')}
+        x={text.label.x}
+        y={text.label.y}
+        {...(text.label.anchor === undefined ? {} : { textAnchor: text.label.anchor })}
+        fontSize={10.5}
+      >
+        {withFullHeightRuleGlyphs(context.label, 10.5)}
+      </text>
+      {text.caption === undefined ? null : (
+        <text
+          id={`${id}-caption`}
+          data-kind="node-context-caption"
+          className={fillClass('muted')}
+          x={text.caption.x}
+          y={text.caption.y}
+          fontSize={9.5}
+          fontStyle="italic"
+        >
+          {context.caption}
+        </text>
+      )}
+    </g>
+  );
+}
+
 function renderCompartment(
   node: NodeLayout,
   compartment: Compartment,
@@ -1048,6 +1153,34 @@ function renderCompartment(
 ): ReactElement {
   const { box } = node;
   const top = box.y + compartment.y;
+  if (compartment.kind === 'context') {
+    const inset = LAYOUT.node.contextInset;
+    return renderContext(
+      compartment.context,
+      compartment.id,
+      {
+        x: box.x + inset,
+        y: top + 3,
+        width: box.width - 2 * inset,
+        height: compartment.height - 6,
+      },
+      {
+        label: {
+          x: box.x + inset + LAYOUT.node.contextPadding,
+          y: top + LAYOUT.node.contextPadding + LAYOUT.node.contextLineHeight / 2,
+        },
+        caption: {
+          x: box.x + inset + LAYOUT.node.contextPadding,
+          y:
+            top +
+            LAYOUT.node.contextPadding +
+            LAYOUT.node.contextLineHeight +
+            LAYOUT.node.contextLineHeight / 2,
+        },
+      },
+      selectedSymbol,
+    );
+  }
   const isWhatIf = compartment.kind === 'what-if';
   return (
     <g key={compartment.id} id={compartment.id} data-kind="node-compartment" data-compartment={compartment.slug}>
@@ -1126,11 +1259,17 @@ function renderRow(
   const traced = row.layer !== NEUTRAL_LAYER;
   const granted = row.kind === 'granted';
   const selected = selectedSymbol !== null && row.layer === selectedSymbol;
-  const dim = selectedSymbol !== null && !selected ? 'rmf-dim-soft' : undefined;
-  // Selecting a symbol pulses every row that says "it is available here" — the
-  // arrivals, by either channel. The owner's own row does not pulse: ownership
-  // is not an arrival, and it is where the animated lanes start.
-  const blink = selected && row.kind !== 'owns' ? 'rmf-blink' : undefined;
+  // Selecting a symbol pulses every row that says "it is available here *and*
+  // this module's files may import it" — the arrivals a reader could act on.
+  // The owner's own row does not pulse: ownership is not an arrival, and it is
+  // where the animated lanes start.
+  const blink = selected && row.kind !== 'owns' && row.importable ? 'rmf-blink' : undefined;
+  // An arrival a tag refuses goes dark instead: the row keeps its place and its
+  // chip, and the selection simply passes it by. Dimming rather than only
+  // withholding the pulse is what makes the contrast survive
+  // `prefers-reduced-motion`, where nothing moves at all.
+  const dark = selected && row.kind !== 'owns' && !row.importable;
+  const dim = selectedSymbol !== null && (!selected || dark) ? 'rmf-dim-soft' : undefined;
   // A granted row has no decision of its own to report, so its name carries the
   // symbol's traced color instead: reach becomes scannable box by box.
   const labelColor: ColorKey = granted ? row.color : row.gray ? 'muted' : 'text';
@@ -1145,6 +1284,8 @@ function renderRow(
       data-owner={row.owner}
       data-marker={row.marker}
       data-gray={row.gray ? 'true' : 'false'}
+      {...(row.tags === undefined ? {} : { 'data-tags': row.tags.join(' ') })}
+      {...(row.importable ? {} : { 'data-importable': 'false' })}
       className={classes(dim, blink, traced ? 'rmf-clickable' : undefined)}
       {...(traced ? { onClick: () => toggle(row.layer) } : {})}
     >
@@ -1180,18 +1321,55 @@ function renderRow(
       )}
       {/* Arrivals are italic: the definition lives where the symbol is owned,
           and everywhere else the name is a reference. The label clears the
-          marker column per glyph: `▲▼` is two glyphs wide, not one. */}
+          marker column per glyph: `▲▼` is two glyphs wide, not one. A struck
+          name is the static statement "visible here, not available": the row
+          is drawn — the exposure chain really does put the symbol here — but
+          no file of this module may import it. */}
       <text
         id={`${row.id}-label`}
         data-kind="node-row-label"
         className={fillClass(labelColor)}
-        x={box.x + LAYOUT.node.paddingX + (row.marker?.length ?? 1) * 10 + 2}
+        x={box.x + rowLabelDx(row.marker)}
         y={y}
         fontSize={12}
         {...(row.kind === 'owns' ? {} : { fontStyle: 'italic' })}
+        {...(row.struck ? { textDecoration: 'line-through', 'data-struck': 'true' } : {})}
       >
         {row.symbol}
       </text>
+      {/*
+        The tag chip, and the binding note where the two bindings disagree.
+        The chip writes each tag behind the glyph of the rule it carries
+        (`⇥ testing`, `⇤ browser`) and sits on a filled pill: it is the one
+        fact on a row a reader must not scan past, and muted text alone
+        disappeared into the box (especially on the dark palette).
+      */}
+      {(row.annotations ?? []).map((annotation) => (
+        <g key={annotation.kind}>
+          {annotation.kind === 'tags' ? (
+            <rect
+              id={`${row.id}-${annotation.kind}-pill`}
+              data-kind="node-row-tags-pill"
+              className={fillClass('separator')}
+              x={box.x + annotation.dx - 3}
+              y={y - 6.5}
+              width={annotation.text.length * LAYOUT.node.annotationCharWidth + 6}
+              height={13}
+              rx={6.5}
+            />
+          ) : null}
+          <text
+            id={`${row.id}-${annotation.kind}`}
+            data-kind={`node-row-${annotation.kind}`}
+            className={fillClass(annotation.kind === 'tags' ? 'text' : 'muted')}
+            x={box.x + annotation.dx}
+            y={y}
+            fontSize={9.5}
+          >
+            {withFullHeightRuleGlyphs(annotation.text, 9.5)}
+          </text>
+        </g>
+      ))}
       {row.provenance === undefined ? null : (
         <text
           id={`${row.id}-from`}
@@ -1396,6 +1574,31 @@ function renderLegendEntryText(entry: LegendEntry): ReactNode {
   );
 }
 
+/** The rule-arrow characters, as a set, for full-height rendering. */
+const RULE_GLYPH_CHARS: ReadonlySet<string> = new Set(Object.values(TAG_GLYPHS));
+
+/**
+ * A text run in which every rule glyph (`⇥`, `⇤`) is enlarged to the full
+ * height the surrounding text occupies. The arrows' font glyphs are drawn
+ * small — barely above the x-height — so at chip size they read as specks; a
+ * larger tspan on the same baseline lets them span the run's full height
+ * without touching the measured layout, which counts characters.
+ */
+function withFullHeightRuleGlyphs(text: string, fontSize: number): ReactNode {
+  if (![...RULE_GLYPH_CHARS].some((glyph) => text.includes(glyph))) {
+    return text;
+  }
+  return [...text].map((character, index) =>
+    RULE_GLYPH_CHARS.has(character) ? (
+      <tspan key={index} fontSize={Math.round(fontSize * 1.4 * 10) / 10}>
+        {character}
+      </tspan>
+    ) : (
+      character
+    ),
+  );
+}
+
 function renderLegendGlyph(
   entry: LegendEntry,
   cx: number,
@@ -1414,6 +1617,21 @@ function renderLegendGlyph(
           y={cy}
           textAnchor="middle"
           fontSize={11}
+        >
+          {withFullHeightRuleGlyphs(glyph.text, 11)}
+        </text>
+      );
+    case 'struck':
+      return (
+        <text
+          data-kind="legend-glyph"
+          className={fillClass('muted')}
+          x={cx}
+          y={cy}
+          textAnchor="middle"
+          fontSize={10}
+          fontStyle="italic"
+          textDecoration="line-through"
         >
           {glyph.text}
         </text>

@@ -113,6 +113,8 @@ export interface LegendEntry {
   readonly id: string;
   readonly glyph:
     | { readonly kind: 'marker'; readonly text: string; readonly muted?: boolean }
+    /** A sample struck name, drawn exactly as a visible-not-available row is. */
+    | { readonly kind: 'struck'; readonly text: string }
     | { readonly kind: 'compartment'; readonly text: string }
     | { readonly kind: 'up-hop' }
     | { readonly kind: 'grant' }

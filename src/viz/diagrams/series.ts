@@ -32,9 +32,41 @@ export const seriesLegendGroups: readonly LegendGroup[] = [
 ];
 
 /**
- * Series node boxes teach *availability*: the second compartment lists both
+ * The legend of the tag examples: the series rows plus the three affordances
+ * only a tag universe draws — the two rule glyphs and the struck name. The
+ * glyphs are a mirror-arrow pair drawing the direction of each rule's demand
+ * (`⇥` rides out with the symbol, `⇤` faces in at the module's door), so the
+ * legend row is the one place the arrows are decoded.
+ */
+export const seriesTagLegendGroups: readonly LegendGroup[] = [
+  ...seriesLegendGroups,
+  {
+    id: 'tags',
+    title: 'Tags',
+    entries: [
+      {
+        id: 'required-module-tag',
+        glyph: { kind: 'marker', text: '⇥' },
+        text: 'rule: available only in modules carrying the same tag',
+      },
+      {
+        id: 'required-symbol-tag',
+        glyph: { kind: 'marker', text: '⇤' },
+        text: 'rule: the module value-imports only symbols carrying the same tag',
+      },
+      {
+        id: 'struck-name',
+        glyph: { kind: 'struck', text: 'name' },
+        text: 'visible here, not available',
+      },
+    ],
+  },
+];
+
+/**
+ * Series node boxes teach *visibility*: the second compartment lists both
  * channels — what a direct child exposed upward and what a proper ancestor
- * granted downward — so every box answers "what is available here?" on its
+ * granted downward — so every box answers "what is visible here?" on its
  * own.
  */
 export const seriesNodeContent: NodeContentOptions = {

@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import { createDiagramContext } from './diagram-definition.js';
 import { example1Diagram } from './diagrams/example1.js';
-import { chordSpecs, decisionPolicies, shopTree } from './diagrams/shop.js';
-import { LAYOUT, type Point } from './geometry.js';
+import { example2Diagram } from './diagrams/example2.js';
+import { example3Diagram } from './diagrams/example3.js';
+import { example4Diagram } from './diagrams/example4.js';
+import { shopDiagram, chordSpecs, decisionPolicies, shopTree } from './diagrams/shop.js';
+import { LAYOUT, rowLabelDx, type Point } from './geometry.js';
 import { buildDiagramLayout } from './layout.js';
 import { descendantsOf } from './layout-nodes.js';
 import { mayImport } from './model-access.js';
@@ -74,6 +77,43 @@ describe('node boxes', () => {
     const checkout = layout.tree.nodeById.get('checkout');
     expect(checkout?.compartments.map((compartment) => compartment.slug)).toEqual(['holds']);
     expect(checkout?.compartments.map((compartment) => compartment.title)).toEqual(['holds']);
+  });
+
+  /**
+   * A row is a line of several labels — marker, name, chip, binding note,
+   * provenance — and the ones in the middle are new. Every diagram of the
+   * series is checked, because the width budget that keeps them apart is
+   * shared: a row must be wider than its own ink, whatever it carries.
+   */
+  it('never lets a row’s labels touch, in any diagram', () => {
+    const provenanceCharWidth = 5.6;
+    for (const definition of [
+      shopDiagram,
+      example1Diagram,
+      example2Diagram,
+      example3Diagram,
+      example4Diagram,
+    ]) {
+      for (const node of buildDiagramLayout(definition).tree.nodes) {
+        for (const row of node.rows) {
+          const nameEnd = rowLabelDx(row.marker) + row.symbol.length * LAYOUT.node.nameCharWidth;
+          let cursor = nameEnd;
+          for (const annotation of row.annotations ?? []) {
+            // Placed after everything before it, with air in between.
+            expect(annotation.dx).toBeGreaterThanOrEqual(cursor);
+            cursor = annotation.dx + annotation.text.length * LAYOUT.node.annotationCharWidth;
+          }
+          // The provenance is drawn against the box's right edge; the row's
+          // content must stop before it starts.
+          const provenanceStart =
+            node.box.width -
+            LAYOUT.node.paddingX -
+            (row.provenance ?? '').length * provenanceCharWidth;
+          expect(cursor).toBeLessThanOrEqual(provenanceStart);
+          expect(cursor).toBeLessThanOrEqual(node.box.width - LAYOUT.node.paddingX);
+        }
+      }
+    }
   });
 
   it('keeps the what-if note inside shipping and hypothetical', () => {
