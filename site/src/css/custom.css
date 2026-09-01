@@ -73,6 +73,40 @@ article {
 }
 
 /**
+ * Glossary term links: a definition cue, not navigation.
+ *
+ * The pages link a term to its glossary entry where they introduce it, and
+ * painting every such term link-blue speckles the prose. A term link is a
+ * lookup, so it wears the conventional defined-term cue instead — ink-colored
+ * text over a fine dotted underline — and only announces itself as a link on
+ * hover, turning solid primary. Links to the glossary *page* (no fragment)
+ * are ordinary navigation and keep the ordinary look.
+ *
+ * A plain attribute selector on the URL shape, nothing framework-specific.
+ */
+:root {
+  --term-underline: rgba(15, 23, 42, 0.4);
+}
+
+[data-theme='dark'] {
+  --term-underline: rgba(226, 232, 240, 0.45);
+}
+
+a[href^='/glossary#'] {
+  color: inherit;
+  text-decoration: underline dotted var(--term-underline);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+a[href^='/glossary#']:hover {
+  color: var(--ifm-color-primary);
+  text-decoration: underline solid currentcolor;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+/**
  * Anchor-target highlight.
  *
  * Following an in-page link near the end of a page cannot scroll the heading
