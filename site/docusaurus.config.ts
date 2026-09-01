@@ -50,8 +50,10 @@ const config: Config = {
   // owns no image assets of its own. `static/diagrams/model-core.svg` is the
   // emitter's checked-in export, not site artwork.
 
-  url: 'https://example.invalid',
-  baseUrl: '/',
+  // GitHub Pages serves the site at https://danmaz74.github.io/ramify/; local
+  // builds and serves stay at the root. CI sets BASE_URL=/ramify/.
+  url: 'https://danmaz74.github.io',
+  baseUrl: process.env.BASE_URL ?? '/',
 
   onBrokenLinks: 'throw',
   onBrokenAnchors: 'throw',
@@ -89,6 +91,7 @@ const config: Config = {
         { to: '/modularity', label: 'Why', position: 'left' },
         { to: '/model', label: 'The core model', position: 'left' },
         { to: '/tags', label: 'Tags', position: 'left' },
+        { to: '/explorer', label: 'Module dependency explorer', position: 'left' },
         { to: '/glossary', label: 'Glossary', position: 'left' },
       ],
     },

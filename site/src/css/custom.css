@@ -72,6 +72,21 @@ article {
   }
 }
 
+/**
+ * Hero tagline: the line directly under a page's h1 title.
+ *
+ * A tagline is not a paragraph - it belongs to the title above it, not the
+ * prose below it - so it sits larger than body text, in muted ink, pulled up
+ * against the heading it subtitles. Opt-in class, same portability reasoning
+ * as `.full-bleed`.
+ */
+.hero-tagline {
+  font-size: 1.4rem;
+  color: var(--ifm-color-emphasis-600);
+  margin-top: -1rem;
+  margin-bottom: 2rem;
+}
+
 /* One line of air between a diagram and the prose that resumes below it.
  * On the diagram root itself, so bare and .wide-figure-wrapped diagrams get
  * the same breathing room without double margins. */
@@ -99,14 +114,14 @@ article .rmf-root {
   --term-underline: rgba(226, 232, 240, 0.45);
 }
 
-a[href^='/glossary#'] {
+a[href*='/glossary#'] {
   color: inherit;
   text-decoration: underline dotted var(--term-underline);
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
 }
 
-a[href^='/glossary#']:hover {
+a[href*='/glossary#']:hover {
   color: var(--ifm-color-primary);
   text-decoration: underline solid currentcolor;
   text-decoration-thickness: 1px;

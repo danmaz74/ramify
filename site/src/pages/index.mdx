@@ -1,0 +1,66 @@
+---
+title: ramify.ts
+description: Multi-file hierarchical modules for TypeScript - a toolkit to define, enforce, and visualize them, and to help agents and humans adhere to its rules.
+hide_table_of_contents: true
+---
+
+import useBaseUrl from '@docusaurus/useBaseUrl';
+import { ModelDiagram, example1Diagram } from "@ramify/viz";
+
+# ramify.ts
+
+<p className="hero-tagline">Multi-file hierarchical modules for TypeScript</p>
+
+TypeScript is modular at exactly one granularity: the file. Above it, every
+exported symbol is importable from every file in the codebase, and the
+architecture of an application - its domains, capabilities, boundaries - has
+no checked existence.
+
+**ramify.ts is a toolkit to define, enforce, and visualize multi-file modules, and
+to help agents and humans adhere to its rules.**
+
+It gives a group of files what a single file
+already has, a boundary and an interface, and arranges these modules in a
+hierarchy, so that work, reasoning, and agent context can split cleanly along the
+boundaries at different abstraction levels.
+
+[**Why modularity**](/modularity) makes the full case.
+
+## The ramify modularity model
+
+The modularity model is based on very few simple but powerful rules.
+
+Every cross-module import is closed by default. A module shares a symbol
+through exactly two channels - to its parent, or to its own subtree - and
+long reach only exists as a chain of such one-hop decisions. That is the
+whole model: this nine-module app's entire access policy is the seven dots
+in its diagram.
+
+<div className="wide-figure">
+  <ModelDiagram definition={example1Diagram} />
+</div>
+
+The diagram is live: click a traced symbol to follow its chain.
+[**The core model**](/model) builds this picture up from scratch, one step
+at a time.
+
+There are two common needs which require more than this: **testing** and
+**browser safety**. ramify.ts solves both using
+[**tags and availability rules**](/tags).
+
+## Module dependency explorer
+
+[TBD]
+
+<div className="wide-figure" style={{ textAlign: 'center' }}>
+  <img
+    src={useBaseUrl('/img/module-explorer.png')}
+    alt="The module dependency explorer drilled into one domain module: its six sub-modules arranged in a circle with their dependency edges, and the selected module's path, description, and metrics in a details panel"
+  />
+</div>
+
+[**Module dependency explorer**](/explorer) - [TBD]
+
+## Formal definitions
+
+All vocabulary is defined in the [**Glossary**](/glossary).
