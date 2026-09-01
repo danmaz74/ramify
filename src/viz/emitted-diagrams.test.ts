@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest';
 
 import type { DiagramDefinition } from './diagram-definition.js';
 import { example1Diagram } from './diagrams/example1.js';
+import { example1aDiagram } from './diagrams/example1a.js';
+import { example1bDiagram } from './diagrams/example1b.js';
 import { example2Diagram } from './diagrams/example2.js';
 import { example3Diagram } from './diagrams/example3.js';
 import { example4Diagram } from './diagrams/example4.js';
@@ -35,7 +37,13 @@ function emitted(definition: DiagramDefinition): string {
   return `${markup}\n`;
 }
 
-const untagged: readonly DiagramDefinition[] = [shopDiagram, example1Diagram, example2Diagram];
+const untagged: readonly DiagramDefinition[] = [
+  shopDiagram,
+  example1Diagram,
+  example1aDiagram,
+  example1bDiagram,
+  example2Diagram,
+];
 const tagged: readonly DiagramDefinition[] = [example3Diagram, example4Diagram];
 
 describe('the checked-in SVGs', () => {
@@ -48,6 +56,15 @@ describe('the checked-in SVGs', () => {
   it('is what the pipeline renders for example 1', async () => {
     await expect(emitted(example1Diagram)).toMatchFileSnapshot(
       '../../site/static/diagrams/example1.svg',
+    );
+  });
+
+  it('is what the pipeline renders for the two build-up stages of example 1', async () => {
+    await expect(emitted(example1aDiagram)).toMatchFileSnapshot(
+      '../../site/static/diagrams/example1a.svg',
+    );
+    await expect(emitted(example1bDiagram)).toMatchFileSnapshot(
+      '../../site/static/diagrams/example1b.svg',
     );
   });
 

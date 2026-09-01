@@ -72,6 +72,13 @@ article {
   }
 }
 
+/* One line of air between a diagram and the prose that resumes below it.
+ * On the diagram root itself, so bare and .wide-figure-wrapped diagrams get
+ * the same breathing room without double margins. */
+article .rmf-root {
+  margin-bottom: 1.65rem;
+}
+
 /**
  * Glossary term links: a definition cue, not navigation.
  *

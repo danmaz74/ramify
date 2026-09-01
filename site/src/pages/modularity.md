@@ -66,17 +66,16 @@ of modules mirrors that decomposition, and modularity at every level of it means
   to a team, or to an agent - with its obligations to the rest of the system
   stated entirely at its boundary.
 - **Privacy nests.** What a sub-module keeps from its own parent is thereby
-  kept from everyone. Hiding composes; a flat namespace cannot say that at
-  all.
+  kept from everyone outside it. Hiding composes; a flat namespace cannot say
+  that at all.
 
 ## Especially - but not only - with agents
 
 Everything above holds for human teams; coding agents raise the stakes on
 each point.
 
-**Bounded context.** An agent's reasoning abilities decrease rapidly when
-context size increases. Splitting its work into smaller chunks at every
-abstraction level can solve this problem: one module's inside plus the
+**Smaller contexts.** An agent reasons worse as its context grows. Splitting
+its work into smaller chunks at every abstraction level counters this: one module's inside plus the
 interfaces it consumes is a workload that fits. The module tree allows
 the decomposition of a codebase into contexts of an ideal size.
 
@@ -112,6 +111,6 @@ From here:
 - [**Glossary**](/glossary) - the agreed vocabulary, one term, one
   definition.
 
-One reading note: on this site, **module** always means a Ramify module -
+One reading note: from here on, **module** always means a Ramify module -
 the declared multi-file unit. A TypeScript/ES module is always called a
 **file**.

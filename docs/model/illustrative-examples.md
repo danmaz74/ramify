@@ -157,6 +157,14 @@ ever carry a symbol out of its subtree.
   measured in decisions, not boxes.
 - The `shipping` box shows the handshake both ways: `owns ▼ ShipmentPlan`
   above `exposed to it · optimizeRoute`.
+- The site presents this example as a three-step build-up: stage A is the
+  `shipping` subtree under an empty root (both channels, one hop each),
+  stage B is the `invoicing` subtree alone under the root (the first chain,
+  the first grant, a reach that stops at the domain border), and the full
+  diagram is the finale, where the cross-domain denials appear. The stages
+  are presentation only - this document stays normative for the one
+  universe - and each stage's subtree and traced colors must match the full
+  diagram exactly (`src/viz/example1-stages.test.ts` pins this).
 
 ## Example 2: Both channels at once
 

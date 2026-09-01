@@ -72,6 +72,8 @@ export {
 } from './diagrams/shop.js';
 
 export { example1Declaration, example1Diagram } from './diagrams/example1.js';
+export { example1aDeclaration, example1aDiagram } from './diagrams/example1a.js';
+export { example1bDeclaration, example1bDiagram } from './diagrams/example1b.js';
 export { example2Declaration, example2Diagram } from './diagrams/example2.js';
 export { example3Declaration, example3Diagram } from './diagrams/example3.js';
 export { example4Declaration, example4Diagram } from './diagrams/example4.js';

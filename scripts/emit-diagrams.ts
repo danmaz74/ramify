@@ -10,6 +10,8 @@
  *   §4, composited;
  * - `site/static/diagrams/example1.svg` - Example 1 of
  *   `docs/model/illustrative-examples.md`: one decision, three reaches;
+ * - `site/static/diagrams/example1a.svg` / `example1b.svg` - the two
+ *   build-up stages the site walks through before Example 1's full diagram;
  * - `site/static/diagrams/example2.svg` - Example 2: both channels at once;
  * - `site/static/diagrams/example3.svg` - Example 3: the tag is the entire
  *   difference (testing);
@@ -34,6 +36,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import {
   ModelDiagramSvg,
   example1Diagram,
+  example1aDiagram,
+  example1bDiagram,
   example2Diagram,
   example3Diagram,
   example4Diagram,
@@ -52,6 +56,8 @@ interface Emission {
 const emissions: readonly Emission[] = [
   { definition: shopDiagram, file: 'site/static/diagrams/model-core.svg' },
   { definition: example1Diagram, file: 'site/static/diagrams/example1.svg' },
+  { definition: example1aDiagram, file: 'site/static/diagrams/example1a.svg' },
+  { definition: example1bDiagram, file: 'site/static/diagrams/example1b.svg' },
   { definition: example2Diagram, file: 'site/static/diagrams/example2.svg' },
   { definition: example3Diagram, file: 'site/static/diagrams/example3.svg' },
   { definition: example4Diagram, file: 'site/static/diagrams/example4.svg' },
