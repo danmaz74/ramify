@@ -1,14 +1,15 @@
 /**
  * Diagram 1 - the core tree model, drawn on a small online shop.
  *
- * This is the complete declaration of `docs/site/diagram1-spec.md` §1.1–§1.2
+ * This is the complete declaration of the retired first diagram's universe
  * (eight modules, eight symbols, and the exposure decision each owner made)
- * together with the editorial data of §3.6–§3.8 and §5: which symbols are
- * traced and in what color, which questions get an explicit chord, and the
- * words on the legend.
+ * together with its editorial data: which symbols are traced and in what
+ * color, which questions get an explicit chord, and the words on the legend.
+ * The diagram is kept as a fixture; the site teaches from the series in
+ * `docs/model/illustrative-examples.md`.
  *
  * Everything the diagram draws beyond the declaration is *derived* from it by
- * the evaluator - including the `holds` compartments, which need no
+ * the evaluator - including the `receives` compartments, which need no
  * declaration at all: `CartApi` is available in `checkout` purely as a
  * consequence of `cart` exposing it to its parent.
  *
@@ -46,8 +47,8 @@ export const shopDeclaration: ModuleDeclaration = {
     { symbol: 'Money', exposeToDescendants: true },
     { symbol: 'formatDate', exposeToDescendants: true },
   ],
-  // `catalog` exposed `ProductId` upward; `shop` sends it back down into the
-  // whole application. The router never becomes the owner.
+  // `catalog` exposed `ProductId` to its parent; `shop` sends it back down into
+  // the whole application. The re-exposing module never becomes the owner.
   reExposes: [{ symbol: 'ProductId', from: 'catalog', exposeToDescendants: true }],
   children: [
     {
@@ -110,7 +111,7 @@ export const tracedSymbols: readonly TracedSymbol[] = [
     symbol: 'CartApi',
     owner: 'cart',
     color: 'traced3',
-    role: 'held, not routed: the ribbon stops',
+    role: 'received, not re-exposed: the ribbon stops',
   },
 ];
 
@@ -148,7 +149,7 @@ export const chordSpecs: readonly ChordSpec[] = [
     owner: 'payment',
     symbol: 'PaymentApi',
     verdict: 'denied',
-    reason: "grant covers checkout's subtree",
+    reason: "exposed to checkout's subtree only",
     expectDenial: 'no-exposure-chain',
   },
   {
@@ -157,7 +158,7 @@ export const chordSpecs: readonly ChordSpec[] = [
     owner: 'cart',
     symbol: 'CartApi',
     verdict: 'denied',
-    reason: 'held by checkout, not re-exposed',
+    reason: 'received by checkout, not re-exposed',
     expectDenial: 'no-exposure-chain',
   },
   {
@@ -166,20 +167,20 @@ export const chordSpecs: readonly ChordSpec[] = [
     owner: 'catalog',
     symbol: 'SkuRules',
     verdict: 'denied',
-    reason: "grant covers catalog's subtree",
+    reason: "exposed to catalog's subtree only",
     expectDenial: 'no-exposure-chain',
   },
 ];
 
 /**
- * The uniform-grant footnote (§1.5), anchored to chord A1. It is the only
+ * The uniform-exposure footnote (§1.5), anchored to chord A1. It is the only
  * allowed import the diagram draws, because it is the only one whose answer
  * surprises people.
  */
-export const uniformGrantFootnote: readonly string[] = [
+export const uniformExposureFootnote: readonly string[] = [
   'A1 - search may import ProductId. catalog exposed it only to its parent, so catalog gave',
   'its own children nothing; shop sent it back down into every branch, including the branch it',
-  'came up through. A descendant grant is uniform: no backflow exclusion, no provenance carried.',
+  'came up through. Exposure to descendants is uniform: no backflow exclusion, no provenance carried.',
 ];
 
 /**
@@ -191,20 +192,20 @@ export const uniformGrantFootnote: readonly string[] = [
 export const whatIfNote: WhatIfNote = {
   moduleId: 'shipping',
   title: 'what-if',
-  text: 'split into rates + labels: both keep exactly these imports - grants address subtrees, not shapes',
+  text: 'split into rates + labels: both keep exactly these imports - exposures address subtrees, not shapes',
 };
 
 /**
  * The five statements of §4.1: the entire access policy of the application,
  * read off the decision dots.
  *
- * The spec's own numbering groups the three bottom-row up-hops into a single
+ * The spec's own numbering groups the three bottom-row exposures to the parent into a single
  * statement, so these five sentences partition more than five dots.
  */
 export const decisionPolicies: readonly DecisionPolicy[] = [
   {
     id: 'P1',
-    text: 'shop grants Money, formatDate, ProductId to its subtree.',
+    text: 'shop exposes Money, formatDate, ProductId to its descendants.',
     deciders: ['shop'],
     channel: 'toDescendants',
   },
@@ -216,7 +217,7 @@ export const decisionPolicies: readonly DecisionPolicy[] = [
   },
   {
     id: 'P3',
-    text: 'catalog grants SkuRules to its subtree.',
+    text: 'catalog exposes SkuRules to its descendants.',
     deciders: ['catalog'],
     channel: 'toDescendants',
   },
@@ -228,7 +229,7 @@ export const decisionPolicies: readonly DecisionPolicy[] = [
   },
   {
     id: 'P5',
-    text: 'checkout grants PaymentApi to its subtree.',
+    text: 'checkout exposes PaymentApi to its descendants.',
     deciders: ['checkout'],
     channel: 'toDescendants',
   },
@@ -247,8 +248,8 @@ export const legendGroups: readonly LegendGroup[] = [
         text: 'goes no further; nothing gray moves',
       },
       {
-        id: 'owns-holds',
-        glyph: { kind: 'compartment', text: 'owns / holds' },
+        id: 'owns-receives',
+        glyph: { kind: 'compartment', text: 'owns / receives' },
         text: 'owned here / received from a child',
       },
     ],
@@ -257,8 +258,12 @@ export const legendGroups: readonly LegendGroup[] = [
     id: 'edges',
     title: 'Along the edges',
     entries: [
-      { id: 'up-hop', glyph: { kind: 'up-hop' }, text: 'up-hop: one edge, one decision' },
-      { id: 'grant', glyph: { kind: 'grant' }, text: 'grant flow: one decision, a subtree' },
+      { id: 'to-parent', glyph: { kind: 'to-parent' }, text: 'to parent: one edge, one decision' },
+      {
+        id: 'flow-to-descendants',
+        glyph: { kind: 'to-descendants' },
+        text: 'flow to descendants: one decision, a subtree',
+      },
       { id: 'dot', glyph: { kind: 'dot' }, text: 'filled dot = somebody decided here' },
       { id: 'head', glyph: { kind: 'arrowhead' }, text: 'arrowhead = this module may import it' },
     ],
@@ -288,11 +293,10 @@ export const diagramTitle = 'The core tree model - who may import what, and who 
 /**
  * The shop diagram.
  *
- * Its second compartment is titled `holds` and lists only what a direct child
- * exposed upward: this diagram teaches the two channels one at a time, and the
- * `owns`/`holds` split is what makes "the root never becomes the owner"
- * visible. The compartment's name is a pending decision of its own, recorded
- * in `docs/model/glossary.md`.
+ * Its second compartment is titled `receives` and lists only what a direct
+ * child exposed to its parent: this diagram teaches the two channels one at a
+ * time, and the `owns`/`receives` split is what makes "the root never becomes
+ * the owner" visible.
  */
 export const shopDiagram: DiagramDefinition = {
   id: 'shop',
@@ -304,9 +308,9 @@ export const shopDiagram: DiagramDefinition = {
   decisionPolicies,
   legendGroups,
   legendNotes,
-  footnote: uniformGrantFootnote,
+  footnote: uniformExposureFootnote,
   whatIfNote,
-  nodeContent: { receivedCompartmentTitle: 'holds', includeAncestorGrants: false },
+  nodeContent: { receivedCompartmentTitle: 'receives', includeAncestorExposures: false },
 };
 
 const context = createDiagramContext(shopDiagram);

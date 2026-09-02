@@ -51,7 +51,7 @@ const example4LegendGroups = seriesTagLegendGroups.map((group) =>
 
 /**
  * ```text
- * app                      grants everything it receives to its subtree
+ * app                      exposes everything it receives to its descendants
  * ├── shared               owns formatMoney (tagged browser), queryDb
  * │                        (both exposed to parent)
  * ├── ui                   browser module: carries the ⇤ browser tag
@@ -116,7 +116,7 @@ export const example4DecisionPolicies: readonly DecisionPolicy[] = [
   },
   {
     id: 'P2',
-    text: 'app grants everything it receives to its descendants.',
+    text: 'app exposes everything it receives to its descendants.',
     deciders: ['app'],
     channel: 'toDescendants',
   },

@@ -1,5 +1,5 @@
 /**
- * Legend layout (§3.8) and the uniform-grant footnote (§1.5).
+ * Legend layout (§3.8) and the uniform-exposure footnote (§1.5).
  *
  * Four short groups, flowed left to right across the available width and
  * wrapping to a second band when they no longer fit, then the two standing

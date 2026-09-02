@@ -20,7 +20,7 @@ export const TagRef = ({ rule, name }) => (
 # Tags
 
 The tree rules decide [**visibility**](/glossary#module-visible-symbol):
-which symbols the exposure chains put within a module's reach. Two real needs
+which symbols the chains of exposures bring to each module. Two real needs
 are not expressible with visibility alone. Tests need deliberately selected
 internals of a module - fakes, in-memory stores, reset hooks - that
 production code must never be able to import. Code that runs in a browser
@@ -30,11 +30,11 @@ the **exposed symbol** have to be compatible, on top of everything the tree
 already decided.
 
 **Tags** carry those facts, and they are purely restrictive: a tag can only
-*withhold* a symbol that is visible, never grant one. ramify ships two tags;
+*withhold* a symbol that is visible, never expose one. ramify ships two tags;
 each gets its own small example universe below, and both universes keep the
-tree trivial - two hops deep, everything exposed up to the root and granted
-back down, so visibility is identical in every box by construction. The tag
-is the only variable in each picture.
+tree trivial - two hops deep, everything exposed to the root and back to
+every descendant, so visibility is identical in every box by construction.
+The tag is the only variable in each picture.
 
 ## `testing` - exposing internals to tests only
 
@@ -46,10 +46,10 @@ tags we would face a false choice - expose the hook to everyone or to no one.
 tagged, through the ordinary channels.
 
 So `orders` exposes two symbols to its parent - `OrderService`, the real
-contract, and `resetOrderStore`, tagged - and `app` grants both to its
-subtree, where `integration-tests` is a testing module beside the production
-consumer `billing`. Identical chains, identical arrivals - and one symbol
-wears a tag.
+contract, and `resetOrderStore`, tagged - and `app` exposes both to its
+descendants, where `integration-tests` is a testing module beside the
+production consumer `billing`. Identical chains, identical arrivals - and one
+symbol wears a tag.
 
 <div className="wide-figure">
   <ModelDiagram definition={example3Diagram} />
@@ -60,7 +60,7 @@ traced symbol to isolate its chain, drag to pan, scroll over a figure to
 zoom.)
 
 Every symbol has a [**tag set**](/glossary#symbol-tagging), assigned once by
-its owner and immutable from then on: no module along a route can add, remove
+its owner and immutable from then on: no module along the way can add, remove
 or change a tag, which is why `resetOrderStore`'s chip rides on the owner's
 row and on every arrival alike. [A module can carry tags
 too](/glossary#module-tagging), declared in its own definition -
@@ -79,9 +79,10 @@ modules carrying the same tag.
 Read `billing`'s box: `resetOrderStore` is listed, provenance and all, with
 its name struck - **visible there, not available**: you can see it, you
 cannot have it. The same strike appears in `app`'s own box: `app` carries no
-tag either, and routing a grant earns no right to import it. In the testing module the name is plain.
-Selecting a tagged symbol shows the same verdicts in motion: exactly the
-arrivals where it is available blink, and withheld rows stay dark.
+tag either, and re-exposing a symbol earns no right to import it. In the
+testing module the name is plain. Selecting a tagged symbol shows the same
+verdicts in motion: exactly the arrivals where it is available blink, and
+withheld rows stay dark.
 
 **On a module,** `testing` classifies the files as tests, and everything such
 a module owns and exposes is implicitly tagged `testing` - test infrastructure can
@@ -90,11 +91,12 @@ never leak into a production contract. And on a symbol the tag is
 both.
 
 Two properties make this small mechanism enough. There is no global test
-channel: `resetOrderStore` reaches the testing module because the chain
-routed it there, not because the importer is a test. And grant breadth is
-safe at any width: `app` blanket-grants what it received to its whole subtree
-without risk, because the availability rule travels with the symbol and
-withholds it from untagged modules everywhere the grant reaches.
+channel: `resetOrderStore` reaches the testing module because the chain of
+exposures brought it there, not because the importer is a test. And exposing
+to descendants is safe at any subtree width: `app` exposes everything it
+receives to its descendants without risk, because the availability rule
+travels with the symbol and withholds it from untagged modules everywhere the
+exposure reaches.
 
 ## `browser` - keeping Node code out of the browser
 
@@ -136,7 +138,7 @@ the examples showed one of each: the required module tag
 (<TagRef rule="⇥" />, `testing`'s) rides out with the symbol, the required
 symbol tag (<TagRef rule="⇤" />, `browser`'s) faces in at the module's door.
 When several rules apply to the same symbol and module, all of them must be
-satisfied. And **tags never grant**: no rule makes an import possible that
+satisfied. And **tags never expose**: no rule makes an import possible that
 the exposure chain did not already allow. A tag can only *withhold* a symbol
 that is visible.
 

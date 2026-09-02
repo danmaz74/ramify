@@ -95,7 +95,7 @@ export interface ChordSpec {
 /**
  * One statement of the diagram's access policy, read off the decision dots.
  *
- * A statement may cover several dots (three sibling up-hops read as one
+ * A statement may cover several dots (three sibling exposures to the parent read as one
  * sentence), but every dot the layout produces must belong to exactly one
  * statement - that partition is what "count the dots and you have counted the
  * decisions" actually means, and `layout.test.ts` checks it.
@@ -120,10 +120,13 @@ export interface LegendEntry {
      */
     | { readonly kind: 'struck'; readonly text: string; readonly suffix?: string }
     | { readonly kind: 'compartment'; readonly text: string }
-    | { readonly kind: 'up-hop' }
-    | { readonly kind: 'grant' }
-    /** The arrival a proper ancestor's grant produces: a row with no marker. */
-    | { readonly kind: 'granted' }
+    | { readonly kind: 'to-parent' }
+    | { readonly kind: 'to-descendants' }
+    /**
+     * The arrival an ancestor's exposure to its descendants produces: a row
+     * with no marker.
+     */
+    | { readonly kind: 'from-ancestor' }
     | { readonly kind: 'dot' }
     | { readonly kind: 'arrowhead' }
     | { readonly kind: 'chord-allowed' }
@@ -159,7 +162,7 @@ export interface WhatIfNote {
  *
  * - a direct child exposing to its parent - always shown, with the child named;
  * - a proper ancestor exposing to its descendants - shown only when
- *   `includeAncestorGrants`, with the granting ancestor named.
+ *   `includeAncestorExposures`, with the exposing ancestor named.
  *
  * A diagram teaching the two channels separately wants the first alone; one
  * teaching *reach* wants both, so that every module's box lists everything
@@ -168,8 +171,11 @@ export interface WhatIfNote {
 export interface NodeContentOptions {
   /** Title of the compartment listing symbols exposed to this module. */
   readonly receivedCompartmentTitle: string;
-  /** Also list symbols a proper ancestor granted, as `granted` rows. */
-  readonly includeAncestorGrants: boolean;
+  /**
+   * Also list symbols a proper ancestor exposed to its descendants, as
+   * `fromAncestor` rows.
+   */
+  readonly includeAncestorExposures: boolean;
 }
 
 /** One complete diagram: a universe, and everything the picture says about it. */

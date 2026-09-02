@@ -32,11 +32,11 @@ import { seriesLegendGroups, seriesNodeContent } from './series.js';
  * └── checkout             owns submitOrder
  * ```
  *
- * Two consumers under `pricing` are deliberate: a grant needs at least two
- * arrivals to read as a grant rather than a private handoff. `submitOrder`
- * is furniture, not a lesson - a known specimen from Example 1 (exposed up,
- * composed, stopped) that keeps `checkout` a real module and gives `app`
- * two stopped rows side by side.
+ * Two consumers under `pricing` are deliberate: an exposure to descendants
+ * needs at least two arrivals to read as one rather than as a private handoff.
+ * `submitOrder` is furniture, not a lesson - a known specimen from Example 1
+ * (exposed to the parent, composed, stopped) that keeps `checkout` a real module and
+ * gives `app` two stopped rows side by side.
  */
 export const example2Declaration: ModuleDeclaration = {
   id: 'app',
@@ -58,7 +58,7 @@ export const example2Declaration: ModuleDeclaration = {
 /**
  * Every exposure path is traced - the series convention. `submitOrder`
  * wears slot 3, the same hue as Example 1's `optimizeRoute`: it plays the
- * identical role (exposed up, composed, stopped), and the repeated color
+ * identical role (exposed to the parent, composed, stopped), and the repeated color
  * lets a reader who followed Example 1 recognize the specimen at a glance.
  */
 export const example2TracedSymbols: readonly TracedSymbol[] = [
@@ -72,7 +72,7 @@ export const example2TracedSymbols: readonly TracedSymbol[] = [
     symbol: 'submitOrder',
     owner: 'checkout',
     color: 'traced3',
-    role: 'exposed up, composed, stopped: parent only',
+    role: 'exposed to the parent, composed, stopped: parent only',
   },
 ];
 

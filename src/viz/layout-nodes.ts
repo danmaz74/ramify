@@ -10,7 +10,7 @@
  *    declared anywhere, and that is the point: `CartApi` is available in
  *    `checkout` as a consequence of `cart`'s decision, not of any decision
  *    `checkout` made. Which of the two arrival channels a diagram lists is the
- *    one editorial choice here (`nodeContent.includeAncestorGrants`).
+ *    one editorial choice here (`nodeContent.includeAncestorExposures`).
  *
  *    Structure asks the *visibility* question, never the availability one:
  *    a box lists what the exposure chain put within the module's reach, and a
@@ -55,13 +55,13 @@ export type ExposureMarker = '▲' | '▼' | '▲▼' | '·';
  * Why a symbol appears in a node box.
  *
  * - `owns` - a file belonging to the module exports it.
- * - `received` - a direct child exposed it to its parent.
- * - `granted` - a proper ancestor exposed it to its descendants.
+ * - `fromChild` - received: a direct child exposed it to its parent.
+ * - `fromAncestor` - received: a proper ancestor exposed it to its descendants.
  *
  * The three are exactly the clauses of the rule, so a row's kind is checkable
  * against `explainImport(...).clause` and `./validate.ts` checks it.
  */
-export type RowKind = 'owns' | 'received' | 'granted';
+export type RowKind = 'owns' | 'fromChild' | 'fromAncestor';
 
 /**
  * A muted label a row carries after its symbol name.
@@ -114,16 +114,16 @@ export interface SymbolRow {
   /** The module that owns the symbol - for an arrival row, never this node. */
   readonly owner: ModuleId;
   /**
-   * Absent on `granted` rows: a module can only re-expose what it owns or was
-   * exposed to it by a child, so an ancestor-granted symbol carries no onward
-   * decision for this module to make.
+   * Absent on `fromAncestor` rows: a module can only re-expose what it owns or
+   * what a direct child exposed to it, so a symbol received from an ancestor
+   * carries no onward decision for this module to make.
    */
   readonly marker?: ExposureMarker;
   /** Gray: the symbol stops here. Nothing gray ever has an arrow attached. */
   readonly gray: boolean;
-  /** The module named by the provenance: the providing child, or the granter. */
+  /** The module named by the provenance: the providing child, or the exposing ancestor. */
   readonly from?: ModuleId;
-  /** The provenance text as drawn (`from cart`, `granted by app`). */
+  /** The provenance text as drawn (`from cart`). */
   readonly provenance?: string;
   readonly layer: string;
   readonly color: ColorKey;
@@ -245,9 +245,12 @@ interface NodeContent {
   readonly moduleContext?: DrawnContext;
 }
 
-/** The provenance a row states, in the words the box draws. */
-export function provenanceText(kind: RowKind, from: ModuleId): string {
-  return kind === 'granted' ? `granted by ${from}` : `from ${from}`;
+/**
+ * The provenance a row states, in the words the box draws: the module the
+ * symbol was received from, whether a direct child or a proper ancestor.
+ */
+export function provenanceText(from: ModuleId): string {
+  return `from ${from}`;
 }
 
 /** Compartment titles double as element-id stems, so they are slugified. */
@@ -265,7 +268,7 @@ function slugify(title: string): string {
  * explanation. An availability question, so no tag is consulted: an arrival is
  * an arrival whether or not the importing files may take it.
  */
-export function derivedHoldings(
+export function derivedChildExposures(
   tree: ModuleTree,
   moduleId: ModuleId,
   symbols: readonly { readonly owner: ModuleId; readonly name: SymbolName }[],
@@ -274,23 +277,24 @@ export function derivedHoldings(
 }
 
 /**
- * The symbols a proper ancestor granted to a module, with the granting
- * ancestor - the evaluator's `ancestor-grant` clause, and the second way a
- * symbol becomes available somewhere its owner never named.
+ * The symbols a proper ancestor exposed to its descendants, as they arrive in
+ * a module, with the exposing ancestor - the evaluator's `ancestor-exposure`
+ * clause, and the second way a symbol becomes available somewhere its owner
+ * never named.
  */
-export function derivedGrants(
+export function derivedDescendantExposures(
   tree: ModuleTree,
   moduleId: ModuleId,
   symbols: readonly { readonly owner: ModuleId; readonly name: SymbolName }[],
 ): { readonly owner: ModuleId; readonly name: SymbolName; readonly from: ModuleId }[] {
-  return arrivals(tree, moduleId, symbols, 'ancestor-grant');
+  return arrivals(tree, moduleId, symbols, 'ancestor-exposure');
 }
 
 function arrivals(
   tree: ModuleTree,
   moduleId: ModuleId,
   symbols: readonly { readonly owner: ModuleId; readonly name: SymbolName }[],
-  clause: 'child-exposure' | 'ancestor-grant',
+  clause: 'child-exposure' | 'ancestor-exposure',
 ): { owner: ModuleId; name: SymbolName; from: ModuleId }[] {
   const found: { owner: ModuleId; name: SymbolName; from: ModuleId }[] = [];
   for (const ref of symbols) {
@@ -314,7 +318,7 @@ export function reExposesToDescendants(
 ): boolean {
   return descendantsOf(tree, moduleId).some((descendant) => {
     const decision = explainAvailability(tree, descendant, owner, symbol);
-    return decision.allowed && decision.clause === 'ancestor-grant' && decision.via === moduleId;
+    return decision.allowed && decision.clause === 'ancestor-exposure' && decision.via === moduleId;
   });
 }
 
@@ -583,36 +587,36 @@ function buildContent(context: DiagramContext): Map<ModuleId, NodeContent> {
       };
     });
 
-    const receivedRows = derivedHoldings(tree, id, allRefs).map((held): DraftRow => {
+    const fromChildRows = derivedChildExposures(tree, id, allRefs).map((arrival): DraftRow => {
       const marker = markerFor(
-        reExposesToParent(tree, id, held.owner, held.name),
-        reExposesToDescendants(tree, id, held.owner, held.name),
+        reExposesToParent(tree, id, arrival.owner, arrival.name),
+        reExposesToDescendants(tree, id, arrival.owner, arrival.name),
       );
       return {
-        kind: 'received',
-        symbol: held.name,
-        owner: held.owner,
+        kind: 'fromChild',
+        symbol: arrival.name,
+        owner: arrival.owner,
         marker,
         gray: marker === '·',
-        from: held.from,
-        provenance: provenanceText('received', held.from),
-        ...tagFacts(tree, id, { marker, symbol: held.name, owner: held.owner }),
+        from: arrival.from,
+        provenance: provenanceText(arrival.from),
+        ...tagFacts(tree, id, { marker, symbol: arrival.name, owner: arrival.owner }),
       };
     });
 
-    // An ancestor-granted symbol arrives with no decision for this module to
-    // make: re-exposing it is a no-op, so the row carries no marker and is
-    // never gray - gray means *stops here*, and nothing stopped.
-    const grantedRows = nodeContent.includeAncestorGrants
-      ? derivedGrants(tree, id, allRefs).map(
-          (granted): DraftRow => ({
-            kind: 'granted',
-            symbol: granted.name,
-            owner: granted.owner,
+    // A symbol received from an ancestor arrives with no decision for this
+    // module to make: re-exposing it is a no-op, so the row carries no marker
+    // and is never gray - gray means *stops here*, and nothing stopped.
+    const fromAncestorRows = nodeContent.includeAncestorExposures
+      ? derivedDescendantExposures(tree, id, allRefs).map(
+          (arrival): DraftRow => ({
+            kind: 'fromAncestor',
+            symbol: arrival.name,
+            owner: arrival.owner,
             gray: false,
-            from: granted.from,
-            provenance: provenanceText('granted', granted.from),
-            ...tagFacts(tree, id, { symbol: granted.name, owner: granted.owner }),
+            from: arrival.from,
+            provenance: provenanceText(arrival.from),
+            ...tagFacts(tree, id, { symbol: arrival.name, owner: arrival.owner }),
           }),
         )
       : [];
@@ -628,7 +632,7 @@ function buildContent(context: DiagramContext): Map<ModuleId, NodeContent> {
     const owns = sortRows(ownsRows);
     // Arrivals from an ancestor sort last: they are the passive half of the
     // compartment, and nothing about them was decided here.
-    const received = [...sortRows(receivedRows), ...grantedRows];
+    const received = [...sortRows(fromChildRows), ...fromAncestorRows];
 
     // §3.2: an absent contract is a statement. A module with neither
     // compartment says so; one with arrivals to list needs no empty box.

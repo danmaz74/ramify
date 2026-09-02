@@ -30,7 +30,7 @@
  * **Availability is tag-free, and importability is not.** A tag restricts
  * *importing*, per context; it changes nobody's availability, and it is
  * consulted only after the tree rules have already said yes - which is how the
- * model's promise that tags never grant is kept structurally rather than
+ * model's promise that tags never expose is kept structurally rather than
  * argued. In a universe that declares no tag the two questions coincide, as the
  * glossary's definition says; where tags are declared, availability is the
  * ceiling and importability is what a particular context may take from it.
@@ -67,7 +67,7 @@ export type ImportClause =
   /** A direct child of the module exposed the symbol to its parent. */
   | 'child-exposure'
   /** A proper ancestor exposed the symbol to its descendants. */
-  | 'ancestor-grant';
+  | 'ancestor-exposure';
 
 /**
  * Why an import is not allowed.
@@ -112,8 +112,9 @@ export interface ImportAllowed {
   readonly clause: ImportClause;
   /**
    * The module whose decision made the symbol available: the direct child that
-   * exposed to its parent, or the granting ancestor. `null` for a module's own
-   * symbols, where nobody had to decide anything.
+   * exposed to its parent, or the proper ancestor that exposed to its
+   * descendants. `null` for a module's own symbols, where nobody had to decide
+   * anything.
    */
   readonly via: ModuleId | null;
   /**
@@ -196,7 +197,7 @@ export function isAvailable(
  *
  * The clauses are tried in the rule's own order, so a symbol several of them
  * would allow is attributed to the earliest - ownership first, even when an
- * ancestor grant also reaches the module.
+ * ancestor's exposure to its descendants also reaches the module.
  *
  * Throws if either module id is unknown; a typo in a declaration is an error,
  * not an answer.
@@ -244,7 +245,7 @@ export function explainAvailability(
   // refused.
   for (const ancestor of ancestorsOf(tree, moduleId)) {
     if (ownedOrReceived(tree, ancestor, ref) && exposes(tree, ancestor, ref, 'exposeToDescendants')) {
-      return { allowed: true, clause: 'ancestor-grant', via: ancestor };
+      return { allowed: true, clause: 'ancestor-exposure', via: ancestor };
     }
   }
 
@@ -369,15 +370,15 @@ function firstUnmetRequirement(
 
 /**
  * Whether `moduleId` owns `ref`, or received it from a direct child that
- * exposed it upward.
+ * exposed it to its parent.
  *
  * A module may expose any symbol available in it, so this is narrower than
- * availability - it omits symbols an ancestor granted. Nothing is lost by the
- * omission: re-exposing a symbol received from an ancestor is always
- * redundant. Its own subtree already lies inside the granting ancestor's
- * subtree, every module on the path upward to that ancestor does too, and
- * reaching any higher needs the granter's own expose-to-parent decision, which
- * no module below it can make on its behalf.
+ * availability - it omits symbols an ancestor exposed to its descendants.
+ * Nothing is lost by the omission: re-exposing a symbol received from an
+ * ancestor is always redundant. Its own subtree already lies inside that
+ * ancestor's subtree, every module on the path up to that ancestor does too,
+ * and reaching any higher needs that ancestor's own expose-to-parent decision,
+ * which no module below it can make on its behalf.
  */
 function ownedOrReceived(tree: ModuleTree, moduleId: ModuleId, ref: SymbolRef): boolean {
   if (ref.owner === moduleId) {

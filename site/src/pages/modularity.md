@@ -98,9 +98,9 @@ its absence immediate.
 
 **ramify.ts makes multi-file, hierarchical modularity declared and
 enforceable in TypeScript.** Modules exist by declaration and form a tree;
-everything cross-module is closed by default; a module routes symbols onward
-through exactly two channels - to its parent, or to its own subtree - so
-reach is never configured, only composed from one-hop decisions.
+everything cross-module is closed by default; a module passes symbols onward
+only by exposing them again, to its parent or to its descendants, so reach is
+never configured, only composed from one-hop decisions.
 
 From here:
 

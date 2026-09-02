@@ -67,7 +67,7 @@ export {
   legendGroups,
   legendNotes,
   tracedSymbols,
-  uniformGrantFootnote,
+  uniformExposureFootnote,
   whatIfNote,
 } from './diagrams/shop.js';
 
@@ -84,8 +84,8 @@ export type { DiagramLayout } from './layout.js';
 
 export {
   descendantsOf,
-  derivedGrants,
-  derivedHoldings,
+  derivedChildExposures,
+  derivedDescendantExposures,
   layoutTree,
   provenanceText,
   tagChipText,

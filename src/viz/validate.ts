@@ -90,11 +90,11 @@ export function validateLandings(tree: ModuleTree, propagation: PropagationLayou
 
 /**
  * The module a dot sits on must be the module the evaluator credits with the
- * decision. For a grant this is the *nearest* granting ancestor, since that is
- * the one `explainAvailability` reports.
+ * decision. For an exposure to descendants this is the *nearest* exposing
+ * ancestor, since that is the one `explainAvailability` reports.
  *
  * A dot is a claim about where a symbol went, so this too is an availability
- * question: a tag never changes whose decision routed a symbol.
+ * question: a tag never changes whose decision made a symbol available.
  */
 export function validateDecisionDots(
   tree: ModuleTree,
@@ -103,12 +103,12 @@ export function validateDecisionDots(
   const byId = new Map<string, PropagationDecision>(
     propagation.decisions.map((decision) => [decision.id, decision]),
   );
-  const grantsOf = (symbolOwner: ModuleId, name: SymbolName): Set<ModuleId> =>
+  const descendantExposuresOf = (symbolOwner: ModuleId, name: SymbolName): Set<ModuleId> =>
     new Set(
       propagation.decisions
         .filter(
           (decision) =>
-            decision.kind === 'grant' &&
+            decision.kind === 'to-descendants' &&
             decision.symbols.some((ref) => ref.owner === symbolOwner && ref.name === name),
         )
         .map((decision) => decision.decider),
@@ -120,10 +120,10 @@ export function validateDecisionDots(
       fail(`Decision dot "${dot.id}" refers to unknown decision "${dot.decisionId}".`);
     }
     for (const ref of decision.symbols) {
-      if (decision.kind === 'up-hop') {
+      if (decision.kind === 'to-parent') {
         const parent = tree.modules.get(decision.decider)?.parent ?? null;
         if (parent === null) {
-          fail(`Up-hop decision "${decision.id}" has no parent to expose to.`);
+          fail(`To-parent decision "${decision.id}" has no parent to expose to.`);
         }
         const verdict = explainAvailability(tree, parent, ref.owner, ref.name);
         if (!verdict.allowed || verdict.clause !== 'child-exposure' || verdict.via !== decision.decider) {
@@ -135,24 +135,25 @@ export function validateDecisionDots(
         continue;
       }
 
-      const granters = grantsOf(ref.owner, ref.name);
+      const exposingAncestors = descendantExposuresOf(ref.owner, ref.name);
       for (const reached of descendantsOf(tree, decision.decider)) {
         const verdict = explainAvailability(tree, reached, ref.owner, ref.name);
         if (!verdict.allowed) {
           fail(
-            `The grant drawn at "${decision.decider}" reaches "${reached}", ` +
+            `The exposure to descendants drawn at "${decision.decider}" reaches "${reached}", ` +
               `but ${describe(reached, ref.owner, ref.name)} is denied.`,
           );
         }
-        if (verdict.clause !== 'ancestor-grant') {
-          // The reached module owns the symbol (a uniform grant landing back on
-          // the provider is harmless) - nothing to attribute.
+        if (verdict.clause !== 'ancestor-exposure') {
+          // The reached module owns the symbol (a uniform exposure to
+          // descendants landing back on the provider is harmless) - nothing to
+          // attribute.
           continue;
         }
-        const nearestGranter = ancestorChain(tree, reached).find((ancestor) => granters.has(ancestor));
-        if (verdict.via !== nearestGranter) {
+        const nearestExposingAncestor = ancestorChain(tree, reached).find((ancestor) => exposingAncestors.has(ancestor));
+        if (verdict.via !== nearestExposingAncestor) {
           fail(
-            `Dot "${dot.id}" attributes ${ref.name} at "${reached}" to "${String(nearestGranter)}", ` +
+            `Dot "${dot.id}" attributes ${ref.name} at "${reached}" to "${String(nearestExposingAncestor)}", ` +
               `but the evaluator credits "${String(verdict.via)}".`,
           );
         }
@@ -217,8 +218,8 @@ export function validateChords(tree: ModuleTree, chords: readonly ChordLayout[])
 export function validateNodeRows(tree: ModuleTree, nodes: readonly NodeLayout[]): void {
   const expectedClause = {
     owns: 'same-module',
-    received: 'child-exposure',
-    granted: 'ancestor-grant',
+    fromChild: 'child-exposure',
+    fromAncestor: 'ancestor-exposure',
   } as const;
 
   for (const node of nodes) {
@@ -250,16 +251,17 @@ export function validateNodeRows(tree: ModuleTree, nodes: readonly NodeLayout[])
 /**
  * Gray means *stops here*: nothing gray may have a lane leaving its node.
  *
- * `granted` rows are exempt in both directions. They record an arrival, not a
- * decision - re-exposing an ancestor-granted symbol is a no-op - so such a row
- * neither claims the symbol stopped nor promises a lane leaving the node.
+ * `fromAncestor` rows are exempt in both directions. They record an arrival,
+ * not a decision - re-exposing a symbol received from an ancestor is a no-op -
+ * so such a row neither claims the symbol stopped nor promises a lane leaving
+ * the node.
  */
 export function validateGrayRows(
   nodes: readonly NodeLayout[],
   propagation: PropagationLayout,
 ): void {
   for (const node of nodes) {
-    for (const row of node.rows.filter((candidate) => candidate.kind !== 'granted')) {
+    for (const row of node.rows.filter((candidate) => candidate.kind !== 'fromAncestor')) {
       const moving = propagation.decisions.some(
         (decision) =>
           decision.decider === node.id &&
@@ -292,7 +294,7 @@ function drawnContextsOf(node: NodeLayout): DrawnContext[] {
  * declared context, and for a type-only import:
  *
  * - **the chip.** A row wears exactly the exposure tags `symbolTagsOf` gives
- *   for its symbol, asked at the owner - never at whoever routed it.
+ *   for its symbol, asked at the owner - never at whoever re-exposed it.
  * - **the strike.** A row is struck exactly when it is not available - the
  *   diagrams tell the value-import story, and type-availability is never a
  *   row affordance.

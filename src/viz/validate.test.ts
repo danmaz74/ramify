@@ -114,8 +114,8 @@ describe('the diagram checks itself against the evaluator', () => {
     const tampered = {
       ...propagation,
       lanes: propagation.lanes.map((lane) =>
-        // `search` may not import `reserveStock`; claim the up-hop landed there.
-        lane.decisionId === 'up-hop-inventory-neutral' ? { ...lane, reaches: 'search' } : lane,
+        // `search` may not import `reserveStock`; claim the exposure to the parent landed there.
+        lane.decisionId === 'to-parent-inventory-neutral' ? { ...lane, reaches: 'search' } : lane,
       ),
     };
     expect(() => validateLandings(shopTree, tampered)).toThrow(/the model denies that import/u);
@@ -163,11 +163,11 @@ describe('node rows are checked row by row', () => {
     }
   });
 
-  it('refuses a granted row that names the wrong ancestor', () => {
-    // `computeTotal` reaches `invoiceComputation` because `app` granted it -
-    // `invoicing` never had it to grant.
+  it('refuses a fromAncestor row that names the wrong ancestor', () => {
+    // `computeTotal` reaches `invoiceComputation` because `app` exposed it to
+    // its descendants - `invoicing` never had it to expose.
     const nodes = nodesWithRow(example1Context, 'invoiceComputation', (row) =>
-      row.kind === 'granted' && row.symbol === 'computeTotal' ? { ...row, from: 'invoicing' } : row,
+      row.kind === 'fromAncestor' && row.symbol === 'computeTotal' ? { ...row, from: 'invoicing' } : row,
     );
     expect(() => validateNodeRows(example1Context.tree, nodes)).toThrow(DiagramModelMismatch);
     expect(() => validateNodeRows(example1Context.tree, nodes)).toThrow(
@@ -176,13 +176,13 @@ describe('node rows are checked row by row', () => {
   });
 
   it('refuses an arrival drawn under the wrong clause', () => {
-    // `optimizeRoute` is in `shipping` because its child exposed it upward, not
-    // because anybody granted it downward.
+    // `optimizeRoute` is in `shipping` because its child exposed it to its
+    // parent, not because any ancestor exposed it to its descendants.
     const nodes = nodesWithRow(example1Context, 'shipping', (row) =>
-      row.symbol === 'optimizeRoute' ? { ...row, kind: 'granted' as const } : row,
+      row.symbol === 'optimizeRoute' ? { ...row, kind: 'fromAncestor' as const } : row,
     );
     expect(() => validateNodeRows(example1Context.tree, nodes)).toThrow(
-      /draws optimizeRoute as a "granted" row \(ancestor-grant\), but the evaluator allows it by "child-exposure"/u,
+      /draws optimizeRoute as a "fromAncestor" row \(ancestor-exposure\), but the evaluator allows it by "child-exposure"/u,
     );
   });
 
@@ -207,16 +207,16 @@ describe('node rows are checked row by row', () => {
     ).not.toThrow();
   });
 
-  it('leaves granted rows out of the gray check: they are arrivals, not stops', () => {
-    // Nothing leaves `invoiceComputation`, and its two granted rows are not
-    // gray. Only a `granted` exemption makes that consistent.
+  it('leaves fromAncestor rows out of the gray check: they are arrivals, not stops', () => {
+    // Nothing leaves `invoiceComputation`, and its two fromAncestor rows are
+    // not gray. Only a `fromAncestor` exemption makes that consistent.
     const geometry = layoutTree(example1Context);
     const propagation = layoutPropagation(example1Context, geometry);
-    const granted = (geometry.nodeById.get('invoiceComputation')?.rows ?? []).filter(
-      (row) => row.kind === 'granted',
+    const fromAncestorRows = (geometry.nodeById.get('invoiceComputation')?.rows ?? []).filter(
+      (row) => row.kind === 'fromAncestor',
     );
-    expect(granted).toHaveLength(2);
-    expect(granted.every((row) => !row.gray)).toBe(true);
+    expect(fromAncestorRows).toHaveLength(2);
+    expect(fromAncestorRows.every((row) => !row.gray)).toBe(true);
     expect(() => validateGrayRows(geometry.nodes, propagation)).not.toThrow();
   });
 });

@@ -39,7 +39,7 @@ describe('example 2 - both channels at once', () => {
 
   it('reaches the subtree and the parent, and the reach stops there', () => {
     for (const id of ['discounts', 'taxes']) {
-      expect(rowsOf(id)).toEqual(['_ PriceModel   granted by pricing']);
+      expect(rowsOf(id)).toEqual(['_ PriceModel   from pricing']);
     }
     // `app` composes both symbols and stops them: gray rows, no dots of its own.
     expect(rowsOf('app')).toEqual([
@@ -77,7 +77,7 @@ describe('example 2 - both channels at once', () => {
   it('sends both of PriceModel’s flows from the same owner', () => {
     const lanes = example2.propagation.lanes.filter((lane) => lane.layer === 'PriceModel');
     const kinds = new Set(lanes.map((lane) => lane.kind));
-    expect(kinds).toEqual(new Set(['up-hop', 'grant']));
+    expect(kinds).toEqual(new Set(['to-parent', 'to-descendants']));
     const decisions = example2.propagation.decisions.filter(
       (decision) => decision.layer === 'PriceModel',
     );

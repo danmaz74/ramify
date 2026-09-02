@@ -55,13 +55,13 @@ export const example1aTracedSymbols: readonly TracedSymbol[] = [
     symbol: 'optimizeRoute',
     owner: 'routingOptimization',
     color: 'traced3',
-    role: 'up one hop, then stops',
+    role: 'to its parent, then stops',
   },
   {
     symbol: 'ShipmentPlan',
     owner: 'shipping',
     color: 'traced4',
-    role: 'down, subtree only',
+    role: 'to its descendants only',
   },
 ];
 

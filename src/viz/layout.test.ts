@@ -51,19 +51,19 @@ describe('node boxes', () => {
     }
   });
 
-  it('derives the holds compartments, with the providing child, from the model alone', () => {
-    const holdsOf = (id: string): string[] =>
+  it('derives the receives compartments, with the providing child, from the model alone', () => {
+    const receivesOf = (id: string): string[] =>
       (layout.tree.nodeById.get(id)?.rows ?? [])
-        .filter((row) => row.kind === 'received')
+        .filter((row) => row.kind === 'fromChild')
         .map((row) => `${String(row.marker)} ${row.symbol} from ${String(row.from)}`);
 
-    // Nothing about holding is declared: `checkout` holds `CartApi` purely
-    // because `cart` exposed it upward, and the gray marker is the consequence
-    // of `checkout` passing it nowhere.
-    expect(holdsOf('checkout')).toEqual(['▼ PaymentApi from payment', '· CartApi from cart']);
-    expect(holdsOf('shop')).toEqual(['▼ ProductId from catalog']);
-    expect(holdsOf('catalog')).toEqual(['· reserveStock from inventory']);
-    expect(holdsOf('payment')).toEqual([]);
+    // Nothing about receiving is declared: `checkout` receives `CartApi` purely
+    // because `cart` exposed it to its parent, and the gray marker is the
+    // consequence of `checkout` passing it nowhere.
+    expect(receivesOf('checkout')).toEqual(['▼ PaymentApi from payment', '· CartApi from cart']);
+    expect(receivesOf('shop')).toEqual(['▼ ProductId from catalog']);
+    expect(receivesOf('catalog')).toEqual(['· reserveStock from inventory']);
+    expect(receivesOf('payment')).toEqual([]);
   });
 
   it('shows an absent contract as a statement, not an empty compartment', () => {
@@ -72,11 +72,11 @@ describe('node boxes', () => {
       const owns = compartments.find((compartment) => compartment.kind === 'owns');
       expect(owns && 'placeholder' in owns ? owns.placeholder : undefined).toBe('(nothing owned)');
     }
-    // `checkout` owns nothing but holds two symbols: the holds compartment is
-    // the statement, so no empty `owns` strip is drawn.
+    // `checkout` owns nothing but receives two symbols: the receives
+    // compartment is the statement, so no empty `owns` strip is drawn.
     const checkout = layout.tree.nodeById.get('checkout');
-    expect(checkout?.compartments.map((compartment) => compartment.slug)).toEqual(['holds']);
-    expect(checkout?.compartments.map((compartment) => compartment.title)).toEqual(['holds']);
+    expect(checkout?.compartments.map((compartment) => compartment.slug)).toEqual(['receives']);
+    expect(checkout?.compartments.map((compartment) => compartment.title)).toEqual(['receives']);
   });
 
   /**
@@ -128,11 +128,11 @@ describe('node boxes', () => {
 
 describe('propagation lanes', () => {
   it('bundles symbols carried by one decision into one lane', () => {
-    const shopGrants = layout.propagation.decisions.filter(
-      (decision) => decision.decider === 'shop' && decision.kind === 'grant',
+    const shopDescendantExposures = layout.propagation.decisions.filter(
+      (decision) => decision.decider === 'shop' && decision.kind === 'to-descendants',
     );
     // Money and formatDate ride one lane; ProductId is traced, so it gets its own.
-    expect(shopGrants.map((decision) => decision.chipText)).toEqual(['Money · formatDate', 'ProductId']);
+    expect(shopDescendantExposures.map((decision) => decision.chipText)).toEqual(['Money · formatDate', 'ProductId']);
   });
 
   it('runs every lane parallel to its tree edge, within the offset budget', () => {
@@ -143,14 +143,14 @@ describe('propagation lanes', () => {
       const edge = edgeById.get(edgeKey(lane.parent, lane.child));
       expect(edge).toBeDefined();
       const base = points(edge!.d);
-      const laid = lane.kind === 'up-hop' ? points(lane.d).reverse() : points(lane.d);
+      const laid = lane.kind === 'to-parent' ? points(lane.d).reverse() : points(lane.d);
       expect(laid).toHaveLength(base.length);
       for (let index = 0; index < base.length; index += 1) {
         expect(Math.abs(laid[index]!.x - base[index]!.x)).toBeLessThanOrEqual(budget);
         expect(Math.abs(laid[index]!.y - base[index]!.y)).toBeLessThanOrEqual(budget);
       }
-      // Left/right assignment is absolute: up-hops left, grants right.
-      expect(lane.kind === 'grant' ? lane.offset > 0 : lane.offset < 0).toBe(true);
+      // Left/right assignment is absolute: exposures to the parent left, flows to descendants right.
+      expect(lane.kind === 'to-descendants' ? lane.offset > 0 : lane.offset < 0).toBe(true);
       expect(Math.abs(lane.offset)).toBeLessThanOrEqual(budget);
     }
   });
@@ -166,8 +166,8 @@ describe('propagation lanes', () => {
     }
     // §4.4 finding 1 names `catalog->inventory` and `checkout->payment` as the
     // four-lane edges. `checkout->cart` is a third: it carries the same three
-    // grant lanes plus `CartApi`'s up-hop. The ceiling of four still holds - the
-    // spec's count of *which* edges reach it was one short.
+    // to-descendants lanes plus `CartApi`'s exposure to the parent. The ceiling of four is still
+    // met - the spec's count of *which* edges reach it was one short.
     const worst = [...perEdge.entries()].filter(([, count]) => count === 4).map(([key]) => key);
     expect(worst.sort()).toEqual(['catalog->inventory', 'checkout->cart', 'checkout->payment']);
   });
@@ -175,14 +175,14 @@ describe('propagation lanes', () => {
   it('stacks lanes shallowest-origin-nearest and keeps a symbol at a stable distance', () => {
     const laneOffsets = (edge: string): { decision: string; offset: number }[] =>
       layout.propagation.lanes
-        .filter((lane) => edgeKey(lane.parent, lane.child) === edge && lane.kind === 'grant')
+        .filter((lane) => edgeKey(lane.parent, lane.child) === edge && lane.kind === 'to-descendants')
         .map((lane) => ({ decision: lane.decisionId, offset: lane.offset }))
         .sort((a, b) => a.offset - b.offset);
 
     expect(laneOffsets('catalog->inventory')).toEqual([
-      { decision: 'grant-shop-neutral', offset: 7 },
-      { decision: 'grant-shop-ProductId', offset: 14 },
-      { decision: 'grant-catalog-neutral', offset: 21 },
+      { decision: 'to-descendants-shop-neutral', offset: 7 },
+      { decision: 'to-descendants-shop-ProductId', offset: 14 },
+      { decision: 'to-descendants-catalog-neutral', offset: 21 },
     ]);
     // The same ribbon keeps its distance from the trunk further down the tree.
     expect(laneOffsets('catalog->search')).toEqual(laneOffsets('catalog->inventory'));
@@ -202,15 +202,15 @@ describe('propagation lanes', () => {
         expect(last.x).toBeCloseTo(lane.headAt.x, 6);
         expect(last.y).toBeCloseTo(lane.headAt.y, 6);
         // The head lands on the module that may therefore import it, and a
-        // grant travels down while an up-hop travels up.
+        // flow to descendants travels down while an exposure to the parent travels up.
         const first = path[0]!;
-        expect(lane.kind === 'grant' ? last.y > first.y : last.y < first.y).toBe(true);
+        expect(lane.kind === 'to-descendants' ? last.y > first.y : last.y < first.y).toBe(true);
       }
     }
   });
 
-  it('lands exactly one chevron on every node a grant reaches', () => {
-    for (const decision of layout.propagation.decisions.filter((entry) => entry.kind === 'grant')) {
+  it('lands exactly one chevron on every node an exposure to descendants reaches', () => {
+    for (const decision of layout.propagation.decisions.filter((entry) => entry.kind === 'to-descendants')) {
       const reached = layout.propagation.lanes
         .filter((lane) => lane.decisionId === decision.id)
         .map((lane) => {
@@ -223,13 +223,13 @@ describe('propagation lanes', () => {
     }
     // §3.5: two dots, seven arrivals for ProductId's journey down from the root.
     const shopProductId = layout.propagation.lanes.filter(
-      (lane) => lane.decisionId === 'grant-shop-ProductId',
+      (lane) => lane.decisionId === 'to-descendants-shop-ProductId',
     );
     expect(shopProductId).toHaveLength(7);
   });
 
-  it('lands one arrowhead on the parent for every up-hop, and nothing further', () => {
-    for (const decision of layout.propagation.decisions.filter((entry) => entry.kind === 'up-hop')) {
+  it('lands one arrowhead on the parent for every exposure to the parent, and nothing further', () => {
+    for (const decision of layout.propagation.decisions.filter((entry) => entry.kind === 'to-parent')) {
       const lanes = layout.propagation.lanes.filter((lane) => lane.decisionId === decision.id);
       expect(lanes).toHaveLength(1);
       expect(lanes[0]!.head).toBe('arrow');
@@ -252,7 +252,7 @@ describe('decision dots', () => {
 
   /**
    * §4.1 reads the picture as five statements - "the entire access policy of
-   * the application". The three bottom-row up-hops are one of those statements
+   * the application". The three bottom-row exposures to the parent are one of those statements
    * and three separate dots, so the checkable invariant is the partition: every
    * dot belongs to exactly one statement, and no statement is unwitnessed.
    */
@@ -273,7 +273,7 @@ describe('decision dots', () => {
 
   it('puts nothing gray in motion', () => {
     // Gray means *stops here*, and "here" is a module: `CartApi` is gray in
-    // `checkout`'s holds compartment while travelling out of `cart`.
+    // `checkout`'s receives compartment while travelling out of `cart`.
     const moving = new Set(
       layout.propagation.decisions.flatMap((decision) =>
         decision.symbols.map((ref) => `${decision.decider}::${ref.owner}::${ref.name}`),
@@ -388,7 +388,7 @@ describe('canvas', () => {
 /**
  * Example 1 of `docs/model/illustrative-examples.md`: nine modules, four
  * symbols, seven decisions, three different reaches - plus one symbol exposed
- * only downward. The doc is normative for everything asserted here.
+ * only to its descendants. The doc is normative for everything asserted here.
  */
 describe('example 1 - one decision, three reaches', () => {
   const rowsOf = (id: string): string[] =>
@@ -412,18 +412,18 @@ describe('example 1 - one decision, three reaches', () => {
     expect(example1.tree.nodeById.get('app')?.badge).toBe('app root');
   });
 
-  it('titles the second compartment “exposed to it” and lists both channels', () => {
+  it('titles the second compartment “receives” and lists both channels', () => {
     const compartments = (id: string): string[] =>
       (example1.tree.nodeById.get(id)?.compartments ?? []).map((compartment) => compartment.title);
-    expect(compartments('invoicingLibrary')).toEqual(['owns', 'exposed to it']);
-    expect(compartments('invoiceComputation')).toEqual(['exposed to it']);
+    expect(compartments('invoicingLibrary')).toEqual(['owns', 'receives']);
+    expect(compartments('invoiceComputation')).toEqual(['receives']);
   });
 
   it('gives the root a contract without owning anything, and no placeholder', () => {
     // `app` owns no code and still carries the application's vocabulary.
     expect(rowsOf('app')).toEqual(['▼ computeTotal   from globalLibrary']);
     const compartments = example1.tree.nodeById.get('app')?.compartments ?? [];
-    expect(compartments.map((compartment) => compartment.slug)).toEqual(['exposed-to-it']);
+    expect(compartments.map((compartment) => compartment.slug)).toEqual(['receives']);
     expect(
       compartments.some((compartment) => 'placeholder' in compartment && compartment.placeholder !== undefined),
     ).toBe(false);
@@ -434,40 +434,40 @@ describe('example 1 - one decision, three reaches', () => {
     expect(rowsOf('moneyUtils')).toEqual(['▲ computeTotal']);
     expect(rowsOf('invoicingLibrary')).toEqual([
       '▲ InvoiceModel',
-      '_ computeTotal   granted by app',
+      '_ computeTotal   from app',
     ]);
     expect(rowsOf('routingOptimization')).toEqual([
       '▲ optimizeRoute',
-      '_ computeTotal   granted by app',
-      '_ ShipmentPlan   granted by shipping',
+      '_ computeTotal   from app',
+      '_ ShipmentPlan   from shipping',
     ]);
     // Above them: passed on, turned downward, or stopped.
     expect(rowsOf('globalLibrary')).toEqual(['▲ computeTotal   from moneyUtils']);
     expect(rowsOf('invoicing')).toEqual([
       '▼ InvoiceModel   from invoicingLibrary',
-      '_ computeTotal   granted by app',
+      '_ computeTotal   from app',
     ]);
     expect(rowsOf('shipping')).toEqual([
       '▼ ShipmentPlan',
       '· optimizeRoute   from routingOptimization',
-      '_ computeTotal   granted by app',
+      '_ computeTotal   from app',
     ]);
     // `shipping` composed the symbol and stopped it: gray, and nothing gray moves.
     const stopped = (example1.tree.nodeById.get('shipping')?.rows ?? []).find(
       (row) => row.symbol === 'optimizeRoute',
     );
     expect(stopped?.gray).toBe(true);
-    expect(stopped?.kind).toBe('received');
+    expect(stopped?.kind).toBe('fromChild');
   });
 
-  it('gives a grant’s two arrivals granted rows, never gray ones', () => {
+  it('gives an exposure’s two arrivals fromAncestor rows, never gray ones', () => {
     for (const id of ['invoiceComputation', 'invoicePDF']) {
       expect(rowsOf(id)).toEqual([
-        '_ computeTotal   granted by app',
-        '_ InvoiceModel   granted by invoicing',
+        '_ computeTotal   from app',
+        '_ InvoiceModel   from invoicing',
       ]);
       const rows = example1.tree.nodeById.get(id)?.rows ?? [];
-      expect(rows.map((row) => row.kind)).toEqual(['granted', 'granted']);
+      expect(rows.map((row) => row.kind)).toEqual(['fromAncestor', 'fromAncestor']);
       expect(rows.every((row) => row.marker === undefined && !row.gray)).toBe(true);
       // Traced color, so reach can be read box by box.
       expect(rows.map((row) => row.color)).toEqual(['traced1', 'traced2']);
@@ -502,9 +502,9 @@ describe('example 1 - one decision, three reaches', () => {
         .map((lane) => lane.reaches)
         .sort();
     // Application-wide: every module below the root.
-    expect(reached('grant-app-computeTotal')).toHaveLength(8);
+    expect(reached('to-descendants-app-computeTotal')).toHaveLength(8);
     // Domain-wide: the `invoicing` subtree, and nothing outside it.
-    expect(reached('grant-invoicing-InvoiceModel')).toEqual([
+    expect(reached('to-descendants-invoicing-InvoiceModel')).toEqual([
       'invoiceComputation',
       'invoicePDF',
       'invoicingLibrary',
@@ -515,16 +515,16 @@ describe('example 1 - one decision, three reaches', () => {
     ).toHaveLength(1);
   });
 
-  it('exposes ShipmentPlan downward only: descendants allowed, the parent not', () => {
+  it('exposes ShipmentPlan to descendants only: descendants allowed, the parent not', () => {
     const tree = createDiagramContext(example1Diagram).tree;
     expect(mayImport(tree, 'routingOptimization', 'shipping', 'ShipmentPlan')).toBe(true);
-    // The parent is not allowed while descendants are: a downward exposure
+    // The parent is not allowed while descendants are: an exposure to descendants
     // never leaves the subtree, root included.
     expect(mayImport(tree, 'app', 'shipping', 'ShipmentPlan')).toBe(false);
     expect(mayImport(tree, 'invoicing', 'shipping', 'ShipmentPlan')).toBe(false);
     // One decision, one lane, one arrival.
     const arrivals = example1.propagation.lanes
-      .filter((lane) => lane.decisionId === 'grant-shipping-ShipmentPlan')
+      .filter((lane) => lane.decisionId === 'to-descendants-shipping-ShipmentPlan')
       .map((lane) => lane.reaches);
     expect(arrivals).toEqual(['routingOptimization']);
   });

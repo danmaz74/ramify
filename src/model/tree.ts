@@ -192,9 +192,9 @@ export interface ModuleTree {
  * tag's hold on the module's exposures.
  *
  * Declarations that are merely *inert* do not throw: exposing to a parent at
- * the root (the root has no parent), re-exposing a symbol the module does not
- * hold, or declaring an importer context with no tags. They are representable
- * and simply grant nothing.
+ * the root (the root has no parent), re-exposing a symbol the module never
+ * received, or declaring an importer context with no tags. They are
+ * representable and simply expose nothing.
  */
 export function buildTree(root: ModuleDeclaration): ModuleTree {
   const modules = new Map<ModuleId, ModuleRecord>();
@@ -391,10 +391,10 @@ export function requireImporterContext(
  * such a module can expose, since a module can only pass on symbols owned
  * inside its own subtree, which its classification reaches too.
  *
- * The question is asked of the **owner**, never of a module that routes the
- * symbol onward: a re-exposure carries no tags and so can neither add, strip
- * nor change any. Re-tagging a real contract as test support is exactly what
- * exclusivity forbids, and no declaration can spell it.
+ * The question is asked of the **owner**, never of a module that re-exposes
+ * the symbol onward: a re-exposure carries no tags and so can neither add,
+ * strip nor change any. Re-tagging a real contract as test support is exactly
+ * what exclusivity forbids, and no declaration can spell it.
  */
 export function symbolTagsOf(
   tree: ModuleTree,

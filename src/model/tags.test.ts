@@ -23,7 +23,7 @@ import {
  * §"Contextual rules: importer contexts and exposure tags", as the example
  * universes of `docs/model/illustrative-examples.md` state them.
  *
- * Examples 3 and 4 keep the tree trivial on purpose: everything is granted
+ * Examples 3 and 4 keep the tree trivial on purpose: everything is exposed
  * everywhere, so availability is identical in every column and the tag is the
  * only variable.
  */
@@ -49,7 +49,7 @@ function allImporters(tree: ModuleTree): ImporterDescriptor[] {
 
 /**
  * ```text
- * app                      grants everything it receives to its subtree
+ * app                      exposes everything it receives to its descendants
  * ├── orders               owns OrderService, resetOrderStore testing
  * │                        (both exposed to parent)
  * ├── billing              production consumer
@@ -81,7 +81,7 @@ describe('Example 3: the tag is the entire difference (testing)', () => {
   it('billing may import OrderService - the ordinary contract', () => {
     expect(explainImport(example3, 'billing', 'orders', 'OrderService')).toEqual({
       allowed: true,
-      clause: 'ancestor-grant',
+      clause: 'ancestor-exposure',
       via: 'app',
     });
   });
@@ -129,11 +129,11 @@ describe('Example 3: the tag is the entire difference (testing)', () => {
     });
   });
 
-  it('routes both symbols identically - only the tag differs', () => {
+  it('makes both symbols available identically - only the tag differs', () => {
     for (const symbol of ['OrderService', 'resetOrderStore']) {
       expect(explainAvailability(example3, 'billing', 'orders', symbol)).toEqual({
         allowed: true,
-        clause: 'ancestor-grant',
+        clause: 'ancestor-exposure',
         via: 'app',
       });
     }
@@ -144,7 +144,7 @@ describe('Example 3: the tag is the entire difference (testing)', () => {
 
 /**
  * ```text
- * app                      grants everything it receives to its subtree
+ * app                      exposes everything it receives to its descendants
  * ├── shared               owns formatMoney browser, queryDb
  * │                        (both exposed to parent)
  * ├── ui                   browser context
@@ -178,13 +178,13 @@ describe('Example 4: a promise about the closure (browser)', () => {
   it('server may import both - it carries no context tag to satisfy', () => {
     expect(explainImport(example4, 'server', 'shared', 'formatMoney')).toEqual({
       allowed: true,
-      clause: 'ancestor-grant',
+      clause: 'ancestor-exposure',
       via: 'app',
       tags: ['browser'],
     });
     expect(explainImport(example4, 'server', 'shared', 'queryDb')).toEqual({
       allowed: true,
-      clause: 'ancestor-grant',
+      clause: 'ancestor-exposure',
       via: 'app',
     });
   });
@@ -192,7 +192,7 @@ describe('Example 4: a promise about the closure (browser)', () => {
   it('ui may value-import formatMoney - the symbol carries the promise', () => {
     expect(explainImport(example4, uiValue, 'shared', 'formatMoney')).toEqual({
       allowed: true,
-      clause: 'ancestor-grant',
+      clause: 'ancestor-exposure',
       via: 'app',
       tags: ['browser'],
     });
@@ -209,12 +209,12 @@ describe('Example 4: a promise about the closure (browser)', () => {
   it('ui may type-import queryDb - erased at runtime', () => {
     expect(explainImport(example4, uiType, 'shared', 'queryDb')).toEqual({
       allowed: true,
-      clause: 'ancestor-grant',
+      clause: 'ancestor-exposure',
       via: 'app',
     });
     expect(explainImport(example4, uiType, 'shared', 'formatMoney')).toEqual({
       allowed: true,
-      clause: 'ancestor-grant',
+      clause: 'ancestor-exposure',
       via: 'app',
       tags: ['browser'],
     });
@@ -231,22 +231,22 @@ describe('Example 4: a promise about the closure (browser)', () => {
   });
 });
 
-// --- Tags never grant ------------------------------------------------------
+// --- Tags never expose -----------------------------------------------------
 
 /**
- * A `testing` symbol routed two hops up and granted application-wide,
+ * A `testing` symbol passed two hops up and then exposed application-wide,
  * beside two the tree stops earlier - a tree refusal and a tag refusal on the
  * same symbols.
  *
  * ```text
- * app                       grants resetOrderStore to its subtree
+ * app                       exposes resetOrderStore to its descendants
  * ├── sales                 receives all three, passes only resetOrderStore up
  * │   └── orders            owns all three testing
  * ├── billing               declares unit-tests
  * └── shipping
  * ```
  */
-const routedDeclaration: ModuleDeclaration = {
+const reExposedDeclaration: ModuleDeclaration = {
   id: 'app',
   contexts: [{ name: 'integration-tests', tags: ['testing'] }],
   reExposes: [{ symbol: 'resetOrderStore', from: 'sales', exposeToDescendants: true }],
@@ -273,18 +273,18 @@ const routedDeclaration: ModuleDeclaration = {
   ],
 };
 
-const routed = buildTree(routedDeclaration);
+const reExposed = buildTree(reExposedDeclaration);
 const salesTests: Importer = { module: 'sales', context: 'sales-tests' };
 const unitTests: Importer = { module: 'billing', context: 'unit-tests' };
 
-describe('tags never grant', () => {
-  it('gives a test context nothing the tree did not route to it', () => {
+describe('tags never expose', () => {
+  it('gives a test context nothing the tree did not re-expose to it', () => {
     // The chain stopped at `sales`; being a test context adds nothing.
-    expect(explainImport(routed, integrationTests, 'orders', 'orderFixtures')).toEqual({
+    expect(explainImport(reExposed, integrationTests, 'orders', 'orderFixtures')).toEqual({
       allowed: false,
       reason: 'no-exposure-chain',
     });
-    expect(explainImport(routed, unitTests, 'orders', 'orderFixtures')).toEqual({
+    expect(explainImport(reExposed, unitTests, 'orders', 'orderFixtures')).toEqual({
       allowed: false,
       reason: 'no-exposure-chain',
     });
@@ -292,7 +292,7 @@ describe('tags never grant', () => {
 
   it('keeps a symbol its owner exposes nowhere unreachable, test context or not', () => {
     for (const importer of [integrationTests, salesTests, unitTests, 'sales'] as const) {
-      expect(explainImport(routed, importer, 'orders', 'orderStoreInternals')).toEqual({
+      expect(explainImport(reExposed, importer, 'orders', 'orderStoreInternals')).toEqual({
         allowed: false,
         reason: 'never-exposed',
       });
@@ -302,12 +302,12 @@ describe('tags never grant', () => {
   it('reports a tree refusal for the tree reason, never a tag reason', () => {
     // One symbol, two refusals: `sales`'s production files are refused by the
     // tag, `app`'s test context by the missing exposure chain.
-    expect(explainImport(routed, 'sales', 'orders', 'orderFixtures')).toEqual({
+    expect(explainImport(reExposed, 'sales', 'orders', 'orderFixtures')).toEqual({
       allowed: false,
       reason: 'symbol-tag-requires-module-tag',
       unmet: { tag: 'testing', requires: 'testing' },
     });
-    expect(explainImport(routed, salesTests, 'orders', 'orderFixtures')).toEqual({
+    expect(explainImport(reExposed, salesTests, 'orders', 'orderFixtures')).toEqual({
       allowed: true,
       clause: 'child-exposure',
       via: 'orders',
@@ -316,7 +316,7 @@ describe('tags never grant', () => {
   });
 
   it('lets no importer of any universe import what is not available in its module', () => {
-    for (const tree of [example3, example4, routed]) {
+    for (const tree of [example3, example4, reExposed]) {
       for (const importer of allImporters(tree)) {
         for (const symbol of allSymbols(tree)) {
           if (mayImport(tree, importer, symbol.owner, symbol.name)) {
@@ -331,35 +331,36 @@ describe('tags never grant', () => {
 // --- A tag travels with its symbol ----------------------------------------
 
 describe('a tag travels with its symbol', () => {
-  it('survives every re-exposure - a route can neither strip nor change it', () => {
-    // `resetOrderStore` crossed two re-exposures and one grant on its way to
-    // `shipping`, and arrives still tagged.
-    expect(explainImport(routed, 'shipping', 'orders', 'resetOrderStore')).toEqual({
+  it('survives every re-exposure - a re-exposing module can neither strip nor change it', () => {
+    // `resetOrderStore` was re-exposed twice on its way to `shipping` - by
+    // `sales` to its parent, by `app` to its descendants - and arrives still
+    // tagged.
+    expect(explainImport(reExposed, 'shipping', 'orders', 'resetOrderStore')).toEqual({
       allowed: false,
       reason: 'symbol-tag-requires-module-tag',
       unmet: { tag: 'testing', requires: 'testing' },
     });
   });
 
-  it('is safe at any grant breadth', () => {
-    // `app` blanket-granted received test support to its whole subtree. Every
+  it('is safe at any exposure breadth', () => {
+    // `app` exposed the test support it received to all its descendants. Every
     // production importer in it is refused, and every test context allowed.
-    for (const module of routed.modules.keys()) {
+    for (const module of reExposed.modules.keys()) {
       if (module === 'orders') {
         continue; // Its owner: same-module imports cross no boundary.
       }
-      expect(mayImport(routed, module, 'orders', 'resetOrderStore')).toBe(false);
+      expect(mayImport(reExposed, module, 'orders', 'resetOrderStore')).toBe(false);
     }
     for (const importer of [integrationTests, salesTests, unitTests]) {
-      expect(mayImport(routed, importer, 'orders', 'resetOrderStore')).toBe(true);
+      expect(mayImport(reExposed, importer, 'orders', 'resetOrderStore')).toBe(true);
     }
   });
 
-  it('answers at the owner, not at whoever routed it', () => {
-    expect(symbolTagsOf(routed, 'orders', 'resetOrderStore')).toEqual(['testing']);
+  it('answers at the owner, not at whoever re-exposed it', () => {
+    expect(symbolTagsOf(reExposed, 'orders', 'resetOrderStore')).toEqual(['testing']);
     // `sales` and `app` both pass the symbol on, and own nothing by that name.
-    expect(symbolTagsOf(routed, 'sales', 'resetOrderStore')).toEqual([]);
-    expect(symbolTagsOf(routed, 'app', 'resetOrderStore')).toEqual([]);
+    expect(symbolTagsOf(reExposed, 'sales', 'resetOrderStore')).toEqual([]);
+    expect(symbolTagsOf(reExposed, 'app', 'resetOrderStore')).toEqual([]);
   });
 });
 
@@ -367,9 +368,9 @@ describe('a tag travels with its symbol', () => {
 
 /**
  * ```text
- * app                          grants what it receives to its subtree
+ * app                          exposes what it receives to its descendants
  * ├── testSupport test       a declared test module: owns fakeClock
- * │   └── testSupportInternals owns stubTimer, exposed up
+ * │   └── testSupportInternals owns stubTimer, exposed to parent
  * ├── orders                   owns resetOrderStore testing
  * └── billing                  production consumer
  * ```
@@ -413,7 +414,7 @@ describe('a declared test module', () => {
     ]);
   });
 
-  it('cannot enter a production ceiling, however widely it is granted', () => {
+  it('cannot enter a production ceiling, however widely it is exposed', () => {
     for (const symbol of [
       { owner: 'testSupport', name: 'fakeClock' },
       { owner: 'testSupportInternals', name: 'stubTimer' },
@@ -533,10 +534,11 @@ describe('exclusivity', () => {
 
   it('is structural everywhere else: one symbol, one exposure, one tag list', () => {
     // A re-exposure declaration has nowhere to put a tag, so a symbol can never
-    // be default contract on one route and test support on another.
-    expect(symbolTagsOf(routed, 'orders', 'resetOrderStore')).toEqual(['testing']);
-    expect(mayImport(routed, 'shipping', 'orders', 'resetOrderStore')).toBe(false);
-    expect(mayImport(routed, 'sales', 'orders', 'resetOrderStore')).toBe(false);
+    // be default contract along one chain of exposures and test support along
+    // another.
+    expect(symbolTagsOf(reExposed, 'orders', 'resetOrderStore')).toEqual(['testing']);
+    expect(mayImport(reExposed, 'shipping', 'orders', 'resetOrderStore')).toBe(false);
+    expect(mayImport(reExposed, 'sales', 'orders', 'resetOrderStore')).toBe(false);
   });
 });
 
@@ -552,7 +554,7 @@ describe('availability and importability', () => {
   it('answers the module-level question without a context or a binding', () => {
     expect(explainAvailability(example4, 'ui', 'shared', 'queryDb')).toEqual({
       allowed: true,
-      clause: 'ancestor-grant',
+      clause: 'ancestor-exposure',
       via: 'app',
     });
     expect(mayImport(example4, uiValue, 'shared', 'queryDb')).toBe(false);
@@ -560,8 +562,8 @@ describe('availability and importability', () => {
   });
 
   it('reports a tree refusal identically for both questions', () => {
-    expect(explainAvailability(routed, 'billing', 'orders', 'orderFixtures')).toEqual(
-      explainImport(routed, unitTests, 'orders', 'orderFixtures'),
+    expect(explainAvailability(reExposed, 'billing', 'orders', 'orderFixtures')).toEqual(
+      explainImport(reExposed, unitTests, 'orders', 'orderFixtures'),
     );
   });
 });
@@ -570,7 +572,7 @@ describe('availability and importability', () => {
 
 describe('the importer descriptor', () => {
   it('reads a bare module id as a value import from the module’s own files', () => {
-    for (const tree of [example3, example4, routed]) {
+    for (const tree of [example3, example4, reExposed]) {
       for (const record of tree.modules.values()) {
         for (const symbol of allSymbols(tree)) {
           const bare = mayImport(tree, record.id, symbol.owner, symbol.name);
@@ -701,7 +703,7 @@ describe('classification reaches the subtree', () => {
     // Test support that does promise it satisfies both requirements at once.
     expect(explainImport(tree, uiTests, 'widgets', 'renderWidgetFixture')).toEqual({
       allowed: true,
-      clause: 'ancestor-grant',
+      clause: 'ancestor-exposure',
       via: 'app',
       tags: ['testing', 'browser'],
     });

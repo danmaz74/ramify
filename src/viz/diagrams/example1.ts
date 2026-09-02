@@ -7,13 +7,13 @@
  * identical decision - expose a symbol to their parent - and end up with three
  * different reaches, because the reach was decided above them. A fourth symbol
  * goes the other way - its owner exposes it to its descendants - and shows the
- * asymmetry: a downward exposure is complete in one decision and can never
- * leave the subtree.
+ * asymmetry: an exposure to descendants is complete in one decision and can
+ * never leave the subtree.
  *
  * Where diagram 1 (`./shop.ts`) teaches the two exposure channels one at a
- * time, this one teaches *reach*. Its second compartment is therefore titled
- * `exposed to it` and lists both channels: what a direct child exposed upward,
- * and what a proper ancestor granted downward. Every box then answers "what is
+ * time, this one teaches *reach*. Its `receives` compartment therefore lists
+ * both channels: what a direct child exposed to its parent, and what a proper
+ * ancestor exposed to its descendants. Every box then answers "what is
  * available here?" on its own, and the three reaches can be read box by box.
  *
  * Pure and browser-compatible: no I/O, no Node built-ins, no side effects.
@@ -29,7 +29,7 @@ import { seriesLegendGroups, seriesNodeContent } from './series.js';
 
 /**
  * ```text
- * app                            (root - owns nothing, and routes anyway)
+ * app                            (root - owns nothing, and re-exposes anyway)
  * ├── globalLibrary
  * │   └── moneyUtils             owns computeTotal
  * ├── invoicing
@@ -40,14 +40,14 @@ import { seriesLegendGroups, seriesNodeContent } from './series.js';
  *     └── routingOptimization    owns optimizeRoute
  * ```
  *
- * Two consumers under `invoicing` are deliberate: a grant needs at least two
- * arrivals to read as a grant rather than a private handoff.
+ * Two consumers under `invoicing` are deliberate: an exposure to descendants
+ * needs at least two arrivals to read as one rather than as a private handoff.
  */
 export const example1Declaration: ModuleDeclaration = {
   id: 'app',
   // The root owns no code and still carries the application's vocabulary:
   // `globalLibrary` passed `computeTotal` up, and `app` sends it back down
-  // into every branch. Routing never transfers ownership.
+  // into every branch. Re-exposing never transfers ownership.
   reExposes: [{ symbol: 'computeTotal', from: 'globalLibrary', exposeToDescendants: true }],
   children: [
     {
@@ -103,7 +103,7 @@ export const example1TracedSymbols: readonly TracedSymbol[] = [
     symbol: 'optimizeRoute',
     owner: 'routingOptimization',
     color: 'traced3',
-    role: 'exposed up, composed, stopped: parent only',
+    role: 'exposed to the parent, composed, stopped: parent only',
   },
   {
     symbol: 'ShipmentPlan',
@@ -167,8 +167,8 @@ export const example1LegendGroups = seriesLegendGroups;
 
 /** The lessons of the doc, in the glossary's vocabulary. */
 export const example1LegendNotes: readonly string[] = [
-  'The three up-exposing owners made the same decision; the three reaches were decided entirely above them.',
-  'Exposing down is final and bounded: one decision, whole subtree, no way out. Exposing up cedes onward routing.',
+  'The three owners that exposed to their parent made the same decision; the three reaches were decided entirely above them.',
+  'Exposing to descendants is final and bounded: one decision, whole subtree, no way out. Exposing to the parent cedes onward exposure.',
   'There is no sibling channel: exposing a symbol to the parent gives siblings nothing.',
   'Files inside one module import each other freely; those imports are not drawn.',
 ];
@@ -179,7 +179,7 @@ export const example1Diagram: DiagramDefinition = {
   // No drawn title: the page's own heading introduces the example, so the
   // picture starts at the tree.
   ariaLabel:
-    'Example 1: three modules expose a symbol to their parent, and the decisions above them produce three different reaches; a fourth symbol is exposed only downward and never leaves its subtree',
+    'Example 1: three modules expose a symbol to their parent, and the decisions above them produce three different reaches; a fourth symbol is exposed only to descendants and never leaves its subtree',
   tracedSymbols: example1TracedSymbols,
   // Nothing is drawn across the tree: non-allowed imports are read from
   // absence, and selecting a symbol makes that absence visible.

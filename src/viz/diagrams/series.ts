@@ -3,8 +3,8 @@
  * (`docs/model/illustrative-examples.md` § Diagram conventions).
  *
  * A series diagram states only what is unique to its universe; everything a
- * reader learns once - the two exposure markers, the "exposed to it"
- * compartment listing both channels - is declared here, once. The shop
+ * reader learns once - the two exposure markers, the `receives` compartment
+ * listing both channels - is declared here, once. The shop
  * diagram (`./shop.ts`) predates the series and deliberately keeps its own
  * older conventions, so it does not import this file.
  *
@@ -16,7 +16,7 @@ import type { LegendGroup, NodeContentOptions } from '../diagram-definition.js';
 /**
  * The series legend: only conventions the picture cannot state in its own
  * words - the two exposure markers. Everything else is written out on the
- * diagram itself (compartment titles, `from`/`granted by` provenance), and
+ * diagram itself (compartment titles, `from` provenance), and
  * the lanes explain themselves at full size: an arrow with a dot at its
  * origin and arrowheads at its arrivals.
  */
@@ -64,12 +64,12 @@ export const seriesTagLegendGroups: readonly LegendGroup[] = [
 ];
 
 /**
- * Series node boxes teach *visibility*: the second compartment lists both
- * channels - what a direct child exposed upward and what a proper ancestor
- * granted downward - so every box answers "what is visible here?" on its
- * own.
+ * Series node boxes teach *visibility*: the `receives` compartment lists both
+ * channels - what a direct child exposed to its parent and what a proper
+ * ancestor exposed to its descendants - so every box answers "what is visible
+ * here?" on its own.
  */
 export const seriesNodeContent: NodeContentOptions = {
-  receivedCompartmentTitle: 'exposed to it',
-  includeAncestorGrants: true,
+  receivedCompartmentTitle: 'receives',
+  includeAncestorExposures: true,
 };

@@ -45,10 +45,10 @@ describe('static markup', () => {
 
   it('carries stable ids and data attributes on every element', () => {
     expect(markup).toContain('id="node-checkout"');
-    expect(markup).toContain('id="node-checkout-holds-CartApi"');
+    expect(markup).toContain('id="node-checkout-receives-CartApi"');
     expect(markup).toContain('id="edge-checkout-payment"');
-    expect(markup).toContain('id="lane-grant-shop-ProductId-catalog-search"');
-    expect(markup).toContain('id="dot-up-hop-cart-CartApi"');
+    expect(markup).toContain('id="lane-to-descendants-shop-ProductId-catalog-search"');
+    expect(markup).toContain('id="dot-to-parent-cart-CartApi"');
     expect(markup).toContain('id="chord-D4"');
     expect(markup).toContain('data-kind="decision-dot"');
     expect(markup).toContain('data-verdict="denied"');
@@ -101,9 +101,9 @@ describe('static markup', () => {
     expect(markup.slice(0, markup.indexOf('>'))).not.toContain('style=');
     // The window shown is the whole diagram, at its intrinsic size.
     const root = markup.slice(0, markup.indexOf('>'));
-    expect(root).toContain('width="1135" height="1172" viewBox="0 0 1135 1172"');
+    expect(root).toContain('width="1106" height="1172" viewBox="0 0 1106 1172"');
     // The ground is exactly diagram-sized, not the grown interactive one.
-    expect(markup).toContain('data-kind="background" class="rmf-f-bg" x="0" y="0" width="1135" height="1172"');
+    expect(markup).toContain('data-kind="background" class="rmf-f-bg" x="0" y="0" width="1106" height="1172"');
   });
 
   it('scales to its container only when asked', () => {
@@ -111,7 +111,7 @@ describe('static markup', () => {
     expect(responsive).toContain('min-width:820px');
     expect(responsive).toContain('width:100%');
     // The intrinsic width/height stay put as the aspect-ratio fallback.
-    expect(responsive).toContain('width="1135" height="1172"');
+    expect(responsive).toContain('width="1106" height="1172"');
   });
 
   it('shows the window a caller asks for, without touching the element tree', () => {
@@ -147,7 +147,7 @@ describe('focus view', () => {
   });
 
   it('sets the flow marching on exactly the selected symbol’s lanes', () => {
-    // ProductId's two decisions: one up-hop and a grant down seven edges.
+    // ProductId's two decisions: one exposure to the parent and a flow to descendants down seven edges.
     expect(count(focused, /class="rmf-s-traced1 rmf-flow"/gu)).toBe(8);
     expect(count(focused, /rmf-flow"/gu)).toBe(8);
     const cartApi = render({ selectedSymbol: 'CartApi' });
@@ -156,9 +156,9 @@ describe('focus view', () => {
   });
 
   it('pulses the rows that say the symbol is available there', () => {
-    // `shop` holds ProductId; `catalog` owns it, and an owner does not pulse.
+    // `shop` receives ProductId; `catalog` owns it, and an owner does not pulse.
     expect(focused).toContain(
-      'id="node-shop-holds-ProductId" data-kind="node-row" data-compartment="holds" ' +
+      'id="node-shop-receives-ProductId" data-kind="node-row" data-compartment="receives" ' +
         'data-symbol="ProductId" data-owner="catalog" data-marker="▼" data-gray="false" ' +
         'class="rmf-blink rmf-clickable"',
     );
@@ -210,9 +210,9 @@ describe('a second diagram, from a second definition', () => {
       'id="node-shipping-owns-ShipmentPlan" data-kind="node-row" data-compartment="owns" ' +
         'data-symbol="ShipmentPlan" data-owner="shipping" data-marker="▼" data-gray="false"',
     );
-    expect(example1).toContain('>granted by shipping</text>');
+    expect(example1).toContain('>from shipping</text>');
     expect(example1).toContain(
-      'id="node-routingOptimization-exposed-to-it-ShipmentPlan-label" data-kind="node-row-label" class="rmf-f-traced4"',
+      'id="node-routingOptimization-receives-ShipmentPlan-label" data-kind="node-row-label" class="rmf-f-traced4"',
     );
   });
 
@@ -233,23 +233,22 @@ describe('a second diagram, from a second definition', () => {
     expect(withoutStylesheet).not.toMatch(/deni|deny/iu);
   });
 
-  it('titles the arrival compartment “exposed to it” and never says holds', () => {
-    expect(example1).toContain('>exposed to it</text>');
-    expect(example1).toContain('data-compartment="exposed-to-it"');
-    expect(example1).not.toContain('holds');
+  it('titles the arrival compartment “receives”', () => {
+    expect(example1).toContain('>receives</text>');
+    expect(example1).toContain('data-compartment="receives"');
   });
 
-  it('draws ancestor grants as marker-less rows naming the granter', () => {
+  it('draws arrivals from an ancestor as marker-less rows naming that ancestor', () => {
     expect(example1).toContain(
-      'id="node-invoiceComputation-exposed-to-it-computeTotal" data-kind="node-row" ' +
-        'data-compartment="exposed-to-it" data-row-kind="granted" data-symbol="computeTotal"',
+      'id="node-invoiceComputation-receives-computeTotal" data-kind="node-row" ' +
+        'data-compartment="receives" data-row-kind="from-ancestor" data-symbol="computeTotal"',
     );
-    expect(example1).toContain('>granted by app</text>');
-    expect(example1).toContain('>granted by invoicing</text>');
+    expect(example1).toContain('>from app</text>');
+    expect(example1).toContain('>from invoicing</text>');
     // No marker glyph, and the name carries the symbol's traced color.
-    expect(example1).not.toContain('id="node-invoiceComputation-exposed-to-it-computeTotal-marker"');
+    expect(example1).not.toContain('id="node-invoiceComputation-receives-computeTotal-marker"');
     expect(example1).toContain(
-      'id="node-invoiceComputation-exposed-to-it-computeTotal-label" data-kind="node-row-label" class="rmf-f-traced1"',
+      'id="node-invoiceComputation-receives-computeTotal-label" data-kind="node-row-label" class="rmf-f-traced1"',
     );
   });
 

@@ -5,9 +5,9 @@
  * the same React component the site embeds, with no selection, once per
  * checked-in diagram definition:
  *
- * - `site/static/diagrams/model-core.svg` - the shop: Panel A (structure and
- *   propagation) and Panel B (import chords) of `docs/site/diagram1-spec.md`
- *   §4, composited;
+ * - `site/static/diagrams/model-core.svg` - the shop, the retired first
+ *   diagram (`src/viz/diagrams/shop.ts`): structure and propagation with
+ *   its import chords composited;
  * - `site/static/diagrams/example1.svg` - Example 1 of
  *   `docs/model/illustrative-examples.md`: one decision, three reaches;
  * - `site/static/diagrams/example1a.svg` / `example1b.svg` - the two

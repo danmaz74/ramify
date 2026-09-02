@@ -9,12 +9,13 @@
  *
  * What is derived, not declared:
  *
- * - **which decisions exist** - a module grants to its descendants iff some
- *   descendant's `explainImport` says `ancestor-grant via <module>`, and
+ * - **which decisions exist** - a module exposes to its descendants iff some
+ *   descendant's `explainImport` says `ancestor-exposure via <module>`, and
  *   exposes to its parent iff the parent's says `child-exposure via <module>`.
  *   Reach is a consequence, so it is read out of the evaluator rather than out
  *   of the declaration;
- * - **which nodes a grant reaches** - every strict descendant, one chevron each;
+ * - **which nodes an exposure to descendants reaches** - every strict
+ *   descendant, one chevron each;
  * - **lane stacking** - shallowest origin nearest the edge, so a symbol's lane
  *   keeps a stable distance from the trunk all the way down its subtree.
  *
@@ -42,7 +43,7 @@ import {
 /** One local decision: a module opening one channel for one bundle of symbols. */
 export interface PropagationDecision {
   readonly id: string;
-  readonly kind: 'grant' | 'up-hop';
+  readonly kind: 'to-descendants' | 'to-parent';
   /** The module that decided. The only module with standing to decide this. */
   readonly decider: ModuleId;
   readonly deciderDepth: number;
@@ -70,15 +71,15 @@ export interface TreeEdgeLayout {
 export interface LanePath {
   readonly id: string;
   readonly decisionId: string;
-  readonly kind: 'grant' | 'up-hop';
+  readonly kind: 'to-descendants' | 'to-parent';
   readonly layer: string;
   readonly color: ColorKey;
   readonly parent: ModuleId;
   readonly child: ModuleId;
-  /** Signed distance from the edge: negative left (up-hops), positive right (grants). */
+  /** Signed distance from the edge: negative left (exposures to the parent), positive right (flows to descendants). */
   readonly offset: number;
   readonly d: string;
-  /** `chevron` where a grant flow meets a reached node; `arrow` where an up-hop lands. */
+  /** `chevron` where a flow to descendants meets a reached node; `arrow` where an exposure to the parent lands. */
   readonly head: 'chevron' | 'arrow';
   readonly headAt: Point;
   /** The module the head lands on - the module that may therefore import it. */
@@ -94,7 +95,7 @@ export interface DecisionDot {
   readonly color: ColorKey;
   readonly at: Point;
   readonly decider: ModuleId;
-  readonly kind: 'grant' | 'up-hop';
+  readonly kind: 'to-descendants' | 'to-parent';
   readonly policyId: string;
 }
 
@@ -133,9 +134,9 @@ function isAncestorOrSelf(tree: ModuleTree, ancestor: ModuleId, node: ModuleId):
   return descendantsOf(tree, ancestor).includes(node);
 }
 
-function policyFor(context: DiagramContext, decider: ModuleId, kind: 'grant' | 'up-hop'): string {
+function policyFor(context: DiagramContext, decider: ModuleId, kind: 'to-descendants' | 'to-parent'): string {
   const { decisionPolicies } = context.definition;
-  const channel = kind === 'grant' ? 'toDescendants' : 'toParent';
+  const channel = kind === 'to-descendants' ? 'toDescendants' : 'toParent';
   const matches = decisionPolicies.filter(
     (policy) => policy.channel === channel && policy.deciders.includes(decider),
   );
@@ -162,7 +163,7 @@ export function enumerateDecisions(context: DiagramContext): PropagationDecision
   const decisions: PropagationDecision[] = [];
   let order = 0;
 
-  const emit = (kind: 'grant' | 'up-hop', decider: ModuleId, carried: readonly SymbolRef[]): void => {
+  const emit = (kind: 'to-descendants' | 'to-parent', decider: ModuleId, carried: readonly SymbolRef[]): void => {
     if (carried.length === 0) {
       return;
     }
@@ -192,12 +193,12 @@ export function enumerateDecisions(context: DiagramContext): PropagationDecision
 
   for (const moduleId of moduleOrder) {
     emit(
-      'grant',
+      'to-descendants',
       moduleId,
       refs.filter((ref) => reExposesToDescendants(tree, moduleId, ref.owner, ref.name)),
     );
     emit(
-      'up-hop',
+      'to-parent',
       moduleId,
       refs.filter((ref) => reExposesToParent(tree, moduleId, ref.owner, ref.name)),
     );
@@ -220,24 +221,25 @@ function treeEdges(context: DiagramContext): EdgeKey[] {
 /**
  * Signed lane offsets on one edge.
  *
- * Grants sit right of the edge, up-hops left - an absolute assignment, so
- * direction stays readable even where a chip is clipped. Within a side, lanes
- * are ordered by the depth of their origin: shallowest nearest the edge.
+ * Flows to descendants sit right of the edge, exposures to the parent left - an absolute
+ * assignment, so direction stays readable even where a chip is clipped. Within
+ * a side, lanes are ordered by the depth of their origin: shallowest nearest
+ * the edge.
  */
 function laneOffsets(
   tree: ModuleTree,
   edge: EdgeKey,
   decisions: readonly PropagationDecision[],
 ): Map<string, number> {
-  const grants = decisions
-    .filter((decision) => decision.kind === 'grant' && isAncestorOrSelf(tree, decision.decider, edge.parent))
+  const descendantExposures = decisions
+    .filter((decision) => decision.kind === 'to-descendants' && isAncestorOrSelf(tree, decision.decider, edge.parent))
     .sort((a, b) => a.deciderDepth - b.deciderDepth || a.order - b.order);
   const ups = decisions
-    .filter((decision) => decision.kind === 'up-hop' && decision.decider === edge.child)
+    .filter((decision) => decision.kind === 'to-parent' && decision.decider === edge.child)
     .sort((a, b) => a.order - b.order);
 
   const offsets = new Map<string, number>();
-  grants.forEach((decision, index) => {
+  descendantExposures.forEach((decision, index) => {
     offsets.set(decision.id, LAYOUT.lane.offset + index * LAYOUT.lane.step);
   });
   ups.forEach((decision, index) => {
@@ -330,11 +332,11 @@ export function layoutPropagation(
         continue;
       }
       const points = edgePoints(parent, child, busY, offset);
-      if (decision.kind === 'grant') {
+      if (decision.kind === 'to-descendants') {
         lanes.push({
           id: `lane-${decision.id}-${edge.parent}-${edge.child}`,
           decisionId: decision.id,
-          kind: 'grant',
+          kind: 'to-descendants',
           layer: decision.layer,
           color: decision.color,
           parent: edge.parent,
@@ -351,7 +353,7 @@ export function layoutPropagation(
         lanes.push({
           id: `lane-${decision.id}-${edge.child}-${edge.parent}`,
           decisionId: decision.id,
-          kind: 'up-hop',
+          kind: 'to-parent',
           layer: decision.layer,
           color: decision.color,
           parent: edge.parent,
@@ -370,10 +372,10 @@ export function layoutPropagation(
   // One dot per decision, never one per hop reached.
   const dots: DecisionDot[] = decisions.map((decision) => {
     const decider = nodeOf(decision.decider);
-    if (decision.kind === 'grant') {
+    if (decision.kind === 'to-descendants') {
       const firstChild = requireModuleRecord(tree, decision.decider).children[0];
       if (firstChild === undefined) {
-        throw new Error(`Module "${decision.decider}" grants to descendants but has no children.`);
+        throw new Error(`Module "${decision.decider}" exposes to descendants but has no children.`);
       }
       const offset =
         offsetsByEdge.get(`${decision.decider}->${firstChild}`)?.get(decision.id) ?? LAYOUT.lane.offset;
@@ -385,7 +387,7 @@ export function layoutPropagation(
         color: decision.color,
         at: { x: from.x + offset, y: from.y },
         decider: decision.decider,
-        kind: 'grant',
+        kind: 'to-descendants',
         policyId: decision.policyId,
       };
     }
@@ -403,7 +405,7 @@ export function layoutPropagation(
       color: decision.color,
       at: { x: to.x + offset, y: to.y },
       decider: decision.decider,
-      kind: 'up-hop',
+      kind: 'to-parent',
       policyId: decision.policyId,
     };
   });
@@ -424,7 +426,7 @@ export function layoutPropagation(
   const CHIP_CLEARANCE = 8;
 
   for (const decision of decisions) {
-    if (decision.kind === 'up-hop') {
+    if (decision.kind === 'to-parent') {
       const child = nodeOf(decision.decider);
       const parent = requireModuleRecord(tree, decision.decider).parent as ModuleId;
       const span = ribbonSpan([`${parent}->${decision.decider}`]);

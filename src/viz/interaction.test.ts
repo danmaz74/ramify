@@ -163,7 +163,7 @@ describe('clicking a symbol', () => {
     expect(blinking()).toEqual([]);
 
     click('[data-kind="header-chip"][data-symbol="ProductId"]');
-    // `shop` holds it; `catalog` owns it, and ownership is not an arrival.
+    // `shop` receives it; `catalog` owns it, and ownership is not an arrival.
     expect(blinking()).toEqual(['shop/ProductId']);
 
     click('[data-kind="header-chip"][data-symbol="PaymentApi"]');
@@ -193,11 +193,11 @@ describe('clicking a symbol', () => {
 
   it('selects from a node row and from a lane, not only from the legend', () => {
     mount();
-    click('#node-checkout-holds-CartApi');
+    click('#node-checkout-receives-CartApi');
     expect(layerClass('CartApi')).not.toContain('rmf-dim');
     expect(layerClass('ProductId')).toContain('rmf-dim');
 
-    click('#lane-grant-shop-ProductId-shop-catalog');
+    click('#lane-to-descendants-shop-ProductId-shop-catalog');
     expect(layerClass('ProductId')).not.toContain('rmf-dim');
     expect(layerClass('CartApi')).toContain('rmf-dim');
   });
@@ -219,7 +219,7 @@ describe('clicking a symbol', () => {
     // Takes whatever room the container offers, up to its own natural width -
     // magnifying past 1:1 would only make the figure taller.
     expect(root.style.width).toBe('100%');
-    expect(root.style.maxWidth).toBe('1135px');
+    expect(root.style.maxWidth).toBe('1106px');
     expect(root.style.marginInline).toBe('auto');
     const wrapper = find('[data-kind="diagram-scroll"]') as HTMLElement;
     expect(wrapper.style.overflowX).toBe('auto');
@@ -242,21 +242,23 @@ describe('a second diagram', () => {
     click('[data-kind="header-chip"][data-symbol="InvoiceModel"]');
     expect(find('svg').getAttribute('data-selected-symbol')).toBe('InvoiceModel');
     expect(layerClass('computeTotal')).toContain('rmf-dim');
-    // One up-hop and a grant down three edges, all marching.
+    // One exposure to the parent and a flow to descendants down three edges, all marching.
     expect(flowing()).toHaveLength(lanesOf('InvoiceModel'));
-    // Its arrivals: received at `invoicing`, granted to the two consumers.
+    // Its arrivals: `invoicing` receives it from its child, the two consumers
+    // from their ancestor.
     expect(blinking()).toEqual([
       'invoicing/InvoiceModel',
       'invoiceComputation/InvoiceModel',
       'invoicePDF/InvoiceModel',
     ]);
 
-    // A granted row is clickable too: it carries the symbol's traced layer.
-    click('#node-invoiceComputation-exposed-to-it-computeTotal');
+    // A row received from an ancestor is clickable too: it carries the
+    // symbol's traced layer.
+    click('#node-invoiceComputation-receives-computeTotal');
     expect(find('svg').getAttribute('data-selected-symbol')).toBe('computeTotal');
-    // computeTotal arrives everywhere except its owner: one received row at
-    // `app` and at `globalLibrary`, and a granted row in each of the six
-    // modules below the root that neither owns nor passed it up.
+    // computeTotal arrives everywhere except its owner: one row from a child
+    // at `app` and at `globalLibrary`, and a row from an ancestor in each of
+    // the six modules below the root that neither owns nor passed it up.
     expect(blinking()).toEqual([
       'app/computeTotal',
       'globalLibrary/computeTotal',
@@ -282,8 +284,9 @@ describe('a second diagram', () => {
     mount({ definition: example1Diagram });
     click('[data-kind="header-chip"][data-symbol="ShipmentPlan"]');
     expect(find('svg').getAttribute('data-selected-symbol')).toBe('ShipmentPlan');
-    // One decision, one marching grant flow, one blinking arrival - nothing
-    // above `shipping` ever moves, because nothing above was ever involved.
+    // One decision, one marching flow to descendants, one blinking arrival -
+    // nothing above `shipping` ever moves, because nothing above was ever
+    // involved.
     expect(flowing()).toHaveLength(lanesOf('ShipmentPlan'));
     expect(blinking()).toEqual(['routingOptimization/ShipmentPlan']);
   });
@@ -315,20 +318,20 @@ describe('selecting a symbol in a tag universe', () => {
     expect(litContexts()).toEqual(['integration-tests/module']);
     // The row is still drawn in `billing`, and still says where it came from -
     // it just goes dark, which is a contrast that survives reduced motion.
-    const dark = find('#node-billing-exposed-to-it-resetOrderStore');
+    const dark = find('#node-billing-receives-resetOrderStore');
     expect(dark.getAttribute('data-importable')).toBe('false');
     expect(dark.getAttribute('class')).toContain('rmf-dim-soft');
     expect(dark.getAttribute('class')).not.toContain('rmf-blink');
-    expect(find('#node-billing-exposed-to-it-resetOrderStore-tags').textContent).toBe(
+    expect(find('#node-billing-receives-resetOrderStore-tags').textContent).toBe(
       '⇥ testing',
     );
     // The strike is the static version of the same statement.
     expect(
-      find('#node-billing-exposed-to-it-resetOrderStore-label').getAttribute('text-decoration'),
+      find('#node-billing-receives-resetOrderStore-label').getAttribute('text-decoration'),
     ).toBe('line-through');
-    // `app` routed the grant and its own production files are dark all the
-    // same: routing a symbol earns no right to import it.
-    expect(find('#node-app-exposed-to-it-resetOrderStore').getAttribute('class')).toContain(
+    // `app` re-exposed the symbol and its own production files are dark all
+    // the same: re-exposing a symbol earns no right to import it.
+    expect(find('#node-app-receives-resetOrderStore').getAttribute('class')).toContain(
       'rmf-dim-soft',
     );
 
@@ -352,9 +355,9 @@ describe('selecting a symbol in a tag universe', () => {
     // …and the strike states the same verdict statically, with the unstruck
     // asterisk saying the type import still passes. No binding note exists.
     expect(
-      find('#node-ui-exposed-to-it-queryDb-label').getAttribute('text-decoration'),
+      find('#node-ui-receives-queryDb-label').getAttribute('text-decoration'),
     ).toBe('line-through');
-    expect(find('#node-ui-exposed-to-it-queryDb-type-available').textContent).toBe('∗');
+    expect(find('#node-ui-receives-queryDb-type-available').textContent).toBe('∗');
     expect(container.querySelectorAll('[data-kind="node-row-type-available"]')).toHaveLength(1);
     expect(container.querySelectorAll('[data-kind="node-row-binding"]')).toHaveLength(0);
 

@@ -31,7 +31,7 @@ reason about for humans and for agents with limited context.
 The modularity model is based on very few simple but powerful rules.
 
 Every cross-module import is closed by default. A module shares a symbol
-through exactly two channels - to its parent, or to its own subtree - and
+through exactly two channels - to its parent, or to its descendants - and
 long reach only exists as a chain of such one-hop decisions. That is the
 whole model. The diagram below shows it at work: nine modules, four shared
 symbols, and every decision drawn as a dot.

@@ -1257,7 +1257,7 @@ function renderRow(
   const { box } = node;
   const y = box.y + row.y;
   const traced = row.layer !== NEUTRAL_LAYER;
-  const granted = row.kind === 'granted';
+  const fromAncestor = row.kind === 'fromAncestor';
   const selected = selectedSymbol !== null && row.layer === selectedSymbol;
   // Selecting a symbol pulses every row that says "it is available here *and*
   // this module's files may import it" - the arrivals a reader could act on.
@@ -1270,16 +1270,17 @@ function renderRow(
   // `prefers-reduced-motion`, where nothing moves at all.
   const dark = selected && row.kind !== 'owns' && !row.importable;
   const dim = selectedSymbol !== null && (!selected || dark) ? 'rmf-dim-soft' : undefined;
-  // A granted row has no decision of its own to report, so its name carries the
-  // symbol's traced color instead: reach becomes scannable box by box.
-  const labelColor: ColorKey = granted ? row.color : row.gray ? 'muted' : 'text';
+  // A row received from an ancestor has no decision of its own to report, so
+  // its name carries the symbol's traced color instead: reach becomes scannable
+  // box by box.
+  const labelColor: ColorKey = fromAncestor ? row.color : row.gray ? 'muted' : 'text';
   return (
     <g
       key={row.id}
       id={row.id}
       data-kind="node-row"
       data-compartment={row.compartment}
-      {...(granted ? { 'data-row-kind': 'granted' } : {})}
+      {...(fromAncestor ? { 'data-row-kind': 'from-ancestor' } : {})}
       data-symbol={row.symbol}
       data-owner={row.owner}
       data-marker={row.marker}
@@ -1707,7 +1708,7 @@ function renderLegendGlyph(
           <line className={strokeClass('separator')} x1={cx - 12} x2={cx + 12} y1={cy} y2={cy} />
         </g>
       );
-    case 'up-hop':
+    case 'to-parent':
       return (
         <g data-kind="legend-glyph">
           <path
@@ -1720,7 +1721,7 @@ function renderLegendGlyph(
           <circle className={fillClass('neutral')} cx={cx} cy={cy + 5} r={2.6} />
         </g>
       );
-    case 'grant':
+    case 'to-descendants':
       return (
         <g data-kind="legend-glyph">
           <path
@@ -1733,9 +1734,9 @@ function renderLegendGlyph(
           <circle className={fillClass('neutral')} cx={cx - 7} cy={cy - 5} r={2.6} />
         </g>
       );
-    case 'granted':
-      // The arrival a grant produces, with no marker on the row: a chevron
-      // landing on the box, and nothing decided there.
+    case 'from-ancestor':
+      // The arrival an exposure to descendants produces, with no marker on the
+      // row: a chevron landing on the box, and nothing decided there.
       return (
         <path
           data-kind="legend-glyph"

@@ -62,28 +62,29 @@ by default**, and becomes available only if some module
 exposing `ShipmentPlan` to its descendants, and that's why `ShipmentPlan` is
 available in `routingOptimization`.
 
-Exposure comes in exactly
-two forms - a module may expose any symbol it owns or receives **to its parent**
-(available one level up, marked `▲`) or **to its descendants** (available in
-its whole subtree, marked `▼`). Those are the only decisions the model
-knows, and each one is drawn as a **filled dot**. This fragment has one of
-each: the `ShipmentPlan` exposure just described, and `routingOptimization`
-exposing `optimizeRoute` to its parent. The second thing each box lists is
-what a symbol's travels earned it - what is **exposed to it**, by a direct
-child (named `from`) or by a proper ancestor (named `granted by`): `optimizeRoute` arrives in `shipping` as `from
+Exposure comes in exactly two forms - a module may expose any symbol it owns
+or receives **to its parent** (available one level up, marked `▲`) or **to
+its descendants** (available in its whole subtree, marked `▼`). Those are
+the only decisions the model knows, and each one is drawn as a **filled
+dot**. This fragment has one of each: the `ShipmentPlan` exposure just
+described, and `routingOptimization` exposing `optimizeRoute` to its parent.
+The second thing each box lists is what the module
+[**receives**](/glossary#module-received-symbol): the symbols exposed to it
+by a direct child or by a proper ancestor, each row naming the module it
+came from. `optimizeRoute` arrives in `shipping` as `from
 routingOptimization`, and `ShipmentPlan` arrives in `routingOptimization` as
-`granted by shipping`.
+`from shipping`.
 
 And notice `app`: it receives nothing. Neither symbol was exposed any
 further, so neither reaches the root. The default everywhere, for every
 symbol, is "goes no further" - reach ends where decisions end.
 
 The two channels are also asymmetric, and `ShipmentPlan` is the witness.
-Exposing down is final and bounded: one decision, whole subtree, nothing
-ceded - and no way out, because only an upward exposure could ever carry a
-symbol out of its subtree. So `app` is not allowed to import `ShipmentPlan`
-while `shipping`'s descendants are: the **parent** is the outsider of a
-downward exposure, root included.
+Exposing to descendants is final and bounded: one decision, whole subtree,
+nothing ceded - and no way out, because only an exposure to the parent could
+ever carry a symbol out of its subtree. So `app` is not allowed to import
+`ShipmentPlan` while `shipping`'s descendants are: the **parent** is the
+outsider of an exposure to descendants, root included.
 
 The diagrams on this page are live. **Click any traced symbol**, in the
 legend or on a row that lists it, to isolate its chain: everything else dims,
@@ -106,7 +107,7 @@ module the symbol had reached.
 
 That chain is exactly what `invoicing` builds. `invoicingLibrary` exposes
 `InvoiceModel` to its parent; `invoicing`, which now has the symbol
-available, exposes it to its descendants - and the grant reaches
+available, exposes it to its descendants - and the exposure reaches
 `invoiceComputation` and `invoicePDF`, the owner's own siblings. Two
 decisions, and `invoicingLibrary` works as a **domain library**: its type is
 shared across the domain and invisible outside it.
@@ -115,11 +116,11 @@ shared across the domain and invisible outside it.
   <ModelDiagram definition={example1bDiagram} />
 </div>
 
-Read `invoiceComputation`'s box: `InvoiceModel` arrives as `granted by
-invoicing` - the provenance names the granter, not the owner. And read what
-is _not_ there: `InvoiceModel` never arrives in `app`, because `invoicing`
-exposed it downward only. A domain keeps its vocabulary to itself unless it
-also decides to expose it upward. Select `InvoiceModel` and the whole story
+Read `invoiceComputation`'s box: `InvoiceModel` arrives as `from invoicing` -
+the row names the module that exposed it, not the owner. And read what is
+_not_ there: `InvoiceModel` never arrives in `app`, because `invoicing`
+exposed it to its descendants only. A domain keeps its vocabulary to itself
+unless it also decides to expose it to its parent. Select `InvoiceModel` and the whole story
 plays out inside the domain: one hop up, a turn, and every arrival blinks
 under `invoicing`.
 
@@ -128,9 +129,10 @@ under `invoicing`.
 One concept is shared by both domains: Money. That's why we create a
 `globalLibrary` module containing a `moneyUtils` module, with a
 `computeTotal` function which we want to make globally available. By now the
-route is predictable - there is no "global" switch, only a longer chain:
-`moneyUtils` exposes `computeTotal` to its parent, `globalLibrary` passes it
-up again, and `app` turns it downward into every branch. Here is the complete
+pattern is predictable - there is no "global" switch, only a longer chain:
+`moneyUtils` exposes `computeTotal` to its parent, `globalLibrary` re-exposes
+it to its parent, and `app` exposes it to its descendants, turning the chain
+downward into every branch. Here is the complete
 app: nine modules, four symbols, and seven dots that are its entire access
 policy - complexity is measured in decisions, not boxes.
 
@@ -140,20 +142,22 @@ policy - complexity is measured in decisions, not boxes.
 
 Now the punchline. Three leaf modules made the identical decision - expose
 one symbol to their parent - and ended up with three different reaches.
-`computeTotal` is passed up again and turned downward at `app`, so every
-module may import it. `InvoiceModel` is turned downward one level lower, at
-`invoicing`, so its two consumers share it and nothing outside that subtree
-can. `optimizeRoute` is composed by `shipping` and exposed no further, so it
-goes one hop and stops. None of the three owners decided that; the modules
-above them did. Exposing a symbol to the parent cedes its onward routing.
+`computeTotal` is re-exposed to the parent once more and then to descendants
+at `app`, so every module may import it. `InvoiceModel` is exposed to
+descendants one level lower, at `invoicing`, so its two consumers share it
+and nothing outside that subtree can. `optimizeRoute` is composed by
+`shipping` and exposed no further, so it goes one hop and stops. None of the
+three owners decided that; the modules above them did. Exposing a symbol to
+the parent cedes its onward exposure.
 
 The full picture also shows what never happens. `shipping` may not import
-`InvoiceModel`: a grant never leaves the granter's subtree, and `invoicing`
-exposed the symbol to no parent, so nothing outside its subtree ever sees it.
-The mirror case is the same rule read the other way - `invoicing` may not
-import `optimizeRoute`, because `shipping` exposed it nowhere. **There is no
-sibling channel.** Select either symbol and the absence is the picture: the flow stops, and no arrival ever
-blinks in the other domain.
+`InvoiceModel`: an exposure to descendants never leaves the exposing module's
+subtree, and `invoicing` did not expose the symbol to its parent, so nothing
+outside its subtree ever sees it. The mirror case is the same rule read the
+other way - `invoicing` may not import `optimizeRoute`, because `shipping`
+exposed it nowhere. **There is no sibling channel.** Select either symbol and
+the absence is the picture: the flow stops, and no arrival ever blinks in the
+other domain.
 
 A "global library" and a "domain library" are the same mechanism at different
 altitudes. `app` exposes `computeTotal` to its descendants and `invoicing`
@@ -173,9 +177,9 @@ the app around it.
 One owner, one symbol, both exposure decisions. `pricing` owns `PriceModel`
 and exposes it to its descendants _and_ to its parent - the first `▲▼`
 marker in the series, and it is not a third channel: two independent one-hop
-decisions that happen to share a row. The grant reaches `discounts` and
-`taxes`; the upward exposure reaches `app`, which receives the type and
-stops it.
+decisions that happen to share a row. The exposure to descendants reaches
+`discounts` and `taxes`; the exposure to the parent reaches `app`, which
+receives the type and stops it.
 
 <div className="wide-figure">
   <ModelDiagram definition={example2Diagram} />
@@ -191,24 +195,24 @@ of a single row - up one hop, down one subtree - and stop.
 Reach ends where decisions end. There are three dots in this picture, all of
 them on `pricing` and `checkout`; `app` has none, and both symbols stop
 there. (`submitOrder` plays the role known from Example 1's `optimizeRoute` -
-exposed up, composed, stopped - and wears that symbol's color.)
+exposed to the parent, composed, stopped - and wears that symbol's color.)
 
 ## Two footnotes
 
-**Grants are uniform.** A descendant grant reaches every branch of the
-granter's subtree - including the branch the symbol originally came up
-through: `app`'s grant of `computeTotal` lands in `globalLibrary` and
+**Exposure to descendants is uniform.** It reaches every branch of the
+exposing module's subtree - including the branch the symbol originally came
+up through: `app`'s exposure of `computeTotal` lands in `globalLibrary` and
 `moneyUtils` too, the very branch that sent it up (the figure omits those two
-arrival rows, because the grant changes nothing there - both boxes already
-had the symbol). No exclusion is possible, and routed symbols carry no
-provenance. A family that does not want its symbol coming back under an
-ancestor's grant has exactly one option: not exposing it upward at all.
+arrival rows, because the exposure changes nothing there - both boxes already
+had the symbol). No exclusion is possible, and re-exposed symbols carry no
+provenance. A family that does not want its symbol coming back from an
+ancestor has exactly one option: not exposing it to the parent at all.
 
-**Subdivision is invisible.** Grants address subtrees, not shapes. Splitting
-`routingOptimization` into two sub-modules would change nothing about what
-either half may import: `shipping`'s grant of `ShipmentPlan` addresses its
-subtree, whatever shape that subtree takes. Structure can be refined freely
-without renegotiating anybody's access.
+**Subdivision is invisible.** Exposure to descendants addresses a subtree,
+not a shape. Splitting `routingOptimization` into two sub-modules would
+change nothing about what either half may import: `shipping`'s exposure of
+`ShipmentPlan` addresses its subtree, whatever shape that subtree takes.
+Structure can be refined freely without renegotiating anybody's access.
 
 ## Where the precision lives
 

@@ -3,10 +3,10 @@
  *
  * The universe, the verdicts and the lessons come from
  * `docs/model/illustrative-examples.md`, which is normative for this diagram:
- * four modules, two symbols, one testing module. Everything is exposed upward
- * and granted back down, so both symbols are visible in every box - and then
- * one symbol is tagged `testing` and its availability rule decides where it is
- * actually available.
+ * four modules, two symbols, one testing module. Everything is exposed to the
+ * parent and re-exposed to its descendants, so both symbols are visible in
+ * every box - and then one symbol is tagged `testing` and its availability
+ * rule decides where it is actually available.
  *
  * The lesson is the required-module-tag rule (`⇥`): a symbol tagged `testing`
  * is available only in modules carrying the same tag. Visibility is uniform
@@ -33,7 +33,7 @@ import { seriesNodeContent, seriesTagLegendGroups } from './series.js';
 
 /**
  * ```text
- * app                      grants everything it receives to its subtree
+ * app                      exposes everything it receives to its descendants
  * ├── orders               owns OrderService, resetOrderStore (tagged testing)
  * │                        (both exposed to parent)
  * ├── billing              production consumer
@@ -48,9 +48,9 @@ import { seriesNodeContent, seriesTagLegendGroups } from './series.js';
  */
 export const example3Declaration: ModuleDeclaration = {
   id: 'app',
-  // Blanket-granting received test support is safe at any breadth: the
-  // availability rule travels with the symbol and withholds it from untagged
-  // modules everywhere the grant reaches.
+  // Exposing received test support to every descendant is safe at any breadth:
+  // the availability rule travels with the symbol and withholds it from
+  // untagged modules everywhere the exposure reaches.
   reExposes: [
     { symbol: 'OrderService', from: 'orders', exposeToDescendants: true },
     { symbol: 'resetOrderStore', from: 'orders', exposeToDescendants: true },
@@ -81,7 +81,7 @@ export const example3TracedSymbols: readonly TracedSymbol[] = [
     symbol: 'OrderService',
     owner: 'orders',
     color: 'traced1',
-    role: 'the default contract: every module the grant reaches may import it',
+    role: 'the default contract: every module the exposure reaches may import it',
   },
   {
     symbol: 'resetOrderStore',
@@ -101,7 +101,7 @@ export const example3DecisionPolicies: readonly DecisionPolicy[] = [
   },
   {
     id: 'P2',
-    text: 'app grants everything it receives to its descendants.',
+    text: 'app exposes everything it receives to its descendants.',
     deciders: ['app'],
     channel: 'toDescendants',
   },
@@ -110,9 +110,9 @@ export const example3DecisionPolicies: readonly DecisionPolicy[] = [
 /** The lessons of the doc, in the glossary's vocabulary. */
 export const example3LegendNotes: readonly string[] = [
   'Both symbols are visible everywhere; the ⇥ testing chip alone decides where the tagged one is available.',
-  'Tags never grant: the testing module imports nothing the tree did not route to it - it sees OrderService because the chain reaches it.',
+  'Tags never expose: the testing module imports nothing the tree did not re-expose to it - it sees OrderService because the chain reaches it.',
   'Test support is curated symbol by symbol, and a symbol is real contract or test support, never both.',
-  'Grant breadth is safe at any width: the availability rule travels with the symbol, so it is not available in untagged modules anywhere the grant reaches.',
+  'Exposing to descendants is safe at any subtree width: the availability rule travels with the symbol, so it is not available in untagged modules anywhere the exposure reaches.',
 ];
 
 export const example3Diagram: DiagramDefinition = {

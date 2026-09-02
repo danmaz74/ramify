@@ -13,10 +13,12 @@ self-explanatory (`computeTotal`, `InvoiceModel`); `PascalCase` = types,
 
 ## Diagram conventions
 
-- Node boxes show two compartments: **owns** and **exposed to it**, the
-  latter naming each arrival's provenance (`from <child>`, `granted by
-  <ancestor>`). Visibility is the union of the two, read box by box -
-  and with no tags declared, what is visible is exactly what is available.
+- Node boxes show two compartments: **owns** and **receives**, the latter
+  naming the module each arrival came from (`from <child>` for a child's
+  exposure to its parent, `from <ancestor>` for an ancestor's exposure to
+  its descendants; the tree shows which is which). Visibility is the union
+  of the two, read box by box - and with no tags declared, what is visible
+  is exactly what is available.
 - Non-allowed imports are not drawn: absence is the statement, and selecting
   a symbol makes the absence visible.
 - Every exposure path is traced - its own color, its own selectable layer.
@@ -25,7 +27,7 @@ self-explanatory (`computeTotal`, `InvoiceModel`); `PascalCase` = types,
   symbol exposed nowhere has no path to trace; it stays gray.
 - **Selecting a traced symbol** (adopted 2026-08-31, works well): the other
   layers dim, the symbol's propagation lines turn dashed and animate in the
-  direction the exposure flows, and its rows in every "exposed to it"
+  direction the exposure flows, and its rows in every "receives"
   compartment blink. Nothing is overlaid: reach is read off the moving
   mechanism and the blinking arrivals. (A derived fan of ✓ chords from each
   permitted importer to the owner was tried first and rejected - it only
@@ -68,8 +70,8 @@ of exposures above it turns downward - or doesn't. Three leaf modules make
 the identical decision, expose a symbol to their parent, and end up with
 three different reaches: application-wide, domain-wide, parent-only. A
 fourth symbol goes the other way - its owner exposes it to its descendants -
-and shows the asymmetry: a downward exposure is complete in one decision and
-can never leave the subtree.
+and shows the asymmetry: an exposure to descendants is complete in one
+decision and can never leave the subtree.
 
 ### Tree
 
@@ -107,60 +109,64 @@ down and a function flowing up, each its own decision.
 | --- | --- | --- | --- |
 | `computeTotal` | expose to parent | passed up again, turned downward at `app` | every module |
 | `InvoiceModel` | expose to parent | turned downward at `invoicing` | the `invoicing` subtree |
-| `optimizeRoute` | expose to parent | `shipping` composed it and stopped | `shipping` only |
+| `optimizeRoute` | expose to parent | `shipping` composed it and stopped | `routingOptimization` and `shipping` |
 | `ShipmentPlan` | expose to descendants | nothing - no one above was ever involved | the `shipping` subtree |
 
-The three up-exposing owners made the **same** decision. The three reaches
-were decided entirely by the ancestors - exposing upward cedes onward
-routing. `ShipmentPlan`'s reach, by contrast, was decided entirely by its
-owner: a downward exposure cedes nothing, and only an upward exposure could
-ever carry a symbol out of its subtree.
+The three owners that exposed to their parent made the **same** decision.
+The three reaches were decided entirely by the ancestors - exposing to the
+parent cedes onward exposure. `ShipmentPlan`'s reach, by contrast, was
+decided entirely by its owner: an exposure to descendants cedes nothing, and
+only an exposure to the parent could ever carry a symbol out of its subtree.
 
 ### Non-allowed imports
 
-- `shipping` ✗ `InvoiceModel` - a grant never leaves the granter's subtree;
-  nor is the symbol available in `routingOptimization`, for the same reason.
+- `shipping` ✗ `InvoiceModel` - an exposure to descendants never leaves the
+  exposing module's subtree; nor is the symbol available in
+  `routingOptimization`, for the same reason.
 - `invoicing` ✗ `optimizeRoute` - **there is no sibling channel**: exposing a
   symbol to the parent gives siblings nothing. Interactively, selecting
   `optimizeRoute` shows a single one-hop flow and a single blinking arrival
   in `shipping` - the sibling's absence is the point.
 - `app` ✗ `ShipmentPlan` - the **parent** is not allowed while descendants
-  are: `shipping` exposed the type only downward, so nothing above it, root
-  included, ever sees it.
+  are: `shipping` exposed the type only to its descendants, so nothing above
+  it, root included, ever sees it.
 
 ### Lessons
 
 1. A "global library" and a "domain library" are the same mechanism at
    different altitudes; nothing is ever declared "global".
-2. Reach is a consequence of where the up-chain turns into a grant, not a
-   property of the symbol or its owner.
-3. Grants are subtree-bounded: `InvoiceModel` reaches both of `invoicing`'s
-   consumers and nothing outside.
-4. Composition without routing is the degenerate case of the same spectrum:
-   `optimizeRoute` stops at the parent.
+2. Reach is a consequence of where the chain of exposures to parents turns
+   into an exposure to descendants, not a property of the symbol or its
+   owner.
+3. Exposure to descendants is subtree-bounded: `InvoiceModel` reaches both
+   of `invoicing`'s consumers and nothing outside.
+4. Composition without re-exposure is the degenerate case of the same
+   spectrum: `optimizeRoute` stops at the parent.
 5. Siblings are strangers by default. Sharing between siblings is never the
-   exposer's decision - the route is through the parent, and the parent
-   decides. The contrast is drawn: `invoicing` turned `InvoiceModel`
-   downward, so its two consumers share it; `shipping` stopped
+   exposer's decision - the way is through the parent, and the parent
+   decides. The contrast is drawn: `invoicing` exposed `InvoiceModel` to its
+   descendants, so its two consumers share it; `shipping` stopped
    `optimizeRoute`, so its sibling sees nothing.
-6. The root routes without owning: `app` has no code of its own and still
-   carries the application's vocabulary.
-7. The two channels are asymmetric. Exposing down is final and bounded - one
-   decision, whole subtree, nothing ceded, no way out. Exposing up hands
-   onward routing to the ancestors.
+6. The root re-exposes without owning: `app` has no code of its own and
+   still carries the application's vocabulary.
+7. The two channels are asymmetric. Exposing to descendants is final and
+   bounded - one decision, whole subtree, nothing ceded, no way out. Exposing
+   to the parent hands onward exposure to the ancestors.
 
 ### Diagram notes
 
-- Two consumers under `invoicing` are deliberate: a grant needs at least two
-  arrivals to read as a grant rather than a private handoff.
+- Two consumers under `invoicing` are deliberate: an exposure to descendants
+  needs at least two arrivals to read as one rather than as a private
+  handoff.
 - Nine modules but only seven decision dots and one theme; complexity is
   measured in decisions, not boxes.
 - The `shipping` box shows the handshake both ways: `owns ▼ ShipmentPlan`
-  above `exposed to it · optimizeRoute`.
+  above `receives · optimizeRoute`.
 - The site presents this example as a three-step build-up: stage A is the
   `shipping` subtree under an empty root (both channels, one hop each),
   stage B is the `invoicing` subtree alone under the root (the first chain,
-  the first grant, a reach that stops at the domain border), and the full
+  the first exposure to descendants, a reach that stops at the domain
+  border), and the full
   diagram is the finale, where the cross-domain denials appear. The stages
   are presentation only - this document stays normative for the one
   universe - and each stage's subtree and traced colors must match the full
@@ -192,13 +198,15 @@ app
 ### Resulting availability
 
 `PriceModel` shows as `▲▼` in `pricing`'s box - the first occurrence of that
-marker in the series: two independent one-hop decisions sharing a row. It is
-granted to `discounts` and `taxes`, and received and stopped at `app` (gray,
-no dot). Reach: the `pricing` subtree plus `app` - one subtree down, one hop
-up, nothing more.
+marker in the series: two independent one-hop decisions sharing a row.
+`discounts` and `taxes` receive it from the exposure to descendants; `app`
+receives it from the exposure to parent and stops it (gray, no dot). Reach:
+the `pricing` subtree plus `app` - one subtree down, one hop up, nothing
+more.
 
 `submitOrder` is furniture, not a lesson: a known specimen from Example 1
-(exposed up, composed, stopped) that keeps `checkout` a real module and gives
+(exposed to the parent, composed, stopped) that keeps `checkout` a real
+module and gives
 `app` two stopped rows side by side.
 
 ### Non-allowed imports
@@ -219,7 +227,8 @@ up, nothing more.
 
 ### Diagram notes
 
-- Two consumers under `pricing` per the grant-needs-two-arrivals convention.
+- Two consumers under `pricing` per the two-arrivals convention for an
+  exposure to descendants.
 - Five modules, three dots, two traced colors - the smallest diagram in the
   series.
 - Selecting `PriceModel` animates both flows out of a single row: up one hop
@@ -230,15 +239,15 @@ up, nothing more.
 ## Example 3: The tag is the entire difference (testing)
 
 Two symbols with identical exposures; one wears `testing`. The tree setup is
-one sentence - everything is granted everywhere, and none of it is the
-lesson. The lesson is the required-module-tag rule (`⇥`) that `testing`
+one sentence - everything is exposed to the root and back to every
+descendant, and none of it is the lesson. The lesson is the required-module-tag rule (`⇥`) that `testing`
 carries: both symbols are visible everywhere, and the tagged one is available
 only in modules carrying the same tag.
 
 ### Tree
 
 ```text
-app                      grants everything it receives to its subtree
+app                      exposes everything it receives to its descendants
 ├── orders               owns OrderService, resetOrderStore (tagged testing)
 │                        (both exposed to parent)
 ├── billing              production consumer
@@ -258,17 +267,17 @@ Visibility is identical in every column; only the tag differs.
 
 1. Visible is not available: both symbols share the same exposure chain,
    and the tag's availability rule alone flips the verdict.
-2. Tags never grant: the testing module imports nothing the tree did not
-   route to it. It sees `OrderService` because the chain reaches it, not
+2. Tags never expose: the testing module imports nothing the tree did not
+   re-expose to it. It sees `OrderService` because the chain reaches it, not
    because it is tagged.
 3. Test support is curated, symbol by symbol: `orders` chose exactly what
    tests may touch; tests never receive blanket private access.
 4. Exclusivity: `testing` removes a symbol from the default contract - a
    symbol is real contract or test support, never both.
-5. Grant breadth is safe at any width: blanket-granting received test
-   support is harmless, because the availability rule travels with the
-   symbol and withholds it from untagged modules everywhere the grant
-   reaches.
+5. Exposing to descendants is safe at any subtree width: exposing all
+   received test support to descendants is harmless, because the
+   availability rule travels with the symbol and withholds it from untagged
+   modules everywhere the exposure reaches.
 
 ### Diagram notes
 
@@ -280,8 +289,8 @@ Visibility is identical in every column; only the tag differs.
   there, not available - and drawn plainly in the testing module. The static
   picture already states the verdict table.
 - Selecting `resetOrderStore`: the testing module blinks; `billing` stays
-  dark, and so does `app`'s own row - routing a grant earns no right to
-  import it. Selecting `OrderService`: both blink - the contrast is the
+  dark, and so does `app`'s own row - re-exposing a symbol to its
+  descendants earns no right to import it. Selecting `OrderService`: both blink - the contrast is the
   picture.
 
 ## Example 4: A promise about the closure (browser)
@@ -295,7 +304,7 @@ entire transitive runtime closure is browser-safe.
 ### Tree
 
 ```text
-app                      grants everything it receives to its subtree
+app                      exposes everything it receives to its descendants
 ├── shared               owns formatMoney (tagged browser), queryDb
 │                        (both exposed to parent)
 ├── ui                   browser module: carries the ⇤ browser tag

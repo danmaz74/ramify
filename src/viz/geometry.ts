@@ -35,7 +35,7 @@ export const LAYOUT = {
      * §3.9 budgets 8 px per character of the widest content line. 7 px here:
      * still a comfortable over-estimate for the 12 px system sans the rows are
      * drawn in, and it keeps the canvas inside the §3.9 width budget once the
-     * derived `holds` compartments are counted.
+     * derived `receives` compartments are counted.
      */
     charWidth: 7,
     paddingX: 11,
@@ -44,7 +44,7 @@ export const LAYOUT = {
     headerHeight: 24,
     /** §3.9: 18 px per symbol row. */
     rowHeight: 18,
-    /** Compartment title strip (`owns`, `holds`, `what-if`). */
+    /** Compartment title strip (`owns`, `receives`, `what-if`). */
     compartmentTitleHeight: 16,
     /** The dashed what-if note wraps to several short lines. */
     whatIfLineHeight: 13,
@@ -81,9 +81,9 @@ export const LAYOUT = {
   },
 
   /**
-   * §3.9: level spacing ≥ 96 px. 112 here, because grant-origin chips are
-   * allowed to wrap to two lines (§4.4 finding 3) and the up-hop chips share
-   * the same gutter.
+   * §3.9: level spacing ≥ 96 px. 112 here, because the chips at the origin of
+   * a flow to descendants are allowed to wrap to two lines (§4.4 finding 3)
+   * and the to-parent chips share the same gutter.
    */
   levelGap: 112,
   /** Where the horizontal run of a tree edge sits inside the gutter. */
@@ -108,7 +108,10 @@ export const LAYOUT = {
     dotRadius: 3.2,
     chipFontSize: 9.5,
     chipCharWidth: 5.3,
-    /** Grant-origin chips wrap to at most two lines (§4.4 finding 3). */
+    /**
+     * Chips at the origin of a flow to descendants wrap to at most two lines
+     * (§4.4 finding 3).
+     */
     chipMaxLines: 2,
   },
 
@@ -219,7 +222,7 @@ export function textWidth(text: string, charWidth: number): number {
  * x of a row's symbol name, relative to its node box's left edge.
  *
  * The name clears the marker column per glyph, because `▲▼` is two glyphs wide
- * and `▲` is one; a marker-less `granted` row keeps the one-glyph column so
+ * and `▲` is one; a marker-less `fromAncestor` row keeps the one-glyph column so
  * that every name in a compartment starts at the same x.
  */
 export function rowLabelDx(marker: string | undefined): number {

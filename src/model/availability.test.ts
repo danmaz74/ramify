@@ -10,8 +10,8 @@ import {
 } from './tree.js';
 
 /**
- * The example universe of `docs/site/diagram1-spec.md` §1.1–§1.2, declared
- * exactly as the spec's decision table states it.
+ * The example universe of the retired first diagram (`src/viz/diagrams/shop.ts`),
+ * declared exactly as that diagram's decision table states it.
  *
  * ```text
  * shop                      (application root - an ordinary module)
@@ -105,7 +105,7 @@ describe('the declared universe (spec §1.2)', () => {
 });
 
 describe('availability', () => {
-  it('holds every symbol a module owns, exposed or not', () => {
+  it('includes every symbol a module owns, exposed or not', () => {
     expect(isAvailable(shop, 'catalog', 'catalog', 'ProductId')).toBe(true);
     expect(isAvailable(shop, 'shop', 'shop', 'Money')).toBe(true);
     // Ownership alone makes a symbol available in its owner: `retryQueue` is
@@ -158,7 +158,7 @@ type Cell = 'own' | '2' | '3' | '-';
 const CLAUSE_OF: Record<Exclude<Cell, '-'>, ImportClause> = {
   own: 'same-module',
   '2': 'child-exposure',
-  '3': 'ancestor-grant',
+  '3': 'ancestor-exposure',
 };
 
 /** The table's columns, in the spec's order. */
@@ -223,7 +223,7 @@ describe('the full ceiling (spec §1.3)', () => {
 // --- The denied examples (spec §1.4) --------------------------------------
 
 describe('the denied examples (spec §1.4)', () => {
-  it('D1: checkout may not import SkuRules - a grant never leaves the granter subtree', () => {
+  it('D1: checkout may not import SkuRules - an exposure to descendants never leaves that subtree', () => {
     expect(explainImport(shop, 'checkout', 'catalog', 'SkuRules')).toEqual({
       allowed: false,
       reason: 'no-exposure-chain',
@@ -303,21 +303,21 @@ describe('closed by default', () => {
   });
 });
 
-describe('uniform descendant grants (backflow, spec §1.5)', () => {
-  it('search may import ProductId although catalog granted its children nothing', () => {
+describe('uniform exposure to descendants (backflow, spec §1.5)', () => {
+  it('search may import ProductId although catalog exposed nothing to its own descendants', () => {
     // `catalog` exposed `ProductId` upward only. `search` reaches it because
     // `shop` sent it back down into every branch, this one included.
     const decision = explainImport(shop, 'search', 'catalog', 'ProductId');
-    expect(decision).toEqual({ allowed: true, clause: 'ancestor-grant', via: 'shop' });
+    expect(decision).toEqual({ allowed: true, clause: 'ancestor-exposure', via: 'shop' });
   });
 
-  it('a grant reaches the branch the symbol came up through', () => {
-    // `checkout` grants `PaymentApi` to its whole subtree, including `payment`,
+  it('an exposure to descendants reaches the branch the symbol came up through', () => {
+    // `checkout` exposes `PaymentApi` to all its descendants, including `payment`,
     // which provided it. Harmless there (rule 1 already applies), visible at
     // `cart`.
     expect(explainImport(shop, 'cart', 'payment', 'PaymentApi')).toEqual({
       allowed: true,
-      clause: 'ancestor-grant',
+      clause: 'ancestor-exposure',
       via: 'checkout',
     });
   });
@@ -372,21 +372,21 @@ describe('subdivision invariance', () => {
     })),
   );
 
-  it('descendant grants reach the new submodules through rule 3', () => {
+  it('exposures to descendants reach the new submodules through rule 3', () => {
     for (const consumer of ['indexing', 'ranking'] as const) {
       expect(explainImport(splitSearch, consumer, 'catalog', 'SkuRules')).toEqual({
         allowed: true,
-        clause: 'ancestor-grant',
+        clause: 'ancestor-exposure',
         via: 'catalog',
       });
       expect(explainImport(splitSearch, consumer, 'shop', 'Money')).toEqual({
         allowed: true,
-        clause: 'ancestor-grant',
+        clause: 'ancestor-exposure',
         via: 'shop',
       });
       expect(explainImport(splitSearch, consumer, 'catalog', 'ProductId')).toEqual({
         allowed: true,
-        clause: 'ancestor-grant',
+        clause: 'ancestor-exposure',
         via: 'shop',
       });
     }
@@ -460,7 +460,7 @@ describe('an owner that does not export', () => {
 });
 
 describe('asking about a symbol at a module that does not own it', () => {
-  it('is denied even though ProductId is available in shop - routing is not ownership', () => {
+  it('is denied even though ProductId is available in shop - re-exposing is not ownership', () => {
     expect(mayImport(shop, 'search', 'catalog', 'ProductId')).toBe(true);
     expect(explainImport(shop, 'search', 'shop', 'ProductId')).toEqual({
       allowed: false,
@@ -497,7 +497,7 @@ describe('the root has no special rule in either direction', () => {
     })),
   );
 
-  it('expose-to-parent at the root grants nothing to anybody', () => {
+  it('expose-to-parent at the root makes nothing available to anybody', () => {
     for (const [consumer, cells] of CEILING) {
       cells.forEach((cell, index) => {
         const column = COLUMNS[index]!;
@@ -513,14 +513,14 @@ describe('the root has no special rule in either direction', () => {
   it('the root reaches its own subtree by the ordinary rule 3, not by privilege', () => {
     expect(explainImport(shop, 'shipping', 'shop', 'Money')).toEqual({
       allowed: true,
-      clause: 'ancestor-grant',
+      clause: 'ancestor-exposure',
       via: 'shop',
     });
   });
 });
 
 describe('an inert declaration', () => {
-  it('re-exposing a symbol the module does not hold grants nothing', () => {
+  it('re-exposing a symbol the module never received exposes nothing', () => {
     // `catalog` claims to pass `reserveStock` down, but `search` never exposed
     // anything to it, so the declaration names a provider that provides
     // nothing.
@@ -533,16 +533,16 @@ describe('an inert declaration', () => {
     expect(mayImport(bogus, 'search', 'inventory', 'reserveStock')).toBe(false);
   });
 
-  it('re-exposing from the child that really provided it does grant', () => {
-    const routed = buildTree(
+  it('re-exposing from the child that really provided it does expose', () => {
+    const reExposed = buildTree(
       mapModule(shopDeclaration, 'catalog', (catalog) => ({
         ...catalog,
         reExposes: [{ symbol: 'reserveStock', from: 'inventory', exposeToDescendants: true }],
       })),
     );
-    expect(explainImport(routed, 'search', 'inventory', 'reserveStock')).toEqual({
+    expect(explainImport(reExposed, 'search', 'inventory', 'reserveStock')).toEqual({
       allowed: true,
-      clause: 'ancestor-grant',
+      clause: 'ancestor-exposure',
       via: 'catalog',
     });
   });

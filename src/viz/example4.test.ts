@@ -47,8 +47,8 @@ describe('example 4 - a promise about the closure', () => {
       }
     }
     expect(rowsOf('server')).toEqual([
-      '_ formatMoney ⇤ browser   granted by app',
-      '_ queryDb   granted by app',
+      '_ formatMoney ⇤ browser   from app',
+      '_ queryDb   from app',
     ]);
   });
 
@@ -96,8 +96,8 @@ describe('example 4 - a promise about the closure', () => {
 
   it('strikes queryDb in ui, with the type-available asterisk', () => {
     expect(rowsOf('ui')).toEqual([
-      '_ formatMoney ⇤ browser   granted by app',
-      '_ queryDb   granted by app',
+      '_ formatMoney ⇤ browser   from app',
+      '_ queryDb   from app',
     ]);
 
     // The strike is the value-import verdict, exactly; the unstruck `*` after
@@ -159,8 +159,8 @@ describe('example 4 - a promise about the closure', () => {
     expect([...byPolicy.keys()].sort()).toEqual(['P1', 'P2']);
     expect(byPolicy.get('P1')).toEqual(['shared', 'shared']);
     expect(byPolicy.get('P2')).toEqual(['app', 'app']);
-    // Three arrivals per grant, one per hop up: the grant reaches the whole
-    // subtree, providing branch included.
+    // Three arrivals per exposure to descendants, one per hop up: the exposure
+    // reaches the whole subtree, providing branch included.
     expect(example4.propagation.lanes).toHaveLength(8);
   });
 

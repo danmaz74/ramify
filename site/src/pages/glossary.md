@@ -37,6 +37,11 @@ dependency.
 If file F belongs to module M, and F exports symbol S, then module M **owns** S. Any
 file belonging to M can import S.
 
+## Module-received symbol
+
+Module M **receives** symbol S when a module other than M exposes S to M: a direct
+child exposing S to its parent, or a proper ancestor exposing S to its descendants.
+
 ## Symbol tagging
 
 In the world of ramify modules, all symbols are always associated with a set of tags. Tags
@@ -55,7 +60,7 @@ A symbol whose tag set is non-empty is called tagged.
 
 ## Module-visible symbol
 
-Symbol S is **visible** in module M when M owns S, or S is exposed to M by another module.
+Symbol S is **visible** in module M when M owns S or receives S.
 
 Visibility is decided by the exposure decisions alone; tags never change what is
 visible in a module.
@@ -68,9 +73,9 @@ one of two types:
 - Expose to parent: S becomes exposed to M's parent
 - Expose to descendants: S becomes exposed to all of M's descendants
 
-A module can expose both its owned symbols and symbols exposed to it. In the latter
-case, we can specify that the symbol was re-exposed if useful, but re-exposing
-isn't different from exposing.
+A module can expose both the symbols it owns and the symbols it receives. Exposing
+a received symbol may be called **re-exposing**, but re-exposing isn't different
+from exposing.
 
 NB: symbols in ramify modules are always associated with their tag set. Exposing or
 re-exposing them means exposing the symbol together with its tag set.
@@ -112,8 +117,8 @@ that it can also be imported as a type.
 All symbols owned by M are available in M, because ramify modules don't affect intra-module
 imports in any way.
 
-The only other symbols available in M are those which other modules expose to it, subject
-to their tag based availability rules.
+The only other symbols available in M are those it receives, subject to their tag based
+availability rules.
 
 At times we can use "fully available" as a synonym of "available" to underline that it implies
 both value and type availability.

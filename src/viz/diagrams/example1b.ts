@@ -4,10 +4,11 @@
  * The second build-up stage the site uses to teach Example 1
  * (`docs/model/illustrative-examples.md`) progressively, and the stage that
  * introduces the second big idea: a **chain** of decisions.
- * `invoicingLibrary` exposes `InvoiceModel` up, `invoicing` grants it down,
- * and the provider's siblings receive it - the first `granted by` row of
- * the build-up and the first domain library. The empty root is again the
- * witness of the boundary: `invoicing` exposed the symbol downward only,
+ * `invoicingLibrary` exposes `InvoiceModel` to its parent, `invoicing` exposes
+ * it to its descendants, and the provider's siblings receive it - the first
+ * row received from an ancestor in the build-up, and the first domain
+ * library. The empty root is again the
+ * witness of the boundary: `invoicing` exposed the symbol to its descendants only,
  * so it never reaches `app`. The other domain is deliberately absent -
  * each stage carries one theme, and the cross-domain denials belong to the
  * full diagram.
@@ -85,7 +86,7 @@ export const example1bLegendGroups = seriesLegendGroups;
 
 export const example1bLegendNotes: readonly string[] = [
   'InvoiceModel travels a chain of two decisions: up to invoicing, then down to its subtree.',
-  'invoicing exposed it downward only, so it never reaches app.',
+  'invoicing exposed it to its descendants only, so it never reaches app.',
   'Files inside one module import each other freely; those imports are not drawn.',
 ];
 
@@ -93,7 +94,7 @@ export const example1bDiagram: DiagramDefinition = {
   id: 'example1b',
   declaration: example1bDeclaration,
   ariaLabel:
-    'Example 1, stage B: invoicingLibrary exposes InvoiceModel to its parent and invoicing grants it to its subtree; the symbol reaches the provider’s siblings and never reaches the empty root',
+    'Example 1, stage B: invoicingLibrary exposes InvoiceModel to its parent and invoicing exposes it to its descendants; the symbol reaches the provider’s siblings and never reaches the empty root',
   tracedSymbols: example1bTracedSymbols,
   chordSpecs: [],
   decisionPolicies: example1bDecisionPolicies,

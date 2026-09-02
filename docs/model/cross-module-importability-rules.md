@@ -11,7 +11,7 @@ file, whether that file **could** legally import that symbol.
 ramify.ts. It extracts and simplifies the access model in
 [Parent-Governed Recursive Module Access](../../../docs/analysis/2026-08-30-parent-governed-recursive-module-access.md)
 (host-repository history; where the two disagree, this document reflects the
-newer decision direction). Named surfaces, routing syntax and enforcement
+newer decision direction). Named surfaces, re-exposure syntax and enforcement
 architecture remain in those earlier documents; tags appear here only
 insofar as they restrict who may import a symbol. The application of this
 model to cucumber-viz - coverage of the current enforcement rules, required
@@ -73,48 +73,49 @@ through exactly two channels:
    of the exposing module's subtree.
 
 That is the entire mechanism. There is no sibling channel, no root privilege,
-no depth-limited audience and no way to receive routing authority from a
-parent (a descendant grant already reaches every depth, so nothing would be
-gained). Exposing a symbol the module does not own may be called
-**re-exposing**, but re-exposing is not a distinct mechanism.
+no depth-limited audience and no way to receive onward-exposure authority
+from a parent (an exposure to descendants already reaches every depth, so
+nothing would be gained). Exposing a symbol the module does not own may be
+called **re-exposing**, but re-exposing is not a distinct mechanism.
 
-Routing is consensual: a routed symbol travels one hop at a time, and a
-grandchild contract becomes available at the app root only if every
+Re-exposure is consensual: a re-exposed symbol travels one hop at a time, and
+a grandchild contract becomes available at the app root only if every
 intermediate module chose to expose it further up.
 
-**Exposing to parent is a single channel that cedes routing.** The parent may
-compose with the symbol and may re-expose it through its own two channels;
-there is no "composition-only, do not re-expose" variant. A contract the
-child does not want routed further is a conversation with the parent
-architect, not a mechanism.
+**Exposing to parent is a single channel that cedes onward exposure.** The
+parent may compose with the symbol and may re-expose it through its own two
+channels; there is no "composition-only, do not re-expose" variant. A
+contract the child does not want re-exposed further is a conversation with
+the parent architect, not a mechanism.
 
-### Backflow: descendant grants are uniform
+### Backflow: exposure to descendants is uniform
 
-A descendant grant reaches the **entire** subtree of the granting module,
-including the branch a re-exposed symbol originally came up through.
+An exposure to descendants reaches the **entire** subtree of the exposing
+module, including the branch a re-exposed symbol originally came up through.
 
 The rejected alternative ("no backflow") would have excluded the providing
 branch, so that a family could keep a symbol app-wide yet forbidden between
 its own children. That was rejected for two reasons. First, it contradicts
-the single-channel decision above: exposing a symbol upward cedes its further
-routing entirely; a residual veto over one region of the tree would claw part
-of that authority back. Second, the only configuration where the rules
-diverge - a symbol both application-wide and sibling-restricted inside its
-own family - is rare and low-stakes (app-wide symbols are vocabulary;
+the single-channel decision above: exposing a symbol to the parent cedes its
+onward exposure entirely; a residual veto over one region of the tree would
+claw part of that authority back. Second, the only configuration where the
+rules diverge - a symbol both application-wide and sibling-restricted inside
+its own family - is rare and low-stakes (app-wide symbols are vocabulary;
 sibling restrictions target machinery), and does not justify provenance
-tracking on routed symbols. A family that wants that combination resolves it
-by not exposing the symbol upward.
+tracking on re-exposed symbols. A family that wants that combination
+resolves it by not exposing the symbol to its parent.
 
 ### Redundant exposure
 
 Because exposure is gated on visibility rather than on a chain-of-custody
 concept, some exposures are legal but inert: they change no module's
-visibility. Re-exposing a symbol received through an ancestor's grant is
-always redundant - the exposer's own subtree is already covered by that
-grant, every module on the upward path lies inside the granter's subtree and
-already has the symbol, and carrying it above the granter always requires
-the granter's own expose-to-parent decision, which nobody below can make for
-it. Redundant exposures deserve a diagnostic, never an error.
+visibility. Re-exposing a symbol received from a proper ancestor's exposure
+to descendants is always redundant - the re-exposer's own subtree is already
+covered by that exposure, every module on the path up to that ancestor lies
+inside its subtree and already has the symbol, and carrying it above that
+ancestor always requires the ancestor's own expose-to-parent decision, which
+nobody below can make for it. Redundant exposures deserve a diagnostic, never
+an error.
 
 ## The importability rule
 
@@ -143,13 +144,13 @@ The familiar access cases are consequences, not additional rules:
 | Parent composes a direct child | Child exposes to parent (rule 2). Not reciprocal. |
 | Domain helpers and concepts | Owner exposes to descendants (rule 3 with `P` = the helper's owner). |
 | Application-wide contracts | The same rule applied at the app root, which is an ordinary module whose subtree happens to be the whole application. |
-| Cross-branch (sibling, cousin) import | The owner exposes upward hop by hop until it is available in the lowest common ancestor; the LCA exposes it to its descendants. The LCA rule of the earlier document is therefore a theorem here: it is exactly the point where the flow turns from up to down, and every hop is a one-level decision by the module that owns that hop. |
-| Closed sibling families | With no upward exposure and no ancestor grant, rules 2 and 3 never fire. Creating a new sibling changes nobody's access. |
-| App-wide child-owned library | Chain of expose-to-parent up to the root, then one root descendant grant. The root never becomes the owner. |
+| Cross-branch (sibling, cousin) import | The owner exposes to its parent, and each module above re-exposes to its parent, until the symbol is visible in the lowest common ancestor; the LCA exposes it to its descendants. The LCA rule of the earlier document is therefore a theorem here: it is exactly the point where the flow turns from up to down, and every hop is a one-level decision by the module that owns that hop. |
+| Closed sibling families | With no exposure to the parent and no exposure to descendants from an ancestor, rules 2 and 3 never fire. Creating a new sibling changes nobody's access. |
+| App-wide child-owned library | Chain of expose-to-parent up to the root, then one exposure to descendants at the root. The root never becomes the owner. |
 
 Two structural properties worth preserving through every later refinement:
 
-- **Subdivision invariance.** Descendant grants are insensitive to how a
+- **Subdivision invariance.** Exposures to descendants are insensitive to how a
   consuming branch is internally organized. Splitting a module into
   submodules never changes what the new submodules may import from outside.
 - **Locality.** Every exposure decision is made by a module the symbol is
@@ -178,7 +179,7 @@ rule"). The same tag names are assigned in two positions:
 - **Symbol tagging.** The owner assigns a tag set to each symbol it owns
   (empty by default). The assignment is immutable: the tags travel with the
   symbol through every exposure and re-exposure, and no module along the
-  route can add, remove or change one.
+  way can add, remove or change one.
 - **Module tagging.** A module may assign tags to itself in its module
   definition, classifying its files - a **testing module**'s files are
   tests, a **browser module**'s files run in a browser. A module may also
@@ -218,7 +219,7 @@ set only these parameters:
 | `symbols-default-to` | Module position only: symbols owned by this module default to the given symbol tag. |
 | `verify` | An externally checked proof obligation attached to the tag's factual claim. Verification is not an importability rule; a false claim is the owner's error, reported at the owner. |
 
-**Tags are purely restrictive.** They never grant access, and they never
+**Tags are purely restrictive.** They never expose a symbol, and so never
 change what is visible. The complete rule:
 
 > An exposed symbol is available in a module iff the tree rules make it
@@ -242,22 +243,22 @@ tags:
   tagged `testing`; tests never receive blanket private access.
 - `testing` is exclusive with the default channel: a symbol is part of
   the real contract or test support, never ambiguously both.
-- `testing` symbols travel through the ordinary exposure channels. Any
-  grant breadth is safe, because the availability rule withholds the symbol
-  from untagged modules everywhere the grant reaches - so a parent may
-  blanket-grant received test support to its whole subtree without risk,
-  while a domain keeps its fakes domain-internal by simply not routing them
-  higher.
+- `testing` symbols travel through the ordinary exposure channels. Exposing
+  them to descendants is safe at any subtree width, because the availability
+  rule withholds the symbol from untagged modules everywhere the exposure
+  reaches - so a parent may expose all received test support to its
+  descendants without risk, while a domain keeps its fakes domain-internal
+  by simply not exposing them to its parent.
 - Everything a testing module exposes is implicitly `testing`; test
   infrastructure can never enter a production ceiling.
 - Integration tests belong under the lowest common ancestor whose
   composition they exercise - as a test context owned by that module, or as
-  a testing module directly beneath it. Rule 2 (with the ancestor's grants)
-  then provides exactly the composition surfaces they need, with no further
-  mechanism. The child-module form additionally needs the ancestor to grant
-  its default-channel composition surfaces to its subtree, which examples
-  keep safe by granting everything received; exclusivity forbids re-tagging
-  real contracts as test support either way.
+  a testing module directly beneath it. Rule 2 (with the ancestor's
+  exposures to descendants) then provides exactly the composition surfaces
+  they need, with no further mechanism. The child-module form additionally
+  needs the ancestor to expose its default-channel composition surfaces to
+  its descendants, which examples keep safe by exposing everything received;
+  exclusivity forbids re-tagging real contracts as test support either way.
 
 ### Instance: browser compatibility
 
@@ -285,11 +286,11 @@ tags:
 An earlier draft gave `testing` a `reach: global` parameter so that
 every testing module could import every test-support symbol without exposure
 chains. It was rejected: it would puncture the consent-chain principle for
-one case, create a second kind of tag semantics (granting rather than
+one case, create a second kind of tag semantics (exposing rather than
 restricting) and silently make every test fake application-wide test API,
-coupling distant tests to internals their owners never routed to them. Tree
-routing costs one re-exposure line per hop - the same ceremony as any
-cross-branch contract, surfaced by the same diagnostics.
+coupling distant tests to internals their owners never exposed to them.
+Reaching a test through the tree costs one re-exposure line per hop - the
+same ceremony as any cross-branch contract, surfaced by the same diagnostics.
 
 ### Built-ins only
 
@@ -310,18 +311,20 @@ accidentally reintroduced:
   implement to participate in composition - does not need it, because
   importing a type confers no ability to participate: participation flows
   upward through exposure to parent, which the intermediate child still
-  controls. Depth-1 grants are also subdivision-variant (reorganizing a
+  controls. Depth-1 exposures are also subdivision-variant (reorganizing a
   consumer breaks its access) and would force a new "relay a parent-provided
-  grant downward" mechanism to recover expressiveness, making the model
-  larger, not smaller. Precedent agrees: visibility systems offer
-  parent-relative (`pub(super)`) and subtree scopes, not depth-limited ones.
-- **Branch-targeted grants** ("expose to descendants, but only branch X").
+  exposure to one's own descendants" mechanism to recover expressiveness,
+  making the model larger, not smaller. Precedent agrees: visibility systems
+  offer parent-relative (`pub(super)`) and subtree scopes, not depth-limited
+  ones.
+- **Branch-targeted exposure** ("expose to descendants, but only branch X").
   Consumer-side restriction inside a receiving branch is that branch's own
   parents' business.
 - **Sibling or cousin channels.** Reduced to up-then-down chains through the
   responsible ancestors.
 - **Root privileges.** The app root has no special rule in either direction;
-  it is only the module whose descendant grants happen to be application-wide.
+  it is only the module whose exposures to descendants happen to be
+  application-wide.
 - **Consumer dependency declarations.** Real, but a dependency-tracking
   concern, not an importability concern. Out of scope by the definition at
   the top.
@@ -333,11 +336,11 @@ the declaration.
 
 ## Decided
 
-- **Single upward channel.** Expose-to-parent always cedes re-routing
-  authority; there is no composition-only variant.
-- **Uniform descendant grants.** A descendant grant reaches the whole
-  subtree; there is no backflow exclusion and no provenance tracking on routed
-  symbols.
+- **Single channel to the parent.** Expose-to-parent always cedes onward
+  exposure; there is no composition-only variant.
+- **Uniform exposure to descendants.** An exposure to descendants reaches the
+  whole subtree; there is no backflow exclusion and no provenance tracking on
+  re-exposed symbols.
 - **No rule is type-only.** The import-form scope is intrinsic to the rule
   kind - required module tags cover both forms, required symbol tags cover
   value imports only - so nothing can ever forbid a type import while
@@ -345,9 +348,9 @@ the declaration.
   type-available, by construction, and the unqualified "available" safely
   means the strong (value) form.
 - **Tags are purely restrictive.** A tag's availability rules gate imports
-  on top of the tree rules; no tag ever grants reach (`reach: global`
+  on top of the tree rules; no tag ever adds reach (`reach: global`
   rejected), and no tag ever changes what is visible.
-- **Test access is tree-routed and tag-gated.** There is no global test
+- **Test access follows the tree and is tag-gated.** There is no global test
   channel: `testing` support travels the ordinary exposure channels, and it
   is available only in testing modules and declared test contexts.
 

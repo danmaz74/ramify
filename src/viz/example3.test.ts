@@ -52,8 +52,8 @@ describe('example 3 - the tag is the entire difference', () => {
     }
     // Same chain, same rows, same provenance - twice.
     expect(rowsOf('billing')).toEqual([
-      '_ OrderService   granted by app',
-      '_ resetOrderStore ⇥ testing   granted by app',
+      '_ OrderService   from app',
+      '_ resetOrderStore ⇥ testing   from app',
     ]);
   });
 
@@ -66,8 +66,8 @@ describe('example 3 - the tag is the entire difference', () => {
 
     // …the test module's arrivals included.
     expect(rowsOf('integration-tests')).toEqual([
-      '_ OrderService   granted by app',
-      '_ resetOrderStore ⇥ testing   granted by app',
+      '_ OrderService   from app',
+      '_ resetOrderStore ⇥ testing   from app',
     ]);
 
     // The chip is the owner's declaration, drawn wherever the symbol arrives.
