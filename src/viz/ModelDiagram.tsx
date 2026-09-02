@@ -103,7 +103,7 @@ export interface ModelDiagramProps {
   readonly onPointerMove?: (event: ReactPointerEvent<SVGSVGElement>) => void;
   readonly onPointerUp?: (event: ReactPointerEvent<SVGSVGElement>) => void;
 
-  // --- the traced-contract tour, driven by the interactive wrapper.
+  // --- the traced-symbol tour, driven by the interactive wrapper.
 
   /** Whether the tour is running; drawn on the play/stop toggle. */
   readonly playing?: boolean;
@@ -125,7 +125,7 @@ export interface ModelDiagramInteractiveProps extends ModelDiagramProps {
    */
   readonly maxWidth?: number | string;
   /**
-   * Start with the traced-contract tour running: each traced symbol is
+   * Start with the traced-symbol tour running: each traced symbol is
    * selected in turn, forever, until the reader takes over. On by default
    * for uncontrolled selection; a controlled component never plays.
    */
@@ -136,8 +136,8 @@ export interface ModelDiagramInteractiveProps extends ModelDiagramProps {
 const DEFAULT_MIN_WIDTH = 820;
 
 /**
- * How long the tour holds each traced contract: five ~1s animation cycles -
- * enough to follow the longest chain twice, not so long the one-hop contracts
+ * How long the tour holds each traced symbol: five ~1s animation cycles -
+ * enough to follow the longest chain twice, not so long the one-hop symbols
  * drag. Uniform on purpose: a steady rhythm reads as a guided tour.
  */
 export const TOUR_DWELL_MS = 5000;
@@ -232,10 +232,10 @@ export function ModelDiagram(props: ModelDiagramInteractiveProps): ReactElement 
   const selectRef = useRef(select);
   selectRef.current = select;
 
-  // The tour: hold each traced contract for TOUR_DWELL_MS, forever. It rides
+  // The tour: hold each traced symbol for TOUR_DWELL_MS, forever. It rides
   // the ordinary selection state, so what it shows is exactly what a hand
   // selection shows. Play begins at the current selection when that is a
-  // traced contract (restarting its dwell), else at the first.
+  // traced symbol (restarting its dwell), else at the first.
   useEffect(() => {
     const symbols = layout.definition.tracedSymbols.map((entry) => entry.symbol);
     if (!playing || symbols.length === 0) {
@@ -1411,9 +1411,9 @@ function renderRow(
 }
 
 /**
- * The traced-contracts panel at the top left - the diagram's selection
+ * The traced-symbols panel at the top left - the diagram's selection
  * control, promoted out of the legend but keeping its vertical row form:
- * `swatch symbol - role`, one row per contract. Rows select exactly as the
+ * `swatch symbol - role`, one row per symbol. Rows select exactly as the
  * legend chips used to. The play/stop toggle is live-only: the static export
  * gets no handler and therefore no toggle.
  */
@@ -1437,7 +1437,7 @@ function renderHeader(
         fontSize={LAYOUT.header.captionFontSize}
         fontWeight={700}
       >
-        Traced contracts
+        Traced symbols
       </text>
       {onTogglePlay === undefined ? null : (
         <g

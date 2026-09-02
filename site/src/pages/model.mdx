@@ -77,7 +77,8 @@ routingOptimization`, and `ShipmentPlan` arrives in `routingOptimization` as
 
 And notice `app`: it receives nothing. Neither symbol was exposed any
 further, so neither reaches the root. The default everywhere, for every
-symbol, is "goes no further" - reach ends where decisions end.
+symbol, is "goes no further" - [**reach**](/glossary#reach) ends where
+decisions end.
 
 The two channels are also asymmetric, and `ShipmentPlan` is the witness.
 Exposing to descendants is final and bounded: one decision, whole subtree,

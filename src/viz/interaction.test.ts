@@ -273,7 +273,7 @@ describe('a second diagram', () => {
     expect(blinking()).not.toContain('moneyUtils/computeTotal');
   });
 
-  it('writes each contract’s role in its header row', () => {
+  it('writes each symbol’s role in its header row', () => {
     mount({ definition: example1Diagram });
     expect(find('[data-kind="header-chip"][data-symbol="computeTotal"]').textContent).toBe(
       'computeTotal - owner → parent → root → everywhere',
@@ -391,7 +391,7 @@ describe('selecting a symbol in a tag universe', () => {
   });
 });
 
-describe('the traced-contract tour', () => {
+describe('the traced-symbol tour', () => {
   const selected = (): string => find('svg').getAttribute('data-selected-symbol') ?? '';
   const dwell = (steps = 1): void => {
     act(() => {
@@ -406,7 +406,7 @@ describe('the traced-contract tour', () => {
     vi.useRealTimers();
   });
 
-  it('plays by default: first contract selected at mount, and the toggle says stop', () => {
+  it('plays by default: first symbol selected at mount, and the toggle says stop', () => {
     act(() => {
       root.render(createElement(ModelDiagram, { definition: example1Diagram }));
     });
@@ -414,7 +414,7 @@ describe('the traced-contract tour', () => {
     expect(find('[data-kind="play-toggle"]').getAttribute('data-playing')).toBe('true');
   });
 
-  it('holds each contract for the dwell, ends the lap on none selected, forever', () => {
+  it('holds each symbol for the dwell, ends the lap on none selected, forever', () => {
     mount({ definition: example1Diagram, autoPlay: true });
     expect(selected()).toBe('computeTotal');
     dwell();
@@ -450,7 +450,7 @@ describe('the traced-contract tour', () => {
     dwell(3);
     expect(selected()).toBe('InvoiceModel');
     click('[data-kind="play-toggle"]');
-    // Resuming restarts the current contract's dwell rather than skipping on.
+    // Resuming restarts the current symbol's dwell rather than skipping on.
     expect(selected()).toBe('InvoiceModel');
     dwell();
     expect(selected()).toBe('optimizeRoute');

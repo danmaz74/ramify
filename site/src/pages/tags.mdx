@@ -42,13 +42,14 @@ In this small app, we keep order handling in an `orders` module. Its tests
 need an internal that must never become a production dependency: the
 `resetOrderStore` hook that clears the module's store between runs. Without
 tags we would face a false choice - expose the hook to everyone or to no one.
-`testing` resolves it: we expose exactly the internals tests may touch,
-tagged, through the ordinary channels.
+[`testing`](/glossary#testing-tag) resolves it: we expose exactly the
+internals tests may touch, tagged, through the ordinary channels.
 
 So `orders` exposes two symbols to its parent - `OrderService`, the real
 contract, and `resetOrderStore`, tagged - and `app` exposes both to its
-descendants, where `integration-tests` is a testing module beside the
-production consumer `billing`. Identical chains, identical arrivals - and one
+descendants, where `integration-tests` is a
+[**testing module**](/glossary#testing-tag) beside the production consumer
+`billing`. Identical chains, identical arrivals - and one
 symbol wears a tag.
 
 <div className="wide-figure">
@@ -64,16 +65,17 @@ its owner and immutable from then on: no module along the way can add, remove
 or change a tag, which is why `resetOrderStore`'s chip rides on the owner's
 row and on every arrival alike. [A module can carry tags
 too](/glossary#module-tagging), declared in its own definition -
-`integration-tests` wears its tag as the dashed box filling the node.
+`integration-tests` is a [**tagged module**](/glossary#tagged-module), and
+wears its tag as the dashed box filling the node.
 
 And a tag is not just a name: **when a tag is defined, it is
 [associated with its availability rule](/glossary#tag-associated-availability-rule),
 and it always carries it.** That is why the diagrams always write a tag
 behind the glyph of its rule - <TagRef rule="⇥" name="testing" /> - the name
-and the rule are one thing. On a symbol, `testing` carries the
-**required module tag** rule, written <TagRef rule="⇥" />: the demand rides
-out with the symbol and is checked where it lands - the symbol is
-[**available**](/glossary#module-available-symbol) from exposure only in
+and the rule are one thing. `testing` carries the **required module tag**
+rule, written <TagRef rule="⇥" />, and that rule fires from the symbol: the
+demand rides out with the symbol and is checked where it lands - the symbol
+is [**available**](/glossary#module-available-symbol) from exposure only in
 modules carrying the same tag.
 
 Read `billing`'s box: `resetOrderStore` is listed, provenance and all, with
@@ -105,7 +107,8 @@ beside it, and a `shared` module both of them draw on. Browser code must not
 pull in Node-only dependencies - and that line runs *through* `shared`, not
 between modules: `shared` owns both `formatMoney` (browser-safe) and
 `queryDb` (Node-only). Splitting every such module in two would multiply
-modules to encode one fact; `browser` states the fact per symbol instead.
+modules to encode one fact; [`browser`](/glossary#browser-tag) states the
+fact per symbol instead.
 
 The universe is the mirror image of the last one: here the **module** wears
 the working tag, and the rule asks the symbols for a match.
@@ -114,22 +117,25 @@ the working tag, and the rule asks the symbols for a match.
   <ModelDiagram definition={example4Diagram} />
 </div>
 
-**On a module,** `browser` classifies files that run in a browser and carries
-the **required symbol tag** rule, written <TagRef rule="⇤" /> - the mirror of
-`testing`'s: the demand faces in at the module's door, checked on everything
-arriving, and the module may import from exposure only symbols tagged
-`browser`. **On a symbol,** `browser` is a falsifiable promise that the
-symbol's entire transitive runtime closure is browser-safe, the owner's
-private files included. It carries no rule of its own; it is what the
-module-side rule asks for. The promise is verified separately, and a false
-claim is reported at the owner - never at the importer, which did nothing
-wrong by believing it.
+`browser` carries the **required symbol tag** rule, written
+<TagRef rule="⇤" /> - the mirror of `testing`'s. Where `testing`'s rule fires
+from the symbol, this one fires from the module. **On a module,** `browser`
+classifies files that run in a browser, and the demand faces in at the
+module's door, checked on everything arriving: the module may import from
+exposure only symbols tagged `browser`. **On a symbol,** `browser` is the
+other side of that demand - a falsifiable promise that the symbol's entire
+transitive runtime closure is browser-safe, the owner's private files
+included. The chip still wears the rule's glyph, because the name and the
+rule are one thing, but nothing fires there. The promise is verified
+separately, and a false claim is reported at the owner - never at the
+importer, which did nothing wrong by believing it.
 
-Read `ui`'s box: it is a browser module - the same dashed box as the testing
-module, labeled <TagRef rule="⇤" name="browser" /> - and `queryDb`'s row in
-it is struck: visible there, not available, like `billing`'s struck row in
-the last picture. Selecting `queryDb` shows the dynamic version -
-`server` lights up and `ui` stays dark.
+Read `ui`'s box: it is a [**browser module**](/glossary#browser-tag) - the
+same dashed box as the testing module, labeled
+<TagRef rule="⇤" name="browser" /> - and `queryDb`'s row in it is struck:
+visible there, not available, like `billing`'s struck row in the last
+picture. Selecting `queryDb` shows the dynamic version - `server` lights up
+and `ui` stays dark.
 
 ## The general shape
 

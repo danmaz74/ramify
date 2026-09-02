@@ -3,7 +3,7 @@
  *
  * Four short groups, flowed left to right across the available width and
  * wrapping to a second band when they no longer fit, then the two standing
- * notes. The traced-contract chips are the diagram's selection control: each
+ * notes. The traced-symbol chips are the diagram's selection control: each
  * carries the symbol it selects.
  *
  * Pure: positions only. The glyph samples themselves are drawn by the view.

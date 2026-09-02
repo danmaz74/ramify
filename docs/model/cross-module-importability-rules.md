@@ -18,8 +18,9 @@ model to cucumber-viz - coverage of the current enforcement rules, required
 restructurings and migration consequences - lives in
 [Importability Rules: cucumber-viz Coverage](../../../docs/analysis/2026-08-31-importability-rules-cucumber-viz-coverage.md);
 this document stays application-agnostic. Vocabulary is defined in the
-[Glossary](glossary.md): module, file, own, visible, available, expose. This
-document uses those terms and does not redefine them.
+[Glossary](glossary.md): module, file, own, receive, visible, reach, expose,
+available, tagged, testing module, browser module. This document uses those
+terms and does not redefine them.
 
 ## What this document is not about
 
@@ -120,13 +121,13 @@ an error.
 ## The importability rule
 
 > A file may import a symbol iff the symbol is **available** in the file's
-> module: **visible** there, and withheld by no tag based availability rule.
+> module: **visible** there, and withheld by no tag-based availability rule.
 > A symbol is visible in a module if the module owns it, or it is exposed to
 > it - by a direct child exposing it to its parent, or by a proper ancestor
 > exposing it to its descendants.
 
 Nothing else creates visibility, and with no tags declared, available and
-visible coincide (the tag based availability rules are the "Contextual
+visible coincide (the tag-based availability rules are the "Contextual
 rules" section below). Expanded, a file belonging to module `S` may import
 symbol `c` owned by module `T` iff every applicable availability rule is
 satisfied and:
@@ -182,7 +183,8 @@ rule"). The same tag names are assigned in two positions:
   way can add, remove or change one.
 - **Module tagging.** A module may assign tags to itself in its module
   definition, classifying its files - a **testing module**'s files are
-  tests, a **browser module**'s files run in a browser. A module may also
+  tests, a **browser module**'s files run in a browser (glossary: "`testing`
+  tag", "`browser` tag"). A module may also
   classify file subtrees the same way (declared importer contexts:
   co-located tests, a domain's feature-test tree). Classification is always
   declared; a file never gains privileges because its name matches a
@@ -190,8 +192,8 @@ rule"). The same tag names are assigned in two positions:
 
 ### Availability rules
 
-The tag based availability rules define which combinations of module and
-symbol tags make an exposed symbol available (glossary: "Tag based
+The tag-based availability rules define which combinations of module and
+symbol tags make an exposed symbol available (glossary: "Tag-based
 availability rules"). There are two kinds, and each tag's definition says
 which it carries:
 
@@ -348,8 +350,8 @@ the declaration.
   type-available, by construction, and the unqualified "available" safely
   means the strong (value) form.
 - **Tags are purely restrictive.** A tag's availability rules gate imports
-  on top of the tree rules; no tag ever adds reach (`reach: global`
-  rejected), and no tag ever changes what is visible.
+  on top of the tree rules; no tag ever adds reach (glossary: "Reach";
+  `reach: global` rejected), and no tag ever changes what is visible.
 - **Test access follows the tree and is tag-gated.** There is no global test
   channel: `testing` support travels the ordinary exposure channels, and it
   is available only in testing modules and declared test contexts.

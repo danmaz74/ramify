@@ -276,7 +276,7 @@ export const legendGroups: readonly LegendGroup[] = [
       { id: 'denied', glyph: { kind: 'chord-denied' }, text: '✗ denied import, with its reason' },
     ],
   },
-  // The traced contracts themselves live in the header strip above the tree
+  // The traced symbols themselves live in the header strip above the tree
   // (rendered from `tracedSymbols`), not in the legend.
 ];
 

@@ -111,6 +111,6 @@ From here:
 - [**Glossary**](/glossary) - the agreed vocabulary, one term, one
   definition.
 
-One reading note: from here on, **module** always means a Ramify module -
+One reading note: from here on, **module** always means a ramify module -
 the declared multi-file unit. A TypeScript/ES module is always called a
 **file**.

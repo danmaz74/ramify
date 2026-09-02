@@ -7,7 +7,7 @@
  * not just a name - when a tag is defined, it is associated with its
  * availability rule, and it always carries it. The same tag names are assigned
  * to symbols (by their owner, immutably) and to modules (in the module
- * definition), and the **tag based availability rules** decide which
+ * definition), and the **tag-based availability rules** decide which
  * combinations make an exposed symbol available:
  *
  * - **Required symbol tag** - if the module has the tag, the only symbols

@@ -19,7 +19,7 @@ import { layoutPropagation, type PropagationLayout } from './layout-lanes.js';
 import { layoutTree, type TreeGeometry } from './layout-nodes.js';
 import { validateDiagram } from './validate.js';
 
-/** One row of the traced-contracts panel: swatch, text, and its hit area. */
+/** One row of the traced-symbols panel: swatch, text, and its hit area. */
 export interface HeaderChip {
   readonly symbol: string;
   /** The colored swatch line, drawn from `swatchFrom` to `swatchTo`. */
@@ -30,8 +30,8 @@ export interface HeaderChip {
 }
 
 /**
- * The traced-contracts panel at the top left - the diagram's selection
- * control: a caption row, then one row per traced contract, stacked
+ * The traced-symbols panel at the top left - the diagram's selection
+ * control: a caption row, then one row per traced symbol, stacked
  * vertically in the band `layoutTree` reserved.
  */
 export interface HeaderLayout {
@@ -56,9 +56,9 @@ export interface DiagramLayout {
   readonly viewBox: { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
 }
 
-const HEADER_CAPTION = 'Traced contracts';
+const HEADER_CAPTION = 'Traced symbols';
 
-/** The traced-contracts panel, laid out in the band `layoutTree` reserved. */
+/** The traced-symbols panel, laid out in the band `layoutTree` reserved. */
 function layoutHeader(definition: DiagramDefinition, left: number): HeaderLayout | undefined {
   if (definition.tracedSymbols.length === 0) {
     return undefined;

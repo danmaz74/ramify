@@ -175,7 +175,7 @@ export const example1DecisionPolicies: readonly DecisionPolicy[] = [
 ];
 
 // The legend and node-content conventions are the series', declared once in
-// `./series.js`. The traced contracts live in the header strip above the
+// `./series.js`. The traced symbols live in the header strip above the
 // tree (rendered from `tracedSymbols`), not in the legend: one selector, and
 // it sits where the eyes are.
 export const example1LegendGroups = seriesLegendGroups;

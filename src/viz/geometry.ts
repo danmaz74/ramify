@@ -159,10 +159,10 @@ export const LAYOUT = {
   },
 
   /**
-   * The traced-contracts panel at the top left: the diagram's selection
+   * The traced-symbols panel at the top left: the diagram's selection
    * control, promoted out of the legend. A caption row, then one row per
-   * traced contract - `swatch symbol - role` - stacked vertically. The band's
-   * height depends only on how many contracts a diagram traces, never on the
+   * traced symbol - `swatch symbol - role` - stacked vertically. The band's
+   * height depends only on how many symbols a diagram traces, never on the
    * selection, so selecting never reflows the tree.
    */
   header: {
@@ -191,7 +191,7 @@ export const LAYOUT = {
   },
 } as const;
 
-/** Height of the traced-contracts band above the tree; zero when nothing is traced. */
+/** Height of the traced-symbols band above the tree; zero when nothing is traced. */
 export function headerBandHeight(tracedCount: number): number {
   if (tracedCount === 0) {
     return 0;

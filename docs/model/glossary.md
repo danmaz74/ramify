@@ -7,11 +7,15 @@ Defines the terms used by
 [Cross-Module Importability Rules](cross-module-importability-rules.md);
 the rules document uses these terms and does not redefine them.
 
-## Ramify Module
+## ramify module
 
-A Ramify Module is a unit of code ownership, declared by marking a directory as a module root. Ramify Modules form a tree: a module's parent is the innermost module whose directory contains its directory, and a single root module covers the whole application.
+A ramify module is a unit of code ownership, declared by marking a directory as a
+module root. ramify modules form a tree: a module's parent is the innermost module
+whose directory contains its directory, and a single root module covers the whole
+application.
 
-In these documents, "module" always means Ramify Module - not a TypeScript/ES module, which is a single file.
+In these documents, "module" always means ramify module - not a TypeScript/ES
+module, which is a single file.
 
 ## Files belonging to a module
 
@@ -61,6 +65,11 @@ Symbol S is **visible** in module M when M owns S or receives S.
 Visibility is decided by the exposure decisions alone; tags never change what is
 visible in a module.
 
+## Reach
+
+The **reach** of symbol S is the set of modules in which S is visible. S's owner is
+always in its reach; every other module is added by exposure.
+
 ## Module-exposed symbol
 
 A module M can **expose** any symbol S which is visible in M. The exposure can be
@@ -85,9 +94,13 @@ Tags can also be assigned to modules in the module definition. This assignment a
 
 By default, no tag is assigned to a module.
 
-## Tag based availability rules
+## Tagged module
 
-**Tag based availability rules** define which combinations of module and symbol tags make
+A module to which at least one tag is assigned is called tagged.
+
+## Tag-based availability rules
+
+**Tag-based availability rules** define which combinations of module and symbol tags make
 a symbol available in a module. Currently there are two kinds of rules:
 
 - Required symbol tag: if the module has the tag, then the only symbols visible from exposure that are available in that module are those associated with the same tag. This rule never blocks type-availability: type-only imports pass it.
@@ -104,6 +117,18 @@ When several rules apply to the same symbol and module, all of them must be sati
 When a tag is defined, it is associated with its availability rule, and it always carries it.
 So, when a tag is associated with a symbol or module, it carries its availability rule.
 
+## `testing` tag
+
+The built-in tag carrying the required module tag rule. A symbol tagged `testing` is
+test support, never part of the production contract. A **testing module** is a module
+tagged `testing`; every symbol it owns is tagged `testing`.
+
+## `browser` tag
+
+The built-in tag carrying the required symbol tag rule. On a symbol it is the owner's
+claim that the symbol's entire transitive runtime closure is browser-safe. A
+**browser module** is a module tagged `browser`; its files run in a browser.
+
 ## Module-available symbol
 
 Saying that symbol S is **available** in module M means that all files belonging to M
@@ -113,7 +138,7 @@ that it can also be imported as a type.
 All symbols owned by M are available in M, because ramify modules don't affect intra-module
 imports in any way.
 
-The only other symbols available in M are those it receives, subject to their tag based
+The only other symbols available in M are those it receives, subject to their tag-based
 availability rules.
 
 At times we can use "fully available" as a synonym of "available" to underline that it implies
