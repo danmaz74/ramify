@@ -46,14 +46,16 @@ Build output (`site/build/`, `site/.docusaurus/`) is git-ignored.
 
 | URL | Page |
 | --- | --- |
-| `/` | Landing: what ramify.ts is, the model's one question, the scope statement |
-| `/model` | The core tree model - the live diagram plus the R1–R6 walkthrough |
-| `/examples` | Illustrative examples - the tree-rule universes ("one decision, three reaches"; "both channels at once"), each with its own live diagram |
-| `/tags` | Tags - the other half of the rule: the two availability rules (`▢` required module tag, `▭` required symbol tag) and the `testing` and `browser` tags that carry them |
+| `/` | Landing page: what ramify.ts is, an overview of the model, and signposts to the detailed pages |
+| `/modularity` | Why multi-file, hierarchical modularity matters and why ramify exists |
+| `/model` | The simplified, tag-free core model, built up through two interactive examples |
+| `/tags` | The two restrictive availability rules (`⇥` required module tag and `⇤` required symbol tag) and the `testing` and `browser` tags that carry them |
+| `/explorer` | A preview of the module dependency explorer |
+| `/glossary` | Definitions of the model's vocabulary |
 
 The normative specification is not rendered as a site page; it ships with the
-repository at `docs/model/cross-module-importability-rules.md`, and every page
-points readers there.
+repository at `docs/model/cross-module-importability-rules.md`; the model,
+tags, and glossary pages point readers there.
 
 ### Portability discipline
 
