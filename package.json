@@ -2,7 +2,7 @@
   "name": "ramify.ts",
   "version": "0.0.0",
   "private": true,
-  "description": "Toolkit to define, enforce, visualize, and help agents adhere to the ramify cross-module importability model.",
+  "description": "Multi-file hierarchical modules for TypeScript: a toolkit to define, enforce, visualize, and help agents adhere to them.",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {

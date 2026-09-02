@@ -1,10 +1,10 @@
 ---
 title: ramify.ts
-description: Multi-file hierarchical modules for TypeScript - a toolkit to define, enforce, and visualize them, and to help agents and humans adhere to its rules.
+description: Multi-file hierarchical modules for TypeScript - declare groups of files as modules with a boundary and an interface, arrange them in a tree, and have the boundaries enforced, for humans and coding agents.
 hide_table_of_contents: true
 ---
 
-import useBaseUrl from '@docusaurus/useBaseUrl';
+import useBaseUrl from "@docusaurus/useBaseUrl";
 import { ModelDiagram, example1Diagram } from "@ramify/viz";
 
 # ramify.ts
@@ -16,13 +16,32 @@ exported symbol is importable from every file in the codebase, and the
 architecture of an application - its domains, capabilities, boundaries -
 exists only by convention: nothing declares it, nothing checks it.
 
-**ramify.ts is a toolkit to define, enforce, and visualize multi-file modules, and
-to help agents and humans adhere to its rules.**
+**ramify.ts lets you declare groups of files as modules with a boundary and
+an interface, arrange them in a tree, and have the boundaries enforced.** It
+is a toolkit to define, enforce, and visualize those modules, and to help
+humans and agents adhere to their rules.
 
-It lets you group files into modules with clear boundaries and interfaces.
-These modules can be arranged into a hierarchy, applying a divide-and-conquer
-strategy at different abstraction levels. That makes the codebase easier to
-reason about for humans and for agents with limited context.
+Three main advantages:
+
+- **Divide and conquer at every abstraction level.** Splitting a complex system
+  into smaller parts you can reason about separately is a foundation of software
+  design, and TypeScript stops supporting it above the file. A module tree lets
+  you make the same split at every level: a system into domains, a domain
+  into capabilities, a capability into implementation pieces. Each level
+  can only compose the one below it through public interfaces, with automated
+  checks enforcing it. For humans and agents alike.
+- **A manageable context for every agent task.** An agent reasons worse as its
+  context grows. In a module tree every task has a natural context: the
+  module it works in, the interfaces it consumes, and the interface it owes
+  its parent - nothing else. Splitting bigger tasks into smaller ones,
+  involving just one or very few modules, ensures that context sizes stay
+  manageable.
+- **Human oversight at the level you care about.** When agents write the code,
+  reading every single file can become overwhelming. ramify's module dependency
+  explorer shows your architecture at the module and interface level, so you can
+  keep track of what agents are doing, and steer it, at whichever abstraction
+  level you care about. Agents too can use its dependency analysis metrics to
+  improve the architecture on their own.
 
 [**Why modularity**](/modularity) makes the full case.
 
@@ -53,9 +72,9 @@ There are two common needs which require more than this: **testing** and
 
 [TBD]
 
-<div className="wide-figure" style={{ textAlign: 'center' }}>
+<div className="wide-figure" style={{ textAlign: "center" }}>
   <img
-    src={useBaseUrl('/img/module-explorer.png')}
+    src={useBaseUrl("/img/module-explorer.png")}
     alt="The module dependency explorer drilled into one domain module: its six sub-modules arranged in a circle with their dependency edges, and the selected module's path, description, and metrics in a details panel"
   />
 </div>

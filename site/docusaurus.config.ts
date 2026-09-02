@@ -45,7 +45,7 @@ function ramifySourcePlugin(): Plugin {
 
 const config: Config = {
   title: 'ramify.ts',
-  tagline: 'Who could import this symbol?',
+  tagline: 'Multi-file hierarchical modules for TypeScript',
   // No favicon: the scaffold's placeholder images were stripped, and this site
   // owns no image assets of its own. `static/diagrams/model-core.svg` is the
   // emitter's checked-in export, not site artwork.
@@ -97,7 +97,7 @@ const config: Config = {
     },
     footer: {
       style: 'light',
-      copyright: 'ramify.ts - a toolkit for cross-module importability.',
+      copyright: 'ramify.ts - multi-file hierarchical modules for TypeScript.',
     },
   } satisfies Preset.ThemeConfig,
 };

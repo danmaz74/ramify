@@ -1,13 +1,39 @@
 # ramify.ts
 
-A toolkit to **define, enforce, visualize, and help agents adhere to** the
-ramify cross-module importability model: a recursive ownership tree with
-closed-by-default boundaries, two exposure channels (to parent, to
-descendants), and purely restrictive tagged cross-requirements for test and
-browser contexts.
+**Multi-file hierarchical modules for TypeScript.**
 
-The model itself is specified in
+TypeScript is modular at exactly one granularity, the file: above it, every
+exported symbol is importable from every file, and an application's
+architecture exists only by convention. ramify.ts lets you declare groups of
+files as modules with a boundary and an interface, arrange them in a tree,
+and have the boundaries checked - so a module can be understood, changed, or
+handed to a team or an agent from its inside and the interfaces it consumes
+alone.
+
+It is a toolkit to **define, enforce, visualize, and help agents adhere to**
+these modules. The rules are few: every cross-module import is closed by
+default, a module shares a symbol only with its parent or with its own
+subtree, and tags restrict, but never widen, what the tree allows. The model
+is specified in
 [docs/model/cross-module-importability-rules.md](docs/model/cross-module-importability-rules.md).
+
+Why it matters:
+
+- **Divide and conquer at every abstraction level.** A module tree lets you
+  make the same split at every level: a system into domains, a domain into
+  capabilities, a capability into implementation pieces. Each level can only
+  compose the one below it through public interfaces, with automated checks
+  enforcing it. For humans and agents alike.
+- **A manageable context for every agent task.** In a module tree every task
+  has a natural context: the module it works in, the interfaces it consumes,
+  and the interface it owes its parent - nothing else. Splitting bigger tasks
+  into smaller ones, on one or very few modules, keeps context sizes
+  manageable.
+- **Human oversight at the level you care about.** The module dependency
+  explorer shows the architecture at the module and interface level, so you
+  can keep track of what agents are doing, and steer it, at whichever
+  abstraction level you care about. Agents too can use its dependency metrics
+  to improve the architecture on their own.
 
 ## Status
 
