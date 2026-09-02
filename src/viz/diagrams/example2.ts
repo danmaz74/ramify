@@ -1,9 +1,8 @@
 /**
  * Example 2 - "Both channels at once".
  *
- * The universe and the decisions come from
- * `docs/model/illustrative-examples.md`, which is normative for this diagram:
- * five modules, two symbols, three decisions. One owner exposes one symbol
+ * This file is the universe's normative statement: five modules, two
+ * symbols, three decisions. One owner exposes one symbol
  * through both channels - to its parent and to its descendants - and the
  * `▲▼` marker makes its first appearance in the series.
  *
@@ -98,7 +97,7 @@ export const example2DecisionPolicies: readonly DecisionPolicy[] = [
   },
 ];
 
-/** The lessons of the doc, in the glossary's vocabulary. */
+/** The lessons the diagram teaches, in the glossary's vocabulary. */
 export const example2LegendNotes: readonly string[] = [
   '▲▼ is not a third channel: two independent one-hop decisions sharing a row.',
   "Both channels at once buy exactly the owner's subtree plus its parent - the most any owner can reach alone.",

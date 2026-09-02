@@ -280,7 +280,7 @@ describe('a second diagram', () => {
     );
   });
 
-  it('shows a downward-only exposure as one flow and one arrival', () => {
+  it('shows an exposure to descendants only as one flow and one arrival', () => {
     mount({ definition: example1Diagram });
     click('[data-kind="header-chip"][data-symbol="ShipmentPlan"]');
     expect(find('svg').getAttribute('data-selected-symbol')).toBe('ShipmentPlan');
@@ -302,8 +302,8 @@ describe('a second diagram', () => {
 });
 
 /**
- * The two selection stories of `docs/model/illustrative-examples.md` examples 3
- * and 4, in the live component: selecting a tagged symbol must light exactly
+ * The two selection stories of examples 3 and 4 (`./diagrams/example3.ts`,
+ * `./diagrams/example4.ts`), in the live component: selecting a tagged symbol must light exactly
  * the arrivals that may actually import it, and leave the rest dark.
  */
 describe('selecting a symbol in a tag universe', () => {

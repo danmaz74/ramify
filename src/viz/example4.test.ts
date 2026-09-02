@@ -13,10 +13,9 @@ const uiValue = { module: 'ui', binding: 'value' } as const;
 const uiType = { module: 'ui', binding: 'type' } as const;
 
 /**
- * Example 4 of `docs/model/illustrative-examples.md`: four modules, two symbols
- * with identical exposures, one of them tagged `browser`, and one browser
- * module. The doc is normative for everything asserted
- * here.
+ * Example 4 (`./diagrams/example4.ts`): four modules, two symbols with
+ * identical exposures, one of them tagged `browser`, and one browser module.
+ * The diagram file is normative for everything asserted here.
  */
 describe('example 4 - a promise about the closure', () => {
   const rowsOf = (id: string): string[] =>
@@ -35,7 +34,7 @@ describe('example 4 - a promise about the closure', () => {
     return node?.moduleContext === undefined ? named : [...named, node.moduleContext];
   };
 
-  it('draws the doc’s tree, and only the doc’s tree', () => {
+  it('draws the declared tree, and only the declared tree', () => {
     expect(example4.tree.nodes.map((node) => node.id)).toEqual(['app', 'shared', 'ui', 'server']);
     expect(example4.tree.nodeById.get('app')?.badge).toBe('app root');
   });
@@ -66,7 +65,7 @@ describe('example 4 - a promise about the closure', () => {
     }
   });
 
-  it('reproduces the doc’s verdict table through the evaluator', () => {
+  it('reproduces the verdict table through the evaluator', () => {
     // | server                | ✓ | ✓ |
     expect(mayImport(tree, 'server', 'shared', 'formatMoney')).toBe(true);
     expect(mayImport(tree, 'server', 'shared', 'queryDb')).toBe(true);

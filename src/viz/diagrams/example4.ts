@@ -1,9 +1,8 @@
 /**
  * Example 4 - "A promise about the closure (browser)".
  *
- * The universe, the verdicts and the lessons come from
- * `docs/model/illustrative-examples.md`, which is normative for this diagram:
- * four modules, two symbols, one browser module. The tree is as trivial as
+ * This file is the universe's normative statement: four modules, two
+ * symbols, one browser module. The tree is as trivial as
  * example 3's, and for the same reason - visibility is uniform by
  * construction, so the tag is the only variable.
  *
@@ -61,6 +60,13 @@ const example4LegendGroups = seriesTagLegendGroups.map((group) =>
  * `ui` is a whole module tagged `browser`, so its dashed box fills its node -
  * the same shape as example 3's testing module. `shared` never splits - the
  * browser line is drawn per symbol, not per file or module.
+ *
+ * Verdicts:
+ *
+ * | Importer | `formatMoney` (tagged `⇤ browser`) | `queryDb` |
+ * | --- | --- | --- |
+ * | `server` | ✓ | ✓ |
+ * | `ui` | ✓ | ✗ - a browser module value-imports only browser symbols; still type-available |
  */
 export const example4Declaration: ModuleDeclaration = {
   id: 'app',
@@ -122,7 +128,7 @@ export const example4DecisionPolicies: readonly DecisionPolicy[] = [
   },
 ];
 
-/** The lessons of the doc, in the glossary's vocabulary. */
+/** The lessons the diagram teaches, in the glossary's vocabulary. */
 export const example4LegendNotes: readonly string[] = [
   'The mirrored rule: here the importing module carries the tag, and the rule asks the symbol for the same one.',
   'The browser line is drawn per symbol, not per file or module: shared never splits to keep browser-safe and Node-only code apart.',

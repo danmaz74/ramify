@@ -21,7 +21,7 @@ import {
 /**
  * The contextual rules of `docs/model/cross-module-importability-rules.md`
  * §"Contextual rules: importer contexts and exposure tags", as the example
- * universes of `docs/model/illustrative-examples.md` state them.
+ * universes of `../viz/diagrams/example3.ts` and `example4.ts` state them.
  *
  * Examples 3 and 4 keep the tree trivial on purpose: everything is exposed
  * everywhere, so availability is identical in every column and the tag is the

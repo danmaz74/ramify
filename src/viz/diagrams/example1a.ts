@@ -2,10 +2,10 @@
  * Example 1, stage A - the `shipping` fragment.
  *
  * The first of two build-up stages the site uses to teach Example 1
- * (`docs/model/illustrative-examples.md`) progressively: the smallest
- * structure that exhibits the entire mechanism. One parent-child edge
- * carries both channels - `routingOptimization` exposes `optimizeRoute`
- * upward, `shipping` exposes `ShipmentPlan` downward - and the empty root
+ * (`./example1.ts`) progressively: the smallest structure that exhibits the
+ * entire mechanism. One parent-child edge carries both channels -
+ * `routingOptimization` exposes `optimizeRoute` to its parent, `shipping`
+ * exposes `ShipmentPlan` to its descendants - and the empty root
  * above them is the witness that both symbols stop: closed by default is
  * drawn, not asserted.
  *

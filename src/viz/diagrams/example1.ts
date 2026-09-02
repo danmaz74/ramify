@@ -1,9 +1,8 @@
 /**
  * Example 1 - "One decision, three reaches".
  *
- * The universe and the decisions come from
- * `docs/model/illustrative-examples.md`, which is normative for this diagram:
- * nine modules, four symbols, seven decisions. Three leaf modules make the
+ * This file is the universe's normative statement: nine modules, four
+ * symbols, seven decisions. Three leaf modules make the
  * identical decision - expose a symbol to their parent - and end up with three
  * different reaches, because the reach was decided above them. A fourth symbol
  * goes the other way - its owner exposes it to its descendants - and shows the
@@ -40,8 +39,24 @@ import { seriesLegendGroups, seriesNodeContent } from './series.js';
  *     └── routingOptimization    owns optimizeRoute
  * ```
  *
- * Two consumers under `invoicing` are deliberate: an exposure to descendants
- * needs at least two arrivals to read as one rather than as a private handoff.
+ * Resulting reach:
+ *
+ * | Symbol | Owner's decision | What happened above | Reach |
+ * | --- | --- | --- | --- |
+ * | `computeTotal` | expose to parent | re-exposed to the parent again, then to descendants at `app` | every module |
+ * | `InvoiceModel` | expose to parent | exposed to descendants at `invoicing` | the `invoicing` subtree |
+ * | `optimizeRoute` | expose to parent | `shipping` composed it and stopped | `routingOptimization` and `shipping` |
+ * | `ShipmentPlan` | expose to descendants | nothing - no one above was ever involved | the `shipping` subtree |
+ *
+ * Imports that are not allowed, read from absence: `shipping` ✗
+ * `InvoiceModel` (an exposure to descendants never leaves the exposing
+ * module's subtree), `invoicing` ✗ `optimizeRoute` (there is no sibling
+ * channel), `app` ✗ `ShipmentPlan` (the parent is the outsider of an
+ * exposure to descendants, root included).
+ *
+ * The site presents this example as a three-step build-up (`./example1a.ts`,
+ * `./example1b.ts`, then this file). The stages are presentation only;
+ * `../example1-stages.test.ts` pins their subtrees and colors to this one.
  */
 export const example1Declaration: ModuleDeclaration = {
   id: 'app',
@@ -165,7 +180,7 @@ export const example1DecisionPolicies: readonly DecisionPolicy[] = [
 // it sits where the eyes are.
 export const example1LegendGroups = seriesLegendGroups;
 
-/** The lessons of the doc, in the glossary's vocabulary. */
+/** The lessons the diagram teaches, in the glossary's vocabulary. */
 export const example1LegendNotes: readonly string[] = [
   'The three owners that exposed to their parent made the same decision; the three reaches were decided entirely above them.',
   'Exposing to descendants is final and bounded: one decision, whole subtree, no way out. Exposing to the parent cedes onward exposure.',

@@ -30,8 +30,9 @@ const shopDeclaration: ModuleDeclaration = {
     { symbol: 'Money', exposeToDescendants: true },
     { symbol: 'formatDate', exposeToDescendants: true },
   ],
-  // `catalog` exposed `ProductId` upward; `shop` sends it back down to the
-  // whole application. The root never becomes the owner.
+  // `catalog` exposed `ProductId` to its parent; `shop` exposes it to its
+  // descendants, back to the whole application. The root never becomes the
+  // owner.
   reExposes: [{ symbol: 'ProductId', from: 'catalog', exposeToDescendants: true }],
   children: [
     {
@@ -305,7 +306,7 @@ describe('closed by default', () => {
 
 describe('uniform exposure to descendants (backflow, spec §1.5)', () => {
   it('search may import ProductId although catalog exposed nothing to its own descendants', () => {
-    // `catalog` exposed `ProductId` upward only. `search` reaches it because
+    // `catalog` exposed `ProductId` to its parent only. `search` reaches it because
     // `shop` sent it back down into every branch, this one included.
     const decision = explainImport(shop, 'search', 'catalog', 'ProductId');
     expect(decision).toEqual({ allowed: true, clause: 'ancestor-exposure', via: 'shop' });

@@ -8,9 +8,9 @@ import { mayImport } from './model-access.js';
 const example2 = buildDiagramLayout(example2Diagram);
 
 /**
- * Example 2 of `docs/model/illustrative-examples.md`: five modules, two
- * symbols, three decisions - one owner exposing one symbol through both
- * channels at once. The doc is normative for everything asserted here.
+ * Example 2 (`./diagrams/example2.ts`): five modules, two symbols, three
+ * decisions - one owner exposing one symbol through both channels at once.
+ * The diagram file is normative for everything asserted here.
  */
 describe('example 2 - both channels at once', () => {
   const rowsOf = (id: string): string[] =>
@@ -19,7 +19,7 @@ describe('example 2 - both channels at once', () => {
         `${row.marker ?? '_'} ${row.symbol}${row.provenance === undefined ? '' : `   ${row.provenance}`}`,
     );
 
-  it('draws the doc’s tree, and only the doc’s tree', () => {
+  it('draws the declared tree, and only the declared tree', () => {
     expect(example2.tree.nodes.map((node) => node.id)).toEqual([
       'app',
       'pricing',

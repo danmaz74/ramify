@@ -113,7 +113,7 @@ export interface ImporterContextDeclaration {
  * symbol received from a child uses the same two channels as exposing an owned
  * one.
  *
- * `from` names the direct child that exposed the symbol upward. Naming the
+ * `from` names the direct child that exposed the symbol to its parent. Naming the
  * child (rather than the possibly distant owner) keeps every decision local:
  * no declaration ever names a module outside the decider's immediate family.
  *

@@ -1,9 +1,8 @@
 /**
  * Example 3 - "The tag is the entire difference (testing)".
  *
- * The universe, the verdicts and the lessons come from
- * `docs/model/illustrative-examples.md`, which is normative for this diagram:
- * four modules, two symbols, one testing module. Everything is exposed to the
+ * This file is the universe's normative statement: four modules, two
+ * symbols, one testing module. Everything is exposed to the
  * parent and re-exposed to its descendants, so both symbols are visible in
  * every box - and then one symbol is tagged `testing` and its availability
  * rule decides where it is actually available.
@@ -45,6 +44,13 @@ import { seriesNodeContent, seriesTagLegendGroups } from './series.js';
  * a child of `app` - the lowest common ancestor whose composition they
  * exercise, per the specification's recommendation - and the whole module is
  * tagged `testing`, so the dashed box fills its node.
+ *
+ * Verdicts (visibility is identical in every column; only the tag differs):
+ *
+ * | Importer | `OrderService` | `resetOrderStore` (tagged `⇥ testing`) |
+ * | --- | --- | --- |
+ * | `billing` (production) | ✓ | ✗ - available only in testing modules |
+ * | `integration-tests` (testing module) | ✓ | ✓ |
  */
 export const example3Declaration: ModuleDeclaration = {
   id: 'app',
@@ -107,7 +113,7 @@ export const example3DecisionPolicies: readonly DecisionPolicy[] = [
   },
 ];
 
-/** The lessons of the doc, in the glossary's vocabulary. */
+/** The lessons the diagram teaches, in the glossary's vocabulary. */
 export const example3LegendNotes: readonly string[] = [
   'Both symbols are visible everywhere; the ⇥ testing chip alone decides where the tagged one is available.',
   'Tags never expose: the testing module imports nothing the tree did not re-expose to it - it sees OrderService because the chain reaches it.',

@@ -5,8 +5,8 @@
  * (eight modules, eight symbols, and the exposure decision each owner made)
  * together with its editorial data: which symbols are traced and in what
  * color, which questions get an explicit chord, and the words on the legend.
- * The diagram is kept as a fixture; the site teaches from the series in
- * `docs/model/illustrative-examples.md`.
+ * The diagram is kept as a fixture; the site teaches from the example series
+ * (`./series.ts`, `./example1.ts` to `./example4.ts`).
  *
  * Everything the diagram draws beyond the declaration is *derived* from it by
  * the evaluator - including the `receives` compartments, which need no

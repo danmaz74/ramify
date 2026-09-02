@@ -2,7 +2,7 @@
  * Example 1, stage B - the `invoicing` domain alone.
  *
  * The second build-up stage the site uses to teach Example 1
- * (`docs/model/illustrative-examples.md`) progressively, and the stage that
+ * (`./example1.ts`) progressively, and the stage that
  * introduces the second big idea: a **chain** of decisions.
  * `invoicingLibrary` exposes `InvoiceModel` to its parent, `invoicing` exposes
  * it to its descendants, and the provider's siblings receive it - the first

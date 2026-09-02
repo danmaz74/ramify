@@ -386,9 +386,9 @@ describe('canvas', () => {
 });
 
 /**
- * Example 1 of `docs/model/illustrative-examples.md`: nine modules, four
- * symbols, seven decisions, three different reaches - plus one symbol exposed
- * only to its descendants. The doc is normative for everything asserted here.
+ * Example 1 (`./diagrams/example1.ts`): nine modules, four symbols, seven
+ * decisions, three different reaches - plus one symbol exposed only to its
+ * descendants. The diagram file is normative for everything asserted here.
  */
 describe('example 1 - one decision, three reaches', () => {
   const rowsOf = (id: string): string[] =>
@@ -397,7 +397,7 @@ describe('example 1 - one decision, three reaches', () => {
         `${row.marker ?? '_'} ${row.symbol}${row.provenance === undefined ? '' : `   ${row.provenance}`}`,
     );
 
-  it('draws the doc’s tree, and only the doc’s tree', () => {
+  it('draws the declared tree, and only the declared tree', () => {
     expect(example1.tree.nodes.map((node) => node.id)).toEqual([
       'app',
       'globalLibrary',

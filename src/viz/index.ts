@@ -10,7 +10,7 @@
  * The pipeline is parameterized by a {@link DiagramDefinition}: no layout
  * module knows which universe it is drawing. `diagrams/shop.ts` is the
  * core-model diagram and the default everywhere; `diagrams/example1.ts` to
- * `diagrams/example4.ts` are the illustrative-examples series - the last two of
+ * `diagrams/example4.ts` are the example series - the last two of
  * them the tag examples, whose chips, contexts and blink sets are derived from
  * their declarations exactly like everything else. The shop's pieces are
  * re-exported here under their historical names.

@@ -9,13 +9,13 @@ import { moduleTagsOf, symbolTagsOf, isAvailable, mayImport } from './model-acce
 const example3 = buildDiagramLayout(example3Diagram);
 const { tree } = createDiagramContext(example3Diagram);
 
-/** The test module - the importer the doc's second row is about. */
+/** The test module - the importer the verdict table's second row is about. */
 const integrationTests = 'integration-tests';
 
 /**
- * Example 3 of `docs/model/illustrative-examples.md`: four modules, two
- * symbols with identical exposures, one of them tagged `testing`. The
- * doc is normative for everything asserted here.
+ * Example 3 (`./diagrams/example3.ts`): four modules, two symbols with
+ * identical exposures, one of them tagged `testing`. The diagram file is
+ * normative for everything asserted here.
  */
 describe('example 3 - the tag is the entire difference', () => {
   const rowsOf = (id: string): string[] =>
@@ -34,7 +34,7 @@ describe('example 3 - the tag is the entire difference', () => {
     return node?.moduleContext === undefined ? named : [...named, node.moduleContext];
   };
 
-  it('draws the doc’s tree, and only the doc’s tree', () => {
+  it('draws the declared tree, and only the declared tree', () => {
     expect(example3.tree.nodes.map((node) => node.id)).toEqual([
       'app',
       'orders',
@@ -88,7 +88,7 @@ describe('example 3 - the tag is the entire difference', () => {
     expect(symbolTagsOf(tree, 'orders', 'OrderService')).toEqual([]);
   });
 
-  it('reproduces the doc’s verdict table through the evaluator', () => {
+  it('reproduces the verdict table through the evaluator', () => {
     // | billing (production)  | ✓ | ✗ - available only in testing modules |
     expect(mayImport(tree, 'billing', 'orders', 'OrderService')).toBe(true);
     expect(mayImport(tree, 'billing', 'orders', 'resetOrderStore')).toBe(false);

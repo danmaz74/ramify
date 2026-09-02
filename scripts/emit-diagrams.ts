@@ -8,8 +8,8 @@
  * - `site/static/diagrams/model-core.svg` - the shop, the retired first
  *   diagram (`src/viz/diagrams/shop.ts`): structure and propagation with
  *   its import chords composited;
- * - `site/static/diagrams/example1.svg` - Example 1 of
- *   `docs/model/illustrative-examples.md`: one decision, three reaches;
+ * - `site/static/diagrams/example1.svg` - Example 1
+ *   (`src/viz/diagrams/example1.ts`): one decision, three reaches;
  * - `site/static/diagrams/example1a.svg` / `example1b.svg` - the two
  *   build-up stages the site walks through before Example 1's full diagram;
  * - `site/static/diagrams/example2.svg` - Example 2: both channels at once;
