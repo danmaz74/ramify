@@ -3,6 +3,8 @@ title: Why hierarchical modularity
 description: TypeScript is modular at exactly one granularity - the file. Why multi-file, hierarchical modularity matters, and why ramify exists.
 ---
 
+import { FocusDiagram, TreeDiagram, shopFocusDiagram, shopTreeDiagram } from "@ramify/viz";
+
 # Why hierarchical modularity
 
 One of the most important and useful ideas in all of software design is that
@@ -52,6 +54,10 @@ capabilities, a capability into implementation pieces, each one an
 abstraction level with its own boundary and interface, down to pieces small
 enough to hold in one head, or in one context window.
 
+An online shop decomposed that way, four levels deep:
+
+<TreeDiagram definition={shopTreeDiagram} />
+
 The recursion is the point. Stopping at the second level, a flat set of
 packages as most languages offer, does not scale well: a complex system
 decomposes into hundreds of modules, and a flat set of hundreds has no level
@@ -79,6 +85,15 @@ decomposition instead, and modularity at every level of it means:
 - **Privacy nests.** What a sub-module keeps from its own parent is thereby
   kept from everyone outside it. Hiding composes; a flat set of packages
   cannot say that at all.
+
+Here is the **focused view** of one module in the middle of the tree:
+what reaches it from above, the module itself with its files and the
+interface it exposes, upward or downward, and what its sub-modules expose to
+it. The rest of the tree is a distant map, and everything dimmed on it is not
+available in `payment`, so it does not need to be read, and cannot be
+imported by mistake:
+
+<FocusDiagram definition={shopFocusDiagram} />
 
 ### Costs and ROI
 
@@ -121,9 +136,10 @@ a matter of meaning:
   sub-barrel directly, and whatever the parent re-exports is open to the
   whole codebase.
 - **Show what the tree is.** Nothing declares which directories are modules.
-  The tree exists in naming habits and in a few heads, so nobody can list
-  the modules, their interfaces, or their dependencies, and a newcomer cannot
-  tell a boundary from a convenience.
+  The tree exists in naming habits and in a few heads. You can reconstruct its
+  modules, interfaces and dependencies from the code, but nothing confirms the
+  reconstruction: a directory may be a module or a convenience, an export an
+  interface or a leftover, an import a decision or an accident.
 
 What is missing is a model that makes the boundary a guarantee rather than
 a request, and the hierarchical structure a semantically defined fact rather
@@ -144,18 +160,18 @@ discipline. They also raise its return.
 For the agent, three main advantages.
 
 **Smaller contexts.** An agent reasons worse as its context grows. With a good
-module architecture, one module's internals plus the interfaces it consumes is
-a workload that fits, and because the tree is declared, that workload can be
-assembled by a tool rather than guessed: the module's files, plus exactly the
-symbols exposed to it.
+module architecture, one module's focused view, its internals plus the
+interfaces it consumes, is a workload that fits, and because the tree is
+declared, a tool can assemble it rather than guess it: the module's files,
+plus exactly the symbols exposed to it.
 
 **The right abstraction level.** An agent planning at the parent level should
 reason over children's interfaces, not their implementations - and an agent
 implementing inside a child should not be tempted by the internals of its
 siblings. The hierarchy gives each task its level and its horizon, and the
-declarations say what they are: what the children expose to the parent is
-the planning view; the module's internals plus what it receives is the
-implementing view.
+declarations say what they are: planning at the parent means working in the
+parent's focused view, where the children appear only as the interfaces they
+expose; implementing means working in the child's own.
 
 **Enforcement over convention.** A convention is exactly what an agent under
 pressure to make the build pass will violate - the deep import that works is

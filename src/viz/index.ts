@@ -79,6 +79,33 @@ export { example3Declaration, example3Diagram } from './diagrams/example3.js';
 export { example4Declaration, example4Diagram } from './diagrams/example4.js';
 export { seriesLegendGroups, seriesNodeContent } from './diagrams/series.js';
 
+export { TreeDiagram, TreeDiagramSvg } from './TreeDiagram.js';
+export type { TreeDiagramProps } from './TreeDiagram.js';
+export { TREE_LAYOUT, focusContext, layoutTreeDiagram } from './tree-diagram.js';
+export type {
+  FocusArrival,
+  FocusContext,
+  TreeBoxRole,
+  TreeDiagramDefinition,
+  TreeDiagramLayout,
+  TreeConnectorLayout,
+  TreeFocus,
+  TreeNodeLayout,
+  TreeNoteLayout,
+  TreeRow,
+} from './tree-diagram.js';
+export { FocusDiagram, FocusDiagramSvg } from './FocusDiagram.js';
+export type { FocusDiagramProps } from './FocusDiagram.js';
+export { FOCUS_LAYOUT, layoutFocusDiagram } from './focus-diagram.js';
+export type {
+  FocusCardId,
+  FocusCardLayout,
+  FocusDiagramDefinition,
+  FocusDiagramLayout,
+  FocusMapLayout,
+} from './focus-diagram.js';
+export { shopFocusDiagram, shopTreeDeclaration, shopTreeDiagram } from './diagrams/shop-tree.js';
+
 export { buildDiagramLayout, coreModelLayout, diagramLayout } from './layout.js';
 export type { DiagramLayout } from './layout.js';
 
