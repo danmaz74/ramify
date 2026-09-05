@@ -15,6 +15,15 @@ two documents define the complete model. The website provides didactical
 explanations and examples; the website, evaluator, diagrams, and other tools
 must conform to these documents.
 
+The required concrete directory structure and declaration grammar are specified in
+[Directory Structure And Module Description Principles](module-description.principles.md).
+That document records these semantics without adding importability rules.
+
+[TypeScript Source Interpretation Principles](typescript-source-interpretation.principles.md)
+records the adopted resource interpretation and proposes how other source
+constructs map to these symbol-level decisions. Its remaining proposed
+source-form policies are not yet adopted model rules.
+
 ## Goals
 
 - Make the permitted imports of a module understandable from its ownership,

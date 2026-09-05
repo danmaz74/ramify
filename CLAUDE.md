@@ -28,6 +28,22 @@ conform to these documents, as must the evaluator, diagrams, and other tools.
 Keep the authoritative rules in the principles document and the vocabulary
 in its companion glossary.
 
+The concrete representation is defined separately in
+[Directory Structure And Module Description Principles](docs/model/module-description.principles.md).
+It specifies the required `src/` and `subs/` layout and the formal
+`module.ramify` version 1 language: `expose-src` names owned exports relative
+to `src/`; `expose-sub` names direct children and alone permits wildcard
+selection. Read it before changing discovery, description parsing, source
+references, or documentation of the file format. It does not add importability
+rules; the current toolkit does not yet implement the filesystem loader or parser.
+
+[TypeScript Source Interpretation Principles](docs/model/typescript-source-interpretation.principles.md)
+contains the adopted resource interpretation: ownership and binding identity
+follow the resolved resource, export names come from its effective TypeScript
+export description, and ordinary exposure and tag rules apply. Read it before
+designing source import checks. Its other source-form policies remain proposals,
+and no TypeScript source checker is implemented yet.
+
 ## Conventions that DO apply
 
 - Self-contained package: own `package.json` and toolchain; run npm commands

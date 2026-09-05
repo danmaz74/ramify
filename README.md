@@ -17,6 +17,13 @@ subtree, and tags restrict, but never widen, what the tree allows. The model
 is specified in the
 [Cross-Module Importability Principles](docs/model/cross-module-importability.principles.md),
 with its vocabulary defined in the [Glossary](docs/model/glossary.md).
+The [Directory Structure And Module Description Principles](docs/model/module-description.principles.md)
+define the required `src/` and `subs/` layout and `module.ramify` language.
+`expose-src` selects owned exports relative to the module's `src/`;
+`expose-sub` selects a direct child's upward-exposed symbols by name or `*`.
+The [TypeScript Source Interpretation Principles](docs/model/typescript-source-interpretation.principles.md)
+record the adopted resource ownership and identity rules and propose how other
+TypeScript imports and source re-exports map to symbol checks.
 
 Why it matters:
 
@@ -47,9 +54,17 @@ toolkit; the analysis of how its current enforcement maps onto the model is
 in the host repository at
 `docs/analysis/2026-08-31-importability-rules-cucumber-viz-coverage.md`.
 
+The version 1 description language is specified; its filesystem loader and
+parser are not yet implemented. The evaluator currently accepts constructed
+module trees. TypeScript source interpretation is specified separately, with
+resource interpretation adopted and other source-form policies still proposed;
+a source checker is not yet implemented.
+
 ## Layout
 
-- `docs/model/` - the authoritative principles and glossary
+- `docs/model/` - the importability principles and glossary, plus the
+  directory and module-description principles and the source interpretation
+  specification
   (application-agnostic; travel with the project).
 - `docs/plans/` - ramify's own planning artifacts.
 - `src/` - toolkit source; tests co-located as `src/**/*.test.ts`.

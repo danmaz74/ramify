@@ -11,6 +11,9 @@ their terms. Together, these two internal documents define the model. The
 website's glossary is a reader-facing copy and must conform to these
 definitions.
 
+The concrete directory layout and declaration language are defined in
+[Directory Structure And Module Description Principles](module-description.principles.md).
+
 ## ramify module
 
 A ramify module is a unit of code ownership, declared by marking a directory as a
