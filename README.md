@@ -14,8 +14,9 @@ It is a toolkit to **define, enforce, visualize, and help agents adhere to**
 these modules. The rules are few: every cross-module import is closed by
 default, a module shares a symbol only with its parent or with its own
 subtree, and tags restrict, but never widen, what the tree allows. The model
-is specified in
-[docs/model/cross-module-importability-rules.md](docs/model/cross-module-importability-rules.md).
+is specified in the
+[Cross-Module Importability Principles](docs/model/cross-module-importability.principles.md),
+with its vocabulary defined in the [Glossary](docs/model/glossary.md).
 
 Why it matters:
 
@@ -48,8 +49,8 @@ in the host repository at
 
 ## Layout
 
-- `docs/model/` - the model specification (application-agnostic; travels
-  with the project).
+- `docs/model/` - the authoritative principles and glossary
+  (application-agnostic; travel with the project).
 - `docs/plans/` - ramify's own planning artifacts.
 - `src/` - toolkit source; tests co-located as `src/**/*.test.ts`.
 - `site/` - the documentation website (its own npm package).
@@ -79,9 +80,10 @@ Build output (`site/build/`, `site/.docusaurus/`) is git-ignored.
 | `/explorer` | A preview of the module dependency explorer |
 | `/glossary` | Definitions of the model's vocabulary |
 
-The normative specification is not rendered as a site page; it ships with the
-repository at `docs/model/cross-module-importability-rules.md`; the model,
-tags, and glossary pages point readers there.
+The website is didactical. The internal principles document and glossary
+together define the complete, authoritative model; the website and
+implementation must conform to them. The model, tags, and glossary pages
+point readers to these documents in `docs/model/`.
 
 ### Portability discipline
 

@@ -298,44 +298,14 @@ describe('tag claims are checked against the evaluator', () => {
     );
   });
 
-  it('refuses a context the declaration does not declare', () => {
-    const nodes = layoutTree(example3Context).nodes.map((node) =>
-      node.id === 'billing'
-        ? {
-            ...node,
-            compartments: [
-              ...node.compartments,
-              {
-                kind: 'context',
-                id: 'node-billing-compartment-context-smoke-tests',
-                slug: 'context-smoke-tests',
-                title: 'smoke-tests',
-                context: {
-                  module: 'billing',
-                  name: 'smoke-tests',
-                  label: 'smoke-tests',
-                  tags: ['testing'],
-                  caption: 'test context',
-                  imports: ['OrderService', 'resetOrderStore'],
-                },
-                y: 0,
-                height: 0,
-              } satisfies Compartment,
-            ],
-          }
-        : node,
-    );
-    expect(() => validateTagClaims(example3Context.tree, nodes, traced3)).toThrow(
-      /draws the contexts \[smoke-tests\], but declares \[\]/u,
-    );
-  });
 
-  it('refuses a context that would blink for more than it may import', () => {
+
+  it('refuses a module classification that would blink for more than it may import', () => {
     const nodes = layoutTree(example4Context).nodes.map((node) =>
-      node.id === 'ui' && node.moduleContext !== undefined
+      node.id === 'ui' && node.classification !== undefined
         ? {
             ...node,
-            moduleContext: { ...node.moduleContext, imports: ['formatMoney', 'queryDb'] },
+            classification: { ...node.classification, imports: ['formatMoney', 'queryDb'] },
           }
         : node,
     );
@@ -344,23 +314,23 @@ describe('tag claims are checked against the evaluator', () => {
     );
   });
 
-  it('refuses a whole-module context the declaration does not classify', () => {
+  it('refuses a module classification the declaration does not classify', () => {
     const nodes = layoutTree(example4Context).nodes.map((node) =>
       node.id === 'server'
         ? {
             ...node,
-            moduleContext: {
+            classification: {
               module: 'server',
               label: 'browser',
               tags: ['browser'] as const,
-              caption: 'browser context',
+              caption: 'browser module',
               imports: [],
             },
           }
         : node,
     );
     expect(() => validateTagClaims(example4Context.tree, nodes, traced4)).toThrow(
-      /"server" draws a whole-module context, but its files carry \[\]/u,
+      /"server" draws a module classification, but its files carry \[\]/u,
     );
   });
 });

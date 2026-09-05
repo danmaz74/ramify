@@ -11,7 +11,7 @@
  * module knows which universe it is drawing. `diagrams/shop.ts` is the
  * core-model diagram and the default everywhere; `diagrams/example1.ts` to
  * `diagrams/example4.ts` are the example series - the last two of
- * them the tag examples, whose chips, contexts and blink sets are derived from
+ * them the tag examples, whose chips, module frames and blink sets are derived from
  * their declarations exactly like everything else. The shop's pieces are
  * re-exported here under their historical names.
  */
@@ -119,7 +119,7 @@ export {
 } from './layout-nodes.js';
 export type {
   Compartment,
-  DrawnContext,
+  ModuleClassification,
   NodeLayout,
   RowAnnotation,
   RowKind,

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  explainVisibility,
   explainAvailability,
   explainImport,
+  isVisible,
   isAvailable,
   mayImport,
   type Importer,
@@ -19,30 +21,24 @@ import {
 } from './tree.js';
 
 /**
- * The contextual rules of `docs/model/cross-module-importability-rules.md`
- * §"Contextual rules: importer contexts and exposure tags", as the example
- * universes of `../viz/diagrams/example3.ts` and `example4.ts` state them.
+ * Exercises the tag evaluator with the example universes of
+ * `../viz/diagrams/example3.ts` and `example4.ts`. The authoritative tag rules
+ * are in `docs/model/cross-module-importability.principles.md`
+ * §"Tags Restrict Availability Without Changing Visibility".
  *
  * Examples 3 and 4 keep the tree trivial on purpose: everything is exposed
- * everywhere, so availability is identical in every column and the tag is the
+ * everywhere, so visibility is identical in every column and the tag is the
  * only variable.
  */
 
-/** The test context `app` declares in several universes below. */
-const integrationTests: Importer = { module: 'app', context: 'integration-tests' };
+/** Each file in this declared module has the same import permissions. */
+const integrationTests: Importer = { module: 'integration-tests' };
 
-/** Every importer a tree can describe: each module, each declared context, each binding. */
+/** Every module and both import forms. */
 function allImporters(tree: ModuleTree): ImporterDescriptor[] {
-  const importers: ImporterDescriptor[] = [];
-  for (const record of tree.modules.values()) {
-    const contexts = [undefined, ...(record.contexts ?? []).map((context) => context.name)];
-    for (const context of contexts) {
-      for (const binding of ['value', 'type'] satisfies ImportBinding[]) {
-        importers.push({ module: record.id, context, binding });
-      }
-    }
-  }
-  return importers;
+  return [...tree.modules.values()].flatMap((record) =>
+    (['value', 'type'] satisfies ImportBinding[]).map((binding) => ({ module: record.id, binding })),
+  );
 }
 
 // --- Example 3: the tag is the entire difference (testing) ----------------
@@ -53,17 +49,17 @@ function allImporters(tree: ModuleTree): ImporterDescriptor[] {
  * ├── orders               owns OrderService, resetOrderStore testing
  * │                        (both exposed to parent)
  * ├── billing              production consumer
- * └── integration-tests  test context declared by app
+ * └── integration-tests  testing module below app
  * ```
  */
 const example3Declaration: ModuleDeclaration = {
   id: 'app',
-  contexts: [{ name: 'integration-tests', tags: ['testing'] }],
   reExposes: [
     { symbol: 'OrderService', from: 'orders', exposeToDescendants: true },
     { symbol: 'resetOrderStore', from: 'orders', exposeToDescendants: true },
   ],
   children: [
+    { id: 'integration-tests', moduleTags: ['testing'] },
     {
       id: 'orders',
       owns: [
@@ -86,7 +82,7 @@ describe('Example 3: the tag is the entire difference (testing)', () => {
     });
   });
 
-  it('billing may not import resetOrderStore - the tag requires a test context', () => {
+  it('billing may not import resetOrderStore - the tag requires a testing module', () => {
     expect(explainImport(example3, 'billing', 'orders', 'resetOrderStore')).toEqual({
       allowed: false,
       reason: 'symbol-tag-requires-module-tag',
@@ -94,27 +90,25 @@ describe('Example 3: the tag is the entire difference (testing)', () => {
     });
   });
 
-  it("app's test context may import OrderService", () => {
+  it("the integration-tests module may import OrderService", () => {
     expect(explainImport(example3, integrationTests, 'orders', 'OrderService')).toEqual({
       allowed: true,
-      clause: 'child-exposure',
-      via: 'orders',
+      clause: 'ancestor-exposure',
+      via: 'app',
     });
   });
 
-  it("app's test context may import resetOrderStore", () => {
+  it("the integration-tests module may import resetOrderStore", () => {
     expect(explainImport(example3, integrationTests, 'orders', 'resetOrderStore')).toEqual({
       allowed: true,
-      clause: 'child-exposure',
-      via: 'orders',
+      clause: 'ancestor-exposure',
+      via: 'app',
       tags: ['testing'],
     });
   });
 
-  it('the declaring module outside that context may not - the context is the difference', () => {
-    // `app` declares the test context and still may not import test support
-    // into its production files: a context classifies files, not the module
-    // that declared it.
+  it('the production parent remains unable to import test support', () => {
+    // Declaring a testing child does not classify the production parent.
     expect(mayImport(example3, 'app', 'orders', 'OrderService')).toBe(true);
     expect(mayImport(example3, 'app', 'orders', 'resetOrderStore')).toBe(false);
   });
@@ -129,9 +123,9 @@ describe('Example 3: the tag is the entire difference (testing)', () => {
     });
   });
 
-  it('makes both symbols available identically - only the tag differs', () => {
+  it('makes both symbols visible identically - only the tag differs', () => {
     for (const symbol of ['OrderService', 'resetOrderStore']) {
-      expect(explainAvailability(example3, 'billing', 'orders', symbol)).toEqual({
+      expect(explainVisibility(example3, 'billing', 'orders', symbol)).toEqual({
         allowed: true,
         clause: 'ancestor-exposure',
         via: 'app',
@@ -147,7 +141,7 @@ describe('Example 3: the tag is the entire difference (testing)', () => {
  * app                      exposes everything it receives to its descendants
  * ├── shared               owns formatMoney browser, queryDb
  * │                        (both exposed to parent)
- * ├── ui                   browser context
+ * ├── ui                   browser module
  * └── server               plain module
  * ```
  */
@@ -175,7 +169,7 @@ const uiValue: Importer = { module: 'ui', binding: 'value' };
 const uiType: Importer = { module: 'ui', binding: 'type' };
 
 describe('Example 4: a promise about the closure (browser)', () => {
-  it('server may import both - it carries no context tag to satisfy', () => {
+  it('server may import both - it carries no module tag to satisfy', () => {
     expect(explainImport(example4, 'server', 'shared', 'formatMoney')).toEqual({
       allowed: true,
       clause: 'ancestor-exposure',
@@ -198,7 +192,7 @@ describe('Example 4: a promise about the closure (browser)', () => {
     });
   });
 
-  it('ui may not value-import queryDb - a browser context requires the tag', () => {
+  it('ui may not value-import queryDb - a browser module requires the tag', () => {
     expect(explainImport(example4, uiValue, 'shared', 'queryDb')).toEqual({
       allowed: false,
       reason: 'module-tag-requires-symbol-tag',
@@ -248,14 +242,17 @@ describe('Example 4: a promise about the closure (browser)', () => {
  */
 const reExposedDeclaration: ModuleDeclaration = {
   id: 'app',
-  contexts: [{ name: 'integration-tests', tags: ['testing'] }],
   reExposes: [{ symbol: 'resetOrderStore', from: 'sales', exposeToDescendants: true }],
   children: [
+    { id: 'integration-tests', moduleTags: ['testing'] },
     {
       id: 'sales',
-      contexts: [{ name: 'sales-tests', tags: ['testing'] }],
-      reExposes: [{ symbol: 'resetOrderStore', from: 'orders', exposeToParent: true }],
+      reExposes: [
+        { symbol: 'resetOrderStore', from: 'orders', exposeToParent: true },
+        { symbol: 'orderFixtures', from: 'orders', exposeToDescendants: true },
+      ],
       children: [
+        { id: 'sales-tests', moduleTags: ['testing'] },
         {
           id: 'orders',
           owns: [
@@ -268,18 +265,18 @@ const reExposedDeclaration: ModuleDeclaration = {
         },
       ],
     },
-    { id: 'billing', contexts: [{ name: 'unit-tests', tags: ['testing'] }] },
+    { id: 'billing', children: [{ id: 'unit-tests', moduleTags: ['testing'] }] },
     { id: 'shipping' },
   ],
 };
 
 const reExposed = buildTree(reExposedDeclaration);
-const salesTests: Importer = { module: 'sales', context: 'sales-tests' };
-const unitTests: Importer = { module: 'billing', context: 'unit-tests' };
+const salesTests: Importer = { module: 'sales-tests' };
+const unitTests: Importer = { module: 'unit-tests' };
 
 describe('tags never expose', () => {
-  it('gives a test context nothing the tree did not re-expose to it', () => {
-    // The chain stopped at `sales`; being a test context adds nothing.
+  it('gives a testing module nothing the tree did not re-expose to it', () => {
+    // The chain stopped at `sales`; being a testing module adds nothing.
     expect(explainImport(reExposed, integrationTests, 'orders', 'orderFixtures')).toEqual({
       allowed: false,
       reason: 'no-exposure-chain',
@@ -290,7 +287,7 @@ describe('tags never expose', () => {
     });
   });
 
-  it('keeps a symbol its owner exposes nowhere unreachable, test context or not', () => {
+  it('keeps a symbol its owner exposes nowhere unreachable, testing module or not', () => {
     for (const importer of [integrationTests, salesTests, unitTests, 'sales'] as const) {
       expect(explainImport(reExposed, importer, 'orders', 'orderStoreInternals')).toEqual({
         allowed: false,
@@ -301,7 +298,7 @@ describe('tags never expose', () => {
 
   it('reports a tree refusal for the tree reason, never a tag reason', () => {
     // One symbol, two refusals: `sales`'s production files are refused by the
-    // tag, `app`'s test context by the missing exposure chain.
+    // tag, `app`'s testing module by the missing exposure chain.
     expect(explainImport(reExposed, 'sales', 'orders', 'orderFixtures')).toEqual({
       allowed: false,
       reason: 'symbol-tag-requires-module-tag',
@@ -309,8 +306,8 @@ describe('tags never expose', () => {
     });
     expect(explainImport(reExposed, salesTests, 'orders', 'orderFixtures')).toEqual({
       allowed: true,
-      clause: 'child-exposure',
-      via: 'orders',
+      clause: 'ancestor-exposure',
+      via: 'sales',
       tags: ['testing'],
     });
   });
@@ -320,7 +317,7 @@ describe('tags never expose', () => {
       for (const importer of allImporters(tree)) {
         for (const symbol of allSymbols(tree)) {
           if (mayImport(tree, importer, symbol.owner, symbol.name)) {
-            expect(isAvailable(tree, importer.module, symbol.owner, symbol.name)).toBe(true);
+            expect(isVisible(tree, importer.module, symbol.owner, symbol.name)).toBe(true);
           }
         }
       }
@@ -344,9 +341,9 @@ describe('a tag travels with its symbol', () => {
 
   it('is safe at any exposure breadth', () => {
     // `app` exposed the test support it received to all its descendants. Every
-    // production importer in it is refused, and every test context allowed.
+    // production importer in it is refused, and every testing module allowed.
     for (const module of reExposed.modules.keys()) {
-      if (module === 'orders') {
+      if (module === 'orders' || moduleTagsOf(reExposed, module).includes('testing')) {
         continue; // Its owner: same-module imports cross no boundary.
       }
       expect(mayImport(reExposed, module, 'orders', 'resetOrderStore')).toBe(false);
@@ -377,20 +374,20 @@ describe('a tag travels with its symbol', () => {
  */
 const testModuleDeclaration: ModuleDeclaration = {
   id: 'app',
-  contexts: [{ name: 'integration-tests', tags: ['testing'] }],
   reExposes: [
     { symbol: 'fakeClock', from: 'testSupport', exposeToDescendants: true },
     { symbol: 'stubTimer', from: 'testSupport', exposeToDescendants: true },
     { symbol: 'resetOrderStore', from: 'orders', exposeToDescendants: true },
   ],
   children: [
+    { id: 'integration-tests', moduleTags: ['testing'] },
     {
       id: 'testSupport',
       moduleTags: ['testing'],
       owns: [{ symbol: 'fakeClock', exposeToParent: true }],
       reExposes: [{ symbol: 'stubTimer', from: 'testSupportInternals', exposeToParent: true }],
       children: [
-        { id: 'testSupportInternals', owns: [{ symbol: 'stubTimer', exposeToParent: true }] },
+        { id: 'testSupportInternals', moduleTags: ['testing'], owns: [{ symbol: 'stubTimer', exposeToParent: true }] },
       ],
     },
     {
@@ -404,11 +401,11 @@ const testModuleDeclaration: ModuleDeclaration = {
 const withTestModule = buildTree(testModuleDeclaration);
 
 describe('a declared test module', () => {
-  it('tags everything it exposes, without declaring a tag anywhere', () => {
+  it('requires testing on its owned symbols without per-symbol declarations', () => {
     expect(symbolTagsOf(withTestModule, 'testSupport', 'fakeClock')).toEqual(['testing']);
   });
 
-  it('tags what its submodules own too - test infrastructure all the way down', () => {
+  it('tags a child’s symbols when that child explicitly declares testing', () => {
     expect(symbolTagsOf(withTestModule, 'testSupportInternals', 'stubTimer')).toEqual([
       'testing',
     ]);
@@ -428,7 +425,7 @@ describe('a declared test module', () => {
     }
   });
 
-  it('is itself a test context, and so is its subtree', () => {
+  it('allows test support in both explicitly tagged testing modules', () => {
     expect(mayImport(withTestModule, 'testSupport', 'orders', 'resetOrderStore')).toBe(true);
     expect(mayImport(withTestModule, 'testSupportInternals', 'orders', 'resetOrderStore')).toBe(
       true,
@@ -436,8 +433,8 @@ describe('a declared test module', () => {
     expect(mayImport(withTestModule, 'billing', 'orders', 'resetOrderStore')).toBe(false);
   });
 
-  it('changes what may be imported, never what is available', () => {
-    expect(isAvailable(withTestModule, 'billing', 'testSupport', 'fakeClock')).toBe(true);
+  it('changes availability without changing visibility', () => {
+    expect(isVisible(withTestModule, 'billing', 'testSupport', 'fakeClock')).toBe(true);
     expect(mayImport(withTestModule, 'billing', 'testSupport', 'fakeClock')).toBe(false);
   });
 });
@@ -458,26 +455,6 @@ describe('exclusivity', () => {
         ],
       }),
     ).toThrow(/"testing", which is exclusive/);
-  });
-
-  it('refuses it in a submodule that inherited the classification', () => {
-    expect(() =>
-      buildTree({
-        id: 'app',
-        children: [
-          {
-            id: 'testSupport',
-            moduleTags: ['testing'],
-            children: [
-              {
-                id: 'testSupportInternals',
-                owns: [{ symbol: 'renderFixture', exposeToParent: true, tags: ['browser'] }],
-              },
-            ],
-          },
-        ],
-      }),
-    ).toThrow(/may not drop that tag by declaring \[browser\]/);
   });
 
   it('refuses an explicitly empty tag list, which is the default channel', () => {
@@ -517,7 +494,7 @@ describe('exclusivity', () => {
   });
 
   it('leaves a classification that implies nothing alone', () => {
-    // A browser context defaults no exposure tag, so a browser module tags its
+    // A browser module defaults no exposure tag, so a browser module tags its
     // own exposures freely.
     const tree = buildTree({
       id: 'app',
@@ -542,17 +519,17 @@ describe('exclusivity', () => {
   });
 });
 
-// --- Availability is the tag-free ceiling ---------------------------------
+// --- Visibility is the tag-free ceiling ---------------------------------
 
 describe('availability and importability', () => {
-  it('leaves availability untouched and gates the import', () => {
-    expect(isAvailable(example3, 'billing', 'orders', 'resetOrderStore')).toBe(true);
+  it('leaves visibility untouched and gates the import', () => {
+    expect(isVisible(example3, 'billing', 'orders', 'resetOrderStore')).toBe(true);
     expect(mayImport(example3, 'billing', 'orders', 'resetOrderStore')).toBe(false);
     expect(mayImport(example3, integrationTests, 'orders', 'resetOrderStore')).toBe(true);
   });
 
-  it('answers the module-level question without a context or a binding', () => {
-    expect(explainAvailability(example4, 'ui', 'shared', 'queryDb')).toEqual({
+  it('answers the module-level question without an import binding', () => {
+    expect(explainVisibility(example4, 'ui', 'shared', 'queryDb')).toEqual({
       allowed: true,
       clause: 'ancestor-exposure',
       via: 'app',
@@ -562,7 +539,7 @@ describe('availability and importability', () => {
   });
 
   it('reports a tree refusal identically for both questions', () => {
-    expect(explainAvailability(reExposed, 'billing', 'orders', 'orderFixtures')).toEqual(
+    expect(explainVisibility(reExposed, 'billing', 'orders', 'orderFixtures')).toEqual(
       explainImport(reExposed, unitTests, 'orders', 'orderFixtures'),
     );
   });
@@ -585,21 +562,6 @@ describe('the importer descriptor', () => {
     }
   });
 
-  it('throws for a context the module does not declare', () => {
-    expect(() =>
-      mayImport(
-        example3,
-        { module: 'billing', context: 'integration-tests' },
-        'orders',
-        'OrderService',
-      ),
-    ).toThrow(/declares no importer context "integration-tests"/);
-    // Even when the answer would have been a refusal anyway.
-    expect(() =>
-      mayImport(example3, { module: 'app', context: 'nowhere' }, 'orders', 'noSuchSymbol'),
-    ).toThrow(/declares no importer context "nowhere"/);
-  });
-
   it('throws for an unknown module id, descriptor or not', () => {
     expect(() => mayImport(example3, { module: 'warehouse' }, 'orders', 'OrderService')).toThrow(
       /Unknown module/,
@@ -607,7 +569,7 @@ describe('the importer descriptor', () => {
   });
 
   it('leaves same-owner imports outside the model', () => {
-    // `ui` is a browser context and owns a symbol it never tagged. Whether its
+    // `ui` is a browser module and owns a symbol it never tagged. Whether its
     // own files keep the platform split internally is its own business.
     const tree = buildTree({
       id: 'app',
@@ -616,7 +578,6 @@ describe('the importer descriptor', () => {
           id: 'ui',
           moduleTags: ['browser'],
           owns: [{ symbol: 'renderApp' }],
-          contexts: [{ name: 'ui-tests', tags: ['testing'] }],
         },
       ],
     });
@@ -625,101 +586,87 @@ describe('the importer descriptor', () => {
       clause: 'same-module',
       via: null,
     });
-    expect(mayImport(tree, { module: 'ui', context: 'ui-tests' }, 'ui', 'renderApp')).toBe(true);
   });
 });
 
-// --- Classification reaches the subtree -----------------------------------
-
-describe('classification reaches the subtree', () => {
-  const splitUi = buildTree({
-    ...example4Declaration,
-    children: (example4Declaration.children ?? []).map((child) =>
-      child.id === 'ui' ? { ...child, children: [{ id: 'uiWidgets' }, { id: 'uiPages' }] } : child,
-    ),
+describe('modules classify only their own files', () => {
+  const tree = buildTree({
+    id: 'app',
+    reExposes: [{ symbol: 'queryDb', from: 'server', exposeToDescendants: true }],
+    children: [
+      { id: 'server', owns: [{ symbol: 'queryDb', exposeToParent: true }] },
+      {
+        id: 'ui', moduleTags: ['browser'],
+        children: [
+          { id: 'renderer' },
+          { id: 'widgets', moduleTags: ['browser'] },
+        ],
+      },
+      {
+        id: 'tests', moduleTags: ['testing'],
+        owns: [{ symbol: 'fakeClock', exposeToParent: true }],
+        reExposes: [{ symbol: 'formatDate', from: 'formatting', exposeToParent: true }],
+        children: [
+          { id: 'formatting', owns: [{ symbol: 'formatDate', exposeToParent: true, tags: [] }] },
+        ],
+      },
+    ],
   });
 
-  it('keeps a browser module’s submodules browser contexts', () => {
-    for (const submodule of ['uiWidgets', 'uiPages'] as const) {
-      expect(moduleTagsOf(splitUi, submodule)).toEqual(['browser']);
-      expect(mayImport(splitUi, { module: submodule }, 'shared', 'queryDb')).toBe(false);
-      expect(mayImport(splitUi, { module: submodule, binding: 'type' }, 'shared', 'queryDb')).toBe(
-        true,
-      );
-      expect(mayImport(splitUi, { module: submodule }, 'shared', 'formatMoney')).toBe(true);
-    }
+  it('requires each browser module to declare its own restriction', () => {
+    expect(mayImport(tree, 'ui', 'server', 'queryDb')).toBe(false);
+    expect(mayImport(tree, 'widgets', 'server', 'queryDb')).toBe(false);
+    expect(mayImport(tree, 'renderer', 'server', 'queryDb')).toBe(true);
   });
 
-  it('adds a declared context’s tags to the ones its module carries', () => {
-    const tree = buildTree({
-      id: 'app',
-      moduleTags: ['browser'],
-      contexts: [{ name: 'ui-tests', tags: ['testing'] }],
-      children: [{ id: 'widgets', contexts: [{ name: 'widget-tests', tags: ['testing'] }] }],
-    });
-    expect(moduleTagsOf(tree, 'app')).toEqual(['browser']);
-    expect(moduleTagsOf(tree, 'app', 'ui-tests')).toEqual(['testing', 'browser']);
-    expect(moduleTagsOf(tree, 'widgets', 'widget-tests')).toEqual(['testing', 'browser']);
+  it('keeps a child-owned production contract distinct from test-owned support', () => {
+    expect(symbolTagsOf(tree, 'tests', 'fakeClock')).toEqual(['testing']);
+    expect(symbolTagsOf(tree, 'formatting', 'formatDate')).toEqual([]);
+    expect(mayImport(tree, 'app', 'tests', 'fakeClock')).toBe(false);
+    expect(mayImport(tree, 'app', 'formatting', 'formatDate')).toBe(true);
   });
+});
 
-  it('never drops a classification an ancestor declared', () => {
-    // A test context inside a browser module is still a browser context: it may
-    // import test support, and still only browser-safe values.
-    const tree = buildTree({
-      id: 'app',
-      reExposes: [
-        { symbol: 'resetWidgetStore', from: 'widgets', exposeToDescendants: true },
-        { symbol: 'renderWidgetFixture', from: 'widgets', exposeToDescendants: true },
-        { symbol: 'queryDb', from: 'server', exposeToDescendants: true },
-      ],
-      children: [
-        {
-          id: 'widgets',
-          owns: [
-            { symbol: 'resetWidgetStore', exposeToParent: true, tags: ['testing'] },
-            {
-              symbol: 'renderWidgetFixture',
-              exposeToParent: true,
-              tags: ['testing', 'browser'],
-            },
-          ],
-        },
-        { id: 'server', owns: [{ symbol: 'queryDb', exposeToParent: true }] },
-        { id: 'ui', moduleTags: ['browser'], contexts: [{ name: 'ui-tests', tags: ['testing'] }] },
-      ],
-    });
-    const uiTests: Importer = { module: 'ui', context: 'ui-tests' };
-
-    // Test support that promises nothing about its closure: type-only here.
-    expect(explainImport(tree, uiTests, 'widgets', 'resetWidgetStore')).toEqual({
-      allowed: false,
-      reason: 'module-tag-requires-symbol-tag',
-      unmet: { tag: 'browser', requires: 'browser' },
-    });
-    expect(mayImport(tree, { ...uiTests, binding: 'type' }, 'widgets', 'resetWidgetStore')).toBe(
-      true,
-    );
-
-    // Test support that does promise it satisfies both requirements at once.
-    expect(explainImport(tree, uiTests, 'widgets', 'renderWidgetFixture')).toEqual({
-      allowed: true,
-      clause: 'ancestor-exposure',
-      via: 'app',
-      tags: ['testing', 'browser'],
-    });
-    // And the production files of the same module still may not: the test
-    // requirement is unchanged by the browser promise.
-    expect(explainImport(tree, 'ui', 'widgets', 'renderWidgetFixture')).toEqual({
+describe('availability includes module tag restrictions', () => {
+  it('distinguishes exposed test support from permission to import it', () => {
+    expect(isVisible(example3, 'billing', 'orders', 'resetOrderStore')).toBe(true);
+    expect(isAvailable(example3, 'billing', 'orders', 'resetOrderStore')).toBe(false);
+    expect(explainAvailability(example3, 'billing', 'orders', 'resetOrderStore')).toEqual({
       allowed: false,
       reason: 'symbol-tag-requires-module-tag',
       unmet: { tag: 'testing', requires: 'testing' },
     });
+    expect(isAvailable(example3, 'integration-tests', 'orders', 'resetOrderStore')).toBe(true);
+  });
 
-    // A Node-only production symbol stays out, test context or not.
-    expect(explainImport(tree, uiTests, 'server', 'queryDb')).toEqual({
-      allowed: false,
-      reason: 'module-tag-requires-symbol-tag',
-      unmet: { tag: 'browser', requires: 'browser' },
+  it('keeps a browser type import distinct from value availability', () => {
+    expect(isVisible(example4, 'ui', 'shared', 'queryDb')).toBe(true);
+    expect(isAvailable(example4, 'ui', 'shared', 'queryDb')).toBe(false);
+    expect(mayImport(example4, uiType, 'shared', 'queryDb')).toBe(true);
+  });
+
+  it('combines testing and browser only when the importing module declares both', () => {
+    const tree = buildTree({
+      id: 'app',
+      reExposes: [
+        { symbol: 'fakeStore', from: 'support', exposeToDescendants: true },
+        { symbol: 'browserFake', from: 'support', exposeToDescendants: true },
+      ],
+      children: [
+        {
+          id: 'support', moduleTags: ['testing'],
+          owns: [
+            { symbol: 'fakeStore', exposeToParent: true },
+            { symbol: 'browserFake', exposeToParent: true, tags: ['testing', 'browser'] },
+          ],
+        },
+        { id: 'ui-tests', moduleTags: ['testing', 'browser'] },
+        { id: 'ui', moduleTags: ['browser'] },
+      ],
     });
+    expect(isAvailable(tree, 'ui-tests', 'support', 'fakeStore')).toBe(false);
+    expect(mayImport(tree, { module: 'ui-tests', binding: 'type' }, 'support', 'fakeStore')).toBe(true);
+    expect(isAvailable(tree, 'ui-tests', 'support', 'browserFake')).toBe(true);
+    expect(mayImport(tree, { module: 'ui', binding: 'type' }, 'support', 'browserFake')).toBe(false);
   });
 });

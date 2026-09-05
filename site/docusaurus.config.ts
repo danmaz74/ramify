@@ -9,10 +9,10 @@ import path from 'node:path';
  * swizzled, and page bodies avoid framework-specific syntax wherever plain
  * MDX works.
  *
- * There is deliberately no docs plugin. The normative specification lives at
- * `ramify/docs/model/cross-module-importability-rules.md` and ships with the
- * repository; the site references that path rather than rendering - and
- * thereby risking a divergent second copy of - the document itself.
+ * There is deliberately no docs plugin. The authoritative rules and vocabulary
+ * live in `ramify/docs/model/cross-module-importability.principles.md` and
+ * `ramify/docs/model/glossary.md`. The site teaches that model and references
+ * the internal documents; its glossary reproduces the canonical definitions.
  */
 
 const RAMIFY_SRC = path.resolve(__dirname, '..', 'src');

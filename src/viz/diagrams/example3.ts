@@ -14,7 +14,7 @@
  * available - and selecting `resetOrderStore` shows it in motion: the testing
  * module blinks and `billing` stays dark.
  *
- * Nothing about the tags is declared to the renderer. The chip, the context box
+ * Nothing about the tags is declared to the renderer. The chip, the module frame
  * and the blink sets are all derived from this declaration through the
  * evaluator, and `../validate.ts` re-derives every one of them before a single
  * element is drawn.

@@ -2,21 +2,19 @@
  * The declared ownership tree.
  *
  * Implements the structural half of the model specified in
- * `docs/model/cross-module-importability-rules.md`, in the vocabulary of
+ * `docs/model/cross-module-importability.principles.md`, in the vocabulary of
  * `docs/model/glossary.md`:
  *
  * - "A module exists only by declaration. Declared modules form a tree with one
  *   explicit application root; every other module has exactly one parent."
  * - A file belonging to a module exports symbols; the module therefore **owns**
  *   them, and they are available in it.
- * - A module makes a symbol available beyond itself through exactly two
+ * - A module makes a symbol visible beyond itself through exactly two
  *   channels: **expose to parent** and **expose to descendants**. Both channels
  *   apply equally to symbols the module owns and to symbols exposed to it.
  *
- * It also carries the declared classifications the contextual rules read: the
- * **exposure tags** an owned symbol's exposure may wear, and the **importer
- * contexts** a module declares over its files. Their meaning is in `./tags.js`;
- * the rule they take part in is in `./availability.ts`.
+ * It carries symbol tags and module tags. Their meaning is in `./tags.js`;
+ * the importability rule they take part in is in `./availability.ts`.
  *
  * This module is pure and browser-compatible: no I/O, no Node built-ins, no
  * side effects. It contains no availability logic - that lives in
@@ -36,9 +34,6 @@ export type ModuleId = string;
 /** Name of a symbol, unique only within its owning module. */
 export type SymbolName = string;
 
-/** Name of an importer context, unique only within the module declaring it. */
-export type ContextName = string;
-
 /**
  * Identity of a symbol. Symbol names are not globally unique, so a symbol is
  * always identified by the pair (owning module, name).
@@ -53,9 +48,9 @@ export interface SymbolRef {
  * default, so a symbol travels only where a decision sent it.
  */
 export interface ExposureDeclaration {
-  /** The direct parent may import the symbol, and may re-expose it further. */
+  /** The direct parent receives the symbol and may re-expose it further. */
   readonly exposeToParent?: boolean;
-  /** Every module in this module's subtree may import the symbol. */
+  /** Every proper descendant receives the symbol, subject to tag restrictions on imports. */
   readonly exposeToDescendants?: boolean;
 }
 
@@ -70,8 +65,8 @@ export interface ExposureDeclaration {
 export interface OwnedSymbolDeclaration extends ExposureDeclaration {
   readonly symbol: SymbolName;
   /**
-   * The exposure tags this symbol's exposure carries. Omitted - or empty - is
-   * the default contract channel.
+   * The symbol tags assigned by its owner. An omitted list defaults to
+   * `testing` for a testing owner and to empty otherwise.
    *
    * Tags are declared once, by the owner, and travel with the symbol through
    * every channel and every re-exposure: they restrict who may import the
@@ -79,31 +74,15 @@ export interface OwnedSymbolDeclaration extends ExposureDeclaration {
    * declaration - never a {@link ReExposureDeclaration} - can carry them.
    *
    * More than one is meaningful: a browser-safe test fake is
-   * `['testing', 'browser']`, and satisfies a browser test context on both
-   * counts. Exclusivity constrains the combination with the *default contract
+   * `['testing', 'browser']`, and satisfies a module tagged both browser and
+   * testing on both counts. Exclusivity constrains the combination with the *default contract
    * channel*, not with another tag.
    *
    * An owner that declares nothing here may still expose tagged symbols: a
-   * module classified as a test context tags everything it exposes implicitly.
+   * testing module must tag every symbol it owns with `testing`.
    * See {@link symbolTagsOf}, which answers the question for both cases.
    */
   readonly tags?: readonly SymbolTag[];
-}
-
-/**
- * A named importer context: a subtree of the declaring module's own files,
- * classified by context tags.
- *
- * A context classifies importing code only. It owns no symbols - ownership is
- * per module - so a context never changes what its module exposes; it changes
- * what the files inside it may import.
- *
- * A context with no tags is representable and inert: it classifies its files as
- * nothing in particular, which is what they already were.
- */
-export interface ImporterContextDeclaration {
-  readonly name: ContextName;
-  readonly tags: readonly ModuleTag[];
 }
 
 /**
@@ -134,27 +113,8 @@ export interface ModuleDeclaration {
   readonly owns?: readonly OwnedSymbolDeclaration[];
   /** Symbols received from a direct child that this module passes on. */
   readonly reExposes?: readonly ReExposureDeclaration[];
-  /**
-   * Context tags classifying this module's files - and, because a module is
-   * declared about its whole subtree, its submodules' files too.
-   *
-   * This is how a whole module is classified: `moduleTags: ['browser']` states
-   * that its code runs in a browser, and `moduleTags: ['testing']` declares a
-   * **test module**, whose files are a test context and whose exposures are all
-   * implicitly `testing`.
-   *
-   * The classification reaches the subtree so that subdivision stays invariant:
-   * splitting a browser module into submodules must not quietly release them
-   * from the platform requirement their parent declared. A submodule adds tags;
-   * it can never drop an ancestor's.
-   */
+  /** Tags declared for this module's own files; not inherited by submodules. */
   readonly moduleTags?: readonly ModuleTag[];
-  /**
-   * Importer contexts declared over subtrees of this module's own files - a
-   * co-located test tree, a feature-test tree - each with its own tags on top
-   * of {@link moduleTags}.
-   */
-  readonly contexts?: readonly ImporterContextDeclaration[];
   readonly children?: readonly ModuleDeclaration[];
 }
 
@@ -166,14 +126,8 @@ export interface ModuleRecord {
   readonly children: readonly ModuleId[];
   readonly owns: readonly OwnedSymbolDeclaration[];
   readonly reExposes: readonly ReExposureDeclaration[];
-  /**
-   * As declared, omitted when the module declares no classification. Read them
-   * through {@link moduleTagsOf}, which adds the tags this module inherits
-   * from its ancestors.
-   */
+  /** Tags declared for this module's own files. */
   readonly moduleTags?: readonly ModuleTag[];
-  /** As declared, omitted when the module declares no importer context. */
-  readonly contexts?: readonly ImporterContextDeclaration[];
 }
 
 /** A validated, indexed ownership tree. Build one with {@link buildTree}. */
@@ -188,13 +142,11 @@ export interface ModuleTree {
  * Throws on declarations that cannot mean anything: duplicate module ids,
  * duplicate symbol names inside one module, duplicate re-exposures,
  * re-exposures whose `from` is not a direct child of the declaring module,
- * duplicate importer context names, and exposure tags that break an exclusive
- * tag's hold on the module's exposures.
+ * and symbol tags that omit a testing owner's required tag.
  *
  * Declarations that are merely *inert* do not throw: exposing to a parent at
  * the root (the root has no parent), re-exposing a symbol the module never
- * received, or declaring an importer context with no tags. They are
- * representable and simply expose nothing.
+ * received. They are representable and simply expose nothing.
  */
 export function buildTree(root: ModuleDeclaration): ModuleTree {
   const modules = new Map<ModuleId, ModuleRecord>();
@@ -202,7 +154,6 @@ export function buildTree(root: ModuleDeclaration): ModuleTree {
   const visit = (
     declaration: ModuleDeclaration,
     parent: ModuleId | null,
-    inheritedModuleTags: readonly ModuleTag[],
   ): void => {
     const { id } = declaration;
     if (id.length === 0) {
@@ -212,7 +163,7 @@ export function buildTree(root: ModuleDeclaration): ModuleTree {
       throw new Error(`Duplicate module id "${id}".`);
     }
 
-    const moduleTags = [...inheritedModuleTags, ...(declaration.moduleTags ?? [])];
+    const moduleTags = declaration.moduleTags ?? [];
     const implicitTag = defaultSymbolTag(moduleTags);
 
     const owns = declaration.owns ?? [];
@@ -228,29 +179,17 @@ export function buildTree(root: ModuleDeclaration): ModuleTree {
         owned.tags !== undefined &&
         !owned.tags.includes(implicitTag)
       ) {
-        // The module's classification tags everything it exposes, and that tag
+        // The module's classification tags every symbol it owns, and that tag
         // is exclusive with the default contract channel. Declaring tags puts
         // the symbol back in that channel unless the implied tag is among them
         // - which is exactly what exclusivity forbids. Adding tags is fine;
         // dropping this one is not.
         throw new Error(
-          `Module "${id}" is classified as a context whose exposures are implicitly ` +
+          `Module "${id}" owns symbols that must carry ` +
             `"${implicitTag}", which is exclusive; its symbol "${owned.symbol}" ` +
             `may not drop that tag by declaring [${owned.tags.join(', ')}].`,
         );
       }
-    }
-
-    const contexts = declaration.contexts ?? [];
-    const seenContexts = new Set<ContextName>();
-    for (const context of contexts) {
-      if (context.name.length === 0) {
-        throw new Error(`Module "${id}" declares an importer context without a name.`);
-      }
-      if (seenContexts.has(context.name)) {
-        throw new Error(`Module "${id}" declares the importer context "${context.name}" twice.`);
-      }
-      seenContexts.add(context.name);
     }
 
     const children = declaration.children ?? [];
@@ -281,15 +220,14 @@ export function buildTree(root: ModuleDeclaration): ModuleTree {
       owns,
       reExposes,
       moduleTags: declaration.moduleTags,
-      contexts: declaration.contexts,
     });
 
     for (const child of children) {
-      visit(child, id, moduleTags);
+      visit(child, id);
     }
   };
 
-  visit(root, null, []);
+  visit(root, null);
   return { root: root.id, modules };
 }
 
@@ -325,76 +263,16 @@ export function ancestorsOf(tree: ModuleTree, id: ModuleId): ModuleId[] {
   return ancestors;
 }
 
-/**
- * The context tags classifying the files of one importer context: those an
- * importer context named by `context` declares, plus those the module and every
- * one of its ancestors declare about their subtrees.
- *
- * Omit `context` for the module's own files - the context every file belonging
- * to the module is in unless a declared context covers it.
- *
- * Tags accumulate from the file outward and are never dropped: a module may add
- * a classification to its subtree, never release one. Duplicates are collapsed,
- * so the result names each tag once, most specific first.
- *
- * Throws if the module declares no context by that name; a typo in a
- * declaration is an error, not an answer.
- */
-export function moduleTagsOf(
-  tree: ModuleTree,
-  moduleId: ModuleId,
-  context?: ContextName,
-): readonly ModuleTag[] {
-  const tags: ModuleTag[] = [];
-  const add = (tag: ModuleTag): void => {
-    if (!tags.includes(tag)) {
-      tags.push(tag);
-    }
-  };
-
-  if (context !== undefined) {
-    for (const tag of requireImporterContext(tree, moduleId, context).tags) {
-      add(tag);
-    }
-  }
-  for (const id of [moduleId, ...ancestorsOf(tree, moduleId)]) {
-    for (const tag of requireModule(tree, id).moduleTags ?? []) {
-      add(tag);
-    }
-  }
-  return tags;
-}
-
-/** The importer context `name` declared by `moduleId`, failing loudly if it declares none. */
-export function requireImporterContext(
-  tree: ModuleTree,
-  moduleId: ModuleId,
-  name: ContextName,
-): ImporterContextDeclaration {
-  const declared = (requireModule(tree, moduleId).contexts ?? []).find(
-    (context) => context.name === name,
-  );
-  if (declared === undefined) {
-    throw new Error(`Module "${moduleId}" declares no importer context "${name}".`);
-  }
-  return declared;
+/** The tags declared for this module. Ownership does not propagate tags. */
+export function moduleTagsOf(tree: ModuleTree, moduleId: ModuleId): readonly ModuleTag[] {
+  return [...new Set(requireModule(tree, moduleId).moduleTags ?? [])];
 }
 
 /**
- * The exposure tags `symbol` carries. Empty for the default contract channel,
- * and for a symbol `owner` does not own.
- *
- * The owner's own declaration wins; with none, the tags come from the owner's
- * classification, because symbols exposed from a context default to that
- * context's exposure tag. This is the whole of "everything a declared test
- * module exposes is implicitly `testing`" - and it holds for every symbol
- * such a module can expose, since a module can only pass on symbols owned
- * inside its own subtree, which its classification reaches too.
- *
- * The question is asked of the **owner**, never of a module that re-exposes
- * the symbol onward: a re-exposure carries no tags and so can neither add,
- * strip nor change any. Re-tagging a real contract as test support is exactly
- * what exclusivity forbids, and no declaration can spell it.
+ * A symbol's immutable tags, determined by its owner alone. A testing owner
+ * supplies the mandatory `testing` tag when the symbol omits its tag list;
+ * buildTree rejects explicit lists that omit that required tag.
+ * Re-exposing a received symbol never changes its owner's tags.
  */
 export function symbolTagsOf(
   tree: ModuleTree,

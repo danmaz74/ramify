@@ -46,7 +46,7 @@ import type { DecisionDot, LaneChip, LanePath, TreeEdgeLayout } from './layout-l
 import {
   TAG_GLYPHS,
   type Compartment,
-  type DrawnContext,
+  type ModuleClassification,
   type NodeLayout,
   type SymbolRow,
 } from './layout-nodes.js';
@@ -1000,14 +1000,12 @@ function renderNode(
   toggle: (symbol: SymbolName) => void,
   live: boolean,
 ): ReactElement {
-  const { box, moduleContext } = node;
-  // A whole-module context is drawn as the dashed sub-box that fills its node:
-  // the same treatment a named context gets, at the size of the module, because
-  // a context can be a subtree of a module's files or an entire module.
+  const { box, classification } = node;
+  // Tags classify the whole module, so the dashed frame fills its node.
   const badgeShift =
-    moduleContext === undefined
+    classification === undefined
       ? 0
-      : moduleContext.label.length * LAYOUT.node.contextCharWidth + 8;
+      : classification.label.length * LAYOUT.node.tagCharWidth + 8;
   return (
     <g key={node.id} id={`node-${node.id}`} data-kind="node" data-module={node.id} data-depth={node.depth}>
       <rect
@@ -1021,11 +1019,11 @@ function renderNode(
         rx={LAYOUT.node.cornerRadius}
         strokeWidth={1.2}
       />
-      {moduleContext === undefined
+      {classification === undefined
         ? null
-        : renderContext(
-            moduleContext,
-            `node-${node.id}-context`,
+        : renderClassification(
+            classification,
+            `node-${node.id}-classification`,
             {
               x: box.x + 3,
               y: box.y + 3,
@@ -1072,40 +1070,30 @@ function renderNode(
   );
 }
 
-/**
- * A declared importer context: a dashed box, its `name` label, and - for a
- * named context - the line that says what its files are.
- *
- * The box pulses when the selected symbol is one its files may actually import,
- * so a selection separates the contexts that may take a tagged symbol from the
- * production compartments that may not.
- */
-function renderContext(
-  context: DrawnContext,
+/** Draw a tagged module's frame, highlighting the symbols it may import. */
+function renderClassification(
+  classification: ModuleClassification,
   id: string,
   frame: { x: number; y: number; width: number; height: number },
   text: {
     label: { x: number; y: number; anchor?: 'start' | 'end' };
-    caption?: { x: number; y: number };
   },
   selectedSymbol: SymbolName | null,
 ): ReactElement {
-  const lit = selectedSymbol !== null && context.imports.includes(selectedSymbol);
+  const lit = selectedSymbol !== null && classification.imports.includes(selectedSymbol);
   const dim = selectedSymbol !== null && !lit ? 'rmf-dim-soft' : undefined;
   return (
     <g
       key={id}
       id={id}
-      data-kind="node-context"
-      data-module={context.module}
-      {...(context.name === undefined ? {} : { 'data-context': context.name })}
-      data-context-scope={context.name === undefined ? 'module' : 'named'}
-      data-tags={context.tags.join(' ')}
+      data-kind="node-classification"
+      data-module={classification.module}
+      data-tags={classification.tags.join(' ')}
       className={classes(dim, lit ? 'rmf-blink' : undefined)}
     >
       <rect
         id={`${id}-frame`}
-        data-kind="node-context-frame"
+        data-kind="node-classification-frame"
         className={strokeClass('muted')}
         fill="none"
         strokeWidth={1}
@@ -1118,28 +1106,16 @@ function renderContext(
       />
       <text
         id={`${id}-label`}
-        data-kind="node-context-label"
+        data-kind="node-classification-label"
         className={fillClass('muted')}
         x={text.label.x}
         y={text.label.y}
         {...(text.label.anchor === undefined ? {} : { textAnchor: text.label.anchor })}
         fontSize={10.5}
       >
-        {withFullHeightRuleGlyphs(context.label, 10.5)}
+        {withFullHeightRuleGlyphs(classification.label, 10.5)}
       </text>
-      {text.caption === undefined ? null : (
-        <text
-          id={`${id}-caption`}
-          data-kind="node-context-caption"
-          className={fillClass('muted')}
-          x={text.caption.x}
-          y={text.caption.y}
-          fontSize={9.5}
-          fontStyle="italic"
-        >
-          {context.caption}
-        </text>
-      )}
+
     </g>
   );
 }
@@ -1153,34 +1129,6 @@ function renderCompartment(
 ): ReactElement {
   const { box } = node;
   const top = box.y + compartment.y;
-  if (compartment.kind === 'context') {
-    const inset = LAYOUT.node.contextInset;
-    return renderContext(
-      compartment.context,
-      compartment.id,
-      {
-        x: box.x + inset,
-        y: top + 3,
-        width: box.width - 2 * inset,
-        height: compartment.height - 6,
-      },
-      {
-        label: {
-          x: box.x + inset + LAYOUT.node.contextPadding,
-          y: top + LAYOUT.node.contextPadding + LAYOUT.node.contextLineHeight / 2,
-        },
-        caption: {
-          x: box.x + inset + LAYOUT.node.contextPadding,
-          y:
-            top +
-            LAYOUT.node.contextPadding +
-            LAYOUT.node.contextLineHeight +
-            LAYOUT.node.contextLineHeight / 2,
-        },
-      },
-      selectedSymbol,
-    );
-  }
   const isWhatIf = compartment.kind === 'what-if';
   return (
     <g key={compartment.id} id={compartment.id} data-kind="node-compartment" data-compartment={compartment.slug}>

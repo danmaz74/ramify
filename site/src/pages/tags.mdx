@@ -68,9 +68,22 @@ too](/glossary#module-tagging), declared in its own definition -
 `integration-tests` is a [**tagged module**](/glossary#tagged-module), and
 wears its tag as the dashed box filling the node.
 
-And a tag is not just a name: **when a tag is defined, it is
-[associated with its availability rule](/glossary#tag-associated-availability-rule),
-and it always carries it.** That is why the diagrams always write a tag
+A module's tags classify the files that belong to it. Ordinary subdirectories
+share that classification, but a separately declared submodule owns its own
+files and declares its own tags. Tags are not inherited from a parent module.
+
+All files in a module have the same cross-module import permissions. If some
+files need a different classification, give them their own module, as we did
+with `integration-tests`. There are no file-level importer contexts.
+
+Classification is explicitly declared. Naming a file `*.test.ts` or
+`client.ts` does not declare a module or assign it a tag.
+
+And a tag is not just a name: **each built-in tag carries the
+[availability rule fixed by Ramify](/glossary#tag-associated-availability-rule).**
+Only `testing` and `browser` have importability semantics. Project-defined
+labels may help search or documentation, but cannot define or change these
+rules. That is why the diagrams always write a built-in tag
 behind the glyph of its rule - <TagRef rule="⇥" name="testing" /> - the name
 and the rule are one thing. `testing` carries the **required module tag**
 rule, written <TagRef rule="⇥" />, and that rule fires from the symbol: the
@@ -86,11 +99,15 @@ testing module the name is plain. Selecting a tagged symbol shows the same
 verdicts in motion: exactly the arrivals where it is available blink, and
 withheld rows stay dark.
 
-**On a module,** `testing` classifies the files as tests, and everything such
-a module owns and exposes is implicitly tagged `testing` - test infrastructure can
-never leak into a production contract. And on a symbol the tag is
+**On a module,** `testing` classifies the files as tests, and every symbol
+owned by that module must carry `testing`. An explicit tag
+set that omits `testing` is invalid; this is not an overridable default. Test
+infrastructure can never leak into a production contract. And on a symbol the tag is
 *exclusive*: a symbol is real contract or test support, never ambiguously
 both.
+
+Received symbols keep their owner's tags. A testing module re-exposing a
+production symbol does not turn it into test support.
 
 Two properties make this small mechanism enough. There is no global test
 channel: `resetOrderStore` reaches the testing module because the chain of
@@ -184,9 +201,9 @@ imports lives here in prose, where it can be explained rather than drawn.
 
 ## Where the precision lives
 
-The examples on this page are teaching material. The normative document is the
-cross-module importability rules specification, which ships with the
-repository at `docs/model/cross-module-importability-rules.md` - the tag rules
-are its "Contextual rules" section - with the vocabulary defined in the
-[glossary](/glossary). Where a page and the specification appear to disagree,
-the specification is right.
+This page teaches the tag rules. The complete, authoritative rules, including
+tag composition and type-only imports, are in **Cross-Module Importability
+Principles** at `docs/model/cross-module-importability.principles.md` in the
+repository. Its companion, `docs/model/glossary.md`, defines the vocabulary
+reproduced in the [glossary](/glossary). The website must conform to these two
+internal documents.

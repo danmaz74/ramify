@@ -1,16 +1,18 @@
 // ramify.ts - toolkit for the cross-module importability model.
-// See docs/model/cross-module-importability-rules.md for the model definition
+// See docs/model/cross-module-importability.principles.md for the model definition
 // and docs/model/glossary.md for its vocabulary.
 
-// The tree half of the model: the ownership tree, availability over it, and the
+// The tree half of the model: the ownership tree, visibility over it, and the
 // importability rule built on both halves.
 export {
   allSymbols,
   ancestorsOf,
   buildTree,
   explainAvailability,
+  explainVisibility,
   explainImport,
   isAvailable,
+  isVisible,
   mayImport,
 } from './model/index.js';
 export type {
@@ -30,26 +32,22 @@ export type {
   SymbolRef,
 } from './model/index.js';
 
-// The contextual half: the declared classifications that restrict who may
-// import what - the exposure tags a symbol carries, the importer contexts a
-// module declares, and the importer descriptor the complete rule reads.
+// The tag rules: symbol tags, module tags, and the import form checked
+// after visibility is established.
 export {
   MODULE_TAGS,
   SYMBOL_TAGS,
   moduleTagsOf,
   defaultSymbolTag,
   symbolTagsOf,
-  requireImporterContext,
 } from './model/index.js';
 export type {
-  ContextName,
   ModuleTag,
   ModuleTagDefinition,
   SymbolTag,
   SymbolTagDefinition,
   ImportBinding,
   Importer,
-  ImporterContextDeclaration,
   ImporterDescriptor,
   UnmetTagRequirement,
 } from './model/index.js';

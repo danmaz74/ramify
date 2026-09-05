@@ -6,7 +6,6 @@ import {
   buildTree,
   moduleTagsOf,
   symbolTagsOf,
-  requireImporterContext,
   type ModuleDeclaration,
 } from './tree.js';
 
@@ -72,40 +71,14 @@ describe('buildTree', () => {
     const tree = buildTree({
       id: 'app',
       moduleTags: ['browser'],
-      contexts: [{ name: 'ui-tests', tags: ['testing'] }],
       children: [{ id: 'widgets' }],
     });
 
     expect(tree.modules.get('app')).toMatchObject({
       moduleTags: ['browser'],
-      contexts: [{ name: 'ui-tests', tags: ['testing'] }],
     });
-    // The record holds the declaration; what a submodule inherits is read
-    // through `moduleTagsOf`, never stored twice.
+    // Each module keeps its own classification.
     expect(tree.modules.get('widgets')?.moduleTags).toBeUndefined();
-  });
-
-  it('rejects two importer contexts with the same name', () => {
-    expect(() =>
-      buildTree({
-        id: 'a',
-        contexts: [
-          { name: 'tests', tags: ['testing'] },
-          { name: 'tests', tags: [] },
-        ],
-      }),
-    ).toThrow(/declares the importer context "tests" twice/);
-  });
-
-  it('rejects an importer context without a name', () => {
-    expect(() => buildTree({ id: 'a', contexts: [{ name: '', tags: ['testing'] }] })).toThrow(
-      /importer context without a name/,
-    );
-  });
-
-  it('accepts an importer context with no tags - representable and inert', () => {
-    const tree = buildTree({ id: 'a', contexts: [{ name: 'scratch', tags: [] }] });
-    expect(tree.modules.get('a')?.contexts).toEqual([{ name: 'scratch', tags: [] }]);
   });
 
   it('rejects a duplicated re-exposure declaration', () => {
@@ -143,38 +116,21 @@ describe('ancestorsOf', () => {
 describe('moduleTagsOf', () => {
   const tree = buildTree({
     id: 'root',
+    moduleTags: ['browser'],
     children: [
-      {
-        id: 'ui',
-        moduleTags: ['browser'],
-        contexts: [{ name: 'ui-tests', tags: ['testing'] }],
-        children: [{ id: 'widgets' }],
-      },
-      { id: 'server' },
+      { id: 'tests', moduleTags: ['testing', 'testing'] },
+      { id: 'plain' },
     ],
   });
 
-  it('names each tag once, most specific first', () => {
-    expect(moduleTagsOf(tree, 'ui', 'ui-tests')).toEqual(['testing', 'browser']);
+  it('deduplicates only the module’s declared tags', () => {
+    expect(moduleTagsOf(tree, 'root')).toEqual(['browser']);
+    expect(moduleTagsOf(tree, 'tests')).toEqual(['testing']);
+    expect(moduleTagsOf(tree, 'plain')).toEqual([]);
   });
 
-  it('gives an unclassified module no tags', () => {
-    expect(moduleTagsOf(tree, 'server')).toEqual([]);
-    expect(moduleTagsOf(tree, 'root')).toEqual([]);
-  });
-
-  it('carries a classification into the declaring module’s subtree', () => {
-    expect(moduleTagsOf(tree, 'widgets')).toEqual(['browser']);
-  });
-
-  it('throws for a context the module does not declare', () => {
-    expect(() => moduleTagsOf(tree, 'server', 'ui-tests')).toThrow(
-      /Module "server" declares no importer context "ui-tests"/,
-    );
-    // A context is declared by exactly one module: a submodule does not inherit it.
-    expect(() => requireImporterContext(tree, 'widgets', 'ui-tests')).toThrow(
-      /declares no importer context/,
-    );
+  it('throws for an unknown module', () => {
+    expect(() => moduleTagsOf(tree, 'missing')).toThrow(/Unknown module/);
   });
 });
 

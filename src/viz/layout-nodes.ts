@@ -6,7 +6,7 @@
  * 1. **Content.** Every row of every node box is *derived* from the
  *    declaration through the evaluator - including the whole received
  *    compartment and its provenance, which is exactly what
- *    `explainAvailability(...).via` reports. Nothing about receiving is
+ *    `explainVisibility(...).via` reports. Nothing about receiving is
  *    declared anywhere, and that is the point: `CartApi` is available in
  *    `checkout` as a consequence of `cart`'s decision, not of any decision
  *    `checkout` made. Which of the two arrival channels a diagram lists is the
@@ -17,7 +17,7 @@
  *    tag restricts who may take it rather than where it arrives. The tags then
  *    enter as content of their own - the chip a tagged symbol wears on every
  *    row, the strike on a visible-not-available arrival, and
- *    the declared importer contexts drawn inside the node that declares them.
+ *    the module classification displayed by each tagged node.
  * 2. **Position.** `d3-hierarchy`'s tidy tree, with a separation function that
  *    already knows each box's width, followed by a relaxation pass that
  *    guarantees the §3.9 clearance at every level (d3 compares sub-tree
@@ -34,11 +34,10 @@ import type { ColorKey, DiagramContext, TracedSymbol } from './diagram-definitio
 import { LAYOUT, headerBandHeight, rowLabelDx, wrapText, type Box } from './geometry.js';
 import {
   moduleTagsOf,
-  explainAvailability,
+  explainVisibility,
   symbolTagsOf,
   mayImport,
   requireModuleRecord,
-  type ContextName,
   type Tag,
   type ModuleTag,
   type SymbolTag,
@@ -77,28 +76,19 @@ export interface RowAnnotation {
   readonly dx: number;
 }
 
-/**
- * A declared importer context, drawn inside the module that declares it: a
- * named context over some of its files, or the whole module classified at once.
- *
- * A context classifies importing code, so what it says about a diagram is which
- * of the traced symbols its files may actually import - {@link imports}, the
- * set that lights up when one of them is selected.
- */
-export interface DrawnContext {
+/** A tagged module's label and the symbols that may highlight its frame. */
+export interface ModuleClassification {
   readonly module: ModuleId;
-  /** The declared context's name; absent when the whole module is the context. */
-  readonly name?: ContextName;
-  /** As drawn: `integration-tests` for a named context, `browser` for a module. */
+  /** The module tags, each written with its rule glyph. */
   readonly label: string;
-  /** The context tags in force for these files, most specific first. */
+  /** Tags declared by this module. */
   readonly tags: readonly ModuleTag[];
   /** The line under the label: `testing module`. */
   readonly caption: string;
   /**
    * The traced symbols these files may value-import, owned elsewhere - the
    * arrivals a selection lights up here. Derived through `mayImport` with this
-   * context as the importer, so a tag that refuses the import keeps the box
+   * module as the importer, so a tag that refuses the import keeps the box
    * dark.
    */
   readonly imports: readonly SymbolName[];
@@ -134,9 +124,9 @@ export interface SymbolRow {
   /** Muted labels after the name: the tag chip. */
   readonly annotations?: readonly RowAnnotation[];
   /**
-   * Whether a file of this module's own context may *value-import* the symbol.
+   * Whether a file of this module may *value-import* the symbol.
    *
-   * Availability put the row here; this says whether the tags let this module
+   * Visibility put the row here; this says whether the tags let this module
    * take it. False rows are drawn exactly like the others - absence is not the
    * statement here, the chip is - but they never blink when the symbol is
    * selected, which is what "production compartments stay dark" means.
@@ -180,16 +170,6 @@ export type Compartment =
       readonly lines: readonly string[];
       readonly y: number;
       readonly height: number;
-    }
-  | {
-      /** A named importer context: a dashed sub-box over part of the module. */
-      readonly kind: 'context';
-      readonly id: string;
-      readonly slug: string;
-      readonly title: string;
-      readonly context: DrawnContext;
-      readonly y: number;
-      readonly height: number;
     };
 
 export interface NodeLayout {
@@ -201,12 +181,8 @@ export interface NodeLayout {
   readonly box: Box;
   readonly compartments: readonly Compartment[];
   readonly rows: readonly SymbolRow[];
-  /**
-   * Set when the module itself is a declared importer context: the dashed
-   * treatment then frames the whole node, because a context can be a subtree of
-   * a module's files or an entire module.
-   */
-  readonly moduleContext?: DrawnContext;
+  /** A tagged module gets a dashed frame around its whole node. */
+  readonly classification?: ModuleClassification;
 }
 
 export interface LevelGeometry {
@@ -242,7 +218,7 @@ interface NodeContent {
   readonly height: number;
   readonly compartments: readonly Compartment[];
   readonly rows: readonly SymbolRow[];
-  readonly moduleContext?: DrawnContext;
+  readonly classification?: ModuleClassification;
 }
 
 /**
@@ -301,7 +277,7 @@ function arrivals(
     if (ref.owner === moduleId) {
       continue;
     }
-    const decision = explainAvailability(tree, moduleId, ref.owner, ref.name);
+    const decision = explainVisibility(tree, moduleId, ref.owner, ref.name);
     if (decision.allowed && decision.clause === clause && decision.via !== null) {
       found.push({ owner: ref.owner, name: ref.name, from: decision.via });
     }
@@ -317,7 +293,7 @@ export function reExposesToDescendants(
   symbol: SymbolName,
 ): boolean {
   return descendantsOf(tree, moduleId).some((descendant) => {
-    const decision = explainAvailability(tree, descendant, owner, symbol);
+    const decision = explainVisibility(tree, descendant, owner, symbol);
     return decision.allowed && decision.clause === 'ancestor-exposure' && decision.via === moduleId;
   });
 }
@@ -333,7 +309,7 @@ export function reExposesToParent(
   if (parent === null) {
     return false;
   }
-  const decision = explainAvailability(tree, parent, owner, symbol);
+  const decision = explainVisibility(tree, parent, owner, symbol);
   return decision.allowed && decision.clause === 'child-exposure' && decision.via === moduleId;
 }
 
@@ -496,64 +472,25 @@ function tagFacts(
   };
 }
 
-/**
- * The importer contexts drawn inside one module: each context it declares, and
- * - when its own files are classified - the module itself.
- *
- * The tags of a whole-module context are the *effective* ones, so a submodule of
- * a browser module states the classification it inherited rather than pretending
- * to be unclassified.
- */
-function drawnContexts(
+/** Module tags and the imports permitted in that module, for its dashed frame. */
+function moduleClassification(
   tree: ModuleTree,
   moduleId: ModuleId,
   traced: readonly TracedSymbol[],
-): { readonly named: DrawnContext[]; readonly module?: DrawnContext } {
-  const importsOf = (context?: ContextName): SymbolName[] =>
-    traced
-      .filter(
-        (entry) =>
-          entry.owner !== moduleId &&
-          mayImport(
-            tree,
-            { module: moduleId, ...(context === undefined ? {} : { context }), binding: 'value' },
-            entry.owner,
-            entry.symbol,
-          ),
-      )
-      .map((entry) => entry.symbol);
-
-  const caption = (tags: readonly ModuleTag[], scope: 'context' | 'module'): string =>
-    tags.length === 0 ? scope : `${tags.join(' · ')} ${scope}`;
-
-  const named = (requireModuleRecord(tree, moduleId).contexts ?? []).map((declared): DrawnContext => {
-    const tags = moduleTagsOf(tree, moduleId, declared.name);
-    return {
-      module: moduleId,
-      name: declared.name,
-      label: declared.name,
-      tags,
-      caption: caption(tags, 'context'),
-      imports: importsOf(declared.name),
-    };
-  });
-
-  const moduleTags = moduleTagsOf(tree, moduleId);
-  const module =
-    moduleTags.length === 0
-      ? undefined
-      : {
-          // A tag always travels with its rule, so the label writes each tag
-          // behind its rule's glyph; the caption states the scope in plain
-          // words.
-          module: moduleId,
-          label: moduleTags.map(tagWithGlyph).join(' · '),
-          tags: moduleTags,
-          caption: caption(moduleTags, 'module'),
-          imports: importsOf(),
-        };
-
-  return { named, ...(module === undefined ? {} : { module }) };
+): ModuleClassification | undefined {
+  const tags = moduleTagsOf(tree, moduleId);
+  if (tags.length === 0) {
+    return undefined;
+  }
+  return {
+    module: moduleId,
+    label: tags.map(tagWithGlyph).join(' · '),
+    tags,
+    caption: `${tags.join(' · ')} module`,
+    imports: traced
+      .filter((entry) => entry.owner !== moduleId && mayImport(tree, moduleId, entry.owner, entry.symbol))
+      .map((entry) => entry.symbol),
+  };
 }
 
 /** Build every node's content and measure it. Positions come later. */
@@ -638,30 +575,19 @@ function buildContent(context: DiagramContext): Map<ModuleId, NodeContent> {
     // compartment says so; one with arrivals to list needs no empty box.
     const showPlaceholder = owns.length === 0 && received.length === 0;
 
-    const contexts = drawnContexts(tree, id, definition.tracedSymbols);
+    const classification = moduleClassification(tree, id, definition.tracedSymbols);
 
     // The header carries the module's name, the root badge, and - when the
-    // module itself is a context - the tag label that says so.
+    // module has tags - the label that lists them.
     const headerChars = [
       id,
       ...(isRoot ? [APP_ROOT_BADGE] : []),
-      ...(contexts.module === undefined ? [] : [contexts.module.label]),
+      ...(classification === undefined ? [] : [classification.label]),
     ].join('   ').length;
-    // A named context's box has two lines of its own, drawn inside its own
-    // inset: measured in that font, then converted into the row budget. A
-    // whole-module context adds nothing here - its label rides the header.
-    const contextChars = contexts.named.map((context) =>
-      Math.ceil(
-        (2 * LAYOUT.node.contextInset +
-          Math.max(context.label.length, context.caption.length) * LAYOUT.node.contextCharWidth) /
-          LAYOUT.node.charWidth,
-      ),
-    );
     const contentChars = [
       headerChars,
       ...(showPlaceholder ? [PLACEHOLDER.length] : []),
       ...[...owns, ...received].map((row) => rowChars(row)),
-      ...contextChars,
     ];
     const width = Math.max(
       LAYOUT.node.minWidth,
@@ -716,23 +642,6 @@ function buildContent(context: DiagramContext): Map<ModuleId, NodeContent> {
       addSymbolCompartment('received', receivedSlug, nodeContent.receivedCompartmentTitle, received);
     }
 
-    // A declared context is part of the node's content, not an overlay: it
-    // takes its own band at the bottom of the box, and the box grew for it.
-    for (const context of contexts.named) {
-      const height =
-        2 * LAYOUT.node.contextPadding + 2 * LAYOUT.node.contextLineHeight;
-      compartments.push({
-        kind: 'context',
-        id: `node-${id}-compartment-context-${context.name ?? ''}`,
-        slug: `context-${context.name ?? ''}`,
-        title: context.label,
-        context,
-        y,
-        height,
-      });
-      y += height;
-    }
-
     if (whatIfNote !== undefined && id === whatIfNote.moduleId) {
       const maxChars = Math.floor((width - 2 * LAYOUT.node.paddingX) / LAYOUT.lane.chipCharWidth);
       const lines = wrapText(whatIfNote.text, maxChars);
@@ -759,7 +668,7 @@ function buildContent(context: DiagramContext): Map<ModuleId, NodeContent> {
       height: y + LAYOUT.node.paddingBottom,
       compartments,
       rows: finishedRows,
-      ...(contexts.module === undefined ? {} : { moduleContext: contexts.module }),
+      ...(classification === undefined ? {} : { classification }),
     });
   }
 
@@ -896,7 +805,7 @@ export function layoutTree(context: DiagramContext): TreeGeometry {
       },
       compartments: content.compartments,
       rows: content.rows,
-      ...(content.moduleContext === undefined ? {} : { moduleContext: content.moduleContext }),
+      ...(content.classification === undefined ? {} : { classification: content.classification }),
     };
   });
 

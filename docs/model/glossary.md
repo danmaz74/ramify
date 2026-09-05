@@ -1,11 +1,15 @@
 # Glossary
 
-**Status:** Agreed vocabulary; the model spec, evaluator, diagrams and site
-are aligned with it.
+**Status:** Active
 
-Defines the terms used by
-[Cross-Module Importability Rules](cross-module-importability-rules.md);
-the rules document uses these terms and does not redefine them.
+## Purpose
+
+Define the authoritative vocabulary for the
+[Cross-Module Importability Principles](cross-module-importability.principles.md).
+The principles document contains the complete rules; this companion defines
+their terms. Together, these two internal documents define the model. The
+website's glossary is a reader-facing copy and must conform to these
+definitions.
 
 ## ramify module
 
@@ -46,7 +50,8 @@ child exposing S to its parent, or a proper ancestor exposing S to its descendan
 
 In the world of ramify modules, all symbols are always associated with a set of tags. Tags
 are assigned to TypeScript exported symbols by the owner module. By default, the tag
-set is empty.
+set is empty, except that every symbol owned by a testing module must carry
+`testing`.
 
 When talking about symbols in the context of ramify modules, we always mean "symbol with
 its tag set".
@@ -90,13 +95,19 @@ a no-op as the same symbol is already visible in M2's parent and all M2's descen
 
 ## Module tagging
 
-Tags can also be assigned to modules in the module definition. This assignment affects availability.
+Tags are assigned explicitly in a module's definition and classify all files
+belonging to that module. By default, a module has no tags. Submodules declare
+their own tags; module tags are not inherited.
 
-By default, no tag is assigned to a module.
+Ordinary subdirectories share their owning module's classification. Separately
+declared submodules have their own ownership and classification. There are no
+file-level importer contexts: files needing different cross-module import
+permissions belong in different modules. Module boundaries and tags are never
+inferred from test-like or client-like filenames or directory names.
 
 ## Tagged module
 
-A module to which at least one tag is assigned is called tagged.
+A module whose declared tag set is non-empty is called tagged.
 
 ## Tag-based availability rules
 
@@ -114,20 +125,25 @@ When several rules apply to the same symbol and module, all of them must be sati
 
 ## Tag-associated availability rule
 
-When a tag is defined, it is associated with its availability rule, and it always carries it.
-So, when a tag is associated with a symbol or module, it carries its availability rule.
+Each built-in tag carries the availability rule fixed by Ramify. Assigning that
+tag to a symbol or module does not change its rule. Only `testing` and `browser`
+have importability semantics; project-defined labels are inert classification
+for search or documentation and cannot define availability rules.
 
 ## `testing` tag
 
 The built-in tag carrying the required module tag rule. A symbol tagged `testing` is
 test support, never part of the production contract. A **testing module** is a module
-tagged `testing`; every symbol it owns is tagged `testing`.
+tagged `testing` in its own definition. Every
+symbol it owns must carry `testing`; a declaration that omits or overrides that
+required tag is invalid. Received symbols keep their owner's tags.
 
 ## `browser` tag
 
 The built-in tag carrying the required symbol tag rule. On a symbol it is the owner's
 claim that the symbol's entire transitive runtime closure is browser-safe. A
-**browser module** is a module tagged `browser`; its files run in a browser.
+**browser module** is a module tagged `browser` in its own definition; its files
+run in a browser.
 
 ## Module-available symbol
 

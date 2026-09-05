@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { createDiagramContext } from './diagram-definition.js';
 import { example3Diagram } from './diagrams/example3.js';
 import { buildDiagramLayout } from './layout.js';
-import type { DrawnContext } from './layout-nodes.js';
-import { moduleTagsOf, symbolTagsOf, isAvailable, mayImport } from './model-access.js';
+import type { ModuleClassification } from './layout-nodes.js';
+import { moduleTagsOf, symbolTagsOf, isVisible, mayImport } from './model-access.js';
 
 const example3 = buildDiagramLayout(example3Diagram);
 const { tree } = createDiagramContext(example3Diagram);
@@ -26,12 +26,9 @@ describe('example 3 - the tag is the entire difference', () => {
         `${row.provenance === undefined ? '' : `   ${row.provenance}`}`,
     );
 
-  const contextsOf = (id: string): DrawnContext[] => {
+  const classificationsOf = (id: string): ModuleClassification[] => {
     const node = example3.tree.nodeById.get(id);
-    const named = (node?.compartments ?? []).flatMap((compartment) =>
-      compartment.kind === 'context' ? [compartment.context] : [],
-    );
-    return node?.moduleContext === undefined ? named : [...named, node.moduleContext];
+    return node?.classification === undefined ? [] : [node.classification];
   };
 
   it('draws the declared tree, and only the declared tree', () => {
@@ -47,7 +44,7 @@ describe('example 3 - the tag is the entire difference', () => {
   it('makes availability uniform, so the tag is the only variable', () => {
     for (const consumer of ['app', 'orders', 'billing', 'integration-tests']) {
       for (const symbol of ['OrderService', 'resetOrderStore']) {
-        expect(isAvailable(tree, consumer, 'orders', symbol)).toBe(true);
+        expect(isVisible(tree, consumer, 'orders', symbol)).toBe(true);
       }
     }
     // Same chain, same rows, same provenance - twice.
@@ -97,25 +94,24 @@ describe('example 3 - the tag is the entire difference', () => {
     expect(mayImport(tree, integrationTests, 'orders', 'resetOrderStore')).toBe(true);
     // The refusal is the tag's, not the tree's.
     expect(mayImport(tree, 'billing', 'orders', 'resetOrderStore')).toBe(false);
-    expect(isAvailable(tree, 'billing', 'orders', 'resetOrderStore')).toBe(true);
+    expect(isVisible(tree, 'billing', 'orders', 'resetOrderStore')).toBe(true);
   });
 
-  it('classifies the whole test module as the context', () => {
-    expect(contextsOf('orders')).toEqual([]);
-    expect(contextsOf('billing')).toEqual([]);
+  it('draws the classification of the testing module', () => {
+    expect(classificationsOf('orders')).toEqual([]);
+    expect(classificationsOf('billing')).toEqual([]);
     // `app` declares nothing: the tests are their own module now, and the
     // classification lives on that module, not inside its parent.
     const compartments = example3.tree.nodeById.get('app')?.compartments ?? [];
     expect(compartments.map((compartment) => compartment.kind)).toEqual(['received']);
 
     const node = example3.tree.nodeById.get('integration-tests');
-    expect(node?.moduleContext?.name).toBeUndefined();
-    expect(node?.moduleContext?.label).toBe('⇥ testing');
-    expect(node?.moduleContext?.tags).toEqual(['testing']);
-    expect(node?.moduleContext?.caption).toBe('testing module');
+    expect(node?.classification?.label).toBe('⇥ testing');
+    expect(node?.classification?.tags).toEqual(['testing']);
+    expect(node?.classification?.caption).toBe('testing module');
     expect(moduleTagsOf(tree, 'integration-tests')).toEqual(['testing']);
     // The verdict table again, read off the drawn box this time.
-    expect(node?.moduleContext?.imports).toEqual(['OrderService', 'resetOrderStore']);
+    expect(node?.classification?.imports).toEqual(['OrderService', 'resetOrderStore']);
   });
 
   it('blinks only the arrivals that may really import the selection', () => {
@@ -128,9 +124,9 @@ describe('example 3 - the tag is the entire difference', () => {
           .map((row) => `${node.id}/${row.symbol}`),
       ),
       ...example3.tree.nodes.flatMap((node) =>
-        contextsOf(node.id)
+        classificationsOf(node.id)
           .filter((context) => context.imports.includes(symbol))
-          .map((context) => `${node.id}/${context.name ?? 'module'}`),
+          .map((context) => `${node.id}/module`),
       ),
     ];
 

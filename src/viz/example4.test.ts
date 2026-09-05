@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { createDiagramContext } from './diagram-definition.js';
 import { example4Diagram } from './diagrams/example4.js';
 import { buildDiagramLayout } from './layout.js';
-import type { DrawnContext } from './layout-nodes.js';
-import { moduleTagsOf, isAvailable, mayImport } from './model-access.js';
+import type { ModuleClassification } from './layout-nodes.js';
+import { moduleTagsOf, isVisible, mayImport } from './model-access.js';
 
 const example4 = buildDiagramLayout(example4Diagram);
 const { tree } = createDiagramContext(example4Diagram);
@@ -26,12 +26,9 @@ describe('example 4 - a promise about the closure', () => {
         `${row.provenance === undefined ? '' : `   ${row.provenance}`}`,
     );
 
-  const contextsOf = (id: string): DrawnContext[] => {
+  const classificationsOf = (id: string): ModuleClassification[] => {
     const node = example4.tree.nodeById.get(id);
-    const named = (node?.compartments ?? []).flatMap((compartment) =>
-      compartment.kind === 'context' ? [compartment.context] : [],
-    );
-    return node?.moduleContext === undefined ? named : [...named, node.moduleContext];
+    return node?.classification === undefined ? [] : [node.classification];
   };
 
   it('draws the declared tree, and only the declared tree', () => {
@@ -42,7 +39,7 @@ describe('example 4 - a promise about the closure', () => {
   it('makes availability uniform, so the tag is the only variable', () => {
     for (const consumer of ['app', 'shared', 'ui', 'server']) {
       for (const symbol of ['formatMoney', 'queryDb']) {
-        expect(isAvailable(tree, consumer, 'shared', symbol)).toBe(true);
+        expect(isVisible(tree, consumer, 'shared', symbol)).toBe(true);
       }
     }
     expect(rowsOf('server')).toEqual([
@@ -78,17 +75,16 @@ describe('example 4 - a promise about the closure', () => {
   });
 
   it('classifies a whole module: the dashed box fills its node', () => {
-    expect(contextsOf('shared')).toEqual([]);
-    expect(contextsOf('server')).toEqual([]);
-    expect(contextsOf('app')).toEqual([]);
+    expect(classificationsOf('shared')).toEqual([]);
+    expect(classificationsOf('server')).toEqual([]);
+    expect(classificationsOf('app')).toEqual([]);
 
     const ui = example4.tree.nodeById.get('ui');
-    expect(ui?.moduleContext?.name).toBeUndefined();
-    expect(ui?.moduleContext?.label).toBe('⇤ browser');
-    expect(ui?.moduleContext?.tags).toEqual(['browser']);
-    expect(ui?.moduleContext?.caption).toBe('browser module');
+    expect(ui?.classification?.label).toBe('⇤ browser');
+    expect(ui?.classification?.tags).toEqual(['browser']);
+    expect(ui?.classification?.caption).toBe('browser module');
     expect(moduleTagsOf(tree, 'ui')).toEqual(['browser']);
-    // No compartment of its own: the module *is* the context, so nothing was
+    // No compartment of its own: the classification applies to the whole module, so nothing was
     // added to the box's content for it.
     expect((ui?.compartments ?? []).map((compartment) => compartment.kind)).toEqual(['received']);
   });
@@ -128,9 +124,9 @@ describe('example 4 - a promise about the closure', () => {
           .map((row) => `${node.id}/${row.symbol}`),
       ),
       ...example4.tree.nodes.flatMap((node) =>
-        contextsOf(node.id)
+        classificationsOf(node.id)
           .filter((context) => context.imports.includes(symbol))
-          .map((context) => `${node.id}/${context.name ?? 'module'}`),
+          .map((context) => `${node.id}/module`),
       ),
     ];
 
@@ -144,7 +140,7 @@ describe('example 4 - a promise about the closure', () => {
       'server/formatMoney',
       'ui/module',
     ]);
-    expect(example4.tree.nodeById.get('ui')?.moduleContext?.imports).toEqual(['formatMoney']);
+    expect(example4.tree.nodeById.get('ui')?.classification?.imports).toEqual(['formatMoney']);
   });
 
   it('draws four decision dots, partitioned by the two policy statements', () => {

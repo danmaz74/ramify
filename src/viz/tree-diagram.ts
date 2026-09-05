@@ -11,7 +11,7 @@
  * available in it.
  *
  * What the focus view claims is read off the evaluator, never off the
- * definition: every received row comes from `explainAvailability`, so a row is
+ * definition: every received row comes from `explainVisibility`, so a row is
  * drawn only where the model says the symbol is available.
  *
  * Pure and browser-compatible: no I/O, no DOM.

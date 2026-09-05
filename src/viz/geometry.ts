@@ -70,14 +70,8 @@ export const LAYOUT = {
     /** Gap before each annotation that follows a row's name. */
     annotationGap: 6,
 
-    /** Inset of a declared context's dashed box from its node's edges. */
-    contextInset: 6,
-    /** Air above and below a context box's two lines. */
-    contextPadding: 6,
-    /** Line height inside a context box. */
-    contextLineHeight: 13,
     /** Advance width of a context box's 10.5 px label and caption. */
-    contextCharWidth: 5.9,
+    tagCharWidth: 5.9,
   },
 
   /**

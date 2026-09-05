@@ -3,7 +3,7 @@
  * declared classifications that restrict who may import what, and the
  * importability rule that follows. Pure, framework-free and browser-compatible.
  *
- * Specified by `docs/model/cross-module-importability-rules.md`; vocabulary in
+ * Specified by `docs/model/cross-module-importability.principles.md`; vocabulary in
  * `docs/model/glossary.md`.
  */
 
@@ -13,12 +13,9 @@ export {
   buildTree,
   moduleTagsOf,
   symbolTagsOf,
-  requireImporterContext,
 } from './tree.js';
 export type {
-  ContextName,
   ExposureDeclaration,
-  ImporterContextDeclaration,
   ModuleDeclaration,
   ModuleId,
   ModuleRecord,
@@ -39,7 +36,14 @@ export type {
   ImportBinding,
 } from './tags.js';
 
-export { explainAvailability, explainImport, isAvailable, mayImport } from './availability.js';
+export {
+  explainVisibility,
+  explainAvailability,
+  explainImport,
+  isVisible,
+  isAvailable,
+  mayImport,
+} from './availability.js';
 export type {
   DenialReason,
   ImportAllowed,

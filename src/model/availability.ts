@@ -1,42 +1,8 @@
 /**
- * Availability, and the file-level importability rule built on it.
- *
- * Implements the rule specified in
- * `docs/model/cross-module-importability-rules.md`, in the vocabulary of
- * `docs/model/glossary.md`. The rule has two conjuncts, and this file keeps
- * them apart.
- *
- * The tree conjunct - the ceiling:
- *
- * > A file may import a symbol iff that symbol is **available** in the file's
- * > module.
- * >
- * > A symbol is available in a module if the module owns it, or if some other
- * > module exposed it there: a direct child exposing to its parent, or a
- * > proper ancestor exposing to its descendants.
- *
- * The contextual conjunct - the tags:
- *
- * > A file may import a symbol iff the tree rules allow it AND every
- * > cross-requirement of every tag involved - on the exposed symbol and on the
- * > importer's context - is satisfied.
- *
- * {@link isAvailable} and {@link explainAvailability} answer the first,
- * module-level question: what the exposure structure puts within a module's
- * reach. {@link mayImport} and {@link explainImport} answer the complete
- * question, for one importing file, described by its module, the importer
- * context it sits in and the binding it uses.
- *
- * **Availability is tag-free, and importability is not.** A tag restricts
- * *importing*, per context; it changes nobody's availability, and it is
- * consulted only after the tree rules have already said yes - which is how the
- * model's promise that tags never expose is kept structurally rather than
- * argued. In a universe that declares no tag the two questions coincide, as the
- * glossary's definition says; where tags are declared, availability is the
- * ceiling and importability is what a particular context may take from it.
- *
- * This module is pure and browser-compatible: no I/O, no Node built-ins, no
- * side effects.
+ * Visibility follows ownership and exposure. Availability adds the importing
+ * module's tag restrictions for value imports; type imports retain coupling
+ * restrictions only. All files belonging to a module have the same verdict.
+ * See docs/model/cross-module-importability.principles.md and its glossary.
  */
 
 import {
@@ -52,7 +18,6 @@ import {
   symbolTagsOf,
   ownedSymbol,
   requireModule,
-  type ContextName,
   type ExposureDeclaration,
   type ModuleId,
   type ModuleTree,
@@ -72,8 +37,8 @@ export type ImportClause =
 /**
  * Why an import is not allowed.
  *
- * The first three reasons are the tree's: the symbol never became available in
- * the importing module. The last two are the tags': the symbol is available,
+ * The first three reasons are the tree's: the symbol never became visible in
+ * the importing module. The last two are the tags': the symbol is visible,
  * and a cross-requirement of the import is unmet. Which side stated the
  * requirement is the whole difference between them, and `requires` has a
  * direction - so the two reasons name it.
@@ -89,19 +54,17 @@ export type DenialReason =
   /** Exposed by its owner, but no chain of exposures reaches this module. */
   | 'no-exposure-chain'
   /**
-   * An exposure tag of the symbol requires a context tag the importing file's
-   * context does not carry - `testing` outside a test context.
+   * A symbol tag requires a tag the importing module does not carry.
    */
   | 'symbol-tag-requires-module-tag'
   /**
-   * A context tag of the importing file requires an exposure tag the symbol
-   * does not carry - a browser context value-importing an untagged symbol.
+   * A module tag requires a symbol tag that is absent, for a value import.
    */
   | 'module-tag-requires-symbol-tag';
 
 /** The cross-requirement that was not met, in the direction that states it. */
 export interface UnmetTagRequirement {
-  /** The tag stating the requirement: on the exposed symbol, or on the context. */
+  /** The tag stating the requirement: on the exposed symbol, or on the module. */
   readonly tag: SymbolTag | ModuleTag;
   /** The tag it requires on the other side of the import. */
   readonly requires: SymbolTag | ModuleTag;
@@ -134,32 +97,19 @@ export interface ImportDenied {
 
 export type ImportDecision = ImportAllowed | ImportDenied;
 
-/**
- * Where an importing file sits, and how it binds what it imports - everything
- * about the importer the complete rule reads.
- *
- * `context` names an importer context the module declares; omit it for the
- * module's own files. `binding` defaults to `value`, the binding subject to
- * every requirement: the type-only exemption is claimed, never assumed.
- */
+/** The owning module of an importing file and its import form (value by default). */
 export interface ImporterDescriptor {
   readonly module: ModuleId;
-  readonly context?: ContextName;
   readonly binding?: ImportBinding;
 }
 
-/**
- * An importing file. A bare module id is shorthand for a value import from a
- * file in that module's own context - the reading every importer had before
- * contexts and bindings existed.
- */
+/** A bare module id denotes a value import from any file belonging to it. */
 export type Importer = ModuleId | ImporterDescriptor;
 
 type Channel = keyof ExposureDeclaration;
 
 interface ResolvedImporter {
   readonly module: ModuleId;
-  readonly context: ContextName | undefined;
   readonly binding: ImportBinding;
 }
 
@@ -168,30 +118,18 @@ interface UnmetRequirementFinding extends UnmetTagRequirement {
   readonly reason: DenialReason;
 }
 
-/**
- * Is `symbol`, owned by `ownerModule`, available in `moduleId`?
- *
- * The module-level question: what the exposure structure puts within the
- * module's reach. Availability is a property of a module, so it is asked of a
- * module - no context, no binding - and it is tag-free: a tag restricts who may
- * import a symbol, not where the symbol arrives.
- *
- * In a universe that declares no tag, availability and importability are one
- * predicate, as the glossary says. Where a tag is involved, this is the
- * ceiling: {@link mayImport} answers what a particular importing file may
- * actually take from it, and is never more permissive.
- */
-export function isAvailable(
+/** Is the symbol owned here or received through exposure, regardless of tags? */
+export function isVisible(
   tree: ModuleTree,
   moduleId: ModuleId,
   ownerModule: ModuleId,
   symbol: SymbolName,
 ): boolean {
-  return explainAvailability(tree, moduleId, ownerModule, symbol).allowed;
+  return explainVisibility(tree, moduleId, ownerModule, symbol).allowed;
 }
 
 /**
- * {@link isAvailable} with its reasoning: which clause of the availability rule
+ * {@link isVisible} with its reasoning: which clause of the visibility rule
  * put the symbol within the module's reach and whose decision that was, or the
  * reason nothing did.
  *
@@ -202,7 +140,7 @@ export function isAvailable(
  * Throws if either module id is unknown; a typo in a declaration is an error,
  * not an answer.
  */
-export function explainAvailability(
+export function explainVisibility(
   tree: ModuleTree,
   moduleId: ModuleId,
   ownerModule: ModuleId,
@@ -252,6 +190,26 @@ export function explainAvailability(
   return { allowed: false, reason: 'no-exposure-chain' };
 }
 
+/** May any file belonging to this module import the symbol as a value? */
+export function isAvailable(
+  tree: ModuleTree,
+  moduleId: ModuleId,
+  ownerModule: ModuleId,
+  symbol: SymbolName,
+): boolean {
+  return explainAvailability(tree, moduleId, ownerModule, symbol).allowed;
+}
+
+/** Value availability with the exposure or tag decision that explains it. */
+export function explainAvailability(
+  tree: ModuleTree,
+  moduleId: ModuleId,
+  ownerModule: ModuleId,
+  symbol: SymbolName,
+): ImportDecision {
+  return explainImport(tree, moduleId, ownerModule, symbol);
+}
+
 /**
  * May `importer` import `symbol`, owned by `ownerModule`?
  *
@@ -282,8 +240,7 @@ export function mayImport(
  * module owns crosses no boundary, and whether the owner keeps its platform or
  * test code apart internally is the owner's business.
  *
- * Throws if either module id is unknown, or if the importer names a context its
- * module does not declare; a typo in a declaration is an error, not an answer.
+ * Throws if either module id is unknown.
  */
 export function explainImport(
   tree: ModuleTree,
@@ -291,13 +248,12 @@ export function explainImport(
   ownerModule: ModuleId,
   symbol: SymbolName,
 ): ImportDecision {
-  const { module: consumerModule, context, binding } = resolveImporter(importer);
+  const { module: consumerModule, binding } = resolveImporter(importer);
 
-  // Resolved before anything is decided: an unknown module or an undeclared
-  // context name must fail loudly whatever the answer would have been.
-  const moduleTags = moduleTagsOf(tree, consumerModule, context);
+  // Resolve the importing module before deciding the import.
+  const moduleTags = moduleTagsOf(tree, consumerModule);
 
-  const ceiling = explainAvailability(tree, consumerModule, ownerModule, symbol);
+  const ceiling = explainVisibility(tree, consumerModule, ownerModule, symbol);
   if (!ceiling.allowed || consumerModule === ownerModule) {
     return ceiling;
   }
@@ -318,11 +274,10 @@ export function explainImport(
 /** An importer in full, filling in the defaults a bare module id leaves out. */
 function resolveImporter(importer: Importer): ResolvedImporter {
   if (typeof importer === 'string') {
-    return { module: importer, context: undefined, binding: 'value' };
+    return { module: importer, binding: 'value' };
   }
   return {
     module: importer.module,
-    context: importer.context,
     binding: importer.binding ?? 'value',
   };
 }
@@ -332,8 +287,8 @@ function resolveImporter(importer: Importer): ResolvedImporter {
  * every tag involved is satisfied.
  *
  * Both directions are checked, in the order the specification introduces them:
- * what each tag of the exposed symbol requires of the importing context, then
- * what each tag of the context requires of the symbol. The scope of each check
+ * what each tag of the exposed symbol requires of the importing module, then
+ * what each tag of the module requires of the symbol. The scope of each check
  * is intrinsic to the rule kind: a required-module-tag rule polices coupling
  * and is in force for both import forms, while a required-symbol-tag rule
  * polices the module's runtime and is not in force for a type-only import,
@@ -355,11 +310,11 @@ function firstUnmetRequirement(
 
   // A required-symbol-tag rule never reaches a type-only import.
   if (binding === 'value') {
-    for (const contextTag of moduleTags) {
-      const definition = MODULE_TAGS[contextTag];
+    for (const moduleTag of moduleTags) {
+      const definition = MODULE_TAGS[moduleTag];
       for (const required of definition.requires) {
         if (!tags.includes(required)) {
-          return { reason: 'module-tag-requires-symbol-tag', tag: contextTag, requires: required };
+          return { reason: 'module-tag-requires-symbol-tag', tag: moduleTag, requires: required };
         }
       }
     }
@@ -372,8 +327,8 @@ function firstUnmetRequirement(
  * Whether `moduleId` owns `ref`, or received it from a direct child that
  * exposed it to its parent.
  *
- * A module may expose any symbol available in it, so this is narrower than
- * availability - it omits symbols an ancestor exposed to its descendants.
+ * A module may expose any symbol visible in it, so this is narrower than
+ * visibility - it omits symbols an ancestor exposed to its descendants.
  * Nothing is lost by the omission: re-exposing a symbol received from an
  * ancestor is always redundant. Its own subtree already lies inside that
  * ancestor's subtree, every module on the path up to that ancestor does too,

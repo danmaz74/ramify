@@ -1,9 +1,10 @@
 /**
  * The tag vocabulary: tags, their availability rules and import bindings.
  *
- * Implements the parameter schema of
- * `docs/model/cross-module-importability-rules.md`
- * §"Contextual rules", in the vocabulary of `docs/model/glossary.md`: a tag is
+ * The tag principles are defined in
+ * `docs/model/cross-module-importability.principles.md`
+ * §"Tags Restrict Availability Without Changing Visibility", in the vocabulary
+ * of `docs/model/glossary.md`: a tag is
  * not just a name - when a tag is defined, it is associated with its
  * availability rule, and it always carries it. The same tag names are assigned
  * to symbols (by their owner, immutably) and to modules (in the module
@@ -39,8 +40,7 @@
 /**
  * How an importing file binds a symbol.
  *
- * The one term the contextual rules add to the core vocabulary, and they add it
- * for one reason: a type import is erased before any runtime exists, so
+ * A type import is erased before any runtime exists, so
  * platform requirements exempt it while testing requirements do not.
  */
 export type ImportBinding = 'value' | 'type';
@@ -72,8 +72,7 @@ export type ModuleTag = Tag;
 /**
  * What a tag means in symbol position.
  *
- * The `verify` parameter of the specification's schema is deliberately absent.
- * It attaches an externally checked proof obligation to a tag's factual claim -
+ * Verification is an externally checked proof obligation on a tag's claim -
  * for `browser`, that the symbol's runtime closure really is browser-safe - and
  * verification is not an importability rule: the importability decision
  * consults only the declared tag, and a false claim is the owner's error,

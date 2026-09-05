@@ -13,9 +13,20 @@ When working under `ramify/`, ignore the usual cucumber-viz rules:
 - cucumber-viz conventions (barrel/vocabulary surfaces, BEM/plain-CSS UI
   rules, dependency-cruiser rules, audit semantics, feature-test tiers) do
   not apply.
-- ramify.ts-specific architecture docs will be added later. Until then, the
-  only normative document is the model spec in
-  [docs/model/cross-module-importability-rules.md](docs/model/cross-module-importability-rules.md).
+
+## Authoritative Model Documents
+
+The importability model is defined by two internal documents:
+
+- [Cross-Module Importability Principles](docs/model/cross-module-importability.principles.md)
+  contains the complete rules.
+- [Glossary](docs/model/glossary.md) defines their vocabulary.
+
+Read these before changing the model, its implementation, or its documentation.
+The website teaches the model through explanations and examples. It must
+conform to these documents, as must the evaluator, diagrams, and other tools.
+Keep the authoritative rules in the principles document and the vocabulary
+in its companion glossary.
 
 ## Conventions that DO apply
 

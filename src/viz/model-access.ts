@@ -11,15 +11,15 @@ export {
   buildTree,
   moduleTagsOf,
   explainAvailability,
+  explainVisibility,
   explainImport,
   symbolTagsOf,
   isAvailable,
+  isVisible,
   mayImport,
-  requireImporterContext,
 } from '../model/index.js';
 
 export type {
-  ContextName,
   Tag,
   ModuleTag,
   DenialReason,
@@ -28,7 +28,6 @@ export type {
   ImportClause,
   ImportDecision,
   Importer,
-  ImporterContextDeclaration,
   ImporterDescriptor,
   ModuleDeclaration,
   ModuleId,

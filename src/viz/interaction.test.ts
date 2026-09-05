@@ -117,13 +117,10 @@ const blinking = (): string[] =>
 const lanesOf = (symbol: string): number =>
   container.querySelectorAll(`[data-kind="lane"][data-symbol="${symbol}"]`).length;
 
-/** Every declared importer context currently pulsing, as `<module>/<context>`. */
-const litContexts = (): string[] =>
-  [...container.querySelectorAll('[data-kind="node-context"].rmf-blink')].map(
-    (element) =>
-      `${element.getAttribute('data-module') ?? '?'}/${
-        element.getAttribute('data-context') ?? element.getAttribute('data-context-scope') ?? '?'
-      }`,
+/** Every tagged module frame currently pulsing. */
+const litClassifications = (): string[] =>
+  [...container.querySelectorAll('[data-kind="node-classification"].rmf-blink')].map(
+    (element) => `${element.getAttribute('data-module') ?? '?'}/module`,
   );
 
 describe('clicking a symbol', () => {
@@ -307,15 +304,15 @@ describe('a second diagram', () => {
  * the arrivals that may actually import it, and leave the rest dark.
  */
 describe('selecting a symbol in a tag universe', () => {
-  it('lights the test context and leaves production dark', () => {
+  it('lights the testing module and leaves production dark', () => {
     mount({ definition: example3Diagram });
     expect(blinking()).toEqual([]);
-    expect(litContexts()).toEqual([]);
+    expect(litClassifications()).toEqual([]);
 
     // "Selecting resetOrderStore: the test module blinks, billing stays dark."
     click('[data-kind="header-chip"][data-symbol="resetOrderStore"]');
     expect(blinking()).toEqual(['integration-tests/resetOrderStore']);
-    expect(litContexts()).toEqual(['integration-tests/module']);
+    expect(litClassifications()).toEqual(['integration-tests/module']);
     // The row is still drawn in `billing`, and still says where it came from -
     // it just goes dark, which is a contrast that survives reduced motion.
     const dark = find('#node-billing-receives-resetOrderStore');
@@ -342,7 +339,7 @@ describe('selecting a symbol in a tag universe', () => {
       'billing/OrderService',
       'integration-tests/OrderService',
     ]);
-    expect(litContexts()).toEqual(['integration-tests/module']);
+    expect(litClassifications()).toEqual(['integration-tests/module']);
   });
 
   it('mirrors it for the browser module', () => {
@@ -351,7 +348,7 @@ describe('selecting a symbol in a tag universe', () => {
     // "Selecting queryDb: server blinks, ui stays dark."
     click('[data-kind="header-chip"][data-symbol="queryDb"]');
     expect(blinking()).toEqual(['app/queryDb', 'server/queryDb']);
-    expect(litContexts()).toEqual([]);
+    expect(litClassifications()).toEqual([]);
     // …and the strike states the same verdict statically, with the unstruck
     // asterisk saying the type import still passes. No binding note exists.
     expect(
@@ -364,10 +361,10 @@ describe('selecting a symbol in a tag universe', () => {
     // "Selecting formatMoney: both blink."
     click('[data-kind="header-chip"][data-symbol="formatMoney"]');
     expect(blinking()).toEqual(['app/formatMoney', 'ui/formatMoney', 'server/formatMoney']);
-    expect(litContexts()).toEqual(['ui/module']);
+    expect(litClassifications()).toEqual(['ui/module']);
   });
 
-  it('draws the whole module as the context box, and nothing extra', () => {
+  it('draws the whole module as the module frame, and nothing extra', () => {
     mount({ definition: example4Diagram });
     // The dashed box *fills* the node: a context can be a subtree of a
     // module's files or an entire module, and here it is the module.
@@ -379,15 +376,15 @@ describe('selecting a symbol in a tag universe', () => {
       ['width', -6],
       ['height', -6],
     ] as const) {
-      expect(attr('#node-ui-context-frame', name)).toBeCloseTo(
+      expect(attr('#node-ui-classification-frame', name)).toBeCloseTo(
         attr('#node-ui-box', name) + inset,
         6,
       );
     }
-    expect(find('#node-ui-context-label').textContent).toBe('⇤ browser');
+    expect(find('#node-ui-classification-label').textContent).toBe('⇤ browser');
     // One context in the diagram, and it belongs to `ui`.
-    expect(container.querySelectorAll('[data-kind="node-context"]')).toHaveLength(1);
-    expect(find('[data-kind="node-context"]').getAttribute('data-module')).toBe('ui');
+    expect(container.querySelectorAll('[data-kind="node-classification"]')).toHaveLength(1);
+    expect(find('[data-kind="node-classification"]').getAttribute('data-module')).toBe('ui');
   });
 });
 

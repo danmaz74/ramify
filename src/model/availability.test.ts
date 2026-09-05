@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { explainImport, isAvailable, mayImport, type ImportClause } from './availability.js';
+import { explainImport, isVisible, mayImport, type ImportClause } from './availability.js';
 import {
   allSymbols,
   buildTree,
@@ -107,32 +107,32 @@ describe('the declared universe (spec §1.2)', () => {
 
 describe('availability', () => {
   it('includes every symbol a module owns, exposed or not', () => {
-    expect(isAvailable(shop, 'catalog', 'catalog', 'ProductId')).toBe(true);
-    expect(isAvailable(shop, 'shop', 'shop', 'Money')).toBe(true);
+    expect(isVisible(shop, 'catalog', 'catalog', 'ProductId')).toBe(true);
+    expect(isVisible(shop, 'shop', 'shop', 'Money')).toBe(true);
     // Ownership alone makes a symbol available in its owner: `retryQueue` is
     // exposed nowhere, and every file belonging to `payment` may still use it.
-    expect(isAvailable(shop, 'payment', 'payment', 'retryQueue')).toBe(true);
+    expect(isVisible(shop, 'payment', 'payment', 'retryQueue')).toBe(true);
   });
 
   it('reaches a parent that a direct child exposed to', () => {
-    expect(isAvailable(shop, 'catalog', 'inventory', 'reserveStock')).toBe(true);
-    expect(isAvailable(shop, 'checkout', 'cart', 'CartApi')).toBe(true);
-    expect(isAvailable(shop, 'checkout', 'payment', 'PaymentApi')).toBe(true);
-    expect(isAvailable(shop, 'shop', 'catalog', 'ProductId')).toBe(true);
+    expect(isVisible(shop, 'catalog', 'inventory', 'reserveStock')).toBe(true);
+    expect(isVisible(shop, 'checkout', 'cart', 'CartApi')).toBe(true);
+    expect(isVisible(shop, 'checkout', 'payment', 'PaymentApi')).toBe(true);
+    expect(isVisible(shop, 'shop', 'catalog', 'ProductId')).toBe(true);
   });
 
   it('stops where a module chose to expose the symbol no further', () => {
     // `reserveStock` is available in `catalog`, which exposed it nowhere.
-    expect(isAvailable(shop, 'shop', 'inventory', 'reserveStock')).toBe(false);
+    expect(isVisible(shop, 'shop', 'inventory', 'reserveStock')).toBe(false);
     // `CartApi` and `PaymentApi` are available in `checkout`, which exposed
     // neither to its own parent.
-    expect(isAvailable(shop, 'shop', 'cart', 'CartApi')).toBe(false);
-    expect(isAvailable(shop, 'shop', 'payment', 'PaymentApi')).toBe(false);
+    expect(isVisible(shop, 'shop', 'cart', 'CartApi')).toBe(false);
+    expect(isVisible(shop, 'shop', 'payment', 'PaymentApi')).toBe(false);
   });
 
   it('reaches a whole subtree when an ancestor exposes to descendants', () => {
-    expect(isAvailable(shop, 'search', 'catalog', 'SkuRules')).toBe(true);
-    expect(isAvailable(shop, 'search', 'catalog', 'ProductId')).toBe(true);
+    expect(isVisible(shop, 'search', 'catalog', 'SkuRules')).toBe(true);
+    expect(isVisible(shop, 'search', 'catalog', 'ProductId')).toBe(true);
   });
 
   /**
@@ -143,7 +143,7 @@ describe('availability', () => {
   it('answers the file-level question and the module-level one identically', () => {
     for (const consumer of shop.modules.keys()) {
       for (const ref of allSymbols(shop)) {
-        expect(isAvailable(shop, consumer, ref.owner, ref.name)).toBe(
+        expect(isVisible(shop, consumer, ref.owner, ref.name)).toBe(
           mayImport(shop, consumer, ref.owner, ref.name),
         );
       }
@@ -455,7 +455,7 @@ describe('an owner that does not export', () => {
 
   it('is available in its owner, and in no other module', () => {
     for (const consumer of shop.modules.keys()) {
-      expect(isAvailable(shop, consumer, 'payment', 'retryQueue')).toBe(consumer === 'payment');
+      expect(isVisible(shop, consumer, 'payment', 'retryQueue')).toBe(consumer === 'payment');
     }
   });
 });

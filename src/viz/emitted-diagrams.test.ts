@@ -20,7 +20,7 @@ import { ModelDiagramSvg } from './ModelDiagram.js';
  *
  * Two things are therefore checked at once - that a diagram still emits what is
  * checked in, and that a change to the shared pipeline (the tag chips, the
- * context boxes, the row geometry they moved) leaves the diagrams that declare
+ * module frames, the row geometry they moved) leaves the diagrams that declare
  * no tag *exactly* as they were.
  */
 
@@ -94,12 +94,11 @@ describe('the checked-in SVGs', () => {
 });
 
 describe('a universe that declares no tag', () => {
-  it('grows no tag content: no chips, no notes, no contexts, nothing dark', () => {
+  it('grows no tag content: no chips, no notes, no module frames, nothing dark', () => {
     for (const definition of untagged) {
       const layout = buildDiagramLayout(definition);
       for (const node of layout.tree.nodes) {
-        expect(node.moduleContext).toBeUndefined();
-        expect(node.compartments.map((compartment) => compartment.kind)).not.toContain('context');
+        expect(node.classification).toBeUndefined();
         for (const row of node.rows) {
           expect(row.tags).toBeUndefined();
           expect(row.annotations).toBeUndefined();
@@ -118,7 +117,7 @@ describe('a universe that declares no tag', () => {
         'node-row-tags',
         'node-row-binding',
         'node-row-type-available',
-        'node-context',
+        'node-classification',
         'data-tags',
         'data-importable',
         'data-struck',
@@ -142,7 +141,7 @@ describe('a universe that declares no tag', () => {
   it('is exactly where the tag examples differ', () => {
     for (const definition of tagged) {
       const markup = emitted(definition);
-      expect(markup).toContain('data-kind="node-context"');
+      expect(markup).toContain('data-kind="node-classification"');
       expect(markup).toContain('data-kind="node-row-tags"');
       expect(markup).toContain('data-kind="node-row-tags-pill"');
     }
