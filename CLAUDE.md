@@ -30,19 +30,45 @@ in its companion glossary.
 
 The concrete representation is defined separately in
 [Directory Structure And Module Description Principles](docs/model/module-description.principles.md).
-It specifies the required `src/` and `subs/` layout and the formal
-`module.ramify` version 1 language: `expose-src` names owned exports relative
-to `src/`; `expose-sub` names direct children and alone permits wildcard
-selection. Read it before changing discovery, description parsing, source
-references, or documentation of the file format. It does not add importability
+It specifies the required `src/` and `subs/` layout, with optional same-owner
+`src/tests/` and `src/interfaces/`, and the formal `module.ramify` version 1
+language. Modules may occur only beneath `subs/`. The module header classifies
+ordinary `src/`, including interfaces; the nested `src/tests/` area uses its
+distinct testing profile. An optional singleton `tests tagged [...]` statement
+immediately after that header sets the complete testing profile. Its default
+is `[testing]`, plus `ui` for a UI module, without inheriting `browser`.
+Explicit testing profiles retain `testing` and their module's required `ui`.
+
+`expose-src` names owned exports relative to `src/`; `expose-test` does the same
+relative to `src/tests/`. An `expose-src` path may also select nested testing
+source without changing its original classification. `src/interfaces/` does
+not automatically expose exports or enable wildcard syntax.
+`expose-sub` names direct children and alone permits
+wildcard selection. The three forms use the same parent/descendants exposure
+channels. Read the specification before changing discovery, description parsing,
+source references, or documentation of the file format. It records the model's
 rules; the current toolkit does not yet implement the filesystem loader or parser.
 
+The built-in tags are `testing`, `browser`, and `ui`. New bindings originating
+in testing or UI source must retain the corresponding required symbol tags;
+forwarding aliases retain their original binding's ownership and tags. Source
+without testing classification cannot import or re-export testing-classified
+source, including same-owner access and forwarding paths. Other same-owner
+imports retain their exemption from exposure and symbol-tag checks. No per-file
+or glob classification overrides are part of this model.
+
 [TypeScript Source Interpretation Principles](docs/model/typescript-source-interpretation.principles.md)
-contains the adopted resource interpretation: ownership and binding identity
-follow the resolved resource, export names come from its effective TypeScript
-export description, and ordinary exposure and tag rules apply. Read it before
-designing source import checks. Its other source-form policies remain proposals,
-and no TypeScript source checker is implemented yet.
+contains the adopted resource interpretation and testing-source isolation.
+Resource ownership and binding identity follow the resolved resource, export
+names come from its effective TypeScript export description, and ordinary
+exposure and tag rules apply. Read it before designing source import checks.
+Its remaining source-form policies remain proposals, and no TypeScript source
+checker is implemented yet.
+
+The existing evaluator and examples predate the `ui` tag and the distinct
+classification of module-owned `src/tests/`. Updating these specifications does
+not establish implementation support; runtime, evaluator, and source-layout
+migration work must be explicitly scoped separately.
 
 ## Conventions that DO apply
 

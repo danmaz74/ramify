@@ -27,13 +27,79 @@ module, which is a single file.
 ## Files belonging to a module
 
 We say that a file **belongs** to a module when that file is contained by that module's
-directory, excluding all directories of its sub-modules.
+declared `src/` directory, including `src/tests/` and `src/interfaces/`.
+The concrete layout places child modules under `subs/`; no part of `src/`
+may contain another module declaration.
+
+## Source area
+
+A module's **source areas** are ordinary source under `src/` excluding
+`src/tests/`, and the optional testing source under `src/tests/`.
+They share one owner and the same module-scoped visibility, but can have
+different importer classifications. A source area is not a child module and
+creates no exposure channel.
+
+The module header's tag set classifies ordinary source, including
+`src/interfaces/`. The `src/tests/` area defaults to
+`[testing]`, plus `ui` when the module is tagged `ui`. An optional
+`tests tagged [...]` statement declares the complete test-area tag set; it must
+include `testing` and cannot omit the module's `ui`. It may add `ui` in a
+non-UI module. `browser` is independent and is not inherited into `src/tests/`:
+browser tests declare it explicitly, for example
+`tests tagged [testing, ui, browser]`.
+
+Every file uses exactly one area's classification: the profile for `src/tests/`
+takes precedence over the ordinary profile of its containing `src/` directory.
+An arbitrary nested directory or a `*.test.ts` filename does not create another
+area or override its tags. A test-looking file outside `src/tests/` has the
+ordinary source classification. There are no per-file importer contexts.
+
+## Interface directory
+
+A module's optional **interface directory** is `<module>/src/interfaces/`.
+It contains curated contract vocabulary, including types, schemas, enums, and
+constants. It is ordinary source of the same owner, with no separate profile
+or automatic exposure. Directory placement and exposure selection are separate
+decisions; the directory does not itself enable wildcard syntax.
+
+## Importer classification
+
+The **importer classification** is the tag set of the importing file's source
+area. It determines which cross-module availability rules apply to that file.
+Module membership determines visibility; source-area classification determines
+availability. A test area receives no additional module reach from its tags.
+
+## Source origin
+
+A binding's **source origin** is its original defining application source or
+resource and that file's source area. Forwarding aliases retain this origin,
+ownership, and tags. A new implementation binding has its own defining area.
+
+A resource's origin is the resolved resource, not the declaration shim that
+describes it. The source/resource accessed through an import is also recorded
+independently of the selected binding's origin: a testing barrel can forward a
+production symbol without becoming its owner or changing that symbol's tags.
+
+## Testing-origin restriction
+
+Non-testing source cannot import or re-export testing-classified application
+source or resources. This restriction applies within one module as well as
+across modules, for values, types, and loads without selected symbols. Check
+the resolved source/resource and the original binding's defining area; a
+testing barrel forwarding a production symbol remains forbidden to a
+non-testing importer.
+
+This is a source-origin restriction, not a blanket same-owner symbol-tag rule.
+A binding explicitly tagged `testing` but newly defined in non-testing `src/`
+retains the ordinary same-owner tag exemption. The tag still limits its
+cross-module importers.
 
 ## Import and Export
 
-TypeScript files export symbols, and they import symbols from other files. We aren't
-altering what these two verbs mean, but we're limiting the importability of symbols
-which are exported by files which sit in a different module.
+TypeScript files export symbols, and they import symbols from other files.
+Ramify limits cross-module importability and forbids non-testing imports of
+testing-origin source, including within one module. Source forwarding exports
+do not create Ramify exposure or transfer symbol ownership.
 
 TypeScript imports come in two forms: ordinary **value imports**, and **type-only
 imports** (`import type`), which are erased at compile time and carry no runtime
@@ -41,8 +107,12 @@ dependency.
 
 ## Module-owned symbol
 
-If file F belongs to module M, and F exports symbol S, then module M **owns** S. Any
-file belonging to M can import S.
+If an original exported binding S is defined by file F belonging to module M,
+then module M **owns** S. Unexported lexical locals are not exposure units.
+A file forwarding another module's symbol does not acquire ownership.
+Resource bindings likewise belong to their resource's containing module and
+source area. Same-owner imports require no exposure and retain the tag
+exemption after the testing-origin restriction passes.
 
 ## Module-received symbol
 
@@ -53,8 +123,18 @@ child exposing S to its parent, or a proper ancestor exposing S to its descendan
 
 In the world of ramify modules, all symbols are always associated with a set of tags. Tags
 are assigned to TypeScript exported symbols by the owner module. By default, the tag
-set is empty, except that every symbol owned by a testing module must carry
-`testing`.
+set contains the tags required by the binding's defining source area: a new
+owned exported binding defined in testing-classified source must carry `testing`, and one
+defined in UI-classified source must carry `ui`. Without either classification,
+the default is empty. A module tagged `ui` therefore requires `ui` on all its
+newly owned symbols, including test-area bindings. These requirements also
+apply to unexposed bindings and resource bindings. `browser` is never assigned
+to symbols automatically.
+
+Explicit symbol tag assignments may add tags but cannot omit required
+`testing` or `ui`. Forwarding aliases are not new bindings and retain their
+original tags; passing a production symbol through a testing area does not
+reclassify the symbol.
 
 When talking about symbols in the context of ramify modules, we always mean "symbol with
 its tag set".
@@ -98,15 +178,17 @@ a no-op as the same symbol is already visible in M2's parent and all M2's descen
 
 ## Module tagging
 
-Tags are assigned explicitly in a module's definition and classify all files
-belonging to that module. By default, a module has no tags. Submodules declare
-their own tags; module tags are not inherited.
+Tags assigned in a module header classify its ordinary `src/` area. By default,
+a module has no tags. Its same-module `src/tests/` area follows the separate
+test-area profile rules, including the mandatory `ui` classification for a UI
+owner. Submodules declare their own tags; module tags are not inherited by
+child modules.
 
-Ordinary subdirectories share their owning module's classification. Separately
-declared submodules have their own ownership and classification. There are no
-file-level importer contexts: files needing different cross-module import
-permissions belong in different modules. Module boundaries and tags are never
-inferred from test-like or client-like filenames or directory names.
+Ordinary subdirectories share their source area's classification. Separately
+declared submodules have their own ownership and source areas. Module
+boundaries and tags are never inferred from test-like or client-like filenames
+or arbitrary directory names. The reserved same-module `src/tests/` area is an
+explicit part of the required layout.
 
 ## Tagged module
 
@@ -114,59 +196,93 @@ A module whose declared tag set is non-empty is called tagged.
 
 ## Tag-based availability rules
 
-**Tag-based availability rules** define which combinations of module and symbol tags make
-a symbol available in a module. Currently there are two kinds of rules:
+**Tag-based availability rules** define which combinations of importer
+source-area tags and original symbol tags permit a cross-module import.
+There are two kinds of rules:
 
-- Required symbol tag: if the module has the tag, then the only symbols visible from exposure that are available in that module are those associated with the same tag. This rule never blocks type-availability: type-only imports pass it.
-- Required module tag: if the symbol has the tag, then the symbol is only available from exposure if the module has the same tag. This rule blocks type-availability too: type-only imports must satisfy it.
+- Required symbol tag: if the importer classification has the tag, a visible foreign symbol is value-available only when it has the same tag. This rule never blocks type-availability: type-only imports pass it.
+- Required importer tag: if the symbol has the tag, it is available through exposure only when the importer classification has the same tag. This rule also restricts type-availability: type-only imports must satisfy it.
 
 The two rules are mirror images for availability, but not for type-availability - only
-the required module tag reaches type-only imports. This is inherent to each rule, not a
+the required importer tag reaches type-only imports. This is inherent to each rule, not a
 parameter of it.
 
-When several rules apply to the same symbol and module, all of them must be satisfied.
+When several rules apply to the same symbol and importing source area, all of
+them must be satisfied. The testing-origin restriction applies separately,
+including before the remaining same-owner exemption.
 
 ## Tag-associated availability rule
 
 Each built-in tag carries the availability rule fixed by Ramify. Assigning that
-tag to a symbol or module does not change its rule. Only `testing` and `browser`
-have importability semantics; project-defined labels are inert classification
+tag to a symbol, module, or test-area profile does not change its rule. Only
+`testing`, `ui`, and `browser` have importability semantics; project-defined labels are inert classification
 for search or documentation and cannot define availability rules.
 
 ## `testing` tag
 
-The built-in tag carrying the required module tag rule. A symbol tagged `testing` is
-test support, never part of the production contract. A **testing module** is a module
-tagged `testing` in its own definition. Every
-symbol it owns must carry `testing`; a declaration that omits or overrides that
-required tag is invalid. Received symbols keep their owner's tags.
+The built-in tag carrying a required importer tag rule. A symbol tagged
+`testing` is test support and may cross a module boundary only into a
+testing-classified source area, for both value and type-only imports.
+
+A **testing module** has `testing` in its module header. Its `src/` and
+same-module `src/tests/` are testing-classified. A non-testing module's `src/tests/`
+is also testing-classified without changing the module's ordinary source.
+Every new owned exported binding defined in testing-classified source must carry `testing`;
+an explicit assignment omitting that required tag is invalid. Received and
+forwarded symbols retain their original owners, origins, and tags.
+
+## `ui` tag
+
+The built-in tag carrying a required importer tag rule for UI coupling. A
+symbol tagged `ui` may cross a module boundary only into a UI-classified
+source area. This applies to both values and types. The tag never grants
+visibility and makes no browser-safety claim.
+
+A **UI module** has `ui` in its module header. Its `src/` and `src/tests/` are
+UI-classified, and every newly owned binding must carry `ui`. A non-UI module
+can give its test area a UI classification explicitly; new bindings defined
+there then also require `ui`. Forwarding preserves the original symbol's tags.
+`ui` and `browser` are independent: UI code may run outside a browser, and
+browser-safe infrastructure need not be UI code.
 
 ## `browser` tag
 
 The built-in tag carrying the required symbol tag rule. On a symbol it is the owner's
 claim that the symbol's entire transitive runtime closure is browser-safe. A
-**browser module** is a module tagged `browser` in its own definition; its files
-run in a browser.
+**browser module** is a module tagged `browser` in its own definition; its
+ordinary source runs in a browser. A **browser test area** explicitly includes
+`browser` in its test-area profile. The test area does not inherit `browser`
+from its module header. On an importing source area, this tag requires the
+tag on foreign value bindings; type-only imports are exempt from this rule.
 
 ## Module-available symbol
 
-Saying that symbol S is **available** in module M means that all files belonging to M
-can import S as a value - the ordinary import. Being able to import as a value implies
-that it can also be imported as a type.
+Availability is evaluated for an importing **source area**, not uniformly for
+all files owned by a module. A symbol S is **available** there when it can be
+imported as a value. A foreign symbol must be visible in the area's owning
+module and satisfy the area's applicable tag rules. A same-owner symbol needs
+no exposure or tag check after the testing-origin restriction passes.
 
-All symbols owned by M are available in M, because ramify modules don't affect intra-module
-imports in any way.
+Every actual import must also pass the source-origin restriction for the
+resolved source/resource it accesses. Availability of a production binding
+does not permit non-testing source to obtain it through a testing barrel.
+Thus "available in module M" is sufficient shorthand only when the importing
+area is specified or all its areas have the same result.
 
-The only other symbols available in M are those it receives, subject to their tag-based
-availability rules.
+Being able to import a binding as a value implies that it can also be imported
+as a type along the same permitted source path. This does not establish a
+blanket exemption for imports within one module.
 
 At times we can use "fully available" as a synonym of "available" to underline that it implies
 both value and type availability.
 
 ## Type-availability
 
-S is **type-available** in module M when all files belonging to M can import S as a
-type-only import. A symbol coming from a different module could be type-available, but not
-value-available.
+S is **type-available** in a source area when it can be imported there as a
+type-only binding, subject to the testing-origin restriction on the original
+binding and the accessed source/resource. A foreign symbol may be type-available
+but not value-available. Visibility still belongs to the area's module.
 
-Whether a rule blocks availability entirely or blocks only value imports - leaving the symbol type-available - is part of the rule's definition. Of the two current rules, the required module tag does the former and the required symbol tag the latter.
+Whether a rule blocks availability entirely or only value imports is part of
+the rule's definition. A required importer tag (`testing` or `ui`) does the
+former; a required symbol tag (`browser`) does the latter.

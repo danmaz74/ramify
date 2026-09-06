@@ -1,7 +1,8 @@
 # Directory Structure And Module Description Principles
 
 **Status:** Active specification; filesystem loading and parsing are not yet
-implemented in the toolkit.
+implemented in the toolkit. The existing evaluator also predates the `ui` tag
+and the separate classification of module-owned `src/tests/` source.
 
 **Format version:** 1
 
@@ -18,15 +19,18 @@ tag rule, or consumer dependency requirement.
 
 The separate
 [TypeScript Source Interpretation Principles](typescript-source-interpretation.principles.md)
-defines the adopted resource interpretation and proposes how other consumer
-imports and source re-exports are resolved and checked. It does not change
-this document's declaration grammar.
+defines the adopted resource interpretation and source isolation of testing
+code, and proposes how other consumer imports and source re-exports are resolved
+and checked. It does not change this document's declaration grammar.
 
 ## Goals
 
 - Make each module's architectural decisions recognizable in one concise file.
 - Make recursive searches of a module's `src/` cover its own implementation
   without entering a child's implementation.
+- Keep its tests in the same owner under `src/tests/`, with a distinct classification
+  and no additional ownership boundary.
+- Keep curated contract vocabulary under the same owner's `src/interfaces/`.
 - Determine ownership and receipt from the tree instead of declaring them again.
 - Distinguish owned exposure and child re-exposure in syntax while preserving
   the same two semantic exposure channels.
@@ -53,8 +57,10 @@ level. No `parent` or `children` declaration overrides physical containment.
 
 For a file `f` in the application tree, its owner is the deepest module
 directory containing `f`. Every application source file must additionally
-lie under its owner's `src/`. Attribution of a file outside that location
-does not make its placement valid. Descriptions, documentation, and other
+lie under its owner's `src/`, including `src/tests/` and `src/interfaces/`.
+These directories belong to the same module; neither is a submodule.
+Attribution of a file outside that source root does
+not make its placement valid. Descriptions, documentation, and other
 non-implementation files may live at the module root.
 
 A present but invalid description is an invalid boundary declaration. A
@@ -66,12 +72,13 @@ its files to the parent.
 Discovery visits the selected application root recursively and validates the
 placement of every description. Every non-root module must lie strictly
 beneath its parent's `subs/`, optionally through ordinary grouping directories.
-The reserved `src/` and `subs/` directories themselves are not module roots.
-No module description may occur anywhere inside a module's `src/`.
+The `src/` and `subs/` containers themselves are not module roots. No module
+description may occur anywhere inside a module's `src/`, including its
+`src/tests/` and `src/interfaces/` directories.
 
 Discovery must detect misplaced descriptions, including those inside `src/`
-or outside `subs/`, and report layout errors. It must not ignore them as
-ordinary files. Existing projects must adopt this layout before their
+or outside `subs/`, and report layout errors. It must not ignore
+them as ordinary files. Existing projects must adopt this layout before their
 descriptions can be accepted; adding marker files alone is not sufficient.
 
 The caller supplies the application source set and discovery exclusions for
@@ -82,7 +89,8 @@ Excluded files cannot be referenced as application-owned exports. Application
 implementation must not be excluded merely to bypass the required layout.
 Repository build configuration and tooling may be outside the application
 source set; executable application code and its same-owner tests and helpers
-belong in the owning module's `src/`.
+belong in the owning module's `src/`, with the classification of their source
+area. The nested `src/tests/` area has its own testing profile.
 
 A TypeScript dependency or standard-library file does not become application
 source merely because the compiler loads it. Treatment of external packages
@@ -113,26 +121,29 @@ shop/
     └── orders/
         ├── module.ramify
         ├── README.md
-        ├── src/                 # orders' own source
+        ├── src/                 # orders' implementation source
         │   ├── place-order.ts
-        │   ├── order.ts
-        │   ├── place-order.test.ts
-        │   └── testing/
-        │       └── make-order.ts
+        │   ├── interfaces/      # orders' curated contract vocabulary
+        │   │   └── order.ts
+        │   └── tests/           # orders' own testing source; not a module
+        │       ├── place-order.test.ts
+        │       └── helpers/
+        │           └── make-order.ts
         └── subs/
-            ├── pricing/
-            │   ├── module.ramify
-            │   └── src/
-            │       └── calculate-total.ts
-            └── tests/
+            └── pricing/
                 ├── module.ramify
                 └── src/
-                    └── orders.test.ts
+                    ├── calculate-total.ts
+                    └── tests/
+                        └── calculate-total.test.ts
 ```
 
-The implementation root is exactly `<module>/src/`; it is fixed and not
-configurable. It contains all directly owned application source and may
-contain ordinary implementation subdirectories, but no declared submodules.
+The owned source root is exactly `<module>/src/`. The optional testing and
+interface directories are exactly `<module>/src/tests/` and
+`<module>/src/interfaces/`; these locations are not configurable. All belong
+to the same module and may contain ordinary subdirectories, but no declared
+submodules. Tests have a distinct classification; `interfaces/` retains the
+ordinary source classification. Helpers and resources follow their source area.
 `subs/` contains child modules, optionally through ordinary grouping
 directories, and no loose parent-owned application source. Each child repeats
 the same separation in its own directory.
@@ -141,26 +152,107 @@ For every application source file `f` and module `M`, a valid layout satisfies:
 
 > `owner(f) = M` if and only if `f` is beneath `<M>/src/`.
 
-A leaf may omit `subs/`. A module with no own application source has an empty
-implementation scope. If its empty `src/` is absent on disk, tooling must
+A leaf may omit `subs/`; a module may omit `src/tests/` or `src/interfaces/`
+when it has no files for that directory. A module with files only beneath
+`src/tests/` has testing source but no ordinary implementation source.
+If its `src/` is absent on disk, tooling must
 create that exact directory before launching implementation work; it must
 never substitute the module root or `subs/` as the implementation scope.
 Descriptions and module documentation live alongside `src/` and `subs/`.
+A `tests` declaration is valid even when `src/tests/` is absent. A sibling
+`<module>/tests/` or `<module>/interfaces/` is not an owned source location.
 
 An implementation agent's working directory and default code-search root
-are the module's `src/`. The launcher must supply the module description,
+are the module's `src/`, including its tests and interface vocabulary. A
+production-only search must explicitly exclude `src/tests/`. The launcher
+must supply the module description,
 relevant documentation, and permitted contracts as initial context. Expanding
 reads beyond that scope is deliberate navigation; write authority is checked
 separately. A directory layout alone is not a write-access control mechanism.
+Work on the module's owned tests uses its `src/tests/` scope without entering child
+implementations. If that scope is absent, create that exact directory before
+launching work there; do not substitute a child module or the module root.
 
 Adding a new child leaves existing parent source in place. Extracting an
 ordinary implementation directory into a child requires moving its source
 from `<module>/src/...` to `<module>/subs/<child>/src/...` and updating
 references. Adding a description inside the old source location is invalid.
+Tests moved with that implementation go from `<module>/src/tests/...` into the
+new child's `src/tests/`. Interface vocabulary moved with it goes into the
+new child's `src/interfaces/`. Tests left with the parent remain parent-owned and no
+longer have same-owner access to the extracted implementation.
 
 Neither a package, a TypeScript project, nor a separate build is required
 per module. `facade/`, `internal/`, `index.ts`, `client.ts`, and `vocabulary.ts`
 are not required and have no implicit Ramify meaning.
+
+### The Two Owned Source Areas Have Explicit Classifications
+
+The module header's tags classify source under `src/` outside `src/tests/`,
+including `src/interfaces/`. Omission means the empty set. The fixed
+`src/tests/` area has its own complete profile: by default
+`[testing]`, with `ui` also included when the module header contains `ui`.
+The module header's `browser` tag is not inherited by `src/tests/`.
+
+Classify a file beneath `src/tests/` with the test profile before applying
+the ordinary `src/` profile. The two areas are disjoint even though their
+directory roots are nested; a file never receives both profiles by containment.
+
+An optional singleton `tests tagged [...]` statement replaces that default
+with the complete testing profile. It must be the next statement after the
+module header, before any exposure; blank lines and comments do not count as
+statements. Its profile must contain `testing` and must also contain `ui` when
+the module header contains `ui`. It may additionally contain `browser` or `ui`.
+Omitting a required tag is an error, not a request to weaken the profile.
+
+```ramify
+ramify 1
+module checkout-view tagged [ui, browser]
+tests tagged [ui, testing, browser]
+```
+
+Here both source areas are browser-classified. Without the `tests` statement,
+the same module's tests have `[testing, ui]`, allowing Node-based UI test
+harnesses to import otherwise reachable Node contracts while retaining UI
+classification. `browser` remains an independent requirement for cross-module
+value imports, not a synonym for `ui`.
+
+| Module header tags | Default `src/tests/` profile |
+| --- | --- |
+| `[]` | `[testing]` |
+| `[browser]` | `[testing]` |
+| `[ui]` | `[testing, ui]` |
+| `[ui, browser]` | `[testing, ui]` |
+| `[testing, browser]` | `[testing]` |
+
+There are no per-file or glob overrides, named profiles, or classification
+inheritance into submodules. Ordinary directories within either area retain
+that area's classification. A `src/example.test.ts` filename does not change
+its classification. The special classification belongs to the module's exact
+`src/tests/` subtree, not to every directory named `tests`: for example,
+`src/helpers/tests/` and `src/interfaces/tests/` retain the module header's
+profile. Files under `src/tests/interfaces/` retain the testing profile.
+
+Tests can import their owner's `src/` exports without exposure declarations.
+They must use ordinary exposure and tag compatibility for foreign symbols.
+Non-testing-classified source cannot import or re-export testing-classified
+source, including same-owner source, forwarding paths, and runtime loads.
+Other same-owner imports remain free of exposure and symbol-tag checks. This
+source isolation is specified by the importability and source interpretation
+principles; it is not an additional exposure destination.
+
+### Interface Vocabulary Belongs Inside The Owned Source Root
+
+`<module>/src/interfaces/` holds curated contract vocabulary, such as types,
+schemas, enums, and constants. It is not restricted to TypeScript interfaces.
+It remains ordinary source of that module: the directory creates no owner,
+importer profile, tag, or exposure channel, and does not expose its contents
+automatically. Owned tests may inspect it under the ordinary same-owner rules.
+
+Use paths such as `"interfaces/order.ts"` in `expose-src` statements. Directory
+placement is independent of selector syntax: version 1 still selects owned
+exports explicitly. A proposed wildcard for vocabulary files requires its own
+specification change; creating this directory does not enable that syntax.
 
 ### Declared Names Identify Modules Within The Tree
 
@@ -173,7 +265,9 @@ quoted; quoting does not change module identity or relax the name constraint.
 
 The root's identifier is its name. Every other canonical module identifier
 is its parent's identifier, `/`, and its local name: `shop/orders/pricing`.
-Ordinary directory names, `src`, and `subs` contribute no identifier segments.
+Ordinary directory names, `src`, `tests`, `interfaces`, and `subs` contribute no identifier
+segments. A separately declared child named `tests` remains possible beneath
+`subs/`; its reserved name must be quoted in its header and child references.
 
 Renaming a physical directory while preserving declared name and parent
 preserves the identifier. Child references in descriptions use that declared
@@ -185,15 +279,15 @@ name nor identifier assigns tags or grants importability.
 ### A Description Is Static Architectural Data
 
 A version 1 description contains a version header, one module declaration,
-and zero or more `expose-src` or `expose-sub` statements. It is parsed as data
-and never executed.
+an optional `tests` declaration, and zero or more `expose-src`, `expose-test`,
+or `expose-sub` statements. It is parsed as data and never executed.
 There are no expressions, variables, imports, includes, conditional blocks,
 or configuration inheritance.
 
 Ownership follows from the source file's owning module. Receipt follows from
 exposure. There are no `own`, `receive`, `expose`, or `re-expose` statements.
-The two supported verbs identify distinct declaration forms for the same
-semantic exposure operation.
+The three supported exposure verbs identify distinct declaration forms for
+the same semantic exposure operation.
 
 An empty module still declares its version and name:
 
@@ -230,14 +324,16 @@ terminals `BARE-NAME`, `BARE-MODULE-NAME`, `STRING`, `SPACE`, `TAB`, and `LF`
 are defined immediately below the grammar.
 
 ```ebnf
-document       = version-line, module-line, { exposure-line } ;
+document       = version-line, module-line, [ tests-line ], { exposure-line } ;
 version-line   = "ramify", hws, "1", LF ;
 module-line    = "module", hws, module-name, [ hws, tag-clause ], LF ;
+tests-line     = "tests", hws, tag-clause, LF ;
 exposure-line  = source-line | sub-line ;
-source-line    = "expose-src", hws, selection-list,
+source-line    = source-verb, hws, selection-list,
                  hws, "from", hws, STRING,
                  [ hws, tag-clause ],
                  hws, "to", hws, destination-list, LF ;
+source-verb    = "expose-src" | "expose-test" ;
 sub-line       = "expose-sub", hws, sub-selection,
                  hws, "from", hws, module-name,
                  hws, "to", hws, destination-list, LF ;
@@ -250,7 +346,7 @@ name           = BARE-NAME | STRING ;
 module-name    = BARE-MODULE-NAME | STRING ;
 tag-clause     = "tagged", hws, "[", ows, [ tag-list ], ows, "]" ;
 tag-list       = tag, { ows, ",", ows, tag } ;
-tag            = "testing" | "browser" ;
+tag            = "testing" | "browser" | "ui" ;
 destination-list = destination, { ows, ",", ows, destination } ;
 destination    = "parent" | "descendants" ;
 
@@ -258,10 +354,10 @@ hws            = ( SPACE | TAB ), { SPACE | TAB } ;
 ows            = { SPACE | TAB } ;
 ```
 
-- The reserved keywords are exactly `ramify`, `module`, `expose-src`,
-  `expose-sub`, `from`, `as`, `tagged`, `to`, `parent`, `descendants`, `testing`,
-  and `browser`. They are reserved in every name position: a source export,
-  child-exposed name, alias, module declaration, or child reference equal to
+- The reserved keywords are exactly `ramify`, `module`, `tests`, `expose-src`,
+  `expose-test`, `expose-sub`, `from`, `as`, `tagged`, `to`, `parent`,
+  `descendants`, `testing`, `browser`, and `ui`. They are reserved in every name
+  position: a source export, child-exposed name, alias, module declaration, or child reference equal to
   one of these keywords must be double-quoted.
 - An unquoted word is a maximal run of ASCII letters, digits, `_`, `$`, or `-`.
   Match the whole word before classifying it: an exact keyword match is always
@@ -307,8 +403,10 @@ not classify the module; classification still requires `tagged [testing]`.
 The grammar requires a source-file reference or child name, a selection, and
 at least one destination for every exposure statement. Only `expose-sub`
 accepts bare `*`, as its entire selection; it cannot combine `*` with named
-selections or apply `as` to it. Of the exposure statements, only `expose-src`
-accepts `tagged`; the module header retains its own tag clause.
+selections or apply `as` to it. Of the exposure statements, `expose-src` and
+`expose-test` accept `tagged`; the module header and optional `tests` statement
+also have their own tag clauses. A `tests` statement requires its tag clause,
+may occur at most once, and cannot follow an exposure statement.
 Semicolons, implicit sources, JSON objects, and unknown clauses are invalid.
 A quoted export name `"*"`, if one exists, names that exact export; it is
 never a wildcard.
@@ -322,8 +420,8 @@ ramify 1
 module orders
 
 expose-src placeOrder from "place-order.ts" to parent
-expose-src Order from "order.ts" to parent, descendants
-expose-src makeOrder from "testing/make-order.ts" tagged [testing] to descendants
+expose-src Order from "interfaces/order.ts" to parent, descendants
+expose-test makeOrder from "helpers/make-order.ts" to descendants
 expose-sub calculateTotal from pricing to parent
 expose-sub * from pricing to descendants
 ```
@@ -336,26 +434,44 @@ destination. Wildcard selection is defined separately below.
 
 The destinations are exactly the existing two channels: `parent` means the
 direct parent; `descendants` means all proper descendants. Listing both is
-equivalent to two exposure statements. Statement order has no semantic effect.
+equivalent to two exposure statements. Exposure statement order has no semantic
+effect; headers and the optional `tests` statement retain their required positions.
 
 There is no declaration for a consumed import. There is also no requirement
 to enumerate source exports that are not exposed. Unlisted exports remain
-owned and unexposed, with the default symbol tags required by the owner.
+owned and unexposed, with the default symbol tags required by their original
+source classification.
 Version 1 has no separate statement for tagging an unexposed export.
 
-### Expose-Src Selects Named Exports Within The Fixed Source Root
+### Owned Exposure Selects Named Exports Within Its Fixed Source Root
 
-For `expose-src`, `from` is a quoted file path relative to the declaring
-module's `src/`. For example, `"testing/make-order.ts"` resolves to
-`<module>/src/testing/make-order.ts`. No `./src/` prefix is required or
-automatically removed; `"src/example.ts"` literally names a file beneath
-`<module>/src/src/`.
+For both owned exposure forms, `from` is a quoted file path relative to the
+declaring module's corresponding root:
+
+| Form | Reference root | Example |
+| --- | --- | --- |
+| `expose-src` | `<module>/src/` | `"order.ts"` selects `<module>/src/order.ts` |
+| `expose-test` | `<module>/src/tests/` | `"helpers/make-order.ts"` selects `<module>/src/tests/helpers/make-order.ts` |
+
+No root prefix is required or automatically removed. For example,
+`expose-src ... from "src/example.ts"` refers to `<module>/src/src/example.ts`,
+and `expose-test ... from "tests/example.ts"` refers to
+`<module>/src/tests/tests/example.ts`.
+
+Because the testing directory is nested under `src/`, `expose-src` can also
+select the same file with `"tests/helpers/make-order.ts"`. Both forms identify
+the same original binding and preserve its testing classification and tags.
+The exposure verb never determines whether source is testing. `expose-test`
+provides a reference relative to the testing directory.
 
 After string decoding, the path must be relative, use `/` separators, and
 contain no backslash or empty path segment. Normalize `.` and `..` segments
-before containment checks; the target must remain inside the declaring
-module's `src/` and outside discovery exclusions. A terminal `/` is invalid
-because the target must be a file. Absolute and drive-qualified paths, URLs,
+before containment checks; the target must remain inside the declaring module's
+selected `src/` or `src/tests/` root and outside discovery exclusions. Escaping
+the selected root with `..` is invalid even when another owned area is reached:
+`expose-src ... from "../tests/helper.ts"` and
+`expose-test ... from "../interfaces/order.ts"` are invalid references. A terminal `/`
+is invalid because the target must be a file. Absolute and drive-qualified paths, URLs,
 package resolution, path-alias expansion, and globs are unsupported.
 
 The target is an exact application source file: there is no extension
@@ -364,9 +480,9 @@ exporting the selected name. Each selection identifies an exact export name
 of that target, including `default` for a default export. The target file and
 the selected export must both belong directly to the declaring module.
 
-A resource file in the application source set is a valid `expose-src` target,
-subject to the same path and ownership constraints as other targets. Its
-export names and original binding identities follow the adopted
+A resource file in the application source set is a valid `expose-src` or
+`expose-test` target, subject to the same root, path, and ownership constraints
+as other targets. Its export names and original binding identities follow the adopted
 [resource interpretation](typescript-source-interpretation.principles.md#resource-bindings-belong-to-the-resolved-resource).
 The effective declaration describing the resource supplies its export names;
 for JSON, TypeScript supplies the export description itself. A shim does not
@@ -375,12 +491,19 @@ change the resource's owner or merge its bindings with another resource's.
 A local TypeScript forwarding export must not claim ownership of another
 Ramify module's symbol. The source analyzer must follow forwarding aliases
 to the original project binding; introducing a new implementation binding
-is distinct from forwarding one. A misplaced submodule inside `src/` is a
-layout error, never a source-reference shortcut.
+is distinct from forwarding one. A same-owner forwarding alias preserves the
+original binding's tags even when the selected file and original binding are
+in different source areas. `expose-test` does not turn a forwarded ordinary `src/`
+binding into test support, and `expose-src` does not remove testing from a
+forwarded `src/tests/` binding. The source isolation rule still rejects a
+non-testing source file that imports or forwards testing-classified source;
+an exposure declaration does not legalize that source access. A misplaced
+submodule inside `src/` is a layout error, never a source-reference
+shortcut.
 
 Every owned symbol that is exposed must be selected explicitly. Bare `*` is
-forbidden on `expose-src`, so adding an exported helper to a source file does
-not by itself add that helper to the module's exposures.
+forbidden on `expose-src` and `expose-test`, so adding an exported helper to a
+source file does not by itself add that helper to the module's exposures.
 
 ### Expose-Sub References A Direct Child By Declared Name
 
@@ -418,8 +541,8 @@ import the symbol. As with named `expose-sub`, `tagged` is forbidden.
 Selection is recomputed from the child's current effective upward contract.
 New upward exposures are forwarded automatically; removed ones stop being
 forwarded. Empty selection is valid and has no effect. Every symbol must
-first enter an exposure chain through an explicit owned `expose-src`
-selection before any wildcard can carry it further.
+first enter an exposure chain through an explicit owned `expose-src` or
+`expose-test` selection before any wildcard can carry it further.
 
 Wildcards may appear at successive parent levels. Each level still makes its
 own forwarding decision. A wildcard has no exclusions, renaming, namespace
@@ -468,8 +591,8 @@ root's descendants. No step imports or executes the symbol, and no step
 requires the exposing module to be tag-compatible with it.
 
 Each file can replace its wildcard with named selections when it needs to
-curate the contract. Both verbs contribute to the same `parent` and
-`descendants` exposure channels; the syntactic distinction introduces no
+curate the contract. All three exposure verbs contribute to the same `parent`
+and `descendants` exposure channels; the syntactic distinction introduces no
 additional reach or availability rule.
 
 ### Exposed Names Preserve Canonical Identity
@@ -509,25 +632,28 @@ Moving a source file requires updating its owning description's path, but
 providers' callers can keep using its exposed name.
 
 For child references, resolve identity through child-exposed names until it
-is grounded in explicit `expose-src` selections. Resolution follows the tree
-downward and cannot introduce a cycle of module references. A name supplied
+is grounded in explicit `expose-src` or `expose-test` selections. Resolution
+follows the tree downward and cannot introduce a cycle of module references. A name supplied
 by multiple declarations must identify exactly one original symbol. Wildcard
 expansion can copy existing names and identities but cannot invent an origin.
 
 ### Tags Are Assigned Once Per Original Symbol
 
 The module header's optional `tagged` clause declares the module's complete
-tag set. Omission means the empty set. Its tags classify directly owned files,
-never separately declared submodules.
+tag set and classifies its ordinary `src/` area, including `src/interfaces/`.
+Omission means the empty set. The default or explicit `tests` profile classifies
+its nested `src/tests/` area, as described above.
+Neither declaration classifies separately owned submodules.
 
 ```ramify
 ramify 1
-module tests tagged [testing]
+module test-support tagged [testing]
 ```
 
-A `tagged` clause on `expose-src` assigns the selected original symbols' tags,
-not the tags of a particular exposure channel. A clause on `expose-sub` is
-invalid, even if it repeats the original tags exactly or accompanies `*`.
+A `tagged` clause on `expose-src` or `expose-test` assigns the selected original
+symbols' tags, not the tags of a particular exposure channel or source-root
+reference. A clause on `expose-sub` is invalid, even if it repeats the original
+tags exactly or accompanies `*`.
 
 Collect all explicit assignments for each original symbol in the owner's
 description before applying defaults. All such assignments must be the same
@@ -543,12 +669,43 @@ expose-src calculateTotal from "calculate-total.ts" tagged [browser] to parent
 expose-src calculateTotal from "calculate-total.ts" to descendants
 ```
 
-If no explicit assignment exists, default to `[testing]` for a testing owner
-and `[]` otherwise. Every explicit assignment by a testing owner must include
-`testing`; `tagged []` and `tagged [browser]` are invalid there. A browser
-module does not automatically tag its symbols `browser`.
+For each original symbol, derive its required symbol tags from the
+classification of the source that originally declares the binding:
 
-Tag order is immaterial. `testing` and `browser` are the only tag tokens in
+- Testing-classified source requires `testing` on every new exported binding.
+- UI-classified source requires `ui` on every new exported binding.
+- Browser classification does not automatically assign `browser`; that tag
+  remains an explicit promise about the symbol's runtime closure.
+
+If no explicit assignment exists, default to exactly the required tag set.
+Every explicit assignment must include that set. Thus all new bindings in
+`src/tests/` require `testing`, including helpers with ordinary `.ts` names; the
+default tags of new bindings in a `[testing, ui]` test profile are
+`[testing, ui]`. An explicit `[browser]` assignment would be invalid for them
+because it omits both required tags.
+
+A module whose header contains `ui` requires `ui` on every symbol it owns,
+including symbols originating in `src/tests/`: its testing profile must retain
+that classification. Similarly, a testing module's owned new bindings require
+`testing`, since both of its source areas are testing-classified. These
+requirements do not retag symbols received from another owner.
+
+```ramify
+ramify 1
+module checkout-view tagged [ui, browser]
+tests tagged [testing, ui, browser]
+
+expose-src CheckoutView from "checkout-view.tsx" tagged [ui, browser] to parent
+expose-test makeCheckoutProps from "helpers/make-checkout-props.ts" tagged [testing, ui, browser] to parent
+```
+
+Original binding identity, rather than the location of a forwarding alias,
+determines these requirements. A `src/tests/` file forwarding its owner's `src/`
+binding preserves that binding's original tags; an independently implemented
+wrapper in `src/tests/` is a new binding and must carry the test profile's required
+tags. The same distinction applies when forwarding through UI-classified source.
+
+Tag order is immaterial. `testing`, `browser`, and `ui` are the only tag tokens in
 version 1. Project labels can be recorded in comments or separate metadata;
 they cannot define availability rules. Re-exposure always carries the
 original assigned set, including when a testing module forwards a production
@@ -564,8 +721,9 @@ before processing its parent.
 
 For a module `M`:
 
-1. Resolve every `expose-src` selection to its original owned symbol and
-   collect the owner's tag assignments and defaults.
+1. Resolve every `expose-src` and `expose-test` selection to its original owned
+   symbol, and collect tag assignments and defaults using that binding's
+   original source classification.
 2. Resolve every named `expose-sub` selection through the named direct
    child's `N(C)`. An absent name is an error. A resolved symbol not in
    `U(C)` retains its identity but makes that selection ineffective.
@@ -603,19 +761,21 @@ application model from descriptions containing them:
 | Condition | Reason |
 | --- | --- |
 | Missing, misplaced, duplicate, or unsupported header; malformed syntax | There is no version 1 document |
+| Repeated `tests` declaration, one without `tagged`, or one following an exposure | The testing profile has no valid declaration position or form |
+| A `tests` profile omitting `testing`, or omitting `ui` when the module header contains `ui` | The profile violates its required classification |
 | An unquoted reserved keyword used as a name | Keywords cannot identify exports, aliases, modules, or children without quoting |
 | Invalid module name or duplicate sibling name | Module identity is ambiguous |
 | Missing root description or an invalid nested description | The ownership tree cannot be accepted |
-| A module declared inside `src/`, at a reserved container root, or outside its parent's `subs/` | The required module layout is violated |
-| Application source outside its owner's `src/`, including loose source in grouping directories | The implementation scope would be incomplete |
-| Missing source path, excluded target, symlink traversal, escape from `src/`, or a non-file target | The source reference has no valid application target |
+| A module declared inside `src/` (including tests or interfaces), at a reserved container root, or outside its parent's `subs/` | The required module layout is violated |
+| Application source outside its owner's `src/`, including sibling `tests/` or `interfaces/` and loose source in grouping directories | The owned source scope would be incomplete |
+| Missing source path, excluded target, symlink traversal, escape from the statement's `src/` or `src/tests/` root, or a non-file target | The source reference has no valid application target |
 | A source file owned by another module or a foreign forwarding export claimed as owned | Source references cannot transfer ownership |
 | An `expose-sub` name that is not a declared direct child | The reference does not identify a permitted provider |
 | A missing source export or undeclared child-exposed name | The named reference does not exist |
 | An ambiguous exposed name, including a collision introduced by a wildcard | There is no unique original symbol |
-| A wildcard on `expose-src`, a path on `expose-sub`, or a tag clause on `expose-sub` | The statement uses the wrong declaration form |
+| A wildcard on `expose-src` or `expose-test`, a path on `expose-sub`, or a tag clause on `expose-sub` | The statement uses the wrong declaration form |
 | Unknown or repeated tag; repeated destination in one list | The declared set is malformed |
-| Conflicting tag assignments, a tag clause on re-exposure, or a testing assignment omitting `testing` | Symbol tags violate their ownership contract |
+| Conflicting tag assignments, a tag clause on re-exposure, or an assignment omitting required `testing` or `ui` | Symbol tags violate their original source classification |
 
 The following are accepted and may produce advisory diagnostics:
 
@@ -625,28 +785,42 @@ The following are accepted and may produce advisory diagnostics:
 | Exposure to parent at the application root | No effect |
 | A wildcard over a child with no effective upward exposures | Empty selection; no effect |
 | Repeated exposure of the same symbol to the same destination | Set union; no extra effect |
+| A valid `tests` declaration when the optional `src/tests/` directory is absent | The profile applies when testing source is added |
 
 Diagnostics must identify the description file, location, and failed
 reference or rule. They must not infer missing tags, grant a missing exposure,
 or silently ignore an invalid declaration to make the model appear valid.
 
-### Test Placement Follows Ordinary Ownership
+### Module-Owned Tests Keep Private Access Without A New Boundary
 
-A co-located `src/place-order.test.ts` remains owned by `orders`. Its
-filename gives it no additional cross-module permissions. It can import
-same-owner symbols freely, including same-owner test support, but importing
-foreign testing-tagged support requires a testing module and valid exposure.
+`orders/src/tests/place-order.test.ts` and `orders/src/place-order.ts` share one
+owner. The test may import ordinary TypeScript exports from its owner's
+implementation without an exposure declaration. Its testing profile also
+permits it to import visible foreign testing support, subject to the remaining
+tag rules. The test filename is irrelevant: helpers under `src/tests/` have the
+same testing classification. Physical nesting under `src/` does not change
+their testing profile or make them production source.
 
-A separately declared `subs/tests/` module uses its own
-`module tests tagged [testing]` header. It has no private access to its
-parent. It sees selected parent support exposed to descendants, along with
-any other symbols that the ordinary tree rules make visible. Browser tests
-can declare `tagged [testing, browser]` and must satisfy both rules.
+In the reverse direction, non-testing-classified `src/` cannot import or
+re-export testing-classified source, including same-owner `src/tests/`. Forwarding
+an original production symbol through a testing file does not create a route
+around that source isolation. A production-owned testing hook declared in
+non-testing `src/` remains usable by other files in that same source scope:
+the source restriction follows classification, not a blanket prohibition on
+same-owner testing-tagged symbols.
 
-Neither `tests`, `testing`, `ui`, nor `client` in a path assigns tags.
-Extracting a testing module requires placing its source under that child's
-own `src/` beneath `subs/`, then reevaluating imports under the new ownership.
-A description inside the original implementation's `src/` is invalid.
+A test left at `orders/src/place-order.test.ts` keeps the module header's
+classification and receives no special filename-based permissions. A module
+may still be wholly testing-classified, with a header such as
+`module test-support tagged [testing]`; its `src/` and `src/tests/` both belong to
+that owner, and its `src/tests/` profile is determined independently of `browser`.
+
+Separately declared test modules remain possible beneath `subs/`, for example
+`subs/integration-tests/` with `module integration-tests tagged [testing]`.
+They have no automatic access to their parent's private exports. They need
+ordinary exposure for parent symbols, just like every foreign owner.
+Extracting owned tests into such a child therefore changes their permissions;
+placing a description inside the original owner's `src/tests/` or `src/` is invalid.
 
 ### Description Syntax Does Not Define Consumer Import Syntax
 
@@ -656,10 +830,13 @@ package export, or dependency allowlist. Any source resolver or generator
 must preserve the importability principles and the identities described here.
 
 The source interpretation specification defines resource interpretation and
-proposes the remaining symbol selection, binding classification, and diagnostics
-for TypeScript source forms separately from the `module.ramify` parser.
+testing-source isolation, and proposes the remaining symbol selection, binding
+classification, and diagnostics for TypeScript source forms separately from
+the `module.ramify` parser.
 
-The existing evaluator accepts constructed module trees; it does not yet
+The existing evaluator accepts constructed module trees with the earlier
+module-only classification model; it does not yet support the `ui` tag,
+distinguish owned `src/` and `src/tests/` importers, enforce testing-source isolation,
 discover directories, parse this language, or resolve TypeScript exports.
 Those integrations must implement this specification before tooling can
 claim support for `module.ramify` version 1.

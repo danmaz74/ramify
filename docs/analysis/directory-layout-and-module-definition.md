@@ -4,6 +4,8 @@
 [Directory Structure And Module Description Principles](../model/module-description.principles.md).
 The analysis below preserves the earlier proposal; its `own` and `receive`
 statements are not part of the adopted language.
+It also predates the adopted `ui` tag and module-owned `tests/` area; its
+module-only classification discussion is historical.
 
 **Date:** 2026-09-05
 
