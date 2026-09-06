@@ -204,15 +204,16 @@ exposing module's subtree - including the branch the symbol originally came
 up through: `app`'s exposure of `computeTotal` lands in `globalLibrary` and
 `moneyUtils` too, the very branch that sent it up (the figure omits those two
 arrival rows, because the exposure changes nothing there - both boxes already
-had the symbol). No exclusion is possible, and re-exposed symbols carry no
-provenance. A family that does not want its symbol coming back from an
-ancestor has exactly one option: not exposing it to the parent at all.
+had the symbol). Re-exposed symbols retain their original identity and owner;
+their route creates no exception to the uniform descendant audience. A family
+that does not want its symbol coming back from an ancestor has exactly one
+option: not exposing it to the parent at all.
 
-**Subdivision is invisible.** Exposure to descendants addresses a subtree,
-not a shape. Splitting `routingOptimization` into two sub-modules would
-change nothing about what either half may import: `shipping`'s exposure of
-`ShipmentPlan` addresses its subtree, whatever shape that subtree takes.
-Structure can be refined freely without renegotiating anybody's access.
+**Ancestor exposures survive subdivision.** Exposure to descendants addresses
+a subtree, not a shape. Splitting `routingOptimization` into two sub-modules
+would leave `ShipmentPlan` visible in both: `shipping`'s exposure still reaches
+its whole subtree. Former same-owner access does change, however. Imports
+between the new owners need exposure through the ordinary channels.
 
 ## Where the precision lives
 

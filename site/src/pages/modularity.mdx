@@ -76,9 +76,10 @@ decomposition instead, and modularity at every level of it means:
 - **A small surface, at every level.** Hierarchical splitting allows
   keeping each interface, but also each implementation, small enough to
   be easily understood.
-- **Refinement is free.** Splitting a module into sub-modules changes nothing
-  about what the rest of the system may import. A flat set renegotiates every
-  dependent each time a package splits.
+- **Refinement can preserve external contracts.** A module can split its
+  implementation into sub-modules and keep the same external interface by
+  re-exposing the selected child contracts. Imports inside the split must
+  follow the new ownership boundaries.
 - **Work splits along the boundaries.** A subtree can be handed over whole,
   to a team or to an agent, with its obligations to the rest of the system
   stated entirely at its boundary.

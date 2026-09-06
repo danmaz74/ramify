@@ -296,9 +296,10 @@ quoted; quoting does not change module identity or relax the name constraint.
 
 The root's identifier is its name. Every other canonical module identifier
 is its parent's identifier, `/`, and its local name: `shop/orders/pricing`.
-Ordinary directory names, `src`, `tests`, `interfaces`, and `subs` contribute no identifier
-segments. A separately declared child named `tests` remains possible beneath
-`subs/`; its reserved name must be quoted in its header and child references.
+Ordinary grouping directories and fixed layout containers contribute no
+identifier segments. A separately declared child named `tests` remains possible
+beneath `subs/`; `tests` is an ordinary name and may be written unquoted in its
+header and child references.
 
 Renaming a physical directory while preserving declared name and parent
 preserves the identifier. Child references in descriptions use that declared
