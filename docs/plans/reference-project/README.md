@@ -76,9 +76,17 @@ even if the baseline topology changes later. A sibling-shell comparison must
 record that root's downward exposure also reaches other compatible UI modules:
 `ui` excludes core consumers but does not select the shell alone.
 
-Root integration tests explicitly use `[testing, dispatch, ui]`: they exercise
-both protocol and view contracts in Node. This adds UI access to the root's
-default testing profile without adding a browser runtime requirement.
+Root protocol and assembly tests stay in root's `src/tests/`, with the fixed
+profile `[testing, dispatch]`. Tests combining protocol and view contracts
+live in `workspace/src/tests/`, whose fixed profile is already
+`[testing, ui, dispatch]`. They can use the views exposed upward to `workspace`
+without exposing those views downward to other feature UIs. Root exposes a
+testing-only setup function and its needed types so these tests exercise the
+actual configured system while preserving router/client identity.
+
+Tests needing other classifications use a separate testing module with those
+tags in its header and test code in its ordinary `src/`. Exercise that shape
+in a temporary variant; it does not add an owner to the clean baseline.
 
 The two feature `src/` areas are their adapters. Separate `core` children make
 the protocol boundary explicit without adding another `server` owner to each
@@ -103,17 +111,17 @@ examples/collection-review/
 ├── package.json                       one example package and its own lockfile
 ├── tsconfig.json                      independent from toolkit compilation
 ├── vite.config.ts                     root points at workspace/src/
-├── vitest.config.ts                   selects each owner's src/tests/ recursively
+├── vitest.config.ts                   selects owned tests and testing-module source
 ├── module.ramify                      explicit application root
 ├── src/                               Node entry and protocol composition
 │   ├── interfaces/                    selected dispatch vocabulary
-│   └── tests/                         integration and protocol tests
+│   └── tests/                         protocol and assembly tests
 └── subs/
     └── workspace/
         ├── module.ramify
         ├── README.md                  module purpose and local documentation
         ├── src/                       index.html, main.tsx, typed client, styles
-        │   └── tests/
+        │   └── tests/                 UI/protocol integration tests
         └── subs/                      remaining owners from the tree
 
 scripts/reference-harness/             Node-only copying/checking/reporting
@@ -126,12 +134,16 @@ receives the example's explicit root and source scope, not the surrounding
 toolkit or its independent fixture programs.
 
 Use `contracts/src/interfaces/vocabulary.ts` for the baseline's shared report
-and revision vocabulary, with explicit exposures. This directory remains
-ordinary source of `contracts`; its placement is settled independently of the
-optional wildcard proposal. Tests and their helpers belong in each owner's
-`src/tests/`, with the testing profile taking precedence over ordinary `src/`.
-Source discovery includes both nested directories; production-only selection
-excludes `src/tests/` without excluding interface vocabulary.
+and revision vocabulary, with `expose-src * from "interfaces/vocabulary.ts" to parent`.
+This explicitly selects all exports of that file with their original tags;
+the directory remains ordinary source of `contracts` and exposes nothing by
+placement alone. Other contracts use named selections, providing a comparison
+when an unrelated export is added. Baseline tests and their helpers belong in each
+owner's `src/tests/`, whose fixed profile takes precedence over ordinary `src/`.
+The separate testing-module variant places its test code in that module's
+ordinary `src/`. Discovery and runner configuration account for both forms;
+production-only selection excludes testing-classified source while retaining
+production interface vocabulary.
 
 The package is self-contained: explicit dependencies, no imports from another
 application, and no accidental reliance on dependencies installed outside
@@ -152,7 +164,7 @@ without a purpose paragraph is reported explicitly; the adapter does not borrow
 text from another owner. H03 exercises these results, and the Phase 5 tour uses
 the returned descriptions and links to the full READMEs.
 
-This is the reference project's documentation convention, settled in Phase 0.
+This follows the [module README convention](../../model/module-description.principles.md#module-documentation-lives-in-its-readme).
 Ramify modules remain valid without READMEs; every reference-baseline owner
 needs a purpose paragraph for the tour. Documentation retrieval adds no
 `module.ramify` field and does not affect ownership, exposure, or tags.
@@ -184,8 +196,12 @@ needs a purpose paragraph for the tour. Documentation retrieval adds no
    Validation's selected functions may travel up to `reviews` and down to core.
 7. **Test support:** a catalog-owned test fixture follows ordinary upward/downward
    routes. Test profiles retain required-importer classifications but do not
-   automatically inherit browser runtime requirements. Own tests keep private
-   access; parent tests use selected child contracts.
+   inherit browser runtime requirements. Root also defines a testing-only setup
+   function in its `src/tests/`, using its own assembly internals, and exposes
+   that function and needed types to descendants. Workspace integration tests
+   obtain the actual configured router/client pair through this contract.
+   These are new testing-owned bindings, not retagged forwarding aliases.
+   Own tests keep private access; foreign tests use selected exposed contracts.
 8. **Neutral reports:** `contracts` exposes selected report/revision vocabulary
    to `workspace`, which makes it available to descendants. Sibling cores gain
    access through this route, not merely through their placement in the tree.
@@ -259,37 +275,39 @@ their own listeners/browser; they never control an unrelated development server.
 
 ## Specification prerequisites and decision status
 
-The [current principles](../../model/cross-module-importability.principles.md)
-adopt `ui` and same-owner `src/tests/`, with `src/interfaces/` also inside the
-owned source root; the evaluator does not yet implement the new source areas.
-The [current grammar](../../model/module-description.principles.md) still has a
-closed tag vocabulary, and the [source profile](../../model/typescript-source-interpretation.principles.md)
-is partly proposed. This project must not pretend otherwise.
+The [principles](../../model/cross-module-importability.principles.md) now make
+the two-kind tag registry, kind-based export/test policies, and same-owner
+`src/tests/` classification definitive. The [description grammar](../../model/module-description.principles.md)
+accepts registered tag names and interface-file wildcards beneath the owner's
+`src/interfaces/`. Cases E07–E09 cover their full expansion, path restrictions,
+original identities, tags, and contract growth. The [source profile](../../model/typescript-source-interpretation.principles.md)
+adopts explicit namespace/lazy selections, permits symbol-free loads subject
+to testing-source isolation, and distinguishes definite failures from
+nonblocking analysis limits. These are specification commitments, not evidence
+of evaluator, loader, or source-checker implementation.
 
-Before authoring baseline declarations, record the minimal accepted specification
-delta for project-defined tags, mandatory export/test policies, and pragmatic
-source checking. Choose the registry serialization then; this plan does not
-invent an executable configuration syntax. Parser implementation can follow
-later—the descriptions can target an approved but unimplemented specification.
+Phase 0 maps those rules to case expectations and concrete integration inputs.
+The registry's configuration serialization and explicit default-replacement
+operation remain unspecified; use the default registry for the baseline and
+the resolved registry contract for model-level custom-tag cases. Do not invent
+accepted configuration syntax. Descriptions can target the definitive format
+before its parser exists, with capability status reported separately.
 
-Phase 0 also records the [README purpose convention](#module-purpose-and-documentation)
-and H03's description-retrieval expectations as a documentation/adapter contract.
-It requires no change to the description language.
+Phase 0 also maps the [README purpose convention](#module-purpose-and-documentation)
+to H03's adapter inputs and outputs. This is a documentation contract with no
+new description-language field.
 
-Phase 0's source-policy delta includes the T03 unmarked-interface case: retain
-the written import form, but apply type-only availability checks when the
-resolved original exists only as a type. Exposure, required-importer tags,
-and testing-origin checks still apply. Contrast it with an unmarked import of
-a class or function, which still needs `browser` for a foreign value request.
-Use a fixture compiler configuration that permits unmarked type imports, and
-report compiler diagnostics separately from Ramify's availability decision.
-This distinction is recorded in the [source proposal](../../model/typescript-source-interpretation.principles.md#explicit-bindings-are-classified-individually);
-it does not establish source-checker support or settle the separate runtime-load
-policy.
+T03 exercises the definitive [unmarked-interface rule](../../model/typescript-source-interpretation.principles.md#explicit-bindings-are-classified-individually):
+retain written import form but use type-only availability for a purely type
+original. Exposure, required-importer tags, and testing-origin checks still
+apply. An unmarked runtime-bearing class or function retains the value check.
+Use a compiler configuration permitting unmarked type imports and report
+compiler diagnostics separately. The case remains unimplemented until a
+source checker can execute it.
 
 Keep these further choices out of the required baseline:
 
-- Automatic exposure of behavior-associated types and `interfaces/` wildcards.
+- Automatic exposure of behavior-associated types or an additional `types` selector.
 - A new selected-child/test-area exposure primitive.
 - A universal runtime import guard or mandatory finite preview registry.
 - Full protocol-independent launching in core: an isolated probe compares an
@@ -299,7 +317,7 @@ Keep these further choices out of the required baseline:
 
 | Phase | Concrete deliverable | Exit condition |
 | --- | --- | --- |
-| 0. Scope and expectations | Final owner/contract map, minimal specification delta, README purpose/retrieval convention, case metadata and supported-profile gates. | Every case is classified as adopted rule, chosen direction, probe, compatibility, or separate responsibility. No invented accepted syntax. |
+| 0. Scope and expectations | Final owner/contract map, definitive specification references, registry integration inputs, README retrieval contract, case metadata and capability gates. | Every case distinguishes its binding rule or reference design from implementation status, undecided probes, and separate responsibilities. No invented accepted syntax. |
 | 1. Runnable reference | The small screen, both native protocol surfaces, in-memory behavior, explicit module descriptions, per-owner purpose READMEs and owned tests. | Independent install/type-check, application tests, protocol checks and ordinary Vite build work even before a source checker exists. |
 | 2. Reference harness | Temporary-copy mutations, meaningful expected diagnostics and a capability/coverage report. | Active supported cases execute; absent capabilities are reported as unimplemented, not green. |
 | 3. Evaluator and loader integration | Attach source-area/custom-tag evaluator support and then real filesystem/description parsing. | Owner/reach/profile cases consume the real project; do not substitute an old handcrafted world as parser evidence. |

@@ -20,13 +20,14 @@ with its vocabulary defined in the [Glossary](docs/model/glossary.md).
 The [Directory Structure And Module Description Principles](docs/model/module-description.principles.md)
 define the required `src/` and `subs/` layout, optional same-owner
 `src/tests/` and `src/interfaces/`, and the `module.ramify` language.
-`expose-src` selects owned exports relative to the module's `src/`;
+`expose-src` selects owned exports relative to the module's `src/`, by name or
+with `*` for one explicitly named file beneath `src/interfaces/`;
 `expose-test` selects owned exports relative to its `src/tests/`;
 `expose-sub` selects a direct child's upward-exposed symbols by name or `*`.
 The [TypeScript Source Interpretation Principles](docs/model/typescript-source-interpretation.principles.md)
-record the adopted resource ownership, identity, and testing-source isolation
-rules and propose how other
-TypeScript imports and source re-exports map to symbol checks.
+define resource ownership, testing-source isolation, and how TypeScript imports
+and source re-exports map to symbol checks. Source checking reports definite
+violations separately from nonblocking analysis limits.
 
 Why it matters:
 
@@ -60,11 +61,12 @@ in the host repository at
 The version 1 description language is specified; its filesystem loader and
 parser are not yet implemented. The evaluator currently accepts constructed
 module trees and implements the earlier module-only `testing`/`browser`
-model. The adopted `ui` tag, separate `tests/` profile, and production-to-testing
-source restriction still require evaluator/source-checker implementation.
-TypeScript source interpretation is specified separately, with resource and
-source-area interpretation adopted and other source-form policies still
-proposed; a source checker is not yet implemented.
+model. The definitive specification uses a project-wide registry with two fixed
+tag kinds and ordinary defaults `testing`, `ui`, `dispatch`, and `browser`.
+The registry, separate `src/tests/` profile, and production-to-testing source
+restriction still require evaluator/source-checker implementation. TypeScript
+source interpretation is definitive within its stated bounded profile; a
+source checker is not yet implemented.
 
 ## Layout
 
@@ -99,7 +101,7 @@ Build output (`site/build/`, `site/.docusaurus/`) is git-ignored.
 | `/` | Landing page: what ramify.ts is, an overview of the model, and signposts to the detailed pages |
 | `/modularity` | Why multi-file, hierarchical modularity matters and why ramify exists |
 | `/model` | The simplified, tag-free core model, built up through two interactive examples |
-| `/tags` | The two restrictive availability rules (`⇥` required importer tag and `⇤` required symbol tag), the `testing`, `ui`, and `browser` tags, and module-owned `tests/` |
+| `/tags` | The two restrictive availability rules (`⇥` required importer tag and `⇤` required symbol tag), the default and project-defined tags, and module-owned `src/tests/` |
 | `/explorer` | A preview of the module dependency explorer |
 | `/glossary` | Definitions of the model's vocabulary |
 

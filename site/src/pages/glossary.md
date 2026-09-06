@@ -37,13 +37,17 @@ different importer classifications. A source area is not a child module and
 creates no exposure channel.
 
 The module header's tag set classifies ordinary source, including
-`src/interfaces/`. The `src/tests/` area defaults to
-`[testing]`, plus `ui` when the module is tagged `ui`. An optional
-`tests tagged [...]` statement declares the complete test-area tag set; it must
-include `testing` and cannot omit the module's `ui`. It may add `ui` in a
-non-UI module. `browser` is independent and is not inherited into `src/tests/`:
-browser tests declare it explicitly, for example
-`tests tagged [testing, ui, browser]`.
+`src/interfaces/`. The `src/tests/` area's fixed profile is `testing` plus every
+required-importer tag in the module header, as defined by the resolved registry.
+Required-symbol tags are not inherited, and the profile cannot be overridden
+or extended. With the default registry, a `[ui, dispatch, browser]` module
+therefore has `[testing, ui, dispatch]` in `src/tests/`.
+
+Tests needing additional tags belong to a separately declared testing module.
+Its test code lives in its ordinary `src/`, using all tags declared in that
+module's header. Its optional `src/tests/` still uses the fixed derived profile.
+The separate owner needs ordinary exposure and tag compatibility to import
+another owner's symbols, including its parent's private exports.
 
 Every file uses exactly one area's classification: the profile for `src/tests/`
 takes precedence over the ordinary profile of its containing `src/` directory.
@@ -56,8 +60,12 @@ ordinary source classification. There are no per-file importer contexts.
 A module's optional **interface directory** is `<module>/src/interfaces/`.
 It contains curated contract vocabulary, including types, schemas, enums, and
 constants. It is ordinary source of the same owner, with no separate profile
-or automatic exposure. Directory placement and exposure selection are separate
-decisions; the directory does not itself enable wildcard syntax.
+or automatic exposure. An `expose-src *` declaration may select all exports of
+one explicitly named file beneath this directory, including its subdirectories.
+It still specifies parent and/or descendants as destinations and preserves
+original ownership and tags. Added file exports join that selected contract.
+Owned-source wildcard selection is invalid elsewhere, including
+`src/tests/interfaces/`; child-contract wildcard re-exposure is independent.
 
 ## Importer classification
 
@@ -98,9 +106,13 @@ Ramify limits cross-module importability and forbids non-testing imports of
 testing-origin source, including within one module. Source forwarding exports
 do not create Ramify exposure or transfer symbol ownership.
 
-TypeScript imports come in two forms: ordinary **value imports**, and **type-only
-imports** (`import type`), which are erased at compile time and carry no runtime
-dependency.
+Ramify checks **value** and **type-only** availability requests. Explicit
+TypeScript type-only bindings produce type-only requests. An unmarked binding
+also produces a type-only request when its resolved original exists only as a
+type, such as an interface with no merged value binding. A runtime-bearing
+original requires an explicit type-only form to receive that exemption.
+The written source form is retained separately: a type-only binding does not
+necessarily erase an entire ordinary import statement or its initialization.
 
 ## Module-owned symbol
 
@@ -120,17 +132,16 @@ child exposing S to its parent, or a proper ancestor exposing S to its descendan
 
 In the world of ramify modules, all symbols are always associated with a set of tags. Tags
 are assigned to TypeScript exported symbols by the owner module. By default, the tag
-set contains the tags required by the binding's defining source area: a new
-owned exported binding defined in testing-classified source must carry `testing`, and one
-defined in UI-classified source must carry `ui`. Without either classification,
-the default is empty. A module tagged `ui` therefore requires `ui` on all its
-newly owned symbols, including test-area bindings. These requirements also
-apply to unexposed bindings and resource bindings. `browser` is never assigned
-to symbols automatically.
+set contains exactly the required-importer tags of the binding's defining
+source area, or is empty when there are none. A module header's required-importer
+tags therefore appear on all its newly owned symbols, including test-area
+bindings, whose profile retains those tags. These requirements also apply to
+unexposed exports, new wrappers, type aliases, and resource bindings.
+Required-symbol tags are never assigned to symbols automatically.
 
 Explicit symbol tag assignments may add tags but cannot omit required
-`testing` or `ui`. Forwarding aliases are not new bindings and retain their
-original tags; passing a production symbol through a testing area does not
+tags of the defining source area. Forwarding aliases are not new bindings and
+retain their original tags; passing a production symbol through a testing area does not
 reclassify the symbol.
 
 When talking about symbols in the context of ramify modules, we always mean "symbol with
@@ -177,8 +188,8 @@ a no-op as the same symbol is already visible in M2's parent and all M2's descen
 
 Tags assigned in a module header classify its ordinary `src/` area. By default,
 a module has no tags. Its same-module `src/tests/` area follows the separate
-test-area profile rules, including the mandatory `ui` classification for a UI
-owner. Submodules declare their own tags; module tags are not inherited by
+test-area profile rules, retaining every required-importer tag in the module
+header. Submodules declare their own tags; module tags are not inherited by
 child modules.
 
 Ordinary subdirectories share their source area's classification. Separately
@@ -210,14 +221,31 @@ including before the remaining same-owner exemption.
 
 ## Tag-associated availability rule
 
-Each built-in tag carries the availability rule fixed by Ramify. Assigning that
-tag to a symbol, module, or test-area profile does not change its rule. Only
-`testing`, `ui`, and `browser` have importability semantics; project-defined labels are inert classification
-for search or documentation and cannot define availability rules.
+Each tag's definition selects one of Ramify's two fixed rule kinds. Assigning
+that tag to a symbol, module, or test-area profile does not change its rule.
+Matching, mandatory export tags, and test-profile propagation follow the kind,
+not the tag name. Projects may add tags of either kind but cannot define new
+rule algorithms, implications, exceptions, or per-tag propagation policies.
+
+## Tag registry
+
+The **tag registry** is the immutable set of tag definitions shared by every
+module in one evaluation. A definition has a name, one fixed rule kind, and
+an optional prose description. The default registry defines `testing`, `ui`,
+and `dispatch` as required-importer tags, and `browser` as a required-symbol tag.
+Registering a tag does not apply it to source or symbols.
+
+Unknown tag uses, duplicate or conflicting definitions, and per-module
+overrides are invalid. Separate evaluations have isolated registries; cached
+decisions and reports identify which registry they use. Only `testing` is
+structurally reserved: it cannot be removed, rebound, or disconnected from
+`src/tests/` and testing-source isolation. Tools claiming the default profile
+must validate its definitions. A tag's domain-specific promise may require
+separate verification; the registry supplies no verification algorithm.
 
 ## `testing` tag
 
-The built-in tag carrying a required importer tag rule. A symbol tagged
+The reserved tag carrying a required importer tag rule. A symbol tagged
 `testing` is test support and may cross a module boundary only into a
 testing-classified source area, for both value and type-only imports.
 
@@ -230,27 +258,40 @@ forwarded symbols retain their original owners, origins, and tags.
 
 ## `ui` tag
 
-The built-in tag carrying a required importer tag rule for UI coupling. A
+The default tag carrying a required importer tag rule for UI coupling. A
 symbol tagged `ui` may cross a module boundary only into a UI-classified
 source area. This applies to both values and types. The tag never grants
 visibility and makes no browser-safety claim.
 
 A **UI module** has `ui` in its module header. Its `src/` and `src/tests/` are
-UI-classified, and every newly owned binding must carry `ui`. A non-UI module
-can give its test area a UI classification explicitly; new bindings defined
-there then also require `ui`. Forwarding preserves the original symbol's tags.
+UI-classified, and every newly owned binding must carry `ui`. Tests requiring
+UI classification outside a UI owner use a separate testing module tagged `ui`;
+its new bindings also require `ui`. Forwarding preserves the original symbol's tags.
 `ui` and `browser` are independent: UI code may run outside a browser, and
 browser-safe infrastructure need not be UI code.
 
+## `dispatch` tag
+
+The default tag carrying a required importer tag rule for dispatch and transport
+coupling. A symbol tagged `dispatch` requires a dispatch-classified foreign
+importer for values and types. Dispatch-classified source requires the tag on
+every newly owned exported binding; its module's tests retain that classification.
+
+This separates transport contracts, typed clients, and connected UI from
+transport-independent code. The tag grants no visibility and does not prove
+that an implementation only dispatches or contains no business workflow.
+
 ## `browser` tag
 
-The built-in tag carrying the required symbol tag rule. On a symbol it is the owner's
+The default tag carrying the required symbol tag rule. On a symbol it is the owner's
 claim that the symbol's entire transitive runtime closure is browser-safe. A
 **browser module** is a module tagged `browser` in its own definition; its
-ordinary source runs in a browser. A **browser test area** explicitly includes
-`browser` in its test-area profile. The test area does not inherit `browser`
-from its module header. On an importing source area, this tag requires the
-tag on foreign value bindings; type-only imports are exempt from this rule.
+ordinary source runs in a browser. A **browser testing module** declares both
+`testing` and `browser`, along with any other needed tags. Its test code belongs
+in its ordinary `src/`, where the full header profile applies. The reserved
+`src/tests/` area never inherits `browser` and has no profile override.
+On an importing source area, `browser` requires the tag on foreign value
+bindings; type-only imports are exempt from this rule.
 
 ## Module-available symbol
 
@@ -281,8 +322,9 @@ binding and the accessed source/resource. A foreign symbol may be type-available
 but not value-available. Visibility still belongs to the area's module.
 
 Whether a rule blocks availability entirely or only value imports is part of
-the rule's definition. A required importer tag (`testing` or `ui`) does the
-former; a required symbol tag (`browser`) does the latter.
+the rule kind. A required importer tag (such as default `testing`, `ui`, or
+`dispatch`) does the former; a required symbol tag (such as default `browser`)
+does the latter.
 
 ## Where the precision lives
 

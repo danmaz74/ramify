@@ -28,8 +28,10 @@ and the **exposed symbol's** tags to be compatible, on top of everything the
 tree already decided.
 
 **Tags** carry those facts, and they are purely restrictive: a tag can only
-*withhold* a symbol that is visible, never expose one. Ramify defines three
-tags: `testing`, `ui`, and `browser`, carrying two kinds of rule. The testing
+*withhold* a symbol that is visible, never expose one. Ramify fixes two rule
+kinds. Its default tag registry defines `testing`, `ui`, `dispatch`, and
+`browser`; projects may add tags of either kind. The examples on this page use
+that default registry. The testing
 and browser diagrams below each use a small example universe and keep the
 tree trivial - two hops deep, everything exposed to the root and back to
 every descendant, so visibility is identical in every box by construction.
@@ -75,11 +77,9 @@ separately declared submodules own their files and declare their own tags.
 Tags are not inherited across ownership boundaries. A `*.test.ts` filename
 outside `src/tests/` does not grant testing classification.
 
-And a tag is not just a name: **each built-in tag carries the
-[availability rule fixed by Ramify](/glossary#tag-associated-availability-rule).**
-Only `testing`, `ui`, and `browser` have importability semantics. Project-defined
-labels may help search or documentation, but cannot define or change these
-rules. That is why the diagrams always write a built-in tag
+And a tag is not just a name: **each registry definition selects one of the
+[two rule kinds fixed by Ramify](/glossary#tag-associated-availability-rule).**
+Project-defined tags follow those same rules. That is why the diagrams write a tag
 behind the glyph of its rule - <TagRef rule="⇥" name="testing" /> - the name
 and the rule are one thing. `testing` carries the **required importer tag**
 rule, written <TagRef rule="⇥" />, and that rule fires from the symbol: the
@@ -134,18 +134,37 @@ exports without exposure declarations. Foreign symbols still need
 an exposure route, and a parent's tests gain no automatic access to a child's
 private internals.
 
-The test profile defaults to `[testing]`, plus `ui` if the module carries
-`ui`. Browser execution is selected independently. For example:
+The test profile is fixed: `testing` plus every required-importer tag in the
+module header. Required-symbol tags are not inherited, and the profile cannot
+be overridden or extended. For example:
 
 ```text
 ramify 1
 module widgets tagged [ui, browser]
-tests tagged [testing, ui]
 ```
 
-Here browser implementation and Node/jsdom tests share ownership. Use
-`tests tagged [testing, ui, browser]` for browser-only tests. Each source
-area has one profile; individual filenames do not override it.
+Here browser implementation and Node/jsdom tests share ownership. The
+`src/tests/` profile is `[testing, ui]`. Each source area has one profile;
+individual filenames do not override it.
+
+A module tagged `[ui, dispatch, browser]` similarly has
+`[testing, ui, dispatch]` in `src/tests/`. The same derivation applies to
+project-defined tags according to their rule kind.
+
+Tests needing additional tags use a separate testing module under `subs/`.
+For example, browser-classified tests can use:
+
+```text
+ramify 1
+module browser-tests tagged [testing, ui, browser]
+```
+
+Put these tests in that module's ordinary `src/`, where all three tags apply.
+Its optional `src/tests/` would still derive `[testing, ui]`. The separate
+module needs explicit exposure and compatible tags for the implementation it
+tests; it gains no automatic access to its parent's private exports. An owner
+can expose a small testing-only helper or wrapper where needed. Forwarding
+aliases retain the original tags.
 
 Non-testing source cannot import, re-export, or load testing source,
 including within the same owner and through a testing barrel. This source
@@ -175,6 +194,20 @@ For an exposed component tagged `[ui, browser]`:
 
 These examples assume the component is visible and its import path passes
 the testing-source restriction. A UI tag supplies no additional reach.
+
+## `dispatch` - keeping transport coupling explicit
+
+`dispatch` also carries the **required importer tag** rule. A foreign transport
+contract or typed client tagged `dispatch` requires a dispatch-classified
+importer for both values and types. Its exposure route still decides where
+that contract can reach.
+
+A connected view can carry `[ui, dispatch, browser]`, while a pure UI module
+uses `[ui, browser]`. The connected view can import visible dispatch contracts;
+the pure UI cannot. Every newly owned export of dispatch source must retain
+`dispatch`, including its test bindings. Forwarded symbols keep their original
+tags. The tag does not prove that a function only dispatches; implementation
+responsibilities need separate review.
 
 ## `browser` - keeping Node code out of the browser
 
@@ -217,13 +250,26 @@ and `ui` stays dark.
 
 Two [availability rules](/glossary#tag-based-availability-rules) exist, and
 the diagrams showed one of each: the required importer tag
-(<TagRef rule="⇥" />, used by `testing` and `ui`) rides out with the symbol;
+(<TagRef rule="⇥" />, used by `testing`, `ui`, and `dispatch`) rides out with the symbol;
 the required symbol tag (<TagRef rule="⇤" />, `browser`'s) is checked for
 the importing source area.
 When several rules apply to the same symbol and source area, all of them must be
 satisfied. And **tags never expose**: no rule makes an import possible that
 the exposure chain did not already allow. A tag can only *withhold* a symbol
 that is visible.
+
+All modules in a check share one [tag registry](/glossary#tag-registry).
+Project-defined tags choose one of the two kinds; they cannot introduce new
+matching algorithms, implications, or exceptions. New owned exported bindings
+must carry all required-importer tags of their defining source area, including
+unexposed exports, new wrappers, type aliases, and resource bindings.
+Required-symbol tags are assigned explicitly. Registering a tag alone does
+not classify any source or export.
+
+Unknown tags, conflicting definitions, and per-module overrides are errors.
+Only `testing` has a reserved structural role: it must retain its required-importer
+kind, its connection to `src/tests/`, and production-to-testing isolation.
+The other default tags use the same matching and propagation as project tags.
 
 ## Type imports
 
@@ -256,6 +302,19 @@ Whether a rule exempts type imports follows from what its claim is about:
   type-available.
 - **`ui` also restricts coupling**: non-UI source cannot depend on a UI
   contract through either value or type-only imports.
+- **`dispatch` restricts coupling too**: transport-independent source cannot
+  import dispatch-tagged contracts in either form.
+
+An interface or type alias imported without a `type` modifier also receives
+a type-only availability check when its resolved original has no runtime
+binding. It must still pass exposure, required-importer tags, and testing-source
+isolation. A runtime-bearing class or function needs an explicit type-only
+import to be exempt from the browser rule; later type-only usage is insufficient.
+
+These checks do not prohibit symbol-free initialization imports across owners.
+Known testing-source restrictions still apply. Source checking checks explicit
+namespace and lazy-import selections and reports unsupported portions as
+nonblocking coverage notes by default; definite violations still fail.
 
 The diagrams give all of this exactly one character: the strike means "not
 available", and an unstruck `∗` after a struck name marks the middle band of

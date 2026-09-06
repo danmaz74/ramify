@@ -80,7 +80,6 @@ cousin, global, or branch-targeted exposure channel.
 Exposing a received symbol is re-exposure. It is the same operation as
 exposing an owned symbol and uses the same two channels.
 
-Every exposure carries the original symbol without transferring ownership.
 Eligibility to expose depends only on visibility. Permission to pass a symbol
 onward does not imply permission to use it.
 
@@ -111,8 +110,7 @@ A descendant cannot carry it outside: reaching the owner's parent still
 requires the owner's own expose-to-parent decision.
 
 Exposure to descendants is independent of the shape of the receiving
-subtree. Subdivision preserves visibility supplied by existing ancestor
-exposures to descendants.
+subtree. Subdivision preserves visibility supplied by existing ancestor exposures to descendants, but does not preserve former same-owner access.
 
 ### Redundant Exposure Is Permitted
 
@@ -184,13 +182,9 @@ defaults are not yet specified; they must preserve this contract.
 
 ### Re-Exposure Preserves Ownership And Tags
 
-Every exposure carries the original symbol together with its immutable tag
-set. Re-exposure never transfers ownership and can't add, remove, or change
-tags. Forwarding aliases preserve the same original binding and its tags.
-
-A module may re-expose a visible symbol even when tag rules prevent its own
-files from importing it. Receiving the symbol lets the module use it only
-when it is also available in the importing source area.
+Every exposure carries the original binding with its owner and its immutable
+tag set. Re-exposure and forwarding aliases never transfer ownership and
+cannot add, remove, or change those tags.
 
 ### Ordinary Source Code And Tests Have Their Own Tag Profiles
 
@@ -203,12 +197,9 @@ owner, the fixed layout defines two source areas:
 - **Testing source:** files under the optional `src/tests/` subtree, including
   the module's tests and their helpers.
 
-These areas share ownership and visibility. Their tag sets, also called
-profiles, determine their different importer classifications.
-
-A module has exactly the tags declared in its own definition, or none when
-no tags are declared. These tags classify its ordinary source.
-Submodules are separate owners and do not inherit tags from their ancestors.
+Each source area's tag set is its profile. Ordinary source uses exactly the
+tags declared on the module, or none when no tags are declared. Submodules
+do not inherit tags from their ancestors.
 
 #### Testing
 
@@ -218,23 +209,23 @@ Testing code requires special treatment:
 - Production code must not depend on testing source, including test helpers.
 - Tests may run in a different environment from the implementation—for example, Node/jsdom tests of browser code.
 
-Ramify therefore keeps a module’s tests in a special source area, `src/tests/`,
-which shares the module ownership and visibility but uses a separate tag
-profile. This profile is always computed from the module’s tags: it contains
-`testing` plus every required-importer tag on the module. Required-symbol tags
-are not inherited, and the profile cannot be overridden or extended.
+Ramify therefore keeps a module’s tests in `src/tests/`, which shares the
+module’s ownership and visibility while using a separate profile: `testing`
+plus every required-importer tag on the module. Required-symbol tags are not
+inherited, and the profile cannot be overridden or extended.
 With the default registry, a `[ui, dispatch, browser]` module therefore has
 `[testing, ui, dispatch]` in `src/tests/`: Node/jsdom tests of browser
-implementation use a non-browser profile, and visible symbols tagged `testing`
-can be imported when the remaining tag rules also pass.
+implementation use a non-browser profile.
 
-The testing profile takes precedence over the containing `src/` directory's
-ordinary profile. Each file belongs to exactly one source area; the profiles
-are not combined merely because the directory roots are nested.
-Ordinary subdirectories share their containing source area's classification.
-Each area has one profile; there are no per-file or glob-based overrides.
-Subdivision preserves ancestor-supplied visibility, but does not assign tags
-or preserve former same-owner access.
+Each file uses exactly one profile: the reserved `src/tests/` profile takes
+precedence over ordinary `src/`. Ordinary subdirectories share their containing
+area's profile, and filenames or globs cannot override it. For example,
+`src/helpers/tests/` and a `*.test.ts` file outside `src/tests/` keep the
+ordinary profile; a `client.ts` filename does not assign `browser`.
+
+The connection between `testing`, `src/tests/`, and production-to-testing
+source isolation is part of the model: a project cannot remove or redefine
+it. No other tag has a reserved directory-based role.
 
 Tests needing additional tags belong to a separately declared testing module
 under `subs/`. That module declares `testing` and the other needed tags in its
@@ -243,24 +234,11 @@ apply. For example, a module tagged `[testing, ui, browser]` checks its `src/`
 imports with all three tags; its optional `src/tests/` still uses the fixed
 derived profile `[testing, ui]`.
 
-A separate testing module has no automatic access to another owner's private
-exports, including its parent's. It needs ordinary exposure and tag
-compatibility. An owner can expose selected bindings or a newly defined
-testing-only wrapper when private access is needed, using the testing tag.
-Forwarding aliases keep the original tags, and exposure to descendants still
-covers the whole subtree.
-
-The reserved `src/tests/` area is the only directory-based classification rule.
-A `*.test.ts` file under ordinary `src/` still has that area's classification;
-it gains no testing permissions from its filename. A directory named `tests`
-elsewhere, such as `src/helpers/tests/`, is ordinary source, and a `client.ts`
-filename does not assign `browser`. Tests and helpers using the derived profile
-belong in the owner's `src/tests/`; those in a separate testing module use that
-module's declared classification under its `src/`.
-
-The reserved `testing` tag must remain tied to this area and to
-production-to-testing source isolation. This structural connection cannot be
-removed or redefined. No other tag has a reserved directory-based role.
+A separate testing module needs ordinary exposure and tag compatibility to
+import another owner's exports, including its parent's. Moving owned tests
+into such a module therefore loses their automatic private access. The
+implementation owner can expose selected bindings or a newly defined wrapper
+tagged `testing` to provide controlled access to its private implementation.
 
 ### Interface Vocabulary Belongs To Ordinary Source
 
@@ -288,38 +266,26 @@ an explicit set may add tags but cannot omit any of them. Required-symbol
 tags are not assigned automatically.
 
 This applies to unexposed exports, new wrappers, type aliases, and resource
-bindings. Forwarding aliases preserve the original binding and its tags;
-they do not acquire the forwarding area's tags.
+bindings. Forwarding aliases are not new bindings and do not acquire the
+forwarding area's tags.
+
+For example, under the default registry, a `[ui, dispatch, browser]` module's
+new ordinary exports default to `[ui, dispatch]`, and its new test exports
+to `[testing, ui, dispatch]`.
 
 ### Testing Support Requires A Testing Importer
 
-The `testing` tag carries the required importer tag rule. A symbol tagged
-`testing` is test support and may be imported across a module boundary only
-by a source area carrying `testing`. This applies to value and type-only imports:
-test support is excluded from the production contract in both forms.
+The `testing` tag marks a symbol as test support. Its required-importer rule
+permits cross-module imports only from testing-classified source, for both
+values and types.
 
-A module curates its test support by tagging and exposing selected symbols.
-Testing modules gain no blanket private access to other modules. The tag
-does not grant global reach; test support must follow ordinary exposure
-chains.
+For example, suppose a module exposes one of its own symbols tagged `testing`
+to its descendants. In a child module that does not declare `testing`:
 
-Every original exported binding defined in testing-classified source must carry
-`testing`. This includes all bindings defined in `src/tests/` and in a testing
-module's `src/`. An explicit symbol tag set omitting `testing` is invalid.
-Other tags may be added; all other required-importer tags of that source area
-are mandatory too. The requirement does not classify symbols owned by a
-separately declared module.
-
-The requirement follows ownership. Received symbols keep their owner's tags,
-including when a testing module re-exposes them. A production symbol received
-from another module, including a child, retains its original tags. Re-exposure
-cannot turn production contracts into test support or remove a test-support
-restriction.
-
-An untagged module may receive and re-expose test support while its ordinary `src/`
-cannot import it. Its `src/tests/` may import that support when all applicable
-rules pass. A parent can expose test support to descendants while the tag
-restricts use to their testing-classified source areas.
+- Files under `src/tests/` may import that symbol, provided every other
+  applicable tag rule also passes.
+- Files elsewhere under `src/` cannot import it, even through a type-only
+  import.
 
 ### UI Contracts Require A UI Importer
 
@@ -329,30 +295,23 @@ carrying `ui`, for both value and type-only imports. This excludes UI contracts
 from non-UI core source even when an ancestor exposes those contracts to its whole
 subtree.
 
-Every symbol owned by a module tagged `ui` must carry `ui`, including its test
-bindings. Tests needing UI classification outside a UI owner belong to a
-separate testing module tagged `ui`. Its new exported bindings also require
-`ui`. Explicit assignments cannot omit these mandatory tags. Received original
-symbols retain their original tags.
-
 `ui` describes architectural coupling; `browser` describes runtime safety.
 A UI source area may use Node services when it is not tagged `browser`.
 Browser-safe non-UI utilities need not carry `ui`. For example, an exposed
 component tagged `[ui, browser]` can be imported by `[ui, browser]` production
 source or `[testing, ui]` Node tests, but not by untagged core source, even
-through a type-only import. Like every tag, `ui` never grants visibility.
+through a type-only import.
 
 ### Dispatch Contracts Require A Dispatch Importer
 
 In the default registry, `dispatch` carries the required importer tag rule.
 Foreign dispatch-tagged contracts require a dispatch-classified importer for
-both values and types. Dispatch source requires `dispatch` on every newly
-owned exported binding, and its owner tests retain that classification.
+both values and types.
 
 This can separate transport contracts, typed clients, and connected UI from
-transport-independent logic or pure UI. The tag does not grant reach or prove
-that a function only dispatches: code responsibilities require separate
-architectural review or verification.
+transport-independent logic or pure UI. The tag does not prove that a function
+only dispatches: code responsibilities require separate architectural review
+or verification.
 
 ### Browser Imports Require Browser-Safe Symbols
 
@@ -406,11 +365,6 @@ unmarked import whose resolved original exists only as a type, such as an
 interface with no merged value binding. Runtime-bearing originals require an
 explicit type-only form to receive this exemption. Exposure, required-importer
 tags, and testing-source isolation still apply in either case.
-
-A concrete source import must also pass the source-origin restriction for
-its target resource, including a forwarding barrel; symbol availability alone
-does not authorize every path to that symbol. Visibility remains a property
-of the owning module; availability is evaluated for the importing source area.
 
 The complete decision is:
 

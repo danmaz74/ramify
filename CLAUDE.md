@@ -34,23 +34,34 @@ It specifies the required `src/` and `subs/` layout, with optional same-owner
 `src/tests/` and `src/interfaces/`, and the formal `module.ramify` version 1
 language. Modules may occur only beneath `subs/`. The module header classifies
 ordinary `src/`, including interfaces; the nested `src/tests/` area uses its
-distinct testing profile. An optional singleton `tests tagged [...]` statement
-immediately after that header sets the complete testing profile. Its default
-is `[testing]`, plus `ui` for a UI module, without inheriting `browser`.
-Explicit testing profiles retain `testing` and their module's required `ui`.
+fixed testing profile: `testing` plus all required-importer tags in the module
+header, without inheriting required-symbol tags. There is no `tests tagged [...]`
+declaration or other test-profile override. Tests needing additional tags belong
+to a separately declared testing module under `subs/`, with test code in its
+ordinary `src/` so the full module header applies. It needs ordinary exposure
+and tag compatibility to access another owner's exports. Test discovery and
+production exclusions must account for testing modules as well as `src/tests/`.
 
 `expose-src` names owned exports relative to `src/`; `expose-test` does the same
 relative to `src/tests/`. An `expose-src` path may also select nested testing
-source without changing its original classification. `src/interfaces/` does
-not automatically expose exports or enable wildcard syntax.
-`expose-sub` names direct children and alone permits
-wildcard selection. The three forms use the same parent/descendants exposure
+source without changing its original classification. `expose-src *` selects all
+exports of one explicitly named file beneath the owner's `src/interfaces/`;
+it is invalid for files elsewhere, and `expose-test` accepts named selections
+only. Directory placement alone exposes nothing. Expansion preserves original
+ownership and tags, rejects foreign-owned exports, and includes added exports.
+`expose-sub` names direct children and permits wildcard selection of their
+effective upward contracts. The three forms use the same parent/descendants exposure
 channels. Read the specification before changing discovery, description parsing,
 source references, or documentation of the file format. It records the model's
 rules; the current toolkit does not yet implement the filesystem loader or parser.
 
-The built-in tags are `testing`, `browser`, and `ui`. New bindings originating
-in testing or UI source must retain the corresponding required symbol tags;
+One resolved registry defines tags for the entire evaluation. Ramify fixes
+two kinds: required importer and required symbol. The default registry defines
+`testing`, `ui`, and `dispatch` as required importer, and `browser` as required
+symbol. Projects may add names of either kind; matching and propagation must
+depend on kind, not tag names. Only `testing` is structurally reserved and
+cannot be removed or rebound. New owned exported bindings must carry all
+required-importer tags of their original defining source area;
 forwarding aliases retain their original binding's ownership and tags. Source
 without testing classification cannot import or re-export testing-classified
 source, including same-owner access and forwarding paths. Other same-owner
@@ -58,14 +69,24 @@ imports retain their exemption from exposure and symbol-tag checks. No per-file
 or glob classification overrides are part of this model.
 
 [TypeScript Source Interpretation Principles](docs/model/typescript-source-interpretation.principles.md)
-contains the adopted resource interpretation and testing-source isolation.
+defines the definitive source interpretation, including testing-source isolation.
 Resource ownership and binding identity follow the resolved resource, export
 names come from its effective TypeScript export description, and ordinary
 exposure and tag rules apply. Read it before designing source import checks.
-Its remaining source-form policies remain proposals, and no TypeScript source
-checker is implemented yet.
+Unmarked imports of purely type originals receive type-only availability
+checks. Explicit namespace and lazy-import member selections check their
+selected originals. There is no general ban on symbol-free cross-module loads;
+known testing-source restrictions still apply. Definite violations fail;
+analysis limits are nonblocking coverage notes by default. Missing or unrun
+checker stages cannot pass as completed. No TypeScript source checker is
+implemented yet.
 
-The existing evaluator and examples predate the `ui` tag and the distinct
+Module prose lives in `README.md` beside `module.ramify`; a tour reads its first
+top-level prose paragraph as a plain-text purpose summary and retains its path.
+Missing documentation is explicit, with no fallback to another owner's prose.
+README completeness is separate from module-description validity.
+
+The existing evaluator and examples predate the tag registry and the distinct
 classification of module-owned `src/tests/`. Updating these specifications does
 not establish implementation support; runtime, evaluator, and source-layout
 migration work must be explicitly scoped separately.

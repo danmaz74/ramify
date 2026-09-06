@@ -19,10 +19,13 @@ frameworks. The harness consumes the example's actual files and the toolkit's
 supported public entry points; it does not become application source itself.
 
 The example uses `src/tests/` and `src/interfaces/` inside every owner that needs
-them. Resolve the testing profile before the enclosing ordinary-source profile.
-Test discovery must find the nested test areas across `subs/`; production-only
-selection excludes them while preserving interface vocabulary. Harness copies
-retain this nesting and do not flatten source areas into sibling directories.
+them. Resolve the fixed testing profile before the enclosing ordinary-source
+profile. Test discovery must find nested test areas across `subs/` and the
+ordinary `src/` of separately declared testing modules. Production-only selection
+excludes testing-classified source while preserving production interface
+vocabulary. Harness copies retain this nesting and do not flatten source areas
+into sibling directories. The O07 variant exercises a testing module whose
+header carries extra tags; no test-profile override is supported.
 
 Prove independence once during scaffolding, and again after dependency changes:
 copy the example without dependencies/build outputs to a temporary directory
@@ -68,7 +71,8 @@ Maintain small case records with:
 - Baseline entry or mutation/overlay description.
 - Required capability: model, source areas, custom registry, loader, resolver,
   a supported source form, browser, or a host adapter contract.
-- Authority status: adopted, chosen pending specification, or undecided probe.
+- Authority status: definitive rule, definitive reference design, undecided
+  probe, or separate responsibility.
 - Expected supported result and the important original/source identities.
 - Expected coverage notes where analysis is intentionally partial.
 
@@ -86,7 +90,7 @@ tests useful without maintaining a second fictitious application indefinitely.
 
 | Axis | States | Meaning |
 | --- | --- | --- |
-| Authority | Adopted / chosen pending specification / probe / separate responsibility | Whether an expected semantic result is binding. |
+| Authority | Definitive rule / definitive reference design / probe / separate responsibility | Whether an expected semantic result is binding and at what scope. |
 | Implementation | Available / absent / deliberately unsupported | Whether a checker can perform the requested analysis. |
 | Execution | Passed / failed / not executed | What actually happened in this run. |
 | Coverage | Complete for the case's stated scope / partial with notes | What the result establishes. |
@@ -106,10 +110,13 @@ Supported architectural assertions: passed
 Known import violations: 0
 Source coverage: partial — 2 runtime-selected loader sites not analysed
 Target capabilities not yet implemented: filesystem descriptions, custom tags
-Design probes awaiting decisions: associated types, vocabulary wildcard
+Design probes awaiting decisions: associated types, all-types selector
 ```
 
 The numbers and names above illustrate report fields, not current results.
+Interface-file wildcard expansion is a definitive format requirement, exercised
+by E07–E09. These cases need real source export descriptions as well as parsing;
+an in-memory exposure set alone cannot establish wildcard conformance.
 An additional definite forbidden import must change the check result to failure
 even when the same coverage notes remain. Missing framework execution is also
 not interchangeable with an accepted static-analysis limitation.
