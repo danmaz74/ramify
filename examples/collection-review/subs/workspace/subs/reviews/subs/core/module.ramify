@@ -1,0 +1,4 @@
+ramify 1
+// The review runtime and the inspection port it depends on. Untagged, so no
+// protocol coupling can reach it.
+module core

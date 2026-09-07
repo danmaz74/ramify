@@ -1,0 +1,4 @@
+ramify 1
+// The catalog feature's own source is its adapter layer; its core child stays
+// transport-independent.
+module catalog tagged [dispatch]

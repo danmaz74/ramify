@@ -1,0 +1,4 @@
+ramify 1
+// A pure view: no dispatch classification is inherited from its parent, so no
+// protocol type can reach it.
+module pure-ui tagged [ui, browser]

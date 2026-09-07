@@ -1,0 +1,32 @@
+{
+  "name": "collection-review",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Ramify reference project: a small collection-review application with two native protocol surfaces.",
+  "scripts": {
+    "dev:api": "tsx src/main.ts",
+    "dev:web": "vite",
+    "build": "vite build",
+    "type-check": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "@trpc/client": "11.18.0",
+    "@trpc/server": "11.18.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "26.4.1",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "@vitejs/plugin-react": "6.1.1",
+    "tsx": "4.23.13",
+    "typescript": "7.0.2",
+    "vite": "8.2.2",
+    "vitest": "5.0.0"
+  }
+}

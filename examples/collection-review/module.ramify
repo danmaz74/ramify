@@ -1,0 +1,4 @@
+ramify 1
+// The application root: the Node entry, the configured protocol runtimes, and
+// the assembly that mounts the adapters its descendants relay upward.
+module collection-review tagged [dispatch]

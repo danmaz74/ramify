@@ -1,0 +1,4 @@
+ramify 1
+// Presentation primitives shared by both feature views. `ui` keeps them out of
+// the core owners, which carry no UI classification.
+module shared-ui tagged [ui, browser]

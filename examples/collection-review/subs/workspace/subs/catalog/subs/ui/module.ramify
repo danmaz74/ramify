@@ -1,0 +1,4 @@
+ramify 1
+// `ui` is a reserved keyword, so the declared name is quoted. The module
+// identifier remains catalog/ui.
+module "ui" tagged [ui, browser]

@@ -1,0 +1,28 @@
+{
+  // One compiler configuration for the whole example: ordinary source, owned
+  // tests under every `src/tests/`, and the build configuration files.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "isolatedModules": true,
+    // `verbatimModuleSyntax` stays off so an unmarked import of a purely type
+    // original remains legal source (reference case T03).
+    "noEmit": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": ["node", "vite/client"],
+    "paths": {
+      "@features/*": ["./subs/workspace/subs/*"]
+    }
+  },
+  "include": [
+    "src",
+    "subs/**/src",
+    "vite.config.ts",
+    "vitest.config.ts"
+  ]
+}

@@ -1,0 +1,4 @@
+ramify 1
+// The connected view. `dispatch` is what lets it name the typed client; the
+// declared name is quoted because `ui` is a reserved keyword.
+module "ui" tagged [ui, browser, dispatch]

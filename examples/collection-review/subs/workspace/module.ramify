@@ -1,0 +1,6 @@
+ramify 1
+// The browser shell. It also relays: feature adapters travel through it to the
+// root, and shared vocabulary travels through it down to every descendant.
+module workspace tagged [ui, browser, dispatch]
+
+expose-sub * from contracts to descendants

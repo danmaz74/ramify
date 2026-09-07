@@ -1,0 +1,3 @@
+ramify 1
+// The review feature's own source is its adapter layer and its session table.
+module reviews tagged [dispatch]

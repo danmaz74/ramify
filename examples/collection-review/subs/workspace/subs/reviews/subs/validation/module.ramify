@@ -1,0 +1,4 @@
+ramify 1
+// Deliberately outside the runtime subtree: validation cannot import the
+// runtime implementations that call it.
+module validation

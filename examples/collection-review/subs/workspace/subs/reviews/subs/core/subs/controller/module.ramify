@@ -1,0 +1,4 @@
+ramify 1
+// One supervisor step. Its operations travel upward only; its siblings cannot
+// import it.
+module controller

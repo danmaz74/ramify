@@ -14,7 +14,13 @@
     "diagrams": "tsx scripts/emit-diagrams.ts",
     "site:dev": "npm --prefix site run start",
     "site:build": "npm --prefix site run build",
-    "site:serve": "npm --prefix site run serve"
+    "site:serve": "npm --prefix site run serve",
+    "example:install": "npm --prefix examples/collection-review install",
+    "example:dev:api": "npm --prefix examples/collection-review run dev:api",
+    "example:dev:web": "npm --prefix examples/collection-review run dev:web",
+    "example:build": "npm --prefix examples/collection-review run build",
+    "example:type-check": "npm --prefix examples/collection-review run type-check",
+    "example:test": "npm --prefix examples/collection-review run test"
   },
   "devDependencies": {
     "@types/d3-hierarchy": "^3.1.7",
