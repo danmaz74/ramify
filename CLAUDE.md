@@ -91,6 +91,16 @@ classification of module-owned `src/tests/`. Updating these specifications does
 not establish implementation support; runtime, evaluator, and source-layout
 migration work must be explicitly scoped separately.
 
+## Implementation Architecture
+
+[Daemon and analysis architecture](docs/architecture/daemon.md) is the proposed
+runtime design: a reusable analysis engine with a long-lived local host, isolated
+worktree contexts, retained source analysis and revisioned checks and queries.
+Read it before planning or changing tooling architecture. It remains a proposal
+for review and does not supersede the definitive model documents or establish
+implemented capabilities. The [tooling plan](docs/plans/tooling-architecture/README.md)
+records contract review, migration and delivery order.
+
 ## Conventions that DO apply
 
 - Self-contained package: own `package.json` and toolchain; run npm commands
