@@ -24,6 +24,9 @@ The decided process model is a lightweight CLI, resident analysis daemon and
 separate on-demand web process. Ordinary CLI commands use local IPC directly;
 batch mode loads a fresh engine into the CLI process. The later web process uses
 tRPC and built frontend assets. Its dependencies remain outside daemon startup.
+The later root-level `mcp [dispatch]` module serves stdio through the lazily loaded
+`ramify mcp` mode and calls the same daemon directly. It can be implemented before
+visualization; optional MCP HTTP hosting can later use the separate web process.
 
 The [project-explorer reuse analysis](../../analysis/project-explorer-reuse.md)
 identifies source to lift during that later visualization phase. Review its
@@ -77,7 +80,7 @@ Before moving or writing implementation code, prepare a concrete review package:
 1. Exact public TypeScript contracts and package entry points. Include analysis
    sessions, context driver, immutable results, source/export catalogs, freshness
    requests, cancellation/conflict outcomes and capability reporting. Separate
-   lightweight client, daemon, batch and later web entry files; review their
+   lightweight client, daemon, batch and later MCP/web entry files; review their
    transitive runtime dependencies, not just their exported types.
 2. Every initial owner's complete `module.ramify` and purpose README draft, plus
    a contract map listing originals, tags, exposure routes and intended consumers.
@@ -94,7 +97,7 @@ Before moving or writing implementation code, prepare a concrete review package:
    idle disposal and recovery behavior. The separate web process is decided;
    its detailed HTTP/event wiring remains a later capability.
 6. A case map linking model/source requirements to the existing reference cases
-   and runtime requirements to DA01–DA18, PC01–PC07, ML01–ML07 and QT01–QT07
+   and runtime requirements to DA01–DA18, PC01–PC08, ML01–ML08 and QT01–QT08
    in the architecture documents. Design the direct-service test binding now;
    add the UI harness when visualization is implemented.
 
@@ -123,21 +126,26 @@ is a different outcome, as specified by the source principles.
 | E. Source checking and batch CLI | Supported source interpretation, reports, inspection and explanations through a reusable fresh analysis session. | Required source cases, independently expected negative mutations and DA01/DA14/DA16/DA18 within their implemented scope. Compiler diagnostics and coverage remain distinct. |
 | F. Retained sessions and updates | Versioned input views, reusable compiler state, dependency-aware invalidation and atomic candidate results. | DA06–DA10 and DA13; compare edit sequences with fresh analysis, including unchanged affected consumers and removals. |
 | G. Local daemon and contexts | Local endpoint, isolated contexts, watchers, exact-content checks, revision publication, bounded retention, lifecycle, lightweight CLI connection and batch fallback. | DA02–DA05, DA10, DA14–DA15 and DA17; real local client/server plus the applicable PC, ML and QT cases below. |
-| H. Overlays and additional clients | Isolated overlays and their conflicts; subsequently editor/MCP clients, richer intelligence and the explorer through its separate on-demand tRPC web process. | DA11–DA12 plus applicable lifecycle/equivalence, quick-mode, actual HTTP/browser and web-memory cases below. |
+| H. Overlays and additional clients | Isolated overlays and their conflicts; independently deliverable stdio MCP adapter, editor clients and richer intelligence; later explorer through its separate on-demand tRPC web process. | DA11–DA12 plus applicable lifecycle/equivalence, MCP, quick-mode, actual HTTP/browser and resource cases below. |
 
 Overlay identity and freshness semantics are reviewed in B even if overlay
 execution ships in H. Stage G advertises disk-context capabilities explicitly.
 Presentation migration accompanies the stages that change its dependencies; it
 is not postponed until the live explorer is built.
 
+MCP service contracts and dependency boundaries are reviewed in B. Its adapter
+can ship once the daemon operations it exposes are implemented; it does not wait
+for overlays, richer search or visualization. Advertise only delivered capability
+scope. Streamable HTTP is optional and requires its own session/lifecycle review.
+
 Apply the additional architecture cases as follows. A case spanning several
 capabilities is completed only when all its scheduled parts have evidence:
 
-| Case family | Initial engine/CLI/daemon work | Later visualization/overlay work |
+| Case family | Initial engine/CLI/daemon work | Later MCP/visualization/overlay work |
 | --- | --- | --- |
-| [PC01–PC07](../../architecture/processes-and-clients.md#acceptance-evidence) | E–G: PC01–PC04, daemon parts of PC06, local-service parts of PC07. | H: PC05, web parts of PC06–PC07. |
-| [ML01–ML07](../../architecture/memory-lifecycle.md#measurement-and-acceptance) | E–G: entry footprints, context/history/enrichment bounds, repeated edits, local slow consumers and disposal. | H: overlay bounds, web footprint/open-close cycles, HTTP serialization and browser slow consumers, including ML05. |
-| [QT01–QT07](../../architecture/quick-testing.md#complementary-verification) | E–G: QT01/QT03, IPC parts of QT04, daemon parts of QT05 and relevant resource cases in QT07. | H: QT02/QT06, HTTP parts of QT04, web parts of QT05 and remaining resource cases in QT07. |
+| [PC01–PC08](../../architecture/processes-and-clients.md#acceptance-evidence) | E–G: PC01–PC04, daemon parts of PC06, local-service parts of PC07. | H: PC08 and MCP parts of PC06–PC07 with MCP; PC05 and web parts with visualization. Optional MCP HTTP cases apply when implemented. |
+| [ML01–ML08](../../architecture/memory-lifecycle.md#measurement-and-acceptance) | E–G: entry footprints, context/history/enrichment bounds, repeated edits, local slow consumers and disposal. | H: ML08 with MCP; overlay bounds, web footprint/open-close cycles, HTTP serialization and browser slow consumers, including ML05, with their respective clients. |
+| [QT01–QT08](../../architecture/quick-testing.md#complementary-verification) | E–G: QT01/QT03, IPC parts of QT04, daemon parts of QT05 and relevant resource cases in QT07. | H: QT08 with MCP; QT02/QT06, HTTP parts of QT04, web parts of QT05 and remaining resource cases in QT07 with visualization. |
 
 Browser-promise verification is a separate capability. Plan and implement its
 algorithm explicitly before claiming it ran; the availability checker continues

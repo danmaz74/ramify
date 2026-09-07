@@ -74,9 +74,9 @@ source checker is not yet implemented.
   specification
   (application-agnostic; travel with the project).
 - `docs/architecture/` - [implementation architecture](docs/architecture/README.md):
-  the resident daemon, lightweight CLI, separate on-demand tRPC web process,
-  bounded memory lifecycle and quick testing, plus the proposed engine/module
-  contracts. These documents distinguish decided architecture from details
+  the resident daemon, lightweight CLI, stdio MCP adapter, separate on-demand
+  tRPC web process, bounded memory lifecycle and quick testing, plus the proposed
+  engine/module contracts. These documents distinguish decided architecture from details
   still under review; they do not establish implementation.
 - `docs/analysis/` - design studies, including
   [preparation for the future project explorer](docs/analysis/project-explorer-reuse.md):

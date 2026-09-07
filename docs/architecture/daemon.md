@@ -67,9 +67,10 @@ existing facilities behind an adapter; it does not implement a new type system.
 
 ## Runtime structure
 
-CLI, editor and agent clients connect to the daemon's local service. The future
-browser connects through a separate, on-demand web process that uses that same
-service. See the [process topology](processes-and-clients.md#process-topology).
+CLI and direct service clients connect to the daemon's local service. Editors
+and agents using MCP reach it through the separate stdio adapter. The future
+browser connects through an on-demand web process that uses that same service.
+See the [process topology](processes-and-clients.md#process-topology).
 Inside the daemon, the analysis flow is:
 
 ```text
@@ -120,15 +121,18 @@ ramify [dispatch]                       executable assembly and client service c
 └── cli [dispatch]                      commands, output and client behavior
 ```
 
-Later root children are `service-api [dispatch]`, containing the separate
-Express/tRPC web host and event adapter; `explorer [ui, browser, dispatch]`,
+Later root children include `mcp [dispatch]`, containing MCP definitions and the
+stdio adapter over the daemon client; `service-api [dispatch]`, containing the
+separate Express/tRPC web host and event adapter; `explorer [ui, browser, dispatch]`,
 containing the connected browser application; and
 `integration-tests [testing, ui, dispatch]`, containing tests that combine UI
 and transport contracts. Reusable project views belong to a later
 `presentation/subs/project-view [ui, browser]` child. Additional integration
 adapters can follow the same service boundary. These owners need not exist as
 empty modules before their capabilities are implemented. The daemon's local
-protocol remains part of the initial architecture.
+protocol remains part of the initial architecture. MCP delivery can precede
+visualization; optional MCP HTTP hosting mounts the same adapter module in the
+web process. Its SDK and protocol state stay outside the resident daemon.
 
 ### Responsibilities and public contracts
 
@@ -137,7 +141,7 @@ to the contract review before code moves.
 
 | Owner | Responsibility | Principal upward contract |
 | --- | --- | --- |
-| `ramify` | Assemble separate CLI, daemon and later web entry points; supply the CLI with a lightweight service client and lazily selected batch delivery. Own the shared client-facing service vocabulary. | No effective parent exposure; package entry points target the appropriate owners. |
+| `ramify` | Assemble CLI, daemon and later MCP/web serving entries; supply the CLI with a lightweight service client and lazily selected batch delivery. Own the shared client-facing service vocabulary. | No effective parent exposure; package entry points target the appropriate owners. |
 | `analysis` | Execute the analysis pipeline, maintain a reusable analysis session, select affected work and produce snapshots, reports and semantic queries. | `createAnalysisSession`, `analyzeProject`, `inspectModule`, `explainAccess`, and owned analysis vocabulary. |
 | `model` | Canonical model identities, registry and profile rules, mandatory symbol tags, exposure reach, availability and testing-origin decisions. | `buildModel`, `explainImport`, `explainVisibility`, model vocabulary and validation operations. |
 | `descriptions` | Parse version 1 with source locations and comments; resolve exact selections, exposed names and wildcard contracts; produce grounded declarations and diagnostics. | `parseDescription`, `linkDescriptions`, and their input/result vocabulary. |
@@ -147,7 +151,7 @@ to the contract review before code moves.
 | `contexts` | Select isolated contexts, serialize their updates, synchronize requested inputs, publish revisions, retain historical results and manage idle eviction. | `createContextManager`, context/revision/status vocabulary and its owned `AnalysisDriver` port. |
 | `presentation` | Render model/report data, interactions and teaching examples. | Selected components explicitly tagged `[ui, browser]` and owned props. |
 | `layout` | Calculate diagram geometry from supplied neutral data. | Selected functions explicitly tagged `[browser]` and owned layout vocabulary. |
-| `cli` | Parse commands, connect directly to the daemon, request freshness/check scope, render results and map execution status to exit behavior. Dispatch batch and explorer launch through supplied entry points. | `runCli` and its dispatch-classified vocabulary. |
+| `cli` | Parse commands, connect directly to the daemon, request freshness/check scope, render results and map execution status to exit behavior. Dispatch batch, MCP serving and explorer launch through supplied entry points. | `runCli` and its dispatch-classified vocabulary. |
 
 `analysis` owns computational invalidation; `contexts` owns scheduling and
 publication; `daemon` owns process and transport mechanics. There is one authority
@@ -561,11 +565,12 @@ about currently passing tests. The plan assigns them to delivery stages. Use
 independently stated outcomes alongside batch/incremental comparisons so a shared
 engine bug cannot make both sides appear correct.
 
-These semantic/runtime cases are complemented by PC01–PC07 in
-[processes and clients](processes-and-clients.md#acceptance-evidence), ML01–ML07
+These semantic/runtime cases are complemented by PC01–PC08 in
+[processes and clients](processes-and-clients.md#acceptance-evidence), ML01–ML08
 in [memory lifecycle](memory-lifecycle.md#measurement-and-acceptance), and
-QT01–QT07 in [quick testing](quick-testing.md#complementary-verification).
-Their web/UI cases remain assigned to the later visualization phase.
+QT01–QT08 in [quick testing](quick-testing.md#complementary-verification).
+Their web/UI cases remain assigned to the later visualization phase; MCP cases
+accompany the separately deliverable adapter.
 
 | ID | Required witness |
 | --- | --- |
@@ -600,7 +605,9 @@ needs the following without reopening those decisions or the model rules:
    original resolution, resources, wildcard growth and unmarked interfaces.
 3. Context-to-daemon grouping, endpoint discovery, wire schemas, compatibility
    handling, notification delivery and reconnect behavior. The separate web
-   process and its tRPC API are already selected.
+   process and its tRPC API, and the separate stdio MCP adapter, are already
+   selected. MCP tool/resource schemas and negotiated protocol details remain
+   to be specified; optional HTTP hosting is a later extension.
 4. Overlay/base-revision protocol, synchronization boundaries and conflict results;
    which operations are included in each first delivery milestone.
 5. Numeric resource/retention limits, lease/idle durations and measured latency

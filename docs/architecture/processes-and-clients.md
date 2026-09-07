@@ -5,15 +5,22 @@ complete contracts and wire details remain subject to implementation review.
 
 The analysis daemon is the resident backend. A separate, on-demand web process
 serves visualization. The CLI connects directly to the daemon for ordinary
-analysis commands and can run the same engine in batch mode. This split keeps
-web allocations out of the daemon's resident lifetime.
+analysis commands and can run the same engine in batch mode. Its MCP serving
+mode runs an adapter for an editor or agent host, also connecting directly to
+the daemon. This split keeps MCP and web allocations out of the daemon's
+resident lifetime.
 
 ## Process topology
 
 ```mermaid
 flowchart LR
   CLI[CLI process] -->|local IPC| API
-  Editors[Editor and agent clients] -->|local IPC| API
+  Native[Direct service clients] -->|local IPC| API
+  Host[Editor or agent MCP host] -->|MCP over stdio| MCP
+  subgraph McpProcess[CLI process in MCP serving mode]
+    MCP[MCP adapter]
+  end
+  MCP -->|local IPC| API
   Browser[Browser] -->|HTTP and notifications| Web
   subgraph WebProcess[On-demand web process]
     Web[tRPC API and built frontend assets]
@@ -30,15 +37,16 @@ flowchart LR
 
 | Process | Owns at runtime | Lifetime |
 | --- | --- | --- |
-| CLI | Argument parsing, local connection, command formatting and launch/control requests. Batch mode additionally owns its fresh engine session. | One command, except explicit streaming/watch commands. |
+| CLI | Argument parsing, local connection, command formatting and launch/control requests. Batch mode additionally owns its fresh engine session; MCP mode dispatches to the adapter below. | One command, except explicit watch or MCP serving modes. |
 | Daemon | Project/worktree contexts, coherent inputs, watchers, compiler sessions, checking, semantic queries, bounded history and local service delivery. | Retained for interactive use, with inactive-context eviction and idle shutdown. |
-| Web server | HTTP/tRPC routing, browser notifications, built static assets and bounded connection/request state. | Started when the explorer is used; exits after its clients leave and an inactivity grace period expires. |
+| MCP adapter | MCP definitions, input schemas, protocol sessions and translation to the daemon service. | The host-launched `ramify mcp` process serves its stdio connection, then releases resources and exits. |
+| Web server | HTTP/tRPC routing, browser notifications, built static assets and bounded connection/request state. May later mount MCP over HTTP. | Started on demand; exits after all relevant client leases expire and an inactivity grace period passes. |
 
-The web process owns no independent module discovery, compiler program or
-permissions catalog. It queries the existing daemon. A browser tab does not
-create another analysis context when it selects the same compatible project
-setup. Different worktrees, registries or overlays retain the isolation defined
-in [daemon and analysis](daemon.md).
+MCP and web adapters own no independent module discovery, compiler program or
+permissions catalog. They query the existing daemon. An MCP session or browser
+tab does not create another analysis context when it selects the same compatible
+project setup. Different worktrees, registries or overlays retain the isolation
+defined in [daemon and analysis](daemon.md).
 
 The ordinary daemon process does not host the web listener. This is a deliberate
 choice for memory reclamation, not a claim that HTTP requires another process.
@@ -53,7 +61,7 @@ Root owns its dispatch-facing vocabulary; domain facts and decisions retain
 their existing analysis owners. The service has two implementations of its
 call boundary:
 
-- A local client used by CLI and web processes to reach the daemon through IPC.
+- A local client used by CLI, MCP and web processes to reach the daemon through IPC.
 - An in-process binding to the real context manager and analysis sessions,
   used by assembly and quick tests.
 
@@ -61,7 +69,8 @@ The local socket/named-pipe transport remains the preferred IPC mechanism.
 Its exact framing, endpoint-discovery scheme and context-to-process grouping
 are contract-review items. The web/daemon split is fixed independently of those
 details. Selecting tRPC for the browser does not require loading the web router
-or Express into the daemon or ordinary CLI.
+or Express into the daemon or ordinary CLI. The MCP SDK and protocol adapter
+are likewise loaded only by an MCP-serving entry point.
 
 Both call boundaries preserve context/generation/revision identity, freshness,
 coverage, cancellation and explicit errors. Domain results are plain data;
@@ -85,9 +94,10 @@ These names are proposed; their process behavior is part of the architecture.
 | `ramify watch` | Keep a bounded subscription open and render published updates. The daemon owns watching and analysis. |
 | `ramify check --batch` | Load the engine only for this mode, create a fresh session, run the check and dispose it on exit. CI uses this independent mode. |
 | `ramify explore` | Ensure a compatible daemon, start or reuse a compatible web process, open the browser at the selected project and exit. Visualization is a later capability. |
+| `ramify mcp` | Lazily load the MCP adapter and serve the host's stdio connection in this process. Resolve a compatible daemon for analysis requests; no web server or per-call CLI subprocess is required. |
 | `ramify daemon status` | Inspect an existing daemon without starting one or loading an analysis engine merely to report absence. |
 | `ramify daemon stop` | Request shutdown of the selected daemon instance and report completion or failure. Selection must not silently target another compatible instance. |
-| `ramify --help`, `ramify --version` | Run locally without connecting to or starting either server. |
+| `ramify --help`, `ramify --version` | Run locally without connecting to or starting any server. |
 
 A command releases its request, subscription and bounded revision references on
 completion, interruption or connection loss. Its completion does not immediately
@@ -109,6 +119,54 @@ neither server. On daemon failure, a reproducible disk operation may use the
 bounded reconnect/batch fallback specified in [daemon recovery](daemon.md#transport-process-lifecycle-and-recovery).
 Report fallback use; do not silently substitute disk state for an overlay or
 current state for an unavailable historical revision.
+
+## MCP server
+
+The root child `mcp [dispatch]`, physically under `subs/mcp/`, owns MCP tool and
+resource definitions, input schemas, protocol sessions and response/error
+mapping. Root assembly injects the same analysis-service client used by the CLI.
+Handlers call that service directly; the daemon and engine remain the authorities
+for project selection, synchronization, checks and query results.
+
+The initial transport is stdio. An editor or agent's MCP host launches
+`ramify mcp`; the CLI loads the MCP serving entry and remains in that process
+for the connection. It does not spawn a second adapter process or start one
+process per tool call. MCP framing reserves stdout for protocol messages;
+diagnostics go to stderr, as required by the
+[MCP transport specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#stdio).
+
+Tool definitions describe the implemented capabilities and their coverage. A
+handler preserves context/generation/revision tokens, explicit freshness and
+structured results when mapping them into MCP responses. Invalid input,
+unavailable execution and known denials remain distinguishable. MCP session
+identity is separate from daemon context or revision identity; changing the
+selected project never silently reuses another worktree's state.
+
+The process releases its subscriptions, request references and owned overlay
+leases on stdio closure or termination, then exits. Abnormal process loss must
+also expire those daemon references. An open but idle MCP connection does not
+indefinitely pin historical revisions or require a warm compiler context without
+an active service lease. Subsequent requests can reopen an evicted context with
+explicit generation/revision handling. Adapter exit does not stop the daemon.
+
+MCP serving follows the same compatibility, bounded recovery and intentional-stop
+rules as other clients. A long-lived MCP session must report a stopped or
+unavailable daemon rather than continually recreating it after an explicit stop.
+
+### Optional HTTP hosting
+
+If Streamable HTTP support is later needed, the separate web process can mount
+the same MCP module with an HTTP transport adapter and an injected daemon client.
+It does not route MCP calls through tRPC procedures or create another analyzer.
+MCP HTTP sessions then contribute to web-process activity alongside browser
+clients, so closing the explorer alone does not stop a server still serving MCP.
+
+HTTP sessions need bounded leases, termination and reconnect behavior. Closing
+an individual HTTP connection is not itself MCP request cancellation; preserve
+the [Streamable HTTP specification's cancellation semantics](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#streamable-http).
+The shared host can reduce the
+number of adapter runtimes when many clients use MCP, but this extension is not
+required for the initial stdio delivery.
 
 ## Web server and tRPC
 
@@ -152,7 +210,9 @@ connections eventually release subscriptions and revision references. Clean
 disconnects release them promptly. After the last lease expires and the idle
 grace period passes, the web process closes its listener, releases daemon
 references and exits. Browser unload events alone are insufficient for cleanup.
-The web process does not own the daemon's shutdown decision.
+The web process does not own the daemon's shutdown decision. If optional MCP
+HTTP hosting is added, its active session leases participate in this same idle
+decision; a temporarily closed HTTP stream does not end a live MCP session.
 
 If the daemon stops, clients receive disconnection/unavailability and follow
 bounded recovery. An explicit stop is not immediately undone by a blind retry
@@ -175,8 +235,14 @@ files; it is not one eagerly imported application barrel.
   formatting. The daemon-owned client implementation must be importable without
   loading its host startup, watchers or compiler assembly.
 - Daemon entry loads the local host and analysis assembly, with no web or UI
-  implementation in its transitive runtime dependencies.
+  implementation or MCP SDK/adapter in its transitive runtime dependencies.
 - Batch dispatch loads the engine factory only when batch execution is selected.
+- MCP serving dispatch loads the root child `mcp [dispatch]` with the lightweight
+  daemon client only when that mode is selected. MCP registration and lifecycle
+  stay outside the CLI command parser. MCP exposes its serving contract to root,
+  which relays selected contracts to descendants through ordinary declarations;
+  `service-api` can receive them for optional HTTP hosting without owning the
+  MCP definitions.
 - Later web entry assembles `service-api [dispatch]` with the lightweight daemon
   client. Browser application code belongs to `explorer [ui, browser, dispatch]`;
   reusable project views belong below `presentation [ui, browser]`.
@@ -196,15 +262,17 @@ They are implementation obligations, not current passing tests.
 
 | ID | Required witness |
 | --- | --- |
-| PC01 | Help/version/status complete without launching servers; ordinary CLI startup does not load compiler/web dependencies, and daemon startup does not load the web stack. |
+| PC01 | Help/version/status complete without launching servers; ordinary CLI startup does not load compiler/web/MCP dependencies, and daemon startup does not load web or MCP adapters. |
 | PC02 | Concurrent commands coordinate startup, select the right worktree/setup and preserve compatible clients during version negotiation. |
 | PC03 | Check/inspect/explain reach the daemon directly and agree with equivalent batch inputs; a delayed watcher cannot hide a just-saved change. |
 | PC04 | Watch interruption and command exit release subscriptions/revision references; inactive project retention follows the daemon policy. |
-| PC05 | Explore starts/reuses the separate web process. Browser loss expires its leases, and web exit/restart leaves warm daemon contexts intact. |
+| PC05 | Explore starts/reuses the separate web process. Browser loss expires its leases; idle exit waits for the last client lease, including any optional HTTP MCP sessions. Web exit/restart leaves warm daemon contexts intact. |
 | PC06 | Unexpected process failure, intentional stop, stale endpoints and incompatible versions have bounded, distinct recovery outcomes. |
-| PC07 | tRPC and local clients return matching semantic results; actual wire tests preserve errors, revision identity and serialization without a second analyzer. |
+| PC07 | tRPC, MCP and local clients return matching semantic results; actual wire tests preserve errors, revision identity and serialization without a second analyzer. |
+| PC08 | The MCP host launches one stdio adapter for its connection; calls reuse daemon analysis without starting the web server. Connection/process loss releases leases and leaves other daemon clients intact. If HTTP hosting is added, MCP activity participates in web lifetime and preserves protocol cancellation. |
 
 CLI and daemon lifecycle evidence is delivered with the local daemon. Web-specific
-parts of these requirements are delivered with later visualization. The
+parts of these requirements are delivered with later visualization. MCP-specific
+parts accompany the later MCP adapter and do not depend on visualization. The
 [quick-testing architecture](quick-testing.md) distinguishes the evidence each
 test mode can establish.

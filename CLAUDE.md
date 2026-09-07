@@ -97,7 +97,10 @@ The [architecture overview](docs/architecture/README.md) routes the implementati
 design. The process split is decided: a lightweight CLI talks directly to the
 resident analysis daemon; a separate on-demand tRPC web process serves later
 visualization. Batch CLI execution uses a fresh session of the same engine.
-The daemon excludes web/development dependencies and follows explicit memory
+The later root child `mcp [dispatch]` serves stdio through a lazily loaded
+`ramify mcp` mode, using the same daemon client; it is independent of visualization.
+Optional MCP HTTP hosting can mount that module in the separate web process.
+The daemon excludes MCP/web/development dependencies and follows explicit memory
 retention, queue and client-lifecycle limits. Quick tests run real services through
 direct adapters, supplemented by actual transport and process tests.
 

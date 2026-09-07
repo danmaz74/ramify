@@ -42,6 +42,13 @@ the same in-process binding. Use real output formatting and assert the selected
 freshness, structured findings and exit behavior. UI providers and browser
 packages are introduced only in the later UI test scope.
 
+MCP tests use the real MCP registration, input validation and response mapping
+with an injected in-process analysis service. Exercise a protocol client/server
+pair through an in-memory transport when available, then real contexts, the
+engine and temporary project files. This does not require tRPC, React or the web
+process. Assert the same semantic results as CLI/service queries, including
+revision tokens, denials, coverage and unavailable capabilities.
+
 ## Harness boundaries
 
 | Part | Quick-mode treatment |
@@ -86,6 +93,7 @@ process cleanup or real browser layout. Keep a focused suite at those boundaries
 | QT05 | Real process tests cover concurrent startup, stale discovery, compatibility, intentional stop, unexpected exit and web/daemon lifetime independence. |
 | QT06 | Real browser tests cover graph sizing, navigation and interactions whose behavior JSDOM cannot establish. |
 | QT07 | Repeated-use and slow-consumer tests cover the limits and cleanup in the memory architecture using the relevant actual transport/process. |
+| QT08 | Real MCP handlers agree with service results in quick mode. Separate stdio-process tests verify initialization, framing, protocol-only stdout, errors, cancellation, connection loss and daemon reuse without starting the web server. Optional HTTP hosting gets its own session/reconnect and web-lifetime tests. |
 
 HTTP tests also verify any configured batching, cancellation, output transforms
 and error formatting. IPC tests verify framing, size bounds and reconnect behavior.
@@ -95,7 +103,7 @@ full browser and server stack.
 
 ## Test ownership and reuse
 
-Daemon and CLI tests belong to their owners' `src/tests/`, using the fixed
+Daemon, CLI and MCP tests belong to their owners' `src/tests/`, using the fixed
 `[testing, dispatch]` profile. Presentation tests use `[testing, ui]`. Full quick
 UI tests combining services and views can use the later root child
 `integration-tests [testing, ui, dispatch]`, with scenario/test source in its
@@ -110,7 +118,9 @@ meaningful workflows into Ramify; do not import the host's entire test world,
 service factory, global state or runner configuration.
 
 QT01/QT03 and relevant IPC/process/resource cases accompany the initial CLI and
-daemon. QT02, browser HTTP cases and QT06 accompany later visualization. Test
+daemon. QT02, browser HTTP cases and QT06 accompany later visualization.
+QT08 accompanies the MCP adapter independently of visualization;
+its HTTP-specific part applies only if that extension is delivered. Test
 runner/framework configuration and exact fixture placement belong to the
 contract and migration review; adding this document does not implement tests
 or claim any of these witnesses pass.

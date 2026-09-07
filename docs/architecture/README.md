@@ -1,24 +1,26 @@
 # Ramify implementation architecture
 
 **Date:** 2026-09-07. **Status:** The process split, client roles, lightweight
-resident design and tRPC/quick-testing approach below are decided. Detailed
-module contracts, wire schemas and measured resource budgets still require
+resident design, MCP adapter and tRPC/quick-testing approach below are decided.
+Detailed module contracts, wire schemas and measured resource budgets still require
 review before implementation. These documents do not claim runtime support.
 
-Ramify has three executable entry points: a usually short-lived CLI, a resident
-analysis daemon, and a separate web server started when visualization is used.
-The CLI and web server consume the same analysis service. Batch execution runs
-the same engine independently inside the CLI process.
+Ramify separates ordinary CLI commands, the resident analysis daemon, an MCP
+adapter process and an on-demand web server. The MCP host starts the adapter
+through a CLI serving mode, `ramify mcp`; that process lives for the stdio
+connection. Ordinary CLI commands, MCP and web adapters consume the same daemon
+service. Batch execution runs the same engine independently inside the CLI
+process.
 
-The daemon retains useful analysis state within explicit resource limits. Web
-dependencies and development tooling have a separate lifetime, so closing the
-explorer can reclaim that process's memory without discarding warm analysis.
+The daemon retains useful analysis state within explicit resource limits. MCP,
+web and development dependencies have separate lifetimes, so an adapter can exit
+and reclaim its memory without discarding warm analysis.
 
 ## Document responsibilities
 
 | Document | Defines |
 | --- | --- |
-| [Processes and clients](processes-and-clients.md) | Process boundaries, CLI command behavior, service adapters, tRPC web delivery, startup, shutdown and compatibility. |
+| [Processes and clients](processes-and-clients.md) | Process boundaries, CLI commands, the MCP adapter, tRPC web delivery, startup, shutdown and compatibility. |
 | [Daemon and analysis](daemon.md) | Proposed Ramify ownership tree, exposure routes, engine pipeline, source facts, contexts, revision semantics and semantic acceptance cases. |
 | [Memory lifecycle](memory-lifecycle.md) | Resident dependency boundaries, retention and work limits, memory reclamation and measurement requirements. |
 | [Quick testing](quick-testing.md) | In-process execution of real client/service flows, the boundaries replaced in quick mode, and complementary transport/process tests. |
@@ -31,7 +33,9 @@ supporting evidence; the architecture documents own the runtime decisions.
 Visualization remains a later implementation phase. Early contract review must
 preserve its required module, contract, usage and revision evidence. There is
 no requirement to create empty web/UI modules or implement browser transport
-before the analysis engine and local clients.
+before the analysis engine and local clients. MCP is a later adapter over that
+service and can be delivered independently of visualization. Streamable HTTP
+hosting for MCP is an optional extension; stdio is the initial MCP transport.
 
 ## Model authority
 

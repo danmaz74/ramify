@@ -5,9 +5,10 @@ Numeric budgets, idle periods and detailed representations require measurement
 and review before implementation milestones claim these guarantees.
 
 The resident daemon should keep only the dependencies and state needed for
-active analysis. Its [separate web process](processes-and-clients.md) exists only
-while visualization is used. This reduces persistent overhead and gives web
-allocations a reclamation boundary without losing warm analysis.
+active analysis. Its [client adapters](processes-and-clients.md) have independent
+lifetimes: stdio MCP lives with the host connection, while the web process lives
+with its browser clients and any future MCP HTTP sessions. Their exit reclaims
+adapter allocations without discarding warm analysis.
 
 Keeping TypeScript analysis warm has an unavoidable memory cost. Lightweight
 does not mean deleting source semantics required by the model. It means bounded
@@ -16,9 +17,10 @@ cannot fit the supported budget.
 
 ## Runtime dependency boundaries
 
-The daemon entry point excludes Express, the web tRPC router, frontend rendering,
-development tooling and host-only integrations. Ordinary CLI startup excludes
-both compiler and web assembly. Verify the transitive runtime imports and actual
+The daemon entry point excludes the MCP SDK/adapter, Express, the web tRPC router,
+frontend rendering, development tooling and host-only integrations. Ordinary CLI
+startup excludes compiler, MCP and web assembly; MCP serving loads its own adapter
+only when selected. Verify the transitive runtime imports and actual
 loaded modules for each entry point; type-only dependencies should remain erased.
 
 The web process serves built assets and uses the daemon's analysis service.
@@ -26,6 +28,14 @@ It retains only bounded request/connection state and temporary result projection
 It does not mirror the entire project graph or maintain compiler sessions.
 Fetch scoped details and send small revision/status notifications instead of
 broadcasting whole source inventories on every edit.
+
+Each stdio MCP connection may require its own adapter runtime, but must reuse
+compatible daemon analysis rather than duplicate compiler state. Measure aggregate
+adapter memory with several connected hosts. Keep tool/resource results, pending
+requests and notification buffers bounded. An idle MCP connection may remain
+open while releasing unused context/history leases; connection lifetime is not
+a reason to pin every revision. HTTP session sharing is an optional deployment
+choice, not a prerequisite for bounding the stdio adapter.
 
 Lazy loading delays an optional dependency's initial cost, but it is not a
 reclamation strategy: imported modules are cached, and closing a listener does
@@ -41,13 +51,13 @@ alone are insufficient when entries contain arbitrarily large source or results.
 
 | State | Owner and required policy |
 | --- | --- |
-| Compiler sessions and source inputs | Analysis/source adapter retains the current state required by each active context. Dispose inactive sessions; bound the number and total retained size of contexts. Do not create another session per browser or query. |
+| Compiler sessions and source inputs | Analysis/source adapter retains the current state required by each active context. Dispose inactive sessions; bound the number and total retained size of contexts. Do not create another session per MCP client, browser or query. |
 | Published and candidate analysis | Analysis/context publication retains the current revision and bounded in-flight work. Share unchanged immutable facts where practical; account for temporary overlap during publication. |
 | Historical revisions | Context retention has explicit byte/count/age limits and bounded request leases. Retain identifiers, evidence and supported historical content; do not keep a full compiler program per revision. |
 | Overlays | Bound clients, source bytes and retained bases. Close abandoned overlays and release their base references. A stale or evicted base returns a conflict/unavailable result. |
 | Optional enrichment and search | Use lazy, byte-bounded caches keyed by context/generation/revision and query. Cache eviction cannot alter completed enforcement results. |
 | Edit and analysis queues | Coalesce changes and supersede obsolete work. Bound queued bytes, concurrent analysis and enrichment; release canceled work's captured inputs. |
-| IPC/HTTP requests and responses | Bound message bodies, batches, result sizes and in-flight requests. Scope/page large queries so serialization does not create uncontrolled transient copies. |
+| IPC/HTTP/MCP requests and responses | Bound message bodies, batches, result sizes and in-flight requests. Scope/page large queries so serialization does not create uncontrolled transient copies. |
 | Events and client connections | Bound listeners, retained revisions and queued bytes. Clean disconnects release promptly; activity leases expire abandoned clients. |
 
 Snapshots and cached query results contain plain data, not hidden references to
@@ -124,6 +134,7 @@ Extend DA17 with the following measurements and acceptance witnesses:
 | ML05 | Repeated explorer open-close cycles terminate the idle web process, release its daemon leases and leave no additional compiler contexts or subscriptions. |
 | ML06 | Detail expansion, large result serialization and historical requests respect peak and retention budgets; unavailable enrichment remains distinguishable from zero/empty data. |
 | ML07 | Idle disposal and any measured recovery strategy release sessions, watchers, timers and child processes; a requested unavailable check cannot pass. |
+| ML08 | Repeated MCP connect/call/disconnect cycles and several simultaneous hosts keep adapter buffers and daemon leases bounded. Stdio process loss releases resources without duplicate analysis contexts. Optional HTTP hosting retains the web process only for its valid client leases. |
 
 Use representative projects and the planned 100/500/1,000-owner fixtures. Agree
 numeric ceilings and acceptable settled growth before accepting the corresponding
