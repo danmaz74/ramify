@@ -20,7 +20,9 @@
     "example:dev:web": "npm --prefix examples/collection-review run dev:web",
     "example:build": "npm --prefix examples/collection-review run build",
     "example:type-check": "npm --prefix examples/collection-review run type-check",
-    "example:test": "npm --prefix examples/collection-review run test"
+    "example:test": "npm --prefix examples/collection-review run test",
+    "reference:cases": "vitest run -c scripts/reference-harness/vitest.config.ts",
+    "reference:report": "tsx scripts/reference-harness/report.ts"
   },
   "devDependencies": {
     "@types/d3-hierarchy": "^3.1.7",

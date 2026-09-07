@@ -7,8 +7,125 @@ to no revision — and runs one deterministic review over them. This root module
 owns the Node entry point, the configured tRPC and MCP runtimes, and the
 assembly that composes the feature adapters its descendants expose upward.
 
-The package is self-contained: it declares its own dependencies and lockfile
-and its own TypeScript, Vite, and Vitest configuration, and it imports no
-source from the repository around it. `npm run dev:api` starts the API
-listener, `npm run dev:web` serves the browser shell, and `npm run type-check`,
-`npm test`, and `npm run build` gate every change.
+The same two capabilities are served through two native protocol surfaces and
+one browser screen. tRPC answers `catalog.get` and `reviews.run` for a typed
+client. MCP lists and calls `catalog.inspect` and `reviews.run` behind one
+server, where a review-session table binds each session to a revision scope and
+every list and call resolves that binding again. The browser lists both records
+as cards and runs a review from a connected panel. Fourteen Ramify owners share
+that work; each one has a `module.ramify`, a `README.md` whose first paragraph
+is its purpose, and its own tests under `src/tests/`.
+
+The package is self-contained: it declares its own dependencies and lockfile and
+its own TypeScript, Vite and Vitest configuration, and it imports no source from
+the repository around it. No owner is a package, and there is no `index.ts`
+anywhere in the tree.
+
+## Running it
+
+```bash
+npm install
+npm run dev:api     # the API listener, http://localhost:8787
+npm run dev:web     # the browser shell, http://localhost:5180
+```
+
+`dev:web` proxies `/trpc` to the API process, so the browser talks to one
+origin; it never talks to `/mcp`. `PORT` overrides the API port. Both mounts are
+served by one Node listener: `src/main.ts` chooses the port and `src/server.ts`
+starts everything else, which is what lets a test start the same program on a
+port the operating system picks.
+
+```bash
+npm run type-check  # ordinary source, every src/tests/, and the config files
+npm test            # every owner's tests, under Node
+npm run build       # the browser bundle, into dist/
+```
+
+**A shell-level `NODE_ENV` reaches `vite build`.** With `NODE_ENV=development`
+exported, the build still reports "for production" but emits React's development
+build — about 415 kB here instead of about 216 kB. Unset it to build what you
+would ship.
+
+Tests run under Node with no DOM: components are rendered to static markup, and
+the protocol tests use real clients over in-process transports, plus one test
+that starts the listener on an ephemeral port and speaks HTTP to both mounts.
+
+## The ownership tree
+
+Every module owns the `src/` beside its `module.ramify`, with children only
+under `subs/`. A module's header tags classify its ordinary source; its
+`src/tests/` area has the fixed derived profile in the third column: `testing`
+plus the header's required-importer tags, never `browser`.
+
+| Module | Header tags | `src/tests/` profile |
+| --- | --- | --- |
+| `collection-review` (root) | `[dispatch]` | `[testing, dispatch]` |
+| `workspace` | `[ui, browser, dispatch]` | `[testing, ui, dispatch]` |
+| `workspace/contracts` | `[]` | `[testing]` |
+| `workspace/shared-ui` | `[ui, browser]` | `[testing, ui]` |
+| `workspace/catalog` | `[dispatch]` | `[testing, dispatch]` |
+| `workspace/catalog/core` | `[]` | `[testing]` |
+| `workspace/catalog/ui` | `[ui, browser]` | `[testing, ui]` |
+| `workspace/reviews` | `[dispatch]` | `[testing, dispatch]` |
+| `workspace/reviews/core` | `[]` | `[testing]` |
+| `workspace/reviews/core/controller` | `[]` | `[testing]` |
+| `workspace/reviews/core/tasks` | `[]` | `[testing]` |
+| `workspace/reviews/validation` | `[]` | `[testing]` |
+| `workspace/reviews/ui` | `[ui, browser, dispatch]` | `[testing, ui, dispatch]` |
+| `workspace/reviews/ui/pure-ui` | `[ui, browser]` | `[testing, ui]` |
+
+`workspace` is the browser shell and the tree's relay point: feature adapters
+travel through it to the root, and shared vocabulary travels through it down to
+every descendant. The two owners named `ui` declare `module "ui"`, because `ui`
+is a reserved keyword; their identifiers are still `workspace/catalog/ui` and
+`workspace/reviews/ui`.
+
+## Reading the descriptions
+
+Each `module.ramify` states one module's name, its tags, and what it exposes and
+in which direction. Read them together with each owner's README, which says what
+the module is for; the comments in the descriptions say why each exposure exists.
+
+Nothing checks them yet: version 1 has no parser, loader or evaluator support.
+Until it does, every description is reviewed by hand against the
+[description review checklist](../../docs/plans/reference-project/implementation.md#description-review-checklist)
+at the end of each iteration. Use that checklist when you change a description,
+and record the change in the contract map below.
+
+## Cases, contracts and the report
+
+- The [case catalogue](../../docs/plans/reference-project/cases.md) names every
+  expectation this project is a witness for, and what each one still needs.
+- The [contract map](../../docs/plans/reference-project/contract-map.md) records
+  every exposed symbol: its owner, defining file, kind, tags, the statements
+  that carry it, and the modules that import it.
+- The [reference harness](../../scripts/reference-harness/) holds one record per
+  case family and prints what has actually been established. From the repository
+  root above this package:
+
+  ```bash
+  npm run reference:report            # runs this package's tiers, then reports
+  npm run reference:report -- --dry-run
+  npm run reference:cases             # the harness's own tests
+  ```
+
+  The report is deliberately unflattering: the application and protocol tiers
+  pass, and every case whose capability does not exist yet is listed as **not
+  executed** rather than skipped or dropped.
+
+## Independence
+
+This package must keep working outside the repository that contains it. The
+procedure, to be repeated whenever its dependencies change:
+
+1. Copy the package to a directory outside that repository, excluding
+   `node_modules/`, `dist/` and `.reference-work/`.
+2. `npm ci`, so the copy installs from this lockfile alone.
+3. `npm run type-check`, `npm run build` and `npm test` in the copy, with no
+   ancestor packages and no inherited module-resolution overrides.
+4. Remove the copy.
+
+Last run on 2026-09-07 with Node v22.23.2 and npm 10.9.8: `npm ci` added 149
+packages, `type-check` reported nothing, `build` transformed 49 modules into
+`dist/`, and `npm test` passed 77 tests in 20 files. Nothing outside the copy
+was needed.

@@ -1,6 +1,10 @@
 # Reference project: contract map
 
-**Date:** 2026-09-07. **Current through:** iteration 4.
+**Date:** 2026-09-07. **Current through:** iteration 5.
+**Status:** complete for the baseline. Every owner, statement and exposed symbol
+of the reference project is recorded below, and all fourteen descriptions have
+passed the plan's [description review checklist](implementation.md#description-review-checklist).
+A later iteration extends this map; it does not start a new one.
 
 This is the living record of every symbol the reference project exposes: its
 owner, its defining file, its kind, its tags, the statements that carry it, and
@@ -77,7 +81,7 @@ ordinary source.
 | `createReviewsTools` | `workspace/reviews` | `subs/workspace/subs/reviews/src/mcp.ts` | function (value) | `[dispatch]` | RV2, W4 | `collection-review` |
 | `ReviewResult` | `workspace/reviews/ui/pure-ui` | `subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.tsx` | component (value) | `[ui, browser]` | PU1 | `workspace/reviews/ui`, `workspace/reviews/ui (tests)` |
 | `ReviewResultProps` | `workspace/reviews/ui/pure-ui` | `subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.tsx` | type | `[ui, browser]` | PU1 | `workspace/reviews/ui` |
-| `ReviewPanel` | `workspace/reviews/ui` | `subs/workspace/subs/reviews/subs/ui/src/review-panel.tsx` | component (value) | `[ui, dispatch, browser]` | RU1, RV5 | `workspace` |
+| `ReviewPanel` | `workspace/reviews/ui` | `subs/workspace/subs/reviews/subs/ui/src/review-panel.tsx` | component (value) | `[ui, dispatch, browser]` | RU1, RV5 | `workspace`, `workspace (tests)` |
 
 ### Shared UI
 
@@ -253,6 +257,7 @@ contextual typing instead.
 | `ToolInputSchema`, `ToolResult` | `collection-review` | `src/interfaces/protocol.ts` | Two of the shapes `McpToolContribution` is written in. Exposing a contract does not expose the types its signature mentions; both features build a contribution without naming them. |
 | `AssembledSystem`, `assembleSystem` | `collection-review` | `src/assembly.ts` | The root's own composition. `AppRouter` is declared here too and is the one export of this file that leaves the owner, through the forwarding alias R3 selects in `src/interfaces/protocol.ts`. |
 | `createFacilities`, `createMcpServer` | `collection-review` | `src/protocol.ts` | The configured runtimes themselves. Features receive facilities as an argument rather than importing a singleton. |
+| `startApiServer`, `ApiServer`, `ApiServerOptions` | `collection-review` | `src/server.ts` | The listener, and the shape of what it answers with. `src/main.ts` is the entry that chooses a port and calls it; this owner's own HTTP test is the only other caller, and nothing below the root needs to start a server. |
 | `CatalogRecord`, `listRecords`, `findRecord` | `workspace/catalog/core` | `.../catalog/subs/core/src/records.ts` | The fixed records are this owner's private data. |
 | `PredecessorResolution`, `resolvePredecessors` | `workspace/catalog/core` | `.../catalog/subs/core/src/history.ts` | The private history helper of case O01: this owner's own `src/tests/` reads it directly, and no other owner can. |
 | `CatalogFixtureRecord` | `workspace/catalog/core` | `.../catalog/subs/core/src/tests/fixture.ts` | The fixture's element type. Only `makeCatalogFixture` is exposed. |
@@ -383,3 +388,51 @@ Four departures from the plan's iteration 4 text are recorded here.
 - The catalog card's badge reports whether the record has a recorded history,
   not a review verdict. A pure card knows nothing about reviews, and giving it
   a verdict would have meant giving it something to fetch.
+
+### Iteration 5 — test completion, harness inventory, independence
+
+Every owner has owned tests, the listener answers over a real socket, the case
+inventory exists as harness data, and the package is proven independent of the
+repository around it.
+
+Added to the map: `startApiServer` and its two result types, under [symbols
+exported but deliberately not
+exposed](#symbols-exported-but-deliberately-not-exposed). No exposure statement
+was added or changed in this iteration: the baseline's contract is exactly what
+iterations 1 to 4 built, and this iteration only exercised it.
+
+One correction to the map: `ReviewPanel` gains `workspace (tests)` as an
+importer. The shell's test names the component in a type query
+(`typeof import(...).ReviewPanel`) to derive the props it must be handed. That
+is a cross-owner type-only import like any other, and the shell's test profile
+`[testing, ui, dispatch]` satisfies the symbol's `ui` and `dispatch` tags; the
+`browser` promise the symbol also carries is a required-symbol tag and does not
+reach a type-only request, which is why a Node test area can name a browser
+component it could never value-import.
+
+Four notes on what this iteration did and did not establish.
+
+- The listener moved out of the entry. `src/main.ts` now chooses the port and
+  calls `startApiServer` from the new same-owner `src/server.ts`; everything the
+  process serves is created inside that one call. The root's `src/tests/`
+  therefore starts the actual program on port 0, calls `catalog.get` and
+  `reviews.run` over HTTP through a real typed client, and opens two MCP
+  sessions with the SDK's streamable HTTP transport. Those two sessions are
+  identified by ids the transport generated rather than ids a test chose, and
+  each one's listing and call snapshot reads its own binding. That is case D03's
+  strongest witness and it now runs in about a second.
+- All fourteen owners already had tests at the end of iteration 4, so no test
+  was added to fill a gap; the HTTP test is the only new one.
+- The fourteen descriptions were re-checked against the plan's checklist, one
+  point at a time, and the tree was scanned for the two rules a grep can settle:
+  no non-testing source imports anything from any `src/tests/`, and no file in
+  the example resolves an import outside the package. Both hold, and the
+  importer columns above were rebuilt from that scan.
+- `scripts/reference-harness/` holds one record per case family and a report
+  that runs this package's application tier. Three families are reported as
+  passed, all of them protocol-tier: D01, D02 and D03. Every other family is
+  **not executed**, because the capability its expectation needs — the loader,
+  the evaluator's source areas and custom registry, the resolver, the source
+  checker, the browser suite or a host adapter — does not exist. The three
+  retained policies are recorded as deliberately unsupported and the six design
+  probes as undecided.

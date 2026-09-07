@@ -1,0 +1,20 @@
+{
+  // The reference harness is Node-only orchestration: it copies files, runs
+  // the example's own scripts as child processes, and reports. It therefore
+  // needs ambient Node types, which the toolkit's own `tsconfig.json`
+  // deliberately keeps out of `src/`. This project covers this directory and
+  // nothing else, so neither configuration has to be weakened for the other.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noEmit": true,
+    "declaration": false,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": ["node"]
+  },
+  "include": ["**/*.ts"]
+}
