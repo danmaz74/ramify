@@ -49,6 +49,8 @@ The historical analyses *Module Intelligence Daemon for Nested TypeScript
 Modules* and *DSL-Driven Nested Module Daemon*, both dated 2026-08-28, remain at
 their original locations. This document carries their useful runtime decisions
 forward and is self-contained; those documents are not normative dependencies.
+They belong to the enclosing cucumber-viz repository and are not included in a
+standalone Ramify checkout; all requirements carried forward are restated here.
 
 | Earlier decision | Treatment here |
 | --- | --- |
@@ -67,8 +69,9 @@ existing facilities behind an adapter; it does not implement a new type system.
 
 ## Runtime structure
 
-CLI and direct service clients connect to the daemon's local service. Editors
-and agents using MCP reach it through the separate stdio adapter. The future
+CLI and external Node programs using the lightweight `connectDaemon` client
+connect to the daemon's local service. Editors and agents using MCP reach it
+through the separate stdio adapter. The future
 browser connects through an on-demand web process that uses that same service.
 See the [process topology](processes-and-clients.md#process-topology).
 Inside the daemon, the analysis flow is:
@@ -100,7 +103,9 @@ indefinitely.
 
 ## Ramify's ownership tree
 
-These are eleven proposed initial owners within one toolkit package. Every owner
+These are eleven proposed owners for the batch and resident iterations within
+one toolkit package. The batch iteration implements nine; `daemon` and its
+`contexts` child arrive in the resident iteration. Every implemented owner
 has `module.ramify`, a purpose `README.md` and its own `src/`, with optional
 `src/interfaces/` and `src/tests/`. Each edge below corresponds to placement under
 the parent's `subs/`. Brackets show module-header tags, not additional syntax.
@@ -147,7 +152,7 @@ to the contract review before code moves.
 | `descriptions` | Parse version 1 with source locations and comments; resolve exact selections, exposed names and wildcard contracts; produce grounded declarations and diagnostics. | `parseDescription`, `linkDescriptions`, and their input/result vocabulary. |
 | `project` | Explicit-root inventory, containment/symlink and scope validation, coherent input reads and README purpose extraction. | `readProject`, project input/inventory and metadata contracts. |
 | `typescript` | Retain compiler integration state; resolve exports, originals and resources; interpret source accesses; obtain optional symbol details. | `createSourceAnalysis` and plain-data catalog, access and enrichment contracts. |
-| `daemon` | Open/close the local endpoint, route requests, adapt filesystem events, handle startup/shutdown and connect clients. Delegate context work to its child. | `startDaemon`, `connectDaemon` and dispatch-classified options/results; selected neutral context vocabulary is relayed unchanged. |
+| `daemon` | Own the shared validated service implementation and its in-process binding, open/close the local endpoint, adapt filesystem events, handle startup/shutdown and connect clients. IPC delegates to that service; context work delegates to its child. | `startDaemon`, `connectDaemon`, the in-process service factory and dispatch-classified options/results; selected neutral context vocabulary is relayed unchanged. |
 | `contexts` | Select isolated contexts, serialize their updates, synchronize requested inputs, publish revisions, retain historical results and manage idle eviction. | `createContextManager`, context/revision/status vocabulary and its owned `AnalysisDriver` port. |
 | `presentation` | Render model/report data, interactions and teaching examples. | Selected components explicitly tagged `[ui, browser]` and owned props. |
 | `layout` | Calculate diagram geometry from supplied neutral data. | Selected functions explicitly tagged `[browser]` and owned layout vocabulary. |
@@ -184,6 +189,10 @@ The `AnalysisDriver` port travels from contexts to daemon and then to root;
 assembly does not import a private grandchild binding. Transport contracts owned
 by root carry `dispatch`, so untagged analysis and contexts source cannot import
 them even when they are visible from above.
+Root exposes the service interface downward to `daemon [dispatch]`, which
+imports and implements it for both IPC delivery and the in-process binding.
+Root assembly supplies dependencies; the shared validation and routing stay
+inside daemon, as specified by the [service boundary](processes-and-clients.md#shared-service-boundary).
 
 Presentation receives its layout child's upward API. A future explorer receives
 presentation components through root's declaration-only relay; root's source need
@@ -517,9 +526,14 @@ current one. Logs identify context, generation, request and revision without
 dumping project source by default. Idle disposal and resource pressure follow the
 [memory policy](memory-lifecycle.md#pressure-eviction-and-recovery).
 
-On daemon failure, an interactive client can attempt a bounded reconnect/restart
-and then use batch analysis where the operation permits it. Preserve root, input
-setup, registry, requested capabilities and exact content when falling back. If
+Clients follow the [shutdown and recovery contract](processes-and-clients.md#launch-compatibility-and-shutdown):
+idle exit permits demand-driven startup, unexpected failure permits bounded
+recovery, and explicit stop suppresses automatic restart by existing clients.
+After recovery fails, only a terminating CLI command over reproducible disk
+inputs may use in-process batch fallback, disposing its session before exit.
+Watch, MCP, web and external service clients report unavailable execution instead
+of loading or spawning another analyzer. Preserve root, input setup, registry,
+requested capabilities and exact content when falling back. If
 an overlay or historical request cannot be reproduced, return unavailable instead
 of substituting disk/current state. Report when fallback was used. An unavailable
 checker never produces successful enforcement.
@@ -531,9 +545,10 @@ checking and requested optional verifiers retain their separate status in both.
 
 ## Declaring and verifying the toolkit
 
-The eleven initial owners' declarations and purpose READMEs are reviewed before
-their code is moved or written. Until the loader exists, declarations receive
-manual checks and automated modularity status remains pending. Once linking works,
+Each iteration reviews the declarations and purpose READMEs of the owners it
+implements before their code is moved or written. Until the loader exists,
+declarations receive manual checks and automated modularity status remains pending.
+Once linking works,
 Ramify validates its own descriptions; as source support lands it checks its own
 imports. Self-checking supplements independent fixtures and the reference project's
 reviewed mutation expectations.
@@ -565,7 +580,7 @@ about currently passing tests. The plan assigns them to delivery stages. Use
 independently stated outcomes alongside batch/incremental comparisons so a shared
 engine bug cannot make both sides appear correct.
 
-These semantic/runtime cases are complemented by PC01–PC08 in
+These semantic/runtime cases are complemented by PC01–PC10 in
 [processes and clients](processes-and-clients.md#acceptance-evidence), ML01–ML08
 in [memory lifecycle](memory-lifecycle.md#measurement-and-acceptance), and
 QT01–QT08 in [quick testing](quick-testing.md#complementary-verification).
@@ -588,7 +603,7 @@ accompany the separately deliverable adapter.
 | DA12 | CLI and service queries agree with enforcement for the same consumer area and revision. Import suggestions also pass resolved-path testing-origin checks. |
 | DA13 | A README edit updates purpose/missing metadata without changing importability. Missing purpose never borrows another owner's prose. |
 | DA14 | Enrichment failure leaves completed checks available; required resolver/stage failure cannot report completion. A known denial still fails alongside nonblocking coverage notes. |
-| DA15 | Restart, version mismatch and batch fallback preserve semantics and input scope. Unavailable checking, expired generations and evicted revisions never become success/current substitutes. |
+| DA15 | Restart, version mismatch and eligible terminating-CLI batch fallback preserve semantics and input scope. Idle exit, crash and explicit stop follow the distinct recovery contract. Unavailable checking, expired generations and evicted revisions never become success/current substitutes. |
 | DA16 | Browser tag matching and separately requested browser-promise verification have distinct findings, coverage and execution status. |
 | DA17 | Idle disposal releases watchers/sessions; cancellation and bounded caches work under several active contexts. Measure cold analysis, warm saves, broad invalidation, query latency and memory on representative and 100/500/1,000-owner fixtures. Agree numeric budgets from measurements. |
 | DA18 | Ramify validates its own declared tree and implemented source forms with explicit coverage; independent negative reference cases still detect intentionally forbidden imports. |

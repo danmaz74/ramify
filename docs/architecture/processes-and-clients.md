@@ -15,7 +15,7 @@ resident lifetime.
 ```mermaid
 flowchart LR
   CLI[CLI process] -->|local IPC| API
-  Native[Direct service clients] -->|local IPC| API
+  Native[External Node service clients] -->|local IPC| API
   Host[Editor or agent MCP host] -->|MCP over stdio| MCP
   subgraph McpProcess[CLI process in MCP serving mode]
     MCP[MCP adapter]
@@ -38,14 +38,22 @@ flowchart LR
 | Process | Owns at runtime | Lifetime |
 | --- | --- | --- |
 | CLI | Argument parsing, local connection, command formatting and launch/control requests. Batch mode additionally owns its fresh engine session; MCP mode dispatches to the adapter below. | One command, except explicit watch or MCP serving modes. |
+| External Node service client | An integrating program uses the lightweight `connectDaemon` client for analysis requests and subscriptions. | Its host owns process lifetime; each connection and operation follows the shared bounded lease and cleanup rules. |
 | Daemon | Project/worktree contexts, coherent inputs, watchers, compiler sessions, checking, semantic queries, bounded history and local service delivery. | Retained for interactive use, with inactive-context eviction and idle shutdown. |
 | MCP adapter | MCP definitions, input schemas, protocol sessions and translation to the daemon service. | The host-launched `ramify mcp` process serves its stdio connection, then releases resources and exits. |
 | Web server | HTTP/tRPC routing, browser notifications, built static assets and bounded connection/request state. May later mount MCP over HTTP. | Started on demand; exits after all relevant client leases expire and an inactivity grace period passes. |
 
-MCP and web adapters own no independent module discovery, compiler program or
-permissions catalog. They query the existing daemon. An MCP session or browser
-tab does not create another analysis context when it selects the same compatible
-project setup. Different worktrees, registries or overlays retain the isolation
+Direct service clients are external Node programs using `connectDaemon`, without
+an MCP or web adapter. They use the same IPC validation, compatibility handshake,
+recovery policy and bounded activity/revision leases as Ramify's clients. Hosts
+dispose connections and subscriptions when finished; clean disconnect releases
+references promptly and abandoned leases expire. This is a client integration
+role, not another Ramify-owned process or module.
+
+Direct clients, MCP and web adapters own no independent module discovery,
+compiler program or permissions catalog. They query the existing daemon. An MCP
+session or browser tab does not create another analysis context when it selects
+the same compatible project setup. Different worktrees, registries or overlays retain the isolation
 defined in [daemon and analysis](daemon.md).
 
 The ordinary daemon process does not host the web listener. This is a deliberate
@@ -61,9 +69,20 @@ Root owns its dispatch-facing vocabulary; domain facts and decisions retain
 their existing analysis owners. The service has two implementations of its
 call boundary:
 
-- A local client used by CLI, MCP and web processes to reach the daemon through IPC.
+- A local client used by CLI, external Node, MCP and web processes to reach the
+  daemon through IPC.
 - An in-process binding to the real context manager and analysis sessions,
   used by assembly and quick tests.
+
+`daemon` owns both bindings. Its in-process service implementation validates and
+dispatches requests to its context manager; the IPC host delegates to that same
+implementation. Root exposes the dispatch-facing service interface downward to
+`daemon`, which imports and implements it through ordinary declarations. Root
+only assembles and injects the analysis driver and other dependencies; it does
+not duplicate service routing. `contexts` keeps its own neutral vocabulary and
+`AnalysisDriver` port and does not import the root-owned dispatch interface.
+The lightweight `connectDaemon` entry remains separate from this host/direct
+binding, so importing the client does not load context or compiler assembly.
 
 The local socket/named-pipe transport remains the preferred IPC mechanism.
 Its exact framing, endpoint-discovery scheme and context-to-process grouping
@@ -115,10 +134,16 @@ remain in contract review. An explicit machine-readable output mode should use
 the same result semantics as human-readable output.
 
 Batch execution uses the same engine and rules as retained execution. It starts
-neither server. On daemon failure, a reproducible disk operation may use the
-bounded reconnect/batch fallback specified in [daemon recovery](daemon.md#transport-process-lifecycle-and-recovery).
+neither server. After bounded daemon recovery fails, a terminating CLI command
+over reproducible disk inputs may use the batch fallback specified in
+[daemon recovery](daemon.md#transport-process-lifecycle-and-recovery).
 Report fallback use; do not silently substitute disk state for an overlay or
 current state for an unavailable historical revision.
+Only terminating CLI commands may load the engine for in-process fallback;
+they dispose the session and exit. Watch, MCP, web and external service clients
+never load a fallback engine: they recover the daemon within the lifecycle
+policy or report unavailable execution. No subprocess batch fallback is part
+of these long-lived client modes.
 
 ## MCP server
 
@@ -149,9 +174,10 @@ indefinitely pin historical revisions or require a warm compiler context without
 an active service lease. Subsequent requests can reopen an evicted context with
 explicit generation/revision handling. Adapter exit does not stop the daemon.
 
-MCP serving follows the same compatibility, bounded recovery and intentional-stop
-rules as other clients. A long-lived MCP session must report a stopped or
-unavailable daemon rather than continually recreating it after an explicit stop.
+MCP serving follows the shared [shutdown and recovery contract](#launch-compatibility-and-shutdown).
+An idle-exited daemon can be started for the next request; an explicit stop must
+not be undone by the still-open session. Recovery failure returns stopped or
+unavailable execution. MCP never falls back to an in-process compiler session.
 
 ### Optional HTTP hosting
 
@@ -214,11 +240,26 @@ The web process does not own the daemon's shutdown decision. If optional MCP
 HTTP hosting is added, its active session leases participate in this same idle
 decision; a temporarily closed HTTP stream does not end a live MCP session.
 
-If the daemon stops, clients receive disconnection/unavailability and follow
-bounded recovery. An explicit stop is not immediately undone by a blind retry
-loop in a still-open web page. Notify connected clients of intentional shutdown
-where possible; a later explicit command can start a daemon again. Distinguish
-unexpected failure from intentional shutdown in the lifecycle contract.
+If the daemon stops, clients receive disconnection/unavailability. Recovery
+distinguishes three outcomes:
+
+| Outcome | Client behavior |
+| --- | --- |
+| Automatic idle exit | Leave the daemon stopped until a real analysis request needs it. That request may coordinate a bounded startup. An open idle connection alone must not trigger restart. |
+| Unexpected failure | Active work may attempt bounded reconnect/restart, preserving requested input and revision semantics; exhausted recovery reports unavailable execution. Only eligible terminating CLI commands may then use batch fallback. |
+| Explicit user stop | Existing clients cancel automatic restart attempts and report stopped/unavailable execution. They remain paused until an explicit user resume/start action or a newly invoked explicit CLI command authorizes startup; background polls and ordinary calls from an existing MCP session do not override the stop. |
+
+A valid active watch lease prevents ordinary idle shutdown. Idle MCP or direct
+client connections without active work need not keep a compiler context or daemon
+alive. Reopening an evicted context or restarting a daemon yields new generations;
+old revision tokens do not silently become requests for current state.
+
+Graceful shutdown reports its disposition. Discovery/control state must also
+preserve explicit-stop information for the selected daemon lifecycle, so a
+client that misses the notification cannot mistake the stop for a crash. A bare
+socket closure is insufficient evidence of the reason. Exact record format,
+instance identity and explicit-resume handling belong to contract review;
+stale records must not suppress an independently authorized new start.
 
 Exact lease durations, discovery records and retry limits remain review items.
 They must implement these lifecycle guarantees without loading web dependencies
@@ -267,9 +308,11 @@ They are implementation obligations, not current passing tests.
 | PC03 | Check/inspect/explain reach the daemon directly and agree with equivalent batch inputs; a delayed watcher cannot hide a just-saved change. |
 | PC04 | Watch interruption and command exit release subscriptions/revision references; inactive project retention follows the daemon policy. |
 | PC05 | Explore starts/reuses the separate web process. Browser loss expires its leases; idle exit waits for the last client lease, including any optional HTTP MCP sessions. Web exit/restart leaves warm daemon contexts intact. |
-| PC06 | Unexpected process failure, intentional stop, stale endpoints and incompatible versions have bounded, distinct recovery outcomes. |
+| PC06 | Idle exit, unexpected failure and explicit stop have distinct recovery outcomes, including a missed shutdown notification. Idle clients do not restart without work; a next request may restart after idle exit; valid watch leases prevent idle exit; existing clients respect explicit stop until explicitly resumed. Stale endpoints and incompatible versions remain bounded. |
 | PC07 | tRPC, MCP and local clients return matching semantic results; actual wire tests preserve errors, revision identity and serialization without a second analyzer. |
 | PC08 | The MCP host launches one stdio adapter for its connection; calls reuse daemon analysis without starting the web server. Connection/process loss releases leases and leaves other daemon clients intact. If HTTP hosting is added, MCP activity participates in web lifetime and preserves protocol cancellation. |
+| PC09 | An external Node client uses the lightweight client entry with the same validation, compatibility and leases; disposal and abrupt host loss release eligible state without loading a compiler. |
+| PC10 | After exhausted recovery, only an eligible terminating CLI command runs a visible batch fallback and disposes its session. Watch, MCP, web and external clients return unavailable without loading or spawning another analyzer. |
 
 CLI and daemon lifecycle evidence is delivered with the local daemon. Web-specific
 parts of these requirements are delivered with later visualization. MCP-specific

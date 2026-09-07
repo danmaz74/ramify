@@ -297,6 +297,9 @@ The [memory analysis](../architecture/memory-lifecycle.md#initial-setup-probe)
 records the limited startup probe behind the process decision. Runtime footprint
 and ballooning must be measured on Ramify's implemented entry points and repeated
 workloads; host behavior is not proof of the new budgets.
+Those initial figures are historical observations without a checked-in executable
+recipe. Use the [repeatable probe](../architecture/memory-lifecycle.md#repeatable-setup-measurements)
+for new setup evidence and retain actual-entry/workload measurements separately.
 
 ## Delivery and review evidence
 

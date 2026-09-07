@@ -25,8 +25,10 @@ and reclaim its memory without discarding warm analysis.
 | [Memory lifecycle](memory-lifecycle.md) | Resident dependency boundaries, retention and work limits, memory reclamation and measurement requirements. |
 | [Quick testing](quick-testing.md) | In-process execution of real client/service flows, the boundaries replaced in quick mode, and complementary transport/process tests. |
 
-The [tooling plan](../plans/tooling-architecture/README.md) owns migration and
-delivery order. The [project-explorer reuse analysis](../analysis/project-explorer-reuse.md)
+The [tooling roadmap](../plans/tooling-architecture/README.md) owns migration and
+delivery order. Its first detailed plan is
+[batch project verification](../plans/iteration-1-project-verifier/main-plan.md),
+followed by resident checking. The [project-explorer reuse analysis](../analysis/project-explorer-reuse.md)
 records source candidates and adaptations for later visualization. It is
 supporting evidence; the architecture documents own the runtime decisions.
 

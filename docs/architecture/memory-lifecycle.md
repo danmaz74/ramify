@@ -22,6 +22,11 @@ frontend rendering, development tooling and host-only integrations. Ordinary CLI
 startup excludes compiler, MCP and web assembly; MCP serving loads its own adapter
 only when selected. Verify the transitive runtime imports and actual
 loaded modules for each entry point; type-only dependencies should remain erased.
+These boundaries also hold during recovery: watch, MCP, web and external service
+clients never load or spawn a batch engine. Only a terminating CLI command may
+use eligible in-process batch fallback, disposing its session before exit.
+Disposing session state alone would not reclaim imported compiler code in a
+long-lived adapter.
 
 The web process serves built assets and uses the daemon's analysis service.
 It retains only bounded request/connection state and temporary result projections.
@@ -101,6 +106,11 @@ Closing the last CLI request does not immediately evict a useful context. Apply
 a bounded warm-idle period, then dispose its compiler session, watchers and
 indexes if no active lease requires it. A watch subscription keeps its selected
 context active within the supported budget. An entirely idle daemon can exit.
+An idle connection without active work does not prevent that exit or immediately
+restart the daemon. The next analysis request may coordinate startup and reopen
+contexts with new generations. This automatic idle exit is distinct from both a
+crash and an explicit user stop; clients follow the
+[shutdown and recovery contract](processes-and-clients.md#launch-compatibility-and-shutdown).
 
 Workers and subprocesses are optional analysis execution strategies that require
 evidence. They can improve responsiveness or isolation, but can also duplicate
@@ -133,8 +143,8 @@ Extend DA17 with the following measurements and acceptance witnesses:
 | ML04 | Oversized requests, rapid edits and slow subscribers exercise limits, reconciliation and explicit errors without losing enforcement semantics. |
 | ML05 | Repeated explorer open-close cycles terminate the idle web process, release its daemon leases and leave no additional compiler contexts or subscriptions. |
 | ML06 | Detail expansion, large result serialization and historical requests respect peak and retention budgets; unavailable enrichment remains distinguishable from zero/empty data. |
-| ML07 | Idle disposal and any measured recovery strategy release sessions, watchers, timers and child processes; a requested unavailable check cannot pass. |
-| ML08 | Repeated MCP connect/call/disconnect cycles and several simultaneous hosts keep adapter buffers and daemon leases bounded. Stdio process loss releases resources without duplicate analysis contexts. Optional HTTP hosting retains the web process only for its valid client leases. |
+| ML07 | Idle disposal and recovery release sessions, watchers, timers and child processes. An idle open client does not cause restart churn; the next real request may restart, while an active watch lease prevents idle exit. Long-lived clients do not acquire compiler allocations during failed recovery; unavailable checking cannot pass. |
+| ML08 | Repeated MCP connect/call/disconnect cycles and several simultaneous hosts keep adapter buffers and daemon leases bounded. Stdio process loss releases resources without duplicate analysis contexts. Failed daemon recovery never loads a fallback compiler into the adapter. Optional HTTP hosting retains the web process only for its valid client leases. |
 
 Use representative projects and the planned 100/500/1,000-owner fixtures. Agree
 numeric ceilings and acceptable settled growth before accepting the corresponding
@@ -145,7 +155,9 @@ active contexts; this document does not invent configuration syntax for them.
 
 A local probe on 2026-09-07 used Node v22.23.2 and the installed enclosing
 repository dependencies. Three fresh-process samples per case were measured
-after explicit garbage collection:
+after explicit garbage collection. No original executable recipe, dependency
+version record or raw samples accompany these figures in this checkout. Treat
+them as historical observations, not independently reproducible evidence:
 
 | Setup | Median RSS |
 | --- | --- |
@@ -158,3 +170,47 @@ or traffic. These figures demonstrate setup cost only. They are not a Ramify
 budget, a long-running leak test or the incremental cost atop a future daemon
 that may already load some dependencies. Repeat measurements on the implemented
 entry points before using them for capacity decisions.
+
+### Repeatable setup measurements
+
+The checked-in [memory probe](../../scripts/memory-probe.mjs) records a new,
+explicit recipe. It does not reconstruct or validate the historical numbers.
+It uses only Node built-ins; from the Ramify directory, run:
+
+```sh
+node scripts/memory-probe.mjs --samples 3 > /tmp/ramify-memory-empty.json
+node scripts/memory-probe.mjs --cases empty,web,web-vite --dependency-root /path/to/installed/project --samples 3 > /tmp/ramify-memory-web.json
+```
+
+The default empty setup needs no optional packages. The web cases require an
+explicit dependency root with Express, `@trpc/server`, Zod and, for `web-vite`,
+Vite installed. In an enclosing checkout that root can be `..`; a standalone
+checkout can use any explicitly prepared dependency tree. Do not add these
+packages to the resident or baseline implementation just to run the probe.
+The script resolves Node require entries from that root, then imports those
+files, constructs an Express application and a tiny tRPC/Zod router, and
+optionally imports Vite. It opens no listeners and starts no Vite server.
+
+Each sample is a fresh Node child with `--expose-gc` and cleared `NODE_OPTIONS`.
+After setup is ready, it waits 100 ms, invokes GC twice, and records RSS, heap,
+external and array-buffer bytes. It repeats that measurement after disposal.
+The JSON includes raw samples and medians, Node/runtime/platform versions,
+resolved dependency versions and entry paths, recipe/fixture and available
+package/lockfile hashes, and timing/timeout settings. The empty case includes
+the same probe machinery; it is not a bare Node executable. Array-buffer bytes
+are included in external memory and should not be added to it again.
+
+For implemented entries, add a checked-in ESM fixture and pass
+`--setup /absolute/path/to/fixture.mjs`. Its exported async `setup()` imports
+the real implementation, waits for the chosen readiness point and returns an
+object with `dispose()` and the state to retain during measurement. The probe
+adds an `entry` case and awaits disposal. Missing dependencies, failed setup or
+disposal, and children that exceed 30 seconds fail the run; they cannot become
+successful empty measurements. Fixtures measure their own process; additional
+daemon/web processes need separately instrumented runtime harnesses.
+
+Plan 1 supplies actual batch/session fixtures and repeated-use measurements;
+later plans add resident, MCP and web workloads. Preserve their recipes, input
+fixtures and versioned raw results with acceptance evidence. The setup probe's
+post-disposal samples do not establish peak allocation, long-running plateaus,
+module unloading or combined multi-process budgets.

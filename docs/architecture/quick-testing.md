@@ -30,7 +30,12 @@ real context publication
 Production injects the daemon IPC client into the same web router. Quick mode
 injects a service binding backed by real contexts and analysis sessions. This
 replaces both the HTTP hop and daemon IPC hop without replacing their underlying
-checking, synchronization or publication behavior.
+checking, synchronization or publication behavior. The binding is the
+`daemon`-owned service implementation also called by the IPC host, including its
+request validation and dispatch to contexts. Root assembly injects dependencies;
+it does not implement another router or bypass validation in quick mode. The
+[shared service boundary](processes-and-clients.md#shared-service-boundary)
+defines the interface ownership and exposure route.
 
 The tRPC direct caller executes the router's procedures, middleware and input
 validation; it is an integration-testing facility. Procedures themselves should
@@ -41,6 +46,8 @@ Before visualization exists, exercise CLI handlers and service flows through
 the same in-process binding. Use real output formatting and assert the selected
 freshness, structured findings and exit behavior. UI providers and browser
 packages are introduced only in the later UI test scope.
+The daemon-owned binding arrives with the resident iteration; the preceding
+batch-only iteration injects real analysis sessions without a context manager.
 
 MCP tests use the real MCP registration, input validation and response mapping
 with an injected in-process analysis service. Exercise a protocol client/server
@@ -88,9 +95,9 @@ process cleanup or real browser layout. Keep a focused suite at those boundaries
 | --- | --- |
 | QT01 | A CLI workflow uses real services and project inputs; changed descriptions/source produce the independently expected output and backend result. |
 | QT02 | An explorer workflow uses the real route, hooks, tRPC router, context manager and engine; revision publication updates the UI consistently. |
-| QT03 | Direct callers/channels propagate sync/async errors and dispose canceled or disconnected work without leaving listeners, sessions or timers. |
+| QT03 | Direct callers/channels use the daemon-owned service validation and routing, reject invalid context/scope requests, propagate sync/async errors and dispose canceled or disconnected work without leaving listeners, sessions or timers. |
 | QT04 | Real HTTP/IPC tests preserve validation, serialized values, errors, context/revision tokens and notification mapping; a direct call is not accepted as this evidence. |
-| QT05 | Real process tests cover concurrent startup, stale discovery, compatibility, intentional stop, unexpected exit and web/daemon lifetime independence. |
+| QT05 | Real process tests cover concurrent startup, stale discovery, compatibility, idle exit with demand-driven restart, crash recovery and explicit stop even when its notification is lost. Active watch leases prevent idle exit; web/daemon lifetimes remain independent. Long-lived clients never load or spawn a fallback engine. |
 | QT06 | Real browser tests cover graph sizing, navigation and interactions whose behavior JSDOM cannot establish. |
 | QT07 | Repeated-use and slow-consumer tests cover the limits and cleanup in the memory architecture using the relevant actual transport/process. |
 | QT08 | Real MCP handlers agree with service results in quick mode. Separate stdio-process tests verify initialization, framing, protocol-only stdout, errors, cancellation, connection loss and daemon reuse without starting the web server. Optional HTTP hosting gets its own session/reconnect and web-lifetime tests. |

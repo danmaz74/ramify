@@ -84,7 +84,7 @@ source checker is not yet implemented.
 - `docs/plans/` - ramify's own planning artifacts, including the
   [Collection Review reference-project plan](docs/plans/reference-project/README.md)
   and its planned compatibility and regression cases, plus the
-  [tooling review and implementation plan](docs/plans/tooling-architecture/README.md).
+  [implementation roadmap and plan briefs](docs/plans/tooling-architecture/README.md).
 - `src/` - toolkit source; tests co-located as `src/**/*.test.ts`.
 - `examples/` - the [Collection Review reference project](examples/collection-review/README.md):
   a small runnable application whose fifteen owners carry the module

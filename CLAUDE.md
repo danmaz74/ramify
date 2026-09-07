@@ -109,8 +109,12 @@ module tree, engine contracts, isolated contexts and revisioned source analysis.
 Read the relevant architecture documents before planning or changing tooling.
 Detailed contracts, protocols and measured budgets still require review. These
 documents do not supersede the model or establish implemented capabilities.
-The [tooling plan](docs/plans/tooling-architecture/README.md) records contract
-review, migration and delivery order. Visualization implementation remains later.
+The [implementation roadmap](docs/plans/tooling-architecture/README.md) records
+all six deliverables, prerequisites, contract reviews, acceptance evidence and
+the briefs for authoring later plans. Visualization implementation remains later.
+The first detailed plan is [batch project verification](docs/plans/iteration-1-project-verifier/main-plan.md).
+It includes the reference checker and toolkit self-check; it does not implement
+the daemon or other runtime clients.
 
 ## Conventions that DO apply
 
