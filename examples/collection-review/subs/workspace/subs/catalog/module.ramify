@@ -2,3 +2,14 @@ ramify 1
 // The catalog feature's own source is its adapter layer; its core child stays
 // transport-independent.
 module catalog tagged [dispatch]
+
+// The two native surfaces this feature builds for the root to mount.
+expose-src createCatalogRouter from "router.ts" to parent
+expose-src createCatalogTools from "mcp.ts" to parent
+
+// The core's inspection, forwarded upward under the name the review side will
+// name it by. The alias renames the exposure, not the original binding: its
+// owner, identity and tags are still the core's.
+expose-sub inspect as inspectRecord from core to parent
+
+expose-sub makeCatalogFixture from core to parent

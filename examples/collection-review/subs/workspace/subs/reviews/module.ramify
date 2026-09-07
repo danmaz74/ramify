@@ -1,3 +1,15 @@
 ramify 1
 // The review feature's own source is its adapter layer and its session table.
 module reviews tagged [dispatch]
+
+// The two native surfaces this feature builds for the root to mount.
+expose-src createReviewsRouter from "router.ts" to parent
+expose-src createReviewsTools from "mcp.ts" to parent
+
+// The port both factories take, so whoever assembles the application can build
+// one and pass it in. The runtime and its outcome type stop at this owner.
+expose-sub InspectionPort from core to parent
+
+// The rules, down to the runtime that calls them. Validation sits outside that
+// subtree, so this owner is where its route down begins.
+expose-sub validateRevisionChain from validation to descendants

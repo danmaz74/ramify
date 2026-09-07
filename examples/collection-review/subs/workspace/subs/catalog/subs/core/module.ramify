@@ -1,3 +1,10 @@
 ramify 1
 // Untagged: record behaviour must not acquire the adapter's dispatch coupling.
 module core
+
+// The whole capability, for the adapter parent to publish. The records
+// themselves and the predecessor helper stay private.
+expose-src getRecord, inspect, CatalogSummary from "catalog.ts" to parent
+
+// Test data built from those private records, for other owners' tests.
+expose-test makeCatalogFixture from "fixture.ts" to parent

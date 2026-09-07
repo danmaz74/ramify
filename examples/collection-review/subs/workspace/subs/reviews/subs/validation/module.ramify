@@ -2,3 +2,7 @@ ramify 1
 // Deliberately outside the runtime subtree: validation cannot import the
 // runtime implementations that call it.
 module validation
+
+// The rules, for the parent to relay down into the runtime that calls them.
+// Nothing travels the other way.
+expose-src validateRevisionChain from "validate.ts" to parent

@@ -2,3 +2,13 @@ ramify 1
 // The application root: the Node entry, the configured protocol runtimes, and
 // the assembly that mounts the adapters its descendants relay upward.
 module collection-review tagged [dispatch]
+
+// The neutral protocol vocabulary a feature needs to build an adapter. It
+// reaches every descendant, but only dispatch-classified source can import it:
+// the core owners and the pure view carry no `dispatch`.
+expose-src InvocationContext, ProtocolFacilities, McpToolContribution, ToolInvocation from "interfaces/protocol.ts" to descendants
+
+// The configured system itself, for any owner's tests. It is a new
+// testing-owned binding, so it carries this owner's test profile and no
+// production source anywhere can import it.
+expose-test createTestSystem from "setup.ts" to descendants

@@ -2,3 +2,16 @@ ramify 1
 // The review runtime and the inspection port it depends on. Untagged, so no
 // protocol coupling can reach it.
 module core
+
+// The port: up as part of the runtime's contract, so the application can build
+// one, and down to the children that work against it.
+expose-src InspectionPort from "interfaces/port.ts" to parent, descendants
+
+// The runtime and the outcome it answers with, for the adapters above. They
+// travel no further down than this owner, so the views never name them.
+expose-src createReviewRuntime, ReviewOutcome from "runtime.ts" to parent
+
+// The task operations, back down to the controller that schedules them. This
+// relay is the whole route between the two children; neither can reach the
+// other on its own.
+expose-sub runInspectionTask, summarizeTaskResult from tasks to descendants
