@@ -1,8 +1,9 @@
 # Daemon and analysis architecture
 
-**Date:** 2026-09-07. **Status:** Proposed for review. This document describes
-the intended implementation architecture; it does not establish implementation
-support or authorize starting implementation.
+**Date:** 2026-09-07. **Status:** The process/client split and memory/testing
+requirements are decided in the [architecture overview](README.md). Detailed
+engine contracts and the ownership tree below remain proposed for review.
+This document does not establish implementation support or authorize coding.
 
 Ramify runs a long-lived local backend that maintains the analyzed state of each
 active project, updates that state as files change, and serves architectural
@@ -12,11 +13,22 @@ visualization clients consume that shared analysis.
 
 ## Scope and authority
 
-This document owns the proposed runtime structure, module boundaries, state
-lifecycle and client contracts. The [tooling plan](../plans/tooling-architecture/README.md)
-owns review steps, migration and delivery order. The
+This document owns the proposed module boundaries, exposure routes, engine
+pipeline, context/revision semantics and semantic service operations.
+[Processes and clients](processes-and-clients.md) defines executable placement,
+CLI behavior and the separate tRPC web process;
+[memory lifecycle](memory-lifecycle.md) defines retention and resource policy;
+[quick testing](quick-testing.md) defines test execution boundaries.
+The [tooling plan](../plans/tooling-architecture/README.md) owns review steps,
+migration and delivery order. The
 [reference project](../plans/reference-project/README.md) is an independent
 application used to exercise the implementation.
+
+[Preparing Ramify for the project explorer](../analysis/project-explorer-reuse.md)
+examines reuse for a later visualization phase. Its early review concerns are
+retained usage/contract evidence, neutral query results and revision-consistent
+details. Browser transport and project-view extraction remain later work; the
+analysis does not add owners to the initial tree below.
 
 The following specifications govern every mode of execution:
 
@@ -55,12 +67,13 @@ existing facilities behind an adapter; it does not implement a new type system.
 
 ## Runtime structure
 
+CLI, editor and agent clients connect to the daemon's local service. The future
+browser connects through a separate, on-demand web process that uses that same
+service. See the [process topology](processes-and-clients.md#process-topology).
+Inside the daemon, the analysis flow is:
+
 ```text
-                    CLI / editors / agents / explorer
-                                  |
-                        versioned service contract
-                                  |
-                           local daemon host
+                         local service endpoint
                                   |
                     isolated project/worktree contexts
                      watches -> ordered change batches
@@ -107,12 +120,15 @@ ramify [dispatch]                       executable assembly and client service c
 └── cli [dispatch]                      commands, output and client behavior
 ```
 
-Later, `service-api [dispatch]` can host MCP/editor integration adapters,
-`explorer [ui, browser, dispatch]` the browser application, and
-`integration-tests [testing, ui, dispatch]` tests that combine UI and transport
-contracts. These would be root children. They need not exist as empty modules
-before those surfaces are implemented. The daemon's local protocol belongs to
-the initial architecture; it is not deferred with these additional adapters.
+Later root children are `service-api [dispatch]`, containing the separate
+Express/tRPC web host and event adapter; `explorer [ui, browser, dispatch]`,
+containing the connected browser application; and
+`integration-tests [testing, ui, dispatch]`, containing tests that combine UI
+and transport contracts. Reusable project views belong to a later
+`presentation/subs/project-view [ui, browser]` child. Additional integration
+adapters can follow the same service boundary. These owners need not exist as
+empty modules before their capabilities are implemented. The daemon's local
+protocol remains part of the initial architecture.
 
 ### Responsibilities and public contracts
 
@@ -121,7 +137,7 @@ to the contract review before code moves.
 
 | Owner | Responsibility | Principal upward contract |
 | --- | --- | --- |
-| `ramify` | Wire the engine factory into the daemon, supply the CLI with a service client, and provide batch delivery. Own the shared client-facing service vocabulary. | No effective parent exposure; package entry points target the appropriate owners. |
+| `ramify` | Assemble separate CLI, daemon and later web entry points; supply the CLI with a lightweight service client and lazily selected batch delivery. Own the shared client-facing service vocabulary. | No effective parent exposure; package entry points target the appropriate owners. |
 | `analysis` | Execute the analysis pipeline, maintain a reusable analysis session, select affected work and produce snapshots, reports and semantic queries. | `createAnalysisSession`, `analyzeProject`, `inspectModule`, `explainAccess`, and owned analysis vocabulary. |
 | `model` | Canonical model identities, registry and profile rules, mandatory symbol tags, exposure reach, availability and testing-origin decisions. | `buildModel`, `explainImport`, `explainVisibility`, model vocabulary and validation operations. |
 | `descriptions` | Parse version 1 with source locations and comments; resolve exact selections, exposed names and wildcard contracts; produce grounded declarations and diagnostics. | `parseDescription`, `linkDescriptions`, and their input/result vocabulary. |
@@ -131,7 +147,7 @@ to the contract review before code moves.
 | `contexts` | Select isolated contexts, serialize their updates, synchronize requested inputs, publish revisions, retain historical results and manage idle eviction. | `createContextManager`, context/revision/status vocabulary and its owned `AnalysisDriver` port. |
 | `presentation` | Render model/report data, interactions and teaching examples. | Selected components explicitly tagged `[ui, browser]` and owned props. |
 | `layout` | Calculate diagram geometry from supplied neutral data. | Selected functions explicitly tagged `[browser]` and owned layout vocabulary. |
-| `cli` | Parse commands, request the required freshness/check scope, render output and map execution status to exit behavior. | `runCli` and its dispatch-classified vocabulary. |
+| `cli` | Parse commands, connect directly to the daemon, request freshness/check scope, render results and map execution status to exit behavior. Dispatch batch and explorer launch through supplied entry points. | `runCli` and its dispatch-classified vocabulary. |
 
 `analysis` owns computational invalidation; `contexts` owns scheduling and
 publication; `daemon` owns process and transport mechanics. There is one authority
@@ -224,6 +240,9 @@ Package exports are separate runtime entry points for the portable model, Node
 analysis, presentation and CLI. They confer no internal Ramify visibility. A single
 source barrel combining Node, UI and dispatch exports is unsuitable for the proposed
 classifications; the existing combined entry point needs migration.
+The [entry-point dependency requirements](processes-and-clients.md#modules-and-executable-entry-points)
+also keep `connectDaemon` usable without importing daemon startup or compiler
+assembly. A legal exposure route alone does not establish low startup memory.
 
 ## Engine inputs and analysis pipeline
 
@@ -295,6 +314,11 @@ Each active context retains:
   needed for invalidation, and findings with coverage and execution status.
 - Current publication, pending updates, last valid historical model when useful,
   and bounded revision-specific query/enrichment caches.
+
+Retention follows the [memory lifecycle](memory-lifecycle.md#state-ownership-and-bounds):
+per-context and global limits, bounded revision leases, optional-cache eviction
+and inactive-session disposal. Historical inspection must not pin one full
+compiler program per revision.
 
 An original identifier is specific to its binding, not just `(owner, name)`.
 Two files in one owner can define distinct same-named bindings. Aliases preserve
@@ -476,23 +500,18 @@ structural edits or revert a user's source after a failed check.
 
 ### Transport, process lifecycle and recovery
 
-Use a versioned local request/response and notification contract. A local socket
-or named pipe is the preferred transport; an HTTP listener is not needed for
-the first CLI. The endpoint belongs to the local user. A later browser or remote
-adapter can translate the same operations without moving rules into the adapter.
-
-One process may multiplex several active worktree contexts with bounded resource
-use. The exact process grouping and endpoint discovery scheme remain open; context
-isolation and version compatibility apply regardless of grouping. Start lazily
-for interactive use, expose status/stop operations, and dispose idle contexts,
-their watchers and compiler sessions before shutting down an idle process.
+The versioned local service and process lifecycle are defined in
+[processes and clients](processes-and-clients.md). The daemon hosts local IPC;
+the optional web process hosts HTTP/tRPC and browser notifications. The endpoint
+belongs to the local user. One daemon may serve several isolated worktree
+contexts within the global resource budget; the exact context-to-process grouping
+and endpoint discovery remain review items.
 
 The handshake checks protocol/schema, engine build and source-adapter compatibility.
-Incompatible clients must obtain a compatible process or an explicit error;
-recovery must not kill a process still serving unrelated compatible clients.
-Bound retained revisions and enrichment caches. A request for an evicted revision
-returns that fact rather than substituting the current one. Logs identify context,
-generation, request and revision without dumping project source by default.
+A request for an evicted revision returns that fact rather than substituting the
+current one. Logs identify context, generation, request and revision without
+dumping project source by default. Idle disposal and resource pressure follow the
+[memory policy](memory-lifecycle.md#pressure-eviction-and-recovery).
 
 On daemon failure, an interactive client can attempt a bounded reconnect/restart
 and then use batch analysis where the operation permits it. Preserve root, input
@@ -519,9 +538,14 @@ Owned tests live in each module's `src/tests/`: model/description/layout tests
 derive `[testing]`, daemon/CLI tests `[testing, dispatch]`, and presentation tests
 `[testing, ui]`. Context tests use controlled driver, input, event and clock fakes
 under their own owner. Real local transport tests belong with daemon; complete
-assembly tests belong with root. Tests requiring additional tags use a separate
-testing module with test code in ordinary `src/`, and ordinary exposure for every
-foreign binding.
+headless assembly tests belong with root. Tests requiring additional tags use a
+separate testing module with test code in ordinary `src/`, and ordinary exposure
+for every foreign binding.
+
+The [quick-testing architecture](quick-testing.md) defines real service flows
+through direct adapters, alongside separate HTTP/IPC, process and browser tests.
+Its UI harness is introduced with later visualization; CLI/context integration
+and resource-lifecycle evidence accompany their initial implementations.
 
 Build and runner configuration must collect nested `subs/**/src/` and preserve
 portable/browser compilation boundaries separately from Node source. Runtime
@@ -536,6 +560,12 @@ These are architectural acceptance requirements for implementation, not claims
 about currently passing tests. The plan assigns them to delivery stages. Use
 independently stated outcomes alongside batch/incremental comparisons so a shared
 engine bug cannot make both sides appear correct.
+
+These semantic/runtime cases are complemented by PC01–PC07 in
+[processes and clients](processes-and-clients.md#acceptance-evidence), ML01–ML07
+in [memory lifecycle](memory-lifecycle.md#measurement-and-acceptance), and
+QT01–QT07 in [quick testing](quick-testing.md#complementary-verification).
+Their web/UI cases remain assigned to the later visualization phase.
 
 | ID | Required witness |
 | --- | --- |
@@ -560,21 +590,22 @@ engine bug cannot make both sides appear correct.
 
 ## Decisions still requiring review
 
-The proposed baseline is a reusable engine, retained analysis sessions and a local
-daemon with isolated contexts, revisioned queries, exact-content synchronization
-and batch equivalence. Approving implementation architecture requires resolving the
-following details without reopening the model rules:
+The process split, client roles and resource/testing requirements are recorded
+in the [architecture overview](README.md). Detailed implementation review still
+needs the following without reopening those decisions or the model rules:
 
 1. Complete TypeScript contracts and `module.ramify` manifests for the proposed
    owners, package entry points and the source/test migration map.
 2. Exact TypeScript adapter API and invalidation dependencies, demonstrated on
    original resolution, resources, wildcard growth and unmarked interfaces.
-3. Process grouping, endpoint discovery, wire schemas, compatibility handling,
-   notification delivery and reconnect behavior.
+3. Context-to-daemon grouping, endpoint discovery, wire schemas, compatibility
+   handling, notification delivery and reconnect behavior. The separate web
+   process and its tRPC API are already selected.
 4. Overlay/base-revision protocol, synchronization boundaries and conflict results;
    which operations are included in each first delivery milestone.
-5. Resource/retention limits and measured latency budgets; optional persistent
-   caches and workers require evidence before adding their complexity.
+5. Numeric resource/retention limits, lease/idle durations and measured latency
+   budgets implementing the memory policy; optional persistent caches and
+   workers require evidence before adding their complexity.
 6. Registry configuration serialization and ordinary-default replacement. Until
    specified, use defaults or the resolved registry API; invent no accepted syntax.
 7. Scope and algorithm of separate browser-promise verification and richer

@@ -3,9 +3,9 @@
 **Date:** 2026-09-07. **Status:** Proposed for review; implementation has not
 started under this plan.
 
-The intended system is defined in [Daemon and analysis architecture](../../architecture/daemon.md).
-That document owns the proposed module tree, responsibilities, exposure routes,
-retained state, synchronization, client behavior and acceptance requirements.
+The intended system is defined in the [architecture documents](../../architecture/README.md).
+They own the decided process/client, resource and testing architecture, plus
+the proposed module tree, exposure routes, retained state and synchronization.
 This plan owns the review process, migration work and implementation sequence.
 It replaces the earlier batch-first architecture draft that deferred the daemon
 and watching as optional optimizations. Batch implementation remains an early
@@ -19,6 +19,17 @@ scope includes project contexts, file watching, exact-content synchronization,
 checks, module inspection and explanations. Keep the existing diagram/site
 behavior working throughout migration. Rich search, editor/MCP adapters and a
 live explorer are later surfaces over the same analysis contracts.
+
+The decided process model is a lightweight CLI, resident analysis daemon and
+separate on-demand web process. Ordinary CLI commands use local IPC directly;
+batch mode loads a fresh engine into the CLI process. The later web process uses
+tRPC and built frontend assets. Its dependencies remain outside daemon startup.
+
+The [project-explorer reuse analysis](../../analysis/project-explorer-reuse.md)
+identifies source to lift during that later visualization phase. Review its
+required facts, query boundaries and revision guarantees in stages A and B so
+the initial backend can support that client. UI extraction and browser transport
+remain later deliverables; no empty visualization modules are needed now.
 
 The [Collection Review plan](../reference-project/README.md), its
 [implementation plan](../reference-project/implementation.md), and the
@@ -49,6 +60,10 @@ and its contracts before coding. In particular, confirm:
   baseline architectural commitments.
 - UI/transport clients share the engine's results; tags and exposure routes keep
   their source dependencies compatible with the model.
+- Entry points preserve the decided process split and lightweight startup paths.
+  Retention, queue and client-lifecycle limits follow the memory architecture.
+- Quick tests exercise real services through direct adapters, with separate
+  evidence for actual IPC, HTTP, processes and browser behavior.
 
 Runtime decisions still requiring detail are listed in the architecture's
 [open decisions](../../architecture/daemon.md#decisions-still-requiring-review).
@@ -61,7 +76,9 @@ Before moving or writing implementation code, prepare a concrete review package:
 
 1. Exact public TypeScript contracts and package entry points. Include analysis
    sessions, context driver, immutable results, source/export catalogs, freshness
-   requests, cancellation/conflict outcomes and capability reporting.
+   requests, cancellation/conflict outcomes and capability reporting. Separate
+   lightweight client, daemon, batch and later web entry files; review their
+   transitive runtime dependencies, not just their exported types.
 2. Every initial owner's complete `module.ramify` and purpose README draft, plus
    a contract map listing originals, tags, exposure routes and intended consumers.
    Include every foreign signature type consumers must import; do not assume
@@ -71,11 +88,15 @@ Before moving or writing implementation code, prepare a concrete review package:
    scripts and independent example/site scopes.
 4. Build, test and package configuration for the nested tree, preserving portable
    and browser boundaries separately from Node analysis and executable code.
-5. Wire protocol, context identity, process grouping/discovery, synchronization,
-   overlay isolation, revision retention and compatibility choices for the first
-   daemon milestone. Record later capabilities explicitly.
+5. Wire protocol, context identity, context-to-daemon grouping/discovery,
+   synchronization, overlay isolation and compatibility choices for the first
+   daemon milestone. Specify retention budgets, backpressure, client leases,
+   idle disposal and recovery behavior. The separate web process is decided;
+   its detailed HTTP/event wiring remains a later capability.
 6. A case map linking model/source requirements to the existing reference cases
-   and runtime requirements to DA01–DA18 in the architecture document.
+   and runtime requirements to DA01–DA18, PC01–PC07, ML01–ML07 and QT01–QT07
+   in the architecture documents. Design the direct-service test binding now;
+   add the UI harness when visualization is implemented.
 
 Root and analysis tests can exercise their own assembly and upward child contracts.
 Context tests use controlled drivers/events/clocks. Owned tests move to each
@@ -95,19 +116,28 @@ is a different outcome, as specified by the source principles.
 
 | Stage | Deliverable | Required evidence |
 | --- | --- | --- |
-| A. Architecture approval | Review the daemon architecture, owner tree, separation of concerns and open design choices. | Agreed target architecture before implementation starts. |
+| A. Architecture approval | Preserve the decided process/client, memory and testing architecture; review the remaining owner tree and detailed contracts. | Agreed target architecture before implementation starts. |
 | B. Contracts and migration | The complete review package above, with all initial descriptions, README drafts and legal import routes. | Contracts and code movement are concrete and reviewable before execution. |
 | C. Layout and model | Declared toolkit layout; canonical original identities, registry, profiles, tag rules and testing-origin decisions; migrated model tests. | Focused rule tests and applicable reference-model cases. Automated loader/source stages remain explicitly absent. |
 | D. Discovery, exports and linking | Project acquisition, parser, source export catalog, exact selections, interface wildcards, grounded exposure evaluation and README metadata. | Real filesystem/reference cases, including E07–E09 and H03. Ramify validates its own descriptions without claiming source checking. |
 | E. Source checking and batch CLI | Supported source interpretation, reports, inspection and explanations through a reusable fresh analysis session. | Required source cases, independently expected negative mutations and DA01/DA14/DA16/DA18 within their implemented scope. Compiler diagnostics and coverage remain distinct. |
 | F. Retained sessions and updates | Versioned input views, reusable compiler state, dependency-aware invalidation and atomic candidate results. | DA06–DA10 and DA13; compare edit sequences with fresh analysis, including unchanged affected consumers and removals. |
-| G. Local daemon and contexts | Local endpoint, isolated contexts, watchers, exact-content checks, revision publication, lifecycle, CLI connection and batch fallback. | DA02–DA05, DA10, DA14–DA15 and DA17; exercise a real local client/server as well as deterministic concurrency fixtures. |
-| H. Overlays and additional clients | Isolated overlays and their conflicts, notifications/reconnect behavior; subsequently editor/MCP clients, richer intelligence and explorer. | DA11–DA12 plus the relevant lifecycle/equivalence cases. An unavailable client capability never silently changes input view or check scope. |
+| G. Local daemon and contexts | Local endpoint, isolated contexts, watchers, exact-content checks, revision publication, bounded retention, lifecycle, lightweight CLI connection and batch fallback. | DA02–DA05, DA10, DA14–DA15 and DA17; real local client/server plus the applicable PC, ML and QT cases below. |
+| H. Overlays and additional clients | Isolated overlays and their conflicts; subsequently editor/MCP clients, richer intelligence and the explorer through its separate on-demand tRPC web process. | DA11–DA12 plus applicable lifecycle/equivalence, quick-mode, actual HTTP/browser and web-memory cases below. |
 
 Overlay identity and freshness semantics are reviewed in B even if overlay
 execution ships in H. Stage G advertises disk-context capabilities explicitly.
 Presentation migration accompanies the stages that change its dependencies; it
 is not postponed until the live explorer is built.
+
+Apply the additional architecture cases as follows. A case spanning several
+capabilities is completed only when all its scheduled parts have evidence:
+
+| Case family | Initial engine/CLI/daemon work | Later visualization/overlay work |
+| --- | --- | --- |
+| [PC01–PC07](../../architecture/processes-and-clients.md#acceptance-evidence) | E–G: PC01–PC04, daemon parts of PC06, local-service parts of PC07. | H: PC05, web parts of PC06–PC07. |
+| [ML01–ML07](../../architecture/memory-lifecycle.md#measurement-and-acceptance) | E–G: entry footprints, context/history/enrichment bounds, repeated edits, local slow consumers and disposal. | H: overlay bounds, web footprint/open-close cycles, HTTP serialization and browser slow consumers, including ML05. |
+| [QT01–QT07](../../architecture/quick-testing.md#complementary-verification) | E–G: QT01/QT03, IPC parts of QT04, daemon parts of QT05 and relevant resource cases in QT07. | H: QT02/QT06, HTTP parts of QT04, web parts of QT05 and remaining resource cases in QT07. |
 
 Browser-promise verification is a separate capability. Plan and implement its
 algorithm explicitly before claiming it ran; the availability checker continues
@@ -129,6 +159,8 @@ because both modes share the same engine.
 
 Measure cold analysis, warm edits, provider/description/configuration changes,
 query latency and memory with representative projects and synthetic owner counts.
+Use the [memory measurement requirements](../../architecture/memory-lifecycle.md#measurement-and-acceptance)
+for repeated-use plateaus, peak allocation, global budgets and reclamation.
 Agree budgets from those measurements. Conservative recomputation may precede finer
 invalidation; correct retained sessions and watching are required, while persistent
 disk caches and worker pools require a demonstrated need.

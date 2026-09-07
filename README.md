@@ -73,10 +73,14 @@ source checker is not yet implemented.
   directory and module-description principles and the source interpretation
   specification
   (application-agnostic; travel with the project).
-- `docs/architecture/` - implementation architecture proposals, starting with
-  the [daemon and shared analysis engine](docs/architecture/daemon.md): retained
-  project analysis, isolated worktree contexts and revisioned checks/queries.
-  The architecture is proposed for review; it does not establish implementation.
+- `docs/architecture/` - [implementation architecture](docs/architecture/README.md):
+  the resident daemon, lightweight CLI, separate on-demand tRPC web process,
+  bounded memory lifecycle and quick testing, plus the proposed engine/module
+  contracts. These documents distinguish decided architecture from details
+  still under review; they do not establish implementation.
+- `docs/analysis/` - design studies, including
+  [preparation for the future project explorer](docs/analysis/project-explorer-reuse.md):
+  reusable source, early analysis contracts and later visualization boundaries.
 - `docs/plans/` - ramify's own planning artifacts, including the
   [Collection Review reference-project plan](docs/plans/reference-project/README.md)
   and its planned compatibility and regression cases, plus the
