@@ -4,6 +4,9 @@
  * `cucumber-js` reads this file as its default profile. It is ordinary runner
  * configuration and sits beside `vite.config.ts` and `vitest.config.ts`:
  * tooling of the package rather than application source, so no module owns it.
+ * The feature and its support code belong to `integration-tests`, a separately
+ * declared testing module under the root's `subs/`, whose ordinary `src/` is
+ * what the globs below collect.
  *
  * One scenario is the whole suite on purpose. It is the reference project's
  * witness for case K05 — actual runner registration, one scenario, and shared
@@ -16,7 +19,10 @@
  * `test:cucumber` script makes loadable by starting Node with `--import tsx`.
  */
 export default {
-  paths: ['src/tests/features/**/*.viz.feature'],
-  import: ['src/tests/features/support/*.ts', 'src/tests/features/steps/*.ts'],
+  paths: ['subs/integration-tests/src/features/**/*.viz.feature'],
+  import: [
+    'subs/integration-tests/src/support/*.ts',
+    'subs/integration-tests/src/steps/*.ts',
+  ],
   format: ['progress'],
 };

@@ -1,20 +1,29 @@
 import { World, setWorldConstructor } from '@cucumber/cucumber';
 
-import { createTestSystem } from '../../setup.js';
-import type { McpSession, TestSystem } from '../../setup.js';
+import { createTestSystem } from '../../../../src/tests/setup.js';
 
 /**
  * What one scenario works with: the assembled system, what it has read from it
  * so far, and the MCP sessions it has opened.
  *
- * The system is the same one every other test in this package uses. This owner
- * defines `createTestSystem` in its own `src/tests/`, so the World imports it
- * as same-owner testing source, and a scenario therefore drives the real tRPC
- * client and the real MCP server rather than anything written for Cucumber.
+ * The system is the same one every other test in this package uses. The root
+ * defines `createTestSystem` in its `src/tests/` and exposes it to its
+ * descendants; this module is a separate owner, so that exposure is its only
+ * way in, and the symbol's `[testing, dispatch]` tags are why this module's
+ * header carries both. The setup's own result types are not exposed, so they
+ * are read off the exposed function below. A scenario therefore drives the
+ * real tRPC client and the real MCP server rather than anything written for
+ * Cucumber.
  *
  * Sessions are kept so the `After` hook can close them. A scenario that leaves
  * one open would keep the runner's process alive after its last step.
  */
+
+/** The configured system, as the root's exposed setup hands it out. */
+type TestSystem = ReturnType<typeof createTestSystem>;
+
+/** One MCP session of that system. */
+export type McpSession = Awaited<ReturnType<TestSystem['connectMcpSession']>>;
 
 /** What `catalog.get` answers, as the typed client infers it. */
 type RecordSummary = Awaited<ReturnType<TestSystem['client']['catalog']['get']['query']>>;

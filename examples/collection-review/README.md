@@ -12,9 +12,11 @@ one browser screen. tRPC answers `catalog.get` and `reviews.run` for a typed
 client. MCP lists and calls `catalog.inspect` and `reviews.run` behind one
 server, where a review-session table binds each session to a revision scope and
 every list and call resolves that binding again. The browser lists both records
-as cards and runs a review from a connected panel. Fourteen Ramify owners share
-that work; each one has a `module.ramify`, a `README.md` whose first paragraph
-is its purpose, and its own tests under `src/tests/`.
+as cards and runs a review from a connected panel. Fifteen Ramify owners share
+that work; each one has a `module.ramify` and a `README.md` whose first
+paragraph is its purpose. Fourteen keep their own tests under `src/tests/`; the
+fifteenth, `integration-tests`, is a separately declared testing module whose
+ordinary `src/` is the Cucumber scenario.
 
 The package is self-contained: it declares its own dependencies and lockfile and
 its own TypeScript, Vite and Vitest configuration, and it imports no source from
@@ -51,9 +53,14 @@ Tests run under Node with no DOM: components are rendered to static markup, and
 the protocol tests use real clients over in-process transports, plus one test
 that starts the listener on an ephemeral port and speaks HTTP to both mounts.
 
-One scenario also runs under Cucumber. It lives in `src/tests/features/`, the
-root owner's testing source, and `cucumber.js` beside the other runner
-configurations collects it. `.viz.feature` is plain Gherkin here: the
+One scenario also runs under Cucumber. It lives in `subs/integration-tests/src/`,
+the ordinary source of a separately declared testing module,
+`integration-tests tagged [testing, dispatch]`, and `cucumber.js` beside the
+other runner configurations collects it. Being a separate owner, that module
+has no private access to the root: it reaches the configured system only
+through `createTestSystem`, which the root exposes to its descendants from its
+`src/tests/`, and its header must carry both `testing` and `dispatch` because
+that symbol does. `.viz.feature` is plain Gherkin here: the
 `# @viz-…` lines at the top are ordinary comments that nothing reads, and the
 file needs `@cucumber/cucumber` and nothing else. The scenario reviews both
 records through the typed client and then through one MCP session bound to part
@@ -78,6 +85,7 @@ plus the header's required-importer tags, never `browser`.
 | Module | Header tags | `src/tests/` profile |
 | --- | --- | --- |
 | `collection-review` (root) | `[dispatch]` | `[testing, dispatch]` |
+| `integration-tests` | `[testing, dispatch]` | `[testing, dispatch]` |
 | `workspace` | `[ui, browser, dispatch]` | `[testing, ui, dispatch]` |
 | `workspace/contracts` | `[]` | `[testing]` |
 | `workspace/shared-ui` | `[ui, browser]` | `[testing, ui]` |
@@ -91,6 +99,10 @@ plus the header's required-importer tags, never `browser`.
 | `workspace/reviews/validation` | `[]` | `[testing]` |
 | `workspace/reviews/ui` | `[ui, browser, dispatch]` | `[testing, ui, dispatch]` |
 | `workspace/reviews/ui/pure-ui` | `[ui, browser]` | `[testing, ui]` |
+
+`integration-tests` is the one testing module: its header classifies its
+ordinary `src/`, where the scenario lives, and it exposes nothing. Every other
+owner keeps its tests in `src/tests/`.
 
 `workspace` is the browser shell and the tree's relay point: feature adapters
 travel through it to the root, and shared vocabulary travels through it down to
@@ -145,9 +157,9 @@ procedure, to be repeated whenever its dependencies change:
    overrides.
 4. Remove the copy.
 
-Last run on 2026-09-07 with Node v22.23.2 and npm 10.9.8, after
-`@cucumber/cucumber` was added: `npm ci` installed 233 packages, `type-check`
-reported nothing, `build` transformed 49 modules into `dist/`, `npm test`
-passed 77 tests in 20 files, and `npm run test:cucumber` passed its one
-scenario of 12 steps and exited on its own. Nothing outside the copy was
-needed.
+Last run on 2026-09-07 with Node v22.23.2 and npm 10.9.8, after the scenario
+moved into `integration-tests`: `npm ci` installed from the lockfile with no
+vulnerabilities, `type-check` reported nothing, `build` transformed 49 modules
+into `dist/`, `npm test` passed 77 tests in 20 files, and
+`npm run test:cucumber` passed its one scenario of 12 steps and exited on its
+own. Nothing outside the copy was needed.

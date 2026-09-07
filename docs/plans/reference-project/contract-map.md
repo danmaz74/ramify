@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-07. **Current through:** iteration 5.
 **Status:** complete for the baseline. Every owner, statement and exposed symbol
-of the reference project is recorded below, and all fourteen descriptions have
+of the reference project is recorded below, and all fifteen descriptions have
 passed the plan's [description review checklist](implementation.md#description-review-checklist).
 A later iteration extends this map; it does not start a new one.
 
@@ -52,7 +52,7 @@ ordinary source.
 | `McpToolContribution` | `collection-review` | `src/interfaces/protocol.ts` | type | `[dispatch]` | R1 | `workspace/catalog`, `workspace/reviews` |
 | `ToolInvocation` | `collection-review` | `src/interfaces/protocol.ts` | type | `[dispatch]` | R1 | `workspace/reviews` |
 | `AppRouter` | `collection-review` | `src/assembly.ts` | type | `[dispatch]` | R3 | `workspace`, `workspace (tests)`, `workspace/reviews/ui` |
-| `createTestSystem` | `collection-review` | `src/tests/setup.ts` | function (value) | `[testing, dispatch]` | R2 | `workspace (tests)`, `workspace/catalog (tests)`, `workspace/reviews (tests)`, `workspace/reviews/ui (tests)` |
+| `createTestSystem` | `collection-review` | `src/tests/setup.ts` | function (value) | `[testing, dispatch]` | R2 | `workspace (tests)`, `workspace/catalog (tests)`, `workspace/reviews (tests)`, `workspace/reviews/ui (tests)`, `integration-tests` (its ordinary `src/`, testing-classified by its header) |
 
 ### Catalog
 
@@ -439,8 +439,15 @@ Four notes on what this iteration did and did not establish.
 
 ### Post-baseline — the Cucumber scenario
 
-Cucumber scenario added under root `src/tests/features/`; no exposure change.
-Its feature file, support files and step definitions are root-owned testing
-source that imports `createTestSystem` from the same owner's `src/tests/`
-and otherwise only packages, so nothing it does crosses an owner boundary and
-no row above changes. It is case K05's fixture, and the harness now runs it.
+Cucumber scenario added, first under the root's `src/tests/features/` and then,
+the same day, moved into a fifteenth owner: `integration-tests`, a separately
+declared testing module under the root's `subs/` with header
+`[testing, dispatch]` and its test code in ordinary `src/`. The module exposes
+nothing and adds no statement. Its one foreign import is `createTestSystem`,
+which R2 already makes visible in every descendant; the symbol's
+`[testing, dispatch]` tags are what force both header tags, and the header's
+`testing` is what lets ordinary source import testing-classified source at all.
+The setup's result types stay unexposed, so the World reads them off the
+exposed function. R2's importer column gains the new owner; no other row
+changes. It is case K05's fixture and the baseline witness for O07's positive
+half, and the harness runs it.

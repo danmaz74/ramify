@@ -48,13 +48,14 @@ to the protocol libraries.
 
 ## Proposed ownership tree
 
-These are **14 Ramify owners**, not 14 packages. Each row owns `src/`, including
+These are **15 Ramify owners**, not 15 packages. Each row owns `src/`, including
 optional `src/tests/` and `src/interfaces/`, with children only beneath `subs/`.
 Bracketed profiles are semantic
 planning notation, not a new description grammar.
 
 ```text
 collection-review [dispatch]             Node entry, configured protocols, assembly
+├── integration-tests [testing, dispatch] the one Cucumber scenario; a testing module
 └── workspace [ui, browser, dispatch]    browser shell; declaration-only relays
     ├── contracts []                    neutral report and revision vocabulary
     ├── shared-ui [ui, browser]         one shared StatusBadge
@@ -93,8 +94,12 @@ testing-only setup function and its needed types so these tests exercise the
 actual configured system while preserving router/client identity.
 
 Tests needing other classifications use a separate testing module with those
-tags in its header and test code in its ordinary `src/`. Exercise that shape
-in a temporary variant; it does not add an owner to the clean baseline.
+tags in its header and test code in its ordinary `src/`. The baseline carries
+one such owner, `integration-tests [testing, dispatch]`, holding the Cucumber
+scenario (decided 2026-09-07): it reaches the configured system only through
+the root's exposed testing setup, must carry both of that symbol's tags, and
+exposes nothing. Testing modules with other tag combinations remain temporary
+variants.
 
 The two feature `src/` areas are their adapters. Separate `core` children make
 the protocol boundary explicit without adding another `server` owner to each

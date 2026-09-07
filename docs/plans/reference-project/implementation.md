@@ -61,7 +61,7 @@ never imports the toolkit's `src/`, and the toolkit's `tsconfig.json` and
 | Component tests | Vitest in the Node environment. Components are checked with `react-dom/server` static markup; no jsdom and no browser automation in this plan. Static markup does not run effects, so every component that loads data separates its loading function from its rendering, and tests call the loader against the test client and render the loaded state. A lazily loaded child renders as its Suspense fallback in a static-markup test; the child's own test covers its behavior. |
 | Module names | `catalog/ui` and `reviews/ui` are declared `module "ui" tagged [...]` and referenced as `expose-sub ... from "ui"`, because `ui` is a reserved keyword. Quoting is syntax only; the identifiers stay `catalog/ui` and `reviews/ui`. Every other name is bare. |
 | Symbol tags | Defaults from the defining area everywhere. `browser` is written explicitly on every exposed runtime symbol that a browser-classified module value-imports, and on the contracts wildcard. An explicit clause repeats the defining area's required tags, because the grammar rejects a clause that omits them. Never write a tag clause on `expose-sub`. |
-| Owned tests | Every owner's tests and helpers live in its `src/tests/`. No separately declared testing module in the baseline; that shape is an O07 variant for the harness. |
+| Owned tests | Every owner's tests and helpers live in its `src/tests/`. Revised 2026-09-07: the Cucumber scenario lives in `integration-tests`, a separately declared testing module under the root's `subs/` with header `[testing, dispatch]` and its test code in ordinary `src/`. It is the baseline's one testing module and the witness for case O07's positive half; it exposes nothing and reaches the configured system only through the root's `expose-test`. Other testing-module shapes remain harness variants. |
 | View contracts | `pure-ui` owns `ReviewResultProps`; the connected panel maps the API's inferred output onto them. Core-owned `ReviewOutcome` is exposed upward to its adapter only and never travels downward, so `validation` cannot see any review-runtime type (cases R01 and D05, project-plan route 5). Catalog deliberately uses the other pattern and relays core-owned `CatalogSummary` down to its view (route 3). |
 | Barrels | No `index.ts` anywhere in the baseline. The baseline has two forwarding aliases, both same-owner: the description alias `inspect as inspectRecord` and the source alias `export type { AppRouter } from '../assembly.js'` in root's interface file. Neither creates a new binding. |
 
@@ -73,6 +73,7 @@ For reference, with derived `src/tests/` profiles:
 | Module | Header tags | `src/tests/` profile |
 | --- | --- | --- |
 | `collection-review` (root) | `[dispatch]` | `[testing, dispatch]` |
+| `integration-tests` (testing module; test code in its ordinary `src/`) | `[testing, dispatch]` | `[testing, dispatch]` |
 | `workspace` | `[ui, browser, dispatch]` | `[testing, ui, dispatch]` |
 | `contracts` | `[]` | `[testing]` |
 | `shared-ui` | `[ui, browser]` | `[testing, ui]` |

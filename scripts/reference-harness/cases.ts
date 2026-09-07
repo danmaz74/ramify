@@ -768,12 +768,15 @@ export const referenceCases: readonly ReferenceCase[] = [
     expected:
       "Its `src/` uses all three tags; it has no private access to its parent without exposure; a foreign value import needs the declared `browser` promise; its own optional `src/tests/` still derives `[testing, ui]`; a forwarding alias cannot acquire new tags.",
     coverageNotes:
-      'The baseline deliberately has no testing module, so this family is variant-only; no test-profile override exists to compare against.',
+      "The baseline carries one testing module, `integration-tests [testing, dispatch]`, holding the Cucumber scenario in its ordinary `src/`: it has no private access to the root and imports `createTestSystem` through the root's exposure to descendants, with a header that must carry both of that symbol's tags. The `[testing, ui, browser]` variant with a `browser` promise on a foreign value, a testing module's derived `src/tests/` profile, and the forwarding-alias half remain variant-only, and no checker executes any of it.",
     implementation: 'absent',
     baselineWitness: {
-      kind: 'document',
-      paths: [`${plans}/implementation.md`],
-      note: 'The decision that keeps the baseline free of a declared testing module and hands the shape to the harness.',
+      kind: 'baseline-source',
+      paths: [
+        `${example}/subs/integration-tests/module.ramify`,
+        `${example}/subs/integration-tests/src/support/world.ts`,
+      ],
+      note: "The testing module's header, and the World that imports the root's exposed setup across the owner boundary.",
     },
   },
 
@@ -1152,18 +1155,18 @@ export const referenceCases: readonly ReferenceCase[] = [
     mode: ['C'],
     authority: ['A', 'D'],
     entry:
-      "The root owner's `src/tests/features/`: one `.viz.feature` scenario reviewing both records through the typed client and one MCP session, run by `@cucumber/cucumber` through `cucumber.js`. Its hook module is reached through two setup paths in one runtime — the runner's `import` glob and a symbol-free `import '../support/hooks.js'` in the step definitions — and the shared initialization is a side effect of loading it, with no exported capability invented to justify that load.",
+      "The ordinary `src/` of `integration-tests`, a separately declared testing module under the root's `subs/` with header `[testing, dispatch]`: one `.viz.feature` scenario reviewing both records through the typed client and one MCP session, run by `@cucumber/cucumber` through `cucumber.js`. Its hook module is reached through two setup paths in one runtime — the runner's `import` glob and a symbol-free `import '../support/hooks.js'` in the step definitions — and the shared initialization is a side effect of loading it, with no exported capability invented to justify that load.",
     capability: 'browser',
     expected:
       'The scenario runs through the real runner and the intended initialization happens exactly once; legitimate side-effect setup needs no invented exported capability.',
     coverageNotes:
-      "Executed: `npm run test:cucumber` in the example runs the scenario, and its last step asserts that the initialization was evaluated once and the run-level hook registered once, over a process-wide tally that a duplicate module instance would raise to 2. That establishes real runner registration and the two-path load under Node's ESM resolution with `tsx`, in process. It establishes nothing about a browser, nothing about other loaders or a CommonJS path, and nothing about how a source checker would classify either import: no analyser has read this fixture.",
+      "Executed: `npm run test:cucumber` in the example runs the scenario, and its last step asserts that the initialization was evaluated once and the run-level hook registered once, over a process-wide tally that a duplicate module instance would raise to 2. That establishes real runner registration and the two-path load under Node's ESM resolution with `tsx`, in process. It establishes nothing about a browser, nothing about other loaders or a CommonJS path, and nothing about how a source checker would classify either import: no analyser has read this fixture. The module reaches the configured system only through the root's exposed `createTestSystem`, so the fixture also carries a testing module's foreign import; that import is likewise unchecked.",
     implementation: 'available',
     baselineWitness: {
       kind: 'baseline-source',
       paths: [
-        `${example}/src/tests/features/collection-review.viz.feature`,
-        `${example}/src/tests/features/support/hooks.ts`,
+        `${example}/subs/integration-tests/src/features/collection-review.viz.feature`,
+        `${example}/subs/integration-tests/src/support/hooks.ts`,
       ],
       note: 'The one scenario, and the hook module the runner and the step definitions both name.',
     },
@@ -1193,17 +1196,17 @@ export const referenceCases: readonly ReferenceCase[] = [
     mode: ['C', 'H'],
     authority: ['A', 'D'],
     entry:
-      "The example's runner configuration over fourteen nested `src/tests/` areas, plus fixtures for a testing module's ordinary `src/`, a mock or instrumentation case and a compiled-entry smoke case.",
+      "The example's two runner configurations, Vitest over fourteen nested `src/tests/` areas and Cucumber over the testing module's ordinary `src/`, plus fixtures for a mock or instrumentation case and a compiled-entry smoke case.",
     capability: 'browser',
     expected:
       "Discovery finds every owned test area and every testing module's `src/`; production selection excludes testing-classified source while keeping production `src/interfaces/` vocabulary; independently analysed fixture programs stay separate.",
     coverageNotes:
-      "The discovery half already holds in the example: one runner configuration collects all fourteen owners' test areas, twenty files in the current run. The testing-module, production-selection, instrumentation and compiled-entry halves have no fixture, and nothing selects production source yet.",
+      "The discovery half already holds in the example: `vitest.config.ts` collects all fourteen `src/tests/` areas, twenty files in the current run, and `cucumber.js` collects the ordinary `src/` of the testing module `integration-tests`. The production-selection, instrumentation and compiled-entry halves have no fixture, and nothing selects production source yet.",
     implementation: 'absent',
     baselineWitness: {
       kind: 'baseline-source',
-      paths: [`${example}/vitest.config.ts`],
-      note: 'The one runner configuration that collects every owner’s nested test area.',
+      paths: [`${example}/vitest.config.ts`, `${example}/cucumber.js`],
+      note: "The two runner configurations: one over every owner's nested test area, one over the testing module's ordinary source.",
     },
   },
 

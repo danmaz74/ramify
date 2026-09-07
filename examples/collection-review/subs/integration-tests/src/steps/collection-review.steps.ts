@@ -9,8 +9,7 @@ import { Given, Then, When } from '@cucumber/cucumber';
 // step of the scenario is what checks that.
 import '../support/hooks.js';
 import { beforeAllRuns, initializationLoads } from '../support/initialization.js';
-import type { CollectionReviewWorld } from '../support/world.js';
-import type { McpSession } from '../../setup.js';
+import type { CollectionReviewWorld, McpSession } from '../support/world.js';
 
 /**
  * The steps of the one scenario this package runs through Cucumber.
