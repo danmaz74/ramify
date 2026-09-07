@@ -156,7 +156,7 @@ not the spelling of a tag name.
 
 The default registry contains ordinary definitions:
 
-| Tag        | Kind                  | Meaning in the default profile  |
+| Tag        | Kind                  | Meaning in the default registry |
 | ---------- | --------------------- | ------------------------------- |
 | `testing`  | Required importer tag | Test support                    |
 | `ui`       | Required importer tag | UI coupling                     |
@@ -172,9 +172,9 @@ registry used, because changing it can change availability.
 
 The `testing` definition is reserved: it must remain a required-importer tag
 and cannot be removed or rebound. The other defaults have no name-specific
-matching or propagation behavior. Tools claiming the default
-profile must validate that the resolved definitions match that profile;
-verification of a tag's domain promise is a separate concern.
+matching or propagation behavior. Tools claiming the default registry
+must validate that the resolved definitions match it; verification of a
+tag's domain promise is a separate concern.
 
 The resolved registry contract is definitive. Its configuration serialization
 and the explicit configuration operation for omitting or replacing ordinary

@@ -64,9 +64,10 @@ at a time.
 
 The diagram is live: click a traced symbol to follow its chain.
 
-There are two common needs which require more than this: **testing** and
-**browser safety**. ramify.ts solves both using
-[**tags and availability rules**](/tags).
+Some needs require more than this: keeping **test support** out of
+production contracts, keeping **UI** and **transport** contracts out of the
+code that must not depend on them, and **browser safety**. ramify.ts handles
+them with [**tags and availability rules**](/tags).
 
 ## Module dependency explorer
 

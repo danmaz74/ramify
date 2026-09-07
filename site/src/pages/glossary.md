@@ -55,6 +55,13 @@ An arbitrary nested directory or a `*.test.ts` filename does not create another
 area or override its tags. A test-looking file outside `src/tests/` has the
 ordinary source classification. There are no per-file importer contexts.
 
+## Profile
+
+A source area's **profile** is its tag set: the importer classification of
+every file in that area. Ordinary source has the module header's tag set as
+its profile; `src/tests/` has the fixed derived profile described under
+Source area.
+
 ## Interface directory
 
 A module's optional **interface directory** is `<module>/src/interfaces/`.
@@ -184,6 +191,12 @@ re-exposing them means exposing the symbol together with its tag set.
 NB: if module M1 exposes symbol S to its descendant M2, M2 can re-expose it, but that's
 a no-op as the same symbol is already visible in M2's parent and all M2's descendants.
 
+## Module header
+
+The **module header** is the `module` statement of `module.ramify`: the
+module's declared name and its optional `tagged` clause. Its tag set is the
+module's declared tag set and classifies the module's ordinary source.
+
 ## Module tagging
 
 Tags assigned in a module header classify its ordinary `src/` area. By default,
@@ -239,7 +252,7 @@ Unknown tag uses, duplicate or conflicting definitions, and per-module
 overrides are invalid. Separate evaluations have isolated registries; cached
 decisions and reports identify which registry they use. Only `testing` is
 structurally reserved: it cannot be removed, rebound, or disconnected from
-`src/tests/` and testing-source isolation. Tools claiming the default profile
+`src/tests/` and testing-source isolation. Tools claiming the default registry
 must validate its definitions. A tag's domain-specific promise may require
 separate verification; the registry supplies no verification algorithm.
 

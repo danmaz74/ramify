@@ -54,9 +54,8 @@ repository because that is where the motivating knowledge and the first
 target codebase are; it is deliberately self-contained (own `package.json`,
 `tsconfig.json`, docs and tests) so it can be extracted into its own
 repository later. cucumber-viz will eventually become a consumer of this
-toolkit; the analysis of how its current enforcement maps onto the model is
-in the host repository at
-`docs/analysis/2026-08-31-importability-rules-cucumber-viz-coverage.md`.
+toolkit; the feasibility study of adopting the model there is in the host
+repository under `docs/analysis/2026-09-05-ramify-adoption-feasibility/`.
 
 The version 1 description language is specified; its filesystem loader and
 parser are not yet implemented. The evaluator currently accepts constructed
@@ -74,9 +73,14 @@ source checker is not yet implemented.
   directory and module-description principles and the source interpretation
   specification
   (application-agnostic; travel with the project).
+- `docs/architecture/` - implementation architecture proposals, starting with
+  the [daemon and shared analysis engine](docs/architecture/daemon.md): retained
+  project analysis, isolated worktree contexts and revisioned checks/queries.
+  The architecture is proposed for review; it does not establish implementation.
 - `docs/plans/` - ramify's own planning artifacts, including the
   [Collection Review reference-project plan](docs/plans/reference-project/README.md)
-  and its planned compatibility and regression cases.
+  and its planned compatibility and regression cases, plus the
+  [tooling review and implementation plan](docs/plans/tooling-architecture/README.md).
 - `src/` - toolkit source; tests co-located as `src/**/*.test.ts`.
 - `site/` - the documentation website (its own npm package).
 

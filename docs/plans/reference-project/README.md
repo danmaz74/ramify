@@ -2,7 +2,9 @@
 
 **Date:** 2026-09-06. **Status:** Initial implementation plan. No application,
 new rule, package installation, or checker implementation is delivered by this
-document. [Case catalogue](cases.md) and [harness plan](harness.md) complete it.
+document. [Case catalogue](cases.md) and [harness plan](harness.md) complete it;
+the [implementation plan](implementation.md) sequences Phase 1 and the start of
+Phase 2 into iterations.
 
 ## Objective and acceptance criterion
 
@@ -75,6 +77,12 @@ actual assembly source. Keep E04 as an explicit browser-ancestor relay variant,
 even if the baseline topology changes later. A sibling-shell comparison must
 record that root's downward exposure also reaches other compatible UI modules:
 `ui` excludes core consumers but does not select the shell alone.
+
+Two owners are named `ui`, a reserved keyword of the description language.
+`catalog/ui` therefore declares `module "ui" tagged [ui, browser]`,
+`reviews/ui` declares `module "ui" tagged [ui, browser, dispatch]`, and their
+parents reference them as `expose-sub ... from "ui"`. Quoting does not change
+module identity.
 
 Root protocol and assembly tests stay in root's `src/tests/`, with the fixed
 profile `[testing, dispatch]`. Tests combining protocol and view contracts
@@ -317,7 +325,7 @@ Keep these further choices out of the required baseline:
 
 | Phase | Concrete deliverable | Exit condition |
 | --- | --- | --- |
-| 0. Scope and expectations | Final owner/contract map, definitive specification references, registry integration inputs, README retrieval contract, case metadata and capability gates. | Every case distinguishes its binding rule or reference design from implementation status, undecided probes, and separate responsibilities. No invented accepted syntax. |
+| 0. Scope and expectations | A living owner/contract map (`contract-map.md`), started with the first iteration and extended by every later one, definitive specification references, registry integration inputs, README retrieval contract, case metadata and capability gates. | The map's format exists and each iteration leaves it current. Every case distinguishes its binding rule or reference design from implementation status, undecided probes, and separate responsibilities. No invented accepted syntax. |
 | 1. Runnable reference | The small screen, both native protocol surfaces, in-memory behavior, explicit module descriptions, per-owner purpose READMEs and owned tests. | Independent install/type-check, application tests, protocol checks and ordinary Vite build work even before a source checker exists. |
 | 2. Reference harness | Temporary-copy mutations, meaningful expected diagnostics and a capability/coverage report. | Active supported cases execute; absent capabilities are reported as unimplemented, not green. |
 | 3. Evaluator and loader integration | Attach source-area/custom-tag evaluator support and then real filesystem/description parsing. | Owner/reach/profile cases consume the real project; do not substitute an old handcrafted world as parser evidence. |
