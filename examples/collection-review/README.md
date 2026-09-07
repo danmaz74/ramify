@@ -36,9 +36,10 @@ starts everything else, which is what lets a test start the same program on a
 port the operating system picks.
 
 ```bash
-npm run type-check  # ordinary source, every src/tests/, and the config files
-npm test            # every owner's tests, under Node
-npm run build       # the browser bundle, into dist/
+npm run type-check    # ordinary source, every src/tests/, and the config files
+npm test              # every owner's tests, under Node
+npm run test:cucumber # the one feature scenario, through the real runner
+npm run build         # the browser bundle, into dist/
 ```
 
 **A shell-level `NODE_ENV` reaches `vite build`.** With `NODE_ENV=development`
@@ -49,6 +50,23 @@ would ship.
 Tests run under Node with no DOM: components are rendered to static markup, and
 the protocol tests use real clients over in-process transports, plus one test
 that starts the listener on an ephemeral port and speaks HTTP to both mounts.
+
+One scenario also runs under Cucumber. It lives in `src/tests/features/`, the
+root owner's testing source, and `cucumber.js` beside the other runner
+configurations collects it. `.viz.feature` is plain Gherkin here: the
+`# @viz-…` lines at the top are ordinary comments that nothing reads, and the
+file needs `@cucumber/cucumber` and nothing else. The scenario reviews both
+records through the typed client and then through one MCP session bound to part
+of a history, so it exercises the same system the other tests do.
+
+It is there for reference case K05, which is about how the runner's setup is
+loaded rather than about the review: the hook module is reached through two
+setup paths in one runtime — the runner's `import` glob and a symbol-free
+`import '../support/hooks.js'` in the step definitions — and the shared
+initialization is a side effect of loading it rather than an exported
+capability invented to justify the load. The scenario's last step asserts that
+the initialization was evaluated once and the run-level hook registered once.
+This is that fixture and not this package's test framework, which is Vitest.
 
 ## The ownership tree
 
@@ -109,9 +127,10 @@ and record the change in the contract map below.
   npm run reference:cases             # the harness's own tests
   ```
 
-  The report is deliberately unflattering: the application and protocol tiers
-  pass, and every case whose capability does not exist yet is listed as **not
-  executed** rather than skipped or dropped.
+  The report is deliberately unflattering: the application, protocol and tools
+  tiers pass — the last of them the one Cucumber scenario — and every case whose
+  capability does not exist yet is listed as **not executed** rather than
+  skipped or dropped.
 
 ## Independence
 
@@ -121,11 +140,14 @@ procedure, to be repeated whenever its dependencies change:
 1. Copy the package to a directory outside that repository, excluding
    `node_modules/`, `dist/` and `.reference-work/`.
 2. `npm ci`, so the copy installs from this lockfile alone.
-3. `npm run type-check`, `npm run build` and `npm test` in the copy, with no
-   ancestor packages and no inherited module-resolution overrides.
+3. `npm run type-check`, `npm run build`, `npm test` and `npm run test:cucumber`
+   in the copy, with no ancestor packages and no inherited module-resolution
+   overrides.
 4. Remove the copy.
 
-Last run on 2026-09-07 with Node v22.23.2 and npm 10.9.8: `npm ci` added 149
-packages, `type-check` reported nothing, `build` transformed 49 modules into
-`dist/`, and `npm test` passed 77 tests in 20 files. Nothing outside the copy
-was needed.
+Last run on 2026-09-07 with Node v22.23.2 and npm 10.9.8, after
+`@cucumber/cucumber` was added: `npm ci` installed 233 packages, `type-check`
+reported nothing, `build` transformed 49 modules into `dist/`, `npm test`
+passed 77 tests in 20 files, and `npm run test:cucumber` passed its one
+scenario of 12 steps and exited on its own. Nothing outside the copy was
+needed.

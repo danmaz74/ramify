@@ -151,12 +151,27 @@ describe('every baseline witness resolves', () => {
 });
 
 describe('the inventory stays honest about implementation status', () => {
-  it('claims availability only for the two executed tiers', () => {
+  it('claims availability only where a tier executes the case', () => {
     const available = referenceCases.filter((record) => record.implementation === 'available');
 
     expect(available.length).toBeGreaterThan(0);
     for (const record of available) {
-      expect(['application', 'protocol']).toContain(record.capability);
+      expect(['application', 'protocol', 'browser']).toContain(record.capability);
+    }
+  });
+
+  it('claims only the Cucumber fixture out of the browser and tools tier', () => {
+    // The tools half of that tier does run: `npm run test:cucumber` in the
+    // example executes K05's scenario. Nothing drives a real browser, so every
+    // other family on this tier stays absent.
+    const tier = referenceCases.filter((record) => record.capability === 'browser');
+    const available = tier.filter((record) => record.implementation === 'available');
+
+    expect(available.map((record) => record.id)).toEqual(['K05']);
+    for (const record of tier) {
+      if (record.id !== 'K05') {
+        expect(record.implementation).toBe('absent');
+      }
     }
   });
 
@@ -170,7 +185,6 @@ describe('the inventory stays honest about implementation status', () => {
           'loader',
           'resolver',
           'source-form',
-          'browser',
           'host-adapter',
           'probe',
         ] as const

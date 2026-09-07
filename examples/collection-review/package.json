@@ -9,7 +9,8 @@
     "dev:web": "vite",
     "build": "vite build",
     "type-check": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:cucumber": "NODE_OPTIONS='--import tsx' cucumber-js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.30.0",
@@ -20,6 +21,7 @@
     "zod": "4.5.4"
   },
   "devDependencies": {
+    "@cucumber/cucumber": "13.2.1",
     "@types/node": "26.4.1",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.7",

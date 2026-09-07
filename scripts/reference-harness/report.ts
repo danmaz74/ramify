@@ -2,17 +2,17 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { capabilityDescriptions, capabilityOrder, referenceCases } from './cases.js';
-import type { ReferenceCase } from './cases.js';
+import type { CaseCapability, ReferenceCase } from './cases.js';
 
 /**
  * The reference report.
  *
- * It runs the example's application tier as child processes and prints what
- * this stage of the project has actually established, next to everything it
- * has not. The separation is the point: a passing application and protocol
- * tier is not a Ramify conformance result, and a family whose capability does
- * not exist is reported as **not executed**, never as passed and never as a
- * skip that quietly leaves the summary.
+ * It runs the example's application and tools tier as child processes and
+ * prints what this stage of the project has actually established, next to
+ * everything it has not. The separation is the point: a passing application,
+ * protocol and tools tier is not a Ramify conformance result, and a family
+ * whose capability does not exist is reported as **not executed**, never as
+ * passed and never as a skip that quietly leaves the summary.
  *
  *     npm run reference:report
  *     npm run reference:report -- --dry-run   # inventory only, no tiers
@@ -23,9 +23,27 @@ const examplePrefix = 'examples/collection-review';
 
 type ExecutionStatus = 'passed' | 'failed' | 'not executed';
 
-/** The example's own scripts, in the order the application tier runs them. */
-const tierScripts = ['type-check', 'test', 'build'] as const;
+/** The example's own scripts, in the order this report runs them. */
+const tierScripts = ['type-check', 'test', 'build', 'test:cucumber'] as const;
 type TierScript = (typeof tierScripts)[number];
+
+/**
+ * Which of those scripts a family's own assertion rides on.
+ *
+ * Protocol assertions live in the example's test suite and in its type-check,
+ * where the compiler negatives are; application-tier assertions need the build
+ * as well. K05 is the one family of the browser and tools tier that executes:
+ * its assertion is the Cucumber scenario, so it follows that run and the
+ * type-check its support code is part of, and nothing else.
+ */
+const scriptsPerCase: Partial<Record<string, readonly TierScript[]>> = {
+  K05: ['type-check', 'test:cucumber'],
+};
+
+const scriptsPerCapability: Partial<Record<CaseCapability, readonly TierScript[]>> = {
+  application: ['type-check', 'test', 'build'],
+  protocol: ['type-check', 'test'],
+};
 
 interface TierRun {
   readonly script: TierScript;
@@ -48,19 +66,21 @@ function runTier(script: TierScript): TierRun {
 }
 
 /**
- * What a case's own execution status is in this run.
- *
- * Protocol assertions live in the example's test suite and in its type-check,
- * where the compiler negatives are; application-tier assertions need the build
- * as well. Everything else is not executed, because nothing can execute it.
+ * What a case's own execution status is in this run: the status of the scripts
+ * its assertion rides on. Everything else is not executed, because nothing can
+ * execute it.
  */
 function executionOf(record: ReferenceCase, tiers: readonly TierRun[]): ExecutionStatus {
   if (record.implementation !== 'available' || tiers.length === 0) {
     return 'not executed';
   }
 
-  const needed: readonly TierScript[] =
-    record.capability === 'protocol' ? ['type-check', 'test'] : tierScripts;
+  const needed = scriptsPerCase[record.id] ?? scriptsPerCapability[record.capability];
+
+  if (!needed) {
+    return 'not executed';
+  }
+
   const relevant = tiers.filter((tier) => needed.includes(tier.script));
 
   if (relevant.length !== needed.length) {
@@ -96,7 +116,9 @@ function main(): number {
   const tiers = dryRun ? [] : tierScripts.map(runTier);
 
   const application = summarize(tiers);
-  const protocolTier = tiers.filter((tier) => tier.script !== 'build');
+  const protocolTier = tiers.filter(
+    (tier) => tier.script === 'type-check' || tier.script === 'test',
+  );
   const protocol = summarize(protocolTier);
 
   const lines: string[] = [];
@@ -109,10 +131,15 @@ function main(): number {
 
   lines.push(`Application/tools: ${application}`);
   for (const tier of tiers) {
-    lines.push(`  npm --prefix ${examplePrefix} run ${tier.script.padEnd(10)} ${tier.status}`);
+    lines.push(`  npm --prefix ${examplePrefix} run ${tier.script.padEnd(13)} ${tier.status}`);
   }
   if (dryRun) {
-    lines.push('  type-check, test and build were not run');
+    lines.push('  no script of the example was run');
+  } else {
+    lines.push(
+      '  test:cucumber is the tools half of this tier: the one Cucumber scenario, which is',
+    );
+    lines.push('  case K05’s witness and the only browser-and-tools family that executes.');
   }
 
   lines.push(`Supported architectural assertions: ${protocol}`);

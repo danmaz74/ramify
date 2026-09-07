@@ -436,3 +436,11 @@ Four notes on what this iteration did and did not establish.
   checker, the browser suite or a host adapter — does not exist. The three
   retained policies are recorded as deliberately unsupported and the six design
   probes as undecided.
+
+### Post-baseline — the Cucumber scenario
+
+Cucumber scenario added under root `src/tests/features/`; no exposure change.
+Its feature file, support files and step definitions are root-owned testing
+source that imports `createTestSystem` from the same owner's `src/tests/`
+and otherwise only packages, so nothing it does crosses an owner boundary and
+no row above changes. It is case K05's fixture, and the harness now runs it.

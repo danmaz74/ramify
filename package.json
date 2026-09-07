@@ -21,6 +21,7 @@
     "example:build": "npm --prefix examples/collection-review run build",
     "example:type-check": "npm --prefix examples/collection-review run type-check",
     "example:test": "npm --prefix examples/collection-review run test",
+    "example:test:cucumber": "npm --prefix examples/collection-review run test:cucumber",
     "reference:cases": "vitest run -c scripts/reference-harness/vitest.config.ts",
     "reference:report": "tsx scripts/reference-harness/report.ts"
   },

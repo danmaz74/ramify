@@ -1152,17 +1152,20 @@ export const referenceCases: readonly ReferenceCase[] = [
     mode: ['C'],
     authority: ['A', 'D'],
     entry:
-      'A tiny fixture with actual runner registration, one scenario, and shared hook initialization imported through two setup paths in the same runtime.',
+      "The root owner's `src/tests/features/`: one `.viz.feature` scenario reviewing both records through the typed client and one MCP session, run by `@cucumber/cucumber` through `cucumber.js`. Its hook module is reached through two setup paths in one runtime — the runner's `import` glob and a symbol-free `import '../support/hooks.js'` in the step definitions — and the shared initialization is a side effect of loading it, with no exported capability invented to justify that load.",
     capability: 'browser',
     expected:
       'The scenario runs through the real runner and the intended initialization happens exactly once; legitimate side-effect setup needs no invented exported capability.',
     coverageNotes:
-      "Deliberately a small fixture and not the example's test framework; nothing is installed for it yet.",
-    implementation: 'absent',
+      "Executed: `npm run test:cucumber` in the example runs the scenario, and its last step asserts that the initialization was evaluated once and the run-level hook registered once, over a process-wide tally that a duplicate module instance would raise to 2. That establishes real runner registration and the two-path load under Node's ESM resolution with `tsx`, in process. It establishes nothing about a browser, nothing about other loaders or a CommonJS path, and nothing about how a source checker would classify either import: no analyser has read this fixture.",
+    implementation: 'available',
     baselineWitness: {
-      kind: 'document',
-      paths: [`${plans}/README.md`],
-      note: 'The tool budget that limits this to one registration smoke fixture.',
+      kind: 'baseline-source',
+      paths: [
+        `${example}/src/tests/features/collection-review.viz.feature`,
+        `${example}/src/tests/features/support/hooks.ts`,
+      ],
+      note: 'The one scenario, and the hook module the runner and the step definitions both name.',
     },
   },
   {
