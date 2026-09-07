@@ -82,6 +82,14 @@ source checker is not yet implemented.
   and its planned compatibility and regression cases, plus the
   [tooling review and implementation plan](docs/plans/tooling-architecture/README.md).
 - `src/` - toolkit source; tests co-located as `src/**/*.test.ts`.
+- `examples/` - the [Collection Review reference project](examples/collection-review/README.md):
+  a small runnable application whose fourteen owners carry the module
+  descriptions, with its own package, lockfile and toolchain.
+- `scripts/reference-harness/` - the reference harness: one record per case
+  family from the [case catalogue](docs/plans/reference-project/cases.md), and
+  `npm run reference:report`, which runs the example's own tiers and reports
+  what has and has not been established. `npm run reference:cases` runs the
+  harness's own tests.
 - `site/` - the documentation website (its own npm package).
 
 ## Documentation site
