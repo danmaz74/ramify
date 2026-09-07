@@ -2,3 +2,9 @@ ramify 1
 // Presentation primitives shared by both feature views. `ui` keeps them out of
 // the core owners, which carry no UI classification.
 module shared-ui tagged [ui, browser]
+
+// The badge and the props it is rendered with. `ui` is what keeps both out of
+// the core owners; `browser` is this owner's promise that the badge's whole
+// runtime is browser-safe, which is what lets the two feature views import it
+// as a value.
+expose-src StatusBadge, StatusBadgeProps from "status-badge.tsx" tagged [ui, browser] to parent

@@ -2,3 +2,8 @@ ramify 1
 // A pure view: no dispatch classification is inherited from its parent, so no
 // protocol type can reach it.
 module pure-ui tagged [ui, browser]
+
+// The view and the props it owns. The connected parent maps whatever the API
+// answered onto these props, which is how the review runtime's own outcome
+// type stays out of every view in the tree.
+expose-src ReviewResult, ReviewResultProps from "review-result.tsx" tagged [ui, browser] to parent

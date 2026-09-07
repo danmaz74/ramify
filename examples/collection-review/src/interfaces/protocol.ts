@@ -13,6 +13,19 @@ import type { createFacilities } from '../protocol.js';
  */
 
 /**
+ * The application router's type, forwarded from the assembly that builds it.
+ *
+ * This is a same-owner alias rather than a new binding: the original stays in
+ * `assembly.ts`, owned here and carrying this owner's `dispatch` tag, and the
+ * assembly itself stays private. A descendant that receives the router type
+ * imports it from this file, which is the only file the root exposes it from.
+ *
+ * `export type` erases the statement entirely, so nothing of the assembly's
+ * Node runtime can travel to a browser along this route.
+ */
+export type { AppRouter } from '../assembly.js';
+
+/**
  * What every request knows about itself, whichever protocol carried it. It is
  * the tRPC context created once per request, and the same pair travels with
  * every MCP tool invocation. `sessionId` is the transport's session identity

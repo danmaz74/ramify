@@ -13,3 +13,6 @@ expose-sub InspectionPort from core to parent
 // The rules, down to the runtime that calls them. Validation sits outside that
 // subtree, so this owner is where its route down begins.
 expose-sub validateRevisionChain from validation to descendants
+
+// The connected view, up to the shell that composes it.
+expose-sub ReviewPanel from "ui" to parent

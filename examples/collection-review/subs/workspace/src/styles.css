@@ -24,3 +24,44 @@ body {
   margin: 0;
   opacity: 0.75;
 }
+
+.shell__records {
+  display: grid;
+  gap: 1.5rem;
+  list-style: none;
+  margin: 1.5rem 0 0;
+  padding: 0;
+}
+
+.shell__loading,
+.shell__failure {
+  margin: 1rem 0 0;
+  opacity: 0.75;
+}
+
+.status-badge {
+  border-radius: 999px;
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.1rem 0.6rem;
+  text-transform: uppercase;
+}
+
+.status-badge[data-status='passed'] {
+  background: rgb(0 128 0 / 15%);
+}
+
+.status-badge[data-status='failed'] {
+  background: rgb(200 0 0 / 15%);
+}
+
+.review-panel {
+  margin-top: 0.75rem;
+}
+
+.review-panel__run {
+  cursor: pointer;
+  font: inherit;
+  padding: 0.35rem 0.9rem;
+}

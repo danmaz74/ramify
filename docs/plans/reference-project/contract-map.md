@@ -1,6 +1,6 @@
 # Reference project: contract map
 
-**Date:** 2026-09-07. **Current through:** iteration 3.
+**Date:** 2026-09-07. **Current through:** iteration 4.
 
 This is the living record of every symbol the reference project exposes: its
 owner, its defining file, its kind, its tags, the statements that carry it, and
@@ -22,7 +22,7 @@ ordinary source.
 | Symbol | Owner | Defining file | Kind | Tags | Exposing statement(s) | Importers |
 | --- | --- | --- | --- | --- | --- | --- |
 | `recordIdSchema` | `workspace/contracts` | `subs/workspace/subs/contracts/src/interfaces/vocabulary.ts` | schema (value) | `[browser]` | C1, W1 | `workspace/catalog`, `workspace/reviews` |
-| `RecordId` | `workspace/contracts` | `subs/workspace/subs/contracts/src/interfaces/vocabulary.ts` | type | `[browser]` | C1, W1 | `workspace/catalog/core`, `workspace/catalog/core (tests)`, `workspace/reviews`, `workspace/reviews/core`, `workspace/reviews/core/tasks` |
+| `RecordId` | `workspace/contracts` | `subs/workspace/subs/contracts/src/interfaces/vocabulary.ts` | type | `[browser]` | C1, W1 | `workspace/catalog/core`, `workspace/catalog/core (tests)`, `workspace/reviews`, `workspace/reviews/core`, `workspace/reviews/core/tasks`, `workspace/reviews/ui/pure-ui` |
 | `revisionSchema` | `workspace/contracts` | `subs/workspace/subs/contracts/src/interfaces/vocabulary.ts` | schema (value) | `[browser]` | C1, W1 | — |
 | `Revision` | `workspace/contracts` | `subs/workspace/subs/contracts/src/interfaces/vocabulary.ts` | type | `[browser]` | C1, W1 | — |
 | `revisionChainSchema` | `workspace/contracts` | `subs/workspace/subs/contracts/src/interfaces/vocabulary.ts` | schema (value) | `[browser]` | C1, W1 | `workspace/catalog/core` |
@@ -30,13 +30,13 @@ ordinary source.
 | `revisionScopeSchema` | `workspace/contracts` | `subs/workspace/subs/contracts/src/interfaces/vocabulary.ts` | schema (value) | `[browser]` | C1, W1 | `workspace/catalog`, `workspace/reviews` |
 | `RevisionScope` | `workspace/contracts` | `subs/workspace/subs/contracts/src/interfaces/vocabulary.ts` | type | `[browser]` | C1, W1 | `workspace/catalog/core`, `workspace/reviews`, `workspace/reviews/core`, `workspace/reviews/core/tasks` |
 | `findingSchema` | `workspace/contracts` | `subs/workspace/subs/contracts/src/interfaces/vocabulary.ts` | schema (value) | `[browser]` | C1, W1 | — |
-| `Finding` | `workspace/contracts` | `subs/workspace/subs/contracts/src/interfaces/vocabulary.ts` | type | `[browser]` | C1, W1 | `workspace/reviews/core`, `workspace/reviews/core/tasks`, `workspace/reviews/core/tasks (tests)`, `workspace/reviews/validation` |
+| `Finding` | `workspace/contracts` | `subs/workspace/subs/contracts/src/interfaces/vocabulary.ts` | type | `[browser]` | C1, W1 | `workspace/reviews/core`, `workspace/reviews/core/tasks`, `workspace/reviews/core/tasks (tests)`, `workspace/reviews/validation`, `workspace/reviews/ui/pure-ui` |
 | `inspectionReportSchema` | `workspace/contracts` | `subs/workspace/subs/contracts/src/interfaces/vocabulary.ts` | schema (value) | `[browser]` | C1, W1 | — |
 | `InspectionReport` | `workspace/contracts` | `subs/workspace/subs/contracts/src/interfaces/vocabulary.ts` | type | `[browser]` | C1, W1 | `workspace/catalog/core`, `workspace/reviews/core`, `workspace/reviews/core/controller (tests)`, `workspace/reviews/core/tasks`, `workspace/reviews/core/tasks (tests)`, `workspace/reviews/validation`, `workspace/reviews/validation (tests)` |
 | `reviewStatusSchema` | `workspace/contracts` | `subs/workspace/subs/contracts/src/interfaces/vocabulary.ts` | schema (value) | `[browser]` | C1, W1 | — |
-| `ReviewStatus` | `workspace/contracts` | `subs/workspace/subs/contracts/src/interfaces/vocabulary.ts` | type | `[browser]` | C1, W1 | `workspace/reviews/core`, `workspace/reviews/core/tasks` |
+| `ReviewStatus` | `workspace/contracts` | `subs/workspace/subs/contracts/src/interfaces/vocabulary.ts` | type | `[browser]` | C1, W1 | `workspace/reviews/core`, `workspace/reviews/core/tasks`, `workspace/shared-ui`, `workspace/reviews/ui/pure-ui` |
 | `observationSchema` | `workspace/contracts` | `subs/workspace/subs/contracts/src/interfaces/vocabulary.ts` | schema (value) | `[browser]` | C1, W1 | — |
-| `Observation` | `workspace/contracts` | `subs/workspace/subs/contracts/src/interfaces/vocabulary.ts` | type | `[browser]` | C1, W1 | `workspace/catalog`, `workspace/catalog/core (tests)`, `workspace/reviews/core`, `workspace/reviews/core/tasks` |
+| `Observation` | `workspace/contracts` | `subs/workspace/subs/contracts/src/interfaces/vocabulary.ts` | type | `[browser]` | C1, W1 | `workspace/catalog`, `workspace/catalog/core (tests)`, `workspace/reviews/core`, `workspace/reviews/core/tasks`, `workspace/reviews/ui/pure-ui` |
 | `ObservationCallback` | `workspace/contracts` | `subs/workspace/subs/contracts/src/interfaces/vocabulary.ts` | type | `[browser]` | C1, W1 | `workspace/catalog/core`, `workspace/reviews/core`, `workspace/reviews/core/tasks` |
 
 ### Root protocol vocabulary and test support
@@ -47,7 +47,8 @@ ordinary source.
 | `ProtocolFacilities` | `collection-review` | `src/interfaces/protocol.ts` | type | `[dispatch]` | R1 | `workspace/catalog`, `workspace/reviews` |
 | `McpToolContribution` | `collection-review` | `src/interfaces/protocol.ts` | type | `[dispatch]` | R1 | `workspace/catalog`, `workspace/reviews` |
 | `ToolInvocation` | `collection-review` | `src/interfaces/protocol.ts` | type | `[dispatch]` | R1 | `workspace/reviews` |
-| `createTestSystem` | `collection-review` | `src/tests/setup.ts` | function (value) | `[testing, dispatch]` | R2 | `workspace/catalog (tests)`, `workspace/reviews (tests)` |
+| `AppRouter` | `collection-review` | `src/assembly.ts` | type | `[dispatch]` | R3 | `workspace`, `workspace (tests)`, `workspace/reviews/ui` |
+| `createTestSystem` | `collection-review` | `src/tests/setup.ts` | function (value) | `[testing, dispatch]` | R2 | `workspace (tests)`, `workspace/catalog (tests)`, `workspace/reviews (tests)`, `workspace/reviews/ui (tests)` |
 
 ### Catalog
 
@@ -55,10 +56,11 @@ ordinary source.
 | --- | --- | --- | --- | --- | --- | --- |
 | `getRecord` | `workspace/catalog/core` | `subs/workspace/subs/catalog/subs/core/src/catalog.ts` | function (value) | `[]` | K1 | `workspace/catalog` |
 | `inspect` | `workspace/catalog/core` | `subs/workspace/subs/catalog/subs/core/src/catalog.ts` | function (value) | `[]` | K1, A3 (as `inspectRecord`), W2 | `workspace/catalog`, `collection-review` |
-| `CatalogSummary` | `workspace/catalog/core` | `subs/workspace/subs/catalog/subs/core/src/catalog.ts` | type | `[]` | K1 | `workspace/catalog`, `workspace/catalog (tests)` |
+| `CatalogSummary` | `workspace/catalog/core` | `subs/workspace/subs/catalog/subs/core/src/catalog.ts` | type | `[]` | K1, A5 | `workspace/catalog`, `workspace/catalog (tests)`, `workspace/catalog/ui` |
 | `makeCatalogFixture` | `workspace/catalog/core` | `subs/workspace/subs/catalog/subs/core/src/tests/fixture.ts` | function (value) | `[testing]` | K2, A4, W3 | `workspace/reviews/core (tests)` |
 | `createCatalogRouter` | `workspace/catalog` | `subs/workspace/subs/catalog/src/router.ts` | function (value) | `[dispatch]` | A1, W2 | `collection-review` |
 | `createCatalogTools` | `workspace/catalog` | `subs/workspace/subs/catalog/src/mcp.ts` | function (value) | `[dispatch]` | A2, W2 | `collection-review` |
+| `CatalogCard` | `workspace/catalog/ui` | `subs/workspace/subs/catalog/subs/ui/src/catalog-card.tsx` | component (value) | `[ui, browser]` | KU1, A6 | `workspace` |
 
 ### Reviews
 
@@ -73,6 +75,16 @@ ordinary source.
 | `ReviewOutcome` | `workspace/reviews/core` | `subs/workspace/subs/reviews/subs/core/src/runtime.ts` | type | `[]` | RC2 | `workspace/reviews`, `workspace/reviews (tests)` |
 | `createReviewsRouter` | `workspace/reviews` | `subs/workspace/subs/reviews/src/router.ts` | function (value) | `[dispatch]` | RV1, W4 | `collection-review` |
 | `createReviewsTools` | `workspace/reviews` | `subs/workspace/subs/reviews/src/mcp.ts` | function (value) | `[dispatch]` | RV2, W4 | `collection-review` |
+| `ReviewResult` | `workspace/reviews/ui/pure-ui` | `subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.tsx` | component (value) | `[ui, browser]` | PU1 | `workspace/reviews/ui`, `workspace/reviews/ui (tests)` |
+| `ReviewResultProps` | `workspace/reviews/ui/pure-ui` | `subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.tsx` | type | `[ui, browser]` | PU1 | `workspace/reviews/ui` |
+| `ReviewPanel` | `workspace/reviews/ui` | `subs/workspace/subs/reviews/subs/ui/src/review-panel.tsx` | component (value) | `[ui, dispatch, browser]` | RU1, RV5 | `workspace` |
+
+### Shared UI
+
+| Symbol | Owner | Defining file | Kind | Tags | Exposing statement(s) | Importers |
+| --- | --- | --- | --- | --- | --- | --- |
+| `StatusBadge` | `workspace/shared-ui` | `subs/workspace/subs/shared-ui/src/status-badge.tsx` | component (value) | `[ui, browser]` | SU1, W5 | `workspace/catalog/ui`, `workspace/reviews/ui/pure-ui` |
+| `StatusBadgeProps` | `workspace/shared-ui` | `subs/workspace/subs/shared-ui/src/status-badge.tsx` | type | `[ui, browser]` | SU1, W5 | — |
 
 ## Exposing statements
 
@@ -82,12 +94,16 @@ ordinary source.
 | W1 | `workspace` | `expose-sub * from contracts to descendants` |
 | R1 | `collection-review` | `expose-src InvocationContext, ProtocolFacilities, McpToolContribution, ToolInvocation from "interfaces/protocol.ts" to descendants` |
 | R2 | `collection-review` | `expose-test createTestSystem from "setup.ts" to descendants` |
+| R3 | `collection-review` | `expose-src AppRouter from "interfaces/protocol.ts" to descendants` |
 | K1 | `workspace/catalog/core` | `expose-src getRecord, inspect, CatalogSummary from "catalog.ts" to parent` |
 | K2 | `workspace/catalog/core` | `expose-test makeCatalogFixture from "fixture.ts" to parent` |
 | A1 | `workspace/catalog` | `expose-src createCatalogRouter from "router.ts" to parent` |
 | A2 | `workspace/catalog` | `expose-src createCatalogTools from "mcp.ts" to parent` |
 | A3 | `workspace/catalog` | `expose-sub inspect as inspectRecord from core to parent` |
 | A4 | `workspace/catalog` | `expose-sub makeCatalogFixture from core to parent` |
+| A5 | `workspace/catalog` | `expose-sub CatalogSummary from core to descendants` |
+| A6 | `workspace/catalog` | `expose-sub CatalogCard from "ui" to parent` |
+| KU1 | `workspace/catalog/ui` | `expose-src CatalogCard from "catalog-card.tsx" tagged [ui, browser] to parent` |
 | VL1 | `workspace/reviews/validation` | `expose-src validateRevisionChain from "validate.ts" to parent` |
 | TK1 | `workspace/reviews/core/tasks` | `expose-src runInspectionTask from "inspection-task.ts" to parent` |
 | TK2 | `workspace/reviews/core/tasks` | `expose-src summarizeTaskResult from "result.ts" to parent` |
@@ -99,9 +115,14 @@ ordinary source.
 | RV2 | `workspace/reviews` | `expose-src createReviewsTools from "mcp.ts" to parent` |
 | RV3 | `workspace/reviews` | `expose-sub InspectionPort from core to parent` |
 | RV4 | `workspace/reviews` | `expose-sub validateRevisionChain from validation to descendants` |
+| RV5 | `workspace/reviews` | `expose-sub ReviewPanel from "ui" to parent` |
+| RU1 | `workspace/reviews/ui` | `expose-src ReviewPanel from "review-panel.tsx" tagged [ui, dispatch, browser] to parent` |
+| PU1 | `workspace/reviews/ui/pure-ui` | `expose-src ReviewResult, ReviewResultProps from "review-result.tsx" tagged [ui, browser] to parent` |
+| SU1 | `workspace/shared-ui` | `expose-src StatusBadge, StatusBadgeProps from "status-badge.tsx" tagged [ui, browser] to parent` |
 | W2 | `workspace` | `expose-sub createCatalogRouter, createCatalogTools, inspectRecord from catalog to parent` |
 | W3 | `workspace` | `expose-sub makeCatalogFixture from catalog to descendants` |
 | W4 | `workspace` | `expose-sub createReviewsRouter, createReviewsTools, InspectionPort from reviews to parent` |
+| W5 | `workspace` | `expose-sub * from shared-ui to descendants` |
 
 C1 is an interface-file wildcard, so the seventeen vocabulary rows are its
 expansion, not seventeen declarations. An export added to `vocabulary.ts` joins
@@ -162,8 +183,64 @@ rules back down to the runtime that calls them. Because RC1 and RC2 stop at
 operations. It can import neither their behaviour nor their types.
 
 `ReviewOutcome` likewise stops at `workspace/reviews`, whose adapters name it.
-It is never exposed downward, so the review views of iteration 4 will receive
-values and props rather than the runtime's own type.
+It is never exposed downward, so the review views receive values and props
+rather than the runtime's own type. The connected panel maps the client's
+inferred `reviews.run` output onto `ReviewResultProps` without naming the
+outcome at all, and nothing below `workspace/reviews` can name it in either
+import form.
+
+R3 is the tree's second same-owner forwarding alias, after A3's rename. The
+original `AppRouter` is declared in the root's private `src/assembly.ts`;
+`src/interfaces/protocol.ts` re-exports it with `export type { AppRouter } from
+'../assembly.js'`, and R3 selects that export. The alias is not a new binding,
+so the symbol keeps the root's ownership and its `[dispatch]` tag, and the
+assembly file itself stays unexposed. No `browser` promise accompanies it,
+which is exactly right: both importers take it as a type. The shell's
+`client.ts` uses the statement-level `import type` form and the connected panel
+the inline `import { type AppRouter }` form; the required-symbol rule reaches
+neither, while `dispatch` reaches both and keeps the router type out of the
+untagged core owners and the pure view that can see it.
+
+SU1 and W5 are the shared-UI route. `shared-ui` exposes the badge and its props
+to its parent, and `workspace` relays the child's whole upward contract to every
+descendant. Both feature views import the badge as a value: they carry `ui`, so
+the required-importer rule passes, and they carry `browser`, so the owner's
+`browser` promise is what makes the value import legal. Every core owner in the
+tree receives the same symbols from the same statement and can import neither,
+in either form, because no core source carries `ui`.
+
+A5 and A6 are the catalog's two directions. The summary type goes down to the
+catalog's own view child, which renders it; the card goes up to the shell, which
+composes it. Neither reaches the other feature: `CatalogSummary` stops inside
+the catalog's subtree, and `CatalogCard` stops at `workspace`. The shell
+therefore names no catalog type at all — it derives the shape it passes from the
+router type it already has.
+
+PU1, RU1 and RV5 are the same arrangement on the review side, one level deeper.
+The pure view exposes its component and its own props to the connected parent;
+the connected parent exposes only the component upward, and the feature relays
+it to the shell. `ReviewPanel` carries `dispatch` as well as `ui`, because its
+defining area does: the shell can import it and no pure view could, whatever
+else it carried.
+
+## Owned resources
+
+Application resources follow the ordinary rules. These two are owned bindings of
+their views, exposed by nothing, imported by their owners alone.
+
+| Resource | Owner | Defining file | Binding | Tags | Exposed | Importers |
+| --- | --- | --- | --- | --- | --- | --- |
+| Catalog card styles | `workspace/catalog/ui` | `subs/workspace/subs/catalog/subs/ui/src/catalog-card.module.css` | `default` | `[ui]` | no | `workspace/catalog/ui` (same owner) |
+| Review result styles | `workspace/reviews/ui/pure-ui` | `subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.module.css` | `default` | `[ui]` | no | `workspace/reviews/ui/pure-ui` (same owner) |
+
+One ambient declaration in `vite/client` describes both files, and it is not
+their owner: each resource's binding belongs to the module whose `src/` contains
+it, with an identity of its own. Their default tags are their defining area's
+required-importer tags, which is `[ui]` in both cases; `browser` is not assigned
+automatically, and neither resource needs it, because only its own owner imports
+it. The application stylesheet `subs/workspace/src/styles.css` is a third
+resource, loaded by `main.tsx` for its side effect and selecting no binding at
+all.
 
 ## Symbols exported but deliberately not exposed
 
@@ -174,7 +251,7 @@ contextual typing instead.
 | Symbol | Owner | Defining file | Why it stays private |
 | --- | --- | --- | --- |
 | `ToolInputSchema`, `ToolResult` | `collection-review` | `src/interfaces/protocol.ts` | Two of the shapes `McpToolContribution` is written in. Exposing a contract does not expose the types its signature mentions; both features build a contribution without naming them. |
-| `AssembledSystem`, `AppRouter`, `assembleSystem` | `collection-review` | `src/assembly.ts` | The root's own composition. `AppRouter` reaches the browser in iteration 4 through a forwarding alias in `src/interfaces/protocol.ts`. |
+| `AssembledSystem`, `assembleSystem` | `collection-review` | `src/assembly.ts` | The root's own composition. `AppRouter` is declared here too and is the one export of this file that leaves the owner, through the forwarding alias R3 selects in `src/interfaces/protocol.ts`. |
 | `createFacilities`, `createMcpServer` | `collection-review` | `src/protocol.ts` | The configured runtimes themselves. Features receive facilities as an argument rather than importing a singleton. |
 | `CatalogRecord`, `listRecords`, `findRecord` | `workspace/catalog/core` | `.../catalog/subs/core/src/records.ts` | The fixed records are this owner's private data. |
 | `PredecessorResolution`, `resolvePredecessors` | `workspace/catalog/core` | `.../catalog/subs/core/src/history.ts` | The private history helper of case O01: this owner's own `src/tests/` reads it directly, and no other owner can. |
@@ -184,6 +261,10 @@ contextual typing instead.
 | `TaskSummary` | `workspace/reviews/core/tasks` | `.../core/subs/tasks/src/result.ts` | The summary's shape. The controller derives it from `summarizeTaskResult`, and the runtime declares its own `ReviewOutcome` instead. |
 | `ReviewRuntime` | `workspace/reviews/core` | `.../reviews/subs/core/src/runtime.ts` | The factory's result type. Its adapters hold the runtime the factory returns and never name the type. |
 | `SessionBinding`, `SessionBindingRequest`, `SessionTable`, `createSessionTable` | `workspace/reviews` | `.../reviews/src/session.ts` | The review-session table is this feature's own state. `createReviewsTools` creates the one instance the application uses, and only this owner's tests reach the factory. |
+| `createClient` | `workspace` | `subs/workspace/src/client.ts` | The shell builds its own client and hands it to the views it composes. A view that could build one would be choosing its own transport. |
+| `App`, `Shell`, `loadShell` | `workspace` | `subs/workspace/src/app.tsx` | The screen itself. Nothing is above `workspace` that renders it, and nothing below it composes the screen; only this owner's tests read `Shell` and `loadShell`. |
+| `loadReview` | `workspace/reviews/ui` | `.../reviews/subs/ui/src/review-panel.tsx` | The panel's own loading step, separated from rendering so this owner's tests can drive it. What this owner publishes is a component, not a second way to call the API. |
+| `formatFinding` | `workspace/reviews/ui/pure-ui` | `.../ui/subs/pure-ui/src/format.ts` | The private formatting of case O04: this view's wording is its own decision, and only its own tests read the function directly. |
 
 ## Iteration log
 
@@ -265,3 +346,40 @@ Three departures from the plan's iteration 3 text are recorded here.
   the chain records twice, so that validation owns a rule set rather than a
   single finding. The missing-predecessor finding is unchanged and remains the
   one the whole application demonstrates.
+
+### Iteration 4 — browser shell and views
+
+The browser shows both records as cards and runs a review from a connected
+panel, through the typed client the shell builds from the router type alone.
+`shared-ui` supplies the one primitive both feature views render; each feature
+owns its view and sends it up to the shell; the review view is split into a
+connected panel and a pure result, so the runtime's own outcome type reaches no
+view at all.
+
+Added to the map: R3, SU1, W5, A5, A6, KU1, PU1, RU1 and RV5, with the six
+symbols they carry, plus the two CSS-module resources the views own. Four
+vocabulary rows gain their first browser-classified importers, `CatalogSummary`
+gains its view, and `createTestSystem` gains the two test areas that render
+components against the real configured system.
+
+Four departures from the plan's iteration 4 text are recorded here.
+
+- The shell does not name `CatalogSummary`. A5 exposes that type to `catalog`'s
+  descendants, not upward, so it is not visible in `workspace`; the shell
+  derives the summary shape from the router type it already holds, exactly as
+  the connected panel derives the review's shape rather than naming
+  `ReviewOutcome`. Both views still receive the values the API returned.
+- `CatalogCard` and `ReviewPanel` keep their props types as unexported local
+  interfaces. Only a props type another owner constructs needs to be a symbol,
+  and both of these are supplied by JSX contextual typing. `StatusBadgeProps`
+  and `ReviewResultProps` are exported and exposed because they name a contract
+  a different owner writes to; `ReviewResultProps` is what the connected panel
+  builds, and `StatusBadgeProps` is exposed alongside its component and so far
+  imported by nobody, which the model permits.
+- `StatusBadge` has no stylesheet of its own. It carries the plain class name
+  the application stylesheet styles, so one badge looks the same wherever a
+  feature places it, and the two CSS modules stay what case S04 describes: two
+  resources of two different owners under one ambient declaration.
+- The catalog card's badge reports whether the record has a recorded history,
+  not a review verdict. A pure card knows nothing about reviews, and giving it
+  a verdict would have meant giving it something to fetch.

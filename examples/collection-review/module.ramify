@@ -12,3 +12,11 @@ expose-src InvocationContext, ProtocolFacilities, McpToolContribution, ToolInvoc
 // testing-owned binding, so it carries this owner's test profile and no
 // production source anywhere can import it.
 expose-test createTestSystem from "setup.ts" to descendants
+
+// The application router's type, for the shell that builds a client from it
+// and the connected view that names that client. It is a same-owner alias of
+// the assembly's own type, so `assembly.ts` stays private. It carries this
+// owner's `dispatch` tag and no browser promise: the core owners and the pure
+// view see it and can import it in neither form, and the two owners that can
+// import it do so as a type.
+expose-src AppRouter from "interfaces/protocol.ts" to descendants

@@ -18,3 +18,8 @@ expose-sub createReviewsRouter, createReviewsTools, InspectionPort from reviews 
 // one. Their ordinary source cannot import it: the fixture is tagged
 // `testing`.
 expose-sub makeCatalogFixture from catalog to descendants
+
+// The shared presentation primitives, down to every descendant. Both feature
+// views take them; their core siblings see them and cannot import them,
+// because no core source carries `ui`.
+expose-sub * from shared-ui to descendants

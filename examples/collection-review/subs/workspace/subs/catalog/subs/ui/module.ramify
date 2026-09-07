@@ -2,3 +2,8 @@ ramify 1
 // `ui` is a reserved keyword, so the declared name is quoted. The module
 // identifier remains catalog/ui.
 module "ui" tagged [ui, browser]
+
+// The card, for the feature parent to relay up to the shell. Its props type
+// stays private: the shell supplies a summary it obtained from the API, and
+// contextual typing is enough to check it.
+expose-src CatalogCard from "catalog-card.tsx" tagged [ui, browser] to parent

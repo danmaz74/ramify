@@ -13,3 +13,12 @@ expose-src createCatalogTools from "mcp.ts" to parent
 expose-sub inspect as inspectRecord from core to parent
 
 expose-sub makeCatalogFixture from core to parent
+
+// The core's summary type, down to this feature's own view child and no
+// further. The shell above composes the card without ever naming the type the
+// card renders.
+expose-sub CatalogSummary from core to descendants
+
+// The view, up to the shell that composes it. A sibling feature's UI never
+// receives it: a view travels upward to its composer, not sideways.
+expose-sub CatalogCard from "ui" to parent

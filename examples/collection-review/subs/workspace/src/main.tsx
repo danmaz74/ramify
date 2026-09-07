@@ -1,7 +1,14 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
+import { App } from './app.js';
 import './styles.css';
+
+/**
+ * The browser entry: it mounts the application and does nothing else. The
+ * stylesheet beside it is plain CSS this owner loads for its side effect; the
+ * two feature views style themselves with CSS modules of their own.
+ */
 
 const container = document.getElementById('root');
 
@@ -11,11 +18,6 @@ if (!container) {
 
 createRoot(container).render(
   <StrictMode>
-    <main className="shell">
-      <h1 className="shell__title">Collection Review</h1>
-      <p className="shell__lead">
-        The record list and the review panel arrive with the feature views.
-      </p>
-    </main>
+    <App />
   </StrictMode>,
 );
