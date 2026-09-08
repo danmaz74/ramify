@@ -49,11 +49,13 @@ module's header. Its optional `src/tests/` still uses the fixed derived profile.
 The separate owner needs ordinary exposure and tag compatibility to import
 another owner's symbols, including its parent's private exports.
 
-Every file uses exactly one area's classification: the profile for `src/tests/`
-takes precedence over the ordinary profile of its containing `src/` directory.
+Every owned source file uses exactly one area's classification: the profile for
+`src/tests/` takes precedence over the ordinary profile of its containing `src/`
+directory.
 An arbitrary nested directory or a `*.test.ts` filename does not create another
-area or override its tags. A test-looking file outside `src/tests/` has the
-ordinary source classification. There are no per-file importer contexts.
+area or override its tags. A test-looking file under `src/` but outside
+`src/tests/` has the ordinary source classification. There are no per-file
+importer contexts.
 
 ## Profile
 

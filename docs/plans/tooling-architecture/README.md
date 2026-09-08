@@ -8,11 +8,17 @@ The intended system is defined in the [architecture documents](../../architectur
 They own the decided process/client, resource and testing architecture, plus
 the proposed module tree, exposure routes, retained state and synchronization.
 This roadmap owns the review process and sequence of working deliverables. Each
-delivery iteration has one plan; architecture review, migration and verification
-are tasks within that plan. The first detailed plan is
-[Iteration 1: Verify a real Ramify project](../iteration-1-project-verifier/main-plan.md).
+deliverable has one plan, run as a sequence of iterations each sized for a
+single 250k-token implementation context; architecture review, migration and
+verification are tasks within those iterations. The first detailed plan is
+[Plan 1: Verify a real Ramify project](../iteration-1-project-verifier/main-plan.md).
 Batch delivery is followed by the resident daemon as a committed architectural
 capability, rather than treating retained analysis as an optional optimization.
+
+Terminology: a **plan** is one of the six deliverables below; an **iteration**
+is a unit of work inside a plan, sized for one implementation context. The
+architecture documents' "batch iteration" and "resident iteration" refer to
+Plans 1 and 2. Plan directories keep the historical `iteration-N-` prefix.
 
 Use this document to choose the next deliverable and write its plan without
 reconstructing decisions from conversation history. Each brief records its
@@ -65,7 +71,7 @@ meaningful tests; existing APIs cannot override the definitive principles.
 
 Review the [eleven-owner tree](../../architecture/daemon.md#ramifys-ownership-tree)
 and the relevant contracts before coding. Nine owners are implemented in the
-batch iteration; daemon and contexts complete that tree in iteration 2. In
+batch plan; daemon and contexts complete that tree in Plan 2. In
 particular, confirm:
 
 - The analysis engine owns resolution, invalidation and rule evaluation; it is
@@ -90,7 +96,7 @@ format or add any new importability rule.
 
 ## Contract and migration review
 
-Before implementing an iteration, prepare its concrete review package. Review
+Before implementing a plan, prepare its concrete review package. Review
 later compatibility where it affects current boundaries; complete later runtime
 contracts with their own delivery plan.
 
@@ -100,7 +106,7 @@ contracts with their own delivery plan.
    lightweight client, daemon, batch and later MCP/web entry files; review their
    transitive runtime dependencies, not just their exported types.
 2. Complete `module.ramify` and purpose README drafts for every owner implemented
-   in that iteration, plus a contract map listing originals, tags, exposure routes
+   in that plan, plus a contract map listing originals, tags, exposure routes
    and intended consumers.
    Include every foreign signature type consumers must import; do not assume
    automatic type exposure or claim a foreign original through an owned wildcard.
@@ -109,7 +115,7 @@ contracts with their own delivery plan.
    scripts and independent example/site scopes.
 4. Build, test and package configuration for the nested tree, preserving portable
    and browser boundaries separately from Node analysis and executable code.
-5. For the daemon iteration: wire protocol, context identity, context-to-daemon
+5. For the daemon plan: wire protocol, context identity, context-to-daemon
    grouping/discovery, synchronization, overlay isolation and compatibility choices for the first
    daemon milestone. Specify retention budgets, backpressure, client leases,
    idle disposal and recovery behavior. The separate web process is decided;
@@ -125,16 +131,16 @@ Context tests use controlled drivers/events/clocks. Owned tests move to each
 owner's `src/tests/`; tests requiring additional classifications use a separate
 properly exposed testing module with test code in ordinary `src/`.
 
-Iteration 1 keeps diagram emission in an explicitly independent build-tool scope,
+Plan 1 keeps diagram emission in an explicitly independent build-tool scope,
 using supported presentation surfaces. Root's dispatch classification alone
 cannot import UI contracts. Do not weaken tags to preserve the old combined barrel.
 
 ## Delivery sequence
 
-Each iteration delivers a usable capability and has an explicit completion gate.
+Each plan delivers a usable capability and has an explicit completion gate.
 A requested missing or unrun checker stage cannot count as passed. Completed
 bounded analysis with documented coverage limits is a different outcome, as
-specified by the source principles. Iterations 2–6 below are the proposed sequence;
+specified by the source principles. Plans 2–6 below are the proposed sequence;
 their detailed plans are written before their implementation.
 
 | Plan | Working deliverable | Required predecessors | Plan artifact |
@@ -155,23 +161,23 @@ explicit rather than silently deleting capabilities from a plan.
 Suggested future directories are `iteration-2-resident-verifier`,
 `iteration-3-project-inspection`, `iteration-4-mcp-access`,
 `iteration-5-change-previews` and `iteration-6-project-explorer`, each under
-`docs/plans/` with one `main-plan.md`. These are reserved names, not existing
-artifacts. Replace the brief's status with a real link when its plan is written;
+`docs/plans/` with one `main-plan.md` and an iterations manifest. These are
+reserved names, not existing artifacts. Replace the brief's status with a real link when its plan is written;
 do not create empty plans or broken links in advance.
 
 Future identity, freshness, query and overlay requirements inform the first
 engine contract review. Their complete protocols are reviewed with the relevant
-iteration. Presentation migration accompanies its changed model dependencies;
+plan. Presentation migration accompanies its changed model dependencies;
 existing diagrams do not wait for the explorer.
 
 MCP delivery does not depend on overlays or visualization. Streamable HTTP is
 optional and requires its own session/lifecycle plan; it is not required by
-iteration 4 or iteration 6.
+Plan 4 or Plan 6.
 
 Apply the additional architecture cases as follows. A case spanning several
 capabilities is completed only when all its scheduled parts have evidence:
 
-| Case family | Iterations 1–2 | Later iterations |
+| Case family | Plans 1–2 | Later plans |
 | --- | --- | --- |
 | [PC01–PC10](../../architecture/processes-and-clients.md#acceptance-evidence) | 1: batch/help startup and applicable PC01 checks. 2: PC01–PC04/PC09, daemon parts of PC06, local-service PC07 and CLI/direct-client PC10. | 3: query-client equivalence; 4: PC08 and MCP portions of PC06–PC07/PC10; 6: PC05 and web portions including PC10. Optional HTTP MCP cases apply only when implemented. |
 | [ML01–ML08](../../architecture/memory-lifecycle.md#measurement-and-acceptance) | 1: batch peak memory, result retention and disposal. 2: resident entry footprint, context/history/work bounds, repeated edits and local slow consumers. | 3: bounded inspection/enrichment; 4: ML08 stdio portions; 5: overlay limits; 6: web/browser footprint, serialization and ML05 open-close cycles. |
@@ -183,11 +189,12 @@ to match declared promises according to the definitive rules.
 
 ## Plan 1: Batch project verification
 
-**Detailed artifact:** [Iteration 1: Verify a real Ramify project](../iteration-1-project-verifier/main-plan.md).
-Its implementation steps and I1-01–I1-30 instance matrix are the completion
+**Detailed artifact:** [Plan 1: Verify a real Ramify project](../iteration-1-project-verifier/main-plan.md).
+Its iteration sequence and I1-01–I1-30 instance matrix are the completion
 authority for this deliverable. Do not duplicate or replace that matrix here.
 
-**Working outcome.** `ramify check --batch <root>` checks real descriptions,
+**Working outcome.** `ramify check`, run inside the project or given
+`--root`, checks real descriptions,
 exports, source accesses, tags and testing origins, with human/JSON reporting.
 The same command checks the reference and the migrated toolkit. The reference
 application's own tRPC/MCP/Cucumber tests remain regression evidence.
@@ -243,8 +250,9 @@ no owner or independent analyzer.
 
 ### Resolve while writing the detailed plan
 
-1. Supported platforms and local transport, endpoint discovery, daemon grouping,
-   ownership of endpoints, concurrent startup coordination and stale cleanup.
+1. Local transport on the supported platforms, Linux and macOS: endpoint
+   discovery, daemon grouping, ownership of endpoints, concurrent startup
+   coordination and stale cleanup.
    Select a concrete initial deployment arrangement; do not leave several
    incompatible lifecycle designs for the implementer to choose.
 2. Context selection from real worktree/root, source scope, configuration,
@@ -307,8 +315,9 @@ local-service PC07, CLI/direct-client PC10 and the applicable ML/QT cases. Inclu
   and separately instrumented resident workloads.
 
 Hand off a documented client API, lifecycle/error tables, codecs, revision and
-freshness guarantees, supported platforms, resource budgets, event/direct-test
-adapters and runnable concurrency/recovery fixtures. Plans 3–6 reuse them.
+freshness guarantees, per-platform transport details, resource budgets,
+event/direct-test adapters and runnable concurrency/recovery fixtures.
+Plans 3–6 reuse them.
 
 ## Plan 3: Project inspection
 
@@ -626,7 +635,7 @@ source/architecture document; do not depend on conversation history.
 | Producer | Required handoff | Consumers |
 | --- | --- | --- |
 | Plan 1 | Implemented package/session/report contracts; canonical source/export facts and exposure evidence; reference instance map; scope/configuration/compiler decisions; self-check and batch resource results. | All later plans. |
-| Plan 2 | Context/generation/revision and freshness contracts; local codecs/client; event ordering and distinct idle-exit/crash/explicit-stop rules; restricted fallback policy; daemon-owned direct-service harness; measured limits and platform support. | Plans 3–6. |
+| Plan 2 | Context/generation/revision and freshness contracts; local codecs/client; event ordering and distinct idle-exit/crash/explicit-stop rules; restricted fallback policy; daemon-owned direct-service harness; measured limits and per-platform transport details. | Plans 3–6. |
 | Plan 3 | Inspection/availability/query schemas; source and original drill-down IDs; usage/counting definitions; detail/cursor/error states; bounded enrichment and consumer fixtures. | Plans 4–6. |
 | Plan 4 | MCP tool/resource schemas and host launch setup; protocol/session lifecycle; actual and in-memory protocol clients; capability and error mapping. | Plan 5 and optional later MCP hosting. |
 | Plan 5 | Overlay input/lifecycle/version contract; comparison result schema; supported edit classes; conflict/eviction examples and materialized-input batch oracle. | Optional explorer preview UI and future editor integrations. |
@@ -677,9 +686,13 @@ implementation of contracts that have not been reviewed.
 7. Record explicit deferrals and the information needed by successor plans.
    Any newly discovered prerequisite belongs to a named current-plan task or
    an explicit roadmap revision, not hidden scope growth.
-8. Author one detailed `main-plan.md` and register it as a single iteration.
-   If planning metadata is used, set `singleIteration: true` with one
-   iteration pointer to that main plan; work steps are not nested delivery plans.
+8. Author one detailed `main-plan.md` and split its work into iterations,
+   each comfortably implementable within a single 250k-token context: one
+   owner or one capability, a bounded matrix slice, its own verification and
+   exit criteria, and a self-contained iteration file naming what to read.
+   Register them in the iterations manifest in dependency order; the plan's
+   gate is its last iteration's exit. Work steps inside an iteration are not
+   delivery plans.
 9. Link the created artifact from this roadmap and mark it as a draft. Review
    its concrete architecture/contracts before implementation. Advance status
    to implemented only when its strict gate and completion report establish it.
@@ -697,6 +710,7 @@ writing future plans; they do not block the current Plan 1 gate.
 | Work | Existing decision / remaining question | When to plan it |
 | --- | --- | --- |
 | Registry configuration serialization | Generic resolved registries and custom tag kinds are required in Plan 1. User-facing serialization, default replacement and configuration loading remain unspecified. | When projects need to supply registry definitions through ordinary CLI/service configuration. Review its source input, identity and invalidation effects before adoption. |
+| Project configuration and possible strict checking | Selected project files outside module source areas produce warnings by default. A future strict configuration might make those warnings fail a check; its syntax and exact scope are undecided and outside Plan 1. | When defining scope customization and warning control, review this option explicitly. It is separate from the reference harness's required conformance gate. |
 | Additional source adapters | The bounded source profile stays explicit. Vite macros, Jiti, compiled-source mapping and other tool-specific interpretation require real target/selection evidence; unsupported access is not automatically external. | Select concrete remaining S/K instances when expanding checking coverage for an actual project. Do not add a second resolver/checker in a client. |
 | Reference browser/tool compatibility | The reference application's K cases exercise its own runtime. They are distinct from tests of Ramify's explorer; existing Cucumber execution does not establish every browser/tool case. | Extend the independent reference harness when those fixtures are implemented; attach source assertions only when the corresponding adapter exists. |
 | Browser-promise verification | Matching the declared browser tag is part of ordinary checking. Proving the promise is a separate verifier with its own capability, coverage and owner findings. | A separately scoped plan if verification is requested. Until then, requesting it returns unavailable. |

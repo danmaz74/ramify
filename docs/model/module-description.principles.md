@@ -871,7 +871,7 @@ application model from descriptions containing them:
 | Invalid module name or duplicate sibling name | Module identity is ambiguous |
 | Missing root description or an invalid nested description | The ownership tree cannot be accepted |
 | A module declared inside `src/` (including tests or interfaces), at a reserved container root, or outside its parent's `subs/` | The required module layout is violated |
-| Application source outside its owner's `src/`, including sibling `tests/` or `interfaces/` and loose source in grouping directories | The owned source scope would be incomplete |
+| A file outside a module's `src/` included as that module's application source | The file is outside the module's source areas; other project files merely present outside them do not invalidate module descriptions |
 | Missing source path, excluded target, symlink traversal, escape from the statement's `src/` or `src/tests/` root, or a non-file target | The source reference has no valid application target |
 | A source file owned by another module or a foreign forwarding export claimed as owned | Source references cannot transfer ownership |
 | An `expose-sub` name that is not a declared direct child | The reference does not identify a permitted provider |

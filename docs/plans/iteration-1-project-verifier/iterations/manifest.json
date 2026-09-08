@@ -1,12 +1,95 @@
 {
-  "singleIteration": true,
   "planPath": "main-plan.md",
   "createdAt": "2026-09-07T11:44:52.616Z",
   "iterations": [
     {
       "index": 1,
       "file": "iteration1.md",
-      "title": "Verify a real Ramify project",
+      "title": "Contract package and scope freeze",
+      "parallelGroup": null
+    },
+    {
+      "index": 2,
+      "file": "iteration2.md",
+      "title": "Skeleton tree, build configuration and harness runner",
+      "parallelGroup": null
+    },
+    {
+      "index": 3,
+      "file": "iteration3.md",
+      "title": "Definitive model",
+      "parallelGroup": null
+    },
+    {
+      "index": 4,
+      "file": "iteration4.md",
+      "title": "Description parser",
+      "parallelGroup": null
+    },
+    {
+      "index": 5,
+      "file": "iteration5.md",
+      "title": "Project acquisition and metadata",
+      "parallelGroup": null
+    },
+    {
+      "index": 6,
+      "file": "iteration6.md",
+      "title": "Source catalog",
+      "parallelGroup": null
+    },
+    {
+      "index": 7,
+      "file": "iteration7.md",
+      "title": "Linking and exposure contracts",
+      "parallelGroup": null
+    },
+    {
+      "index": 8,
+      "file": "iteration8.md",
+      "title": "Toolkit migration into declared owners",
+      "parallelGroup": null
+    },
+    {
+      "index": 9,
+      "file": "iteration9.md",
+      "title": "Static access checking",
+      "parallelGroup": null
+    },
+    {
+      "index": 10,
+      "file": "iteration10.md",
+      "title": "Tags, source areas and testing origin in real source",
+      "parallelGroup": null
+    },
+    {
+      "index": 11,
+      "file": "iteration11.md",
+      "title": "Namespaces, forwarding stars and lazy forms",
+      "parallelGroup": null
+    },
+    {
+      "index": 12,
+      "file": "iteration12.md",
+      "title": "Resources, coverage and the analysis session",
+      "parallelGroup": null
+    },
+    {
+      "index": 13,
+      "file": "iteration13.md",
+      "title": "CLI and process behavior",
+      "parallelGroup": null
+    },
+    {
+      "index": 14,
+      "file": "iteration14.md",
+      "title": "Reference gate",
+      "parallelGroup": null
+    },
+    {
+      "index": 15,
+      "file": "iteration15.md",
+      "title": "Self-check, relocation, measurements and completion",
       "parallelGroup": null
     }
   ]

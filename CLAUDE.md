@@ -28,6 +28,11 @@ conform to these documents, as must the evaluator, diagrams, and other tools.
 Keep the authoritative rules in the principles document and the vocabulary
 in its companion glossary.
 
+Change a principles document only when its model, format or source-interpretation
+rules need to change or require a necessary clarification. Tooling scope, CLI
+behavior and implementation choices belong in architecture documents and plans;
+a definitive tooling decision does not by itself require a principles edit.
+
 The concrete representation is defined separately in
 [Directory Structure And Module Description Principles](docs/model/module-description.principles.md).
 It specifies the required `src/` and `subs/` layout, with optional same-owner
@@ -102,7 +107,18 @@ The later root child `mcp [dispatch]` serves stdio through a lazily loaded
 Optional MCP HTTP hosting can mount that module in the separate web process.
 The daemon excludes MCP/web/development dependencies and follows explicit memory
 retention, queue and client-lifecycle limits. Quick tests run real services through
-direct adapters, supplemented by actual transport and process tests.
+direct adapters, supplemented by actual transport and process tests. The
+[CLI invocation contract](docs/architecture/cli-invocation.md) fixes how
+`ramify check` selects the project, finds the compiler configuration, warns
+about files outside modules and exits.
+Compiler-selected files outside every module's `src/`, including sibling
+`tests/` or `interfaces/` and loose `subs/` source, produce warnings without
+failing the check. An owned import targeting them is an outside-scope analysis
+limit, never an allowed import or an external package. Discovered stray
+`module.ramify` files are layout errors even with valid contents. Other invalid
+declarations and invalid exposure paths remain errors. A future
+strict project configuration might make the outside-source warnings fail a
+check; its syntax and scope are undecided and it is not part of Plan 1.
 
 [Daemon and analysis architecture](docs/architecture/daemon.md) owns the proposed
 module tree, engine contracts, isolated contexts and revisioned source analysis.

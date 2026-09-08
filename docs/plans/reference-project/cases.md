@@ -23,15 +23,20 @@ limits. None of the cases requires an exhaustive runtime closure proof.
 
 ## Ownership and layout
 
+Module validity follows the
+[module-description principles](../../model/module-description.principles.md).
+The outside-module warning expectations follow the
+[CLI invocation contract](../../architecture/cli-invocation.md#files-outside-modules).
+
 | ID | Mode / authority | Witness and meaningful expectation |
 | --- | --- | --- |
 | L01 | B + M / A | Every source, test, and application resource has exactly one owner under `src/`, including `src/tests/` and `src/interfaces/`. Nested tests use their testing profile exactly once; interfaces keep the ordinary profile. A child remains separate. A description anywhere inside `src/` is invalid and cannot silently fall back to its parent. |
-| L02 | M / A | Missing/invalid root or child description, duplicate sibling names, and loose application source under `subs/` produce structural diagnostics. Malformed ownership must not be replaced with a guessed ancestor owner. |
+| L02 | M / A | Missing/invalid root or child description, duplicate sibling names and a discovered stray `module.ramify` are structural errors; valid contents do not legalize a misplaced description. Malformed ownership must not be replaced with a guessed ancestor owner. Compiler-selected loose source under `subs/` is outside checked module source and produces a warning without invalidating the tree. |
 | L03 | M + H / A | An empty owner has its own `src/` implementation scope, created before work if absent. Search excludes children; test and metadata scopes are distinct. No mandatory `index.ts`, package, or build per owner. |
 | L04 | M + H / A | Moving a module through an ordinary grouping directory preserves declared identity. Renaming or reparenting changes it; historical-reference migration is explicit host work. |
 | L05 | M / A | `expose-src` paths start at `src/`; `expose-test` paths start at `src/tests/`. Selecting a test file through either form preserves the same identity and testing tags. Missing export, root escape, alias collision and invalid duplicate declarations are diagnosed. Quoting/comments/version-token cases use small parser inputs. Accept `module tests tagged [testing]` and child references `from tests`; quoting `"tests"` preserves the same identity. Contrast the reserved name `"testing"`, which requires quotes. |
 | L06 | M / A | Actual filesystem symlinks exercise v1 policy: a symlink root or description and a `from` path traversing a symlink are rejected; discovery does not traverse directory symlinks. These are filesystem fixtures, not parser-only strings. |
-| L07 | B + M / A | `contracts/src/interfaces/vocabulary.ts` is ordinary owned source. A wildcard declaration selects its exports as covered by E07; moving a binding into an unselected file there does not expose it or change its profile. Source at sibling `tests/` or `interfaces/` fails layout validation; an ordinary nested `src/helpers/tests/` does not gain the test profile. |
+| L07 | B + M / A | `contracts/src/interfaces/vocabulary.ts` is ordinary owned source. A wildcard declaration selects its exports as covered by E07; moving a binding into an unselected file there does not expose it or change its profile. Compiler-selected source at sibling `tests/` or `interfaces/` produces warnings without failing layout validation and receives no owned source-area classification; an ordinary nested `src/helpers/tests/` does not gain the test profile. |
 
 ## Exposure and original identity
 

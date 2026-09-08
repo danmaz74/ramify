@@ -105,6 +105,8 @@ project state and unavailable execution.
 ## CLI commands
 
 These names are proposed; their process behavior is part of the architecture.
+The invocation contract of `check`, covering root selection, configuration
+discovery, warnings and exits, is [CLI invocation](cli-invocation.md).
 
 | Command | Required behavior |
 | --- | --- |

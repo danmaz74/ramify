@@ -195,21 +195,24 @@ export const referenceCases: readonly ReferenceCase[] = [
   },
   {
     id: 'L02',
-    intent: 'Structural diagnostics for malformed ownership.',
+    intent: 'Ownership errors and outside-source warnings remain distinct.',
     mode: ['M'],
     authority: ['A'],
     entry:
-      'Copies with the root description removed, a child description made invalid, two siblings sharing a declared name, and application source loose under `subs/`.',
+      'Copies with the root description removed, a child description made invalid, two siblings sharing a declared name, a syntactically valid stray `tests/module.ramify` beside selected `tests/helper.ts`, and compiler-selected project source loose under `subs/`.',
     capability: 'loader',
     expected:
-      'Each fault is reported against its own description with a useful location; no file is re-attributed to a guessed ancestor owner and no partial model is published.',
+      'Description faults, including the stray description with valid contents, are located errors: no file is re-attributed to a guessed ancestor owner and no valid model is published. Loose source under `subs/` produces a warning without invalidating the tree and receives no owned source-area classification.',
     coverageNotes:
       'A pure mutation family: the baseline authors nothing for it. Neither the mutation runner nor the parser exists.',
     implementation: 'absent',
     baselineWitness: {
       kind: 'document',
-      paths: [`${model}/module-description.principles.md`],
-      note: 'The validation table that fixes these conditions as errors.',
+      paths: [
+        `${model}/module-description.principles.md`,
+        'docs/architecture/cli-invocation.md',
+      ],
+      note: 'The principles define invalid descriptions and source claims; the CLI contract defines outside-source warnings.',
     },
   },
   {
@@ -295,10 +298,10 @@ export const referenceCases: readonly ReferenceCase[] = [
     mode: ['B', 'M'],
     authority: ['A'],
     entry:
-      "`contracts/src/interfaces/vocabulary.ts` and the wildcard that selects it; mutations move a binding into a second, unselected interface file, add a sibling `tests/` and `interfaces/`, and add an ordinary `src/helpers/tests/`.",
+      "`contracts/src/interfaces/vocabulary.ts` and the wildcard that selects it; mutations move a binding into a second, unselected interface file, add compiler-selected source at sibling `tests/` and `interfaces/`, and add an ordinary `src/helpers/tests/`.",
     capability: 'loader',
     expected:
-      'The wildcard covers the named file alone; a binding moved into an unselected file is neither exposed nor reclassified; source at a sibling `tests/` or `interfaces/` fails layout validation; `src/helpers/tests/` keeps the ordinary profile.',
+      'The wildcard covers the named file alone; a binding moved into an unselected file is neither exposed nor reclassified; compiler-selected source at sibling `tests/` or `interfaces/` produces warnings without failing layout validation and receives no owned source-area classification; `src/helpers/tests/` keeps the ordinary profile.',
     coverageNotes:
       'The baseline half is authored; every assertion needs the loader, and the added-export half overlaps E07.',
     implementation: 'absent',
