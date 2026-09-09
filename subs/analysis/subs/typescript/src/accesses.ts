@@ -5,7 +5,7 @@ import type { Project } from 'typescript/unstable/sync';
 import { SyntaxKind, isCallExpression, isExportDeclaration, isImportDeclaration,
   isNamedExports, isNamedImports, isStringLiteral, isImportTypeNode, isLiteralTypeNode,
   isNamespaceImport, isAwaitExpression, isParenthesizedExpression, isPropertyAccessExpression,
-  isVariableDeclaration, isExpressionStatement, isVoidExpression, isArrowFunction, isFunctionExpression,
+  isVariableDeclaration, isVariableStatement, isExpressionStatement, isVoidExpression, isArrowFunction, isFunctionExpression, isFunctionDeclaration,
   isQualifiedName, isIdentifier, isImportEqualsDeclaration, isExternalModuleReference, isExportAssignment,
   isBinaryExpression, isElementAccessExpression, isMetaProperty, type Node } from 'typescript/unstable/ast';
 import { originalKey } from '../../model/src/identity.js';
@@ -149,6 +149,24 @@ export function collectAccesses(project: Project, inputs: HelperInputs, host: Ca
     };
     const loaderFactories = new Set<number>(), loaderNamespaces = new Set<number>(), loaders = new Set<number>();
     const symbolId = (node: Node): number | undefined => project.checker.getSymbolAtLocation(node)?.id;
+    const commonjsRequire = (node: Node): boolean => {
+      const symbol = project.checker.getSymbolAtLocation(node);
+      // An unbound require remains a potential CommonJS access. A resolved
+      // application binding must not turn its arguments into source loads.
+      if (!symbol) return true;
+      return symbol.declarations.length > 0 && symbol.declarations.every(handle => {
+        const declaration = handle.resolve(project);
+        if (!declaration) return false;
+        if (isFunctionDeclaration(declaration)) return !declaration.body && (declaration.getSourceFile().isDeclarationFile
+          || !!declaration.modifiers?.some(modifier => modifier.kind === SyntaxKind.DeclareKeyword));
+        if (isVariableDeclaration(declaration)) {
+          const statement = declaration.parent.parent;
+          return !declaration.initializer && (declaration.getSourceFile().isDeclarationFile
+            || isVariableStatement(statement) && !!statement.modifiers?.some(modifier => modifier.kind === SyntaxKind.DeclareKeyword));
+        }
+        return false;
+      });
+    };
     const indexed = (symbols: ReadonlySet<number>, node: Node): boolean => {
       const id = symbolId(node); return id !== undefined && symbols.has(id);
     };
@@ -244,7 +262,7 @@ export function collectAccesses(project: Project, inputs: HelperInputs, host: Ca
       }
       if (isCallExpression(node)) {
         const selected = member(node.expression);
-        if (isIdentifier(node.expression) && node.expression.text === 'require') {
+        if (isIdentifier(node.expression) && node.expression.text === 'require' && commonjsRequire(node.expression)) {
           record(node, node.arguments[0], 'commonjs', 'unknown', true, undefined,
             { code: 'unsupported-commonjs', message: 'CommonJS require access is outside the ECMAScript interpretation profile' });
         } else if (isIdentifier(node.expression) && loaders.size > 0 && indexed(loaders, node.expression)

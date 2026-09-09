@@ -39,6 +39,9 @@ export class NamespaceUses {
 
   binding(name: BindingName, sink: NamespaceSink, path: readonly string[] = [], then = false): void {
     if (isObjectBindingPattern(name)) {
+      // Empty nested patterns still consume a merged runtime binding, even
+      // though they select none of its namespace constituents.
+      if (!name.elements.length && path.length && sink.original(path)) sink.select(name, path, then ? 'then-destructure' : 'destructure', null);
       for (const element of name.elements) {
         if (!element.name) { sink.unknown(element, 'namespace-escape'); continue; }
         if (element.dotDotDotToken) { sink.unknown(element, 'namespace-escape'); continue; }

@@ -443,3 +443,87 @@ describe('public disposable analysis session', () => {
     } finally { hook.disable(); await session.dispose(); }
   }), 15_000);
 });
+
+describe('iteration 12 constraint remediation', () => {
+  async function compilerValid(root: string): Promise<void> {
+    const compiler = await promisify(execFile)(process.execPath,
+      [fileURLToPath(new URL('../../../../node_modules/typescript/lib/tsc.js', import.meta.url)), '--noEmit', '--project', join(root, 'tsconfig.json')],
+      { cwd: root, timeout: 10_000 });
+    expect([compiler.stdout, compiler.stderr]).toEqual(['', '']);
+  }
+
+  it.each(['local', 'overloaded', 'variable', 'parameter', 'imported', 'imported-alias', 'renamed'] as const)(
+    'does not treat a %s application function as the CommonJS loader', async variant => fixture(async (root, inputs) => {
+      await put(root, 'subs/consumer/src/tests/theme.css', '.theme {}\n');
+      await put(root, 'subs/consumer/src/identity.ts', 'export function require(value: string) { return value; }\n');
+      const call = variant === 'renamed' ? 'identity' : 'require';
+      const prefix = variant === 'local' ? 'function require(value: string) { return value; }'
+        : variant === 'overloaded' ? 'function require(value: string): string; function require(value: string) { return value; }'
+        : variant === 'variable' ? 'const require = (value: string) => value;'
+        : variant === 'parameter' ? 'function invoke(require: (value: string) => string) { return require("./tests/theme.css"); }'
+        : variant === 'imported' ? 'import { require } from "./identity.js";'
+        : variant === 'imported-alias' ? 'import { require as identity } from "./identity.js"; const require = identity;'
+        : 'function identity(value: string) { return value; }';
+      await put(root, importer, `${prefix}\n${variant === 'parameter' ? 'void invoke(value => value);' : `void ${call}("./tests/theme.css");`}\nexport {};\n`);
+      await compilerValid(root);
+      const report = reported(await analyzeProject(inputs));
+      expect(report.outcome).toEqual({ execution: 'completed', check: 'passed', coverage: 'complete' });
+      expect(report.diagnostics).toEqual([]);
+      expect(report.coverage).toEqual([]);
+      expect(report.snapshot!.accesses.some(access => access.form === 'commonjs')).toBe(false);
+      expect(report.snapshot!.accesses.some(access => access.specifier === './tests/theme.css')).toBe(false);
+      if (variant.startsWith('imported')) {
+        expect(report.snapshot!.results.some(result => result.decisions.some(decision => decision.status === 'allowed'
+          && decision.original?.id.binding === 'require'))).toBe(true);
+      }
+    }), 15_000);
+
+  it.each(['function', 'variable', 'node-types'] as const)('preserves actual CommonJS origin checks with %s declarations', async variant => fixture(async (root, inputs) => {
+    await put(root, 'subs/consumer/src/tests/theme.css', '.theme {}\n');
+    await put(root, 'package.json', '{"type":"commonjs"}');
+    await put(root, 'tsconfig.json', JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'Node16', moduleResolution: 'Node16',
+      types: variant === 'node-types' ? ['node'] : [], skipLibCheck: true,
+      ...(variant === 'node-types' ? { typeRoots: [fileURLToPath(new URL('../../../../node_modules/@types', import.meta.url))] } : {}) }, include: ['src', 'subs'] }));
+    const ambient = variant === 'function' ? 'declare function require(value: string): unknown;'
+      : variant === 'variable' ? 'declare const require: (value: string) => unknown;' : '';
+    await put(root, importer, `${ambient}\nvoid require("./tests/theme.css");\nexport {};\n`);
+    await compilerValid(root);
+    const report = reported(await analyzeProject(inputs));
+    expect(report.outcome).toEqual({ execution: 'completed', check: 'failed', coverage: 'partial' });
+    expect(report.coverage).toEqual([expect.objectContaining({ code: 'unsupported-commonjs' })]);
+    expect(report.diagnostics).toEqual([expect.objectContaining({ code: 'testing-origin', location: expect.objectContaining({ file: importer, line: 2 }) })]);
+    expect(report.snapshot!.accesses).toEqual([expect.objectContaining({ form: 'commonjs',
+      target: { kind: 'application', origin: expect.objectContaining({ file: 'subs/consumer/src/tests/theme.css' }) } })]);
+  }), 15_000);
+
+  const selections = {
+    static: (pattern: string) => `import * as ns from '../../../src/interfaces/api.js'; const { ${pattern} } = ns;`,
+    awaited: (pattern: string) => `const { ${pattern} } = await import('../../../src/interfaces/api.js'); export {};`,
+    callback: (pattern: string) => `void import('../../../src/interfaces/api.js').then(({ ${pattern} }) => {});`,
+    'callback-body': (pattern: string) => `void import('../../../src/interfaces/api.js').then(ns => { const { ${pattern} } = ns; });`,
+  };
+  it.each(Object.entries(selections).flatMap(([form, source]) => (['private', 'unpromised', 'allowed'] as const).map(permission => ({ form, source, permission }))))(
+    'checks the $permission merged binding in $form empty nested destructuring', async ({ source, permission }) => fixture(async (root, inputs) => {
+      await put(root, 'src/interfaces/api.ts', 'export function Merged() {}\nexport namespace Merged { export const member = 1; }\n');
+      await put(root, 'module.ramify', `ramify 1\nmodule fixture\n${permission === 'private' ? ''
+        : `expose-src Merged from "interfaces/api.ts"${permission === 'allowed' ? ' tagged [browser]' : ''} to descendants\n`}`);
+      await put(root, 'subs/consumer/module.ramify', 'ramify 1\nmodule consumer tagged [browser]\n');
+      for (const pattern of ['Merged', 'Merged: {}']) {
+        await put(root, importer, `${source(pattern)}\n`);
+        await compilerValid(root);
+        const report = reported(await analyzeProject(inputs));
+        expect(report.outcome).toEqual({ execution: 'completed', check: permission === 'allowed' ? 'passed' : 'failed', coverage: 'complete' });
+        expect(report.coverage).toEqual([]);
+        const accesses = report.snapshot!.accesses.filter(access => access.importer.file === importer);
+        expect(accesses).toHaveLength(1);
+        expect(accesses[0].selections).toEqual([expect.objectContaining({ request: 'value', status: 'resolved',
+          original: { kind: 'code', owner: 'fixture', file: 'interfaces/api.ts', binding: 'Merged' },
+          location: expect.objectContaining({ file: importer, line: 1 }) })]);
+        const decisions = report.snapshot!.results.flatMap(result => result.decisions);
+        expect(decisions).toHaveLength(1);
+        expect(decisions[0]).toMatchObject({ status: permission === 'allowed' ? 'allowed' : 'denied',
+          reason: permission === 'private' ? 'not-visible' : permission === 'unpromised' ? 'required-symbol-tag' : 'exposed' });
+        if (permission === 'unpromised') expect(decisions[0].visibility?.visible).toBe(true);
+      }
+    }), 20_000);
+});

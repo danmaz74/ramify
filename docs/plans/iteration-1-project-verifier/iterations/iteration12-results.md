@@ -118,3 +118,28 @@ Ignored local evidence is under `.reference-work/iteration12-evidence/`: gate st
 - Use the installed analysis entry and lazy root batch assembly; retain lightweight help/version startup and the reviewed final CLI/package declaration activation.
 - Preserve origin evidence for unresolved bindings and known testing targets without turning unsupported CommonJS/loader selections into allowed imports.
 - Iterations 14 and 15 retain the whole-reference completion gate, runtime regression tiers, self-check/negative, relocation and workload measurements. No daemon, server, persistent cache, worker pool or alternate checker was added.
+
+## Constraint remediation (2026-09-09)
+
+Addressed both reported iteration-12 findings in the authoritative checkout, starting from workflow checkpoint `f3aac7a`. The original 268-instance gate and implementation evidence above belong to the initial implementation turn; they were not rerun during this focused remediation.
+
+- **cf-constraints-mtuqfi7x-r3lyf0mm — application functions named require:** CommonJS call recognition now inspects the compiler symbol's declarations. Local implementations, overloads with implementations, variables, parameters and imported application bindings do not turn their string arguments into source loads. Ambient function/variable declarations and Node's actual require binding retain the existing CommonJS coverage and testing-origin checks.
+- **cf-constraints-mtuqfi7x-bfjx9qy4 — empty nested merged-binding patterns:** an empty nested object pattern retains the consumed runtime original. Static namespaces, awaited imports, callback parameters and callback-body destructuring now check Merged for visibility and browser promises. Nonempty patterns continue to select actual namespace constituents independently.
+
+Added **22 compiler-valid public-session regression cases**. Seven application-function variants include imported/renamed controls; three actual CommonJS variants cover ambient functions, ambient variables and Node types. Twelve merged-binding cases combine four source forms with private, visible-but-unpromised and explicitly browser-promised originals. Each merged-binding case first asserts ordinary named destructuring and then the empty nested pattern, retaining original identity, value request, location, decision and coverage assertions.
+
+Before the fixes, **18 cases failed and four controls passed**, reproducing the reported contradictions without compiler fixture errors. After the fixes, all **22 cases passed**. The independent controls establish that application function calls have no invented resource access, actual CommonJS keeps its known testing-origin denial beside coverage, and empty patterns neither bypass definite denials nor omit allowed selected originals.
+
+Focused verification passed:
+
+```sh
+npx vitest run subs/analysis/src/tests/session.test.ts -t 'iteration 12 constraint remediation'
+npx vitest run subs/analysis/subs/typescript/src/tests/coverage.test.ts subs/analysis/src/tests/evaluate-accesses.test.ts subs/analysis/src/tests/session.test.ts -t 'records .*CommonJS|keeps known .*origins on unsupported CommonJS|nested-member|name-property|import-type Merged|actual merged namespace export|binding propert|symbol-free source'
+npm run type-check
+npm run build
+git diff --check
+```
+
+The first command passed **22 new cases**; the second passed **17 affected existing cases** covering CommonJS forms/origins, nested namespace constituents, ordinary binding properties, import-type qualifiers and symbol-free origin isolation. Type-check covered toolkit, portable owners, scripts and harness. The production build and emitted dependency/helper checks passed. Current toolkit declaration/export validation through the compiled public analysis entry remained valid: **9 owners, 134 files, 56 expanded statements**.
+
+Before/after test logs, affected checks, type-check/build output and declaration validation are retained under ignored `.reference-work/iteration12-evidence/remediation/`. No existing assertion, scenario, public contract, exposure, model principle, reference fixture or matrix record was removed or weakened. Full regression, scenario coverage, sealed-file and constraint acceptance checks remain with workflow automation.
