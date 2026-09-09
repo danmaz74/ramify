@@ -2,7 +2,7 @@
 
 # Iteration 5 results: project acquisition and metadata
 
-Status: implementation and focused verification complete; publication is blocked by the workflow artifact-state conflict documented below. The draft has not been accepted and automatic iteration-5 checks have not started. This establishes project acquisition and metadata, not source cataloging, linked permissions, CLI checking or Plan 1 completion.
+Status: the two remaining constraint findings are corrected and local verification passes. Publication recovery and fresh Studio audit are pending. This establishes project acquisition and metadata, not source cataloging, linked permissions, CLI checking or Plan 1 completion.
 
 ## Prerequisites and working scope
 
@@ -124,3 +124,20 @@ Resubmission returned `FILE_POLICY_VIOLATION`: that artifact belongs to iteratio
 Read-only diagnosis identified installed cucumber-viz 0.6.3, configured project state under `/ramify/.cucumber-viz/`, the authoritative execution worktree above, and the active supplied iteration-5 attempt. The workflow journal records publication operation `pub-_JG0Ucx92X1f6WqRyuxxC-5-1788955143954`, draft head `dad9cf6`, base head `f8e8517`, and rejection of the single predecessor artifact. Publication status reports no pending accepted draft.
 
 Recovery requires the workflow control plane to reconcile the already generated iteration-4 outcome with the iteration-5 publication baseline, or otherwise correctly absorb its own predecessor bookkeeping, then retry publication of this draft. No callable supported recovery control was found for that reconciliation. Neither workflow state nor check-result contents were manually rewritten; shared services were not restarted. Both required iteration-5 artifacts and all implementation/evidence remain committed and reviewable. The separate bookkeeping commit preserves the exact predecessor output for recovery.
+
+## Interactive recovery verification
+
+The 2026-09-09 constraints check reported two remaining defects after automatic remediation. Both were reproduced with failing tests before correction:
+
+- Discovery excluded compiler outDir but omitted declarationDir. It now excludes both resolved output directories. Real TypeScript emission fixtures use an inherited declarationDir beneath ordinary source and beneath testing source; generated declarations stay outside the inventory and cannot be exposed. Compiler-excluded ordinary implementation and tests remain inventoried.
+- README purpose extraction kept the skipped-block state after indented code ended. Indented code now stops at the next unindented line, while list and quote continuation behavior is preserved. Space- and tab-indented examples and public readProject acquisition select Purpose. immediately after code, instead of Later.
+
+Verification on the corrected source:
+
+- npm test -- subs/analysis/subs/project/src/tests: 4 files, 104 tests passed.
+- npm test: 26 files, 790 tests passed.
+- npm run type-check and npm run build: passed.
+- npm run reference:verify -- --plan 1 --iteration 5: 88 required instances passed, zero failed. Future stages remain unexecuted and Plan 1 is incomplete.
+- git diff --check: passed.
+
+These results supersede the earlier local-verification and not-yet-run statements above. The historical failed constraints result and skipped automatic regression result remain preserved in Studio; fresh audit and publication recovery will provide subsequent evidence.

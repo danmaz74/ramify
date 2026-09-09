@@ -26,7 +26,10 @@ export function readPurpose(readme: string, text: string | undefined): ModulePur
     if (!line.trim()) { excludedBlock = false; index++; continue; }
     if (/^ {0,3}</.test(line)) { html = !line.includes('-->'); index++; continue; }
     if (/^ {0,3}#{1,6}(?:[ \t]|$)/.test(line)) { excludedBlock = false; index++; continue; }
-    if (/^(?: {0,3}(?:>|[-+*]\s|\d+[.)]\s|\[[^\]]+\]:)| {4}|\t|\s*[-*_]{3,}\s*$|\s*\|)/.test(line)) {
+    // Indented code ends at the first unindented line; lists and quotes can
+    // retain unmarked continuation lines until their paragraph ends.
+    if (/^(?: {4}|\t)/.test(line)) { index++; continue; }
+    if (/^(?: {0,3}(?:>|[-+*]\s|\d+[.)]\s|\[[^\]]+\]:)|\s*[-*_]{3,}\s*$|\s*\|)/.test(line)) {
       excludedBlock = true; index++; continue;
     }
     if (excludedBlock) { index++; continue; }

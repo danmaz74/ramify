@@ -11,5 +11,5 @@
   },
   "completedAt": "2026-09-09T12:00:43.272Z",
   "iteration": "5",
-  "notes": "Implementation and verification complete: 102 focused tests; 88/88 required instances, 3,070 assertions; type-check/build and compiled acquisition/seal/disposal passed. Publication remains blocked: WORKTREE_DIRTY required committing the pre-existing generated iteration4-check-results.md change, then FILE_POLICY_VIOLATION rejected that predecessor artifact. Control-plane baseline reconciliation is required. Full regression/Cucumber/scenario/sealed checks remain delegated to automation and have not run for this draft."
+  "notes": "Both remaining constraints defects reproduced and corrected: exclude resolved declarationDir from discovery/exposure; end indented README code before following prose. Verification: 104 project tests; 790 full-suite tests; 88/88 required iteration-5 reference instances; type-check/build and diff checks pass. Historical failed constraints and skipped automatic regression are preserved. Fresh Studio audit and publication recovery pending; full Plan 1 remains incomplete."
 }

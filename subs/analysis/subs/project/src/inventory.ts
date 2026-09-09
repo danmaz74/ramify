@@ -15,7 +15,8 @@ type InventoryRead = { inventory: ProjectInventory; issues: ProjectIssue[] }
 
 function excludedDirectory(path: string, config: ConfigurationData): boolean {
   if (['.git', 'node_modules', 'bower_components', 'jspm_packages'].includes(basename(path))) return true;
-  if (typeof config.options.outDir === 'string' && within(config.options.outDir, path)) return true;
+  if ([config.options.outDir, config.options.declarationDir]
+    .some(directory => typeof directory === 'string' && within(directory, path))) return true;
   // Only generated scratch conventions use an explicit directory exclusion.
   // An arbitrary excluded/unselected tests/ or tools/ directory still needs
   // discovery: a marker there is a layout error regardless of source selection.

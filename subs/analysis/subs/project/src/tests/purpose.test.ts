@@ -12,6 +12,8 @@ describe('README purpose', () => {
     '```md\nFalse prose\n```\n\nPurpose.',
     '~~~~\nFalse prose\n~~~\nstill code\n~~~~\n\nPurpose.',
     '    indented code\n\nPurpose.',
+    '    const code = 1;\nPurpose.\n\nLater.',
+    '\tconst code = 1;\nPurpose.\n\nLater.',
     '<!-- Comment\nfalse prose\n-->\n\nPurpose.',
     '\uFEFF# Title\r\n\r\nPurpose.',
   ])('skips non-prose blocks: %s', text => {

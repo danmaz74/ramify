@@ -23,6 +23,11 @@ function view(result: ProjectRead): ProjectInputView {
 }
 
 describe('real project configuration and scope', () => {
+  it('reads the first prose paragraph immediately after indented README code', async () => {
+    await put(root, 'README.md', '    const code = 1;\nPurpose.\n\nLater.\n');
+    expect(view(await read()).inventory.modules[0]?.purpose)
+      .toEqual({ state: 'present', readme: 'README.md', paragraph: 'Purpose.' });
+  });
   it('uses inherited JSONC compiler selection and retains every owned file, including binary resources', async () => {
     await put(root, 'base.json', '{ /* inherited */ "compilerOptions": {"allowJs": true, "checkJs": true, "types": [],}, "include": ["src", "tests"], "exclude": ["src/omitted.ts", "tests/unselected.ts"],}');
     await put(root, 'tsconfig.json', '{"extends":"./base.json"}');

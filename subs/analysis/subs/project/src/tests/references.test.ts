@@ -1,6 +1,9 @@
-import { mkdtemp, rm, symlink } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { mkdtemp, readFile, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readProject } from '../read-project.js';
 import type { ProjectInputView, ProjectReadOptions } from '../interfaces/project.js';
@@ -31,6 +34,27 @@ async function reference(path: string, kind: 'expose-src' | 'expose-test' = 'exp
 }
 
 describe('exact owned source paths', () => {
+  it.each(['src/generated', 'src/tests/generated'])('excludes emitted declarations at %s and rejects their exposure', async declarationDir => {
+    await put(root, 'config/base.json', JSON.stringify({ compilerOptions: {
+      types: [], module: 'ESNext', moduleResolution: 'bundler', declaration: true,
+      rootDir: '../src', outDir: '../dist', declarationDir: `../${declarationDir}`,
+    } }));
+    await put(root, 'tsconfig.json', JSON.stringify({ extends: './config/base.json',
+      files: ['src/value.ts'], exclude: [declarationDir, 'src/tests', 'src/interfaces'],
+    }));
+    await promisify(execFile)(process.execPath,
+      [fileURLToPath(new URL('./bin/tsc', import.meta.resolve('typescript/package.json'))), '--project', join(root, 'tsconfig.json')],
+      { cwd: root, timeout: 30_000 });
+    expect(await readFile(join(root, declarationDir, 'value.d.ts'), 'utf8')).toContain('export declare const value');
+    const owned = await reference('value.ts');
+    expect(owned.result.status).toBe('acquired');
+    expect(owned.inventory?.files.map(file => file.path)).toEqual(['src/interfaces/api.ts', 'src/tests/fixture.ts', 'src/value.ts']);
+    expect(owned.inventory?.warnings).toEqual([]);
+    await retained?.dispose(); retained = undefined;
+    const excluded = await reference(`${declarationDir.slice('src/'.length)}/value.d.ts`);
+    expect(excluded.result.status).toBe('invalid');
+    expect(excluded.reference).toMatchObject({ normalized: `${declarationDir}/value.d.ts`, status: 'excluded' });
+  });
   it('normalizes dot segments without probing and preserves the decoded path', async () => {
     const checked = await reference('./interfaces/../interfaces/api.ts');
     expect(checked.result.status).toBe('acquired');
