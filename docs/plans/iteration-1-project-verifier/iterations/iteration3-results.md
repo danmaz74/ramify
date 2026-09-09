@@ -2,8 +2,9 @@
 
 # Iteration 3 results: definitive model
 
-Status: implementation and focused verification complete; automatic regression
-checks pending. This iteration establishes constructed-tree model evidence only.
+Status: implementation and focused verification complete; publication blocked
+by conflicting control-plane artifact checks. Automatic iteration 3 regression
+checks have not started. This iteration establishes constructed-tree model evidence only.
 It does not claim filesystem/source coverage or Plan 1 completion.
 
 ## Prerequisites and scope
@@ -193,3 +194,42 @@ control plane's added `Regression Tests: PASSED` line. Its contents were not
 edited; that existing generated output is committed separately with this
 publication note so publication can preserve it. No iteration 3 regression
 outcome is inferred from the iteration 2 result.
+
+## Publication failure diagnosis
+
+The retry after bookkeeping commit `70203cb` returned
+`FILE_POLICY_VIOLATION`: the unchanged generated
+`iteration2-check-results.md` belongs to iteration 2 and cannot appear in the
+iteration 3 diff. The working tree is clean; implementation and required drafts
+are committed. Publication has not succeeded.
+
+Installed cucumber-viz version: **0.6.3**. Configured project root: `/ramify`;
+Studio port: 4080. Workflow: `_JG0Ucx92X1f6WqRyuxxC`; active attempt:
+`attempt_mhbYNTHGn40H6Dgjt3nRy`. The live publication-status tool reports no
+pending accepted draft and retains the file-policy rejection.
+
+Read-only evidence:
+
+- The initial checkout diff already contained only the control plane's new
+  iteration 2 `Regression Tests: PASSED` line.
+- The workflow journal records iteration 2 post-commit regression completion
+  immediately before iteration 3 starts. It records publication rejection
+  against base `5a900cd98d550ce172a68c4eba7b02ea03e14471` and draft head
+  `70203cbfefd0f6410a3fc33cfa2b49fec48a4ab8`.
+- Installed `publication-service.js`, lines 2265-2321, restricts publish-time
+  bookkeeping commits to current-iteration artifacts, but its subsequent
+  dirty-file check rejects the changed previous-iteration artifact.
+- The same service, lines 610-638, rejects a committed sibling-iteration
+  artifact unless it matches accepted artifact state. This produced the second
+  rejection after following the first error's instruction to commit.
+- The available workflow tools include publication retry and status, but no
+  control to reconcile this generated post-commit result with the accepted
+  artifact state/base.
+
+No application correction can resolve this publication-policy conflict.
+The concrete next action is for the workflow service/operator to reconcile
+iteration 2's generated post-commit result with its accepted artifact state
+and publication base, then retry iteration 3. This belongs to external
+cucumber-viz recovery; no workflow state, accepted artifact metadata or check
+outcome was manually edited. The iteration 3 implementation remains ready for
+automatic verification.
