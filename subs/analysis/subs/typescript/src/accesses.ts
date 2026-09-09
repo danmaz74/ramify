@@ -20,7 +20,7 @@ const identity = (kind: string, value: unknown): string => `${kind}/1:${createHa
 /** Interpret the captured compiler program in its supervised lifetime. Catalog
  * selections supply originals, including local aliases and forwarding paths. */
 export function collectAccesses(project: Project, inputs: HelperInputs, host: CatalogHost,
-  catalog: SourceCatalog): Awaited<ReturnType<SourceAnalysis['accesses']>> {
+  catalog: SourceCatalog, runtime: ReadonlyMap<CatalogExport, boolean>): Awaited<ReturnType<SourceAnalysis['accesses']>> {
   const root = inputs.inventory.scope.root;
   const resolution = new Resolution(project, inputs.inventory, host);
   const files = new Map(catalog.files.map(file => [file.file, file]));
@@ -63,12 +63,19 @@ export function collectAccesses(project: Project, inputs: HelperInputs, host: Ca
     let entries = file?.exports;
     let entry: CatalogExport | undefined;
     const forwarding = new Map<string, SourceOrigin>();
+    let complete = file?.state === 'complete';
+    const issueIds = new Set(file?.issueIds ?? []);
     for (const name of path) {
       entry = entries?.find(item => item.name === name);
-      for (const origin of entry?.forwarding ?? []) forwarding.set(origin.file, origin);
+      for (const origin of entry?.forwarding ?? []) {
+        forwarding.set(origin.file, origin);
+        const forwarded = files.get(origin.file);
+        complete &&= forwarded?.state === 'complete';
+        forwarded?.issueIds.forEach(id => issueIds.add(id));
+      }
       entries = entry?.namespace ?? undefined;
     }
-    return { file, entry, forwarding: [...forwarding.values()] };
+    return { file, entry, complete, issueIds: [...issueIds], forwarding: [...forwarding.values()] };
   };
   const record = (node: Node, specifierNode: Node | undefined, form: WrittenForm,
     selectionForm: SourceAccess['selectionForm'], runtimeLoad: boolean,
@@ -103,16 +110,16 @@ export function collectAccesses(project: Project, inputs: HelperInputs, host: Ca
             || issue.location.start === issue.location.end && issue.location.start >= at.start)));
       const ambiguousResource = resolved?.resource && file?.state === 'ambiguous';
       const status: AccessSelection['status'] = original && (!selection.runtimeOnly || original.hasValue) && !blocked.length && !ambiguousResource ? 'resolved'
-        : !entry && file?.state === 'complete' && !blocked.length ? 'missing-export' : 'unresolved';
+        : !entry && found.complete && !blocked.length ? 'missing-export' : 'unresolved';
       const request = selection.explicitType || status === 'resolved' && original && !original.hasValue && original.hasType
         ? 'type-only' : 'value';
       selections.push({ location: selectedAt, exportedName: selection.name, localName: selection.local,
         explicitType: selection.explicitType, request, status,
         original: status === 'resolved' ? original!.id : null, forwarding: found.forwarding });
       if (status === 'unresolved' && target.kind === 'application') coverageIds.push(limit(
-        blocked.length ? 'compiler-blocked' : 'unresolved-original', selectedAt,
+        blocked.length ? 'compiler-blocked' : !entry && !found.complete ? 'incomplete-exports' : 'unresolved-original', selectedAt,
         `Cannot establish original for selected export ${selection.name}`,
-        [...blocked.map(issue => issue.location), ...(file?.issueIds.flatMap(id => catalog.coverage.filter(issue => issue.id === id).map(issue => issue.location)) ?? [])]));
+        [...blocked.map(issue => issue.location), ...found.issueIds.flatMap(id => catalog.coverage.filter(issue => issue.id === id).map(issue => issue.location))]));
     }
     const value = { location: at, importer: origin(at.file), specifier, form, selectionForm, runtimeLoad,
       target, selections, coverageIds };
@@ -143,6 +150,7 @@ export function collectAccesses(project: Project, inputs: HelperInputs, host: Ca
       const sink: NamespaceSink = {
         namespace: path => !!lookup(specifier, path).entry?.namespace,
         original: path => !!lookup(specifier, path).entry?.original,
+        exported: path => !!lookup(specifier, path).entry,
         select: emit,
         unknown: (at, code) => unknown(at, code, code === 'unknown-key' ? 'Namespace key is not a string literal'
           : 'Namespace flow is outside the bounded member selection profile'),
@@ -158,11 +166,12 @@ export function collectAccesses(project: Project, inputs: HelperInputs, host: Ca
           } else unknown(node, 'incomplete-exports', 'Cannot enumerate the selected namespace');
           return;
         }
-        if (found.file?.state !== 'complete' || found.forwarding.some(origin => files.get(origin.file)?.state !== 'complete')) {
+        if (!found.complete) {
           unknown(node, 'incomplete-exports', 'The selected namespace has an incomplete export description');
         }
         for (const entry of entries) {
           if (excludeDefault && entry.name === 'default') continue;
+          if (runtimeOnly && runtime.get(entry) === false) continue;
           const next = [...path, entry.name];
           if (entry.namespace && !entry.original) whole(next, selectionForm, false, depth + 1);
           else {

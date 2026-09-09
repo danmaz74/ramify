@@ -1,7 +1,7 @@
 {
   "_cucumberViz": {
     "generatedBy": "cucumber-viz",
-    "mcpTool": "workflow.publish_iteration",
+    "mcpTool": "workflow.write_iteration_checklist",
     "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
   },
   "checks": {
@@ -9,7 +9,7 @@
     "functionalRequirementsSatisfied": true,
     "newCodeCoveredByTests": true
   },
-  "completedAt": "2026-09-09T22:34:01.015Z",
+  "completedAt": "2026-09-09T22:52:10Z",
   "iteration": "11",
-  "notes": "All 44 iteration-11 variants and 209 prerequisite-closure instances passed. Final focused run: 20 owner tests; registration: 1 test. Type-check, build, inventory, declaration/export validation and diff checks passed. Inherited JSX ordering and dotted namespace occurrence identity regressions reproduced and fixed. Full regression, scenario coverage, sealed-file checks and acceptance remain with workflow automation. Plan 1 is not complete."
+  "notes": "Remediated all four reported namespace constraints. Passed 26 new compiler-backed regression cases, 8 affected existing tests, type-check, build, unchanged-reference analysis, declaration validation and diff checks. The original 209-instance iteration gate is historical evidence and was not rerun during remediation. Full regression and acceptance checks remain with workflow automation."
 }

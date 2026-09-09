@@ -1,5 +1,5 @@
 import { relative, resolve } from 'node:path';
-import { SymbolFlags, type Project, type Symbol as CompilerSymbol } from 'typescript/unstable/sync';
+import { SymbolFlags, TypeFlags, type Project, type Symbol as CompilerSymbol } from 'typescript/unstable/sync';
 import { SyntaxKind, isExportDeclaration, isExportSpecifier, isImportDeclaration,
   isImportSpecifier, isImportClause, isNamespaceImport,
   isModuleDeclaration, isIdentifier, isStringLiteral, isExportAssignment,
@@ -14,13 +14,13 @@ import { SourceFailure } from './wire.js';
 interface Inputs { readonly inventory: ProjectInventory; readonly areas: readonly SourceArea[]; readonly limits: SourceWorkLimits }
 interface MutableFile { file: string; state: FileExports['state']; exports: CatalogExport[]; issueIds: string[]; descriptionFiles: string[] }
 interface Selection { file: string; name: string; node: Node }
-interface Stars { source: SourceFile; explicit: Set<string>; targets: { file: string; node: Node }[] }
+interface Stars { source: SourceFile; explicit: Set<string>; targets: { file: string; node: Node; typeOnly: boolean }[] }
 const order = (a: string, b: string) => Buffer.compare(Buffer.from(a), Buffer.from(b));
 
 /** Called only in the supervised helper. The returned graph contains no native
  * compiler handles; every identity comes from declarations and captured owners. */
-export function buildCatalog(project: Project, inputs: Inputs, host: CatalogHost): SourceCatalog {
-  return new CatalogBuilder(project, inputs, host).build();
+export function buildCatalog(project: Project, inputs: Inputs, host: CatalogHost, runtime: Map<CatalogExport, boolean>): SourceCatalog {
+  return new CatalogBuilder(project, inputs, host, runtime).build();
 }
 
 class CatalogBuilder {
@@ -36,7 +36,8 @@ class CatalogBuilder {
   private readonly starTargets = new Map<string, Stars>();
   private readonly namespaceTargets: { file: MutableFile; target: MutableFile; name: string; node: Node }[] = [];
   private readonly root: string;
-  constructor(private readonly project: Project, private readonly inputs: Inputs, private readonly host: CatalogHost) {
+  constructor(private readonly project: Project, private readonly inputs: Inputs, private readonly host: CatalogHost,
+    private readonly runtime: Map<CatalogExport, boolean>) {
     this.root = inputs.inventory.scope.root;
     this.resolution = new Resolution(project, inputs.inventory, host);
   }
@@ -72,6 +73,12 @@ class CatalogBuilder {
   private check(depth: number, record = false): void {
     if (depth > this.inputs.limits.maxForwardingDepth) throw new SourceFailure('resource-limit', 'Source forwarding depth limit exceeded');
     if (record && ++this.count > this.inputs.limits.maxExports) throw new SourceFailure('resource-limit', 'Source export record limit exceeded');
+  }
+  private runtimeMembers(module: CompilerSymbol, at: Node, entries: readonly CatalogExport[]): void {
+    const type = this.project.checker.getTypeOfSymbolAtLocation(module, at);
+    if (type.isErrorType() || type.flags & (TypeFlags.Any | TypeFlags.Unknown)) return;
+    const members = new Set(this.project.checker.getPropertiesOfType(type).map(symbol => symbol.name));
+    for (const entry of entries) this.runtime.set(entry, members.has(entry.name));
   }
   build(): SourceCatalog {
     // The compiler resolves resource descriptions both in actual source and in
@@ -139,6 +146,7 @@ class CatalogBuilder {
           for (const symbol of this.project.checker.getExportsOfModule(module)) {
             this.check(depth, true); file.exports.push(this.export(symbol, symbol.name, file, depth + 1));
           }
+          this.runtimeMembers(module, source, file.exports);
           this.stars(source, file, depth + 1);
         } else if (source.externalModuleIndicator) this.limit(file, 'incomplete-exports', 'Compiler did not supply an export description for this module', source);
       }
@@ -310,6 +318,7 @@ class CatalogBuilder {
     if (symbol.flags & SymbolFlags.Namespace) namespace = this.project.checker.getExportsOfModule(symbol).map(member => {
       this.check(depth, true); return this.export(member, member.name, file, depth + 1, chain, nextSeen);
     });
+    if (namespace) this.runtimeMembers(symbol, node, namespace);
     return { name, original: id, namespace, forwarding: chain };
   }
   private binding(node: Node, symbol: CompilerSymbol): string {
@@ -335,7 +344,7 @@ class CatalogBuilder {
         this.limit(file, target.kind === 'outside-module' ? 'outside-module-target' : target.kind === 'resource-target' ? 'resource-target' : 'incomplete-exports',
           'Cannot enumerate every application original of this star export', statement.moduleSpecifier); continue;
       }
-      targets.push({ file: target.file, node: statement.moduleSpecifier });
+      targets.push({ file: target.file, node: statement.moduleSpecifier, typeOnly: !!statement.isTypeOnly });
     }
     this.starTargets.set(file.file, { source, explicit, targets: targets.sort((a, b) => order(a.file, b.file)) });
     this.check(depth);
@@ -360,6 +369,7 @@ class CatalogBuilder {
     interface Definition {
       file: MutableFile; entry: CatalogExport; edges: string[] | null; node?: Node;
       forwarding: readonly SourceOrigin[]; ambiguous: boolean;
+      runtimeEdges: string[] | null; runtime: boolean | undefined;
     }
     const definitions = new Map<string, Definition>();
     const namespaces = new Map<readonly CatalogExport[], string>();
@@ -369,10 +379,33 @@ class CatalogBuilder {
       if (stars?.targets.length && !stars.explicit.has(entry.name)) {
         definitions.set(key(file.file, entry.name), { file, entry, node: stars.source,
           edges: stars.targets.filter(target => entry.name !== 'default' && this.files.get(target.file)!.exports.some(item => item.name === entry.name))
-            .map(target => key(target.file, entry.name)), forwarding: [this.origin(file.file)!], ambiguous: file.state === 'ambiguous' });
+            .map(target => key(target.file, entry.name)), forwarding: [this.origin(file.file)!], ambiguous: file.state === 'ambiguous',
+          runtime: undefined, runtimeEdges: stars.targets.filter(target => !target.typeOnly && entry.name !== 'default'
+            && this.files.get(target.file)!.exports.some(item => item.name === entry.name)).map(target => key(target.file, entry.name)) });
       } else definitions.set(key(file.file, entry.name), { file, entry,
         edges: selection ? [key(selection.file, selection.name)] : null, node: selection?.node,
-        forwarding: entry.forwarding, ambiguous: file.state === 'ambiguous' });
+        forwarding: entry.forwarding, ambiguous: file.state === 'ambiguous', runtime: this.runtime.get(entry),
+        runtimeEdges: selection ? [key(selection.file, selection.name)] : null });
+    }
+    // Runtime presence belongs to an export path, not its canonical original.
+    // The compiler handles named/local type aliases; explicit star edges also
+    // matter because the pinned compiler's module type includes type-star keys.
+    // Reuse the same finite graph and accept any live path to a value leaf.
+    for (const [root, definition] of definitions) {
+      const seen = new Set<string>();
+      const available = (id: string, depth: number): boolean | undefined => {
+        this.check(depth);
+        if (seen.has(id)) return false;
+        seen.add(id);
+        const current = definitions.get(id);
+        if (!current) return undefined;
+        if (current.runtime === false || current.runtimeEdges === null) return current.runtime;
+        const choices = current.runtimeEdges.map(edge => available(edge, depth + 1));
+        return choices.includes(true) ? true : choices.includes(undefined) ? undefined : false;
+      };
+      const value = available(root, 0);
+      if (value === undefined) this.runtime.delete(definition.entry);
+      else this.runtime.set(definition.entry, value);
     }
     const results = new Map<CatalogExport, CatalogExport>();
     for (const [root, definition] of definitions) {

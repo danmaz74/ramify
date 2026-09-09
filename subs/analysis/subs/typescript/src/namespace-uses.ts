@@ -1,7 +1,7 @@
 import type { Project } from 'typescript/unstable/sync';
 import { isIdentifier, isPropertyAccessExpression, isElementAccessExpression, isStringLiteral,
   isQualifiedName, isParenthesizedExpression, isVariableDeclaration, isObjectBindingPattern,
-  isComputedPropertyName, type Node, type Identifier, type BindingName, type SourceFile } from 'typescript/unstable/ast';
+  isComputedPropertyName, isShorthandPropertyAssignment, type Node, type Identifier, type BindingName, type SourceFile } from 'typescript/unstable/ast';
 import type { SourceAccess } from './interfaces/source.js';
 
 type Form = SourceAccess['selectionForm'];
@@ -9,6 +9,7 @@ export interface NamespaceSink {
   /** A module namespace has constituents but no new owned wrapper original. */
   namespace(path: readonly string[]): boolean;
   original(path: readonly string[]): boolean;
+  exported(path: readonly string[]): boolean;
   select(node: Node, path: readonly string[], form: Form, local: string | null): void;
   unknown(node: Node, code: 'unknown-key' | 'namespace-escape'): void;
 }
@@ -20,7 +21,9 @@ export class NamespaceUses {
   constructor(private readonly project: Project, source: SourceFile) {
     const visit = (node: Node): void => {
       if (isIdentifier(node)) {
-        const symbol = project.checker.getSymbolAtLocation(node);
+        const symbol = isShorthandPropertyAssignment(node.parent) && node.parent.name === node
+          ? project.checker.getShorthandAssignmentValueSymbol(node.parent)
+          : project.checker.getSymbolAtLocation(node);
         if (symbol) {
           const nodes = this.references.get(symbol.id) ?? [];
           nodes.push(node); this.references.set(symbol.id, nodes);
@@ -68,7 +71,10 @@ export class NamespaceUses {
       } else { sink.unknown(parent, 'unknown-key'); return; }
     }
     if (selected) {
-      if (sink.namespace(selected)) this.expression(parent, sink, selected, then);
+      // A merged function/namespace has both exports and ordinary function
+      // properties. Only actual namespace exports extend the original path.
+      if (path.length && sink.original(path) && !sink.exported(selected)) sink.select(node, path, form, null);
+      else if (sink.namespace(selected)) this.expression(parent, sink, selected, then);
       else sink.select(parent, selected, form, null);
     } else if (isVariableDeclaration(parent) && parent.initializer === node && isObjectBindingPattern(parent.name)) {
       this.binding(parent.name, sink, path, then);

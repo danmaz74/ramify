@@ -97,3 +97,30 @@ Ignored local evidence is under `.reference-work/iteration11-evidence/`: gate st
 - Namespace whole selections require completeness evidence even after named relays. Preserve known constituent checks alongside expansion limits and retain distinct path segments in occurrence identities.
 - Complete resource-access reporting, unsupported macro/CommonJS coverage, session cancellation/disposal and coherent-input outcomes remain iteration 12 obligations. The inherited resource-description conflict concern is not claimed resolved here.
 - The public session, CLI, whole-plan reference gate, self-check/negative, relocation and performance evidence remain with their assigned later iterations. No daemon, server, persistent cache or alternate checker was added.
+
+## Constraint remediation (2026-09-09)
+
+Addressed all four reported iteration-11 contradictions in the authoritative checkout, starting from workflow checkpoint `a1b40c6`. The original 209-instance gate and earlier implementation evidence above belong to the original implementation turn; they were not rerun during this focused remediation.
+
+- **cf-constraints-mtuokf8t-pxtrkmnf — shorthand namespace escape:** the reference index now resolves shorthand properties through their referenced value symbols. Static and awaited dynamic namespaces passed as `{ ns }` produce located namespace-escape coverage. Any independently selected private member still produces its denial.
+- **cf-constraints-mtuokf8t-n0cmr3tj — erased export paths:** runtime membership now belongs to the export path, independently of the canonical original's value/type existence. Compiler namespace-member facts handle named and local type-only forwarding; the existing finite forwarding graph preserves erasure through named relays and type-star edges. Whole typeof-import queries exclude erased paths, while explicit type imports keep their original identities and permission checks. These private facts stay within the helper lifetime, are cleared on disposal, and do not change the public catalog contract.
+- **cf-constraints-mtuokf8t-10lyqima — merged function properties:** namespace traversal distinguishes an actual nested export from ordinary properties on an owned runtime binding. Calls, function name access, call-method access and literal property access select the function original. Actual merged namespace members still select their own originals and receive their independent permission checks.
+- **cf-constraints-mtuokf8t-9ms7h83l — incomplete nested namespaces:** each lookup segment accumulates completeness and issue evidence from its forwarding sources. An absent member produces a definite missing-export diagnostic only with complete evidence; otherwise it produces located incomplete-exports coverage with related source evidence. Known members continue to resolve and receive their checks through one or multiple namespace relays.
+
+Added **26 parameterized compiler-backed regression cases** through the real acquisition, catalog, linker and analysis evaluation pipeline. They cover static/awaited shorthand and direct escape controls (including known denials), six erased-forwarding forms with explicit type controls, mixed live/erased nested namespaces, merged/unmerged function properties and actual namespace members, and complete/incomplete nested namespace lookups with known-member controls. Missing-source/member fixtures intentionally assert their compiler diagnostics; the remaining fixtures compile successfully.
+
+The first focused run exposed the reported failures. Two fixture assertions were corrected before final verification: native subprocess diagnostics are on stdout, and an absent namespace member uses TS2694. An executable compiler probe also established that the pinned compiler includes type-star keys in its module type; the runtime-path implementation therefore uses explicit type-star edges rather than relying solely on that native property list. The type-star regression retains an independent zero-runtime-selection assertion.
+
+Focused verification passed:
+
+```sh
+npx vitest run subs/analysis/src/tests/evaluate-accesses.test.ts -t 'iteration 11 constraint regressions'
+npx vitest run subs/analysis/subs/typescript/src/tests/accesses.test.ts subs/analysis/src/tests/evaluate-accesses.test.ts -t 'bounded|nested namespace|attached JSDoc|nested expansion|literal dotted|keeps exposure, importer tags'
+npm run type-check
+npm run build
+git diff --check
+```
+
+The first test command passed all **26 new cases**; the second passed **8 affected existing cases**. Type-check covered toolkit, portable owners, scripts and harness. The production build and helper/dependency checks passed. Direct unchanged-reference verification retained **294 occurrences, 166 application decisions, no access coverage and no permission diagnostics**, including the authored lazy load and import-type query. Toolkit declaration/export validation remained valid: **9 owners, 126 files, 54 expanded statements**.
+
+Before/after test logs, compiler probe, type-check/build output, reference facts and declaration validation are retained under ignored `.reference-work/iteration11-evidence/remediation/`. After these checks, only an explanatory test comment and workflow draft artifacts changed. Full regression, scenario coverage, sealed-file and constraint acceptance checks remain with workflow automation. No scenario, existing assertion, exposure, public contract, reviewed matrix record or reference configuration was removed or weakened.

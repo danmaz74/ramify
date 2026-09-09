@@ -271,3 +271,136 @@ import * as ns from '../../../src/interfaces/api.js'; void ns;
     expect(() => evaluateAccesses(result.model, result.accesses, 1)).toThrow('Source diagnostics exceed');
   }, 30_000);
 });
+
+async function compilerClean(root: string): Promise<void> {
+  const compiler = await promisify(execFile)(process.execPath,
+    [fileURLToPath(new URL('../../../../node_modules/typescript/lib/tsc.js', import.meta.url)), '--noEmit', '--project', join(root, 'tsconfig.json')],
+    { cwd: root, timeout: 10_000 });
+  expect([compiler.stdout, compiler.stderr]).toEqual(['', '']);
+}
+const namespaceImporter = 'subs/consumer/src/probe.ts';
+const namespaceApi = '../../../src/interfaces/api.js';
+
+describe('iteration 11 constraint regressions', () => {
+  it.each(['static', 'awaited'].flatMap(kind => ['direct', 'shorthand', 'shorthand-with-denial'].map(flow => ({ kind, flow }))))
+  ('reports $kind namespace $flow escape with any known denial intact', async ({ kind, flow }) => {
+    const declaration = kind === 'static' ? `import * as ns from '${namespaceApi}';` : `const ns = await import('${namespaceApi}');`;
+    const result = await stage(`${declaration}
+declare function consume(value: unknown): void;
+${flow === 'shorthand-with-denial' ? 'void ns.privateValue;' : ''}
+consume(${flow === 'direct' ? 'ns' : '{ ns }'});
+export {};`, {}, compilerClean);
+    const accesses = result.accesses.filter(access => access.importer.file === namespaceImporter);
+    const coverage = result.coverage.filter(issue => issue.location.file === namespaceImporter);
+    expect(coverage.map(issue => issue.code)).toEqual(['namespace-escape']);
+    expect(coverage[0].location.line).toBe(4);
+    expect(accesses.flatMap(access => access.selections.map(selection => selection.original?.binding)))
+      .toEqual(flow === 'shorthand-with-denial' ? ['privateValue'] : []);
+    expect(result.diagnostics.filter(issue => issue.location?.file === namespaceImporter).map(issue => issue.code))
+      .toEqual(flow === 'shorthand-with-denial' ? ['not-visible'] : []);
+    const escape = accesses.find(access => access.coverageIds.includes(coverage[0].id))!;
+    expect(result.results.find(item => item.accessId === escape.id)).toMatchObject({ outcome: 'mixed', coverage: [coverage[0].id] });
+  }, 30_000);
+
+  it.each([
+    { name: 'statement type export', bridge: "export type { privateValue as selected } from './interfaces/api.js';", binding: 'selected' },
+    { name: 'inline type export', bridge: "export { type privateValue as selected } from './interfaces/api.js';", binding: 'selected' },
+    { name: 'local type import relay', bridge: "import type { privateValue as selected } from './interfaces/api.js'; export { selected };", binding: 'selected' },
+    { name: 'type star export', bridge: "export type * from './interfaces/api.js';", binding: 'privateValue' },
+    { name: 'type namespace export', bridge: "export type * as selected from './interfaces/api.js';", binding: 'selected', namespace: true },
+    { name: 'named relay of type export', bridge: "export { selected } from './erased.js';", binding: 'selected' },
+  ])('excludes $name from runtime namespace membership but keeps explicit type checks', async ({ bridge, binding, namespace }) => {
+    // The pinned compiler retains type-star keys in its namespace type. Keep
+    // that fixture compiler-valid while independently asserting runtime erasure.
+    const result = await stage(`type All = typeof import('../../../src/type-bridge.js');
+type AssertNever<T extends never> = T;
+type RuntimeKeys = ${bridge.startsWith('export type * from') ? 'keyof All' : 'AssertNever<keyof All>'};
+import type { ${binding} } from '../../../src/type-bridge.js';
+type Explicit = typeof ${binding}${namespace ? '.privateValue' : ''};`, {
+      'src/type-bridge.ts': bridge,
+      'src/erased.ts': "export type { privateValue as selected } from './interfaces/api.js';",
+    }, compilerClean);
+    const accesses = result.accesses.filter(access => access.importer.file === namespaceImporter);
+    const whole = accesses.filter(access => access.selectionForm === 'whole-namespace');
+    expect(whole).toHaveLength(1);
+    expect(whole[0]).toMatchObject({ runtimeLoad: false, selections: [], coverageIds: [] });
+    expect(result.results.find(item => item.accessId === whole[0].id)).toMatchObject({ outcome: 'checked', diagnostics: [] });
+    const explicit = accesses.filter(access => access.form === 'import-type');
+    expect(explicit.flatMap(access => access.selections.map(selection => [selection.original, selection.request, selection.status])))
+      .toEqual([[{ kind: 'code', owner: 'fixture', file: 'interfaces/api.ts', binding: 'privateValue' }, 'type-only', 'resolved']]);
+    expect(result.model.originals.find(original => original.id.binding === 'privateValue')!.hasValue).toBe(true);
+    expect(result.diagnostics.filter(issue => issue.location?.file === namespaceImporter).map(issue => issue.code)).toEqual(['not-visible']);
+  }, 30_000);
+
+  it('keeps value-forwarded runtime membership and type-only nested membership separate', async () => {
+    const result = await stage(`type All = typeof import('../../../src/outer.js');
+type AssertNever<T extends never> = T;
+type Empty = AssertNever<keyof All['erased']>;
+type AssertKey<T extends 'selected'> = T;
+type RuntimeKeys = AssertKey<keyof All['live']>;`, {
+      'src/erased.ts': "export type { privateValue as selected } from './interfaces/api.js';",
+      'src/live.ts': "export { privateValue as selected } from './interfaces/api.js';",
+      'src/outer.ts': "export * as erased from './erased.js'; export * as live from './live.js';",
+    }, compilerClean);
+    const accesses = result.accesses.filter(access => access.importer.file === namespaceImporter);
+    expect(accesses.flatMap(access => access.selections.map(selection => [selection.exportedName, selection.original?.binding, selection.request])))
+      .toEqual([['live.selected', 'privateValue', 'type-only']]);
+    expect(result.coverage.filter(issue => issue.location.file === namespaceImporter)).toEqual([]);
+    expect(result.diagnostics.filter(issue => issue.location?.file === namespaceImporter).map(issue => issue.code)).toEqual(['not-visible']);
+  }, 30_000);
+
+  it.each(['Merged', 'Plain'].flatMap(binding => ['()', '.name', '.call(null)', "['name']"].map(property => ({ binding, property }))))
+  ('checks $binding as a value for ordinary function access $property', async ({ binding, property }) => {
+    const result = await stage(`import * as ns from '${namespaceApi}'; void ns.${binding}${property};`, {
+      'src/interfaces/api.ts': files['src/interfaces/api.ts'] + '\nexport function Merged() { return 1; }\nexport namespace Merged { export const member = 2; }\nexport function Plain() { return 3; }',
+      'module.ramify': files['module.ramify'] + 'expose-src Merged, Plain from "interfaces/api.ts" tagged [browser] to descendants\n',
+    }, compilerClean);
+    const accesses = result.accesses.filter(access => access.importer.file === namespaceImporter);
+    expect(accesses.flatMap(access => access.selections.map(selection => [selection.original?.binding, selection.request, selection.status])))
+      .toEqual([[binding, 'value', 'resolved']]);
+    expect(accesses[0].selections[0].location).toMatchObject({ file: namespaceImporter, line: 1 });
+    expect(result.coverage.filter(issue => issue.location.file === namespaceImporter)).toEqual([]);
+    expect(result.diagnostics.filter(issue => issue.location?.file === namespaceImporter)).toEqual([]);
+    expect(result.results.find(item => item.accessId === accesses[0].id)).toMatchObject({ outcome: 'checked', decisions: [{ status: 'allowed', reason: 'exposed' }] });
+  }, 30_000);
+
+  it('still checks an actual merged namespace export as its own original', async () => {
+    const result = await stage(`import * as ns from '${namespaceApi}'; void ns.Merged.member;`, {
+      'src/interfaces/api.ts': files['src/interfaces/api.ts'] + '\nexport function Merged() { return 1; }\nexport namespace Merged { export const member = 2; }',
+      'module.ramify': files['module.ramify'] + 'expose-src Merged from "interfaces/api.ts" tagged [browser] to descendants\n',
+    }, compilerClean);
+    const accesses = result.accesses.filter(access => access.importer.file === namespaceImporter);
+    expect(accesses.flatMap(access => access.selections.map(selection => selection.original?.binding))).toEqual(['Merged/member']);
+    expect(result.diagnostics.filter(issue => issue.location?.file === namespaceImporter).map(issue => issue.code)).toEqual(['not-visible']);
+  }, 30_000);
+
+  it.each([false, true].flatMap(incomplete => [false, true].map(nested => ({ incomplete, nested }))))
+  ('requires containing namespace completeness for absent members (incomplete=$incomplete, nested=$nested)', async ({ incomplete, nested }) => {
+    const target = nested ? 'outer' : 'relay', prefix = nested ? 'outer.ns' : 'ns';
+    const result = await stage(`type Missing = typeof import('../../../src/${target}.js').${prefix}.absent;
+type Known = typeof import('../../../src/${target}.js').${prefix}.safe;`, {
+      'src/namespace-source.ts': "export { safe } from './interfaces/api.js';" + (incomplete ? " export * from './missing.js';" : ''),
+      'src/namespace-bridge.ts': "export * as ns from './namespace-source.js';",
+      'src/relay.ts': "export { ns } from './namespace-bridge.js';",
+      'src/outer.ts': "export * as outer from './relay.js';",
+    }, async root => {
+      try { await compilerClean(root); throw new Error('Expected intentional missing-source/member compiler diagnostic'); }
+      catch (error) { expect((error as { stdout?: string }).stdout).toContain(incomplete ? 'TS2307' : 'TS2694'); }
+    });
+    const accesses = result.accesses.filter(access => access.importer.file === namespaceImporter);
+    expect(accesses.flatMap(access => access.selections.map(selection => [selection.exportedName, selection.status])))
+      .toEqual([[`${prefix}.absent`, incomplete ? 'unresolved' : 'missing-export'], [`${prefix}.safe`, 'resolved']]);
+    const missing = accesses[0], known = accesses[1];
+    const coverage = result.coverage.filter(issue => issue.location.file === namespaceImporter);
+    if (incomplete) {
+      expect(coverage.map(issue => issue.code)).toEqual(['incomplete-exports']);
+      expect(coverage[0].location).toMatchObject({ file: namespaceImporter, line: 1 });
+      expect(coverage[0].related.some(location => location.file === 'src/namespace-bridge.ts' || location.file === 'src/namespace-source.ts')).toBe(true);
+      expect(result.results.find(item => item.accessId === missing.id)).toMatchObject({ outcome: 'mixed', diagnostics: [] });
+    } else expect(coverage).toEqual([]);
+    expect(result.diagnostics.filter(issue => issue.location?.file === namespaceImporter).map(issue => issue.code))
+      .toEqual(incomplete ? [] : ['missing-export']);
+    expect(known.selections[0].original).toEqual({ kind: 'code', owner: 'fixture', file: 'interfaces/api.ts', binding: 'safe' });
+    expect(result.results.find(item => item.accessId === known.id)).toMatchObject({ outcome: 'checked', decisions: [{ status: 'allowed', reason: 'exposed' }] });
+  }, 30_000);
+});
