@@ -54,6 +54,9 @@ filenames and nested `helpers/tests/` directories retain the ordinary profile.
 Unmarked interfaces request types; unmarked classes and merged runtime bindings
 request values regardless of later usage. Accessed testing barrels, testing
 originals and stylesheet targets retain their origin through forwarding.
-The script fallback applies the same `.ts`, `.tsx`, declaration and JavaScript
-substitution priority to `.js` and `.jsx` aliases, with a compiler-trace control
-for an ordinary script preceding a testing candidate.
+The script fallback tries an explicit `paths` target's exact extension first,
+including configured module suffixes. When that target is absent, `.js` and
+`.jsx` aliases use the same `.ts`, `.tsx`, declaration and JavaScript substitution
+priority. Relative imports use extension substitution directly. Compiler-trace
+controls cover existing exact targets and an absent target whose ordinary
+substitution precedes a testing candidate.

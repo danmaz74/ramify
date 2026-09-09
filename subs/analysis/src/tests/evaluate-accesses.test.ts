@@ -64,6 +64,36 @@ async function stage(probe: string, overrides: Readonly<Record<string, string>> 
 }
 
 describe('analysis mapping of located static source requests', () => {
+  it.each([
+    { specifier: '@init', extension: '.jsx', suffix: '', expected: 'src/init.jsx' },
+    { specifier: '../../../src/init.jsx', extension: '.jsx', suffix: '', expected: 'src/init.ts' },
+    { specifier: '@init', extension: '.js', suffix: '', expected: 'src/init.js' },
+    { specifier: '../../../src/init.js', extension: '.js', suffix: '', expected: 'src/init.ts' },
+    { specifier: '@init', extension: '.jsx', suffix: '.native', expected: 'src/init.native.jsx' },
+    { specifier: '../../../src/init.jsx', extension: '.jsx', suffix: '.native', expected: 'src/init.native.ts' },
+  ])('matches compiler exact paths priority for $specifier ($extension, suffix "$suffix")', async ({ specifier, extension, suffix, expected }) => {
+    const importer = 'subs/consumer/src/probe.ts';
+    const result = await stage(`import '${specifier}';`, {
+      'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'bundler', types: [],
+        allowJs: true, checkJs: true, jsx: 'preserve', noUncheckedSideEffectImports: true,
+        moduleSuffixes: suffix ? [suffix, ''] : [''], paths: { '@init': [`./src/init${extension}`] } }, include: ['src', 'subs'] }),
+      [`src/init${extension}`]: 'globalThis.console.log(3);',
+      ...(suffix ? { [`src/init${suffix}${extension}`]: 'globalThis.console.log(4);',
+        [`src/init${suffix}.ts`]: 'globalThis.console.log(5);' } : {}),
+    }, async root => {
+      const compiler = await promisify(execFile)(process.execPath,
+        [fileURLToPath(new URL('../../../../node_modules/typescript/lib/tsc.js', import.meta.url)),
+          '--noEmit', '--traceResolution', '--project', join(root, 'tsconfig.json')], { cwd: root, timeout: 10_000 });
+      expect(compiler.stderr).toBe('');
+      expect(compiler.stdout).toContain(`Module name '${specifier}' was successfully resolved to '${join(root, expected)}'`);
+    });
+    const access = result.accesses.find(access => access.importer.file === importer)!;
+    expect(access.target).toMatchObject({ kind: 'application', origin: { file: expected, area: { kind: 'ordinary', profile: [] } } });
+    expect(access.coverageIds).toEqual([]);
+    expect(result.results.find(item => item.accessId === access.id)).toMatchObject({ outcome: 'checked', diagnostics: [],
+      decisions: [{ status: 'allowed', reason: 'symbol-free', original: null }] });
+  }, 30_000);
+
   it.each(['.js', '.jsx'])('matches compiler script substitution priority for a %s alias', async extension => {
     const importer = 'subs/consumer/src/probe.ts';
     const result = await stage("import '@init';", {

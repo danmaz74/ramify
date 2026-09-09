@@ -95,3 +95,31 @@ Ignored local evidence is under `.reference-work/iteration10-evidence/`: the gat
 - Use profile membership, including a testing module's ordinary source, for origin isolation. Keep the reserved test-area derivation and ordinary same-owner exemption order; do not infer profiles from file names or globs.
 - Without a compiler-established module, the script fallback still has its documented package, directory, extensionless and rootDirs limits. Unknown targets remain coverage limits.
 - The predecessor's resource-description conflict and namespace-completeness concerns remain outside this iteration. Complete resource-access reporting, self-check/negative, CLI/relocation, performance evidence and Plan 1 completion remain assigned to later iterations.
+
+## Constraint remediation: exact paths targets (2026-09-09)
+
+Addressed **cf-constraints-mtund816-eglv135x** in the authoritative checkout, starting from workflow checkpoint `6233601`. The previous 201-instance gate and other implementation evidence above belong to the original implementation turn; they were not rerun during this focused remediation.
+
+The compiler treats an explicit `paths` substitution differently from a relative source specifier. With both `src/init.jsx` and `src/init.ts` present, `@init -> ./src/init.jsx` resolves the exact JSX file before attempting TypeScript extension substitution. The previous correction only handled an absent JSX target and therefore selected the wrong source when that target existed.
+
+The fallback now tries a matched paths candidate's exact extension, including configured module suffixes, before its existing extension-substitution order. Relative imports retain their existing substitution order. Compiler-established module targets still take precedence, and a selected script must still be loaded in the captured program; the change does not make an unknown target an allowed access.
+
+Added six compiler-trace comparisons through the real acquisition/catalog/linker/evaluation pipeline, with `allowJs`, `checkJs`, `jsx: preserve` and bundler resolution:
+
+- Exact JSX alias versus relative JSX import with both JSX and TypeScript files present.
+- Exact JavaScript alias versus relative JavaScript import with both JavaScript and TypeScript files present.
+- Exact JSX alias versus relative JSX import with configured `.native` suffix candidates.
+
+Before the fix, all three alias cases failed on the wrong accessed source; the three relative controls and the existing two absent-file controls passed. After the fix, all six new cases and five existing resolution controls passed. Each new case asserts a successful compiler invocation and its resolution trace, the same adapter target/source area, empty access coverage and the expected checked symbol-free decision.
+
+Focused verification:
+
+```sh
+npx vitest run subs/analysis/src/tests/evaluate-accesses.test.ts subs/analysis/subs/typescript/src/tests/accesses.test.ts -t 'compiler exact paths priority|compiler script substitution priority|wildcard paths resolution|plain initialization scripts'
+npm run type-check
+git diff --check
+```
+
+All passed: **11 selected tests** (including all six new cases), type-check across toolkit/portable owners/scripts/harness, and diff validation. Eleven other tests were outside the focused selection. Before/after logs and type-check output are retained as `remediation-exact-*` under `.reference-work/iteration10-evidence/`.
+
+Only the fallback's candidate ordering, its regression tests, the affected owner documentation and required workflow draft artifacts changed. No model rule, exposure declaration, public contract, matrix record, test assertion or scenario was removed or weakened. Full regression, scenario coverage, sealed-file and constraint acceptance checks remain with workflow automation.

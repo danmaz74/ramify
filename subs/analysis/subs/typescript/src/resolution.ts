@@ -135,7 +135,9 @@ export class Resolution {
         const endings = substitutions[extension];
         if (!endings) continue;
         let selected: string | undefined;
-        for (const ending of endings) {
+        // A paths substitution tries its exact extension (with moduleSuffixes)
+        // before extension substitution. Relative imports have no such priority.
+        for (const ending of matches[0] ? [extension, ...endings] : endings) {
           for (const suffix of options.moduleSuffixes ?? ['']) {
             const path = `${candidate.slice(0, -extension.length)}${suffix}${ending}`;
             if (this.host.fileExists(path)) { selected = path; break; }
