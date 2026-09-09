@@ -47,3 +47,13 @@ be loaded in the captured program. It stops at the first existing candidate.
 Without a compiler-established module target, package, directory, extensionless
 and `rootDirs` script resolution remain limits. No script bytes or project
 compiler settings are rewritten to manufacture a module symbol.
+
+Iteration 10 verifies these static facts against actual tag and source-area
+cases. Importer and original profiles come from inventory areas: test-like
+filenames and nested `helpers/tests/` directories retain the ordinary profile.
+Unmarked interfaces request types; unmarked classes and merged runtime bindings
+request values regardless of later usage. Accessed testing barrels, testing
+originals and stylesheet targets retain their origin through forwarding.
+The script fallback applies the same `.ts`, `.tsx`, declaration and JavaScript
+substitution priority to `.js` and `.jsx` aliases, with a compiler-trace control
+for an ordinary script preceding a testing candidate.

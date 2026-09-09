@@ -64,6 +64,25 @@ async function stage(probe: string, overrides: Readonly<Record<string, string>> 
 }
 
 describe('analysis mapping of located static source requests', () => {
+  it.each(['.js', '.jsx'])('matches compiler script substitution priority for a %s alias', async extension => {
+    const importer = 'subs/consumer/src/probe.ts';
+    const result = await stage("import '@init';", {
+      'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'bundler', types: [],
+        noUncheckedSideEffectImports: true, paths: { '@init': [`./src/init${extension}`, './src/tests/init.ts'] } }, include: ['src', 'subs'] }),
+    }, async root => {
+      const compiler = await promisify(execFile)(process.execPath,
+        [fileURLToPath(new URL('../../../../node_modules/typescript/lib/tsc.js', import.meta.url)),
+          '--noEmit', '--traceResolution', '--project', join(root, 'tsconfig.json')], { cwd: root, timeout: 10_000 });
+      expect(compiler.stderr).toBe('');
+      expect(compiler.stdout).toContain(`Module name '@init' was successfully resolved to '${join(root, 'src/init.ts')}'`);
+    });
+    const access = result.accesses.find(access => access.importer.file === importer)!;
+    expect(access.target).toMatchObject({ kind: 'application', origin: { file: 'src/init.ts', area: { kind: 'ordinary', profile: [] } } });
+    expect(access.coverageIds).toEqual([]);
+    expect(result.results.find(item => item.accessId === access.id)).toMatchObject({ outcome: 'checked', diagnostics: [],
+      decisions: [{ status: 'allowed', reason: 'symbol-free', original: null }] });
+  }, 30_000);
+
   it('preserves an independent private denial beside duplicate local aliases', async () => {
     const importer = 'subs/consumer/src/probe.ts';
     const baseline = await stage("import { safe, privateValue } from '../../../src/interfaces/api.js';");

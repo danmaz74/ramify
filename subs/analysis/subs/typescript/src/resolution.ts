@@ -128,7 +128,7 @@ export class Resolution {
       for (const candidate of candidates) {
         const extension = extname(candidate);
         const substitutions: Readonly<Record<string, readonly string[]>> = {
-          '.js': ['.ts', '.tsx', '.d.ts', '.js', '.jsx'], '.jsx': ['.tsx', '.d.ts', '.jsx'],
+          '.js': ['.ts', '.tsx', '.d.ts', '.js', '.jsx'], '.jsx': ['.ts', '.tsx', '.d.ts', '.js', '.jsx'],
           '.mjs': ['.mts', '.d.mts', '.mjs'], '.cjs': ['.cts', '.d.cts', '.cjs'],
           '.ts': ['.ts'], '.tsx': ['.tsx'], '.mts': ['.mts'], '.cts': ['.cts'],
         };

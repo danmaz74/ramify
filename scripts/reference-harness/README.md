@@ -3,8 +3,9 @@
 This independent Node tool scope inventories reference expectations, owns
 temporary mutation projects and requires evidence from registered capabilities.
 The current runtime registers `registry`, `parse`, `acquire`, `metadata`,
-`catalog`, `link` and `static-access` through their public provider APIs. It
-executes 165 reviewed instances; 143 later instances remain unexecuted. Model
+`catalog`, `link`, `static-access` and `tags-origin` through the real providers
+and analysis evaluation stage. It executes 201 reviewed instances; 107 later
+instances remain unexecuted. Model
 assertions use constructed trees; source assertions use captured projects and
 the real compiler, linker and model. No stage result claims plan completion.
 
@@ -93,10 +94,25 @@ assembly arrive in iteration 12.
 `npm run reference:verify -- --plan 1 --iteration 9` requires all 165 instances
 in prerequisite closure `[1, 2, 3, 4, 5, 6, 7, 9]`. Iteration 8's migration is
 independent and adds no matrix instances. The unfiltered plan gate still fails
-for the 143 instances assigned to later capabilities.
+for the instances assigned to later capabilities.
 
 The no-project ancestry case necessarily uses an owned OS temporary directory:
 a directory under the ramified harness checkout would discover that enclosing
 project. It creates a described project below the unmarked working directory,
 asserts that discovery never searches downwards, and deletes the temporary tree
 in `finally`. All other mutations use the ordinary isolated harness copy.
+
+Iteration 10 registers all 36 tag/origin instances and syntax/owner variants.
+The shared source driver calls the analysis-owned `evaluateAccesses` stage,
+retaining its diagnostics alongside model evidence. Its tests cover exact
+importer profiles, required importer tags after visibility, browser value/type
+requests, private test access, testing support declared in ordinary source,
+and isolation through accessed sources, resources and forwarding paths. The
+stylesheet instance checks both a default binding and a symbol-free load. Each
+negative starts from a clean captured baseline; both baseline and mutation must
+compile independently. No fixture changes the running application.
+
+`npm run reference:verify -- --plan 1 --iteration 10` requires 201 instances in
+prerequisite closure `[1, 2, 3, 4, 5, 6, 7, 9, 10]`. The 107 later instances stay
+unexecuted; this stage advertises neither the iteration-11 source forms nor the
+iteration-12 public session and complete resource-access capability.

@@ -3,11 +3,12 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { parseDescription } from '../../subs/analysis/subs/descriptions/src/parse.js';
 import { linkDescriptions } from '../../subs/analysis/subs/descriptions/src/link.js';
-import { buildModel, createDefaultTagRegistry, deriveSourceAreas, explainImport } from '../../subs/analysis/subs/model/src/index.js';
+import { buildModel, createDefaultTagRegistry, deriveSourceAreas } from '../../subs/analysis/subs/model/src/index.js';
 import type { ImportDecision, ModelResult } from '../../subs/analysis/subs/model/src/index.js';
 import { readProject } from '../../subs/analysis/subs/project/src/read-project.js';
 import { createSourceAnalysis } from '../../subs/analysis/subs/typescript/src/source-analysis.js';
 import type { SourceAccess, SourceAnalysis } from '../../subs/analysis/subs/typescript/src/interfaces/source.js';
+import { evaluateAccesses } from '../../subs/analysis/src/evaluate-accesses.js';
 import { repositoryRoot } from './plan.js';
 import { validationInputs } from './linking-expectations.js';
 import type { Assertions } from './runner.js';
@@ -18,8 +19,8 @@ function valid<T>(result: ModelResult<T>): T {
 }
 export const staticForms = new Set(['import', 'import-type', 'inline-type-import', 'named-export', 'type-export', 'inline-type-export', 'side-effect-import']);
 
-/** I9 stage evidence binds the published acquisition, source and model provider
- * operations on ONE captured view. The completed analysis session arrives in I12. */
+/** Stage evidence binds acquisition, source, linking and the analysis-owned
+ * evaluation on ONE captured view. The completed public session arrives in I12. */
 export async function staticProject(root: string) {
   const inputs = validationInputs(root);
   const registry = createDefaultTagRegistry();
@@ -36,21 +37,13 @@ export async function staticProject(root: string) {
     if (linked.status !== 'valid') throw new Error(JSON.stringify(linked));
     const model = valid(buildModel(linked.modelInput));
     const observed = await source.accesses();
-    const decisions: { access: SourceAccess; decision: ImportDecision }[] = [];
-    for (const access of observed.accesses) {
-      if (!staticForms.has(access.form) || access.target.kind !== 'application') continue;
-      const target = access.target.origin;
-      for (const selection of access.selections) {
-        if (selection.status !== 'resolved' || !selection.original) continue;
-        decisions.push({ access, decision: explainImport(model, { importer: access.importer, location: selection.location,
-          target, forwarding: selection.forwarding, selection: { original: selection.original, request: selection.request } }) });
-      }
-      if (!access.selections.length && access.form === 'side-effect-import') decisions.push({ access, decision: explainImport(model,
-        { importer: access.importer, location: access.location, target, forwarding: [], selection: null }) });
-    }
+    const evaluation = evaluateAccesses(model, observed.accesses, inputs.limits.maxDiagnostics);
+    const byAccess = new Map(evaluation.results.map(result => [result.accessId, result]));
+    const decisions = observed.accesses.filter(access => staticForms.has(access.form))
+      .flatMap(access => byAccess.get(access.id)!.decisions.map(decision => ({ access, decision })));
     const seal = await acquired.view.seal();
     if (seal.status !== 'coherent') throw new Error(JSON.stringify(seal));
-    return { inventory, catalog, linked, model, ...observed, decisions };
+    return { inventory, catalog, linked, model, ...observed, ...evaluation, decisions };
   } finally {
     try { await source?.dispose(); } finally { await acquired.view.dispose(); }
   }
@@ -90,17 +83,25 @@ export function selected(result: StaticProject, assertions: Assertions, importer
   return found[0]!;
 }
 
-export function expectedDecision(assertions: Assertions, selected: { access: SourceAccess; decision: ImportDecision }, expected: {
+export function expectedDecision(evidence: Assertions, selected: { access: SourceAccess; decision: ImportDecision }, expected: {
   readonly importer: string; readonly owner: string; readonly file: string; readonly binding: string;
   readonly target: string; readonly status: ImportDecision['status']; readonly reason: ImportDecision['reason'];
   readonly request?: 'value' | 'type-only'; readonly tags: readonly string[]; readonly profile: readonly string[];
   readonly hops?: readonly string[]; readonly failedTag?: string;
+  readonly importerArea?: 'ordinary' | 'tests'; readonly originalArea?: 'ordinary' | 'tests';
+  readonly originalKind?: 'code' | 'resource';
 }): void {
+  const prefix = `${expected.importer}#${expected.binding}`;
+  const assertions = {
+    equal: (name: string, actual: unknown, wanted: unknown) => evidence.equal(`${prefix}: ${name}`, actual, wanted),
+    ok: (name: string, actual: unknown) => evidence.ok(`${prefix}: ${name}`, actual),
+  };
   const { access, decision } = selected;
-  assertions.equal('located importer and ordinary area', [decision.question.importer.file, decision.question.importer.area.kind,
-    decision.question.importer.area.profile], [expected.importer, 'ordinary', expected.profile]);
+  assertions.equal('located importer and source area', [decision.question.importer.file, decision.question.importer.area.kind,
+    decision.question.importer.area.profile], [expected.importer, expected.importerArea ?? 'ordinary', expected.profile]);
   assertions.equal('canonical original and defining area', [decision.original?.id, decision.original?.origin.area.owner, decision.original?.tags],
-    [{ kind: 'code', owner: expected.owner, file: expected.file, binding: expected.binding }, expected.owner, expected.tags]);
+    [{ kind: expected.originalKind ?? 'code', owner: expected.owner, file: expected.file, binding: expected.binding }, expected.owner, expected.tags]);
+  assertions.equal('original defining source area', decision.original?.origin.area.kind, expected.originalArea ?? 'ordinary');
   assertions.equal('accessed source retained separately', decision.question.target.file, expected.target);
   assertions.equal('independently expected decision', [decision.status, decision.reason, decision.question.selection?.request],
     [expected.status, expected.reason, expected.request ?? 'value']);

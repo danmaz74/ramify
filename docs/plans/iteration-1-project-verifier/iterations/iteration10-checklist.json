@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": true,
+    "functionalRequirementsSatisfied": true,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-09T22:00:49Z",
+  "iteration": "10",
+  "notes": "All 36 iteration-10 instances and 165 prerequisite instances passed the intermediate gate (201/201). Final type-check, build, focused resolution and registration tests, inventory and actual declaration validation passed. Fixed the inherited .jsx script-alias resolution contradiction with a compiler-trace regression. Full Vitest/Cucumber regression, scenario coverage, sealed-file and acceptance checks remain with workflow automation; Plan 1 is not complete."
+}

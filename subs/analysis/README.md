@@ -28,3 +28,11 @@ denied imports and unresolved work remain distinct. This stage takes a valid
 linked model and detached source occurrences; iteration 12 connects it to the
 public session. `validateProject` continues to accept validation capabilities
 only, and does not report a completed source check.
+
+Iteration 10 exercises the evaluation stage through the real source matrix.
+Testing-origin decisions precede same-owner and tag exemptions, including
+symbol-free and stylesheet targets; a production binding explicitly tagged
+`testing` instead retains ordinary same-owner access. Reference assertions
+retain exact profiles, selected requests, exposure evidence and located analysis
+diagnostics. No public session contract or later source capability activates at
+this stage.
