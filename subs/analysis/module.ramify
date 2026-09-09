@@ -1,2 +1,4 @@
 ramify 1
 module analysis
+
+expose-sub * from model to parent, descendants

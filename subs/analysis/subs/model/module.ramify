@@ -1,2 +1,11 @@
 ramify 1
 module model tagged [browser]
+
+// M1: portable owned vocabulary.
+expose-src * from "interfaces/model.ts" to parent
+// M2-M6: values explicitly promise browser-safe transitive closures.
+expose-src resolveTagRegistry, createDefaultTagRegistry from "registry.ts" tagged [browser] to parent
+expose-src deriveSourceAreas, assignOriginalTags from "profiles.ts" tagged [browser] to parent
+expose-src originalKey from "identity.ts" tagged [browser] to parent
+expose-src buildModel from "model.ts" tagged [browser] to parent
+expose-src explainVisibility, explainImport from "decisions.ts" tagged [browser] to parent

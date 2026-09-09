@@ -2,8 +2,10 @@
 
 This independent Node tool scope inventories reference expectations, owns
 temporary mutation projects and requires evidence from registered capabilities.
-It contains no source checker. The current runtime registers no Plan 1
-capability or semantic handler, so all 308 reviewed instances remain unexecuted.
+The current runtime registers the model's `registry` capability and the 14
+I1-14 instances through its public library API. These assertions use constructed
+trees and establish no filesystem or source coverage; the other 294 reviewed
+instances remain unexecuted.
 
 `npm run reference:cases` runs the family, instance, gate, mutation and invocation
 tests under this directory's Vitest configuration. The deterministic gate stubs
@@ -17,8 +19,8 @@ runs the example's existing tiers. Its old hand-reviewed violation count remains
 explicitly separate from checker evidence until iteration 14 replaces it.
 
 `npm run reference:verify -- --plan 1` requires every reviewed leaf and currently
-exits 1 for absent capabilities. Add `--iteration 3` to require iteration 3 and
-its transitive prerequisites, while retaining every future instance as not
+exits 1 for absent capabilities. Add `--iteration 3` to execute and require
+the 14 implemented model instances and their prerequisites, while retaining every future instance as not
 executed. Iteration verification never claims plan completion, even for
 iteration 15. `--format json` emits the same result as one JSON document;
 `--preserve-on-failure` keeps failed project copies for inspection. Invalid
@@ -58,6 +60,7 @@ that invocation's directory, including after copying or setup fails. Concurrent
 runs never share a mutation directory. Preservation retains only a failed run
 and reports its location.
 
-The complete fixture recipes, checked baselines and real assertions arrive
-with their assigned capabilities. A passing harness test or inventory command
-does not execute any of those I1 instances.
+The remaining fixture recipes, checked baselines and real assertions arrive
+with their assigned capabilities. Inventory commands and harness stubs do not
+establish semantic outcomes. Actual model assertions are recorded individually
+by `model-cases.ts`; the required gate membership remains in the reviewed plan.

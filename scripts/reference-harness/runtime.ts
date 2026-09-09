@@ -1,7 +1,8 @@
 import type { HarnessRuntime } from './runner.js';
+import { modelHandlers } from './model-cases.js';
 
-/** Later iterations register real providers and their exact leaf assertions here. */
+/** Only executed public providers advertise capabilities; source analysis arrives later. */
 export const referenceRuntime: HarnessRuntime = {
-  capabilities: new Set(),
-  handlers: new Map(),
+  capabilities: new Set(['registry']),
+  handlers: new Map(modelHandlers),
 };

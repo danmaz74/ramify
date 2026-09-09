@@ -35,12 +35,13 @@ function verify(iteration: number | undefined, providers: HarnessRuntime, record
 }
 
 describe('required capability and assertion execution gates', () => {
-  it('reports every real instance unexecuted; a full check fails with no capabilities', async () => {
+  it('runs the model instances and retains unavailable source capabilities in the full gate', async () => {
     const report = await verify(undefined, referenceRuntime);
     expect(report.passed).toBe(false);
     expect(report.planComplete).toBe(false);
-    expect(report.summary).toEqual({ required: 308, passed: 0, failed: 0, notExecuted: 308 });
-    expect(report.instances.every((item) => item.reason === 'missing-capability')).toBe(true);
+    expect(report.summary).toEqual({ required: 308, passed: 14, failed: 0, notExecuted: 294 });
+    expect(report.availableCapabilities).toEqual(['registry']);
+    expect(report.instances.filter((item) => item.status === 'not-executed').every((item) => item.reason === 'missing-capability')).toBe(true);
     expect(await readdir(workRoot)).toEqual([]);
   });
 

@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": true,
+    "functionalRequirementsSatisfied": true,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-09T10:28:46Z",
+  "iteration": "3",
+  "notes": "Implemented the exact reviewed pure model API and I3 exposure stages. Final focused model verification: 4 files, 158 tests passed; 3 amended harness tests passed. I1-14: all 14 required instances passed through the public library API with 129 assertions. Build, full type-check and inventory validation passed; compiled model closure has 7 local runtime modules and no filesystem/compiler/UI dependency. Automatic full Vitest/Cucumber, scenario and sealed checks remain pending under the supplied policy. No source coverage or Plan 1 completion is claimed; 294 future instances remain unexecuted."
+}

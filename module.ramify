@@ -1,2 +1,4 @@
 ramify 1
 module "ramify" tagged [dispatch]
+
+expose-sub ModuleId, TagName, TagKind, TagDefinition, ResolvedTagRegistry, SourceLocation, ModelIssue, ModelResult, SourceArea, ModuleRecord, OriginalId, SourceOrigin, Original, Destination, Exposure, ModelInput, Model, ExposureHop, VisibilityDecision, BindingRequest, ImportQuestion, TagRequirement, ImportReason, ImportDecision, resolveTagRegistry, createDefaultTagRegistry, deriveSourceAreas, assignOriginalTags, originalKey, buildModel, explainVisibility, explainImport from analysis to descendants
