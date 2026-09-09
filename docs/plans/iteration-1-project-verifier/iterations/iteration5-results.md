@@ -2,7 +2,7 @@
 
 # Iteration 5 results: project acquisition and metadata
 
-Status: the two remaining constraint findings are corrected and local verification passes. Publication recovery and fresh Studio audit are pending. This establishes project acquisition and metadata, not source cataloging, linked permissions, CLI checking or Plan 1 completion.
+Status: the two remaining constraint findings are corrected and local verification passes. Studio's commit-bound audit passes on a4aaa10; publication recovery is pending. This establishes project acquisition and metadata, not source cataloging, linked permissions, CLI checking or Plan 1 completion.
 
 ## Prerequisites and working scope
 
@@ -140,4 +140,6 @@ Verification on the corrected source:
 - npm run reference:verify -- --plan 1 --iteration 5: 88 required instances passed, zero failed. Future stages remain unexecuted and Plan 1 is incomplete.
 - git diff --check: passed.
 
-These results supersede the earlier local-verification and not-yet-run statements above. The historical failed constraints result and skipped automatic regression result remain preserved in Studio; fresh audit and publication recovery will provide subsequent evidence.
+These results supersede the earlier local-verification and not-yet-run statements above. The historical failed constraints result and skipped automatic regression result remain preserved in Studio; Studio's commit-bound audit below provides subsequent verification evidence.
+
+Studio audit on implementation commit a4aaa10b2a171d10ac5b1aa31369b08a5dd144c8: overall PASS; regression and static checks passed in an isolated worktree. Retrieve the report with git show refs/audited/runs/2026-09-09T12-28-51Z-a4aaa10:reports/audit/summary.json. This audit did not rerun the agentic constraints check; the targeted regressions above verify both reported defects. Publication recovery remains pending.
