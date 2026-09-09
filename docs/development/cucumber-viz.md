@@ -11,8 +11,16 @@ Claude Code, Codex, PM2, Chromium and cucumber-viz, installed globally from
 the private registry at npm.braimax.com and pinned by the
 `CUCUMBER_VIZ_VERSION` build argument in the Dockerfile and the compose file.
 To move to a newly published cucumber-viz, bump that argument and rebuild the
-container. Bring the container up on the server with the Dev Containers
-"Reopen in Container" command or `devcontainer up`.
+container. Bring the container up the first time from a Remote-SSH window on
+the server: open the checkout and run the Dev Containers "Reopen in Container"
+command. Afterwards nothing special is needed to get back to it. VS Code
+restores the window at launch and lists it under Open Recent, and the Remote
+Explorer's Dev Containers view in the Remote-SSH window shows it next to the
+cucumber-viz container. Closing the window never stops the container
+(`shutdownAction` is `none`), and on the server a git-ignored
+`.devcontainer/.env` with `RESTART_POLICY=unless-stopped` brings it back after
+a host reboot. PM2 processes are not restored; `post-start.sh` runs on the next
+connection.
 
 The workspace is `/ramify`, not `/app`. Claude Code and Codex key per-project
 state by absolute path and `~/.claude` is shared with a cucumber-viz

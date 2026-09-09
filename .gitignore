@@ -17,3 +17,6 @@ cucumber-viz.config.local.json
 
 # Reference-harness mutation copies of the example.
 examples/collection-review/.reference-work/
+
+# Host-specific compose interpolation, e.g. RESTART_POLICY on the server.
+.devcontainer/.env

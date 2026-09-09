@@ -23,6 +23,11 @@ services:
       - example_node_modules:/ramify/examples/collection-review/node_modules
     environment:
       NODE_ENV: development
+    # Come back after a host reboot. Compose reads .devcontainer/.env, which is
+    # git-ignored: the server sets RESTART_POLICY=unless-stopped there, any
+    # other host defaults to no restart. PM2 processes inside still need
+    # relaunching; post-start.sh runs again on the next VS Code connection.
+    restart: ${RESTART_POLICY:-no}
     # tini as PID 1 so exited processes are reaped.
     init: true
     stdin_open: true

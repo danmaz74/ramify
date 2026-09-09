@@ -74,6 +74,12 @@
 
   "remoteUser": "app",
 
+  // Closing the VS Code window must not stop the container: work keeps running
+  // on the server and every reconnect route finds it up. The compose default
+  // would stop the whole project. A host reboot is covered by the restart
+  // policy in docker-compose.yml.
+  "shutdownAction": "none",
+
   "postCreateCommand": "/bin/bash /ramify/.devcontainer/setup.sh",
   "postStartCommand": "/bin/bash /ramify/.devcontainer/post-start.sh",
 
