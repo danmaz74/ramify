@@ -2,7 +2,7 @@
 
 # Iteration 8 results: toolkit migration into declared owners
 
-Status: implemented and locally verified; submitted for workflow acceptance. This iteration completes the toolkit migration and production selection. It does not establish source access checking, the public analysis session, installed CLI behavior or Plan 1 completion.
+Status: implemented and locally verified; publication is blocked by a workflow bookkeeping conflict. This iteration completes the toolkit migration and production selection. It does not establish source access checking, the public analysis session, installed CLI behavior or Plan 1 completion.
 
 ## Prerequisites and scope
 
@@ -95,3 +95,13 @@ Ignored local evidence is under `.reference-work/iteration8-evidence/`: referenc
 - The iteration-7 handoff's TypeScript-provider concerns about incompatible resource descriptions and namespace completeness were outside this migration and are not claimed fixed.
 - Keep the independent stage-specific parser/acquisition/catalog harness tests on their reviewed public provider operations; full application checking should continue through the analysis entry as its remaining stages arrive.
 - No new source-access capability, daemon, server, persistent cache, worker pool or configuration language was implemented. Full regression and acceptance remain workflow-owned.
+
+## Publication blocker
+
+Implementation and both required artifacts were committed in `9179fc3c56dce8fa793d3887e4adf3fbfdbe5877`. The first publish returned WORKTREE_DIRTY for the pre-existing generated iteration7-check-results.md change and explicitly required committing it. That change was exactly the already generated line `- **Regression Tests**: PASSED`; its untouched bytes were committed separately as `88682ef`.
+
+The retry then returned FILE_POLICY_VIOLATION because the same artifact belongs to iteration 7 rather than iteration 8. Publication status reports success false and no pending accepted draft. Thus publication has not completed, despite passing implementation checks.
+
+Read-only diagnosis identified cucumber-viz 0.6.3, project state under /ramify/.cucumber-viz/, this authoritative worktree and the supplied workflow/attempt. The journal records rejection operation `pub-_JG0Ucx92X1f6WqRyuxxC-8-1788963738344`. Earlier iteration-3 and iteration-5 results document the same contradictory predecessor-artifact handling.
+
+Recovery requires the workflow control plane to reconcile its generated iteration-7 result with the iteration-8 publication baseline, then retry this committed draft. Available workflow controls expose status and publication retry but no supported reconciliation operation. No application-code change can repair this policy conflict. Check-result contents and workflow state were not manually rewritten, and shared services were not restarted. All code, draft artifacts and predecessor output remain preserved for recovery.
