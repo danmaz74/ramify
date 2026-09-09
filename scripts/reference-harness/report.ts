@@ -1,8 +1,12 @@
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import { capabilityDescriptions, capabilityOrder, referenceCases } from './cases.js';
+import { capabilityDescriptions, capabilityOrder, plan1Instances, referenceCases } from './cases.js';
 import type { CaseCapability, ReferenceCase } from './cases.js';
+import { readReviewedPlan } from './plan.js';
+import { referenceRuntime } from './runtime.js';
+import { verifyInstances } from './runner.js';
+import { formatVerification } from './verify.js';
 
 /**
  * The reference report.
@@ -111,9 +115,15 @@ function summarize(runs: readonly TierRun[]): ExecutionStatus {
   return runs.every((run) => run.status === 'passed') ? 'passed' : 'failed';
 }
 
-function main(): number {
+async function main(): Promise<number> {
   const dryRun = process.argv.slice(2).includes('--dry-run');
   const tiers = dryRun ? [] : tierScripts.map(runTier);
+  const instanceReport = await verifyInstances({
+    plan: readReviewedPlan(), records: plan1Instances,
+    // A dry run always inventories without invoking any provider.
+    runtime: dryRun ? { capabilities: new Set(), handlers: new Map() } : referenceRuntime,
+    workRoot: `${repositoryRoot}/examples/collection-review/.reference-work`,
+  });
 
   const application = summarize(tiers);
   const protocolTier = tiers.filter(
@@ -233,6 +243,8 @@ function main(): number {
     }
   }
 
+  lines.push('', 'Plan 1 instance inventory (separate from application tiers)',
+    formatVerification(instanceReport));
   console.log(lines.join('\n'));
 
   const failed = tiers.filter((tier) => tier.status === 'failed');
@@ -245,7 +257,10 @@ function main(): number {
     return 1;
   }
 
-  return 0;
+  return instanceReport.inventoryIssues.length || instanceReport.summary.failed ? 1 : 0;
 }
 
-process.exitCode = main();
+main().then((code) => { process.exitCode = code; }, (error: unknown) => {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exitCode = 1;
+});

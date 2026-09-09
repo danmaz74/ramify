@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": false,
+    "functionalRequirementsSatisfied": true,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-09T09:59:20Z",
+  "iteration": "2",
+  "notes": "Implementation draft complete. Build, all type-check configurations, 308-record inventory/pointer/prerequisite validation, dry-run reporting, diagrams, site build and whitespace checks passed. Full and iteration-3 verification fail as expected for absent capabilities. Four new Vitest files cover runner/inventory/mutation/subprocess behavior and type-check successfully. allNewTestsPass is false because execution is pending, not because a test failure was observed: the supplied policy reserves Vitest/Cucumber and reference:cases for automatic checks. No I1 semantic instance executed."
+}

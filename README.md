@@ -1,5 +1,7 @@
 # ramify.ts
 
+Ramify assembles the command line entry and lazy batch analysis, maps completed reports to invocation results, and keeps executable dispatch separate from portable model and presentation entries.
+
 **Multi-file hierarchical modules for TypeScript.**
 
 TypeScript is modular at exactly one granularity, the file: above it, every

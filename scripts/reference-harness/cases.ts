@@ -1,3 +1,6 @@
+export { plan1Instances } from './plan1-instances.js';
+export type { ReferenceInstance } from './instances.js';
+
 /**
  * The reference project's case inventory.
  *

@@ -8,13 +8,14 @@
     "strict": true,
     "declaration": true,
     "outDir": "dist",
-    "rootDir": "src",
+    "rootDir": ".",
+    "noEmit": true,
     "skipLibCheck": true,
-    // No ambient Node types under src/: everything there must be browser-safe.
-    // The one file that needs them (scripts/emit-diagrams.ts) is type-checked
-    // by tsconfig.scripts.json instead.
-    "types": [],
+    // Whole-project checking includes Node owners and all owned tests.
+    // Portable owners also pass the separate tsconfig.portable.json check.
+    "types": ["node"],
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*", "subs/**/src/**/*"],
+  "exclude": ["node_modules", "dist", "site", "examples", "scripts", "**/.reference-work"]
 }
