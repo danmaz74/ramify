@@ -2,7 +2,6 @@
 
 ## Summary
 - **Static Analysis**: PASSED
-- **Scope Review**: PASSED
 - **Sealed Files**: PASSED
 - **Constraints**: FAILED
 
@@ -12,15 +11,15 @@
 ```
 {
   "met": false,
-  "reasoning": "Reviewed all four selected constraints. The two compiler regression cases and matrix-registration test pass, but an additional compiler-backed probe confirms one resolution contradiction introduced by the diff. No other concrete contradictions were established. No repository files were edited.",
+  "reasoning": "Reviewed all four selected constraints. Nine focused tests pass, but a compiler-backed probe confirms one resolution contradiction introduced by the diff. No other concrete contradictions were established. No repository files were edited.",
   "issues": [
     {
       "constraintPath": "docs/model/typescript-source-interpretation.principles.md",
       "constraintId": "docs/model/typescript-source-interpretation.principles.md#principles-md",
       "ruleId": "principles-md",
       "severity": "important",
-      "issue": "In subs/analysis/subs/typescript/src/resolution.ts:131, adding .ts before .jsx causes the script fallback to override an existing exact paths target. Reproduced with paths: { \"@init\": [\"./src/init.jsx\"] }, plain scripts at both src/init.jsx and src/init.ts, and src/use.ts importing '@init'. With allowJs/checkJs enabled, jsx: 'preserve', and bundler resolution, the pinned compiler exits successfully and resolves src/init.jsx. The real analysis pipeline instead selects src/init.ts and reports a checked, allowed symbol-free load with empty coverage. Previously, this fixture reached the existing .jsx candidate. The implementation therefore reports a different accessed source from the compiler-selected target.",
-      "guidance": "Preserve the compiler's exact-file priority for paths substitutions before applying extension substitution, while retaining the correct behavior when the exact target is absent. Prefer compiler-established resolution where available; report unresolved coverage when a faithful target cannot be established. Add a regression with both init.jsx and init.ts present that compares the compiler trace with the analysis target, alongside the existing absent-.jsx controls."
+      "issue": "In subs/analysis/subs/typescript/src/resolution.ts:131, the new .jsx substitution list places .js before .jsx and changes relative-import resolution incorrectly. Reproduced with src/use.ts importing './init.jsx', plain scripts at both src/init.js and src/init.jsx, and no TypeScript counterparts. With allowJs/checkJs enabled, jsx: 'preserve', and bundler resolution, TypeScript 7.0.2 exits successfully and its trace resolves src/init.jsx. The real analysis pipeline instead targets src/init.js and reports a checked, allowed symbol-free load with empty coverage. The previous .jsx substitution list selected src/init.jsx.",
+      "guidance": "Preserve the compiler's priority between .jsx and .js candidates while retaining the verified TypeScript substitutions and exact paths-target behavior. Add a compiler-trace regression for a relative .jsx import with both JavaScript files present and no TypeScript counterpart, alongside the existing controls. If faithful resolution cannot be established, report unresolved coverage instead of checking a guessed target."
     }
   ],
   "selectedConstraints": [
@@ -28,7 +27,7 @@
       "path": "docs/architecture/quick-testing.spec.md",
       "id": "docs/architecture/quick-testing.spec.md#architecture-specs",
       "ruleId": "architecture-specs",
-      "score": 0.88,
+      "score": 0.85,
       "selectedBy": [
         "semantic"
       ]
@@ -46,7 +45,7 @@
       "path": "docs/model/module-description.principles.md",
       "id": "docs/model/module-description.principles.md#principles-md",
       "ruleId": "principles-md",
-      "score": 0.74,
+      "score": 0.64,
       "selectedBy": [
         "semantic"
       ]
