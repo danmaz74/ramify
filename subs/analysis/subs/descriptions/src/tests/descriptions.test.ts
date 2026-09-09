@@ -20,7 +20,7 @@ const both = ['parent', 'descendants'] as const;
 const browser = ['browser'];
 const uiBrowser = ['ui', 'browser'];
 
-// Independent selections from the reference contract map and the reviewed I6
+// Independent selections from the reference contract map and the reviewed I8
 // declaration stage. Read the actual authored texts, including their comments.
 const modelNames = [
   'ModuleId', 'TagName', 'TagKind', 'TagDefinition', 'ResolvedTagRegistry', 'SourceLocation',
@@ -31,7 +31,7 @@ const modelNames = [
   'originalKey', 'buildModel', 'explainVisibility', 'explainImport',
 ];
 const linkingNames = ['LinkInputs', 'ExpandedSelection', 'LinkIssue', 'LinkedDescriptions'];
-const analysisNames = ['Capability', 'StageId', 'RunControl', 'AnalysisLimits', 'AnalysisInputs', 'InventorySnapshot', 'ValidationRun', 'AnalysisCode', 'AnalysisDiagnostic'];
+const analysisNames = ['Capability', 'StageId', 'RunControl', 'AnalysisLimits', 'AnalysisInputs', 'InventoryInputs', 'InventorySnapshot', 'InventoryRun', 'ValidationRun', 'AnalysisCode', 'AnalysisDiagnostic'];
 const syntaxNames = ['TextSpan', 'DescriptionToken', 'DescriptionIssue', 'NamedSelection',
   'DescriptionSelection', 'DescriptionStatement', 'DescriptionDocument', 'ParsedDescription', 'DescriptionParser'];
 
@@ -42,6 +42,33 @@ const projectNames = ['ProjectRequest', 'ProjectScope', 'CapturedInput', 'Invent
 const sourceNames = ['CatalogOriginal', 'CatalogExport', 'FileExports', 'SourceCatalog', 'SourceLimit',
   'SourceWorkLimits', 'SourceAnalysisInputs', 'SourceAnalysis'];
 
+const presentationNames = ['DiagramDefinition', 'TreeDiagramDefinition', 'FocusDiagramDefinition',
+  'ModelDiagramProps', 'ModelDiagramInteractiveProps', 'TreeDiagramProps', 'FocusDiagramProps',
+  'ModelDiagram', 'ModelDiagramSvg', 'TreeDiagram', 'TreeDiagramSvg', 'FocusDiagram', 'FocusDiagramSvg',
+  'shopDiagram', 'example1Diagram', 'example1aDiagram', 'example1bDiagram', 'example2Diagram',
+  'example3Diagram', 'example4Diagram', 'shopTreeDiagram', 'shopFocusDiagram'];
+const presentationStatements = [
+  src(['ModelDiagram', 'ModelDiagramSvg'], 'ModelDiagram.tsx', uiBrowser),
+  src(['TreeDiagram', 'TreeDiagramSvg'], 'TreeDiagram.tsx', uiBrowser),
+  src(['FocusDiagram', 'FocusDiagramSvg'], 'FocusDiagram.tsx', uiBrowser),
+  src(['ModelDiagramProps', 'ModelDiagramInteractiveProps'], 'ModelDiagram.tsx'),
+  src(['TreeDiagramProps'], 'TreeDiagram.tsx'), src(['FocusDiagramProps'], 'FocusDiagram.tsx'),
+  src(['DiagramDefinition'], 'diagram-definition.ts'), src(['TreeDiagramDefinition'], 'tree-diagram.ts'),
+  src(['FocusDiagramDefinition'], 'focus-diagram.ts'),
+  ...['shop', 'example1', 'example1a', 'example1b', 'example2', 'example3', 'example4']
+    .map((name) => src([`${name}Diagram`], `diagrams/${name}.ts`, uiBrowser)),
+  src(['shopTreeDiagram', 'shopFocusDiagram'], 'diagrams/shop-tree.ts', uiBrowser),
+];
+const layoutStatements = [
+  src('*', 'interfaces/layout.ts'),
+  ...(['Nodes', 'Lanes', 'Chords', 'Legend', 'Tree', 'Focus'] as const)
+    .map((name, index) => src([`place${name}`], `${['node', 'lane', 'chord', 'legend', 'tree', 'focus'][index]}-placement.ts`, browser)),
+  src(['measureBounds'], 'bounds.ts', browser),
+  src(['LAYOUT', 'headerBandHeight', 'r', 'polyline', 'textWidth', 'rowLabelDx', 'wrapText'], 'geometry.ts', browser),
+  src(['CENTER', 'DRAG_THRESHOLD', 'MAX_SCALE', 'MIN_SCALE', 'clampPan', 'isReset', 'normalizeWheelDelta',
+    'panBy', 'scaleOf', 'wheelFactor', 'zoomAt'], 'viewport.ts', browser),
+];
+
 interface Fixture {
   path: string;
   name: string;
@@ -49,8 +76,8 @@ interface Fixture {
   statements: readonly ReturnType<typeof statement>[];
 }
 const toolkit: readonly Fixture[] = [
-  { path: '', name: 'ramify', tags: ['dispatch'], statements: [sub(modelNames, 'analysis', descendants), sub([...syntaxNames, ...linkingNames], 'analysis', descendants), sub(projectNames, 'analysis', descendants), sub(sourceNames, 'analysis', descendants), sub(analysisNames, 'analysis', descendants)] },
-  { path: 'subs/analysis/', name: 'analysis', tags: [], statements: [sub('*', 'model', both), sub([...syntaxNames, ...linkingNames], 'descriptions', both), sub(projectNames, 'project', both), sub(sourceNames, 'typescript', both), src(['validateProject'], 'validation.ts'), src('*', 'interfaces/analysis.ts')] },
+  { path: '', name: 'ramify', tags: ['dispatch'], statements: [sub(modelNames, 'analysis', descendants), sub([...syntaxNames, ...linkingNames], 'analysis', descendants), sub(projectNames, 'analysis', descendants), sub(sourceNames, 'analysis', descendants), sub(analysisNames, 'analysis', descendants), sub(presentationNames, 'presentation', descendants)] },
+  { path: 'subs/analysis/', name: 'analysis', tags: [], statements: [sub('*', 'model', both), sub([...syntaxNames, ...linkingNames], 'descriptions', both), sub(projectNames, 'project', both), sub(sourceNames, 'typescript', both), src(['validateProject'], 'validation.ts'), src('*', 'interfaces/analysis.ts'), src(['acquireInventory'], 'inventory.ts')] },
   { path: 'subs/analysis/subs/descriptions/', name: 'descriptions', tags: browser, statements: [src(['parseDescription'], 'parse.ts', browser), src('*', 'interfaces/syntax.ts'), src(['linkDescriptions'], 'link.ts', browser), src('*', 'interfaces/linking.ts')] },
   { path: 'subs/analysis/subs/model/', name: 'model', tags: browser, statements: [
     src('*', 'interfaces/model.ts'), src(['resolveTagRegistry', 'createDefaultTagRegistry'], 'registry.ts', browser),
@@ -60,8 +87,8 @@ const toolkit: readonly Fixture[] = [
   { path: 'subs/analysis/subs/project/', name: 'project', tags: [], statements: [src(['readProject'], 'read-project.ts'), src('*', 'interfaces/project.ts')] },
   { path: 'subs/analysis/subs/typescript/', name: 'typescript', tags: [], statements: [src(['createSourceAnalysis'], 'source-analysis.ts'), src('*', 'interfaces/source.ts')] },
   { path: 'subs/cli/', name: 'cli', tags: ['dispatch'], statements: [] },
-  { path: 'subs/presentation/', name: 'presentation', tags: uiBrowser, statements: [] },
-  { path: 'subs/presentation/subs/layout/', name: 'layout', tags: browser, statements: [] },
+  { path: 'subs/presentation/', name: 'presentation', tags: uiBrowser, statements: presentationStatements },
+  { path: 'subs/presentation/subs/layout/', name: 'layout', tags: browser, statements: layoutStatements },
 ];
 const workspace = 'subs/workspace/';
 const catalog = `${workspace}subs/catalog/`;

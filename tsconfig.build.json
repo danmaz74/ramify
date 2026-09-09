@@ -6,7 +6,9 @@
     "rootDir": ".",
     "outDir": "dist",
     "incremental": false
-  }
-  // Transitional emission includes tests. Inventory-based production
-  // selection replaces this inherited include set in iteration 8.
+  },
+  // scripts/build-production.ts supplies an explicit inventory-derived files
+  // list and temporary outDir. This file no longer chooses production files.
+  "files": [],
+  "include": []
 }

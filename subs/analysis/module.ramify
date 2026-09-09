@@ -15,3 +15,6 @@ expose-sub CatalogOriginal, CatalogExport, FileExports, SourceCatalog, SourceLim
 // A1/A4: validation operations and implemented analysis vocabulary.
 expose-src validateProject from "validation.ts" to parent
 expose-src * from "interfaces/analysis.ts" to parent
+
+// A2: inventory and source-profile assembly for production selection.
+expose-src acquireInventory from "inventory.ts" to parent

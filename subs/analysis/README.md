@@ -12,3 +12,11 @@ unavailable and cancelled outcomes contain no usable linked model.
 
 This entry supports migration and declaration verification. Source access
 decisions, the public analysis session and CLI arrive in later iterations.
+
+Iteration 8 adds `acquireInventory(inputs, control?)` through
+`src/inventory-entry.ts` and the installed `ramify.ts/analysis/inventory` entry.
+It acquires and seals the real project inventory, resolves model source profiles
+and releases its input view before returning detached data. It uses the
+configuration-only integration without opening a source compiler program.
+Production tooling consumes these profiles to exclude testing-classified areas;
+the inventory itself retains every owned file and area.

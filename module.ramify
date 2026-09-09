@@ -13,4 +13,7 @@ expose-sub ProjectRequest, ProjectScope, CapturedInput, InventoryArea, ModulePur
 expose-sub CatalogOriginal, CatalogExport, FileExports, SourceCatalog, SourceLimit, SourceWorkLimits, SourceAnalysisInputs, SourceAnalysis from analysis to descendants
 
 // R3: current analysis validation vocabulary.
-expose-sub Capability, StageId, RunControl, AnalysisLimits, AnalysisInputs, InventorySnapshot, ValidationRun, AnalysisCode, AnalysisDiagnostic from analysis to descendants
+expose-sub Capability, StageId, RunControl, AnalysisLimits, AnalysisInputs, InventoryInputs, InventorySnapshot, InventoryRun, ValidationRun, AnalysisCode, AnalysisDiagnostic from analysis to descendants
+
+// R5: declaration-only UI relay; root source imports none of these.
+expose-sub DiagramDefinition, TreeDiagramDefinition, FocusDiagramDefinition, ModelDiagramProps, ModelDiagramInteractiveProps, TreeDiagramProps, FocusDiagramProps, ModelDiagram, ModelDiagramSvg, TreeDiagram, TreeDiagramSvg, FocusDiagram, FocusDiagramSvg, shopDiagram, example1Diagram, example1aDiagram, example1bDiagram, example2Diagram, example3Diagram, example4Diagram, shopTreeDiagram, shopFocusDiagram from presentation to descendants

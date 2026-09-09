@@ -32,5 +32,7 @@ parsed header span. Explicit symbol assignments already retain supplied spans.
 Owned tests include the independently retained shop visibility table and cases
 for registry replacement, source profiles, tags, identities, exposure evidence
 and testing origins. I1-14 harness assertions consume this public entry over
-constructed trees. Filesystem and TypeScript source evidence belongs to later
-iterations. The legacy `src/model` remains for diagrams until iteration 8.
+constructed trees. Presentation adapts its teaching fixtures to this same model
+through the declared analysis and root relays; the legacy evaluator is retired.
+Filesystem and TypeScript source evidence belongs to the analysis assembly and
+its acquisition and compiler adapters.

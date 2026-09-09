@@ -1,7 +1,12 @@
 {
   "extends": "@docusaurus/tsconfig",
   "compilerOptions": {
-    "baseUrl": "."
+    "baseUrl": ".",
+    "paths": {
+      "@ramify/presentation": ["../subs/presentation/src/index.ts"],
+      "@ramify/model": ["../subs/analysis/subs/model/src/index.ts"],
+      "@ramify/layout": ["../subs/presentation/subs/layout/src/index.ts"]
+    }
   },
   "exclude": [".docusaurus", "build"]
 }

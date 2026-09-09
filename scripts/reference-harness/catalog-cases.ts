@@ -1,13 +1,14 @@
 import { symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 
+import type { CatalogOriginal, FileExports, ProjectInventory, SourceCatalog } from '../../subs/analysis/src/validation-entry.js';
 import { parseDescription } from '../../subs/analysis/subs/descriptions/src/parse.js';
 import { assignOriginalTags, createDefaultTagRegistry, deriveSourceAreas, originalKey } from '../../subs/analysis/subs/model/src/index.js';
 import type { ModelResult, OriginalId, SourceArea } from '../../subs/analysis/subs/model/src/index.js';
 import { readProject } from '../../subs/analysis/subs/project/src/read-project.js';
-import type { AcquisitionLimits, ProjectInventory } from '../../subs/analysis/subs/project/src/interfaces/project.js';
+import type { AcquisitionLimits } from '../../subs/analysis/subs/project/src/interfaces/project.js';
 import { createSourceAnalysis } from '../../subs/analysis/subs/typescript/src/source-analysis.js';
-import type { CatalogOriginal, FileExports, SourceAnalysis, SourceCatalog, SourceWorkLimits } from '../../subs/analysis/subs/typescript/src/interfaces/source.js';
+import type { SourceAnalysis, SourceWorkLimits } from '../../subs/analysis/subs/typescript/src/interfaces/source.js';
 import { createProjectFixture, put } from './fixtures/plan1/project.js';
 import { repositoryRoot } from './plan.js';
 import type { Assertions, InstanceHandler, ProjectContext } from './runner.js';

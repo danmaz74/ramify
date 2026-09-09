@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": true,
+    "functionalRequirementsSatisfied": true,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-09T14:21:00Z",
+  "iteration": "8",
+  "notes": "Migration and inventory-driven clean build implemented. 259 focused tests pass; iteration gate 139/139; compiled validation 9 owners/121 files/54 statements with no diagnostics. Final type-check, diagrams and site build pass. 8/9 SVGs byte-identical; core path serialization visually reviewed. Full regression/scenario/sealed checks remain with workflow automation. Plan 1 is not complete."
+}

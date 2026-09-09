@@ -1,9 +1,39 @@
 import { fileURLToPath } from 'node:url';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
+import type { CatalogExport, CatalogOriginal, FileExports, ProjectInventory, SourceCatalog } from '../../subs/analysis/src/validation-entry.js';
 import { parseDescription } from '../../subs/analysis/subs/descriptions/src/parse.js';
+import { createDefaultTagRegistry, deriveSourceAreas } from '../../subs/analysis/subs/model/src/index.js';
+import type { OriginalId } from '../../subs/analysis/subs/model/src/index.js';
 import { readProject } from '../../subs/analysis/subs/project/src/read-project.js';
-import type { SourceCatalog } from '../../subs/analysis/subs/typescript/src/interfaces/source.js';
-import { analyzeView, code, exported, file, original, resource } from '../../subs/analysis/subs/typescript/src/tests/fixtures.js';
+import { createSourceAnalysis } from '../../subs/analysis/subs/typescript/src/source-analysis.js';
+import type { SourceAnalysis } from '../../subs/analysis/subs/typescript/src/interfaces/source.js';
+
+function file(catalog: SourceCatalog, path: string): FileExports {
+  const found = catalog.files.find(entry => entry.file === path);
+  if (!found) throw new Error(`Catalog has no file ${path}`);
+  return found;
+}
+
+function exported(catalog: SourceCatalog, path: string, name: string): CatalogExport {
+  const found = file(catalog, path).exports.find(entry => entry.name === name);
+  if (!found) throw new Error(`Catalog has no export ${name} in ${path}`);
+  return found;
+}
+
+function original(catalog: SourceCatalog, id: OriginalId): CatalogOriginal {
+  const found = catalog.originals.find(entry => entry.id.kind === id.kind && entry.id.owner === id.owner
+    && entry.id.file === id.file && entry.id.binding === id.binding);
+  if (!found) throw new Error(`Catalog has no original ${JSON.stringify(id)}`);
+  return found;
+}
+
+function code(file: string, binding: string, owner: string): OriginalId {
+  return { kind: 'code', owner, file, binding };
+}
+
+function resource(file: string, binding: string, owner: string): OriginalId {
+  return { kind: 'resource', owner, file, binding };
+}
 
 // Independent expected declarations from the reference contract map, including
 // its deliberately unexposed exports. These are not derived from the compiler,
@@ -49,7 +79,7 @@ function sourcePath(owner: string, source: string): string {
 function ownerId(owner: string): string { return owner ? `collection-review/${owner}` : 'collection-review'; }
 
 describe('unchanged Collection Review catalog', () => {
-  let result: Awaited<ReturnType<typeof analyzeView>>;
+  let inventory: ProjectInventory;
   let catalog: SourceCatalog;
   beforeAll(async () => {
     const root = fileURLToPath(new URL('../../examples/collection-review/', import.meta.url));
@@ -60,10 +90,27 @@ describe('unchanged Collection Review catalog', () => {
         maxApplicationBytes: 64 * 1024 ** 2, maxOwners: 1000, maxDepth: 128, deadlineMs: 30_000 },
     });
     if (acquired.status !== 'acquired') throw new Error(JSON.stringify(acquired));
-    result = await analyzeView(acquired.view);
-    catalog = result.catalog;
+    inventory = acquired.view.inventory;
+    let source: SourceAnalysis | undefined;
+    try {
+      const registry = createDefaultTagRegistry();
+      const areas = inventory.modules.flatMap(module => {
+        const ordinary = module.areas.find(area => area.kind === 'ordinary');
+        if (!ordinary) throw new Error(`No ordinary area for ${module.id}`);
+        const result = deriveSourceAreas(registry, module.id, ordinary.root, module.headerTags);
+        if (result.status !== 'valid') throw new Error(JSON.stringify(result.issues));
+        return result.value;
+      });
+      source = await createSourceAnalysis({ view: acquired.view, inventory, areas, limits: {
+        maxExports: 250_000, maxAccesses: 250_000, maxSelections: 1_000_000,
+        maxForwardingDepth: 256, deadlineMs: 90_000,
+      } });
+      catalog = await source.catalog();
+    } finally {
+      try { await source?.dispose(); }
+      finally { await acquired.view.dispose(); }
+    }
   }, 90_000);
-  afterAll(async () => { await result?.dispose(); });
 
   it.each(expectedFiles)('retains contract-map originals for %s src/%s', (owner, source, values, types) => {
     const path = sourcePath(owner, source);
@@ -102,8 +149,8 @@ describe('unchanged Collection Review catalog', () => {
   });
 
   it('covers every owned file and keeps the standalone testing owner ordinary area', () => {
-    expect(result.view.inventory.modules).toHaveLength(15);
-    expect(catalog.files.map(entry => entry.file).sort()).toEqual(result.view.inventory.files.map(entry => entry.path).sort());
+    expect(inventory.modules).toHaveLength(15);
+    expect(catalog.files.map(entry => entry.file).sort()).toEqual(inventory.files.map(entry => entry.path).sort());
     const testingOwner = 'collection-review/integration-tests';
     const world = catalog.originals.find(entry => entry.id.owner === testingOwner && entry.id.binding === 'CollectionReviewWorld');
     expect(world).toMatchObject({ origin: { area: { owner: testingOwner, kind: 'ordinary', profile: ['dispatch', 'testing'] } } });

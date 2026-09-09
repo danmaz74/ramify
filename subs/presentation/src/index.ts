@@ -1,0 +1,21 @@
+/** Supported presentation entry. Portable geometry has its own layout entry. */
+export { ModelDiagram, ModelDiagramSvg, TOUR_DWELL_MS, accessPolicyStatements, accessPolicyStatementsOf } from './ModelDiagram.js';
+export type { ModelDiagramProps, ModelDiagramInteractiveProps } from './ModelDiagram.js';
+export { TreeDiagram, TreeDiagramSvg } from './TreeDiagram.js';
+export type { TreeDiagramProps } from './TreeDiagram.js';
+export { FocusDiagram, FocusDiagramSvg } from './FocusDiagram.js';
+export type { FocusDiagramProps } from './FocusDiagram.js';
+export { createDiagramContext } from './diagram-definition.js';
+export type { DiagramDefinition, DiagramContext } from './diagram-definition.js';
+export type { TreeDiagramDefinition, TreeDiagramLayout } from './tree-diagram.js';
+export type { FocusDiagramDefinition, FocusDiagramLayout } from './focus-diagram.js';
+export { shopDiagram, shopDeclaration, shopTree } from './diagrams/shop.js';
+export { example1Diagram, example1Declaration } from './diagrams/example1.js';
+export { example1aDiagram, example1aDeclaration } from './diagrams/example1a.js';
+export { example1bDiagram, example1bDeclaration } from './diagrams/example1b.js';
+export { example2Diagram, example2Declaration } from './diagrams/example2.js';
+export { example3Diagram, example3Declaration } from './diagrams/example3.js';
+export { example4Diagram, example4Declaration } from './diagrams/example4.js';
+export { shopTreeDiagram, shopFocusDiagram, shopTreeDeclaration } from './diagrams/shop-tree.js';
+export { buildDiagramLayout, coreModelLayout, diagramLayout } from './layout.js';
+export type { DiagramLayout } from './layout.js';

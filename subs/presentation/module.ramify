@@ -1,2 +1,23 @@
 ramify 1
 module presentation tagged [ui, browser]
+
+// V1-V3: rendering values keep UI coupling and explicit browser promises.
+expose-src ModelDiagram, ModelDiagramSvg from "ModelDiagram.tsx" tagged [ui, browser] to parent
+expose-src TreeDiagram, TreeDiagramSvg from "TreeDiagram.tsx" tagged [ui, browser] to parent
+expose-src FocusDiagram, FocusDiagramSvg from "FocusDiagram.tsx" tagged [ui, browser] to parent
+// V4-V7: owned props, no implicit exposure of types they mention.
+expose-src ModelDiagramProps, ModelDiagramInteractiveProps from "ModelDiagram.tsx" to parent
+expose-src TreeDiagramProps from "TreeDiagram.tsx" to parent
+expose-src FocusDiagramProps from "FocusDiagram.tsx" to parent
+expose-src DiagramDefinition from "diagram-definition.ts" to parent
+expose-src TreeDiagramDefinition from "tree-diagram.ts" to parent
+expose-src FocusDiagramDefinition from "focus-diagram.ts" to parent
+// V8-V15: independently owned teaching fixtures.
+expose-src shopDiagram from "diagrams/shop.ts" tagged [ui, browser] to parent
+expose-src example1Diagram from "diagrams/example1.ts" tagged [ui, browser] to parent
+expose-src example1aDiagram from "diagrams/example1a.ts" tagged [ui, browser] to parent
+expose-src example1bDiagram from "diagrams/example1b.ts" tagged [ui, browser] to parent
+expose-src example2Diagram from "diagrams/example2.ts" tagged [ui, browser] to parent
+expose-src example3Diagram from "diagrams/example3.ts" tagged [ui, browser] to parent
+expose-src example4Diagram from "diagrams/example4.ts" tagged [ui, browser] to parent
+expose-src shopTreeDiagram, shopFocusDiagram from "diagrams/shop-tree.ts" tagged [ui, browser] to parent

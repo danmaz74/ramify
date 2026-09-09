@@ -26,12 +26,22 @@ export interface AnalysisInputs {
   readonly capabilities: readonly Capability[];
   readonly limits: AnalysisLimits;
 }
+export interface InventoryInputs {
+  readonly project: ProjectRequest;
+  readonly registry: ResolvedTagRegistry;
+  readonly limits: AcquisitionLimits;
+}
 export interface InventorySnapshot {
   readonly inventory: ProjectInventory;
   readonly areas: readonly SourceArea[];
   readonly inputs: readonly CapturedInput[];
   readonly inputId: string;
 }
+export type InventoryRun =
+  | { readonly status: 'completed'; readonly snapshot: InventorySnapshot }
+  | { readonly status: 'invalid' | 'incomplete' | 'unavailable';
+      readonly diagnostics: readonly AnalysisDiagnostic[] }
+  | { readonly status: 'cancelled' };
 export type ValidationRun =
   | { readonly status: 'valid'; readonly input: InventorySnapshot;
       readonly catalog: SourceCatalog;

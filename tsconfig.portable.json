@@ -5,8 +5,6 @@
     "noEmit": true
   },
   "include": [
-    "src/model/**/*",
-    "src/viz/**/*",
     "subs/analysis/subs/model/src/**/*",
     "subs/analysis/subs/descriptions/src/**/*",
     "subs/presentation/subs/layout/src/**/*"
