@@ -2,7 +2,8 @@
 
 # Iteration 2 results: skeleton tree, build configuration and harness runner
 
-Status: implementation draft complete; automatic regression verification pending.
+Status: implementation and focused new-test verification complete; automatic
+regression verification pending.
 No I1 semantic instance has executed, and this iteration does not claim Plan 1
 completion or acceptance of iteration 1's architecture contracts.
 
@@ -50,7 +51,7 @@ completion or acceptance of iteration 1's architecture contracts.
   hand-reviewed violation count is retained as required until I14.
 - Added harness documentation and updated the testing command guide.
 
-## Tests supplied for automatic execution
+## Test coverage and focused verification
 
 Four new Vitest files cover inventory integrity and exact variants; prerequisite
 closure; full/intermediate positive controls and sabotaged gates; missing
@@ -62,11 +63,12 @@ and real harness subprocess output/exits.
 
 These deterministic harness stubs are test-only. They do not register a
 capability in `runtime.ts` or establish source/model conformance. All new tests
-were type-checked, but Vitest and Cucumber were not run locally under the supplied
-automatic-check policy. Their execution and passing status remain pending.
-`npm run reference:cases` invokes Vitest, so its full test command was likewise
-reserved for the automatic checks. Its instance/pointer validation was run
-separately through `validate.ts`.
+were type-checked during implementation. The focused self-assessment follow-up
+then executed exactly the four newly added test files: all 48 tests passed.
+The existing family catalogue suite, toolkit regression suites and Cucumber
+remain reserved for automatic checks. The full `npm run reference:cases`
+command was not run locally; its instance/pointer validation was previously
+run separately through `validate.ts`.
 
 ## Verification performed
 
@@ -109,6 +111,36 @@ in the reference family catalogue. Validation now also checks their owning
 architecture documents and retains those pointers; the subsequent validation
 passed. This was a harness validator correction, not an I1 checker result.
 
+## Self-assessment follow-up
+
+The one focused follow-up re-read the iteration scope and inspected the new
+harness tests. Workflow detail reported iteration 2 at `validate_output_retry`;
+no iteration 2 automatic regression result was available. The earlier
+assessment had treated all Vitest invocation as delegated, including first-run
+validation of the new tests. This follow-up ran only the four newly added files,
+leaving existing regression suites to automation:
+
+```sh
+npx vitest run -c scripts/reference-harness/vitest.config.ts \
+  scripts/reference-harness/instances.test.ts \
+  scripts/reference-harness/mutation.test.ts \
+  scripts/reference-harness/runner.test.ts \
+  scripts/reference-harness/verify.test.ts
+```
+
+Observed result on implementation revision `8107bb8`: exit 0, **4 test files
+passed, 48 tests passed**, 618 ms reported duration, Vitest 4.1.11. This executes
+the tiny project copy/mutation/cleanup/preservation and concurrent-isolation
+tests, baseline enforcement, full/intermediate gate sabotage and positive
+controls, inventory checks, and real harness subprocess checks.
+
+No source or test edits were needed. `allNewTestsPass` is now true on actual
+focused execution evidence; the other two checklist checks remain true.
+Full toolkit, existing catalogue and Cucumber regressions are still delegated.
+No I1 semantic capability was activated or instance executed. Both managed
+deliverables were updated through MCP, and this follow-up does not invoke
+`workflow.publish_iteration_draft`.
+
 ## Preserved state and limits
 
 The pre-existing change to `iteration1-check-results.md` was left untouched and
@@ -132,6 +164,6 @@ and protocol execution paths remain present; their regressions are automatic.
 4. Materialize the F/J/T/H recipes at their assigned stages. Project handlers
    must assert their prepared positive baseline before applying the recorded
    cause, await all work, and assert through the evidence recorder.
-5. Run the automatic toolkit and harness Vitest suites and Cucumber checks before
+5. Run the automatic full toolkit and harness Vitest suites and Cucumber checks before
    accepting this draft. Full Plan 1 verification must continue to fail until
    every required capability and assertion exists and executes successfully.
