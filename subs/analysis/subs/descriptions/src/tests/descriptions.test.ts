@@ -30,6 +30,8 @@ const modelNames = [
   'resolveTagRegistry', 'createDefaultTagRegistry', 'deriveSourceAreas', 'assignOriginalTags',
   'originalKey', 'buildModel', 'explainVisibility', 'explainImport',
 ];
+const linkingNames = ['LinkInputs', 'ExpandedSelection', 'LinkIssue', 'LinkedDescriptions'];
+const analysisNames = ['Capability', 'StageId', 'RunControl', 'AnalysisLimits', 'AnalysisInputs', 'InventorySnapshot', 'ValidationRun', 'AnalysisCode', 'AnalysisDiagnostic'];
 const syntaxNames = ['TextSpan', 'DescriptionToken', 'DescriptionIssue', 'NamedSelection',
   'DescriptionSelection', 'DescriptionStatement', 'DescriptionDocument', 'ParsedDescription', 'DescriptionParser'];
 
@@ -47,9 +49,9 @@ interface Fixture {
   statements: readonly ReturnType<typeof statement>[];
 }
 const toolkit: readonly Fixture[] = [
-  { path: '', name: 'ramify', tags: ['dispatch'], statements: [sub(modelNames, 'analysis', descendants), sub(syntaxNames, 'analysis', descendants), sub(projectNames, 'analysis', descendants), sub(sourceNames, 'analysis', descendants)] },
-  { path: 'subs/analysis/', name: 'analysis', tags: [], statements: [sub('*', 'model', both), sub(syntaxNames, 'descriptions', both), sub(projectNames, 'project', both), sub(sourceNames, 'typescript', both)] },
-  { path: 'subs/analysis/subs/descriptions/', name: 'descriptions', tags: browser, statements: [src(['parseDescription'], 'parse.ts', browser), src('*', 'interfaces/syntax.ts')] },
+  { path: '', name: 'ramify', tags: ['dispatch'], statements: [sub(modelNames, 'analysis', descendants), sub([...syntaxNames, ...linkingNames], 'analysis', descendants), sub(projectNames, 'analysis', descendants), sub(sourceNames, 'analysis', descendants), sub(analysisNames, 'analysis', descendants)] },
+  { path: 'subs/analysis/', name: 'analysis', tags: [], statements: [sub('*', 'model', both), sub([...syntaxNames, ...linkingNames], 'descriptions', both), sub(projectNames, 'project', both), sub(sourceNames, 'typescript', both), src(['validateProject'], 'validation.ts'), src('*', 'interfaces/analysis.ts')] },
+  { path: 'subs/analysis/subs/descriptions/', name: 'descriptions', tags: browser, statements: [src(['parseDescription'], 'parse.ts', browser), src('*', 'interfaces/syntax.ts'), src(['linkDescriptions'], 'link.ts', browser), src('*', 'interfaces/linking.ts')] },
   { path: 'subs/analysis/subs/model/', name: 'model', tags: browser, statements: [
     src('*', 'interfaces/model.ts'), src(['resolveTagRegistry', 'createDefaultTagRegistry'], 'registry.ts', browser),
     src(['deriveSourceAreas', 'assignOriginalTags'], 'profiles.ts', browser), src(['originalKey'], 'identity.ts', browser),

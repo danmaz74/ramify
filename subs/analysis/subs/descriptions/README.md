@@ -4,7 +4,8 @@ Descriptions parses the version 1 language with original source locations and li
 
 Iteration 4 implements `parseDescription(file, text)` in `src/parse.ts` and the
 reviewed vocabulary in `src/interfaces/syntax.ts`. Its runtime uses only local
-portable code. Linking arrives in iteration 7.
+portable code. Iteration 7 adds `linkDescriptions(inputs)` in `src/link.ts` and
+its contract in `src/interfaces/linking.ts`.
 
 The parser receives decoded text. It keeps UTF-16 offsets into that original
 text, with one-based lines and columns; BOM and CRLF code units remain in
@@ -25,3 +26,12 @@ exposure semantics await acquisition/linking. The parser never probes a path or
 validates UTF-8 bytes that its string input cannot represent; acquisition owns
 byte decoding. Tests read all fifteen reference and nine current toolkit
 descriptions and assert their independently listed selections.
+
+The linker consumes captured inventory/reference facts, a source catalog and
+one resolved registry. It resolves owned selections, expands eligible interface
+files and evaluates direct-child contracts from leaves to root. It assigns tags
+through the model before publishing the complete result. Empty expansions and
+ineffective named child selections retain declaration evidence; invalid
+prerequisites, collisions, conflicting assignments and incomplete expansions
+return diagnostics without a partial model. All catalogued originals, including
+unexposed exports, retain their defining source areas and mandatory tags.

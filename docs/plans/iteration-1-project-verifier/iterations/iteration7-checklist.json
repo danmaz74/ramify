@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": true,
+    "functionalRequirementsSatisfied": true,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-09T13:53:37Z",
+  "iteration": "7",
+  "notes": "Iteration-7 scope complete: 139 required instances passed, including all 34 new records and 6,206 assertions. Thirty-five distinct focused tests, type-check, build, real compiled validation of both projects, and diff checks passed. Full regression/scenario/sealed checks remain with workflow automation. Source-adapter findings from the supplied predecessor output remain recorded as follow-up provider work; no source-access or Plan 1 completion claim."
+}

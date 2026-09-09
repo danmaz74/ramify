@@ -34,6 +34,12 @@ export function validLocation(value: unknown): value is SourceLocation {
     && Number.isInteger(value.column) && Number(value.column) >= 1;
 }
 
+/** A resource's effective declaration may be in a dependency above the root. */
+export function validDeclarationLocation(value: unknown): value is SourceLocation {
+  if (!isRecord(value) || typeof value.file !== 'string') return false;
+  return validLocation({ ...value, file: value.file.replace(/^(?:\.\.\/)+/, '') });
+}
+
 export function locations(values: readonly SourceLocation[]): SourceLocation[] {
   const canonical = values.map(({ file, start, end, line, column }) => ({ file, start, end, line, column }));
   const unique = new Map(canonical.map((value) => [JSON.stringify(value), value]));

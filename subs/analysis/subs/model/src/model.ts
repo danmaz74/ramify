@@ -1,5 +1,5 @@
 import type { Exposure, Model, ModelInput, ModelIssue, ModelResult, ModuleRecord, Original, SourceArea, SourceOrigin } from './interfaces/model.js';
-import { compare, immutable, issue, locations, namePattern, sortedNames, validLocation, validPath, validText } from './data.js';
+import { compare, immutable, issue, locations, namePattern, sortedNames, validDeclarationLocation, validLocation, validPath, validText } from './data.js';
 import { originalKey, validModuleId, validOriginalId } from './identity.js';
 import { deriveSourceAreas, requiredImporterTags, tagIssues } from './profiles.js';
 import { validateRegistry } from './registry.js';
@@ -105,7 +105,7 @@ export function buildModel(input: ModelInput): ModelResult<Model> {
   const originals = new Map<string, Original>();
   for (const original of captured.originals as readonly Original[]) {
     if (!original || !validOriginalId(original.id)
-      || !Array.isArray(original.declarations) || !original.declarations.every(validLocation)
+      || !Array.isArray(original.declarations) || !original.declarations.every(validDeclarationLocation)
       || !Array.isArray(original.tagEvidence) || !original.tagEvidence.every(validLocation)
       || typeof original.hasValue !== 'boolean' || typeof original.hasType !== 'boolean'
       || (!original.hasValue && !original.hasType)) {
