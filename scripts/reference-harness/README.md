@@ -2,10 +2,12 @@
 
 This independent Node tool scope inventories reference expectations, owns
 temporary mutation projects and requires evidence from registered capabilities.
-The current runtime registers the model's `registry` capability and the 14
-I1-14 instances through its public library API. These assertions use constructed
-trees and establish no filesystem or source coverage; the other 294 reviewed
-instances remain unexecuted.
+The current runtime registers the model's `registry` capability and 14 I1-14
+instances, plus the descriptions owner's `parse` capability and 53 I1-04 syntax
+variants through their public APIs. Model assertions use constructed trees;
+parser assertions use the reviewed description texts and independent decoded
+statements, reason codes and original locations. Neither establishes filesystem
+or source coverage; the other 241 reviewed instances remain unexecuted.
 
 `npm run reference:cases` runs the family, instance, gate, mutation and invocation
 tests under this directory's Vitest configuration. The deterministic gate stubs
@@ -20,8 +22,10 @@ explicitly separate from checker evidence until iteration 14 replaces it.
 
 `npm run reference:verify -- --plan 1` requires every reviewed leaf and currently
 exits 1 for absent capabilities. Add `--iteration 3` to execute and require
-the 14 implemented model instances and their prerequisites, while retaining every future instance as not
-executed. Iteration verification never claims plan completion, even for
+the 14 implemented model instances and their prerequisites, or `--iteration 4`
+for all 53 parser variants and prerequisite closure `[1, 2, 4]`. Parser execution
+is independent of the model. Every other instance remains not executed in
+that intermediate gate. Iteration verification never claims plan completion, even for
 iteration 15. `--format json` emits the same result as one JSON document;
 `--preserve-on-failure` keeps failed project copies for inspection. Invalid
 arguments exit 2.
@@ -45,7 +49,9 @@ Project handlers supply a copy source or materialization recipe. Their optional
 through `context.assertions.equal` or `ok`. Only a successful, nonempty baseline
 permits `mutate`, followed by `run` with the independent result assertions.
 `replaceExactlyOnce` rejects a missing or repeated source anchor before writing.
-Pure model handlers can run in memory with the same assertion recorder.
+Pure model and text-only parser handlers can run in memory with the same
+assertion recorder. Each invalid parser variant first asserts the unchanged D
+description as its positive baseline; no filesystem fixture or compiler is used.
 Handlers must await all their work. A return value, an empty handler, or a caught
 assertion failure cannot manufacture a pass; assertion recording closes at
 completion.
@@ -63,4 +69,5 @@ and reports its location.
 The remaining fixture recipes, checked baselines and real assertions arrive
 with their assigned capabilities. Inventory commands and harness stubs do not
 establish semantic outcomes. Actual model assertions are recorded individually
-by `model-cases.ts`; the required gate membership remains in the reviewed plan.
+by `model-cases.ts` and `parser-cases.ts`; the required gate membership remains
+in the reviewed plan.

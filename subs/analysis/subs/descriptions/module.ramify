@@ -1,2 +1,6 @@
 ramify 1
 module descriptions tagged [browser]
+
+// D1-D2: standalone syntax contract.
+expose-src parseDescription from "parse.ts" tagged [browser] to parent
+expose-src * from "interfaces/syntax.ts" to parent
