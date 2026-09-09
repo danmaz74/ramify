@@ -9,6 +9,7 @@ import type { ProjectInputView, ProjectInventory, ProjectIssue, ProjectRead, Pro
 
 const invalidCodes = new Set<ProjectIssue['code']>(['missing-root-description', 'symlink-root', 'symlink-description', 'invalid-description']);
 const unavailableCodes = new Set<ProjectIssue['code']>(['root-not-found', 'configuration-not-found', 'references-only-configuration']);
+const issueOrder = (a: ProjectIssue, b: ProjectIssue): number => byteOrder(a.path, b.path) || byteOrder(a.code, b.code) || byteOrder(a.message, b.message);
 
 export async function readProject(options: ProjectReadOptions): Promise<ProjectRead> {
   const { request, limits, signal } = options;
@@ -21,6 +22,7 @@ export async function readProject(options: ProjectReadOptions): Promise<ProjectR
     const capture = new Capture(resolve(request.cwd), limits, deadline, signal);
     let retained = false;
     let inventory: ProjectInventory | null = null;
+    let issues: ProjectIssue[] = [];
     try {
       const selected = await selectRoot(capture, request);
       capture.root = selected.root;
@@ -30,10 +32,11 @@ export async function readProject(options: ProjectReadOptions): Promise<ProjectR
         `Solution-style configurations are unavailable; referenced configurations: ${config.references.join(', ')}`);
       const acquired = await inventoryProject(capture, { ...selected, configuration }, config, options.parse);
       inventory = acquired.inventory;
+      issues = acquired.issues;
+      if (acquired.status === 'failed') throw acquired.error;
       const changed = await capture.validate();
       if (changed.length) throw new AcquisitionError('changed-input', selected.root, `Inputs changed during acquisition: ${changed.join(', ')}`);
-      if (acquired.issues.length) return freeze({ status: 'invalid', inventory,
-        issues: acquired.issues.sort((a, b) => byteOrder(a.path, b.path) || byteOrder(a.code, b.code) || byteOrder(a.message, b.message)) });
+      if (issues.length) return freeze({ status: 'invalid', inventory, issues: issues.sort(issueOrder) });
       const view: ProjectInputView = Object.freeze({ inventory,
         get inputs() { return capture.inputs; },
         readFile: (path: string) => capture.readFile(path),
@@ -51,8 +54,9 @@ export async function readProject(options: ProjectReadOptions): Promise<ProjectR
       const failure = error instanceof AcquisitionError ? error : new AcquisitionError('read-failure', capture.root,
         error instanceof Error ? error.message : String(error));
       if (failure.code === 'changed-input' && attempt + 1 < limits.attempts) continue;
+      issues.push({ code: failure.code, path: capture.label(capture.path(failure.path)), message: failure.message });
       return freeze({ status: invalidCodes.has(failure.code) ? 'invalid' : unavailableCodes.has(failure.code) ? 'unavailable' : 'incomplete',
-        inventory, issues: [{ code: failure.code, path: capture.label(capture.path(failure.path)), message: failure.message }] });
+        inventory, issues: issues.sort(issueOrder) });
     } finally { if (!retained) await capture.dispose(); }
   }
   throw new Error('Unreachable acquisition retry state');

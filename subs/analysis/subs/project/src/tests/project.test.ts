@@ -123,6 +123,39 @@ describe('real project configuration and scope', () => {
     expect(acquired.inventory.modules.map(m => m.id)).toEqual(['fixture', 'fixture/child']);
     expect(acquired.inventory.files.map(f => f.path)).toEqual(['src/value.ts', 'subs/child/src/file.ts']);
   });
+  it.each(['src', 'subs', 'subs/child/src', 'subs/child/src/tests'])('keeps dependency directories beneath %s outside application discovery', async area => {
+    await put(root, 'subs/child/module.ramify', 'ramify 1\nmodule child\n');
+    await put(root, 'subs/child/src/kept.ts', 'export {};');
+    await put(root, 'src/tests/kept.ts', 'export {};');
+    await put(root, `${area}/node_modules/lib/index.ts`, 'export const dependency = 1;');
+    await put(root, `${area}/node_modules/lib/package.json`, '{"name":"lib"}');
+    const acquired = view(await read());
+    expect(acquired.inventory.modules.map(module => module.id)).toEqual(['fixture', 'fixture/child']);
+    expect(acquired.inventory.files.map(file => file.path)).toEqual(['src/tests/kept.ts', 'src/value.ts', 'subs/child/src/kept.ts']);
+    expect(acquired.inventory.warnings).toEqual([]);
+  });
+  it.each(['src/generated', 'subs/generated', 'subs/child/src/generated', 'subs/child/src/tests/generated'])('keeps compiler output at %s outside application discovery', async outDir => {
+    await put(root, 'tsconfig.json', JSON.stringify({ compilerOptions: { outDir, allowJs: true }, include: ['src', 'subs/**/src'] }));
+    await put(root, 'subs/child/module.ramify', 'ramify 1\nmodule child\n');
+    await put(root, 'subs/child/src/kept.ts', 'export {};');
+    await put(root, 'src/tests/kept.ts', 'export {};');
+    await put(root, `${outDir}/generated.js`, 'export const generated = 1;');
+    const acquired = view(await read());
+    expect(acquired.inventory.modules.map(module => module.id)).toEqual(['fixture', 'fixture/child']);
+    expect(acquired.inventory.files.map(file => file.path)).toEqual(['src/tests/kept.ts', 'src/value.ts', 'subs/child/src/kept.ts']);
+    expect(acquired.inventory.warnings).toEqual([]);
+  });
+  it.each(['src/node_modules/lib', 'subs/node_modules/lib', 'src/generated', 'subs/generated'])('does not let explicit compiler selection reopen discovery at %s', async excluded => {
+    await put(root, 'tsconfig.json', JSON.stringify({ compilerOptions: { outDir: excluded.endsWith('/generated') ? excluded : 'dist' }, files: [`${excluded}/index.ts`] }));
+    await put(root, `${excluded}/index.ts`, 'export {};');
+    await put(root, `${excluded}/module.ramify`, 'ramify 1\nmodule excluded\n');
+    const acquired = view(await read());
+    expect(acquired.inventory.modules.map(module => module.id)).toEqual(['fixture']);
+    expect(acquired.inventory.files.map(file => file.path)).toEqual(['src/value.ts']);
+    expect(acquired.inventory.outsideModuleFiles).toEqual([]);
+    expect(acquired.inventory.warnings).toEqual([]);
+    expect(acquired.inputs.some(input => input.path === `${excluded}/module.ramify`)).toBe(false);
+  });
   it('keeps independent projects out of enclosing discovery', async () => {
     await fixture(join(root, 'examples/demo'));
     const acquired = view(await read());
@@ -139,6 +172,56 @@ describe('acquisition limits and cancellation', () => {
     await put(root, 'subs/a/module.ramify', 'ramify 1\nmodule child\n');
     await put(root, 'subs/a/subs/b/module.ramify', 'ramify 1\nmodule child\n');
     expect(await read({ limits: { ...limits, ...changed } })).toMatchObject({ status: 'incomplete', issues: [{ code: 'resource-limit' }] });
+  });
+  it.each([
+    ['resource-limit', 'x'.repeat(1024)],
+    ['read-failure', new Uint8Array([0xff])],
+  ] as const)('retains collected layout findings and partial inventory when %s stops acquisition', async (code, bytes) => {
+    await put(root, 'src/module.ramify', 'ramify 1\nmodule hidden\n');
+    await put(root, 'subs/child/module.ramify', 'ramify 1\nmodule child\n');
+    await put(root, 'subs/child/src/kept.ts', 'export {};');
+    await put(root, 'src/z-failure.ts', bytes);
+    const result = await read({ limits: { ...limits, maxFileBytes: 512 } });
+    expect(result.status).toBe('incomplete');
+    if (result.status !== 'incomplete') throw new Error('Expected incomplete acquisition');
+    expect(result.issues.map(issue => [issue.code, issue.path])).toEqual([
+      ['description-in-src', 'src/module.ramify'], [code, 'src/z-failure.ts'],
+    ]);
+    expect(result.inventory?.modules.map(module => module.id)).toEqual(['fixture', 'fixture/child']);
+    expect(result.inventory?.files.map(file => file.path)).toEqual(['subs/child/src/kept.ts']);
+    expect(result.inventory?.warnings).toEqual([{ code: 'outside-module-source', entry: 'src', count: 2, files: ['src/value.ts', 'src/z-failure.ts'] }]);
+    expect(Object.isFrozen(result.inventory)).toBe(true);
+    expect(Object.isFrozen(result.issues)).toBe(true);
+  });
+  it('retains collected layout findings when an owned source read stops discovery', async () => {
+    await put(root, 'src/module.ramify', 'ramify 1\nmodule hidden\n');
+    await put(root, 'subs/child/module.ramify', 'ramify 1\nmodule child\n');
+    await put(root, 'subs/child/src/a-kept.ts', 'export {};');
+    await put(root, 'subs/child/src/z-failure.ts', 'x'.repeat(1024));
+    const result = await read({ limits: { ...limits, maxFileBytes: 512 } });
+    expect(result.status).toBe('incomplete');
+    if (result.status !== 'incomplete') throw new Error('Expected incomplete acquisition');
+    expect(result.issues.map(issue => [issue.code, issue.path])).toEqual([
+      ['description-in-src', 'src/module.ramify'], ['resource-limit', 'subs/child/src/z-failure.ts'],
+    ]);
+    expect(result.inventory?.modules.map(module => module.id)).toEqual(['fixture', 'fixture/child']);
+    expect(result.inventory?.files.map(file => file.path)).toEqual(['subs/child/src/a-kept.ts']);
+  });
+  it('retains collected layout findings when final input validation exhausts retries', async () => {
+    await put(root, 'src/module.ramify', 'ramify 1\nmodule hidden\n');
+    let calls = 0;
+    const result = await read({ parse: (file, text) => {
+      writeFileSync(join(root, 'module.ramify'), `ramify 1\nmodule fixture\n// ${++calls}\n`);
+      return syntax(file, text);
+    } });
+    expect(calls).toBe(3);
+    expect(result.status).toBe('incomplete');
+    if (result.status !== 'incomplete') throw new Error('Expected incomplete acquisition');
+    expect(result.issues.map(issue => [issue.code, issue.path])).toEqual([
+      ['changed-input', '.'], ['description-in-src', 'src/module.ramify'],
+    ]);
+    expect(result.inventory?.modules.map(module => module.id)).toEqual(['fixture']);
+    expect(result.inventory?.outsideModuleFiles).toEqual(['src/value.ts']);
   });
   it('returns cancelled for an already aborted request', async () => {
     const controller = new AbortController(); controller.abort();

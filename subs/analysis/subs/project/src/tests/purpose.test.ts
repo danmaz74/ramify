@@ -17,6 +17,16 @@ describe('README purpose', () => {
   ])('skips non-prose blocks: %s', text => {
     expect(readPurpose('README.md', text)).toEqual({ state: 'present', readme: 'README.md', paragraph: 'Purpose.' });
   });
+  it.each([
+    '# Title\nPurpose.\n',
+    '# Title\nPurpose.\n\nLater paragraph.\n',
+    '## Title\nPurpose.\n',
+    '#\nPurpose.\n',
+    '- Previous list\n# Title\nPurpose.\n',
+    'Title\n=====\nPurpose.\n',
+  ])('selects prose immediately after a heading: %s', text => {
+    expect(readPurpose('README.md', text)).toEqual({ state: 'present', readme: 'README.md', paragraph: 'Purpose.' });
+  });
   it('joins paragraph lines and renders inline prose', () => {
     expect(readPurpose('README.md', '# Title\n\nA **useful** [module](./module.md) with `code`\nand &amp; text.'))
       .toEqual({ state: 'present', readme: 'README.md', paragraph: 'A useful module with code and & text.' });

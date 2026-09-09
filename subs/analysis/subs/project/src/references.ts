@@ -2,8 +2,7 @@ import { basename, join, posix } from 'node:path';
 import { Capture } from './capture.js';
 import type { ExactReference, InventoryModule, ProjectIssue } from './interfaces/project.js';
 
-export async function exactReferences(capture: Capture, modules: readonly InventoryModule[], owned: ReadonlySet<string>, issues: ProjectIssue[]): Promise<ExactReference[]> {
-  const references: ExactReference[] = [];
+export async function exactReferences(capture: Capture, modules: readonly InventoryModule[], owned: ReadonlySet<string>, issues: ProjectIssue[], references: ExactReference[]): Promise<void> {
   for (const module of modules) {
     if (module.description.status !== 'valid') continue;
     for (const statement of module.description.document.statements) {
@@ -42,5 +41,4 @@ export async function exactReferences(capture: Capture, modules: readonly Invent
       }
     }
   }
-  return references;
 }

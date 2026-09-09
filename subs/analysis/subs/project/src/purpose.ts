@@ -25,15 +25,19 @@ export function readPurpose(readme: string, text: string | undefined): ModulePur
     if (html) { if (!line.trim() || line.includes('-->')) html = false; index++; continue; }
     if (!line.trim()) { excludedBlock = false; index++; continue; }
     if (/^ {0,3}</.test(line)) { html = !line.includes('-->'); index++; continue; }
-    if (/^(?: {0,3}(?:#{1,6}\s|>|[-+*]\s|\d+[.)]\s|\[[^\]]+\]:)| {4}|\t|\s*[-*_]{3,}\s*$|\s*\|)/.test(line)) {
+    if (/^ {0,3}#{1,6}(?:[ \t]|$)/.test(line)) { excludedBlock = false; index++; continue; }
+    if (/^(?: {0,3}(?:>|[-+*]\s|\d+[.)]\s|\[[^\]]+\]:)| {4}|\t|\s*[-*_]{3,}\s*$|\s*\|)/.test(line)) {
       excludedBlock = true; index++; continue;
     }
     if (excludedBlock) { index++; continue; }
-    if (index + 1 < lines.length && /^\s*(?:[=-]+\s*$|\|?\s*:?-{3,})/.test(lines[index + 1]!)) {
+    if (index + 1 < lines.length && /^ {0,3}(?:=+|-+)\s*$/.test(lines[index + 1]!)) {
+      index += 2; continue;
+    }
+    if (index + 1 < lines.length && /^\s*\|?\s*:?-{3,}/.test(lines[index + 1]!)) {
       excludedBlock = true; index += 2; continue;
     }
     const paragraph: string[] = [];
-    while (index < lines.length && lines[index]!.trim() && !/^ {0,3}(?:#{1,6}\s|>|[-+*]\s|\d+[.)]\s|`{3,}|~{3,}|<)/.test(lines[index]!)) {
+    while (index < lines.length && lines[index]!.trim() && !/^ {0,3}(?:#{1,6}(?:[ \t]|$)|>|[-+*]\s|\d+[.)]\s|`{3,}|~{3,}|<)/.test(lines[index]!)) {
       paragraph.push(lines[index++]!);
     }
     const summary = plain(paragraph.join(' '));

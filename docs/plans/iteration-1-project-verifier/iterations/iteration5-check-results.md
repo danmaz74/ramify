@@ -2,7 +2,6 @@
 
 ## Summary
 - **Static Analysis**: PASSED
-- **Scope Review**: PASSED
 - **Sealed Files**: PASSED
 - **Constraints**: FAILED
 
@@ -12,31 +11,23 @@
 ```
 {
   "met": false,
-  "reasoning": "Reviewed all five selected constraints. Isolated probes confirmed three contradictions in discovery exclusions, failure reporting, and README metadata extraction.",
+  "reasoning": "Reviewed all five selected constraints. Focused probes confirm the three previously reported cases are corrected, but two concrete contradictions remain in generated-output discovery and README purpose extraction.",
   "issues": [
     {
       "constraintPath": "docs/model/module-description.principles.md",
       "constraintId": "docs/model/module-description.principles.md#principles-md",
       "ruleId": "principles-md",
       "severity": "important",
-      "issue": "In subs/analysis/subs/project/src/inventory.ts:100-102, discovery exclusions are bypassed beneath src/ and subs/. A probe with outDir set to src/generated inventories its generated JavaScript as application source; another inventories src/node_modules/lib/index.ts and its package.json as owned files. This contradicts the requirement that application source remain outside dependency and generated-output discovery exclusions.",
-      "guidance": "Apply dependency and generated-output discovery exclusions within source and child containers too. Keep these exclusions distinct from ordinary compiler include/exclude selection, which must not hide owned implementation or tests."
-    },
-    {
-      "constraintPath": "docs/architecture/cli-invocation.spec.md",
-      "constraintId": "docs/architecture/cli-invocation.spec.md#architecture-specs",
-      "ruleId": "architecture-specs",
-      "severity": "important",
-      "issue": "Collected findings disappear when acquisition subsequently fails. inventoryProject keeps issues locally until completion, while read-project.ts:54-55 returns only the terminal error. A probe that discovers src/module.ramify before encountering an oversized source file returns only resource-limit, losing the already detected description-in-src error. The invocation contract requires findings obtained before an execution failure to be retained.",
-      "guidance": "Preserve collected diagnostics and available partial inventory when acquisition fails. Include them alongside the terminal error while retaining the incomplete outcome."
+      "issue": "subs/analysis/subs/project/src/inventory.ts:16-24 excludes outDir but ignores declarationDir. An isolated fixture successfully compiled declarations into src/generated using declarationDir and explicitly excluded that directory from compiler selection. readProject nevertheless inventoried the generated src/generated/value.d.ts as owned application source and accepted an expose-src reference to it. This contradicts the requirement that generated outputs remain outside application discovery and cannot be referenced as application-owned exports.",
+      "guidance": "Include configured declaration output directories in discovery exclusions and reject exposure references into them. Add a focused case using actual emitted declarations while retaining the rule that ordinary compiler exclusions cannot hide owned implementation or tests."
     },
     {
       "constraintPath": "docs/model/module-description.principles.md",
       "constraintId": "docs/model/module-description.principles.md#principles-md",
       "ruleId": "principles-md",
       "severity": "important",
-      "issue": "In subs/analysis/subs/project/src/purpose.ts:28-31, a heading suppresses every following line until a blank line. For '# Title\\nActual purpose.\\n', readPurpose returns no-paragraph; adding a later separated paragraph makes it return that later paragraph. The first paragraph immediately following an ATX heading is valid top-level prose and must supply the purpose.",
-      "guidance": "Track Markdown block boundaries so headings do not suppress subsequent paragraphs. Add a focused case with prose immediately following a heading and assert that the first paragraph is selected."
+      "issue": "subs/analysis/subs/project/src/purpose.ts:29-32 keeps excludedBlock active after an indented code block ends. For README text '    const code = 1;\\nPurpose.\\n\\nLater.\\n', both readPurpose and public readProject return 'Later.' instead of the first top-level paragraph, 'Purpose.'. An independent Markdown parser confirmed that the input contains a code block followed by those two separate paragraphs.",
+      "guidance": "End the indented-code exclusion when an unindented paragraph begins. Add a focused regression asserting that prose immediately following the code block supplies the purpose without requiring a blank separator."
     }
   ],
   "selectedConstraints": [
@@ -80,7 +71,7 @@
       "path": "docs/model/typescript-source-interpretation.principles.md",
       "id": "docs/model/typescript-source-interpretation.principles.md#principles-md",
       "ruleId": "principles-md",
-      "score": 0.73,
+      "score": 0.75,
       "selectedBy": [
         "semantic"
       ]
