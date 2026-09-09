@@ -13,6 +13,8 @@ import { SourceFailure } from './wire.js';
 
 interface Inputs { readonly inventory: ProjectInventory; readonly areas: readonly SourceArea[]; readonly limits: SourceWorkLimits }
 interface MutableFile { file: string; state: FileExports['state']; exports: CatalogExport[]; issueIds: string[]; descriptionFiles: string[] }
+interface Selection { file: string; name: string; node: Node }
+interface Stars { source: SourceFile; explicit: Set<string>; targets: { file: string; node: Node }[] }
 const order = (a: string, b: string) => Buffer.compare(Buffer.from(a), Buffer.from(b));
 
 /** Called only in the supervised helper. The returned graph contains no native
@@ -30,6 +32,9 @@ class CatalogBuilder {
   private count = 0;
   private readonly resourceModules = new Map<string, CompilerSymbol[]>();
   private readonly bindingProblems = new Map<string, readonly SourceLocation[]>();
+  private readonly selections = new Map<CatalogExport, Selection>();
+  private readonly starTargets = new Map<string, Stars>();
+  private readonly namespaceTargets: { file: MutableFile; target: MutableFile; name: string; node: Node }[] = [];
   private readonly root: string;
   constructor(private readonly project: Project, private readonly inputs: Inputs, private readonly host: CatalogHost) {
     this.root = inputs.inventory.scope.root;
@@ -89,6 +94,7 @@ class CatalogBuilder {
       visit(source);
     }
     for (const file of [...this.inputs.inventory.files].sort((a, b) => order(a.path, b.path))) this.file(file.path, 0);
+    this.resolveExports();
     // Native star enumeration may temporarily supply one conflicting winner.
     // Only originals retained by the validated export selections are facts.
     const retained = new Set<string>();
@@ -168,14 +174,15 @@ class CatalogBuilder {
       this.limit(file, 'unresolved-original', `Cannot resolve resource export ${name}`);
       return { name, original: null, namespace: null, forwarding: [] };
     }
-    // Aliases inside one description coalesce by their original declaration.
-    // Prefer an effective public default spelling for the CSS classes binding.
+    // Only compiler-proven aliases share a resource binding. Different package
+    // originals can have the same declaration name, so use the effective alias
+    // group's first name, preferring default, rather than that declaration name.
     const module = (this.resourceModules.get(inventory.path) ?? []).find(module => this.project.checker.getExportsOfModule(module).some(item => item.id === symbol.id));
     const aliases = module ? this.project.checker.getExportsOfModule(module).filter(item => {
       const original = item.flags & SymbolFlags.Alias ? this.project.checker.getAliasedSymbol(item) : item;
       return original.id === target.id;
     }).map(item => item.name).sort(order) : [name];
-    const binding = forcedBinding ?? (aliases.includes('default') ? 'default' : target.name);
+    const binding = forcedBinding ?? (aliases.includes('default') ? 'default' : aliases[0] ?? name);
     const origin = this.origin(inventory.path)!;
     const ordinary = this.inputs.areas.find(area => area.owner === inventory.owner && area.kind === 'ordinary')!;
     const id: OriginalId = { kind: 'resource', owner: inventory.owner, file: relative(resolve(this.root, ordinary.root), resolve(this.root, inventory.path)), binding };
@@ -228,16 +235,12 @@ class CatalogBuilder {
             return { name, original: null, namespace: null, forwarding };
           }
           const selected = this.selectedName(node);
-          if (target.kind === 'application' && target.file && selected !== null && !this.active.has(target.file)) {
-            const targetFile = this.file(target.file, depth + 1);
-            const entry = targetFile.exports.find(entry => entry.name === selected);
-            if (!entry || (!entry.original && !entry.namespace)) {
-              this.limit(file, targetFile.state === 'ambiguous' ? 'ambiguous-original' : 'unresolved-original',
-                `Cannot establish selected export ${selected} of ${target.file}`, node);
-              return { name, original: null, namespace: null, forwarding };
-            }
-            const origins = [...forwarding, ...entry.forwarding];
-            return { ...entry, name, forwarding: origins.filter((origin, index) => origins.findIndex(item => item.file === origin.file) === index) };
+          if (target.kind === 'application' && target.file && selected !== null) {
+            // A native alias can point at an arbitrary star winner. Resolve the
+            // selection only after every file's export dependencies are known.
+            const entry: CatalogExport = { name, original: null, namespace: null, forwarding };
+            this.selections.set(entry, { file: target.file, name: selected, node });
+            return entry;
           }
           if (target.kind === 'resource-target' || target.kind === 'unresolved') {
             this.limit(file, target.kind === 'resource-target' ? 'resource-target' : 'unresolved-target', `Cannot establish target for export ${name}`, specifier);
@@ -281,7 +284,7 @@ class CatalogBuilder {
           return { name, original: null, namespace: null, forwarding: chain };
         }
         const nested = this.file(path, depth + 1);
-        if (nested.state !== 'complete') this.limit(file, 'incomplete-exports', `Namespace ${name} has an incomplete export description`, moduleSource);
+        this.namespaceTargets.push({ file, target: nested, name, node: moduleSource });
         return { name, original: null, namespace: nested.exports, forwarding: chain };
       }
     }
@@ -324,7 +327,7 @@ class CatalogBuilder {
     for (const symbol of this.project.checker.getExportsOfModule(this.project.checker.getSymbolAtLocation(source)!)) {
       if (symbol.declarations.some(handle => resolve(handle.path) === resolve(source.fileName))) explicit.add(symbol.name);
     }
-    const candidates = new Map<string, CatalogExport[]>();
+    const targets: Stars['targets'] = [];
     for (const statement of source.statements) {
       if (!isExportDeclaration(statement) || statement.exportClause || !statement.moduleSpecifier) continue;
       const target = this.resolution.module(statement.moduleSpecifier);
@@ -332,26 +335,116 @@ class CatalogBuilder {
         this.limit(file, target.kind === 'outside-module' ? 'outside-module-target' : target.kind === 'resource-target' ? 'resource-target' : 'incomplete-exports',
           'Cannot enumerate every application original of this star export', statement.moduleSpecifier); continue;
       }
-      // Cycles do not make finite named exports invalid. Native enumeration
-      // supplies known members; avoid recursing into the currently active file.
-      const nested = this.file(target.file, depth + 1);
-      if (nested.state !== 'complete') this.limit(file, nested.state === 'ambiguous' ? 'ambiguous-original' : 'incomplete-exports', 'Star target has an incomplete export description', statement.moduleSpecifier);
-      for (const entry of nested.exports) {
-        if (entry.name === 'default' || explicit.has(entry.name)) continue;
-        const group = candidates.get(entry.name) ?? []; group.push(entry); candidates.set(entry.name, group);
+      targets.push({ file: target.file, node: statement.moduleSpecifier });
+    }
+    this.starTargets.set(file.file, { source, explicit, targets: targets.sort((a, b) => order(a.file, b.file)) });
+    this.check(depth);
+  }
+  private resolveExports(): void {
+    // Grow the finite name sets first. A back edge contributes names, never a
+    // partially evaluated original. Explicit exports shadow star candidates.
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const [path, stars] of this.starTargets) {
+        const file = this.files.get(path)!;
+        for (const target of stars.targets) for (const entry of this.files.get(target.file)!.exports) {
+          if (entry.name === 'default' || file.exports.some(item => item.name === entry.name)) continue;
+          this.check(0, true);
+          file.exports.push({ name: entry.name, original: null, namespace: null, forwarding: [] });
+          changed = true;
+        }
       }
     }
-    for (const [name, entries] of candidates) {
-      const keys = new Set(entries.map(entry => entry.original ? originalKey(entry.original) : JSON.stringify(entry.namespace)));
-      const index = file.exports.findIndex(entry => entry.name === name);
-      if (keys.size > 1) {
-        this.limit(file, 'ambiguous-original', `Star exports supply distinct originals named ${name}`, source);
-        const entry = { name, original: null, namespace: null, forwarding: [] };
-        if (index >= 0) file.exports[index] = entry; else file.exports.push(entry);
-      } else if (index >= 0) {
-        const current = this.origin(file.file)!;
-        const origins = [current, ...entries.flatMap(entry => entry.forwarding)];
-        file.exports[index] = { ...entries[0], forwarding: origins.filter((origin, index) => origins.findIndex(item => item.file === origin.file) === index) };
+    const key = (file: string, name: string) => JSON.stringify([file, name]);
+    interface Definition {
+      file: MutableFile; entry: CatalogExport; edges: string[] | null; node?: Node;
+      forwarding: readonly SourceOrigin[]; ambiguous: boolean;
+    }
+    const definitions = new Map<string, Definition>();
+    const namespaces = new Map<readonly CatalogExport[], string>();
+    for (const file of this.files.values()) namespaces.set(file.exports, file.file);
+    for (const file of this.files.values()) for (const entry of file.exports) {
+      const stars = this.starTargets.get(file.file), selection = this.selections.get(entry);
+      if (stars?.targets.length && !stars.explicit.has(entry.name)) {
+        definitions.set(key(file.file, entry.name), { file, entry, node: stars.source,
+          edges: stars.targets.filter(target => entry.name !== 'default' && this.files.get(target.file)!.exports.some(item => item.name === entry.name))
+            .map(target => key(target.file, entry.name)), forwarding: [this.origin(file.file)!], ambiguous: file.state === 'ambiguous' });
+      } else definitions.set(key(file.file, entry.name), { file, entry,
+        edges: selection ? [key(selection.file, selection.name)] : null, node: selection?.node,
+        forwarding: entry.forwarding, ambiguous: file.state === 'ambiguous' });
+    }
+    const results = new Map<CatalogExport, CatalogExport>();
+    for (const [root, definition] of definitions) {
+      if (definition.edges === null) continue;
+      const visited = new Set<string>(), candidates = new Map<string, CatalogExport>(), origins = new Map<string, SourceOrigin>();
+      let unresolved = false, ambiguous = false;
+      // Search the whole reachable selection graph for this name. A visited
+      // back edge adds no candidate; its other reachable leaves are still read.
+      // Do not memoize a result cut short by another lookup's recursion stack.
+      const visit = (id: string, depth: number): void => {
+        if (visited.has(id)) return;
+        this.check(depth); visited.add(id);
+        const current = definitions.get(id);
+        if (!current) { unresolved = true; return; }
+        for (const origin of current.forwarding) if (!origins.has(origin.file)) origins.set(origin.file, origin);
+        if (current.edges !== null) { for (const edge of current.edges) visit(edge, depth + 1); return; }
+        const entry = current.entry;
+        if (!entry.original && !entry.namespace) {
+          unresolved = true; ambiguous ||= current.ambiguous; return;
+        }
+        const identity = entry.original ? originalKey(entry.original)
+          : JSON.stringify(['namespace', namespaces.get(entry.namespace!) ?? entry.namespace]);
+        candidates.set(identity, entry);
+      };
+      visit(root, 0);
+      ambiguous ||= candidates.size > 1;
+      const forwarding = [...origins.values()];
+      if (ambiguous || unresolved || candidates.size !== 1) {
+        this.limit(definition.file, ambiguous ? 'ambiguous-original' : 'unresolved-original',
+          ambiguous ? `Export paths supply distinct or ambiguous originals named ${definition.entry.name}`
+            : `Cannot establish selected export ${definition.entry.name}`, definition.node);
+        results.set(definition.entry, { name: definition.entry.name, original: null, namespace: null, forwarding });
+      } else results.set(definition.entry, { ...candidates.values().next().value!, name: definition.entry.name, forwarding });
+    }
+    // Apply together so one lookup cannot observe another lookup's tentative
+    // result. Namespace forwarding through stars must also retain the finite
+    // boundary established during extraction, rather than create a JSON cycle.
+    const recursive = (entry: CatalogExport, active = new Set<CatalogExport>(), visited = new Set<CatalogExport>()): boolean => {
+      if (active.has(entry)) return true;
+      if (visited.has(entry)) return false;
+      this.check(active.size); active.add(entry); visited.add(entry);
+      const cycle = (results.get(entry) ?? entry).namespace?.some(member => recursive(member, active, visited)) ?? false;
+      active.delete(entry);
+      return cycle;
+    };
+    const recursiveEntries = new Set([...results.keys()].filter(entry => recursive(entry)));
+    for (const definition of definitions.values()) if (recursiveEntries.has(definition.entry)) {
+      this.limit(definition.file, 'incomplete-exports', `Recursive namespace ${definition.entry.name} exceeds a finite export description`, definition.node);
+      const result = results.get(definition.entry)!;
+      results.set(definition.entry, { ...result, original: null, namespace: null });
+    }
+    // Keep the arrays used by nonrecursive namespace descriptions intact.
+    for (const [entry, result] of results) Object.assign(entry, result);
+    changed = true;
+    while (changed) {
+      changed = false;
+      for (const [path, stars] of this.starTargets) {
+        const file = this.files.get(path)!;
+        for (const target of stars.targets) {
+          const nested = this.files.get(target.file)!;
+          if (nested.state === 'complete') continue;
+          const before = file.state;
+          this.limit(file, nested.state === 'ambiguous' ? 'ambiguous-original' : 'incomplete-exports',
+            'Star target has an incomplete export description', target.node);
+          changed ||= before !== file.state;
+        }
+      }
+      for (const { file, target, name, node } of this.namespaceTargets) {
+        if (target.state === 'complete') continue;
+        const before = file.state;
+        this.limit(file, 'incomplete-exports', `Namespace ${name} has an incomplete export description`, node);
+        changed ||= before !== file.state;
       }
     }
   }

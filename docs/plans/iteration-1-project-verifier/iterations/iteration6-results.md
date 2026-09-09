@@ -2,7 +2,7 @@
 
 # Iteration 6 results: source catalog
 
-Status: implementation and scoped verification complete; ready for workflow acceptance. This establishes compiler-backed catalog facts, not source import decisions, the public analysis session, CLI checking or Plan 1 completion.
+Status: all three reported source-catalog constraint findings are corrected and focused remediation checks pass; resubmitted verification remains with workflow automation. This establishes compiler-backed catalog facts, not source import decisions, the public analysis session, CLI checking or Plan 1 completion.
 
 ## Prerequisites and scope
 
@@ -84,3 +84,20 @@ The supplied check policy leaves full Vitest/Cucumber regression, scenario cover
 4. Include the deterministic synthetic configuration/resource-witness recipe and complete selected root set in iteration 12's input identity. Their bytes are already bounded and are determined by captured configuration, inventory and absence observations. No daemon revision identity is introduced.
 5. Preserve the pinned native API and the observed paths-base behavior when dependencies change. The launcher uses the development tsx loader only for source execution; the emitted helper ran with ordinary Node ESM.
 6. Full public-session cancellation, native-child reaping/repeated-use measurements, relocated packaging and the final plan gate remain their later acceptance obligations. The focused lifetime and retention tests do not claim those whole matrix instances.
+
+## Constraint remediation on 2026-09-09
+
+The supplied failed check reported three concrete source-catalog defects. Each was reproduced with a failing focused test before correction. Work used the same authoritative checkout and branch, starting from workflow checkpoint `a68352c`. Only the affected TypeScript catalog/resolution implementation, three new owned test files, and these managed iteration artifacts changed. No specification, exposure, matrix membership or scenario expectation was weakened.
+
+- `cf-constraints-mtu45734-7gb1vcda`: cyclic stars previously read an in-progress barrel as a completed export set, allowing a native arbitrary clash winner to survive downstream. Named selections and stars now resolve against the complete finite export dependency graph. Traversal collects grounded originals, respects explicit overrides and coalesces repeated paths to the same original. Ambiguity reaches both barrels and named forwarders while unrelated exports remain resolved. Twelve tests cover path order, statement order, consumer-first traversal, same-original cycles, explicit overrides and finite recursive namespace descriptions. Review reproduced a namespace/star cycle introduced during the correction; the final implementation preserves an explicit incomplete boundary instead of constructing a cyclic result, and both traversal controls pass.
+- `cf-constraints-mtu45734-kgntentb`: resource declaration recognition now accounts for the compiler's configured moduleSuffixes, including inherited aliases, arbitrary-extension and legacy declaration forms. It matches the compiler-selected description separately from the physical resource and keeps a missing or ambiguous physical target as a resource-target limit. Twelve tests cover the reported CSS case, multi-part suffixes, fallback, suffix/extension overlap, rootDirs redirection with present/missing resources, and preservation of explicit code/declaration aliases and package precedence. Both rootDirs variants also failed before the fallback correction.
+- `cf-constraints-mtu45734-1w20lzhq`: resource binding keys now come from distinct compiler-proven effective alias groups, preferring default where present. Equal declaration names from different packages cannot overwrite each other's original or value/type flags. Four tests cover distinct const/interface originals, forwarded identities, declaration permutations, true alias coalescing, default priority and ordinary direct named bindings.
+
+Focused verification during this remediation passed:
+
+- Final five-file selection of `cyclic-stars.test.ts`, `resource-bindings.test.ts`, `resource-suffixes.test.ts`, `resources.test.ts` and `retention.test.ts`: **41 tests passed**, including **28 new regression cases**.
+- `npx vitest run subs/analysis/subs/typescript/src/tests/cyclic-stars.test.ts subs/analysis/subs/typescript/src/tests/catalog.test.ts`: **28 passed**, including all **16 existing catalog tests** and the twelve cycle cases.
+- `npx vitest run -c scripts/reference-harness/vitest.config.ts scripts/reference-harness/catalog.test.ts`: **31 passed**, exercising real project acquisition and the unchanged reference's independently enumerated original identities.
+- Final `npm run type-check`, `npm run build`, and `git diff --check`: passed.
+
+These commands cover **88 distinct focused tests**; overlapping cycle/resource runs are not counted twice. The earlier iteration-6 gate evidence above remains historical and was not rerun during this remediation. Full regression, scenario coverage, sealed-file and constraints checks remain with workflow automation under the supplied check policy. Their post-remediation outcomes are not claimed here. The later-iteration handoff and Plan 1 completion boundary remain unchanged.

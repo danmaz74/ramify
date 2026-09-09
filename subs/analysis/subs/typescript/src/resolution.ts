@@ -1,4 +1,4 @@
-import { dirname, isAbsolute, relative, resolve } from 'node:path';
+import { basename, dirname, extname, isAbsolute, relative, resolve } from 'node:path';
 import { isBuiltin } from 'node:module';
 import type { Project, Symbol as CompilerSymbol } from 'typescript/unstable/sync';
 import { isStringLiteral, SyntaxKind, type Node } from 'typescript/unstable/ast';
@@ -28,37 +28,6 @@ export class Resolution {
     const specifier = isStringLiteral(node) ? node.text : '';
     const declarations = module?.declarations ?? [];
     const paths = [...new Set(declarations.map(declaration => resolve(declaration.path)))];
-    // JSON and ordinary ESM code resolve to actual source files. Ambient module
-    // declarations instead name their describing source file, handled below.
-    const sourcePaths = paths.filter(path => declarations.some(declaration =>
-      declaration.path === path && declaration.resolve(this.project)?.kind === SyntaxKind.SourceFile));
-    const describedResources: string[] = [];
-    for (const path of sourcePaths) {
-      // An import naming the declaration itself still names code. A compiler
-      // resolution to an arbitrary-extension declaration describes a resource.
-      if (!/\.[cm]?[jt]sx?$/.test(specifier)) {
-        if (/\.d\.[^.\/]+\.ts$/.test(path)) { describedResources.push(path.replace(/\.d\.([^.\/]+)\.ts$/, '.$1')); continue; }
-        if (/\.(?:css|svg|html|png|jpg|json)\.d\.ts$/.test(path)) { describedResources.push(path.slice(0, -5)); continue; }
-      }
-      const owned = this.files.get(path);
-      if (owned) return { kind: 'application', module, file: owned.path, resource: owned.kind === 'resource' ? owned : null };
-      // An actual compiler-resolved code/package target wins over every later
-      // paths substitution, even if that alternative happens to be a resource.
-      return this.external(path)
-        ? { kind: 'external', module, file: path, resource: null }
-        : { kind: 'outside-module', module, file: relative(this.inventory.scope.root, path), resource: null };
-    }
-    if (describedResources.length) {
-      for (const path of describedResources) {
-        if (!this.host.fileExists(path)) continue;
-        const owned = this.files.get(path);
-        if (owned?.kind === 'resource') return { kind: 'application', module, file: owned.path, resource: owned };
-        return sourcePaths.every(path => this.external(path))
-          ? { kind: 'external', module, file: path, resource: null }
-          : { kind: 'outside-module', module, file: relative(this.inventory.scope.root, path), resource: null };
-      }
-      return { kind: 'resource-target', module, file: null, resource: null };
-    }
     const candidates: string[] = [];
     if (specifier.startsWith('.') || isAbsolute(specifier)) candidates.push(resolve(dirname(node.getSourceFile().fileName), specifier));
     // The pinned native API returns pathsBasePath alongside parsed options,
@@ -80,6 +49,70 @@ export class Resolution {
       const base = options.baseUrl ?? options.pathsBasePath;
       if (isAbsolute(selected)) candidates.push(selected);
       else if (base && isAbsolute(base)) candidates.push(resolve(base, selected));
+    }
+    // JSON and ordinary ESM code resolve to actual source files. Ambient module
+    // declarations instead name their describing source file, handled below.
+    const sourcePaths = paths.filter(path => declarations.some(declaration =>
+      declaration.path === path && declaration.resolve(this.project)?.kind === SyntaxKind.SourceFile));
+    const describedResources: string[] = [];
+    for (const path of sourcePaths) {
+      // An import naming the declaration itself still names code. A compiler
+      // resolution to an arbitrary-extension declaration describes a resource.
+      if (!/\.[cm]?[jt]sx?$/.test(specifier)) {
+        // Match the declaration TypeScript actually selected, including its
+        // configured suffix. Stripping a filename suffix without the requested
+        // resource path could mistake part of its real extension for a suffix.
+        const described = candidates.find(candidate => {
+          candidate = resolve(candidate);
+          const extension = extname(candidate);
+          if (!extension || /\.[cm]?[jt]sx?$/.test(extension)) return false;
+          return (options.moduleSuffixes ?? ['']).some(suffix =>
+            path === `${candidate.slice(0, -extension.length)}.d${extension}${suffix}.ts`
+            || /\.(?:css|svg|html|png|jpg|json)$/.test(extension) && path === `${candidate}${suffix}.d.ts`);
+        });
+        if (described) { describedResources.push(resolve(described)); continue; }
+        // rootDirs and package resolution can select a declaration outside the
+        // exact requested directory. Identify its described resource from the
+        // selected filename; retain an explicit limit if suffix spellings make
+        // that interpretation ambiguous. An alias naming source still names code.
+        const namesCode = candidates.some(candidate => /\.[cm]?[jt]sx?$/.test(candidate)
+          && (resolve(candidate) === path || (options.moduleSuffixes ?? ['']).some(suffix =>
+            ['.d.ts', '.ts', '.tsx', '.js', '.jsx', '.mts', '.cts', '.mjs', '.cjs'].some(extension =>
+              candidate.endsWith(extension) && resolve(`${candidate.slice(0, -extension.length)}${suffix}${extension}`) === path))));
+        if (!namesCode) {
+          const alternatives = new Set<string>();
+          for (const suffix of new Set([...(options.moduleSuffixes ?? []), ''])) {
+            for (const extension of ['.d.ts', '.ts']) {
+              if (!path.endsWith(`${suffix}${extension}`)) continue;
+              const withoutSuffix = `${path.slice(0, -suffix.length - extension.length)}${extension}`;
+              if (/\.d\.[^.\/]+\.ts$/.test(withoutSuffix)) alternatives.add(withoutSuffix.replace(/\.d\.([^.\/]+)\.ts$/, '.$1'));
+              if (/\.(?:css|svg|html|png|jpg|json)\.d\.ts$/.test(withoutSuffix)) alternatives.add(withoutSuffix.slice(0, -5));
+            }
+          }
+          const named = [...alternatives].filter(resource => [specifier, ...candidates].some(candidate => basename(candidate) === basename(resource)));
+          const possible = named.length ? named : [...alternatives];
+          if (possible.length === 1) { describedResources.push(possible[0]!); continue; }
+          if (possible.length > 1) return { kind: 'resource-target', module, file: null, resource: null };
+        }
+      }
+      const owned = this.files.get(path);
+      if (owned) return { kind: 'application', module, file: owned.path, resource: owned.kind === 'resource' ? owned : null };
+      // An actual compiler-resolved code/package target wins over every later
+      // paths substitution, even if that alternative happens to be a resource.
+      return this.external(path)
+        ? { kind: 'external', module, file: path, resource: null }
+        : { kind: 'outside-module', module, file: relative(this.inventory.scope.root, path), resource: null };
+    }
+    if (describedResources.length) {
+      for (const path of describedResources) {
+        if (!this.host.fileExists(path)) continue;
+        const owned = this.files.get(path);
+        if (owned?.kind === 'resource') return { kind: 'application', module, file: owned.path, resource: owned };
+        return sourcePaths.every(path => this.external(path))
+          ? { kind: 'external', module, file: path, resource: null }
+          : { kind: 'outside-module', module, file: relative(this.inventory.scope.root, path), resource: null };
+      }
+      return { kind: 'resource-target', module, file: null, resource: null };
     }
     for (const candidate of candidates) {
       const file = this.files.get(resolve(candidate));
