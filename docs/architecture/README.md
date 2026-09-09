@@ -21,7 +21,7 @@ and reclaim its memory without discarding warm analysis.
 | Document | Defines |
 | --- | --- |
 | [Processes and clients](processes-and-clients.md) | Process boundaries, CLI commands, the MCP adapter, tRPC web delivery, startup, shutdown and compatibility. |
-| [Daemon and analysis](daemon.md) | Proposed Ramify ownership tree, exposure routes, engine pipeline, source facts, contexts, revision semantics and semantic acceptance cases. |
+| [Daemon and analysis](daemon.md) | Proposed Ramify ownership tree, exposure channels, engine pipeline, source facts, contexts, revision semantics and semantic acceptance cases. |
 | [Memory lifecycle](memory-lifecycle.md) | Resident dependency boundaries, retention and work limits, memory reclamation and measurement requirements. |
 | [Quick testing](quick-testing.md) | In-process execution of real client/service flows, the boundaries replaced in quick mode, and complementary transport/process tests. |
 | [CLI invocation](cli-invocation.md) | How `ramify check` selects the project, finds the compiler configuration, treats files outside modules, reports and exits. |
@@ -32,6 +32,10 @@ delivery order. Its first detailed plan is
 followed by resident checking. The [project-explorer reuse analysis](../analysis/project-explorer-reuse.md)
 records source candidates and adaptations for later visualization. It is
 supporting evidence; the architecture documents own the runtime decisions.
+
+The [development guides](../development/README.md) explain how contributors and
+agents implement and verify these decisions, including use of cucumber-viz.
+They complement the runtime contracts without introducing another module model.
 
 Visualization remains a later implementation phase. Early contract review must
 preserve its required module, contract, usage and revision evidence. There is
@@ -47,9 +51,9 @@ Implementation architecture conforms to the
 [glossary](../model/glossary.md),
 [module-description format](../model/module-description.principles.md) and
 [TypeScript interpretation](../model/typescript-source-interpretation.principles.md).
-Processes and package entry points are deployment boundaries; they grant no
+Processes and package entry points are deployment boundaries; they confer no
 source-level importability. All toolkit runtime code remains inside declared
-owners, with legal exposure routes and source classifications.
+owners, with legal exposure channels and source classifications.
 
 ## Review still needed
 

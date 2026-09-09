@@ -13,7 +13,7 @@ visualization clients consume that shared analysis.
 
 ## Scope and authority
 
-This document owns the proposed module boundaries, exposure routes, engine
+This document owns the proposed module boundaries, exposure paths, engine
 pipeline, context/revision semantics and semantic service operations.
 [Processes and clients](processes-and-clients.md) defines executable placement,
 CLI behavior and the separate tRPC web process;
@@ -144,7 +144,7 @@ web process. Its SDK and protocol state stay outside the resident daemon.
 API names below are proposed. Complete signatures and exposure manifests belong
 to the contract review before code moves.
 
-| Owner | Responsibility | Principal upward contract |
+| Owner | Responsibility | Principal to-parent contract |
 | --- | --- | --- |
 | `ramify` | Assemble CLI, daemon and later MCP/web serving entries; supply the CLI with a lightweight service client and lazily selected batch delivery. Own the shared client-facing service vocabulary. | No effective parent exposure; package entry points target the appropriate owners. |
 | `analysis` | Execute the analysis pipeline, maintain a reusable analysis session, select affected work and produce snapshots, reports and semantic queries. | `createAnalysisSession`, `analyzeProject`, `inspectModule`, `explainAccess`, and owned analysis vocabulary. |
@@ -175,32 +175,32 @@ The model owns `ImportDecision`; analysis owns `AnalysisSnapshot` and
 layout owns diagram geometry. Keep types with the owner that defines their meaning.
 Do not introduce a general shared-contracts owner.
 
-### Exposure routes
+### Exposure paths
 
-Analysis composes its four children through their upward contracts. It exposes
+Analysis composes its four children through their to-parent contracts. It exposes
 selected model operations and vocabulary to descendants where needed. Parser,
 filesystem and TypeScript implementation functions otherwise remain visible only
 to analysis. Analysis passes data between those children through their public
 input contracts.
 
 Root receives the analysis and daemon contracts. It relays selected analysis
-types downward for clients and contexts, and portable model queries for diagrams.
+types to its descendants for clients and contexts, and portable model queries for diagrams.
 The `AnalysisDriver` port travels from contexts to daemon and then to root;
 assembly does not import a private grandchild binding. Transport contracts owned
 by root carry `dispatch`, so untagged analysis and contexts source cannot import
 them even when they are visible from above.
-Root exposes the service interface downward to `daemon [dispatch]`, which
+Root exposes the service interface to its descendants, and `daemon [dispatch]`
 imports and implements it for both IPC delivery and the in-process binding.
 Root assembly supplies dependencies; the shared validation and routing stay
 inside daemon, as specified by the [service boundary](processes-and-clients.md#shared-service-boundary).
 
-Presentation receives its layout child's upward API. A future explorer receives
+Presentation receives its layout child's to-parent API. A future explorer receives
 presentation components through root's declaration-only relay; root's source need
-not import a UI symbol. A downward exposure reaches all descendants, including
+not import a UI symbol. An exposure to descendants reaches all of them, including
 other compatible UI owners. Named relays make the chosen audience explicit;
 there is no selected-branch permission.
 
-For example, these fragments describe the planned analysis-driver route. Paths
+For example, these fragments describe the planned analysis-driver path. Paths
 are relative to the toolkit root; source files and full manifests are not yet
 implemented.
 
@@ -226,7 +226,7 @@ expose-src * from "interfaces/daemon.ts" to parent
 expose-sub AnalysisDriver, ContextRevision, ContextStatus from contexts to parent
 ```
 
-At root, assuming analysis's upward contract includes these owned types:
+At root, assuming analysis's to-parent contract includes these owned types:
 
 ```ramify
 ramify 1
@@ -241,7 +241,7 @@ vocabulary acquires `dispatch`. Foreign originals cannot be placed in an owned
 interface wildcard: every selected original must belong to that owner, otherwise
 the whole declaration is invalid. Importing foreign types to describe an owned
 interface is allowed when those types are themselves importable. Types that a
-foreign consumer needs to import explicitly require their own exposure routes;
+foreign consumer needs to import explicitly require their own exposure paths;
 there is no automatic signature-type exposure.
 
 Browser module headers do not assign browser promises to exports. Portable model,
@@ -255,7 +255,7 @@ source barrel combining Node, UI and dispatch exports is unsuitable for the prop
 classifications; the existing combined entry point needs migration.
 The [entry-point dependency requirements](processes-and-clients.md#modules-and-executable-entry-points)
 also keep `connectDaemon` usable without importing daemon startup or compiler
-assembly. A legal exposure route alone does not establish low startup memory.
+assembly. A legal exposure path alone does not establish low startup memory.
 
 ## Engine inputs and analysis pipeline
 
@@ -275,7 +275,7 @@ The initial pass, and any conservative full recomputation, follows this order:
    identities, including unexposed exports and resource bindings. This does not
    require the corresponding imports to be allowed.
 3. **Link declarations.** Resolve exact owned references, complete interface-file
-   wildcards and child-exposed names from leaves upward. Gather tag assignments
+   wildcards and child-exposed names from the leaves toward the root. Gather tag assignments
    before defaults, validate them through the model, and preserve ineffective
    named exposure chains. Produce a valid model only when its prerequisites pass.
 4. **Interpret accesses.** Produce source occurrences, selected originals,

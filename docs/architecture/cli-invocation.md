@@ -38,7 +38,7 @@ The project is the tree beneath one root description: the root's `src/`, its
    parent of that `subs/` directory has no description, report that missing parent
    description instead of treating the child as an independent root.
 3. Outside any ramified project, the command fails with exit 2 and a message
-   naming the working directory. It never searches downward.
+   naming the working directory. It never searches subdirectories.
 
 Paths are canonicalized before the climb, so a working directory reached
 through a symlink finds the same root as its real path. A consequence of the

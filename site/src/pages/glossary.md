@@ -275,7 +275,7 @@ forwarded symbols retain their original owners, origins, and tags.
 
 The default tag carrying a required importer tag rule for UI coupling. A
 symbol tagged `ui` may cross a module boundary only into a UI-classified
-source area. This applies to both values and types. The tag never grants
+source area. This applies to both values and types. The tag never creates
 visibility and makes no browser-safety claim.
 
 A **UI module** has `ui` in its module header. Its `src/` and `src/tests/` are
@@ -293,7 +293,7 @@ importer for values and types. Dispatch-classified source requires the tag on
 every newly owned exported binding; its module's tests retain that classification.
 
 This separates transport contracts, typed clients, and connected UI from
-transport-independent code. The tag grants no visibility and does not prove
+transport-independent code. The tag creates no visibility and does not prove
 that an implementation only dispatches or contains no business workflow.
 
 ## `browser` tag

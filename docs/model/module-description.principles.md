@@ -306,7 +306,7 @@ preserves the identifier. Child references in descriptions use that declared
 name, so moving a child through ordinary grouping directories requires no
 description-path update.
 Changing the declared name or parent changes the identifier. Neither the
-name nor identifier assigns tags or grants importability.
+name nor identifier assigns tags or confers importability.
 
 ### A Description Is Static Architectural Data
 
@@ -425,7 +425,7 @@ and registered project tags are valid without adding grammar keywords;
 registering a tag does not reserve its name in export or module-name positions.
 Registering tags does not extend the fixed keyword list. Quoted tags and unknown tag names
 are errors. The three explicit alternatives in `tag` preserve existing lexical
-syntax; they do not grant these names extra matching or propagation semantics.
+syntax; they do not give these names extra matching or propagation semantics.
 
 For example, this module and its selected and exposed names all require quotes:
 
@@ -583,7 +583,7 @@ Every selected original must belong to the declaring module. A same-owner
 forwarding alias is valid and preserves the original binding and its tags,
 even if that binding is defined outside `src/interfaces/`. A foreign-owned
 forwarding export makes the declaration invalid; expansion must not silently
-skip it or grant ownership. Resource exports follow the same effective export
+skip it or assign ownership. Resource exports follow the same effective export
 description and resource-identity rules as named selections. An incomplete or
 ambiguous export description cannot yield a valid partial expansion.
 
@@ -615,16 +615,16 @@ unambiguous, including through grouping directories.
 Each named selection refers to an exposed name in that child. The selected
 symbol must be effectively exposed by the child to parent for the selection
 to contribute exposure here. The child can expose an owned symbol or one it
-has itself received from a child; the reference cannot skip an upward step.
+has itself received from a child; the reference cannot skip a to-parent step.
 
 There is no reference to self, a parent, another ancestor, a sibling, or a
 non-direct descendant. Symbols received from an ancestor are already visible
-throughout the receiving module's subtree, and forwarding them upward returns
+throughout the receiving module's subtree, and forwarding them to the parent returns
 them to a module that already has them. The semantic model permits that
 redundancy; the description language omits a redundant ancestor-reference form.
 Imports can still use symbols received from ancestors under the ordinary rules.
 
-### Child Re-Exposure Can Forward The Whole Upward Contract
+### Child Re-Exposure Can Forward The Whole To-Parent Contract
 
 `expose-sub * from pricing to parent, descendants` selects all exposed names
 of the direct child `pricing` whose canonical symbols it effectively exposes
@@ -636,8 +636,8 @@ identity, owner, and complete tag set. This includes a `default` name if the
 child exposes one. It does not filter by whether the forwarding module can
 import the symbol. As with named `expose-sub`, `tagged` is forbidden.
 
-Selection is recomputed from the child's current effective upward contract.
-New upward exposures are forwarded automatically; removed ones stop being
+Selection is recomputed from the child's current effective to-parent contract.
+New to-parent exposures are forwarded automatically; removed ones stop being
 forwarded. Empty selection is valid and has no effect. Every symbol must
 first enter an exposure chain through an owned `expose-src` selection, named
 or expanded from an interface-file wildcard, or a named `expose-test` selection
@@ -732,7 +732,7 @@ providers' callers can keep using its exposed name.
 
 For child references, resolve identity through child-exposed names until it
 is grounded in explicit `expose-src` or `expose-test` selections. Resolution
-follows the tree downward and cannot introduce a cycle of module references. A name supplied
+follows the tree toward its leaves and cannot introduce a cycle of module references. A name supplied
 by multiple declarations must identify exactly one original symbol. Wildcard
 expansion can copy existing names and identities but cannot invent an origin.
 
@@ -842,7 +842,8 @@ For a module `M`:
    are effective; child selections are effective only for symbols in `U(C)`.
    Ignore the parent destination at the root, whose `U(root)` stays empty.
 
-The finite ownership tree and downward-only provider references make this
+The finite ownership tree and provider references that only point toward the
+leaves make this
 evaluation finite and independent of statement order. Sets combine duplicate
 exposures without adding permissions. An empty wildcard contributes neither
 a name nor an exposure and is valid.
@@ -853,7 +854,7 @@ receive them. The grammar has no ancestor-provider form because forwarding
 those symbols would add no visibility. Tag compatibility is checked for
 imports afterward and never filters wildcard selection or re-exposure.
 
-Child-exposed names select canonical symbols. Upward exposure is checked
+Child-exposed names select canonical symbols. To-parent exposure is checked
 for the canonical symbol, including exposure under another alias; alias
 spelling cannot create a distinct channel or change reach.
 
@@ -889,12 +890,12 @@ The following are accepted and may produce advisory diagnostics:
 | --- | --- |
 | A resolved named child symbol is not exposed to parent | That selection is ineffective and adds no exposure |
 | Exposure to parent at the application root | No effect |
-| A wildcard over a child with no effective upward exposures | Empty selection; no effect |
+| A wildcard over a child with no effective to-parent exposures | Empty selection; no effect |
 | A wildcard over a valid interface file with no exports | Empty selection; no effect |
 | Repeated exposure of the same symbol to the same destination | Set union; no extra effect |
 
 Diagnostics must identify the description file, location, and failed
-reference or rule. They must not infer missing tags, grant a missing exposure,
+reference or rule. They must not infer missing tags, supply a missing exposure,
 or silently ignore an invalid declaration to make the model appear valid.
 
 ### Module-Owned Tests Keep Private Access Without A New Boundary
@@ -909,7 +910,7 @@ their testing profile or make them production source.
 
 In the reverse direction, non-testing-classified `src/` cannot import or
 re-export testing-classified source, including same-owner `src/tests/`. Forwarding
-an original production symbol through a testing file does not create a route
+an original production symbol through a testing file does not create a way
 around that source isolation. A production-owned testing hook declared in
 non-testing `src/` remains usable by other files in that same source scope:
 the source restriction follows classification, not a blanket prohibition on
@@ -933,7 +934,7 @@ placing a description inside the original owner's `src/tests/` or `src/` is inva
 An owner may expose a newly defined testing-only helper or wrapper from its own
 `src/tests/` when these tests need controlled access to private implementation.
 A forwarding alias preserves the original tags. Exposing an existing production
-binding downward can also make it available to other compatible descendants;
+binding to descendants can also make it available to other compatible descendants;
 the testing module's tags do not narrow that exposure's audience.
 
 Test discovery and production-source selection must account for testing modules'

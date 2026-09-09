@@ -38,7 +38,7 @@ honest answers for everything the plan does not implement.
    later failure are retained with exit 2; exit 0 is never chosen from an
    empty diagnostic list without checking stage completion.
 5. Invocation outside a ramified project without `--root` fails with exit 2
-   and never searches downward; unsupported commands and requested
+   and never searches subdirectories; unsupported commands and requested
    capabilities, including a browser-promise verifier, return an explicit
    unavailable result.
 6. Tests: real CLI handlers with an injected real session over temporary

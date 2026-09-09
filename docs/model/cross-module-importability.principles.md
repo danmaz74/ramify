@@ -53,7 +53,7 @@ The unit of exposure is an individual exported symbol.
 
 Every cross-module symbol import is closed by default: the symbol must first
 be made visible through explicit exposure. A module's position in the tree,
-including being the application root, grants no implicit access to another
+including being the application root, gives no implicit access to another
 module's symbols.
 
 A symbol is visible in a module if and only if one of these conditions holds:
@@ -86,12 +86,12 @@ onward does not imply permission to use it.
 ### Exposure To Parent Cedes Onward Exposure
 
 A child exposing a symbol to its parent permits the parent to re-expose it
-through either channel. The child cannot grant access to the parent while
+through either channel. The child cannot expose a symbol to the parent while
 withholding the parent's authority to expose it onward.
 
 Re-exposure follows a chain of one-hop decisions. A grandchild's symbol can
 reach the application root only when every intermediate module exposes it
-further upward.
+to its parent in turn.
 
 ### Exposure To Descendants Covers The Whole Subtree
 
@@ -101,8 +101,8 @@ cannot exclude a branch or stop at a selected depth.
 
 The exposure also reaches the branch from which a re-exposed symbol arrived.
 An exposure from above can therefore make a symbol visible between siblings
-even when their immediate parent does not expose it downward. The downward
-turn in a cross-branch chain may occur at the lowest common ancestor or at
+even when their immediate parent does not expose it to its descendants. The
+turn toward descendants in a cross-branch chain may occur at the lowest common ancestor or at
 an ancestor above it.
 
 An owner exposing a symbol only to descendants keeps it within its subtree.
@@ -246,7 +246,7 @@ The optional `src/interfaces/` directory holds a module's curated contract
 vocabulary, including types, schemas, enums, and constants. It belongs to the
 same owner and uses the ordinary source profile.
 
-The directory does not create a third classification, grant importability,
+The directory does not create a third classification, confer importability,
 or automatically expose its contents. The only special feature is that an
 owner can expose all symbols exported by files in `src/interfaces/` using
 a wildcard, which isn't allowed for owned files in other directories.
@@ -414,4 +414,4 @@ importability rules.
 Import specifiers, TypeScript resolution, declaration syntax, generated
 surfaces, evaluator APIs, and enforcement architecture are implementation
 concerns. They must preserve the ownership, exposure, and availability rules
-without introducing additional ways to grant access.
+without introducing additional ways to give access.

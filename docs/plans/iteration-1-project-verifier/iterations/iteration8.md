@@ -24,7 +24,7 @@ validates the toolkit's migration-stage descriptions the moment the move lands.
 ## Deliverables
 
 1. Legacy `src/model` removed; every diagram consumer uses the iteration 3
-   model through legal routes: model to analysis to root, relayed to
+   model through legal paths: model to analysis to root, relayed to
    presentation with explicit `browser` promises on the values the browser
    needs.
 2. `src/viz` split per the move map: geometry and viewport into layout with

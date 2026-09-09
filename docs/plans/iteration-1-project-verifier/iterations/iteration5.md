@@ -50,7 +50,7 @@ instances against real files.
    symlinks.
 4. `ProjectInputView`: captured bytes and content identities for source,
    descriptions, READMEs and configuration inputs; the compiler configuration
-   found from the root upward; project files outside
+   found in the root or an ancestor; project files outside
    modules derived from that configuration's selection and warned about per
    top-level entry, with stray descriptions reported as individual layout
    errors; a scope report naming the root, how it was selected, the configuration

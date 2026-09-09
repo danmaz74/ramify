@@ -35,7 +35,7 @@ checking, synchronization or publication behavior. The binding is the
 request validation and dispatch to contexts. Root assembly injects dependencies;
 it does not implement another router or bypass validation in quick mode. The
 [shared service boundary](processes-and-clients.md#shared-service-boundary)
-defines the interface ownership and exposure route.
+defines the interface ownership and exposure path.
 
 The tRPC direct caller executes the router's procedures, middleware and input
 validation; it is an integration-testing facility. Procedures themselves should

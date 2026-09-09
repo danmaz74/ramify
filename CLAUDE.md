@@ -1,15 +1,17 @@
 # CLAUDE.md - ramify.ts
 
 ramify.ts is a self-contained sub-project that will eventually be extracted
-into its own repository. cucumber-viz will become a *consumer* of it.
+into its own repository. These instructions apply to both Claude and Codex.
+cucumber-viz is the external planning/implementation tool and will also become
+a *consumer* of Ramify.
 
 ## Host-repo rules do NOT apply here
 
 When working under `ramify/`, ignore the usual cucumber-viz rules:
 
-- Do **not** check `docs/architecture/key-decisions.md`,
-  `docs/architecture/modularization/`, or any other cucumber-viz
-  architecture doc - none of them bind this sub-project.
+- cucumber-viz architecture documents do not bind this project. Consult them
+  when investigating the external tool or adapting a source pattern, rather
+  than treating them as Ramify requirements.
 - cucumber-viz conventions (barrel/vocabulary surfaces, BEM/plain-CSS UI
   rules, dependency-cruiser rules, audit semantics, feature-test tiers) do
   not apply.
@@ -55,7 +57,7 @@ it is invalid for files elsewhere, and `expose-test` accepts named selections
 only. Directory placement alone exposes nothing. Expansion preserves original
 ownership and tags, rejects foreign-owned exports, and includes added exports.
 `expose-sub` names direct children and permits wildcard selection of their
-effective upward contracts. The three forms use the same parent/descendants exposure
+effective to-parent contracts. The three forms use the same parent/descendants exposure
 channels. Read the specification before changing discovery, description parsing,
 source references, or documentation of the file format. It records the model's
 rules; the current toolkit does not yet implement the filesystem loader or parser.
@@ -98,7 +100,7 @@ migration work must be explicitly scoped separately.
 
 ## Implementation Architecture
 
-The [architecture overview](docs/architecture/README.md) routes the implementation
+The [architecture overview](docs/architecture/README.md) indexes the implementation
 design. The process split is decided: a lightweight CLI talks directly to the
 resident analysis daemon; a separate on-demand tRPC web process serves later
 visualization. Batch CLI execution uses a fresh session of the same engine.
@@ -137,7 +139,37 @@ the daemon or other runtime clients.
 - Self-contained package: own `package.json` and toolchain; run npm commands
   from `ramify/`. Never import from cucumber-viz `src/`, and never add
   ramify to the host repo's build, test, or enforcement tooling.
-- ESM with `.js` extensions in source imports; strict TypeScript;
-  vitest tests co-located as `src/**/*.test.ts`.
-- Documentation and examples must stay generic - no cucumber-viz domains or
-  references in ramify docs or the site.
+- ESM with `.js` extensions in source imports and strict TypeScript. Vitest
+  tests currently co-located under `src/` follow the active plan's migration
+  into declared test owners; use the model's test layout for new declared owners.
+- Model teaching and examples stay application-agnostic. Development guides
+  and source-reuse analyses may reference cucumber-viz as an external tool or
+  provenance source, without adopting its domain names or conventions as rules.
+
+## Writing conventions
+
+These apply to every document, page and comment, including agent-written
+results and docs-maintenance edits:
+
+- A module exposes a symbol to its parent or to its descendants, and the other
+  side receives it. Never say grant or route; an ancestor re-exposes what it
+  received.
+- Up and down describe motion in a picture, never a channel. Descendants are
+  the target of exposure; the subtree is the region.
+- Say a module's internals, not its inside. Use inside only as a preposition
+  or in the inside/outside contrast.
+- Say enforced, verified or a rule. Never say checked fact or coin similar
+  terms.
+- Glossary entries are definitions: one term, one crisp definition. Rationale
+  belongs in the principles document.
+- Assume common computer-science concepts such as trees, roots and siblings;
+  state only what Ramify does with them.
+- Principle statements stay short. Other documents reference principles
+  documents, never the reverse; fold a new principle into the document where
+  it belongs rather than adding a file.
+
+## Development workflow and skills
+
+Use the [development guides](docs/development/README.md) for planning,
+implementation, testing and cucumber-viz operations. The index lists the shared
+Claude and Codex skills; select the one relevant to the task.

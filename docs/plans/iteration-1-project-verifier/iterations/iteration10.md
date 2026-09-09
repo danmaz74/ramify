@@ -42,7 +42,7 @@ testing-origin isolation that forwarding cannot bypass.
 ## Matrix rows executed here
 
 - I1-12: `ui-value`, `ui-type`, `dispatch-value`, `dispatch-type`,
-  `tag-without-route`.
+  `tag-without-path`.
 - I1-13: `browser-value`, `explicit-type`, `unmarked-interface`,
   `unmarked-class`, `merged-runtime`, `same-owner`.
 - I1-15: `derived-profile`, `child-profile`, `test-looking-file`,

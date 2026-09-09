@@ -75,7 +75,7 @@ A module's tags classify its ordinary source under `src/`, including
 Ordinary subdirectories share their source area's profile;
 separately declared submodules own their files and declare their own tags.
 Tags are not inherited across ownership boundaries. A `*.test.ts` filename
-outside `src/tests/` does not grant testing classification.
+outside `src/tests/` does not confer testing classification.
 
 And a tag is not just a name: **each registry definition selects one of the
 [two rule kinds fixed by Ramify](/glossary#tag-associated-availability-rule).**
@@ -131,7 +131,7 @@ precedence within `src/tests/`; the module header classifies the rest of `src/`,
 including `src/interfaces/`. The interface directory adds no separate profile
 or automatic exposure. Tests can import their own implementation's internal
 exports without exposure declarations. Foreign symbols still need
-an exposure route, and a parent's tests gain no automatic access to a child's
+an exposure path, and a parent's tests gain no automatic access to a child's
 private internals.
 
 The test profile is fixed: `testing` plus every required-importer tag in the
@@ -199,7 +199,7 @@ the testing-source restriction. A UI tag supplies no additional reach.
 
 `dispatch` also carries the **required importer tag** rule. A foreign transport
 contract or typed client tagged `dispatch` requires a dispatch-classified
-importer for both values and types. Its exposure route still decides where
+importer for both values and types. Its exposure path still decides where
 that contract can reach.
 
 A connected view can carry `[ui, dispatch, browser]`, while a pure UI module

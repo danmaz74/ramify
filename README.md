@@ -23,7 +23,7 @@ define the required `src/` and `subs/` layout, optional same-owner
 `expose-src` selects owned exports relative to the module's `src/`, by name or
 with `*` for one explicitly named file beneath `src/interfaces/`;
 `expose-test` selects owned exports relative to its `src/tests/`;
-`expose-sub` selects a direct child's upward-exposed symbols by name or `*`.
+`expose-sub` selects, by name or `*`, the symbols a direct child exposes to it.
 The [TypeScript Source Interpretation Principles](docs/model/typescript-source-interpretation.principles.md)
 define resource ownership, testing-source isolation, and how TypeScript imports
 and source re-exports map to symbol checks. Source checking reports definite
@@ -78,6 +78,9 @@ source checker is not yet implemented.
   tRPC web process, bounded memory lifecycle and quick testing, plus the proposed
   engine/module contracts. These documents distinguish decided architecture from details
   still under review; they do not establish implementation.
+- `docs/development/` - [development guides](docs/development/README.md):
+  implementation workflow, testing, engineering practices, cucumber-viz setup
+  and the shared Claude/Codex skills.
 - `docs/analysis/` - design studies, including
   [preparation for the future project explorer](docs/analysis/project-explorer-reuse.md):
   reusable source, early analysis contracts and later visualization boundaries.

@@ -6,7 +6,7 @@ Implementation completion must be established by each plan's evidence.
 
 The intended system is defined in the [architecture documents](../../architecture/README.md).
 They own the decided process/client, resource and testing architecture, plus
-the proposed module tree, exposure routes, retained state and synchronization.
+the proposed module tree, exposure paths, retained state and synchronization.
 This roadmap owns the review process and sequence of working deliverables. Each
 deliverable has one plan, run as a sequence of iterations each sized for a
 single 250k-token implementation context; architecture review, migration and
@@ -82,7 +82,7 @@ particular, confirm:
   may be obtained lazily.
 - Watching, retained sessions, explicit freshness and batch equivalence are
   baseline architectural commitments.
-- UI/transport clients share the engine's results; tags and exposure routes keep
+- UI/transport clients share the engine's results; tags and exposure paths keep
   their source dependencies compatible with the model.
 - Entry points preserve the decided process split and lightweight startup paths.
   Retention, queue and client-lifecycle limits follow the memory architecture.
@@ -106,7 +106,7 @@ contracts with their own delivery plan.
    lightweight client, daemon, batch and later MCP/web entry files; review their
    transitive runtime dependencies, not just their exported types.
 2. Complete `module.ramify` and purpose README drafts for every owner implemented
-   in that plan, plus a contract map listing originals, tags, exposure routes
+   in that plan, plus a contract map listing originals, tags, exposure paths
    and intended consumers.
    Include every foreign signature type consumers must import; do not assume
    automatic type exposure or claim a foreign original through an owned wildcard.
@@ -126,7 +126,7 @@ contracts with their own delivery plan.
    and its root-owned interface exposure now;
    add the UI harness when visualization is implemented.
 
-Root and analysis tests can exercise their own assembly and upward child contracts.
+Root and analysis tests can exercise their own assembly and their children's to-parent contracts.
 Context tests use controlled drivers/events/clocks. Owned tests move to each
 owner's `src/tests/`; tests requiring additional classifications use a separate
 properly exposed testing module with test code in ordinary `src/`.
@@ -227,8 +227,9 @@ commands work; explicit batch checking continues to run independently.
 Add root child `daemon [dispatch]` and its `contexts []` child, completing
 the eleven-owner batch/resident tree. Daemon owns process startup/discovery,
 local transport, the shared validated service implementation/in-process binding
-and watcher adapters. Root exposes its dispatch-facing service interface downward
-to daemon; the IPC host calls the same implementation as quick tests. Root
+and watcher adapters. Root exposes its dispatch-facing service interface to its
+descendants, and daemon implements it; the IPC host calls the same
+implementation as quick tests. Root
 assembly supplies dependencies without duplicating validation or routing.
 Contexts owns isolation, update ordering,
 publication and leases; its neutral `AnalysisDriver` port is implemented by
@@ -345,7 +346,7 @@ Include basic name/purpose lookup and selected signature detail useful to humans
 and agents; advanced ranking and whole-project complexity are later extensions.
 
 Define observed file-target edges separately from original-binding use and
-exposure routes. Each aggregate declares its unit, source-area filter and owned
+exposure paths. Each aggregate declares its unit, source-area filter and owned
 versus subtree scope. Count owned files once; retain denied accesses in observed
 usage and unused available exports in contract inspection.
 

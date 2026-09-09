@@ -76,8 +76,8 @@ call boundary:
 
 `daemon` owns both bindings. Its in-process service implementation validates and
 dispatches requests to its context manager; the IPC host delegates to that same
-implementation. Root exposes the dispatch-facing service interface downward to
-`daemon`, which imports and implements it through ordinary declarations. Root
+implementation. Root exposes the dispatch-facing service interface to its
+descendants, and `daemon` imports and implements it through ordinary declarations. Root
 only assembles and injects the analysis driver and other dependencies; it does
 not duplicate service routing. `contexts` keeps its own neutral vocabulary and
 `AnalysisDriver` port and does not import the root-owned dispatch interface.
@@ -294,7 +294,7 @@ The later owners are declared only when implemented. Root relays the selected
 contracts through ordinary exposure declarations. UI props retain `ui`, service
 contracts retain `dispatch`, and browser-consumed foreign values need explicit
 browser promises. Exact owned interface wildcards cannot claim foreign types.
-Separate entry files and package exports must preserve these legal routes and
+Separate entry files and package exports must preserve these legal exposure channels and
 the runtime dependency boundaries; source modularity alone does not prove a
 lightweight entry point.
 

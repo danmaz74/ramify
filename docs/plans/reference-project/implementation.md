@@ -62,7 +62,7 @@ never imports the toolkit's `src/`, and the toolkit's `tsconfig.json` and
 | Module names | `catalog/ui` and `reviews/ui` are declared `module "ui" tagged [...]` and referenced as `expose-sub ... from "ui"`, because `ui` is a reserved keyword. Quoting is syntax only; the identifiers stay `catalog/ui` and `reviews/ui`. Every other name is bare. |
 | Symbol tags | Defaults from the defining area everywhere. `browser` is written explicitly on every exposed runtime symbol that a browser-classified module value-imports, and on the contracts wildcard. An explicit clause repeats the defining area's required tags, because the grammar rejects a clause that omits them. Never write a tag clause on `expose-sub`. |
 | Owned tests | Every owner's tests and helpers live in its `src/tests/`. Revised 2026-09-07: the Cucumber scenario lives in `integration-tests`, a separately declared testing module under the root's `subs/` with header `[testing, dispatch]` and its test code in ordinary `src/`. It is the baseline's one testing module and the witness for case O07's positive half; it exposes nothing and reaches the configured system only through the root's `expose-test`. Other testing-module shapes remain harness variants. |
-| View contracts | `pure-ui` owns `ReviewResultProps`; the connected panel maps the API's inferred output onto them. Core-owned `ReviewOutcome` is exposed upward to its adapter only and never travels downward, so `validation` cannot see any review-runtime type (cases R01 and D05, project-plan route 5). Catalog deliberately uses the other pattern and relays core-owned `CatalogSummary` down to its view (route 3). |
+| View contracts | `pure-ui` owns `ReviewResultProps`; the connected panel maps the API's inferred output onto them. Core-owned `ReviewOutcome` is exposed to its adapter only and never to descendants, so `validation` cannot see any review-runtime type (cases R01 and D05, project-plan path 5). Catalog deliberately uses the other pattern and relays core-owned `CatalogSummary` to its view (path 3). |
 | Barrels | No `index.ts` anywhere in the baseline. The baseline has two forwarding aliases, both same-owner: the description alias `inspect as inspectRecord` and the source alias `export type { AppRouter } from '../assembly.js'` in root's interface file. Neither creates a new binding. |
 
 ## Target tree
@@ -278,7 +278,7 @@ re-resolves its binding per request for both list and call.
 | `reviews` | `expose-sub validateRevisionChain from validation to descendants` |
 | `workspace` | `expose-sub createReviewsRouter, createReviewsTools, InspectionPort from reviews to parent` |
 
-Task helpers travel up to `reviews/core` and down only within its subtree;
+Task helpers are exposed to `reviews/core` and only to its descendants;
 validation reaches `reviews/core` through `reviews`; `validation` sees
 nothing owned by `reviews/core` or its children, so it can import neither
 their behavior nor their types; tasks cannot import the controller.
@@ -296,7 +296,7 @@ updated. Cases authored: R01, R02, D01, D02, D03, D04, D05, O02, E03.
 
 **Goal.** A browser shows both records as cards and runs a review from a
 connected panel, through the typed client, with the view contracts flowing
-through the tree as the plan's routes 4 and 5 describe.
+through the tree as the plan's paths 4 and 5 describe.
 
 **Deliverables.**
 

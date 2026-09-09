@@ -16,7 +16,7 @@ toolkit source moves and no checker code is written here.
   Implementation ownership and migration, Analysis path and contract review,
   Reports and exit behavior, Reference acceptance matrix.
 - [Daemon architecture](../../../architecture/daemon.md): Ramify's ownership
-  tree, Responsibilities and public contracts, Exposure routes.
+  tree, Responsibilities and public contracts, Exposure paths.
 - [Module-description principles](../../../model/module-description.principles.md)
   in full; the other model documents as the drafts require.
 - [Reference contract map](../../reference-project/contract-map.md) for the
@@ -34,7 +34,7 @@ All under `docs/plans/iteration-1-project-verifier/`:
    Draft the future session-to-`AnalysisDriver` boundary as a type only.
 2. `owners.md`: for each of the nine owners, the complete final `module.ramify` text
    and the README purpose paragraph, and a contract map listing originals,
-   tags, exposure routes, every foreign signature type a consumer must import
+   tags, exposure paths, every foreign signature type a consumer must import
    and the intended consumers. Apply the plan's exposure rules for the
    migration; no owned interface wildcard may claim a foreign original.
    Include the reviewed declaration stages: headers only for empty owners,
@@ -70,9 +70,9 @@ None. This iteration produces no executable evidence.
 
 - `npm run type-check` still passes; probe scripts type-check under
   `tsconfig.scripts.json` and run with `npx tsx scripts/probes/<name>.ts`.
-- Every exposure route in `owners.md` is checked by hand against the
+- Every exposure path in `owners.md` is checked by hand against the
   description principles' review checklist; every foreign type a consumer
-  imports has a named route.
+  imports has a named path.
 - The package is presented for architecture and contract review. Drafting it
   does not approve an unresolved contract change.
 

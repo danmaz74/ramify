@@ -268,7 +268,7 @@ determine which bindings exist in each form.
 An unknown computed key, a namespace passed to unknown code, object rest, or
 other unsupported data flow makes that portion unverifiable. Continue checking
 identifiable selections and report the uncovered portion; do not silently
-grant the namespace's contents or treat escape as a definite violation.
+accept the namespace's contents or treat escape as a definite violation.
 The profile does not require exhaustive namespace data-flow analysis.
 
 ### Source Re-Exports Are Imports By The Forwarding File
@@ -403,7 +403,7 @@ directories named `testing` or `ui` do not establish a source area.
 | Form or target | Treatment |
 | --- | --- |
 | `import x = require(...)`, `export =`, and CommonJS `require`/export patterns | No cross-module interpretation is specified in this profile. Report potentially cross-module application access as unverifiable. Proven same-owner access retains the model's exemption only after the adopted testing-origin restriction passes; unknown source origin cannot be assumed non-testing. |
-| Triple-slash references | Interpret as compiler inputs, not as requests for every symbol in the referenced file. They grant no Ramify exposure and cannot silently change application ownership. |
+| Triple-slash references | Interpret as compiler inputs, not as requests for every symbol in the referenced file. They create no Ramify exposure and cannot silently change application ownership. |
 | Ambient declarations and module/global augmentations | Resource shims follow the adopted resource rule. Other external declarations remain outside the application tree. Application constructs that introduce shared globals, ambiguous ownership, or dependencies not representable by the requests above are unverifiable in this profile. |
 | Packages, built-ins, and standard-library declarations outside the application | Outside the application symbol-exposure model. Report that scope explicitly; do not fabricate an owning Ramify module. Browser-safety verification may still inspect runtime dependencies. |
 | Stylesheets, JSON, and other non-code resources | Bindings belong to the resolved resource's owner and source area, with identities specific to that resource and names from its effective TypeScript export description. Ordinary exposure, tag, and testing-origin rules apply. A shim alone proves neither resource existence nor external status. Unestablished targets, source areas, or export descriptions are unverifiable. Symbol-free loads retain testing-source isolation without a general load ban. See the [resource principle](#resource-bindings-belong-to-the-resolved-resource). |

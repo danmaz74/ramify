@@ -72,11 +72,11 @@ collection-review [dispatch]             Node entry, configured protocols, assem
 ```
 
 The shell deliberately contains the features so their selected views reach it
-through upward exposure without becoming available to other features' UI;
+through to-parent exposure without becoming available to other features' UI;
 backend children retain independent source profiles. The backend root owns its
 actual assembly source. Keep E04 as an explicit browser-ancestor relay variant,
 even if the baseline topology changes later. A sibling-shell comparison must
-record that root's downward exposure also reaches other compatible UI modules:
+record that root's to-descendants exposure also reaches other compatible UI modules:
 `ui` excludes core consumers but does not select the shell alone.
 
 Two owners are named `ui`, a reserved keyword of the description language.
@@ -88,8 +88,8 @@ module identity.
 Root protocol and assembly tests stay in root's `src/tests/`, with the fixed
 profile `[testing, dispatch]`. Tests combining protocol and view contracts
 live in `workspace/src/tests/`, whose fixed profile is already
-`[testing, ui, dispatch]`. They can use the views exposed upward to `workspace`
-without exposing those views downward to other feature UIs. Root exposes a
+`[testing, ui, dispatch]`. They can use the views exposed to `workspace`
+without `workspace` exposing them to other feature UIs. Root exposes a
 testing-only setup function and its needed types so these tests exercise the
 actual configured system while preserving router/client identity.
 
@@ -107,7 +107,7 @@ feature. One feature's entire UI is already pure; only the connected feature
 needs an ordinary `pure-ui` child.
 
 Shared test support is one fixture exported from `catalog/core/src/tests/`, relayed
-upward and then made available to other owners' tests. A separate support owner
+toward the root and then made available to other owners' tests. A separate support owner
 would add no distinct requirement. Shared UI does retain its own owner: two
 vertical feature UIs must use it while their core siblings cannot.
 
@@ -182,33 +182,35 @@ Ramify modules remain valid without READMEs; every reference-baseline owner
 needs a purpose paragraph for the tour. Documentation retrieval adds no
 `module.ramify` field and does not affect ownership, exposure, or tags.
 
-## Required exposure routes
+## Required exposure paths
 
-1. **Adapters upward:** feature adapters expose factories to `workspace`, which
+1. **Adapters to the parent:** feature adapters expose factories to `workspace`, which
    declaration-relays them to the root. The root mounts the finished APIs.
    A source barrel in `workspace/src/` is not a substitute for this relay.
-2. **Dispatch vocabulary downward:** the root exposes selected neutral protocol
+2. **Dispatch vocabulary to descendants:** the root exposes selected neutral protocol
    and invocation types to descendants. Dispatch consumers can import them;
    core and pure UI cannot. Configured runtimes/services are passed to factories,
    not automatically exposed as broadly importable singletons.
 3. **Core to its adapter:** each core exposes selected behavior and needed types
    to its feature parent. The parent calls them. Runtime implementations are
    not broadcast merely to let the connected UI make an API request. Catalog
-   also relays the core-owned `CatalogSummary` type down to its UI child.
+   also relays the core-owned `CatalogSummary` type to its UI child.
 4. **Shared UI:** `StatusBadge` and its props reach `workspace`, which exposes
    them to descendants. Both feature UIs pass; both core owners fail for values
    and types because they lack `ui`.
-5. **Views:** `ReviewResult` and its view-owned props travel upward to connected
-   UI. Private formatting and its tests stay in `pure-ui`; no `dispatch`
+5. **Views:** `ReviewResult` and its view-owned props reach connected UI through
+   to-parent exposure. Private formatting and its tests stay in `pure-ui`; no `dispatch`
    classification is inherited from the parent. Each feature's selected UI
-   component travels up through its feature owner to `workspace` for shell
-   composition; it does not need a general downward exposure to other features.
-6. **Runtime direction:** task helpers travel up to `reviews/core` and down only
-   inside that subtree. Controller operations travel upward only. Validation
+   component is exposed through its feature owner to `workspace` for shell
+   composition; it does not need a general to-descendants exposure to other features.
+6. **Runtime direction:** task helpers are exposed to `reviews/core`, which
+   exposes them only to its descendants. Controller operations are exposed to
+   the parent only. Validation
    sits outside that subtree and cannot import its runtime implementations.
-   Validation's selected functions may travel up to `reviews` and down to core.
-7. **Test support:** a catalog-owned test fixture follows ordinary upward/downward
-   routes. Test profiles retain required-importer classifications but do not
+   Validation's selected functions may be exposed to `reviews`, which exposes
+   them to its descendants, including core.
+7. **Test support:** a catalog-owned test fixture follows ordinary to-parent and
+   to-descendants paths. Test profiles retain required-importer classifications but do not
    inherit browser runtime requirements. Root also defines a testing-only setup
    function in its `src/tests/`, using its own assembly internals, and exposes
    that function and needed types to descendants. Workspace integration tests
@@ -217,10 +219,10 @@ needs a purpose paragraph for the tour. Documentation retrieval adds no
    Own tests keep private access; foreign tests use selected exposed contracts.
 8. **Neutral reports:** `contracts` exposes selected report/revision vocabulary
    to `workspace`, which makes it available to descendants. Sibling cores gain
-   access through this route, not merely through their placement in the tree.
+   access through this path, not merely through their placement in the tree.
 9. **Business port:** review core exposes its owned `InspectionPort` to its
-   controller/task descendants and upward as part of its factory contract. Any
-   ancestor that names it explicitly needs the corresponding upward relays.
+   controller/task descendants and to its parent as part of its factory contract.
+   Any ancestor that names it explicitly needs the corresponding to-parent relays.
 
 Use explicit source exposures in the baseline. Do not require `index.ts` files.
 Keep one targeted forwarding example in a test variant so alias/provenance

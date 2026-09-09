@@ -207,7 +207,7 @@ modules; filesystem and compiler functions do not enter their runtime closure.
 - Explicitly promise `browser` on exported values required by browser
   consumers. Header placement alone does not assign that promise.
 - Interface-file wildcards select only owned originals. Every foreign type a
-  consumer must name needs its own legal route, even when mentioned in a
+  consumer must name needs its own legal path, even when mentioned in a
   function signature.
 - Root/CLI tests derive `[testing, dispatch]`; portable model/descriptions/layout
   tests derive `[testing]`; presentation tests derive `[testing, ui]`.
@@ -221,7 +221,7 @@ The map must account for every current source/test/barrel, including removals.
 | Current files | Target / required treatment |
 | --- | --- |
 | `src/model/{tree,tags,availability}.ts` and their tests | Model owner; adapt semantics and canonical identities, preserving independently useful cases. Tests move under its `src/tests/`. |
-| `src/model/index.ts` | Replace or narrow to a model-owned entry. A barrel remains optional and does not grant exposure. |
+| `src/model/index.ts` | Replace or narrow to a model-owned entry. A barrel remains optional and does not create exposure. |
 | `src/viz/{geometry,viewport}.ts` and geometry-only helpers | Layout owner, with its own neutral vocabulary and tests. |
 | `src/viz/layout*.ts`, `tree-diagram.ts`, `focus-diagram.ts` | Split source-dependent diagram preparation into presentation and geometry computation into layout. Review dependencies before moving whole files. |
 | `src/viz/diagram-definition.ts`, `model-access.ts`, `validate.ts`, `diagrams/*`, React components and theme | Presentation owner; adapt teaching fixtures and model access to the definitive evaluator. Move tests to the owner of the behavior they assert. |
@@ -353,7 +353,7 @@ collision rules. Reject foreign originals or incomplete expansion rather than
 dropping inconvenient members. Statement order must not change results.
 
 Expose-sub resolution uses direct children's declared names and their effective
-upward contracts. Evaluate exposure independently from whether the relay's own
+to-parent contracts. Evaluate exposure independently from whether the relay's own
 source could import the original.
 
 ### Source forms
@@ -389,7 +389,7 @@ The proposed CLI contract is:
 | `--format json` | One versioned JSON result on stdout; operational logging on stderr. No banner mixed into JSON. |
 | `--root <dir>` | Optional override for the root; the effective root and configuration appear in both formats. |
 | `--help`, `--version` | Complete without loading the compiler, React, MCP or web stacks. |
-| `--batch` | Accepted; before Plan 2 every check already runs a fresh in-process session. Invocation outside a ramified project without `--root` fails with exit 2 and never searches downward. |
+| `--batch` | Accepted; before Plan 2 every check already runs a fresh in-process session. Invocation outside a ramified project without `--root` fails with exit 2 and never searches subdirectories. |
 | Unsupported commands or requested capabilities | Explicit unavailable/usage result. No implied inspection, watch, MCP or browser verifier support. |
 
 Agree the exact package entry filenames in iteration 1. The intended executable is
@@ -435,17 +435,17 @@ do not contaminate the clean running application with forbidden imports.
 | I1-03 | L03–L04, H01 | `empty-owner`: retain its ID and intended source root without writing files; `grouping-move`: same declared parent/name preserves ID; `rename` and `reparent`: IDs change, with no invented historical migration. |
 | I1-04 | L05–L06 | `syntax-valid`: comments, quotes, BOM/CRLF and legal reserved-name forms parse; `syntax-invalid`: bad version/clauses, semicolons and test-profile declarations fail; `exact-path`: no extension/alias probing; `case-mismatch`: a declared path differing from the directory entry only by case is invalid on every supported platform; `escape`, `symlink-root`, `symlink-description`, `symlink-reference`: reject; `symlink-directory`: do not traverse. |
 | I1-05 | L05, E05–E06 | `missing-file`, `missing-export`, `name-collision`, `conflicting-tags`: invalid; `same-original-repeat`: harmless merge; `statement-permutation`: identical semantic result; `named-growth`: an unselected added export stays private. |
-| I1-06 | E01–E04, D04 | `remove-hop`: remove W2's catalog-router relay while keeping root's import, and diagnose the missing route; `restore-hop`: same source passes; `relay-only`: browser workspace may relay a server original; `source-forward`: an incompatible workspace value re-export fails. |
-| I1-07 | E03, R01–R02 | `deeper-descendant`: a newly declared nested consumer receives the existing downward route; `reverse-task-controller`: task cannot import controller `tick`; `validation-runtime`: outside validator cannot import runtime behavior/types; `parent-private`: parent cannot import child-private helper. |
+| I1-06 | E01–E04, D04 | `remove-hop`: remove W2's catalog-router relay while keeping root's import, and diagnose the missing path; `restore-hop`: same source passes; `relay-only`: browser workspace may relay a server original; `source-forward`: an incompatible workspace value re-export fails. |
+| I1-07 | E03, R01–R02 | `deeper-descendant`: a newly declared nested consumer receives the existing to-descendants path; `reverse-task-controller`: task cannot import controller `tick`; `validation-runtime`: outside validator cannot import runtime behavior/types; `parent-private`: parent cannot import child-private helper. |
 | I1-08 | E05, T06 | `import-rename`, `exposure-rename`, `same-owner-forward`: original identity/tags unchanged; `same-spelling`: unrelated originals stay distinct; `new-wrapper` and `new-type-alias`: new bindings receive their defining area's tags. |
 | I1-09 | E07 | `equivalent-names`: C1 wildcard equals explicit selection of every export; `add-export` and `remove-export`: repeated fresh runs update C1/W1 contracts; `unselected-file`: remains private; `signature-only-type`: not auto-exposed; `empty-file`: valid empty contract; `default`: included. |
 | I1-10 | E08 | `nested-interface`, `testing-module-interface`: valid wildcard targets; `implementation`, `tests-interface`, `helpers-interface`, `normalized-outside`, `directory`, `glob`, `test-wildcard`: invalid targets/forms. |
 | I1-11 | E09 | `owned-alias` and `resource-alias`: preserve originals; `foreign-forward` and `ambiguous-expansion`: invalidate whole expansion; `required-tag-omission` and `assignment-conflict`: invalid; `cross-selection-collision`: distinguish repeated same original from distinct originals; `literal-star-name`: differs from a wildcard. |
-| I1-12 | T01–T02 | `ui-value` and `ui-type`: a core importing visible SU1 originals is denied for missing ui; `dispatch-value` and `dispatch-type`: core/pure UI importing a visible dispatch original is denied; `tag-without-route`: adding a tag does not repair absent exposure. Establish visibility before testing a tag-specific denial. |
+| I1-12 | T01–T02 | `ui-value` and `ui-type`: a core importing visible SU1 originals is denied for missing ui; `dispatch-value` and `dispatch-type`: core/pure UI importing a visible dispatch original is denied; `tag-without-path`: adding a tag does not repair absent exposure. Establish visibility before testing a tag-specific denial. |
 | I1-13 | T03 | `browser-value`: foreign unpromised value denied; `explicit-type` and `unmarked-interface`: otherwise authorized imports allowed; `unmarked-class` and `merged-runtime`: value check required; `same-owner`: tag exemption retained after origin check. Use compiler-valid syntax/configuration. |
 | I1-14 | T04–T05 | `renamed-kinds`: equivalent decisions with project-defined tag names; `conjunction`: all applicable requirements hold; `unknown`, `duplicate`, `invalid-kind`, `remove-testing`, `rebind-testing`: invalid registry/uses; `two-evaluations`: no registry leakage. Supply the resolved registry through the library API. |
 | I1-15 | T05, O01, O04–O05 | `derived-profile`: testing plus header required-importer tags only; `child-profile`: independent of parent; `test-looking-file`: ordinary source outside the special area; `nested-helpers-tests`: no testing classification; `own-private-test`: allowed; `foreign-private-test`: denied. |
-| I1-16 | O02–O03, T06 | `foreign-fixture`: declared K2/A4/W3 route allows review tests; `remove-fixture-hop`: denies foreign tests while own tests still pass; `production-value`, `production-type`, `production-side-effect`: own/foreign testing source denied; `testing-barrel` and `production-forwarding-test`: forwarding cannot bypass origin isolation. |
+| I1-16 | O02–O03, T06 | `foreign-fixture`: declared K2/A4/W3 path allows review tests; `remove-fixture-hop`: denies foreign tests while own tests still pass; `production-value`, `production-type`, `production-side-effect`: own/foreign testing source denied; `testing-barrel` and `production-forwarding-test`: forwarding cannot bypass origin isolation. |
 | I1-17 | O06–O07 | `production-tagged-testing`: same-owner ordinary access allowed, foreign production denied; `separate-testing-module`: header controls ordinary source, no parent-private access; `testing-module-browser`: foreign values need browser promises; `nested-tests`: derived profile drops browser. |
 | I1-18 | S01, T06 | `js-substitution` and `path-alias`: same resolved originals; `AppRouter-forward`: root original preserved; `named-default`: correct export identity; `source-types`: both type modifiers retain coupling restrictions; `application-alias`: never classified external merely because it is a bare alias. |
 | I1-19 | S01–S03 | `namespace-members`, `literal-key`, `destructure`, `qualified-type`: selected originals only; `private-growth`: no broadened selection; `unknown-key` and `escape`: partial coverage; `known-denial-plus-escape`: still fails for the known denial. |
@@ -643,7 +643,7 @@ The plan is complete only when all of these hold:
 | Canonical identity follows aliases or shim symbols incorrectly | Assert identities directly on AppRouter forwarding and the two CSS resources, then across the negative fixtures. |
 | A broad wildcard implementation manufactures a partial valid contract | Make export completeness and original ownership explicit linker prerequisites. |
 | The legacy diagram model resists the new registry/source-area representation | Adapt presentation fixtures at the migration boundary; keep the definitive model as the sole rule authority. |
-| Layout migration imports ui-owned vocabulary into portable geometry | Define neutral inputs in layout and adapt from presentation; review exact exposure and value/type routes. |
+| Layout migration imports ui-owned vocabulary into portable geometry | Define neutral inputs in layout and adapt from presentation; review exact exposure and value/type paths. |
 | Self-checking gives false confidence | Require independently expected reference and toolkit negatives, plus real compiled-entry checks. |
 | Coverage notes or stray-file warnings conceal unfinished checking | Freeze the baseline's required forms; enforce them in the strict plan gate. |
 | Contract work starts implementing later services | Review future compatibility at the engine boundary; keep daemon, MCP, overlays and explorer runtime out of this deliverable. |

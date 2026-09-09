@@ -136,7 +136,7 @@ description changing.
 W1 makes the vocabulary visible in every proper descendant of `workspace`,
 which is every other owner except the application root. The root receives
 nothing from this chain: C1 exposes to `contracts`' parent only, and `workspace`
-does not expose the vocabulary upward.
+does not expose the vocabulary to its parent.
 
 Each vocabulary symbol's tags are `[browser]` exactly. `contracts` declares no
 header tags, so its ordinary source has no required-importer tags and its
@@ -169,25 +169,25 @@ ordinary source could not import it. Forwarding requires visibility, not
 importability, so the relay is legal and the restriction survives it.
 
 RC1 is the only statement in the tree with two destinations on one line. The
-port is one symbol with one role on both sides: upward it is part of the
+port is one symbol with one role on both sides: to the parent it is part of the
 runtime's contract, so the application can build something that satisfies it,
-and downward it is what the task and the controller work against.
+and to the descendants it is what the task and the controller work against.
 
-RC3 is the whole route between the two children of `workspace/reviews/core`.
-`tasks` exposes its operations to its parent, and the parent sends them back
-down into its own subtree, which is how the controller reaches its sibling.
+RC3 is the whole path between the two children of `workspace/reviews/core`.
+`tasks` exposes its operations to its parent, and the parent exposes them
+to its own descendants, which is how the controller reaches its sibling.
 Nothing travels the other way: CT1 exposes `tick` to parent only, so `tasks`
 cannot import the controller that schedules it.
 
 RV4 is the mirror of that arrangement across a wider gap. `validation` is not in
-the runtime's subtree at all; it exposes upward to `reviews`, which sends the
-rules back down to the runtime that calls them. Because RC1 and RC2 stop at
+the runtime's subtree at all; it exposes to its parent `reviews`, which exposes the
+rules to its descendants, reaching the runtime that calls them. Because RC1 and RC2 stop at
 `workspace/reviews`, nothing owned by the runtime or its children is visible in
 `validation` — not the port, not the runtime, not the outcome, and not the task
 operations. It can import neither their behaviour nor their types.
 
 `ReviewOutcome` likewise stops at `workspace/reviews`, whose adapters name it.
-It is never exposed downward, so the review views receive values and props
+It is never exposed to descendants, so the review views receive values and props
 rather than the runtime's own type. The connected panel maps the client's
 inferred `reviews.run` output onto `ReviewResultProps` without naming the
 outcome at all, and nothing below `workspace/reviews` can name it in either
@@ -205,16 +205,16 @@ the inline `import { type AppRouter }` form; the required-symbol rule reaches
 neither, while `dispatch` reaches both and keeps the router type out of the
 untagged core owners and the pure view that can see it.
 
-SU1 and W5 are the shared-UI route. `shared-ui` exposes the badge and its props
-to its parent, and `workspace` relays the child's whole upward contract to every
+SU1 and W5 are the shared-UI path. `shared-ui` exposes the badge and its props
+to its parent, and `workspace` relays the child's whole to-parent contract to every
 descendant. Both feature views import the badge as a value: they carry `ui`, so
 the required-importer rule passes, and they carry `browser`, so the owner's
 `browser` promise is what makes the value import legal. Every core owner in the
 tree receives the same symbols from the same statement and can import neither,
 in either form, because no core source carries `ui`.
 
-A5 and A6 are the catalog's two directions. The summary type goes down to the
-catalog's own view child, which renders it; the card goes up to the shell, which
+A5 and A6 are the catalog's two directions. The summary type is exposed to the
+catalog's own view child, which renders it; the card reaches the shell, which
 composes it. Neither reaches the other feature: `CatalogSummary` stops inside
 the catalog's subtree, and `CatalogCard` stops at `workspace`. The shell
 therefore names no catalog type at all — it derives the shape it passes from the
@@ -222,7 +222,7 @@ router type it already has.
 
 PU1, RU1 and RV5 are the same arrangement on the review side, one level deeper.
 The pure view exposes its component and its own props to the connected parent;
-the connected parent exposes only the component upward, and the feature relays
+the connected parent exposes only the component to its parent, and the feature relays
 it to the shell. `ReviewPanel` carries `dispatch` as well as `ui`, because its
 defining area does: the shell can import it and no pure view could, whatever
 else it carried.
@@ -357,7 +357,7 @@ Three departures from the plan's iteration 3 text are recorded here.
 The browser shows both records as cards and runs a review from a connected
 panel, through the typed client the shell builds from the router type alone.
 `shared-ui` supplies the one primitive both feature views render; each feature
-owns its view and sends it up to the shell; the review view is split into a
+owns its view and sends it toward the shell; the review view is split into a
 connected panel and a pure result, so the runtime's own outcome type reaches no
 view at all.
 
@@ -370,7 +370,7 @@ components against the real configured system.
 Four departures from the plan's iteration 4 text are recorded here.
 
 - The shell does not name `CatalogSummary`. A5 exposes that type to `catalog`'s
-  descendants, not upward, so it is not visible in `workspace`; the shell
+  descendants, not its parent, so it is not visible in `workspace`; the shell
   derives the summary shape from the router type it already holds, exactly as
   the connected panel derives the review's shape rather than naming
   `ReviewOutcome`. Both views still receive the values the API returned.

@@ -39,7 +39,7 @@ exports.
    and it invalidates the whole declaration on a foreign original or an
    incomplete expansion.
 3. Child-contract linking: `expose-sub` names direct children and relays their
-   effective upward contracts, evaluated independently of whether the relay's
+   effective to-parent contracts, evaluated independently of whether the relay's
    own source could import the original.
 4. Tag assignment validation through the model: uniform `tagged` clauses,
    omitted required tags, conflicting assignments, literal `"*"` names, and
