@@ -105,9 +105,9 @@ The site is a separate npm package under `site/`, so its framework never
 enters this package's dependencies. Run it from here:
 
 ```bash
-npm run site:dev      # dev server with live reload (Docusaurus default port)
+npm run site:dev      # dev server with live reload on port 4300
 npm run site:build    # static build into site/build/
-npm run site:serve    # serve a previously built site
+npm run site:serve    # serve a previously built site on port 4301
 ```
 
 The first run installs the site's own dependencies: `npm --prefix site install`.

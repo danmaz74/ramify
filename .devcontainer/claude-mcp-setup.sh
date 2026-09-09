@@ -19,7 +19,7 @@ if [ -f "$CLAUDE_CONFIG" ]; then
       try {
         const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
         let changed = false;
-        const projectMcp = config.projects && config.projects["/ramify"] && config.projects["/app"].mcpServers;
+        const projectMcp = config.projects && config.projects["/ramify"] && config.projects["/ramify"].mcpServers;
         if (projectMcp) {
           for (const key of ["chrome-devtools", "playwright"]) {
             if (projectMcp[key]) { delete projectMcp[key]; changed = true; }
