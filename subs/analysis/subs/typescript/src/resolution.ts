@@ -114,6 +114,40 @@ export class Resolution {
       }
       return { kind: 'resource-target', module, file: null, resource: null };
     }
+    // A plain initialization script has no module symbol in the native API.
+    // For explicit file references, use TypeScript's extension/suffix order and
+    // require the selected file to be present in this compiler program. Stop at
+    // the first existing candidate, even if it cannot be interpreted: an alias
+    // fallback must never skip a selected module to reach a later script.
+    // Package/directory/extensionless and rootDirs resolution still require a
+    // compiler-established module; this fallback does not guess their targets.
+    if (!module && !options.rootDirs?.length) {
+      for (const candidate of candidates) {
+        const extension = extname(candidate);
+        const substitutions: Readonly<Record<string, readonly string[]>> = {
+          '.js': ['.ts', '.tsx', '.d.ts', '.js', '.jsx'], '.jsx': ['.tsx', '.d.ts', '.jsx'],
+          '.mjs': ['.mts', '.d.mts', '.mjs'], '.cjs': ['.cts', '.d.cts', '.cjs'],
+          '.ts': ['.ts'], '.tsx': ['.tsx'], '.mts': ['.mts'], '.cts': ['.cts'],
+        };
+        const endings = substitutions[extension];
+        if (!endings) continue;
+        let selected: string | undefined;
+        for (const ending of endings) {
+          for (const suffix of options.moduleSuffixes ?? ['']) {
+            const path = `${candidate.slice(0, -extension.length)}${suffix}${ending}`;
+            if (this.host.fileExists(path)) { selected = path; break; }
+          }
+          if (selected) break;
+        }
+        if (!selected) continue;
+        const source = this.project.program.getSourceFile(selected);
+        if (!source || source.externalModuleIndicator) break;
+        const owned = this.files.get(resolve(selected));
+        if (owned?.kind === 'source') return { kind: 'application', module, file: owned.path, resource: null };
+        if (this.external(selected)) return { kind: 'external', module, file: selected, resource: null };
+        return { kind: 'outside-module', module, file: relative(this.inventory.scope.root, selected), resource: null };
+      }
+    }
     for (const candidate of candidates) {
       const file = this.files.get(resolve(candidate));
       if (file?.kind === 'resource' && this.host.fileExists(candidate)) {

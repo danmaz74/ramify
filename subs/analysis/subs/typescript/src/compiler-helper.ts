@@ -2,6 +2,8 @@ import { readSync, writeSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { API } from 'typescript/unstable/sync';
 import { buildCatalog } from './catalog.js';
+import { collectAccesses } from './accesses.js';
+import type { SourceCatalog } from './interfaces/source.js';
 import { CHUNK_BYTES, FILE_BYTES, FRAME_BYTES, READ_RESPONSE_BYTES, RESULT_BYTES, SourceFailure, decodeChunk, encode } from './wire.js';
 import type { HelperInputs, Operation } from './wire.js';
 
@@ -137,16 +139,20 @@ try {
   snapshot = api.updateSnapshot({ openProjects: [synthetic] });
   const project = snapshot.getProject(synthetic);
   if (!project) throw new SourceFailure('unavailable', 'The compiler could not create the selected project');
+  let catalog: SourceCatalog | undefined;
+  const currentCatalog = (): SourceCatalog => catalog ??= buildCatalog(project, inputs, { fileExists, readFile, resourceWitness });
   result('ready', null);
   for (;;) {
     const command = receive();
     if (command.kind !== 'command') throw new SourceFailure('protocol-error', 'Expected source operation command');
     if (command.command === 'catalog') {
-      result('catalog', buildCatalog(project, inputs, { fileExists, readFile, resourceWitness }));
+      result('catalog', currentCatalog());
+    } else if (command.command === 'accesses') {
+      result('accesses', collectAccesses(project, inputs, { fileExists, readFile, resourceWitness }, currentCatalog()));
     } else if (command.command === 'dispose') {
       snapshot.dispose(); snapshot = undefined;
       api.close(); api = undefined;
-      virtual.clear();
+      virtual.clear(); catalog = undefined;
       result('dispose', null); break;
     } else throw new SourceFailure('unavailable', `Source capability ${String(command.command)} is unavailable`);
   }

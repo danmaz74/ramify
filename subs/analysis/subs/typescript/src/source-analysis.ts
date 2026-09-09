@@ -13,6 +13,7 @@ export async function createSourceAnalysis(inputs: SourceAnalysisInputs): Promis
     await bridge.ready();
     return Object.freeze({
       catalog: (signal?: AbortSignal) => bridge.catalog(signal),
+      accesses: (signal?: AbortSignal) => bridge.accesses(signal),
       dispose: () => bridge.dispose(),
     });
   } catch (error) { await bridge.dispose(); throw error; }

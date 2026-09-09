@@ -2,12 +2,11 @@
 
 This independent Node tool scope inventories reference expectations, owns
 temporary mutation projects and requires evidence from registered capabilities.
-The current runtime registers the model's `registry` capability and 14 I1-14
-instances, plus the descriptions owner's `parse` capability and 53 I1-04 syntax
-variants through their public APIs. Model assertions use constructed trees;
-parser assertions use the reviewed description texts and independent decoded
-statements, reason codes and original locations. Neither establishes filesystem
-or source coverage; the other 241 reviewed instances remain unexecuted.
+The current runtime registers `registry`, `parse`, `acquire`, `metadata`,
+`catalog`, `link` and `static-access` through their public provider APIs. It
+executes 165 reviewed instances; 143 later instances remain unexecuted. Model
+assertions use constructed trees; source assertions use captured projects and
+the real compiler, linker and model. No stage result claims plan completion.
 
 `npm run reference:cases` runs the family, instance, gate, mutation and invocation
 tests under this directory's Vitest configuration. The deterministic gate stubs
@@ -61,7 +60,8 @@ Each project invocation gets its own
 `context.request` explicitly selects that copied root with configuration
 discovery and whole-project scope. The copier retains owned source and test
 nesting, excludes dependencies and generated outputs, and leaves dependency
-resolution to the example's own ancestor `node_modules`. Cleanup removes only
+resolution to the example's own installed `node_modules` (linked into reference
+copies when needed). Cleanup removes only
 that invocation's directory, including after copying or setup fails. Concurrent
 runs never share a mutation directory. Preservation retains only a failed run
 and reports its location.
@@ -79,6 +79,21 @@ materialize the reviewed F recipe in `fixtures/plan1/project.ts` or copy the
 unchanged reference. Both reference scope variants also acquire the toolkit and
 assert its nine owners. Syntax, source export resolution and permission checking
 remain distinct capabilities.
+
+Iteration 9 registers 26 static-access instances across I1-06, I1-07, I1-08 and
+I1-18, retaining each syntax variant. Its stage driver uses one captured input
+view for the public parser, acquisition, catalog, linker and model operations.
+It checks both baseline and changed fixtures with TypeScript, then asserts
+independent permissions, originals, forwarding origins and exposure locations.
+The unchanged reference has 292 static occurrences: 164 application decisions
+and 128 compiler-proven external selections. Its lazy import and import-type
+query remain recorded for iteration 11. The public analysis session and report
+assembly arrive in iteration 12.
+
+`npm run reference:verify -- --plan 1 --iteration 9` requires all 165 instances
+in prerequisite closure `[1, 2, 3, 4, 5, 6, 7, 9]`. Iteration 8's migration is
+independent and adds no matrix instances. The unfiltered plan gate still fails
+for the 143 instances assigned to later capabilities.
 
 The no-project ancestry case necessarily uses an owned OS temporary directory:
 a directory under the ramified harness checkout would discover that enclosing

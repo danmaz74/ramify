@@ -11,7 +11,7 @@ export const READ_RESPONSE_BYTES = FILE_BYTES * 6 + 2;
 export const RESULT_BYTES = 32 * 1024 * 1024 - 64 * 1024;
 export const INPUT_BYTES = 256 * 1024 * 1024;
 export const DISPOSAL_MS = 5000;
-export type Operation = 'ready' | 'catalog' | 'dispose';
+export type Operation = 'ready' | 'catalog' | 'accesses' | 'dispose';
 
 export class SourceFailure extends Error {
   constructor(readonly code: string, message: string) { super(message); this.name = 'SourceAnalysisError'; }

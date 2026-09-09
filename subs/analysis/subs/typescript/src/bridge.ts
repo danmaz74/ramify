@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { CHUNK_BYTES, DISPOSAL_MS, FILE_BYTES, FRAME_BYTES, INPUT_BYTES, READ_RESPONSE_BYTES,
   RESULT_BYTES, SourceFailure, decodeChunk, encode, freezeData } from './wire.js';
 import type { Operation } from './wire.js';
-import type { SourceAnalysisInputs, SourceCatalog } from './interfaces/source.js';
+import type { SourceAnalysis, SourceAnalysisInputs, SourceCatalog } from './interfaces/source.js';
 
 interface PendingOperation {
   name: Operation;
@@ -75,18 +75,26 @@ export class CompilerBridge {
 
   ready(): Promise<unknown> { return this.#ready; }
 
-  async catalog(signal?: AbortSignal): Promise<SourceCatalog> {
+  catalog(signal?: AbortSignal): Promise<SourceCatalog> {
+    return this.#query('catalog', signal) as Promise<SourceCatalog>;
+  }
+
+  accesses(signal?: AbortSignal): ReturnType<SourceAnalysis['accesses']> {
+    return this.#query('accesses', signal) as ReturnType<SourceAnalysis['accesses']>;
+  }
+
+  async #query(name: 'catalog' | 'accesses', signal?: AbortSignal): Promise<unknown> {
     if (this.#terminal) await this.#cleanup();
     this.#check();
     if (this.#operation) throw new SourceFailure('concurrent-operation', 'A source operation is already running');
     if (signal?.aborted) {
-      const error = new SourceFailure('cancelled', 'Source catalog was cancelled before execution');
+      const error = new SourceFailure('cancelled', `Source ${name} was cancelled before execution`);
       this.#fail(error); await this.#cleanup(); throw error;
     }
-    const result = this.#begin('catalog', this.#inputs!.limits.deadlineMs, signal);
-    try { this.#write({ kind: 'command', command: 'catalog' }); }
+    const result = this.#begin(name, this.#inputs!.limits.deadlineMs, signal);
+    try { this.#write({ kind: 'command', command: name }); }
     catch (error) { this.#fail(error); }
-    try { return freezeData(await result as SourceCatalog); }
+    try { return freezeData(await result); }
     catch (error) { await this.dispose(); throw error; }
   }
 

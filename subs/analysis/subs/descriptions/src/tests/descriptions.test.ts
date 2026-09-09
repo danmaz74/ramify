@@ -20,7 +20,7 @@ const both = ['parent', 'descendants'] as const;
 const browser = ['browser'];
 const uiBrowser = ['ui', 'browser'];
 
-// Independent selections from the reference contract map and the reviewed I8
+// Independent selections from the reference contract map and the reviewed I9
 // declaration stage. Read the actual authored texts, including their comments.
 const modelNames = [
   'ModuleId', 'TagName', 'TagKind', 'TagDefinition', 'ResolvedTagRegistry', 'SourceLocation',
@@ -39,7 +39,7 @@ const projectNames = ['ProjectRequest', 'ProjectScope', 'CapturedInput', 'Invent
   'InventoryModule', 'InventoryFile', 'ExactReference', 'OutsideSourceWarning', 'ProjectInventory',
   'ProjectIssue', 'AcquisitionLimits', 'ProjectInputView', 'ProjectReadOptions', 'ProjectRead'];
 
-const sourceNames = ['CatalogOriginal', 'CatalogExport', 'FileExports', 'SourceCatalog', 'SourceLimit',
+const sourceNames = ['CatalogOriginal', 'CatalogExport', 'FileExports', 'SourceCatalog', 'SourceTarget', 'WrittenForm', 'AccessSelection', 'SourceAccess', 'SourceLimit',
   'SourceWorkLimits', 'SourceAnalysisInputs', 'SourceAnalysis'];
 
 const presentationNames = ['DiagramDefinition', 'TreeDiagramDefinition', 'FocusDiagramDefinition',

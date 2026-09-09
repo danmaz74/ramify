@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": true,
+    "functionalRequirementsSatisfied": true,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-09T21:28:46Z",
+  "iteration": "9",
+  "notes": "Static-access stage implemented. Iteration-9 gate: 165 required/passed, including all 26 new instances; 143 later instances remain unexecuted. 38 focused tests, type-check, build, current declaration linking and compiled static-stage check passed. Full Vitest/Cucumber regression, scenario coverage and sealed-file checks remain workflow-owned. Public analysis session and complete source-form coverage remain later iterations."
+}

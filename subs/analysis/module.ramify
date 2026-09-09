@@ -10,7 +10,7 @@ expose-sub TextSpan, DescriptionToken, DescriptionIssue, NamedSelection, Descrip
 expose-sub ProjectRequest, ProjectScope, CapturedInput, InventoryArea, ModulePurpose, InventoryModule, InventoryFile, ExactReference, OutsideSourceWarning, ProjectInventory, ProjectIssue, AcquisitionLimits, ProjectInputView, ProjectReadOptions, ProjectRead from project to parent, descendants
 
 // A8: current source catalog vocabulary.
-expose-sub CatalogOriginal, CatalogExport, FileExports, SourceCatalog, SourceLimit, SourceWorkLimits, SourceAnalysisInputs, SourceAnalysis from typescript to parent, descendants
+expose-sub CatalogOriginal, CatalogExport, FileExports, SourceCatalog, SourceTarget, WrittenForm, AccessSelection, SourceAccess, SourceLimit, SourceWorkLimits, SourceAnalysisInputs, SourceAnalysis from typescript to parent, descendants
 
 // A1/A4: validation operations and implemented analysis vocabulary.
 expose-src validateProject from "validation.ts" to parent
