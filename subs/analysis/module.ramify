@@ -8,3 +8,6 @@ expose-sub TextSpan, DescriptionToken, DescriptionIssue, NamedSelection, Descrip
 
 // A7: project vocabulary supplied to assembly and children.
 expose-sub ProjectRequest, ProjectScope, CapturedInput, InventoryArea, ModulePurpose, InventoryModule, InventoryFile, ExactReference, OutsideSourceWarning, ProjectInventory, ProjectIssue, AcquisitionLimits, ProjectInputView, ProjectReadOptions, ProjectRead from project to parent, descendants
+
+// A8: current source catalog vocabulary.
+expose-sub CatalogOriginal, CatalogExport, FileExports, SourceCatalog, SourceLimit, SourceWorkLimits, SourceAnalysisInputs, SourceAnalysis from typescript to parent, descendants

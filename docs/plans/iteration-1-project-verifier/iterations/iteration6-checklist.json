@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": true,
+    "functionalRequirementsSatisfied": true,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-09T12:59:30.000Z",
+  "iteration": "6",
+  "notes": "Catalog stage implemented over the captured input view with supervised TypeScript 7.0.2, stable code/resource originals, complete/ambiguous export states and disposal. Type-check/build passed; 41 new source-owner tests and 31 reference-map tests passed; iteration-6 verifier passed 105 instances with 3,356 assertions and 203 future instances. Full regression, scenario coverage and sealed-file checks remain with workflow automation. Plan 1 is not complete."
+}

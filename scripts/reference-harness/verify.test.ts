@@ -22,7 +22,7 @@ describe('reference verification invocation', () => {
     expect(() => parseVerifyArguments(args)).toThrow();
   });
 
-  it.each([undefined, 3, 4, 5])('reports actual model/parser/acquisition execution and pending source work for iteration %s', (iteration) => {
+  it.each([undefined, 3, 4, 5, 6])('reports actual model/parser/acquisition/catalog execution and pending source-access work for iteration %s', (iteration) => {
     const args = ['--import', 'tsx', resolve(repositoryRoot, 'scripts/reference-harness/verify.ts'), '--plan', '1', '--format', 'json'];
     if (iteration) args.push('--iteration', String(iteration));
     const result = spawnSync(process.execPath, args, { cwd: repositoryRoot, encoding: 'utf8', timeout: 60_000 });
@@ -30,11 +30,12 @@ describe('reference verification invocation', () => {
     expect(result.status).toBe(iteration ? 0 : 1);
     expect(result.stderr).toBe('');
     const report = JSON.parse(result.stdout);
-    const passed = iteration === 3 ? 14 : iteration === 4 ? 53 : iteration === 5 ? 88 : 102;
+    const passed = iteration === 3 ? 14 : iteration === 4 ? 53 : iteration === 5 ? 88 : 105;
     expect(report.summary).toEqual({ required: iteration ? passed : 308, passed, failed: 0, notExecuted: 308 - passed });
-    expect(report.availableCapabilities).toEqual(['acquire', 'metadata', 'parse', 'registry']);
+    expect(report.availableCapabilities).toEqual(['acquire', 'catalog', 'metadata', 'parse', 'registry']);
     expect(report.instances.filter((item: { status: string }) => item.status === 'passed')).toHaveLength(passed);
     if (iteration === 4) expect(report.requiredIterations).toEqual([1, 2, 4]);
+    if (iteration === 6) expect(report.requiredIterations).toEqual([1, 2, 3, 4, 5, 6]);
     expect(report.mode).toBe(iteration ? 'iteration-verification' : 'plan-verification');
     expect(report.planComplete).toBe(false);
     expect(report.instances).toHaveLength(308);

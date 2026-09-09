@@ -8,3 +8,6 @@ expose-sub TextSpan, DescriptionToken, DescriptionIssue, NamedSelection, Descrip
 
 // R4: project vocabulary relayed unchanged from analysis.
 expose-sub ProjectRequest, ProjectScope, CapturedInput, InventoryArea, ModulePurpose, InventoryModule, InventoryFile, ExactReference, OutsideSourceWarning, ProjectInventory, ProjectIssue, AcquisitionLimits, ProjectInputView, ProjectReadOptions, ProjectRead from analysis to descendants
+
+// R4: source catalog vocabulary relayed unchanged from analysis.
+expose-sub CatalogOriginal, CatalogExport, FileExports, SourceCatalog, SourceLimit, SourceWorkLimits, SourceAnalysisInputs, SourceAnalysis from analysis to descendants
