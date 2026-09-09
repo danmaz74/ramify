@@ -3,8 +3,9 @@
 This independent Node tool scope inventories reference expectations, owns
 temporary mutation projects and requires evidence from registered capabilities.
 The current runtime registers `registry`, `parse`, `acquire`, `metadata`,
-`catalog`, `link`, `static-access` and `tags-origin` through the real providers
-and analysis evaluation stage. It executes 201 reviewed instances; 107 later
+`catalog`, `link`, `static-access`, `tags-origin`, `namespace`, `lazy`,
+`symbol-free` and bounded `coverage` through the real providers and analysis
+evaluation stage. It executes 245 reviewed instances; 63 later
 instances remain unexecuted. Model
 assertions use constructed trees; source assertions use captured projects and
 the real compiler, linker and model. No stage result claims plan completion.
@@ -88,7 +89,7 @@ It checks both baseline and changed fixtures with TypeScript, then asserts
 independent permissions, originals, forwarding origins and exposure locations.
 The unchanged reference has 292 static occurrences: 164 application decisions
 and 128 compiler-proven external selections. Its lazy import and import-type
-query remain recorded for iteration 11. The public analysis session and report
+query are now checked by iteration 11. The public analysis session and report
 assembly arrive in iteration 12.
 
 `npm run reference:verify -- --plan 1 --iteration 9` requires all 165 instances
@@ -114,5 +115,24 @@ compile independently. No fixture changes the running application.
 
 `npm run reference:verify -- --plan 1 --iteration 10` requires 201 instances in
 prerequisite closure `[1, 2, 3, 4, 5, 6, 7, 9, 10]`. The 107 later instances stay
-unexecuted; this stage advertises neither the iteration-11 source forms nor the
-iteration-12 public session and complete resource-access capability.
+unexecuted in that iteration-specific run. The public session and complete
+resource-access capability remain assigned to iteration 12.
+
+
+Iteration 11 registers all 44 namespace, forwarding, lazy, import-type and
+symbol-free instances, including each quote, destructuring, type syntax and
+same/foreign-owner variant. The TypeScript and JSDoc import-type records use
+separate fixtures; only the JavaScript fixture enables `allowJs` and `checkJs`.
+Unknown keys, escaped namespaces and nonliteral targets retain located coverage;
+known selections and denials remain independently asserted. Whole source exports
+check their complete membership, with `default` excluded only by star exports.
+
+`npm run reference:verify -- --plan 1 --iteration 11` requires 209 instances in
+prerequisite closure `[1, 2, 3, 4, 5, 6, 7, 9, 11]`. Iteration 10 is independently
+available but outside that closure. Every baseline and changed fixture runs the
+real compiler and captured acquisition/catalog/linker/evaluation path. The
+unchanged reference has 294 occurrences: 166 allowed application decisions and
+128 proven external selections, with no source coverage notes. The authored
+lazy ReviewPanel callback, import-type query and Cucumber hook are included.
+These are source-stage assertions; runtime regression and Plan 1 completion
+remain separate evidence.

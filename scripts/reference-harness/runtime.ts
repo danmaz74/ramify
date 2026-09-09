@@ -6,9 +6,10 @@ import { catalogHandlers } from './catalog-cases.js';
 import { linkingHandlers } from './linking-cases.js';
 import { staticHandlers } from './static-cases.js';
 import { tagsOriginHandlers } from './tags-origin-cases.js';
+import { boundedHandlers } from './bounded-cases.js';
 
 /** Only implemented providers advertise capabilities; later forms and session checking remain unavailable. */
 export const referenceRuntime: HarnessRuntime = {
-  capabilities: new Set(['registry', 'parse', 'acquire', 'metadata', 'catalog', 'link', 'static-access', 'tags-origin']),
-  handlers: new Map([...modelHandlers, ...parserHandlers, ...projectHandlers, ...catalogHandlers, ...linkingHandlers, ...staticHandlers, ...tagsOriginHandlers]),
+  capabilities: new Set(['registry', 'parse', 'acquire', 'metadata', 'catalog', 'link', 'static-access', 'tags-origin', 'namespace', 'lazy', 'symbol-free', 'coverage']),
+  handlers: new Map([...modelHandlers, ...parserHandlers, ...projectHandlers, ...catalogHandlers, ...linkingHandlers, ...staticHandlers, ...tagsOriginHandlers, ...boundedHandlers]),
 };

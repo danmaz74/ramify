@@ -35,14 +35,14 @@ function verify(iteration: number | undefined, providers: HarnessRuntime, record
 }
 
 describe('required capability and assertion execution gates', () => {
-  // The 201-instance gate takes about 491 seconds alone; Vitest also runs
-  // the real subprocess gate concurrently. Keep a finite contention allowance.
+  // The full provider gate and its subprocess control can run concurrently.
+  // Keep their existing finite contention allowance as new providers activate.
   it('runs all implemented providers and retains unavailable later capabilities in the full gate', async () => {
     const report = await verify(undefined, referenceRuntime);
     expect(report.passed).toBe(false);
     expect(report.planComplete).toBe(false);
-    expect(report.summary).toEqual({ required: 308, passed: 201, failed: 0, notExecuted: 107 });
-    expect(report.availableCapabilities).toEqual(['acquire', 'catalog', 'link', 'metadata', 'parse', 'registry', 'static-access', 'tags-origin']);
+    expect(report.summary).toEqual({ required: 308, passed: 245, failed: 0, notExecuted: 63 });
+    expect(report.availableCapabilities).toEqual(['acquire', 'catalog', 'coverage', 'lazy', 'link', 'metadata', 'namespace', 'parse', 'registry', 'static-access', 'symbol-free', 'tags-origin']);
     expect(report.instances.filter((item) => item.status === 'not-executed').every((item) => item.reason === 'missing-capability')).toBe(true);
     expect(await readdir(workRoot)).toEqual([]);
   }, 1_200_000);

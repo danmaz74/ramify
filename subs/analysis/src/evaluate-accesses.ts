@@ -67,8 +67,10 @@ export function evaluateAccesses(model: Model, accesses: readonly SourceAccess[]
       }
       // A known target retains its origin guard even when a selected original
       // cannot be established. Deferred forms must never become empty successes.
-      if (!decisions.length && (access.runtimeLoad || access.selections.length > 0)) decide(access.location, null, []);
-      if (!access.selections.length && access.form !== 'side-effect-import') unknown = true;
+      if (!decisions.length) decide(access.location, null, []);
+      // The interpreter distinguishes supported empty selections from unknown
+      // flows. Both retain the same target-origin check, including erased forms.
+      if (!access.selections.length && access.selectionForm === 'unknown') unknown = true;
     }
     return { accessId: access.id, decisions,
       outcome: access.target.kind === 'external' ? 'external' : access.target.kind === 'outside-module' ? 'outside-scope'

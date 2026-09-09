@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": true,
+    "functionalRequirementsSatisfied": true,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-09T22:34:01.015Z",
+  "iteration": "11",
+  "notes": "All 44 iteration-11 variants and 209 prerequisite-closure instances passed. Final focused run: 20 owner tests; registration: 1 test. Type-check, build, inventory, declaration/export validation and diff checks passed. Inherited JSX ordering and dotted namespace occurrence identity regressions reproduced and fixed. Full regression, scenario coverage, sealed-file checks and acceptance remain with workflow automation. Plan 1 is not complete."
+}

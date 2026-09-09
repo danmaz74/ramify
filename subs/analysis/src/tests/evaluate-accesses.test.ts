@@ -64,6 +64,64 @@ async function stage(probe: string, overrides: Readonly<Record<string, string>> 
 }
 
 describe('analysis mapping of located static source requests', () => {
+  it.each(['typescript', 'jsdoc'] as const)('keeps exposure, importer tags and testing origin on %s import types', async variant => {
+    const queries = [
+      ["../../../src/interfaces/api.js", 'Contract'],
+      ["../../../src/interfaces/api.js", 'PrivateType'],
+      ["../../../src/interfaces/api.js", 'UiType'],
+      ["../../../src/tests/types.js", 'TestType'],
+    ];
+    const body = queries.map(([path, name], index) => variant === 'typescript'
+      ? `type Local${index} = import('${path}').${name};`
+      : `/** @typedef {import('${path}').${name}} Local${index} */`).join('\n') + '\nexport {};';
+    const importer = `subs/consumer/src/probe.${variant === 'typescript' ? 'ts' : 'js'}`;
+    const result = await stage(variant === 'typescript' ? body : 'export {};', {
+      ...(variant === 'jsdoc' ? { [importer]: body } : {}),
+      'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'bundler',
+        types: [], allowJs: true, checkJs: true, noEmit: true }, include: ['src', 'subs'] }),
+      'module.ramify': files['module.ramify'] + 'expose-src UiType from "interfaces/api.ts" tagged [ui] to descendants\n',
+      'src/interfaces/api.ts': files['src/interfaces/api.ts'] + 'export interface UiType {} export interface PrivateType {}',
+      'src/tests/types.ts': 'export interface TestType {}',
+    }, async root => {
+      const compiler = await promisify(execFile)(process.execPath,
+        [fileURLToPath(new URL('../../../../node_modules/typescript/lib/tsc.js', import.meta.url)), '--noEmit', '--project', join(root, 'tsconfig.json')],
+        { cwd: root, timeout: 10_000 });
+      expect([compiler.stdout, compiler.stderr]).toEqual(['', '']);
+    });
+    const accesses = result.accesses.filter(access => access.importer.file === importer);
+    expect(accesses).toHaveLength(4);
+    expect(accesses.every(access => !access.runtimeLoad && !access.coverageIds.length && access.selections[0].request === 'type-only'
+      && access.selections[0].explicitType && access.form === (variant === 'typescript' ? 'import-type-query' : 'jsdoc-import-type'))).toBe(true);
+    expect(accesses.flatMap(access => result.results.find(item => item.accessId === access.id)!.decisions.map(decision =>
+      [decision.original?.id.binding, decision.status, decision.reason]))).toEqual([
+      ['Contract', 'allowed', 'exposed'], ['PrivateType', 'denied', 'not-visible'], ['UiType', 'denied', 'required-importer-tag'],
+      ['TestType', 'denied', 'testing-origin'],
+    ]);
+    expect(result.diagnostics.filter(issue => issue.location?.file === importer).map(issue => issue.code))
+      .toEqual(['not-visible', 'required-importer-tag', 'testing-origin']);
+  }, 30_000);
+
+  it('matches compiler relative JSX priority with both JavaScript scripts present', async () => {
+    const specifier = '../../../src/initialize.jsx';
+    const result = await stage(`import '${specifier}';`, {
+      'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'bundler',
+        types: [], allowJs: true, checkJs: true, jsx: 'preserve', noUncheckedSideEffectImports: true }, include: ['src', 'subs'] }),
+      'src/initialize.js': 'globalThis.console.log(1);',
+      'src/initialize.jsx': 'globalThis.console.log(2);',
+    }, async root => {
+      const compiler = await promisify(execFile)(process.execPath,
+        [fileURLToPath(new URL('../../../../node_modules/typescript/lib/tsc.js', import.meta.url)),
+          '--noEmit', '--traceResolution', '--project', join(root, 'tsconfig.json')], { cwd: root, timeout: 10_000 });
+      expect(compiler.stderr).toBe('');
+      expect(compiler.stdout).toContain(`Module name '${specifier}' was successfully resolved to '${join(root, 'src/initialize.jsx')}'`);
+    });
+    const access = result.accesses.find(access => access.specifier === specifier)!;
+    expect(access.target).toMatchObject({ kind: 'application', origin: { file: 'src/initialize.jsx', area: { kind: 'ordinary' } } });
+    expect(access.coverageIds).toEqual([]);
+    expect(result.results.find(item => item.accessId === access.id)).toMatchObject({ outcome: 'checked', diagnostics: [],
+      decisions: [{ status: 'allowed', reason: 'symbol-free', original: null }] });
+  }, 30_000);
+
   it.each([
     { specifier: '@init', extension: '.jsx', suffix: '', expected: 'src/init.jsx' },
     { specifier: '../../../src/init.jsx', extension: '.jsx', suffix: '', expected: 'src/init.ts' },

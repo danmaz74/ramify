@@ -39,11 +39,12 @@ export async function staticProject(root: string) {
     const observed = await source.accesses();
     const evaluation = evaluateAccesses(model, observed.accesses, inputs.limits.maxDiagnostics);
     const byAccess = new Map(evaluation.results.map(result => [result.accessId, result]));
-    const decisions = observed.accesses.filter(access => staticForms.has(access.form))
+    const allDecisions = observed.accesses
       .flatMap(access => byAccess.get(access.id)!.decisions.map(decision => ({ access, decision })));
+    const decisions = allDecisions.filter(item => staticForms.has(item.access.form));
     const seal = await acquired.view.seal();
     if (seal.status !== 'coherent') throw new Error(JSON.stringify(seal));
-    return { inventory, catalog, linked, model, ...observed, ...evaluation, decisions };
+    return { inventory, catalog, linked, model, ...observed, ...evaluation, decisions, allDecisions };
   } finally {
     try { await source?.dispose(); } finally { await acquired.view.dispose(); }
   }

@@ -29,10 +29,22 @@ loads retain their target's source area without inventing an exported binding.
 return frozen plain data. Cancellation, disposal and finite transfer/work limits
 apply to both operations.
 
-Namespace selections, whole re-exports, empty statements and dynamic/import-type
-forms remain explicitly uncovered at this stage. Resource/coverage completion
-and the public analysis report follow in later iterations. These limitations do
-not suppress resolved static selections.
+Iteration 11 adds explicit namespace members, literal keys, destructuring and
+qualified types; source star and namespace re-exports; awaited and direct `.then`
+dynamic selections; TypeScript and JSDoc import-type queries; and empty or
+discarded loads. Namespace references use compiler symbol identity so shadowed
+names do not become accesses. Nested module namespaces retain constituent
+originals and forwarding source areas. Whole re-exports include every member,
+with `default` excluded by stars. Import-type namespace queries select runtime
+members' types without a load; ordinary type-only exports remain outside that
+runtime membership.
+
+Unknown keys, namespace escape and nonliteral imports produce located coverage
+notes without broadening known selections. Incomplete whole expansions preserve
+both their limits and known bindings, including through namespace relays. Empty
+selections use the existing target-origin check without invented symbols.
+Resource/coverage completion and the public analysis report follow in iteration
+12. These limits do not suppress resolved selections.
 
 The native API returns the base of inherited `paths` mappings as `pathsBasePath`
 alongside parsed options, although its published `CompilerOptions` type omits
@@ -56,7 +68,8 @@ request values regardless of later usage. Accessed testing barrels, testing
 originals and stylesheet targets retain their origin through forwarding.
 The script fallback tries an explicit `paths` target's exact extension first,
 including configured module suffixes. When that target is absent, `.js` and
-`.jsx` aliases use the same `.ts`, `.tsx`, declaration and JavaScript substitution
-priority. Relative imports use extension substitution directly. Compiler-trace
-controls cover existing exact targets and an absent target whose ordinary
-substitution precedes a testing candidate.
+`.jsx` aliases try `.ts`, `.tsx` and declarations before JavaScript. Relative
+imports use extension substitution directly; a `.jsx` spelling prefers JSX to
+an adjacent `.js` script when no TypeScript counterpart exists. Compiler-trace
+controls cover exact targets, absent targets with ordinary substitutions before
+testing candidates, and that relative JSX priority.
