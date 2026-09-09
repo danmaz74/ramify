@@ -2,7 +2,7 @@
 
 # Iteration 5 results: project acquisition and metadata
 
-Status: implementation and focused verification complete; submitted as an iteration draft for acceptance and automatic checks. This establishes project acquisition and metadata, not source cataloging, linked permissions, CLI checking or Plan 1 completion.
+Status: implementation and focused verification complete; publication is blocked by the workflow artifact-state conflict documented below. The draft has not been accepted and automatic iteration-5 checks have not started. This establishes project acquisition and metadata, not source cataloging, linked permissions, CLI checking or Plan 1 completion.
 
 ## Prerequisites and working scope
 
@@ -114,3 +114,13 @@ ProjectInputView is intentionally live and disposable; inventory and captured-in
 2. Preserve the difference between raw source areas and resolved model profiles, and between exact resource existence and compiler export descriptions.
 3. Extend influencing-input and cancellation evidence through the real source helper and session at their assigned stages, including the explicit changed-input matrix variants.
 4. Continue activating declarations only alongside real exports and provider contracts. Run automated regressions before accepting this draft; the full Plan 1 completion gate must continue to fail for missing future capabilities.
+
+## Publication blocker
+
+Implementation and required draft artifacts were committed in `4d61c214ae0ae8688001b4bb141d60fb4a9750f9`. The first publication attempt returned `WORKTREE_DIRTY` for the pre-existing generated `iteration4-check-results.md` delta and explicitly instructed committing it before publication. Inspection showed exactly one existing generated line: `- **Regression Tests**: PASSED`. Its unchanged bytes were preserved in the separate bookkeeping commit `dad9cf6e4c891828f75beb7d84768b119b0fe951`.
+
+Resubmission returned `FILE_POLICY_VIOLATION`: that artifact belongs to iteration 4, not 5. The tool thus first required the generated predecessor output in a commit and then rejected that same output in the iteration-5 diff. The working tree is otherwise committed; this is a publication bookkeeping conflict, not a failed acquisition check.
+
+Read-only diagnosis identified installed cucumber-viz 0.6.3, configured project state under `/ramify/.cucumber-viz/`, the authoritative execution worktree above, and the active supplied iteration-5 attempt. The workflow journal records publication operation `pub-_JG0Ucx92X1f6WqRyuxxC-5-1788955143954`, draft head `dad9cf6`, base head `f8e8517`, and rejection of the single predecessor artifact. Publication status reports no pending accepted draft.
+
+Recovery requires the workflow control plane to reconcile the already generated iteration-4 outcome with the iteration-5 publication baseline, or otherwise correctly absorb its own predecessor bookkeeping, then retry publication of this draft. No callable supported recovery control was found for that reconciliation. Neither workflow state nor check-result contents were manually rewritten; shared services were not restarted. Both required iteration-5 artifacts and all implementation/evidence remain committed and reviewable. The separate bookkeeping commit preserves the exact predecessor output for recovery.
