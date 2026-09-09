@@ -6,8 +6,8 @@
 
 | # | Iteration | Status | Started | Ended | Elapsed |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Contract package and scope freeze | completed | 09:04:58 | 09:38:22 | 33m 24s |
-| 2 | Skeleton tree, build configuration and harness runner | pending | - | - | - |
+| 1 | Contract package and scope freeze | completed | 09:04:58 | 09:38:26 | 33m 28s |
+| 2 | Skeleton tree, build configuration and harness runner | completed | 09:38:26 | 10:05:36 | 27m 10s |
 | 3 | Definitive model | pending | - | - | - |
 | 4 | Description parser | pending | - | - | - |
 | 5 | Project acquisition and metadata | pending | - | - | - |
@@ -28,6 +28,9 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | attempt_KOT4Bn-Ju3IRDZr1FudMV | off | first-pass (v2) | in unavailable (launch-affordances-disabled); escape unavailable (launch-affordances-disabled); unaccounted unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | 0 | surface unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); search unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); expand unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) |
 | 1 | attempt_KOT4Bn-Ju3IRDZr1FudMV | off | cumulative (v2) | in unavailable (launch-affordances-disabled); escape unavailable (launch-affordances-disabled); unaccounted unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | 0 | surface unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); search unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); expand unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) |
-| 1 | attempt_KOT4Bn-Ju3IRDZr1FudMV | off | final (v2) | pending | pending | pending | pending | pending |
+| 1 | attempt_KOT4Bn-Ju3IRDZr1FudMV | off | final (v2) | in unavailable (launch-affordances-disabled); escape unavailable (launch-affordances-disabled); unaccounted unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | 0 | surface unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); search unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); expand unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) |
+| 2 | attempt_8yncVt4kPNKuV_0dE-E-z | off | first-pass (v2) | in unavailable (launch-affordances-disabled); escape unavailable (launch-affordances-disabled); unaccounted unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | 0 | surface unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); search unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); expand unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) |
+| 2 | attempt_8yncVt4kPNKuV_0dE-E-z | off | cumulative (v2) | in unavailable (launch-affordances-disabled); escape unavailable (launch-affordances-disabled); unaccounted unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | 0 | surface unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); search unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); expand unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) |
+| 2 | attempt_8yncVt4kPNKuV_0dE-E-z | off | final (v2) | pending | pending | pending | pending | pending |
 
-*Last updated: 2026-09-09T09:38:22.695Z*
+*Last updated: 2026-09-09T10:05:36.169Z*
