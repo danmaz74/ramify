@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "cucumber-viz": {
+      "command": "node",
+      "args": [
+        "/usr/local/lib/node_modules/cucumber-viz/dist/core/shared/services/mcp/mcp-stdio-bridge.js",
+        "--port",
+        "4080",
+        "--studio"
+      ],
+      "env": {}
+    }
+  }
+}

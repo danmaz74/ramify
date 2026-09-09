@@ -4,6 +4,37 @@ Complete the [standalone setup checklist](cucumber-viz-setup.md) before running
 Studio in the new repository. For planning and implementation conventions, use
 [the workflow guide](implementation-workflow.md).
 
+## Devcontainer and ports
+
+`.devcontainer/` builds the image for this repository on its own: Node 22,
+Claude Code, Codex, PM2, Chromium and cucumber-viz, installed globally from
+the private registry at npm.braimax.com and pinned by the
+`CUCUMBER_VIZ_VERSION` build argument in the Dockerfile and the compose file.
+To move to a newly published cucumber-viz, bump that argument and rebuild the
+container. Bring the container up on the server with the Dev Containers
+"Reopen in Container" command or `devcontainer up`.
+
+The workspace is `/ramify`, not `/app`. Claude Code and Codex key per-project
+state by absolute path and `~/.claude` is shared with a cucumber-viz
+devcontainer on the same host whose workspace is `/app`; a distinct path keeps
+memory, transcripts and trust settings apart.
+
+The Studio wiring lives in the repository: `cucumber-viz.config.ts`,
+`.mcp.json` for Claude Code, `.devcontainer/codex-config.toml` for Codex and
+`ecosystem.config.cjs` for PM2. All point at the global install.
+
+| Port | Process | Start |
+| --- | --- | --- |
+| 4080 | cucumber-viz Studio | `pm2 start ecosystem.config.cjs --only main` |
+| 4300 | Documentation site, dev server | `npm run site:dev` |
+| 4301 | Documentation site, built | `npm run site:build && pm2 start ecosystem.config.cjs --only site` |
+| 8787 | Example API | `npm run example:dev:api` |
+| 5180 | Example Vite dev server | `npm run example:dev:web` |
+
+None of these collide with the cucumber-viz devcontainer's ports, so both
+projects can be forwarded to one local VS Code at the same time. Nothing
+auto-forwards; use the Ports panel.
+
 ## Plan artifacts and prompts
 
 Keep each plan under `docs/plans/<plan>/`, with `main-plan.md`, `plan.json`,

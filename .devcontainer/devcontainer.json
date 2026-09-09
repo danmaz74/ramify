@@ -1,0 +1,89 @@
+{
+  "name": "Ramify - Development",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/ramify",
+
+  "remoteEnv": {
+    "NODE_ENV": "development",
+    "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "350000"
+  },
+
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {}
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.vscode-typescript-next",
+        "alexkrechik.cucumberautocomplete",
+        "mhutchie.git-graph",
+        "ms-azuretools.vscode-docker",
+        "streetsidesoftware.code-spell-checker",
+        "editorconfig.editorconfig",
+        "xyz.local-history",
+        "renanbs.git-context-menu",
+        "anthropic.claude-code",
+        "openai.chatgpt"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "zsh",
+        "terminal.integrated.profiles.linux": {
+          "zsh": {
+            "path": "/bin/zsh"
+          }
+        },
+        "files.trimTrailingWhitespace": true,
+        "files.insertFinalNewline": true,
+        "typescript.tsdk": "node_modules/typescript/lib",
+        "remote.autoForwardPorts": false
+      }
+    }
+  },
+
+  // Ports are chosen not to collide with a cucumber-viz devcontainer on the same
+  // host (3000-3002, 3100-3102, 5173-5174, 8080, 8090, 9000, 9222), so both can
+  // be forwarded to one local VS Code at the same time. Nothing auto-forwards;
+  // use the Ports panel.
+  "portsAttributes": {
+    "4080": {
+      "label": "cucumber-viz Studio (PM2 main)",
+      "onAutoForward": "ignore"
+    },
+    "4300": {
+      "label": "Site dev server",
+      "onAutoForward": "ignore"
+    },
+    "4301": {
+      "label": "Site build served (PM2 site)",
+      "onAutoForward": "ignore"
+    },
+    "8787": {
+      "label": "Example API",
+      "onAutoForward": "ignore"
+    },
+    "5180": {
+      "label": "Example Vite dev server",
+      "onAutoForward": "ignore"
+    }
+  },
+  "otherPortsAttributes": {
+    "onAutoForward": "ignore"
+  },
+
+  "remoteUser": "app",
+
+  "postCreateCommand": "/bin/bash /ramify/.devcontainer/setup.sh",
+  "postStartCommand": "/bin/bash /ramify/.devcontainer/post-start.sh",
+
+  // Git config, SSH keys, Claude state and Codex auth come from the host user.
+  // ~/.claude is shared with other devcontainers on this host; per-project state
+  // stays apart because this workspace is /ramify.
+  "mounts": [
+    "source=${localEnv:HOME}/.gitconfig,target=/home/app/.gitconfig,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/.ssh,target=/home/app/.ssh,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/.claude,target=/home/app/.claude,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/.codex/auth.json,target=/home/app/.codex/auth.json,type=bind,consistency=cached"
+  ]
+}

@@ -1,0 +1,34 @@
+services:
+  app:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+      args:
+        CLAUDE_CODE_VERSION: latest
+        CUCUMBER_VIZ_VERSION: 0.6.3
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    # Shared memory and seccomp for headless Chromium.
+    shm_size: '2gb'
+    security_opt:
+      - seccomp:unconfined
+    volumes:
+      - ..:/ramify:cached
+      # One named volume per package so installs never touch the host tree.
+      - node_modules:/ramify/node_modules
+      - site_node_modules:/ramify/site/node_modules
+      - example_node_modules:/ramify/examples/collection-review/node_modules
+    environment:
+      NODE_ENV: development
+    # tini as PID 1 so exited processes are reaped.
+    init: true
+    stdin_open: true
+    tty: true
+
+volumes:
+  node_modules:
+  site_node_modules:
+  example_node_modules:

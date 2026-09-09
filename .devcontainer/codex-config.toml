@@ -1,0 +1,47 @@
+model = "gpt-5.5"
+model_reasoning_effort = "xhigh"
+personality = "pragmatic"
+service_tier = "fast"
+
+[projects."/ramify"]
+trust_level = "trusted"
+
+[projects."/tmp"]
+trust_level = "trusted"
+
+# Rewritten on every container start by .devcontainer/codex-mcp-setup.sh, which
+# resolves the bridge inside the global cucumber-viz install.
+[mcp_servers.cucumber-viz]
+command = "node"
+args = ["/usr/local/lib/node_modules/cucumber-viz/dist/core/shared/services/mcp/mcp-stdio-bridge.js", "--port", "4080", "--studio"]
+cwd = "/ramify"
+startup_timeout_sec = 20
+tool_timeout_sec = 900
+required = false
+
+[mcp_servers.chrome-devtools]
+command = "npx"
+args = ["chrome-devtools-mcp@latest"]
+
+[mcp_servers.openaiDeveloperDocs]
+url = "https://developers.openai.com/mcp"
+
+[features]
+js_repl = false
+multi_agent = true
+memories = true
+
+[plugins."github@openai-curated"]
+enabled = true
+
+[plugins."documents@openai-primary-runtime"]
+enabled = true
+
+[plugins."spreadsheets@openai-primary-runtime"]
+enabled = true
+
+[plugins."presentations@openai-primary-runtime"]
+enabled = true
+
+[plugins."browser@openai-bundled"]
+enabled = true

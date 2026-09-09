@@ -12,14 +12,17 @@ the installed version. Record completion evidence here. After setup, use the
   Studio creates worktrees under `/tmp/worktrees/` and `workflow/<plan>`
   branches from the repository root it is pointed at; a nested directory is
   not a root.
-- [ ] Add `cucumber-viz.config.ts` at the root. `featurePaths` is the only
+- [x] Add `cucumber-viz.config.ts` at the root. `featurePaths` is the only
   required key; point it at the example's scenario. Set
   `documentRetention.enabled: false`: the default prunes date-prefixed files
   under `docs/analysis/` after 30 days and `docs/plans/done/` after 7.
-- [ ] Ignore `.cucumber-viz/`, `cucumber-viz.config.local.json`,
+  Done 2026-09-09, together with `.devcontainer/`, `.mcp.json`,
+  `ecosystem.config.cjs` and the Codex config; the
+  [operating guide](cucumber-viz.md#devcontainer-and-ports) lists the ports.
+- [x] Ignore `.cucumber-viz/`, `cucumber-viz.config.local.json`,
   `*.viz.feature.meta/` and `examples/collection-review/.reference-work/`.
   Studio writes workflow state, turns, logs and review diffs under
-  `.cucumber-viz/`.
+  `.cucumber-viz/`. Done 2026-09-09, with `dist/`.
 - [ ] Decide the plan directory name. Studio uses it as the workflow branch
   and commit prefix, so `iteration-1-project-verifier` reads as an iteration
   everywhere. Renaming is a link sweep now and a live workflow later.
@@ -28,8 +31,8 @@ the installed version. Record completion evidence here. After setup, use the
 
 ## Checks
 
-- [ ] Keep the default `nodejs-react` profile and override its two command
-  checks. Its `static` check runs `deps:check`, `deps:check:runtime-imports`,
+- [x] Keep the default `nodejs-react` profile and override its two command
+  checks. Done 2026-09-09 in `cucumber-viz.config.ts`. Its `static` check runs `deps:check`, `deps:check:runtime-imports`,
   `runtime-deps:check`, `imports:check:ui-domains`,
   `imports:check:lib-type-imports` and `exports:check`, and its `regression`
   check runs a root `test:cucumber`; Ramify has none of these, and a missing
@@ -98,6 +101,7 @@ Keep `docs/plans/**` other than the two files above, `docs/analysis/**`,
 ## Worktrees and agents
 
 - [ ] Decide how the example's dependencies reach an execution worktree. The
+  devcontainer installs them in the main checkout only. The
   Node workspace strategy symlinks the root `node_modules` and runs
   `npm run build` with a two-minute timeout; it installs nothing else, and
   `workspace.setupCommands` is honored only by the Rails adapter. Either hoist

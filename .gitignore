@@ -6,3 +6,14 @@ node_modules/
 site/node_modules/
 site/build/
 site/.docusaurus/
+
+# Build output of the toolkit and the reference example.
+dist/
+
+# cucumber-viz state written into the project while Studio runs.
+.cucumber-viz/
+cucumber-viz.config.local.json
+*.viz.feature.meta/
+
+# Reference-harness mutation copies of the example.
+examples/collection-review/.reference-work/

@@ -9,7 +9,7 @@ and the writing conventions every document follows.
 | [Implementation workflow](implementation-workflow.md) | Plan the work, implement iterations and hand off results. |
 | [Testing](testing.md) | Choose tests, run checks and reproduce bugs. |
 | [Engineering practices](engineering-practices.md) | Design contracts, manage resources and refactor safely. |
-| [Using cucumber-viz](cucumber-viz.md) | Run and diagnose Studio workflows. |
+| [Using cucumber-viz](cucumber-viz.md) | The devcontainer and its ports; run and diagnose Studio workflows. |
 | [Standalone setup checklist](cucumber-viz-setup.md) | Resolve the remaining integration work before using Studio in the new repository. |
 
 ## Shared agent skills
