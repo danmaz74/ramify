@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "inactiveGlobs": [
+    "docs/plans/**",
+    "docs/analysis/**",
+    "**/.reference-work/**"
+  ],
+  "rules": [
+    {
+      "id": "principles-md",
+      "kind": "principles",
+      "description": "Protect project principles from unreviewed changes.",
+      "globs": ["**/*.principles.md"],
+      "executable": false,
+      "sealed": true
+    },
+    {
+      "id": "architecture-specs",
+      "kind": "spec",
+      "description": "Protect architecture specifications from unreviewed changes.",
+      "globs": ["docs/architecture/**/*.spec.md"],
+      "executable": false,
+      "sealed": true
+    }
+  ]
+}

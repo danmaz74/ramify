@@ -18,7 +18,7 @@ pipeline, context/revision semantics and semantic service operations.
 [Processes and clients](processes-and-clients.md) defines executable placement,
 CLI behavior and the separate tRPC web process;
 [memory lifecycle](memory-lifecycle.md) defines retention and resource policy;
-[quick testing](quick-testing.md) defines test execution boundaries.
+[quick testing](quick-testing.spec.md) defines test execution boundaries.
 The [tooling plan](../plans/tooling-architecture/README.md) owns review steps,
 migration and delivery order. The
 [reference project](../plans/reference-project/README.md) is an independent
@@ -561,7 +561,7 @@ headless assembly tests belong with root. Tests requiring additional tags use a
 separate testing module with test code in ordinary `src/`, and ordinary exposure
 for every foreign binding.
 
-The [quick-testing architecture](quick-testing.md) defines real service flows
+The [quick-testing architecture](quick-testing.spec.md) defines real service flows
 through direct adapters, alongside separate HTTP/IPC, process and browser tests.
 Its UI harness is introduced with later visualization; CLI/context integration
 and resource-lifecycle evidence accompany their initial implementations.
@@ -583,7 +583,7 @@ engine bug cannot make both sides appear correct.
 These semantic/runtime cases are complemented by PC01–PC10 in
 [processes and clients](processes-and-clients.md#acceptance-evidence), ML01–ML08
 in [memory lifecycle](memory-lifecycle.md#measurement-and-acceptance), and
-QT01–QT08 in [quick testing](quick-testing.md#complementary-verification).
+QT01–QT08 in [quick testing](quick-testing.spec.md#complementary-verification).
 Their web/UI cases remain assigned to the later visualization phase; MCP cases
 accompany the separately deliverable adapter.
 

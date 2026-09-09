@@ -8,7 +8,7 @@ description: Design, run or assess Ramify tests and acceptance evidence, includi
 Read the active acceptance criteria and the
 [testing guide](../../../docs/development/testing.md). Inspect the actual package
 scripts and runner scope before choosing commands. Read the
-[quick-testing architecture](../../../docs/architecture/quick-testing.md) when
+[quick-testing architecture](../../../docs/architecture/quick-testing.spec.md) when
 designing a harness or deciding whether direct execution establishes a claim.
 
 Identify the observable behavior, independently expected result and boundary

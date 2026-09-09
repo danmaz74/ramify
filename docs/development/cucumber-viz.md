@@ -67,8 +67,24 @@ worktrees. Complete the assigned iteration and return results through its tools;
 leave advancement to the server.
 
 Before edits or checks, confirm the execution worktree and revision. Use its
-source, plan and generated output. Prepare dependencies for each package whose
-checks run, keeping first-party source tied to the tested checkout.
+source, plan and generated output. Before implementing in a new execution
+worktree, run this from its root:
+
+```sh
+npm run worktree:prepare
+```
+
+This runs `npm ci` for the reference example and the site using that checkout's
+lockfiles. Repeat after either package's manifest or lockfile changes. The
+command replaces those packages' local dependency directories each time; run it
+before their tests or development servers. It leaves Studio's root
+`node_modules` link intact and keeps first-party source tied to the tested
+checkout. Direct worktrees need root dependencies installed or linked first.
+
+Studio's static check also runs this command before type-checking, so fresh
+audit worktrees receive the same preparation. The installed Node adapter does
+not run `workspace.setupCommands`. Preparation is explicit at iteration startup
+because execution-worktree creation itself only links root dependencies.
 
 For direct work outside Studio, use an isolated worktree when useful. Preserve
 unmerged changes and evidence before cleanup.

@@ -106,7 +106,7 @@ project state and unavailable execution.
 
 These names are proposed; their process behavior is part of the architecture.
 The invocation contract of `check`, covering root selection, configuration
-discovery, warnings and exits, is [CLI invocation](cli-invocation.md).
+discovery, warnings and exits, is [CLI invocation](cli-invocation.spec.md).
 
 | Command | Required behavior |
 | --- | --- |
@@ -319,5 +319,5 @@ They are implementation obligations, not current passing tests.
 CLI and daemon lifecycle evidence is delivered with the local daemon. Web-specific
 parts of these requirements are delivered with later visualization. MCP-specific
 parts accompany the later MCP adapter and do not depend on visualization. The
-[quick-testing architecture](quick-testing.md) distinguishes the evidence each
+[quick-testing architecture](quick-testing.spec.md) distinguishes the evidence each
 test mode can establish.

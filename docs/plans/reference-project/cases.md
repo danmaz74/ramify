@@ -26,7 +26,7 @@ limits. None of the cases requires an exhaustive runtime closure proof.
 Module validity follows the
 [module-description principles](../../model/module-description.principles.md).
 The outside-module warning expectations follow the
-[CLI invocation contract](../../architecture/cli-invocation.md#files-outside-modules).
+[CLI invocation contract](../../architecture/cli-invocation.spec.md#files-outside-modules).
 
 | ID | Mode / authority | Witness and meaningful expectation |
 | --- | --- | --- |

@@ -18,7 +18,7 @@ instances against real files.
 - [Module-description principles](../../../model/module-description.principles.md):
   layout, `src/`, `subs/`, `src/tests/`, `src/interfaces/`, containment,
   symlink policy and the README convention.
-- [CLI invocation](../../../architecture/cli-invocation.md): selecting the
+- [CLI invocation](../../../architecture/cli-invocation.spec.md): selecting the
   project, compiler configuration, files outside modules.
 - Main plan: Source scope and project selection, Supported platforms,
   Coherent inputs and later reuse, the `ProjectInputView` and

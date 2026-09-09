@@ -210,7 +210,7 @@ export const referenceCases: readonly ReferenceCase[] = [
       kind: 'document',
       paths: [
         `${model}/module-description.principles.md`,
-        'docs/architecture/cli-invocation.md',
+        'docs/architecture/cli-invocation.spec.md',
       ],
       note: 'The principles define invalid descriptions and source claims; the CLI contract defines outside-source warnings.',
     },

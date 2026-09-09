@@ -1,7 +1,7 @@
 # Testing
 
 Choose tests from the changed behavior and the active plan's acceptance criteria.
-The [quick-testing architecture](../architecture/quick-testing.md) defines the
+The [quick-testing architecture](../architecture/quick-testing.spec.md) defines the
 use of direct adapters and the complementary transport and process tests.
 
 ## Test behavior at the relevant boundary

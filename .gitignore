@@ -1,9 +1,9 @@
 # ramify.ts keeps its own ignore list, like the rest of its toolchain.
 
-node_modules/
+# Match dependency directories and the symlinks Studio creates in worktrees.
+node_modules
 
 # Documentation site: its own npm package, its own build output.
-site/node_modules/
 site/build/
 site/.docusaurus/
 

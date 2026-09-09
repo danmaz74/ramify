@@ -6,6 +6,7 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
+    "worktree:prepare": "npm --prefix examples/collection-review ci && npm --prefix site ci",
     "build": "tsc",
     "dev": "tsc --watch",
     "type-check": "tsc --noEmit && tsc -p tsconfig.scripts.json",

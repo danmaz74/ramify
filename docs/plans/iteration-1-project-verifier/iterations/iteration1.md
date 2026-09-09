@@ -50,7 +50,7 @@ All under `docs/plans/iteration-1-project-verifier/`:
    acquisition/work/report limits with their initial values, and the
    supported-platform consequences already decided in the plan. Root
    selection, configuration discovery, warnings and exits are fixed by the
-   [CLI invocation](../../../architecture/cli-invocation.md) contract and are
+   [CLI invocation](../../../architecture/cli-invocation.spec.md) contract and are
    not redecided here.
 5. `probes.md` with runnable scripts under `scripts/probes/`: focused
    TypeScript compiler API probes on source aliases, unmarked interfaces,

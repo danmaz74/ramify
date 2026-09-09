@@ -23,8 +23,8 @@ and reclaim its memory without discarding warm analysis.
 | [Processes and clients](processes-and-clients.md) | Process boundaries, CLI commands, the MCP adapter, tRPC web delivery, startup, shutdown and compatibility. |
 | [Daemon and analysis](daemon.md) | Proposed Ramify ownership tree, exposure channels, engine pipeline, source facts, contexts, revision semantics and semantic acceptance cases. |
 | [Memory lifecycle](memory-lifecycle.md) | Resident dependency boundaries, retention and work limits, memory reclamation and measurement requirements. |
-| [Quick testing](quick-testing.md) | In-process execution of real client/service flows, the boundaries replaced in quick mode, and complementary transport/process tests. |
-| [CLI invocation](cli-invocation.md) | How `ramify check` selects the project, finds the compiler configuration, treats files outside modules, reports and exits. |
+| [Quick testing](quick-testing.spec.md) | In-process execution of real client/service flows, the boundaries replaced in quick mode, and complementary transport/process tests. |
+| [CLI invocation](cli-invocation.spec.md) | How `ramify check` selects the project, finds the compiler configuration, treats files outside modules, reports and exits. |
 
 The [tooling roadmap](../plans/tooling-architecture/README.md) owns migration and
 delivery order. Its first detailed plan is

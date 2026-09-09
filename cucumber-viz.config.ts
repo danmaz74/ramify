@@ -21,16 +21,20 @@ export default {
 
   // Keep the nodejs-react profile for its worktree preparation (node_modules
   // link and build) and replace the two command checks whose scripts Ramify
-  // does not have. An override replaces the whole executor. The reference gate
-  // (reference:verify) and the self-check are never workflow checks before
-  // their iterations pass.
+  // does not have. Prepare the independent packages in each execution/audit
+  // checkout before checking it. An override replaces the whole executor.
+  // The reference gate (reference:verify) and the self-check are never workflow
+  // checks before their iterations pass.
   checks: {
     profile: 'nodejs-react',
     overrides: {
       static: {
         executor: {
           kind: 'command',
-          commands: [{ name: 'type-check', cmd: 'npm', args: ['run', 'type-check'] }],
+          commands: [
+            { name: 'worktree-dependencies', cmd: 'npm', args: ['run', 'worktree:prepare'] },
+            { name: 'type-check', cmd: 'npm', args: ['run', 'type-check'] },
+          ],
           parallel: false,
         },
       },

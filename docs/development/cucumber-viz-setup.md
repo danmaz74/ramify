@@ -23,6 +23,9 @@ the installed version. Record completion evidence here. After setup, use the
   `*.viz.feature.meta/` and `examples/collection-review/.reference-work/`.
   Studio writes workflow state, turns, logs and review diffs under
   `.cucumber-viz/`. Done 2026-09-09, with `dist/`.
+- [x] Ignore dependency directories and symlinks with `node_modules` (without
+  a trailing slash). Done 2026-09-09. The former `node_modules/` pattern left
+  Studio's root dependency link untracked in fresh worktrees.
 - [ ] Decide the plan directory name. Studio uses it as the workflow branch
   and commit prefix, so `iteration-1-project-verifier` reads as an iteration
   everywhere. Renaming is a link sweep now and a live workflow later.
@@ -37,9 +40,9 @@ the installed version. Record completion evidence here. After setup, use the
   `imports:check:lib-type-imports` and `exports:check`, and its `regression`
   check runs a root `test:cucumber`; Ramify has none of these, and a missing
   script is an ordinary failing finding that enters the remediation loop, not
-  a skip. Set `checks.overrides.static.executor` to run only
-  `npm run type-check` and `checks.overrides.regression.executor` to run only
-  `npm test`; an override replaces the whole executor. Do not switch to the
+  a skip. The static override now runs `npm run worktree:prepare` followed by
+  `npm run type-check`; the regression override runs only `npm test`.
+  An override replaces the whole executor. Do not switch to the
   `minimal` profile: its workspace strategy is `none`, so execution and audit
   worktrees would get neither the `node_modules` link nor the build.
 - [ ] Never register `npm run reference:verify` as a workflow check. It is the
@@ -48,21 +51,24 @@ the installed version. Record completion evidence here. After setup, use the
 
 ## Constraints and sealed files
 
-- [ ] Add `cucumber-viz.constraints.json` at the root, sealed by its own
-  `.seal` sidecar. Each rule carries `globs`, `executable` and `sealed`;
-  sealing is that flag, and a `.seal` sidecar seals one file outside any rule.
-  The sealed-files check cannot be disabled and passes trivially while the
-  file is absent, so the file is what gives it teeth. Suggested rules:
+- [x] Add [cucumber-viz.constraints.json](../../cucumber-viz.constraints.json)
+  at the root and protect it with `cucumber-viz.constraints.json.seal`.
+  Done 2026-09-09. Both rules are non-executable and sealed:
 
 | Globs | Kind | Sealed |
 | --- | --- | --- |
-| `docs/model/*.principles.md`, `docs/model/glossary.md` | principles | Yes. |
-| `docs/architecture/cli-invocation.md` and the other decided architecture documents | spec | Yes. |
-| `docs/plans/reference-project/cases.md`, `docs/plans/reference-project/contract-map.md` | spec | Yes. The plan forbids weakening the checker to manufacture a pass. |
-| `**/*.viz.feature` | behavior | No; executable. |
+| `**/*.principles.md` | principles | Yes. |
+| `docs/architecture/**/*.spec.md` | spec | Yes. |
 
-Keep `docs/plans/**` other than the two files above, `docs/analysis/**`,
-`**/.reference-work/**`, dependency trees and build output in `inactiveGlobs`.
+The active matches are the three model principles documents,
+`cli-invocation.spec.md` and `quick-testing.spec.md`. The glossary, other
+architecture documents and reference plans retain their existing names and are
+not sealed. `docs/plans/**`, `docs/analysis/**` and `**/.reference-work/**` are
+inactive; cucumber-viz also excludes dependency and build directories.
+
+The rule file's sidecar protects the policy itself. Sealed-file checks also
+detect changes to seal controls. Inspect the effective targets with Studio's
+`sealed_files.ls` tools; the mandatory sealed-files check enforces the result.
 
 ## Documents the Studio looks up by path
 
@@ -100,14 +106,21 @@ Keep `docs/plans/**` other than the two files above, `docs/analysis/**`,
 
 ## Worktrees and agents
 
-- [ ] Decide how the example's dependencies reach an execution worktree. The
-  devcontainer installs them in the main checkout only. The
-  Node workspace strategy symlinks the root `node_modules` and runs
-  `npm run build` with a two-minute timeout; it installs nothing else, and
-  `workspace.setupCommands` is honored only by the Rails adapter. Either hoist
-  `examples/collection-review` into a root npm workspace so its dependencies
-  land in the root `node_modules`, or make the harness install them during the
-  iteration. Iterations from 5 onward resolve the example's imports.
+- [x] Prepare independent package dependencies in execution and audit
+  worktrees. Done 2026-09-09 with `npm run worktree:prepare`, which runs
+  `npm ci` for the example and site using the tested checkout's lockfiles.
+  Root agent instructions require it before implementation in each new
+  execution worktree and after either package's manifest or lockfile changes.
+  Studio's static executor runs it before type-checking, including in fresh
+  audit worktrees. The Node strategy links only root `node_modules`; its
+  audit build has a two-minute timeout, and `workspace.setupCommands` is
+  honored only by the Rails adapter. See the
+  [worktree procedure](cucumber-viz.md#execute-in-a-worktree).
+  Verified with cucumber-viz 0.6.3 in a fresh disposable worktree: the
+  resolved static and regression commands passed (353 toolkit tests), as
+  did example type-checking, 77 example tests, its Cucumber scenario and
+  build, and the site build. Both package dependency directories remained
+  local to that checkout, and Git ignored them and the root dependency link.
 - [ ] Preserve the [shared skill symlinks](README.md#shared-agent-skills)
   during export. Verify that both Claude and Codex launchers read Ramify's
   instructions and discover its five skills in the main checkout and in an

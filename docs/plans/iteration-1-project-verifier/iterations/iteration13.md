@@ -13,7 +13,7 @@ honest answers for everything the plan does not implement.
 
 ## Read first
 
-- [CLI invocation](../../../architecture/cli-invocation.md) in full.
+- [CLI invocation](../../../architecture/cli-invocation.spec.md) in full.
 - Main plan: Reports and exit behavior in full, the `BatchInvocation` and
   `BatchResult` rows of the contract table, matrix rows I1-26 and I1-28.
 - [Processes and clients](../../../architecture/processes-and-clients.md):

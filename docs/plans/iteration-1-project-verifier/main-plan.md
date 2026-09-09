@@ -25,7 +25,7 @@ configuration by itself and reports findings for humans; the second names the
 root explicitly and returns the same result as structured data. Both finish
 and release their analysis resources. Neither starts a daemon, MCP server or
 web server. Invocation is specified in
-[CLI invocation](../../architecture/cli-invocation.md).
+[CLI invocation](../../architecture/cli-invocation.spec.md).
 
 Completion requires a clean reference check, independently expected negative
 and positive variants, verification of Ramify's own migrated source, and
@@ -45,8 +45,8 @@ same identities, facts and decisions in later plans.
 | [Module-description principles](../../model/module-description.principles.md) | Definitive layout, version 1 grammar, exact paths, wildcards and README convention. |
 | [TypeScript interpretation](../../model/typescript-source-interpretation.principles.md) | Definitive original resolution, resource identity, source forms and coverage policy. |
 | [Architecture](../../architecture/README.md) and [daemon design](../../architecture/daemon.md) | Ownership boundaries, reusable engine, coherent inputs and later resident service. |
-| [Processes](../../architecture/processes-and-clients.md), [memory](../../architecture/memory-lifecycle.md) and [quick testing](../../architecture/quick-testing.md) | Entry-point separation, resource cleanup and real-service verification. |
-| [CLI invocation](../../architecture/cli-invocation.md) | Root and configuration discovery, scope, warnings, output and exit behavior of `ramify check`. |
+| [Processes](../../architecture/processes-and-clients.md), [memory](../../architecture/memory-lifecycle.md) and [quick testing](../../architecture/quick-testing.spec.md) | Entry-point separation, resource cleanup and real-service verification. |
+| [CLI invocation](../../architecture/cli-invocation.spec.md) | Root and configuration discovery, scope, warnings, output and exit behavior of `ramify check`. |
 | [Tooling roadmap](../tooling-architecture/README.md) | Delivery order across the six plans. |
 | [Reference cases](../reference-project/cases.md), [contract map](../reference-project/contract-map.md) and [harness](../reference-project/harness.md) | Independent expected outcomes, actual exposure witnesses and mutation discipline. |
 
@@ -121,7 +121,7 @@ continue independently.
 
 Root selection, compiler-configuration discovery, the definition of project
 files outside modules and the warnings they produce are specified in
-[CLI invocation](../../architecture/cli-invocation.md); this plan implements
+[CLI invocation](../../architecture/cli-invocation.spec.md); this plan implements
 that contract and adds nothing to it. In particular: the check always covers
 the whole project from its root; every owned `src/` and nested test area is
 analyzed whether or not the compiler configuration selects it; application
@@ -398,7 +398,7 @@ The ordinary entry imports CLI handling only; dispatch lazily imports the batch
 assembly. The build preserves the nested owner paths.
 
 Exit codes and their meaning are fixed by the
-[CLI invocation](../../architecture/cli-invocation.md) contract; the plan adds
+[CLI invocation](../../architecture/cli-invocation.spec.md) contract; the plan adds
 none.
 
 The report schema must include a schema version; requested root/configuration/

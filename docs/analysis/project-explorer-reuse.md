@@ -282,7 +282,7 @@ Preserve the existing interactions while making the displayed concepts precise:
 
 ## Quick-testing and web-adapter source
 
-The chosen [quick-testing architecture](../architecture/quick-testing.md) reuses
+The chosen [quick-testing architecture](../architecture/quick-testing.spec.md) reuses
 the following patterns while keeping their implementations inside Ramify:
 
 | Source | Extraction boundary |

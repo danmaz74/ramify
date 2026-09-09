@@ -181,7 +181,7 @@ capabilities is completed only when all its scheduled parts have evidence:
 | --- | --- | --- |
 | [PC01–PC10](../../architecture/processes-and-clients.md#acceptance-evidence) | 1: batch/help startup and applicable PC01 checks. 2: PC01–PC04/PC09, daemon parts of PC06, local-service PC07 and CLI/direct-client PC10. | 3: query-client equivalence; 4: PC08 and MCP portions of PC06–PC07/PC10; 6: PC05 and web portions including PC10. Optional HTTP MCP cases apply only when implemented. |
 | [ML01–ML08](../../architecture/memory-lifecycle.md#measurement-and-acceptance) | 1: batch peak memory, result retention and disposal. 2: resident entry footprint, context/history/work bounds, repeated edits and local slow consumers. | 3: bounded inspection/enrichment; 4: ML08 stdio portions; 5: overlay limits; 6: web/browser footprint, serialization and ML05 open-close cycles. |
-| [QT01–QT08](../../architecture/quick-testing.md#complementary-verification) | 1: batch QT01/QT03 and actual CLI process cases. 2: IPC QT04, daemon QT05 and relevant resource QT07. | 3: real query flows; 4: QT08; 5: real overlay flows; 6: QT02/QT06, HTTP QT04, web QT05 and remaining resource QT07. |
+| [QT01–QT08](../../architecture/quick-testing.spec.md#complementary-verification) | 1: batch QT01/QT03 and actual CLI process cases. 2: IPC QT04, daemon QT05 and relevant resource QT07. | 3: real query flows; 4: QT08; 5: real overlay flows; 6: QT02/QT06, HTTP QT04, web QT05 and remaining resource QT07. |
 
 Browser-promise verification is a separate capability. Plan and implement its
 algorithm explicitly before claiming it ran; the availability checker continues

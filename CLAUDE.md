@@ -110,7 +110,7 @@ Optional MCP HTTP hosting can mount that module in the separate web process.
 The daemon excludes MCP/web/development dependencies and follows explicit memory
 retention, queue and client-lifecycle limits. Quick tests run real services through
 direct adapters, supplemented by actual transport and process tests. The
-[CLI invocation contract](docs/architecture/cli-invocation.md) fixes how
+[CLI invocation contract](docs/architecture/cli-invocation.spec.md) fixes how
 `ramify check` selects the project, finds the compiler configuration, warns
 about files outside modules and exits.
 Compiler-selected files outside every module's `src/`, including sibling
@@ -173,3 +173,9 @@ results and docs-maintenance edits:
 Use the [development guides](docs/development/README.md) for planning,
 implementation, testing and cucumber-viz operations. The index lists the shared
 Claude and Codex skills; select the one relevant to the task.
+
+Before implementing in a new Studio execution worktree, run
+`npm run worktree:prepare` from that checkout's root to install the example and
+site dependencies. Repeat after either package's manifest or lockfile changes.
+Studio links only the toolkit's root dependencies; see the
+[worktree guide](docs/development/cucumber-viz.md#execute-in-a-worktree).
