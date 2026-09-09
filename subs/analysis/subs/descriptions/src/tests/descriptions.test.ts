@@ -20,7 +20,7 @@ const both = ['parent', 'descendants'] as const;
 const browser = ['browser'];
 const uiBrowser = ['ui', 'browser'];
 
-// Independent selections from the reference contract map and the reviewed I4
+// Independent selections from the reference contract map and the reviewed I5
 // declaration stage. Read the actual authored texts, including their comments.
 const modelNames = [
   'ModuleId', 'TagName', 'TagKind', 'TagDefinition', 'ResolvedTagRegistry', 'SourceLocation',
@@ -33,6 +33,10 @@ const modelNames = [
 const syntaxNames = ['TextSpan', 'DescriptionToken', 'DescriptionIssue', 'NamedSelection',
   'DescriptionSelection', 'DescriptionStatement', 'DescriptionDocument', 'ParsedDescription', 'DescriptionParser'];
 
+const projectNames = ['ProjectRequest', 'ProjectScope', 'CapturedInput', 'InventoryArea', 'ModulePurpose',
+  'InventoryModule', 'InventoryFile', 'ExactReference', 'OutsideSourceWarning', 'ProjectInventory',
+  'ProjectIssue', 'AcquisitionLimits', 'ProjectInputView', 'ProjectReadOptions', 'ProjectRead'];
+
 interface Fixture {
   path: string;
   name: string;
@@ -40,15 +44,15 @@ interface Fixture {
   statements: readonly ReturnType<typeof statement>[];
 }
 const toolkit: readonly Fixture[] = [
-  { path: '', name: 'ramify', tags: ['dispatch'], statements: [sub(modelNames, 'analysis', descendants), sub(syntaxNames, 'analysis', descendants)] },
-  { path: 'subs/analysis/', name: 'analysis', tags: [], statements: [sub('*', 'model', both), sub(syntaxNames, 'descriptions', both)] },
+  { path: '', name: 'ramify', tags: ['dispatch'], statements: [sub(modelNames, 'analysis', descendants), sub(syntaxNames, 'analysis', descendants), sub(projectNames, 'analysis', descendants)] },
+  { path: 'subs/analysis/', name: 'analysis', tags: [], statements: [sub('*', 'model', both), sub(syntaxNames, 'descriptions', both), sub(projectNames, 'project', both)] },
   { path: 'subs/analysis/subs/descriptions/', name: 'descriptions', tags: browser, statements: [src(['parseDescription'], 'parse.ts', browser), src('*', 'interfaces/syntax.ts')] },
   { path: 'subs/analysis/subs/model/', name: 'model', tags: browser, statements: [
     src('*', 'interfaces/model.ts'), src(['resolveTagRegistry', 'createDefaultTagRegistry'], 'registry.ts', browser),
     src(['deriveSourceAreas', 'assignOriginalTags'], 'profiles.ts', browser), src(['originalKey'], 'identity.ts', browser),
     src(['buildModel'], 'model.ts', browser), src(['explainVisibility', 'explainImport'], 'decisions.ts', browser),
   ] },
-  { path: 'subs/analysis/subs/project/', name: 'project', tags: [], statements: [] },
+  { path: 'subs/analysis/subs/project/', name: 'project', tags: [], statements: [src(['readProject'], 'read-project.ts'), src('*', 'interfaces/project.ts')] },
   { path: 'subs/analysis/subs/typescript/', name: 'typescript', tags: [], statements: [] },
   { path: 'subs/cli/', name: 'cli', tags: ['dispatch'], statements: [] },
   { path: 'subs/presentation/', name: 'presentation', tags: uiBrowser, statements: [] },

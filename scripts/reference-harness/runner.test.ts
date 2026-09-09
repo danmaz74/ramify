@@ -35,15 +35,15 @@ function verify(iteration: number | undefined, providers: HarnessRuntime, record
 }
 
 describe('required capability and assertion execution gates', () => {
-  it('runs the model and parser instances and retains unavailable source capabilities in the full gate', async () => {
+  it('runs the model, parser and acquisition instances and retains unavailable source capabilities in the full gate', async () => {
     const report = await verify(undefined, referenceRuntime);
     expect(report.passed).toBe(false);
     expect(report.planComplete).toBe(false);
-    expect(report.summary).toEqual({ required: 308, passed: 67, failed: 0, notExecuted: 241 });
-    expect(report.availableCapabilities).toEqual(['parse', 'registry']);
+    expect(report.summary).toEqual({ required: 308, passed: 102, failed: 0, notExecuted: 206 });
+    expect(report.availableCapabilities).toEqual(['acquire', 'metadata', 'parse', 'registry']);
     expect(report.instances.filter((item) => item.status === 'not-executed').every((item) => item.reason === 'missing-capability')).toBe(true);
     expect(await readdir(workRoot)).toEqual([]);
-  });
+  }, 60_000);
 
   it('permits an intermediate positive control while all future members remain pending', async () => {
     const report = await verify(3, runtime(3));

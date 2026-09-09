@@ -5,3 +5,6 @@ expose-sub ModuleId, TagName, TagKind, TagDefinition, ResolvedTagRegistry, Sourc
 
 // R4: syntax vocabulary relayed unchanged from analysis.
 expose-sub TextSpan, DescriptionToken, DescriptionIssue, NamedSelection, DescriptionSelection, DescriptionStatement, DescriptionDocument, ParsedDescription, DescriptionParser from analysis to descendants
+
+// R4: project vocabulary relayed unchanged from analysis.
+expose-sub ProjectRequest, ProjectScope, CapturedInput, InventoryArea, ModulePurpose, InventoryModule, InventoryFile, ExactReference, OutsideSourceWarning, ProjectInventory, ProjectIssue, AcquisitionLimits, ProjectInputView, ProjectReadOptions, ProjectRead from analysis to descendants

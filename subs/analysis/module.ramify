@@ -5,3 +5,6 @@ expose-sub * from model to parent, descendants
 
 // A6: syntax vocabulary available to assembly and acquisition.
 expose-sub TextSpan, DescriptionToken, DescriptionIssue, NamedSelection, DescriptionSelection, DescriptionStatement, DescriptionDocument, ParsedDescription, DescriptionParser from descriptions to parent, descendants
+
+// A7: project vocabulary supplied to assembly and children.
+expose-sub ProjectRequest, ProjectScope, CapturedInput, InventoryArea, ModulePurpose, InventoryModule, InventoryFile, ExactReference, OutsideSourceWarning, ProjectInventory, ProjectIssue, AcquisitionLimits, ProjectInputView, ProjectReadOptions, ProjectRead from project to parent, descendants

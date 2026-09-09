@@ -69,5 +69,19 @@ and reports its location.
 The remaining fixture recipes, checked baselines and real assertions arrive
 with their assigned capabilities. Inventory commands and harness stubs do not
 establish semantic outcomes. Actual model assertions are recorded individually
-by `model-cases.ts` and `parser-cases.ts`; the required gate membership remains
+by `model-cases.ts`, `parser-cases.ts` and `project-cases.ts`; the required gate membership remains
 in the reviewed plan.
+
+
+Iteration 5 registers `acquire` and `metadata` using the public `readProject`
+operation with the real injected description parser. Its 35 filesystem instances
+materialize the reviewed F recipe in `fixtures/plan1/project.ts` or copy the
+unchanged reference. Both reference scope variants also acquire the toolkit and
+assert its nine owners. Syntax, source export resolution and permission checking
+remain distinct capabilities.
+
+The no-project ancestry case necessarily uses an owned OS temporary directory:
+a directory under the ramified harness checkout would discover that enclosing
+project. It creates a described project below the unmarked working directory,
+asserts that discovery never searches downwards, and deletes the temporary tree
+in `finally`. All other mutations use the ordinary isolated harness copy.
