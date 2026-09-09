@@ -1,0 +1,15 @@
+{
+  "probe": "config-input-view",
+  "api": "API.parseConfigFile",
+  "openedProjectOrSnapshot": false,
+  "selectedFiles": [
+    "src/selected.ts"
+  ],
+  "inheritedStrictOption": true,
+  "capturedConfigurationReads": [
+    "base.json",
+    "tsconfig.json"
+  ],
+  "configurationFilesWritten": false,
+  "liveFilesystemFallback": false
+}

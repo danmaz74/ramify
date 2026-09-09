@@ -1,0 +1,99 @@
+{
+  "probe": "fixture-sizes",
+  "nodeVersion": "v22.23.2",
+  "unit": "bytes of UTF-8 file contents",
+  "identityEncoding": "sha256(JSON.stringify(sorted [root-relative path, UTF-8 contents] pairs))",
+  "excluded": [
+    ".git",
+    ".reference-work",
+    "dist",
+    "node_modules"
+  ],
+  "reference": {
+    "root": "examples/collection-review",
+    "configurationFiles": [
+      "tsconfig.json",
+      "package.json",
+      "vite.config.ts",
+      "vitest.config.ts"
+    ],
+    "contentMapSha256": "626a8e7b81df9aae566b585c87b971e11d1e367d9fa4dded746bbd3839a04bff",
+    "all": {
+      "files": 93,
+      "bytes": 181115
+    },
+    "descriptions": {
+      "files": 15,
+      "bytes": 9278
+    },
+    "readmes": {
+      "files": 15,
+      "bytes": 16267
+    },
+    "source": {
+      "files": 59,
+      "bytes": 152358
+    },
+    "typescript": {
+      "files": 54,
+      "bytes": 148505
+    },
+    "css": {
+      "files": 3,
+      "bytes": 2140
+    },
+    "nestedTests": {
+      "files": 22,
+      "bytes": 69673
+    },
+    "configurations": {
+      "files": 4,
+      "bytes": 3212
+    },
+    "largestFileBytes": 10157
+  },
+  "hundredOwners": {
+    "generator": "scripts/probes/fixtures/hundred-owners.ts",
+    "owners": 100,
+    "separatelyTestingOwners": 9,
+    "sourceFilesInSeparatelyTestingOwners": 108,
+    "ordinaryTypeScriptFiles": 1000,
+    "nestedTestFiles": 100,
+    "sourceFilesExcludedFromProduction": 199,
+    "contentMapSha256": "d5b77b9ff57c443b35f386f40598506ff20c51c4ec75b800371f0cec089c0897",
+    "all": {
+      "files": 1402,
+      "bytes": 1164385
+    },
+    "descriptions": {
+      "files": 100,
+      "bytes": 3372
+    },
+    "readmes": {
+      "files": 100,
+      "bytes": 8701
+    },
+    "source": {
+      "files": 1200,
+      "bytes": 1152000
+    },
+    "typescript": {
+      "files": 1100,
+      "bytes": 1126400
+    },
+    "css": {
+      "files": 100,
+      "bytes": 25600
+    },
+    "nestedTests": {
+      "files": 100,
+      "bytes": 102400
+    },
+    "configurations": {
+      "files": 2,
+      "bytes": 312
+    },
+    "largestFileBytes": 1024
+  },
+  "semanticCheckingExecuted": false
+}

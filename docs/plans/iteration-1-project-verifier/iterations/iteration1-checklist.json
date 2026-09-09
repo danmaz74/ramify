@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": true,
+    "functionalRequirementsSatisfied": true,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-09T09:35:44Z",
+  "iteration": "1",
+  "notes": "Review-package scope complete: six documents, nine owner drafts, seven asserted compiler/input probes, all 308 required matrix records inventoried. Type-check, extracted declaration checking, links/anchors, exhaustive move map, membership and whitespace validation pass. No checker implementation or I1 matrix execution; regressions remain automatic. Architecture/contract acceptance is still required before iteration 3."
+}

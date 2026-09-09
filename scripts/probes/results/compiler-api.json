@@ -1,0 +1,294 @@
+{
+  "probe": "compiler-api",
+  "nodeVersion": "v22.23.2",
+  "compilerVersion": "7.0.2",
+  "rootExports": [
+    "version",
+    "versionMajorMinor"
+  ],
+  "entry": "typescript/unstable/sync",
+  "fixture": "scripts/probes/fixtures/compiler-api",
+  "selectedRootFiles": [
+    "src/alias-consumer.ts",
+    "src/consumer.ts",
+    "src/forward.ts",
+    "src/interfaces/public.ts",
+    "src/originals.ts"
+  ],
+  "compilerDiagnosticCount": 0,
+  "imports": [
+    {
+      "importer": "src/consumer.ts",
+      "specifier": "'./originals.js'",
+      "selectedName": "Shape",
+      "writtenTypeOnly": false,
+      "resolvedModule": [
+        "src/originals.ts"
+      ],
+      "exportName": "Shape",
+      "originalName": "Shape",
+      "existsAsValue": false,
+      "existsAsType": true,
+      "declarations": [
+        {
+          "file": "src/originals.ts",
+          "start": 0,
+          "end": 48
+        }
+      ]
+    },
+    {
+      "importer": "src/consumer.ts",
+      "specifier": "'./originals.js'",
+      "selectedName": "RuntimeClass",
+      "writtenTypeOnly": false,
+      "resolvedModule": [
+        "src/originals.ts"
+      ],
+      "exportName": "RuntimeClass",
+      "originalName": "RuntimeClass",
+      "existsAsValue": true,
+      "existsAsType": true,
+      "declarations": [
+        {
+          "file": "src/originals.ts",
+          "start": 50,
+          "end": 97
+        }
+      ]
+    },
+    {
+      "importer": "src/consumer.ts",
+      "specifier": "'./originals.js'",
+      "selectedName": "Merged",
+      "writtenTypeOnly": false,
+      "resolvedModule": [
+        "src/originals.ts"
+      ],
+      "exportName": "Merged",
+      "originalName": "Merged",
+      "existsAsValue": true,
+      "existsAsType": true,
+      "declarations": [
+        {
+          "file": "src/originals.ts",
+          "start": 99,
+          "end": 148
+        },
+        {
+          "file": "src/originals.ts",
+          "start": 162,
+          "end": 182
+        }
+      ]
+    },
+    {
+      "importer": "src/consumer.ts",
+      "specifier": "'./forward.js'",
+      "selectedName": "ForwardedShape",
+      "writtenTypeOnly": false,
+      "resolvedModule": [
+        "src/forward.ts"
+      ],
+      "exportName": "ForwardedShape",
+      "originalName": "Shape",
+      "existsAsValue": false,
+      "existsAsType": true,
+      "declarations": [
+        {
+          "file": "src/originals.ts",
+          "start": 0,
+          "end": 48
+        }
+      ]
+    },
+    {
+      "importer": "src/alias-consumer.ts",
+      "specifier": "'@probe/originals.js'",
+      "selectedName": "PathAliasShape",
+      "writtenTypeOnly": false,
+      "resolvedModule": [
+        "src/originals.ts"
+      ],
+      "exportName": "PathAliasShape",
+      "originalName": "Shape",
+      "existsAsValue": false,
+      "existsAsType": true,
+      "declarations": [
+        {
+          "file": "src/originals.ts",
+          "start": 0,
+          "end": 48
+        }
+      ]
+    }
+  ],
+  "interfaceExports": [
+    {
+      "exportName": "Contract",
+      "originalName": "Contract",
+      "existsAsValue": false,
+      "existsAsType": true,
+      "declarations": [
+        {
+          "file": "src/interfaces/public.ts",
+          "start": 0,
+          "end": 51
+        }
+      ]
+    },
+    {
+      "exportName": "default",
+      "originalName": "default",
+      "existsAsValue": true,
+      "existsAsType": false,
+      "declarations": [
+        {
+          "file": "src/interfaces/public.ts",
+          "start": 112,
+          "end": 182
+        }
+      ]
+    },
+    {
+      "exportName": "ownAlias",
+      "originalName": "ownValue",
+      "existsAsValue": true,
+      "existsAsType": false,
+      "declarations": [
+        {
+          "file": "src/interfaces/public.ts",
+          "start": 65,
+          "end": 77
+        }
+      ]
+    },
+    {
+      "exportName": "ownValue",
+      "originalName": "ownValue",
+      "existsAsValue": true,
+      "existsAsType": false,
+      "declarations": [
+        {
+          "file": "src/interfaces/public.ts",
+          "start": 65,
+          "end": 77
+        }
+      ]
+    },
+    {
+      "exportName": "unselectedExport",
+      "originalName": "unselectedExport",
+      "existsAsValue": true,
+      "existsAsType": false,
+      "declarations": [
+        {
+          "file": "src/interfaces/public.ts",
+          "start": 277,
+          "end": 297
+        }
+      ]
+    }
+  ],
+  "originalExports": [
+    {
+      "exportName": "default",
+      "originalName": "default",
+      "existsAsValue": true,
+      "existsAsType": false,
+      "declarations": [
+        {
+          "file": "src/originals.ts",
+          "start": 217,
+          "end": 277
+        }
+      ]
+    },
+    {
+      "exportName": "Merged",
+      "originalName": "Merged",
+      "existsAsValue": true,
+      "existsAsType": true,
+      "declarations": [
+        {
+          "file": "src/originals.ts",
+          "start": 99,
+          "end": 148
+        },
+        {
+          "file": "src/originals.ts",
+          "start": 162,
+          "end": 182
+        }
+      ]
+    },
+    {
+      "exportName": "privateExport",
+      "originalName": "privateExport",
+      "existsAsValue": true,
+      "existsAsType": false,
+      "declarations": [
+        {
+          "file": "src/originals.ts",
+          "start": 198,
+          "end": 215
+        }
+      ]
+    },
+    {
+      "exportName": "RuntimeClass",
+      "originalName": "RuntimeClass",
+      "existsAsValue": true,
+      "existsAsType": true,
+      "declarations": [
+        {
+          "file": "src/originals.ts",
+          "start": 50,
+          "end": 97
+        }
+      ]
+    },
+    {
+      "exportName": "Shape",
+      "originalName": "Shape",
+      "existsAsValue": false,
+      "existsAsType": true,
+      "declarations": [
+        {
+          "file": "src/originals.ts",
+          "start": 0,
+          "end": 48
+        }
+      ]
+    }
+  ],
+  "forwardExports": [
+    {
+      "exportName": "ForwardedShape",
+      "originalName": "Shape",
+      "existsAsValue": false,
+      "existsAsType": true,
+      "declarations": [
+        {
+          "file": "src/originals.ts",
+          "start": 0,
+          "end": 48
+        }
+      ]
+    },
+    {
+      "exportName": "renamedDefault",
+      "originalName": "default",
+      "existsAsValue": true,
+      "existsAsType": false,
+      "declarations": [
+        {
+          "file": "src/originals.ts",
+          "start": 217,
+          "end": 277
+        }
+      ]
+    }
+  ],
+  "snapshotDisposed": true
+}

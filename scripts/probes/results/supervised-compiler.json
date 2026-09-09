@@ -1,0 +1,29 @@
+{
+  "probe": "supervised-compiler",
+  "nativeApi": "typescript/unstable/sync",
+  "transport": "private inherited stdin/stdout pipes, one request at a time",
+  "supervisor": "one-shot POSIX process group; no worker pool or listener",
+  "outcomes": [
+    {
+      "mode": "normal",
+      "parentEventLoopResponsive": true,
+      "parentCapturedObservations": 158,
+      "allCompilerFileReadsUseParentView": true,
+      "nativeDescendantObservedBeforeDeadline": false,
+      "stalledReplyTerminatedAsProcessGroup": false,
+      "noLateSuccess": true,
+      "exit": "completed"
+    },
+    {
+      "mode": "stall",
+      "parentEventLoopResponsive": true,
+      "parentCapturedObservations": 28,
+      "allCompilerFileReadsUseParentView": true,
+      "nativeDescendantObservedBeforeDeadline": true,
+      "stalledReplyTerminatedAsProcessGroup": true,
+      "noLateSuccess": true,
+      "exit": "deadline-terminated"
+    }
+  ],
+  "ramifyAnalysisSessionImplemented": false
+}

@@ -1,0 +1,10 @@
+{
+  "probe": "async-api-feasibility",
+  "api": "typescript/unstable/async",
+  "eventLoopResponsive": true,
+  "selectedExportNamesMatchSyncProbe": true,
+  "normalCloseDisposesSnapshot": true,
+  "pendingConfigRequestRejectedOnClose": true,
+  "pendingCloseHadNoActiveSnapshots": true,
+  "hardDeadlineOrChildExitGuaranteeEstablished": false
+}
