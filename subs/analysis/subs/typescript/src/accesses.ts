@@ -76,8 +76,13 @@ export function collectAccesses(project: Project, inputs: HelperInputs, host: Ca
       const file = target.kind === 'application' ? files.get(target.origin.file) : undefined;
       const entry = file?.exports.find(entry => entry.name === selection.name);
       const original = entry?.original ? originals.get(originalKey(entry.original)) : undefined;
+      // A problem with another local binding does not prevent this selection
+      // from resolving. Problems at the shared module target affect each one.
+      const relevantLocations = specifierNode ? [selectedAt, location(specifierNode)] : [selectedAt];
       const blocked = catalog.coverage.filter(issue => issue.code === 'compiler-blocked'
-        && issue.location.file === at.file && issue.location.start < at.end && issue.location.end > at.start);
+        && relevantLocations.some(at => issue.location.file === at.file
+          && issue.location.start < at.end && (issue.location.end > at.start
+            || issue.location.start === issue.location.end && issue.location.start >= at.start)));
       const ambiguousResource = resolved?.resource && file?.state === 'ambiguous';
       const status: AccessSelection['status'] = original && !blocked.length && !ambiguousResource ? 'resolved'
         : !entry && file?.state === 'complete' && !blocked.length ? 'missing-export' : 'unresolved';

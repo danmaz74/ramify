@@ -1,7 +1,7 @@
 {
   "_cucumberViz": {
     "generatedBy": "cucumber-viz",
-    "mcpTool": "workflow.publish_iteration",
+    "mcpTool": "workflow.write_iteration_checklist",
     "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
   },
   "checks": {
@@ -9,7 +9,7 @@
     "functionalRequirementsSatisfied": true,
     "newCodeCoveredByTests": true
   },
-  "completedAt": "2026-09-09T21:28:46Z",
+  "completedAt": "2026-09-09T21:40:06Z",
   "iteration": "9",
-  "notes": "Static-access stage implemented. Iteration-9 gate: 165 required/passed, including all 26 new instances; 143 later instances remain unexecuted. 38 focused tests, type-check, build, current declaration linking and compiled static-stage check passed. Full Vitest/Cucumber regression, scenario coverage and sealed-file checks remain workflow-owned. Public analysis session and complete source-form coverage remain later iterations."
+  "notes": "Remediated both reported constraint findings: compiler diagnostics affect only relevant selections/targets; relative and absolute specifiers do not consume paths mappings. All 3 new regression instances and 3 related existing tests passed, as did npm run type-check and git diff --check. Original 165-instance gate evidence is retained and was not rerun during remediation; automated acceptance checks remain pending."
 }

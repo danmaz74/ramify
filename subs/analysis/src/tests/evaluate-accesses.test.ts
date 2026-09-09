@@ -1,6 +1,9 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { execFile } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
 import { evaluateAccesses } from '../evaluate-accesses.js';
 import { parseDescription } from '../../subs/descriptions/src/parse.js';
@@ -27,15 +30,16 @@ const files = {
   'src/bridge.ts': "export { alias } from './tests/forward.js';",
   'subs/consumer/module.ramify': 'ramify 1\nmodule consumer tagged [browser]\n',
 };
-async function stage(probe: string) {
+async function stage(probe: string, overrides: Readonly<Record<string, string>> = {}, inspect?: (root: string) => Promise<void>) {
   const root = await mkdtemp(join(tmpdir(), 'ramify-static-analysis-'));
   const registry = createDefaultTagRegistry();
   let source: SourceAnalysis | undefined;
   let view: Extract<Awaited<ReturnType<typeof readProject>>, { status: 'acquired' }>['view'] | undefined;
   try {
-    for (const [path, text] of Object.entries({ ...files, 'subs/consumer/src/probe.ts': probe })) {
+    for (const [path, text] of Object.entries({ ...files, 'subs/consumer/src/probe.ts': probe, ...overrides })) {
       await mkdir(dirname(join(root, path)), { recursive: true }); await writeFile(join(root, path), text);
     }
+    await inspect?.(root);
     const acquired = await readProject({ request: { cwd: root, root, scope: 'whole-project', configuration: 'discover' }, parse: parseDescription,
       limits: { attempts: 3, maxFiles: 50_000, maxApplicationFiles: 20_000, maxFileBytes: 8 * 1024 ** 2, maxInputBytes: 256 * 1024 ** 2,
         maxApplicationBytes: 64 * 1024 ** 2, maxOwners: 1000, maxDepth: 128, deadlineMs: 30_000 } });
@@ -60,6 +64,54 @@ async function stage(probe: string) {
 }
 
 describe('analysis mapping of located static source requests', () => {
+  it('preserves an independent private denial beside duplicate local aliases', async () => {
+    const importer = 'subs/consumer/src/probe.ts';
+    const baseline = await stage("import { safe, privateValue } from '../../../src/interfaces/api.js';");
+    expect(baseline.diagnostics.filter(issue => issue.location?.file === importer).map(issue => issue.code)).toEqual(['not-visible']);
+    const result = await stage("import { safe as clash, privateValue, safe as clash } from '../../../src/interfaces/api.js';");
+    const accesses = result.accesses.filter(access => access.importer.file === importer);
+    expect(accesses.map(access => [access.selections[0].localName, access.selections[0].status])).toEqual([
+      ['clash', 'unresolved'], ['privateValue', 'resolved'], ['clash', 'unresolved'],
+    ]);
+    expect(result.coverage.filter(issue => issue.location.file === importer).map(issue => issue.code)).toEqual(['compiler-blocked', 'compiler-blocked']);
+    const denial = result.diagnostics.filter(issue => issue.location?.file === importer);
+    expect(denial).toEqual([expect.objectContaining({ code: 'not-visible', category: 'import',
+      importer: expect.objectContaining({ owner: 'fixture/consumer' }),
+      original: { kind: 'code', owner: 'fixture', file: 'interfaces/api.ts', binding: 'privateValue' },
+      location: expect.objectContaining({ file: importer, line: 1, column: 25 }),
+    })]);
+    expect(result.results.find(item => item.accessId === accesses[1].id)).toMatchObject({ outcome: 'checked', coverage: [],
+      decisions: [expect.objectContaining({ status: 'denied', reason: 'not-visible' })] });
+  }, 30_000);
+
+  it.each(['./init.js', 'init.js'])('keeps wildcard paths resolution consistent with the compiler for %s', async specifier => {
+    const importer = 'subs/consumer/src/probe.ts';
+    const relative = specifier.startsWith('./');
+    const result = await stage(`import '${specifier}';`, {
+      'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'bundler', types: [],
+        noUncheckedSideEffectImports: true, paths: { '*': ['./subs/consumer/src/tests/*'] } }, include: ['src', 'subs'] }),
+      'subs/consumer/src/tests/init.ts': 'globalThis.console.log(1);',
+    }, async root => {
+      const run = promisify(execFile)(process.execPath, [fileURLToPath(new URL('../../../../node_modules/typescript/lib/tsc.js', import.meta.url)),
+        '--noEmit', '--project', join(root, 'tsconfig.json')], { cwd: root, timeout: 10_000 });
+      if (relative) await expect(run).rejects.toMatchObject({ code: 1,
+        stdout: expect.stringContaining("error TS2882: Cannot find module or type declarations for side-effect import of './init.js'") });
+      else await expect(run).resolves.toMatchObject({ stdout: '', stderr: '' });
+    });
+    const access = result.accesses.find(access => access.importer.file === importer)!;
+    const evaluated = result.results.find(item => item.accessId === access.id)!;
+    if (relative) {
+      expect(access.target).toEqual({ kind: 'unresolved' });
+      expect(result.coverage.filter(issue => access.coverageIds.includes(issue.id)).map(issue => issue.code)).toEqual(['unresolved-target']);
+      expect(evaluated).toMatchObject({ outcome: 'unverifiable', decisions: [], diagnostics: [] });
+      expect(result.diagnostics.filter(issue => issue.location?.file === importer)).toEqual([]);
+    } else {
+      expect(access.target).toMatchObject({ kind: 'application', origin: { file: 'subs/consumer/src/tests/init.ts', area: { kind: 'tests' } } });
+      expect(access.coverageIds).toEqual([]);
+      expect(evaluated.decisions).toEqual([expect.objectContaining({ status: 'denied', reason: 'testing-origin' })]);
+    }
+  }, 30_000);
+
   it('checks every mixed binding and retains denial, tag and exposure evidence after disposal', async () => {
     const result = await stage(`import { safe, unsafe, Contract, privateValue } from '../../../src/interfaces/api.js';`);
     const decisions = result.results.flatMap(result => result.decisions).filter(decision => decision.question.importer.area.owner === 'fixture/consumer');

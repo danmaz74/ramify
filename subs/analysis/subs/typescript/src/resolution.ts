@@ -29,13 +29,16 @@ export class Resolution {
     const declarations = module?.declarations ?? [];
     const paths = [...new Set(declarations.map(declaration => resolve(declaration.path)))];
     const candidates: string[] = [];
-    if (specifier.startsWith('.') || isAbsolute(specifier)) candidates.push(resolve(dirname(node.getSourceFile().fileName), specifier));
+    const pathSpecifier = specifier === '.' || specifier === '..' || specifier.startsWith('./')
+      || specifier.startsWith('../') || isAbsolute(specifier);
+    if (pathSpecifier) candidates.push(resolve(dirname(node.getSourceFile().fileName), specifier));
     // The pinned native API returns pathsBasePath alongside parsed options,
     // including the directory of an inherited paths declaration. It is omitted
     // from its published CompilerOptions type. Do not substitute importer cwd.
     const options = this.project.program.getCompilerOptions() as ReturnType<Project['program']['getCompilerOptions']>
       & { readonly pathsBasePath?: string; readonly baseUrl?: string };
-    const matches = Object.entries(options.paths ?? {}).flatMap(([pattern, substitutions]) => {
+    // TypeScript applies paths substitutions only to non-relative names.
+    const matches = Object.entries(pathSpecifier ? {} : options.paths ?? {}).flatMap(([pattern, substitutions]) => {
       const star = pattern.indexOf('*');
       if (star < 0) return pattern === specifier ? [{ prefix: Infinity, text: '', substitutions }] : [];
       const prefix = pattern.slice(0, star), suffix = pattern.slice(star + 1);

@@ -2,7 +2,7 @@
 
 # Iteration 9 results: static access checking
 
-Status: implemented and locally verified. This is the static source stage; it does not establish the public analysis session, complete source-form coverage, CLI behavior or Plan 1 completion.
+Status: implemented and locally verified; both reported constraint failures have been remediated. Automated acceptance is pending. This is the static source stage; it does not establish the public analysis session, complete source-form coverage, CLI behavior or Plan 1 completion.
 
 ## Prerequisites and scope
 
@@ -78,6 +78,29 @@ Failure transcripts are retained alongside passing output in the local evidence 
 ## Evidence location
 
 Ignored local evidence is under `.reference-work/iteration9-evidence/`: intermediate gate stdout/stderr, focused passing/failing tests, independent static inventory, native script-target probe, toolkit declaration summary, build and type-check output, and compiled static-stage results. These are local evidence files, not a plan-completion artifact or committed dependency inventory.
+
+## Constraint remediation (2026-09-09)
+
+Addressed both reported source-interpretation failures in this remediation attempt. Work started from the workflow's `0d9846a` pre-remediation checkpoint in the same authoritative checkout and branch. The bugfixing skill guided reproduction and focused verification.
+
+- **cf-constraints-mtum7hd7-q8qvglzo:** Compiler-blocked diagnostics were matched against an entire import statement, suppressing independently resolvable selections. The adapter now matches diagnostic spans against the selected binding or shared module target. Duplicate local aliases retain their compiler coverage notes while a separate private binding remains resolved and produces its located `not-visible` denial, original identity and importer evidence.
+- **cf-constraints-mtum7hd7-hl0yvz64:** The plain-script fallback incorrectly applied wildcard `paths` substitutions to relative imports. Candidate construction now applies these mappings only to eligible non-relative, non-absolute specifiers. The reported relative import remains an unresolved target with coverage and no permission denial. A bare alias still selects the testing script and receives the model's origin denial.
+
+Added three real-pipeline regression instances in the existing analysis evaluation suite: duplicate local aliases with an independently private import, relative script resolution under wildcard paths, and the corresponding bare-alias positive resolution control. The latter two run the pinned TypeScript 7.0.2 CLI against the same fixture before acquisition: the relative form produces TS2882, while the bare form compiles successfully. The tests assert the adapter target, coverage and model evaluation separately. Existing assertions and scenario coverage were preserved.
+
+Before changing runtime code, the two defect regressions failed for the reported behaviors and the bare-alias control passed. During test setup, corrected the compiler executable's relative path, the pinned compiler's exact side-effect diagnostic/exit expectation and a manually counted source column; these were new test-authoring errors, not changes to expected permission outcomes.
+
+After the fixes:
+
+```sh
+npx vitest run subs/analysis/src/tests/evaluate-accesses.test.ts subs/analysis/subs/typescript/src/tests/accesses.test.ts -t 'independent private denial|wildcard paths resolution|classifies each binding|plain initialization scripts|every mixed binding'
+npm run type-check
+git diff --check
+```
+
+All passed: **6 selected tests**, including all 3 new instances and 3 existing binding/alias checks; 8 other tests were outside that focused selection. Type-check covered toolkit, portable owners, scripts and harness. Before/after transcripts and type-check output are retained as `remediation-*` files under the existing ignored evidence directory.
+
+The 165-instance gate and other implementation evidence above are from the original implementation turn and were not rerun during remediation. Full regression, scenario coverage, sealed-file and constraint acceptance checks remain with workflow automation. Only the two runtime corrections, their tests and required workflow draft artifacts changed; no model principles, contracts, exposure declarations, matrix records or capability scope changed.
 
 ## Handoff and Recommendations for Next Iteration
 
