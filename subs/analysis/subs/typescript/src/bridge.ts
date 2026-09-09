@@ -149,8 +149,9 @@ export class CompilerBridge {
     if (this.#terminal) return;
     if (!(error instanceof SourceFailure)) {
       const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
+      const path = error && typeof error === 'object' && 'path' in error && typeof error.path === 'string' ? error.path : undefined;
       error = new SourceFailure(['resource-limit', 'changed-input', 'cancelled'].includes(code) ? code : 'read-failure',
-        error instanceof Error ? error.message : String(error));
+        error instanceof Error ? error.message : String(error), path);
     }
     this.#terminal = true;
     this.#failure = error;

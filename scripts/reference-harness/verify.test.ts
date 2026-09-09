@@ -30,9 +30,9 @@ describe('reference verification invocation', () => {
     expect(result.status).toBe(iteration ? 0 : 1);
     expect(result.stderr).toBe('');
     const report = JSON.parse(result.stdout);
-    const passed = iteration === 3 ? 14 : iteration === 4 ? 53 : iteration === 5 ? 88 : iteration === 6 ? 105 : 245;
+    const passed = iteration === 3 ? 14 : iteration === 4 ? 53 : iteration === 5 ? 88 : iteration === 6 ? 105 : 268;
     expect(report.summary).toEqual({ required: iteration ? passed : 308, passed, failed: 0, notExecuted: 308 - passed });
-    expect(report.availableCapabilities).toEqual(['acquire', 'catalog', 'coverage', 'lazy', 'link', 'metadata', 'namespace', 'parse', 'registry', 'static-access', 'symbol-free', 'tags-origin']);
+    expect(report.availableCapabilities).toEqual(['acquire', 'catalog', 'coverage', 'lazy', 'link', 'metadata', 'namespace', 'parse', 'registry', 'resources', 'session', 'static-access', 'symbol-free', 'tags-origin']);
     expect(report.instances.filter((item: { status: string }) => item.status === 'passed')).toHaveLength(passed);
     if (iteration === 4) expect(report.requiredIterations).toEqual([1, 2, 4]);
     if (iteration === 6) expect(report.requiredIterations).toEqual([1, 2, 3, 4, 5, 6]);

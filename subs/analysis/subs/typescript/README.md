@@ -16,8 +16,9 @@ the project. All native filesystem callbacks use the same captured view.
 
 Catalogs retain declarations, original identities, source areas, export names,
 namespace members and forwarding origins as frozen plain data. Incomplete or
-ambiguous export sets retain located limits and known selections. Ordinary type
-checking and application execution do not run.
+ambiguous export sets retain located limits and known selections. An unresolved
+forwarding target also retains the compiler diagnostic at that specifier.
+Ordinary project type-checking and application execution do not run.
 
 Iteration 9 interprets static named/default imports, explicit and inferred type
 requests, named source re-exports and side-effect imports. Each binding retains
@@ -43,8 +44,19 @@ Unknown keys, namespace escape and nonliteral imports produce located coverage
 notes without broadening known selections. Incomplete whole expansions preserve
 both their limits and known bindings, including through namespace relays. Empty
 selections use the existing target-origin check without invented symbols.
-Resource/coverage completion and the public analysis report follow in iteration
-12. These limits do not suppress resolved selections.
+These limits do not suppress resolved selections.
+
+Iteration 12 records proven package and builtin scope separately from unresolved
+targets and project files outside modules. Vite globs, loader import methods,
+direct Jiti calls and CommonJS access/export patterns retain explicit coverage.
+They never become native ESM selections. Known CommonJS targets retain their source areas for
+analysis to apply testing-origin isolation.
+
+Resource descriptions come from actual static, dynamic and import-type accesses
+alongside the synthetic witness. Descriptions for one resource must agree on
+export identities and value/type existence. Missing resources remain target
+limits; absent names in a complete resource description remain definite
+missing-export selections for the analysis report.
 
 The native API returns the base of inherited `paths` mappings as `pathsBasePath`
 alongside parsed options, although its published `CompilerOptions` type omits

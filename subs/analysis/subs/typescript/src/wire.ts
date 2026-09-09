@@ -14,7 +14,7 @@ export const DISPOSAL_MS = 5000;
 export type Operation = 'ready' | 'catalog' | 'accesses' | 'dispose';
 
 export class SourceFailure extends Error {
-  constructor(readonly code: string, message: string) { super(message); this.name = 'SourceAnalysisError'; }
+  constructor(readonly code: string, message: string, readonly path?: string) { super(message); this.name = 'SourceAnalysisError'; }
 }
 
 /** Account JSON string escaping before constructing its encoded copy. */

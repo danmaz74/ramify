@@ -4,8 +4,8 @@ This independent Node tool scope inventories reference expectations, owns
 temporary mutation projects and requires evidence from registered capabilities.
 The current runtime registers `registry`, `parse`, `acquire`, `metadata`,
 `catalog`, `link`, `static-access`, `tags-origin`, `namespace`, `lazy`,
-`symbol-free` and bounded `coverage` through the real providers and analysis
-evaluation stage. It executes 245 reviewed instances; 63 later
+`symbol-free`, `resources`, `coverage` and `session` through the real providers
+and public analysis session. It executes 268 reviewed instances; 40 later
 instances remain unexecuted. Model
 assertions use constructed trees; source assertions use captured projects and
 the real compiler, linker and model. No stage result claims plan completion.
@@ -89,8 +89,8 @@ It checks both baseline and changed fixtures with TypeScript, then asserts
 independent permissions, originals, forwarding origins and exposure locations.
 The unchanged reference has 292 static occurrences: 164 application decisions
 and 128 compiler-proven external selections. Its lazy import and import-type
-query are now checked by iteration 11. The public analysis session and report
-assembly arrive in iteration 12.
+query are now checked by iteration 11. Iteration 12 supplies the public analysis
+session and report assembly used by its source and lifecycle handlers.
 
 `npm run reference:verify -- --plan 1 --iteration 9` requires all 165 instances
 in prerequisite closure `[1, 2, 3, 4, 5, 6, 7, 9]`. Iteration 8's migration is
@@ -115,8 +115,8 @@ compile independently. No fixture changes the running application.
 
 `npm run reference:verify -- --plan 1 --iteration 10` requires 201 instances in
 prerequisite closure `[1, 2, 3, 4, 5, 6, 7, 9, 10]`. The 107 later instances stay
-unexecuted in that iteration-specific run. The public session and complete
-resource-access capability remain assigned to iteration 12.
+unexecuted in that iteration-specific run. Iteration 12 registers the public
+session and resource-access capability.
 
 
 Iteration 11 registers all 44 namespace, forwarding, lazy, import-type and
@@ -136,3 +136,26 @@ unchanged reference has 294 occurrences: 166 allowed application decisions and
 lazy ReviewPanel callback, import-type query and Cucumber hook are included.
 These are source-stage assertions; runtime regression and Plan 1 completion
 remain separate evidence.
+
+
+Iteration 12 registers all 23 resource, coverage, session-lifecycle and input
+coherence instances through `analyzeProject` or `createAnalysisSession`. The
+reference resource variants distinguish missing targets from definite missing
+export names and invalid declarations. Coverage fixtures retain compiler
+problems, unsupported macros/CommonJS and outside-module targets without
+turning them into permission decisions. The partial clean/denied controls assert
+independent execution, check and coverage dimensions from the same public report.
+
+Lifecycle handlers run isolated workers that instrument Node filesystem and
+compiler-process boundaries. They hold actual captured reads or catalog work,
+abort/dispose the public session, inject read failures and change bytes during
+capture validation. No testing hook extends the production API. Each worker
+accounts open/closed input handles and helper processes. Retention evidence
+traverses all property descriptors and prototypes, retains 25 reports after five
+warmup cycles, checks weak references to disposed sessions, and applies the
+reviewed settled heap/RSS bounds. Those fixture measurements do not replace
+iteration 15's reference and 100-owner workloads or compiled-entry measurements.
+
+`npm run reference:verify -- --plan 1 --iteration 12` requires 268 instances in
+prerequisite closure `[1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12]`. The remaining 40
+records stay unexecuted; this iteration does not establish Plan 1 completion.

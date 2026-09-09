@@ -162,7 +162,9 @@ export class Resolution {
         return { kind: 'outside-module', module, file: relative(this.inventory.scope.root, candidate), resource: null };
       }
     }
-    if (module && paths.length && isBuiltin(specifier)) return { kind: 'external', module, file: paths[0], resource: null };
+    // Node's builtin resolver establishes these targets even when this project
+    // intentionally supplies no ambient Node declarations.
+    if (isBuiltin(specifier)) return { kind: 'external', module, file: paths[0] ?? null, resource: null };
     const resourceLike = declarations.some(handle => {
       const declaration = handle.resolve(this.project);
       return declaration && 'name' in declaration && isStringLiteral(declaration.name as Node)

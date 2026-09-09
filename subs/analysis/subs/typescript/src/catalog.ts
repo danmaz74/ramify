@@ -1,8 +1,8 @@
 import { relative, resolve } from 'node:path';
-import { SymbolFlags, TypeFlags, type Project, type Symbol as CompilerSymbol } from 'typescript/unstable/sync';
+import { SymbolFlags, TypeFlags, type Project, type Symbol as CompilerSymbol, type Diagnostic } from 'typescript/unstable/sync';
 import { SyntaxKind, isExportDeclaration, isExportSpecifier, isImportDeclaration,
   isImportSpecifier, isImportClause, isNamespaceImport,
-  isModuleDeclaration, isIdentifier, isStringLiteral, isExportAssignment,
+  isModuleDeclaration, isIdentifier, isStringLiteral, isExportAssignment, isCallExpression, isImportTypeNode, isLiteralTypeNode,
   type Node, type SourceFile } from 'typescript/unstable/ast';
 import { originalKey } from '../../model/src/identity.js';
 import type { OriginalId, SourceArea, SourceLocation, SourceOrigin } from '../../model/src/interfaces/model.js';
@@ -32,6 +32,7 @@ class CatalogBuilder {
   private count = 0;
   private readonly resourceModules = new Map<string, CompilerSymbol[]>();
   private readonly bindingProblems = new Map<string, readonly SourceLocation[]>();
+  private readonly resolutionDiagnostics = new Map<string, readonly Diagnostic[]>();
   private readonly selections = new Map<CatalogExport, Selection>();
   private readonly starTargets = new Map<string, Stars>();
   private readonly namespaceTargets: { file: MutableFile; target: MutableFile; name: string; node: Node }[] = [];
@@ -74,6 +75,25 @@ class CatalogBuilder {
     if (depth > this.inputs.limits.maxForwardingDepth) throw new SourceFailure('resource-limit', 'Source forwarding depth limit exceeded');
     if (record && ++this.count > this.inputs.limits.maxExports) throw new SourceFailure('resource-limit', 'Source export record limit exceeded');
   }
+  private unresolvedCompilerTarget(file: MutableFile, specifier: Node): void {
+    const source = specifier.getSourceFile();
+    // Resolution errors are semantic diagnostics in the pinned native API.
+    // Request them only after a forwarding target failed resolution, and keep
+    // only the diagnostics on that target. Unrelated type errors are outside
+    // this checker and never become architectural findings.
+    let diagnostics = this.resolutionDiagnostics.get(source.fileName);
+    if (!diagnostics) {
+      diagnostics = this.project.program.getSemanticDiagnostics(source.fileName);
+      this.resolutionDiagnostics.set(source.fileName, diagnostics);
+    }
+    const start = specifier.getStart();
+    for (const diagnostic of diagnostics) {
+      if (diagnostic.pos >= specifier.end || diagnostic.end <= start) continue;
+      const point = source.getLineAndCharacterOfPosition(diagnostic.pos);
+      this.limit(file, 'compiler-blocked', `Compiler could not resolve this forwarding target (TS${diagnostic.code})`, undefined, [], diagnostic.code,
+        { file: file.file, start: diagnostic.pos, end: diagnostic.end, line: point.line + 1, column: point.character + 1 });
+    }
+  }
   private runtimeMembers(module: CompilerSymbol, at: Node, entries: readonly CatalogExport[]): void {
     const type = this.project.checker.getTypeOfSymbolAtLocation(module, at);
     if (type.isErrorType() || type.flags & (TypeFlags.Any | TypeFlags.Unknown)) return;
@@ -87,15 +107,23 @@ class CatalogBuilder {
     for (const path of sourceFiles) {
       const source = this.project.program.getSourceFile(path);
       if (!source) continue;
+      const visited = new Set<string>();
       const visit = (node: Node): void => {
-        if ((isImportDeclaration(node) || isExportDeclaration(node)) && node.moduleSpecifier) {
-          const target = this.resolution.module(node.moduleSpecifier);
+        const key = `${node.kind}:${node.pos}:${node.end}`;
+        if (visited.has(key)) return;
+        visited.add(key);
+        const specifier = isImportDeclaration(node) || isExportDeclaration(node) ? node.moduleSpecifier
+          : isCallExpression(node) && node.expression.kind === SyntaxKind.ImportKeyword ? node.arguments[0]
+          : isImportTypeNode(node) && isLiteralTypeNode(node.argument) ? node.argument.literal : undefined;
+        if (specifier && isStringLiteral(specifier)) {
+          const target = this.resolution.module(specifier);
           if (target.resource && target.module) {
             const descriptions = this.resourceModules.get(target.resource.path) ?? [];
             if (!descriptions.some(symbol => symbol.id === target.module!.id)) descriptions.push(target.module);
             this.resourceModules.set(target.resource.path, descriptions);
           }
         }
+        for (const doc of (node as Node & { jsDoc?: readonly Node[] }).jsDoc ?? []) visit(doc);
         node.forEachChild(child => { visit(child); });
       };
       visit(source);
@@ -131,8 +159,8 @@ class CatalogBuilder {
       const source = this.project.program.getSourceFile(resolve(this.root, path));
       if (!source) this.limit(file, 'compiler-blocked', 'Owned source was not loaded by the configured compiler');
       else {
-        // Parsing/binding is needed to establish declarations. Never request
-        // semantic, global, suggestion or declaration-emit diagnostics.
+        // Parsing/binding is needed to establish declarations. Resolution
+        // failures request their own narrowly located diagnostic evidence.
         const bindingDiagnostics = this.project.program.getBindDiagnostics(source.fileName);
         this.bindingProblems.set(path, bindingDiagnostics.map(diagnostic => ({ ...this.at(path), start: diagnostic.pos, end: diagnostic.end })));
         for (const diagnostic of [...this.project.program.getSyntacticDiagnostics(source.fileName), ...bindingDiagnostics]) {
@@ -158,6 +186,7 @@ class CatalogBuilder {
     const modules = this.resourceModules.get(inventory.path) ?? [];
     if (!modules.length) { this.limit(file, 'resource-description', 'No effective compiler export description for the existing resource'); return; }
     const alternatives: CatalogExport[][] = [];
+    const signatures: string[] = [];
     for (const module of modules) {
       const names = [...this.project.checker.getExportsOfModule(module)];
       // JSON has a synthetic ESM default supplied by TypeScript's module type,
@@ -166,14 +195,25 @@ class CatalogBuilder {
       const entries = names.map(symbol => this.resourceExport(symbol, symbol.name, file, inventory, depth + 1));
       if (json && !entries.some(entry => entry.name === 'default')) entries.push(this.resourceExport(module, 'default', file, inventory, depth + 1, 'default'));
       alternatives.push(entries);
+      // Compare each effective description before another description supplies
+      // facts for the same canonical resource binding. Equal export names do
+      // not establish agreement on value/type existence.
+      signatures.push(JSON.stringify(entries.map(entry => {
+        const original = entry.original && this.originals.get(originalKey(entry.original));
+        return [entry.name, entry.original, original && [original.hasValue, original.hasType]];
+      }).sort((a, b) => order(String(a[0]), String(b[0])))));
       for (const handle of module.declarations) {
         const path = relative(this.root, handle.path);
         if (!file.descriptionFiles.includes(path)) file.descriptionFiles.push(path);
       }
     }
     file.exports = alternatives[0];
-    const signature = (entries: CatalogExport[]) => JSON.stringify(entries.map(entry => [entry.name, entry.original]).sort((a, b) => order(String(a[0]), String(b[0]))));
-    if (alternatives.some(entries => signature(entries) !== signature(file.exports))) this.limit(file, 'ambiguous-original', 'Conflicting effective export descriptions for one resource');
+    if (signatures.some(signature => signature !== signatures[0])) {
+      this.limit(file, 'ambiguous-original', 'Conflicting effective export descriptions for one resource');
+      // Neither named declarations nor forwarding may ground permissions in
+      // the arbitrarily first description when its binding facts conflict.
+      file.exports = file.exports.map(entry => ({ ...entry, original: null }));
+    }
   }
   private resourceExport(symbol: CompilerSymbol, name: string, file: MutableFile, inventory: InventoryFile, depth: number, forcedBinding?: string): CatalogExport {
     this.check(depth, true);
@@ -252,6 +292,7 @@ class CatalogBuilder {
           }
           if (target.kind === 'resource-target' || target.kind === 'unresolved') {
             this.limit(file, target.kind === 'resource-target' ? 'resource-target' : 'unresolved-target', `Cannot establish target for export ${name}`, specifier);
+            this.unresolvedCompilerTarget(file, specifier);
             return { name, original: null, namespace: null, forwarding };
           }
           if (target.kind === 'outside-module' || target.kind === 'external') {
@@ -342,7 +383,9 @@ class CatalogBuilder {
       const target = this.resolution.module(statement.moduleSpecifier);
       if (target.kind !== 'application' || !target.file) {
         this.limit(file, target.kind === 'outside-module' ? 'outside-module-target' : target.kind === 'resource-target' ? 'resource-target' : 'incomplete-exports',
-          'Cannot enumerate every application original of this star export', statement.moduleSpecifier); continue;
+          'Cannot enumerate every application original of this star export', statement.moduleSpecifier);
+        if (target.kind === 'unresolved' || target.kind === 'resource-target') this.unresolvedCompilerTarget(file, statement.moduleSpecifier);
+        continue;
       }
       targets.push({ file: target.file, node: statement.moduleSpecifier, typeOnly: !!statement.isTypeOnly });
     }

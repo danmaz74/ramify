@@ -1,7 +1,7 @@
 import type { Project } from 'typescript/unstable/sync';
 import { isIdentifier, isPropertyAccessExpression, isElementAccessExpression, isStringLiteral,
   isQualifiedName, isParenthesizedExpression, isVariableDeclaration, isObjectBindingPattern,
-  isComputedPropertyName, isShorthandPropertyAssignment, type Node, type Identifier, type BindingName, type SourceFile } from 'typescript/unstable/ast';
+  isComputedPropertyName, isShorthandPropertyAssignment, isExportSpecifier, isExportDeclaration, type Node, type Identifier, type BindingName, type SourceFile } from 'typescript/unstable/ast';
 import type { SourceAccess } from './interfaces/source.js';
 
 type Form = SourceAccess['selectionForm'];
@@ -23,6 +23,9 @@ export class NamespaceUses {
       if (isIdentifier(node)) {
         const symbol = isShorthandPropertyAssignment(node.parent) && node.parent.name === node
           ? project.checker.getShorthandAssignmentValueSymbol(node.parent)
+          : isExportSpecifier(node.parent) && isExportDeclaration(node.parent.parent.parent) && !node.parent.parent.parent.moduleSpecifier
+            && (node.parent.propertyName ?? node.parent.name) === node
+            ? project.checker.getExportSpecifierLocalTargetSymbol(node.parent)
           : project.checker.getSymbolAtLocation(node);
         if (symbol) {
           const nodes = this.references.get(symbol.id) ?? [];
@@ -45,7 +48,9 @@ export class NamespaceUses {
         else if (isComputedPropertyName(property) && isStringLiteral(property.expression)) key = property.expression.text;
         if (key === undefined) { sink.unknown(element, 'unknown-key'); continue; }
         const selected = [...path, key];
-        if (sink.namespace(selected) && !sink.original(selected)) this.binding(element.name, sink, selected, then);
+        if (path.length && sink.original(path) && !sink.exported(selected)) {
+          sink.select(element, path, then ? 'then-destructure' : 'destructure', isIdentifier(element.name) ? element.name.text : null);
+        } else if (sink.namespace(selected) && (isObjectBindingPattern(element.name) || !sink.original(selected))) this.binding(element.name, sink, selected, then);
         else sink.select(element, selected, then ? 'then-destructure' : 'destructure', isIdentifier(element.name) ? element.name.text : null);
       }
     } else if (isIdentifier(name)) {

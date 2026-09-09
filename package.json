@@ -5,10 +5,30 @@
   "description": "Multi-file hierarchical modules for TypeScript: a toolkit to define, enforce, visualize, and help agents adhere to them.",
   "type": "module",
   "exports": {
-    "./analysis/inventory": { "types": "./dist/subs/analysis/src/inventory-entry.d.ts", "import": "./dist/subs/analysis/src/inventory-entry.js" },
-    "./model": { "types": "./dist/subs/analysis/subs/model/src/index.d.ts", "import": "./dist/subs/analysis/subs/model/src/index.js" },
-    "./presentation": { "types": "./dist/subs/presentation/src/index.d.ts", "import": "./dist/subs/presentation/src/index.js" },
-    "./layout": { "types": "./dist/subs/presentation/subs/layout/src/index.d.ts", "import": "./dist/subs/presentation/subs/layout/src/index.js" }
+    ".": {
+      "types": "./dist/subs/analysis/src/index.d.ts",
+      "import": "./dist/subs/analysis/src/index.js"
+    },
+    "./analysis": {
+      "types": "./dist/subs/analysis/src/index.d.ts",
+      "import": "./dist/subs/analysis/src/index.js"
+    },
+    "./analysis/inventory": {
+      "types": "./dist/subs/analysis/src/inventory-entry.d.ts",
+      "import": "./dist/subs/analysis/src/inventory-entry.js"
+    },
+    "./model": {
+      "types": "./dist/subs/analysis/subs/model/src/index.d.ts",
+      "import": "./dist/subs/analysis/subs/model/src/index.js"
+    },
+    "./presentation": {
+      "types": "./dist/subs/presentation/src/index.d.ts",
+      "import": "./dist/subs/presentation/src/index.js"
+    },
+    "./layout": {
+      "types": "./dist/subs/presentation/subs/layout/src/index.d.ts",
+      "import": "./dist/subs/presentation/subs/layout/src/index.js"
+    }
   },
   "scripts": {
     "worktree:prepare": "npm --prefix examples/collection-review ci && npm --prefix site ci",
@@ -49,5 +69,7 @@
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "typescript": "7.0.2"
-  }
+  },
+  "main": "./dist/subs/analysis/src/index.js",
+  "types": "./dist/subs/analysis/src/index.d.ts"
 }

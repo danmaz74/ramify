@@ -6,7 +6,8 @@ import { SyntaxKind, isCallExpression, isExportDeclaration, isImportDeclaration,
   isNamedExports, isNamedImports, isStringLiteral, isImportTypeNode, isLiteralTypeNode,
   isNamespaceImport, isAwaitExpression, isParenthesizedExpression, isPropertyAccessExpression,
   isVariableDeclaration, isExpressionStatement, isVoidExpression, isArrowFunction, isFunctionExpression,
-  isQualifiedName, isIdentifier, type Node } from 'typescript/unstable/ast';
+  isQualifiedName, isIdentifier, isImportEqualsDeclaration, isExternalModuleReference, isExportAssignment,
+  isBinaryExpression, isElementAccessExpression, isMetaProperty, type Node } from 'typescript/unstable/ast';
 import { originalKey } from '../../model/src/identity.js';
 import type { SourceLocation, SourceOrigin } from '../../model/src/interfaces/model.js';
 import type { AccessSelection, CatalogExport, SourceAccess, SourceAnalysis, SourceCatalog, SourceLimit, SourceTarget, WrittenForm } from './interfaces/source.js';
@@ -85,10 +86,10 @@ export function collectAccesses(project: Project, inputs: HelperInputs, host: Ca
     if (selection && ++selectionCount > inputs.limits.maxSelections) throw new SourceFailure('resource-limit', 'Source selection record limit exceeded');
     const at = location(node);
     const specifier = specifierNode && isStringLiteral(specifierNode) ? specifierNode.text : null;
-    const resolved = specifierNode && specifier !== null ? resolution.module(specifierNode) : undefined;
+    const resolved = specifierNode && specifier !== null && form !== 'macro' ? resolution.module(specifierNode) : undefined;
     const target: SourceTarget = resolved && specifier !== null ? targetOf(resolved, specifier) : { kind: 'unresolved' };
     const coverageIds: string[] = [];
-    if (target.kind === 'unresolved') coverageIds.push(limit(specifier === null ? 'nonliteral-target'
+    if (target.kind === 'unresolved' && form !== 'macro' && !(form === 'commonjs' && specifier === null)) coverageIds.push(limit(specifier === null ? 'nonliteral-target'
       : resolved?.kind === 'resource-target' ? 'resource-target' : 'unresolved-target',
     specifierNode ? location(specifierNode) : at, 'Cannot establish the accessed source or resource target'));
     if (target.kind === 'outside-module') coverageIds.push(limit('outside-module-target', at,
@@ -135,6 +136,43 @@ export function collectAccesses(project: Project, inputs: HelperInputs, host: Ca
       continue;
     }
     const uses = new NamespaceUses(project, source);
+    const member = (node: Node): { base: Node; name: string } | undefined => {
+      if (isPropertyAccessExpression(node)) return { base: node.expression, name: node.name.text };
+      if (isElementAccessExpression(node) && isStringLiteral(node.argumentExpression)) return { base: node.expression, name: node.argumentExpression.text };
+      return undefined;
+    };
+    const commonjsExport = (node: Node): boolean => {
+      const selected = member(node);
+      if (!selected) return false;
+      return isIdentifier(selected.base) && (selected.base.text === 'exports' || selected.base.text === 'module' && selected.name === 'exports')
+        || commonjsExport(selected.base);
+    };
+    const loaderFactories = new Set<number>(), loaderNamespaces = new Set<number>(), loaders = new Set<number>();
+    const symbolId = (node: Node): number | undefined => project.checker.getSymbolAtLocation(node)?.id;
+    const indexed = (symbols: ReadonlySet<number>, node: Node): boolean => {
+      const id = symbolId(node); return id !== undefined && symbols.has(id);
+    };
+    for (const statement of source.statements) {
+      if (!isImportDeclaration(statement) || !isStringLiteral(statement.moduleSpecifier) || statement.moduleSpecifier.text !== 'jiti') continue;
+      const clause = statement.importClause;
+      const remember = (symbols: Set<number>, node: Node): void => { const id = symbolId(node); if (id !== undefined) symbols.add(id); };
+      if (clause?.name) remember(loaderFactories, clause.name);
+      if (clause?.namedBindings && isNamedImports(clause.namedBindings)) for (const binding of clause.namedBindings.elements) {
+        if ((binding.propertyName ?? binding.name).text === 'createJiti') remember(loaderFactories, binding.name);
+      }
+      if (clause?.namedBindings && isNamespaceImport(clause.namedBindings)) remember(loaderNamespaces, clause.namedBindings.name);
+    }
+    const indexLoaders = (node: Node): void => {
+      if (isVariableDeclaration(node) && isIdentifier(node.name) && node.initializer && isCallExpression(node.initializer)) {
+        const expression = node.initializer.expression, selected = member(expression);
+        if (isIdentifier(expression) && indexed(loaderFactories, expression)
+          || selected?.name === 'createJiti' && indexed(loaderNamespaces, selected.base)) {
+          const id = symbolId(node.name); if (id !== undefined) loaders.add(id);
+        }
+      }
+      node.forEachChild(child => { indexLoaders(child); });
+    };
+    if (loaderFactories.size || loaderNamespaces.size) indexLoaders(source);
     const interpret = (node: Node, specifier: Node | undefined, form: WrittenForm, runtimeLoad: boolean, explicitType: boolean,
       runtimeOnly = false) => {
       let records = 0;
@@ -195,6 +233,27 @@ export function collectAccesses(project: Project, inputs: HelperInputs, host: Ca
       // forEachChild excludes attached JSDoc; its parsed type AST is still
       // compiler input when allowJs/checkJs select this JavaScript source.
       for (const doc of (node as Node & { jsDoc?: readonly Node[] }).jsDoc ?? []) visit(doc);
+      if (isImportEqualsDeclaration(node) && isExternalModuleReference(node.moduleReference)) {
+        record(node, node.moduleReference.expression, 'commonjs', 'unknown', !node.isTypeOnly, undefined,
+          { code: 'unsupported-commonjs', message: 'Import-equals access is outside the ECMAScript interpretation profile' });
+        return;
+      }
+      if (isExportAssignment(node) && node.isExportEquals || isBinaryExpression(node) && node.operatorToken.kind === SyntaxKind.EqualsToken && commonjsExport(node.left)) {
+        record(node, undefined, 'commonjs', 'unknown', true, undefined,
+          { code: 'unsupported-commonjs', message: 'CommonJS export assignment is outside the ECMAScript interpretation profile' });
+      }
+      if (isCallExpression(node)) {
+        const selected = member(node.expression);
+        if (isIdentifier(node.expression) && node.expression.text === 'require') {
+          record(node, node.arguments[0], 'commonjs', 'unknown', true, undefined,
+            { code: 'unsupported-commonjs', message: 'CommonJS require access is outside the ECMAScript interpretation profile' });
+        } else if (isIdentifier(node.expression) && loaders.size > 0 && indexed(loaders, node.expression)
+          || selected && (selected.name === 'import' || ['glob', 'globEager'].includes(selected.name)
+            && isMetaProperty(selected.base) && selected.base.keywordToken === SyntaxKind.ImportKeyword)) {
+          record(node, node.arguments[0], 'macro', 'unknown', true, undefined,
+            { code: 'unsupported-loader', message: 'No adapter interprets this loader or macro target and selection' });
+        }
+      }
       if (isImportDeclaration(node)) {
         const clause = node.importClause;
         if (!clause) record(node, node.moduleSpecifier, 'side-effect-import', 'none', true);
@@ -280,6 +339,13 @@ export function collectAccesses(project: Project, inputs: HelperInputs, host: Ca
           else if (isIdentifier(name)) path.push(name.text);
         };
         if (node.qualifier) qualifier(node.qualifier);
+        // A typeof-import qualifier can continue through ordinary properties
+        // on an owned value. Namespace constituents alone extend its identity.
+        if (node.isTypeOf) for (let length = 1; length < path.length; length++) {
+          if (lookup(specifier, path.slice(0, length)).entry?.original && !lookup(specifier, path.slice(0, length + 1)).entry) {
+            path.length = length; break;
+          }
+        }
         if (!path.length || lookup(specifier, path).entry?.namespace && !lookup(specifier, path).entry?.original) {
           interpretation.whole(path, 'whole-namespace'); interpretation.finish('whole-namespace');
         } else interpretation.emit(node.qualifier ?? node, path, 'qualified-type', null);

@@ -41,9 +41,10 @@ describe('required capability and assertion execution gates', () => {
     const report = await verify(undefined, referenceRuntime);
     expect(report.passed).toBe(false);
     expect(report.planComplete).toBe(false);
-    expect(report.summary).toEqual({ required: 308, passed: 245, failed: 0, notExecuted: 63 });
-    expect(report.availableCapabilities).toEqual(['acquire', 'catalog', 'coverage', 'lazy', 'link', 'metadata', 'namespace', 'parse', 'registry', 'static-access', 'symbol-free', 'tags-origin']);
-    expect(report.instances.filter((item) => item.status === 'not-executed').every((item) => item.reason === 'missing-capability')).toBe(true);
+    expect(report.summary).toEqual({ required: 308, passed: 268, failed: 0, notExecuted: 40 });
+    expect(report.availableCapabilities).toEqual(['acquire', 'catalog', 'coverage', 'lazy', 'link', 'metadata', 'namespace', 'parse', 'registry', 'resources', 'session', 'static-access', 'symbol-free', 'tags-origin']);
+    expect(report.instances.filter((item) => item.status === 'not-executed' && item.reason === 'missing-handler').map(item => item.id)).toEqual(['I1-01:baseline']);
+    expect(report.instances.filter((item) => item.status === 'not-executed' && item.id !== 'I1-01:baseline').every(item => item.reason === 'missing-capability')).toBe(true);
     expect(await readdir(workRoot)).toEqual([]);
   }, 1_200_000);
 

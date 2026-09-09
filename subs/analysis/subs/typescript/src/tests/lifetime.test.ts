@@ -70,12 +70,12 @@ describe('supervised source lifetime', () => {
   }, 15_000);
 
   it('turns an influencing read failure into an explicit failed startup and releases the helper', async () => {
-    await withInputs(async inputs => {
+    await withInputs(async (inputs, root) => {
       let reads = 0;
       const start = performance.now();
       await expect(createSourceAnalysis(replaceView(inputs, {
-        async readFile() { reads++; throw new Error('Deliberately unreadable captured input'); },
-      }))).rejects.toMatchObject({ code: 'read-failure', message: 'Deliberately unreadable captured input' });
+        async readFile() { reads++; throw Object.assign(new Error('Deliberately unreadable captured input'), { path: join(root, 'src/value.ts') }); },
+      }))).rejects.toMatchObject({ code: 'read-failure', message: 'Deliberately unreadable captured input', path: join(root, 'src/value.ts') });
       expect(reads).toBe(1);
       expect(performance.now() - start).toBeLessThan(5000);
       // The independent next session proves failed startup leaves no reusable

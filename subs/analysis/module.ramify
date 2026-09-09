@@ -18,3 +18,7 @@ expose-src * from "interfaces/analysis.ts" to parent
 
 // A2: inventory and source-profile assembly for production selection.
 expose-src acquireInventory from "inventory.ts" to parent
+
+// A3: disposable batch sessions and the direct service binding.
+expose-src createAnalysisSession from "session.ts" to parent
+expose-src analyzeProject from "analyze-project.ts" to parent

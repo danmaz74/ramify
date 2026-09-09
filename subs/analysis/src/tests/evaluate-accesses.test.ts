@@ -5,7 +5,7 @@ import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
-import { evaluateAccesses } from '../evaluate-accesses.js';
+import { evaluateAccesses, evaluateAccessesAsync } from '../evaluate-accesses.js';
 import { parseDescription } from '../../subs/descriptions/src/parse.js';
 import { linkDescriptions } from '../../subs/descriptions/src/link.js';
 import { buildModel, createDefaultTagRegistry, deriveSourceAreas } from '../../subs/model/src/index.js';
@@ -62,6 +62,58 @@ async function stage(probe: string, overrides: Readonly<Record<string, string>> 
     try { await source?.dispose(); } finally { await view?.dispose(); await rm(root, { recursive: true, force: true }); }
   }
 }
+
+describe('cancellable real-source decision batches', () => {
+  it('admits queued cancellation before finishing one large namespace occurrence', async () => {
+    const names = Array.from({ length: 256 }, (_, index) => `value${index}`);
+    const probe = "import * as api from '../../../src/interfaces/api.js';\n" + names.map(name => `void api.${name};`).join('\n');
+    const result = await stage(probe, {
+      'module.ramify': 'ramify 1\nmodule fixture\nexpose-src * from "interfaces/api.ts" tagged [browser] to descendants\n',
+      'src/interfaces/api.ts': files['src/interfaces/api.ts'] + '\n' + names.map(name => `export const ${name} = 1;`).join('\n'),
+    }, compilerClean);
+    const members = result.accesses.filter(access => access.importer.file === 'subs/consumer/src/probe.ts');
+    expect(members).toHaveLength(names.length);
+    expect(members.every(access => access.selections.length === 1 && access.coverageIds.length === 0)).toBe(true);
+    // The adapter currently emits each selected member separately. Group the
+    // actual source facts at their shared namespace import to exercise the
+    // supported multi-selection contract without inventing bindings or a model.
+    const accesses = [{ ...members[0], selections: members.flatMap(access => access.selections) }];
+    expect(accesses[0].selections).toHaveLength(names.length);
+    expect(accesses[0].coverageIds).toEqual([]);
+    const baseline = evaluateAccesses(result.model, accesses, 100_000);
+    expect(baseline.diagnostics).toEqual([]);
+    expect(baseline.results[0].decisions).toHaveLength(names.length);
+    expect(baseline.results[0].decisions.every(decision => decision.status === 'allowed')).toBe(true);
+
+    const controller = new AbortController();
+    let checkpoints = 0, completed = 0, diagnostics = 0;
+    let cancel: ReturnType<typeof setImmediate> | undefined;
+    try {
+      await expect(evaluateAccessesAsync(result.model, accesses, 100_000, {
+        checkpoint() {
+          if (!checkpoints++) cancel = setImmediate(() => controller.abort());
+          if (controller.signal.aborted) throw Object.assign(new Error('Decision work cancelled'), { code: 'cancelled' });
+        },
+        diagnostic() { diagnostics++; },
+        result() { completed++; },
+      })).rejects.toMatchObject({ code: 'cancelled' });
+      expect(controller.signal.aborted).toBe(true);
+      expect(checkpoints).toBeGreaterThan(1);
+      expect(checkpoints).toBeLessThan(names.length);
+      expect(completed).toBe(0);
+      expect(diagnostics).toBe(0);
+      await new Promise<void>(done => setImmediate(done));
+      expect(completed).toBe(0);
+    } finally { if (cancel) clearImmediate(cancel); }
+
+    const fresh: typeof baseline.results[number][] = [];
+    await evaluateAccessesAsync(result.model, accesses, 100_000, {
+      checkpoint() {}, diagnostic() { throw new Error('The exposed positive control must have no diagnostics'); },
+      result(access) { fresh.push(access); },
+    });
+    expect(fresh).toEqual(baseline.results);
+  }, 30_000);
+});
 
 describe('analysis mapping of located static source requests', () => {
   it.each(['typescript', 'jsdoc'] as const)('keeps exposure, importer tags and testing origin on %s import types', async variant => {
@@ -282,6 +334,47 @@ const namespaceImporter = 'subs/consumer/src/probe.ts';
 const namespaceApi = '../../../src/interfaces/api.js';
 
 describe('iteration 11 constraint regressions', () => {
+  it.each(['static', 'awaited'].flatMap(kind => ['local-export', 'renamed-export', 'local-export-with-denial'].map(flow => ({ kind, flow }))))
+  ('reports $kind namespace $flow escape and preserves selected denials', async ({ kind, flow }) => {
+    const declaration = kind === 'static' ? `import * as ns from '${namespaceApi}';` : `const ns = await import('${namespaceApi}');`;
+    const result = await stage(`${declaration}\n${flow.endsWith('with-denial') ? 'void ns.privateValue;' : ''}\nexport { ns${flow === 'renamed-export' ? ' as forwarded' : ''} };`, {}, compilerClean);
+    const coverage = result.coverage.filter(issue => issue.location.file === namespaceImporter);
+    expect(coverage.map(issue => issue.code)).toEqual(['namespace-escape']);
+    expect(coverage[0].location.line).toBe(3);
+    expect(result.diagnostics.filter(issue => issue.location?.file === namespaceImporter).map(issue => issue.code))
+      .toEqual(flow.endsWith('with-denial') ? ['not-visible'] : []);
+  }, 30_000);
+
+  it.each(['static', 'awaited'].flatMap(kind => ['nested-member', 'name-property', 'renamed-name-property'].map(selection => ({ kind, selection }))))
+  ('checks $kind namespace destructuring $selection against the selected original', async ({ kind, selection }) => {
+    const declaration = kind === 'static' ? `import * as ns from '${namespaceApi}';` : `const ns = await import('${namespaceApi}');`;
+    const body = selection === 'nested-member' ? 'const { Merged: { member } } = ns;'
+      : `const { name${selection === 'renamed-name-property' ? ': label' : ''} } = ns.Merged;`;
+    const result = await stage(`${declaration}\n${body}\nexport {};`, {
+      'src/interfaces/api.ts': files['src/interfaces/api.ts'] + '\nexport function Merged() { return 1; }\nexport namespace Merged { export const member = 2; }',
+      'module.ramify': files['module.ramify'] + 'expose-src Merged from "interfaces/api.ts" tagged [browser] to descendants\n',
+    }, compilerClean);
+    const accesses = result.accesses.filter(access => access.importer.file === namespaceImporter);
+    expect(accesses.flatMap(access => access.selections.map(selection => [selection.original?.binding, selection.request, selection.status])))
+      .toEqual([[selection === 'nested-member' ? 'Merged/member' : 'Merged', 'value', 'resolved']]);
+    expect(result.coverage.filter(issue => issue.location.file === namespaceImporter)).toEqual([]);
+    expect(result.diagnostics.filter(issue => issue.location?.file === namespaceImporter).map(issue => issue.code))
+      .toEqual(selection === 'nested-member' ? ['not-visible'] : []);
+  }, 30_000);
+
+  it.each(['name', 'call', 'member'])('checks import-type Merged.%s against the appropriate original', async property => {
+    const result = await stage(`type Selected = typeof import('${namespaceApi}').Merged.${property};`, {
+      'src/interfaces/api.ts': files['src/interfaces/api.ts'] + '\nexport function Merged() { return 1; }\nexport namespace Merged { export const member = 2; }',
+      'module.ramify': files['module.ramify'] + 'expose-src Merged from "interfaces/api.ts" tagged [browser] to descendants\n',
+    }, compilerClean);
+    const accesses = result.accesses.filter(access => access.importer.file === namespaceImporter);
+    expect(accesses.flatMap(access => access.selections.map(selection => [selection.original?.binding, selection.request, selection.status])))
+      .toEqual([[property === 'member' ? 'Merged/member' : 'Merged', 'type-only', 'resolved']]);
+    expect(result.coverage.filter(issue => issue.location.file === namespaceImporter)).toEqual([]);
+    expect(result.diagnostics.filter(issue => issue.location?.file === namespaceImporter).map(issue => issue.code))
+      .toEqual(property === 'member' ? ['not-visible'] : []);
+  }, 30_000);
+
   it.each(['static', 'awaited'].flatMap(kind => ['direct', 'shorthand', 'shorthand-with-denial'].map(flow => ({ kind, flow }))))
   ('reports $kind namespace $flow escape with any known denial intact', async ({ kind, flow }) => {
     const declaration = kind === 'static' ? `import * as ns from '${namespaceApi}';` : `const ns = await import('${namespaceApi}');`;
