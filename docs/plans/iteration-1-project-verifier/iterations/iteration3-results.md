@@ -183,3 +183,13 @@ handlers remain pending at their scheduled iterations.
    into empty successful models.
 4. Run the delegated automatic regressions before accepting this draft. Keep
    the full Plan 1 gate failing until every required future instance executes.
+
+## Publication bookkeeping
+
+Implementation commit: `9ab062f`.
+The first publication attempt returned `WORKTREE_DIRTY` for the pre-existing
+generated `iteration2-check-results.md` change. Inspection showed only the
+control plane's added `Regression Tests: PASSED` line. Its contents were not
+edited; that existing generated output is committed separately with this
+publication note so publication can preserve it. No iteration 3 regression
+outcome is inferred from the iteration 2 result.
