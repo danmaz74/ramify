@@ -9,14 +9,15 @@
 
 Check the first source forms end to end: static named and default imports,
 type-only forms, forwarding exports and local aliases, `.js` substitution and
-configured aliases. Each occurrence becomes a located request, the model
-decides it, and the decision keeps its evidence.
+configured aliases, plus static symbol-free import targets. Each occurrence
+becomes a located request, the model decides it, and the decision keeps its evidence.
 
 ## Read first
 
 - [TypeScript interpretation principles](../../../model/typescript-source-interpretation.principles.md):
   explicit bindings classified individually, forwarding, `.js` substitution,
-  aliases, written form versus checked form.
+  aliases, written form versus checked form, symbol-free loads and their
+  testing-origin checks.
 - Main plan: Source forms table rows one and two, the `SourceAccess` and
   `ImportDecision` rows of the contract table, Reports and exit behavior for
   diagnostic contents.
@@ -25,9 +26,15 @@ decides it, and the decision keeps its evidence.
 
 1. `SourceAccess` occurrences for static imports and re-exports: accessed
    file, original binding, forwarding-origin path, written form, selected
-   binding form (value or type), importer file and source area.
-2. Evaluation: every occurrence passes through `ImportDecision`; allowed and
-   denied results retain importer area, original, tags, exposure declarations
+   binding form (value or type), importer file and source area. Also retain
+   target-only occurrences for static side-effect imports of source or
+   stylesheets, with no fabricated symbol. Resolve their source area and apply
+   the model's origin guard so iteration 10 can execute `production-side-effect`
+   and `testing-style`. Empty/re-export and discarded-lazy variants, and the
+   I1-22 instances, are completed in iteration 11.
+2. Evaluation: every selected binding passes through `ImportDecision` and
+   every known target-only occurrence through the source-origin guard;
+   allowed and denied results retain importer area, original, tags, exposure declarations
    and source-origin evidence, plus repository-relative locations.
 3. Diagnostics with stable reason categories, deterministic ordering and no
    compiler internals.
@@ -48,7 +55,7 @@ decides it, and the decision keeps its evidence.
 
 ```sh
 npm run type-check && npm test
-npm run reference:verify -- --plan 1
+npm run reference:verify -- --plan 1 --iteration 9
 ```
 
 ## Exit criteria
@@ -62,4 +69,6 @@ npm run reference:verify -- --plan 1
 ## Handoff
 
 Iterations 10 and 11 add forms and rules on the same occurrence and decision
-pipeline; iteration 12 assembles it into the analysis session.
+pipeline. Iteration 10's symbol-free origin fixtures use the static target-only
+support implemented here; they do not depend on iteration 11. Iteration 12
+assembles the pipeline into the analysis session.

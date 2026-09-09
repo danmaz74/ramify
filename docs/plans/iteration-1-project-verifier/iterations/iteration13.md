@@ -70,7 +70,7 @@ a layout error in both formats, with exit 1 and no strict option.
 npm run build && npm run type-check && npm test
 (cd examples/collection-review && node ../../dist/src/cli-entry.js check)
 node dist/src/cli-entry.js check --root examples/collection-review --format json
-npm run reference:verify -- --plan 1
+npm run reference:verify -- --plan 1 --iteration 13
 ```
 
 ## Exit criteria

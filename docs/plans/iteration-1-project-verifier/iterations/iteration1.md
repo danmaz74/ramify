@@ -24,7 +24,9 @@ toolkit source moves and no checker code is written here.
 
 ## Deliverables
 
-All under `docs/plans/iteration-1-project-verifier/`:
+The review documents live under `docs/plans/iteration-1-project-verifier/`.
+Executable probes live at the package root's `scripts/probes/`, in the
+independent scripts scope selected by `tsconfig.scripts.json`.
 
 1. `contracts.md`: exact TypeScript signatures and owned vocabulary for every
    contract in the plan's proposed-contract table, plus the package export map
@@ -44,23 +46,34 @@ All under `docs/plans/iteration-1-project-verifier/`:
 3. `move-map.md`: the file-by-file map from every current `src/` and
    `scripts/` file to its target owner, entry or independent scope, including
    removals. Account for `scripts/emit-diagrams.ts` and the reference harness
-   as an explicitly independent tooling scope.
+   as an explicitly independent tooling scope. Record the existing
+   `site/static/diagrams/` snapshot destinations used by
+   `src/viz/{emitted-diagrams,tree-diagram,focus-diagram}.test.ts`, and their
+   paths after the tests move to presentation's `src/tests/`.
 4. `scope.md`: the exact configuration files of the two target projects, the
    compiler integration choice, the report schema with its version, finite
    acquisition/work/report limits with their initial values, and the
    supported-platform consequences already decided in the plan. Root
    selection, configuration discovery, warnings and exits are fixed by the
    [CLI invocation](../../../architecture/cli-invocation.spec.md) contract and are
-   not redecided here.
-5. `probes.md` with runnable scripts under `scripts/probes/`: focused
+   not redecided here. Specify the deterministic output of
+   `npm run production:files -- --root <dir>`, its independent script entry,
+   the analysis inventory/profile contract it consumes, and the production
+   build configuration that uses the same selected files. Activate this in
+   iteration 8, exclude both forms of testing source, and preserve complete
+   type-check/test inputs. Specify how the tool loads the analysis API before
+   `dist/` exists, so a clean build has no bootstrap cycle.
+5. `probes.md` with runnable scripts under package-root `scripts/probes/`: focused
    TypeScript compiler API probes on source aliases, unmarked interfaces,
    merged runtime bindings, interface-file wildcard export enumeration, `.js`
    substitution and the reference's two CSS-module resources. Record the
    installed compiler version and the exact APIs selected.
 6. The final subcase list for iterations 2 to 15: every I1 subcase named in
-   the matrix, its required capability, fixture root, mutation summary and
-   independently expected outcome, as the table iteration 2 turns into
-   harness instance records.
+   the matrix, its implementing iteration, required capability, fixture root,
+   mutation summary and independently expected outcome, as the table
+   iteration 2 turns into harness instance records. Include iteration
+   prerequisites for intermediate verification and separately identify the
+   TypeScript and checked-JavaScript JSDoc variants of I1-21 `import-type`.
 
 ## Matrix rows executed here
 

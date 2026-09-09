@@ -36,7 +36,12 @@ the checker, and the reference's own regression tiers remain evidence.
 4. Test discovery evidence: every migrated toolkit owner's tests and the
    example's standalone testing-module fixture are discovered; production
    selection excludes testing-classified source and retains ordinary
-   interfaces.
+   interfaces. I1-30 `production-selection` invokes iteration 8's actual
+   `production:files` command for the toolkit and the reference, compares its
+   output with independently named expected inclusions/exclusions, and checks
+   that the toolkit build consumes the same selection. Assert absence of
+   nested test sources and `integration-tests/src/`, preservation of ordinary
+   `src/interfaces/` files, and continued complete type-check/test discovery.
 5. A portable gate report: revision and build identity, command, scope,
    capabilities, per-instance outcomes, diagnostics and coverage, durations
    and retained pending work; no machine secrets or dependency inventories.
@@ -52,6 +57,7 @@ the checker, and the reference's own regression tiers remain evidence.
 ```sh
 npm run reference:cases
 npm run check:reference
+npm run reference:verify -- --plan 1 --iteration 14
 npm run reference:verify -- --plan 1
 npm run reference:report
 ```
@@ -59,8 +65,12 @@ npm run reference:report
 ## Exit criteria
 
 - All I1 instances assigned to iterations 3 to 14 pass in one
-  `reference:verify` run; none is skipped, and a deliberately removed
-  instance fails the run.
+  `reference:verify -- --plan 1 --iteration 14` run; none is skipped, and a
+  deliberately removed instance fails the run.
+- The unfiltered completion gate still fails solely for the pending iteration
+  15 instances: I1-27 `self-check` and `self-negative`, and I1-28
+  `relocated-package`. Any additional missing or failed assertion blocks this
+  iteration. Its successful stage result does not claim plan completion.
 - The unchanged reference has all fifteen owners and every required baseline
   construct checked, with proven external dependencies reported separately.
 

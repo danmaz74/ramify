@@ -86,7 +86,7 @@ invalidating the tree.
 
 ```sh
 npm run type-check && npm test
-npm run reference:verify -- --plan 1   # the rows above executed; the rest pending
+npm run reference:verify -- --plan 1 --iteration 5
 ```
 
 ## Exit criteria

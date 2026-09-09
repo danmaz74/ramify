@@ -60,7 +60,7 @@ exports.
 
 ```sh
 npm run type-check && npm test
-npm run reference:verify -- --plan 1
+npm run reference:verify -- --plan 1 --iteration 7
 ```
 
 ## Exit criteria

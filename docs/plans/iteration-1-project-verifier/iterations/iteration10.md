@@ -35,6 +35,8 @@ testing-origin isolation that forwarding cannot bypass.
 3. Testing-origin isolation: production source cannot import or load testing
    source in value, type, stylesheet or side-effect form, its own or foreign;
    a testing barrel or non-testing forwarder cannot hide a testing original.
+   The static side-effect and stylesheet cases use iteration 9's target-only
+   occurrences and origin evaluation; no iteration 11 capability is required.
 4. Fixture families for a production binding explicitly tagged `testing`, a
    separate testing module with extra header tags, and its nested
    `src/tests/` dropping `browser`.
@@ -58,7 +60,7 @@ testing-origin isolation that forwarding cannot bypass.
 
 ```sh
 npm run type-check && npm test
-npm run reference:verify -- --plan 1
+npm run reference:verify -- --plan 1 --iteration 10
 ```
 
 ## Exit criteria

@@ -61,7 +61,7 @@ iteration 12 and must assert the resulting failed check.
 
 ```sh
 npm run type-check && npm test
-npm run reference:verify -- --plan 1
+npm run reference:verify -- --plan 1 --iteration 6
 ```
 
 ## Exit criteria

@@ -47,7 +47,7 @@ export data: this owner stays a portable browser module.
 
 ```sh
 npm run type-check && npm test
-npm run reference:verify -- --plan 1   # the two I1-04 syntax instances executed
+npm run reference:verify -- --plan 1 --iteration 4
 ```
 
 ## Exit criteria

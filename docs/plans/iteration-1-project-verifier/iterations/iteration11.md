@@ -34,10 +34,17 @@ visible coverage notes and never widen a selection.
    `.then(panel => ({ default: panel.ReviewPanel }))`; nonliteral specifiers
    are unverifiable with an explicit note.
 4. Import-type expressions and `typeof import(...)` member and namespace
-   queries as type requests with no runtime load.
+   queries as type requests with no runtime load. Include supported JSDoc
+   import-type expressions in JavaScript analyzed by TypeScript. Use a small
+   independent fixture with `allowJs`, `checkJs` and `noEmit`; retain the
+   unchanged reference configuration. Record the TypeScript and JSDoc variants
+   of I1-21 `import-type` separately, and assert type-only selection with
+   exposure, required-importer and testing-origin checks still in force.
 5. Side-effect and empty imports and re-exports, and discarded dynamic
    imports: no invented symbol requirement; resolve the target and apply the
    testing-origin check; an inline `type` statement keeps its origin check.
+   Extend iteration 9's static target-only support to the remaining forms
+   rather than introducing a second origin-checking path.
 
 ## Matrix rows executed here
 
@@ -55,7 +62,7 @@ visible coverage notes and never widen a selection.
 
 ```sh
 npm run type-check && npm test
-npm run reference:verify -- --plan 1
+npm run reference:verify -- --plan 1 --iteration 11
 ```
 
 ## Exit criteria

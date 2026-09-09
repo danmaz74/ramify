@@ -67,7 +67,7 @@ instances execute in iterations 5 and 9 against real files.
 
 ```sh
 npm run type-check && npm test
-npm run reference:verify -- --plan 1   # I1-14 instances executed; the rest pending
+npm run reference:verify -- --plan 1 --iteration 3
 ```
 
 ## Exit criteria

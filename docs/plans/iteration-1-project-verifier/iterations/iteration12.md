@@ -66,7 +66,7 @@ disposal that leaves no compiler state behind a retained report.
 
 ```sh
 npm run type-check && npm test
-npm run reference:verify -- --plan 1
+npm run reference:verify -- --plan 1 --iteration 12
 ```
 
 ## Exit criteria

@@ -135,6 +135,16 @@ projects. For Ramify's self-check, the example, the site and the scripts each
 compile under their own configuration, so the toolkit's root configuration
 selects none of them and they appear nowhere in its result.
 
+Production build selection is separate from checking. Iteration 1 specifies
+`npm run production:files -- --root <dir>` and the build entry that consumes
+its deterministic source-file list; iteration 8 implements them using the
+real inventory and resolved source profiles through the analysis API. Exclude
+every testing-classified area, including a testing module's ordinary `src/`,
+and retain ordinary interfaces. The toolkit production build consumes this
+selection; its whole-project compiler configuration, type-check and test
+discovery continue to cover all owned tests. The build must bootstrap from a
+clean checkout without depending on its own pre-existing `dist/` output.
+
 No check creates a missing `src/`, repairs declarations, loads application
 entry points or runs a project configuration script. Empty owners are valid
 inventory entries; source-directory creation belongs to authoring tools.
@@ -225,6 +235,7 @@ The map must account for every current source/test/barrel, including removals.
 | `src/viz/{geometry,viewport}.ts` and geometry-only helpers | Layout owner, with its own neutral vocabulary and tests. |
 | `src/viz/layout*.ts`, `tree-diagram.ts`, `focus-diagram.ts` | Split source-dependent diagram preparation into presentation and geometry computation into layout. Review dependencies before moving whole files. |
 | `src/viz/diagram-definition.ts`, `model-access.ts`, `validate.ts`, `diagrams/*`, React components and theme | Presentation owner; adapt teaching fixtures and model access to the definitive evaluator. Move tests to the owner of the behavior they assert. |
+| `src/viz/{emitted-diagrams,tree-diagram,focus-diagram}.test.ts` snapshot assertions | Keep snapshot assertions in presentation tests and update their file-relative paths to the existing package-root `site/static/diagrams/` artifacts. Include these destinations in the move map. |
 | `src/viz/index.ts` | Replace with selected presentation/layout package surfaces and legal original-owner exposure. No automatic foreign wildcard claims. |
 | `src/index.ts` | Replace the combined application barrel with separate declared entry files and package exports. Update internal consumers explicitly. |
 | `scripts/emit-diagrams.ts` and reference harness | Keep an explicitly independent build/test-tool scope using supported package surfaces. Do not disguise runtime implementation as tooling. |
@@ -450,7 +461,7 @@ do not contaminate the clean running application with forbidden imports.
 | I1-18 | S01, T06 | `js-substitution` and `path-alias`: same resolved originals; `AppRouter-forward`: root original preserved; `named-default`: correct export identity; `source-types`: both type modifiers retain coupling restrictions; `application-alias`: never classified external merely because it is a bare alias. |
 | I1-19 | S01–S03 | `namespace-members`, `literal-key`, `destructure`, `qualified-type`: selected originals only; `private-growth`: no broadened selection; `unknown-key` and `escape`: partial coverage; `known-denial-plus-escape`: still fails for the known denial. |
 | I1-20 | S02–S03 | `source-star`, `type-star`, `namespace-export`, `type-namespace-export`: correct forwarding checks and default membership; `downstream-selection`: does not narrow a star re-export; `no-declaration`: source forwarding alone creates no Ramify exposure. |
-| I1-21 | S01–S03 | `reference-lazy`, `await-member`, `await-destructure`, `then-member`, `then-destructure`: literal selected binding checks; `import-type`, `typeof-import-member`, `typeof-import-namespace`: type-only checks with no runtime load; `nonliteral-target`: explicit coverage note. |
+| I1-21 | S01–S03 | `reference-lazy`, `await-member`, `await-destructure`, `then-member`, `then-destructure`: literal selected binding checks; `import-type`, `typeof-import-member`, `typeof-import-namespace`: type-only checks with no runtime load; `import-type` has separately recorded TypeScript and JSDoc-in-JavaScript variants, with `allowJs` and `checkJs` enabled in the latter's independent fixture configuration; `nonliteral-target`: explicit coverage note. |
 | I1-22 | S03, O03, K05 | `hook-side-effect`, `empty-import`, `empty-export`, `discarded-lazy`: known ordinary/testing-eligible loads need no dummy symbol; `inline-type-statement`: preserve source-origin checking independently of its type request; `testing-target`: non-testing load denied even without selected symbols. |
 | I1-23 | S04–S05, O03 | `two-css-resources`: distinct identities under the shared shim; `resource-alias`: same resource identity; `missing-resource`: source coverage note, but an exposure to it is invalid; `missing-resource-export`: a source import selecting an absent name from a known resource export description produces a located missing-export error and a failed check through the public analysis session; `json-binding`: actual resource owns its exports; `testing-style`: origin guard applies. |
 | I1-24 | S06–S07 | `external`: proven package/builtin scope; `unresolved`, `unsupported-macro`, `unsupported-commonjs`: visible limits; `partial-clean`: completed bounded check may exit 0; `partial-denied`: same notes plus definite denial exit 1; `resolution-blocked`: a compiler problem that prevents resolving an import or enumerating exports is an analysis limit on that construct, never a failure by itself. |
@@ -459,7 +470,7 @@ do not contaminate the clean running application with forbidden imports.
 | I1-27 | DA18, QT01, QT03 | `self-check`: migrated toolkit descriptions and implemented source pass the same engine; `self-negative`: deliberately forbidden toolkit import detected; `cancel`, `read-failure`, `dispose`: resources released and no late success; `report-retention`: plain result does not retain compiler state. |
 | I1-28 | DA01, DA14, PC01, QT01 | `compiled-cli-clean`, `compiled-cli-denied`, `compiled-cli-invalid`, `compiled-cli-unavailable`: real subprocess exits/output match the documented contract; `compiled-cli-warnings`: a selected file outside module source produces visible warnings in human and JSON output and exit 0, with no layout error; `compiled-cli-stray-description`: adding a valid `module.ramify` beside that file produces a located layout error in both formats and exit 1 without a strict option; `no-servers`: no listeners/daemon launch; `relocated-package`: build and installed executable work without the enclosing repository. |
 | I1-29 | L01, S06–S07 | `explicit-root`: `--root` selects the project and nothing above it enters analysis; `root-from-subdirectory`: invocation inside a module finds the same root and says so; `root-from-grouped-subdirectory`: invocation inside a child reached through ordinary grouping directories still selects the whole project; `root-outside`: invocation outside any project fails with exit 2; `nested-project-root`: invocation inside an independent example selects that example, including when it is inside a child module's examples directory beneath the enclosing project's subs tree; `outside-module-target`: an owned import of a project file outside any module is reported as outside scope, never as external; `stray-files`: project files outside modules produce aggregated warnings and no failure; `scope-report`: root, selection method, configuration and walked areas are visible; `changed-input`: captured-view consistency or explicit acquisition failure, never mixed-state success. |
-| I1-30 | D01–D03, K05, K07 | `reference-regression`: existing application/protocol/Cucumber tiers still run; `test-discovery`: all migrated owner tests and the standalone testing-module fixture are discovered; `production-selection`: excludes testing-classified source and retains ordinary interfaces; `harness-required`: deleting or disabling a required instance fails the completion gate. |
+| I1-30 | D01–D03, K05, K07 | `reference-regression`: existing application/protocol/Cucumber tiers still run; `test-discovery`: all migrated owner tests and the standalone testing-module fixture are discovered; `production-selection`: the implemented production-file command and toolkit build exclude testing-classified source, including testing modules' ordinary source, and retain ordinary interfaces; `harness-required`: deleting or disabling a required instance fails the completion gate. |
 
 The matrix exercises only the stated portions of each reference family. For
 example, I1-23 does not implement compiled-source mapping from S05, and I1-30
@@ -479,8 +490,9 @@ Extend the existing harness rather than creating a second checker.
 
 1. Keep the family catalogue and its authority classifications.
 2. Add instance records identifying the matrix ID/subcase, required capabilities,
-   fixture/root/config/registry, exact mutation, independent expectation and
-   expected coverage.
+   implementing iteration, fixture/root/config/registry, exact mutation,
+   independent expectation and expected coverage. Record iteration prerequisites
+   and validate their agreement with the iteration sequence.
 3. Separate capability availability from execution and coverage. Derive execution
    from actual assertions, not a hand-edited availability flag or a successful
    example build.
@@ -506,6 +518,18 @@ Extend the existing harness rather than creating a second checker.
     durations and retained pending work. Do not record machine-specific secrets
     or full dependency inventories as report noise.
 
+The runner also supports `--iteration <n>` for intermediate verification.
+It requires every instance assigned to that iteration and its transitive
+prerequisites, including every syntax variant, and fails on missing capabilities,
+removed records, unrun assertions or failed assertions in that set. Required
+membership comes from the reviewed matrix and iteration assignments, never from
+which handlers happen to be available. Other instances remain explicitly not
+executed in the report. An iteration result cannot claim plan completion.
+Without this flag, the command always requires the entire matrix; until
+iteration 15 finishes, that completion gate is expected to fail. Exercise both
+modes with a removed required record and a failing assertion so that expected
+pending work cannot conceal a regression.
+
 Required commands to add during implementation:
 
 | Command from the Ramify root | Meaning |
@@ -513,8 +537,10 @@ Required commands to add during implementation:
 | `npm run check:reference` | Invoke the compiled CLI on the unchanged example through `--root`. |
 | `npm run check:self` | Invoke it at the toolkit root; the example, the site and the scripts compile under their own configurations and are outside its program. |
 | `npm run reference:verify -- --plan 1` | Require every I1 instance and its capabilities, execute the matrix and fail on missing/failed assertions. |
+| `npm run reference:verify -- --plan 1 --iteration <n>` | Require the named iteration's instances and prerequisite instances; report remaining work without claiming plan completion. |
 | `npm run reference:report` | Run/report current supported tiers and retain the pending inventory. This alone is not the plan gate. |
 | `npm run reference:cases` | Validate family/instance inventory integrity, pointers and gate membership. |
+| `npm run production:files -- --root <dir>` | Report the production source selection used by the build; this independent build tool does not narrow `ramify check`. |
 
 The instance inventory is verification data: it enumerates expected evidence,
 not a second module language or permission registry. It must not derive expected
@@ -533,8 +559,9 @@ New owners are created directly in their declared `subs/` locations from
 iteration 2 onward; only the legacy `src/model` and `src/viz` move, in
 iteration 8, once the linker can validate the migrated descriptions. The
 harness runner and instance records arrive in iteration 2 so that every later
-iteration activates its own subcases. A subcase executes in exactly one
-iteration.
+iteration activates its own subcases. Each subcase has exactly one implementing
+iteration. Later prerequisite checks and the final gate rerun those instances
+as regression evidence.
 
 | # | Iteration | Requires | Executes |
 | --- | --- | --- | --- |
