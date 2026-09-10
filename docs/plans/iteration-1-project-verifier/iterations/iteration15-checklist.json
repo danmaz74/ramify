@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": false,
+    "functionalRequirementsSatisfied": true,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-10T07:22:11.000Z",
+  "iteration": "15",
+  "notes": "Implementation committed as fd8a351. Fresh build, type-check, final declarations, 308-record inventory, reference check and toolkit self-check passed in this active attempt. Current runtime bytes exactly match retained evidence: ten focused architectural/lifecycle providers with 356 passing assertions, 61 passing partial-relocation assertions, and both complete batch measurement workloads passing unchanged budgets. Full 308-instance gate, relocated npm test, Vitest/Cucumber, scenario and sealed-file checks remain unrun locally under the automation-only policy. allNewTestsPass remains false pending their results; Plan 1 completion and automated acceptance are not claimed. Restored results/checklist through the current attempt after the preceding session's stale binding."
+}
