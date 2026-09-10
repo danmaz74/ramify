@@ -14,7 +14,7 @@ export data: this owner stays a portable browser module.
 
 ## Read first
 
-- [Module-description principles](../../../model/module-description.principles.md):
+- [Module-description principles](../../../../model/module-description.principles.md):
   the grammar, tokens, quoting and reserved names, encoding, comments,
   version checks, path string decoding and the wildcard forms.
 - Main plan: Descriptions and model, the `ParsedDescription` row of the

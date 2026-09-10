@@ -1,0 +1,1165 @@
+{
+  "capturedAt": "2026-09-10T06:03:51.045384+00:00",
+  "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+  "projectRoot": "/ramify",
+  "worktreePath": "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier",
+  "installedVersion": "0.6.3",
+  "journal": [
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 92,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "draft.written",
+        "detail": {
+          "artifactType": "results",
+          "iterationIndex": 3,
+          "sourceTool": "workflow.write_iteration_results"
+        },
+        "ts": "2026-09-09T10:30:04.056Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 93,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "draft.written",
+        "detail": {
+          "artifactType": "checklist",
+          "iterationIndex": 3,
+          "sourceTool": "workflow.write_iteration_checklist"
+        },
+        "ts": "2026-09-09T10:30:21.094Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 94,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "draft.written",
+        "detail": {
+          "artifactType": "results",
+          "iterationIndex": 3,
+          "sourceTool": "workflow.write_iteration_results"
+        },
+        "ts": "2026-09-09T10:30:59.330Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 95,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "publication.started",
+        "detail": {
+          "iterationIndex": 3,
+          "operationId": "pub-_JG0Ucx92X1f6WqRyuxxC-3-1788949865596",
+          "draftHeadSha": "70203cbfefd0f6410a3fc33cfa2b49fec48a4ab8",
+          "baseHeadSha": "5a900cd98d550ce172a68c4eba7b02ea03e14471"
+        },
+        "ts": "2026-09-09T10:31:05.597Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 96,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "publication.failed",
+        "detail": {
+          "iterationIndex": 3,
+          "operationId": "pub-_JG0Ucx92X1f6WqRyuxxC-3-1788949865596",
+          "failureCode": "FILE_POLICY_VIOLATION",
+          "failureMessage": "Iteration 3 publish rejected 1 sibling iteration artifact(s)",
+          "failureDetails": {
+            "rejectedFiles": [
+              {
+                "path": "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/docs/plans/iteration-1-project-verifier/iterations/iteration2-check-results.md",
+                "reason": "Iteration artifact iteration2-check-results.md belongs to iteration 2, not 3"
+              }
+            ]
+          }
+        },
+        "ts": "2026-09-09T10:31:05.715Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 97,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "draft.written",
+        "detail": {
+          "artifactType": "results",
+          "iterationIndex": 3,
+          "sourceTool": "workflow.write_iteration_results"
+        },
+        "ts": "2026-09-09T10:33:13.434Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 98,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "draft.written",
+        "detail": {
+          "artifactType": "checklist",
+          "iterationIndex": 3,
+          "sourceTool": "workflow.write_iteration_checklist"
+        },
+        "ts": "2026-09-09T10:33:13.473Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 120,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "workflow.attempt-completed",
+        "phase": "executing",
+        "detail": {
+          "workUnitId": "iteration:3:draft",
+          "attemptId": "attempt_mhbYNTHGn40H6Dgjt3nRy"
+        },
+        "ts": "2026-09-09T10:35:37.871Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 121,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "publication.bookkeeping_committed",
+        "detail": {
+          "iterationIndex": 3,
+          "committedPaths": [
+            "docs/plans/iteration-1-project-verifier/iterations/iteration3-check-results.md"
+          ]
+        },
+        "ts": "2026-09-09T11:03:47.482Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 122,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "publication.started",
+        "detail": {
+          "iterationIndex": 3,
+          "operationId": "pub-_JG0Ucx92X1f6WqRyuxxC-3-1788951827521",
+          "draftHeadSha": "17db2283141082177b1d11d268652fb55861a686",
+          "baseHeadSha": "5a900cd98d550ce172a68c4eba7b02ea03e14471"
+        },
+        "ts": "2026-09-09T11:03:47.523Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 124,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "publication.accepted",
+        "detail": {
+          "iterationIndex": 3,
+          "acceptedFiles": 26,
+          "draftHeadSha": "17db2283141082177b1d11d268652fb55861a686"
+        },
+        "ts": "2026-09-09T11:03:47.805Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 127,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "workflow.attempt-intent-persisted",
+        "phase": "executing",
+        "detail": {
+          "workUnitId": "iteration:4:draft",
+          "attemptId": "attempt_s6UaoRLu4JwMKX7-QjmMe"
+        },
+        "ts": "2026-09-09T11:03:47.815Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 130,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "workflow.attempt-running",
+        "phase": "executing",
+        "detail": {
+          "workUnitId": "iteration:4:draft",
+          "attemptId": "attempt_s6UaoRLu4JwMKX7-QjmMe",
+          "sessionId": "session-1788951827871-vbza07ic",
+          "turnId": "turn-1788951827871-80ydwi7d"
+        },
+        "ts": "2026-09-09T11:03:47.884Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 323,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "draft.written",
+        "detail": {
+          "artifactType": "results",
+          "iterationIndex": 8,
+          "sourceTool": "workflow.write_iteration_results"
+        },
+        "ts": "2026-09-09T14:21:18.279Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 324,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "draft.written",
+        "detail": {
+          "artifactType": "checklist",
+          "iterationIndex": 8,
+          "sourceTool": "workflow.write_iteration_checklist"
+        },
+        "ts": "2026-09-09T14:21:31.743Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 325,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "publication.started",
+        "detail": {
+          "iterationIndex": 8,
+          "operationId": "pub-_JG0Ucx92X1f6WqRyuxxC-8-1788963738344",
+          "draftHeadSha": "88682ef0729131e5c96987f5938fa3852907932e",
+          "baseHeadSha": "4017db8d8b8d31847604e83507ff71ad40e5eec8"
+        },
+        "ts": "2026-09-09T14:22:18.346Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 326,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "publication.failed",
+        "detail": {
+          "iterationIndex": 8,
+          "operationId": "pub-_JG0Ucx92X1f6WqRyuxxC-8-1788963738344",
+          "failureCode": "FILE_POLICY_VIOLATION",
+          "failureMessage": "Iteration 8 publish rejected 1 sibling iteration artifact(s)",
+          "failureDetails": {
+            "rejectedFiles": [
+              {
+                "path": "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/docs/plans/iteration-1-project-verifier/iterations/iteration7-check-results.md",
+                "reason": "Iteration artifact iteration7-check-results.md belongs to iteration 7, not 8"
+              }
+            ]
+          }
+        },
+        "ts": "2026-09-09T14:22:18.761Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 327,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "draft.written",
+        "detail": {
+          "artifactType": "results",
+          "iterationIndex": 8,
+          "sourceTool": "workflow.write_iteration_results"
+        },
+        "ts": "2026-09-09T14:24:11.484Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 328,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "draft.written",
+        "detail": {
+          "artifactType": "checklist",
+          "iterationIndex": 8,
+          "sourceTool": "workflow.write_iteration_checklist"
+        },
+        "ts": "2026-09-09T14:24:20.687Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 350,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "workflow.attempt-completed",
+        "phase": "executing",
+        "detail": {
+          "workUnitId": "iteration:8:draft",
+          "attemptId": "attempt_fEZBdwt7YFpcol2rF6xZ2"
+        },
+        "ts": "2026-09-09T14:28:02.162Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 351,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "publication.bookkeeping_committed",
+        "detail": {
+          "iterationIndex": 8,
+          "committedPaths": [
+            "docs/plans/iteration-1-project-verifier/iterations/iteration8-check-results.md"
+          ]
+        },
+        "ts": "2026-09-09T21:02:41.668Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 352,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "publication.started",
+        "detail": {
+          "iterationIndex": 8,
+          "operationId": "pub-_JG0Ucx92X1f6WqRyuxxC-8-1788987761700",
+          "draftHeadSha": "bba4f2152ab44667f063938d8453df022b0ff3cd",
+          "baseHeadSha": "4017db8d8b8d31847604e83507ff71ad40e5eec8"
+        },
+        "ts": "2026-09-09T21:02:41.702Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 354,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "publication.accepted",
+        "detail": {
+          "iterationIndex": 8,
+          "acceptedFiles": 104,
+          "draftHeadSha": "bba4f2152ab44667f063938d8453df022b0ff3cd"
+        },
+        "ts": "2026-09-09T21:02:42.398Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 357,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "workflow.attempt-intent-persisted",
+        "phase": "executing",
+        "detail": {
+          "workUnitId": "iteration:9:draft",
+          "attemptId": "attempt_Y8OTgxVwkv3jf0BoMRVZD"
+        },
+        "ts": "2026-09-09T21:02:42.411Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 360,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "workflow.attempt-running",
+        "phase": "executing",
+        "detail": {
+          "workUnitId": "iteration:9:draft",
+          "attemptId": "attempt_Y8OTgxVwkv3jf0BoMRVZD",
+          "sessionId": "session-1788987762631-w4p7v73o",
+          "turnId": "turn-1788987762631-5p9tfxcz"
+        },
+        "ts": "2026-09-09T21:02:42.643Z"
+      }
+    }
+  ],
+  "turns": [
+    {
+      "source": ".cucumber-viz/turns/turn_o29Rj5pFadz36S0IlDSpk.json",
+      "id": "o29Rj5pFadz36S0IlDSpk",
+      "chatKey": "implementation-studio:workflow:_JG0Ucx92X1f6WqRyuxxC:interactive:iter:3",
+      "sessionId": "session-1788948339966-fxk0lkpn",
+      "turnId": "turn-1788948339966-g2qig4l0",
+      "startedAt": "2026-09-09T10:05:39.966Z",
+      "completedAt": "2026-09-09T10:33:33.421Z",
+      "status": "completed",
+      "publicationCalls": [
+        {
+          "input": {
+            "server": "cucumber-viz-workflow",
+            "tool": "workflow.publish_iteration_draft",
+            "arguments": {
+              "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+              "attemptId": "attempt_mhbYNTHGn40H6Dgjt3nRy",
+              "iterationIndex": 3
+            }
+          },
+          "result": {
+            "success": false,
+            "errors": [
+              {
+                "code": "WORKTREE_DIRTY",
+                "message": "Generated iteration artifacts are dirty and the publish-time bookkeeping commit could not absorb them. Commit them before publishing \u2014 otherwise they would be dropped from the published diff.",
+                "details": {
+                  "dirtyFiles": [
+                    "docs/plans/iteration-1-project-verifier/iterations/iteration2-check-results.md"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "input": {
+            "server": "cucumber-viz-workflow",
+            "tool": "workflow.publish_iteration_draft",
+            "arguments": {
+              "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+              "attemptId": "attempt_mhbYNTHGn40H6Dgjt3nRy",
+              "iterationIndex": 3
+            }
+          },
+          "result": {
+            "success": false,
+            "errors": [
+              {
+                "code": "FILE_POLICY_VIOLATION",
+                "message": "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/docs/plans/iteration-1-project-verifier/iterations/iteration2-check-results.md: Iteration artifact iteration2-check-results.md belongs to iteration 2, not 3",
+                "details": {
+                  "path": "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/docs/plans/iteration-1-project-verifier/iterations/iteration2-check-results.md",
+                  "reason": "Iteration artifact iteration2-check-results.md belongs to iteration 2, not 3"
+                }
+              }
+            ],
+            "rejectedFiles": [
+              {
+                "path": "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/docs/plans/iteration-1-project-verifier/iterations/iteration2-check-results.md",
+                "reason": "Iteration artifact iteration2-check-results.md belongs to iteration 2, not 3"
+              }
+            ]
+          }
+        },
+        {
+          "input": {
+            "server": "cucumber-viz-workflow",
+            "tool": "workflow.get_publication_status",
+            "arguments": {
+              "workflowId": "_JG0Ucx92X1f6WqRyuxxC"
+            }
+          },
+          "result": {
+            "hasPendingDraft": false,
+            "lastPublishResult": {
+              "success": false,
+              "errors": [
+                {
+                  "code": "FILE_POLICY_VIOLATION",
+                  "message": "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/docs/plans/iteration-1-project-verifier/iterations/iteration2-check-results.md: Iteration artifact iteration2-check-results.md belongs to iteration 2, not 3",
+                  "details": {
+                    "path": "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/docs/plans/iteration-1-project-verifier/iterations/iteration2-check-results.md",
+                    "reason": "Iteration artifact iteration2-check-results.md belongs to iteration 2, not 3"
+                  }
+                }
+              ],
+              "rejectedFiles": [
+                {
+                  "path": "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/docs/plans/iteration-1-project-verifier/iterations/iteration2-check-results.md",
+                  "reason": "Iteration artifact iteration2-check-results.md belongs to iteration 2, not 3"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "source": ".cucumber-viz/turns/turn_8dmvMv1QmRM7TvQT4QZ-W.json",
+      "id": "8dmvMv1QmRM7TvQT4QZ-W",
+      "chatKey": "implementation-studio:workflow:_JG0Ucx92X1f6WqRyuxxC:interactive:iter:8",
+      "sessionId": "session-1788962373755-yqvhcxp9",
+      "turnId": "turn-1788962373755-qptgv1dh",
+      "startedAt": "2026-09-09T13:59:33.755Z",
+      "completedAt": "2026-09-09T14:24:52.182Z",
+      "status": "completed",
+      "publicationCalls": [
+        {
+          "input": {
+            "server": "cucumber-viz-workflow",
+            "tool": "workflow.publish_iteration_draft",
+            "arguments": {
+              "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+              "attemptId": "attempt_fEZBdwt7YFpcol2rF6xZ2",
+              "iterationIndex": 8
+            }
+          },
+          "result": {
+            "success": false,
+            "errors": [
+              {
+                "code": "WORKTREE_DIRTY",
+                "message": "Generated iteration artifacts are dirty and the publish-time bookkeeping commit could not absorb them. Commit them before publishing \u2014 otherwise they would be dropped from the published diff.",
+                "details": {
+                  "dirtyFiles": [
+                    "docs/plans/iteration-1-project-verifier/iterations/iteration7-check-results.md"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "input": {
+            "server": "cucumber-viz-workflow",
+            "tool": "workflow.publish_iteration_draft",
+            "arguments": {
+              "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+              "attemptId": "attempt_fEZBdwt7YFpcol2rF6xZ2",
+              "iterationIndex": 8
+            }
+          },
+          "result": {
+            "success": false,
+            "errors": [
+              {
+                "code": "FILE_POLICY_VIOLATION",
+                "message": "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/docs/plans/iteration-1-project-verifier/iterations/iteration7-check-results.md: Iteration artifact iteration7-check-results.md belongs to iteration 7, not 8",
+                "details": {
+                  "path": "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/docs/plans/iteration-1-project-verifier/iterations/iteration7-check-results.md",
+                  "reason": "Iteration artifact iteration7-check-results.md belongs to iteration 7, not 8"
+                }
+              }
+            ],
+            "rejectedFiles": [
+              {
+                "path": "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/docs/plans/iteration-1-project-verifier/iterations/iteration7-check-results.md",
+                "reason": "Iteration artifact iteration7-check-results.md belongs to iteration 7, not 8"
+              }
+            ]
+          }
+        },
+        {
+          "input": {
+            "server": "cucumber-viz-workflow",
+            "tool": "workflow.get_publication_status",
+            "arguments": {
+              "workflowId": "_JG0Ucx92X1f6WqRyuxxC"
+            }
+          },
+          "result": {
+            "hasPendingDraft": false,
+            "lastPublishResult": {
+              "success": false,
+              "errors": [
+                {
+                  "code": "FILE_POLICY_VIOLATION",
+                  "message": "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/docs/plans/iteration-1-project-verifier/iterations/iteration7-check-results.md: Iteration artifact iteration7-check-results.md belongs to iteration 7, not 8",
+                  "details": {
+                    "path": "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/docs/plans/iteration-1-project-verifier/iterations/iteration7-check-results.md",
+                    "reason": "Iteration artifact iteration7-check-results.md belongs to iteration 7, not 8"
+                  }
+                }
+              ],
+              "rejectedFiles": [
+                {
+                  "path": "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/docs/plans/iteration-1-project-verifier/iterations/iteration7-check-results.md",
+                  "reason": "Iteration artifact iteration7-check-results.md belongs to iteration 7, not 8"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "source": ".cucumber-viz/turns/turn_svFsBcKExiOo_6_VgFQ78.json",
+      "id": "svFsBcKExiOo_6_VgFQ78",
+      "chatKey": "implementation-studio:workflow:_JG0Ucx92X1f6WqRyuxxC:interactive:iter:3",
+      "sessionId": "session-1788948339966-fxk0lkpn",
+      "turnId": "turn-1788950137877-v0wcncyg",
+      "startedAt": "2026-09-09T10:35:37.877Z",
+      "completedAt": "2026-09-09T10:35:51.007Z",
+      "status": "completed",
+      "publicationCalls": [
+        {
+          "input": {
+            "server": "cucumber-viz-workflow",
+            "tool": "workflow.publish_iteration_draft",
+            "arguments": {
+              "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+              "iterationIndex": "3",
+              "attemptId": "attempt_mhbYNTHGn40H6Dgjt3nRy"
+            }
+          },
+          "result": {
+            "ok": false,
+            "error": {
+              "code": "STALE_ATTEMPT",
+              "message": "The workflow attempt associated with this MCP binding is no longer active.",
+              "issues": []
+            }
+          }
+        }
+      ],
+      "prompt": "## Workflow Tools\n\nYou have `cucumber-viz-workflow` MCP tools available. For all tool calls, use `workflowId`: `_JG0Ucx92X1f6WqRyuxxC`.\nFor every write-capable workflow tool call in this session, also pass `attemptId`: `attempt_mhbYNTHGn40H6Dgjt3nRy`.\nIf a workflow tool returns `STALE_ATTEMPT`, stop using this session for workflow writes and report the stale attempt.\nUse MCP tools for structured workflow drafts (*-checklist.json, *-results.md, tracking JSON, and manifest/fix iterations via `workflow.add_fix_iterations`) \u2014 direct edits will be rejected at publication time.\nDo not edit `*-check-results.md` or `status.md` directly; those are control-plane outputs, not agent-authored draft files.\nFiles you CAN edit directly: application code and tests (src/**, features/**, docs/** excluding plan artifacts).\n## Publish Iteration Draft\n\nIteration 3 has completed its automated pipeline and is waiting at the publication gate.\n\nCall `workflow.publish_iteration_draft` with:\n- `workflowId`: `_JG0Ucx92X1f6WqRyuxxC`\n- `iterationIndex`: `3`\n- `attemptId`: `attempt_mhbYNTHGn40H6Dgjt3nRy`\n\nDo not edit source files or workflow-owned draft artifacts in this turn.\nIf publication fails, fix only the reported publication errors and submit publication again.\n",
+      "response": "I\u2019ll publish the completed iteration 3 draft now.\n\nPublication returned `STALE_ATTEMPT`: the supplied attempt is no longer active. I stopped workflow writes as instructed. Publication requires an active attempt binding."
+    },
+    {
+      "source": ".cucumber-viz/turns/turn_K1JgXup1zk2NaexmCCM4e.json",
+      "id": "K1JgXup1zk2NaexmCCM4e",
+      "chatKey": "implementation-studio:workflow:_JG0Ucx92X1f6WqRyuxxC:interactive:iter:8",
+      "sessionId": "session-1788962373755-yqvhcxp9",
+      "turnId": "turn-1788964082167-kg9l6wb6",
+      "startedAt": "2026-09-09T14:28:02.167Z",
+      "completedAt": "2026-09-09T14:29:27.666Z",
+      "status": "completed",
+      "publicationCalls": [
+        {
+          "input": {
+            "server": "cucumber-viz-workflow",
+            "tool": "workflow.publish_iteration_draft",
+            "arguments": {
+              "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+              "iterationIndex": 8,
+              "attemptId": "attempt_fEZBdwt7YFpcol2rF6xZ2"
+            }
+          },
+          "result": {
+            "ok": false,
+            "error": {
+              "code": "STALE_ATTEMPT",
+              "message": "The workflow attempt associated with this MCP binding is no longer active.",
+              "issues": []
+            }
+          }
+        }
+      ],
+      "prompt": "## Workflow Tools\n\nYou have `cucumber-viz-workflow` MCP tools available. For all tool calls, use `workflowId`: `_JG0Ucx92X1f6WqRyuxxC`.\nFor every write-capable workflow tool call in this session, also pass `attemptId`: `attempt_fEZBdwt7YFpcol2rF6xZ2`.\nIf a workflow tool returns `STALE_ATTEMPT`, stop using this session for workflow writes and report the stale attempt.\nUse MCP tools for structured workflow drafts (*-checklist.json, *-results.md, tracking JSON, and manifest/fix iterations via `workflow.add_fix_iterations`) \u2014 direct edits will be rejected at publication time.\nDo not edit `*-check-results.md` or `status.md` directly; those are control-plane outputs, not agent-authored draft files.\nFiles you CAN edit directly: application code and tests (src/**, features/**, docs/** excluding plan artifacts).\n## Publish Iteration Draft\n\nIteration 8 has completed its automated pipeline and is waiting at the publication gate.\n\nCall `workflow.publish_iteration_draft` with:\n- `workflowId`: `_JG0Ucx92X1f6WqRyuxxC`\n- `iterationIndex`: `8`\n- `attemptId`: `attempt_fEZBdwt7YFpcol2rF6xZ2`\n\nDo not edit source files or workflow-owned draft artifacts in this turn.\nIf publication fails, fix only the reported publication errors and submit publication again.\n",
+      "response": "I\u2019ll publish the iteration 8 draft now.\n\nPublication returned `STALE_ATTEMPT`: attempt `attempt_fEZBdwt7YFpcol2rF6xZ2` is no longer active.\n\nI stopped workflow writes as instructed. No files were edited. Publication requires an active attempt."
+    },
+    {
+      "source": ".cucumber-viz/turns/turn_JiTMRcUxSfKTRQXHXZS8A.json",
+      "id": "JiTMRcUxSfKTRQXHXZS8A",
+      "chatKey": "implementation-studio:workflow:_JG0Ucx92X1f6WqRyuxxC:interactive",
+      "sessionId": "session-1788951618300-t17s3u7j",
+      "turnId": "turn-1788951730050-bwod42ie",
+      "startedAt": "2026-09-09T11:02:10.050Z",
+      "completedAt": "2026-09-09T11:04:02.764Z",
+      "status": "completed",
+      "publicationCalls": [
+        {
+          "input": {
+            "server": "cucumber-viz-workflow",
+            "tool": "workflow.get_publication_status",
+            "arguments": {
+              "workflowId": "_JG0Ucx92X1f6WqRyuxxC"
+            }
+          },
+          "result": {
+            "hasPendingDraft": true,
+            "lastPublishResult": {
+              "success": false,
+              "errors": [
+                {
+                  "code": "FILE_POLICY_VIOLATION",
+                  "message": "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/docs/plans/iteration-1-project-verifier/iterations/iteration2-check-results.md: Iteration artifact iteration2-check-results.md belongs to iteration 2, not 3",
+                  "details": {
+                    "path": "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/docs/plans/iteration-1-project-verifier/iterations/iteration2-check-results.md",
+                    "reason": "Iteration artifact iteration2-check-results.md belongs to iteration 2, not 3"
+                  }
+                }
+              ],
+              "rejectedFiles": [
+                {
+                  "path": "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/docs/plans/iteration-1-project-verifier/iterations/iteration2-check-results.md",
+                  "reason": "Iteration artifact iteration2-check-results.md belongs to iteration 2, not 3"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "input": {
+            "server": "cucumber-viz-workflow",
+            "tool": "workflow.publish_iteration_draft",
+            "arguments": {
+              "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+              "iterationIndex": 3,
+              "attemptId": "attempt_mhbYNTHGn40H6Dgjt3nRy"
+            }
+          },
+          "result": {
+            "success": true,
+            "acceptedFileCount": 26
+          }
+        },
+        {
+          "input": {
+            "server": "cucumber-viz-workflow",
+            "tool": "workflow.get_publication_status",
+            "arguments": {
+              "workflowId": "_JG0Ucx92X1f6WqRyuxxC"
+            }
+          },
+          "result": {
+            "hasPendingDraft": false,
+            "lastPublishResult": {
+              "success": true,
+              "errors": [],
+              "acceptedFiles": [
+                "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/docs/plans/iteration-1-project-verifier/iterations/iteration3-check-results.md",
+                "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/docs/plans/iteration-1-project-verifier/iterations/iteration3-checklist.json",
+                "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/docs/plans/iteration-1-project-verifier/iterations/iteration3-results.md",
+                "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/docs/plans/iteration-1-project-verifier/iterations/status.md",
+                "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/module.ramify",
+                "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/scripts/reference-harness/README.md",
+                "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/scripts/reference-harness/model-cases.ts",
+                "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/scripts/reference-harness/runner.test.ts",
+                "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/scripts/reference-harness/runtime.ts",
+                "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/scripts/reference-harness/verify.test.ts",
+                "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/subs/analysis/module.ramify",
+                "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/subs/analysis/subs/model/README.md",
+                "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/subs/analysis/subs/model/module.ramify",
+                "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/subs/analysis/subs/model/src/data.ts",
+                "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/subs/analysis/subs/model/src/decisions.ts",
+                "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/subs/analysis/subs/model/src/identity.ts",
+                "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/subs/analysis/subs/model/src/index.ts",
+                "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/subs/analysis/subs/model/src/interfaces/model.ts",
+                "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/subs/analysis/subs/model/src/model.ts",
+                "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/subs/analysis/subs/model/src/profiles.ts",
+                "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/subs/analysis/subs/model/src/registry.ts",
+                "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/subs/analysis/subs/model/src/tests/decisions.test.ts",
+                "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/subs/analysis/subs/model/src/tests/fixtures.ts",
+                "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/subs/analysis/subs/model/src/tests/identity-model.test.ts",
+                "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/subs/analysis/subs/model/src/tests/legacy-visibility.test.ts",
+                "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/subs/analysis/subs/model/src/tests/registry-profiles.test.ts"
+              ],
+              "sealedFilesOutcome": "pass",
+              "sealedReviewRequired": false,
+              "sealedFindings": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "source": ".cucumber-viz/turns/turn_gbA45MJRaOL0m-lAaheGx.json",
+      "id": "gbA45MJRaOL0m-lAaheGx",
+      "chatKey": "implementation-studio:workflow:_JG0Ucx92X1f6WqRyuxxC:interactive",
+      "sessionId": "session-1788951618300-t17s3u7j",
+      "turnId": "turn-1788987734548-pydwv0f7",
+      "startedAt": "2026-09-09T21:02:14.548Z",
+      "completedAt": "2026-09-09T21:02:52.350Z",
+      "status": "completed",
+      "publicationCalls": [
+        {
+          "input": {
+            "server": "cucumber-viz-workflow",
+            "tool": "workflow.get_publication_status",
+            "arguments": {
+              "workflowId": "_JG0Ucx92X1f6WqRyuxxC"
+            }
+          },
+          "result": {
+            "hasPendingDraft": true,
+            "lastPublishResult": {
+              "success": false,
+              "errors": [
+                {
+                  "code": "FILE_POLICY_VIOLATION",
+                  "message": "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/docs/plans/iteration-1-project-verifier/iterations/iteration7-check-results.md: Iteration artifact iteration7-check-results.md belongs to iteration 7, not 8",
+                  "details": {
+                    "path": "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/docs/plans/iteration-1-project-verifier/iterations/iteration7-check-results.md",
+                    "reason": "Iteration artifact iteration7-check-results.md belongs to iteration 7, not 8"
+                  }
+                }
+              ],
+              "rejectedFiles": [
+                {
+                  "path": "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier/docs/plans/iteration-1-project-verifier/iterations/iteration7-check-results.md",
+                  "reason": "Iteration artifact iteration7-check-results.md belongs to iteration 7, not 8"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "input": {
+            "server": "cucumber-viz-workflow",
+            "tool": "workflow.publish_iteration_draft",
+            "arguments": {
+              "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+              "iterationIndex": 8,
+              "attemptId": "attempt_fEZBdwt7YFpcol2rF6xZ2"
+            }
+          },
+          "result": {
+            "success": true,
+            "acceptedFileCount": 104
+          }
+        }
+      ]
+    },
+    {
+      "source": ".cucumber-viz/turns/turn_ByBzIT3-mjBfDwcs2uqxu.json",
+      "id": "ByBzIT3-mjBfDwcs2uqxu",
+      "chatKey": "implementation-studio:workflow:_JG0Ucx92X1f6WqRyuxxC:interactive:iter:5",
+      "sessionId": "session-1788953140872-mcz7rxjv",
+      "turnId": "turn-1788956329211-bugusg3i",
+      "startedAt": "2026-09-09T12:18:49.211Z",
+      "completedAt": "2026-09-09T12:19:05.269Z",
+      "status": "completed",
+      "publicationCalls": [
+        {
+          "input": {
+            "server": "cucumber-viz-workflow",
+            "tool": "workflow.publish_iteration_draft",
+            "arguments": {
+              "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+              "iterationIndex": 5,
+              "attemptId": "attempt_zyXKCIV7A7l6i8X7yKXcw"
+            }
+          },
+          "result": {
+            "ok": false,
+            "error": {
+              "code": "STALE_ATTEMPT",
+              "message": "The workflow attempt associated with this MCP binding is no longer active.",
+              "issues": []
+            }
+          }
+        }
+      ],
+      "prompt": "## Workflow Tools\n\nYou have `cucumber-viz-workflow` MCP tools available. For all tool calls, use `workflowId`: `_JG0Ucx92X1f6WqRyuxxC`.\nFor every write-capable workflow tool call in this session, also pass `attemptId`: `attempt_zyXKCIV7A7l6i8X7yKXcw`.\nIf a workflow tool returns `STALE_ATTEMPT`, stop using this session for workflow writes and report the stale attempt.\nUse MCP tools for structured workflow drafts (*-checklist.json, *-results.md, tracking JSON, and manifest/fix iterations via `workflow.add_fix_iterations`) \u2014 direct edits will be rejected at publication time.\nDo not edit `*-check-results.md` or `status.md` directly; those are control-plane outputs, not agent-authored draft files.\nFiles you CAN edit directly: application code and tests (src/**, features/**, docs/** excluding plan artifacts).\n## Publish Iteration Draft\n\nIteration 5 has completed its automated pipeline and is waiting at the publication gate.\n\nCall `workflow.publish_iteration_draft` with:\n- `workflowId`: `_JG0Ucx92X1f6WqRyuxxC`\n- `iterationIndex`: `5`\n- `attemptId`: `attempt_zyXKCIV7A7l6i8X7yKXcw`\n\nDo not edit source files or workflow-owned draft artifacts in this turn.\nIf publication fails, fix only the reported publication errors and submit publication again.\n",
+      "response": "I\u2019ll submit iteration 5 at the publication gate now.\nPublication failed with `STALE_ATTEMPT`: the supplied workflow attempt is no longer active. I stopped workflow writes as instructed. Publication requires an active attempt."
+    }
+  ],
+  "operationalLog": [
+    {
+      "source": ".cucumber-viz/logs/planning-studio-2026-09-09.jsonl",
+      "line": 40,
+      "entry": {
+        "level": 30,
+        "time": "2026-09-09T10:35:37.882Z",
+        "pid": 10586,
+        "hostname": "243168472f39",
+        "subsystem": "agent-chat.codex-runtime",
+        "runtimeSessionId": "codex-runtime-1788950137879-15",
+        "childProcessId": 37667,
+        "chatKey": "implementation-studio:workflow:_JG0Ucx92X1f6WqRyuxxC:interactive:iter:3",
+        "sessionId": "session-1788948339966-fxk0lkpn",
+        "codexBin": "codex",
+        "workingDirectory": "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier",
+        "mode": "resume",
+        "conversationId": "01a085a1-5d88-7851-8d43-bb9ecbadf589",
+        "msg": "codex.runtime.spawn.succeeded"
+      }
+    },
+    {
+      "source": ".cucumber-viz/logs/planning-studio-2026-09-09.jsonl",
+      "line": 41,
+      "entry": {
+        "level": 30,
+        "time": "2026-09-09T10:35:51.006Z",
+        "pid": 10586,
+        "hostname": "243168472f39",
+        "subsystem": "agent-chat.codex-runtime",
+        "runtimeSessionId": "codex-runtime-1788950137879-15",
+        "childProcessId": 37667,
+        "exitCode": 0,
+        "signal": null,
+        "msg": "codex.runtime.process.exited"
+      }
+    },
+    {
+      "source": ".cucumber-viz/logs/planning-studio-2026-09-09.jsonl",
+      "line": 44,
+      "entry": {
+        "level": 30,
+        "time": "2026-09-09T11:02:10.054Z",
+        "pid": 10586,
+        "hostname": "243168472f39",
+        "subsystem": "agent-chat.codex-runtime",
+        "runtimeSessionId": "codex-runtime-1788951730050-17",
+        "childProcessId": 39873,
+        "chatKey": "implementation-studio:workflow:_JG0Ucx92X1f6WqRyuxxC:interactive",
+        "sessionId": "session-1788951618300-t17s3u7j",
+        "codexBin": "codex",
+        "workingDirectory": "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier",
+        "mode": "resume",
+        "conversationId": "01a085d3-637c-7ed3-acb4-37ff6097472c",
+        "msg": "codex.runtime.spawn.succeeded"
+      }
+    },
+    {
+      "source": ".cucumber-viz/logs/planning-studio-2026-09-09.jsonl",
+      "line": 45,
+      "entry": {
+        "level": 30,
+        "time": "2026-09-09T11:03:47.876Z",
+        "pid": 10586,
+        "hostname": "243168472f39",
+        "subsystem": "agent-chat.codex-runtime",
+        "runtimeSessionId": "codex-runtime-1788951827873-18",
+        "childProcessId": 40367,
+        "chatKey": "implementation-studio:workflow:_JG0Ucx92X1f6WqRyuxxC:interactive:iter:4",
+        "sessionId": "session-1788951827871-vbza07ic",
+        "codexBin": "codex",
+        "workingDirectory": "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier",
+        "mode": "start",
+        "conversationId": null,
+        "msg": "codex.runtime.spawn.succeeded"
+      }
+    },
+    {
+      "source": ".cucumber-viz/logs/planning-studio-2026-09-09.jsonl",
+      "line": 108,
+      "entry": {
+        "level": 30,
+        "time": "2026-09-09T14:28:02.172Z",
+        "pid": 10586,
+        "hostname": "243168472f39",
+        "subsystem": "agent-chat.codex-runtime",
+        "runtimeSessionId": "codex-runtime-1788964082168-49",
+        "childProcessId": 135590,
+        "chatKey": "implementation-studio:workflow:_JG0Ucx92X1f6WqRyuxxC:interactive:iter:8",
+        "sessionId": "session-1788962373755-yqvhcxp9",
+        "codexBin": "codex",
+        "workingDirectory": "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier",
+        "mode": "resume",
+        "conversationId": "01a08677-80fc-71b1-ad07-7b2aec266e10",
+        "msg": "codex.runtime.spawn.succeeded"
+      }
+    },
+    {
+      "source": ".cucumber-viz/logs/planning-studio-2026-09-09.jsonl",
+      "line": 109,
+      "entry": {
+        "level": 30,
+        "time": "2026-09-09T14:29:27.666Z",
+        "pid": 10586,
+        "hostname": "243168472f39",
+        "subsystem": "agent-chat.codex-runtime",
+        "runtimeSessionId": "codex-runtime-1788964082168-49",
+        "childProcessId": 135590,
+        "exitCode": 0,
+        "signal": null,
+        "msg": "codex.runtime.process.exited"
+      }
+    },
+    {
+      "source": ".cucumber-viz/logs/planning-studio-2026-09-09.jsonl",
+      "line": 110,
+      "entry": {
+        "level": 30,
+        "time": "2026-09-09T21:02:14.562Z",
+        "pid": 10586,
+        "hostname": "243168472f39",
+        "subsystem": "agent-chat.codex-runtime",
+        "runtimeSessionId": "codex-runtime-1788987734548-50",
+        "childProcessId": 138784,
+        "chatKey": "implementation-studio:workflow:_JG0Ucx92X1f6WqRyuxxC:interactive",
+        "sessionId": "session-1788951618300-t17s3u7j",
+        "codexBin": "codex",
+        "workingDirectory": "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier",
+        "mode": "resume",
+        "conversationId": "01a085d3-637c-7ed3-acb4-37ff6097472c",
+        "msg": "codex.runtime.spawn.succeeded"
+      }
+    },
+    {
+      "source": ".cucumber-viz/logs/planning-studio-2026-09-09.jsonl",
+      "line": 111,
+      "entry": {
+        "level": 30,
+        "time": "2026-09-09T21:02:42.636Z",
+        "pid": 10586,
+        "hostname": "243168472f39",
+        "subsystem": "agent-chat.codex-runtime",
+        "runtimeSessionId": "codex-runtime-1788987762633-51",
+        "childProcessId": 139188,
+        "chatKey": "implementation-studio:workflow:_JG0Ucx92X1f6WqRyuxxC:interactive:iter:9",
+        "sessionId": "session-1788987762631-w4p7v73o",
+        "codexBin": "codex",
+        "workingDirectory": "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier",
+        "mode": "start",
+        "conversationId": null,
+        "msg": "codex.runtime.spawn.succeeded"
+      }
+    }
+  ],
+  "checks": {
+    "3": {
+      "headCommitRef": "33b0972d8a09565ca2273c284bc60b35b65e28f8",
+      "checks": {
+        "static": {
+          "passed": true,
+          "status": "pass",
+          "summary": "worktree-dependencies: PASS; type-check: PASS",
+          "durationSeconds": 10.271,
+          "outputRef": {
+            "kind": "workflow-check-result",
+            "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+            "metadataPath": "check-results/iteration-3-1788950013475-8a242c/static/metadata.json",
+            "outputPath": "check-results/iteration-3-1788950013475-8a242c/static/output.log",
+            "bytes": 1019
+          }
+        },
+        "scopeReview": {
+          "passed": true,
+          "status": null,
+          "summary": null,
+          "durationSeconds": 39.123,
+          "outputRef": {
+            "kind": "workflow-check-result",
+            "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+            "metadataPath": "check-results/iteration-3-1788950013475-8a242c/scopeReview/metadata.json",
+            "outputPath": "check-results/iteration-3-1788950013475-8a242c/scopeReview/output.log",
+            "bytes": 36
+          }
+        },
+        "sealedFiles": {
+          "passed": true,
+          "status": "pass",
+          "summary": "Sealed files check passed with no findings.",
+          "durationSeconds": 0.114,
+          "outputRef": {
+            "kind": "workflow-check-result",
+            "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+            "metadataPath": "check-results/iteration-3-1788950013475-8a242c/sealedFiles/metadata.json",
+            "outputPath": "check-results/iteration-3-1788950013475-8a242c/sealedFiles/output.log",
+            "bytes": 48
+          }
+        },
+        "constraints": {
+          "passed": true,
+          "status": null,
+          "summary": null,
+          "durationSeconds": 120.717,
+          "outputRef": {
+            "kind": "workflow-check-result",
+            "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+            "metadataPath": "check-results/iteration-3-1788950013475-8a242c/constraints/metadata.json",
+            "outputPath": "check-results/iteration-3-1788950013475-8a242c/constraints/output.log",
+            "bytes": 1210
+          }
+        },
+        "regression": {
+          "passed": true,
+          "status": "pass",
+          "summary": "vitest: PASS",
+          "durationSeconds": 3.247,
+          "outputRef": {
+            "kind": "workflow-check-result",
+            "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+            "metadataPath": "check-results/post_commit_regression-3-1788950134395-2512db/regression/metadata.json",
+            "outputPath": "check-results/post_commit_regression-3-1788950134395-2512db/regression/output.log",
+            "bytes": 305
+          }
+        }
+      },
+      "regressionOutput": "### vitest [PASS]\n> ramify.ts@0.0.0 test\n> vitest run\n\n\n RUN  v4.1.11 /tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier\n\n\n Test Files  19 passed (19)\n      Tests  511 passed (511)\n   Start at  10:35:34\n   Duration  2.65s (transform 2.61s, setup 0ms, import 4.98s, tests 2.63s, environment 767ms)"
+    },
+    "8": {
+      "headCommitRef": "dfaa044c3c7a552970924bbde5c31290c5a89baf",
+      "checks": {
+        "static": {
+          "passed": true,
+          "status": "pass",
+          "summary": "worktree-dependencies: PASS; type-check: PASS",
+          "durationSeconds": 10.572,
+          "outputRef": {
+            "kind": "workflow-check-result",
+            "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+            "metadataPath": "check-results/iteration-8-1788963892246-ca891c/static/metadata.json",
+            "outputPath": "check-results/iteration-8-1788963892246-ca891c/static/output.log",
+            "bytes": 1019
+          }
+        },
+        "scopeReview": {
+          "passed": true,
+          "status": null,
+          "summary": null,
+          "durationSeconds": 174.416,
+          "outputRef": {
+            "kind": "workflow-check-result",
+            "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+            "metadataPath": "check-results/iteration-8-1788963892246-ca891c/scopeReview/metadata.json",
+            "outputPath": "check-results/iteration-8-1788963892246-ca891c/scopeReview/output.log",
+            "bytes": 36
+          }
+        },
+        "sealedFiles": {
+          "passed": true,
+          "status": "pass",
+          "summary": "Sealed files check passed with no findings.",
+          "durationSeconds": 0.325,
+          "outputRef": {
+            "kind": "workflow-check-result",
+            "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+            "metadataPath": "check-results/iteration-8-1788963892246-ca891c/sealedFiles/metadata.json",
+            "outputPath": "check-results/iteration-8-1788963892246-ca891c/sealedFiles/output.log",
+            "bytes": 48
+          }
+        },
+        "constraints": {
+          "passed": true,
+          "status": null,
+          "summary": null,
+          "durationSeconds": 137.723,
+          "outputRef": {
+            "kind": "workflow-check-result",
+            "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+            "metadataPath": "check-results/iteration-8-1788963892246-ca891c/constraints/metadata.json",
+            "outputPath": "check-results/iteration-8-1788963892246-ca891c/constraints/output.log",
+            "bytes": 1321
+          }
+        },
+        "regression": {
+          "passed": true,
+          "status": "pass",
+          "summary": "vitest: PASS",
+          "durationSeconds": 15.213,
+          "outputRef": {
+            "kind": "workflow-check-result",
+            "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+            "metadataPath": "check-results/post_commit_regression-8-1788964066773-a7ffa9/regression/metadata.json",
+            "outputPath": "check-results/post_commit_regression-8-1788964066773-a7ffa9/regression/output.log",
+            "bytes": 307
+          }
+        }
+      },
+      "regressionOutput": "### vitest [PASS]\n> ramify.ts@0.0.0 test\n> vitest run\n\n\n RUN  v4.1.11 /tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier\n\n\n Test Files  38 passed (38)\n      Tests  764 passed (764)\n   Start at  14:27:47\n   Duration  14.60s (transform 3.32s, setup 0ms, import 8.01s, tests 97.98s, environment 899ms)"
+    }
+  },
+  "sourceFingerprints": {
+    "src/domain-sub-apps/implementation-studio/core/workflow-service/spawn-iterations.ts": "70e4155513ea794f969c3681fc52d468c935309cea7f2ee994b42e056b2923c7",
+    "dist/domain-sub-apps/implementation-studio/core/workflow-service/spawn-iterations.js": "718ed6d84ded60ff28ee8a1a35b4bd2fd0a0a1656c04570ec26c7bc69b4065d1",
+    "src/domain-sub-apps/implementation-studio/core/workflow-service/iteration-invoke-services.ts": "3569ce5b5770b4d833d72df6edb101edad943fb26180944b82bbd2015527929b",
+    "dist/domain-sub-apps/implementation-studio/core/workflow-service/iteration-invoke-services.js": "548fc9ad2793e6b522a21460e1dde791cdeb965f44919c5902c4a7aa8dd90a51",
+    "src/domain-sub-apps/implementation-studio/core/runtime/sealed-files/production-sanctioned-sealed-write-integration.ts": "01160495055f327c2e568d8a5797e9a4fafa421be2a4c4c1d864f0e5e311f15c",
+    "dist/domain-sub-apps/implementation-studio/core/runtime/sealed-files/production-sanctioned-sealed-write-integration.js": "cc8ce60c93375abee377b66781835880b29f71986860867a3a447c563386ed49",
+    "src/domain-sub-apps/implementation-studio/core/runtime/work-units/index.ts": "4830483f85ca671f83784e571bb5b88a38480e5bf727ed1edb529d3b2947b849",
+    "dist/domain-sub-apps/implementation-studio/core/runtime/work-units/index.js": "e0102ff124de05ce1621fa1d559868a317b56fd04e5b4777befae81c11043e9f",
+    "src/domain-sub-apps/implementation-studio/core/runtime/publication/publication-service.ts": "e04c8fdc9d9d3e7375adeed958283f4881f0c834fb5b0a7efa8f96f1ad5cf5ea",
+    "dist/domain-sub-apps/implementation-studio/core/runtime/publication/publication-service.js": "e8d81f9c5e2f8cd3178d19966094a5b096f91785f4bf7009696b520dd2513688",
+    "src/server/orchestration/mcp-http-endpoints.ts": "c1bf0fefdd8da90c5aa0226b064366512d876b73b27fbc5df9391ea02b57766f",
+    "dist/server/orchestration/mcp-http-endpoints.js": "0709c1c3aa21a4eed0a2b226c6d1c686a3bf0fd92e33cfb888d7640cea7c5701"
+  },
+  "gitEvidence": {
+    "70203cb": "70203cbfefd0f6410a3fc33cfa2b49fec48a4ab8\n2026-09-09T10:30:59+00:00\nchore(workflow): preserve generated prerequisite check result\ndiff --git a/docs/plans/iteration-1-project-verifier/iterations/iteration2-check-results.md b/docs/plans/iteration-1-project-verifier/iterations/iteration2-check-results.md\nindex c87fc4a..2c21a3d 100644\n--- a/docs/plans/iteration-1-project-verifier/iterations/iteration2-check-results.md\n+++ b/docs/plans/iteration-1-project-verifier/iterations/iteration2-check-results.md\n@@ -5,3 +5,4 @@\n - **Scope Review**: PASSED\n - **Sealed Files**: PASSED\n - **Constraints**: PASSED\n+- **Regression Tests**: PASSED\ndiff --git a/docs/plans/iteration-1-project-verifier/iterations/iteration3-results.md b/docs/plans/iteration-1-project-verifier/iterations/iteration3-results.md\nindex e2b4ed4..d72f26a 100644\n--- a/docs/plans/iteration-1-project-verifier/iterations/iteration3-results.md\n+++ b/docs/plans/iteration-1-project-verifier/iterations/iteration3-results.md\n@@ -183,3 +183,13 @@ handlers remain pending at their scheduled iterations.\n    into empty successful models.\n 4. Run the delegated automatic regressions before accepting this draft. Keep\n    the full Plan 1 gate failing until every required future instance executes.\n+\n+## Publication bookkeeping\n+\n+Implementation commit: `9ab062f`.\n+The first publication attempt returned `WORKTREE_DIRTY` for the pre-existing\n+generated `iteration2-check-results.md` change. Inspection showed only the\n+control plane's added `Regression Tests: PASSED` line. Its contents were not\n+edited; that existing generated output is committed separately with this\n+publication note so publication can preserve it. No iteration 3 regression\n+outcome is inferred from the iteration 2 result.\n",
+    "88682ef": "88682ef0729131e5c96987f5938fa3852907932e\n2026-09-09T14:22:12+00:00\nRecord generated iteration 7 regression result\ndiff --git a/docs/plans/iteration-1-project-verifier/iterations/iteration7-check-results.md b/docs/plans/iteration-1-project-verifier/iterations/iteration7-check-results.md\nindex 3b84c84..da2807b 100644\n--- a/docs/plans/iteration-1-project-verifier/iterations/iteration7-check-results.md\n+++ b/docs/plans/iteration-1-project-verifier/iterations/iteration7-check-results.md\n@@ -5,3 +5,4 @@\n - **Scope Review**: PASSED\n - **Sealed Files**: PASSED\n - **Constraints**: PASSED\n+- **Regression Tests**: PASSED\n",
+    "17db228": "17db2283141082177b1d11d268652fb55861a686\n2026-09-09T11:03:47+00:00\nplan(iteration-1-project-verifier): finalize workflow bookkeeping\ndiff --git a/docs/plans/iteration-1-project-verifier/iterations/iteration3-check-results.md b/docs/plans/iteration-1-project-verifier/iterations/iteration3-check-results.md\nindex 6f09d0b..1ce5253 100644\n--- a/docs/plans/iteration-1-project-verifier/iterations/iteration3-check-results.md\n+++ b/docs/plans/iteration-1-project-verifier/iterations/iteration3-check-results.md\n@@ -5,3 +5,4 @@\n - **Scope Review**: PASSED\n - **Sealed Files**: PASSED\n - **Constraints**: PASSED\n+- **Regression Tests**: PASSED\n",
+    "bba4f21": "bba4f2152ab44667f063938d8453df022b0ff3cd\n2026-09-09T21:02:41+00:00\nplan(iteration-1-project-verifier): finalize workflow bookkeeping\ndiff --git a/docs/plans/iteration-1-project-verifier/iterations/iteration8-check-results.md b/docs/plans/iteration-1-project-verifier/iterations/iteration8-check-results.md\nindex 7c78689..28ac60a 100644\n--- a/docs/plans/iteration-1-project-verifier/iterations/iteration8-check-results.md\n+++ b/docs/plans/iteration-1-project-verifier/iterations/iteration8-check-results.md\n@@ -5,3 +5,4 @@\n - **Scope Review**: PASSED\n - **Sealed Files**: PASSED\n - **Constraints**: PASSED\n+- **Regression Tests**: PASSED\n"
+  }
+}

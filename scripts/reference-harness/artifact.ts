@@ -29,8 +29,8 @@ export async function executionIdentity() {
   const git = (args: string[]) => execFileSync('git', args, { cwd: repositoryRoot, encoding: 'utf8' }).trim();
   const inputs = git(['ls-files', '--cached', '--others', '--exclude-standard', '-z', '--', 'src', 'subs', 'scripts',
     'module.ramify', 'README.md', 'package.json', 'package-lock.json', 'tsconfig*.json', 'vitest.config.ts', 'examples/collection-review',
-    'docs/plans/iteration-1-project-verifier/main-plan.md', 'docs/plans/iteration-1-project-verifier/subcases.md',
-    'docs/plans/iteration-1-project-verifier/iterations/manifest.json'])
+    'docs/plans/done/iteration-1-project-verifier/main-plan.md', 'docs/plans/done/iteration-1-project-verifier/subcases.md',
+    'docs/plans/done/iteration-1-project-verifier/iterations/manifest.json'])
     .split('\0').filter(Boolean);
   const files = [...new Set(inputs)].filter(file => !file.includes('/node_modules/') && !file.includes('/.reference-work/'));
   const packageData = JSON.parse(await readFile(join(repositoryRoot, 'package.json'), 'utf8'));

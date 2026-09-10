@@ -96,7 +96,7 @@ README completeness is separate from module-description validity.
 The evaluator, teaching diagrams and toolkit source have migrated to the resolved
 tag registry and module-owned `src/tests/`. `npm run check:self` checks all nine
 toolkit owners, including owned tests. The independent scripts, site and example
-have separate compiler scopes. The [iteration 15 completion report](docs/plans/iteration-1-project-verifier/iterations/iteration15-results.md)
+have separate compiler scopes. The [iteration 15 completion report](docs/plans/done/iteration-1-project-verifier/iterations/iteration15-results.md)
 records acceptance evidence and remaining limitations.
 
 ## Implementation Architecture
@@ -131,7 +131,7 @@ documents do not supersede the model or establish implemented capabilities.
 The [implementation roadmap](docs/plans/tooling-architecture/README.md) records
 all six deliverables, prerequisites, contract reviews, acceptance evidence and
 the briefs for authoring later plans. Visualization implementation remains later.
-The first detailed plan is [batch project verification](docs/plans/iteration-1-project-verifier/main-plan.md).
+The first detailed plan is [batch project verification](docs/plans/done/iteration-1-project-verifier/main-plan.md).
 It includes the reference checker and toolkit self-check; it does not implement
 the daemon or other runtime clients.
 

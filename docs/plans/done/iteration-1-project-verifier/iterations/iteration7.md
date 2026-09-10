@@ -16,12 +16,12 @@ exports.
 
 ## Read first
 
-- [Module-description principles](../../../model/module-description.principles.md):
+- [Module-description principles](../../../../model/module-description.principles.md):
   exposure forms, `src/interfaces/` wildcard rules, `expose-sub`, tag
   clauses, collision rules.
 - Main plan: Descriptions and model, the `LinkedDescriptions` row of the
   contract table.
-- [Reference contract map](../../reference-project/contract-map.md): the
+- [Reference contract map](../../../reference-project/contract-map.md): the
   hand-reviewed expanded contracts the baseline must reproduce.
 
 ## Deliverables

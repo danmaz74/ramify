@@ -17,7 +17,7 @@ subcase is inventoried as not executed, and nothing is green by omission.
 - Main plan: Implementation ownership and migration, Harness implementation
   and evidence, Reference acceptance matrix.
 - Iteration 1's `owners.md`, `scope.md` and subcase list.
-- [Harness plan](../../reference-project/harness.md) and the current
+- [Harness plan](../../../reference-project/harness.md) and the current
   `scripts/reference-harness/{cases,report}.ts`.
 
 ## Deliverables

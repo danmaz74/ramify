@@ -1,0 +1,493 @@
+{
+  "capturedAt": "2026-09-10T06:06:10.417112+00:00",
+  "installedVersion": "0.6.3",
+  "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+  "worktreePath": "/tmp/worktrees/ramify-67e9dd0f/iteration-1-project-verifier",
+  "summary": {
+    "repairTurns": 1081,
+    "firstRepair": "2026-09-10T01:29:22.841Z",
+    "lastRepairCompleted": "2026-09-10T05:39:47.299Z",
+    "repairTurnsWithoutTools": 800,
+    "repairErrors": {
+      "STALE_ATTEMPT": 284
+    }
+  },
+  "sampleTurns": [
+    {
+      "file": ".cucumber-viz/turns/turn_i9GtB-NIUdrWLPxeaEY_P.json",
+      "startedAt": "2026-09-10T00:40:45.831Z",
+      "completedAt": "2026-09-10T01:29:22.816Z",
+      "durationMs": 2916985,
+      "kind": "implementation",
+      "response": "I\u2019ll read the project instructions, iteration contracts and workflow state, then implement and verify the reference gate. I\u2019ll also check how the reported iteration-13 publication issue affects this iteration\u2019s prerequisites.\nI\u2019m using the iteration-work and testing skills for this implementation. The existing runner already covers iterations 3\u201313; this iteration will add baseline, regression, discovery and production-selection evidence, plus checker-derived reporting. I\u2019ll carry the inherited CLI and loader findings forward as separate issues outside this scope.\nWorkflow state marks iteration 13 accepted, so its prerequisite is satisfied. The supplied handoff still records the CLI interruption finding. I also confirmed two gaps in this iteration\u2019s scope: the report prints a handwritten zero-violation count, and none of the 15 iteration-14 variants has a handler. I\u2019ll replace those with executable evidence and retain the three iteration-15 instances as pending.\nThe compiled checker passes the unchanged reference: 15 owners, 294 accesses, zero denials or coverage notes, and the two expected configuration warnings. I\u2019m adding assertions for the specific baseline constructs, discovery checks against the migration map, and production checks that compare selected files with emitted artifacts.\nAll 15 iteration-14 variants are wired in and type-check. I\u2019m running them in isolation first to check the new assertions. The six gate-sabotage variants remove a record, disable a handler or force an assertion failure in both intermediate and full modes.\nThe focused run found harness issues: the copier could not copy the toolkit into a deeply nested work directory, and Cucumber rejected a report path containing the instance ID\u2019s colon. Both are fixed. I also corrected a baseline assertion: HTML and feature files are inventoried resources, but they need no export description unless source imports them.\nThe baseline and Cucumber checks now pass, and the production check confirms that the toolkit emits exactly the files returned by its selector. Focused harness tests pass too. I\u2019m finishing report persistence before running the full iteration gate; each portable report will include revision/build identity, observed diagnostics, individual outcomes and pending work.\nThe 305-instance gate is running. Type-check, inventory validation, the new `check:reference` command and dry-run reporting have passed. Dry-run output now says violations are unmeasured. The separate harness suite has reported a declaration-validation failure; I\u2019ll inspect it while the gate continues.\nThe declaration test still expected the analysis-session export to be absent, although iteration 13 activated the final contracts. I updated that stale assertion, and the focused checks now pass. I stopped the broader runs before making the correction so the next reports can identify one unchanged source revision.\nThe restarted runs are progressing through the parser, ownership and linking cases without command errors so far. I\u2019m checking the full-plan command and the report command as well: the full gate should fail only for iteration 15\u2019s three pending instances, while the report should succeed for the implemented scope.\nThe runners have reached the exposure-path mutations, including removal and restoration of required relays. Source and build files remain unchanged during these runs. The final reports will retain the compiled baseline result, separate regression-tier results and each gate-sabotage outcome.\nThe access cases are still running, with no operational errors reported so far. The inherited CLI interruption and `createRequire` findings remain outside this change; I\u2019ll preserve them in the handoff without treating the reference gate as proof that they are fixed.\nThe runners are now exercising alias identity and wildcard export growth. These cases check that renames preserve originals and that added exports affect only the declared wildcard contracts. Final per-instance totals will be available when the runs finish.\nThe runs are still active and have reached wildcard collision cases. No command-level errors have appeared. Once they finish, I\u2019ll check the assertion results, confirm that only iteration 15 remains pending, then write the workflow artifacts and commit the change.\nThe runners are exercising tag restrictions, including dispatch imports into core and UI owners. I\u2019ll keep the final evidence separate: declaration validity, import decisions, regression tests and whole-plan completion each establish different things.\nThe runs have reached source-area and testing-origin cases. The focused checks already confirmed discovery of both ordinary testing-module tests and nested tests; the full run is now exercising that behavior alongside the prerequisite checks.\nThe testing-origin checks are still running, with no command errors reported. I\u2019m also checking for retained failed fixtures so I can investigate an assertion failure before the full runs finish.\nNo failed fixture has been retained by the final gate runs so far. They are moving through source-resolution cases, including `.js` substitution and aliases. The completed reports will provide the authoritative pass/fail totals.\nThe source-resolution cases are still running without command errors. The remaining groups cover namespace and lazy imports, resources, session lifecycle, CLI behavior, and the new regression and production checks.\nThe runs have reached lazy-import and import-type variants, including the reference\u2019s React lazy callback. Those results will sit alongside the actual application-tier results in the report; a successful application build alone won\u2019t supply a checker verdict.\nThe runners are checking symbol-free loads and testing-origin isolation now, including side-effect imports and discarded dynamic imports. Command error streams remain empty, and I haven\u2019t found a retained failed fixture from the final gate runs.\nThe runs have reached resource and coverage cases. These check the distinction between an unresolved resource, a missing export on a known resource, and a definite denial. The new report preserves those diagnostics separately from the violation count.\nThe leading runners are now in the CLI and session cases. No operational failures or retained failed fixtures have appeared in the final runs. After the matrix finishes, I\u2019ll inspect the persisted reports for missing instances, assertion failures and machine-specific paths.\nThe compiled CLI variants are running now: clean, denied, invalid and unavailable results, plus warnings and stray descriptions. I\u2019m waiting for the full results before marking the checklist complete.\nThe harness suite hit a scheduling problem: two older tests each rerun the entire matrix, and both exceeded their 20-minute timeout while the required gate commands were also running. The other 234 tests passed. I\u2019ll keep exhaustive execution in the dedicated gate commands and make `reference:cases` focus on inventory, registration and runner behavior, without removing any I1 requirement.\nThe iteration gate passed all 305 required instances. The full-plan gate failed only for the three iteration-15 instances, and `reference:report` passed with checker-derived zero violations, 77/77 example Vitest tests and one Cucumber scenario. I\u2019m finishing the inventory-test adjustment that removes the redundant full-matrix runs.\nThe three exhaustive reports are complete, with no machine-specific paths found in the portable artifacts. The shortened harness suite exposed another test issue: its declaration test reads the shared reference directory while other tests create fixtures beneath it, so acquisition returned `incomplete`. I\u2019m moving that test to an isolated copy, as the gate already does.\nThe final type-check passes. The harness suite is running with the declaration tests isolated and the duplicate exhaustive runs removed. The earlier full-matrix results still cover unchanged gate handlers and checker code; I\u2019ll note the later test-only adjustments in the handoff.\nAll required checks for iteration 14 are satisfied. The final harness suite passed 235 tests; the iteration gate passed 305/305 instances; and the full gate failed only for the three iteration-15 obligations. I\u2019ll now write the required results and checklist, commit the changes, and publish the draft for acceptance.\nThe workflow rejected the results write with `FRAME_MISMATCH`, saying the worktree or sealed index no longer matches its active frame. The implementation and local verification are complete. I\u2019ll check the workflow state before attempting publication.\nThe workflow now returns `STALE_ATTEMPT`: its MCP session binding is unknown or stale. Following your instruction, I\u2019m stopping all workflow writes. I used the cucumber-viz-debugging skill to check the state. I\u2019ll commit the verified code on the authoritative branch; submitting the results, checklist and publication requires a fresh workflow session.\nCommitted as `9247480`.\n\n- Iteration gate: **305/305 passed**.\n- Harness tests: **235 passed**.\n- Full gate fails only for the three pending iteration-15 instances.\n\nWorkflow submission is blocked by `STALE_ATTEMPT`. Results/checklist writes and publication remain incomplete; a fresh workflow session is required.",
+      "errors": [
+        {
+          "tool": "workflow.write_iteration_results",
+          "error": {
+            "code": "FRAME_MISMATCH",
+            "message": "The workflow worktree or sealed index no longer matches the active frame.",
+            "issues": []
+          }
+        },
+        {
+          "tool": "workflow.get_publication_status",
+          "error": {
+            "code": "STALE_ATTEMPT",
+            "message": "The workflow MCP session binding is unknown or stale.",
+            "issues": []
+          }
+        }
+      ],
+      "toolCount": 101
+    },
+    {
+      "file": ".cucumber-viz/turns/turn_o0TLbetxQtPT0gKZuxSvc.json",
+      "startedAt": "2026-09-10T01:29:22.841Z",
+      "completedAt": "2026-09-10T01:33:18.766Z",
+      "durationMs": 235925,
+      "kind": "repair",
+      "response": null,
+      "errors": [
+        {
+          "tool": "workflow.write_iteration_results",
+          "error": {
+            "code": "STALE_ATTEMPT",
+            "message": "The workflow MCP session binding is unknown or stale.",
+            "issues": []
+          }
+        }
+      ],
+      "toolCount": 2
+    },
+    {
+      "file": ".cucumber-viz/turns/turn_k1f3sCCwueFnFvud22WGH.json",
+      "startedAt": "2026-09-10T01:33:18.785Z",
+      "completedAt": "2026-09-10T01:35:05.702Z",
+      "durationMs": 106917,
+      "kind": "repair",
+      "response": null,
+      "errors": [
+        {
+          "tool": "workflow.write_iteration_results",
+          "error": {
+            "code": "STALE_ATTEMPT",
+            "message": "The workflow MCP session binding is unknown or stale.",
+            "issues": []
+          }
+        }
+      ],
+      "toolCount": 1
+    },
+    {
+      "file": ".cucumber-viz/turns/turn_2g1hLyvibDQCR7lRqVi1S.json",
+      "startedAt": "2026-09-10T01:35:05.739Z",
+      "completedAt": "2026-09-10T01:36:34.998Z",
+      "durationMs": 89259,
+      "kind": "repair",
+      "response": null,
+      "errors": [
+        {
+          "tool": "workflow.write_iteration_results",
+          "error": {
+            "code": "STALE_ATTEMPT",
+            "message": "The workflow MCP session binding is unknown or stale.",
+            "issues": []
+          }
+        }
+      ],
+      "toolCount": 1
+    },
+    {
+      "file": ".cucumber-viz/turns/turn_DDDoNkUn6OCD2et9zricR.json",
+      "startedAt": "2026-09-10T01:36:35.044Z",
+      "completedAt": "2026-09-10T01:36:59.641Z",
+      "durationMs": 24597,
+      "kind": "repair",
+      "response": null,
+      "errors": [
+        {
+          "tool": "workflow.get_publication_status",
+          "error": {
+            "code": "STALE_ATTEMPT",
+            "message": "The workflow MCP session binding is unknown or stale.",
+            "issues": []
+          }
+        }
+      ],
+      "toolCount": 1
+    },
+    {
+      "file": ".cucumber-viz/turns/turn_GzIArMehrA4S_L7FVAqo0.json",
+      "startedAt": "2026-09-10T01:36:59.658Z",
+      "completedAt": "2026-09-10T01:37:13.812Z",
+      "durationMs": 14154,
+      "kind": "repair",
+      "response": null,
+      "errors": [
+        {
+          "tool": "workflow.get_publication_status",
+          "error": {
+            "code": "STALE_ATTEMPT",
+            "message": "The workflow MCP session binding is unknown or stale.",
+            "issues": []
+          }
+        }
+      ],
+      "toolCount": 1
+    },
+    {
+      "file": ".cucumber-viz/turns/turn_H1g_PNQ9yuvsmvzR3Q6aK.json",
+      "startedAt": "2026-09-10T05:39:14.515Z",
+      "completedAt": "2026-09-10T05:39:27.648Z",
+      "durationMs": 13133,
+      "kind": "repair",
+      "response": null,
+      "errors": [],
+      "toolCount": 0
+    },
+    {
+      "file": ".cucumber-viz/turns/turn_S3iWvjT0YMl4lTR6JHsxk.json",
+      "startedAt": "2026-09-10T05:39:27.705Z",
+      "completedAt": "2026-09-10T05:39:47.299Z",
+      "durationMs": 19594,
+      "kind": "repair",
+      "response": null,
+      "errors": [
+        {
+          "tool": "workflow.get_publication_status",
+          "error": {
+            "code": "STALE_ATTEMPT",
+            "message": "The workflow MCP session binding is unknown or stale.",
+            "issues": []
+          }
+        }
+      ],
+      "toolCount": 1
+    },
+    {
+      "file": ".cucumber-viz/turns/turn_0dF9j8_FeDFXhbMW81YwI.json",
+      "startedAt": "2026-09-10T05:39:47.446Z",
+      "completedAt": "2026-09-10T05:40:17.856Z",
+      "durationMs": 30410,
+      "kind": "publication",
+      "response": null,
+      "errors": [
+        {
+          "tool": "workflow.publish_iteration_draft",
+          "error": {
+            "code": "STALE_ATTEMPT",
+            "message": "The workflow MCP session binding is unknown or stale.",
+            "issues": []
+          }
+        }
+      ],
+      "toolCount": 1
+    }
+  ],
+  "journal": [
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 631,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "workflow.attempt-intent-persisted",
+        "phase": "executing",
+        "detail": {
+          "workUnitId": "iteration:14:draft",
+          "attemptId": "attempt_WkjCOzzfjoiXjlROxUBtR"
+        },
+        "ts": "2026-09-10T00:40:45.424Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 634,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "workflow.attempt-running",
+        "phase": "executing",
+        "detail": {
+          "workUnitId": "iteration:14:draft",
+          "attemptId": "attempt_WkjCOzzfjoiXjlROxUBtR",
+          "sessionId": "session-1789000845831-cn63wzqb",
+          "turnId": "turn-1789000845831-z4y2tlso"
+        },
+        "ts": "2026-09-10T00:40:45.845Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 2796,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "draft.written",
+        "detail": {
+          "artifactType": "results",
+          "iterationIndex": 14,
+          "sourceTool": "workflow.write_iteration_results"
+        },
+        "ts": "2026-09-10T05:39:18.160Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 2799,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "draft.written",
+        "detail": {
+          "artifactType": "checklist",
+          "iterationIndex": 14,
+          "sourceTool": "workflow.write_iteration_checklist"
+        },
+        "ts": "2026-09-10T05:39:34.335Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 2812,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "workflow.attempt-completed",
+        "phase": "executing",
+        "detail": {
+          "workUnitId": "iteration:14:draft",
+          "attemptId": "attempt_WkjCOzzfjoiXjlROxUBtR"
+        },
+        "ts": "2026-09-10T05:39:47.424Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 2813,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "workflow.snapshot",
+        "phase": "stopped",
+        "ts": "2026-09-10T05:44:21.919Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 2816,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "workflow.attempt-intent-persisted",
+        "phase": "executing",
+        "detail": {
+          "workUnitId": "iteration:14:draft",
+          "attemptId": "attempt__Qxe2YLX2hL8XJv2p5f6w"
+        },
+        "ts": "2026-09-10T05:44:30.359Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 2819,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "workflow.attempt-running",
+        "phase": "executing",
+        "detail": {
+          "workUnitId": "iteration:14:draft",
+          "attemptId": "attempt__Qxe2YLX2hL8XJv2p5f6w",
+          "sessionId": "session-1789019070999-blsz3ve1",
+          "turnId": "turn-1789019070999-i2shpmav"
+        },
+        "ts": "2026-09-10T05:44:31.022Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 2821,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "draft.written",
+        "detail": {
+          "artifactType": "results",
+          "iterationIndex": 14,
+          "sourceTool": "workflow.write_iteration_results"
+        },
+        "ts": "2026-09-10T05:46:36.975Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 2822,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "draft.written",
+        "detail": {
+          "artifactType": "checklist",
+          "iterationIndex": 14,
+          "sourceTool": "workflow.write_iteration_checklist"
+        },
+        "ts": "2026-09-10T05:46:50.738Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 2823,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "publication.started",
+        "detail": {
+          "iterationIndex": 14,
+          "operationId": "pub-_JG0Ucx92X1f6WqRyuxxC-14-1789019229240",
+          "draftHeadSha": "cc0f7e67711734d672e6fca5ae7ed79f0e685b59",
+          "baseHeadSha": "610b869b3c5c0d8d9ffbc766c1defddcac1e196f"
+        },
+        "ts": "2026-09-10T05:47:09.242Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 2825,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "publication.accepted",
+        "detail": {
+          "iterationIndex": 14,
+          "acceptedFiles": 27,
+          "draftHeadSha": "cc0f7e67711734d672e6fca5ae7ed79f0e685b59"
+        },
+        "ts": "2026-09-10T05:47:09.697Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 2846,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "draft.written",
+        "detail": {
+          "artifactType": "results",
+          "iterationIndex": 14,
+          "sourceTool": "workflow.write_iteration_results"
+        },
+        "ts": "2026-09-10T05:50:41.202Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 2847,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "draft.written",
+        "detail": {
+          "artifactType": "checklist",
+          "iterationIndex": 14,
+          "sourceTool": "workflow.write_iteration_checklist"
+        },
+        "ts": "2026-09-10T05:50:52.341Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 2848,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "publication.started",
+        "detail": {
+          "iterationIndex": 14,
+          "operationId": "pub-_JG0Ucx92X1f6WqRyuxxC-14-1789019467724",
+          "draftHeadSha": "4e3b1d4384976ecc5c431afc30a831adb276f65e",
+          "baseHeadSha": "a62474b97baddd637677eb09a79f8ab8f9c06fbc"
+        },
+        "ts": "2026-09-10T05:51:07.726Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 2850,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "publication.accepted",
+        "detail": {
+          "iterationIndex": 14,
+          "acceptedFiles": 3,
+          "draftHeadSha": "4e3b1d4384976ecc5c431afc30a831adb276f65e"
+        },
+        "ts": "2026-09-10T05:51:08.079Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 2868,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "workflow.attempt-completed",
+        "phase": "executing",
+        "detail": {
+          "workUnitId": "iteration:14:draft",
+          "attemptId": "attempt__Qxe2YLX2hL8XJv2p5f6w"
+        },
+        "ts": "2026-09-10T05:53:23.072Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 2871,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "workflow.attempt-intent-persisted",
+        "phase": "executing",
+        "detail": {
+          "workUnitId": "iteration:15:draft",
+          "attemptId": "attempt_ngipyAS6HUlbh1K1EP9t8"
+        },
+        "ts": "2026-09-10T05:53:23.090Z"
+      }
+    },
+    {
+      "source": ".cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/journal.ndjson",
+      "line": 2874,
+      "entry": {
+        "workflowId": "_JG0Ucx92X1f6WqRyuxxC",
+        "event": "workflow.attempt-running",
+        "phase": "executing",
+        "detail": {
+          "workUnitId": "iteration:15:draft",
+          "attemptId": "attempt_ngipyAS6HUlbh1K1EP9t8",
+          "sessionId": "session-1789019603619-2hikfiu7",
+          "turnId": "turn-1789019603619-2svuwfhx"
+        },
+        "ts": "2026-09-10T05:53:23.634Z"
+      }
+    }
+  ],
+  "copiedSeals": [
+    {
+      "path": "examples/collection-review/.reference-work/run-3qBaiH/I1-30:test-discovery/toolkit/project/cucumber-viz.constraints.json.seal",
+      "mtime": "2026-09-10T00:49:44.628457+00:00",
+      "ctime": "2026-09-10T00:49:44.628457+00:00"
+    },
+    {
+      "path": "examples/collection-review/.reference-work/run-Xw1pxm/I1-30:test-discovery/toolkit/project/cucumber-viz.constraints.json.seal",
+      "mtime": "2026-09-10T00:52:35.935779+00:00",
+      "ctime": "2026-09-10T00:52:35.935779+00:00"
+    },
+    {
+      "path": "examples/collection-review/.reference-work/run-dHSoIB/I1-30:production-selection/toolkit/project/cucumber-viz.constraints.json.seal",
+      "mtime": "2026-09-10T00:49:46.898435+00:00",
+      "ctime": "2026-09-10T00:49:46.898435+00:00"
+    },
+    {
+      "path": "examples/collection-review/.reference-work/run-yUmcok/I1-30:production-selection/toolkit/project/cucumber-viz.constraints.json.seal",
+      "mtime": "2026-09-10T00:52:37.044768+00:00",
+      "ctime": "2026-09-10T00:52:37.044768+00:00"
+    }
+  ],
+  "sourceSha256": {
+    "src/domain-sub-apps/implementation-studio/core/machines/iteration.machine.ts": "79e5b8f9192238bca439efc6c0c8fb8f33a4a7eeca20f273a942456118a234fe",
+    "dist/domain-sub-apps/implementation-studio/core/machines/iteration.machine.js": "591b66d880d15c92b4803db2ab7b745815b3739a169012249cde4911bc56c2d3",
+    "src/domain-sub-apps/implementation-studio/core/workflow-service/agent-session-handlers.ts": "b2aa5c1b7a3cfd9f4bf836283bd9b55c157ff6e10924c809f85fdadeccee711c",
+    "dist/domain-sub-apps/implementation-studio/core/workflow-service/agent-session-handlers.js": "13b5056cdce2cc5464b82047ac6b3dd9ad755f472db0bd612d228261241a9236",
+    "src/domain-sub-apps/implementation-studio/core/runtime/sealed-files/production-sanctioned-sealed-write-integration.ts": "01160495055f327c2e568d8a5797e9a4fafa421be2a4c4c1d864f0e5e311f15c",
+    "dist/domain-sub-apps/implementation-studio/core/runtime/sealed-files/production-sanctioned-sealed-write-integration.js": "cc8ce60c93375abee377b66781835880b29f71986860867a3a447c563386ed49",
+    "src/core/shared/services/sealed-files/marker-discovery.ts": "d8cc29dc982c74d68561f7b87be230ed78a1a383515821ee0282eed421b74158",
+    "dist/core/shared/services/sealed-files/marker-discovery.js": "a6f23603c7cd92647ac08db8ecce5a02647f8f039218f62b42a0e63d042ce50c",
+    "src/server/orchestration/mcp-http-endpoints.ts": "c1bf0fefdd8da90c5aa0226b064366512d876b73b27fbc5df9391ea02b57766f",
+    "dist/server/orchestration/mcp-http-endpoints.js": "0709c1c3aa21a4eed0a2b226c6d1c686a3bf0fd92e33cfb888d7640cea7c5701"
+  }
+}

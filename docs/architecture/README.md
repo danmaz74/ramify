@@ -5,7 +5,7 @@ toolkit migration are implemented. The process split, client roles, lightweight
 resident design, MCP adapter and tRPC/quick-testing approach below remain the
 decided architecture for later delivery. Their contracts, wire schemas and
 resident resource budgets still require review. The
-[Plan 1 handoff](../plans/iteration-1-project-verifier/iterations/iteration15-results.md)
+[Plan 1 handoff](../plans/done/iteration-1-project-verifier/iterations/iteration15-results.md)
 records implemented behavior and outstanding acceptance evidence.
 
 The current CLI runs `ramify check` through a fresh disposable analysis session;
@@ -37,7 +37,7 @@ and reclaim its memory without discarding warm analysis.
 
 The [tooling roadmap](../plans/tooling-architecture/README.md) owns migration and
 delivery order. Its first detailed plan is
-[batch project verification](../plans/iteration-1-project-verifier/main-plan.md),
+[batch project verification](../plans/done/iteration-1-project-verifier/main-plan.md),
 followed by resident checking. The [project-explorer reuse analysis](../analysis/project-explorer-reuse.md)
 records source candidates and adaptations for later visualization. It is
 supporting evidence; the architecture documents own the runtime decisions.

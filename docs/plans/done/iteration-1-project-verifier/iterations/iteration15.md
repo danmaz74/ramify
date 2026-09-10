@@ -16,9 +16,9 @@ starts from.
 
 - Main plan: Source scope and project selection,
   Validation and completion conditions, Risks table.
-- [Memory lifecycle](../../../architecture/memory-lifecycle.md): Measurement
+- [Memory lifecycle](../../../../architecture/memory-lifecycle.md): Measurement
   and acceptance, Repeatable setup measurements, ML01 and ML02.
-- [Tooling roadmap](../../tooling-architecture/README.md): Plan 1 completion
+- [Tooling roadmap](../../../tooling-architecture/README.md): Plan 1 completion
   and handoff, Information to preserve between plans.
 
 ## Deliverables

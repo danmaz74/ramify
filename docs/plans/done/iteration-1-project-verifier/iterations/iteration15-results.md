@@ -51,7 +51,7 @@ Report tests cover exact JSON preservation, input detachment, original/tag/value
 - Added `npm run measure:batch` and checked-in setup, cold-process, repeated-session and canonical 100-owner materialization recipes.
 - Registered all three final providers; removed the old iteration-14 cutoff from executing `reference:report` success. The report command keeps `planComplete: false`; the explicit matrix gate owns its matrix-completion flag, and separate resource/overall acceptance remains visible.
 - Strengthened execution identity to include the root declaration/README and reviewed matrix artifacts. Portable paths retain their separators; pending completion obligations reflect actual instance outcomes.
-- Updated CLAUDE.md, package README, development guidance, memory documentation, harness documentation and roadmap status to the implemented batch scope. Added the [batch usage guide](../../../development/batch-verification.md). Future runtime capabilities remain explicitly unavailable.
+- Updated CLAUDE.md, package README, development guidance, memory documentation, harness documentation and roadmap status to the implemented batch scope. Added the [batch usage guide](../../../../development/batch-verification.md). Future runtime capabilities remain explicitly unavailable.
 
 ## Current source scope and results
 
@@ -100,7 +100,7 @@ Iteration 14's accepted 305-instance evidence is predecessor evidence at its rec
 
 ## Batch measurements and agreed budgets
 
-The [recipes](../../../../scripts/measurements/README.md), [summary](../../../../scripts/measurements/results/README.md) and [lossless archive index](../../../../scripts/measurements/results/index.json) retain the input fixtures, runtime/dependency versions, raw samples, earlier failures and final outcome. Budgets are unchanged from [scope.md](../scope.md#workload-measurements-and-proposed-initial-limits).
+The [recipes](../../../../../scripts/measurements/README.md), [summary](../../../../../scripts/measurements/results/README.md) and [lossless archive index](../../../../../scripts/measurements/results/index.json) retain the input fixtures, runtime/dependency versions, raw samples, earlier failures and final outcome. Budgets are unchanged from [scope.md](../scope.md#workload-measurements-and-proposed-initial-limits).
 
 The final quiet all-phase run executed from 06:35:06.681 to 06:41:49.540 UTC on 2026-09-10, Linux x64, Node v22.23.2, TypeScript 7.0.2 and tsx 4.23.13. It exited 0 with both workloads passing every numeric and lifecycle requirement.
 
@@ -144,7 +144,7 @@ No local Vitest/Cucumber, scenario coverage or sealed-file pass is claimed. The 
 
 ## Portable evidence and identity
 
-The [focused/relocation archive](../../../../scripts/reference-harness/evidence/README.md) contains actual assertion records, scope, diagnostics/coverage and run observations. Its uncompressed size is 7,680,270 bytes, gzip size 610,846 bytes and raw SHA-256 is `2123ff38d2daaef3702ea90055c3c3bd05c715b1e1696180fc47cfb204f33fce`.
+The [focused/relocation archive](../../../../../scripts/reference-harness/evidence/README.md) contains actual assertion records, scope, diagnostics/coverage and run observations. Its uncompressed size is 7,680,270 bytes, gzip size 610,846 bytes and raw SHA-256 is `2123ff38d2daaef3702ea90055c3c3bd05c715b1e1696180fc47cfb204f33fce`.
 
 The focused run lasted 80,912.794 ms from 06:45:13.708 to 06:46:34.621 UTC. It records revision `5640de98f2f046aea3b266a781be58eaf811da6a` with dirty implementation source and source SHA `84c97ff9bbb122597b5550f1fec2f43dc10acc61be1824f7b839ffb67f0b0ad9`. That source hash predates this archive's final rewrite and README update; it is not the final commit's source hash. No runtime source changed afterward.
 

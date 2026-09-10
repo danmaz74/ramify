@@ -9,7 +9,7 @@ export const verificationCapabilities = [
 export type VerificationCapability = (typeof verificationCapabilities)[number];
 export type FixtureCode = 'R' | 'F' | 'J' | 'T' | 'M' | 'H';
 
-export const planDirectory = 'docs/plans/iteration-1-project-verifier';
+export const planDirectory = 'docs/plans/done/iteration-1-project-verifier';
 export const inventoryDocument = `${planDirectory}/subcases.md`;
 
 export interface ReferenceInstance {

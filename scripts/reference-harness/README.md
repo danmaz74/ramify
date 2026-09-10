@@ -53,7 +53,7 @@ always comes from the reviewed plan, never available handlers.
 
 ## Activating an assigned instance
 
-The [reviewed subcase list](../../docs/plans/iteration-1-project-verifier/subcases.md)
+The [reviewed subcase list](../../docs/plans/done/iteration-1-project-verifier/subcases.md)
 defines membership independently of executable records. `plan.ts` checks that
 list and its prerequisites against the main plan; `cases.ts` exports the
 transcribed 308 records. Removing a record, changing its independent expectation
@@ -214,7 +214,7 @@ their independent expectations. The full handler has no successful skip mode.
 Its named smoke helpers can provide partial implementation feedback, but do not
 register an instance pass without the required relocated regression.
 
-See the [completion report](../../docs/plans/iteration-1-project-verifier/iterations/iteration15-results.md)
+See the [completion report](../../docs/plans/done/iteration-1-project-verifier/iterations/iteration15-results.md)
 for actual executed evidence, and the [measurement recipes](../measurements/README.md)
 for setup, combined process memory and repeated-session budgets. A source-matrix
 pass alone does not establish those resource requirements or later services.

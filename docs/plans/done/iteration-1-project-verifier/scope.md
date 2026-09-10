@@ -5,7 +5,7 @@ size observations below describe this checkout. Proposed limits are initial
 acceptance targets, not measured checker performance or approval of this
 package. No checker exists at this iteration.
 
-The [CLI invocation contract](../../architecture/cli-invocation.spec.md) remains
+The [CLI invocation contract](../../../architecture/cli-invocation.spec.md) remains
 the authority for project/root selection, compiler-configuration discovery,
 outside-source warnings, output order and exits. This document selects concrete
 implementation inputs and limits; it adds no invocation flags or exclusion
@@ -329,9 +329,9 @@ an inspectable build input and never narrows `ramify check`.
 
 ## Workload measurements and proposed initial limits
 
-The iteration 1 [size probe](../../../scripts/probes/fixture-sizes.ts) records
+The iteration 1 [size probe](../../../../scripts/probes/fixture-sizes.ts) records
 fixture byte/count measurements only; its
-[raw result](../../../scripts/probes/results/fixture-sizes.json) includes the
+[raw result](../../../../scripts/probes/results/fixture-sizes.json) includes the
 complete measured content-map identities. On this Linux x64 checkout with
 Node v22.23.2 and TypeScript 7.0.2, the
 unchanged reference contains:
@@ -360,7 +360,7 @@ content-map SHA-256 is
 `d5b77b9ff57c443b35f386f40598506ff20c51c4ec75b800371f0cec089c0897`;
 the reference measured content-map SHA-256 is
 `626a8e7b81df9aae566b585c87b971e11d1e367d9fa4dded746bbd3839a04bff`.
-The checked-in [generator](../../../scripts/probes/fixtures/hundred-owners.ts)
+The checked-in [generator](../../../../scripts/probes/fixtures/hundred-owners.ts)
 returns the exact path/content map so iteration 15 can materialize the same
 workload. These measured maps cover authored fixture inputs, not the future
 full analysis input identity. These figures exclude
@@ -423,7 +423,7 @@ proposals pending measurement, not inferred from file sizes:
 Measure at the compiled entry and direct real session using the same recorded
 fixture bytes, dependency versions, invocation/config/registry and machine/runtime
 metadata. Keep raw cold-duration and sampled peak-memory records separately from
-the existing [setup/disposal probe](../../architecture/memory-lifecycle.md#repeatable-setup-measurements).
+the existing [setup/disposal probe](../../../architecture/memory-lifecycle.md#repeatable-setup-measurements).
 For parent, helper and native compiler child, record per-process and combined
 RSS; parent-only RSS misses the compiler allocation. Summed RSS counts shared mappings more than
 once, so it is a conservative process-group bound, not unique physical memory.

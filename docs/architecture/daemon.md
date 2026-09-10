@@ -4,7 +4,7 @@
 The resident daemon, contexts and incremental contracts below remain a design
 for later delivery. The process/client split and memory/testing requirements
 are decided in the [architecture overview](README.md). Implementation support is
-limited to batch verification; the [Plan 1 handoff](../plans/iteration-1-project-verifier/iterations/iteration15-results.md)
+limited to batch verification; the [Plan 1 handoff](../plans/done/iteration-1-project-verifier/iterations/iteration15-results.md)
 records its evidence and outstanding acceptance work.
 
 The resident design calls for a long-lived local backend that maintains the

@@ -30,17 +30,17 @@ assertion makes the probe command fail. No Vitest or Cucumber regression suite
 was run by these probes.
 
 Portable stdout captures are retained in
-[`scripts/probes/results/`](../../../scripts/probes/results/):
+[`scripts/probes/results/`](../../../../scripts/probes/results/):
 
 | Command | Raw result | Assertion/result |
 | --- | --- | --- |
-| `compiler-api.ts` | [compiler-api.json](../../../scripts/probes/results/compiler-api.json) | Zero compiler diagnostics; originals, alias identity, value/type flags, module targets and export selections asserted. |
-| `reference-resolution.ts` | [reference-resolution.json](../../../scripts/probes/results/reference-resolution.json) | Zero compiler diagnostics; actual AppRouter original, both physical CSS resources and all 17 vocabulary exports asserted. |
-| `config-input-view.ts` | [config-input-view.json](../../../scripts/probes/results/config-input-view.json) | Captured configuration inheritance and file selection with no project/snapshot and no disk fallback. |
-| `compiler-lifecycle.ts` | [compiler-lifecycle.json](../../../scripts/probes/results/compiler-lifecycle.json) | Explicit disposal and a controlled early failure both close the client, dispose the snapshot and reject further use. |
-| `async-api-feasibility.ts` | [async-api-feasibility.json](../../../scripts/probes/results/async-api-feasibility.json) | Async calls preserve event-loop responsiveness and ordinary exports; closing with no active snapshot rejects a pending config request. This does not establish bounded termination. |
-| `supervised-compiler.ts` | [supervised-compiler.json](../../../scripts/probes/results/supervised-compiler.json) | Parent-owned captured reads cross a private synchronous pipe bridge; the responsive parent terminates a deliberately stalled helper and its observed native descendant as one process group. |
-| `fixture-sizes.ts` | [fixture-sizes.json](../../../scripts/probes/results/fixture-sizes.json) | Reference sizes and deterministic 100-owner byte inventory only; no performance or semantic result. |
+| `compiler-api.ts` | [compiler-api.json](../../../../scripts/probes/results/compiler-api.json) | Zero compiler diagnostics; originals, alias identity, value/type flags, module targets and export selections asserted. |
+| `reference-resolution.ts` | [reference-resolution.json](../../../../scripts/probes/results/reference-resolution.json) | Zero compiler diagnostics; actual AppRouter original, both physical CSS resources and all 17 vocabulary exports asserted. |
+| `config-input-view.ts` | [config-input-view.json](../../../../scripts/probes/results/config-input-view.json) | Captured configuration inheritance and file selection with no project/snapshot and no disk fallback. |
+| `compiler-lifecycle.ts` | [compiler-lifecycle.json](../../../../scripts/probes/results/compiler-lifecycle.json) | Explicit disposal and a controlled early failure both close the client, dispose the snapshot and reject further use. |
+| `async-api-feasibility.ts` | [async-api-feasibility.json](../../../../scripts/probes/results/async-api-feasibility.json) | Async calls preserve event-loop responsiveness and ordinary exports; closing with no active snapshot rejects a pending config request. This does not establish bounded termination. |
+| `supervised-compiler.ts` | [supervised-compiler.json](../../../../scripts/probes/results/supervised-compiler.json) | Parent-owned captured reads cross a private synchronous pipe bridge; the responsive parent terminates a deliberately stalled helper and its observed native descendant as one process group. |
+| `fixture-sizes.ts` | [fixture-sizes.json](../../../../scripts/probes/results/fixture-sizes.json) | Reference sizes and deterministic 100-owner byte inventory only; no performance or semantic result. |
 
 The captures contain root-relative paths, public binding names and locations;
 they omit compiler handle IDs and machine-specific paths. Regenerate a capture
@@ -118,7 +118,7 @@ without a worker pool or moving the analysis engine into another owner.
 
 ### Captured-input bridge and supervision feasibility
 
-The [supervised helper fixture](../../../scripts/probes/fixtures/supervised-compiler-child.ts)
+The [supervised helper fixture](../../../../scripts/probes/fixtures/supervised-compiler-child.ts)
 has one reader for inherited stdin and one framed writer for stdout. A native
 filesystem callback writes `{ id, method, path }`, synchronously reads the
 matching response, and returns its ordinary synchronous value. It never reads
@@ -187,7 +187,7 @@ compiler operation or final session cleanup path works.
 ## Source, alias and export findings
 
 The small independent fixture is
-[`scripts/probes/fixtures/compiler-api/`](../../../scripts/probes/fixtures/compiler-api/).
+[`scripts/probes/fixtures/compiler-api/`](../../../../scripts/probes/fixtures/compiler-api/).
 Its configuration uses bundler resolution, a `@probe/*` path alias and
 `verbatimModuleSyntax: false`, so the unmarked purely type imports are legal.
 The repository scripts scope checks the probe and fixture source; the one

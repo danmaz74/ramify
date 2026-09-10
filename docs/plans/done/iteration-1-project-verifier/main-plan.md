@@ -25,7 +25,7 @@ configuration by itself and reports findings for humans; the second names the
 root explicitly and returns the same result as structured data. Both finish
 and release their analysis resources. Neither starts a daemon, MCP server or
 web server. Invocation is specified in
-[CLI invocation](../../architecture/cli-invocation.spec.md).
+[CLI invocation](../../../architecture/cli-invocation.spec.md).
 
 Completion requires a clean reference check, independently expected negative
 and positive variants, verification of Ramify's own migrated source, and
@@ -41,14 +41,14 @@ same identities, facts and decisions in later plans.
 
 | Document | Role |
 | --- | --- |
-| [Importability principles](../../model/cross-module-importability.principles.md) and [glossary](../../model/glossary.md) | Definitive ownership, visibility, tags, source areas and testing-origin rules. |
-| [Module-description principles](../../model/module-description.principles.md) | Definitive layout, version 1 grammar, exact paths, wildcards and README convention. |
-| [TypeScript interpretation](../../model/typescript-source-interpretation.principles.md) | Definitive original resolution, resource identity, source forms and coverage policy. |
-| [Architecture](../../architecture/README.md) and [daemon design](../../architecture/daemon.md) | Ownership boundaries, reusable engine, coherent inputs and later resident service. |
-| [Processes](../../architecture/processes-and-clients.md), [memory](../../architecture/memory-lifecycle.md) and [quick testing](../../architecture/quick-testing.spec.md) | Entry-point separation, resource cleanup and real-service verification. |
-| [CLI invocation](../../architecture/cli-invocation.spec.md) | Root and configuration discovery, scope, warnings, output and exit behavior of `ramify check`. |
-| [Tooling roadmap](../tooling-architecture/README.md) | Delivery order across the six plans. |
-| [Reference cases](../reference-project/cases.md), [contract map](../reference-project/contract-map.md) and [harness](../reference-project/harness.md) | Independent expected outcomes, actual exposure witnesses and mutation discipline. |
+| [Importability principles](../../../model/cross-module-importability.principles.md) and [glossary](../../../model/glossary.md) | Definitive ownership, visibility, tags, source areas and testing-origin rules. |
+| [Module-description principles](../../../model/module-description.principles.md) | Definitive layout, version 1 grammar, exact paths, wildcards and README convention. |
+| [TypeScript interpretation](../../../model/typescript-source-interpretation.principles.md) | Definitive original resolution, resource identity, source forms and coverage policy. |
+| [Architecture](../../../architecture/README.md) and [daemon design](../../../architecture/daemon.md) | Ownership boundaries, reusable engine, coherent inputs and later resident service. |
+| [Processes](../../../architecture/processes-and-clients.md), [memory](../../../architecture/memory-lifecycle.md) and [quick testing](../../../architecture/quick-testing.spec.md) | Entry-point separation, resource cleanup and real-service verification. |
+| [CLI invocation](../../../architecture/cli-invocation.spec.md) | Root and configuration discovery, scope, warnings, output and exit behavior of `ramify check`. |
+| [Tooling roadmap](../../tooling-architecture/README.md) | Delivery order across the six plans. |
+| [Reference cases](../../reference-project/cases.md), [contract map](../../reference-project/contract-map.md) and [harness](../../reference-project/harness.md) | Independent expected outcomes, actual exposure witnesses and mutation discipline. |
 
 This plan selects implementation scope and evidence; it does not revise the
 model. If a source example conflicts with a principle, diagnose and review the
@@ -60,7 +60,7 @@ The planning inspection on 2026-09-07 established the following from the
 current files. Recheck them at implementation start because other work can
 continue independently.
 
-- [Collection Review](../../../examples/collection-review/README.md) has fifteen
+- [Collection Review](../../../../examples/collection-review/README.md) has fifteen
   owners, each with a description and purpose README. It has real tRPC and MCP
   adapters, React views, two CSS-module resources and owned tests. Its standalone
   `integration-tests [testing, dispatch]` owner keeps the Cucumber scenario and
@@ -69,17 +69,17 @@ continue independently.
   forwarding alias for `AppRouter`, type imports, a literal dynamic import
   selecting `ReviewPanel`, an import-type query, CSS imports and a Cucumber
   hook loaded for its side effects.
-- [The harness inventory](../../../scripts/reference-harness/cases.ts) contains
+- [The harness inventory](../../../../scripts/reference-harness/cases.ts) contains
   63 families: four available, 56 absent and three deliberately unsupported.
   The available families are D01–D03 and K05. A dry-run inventory was inspected;
   this plan does not claim that their runtime tests were rerun.
-- [The report](../../../scripts/reference-harness/report.ts) prints a hand-reviewed
+- [The report](../../../../scripts/reference-harness/report.ts) prints a hand-reviewed
   zero-violation statement and explicitly says source coverage is absent. It
   does not invoke a Ramify source checker or execute source mutations.
-- [The evaluator](../../../src/model/) operates on constructed trees and
+- [The evaluator](../../../../src/model/) operates on constructed trees and
   predates the complete registry/source-area model. Existing useful algorithms
   and tests are migration inputs, not the specification.
-- [The diagrams](../../../src/viz/) and site depend on the old source layout.
+- [The diagrams](../../../../src/viz/) and site depend on the old source layout.
   The root barrel currently combines model and UI exports.
 - The current toolkit compiler/test configuration targets `src/`. It must be
   deliberately migrated to the nested ownership tree.
@@ -121,7 +121,7 @@ continue independently.
 
 Root selection, compiler-configuration discovery, the definition of project
 files outside modules and the warnings they produce are specified in
-[CLI invocation](../../architecture/cli-invocation.spec.md); this plan implements
+[CLI invocation](../../../architecture/cli-invocation.spec.md); this plan implements
 that contract and adds nothing to it. In particular: the check always covers
 the whole project from its root; every owned `src/` and nested test area is
 analyzed whether or not the compiler configuration selects it; application
@@ -409,7 +409,7 @@ The ordinary entry imports CLI handling only; dispatch lazily imports the batch
 assembly. The build preserves the nested owner paths.
 
 Exit codes and their meaning are fixed by the
-[CLI invocation](../../architecture/cli-invocation.spec.md) contract; the plan adds
+[CLI invocation](../../../architecture/cli-invocation.spec.md) contract; the plan adds
 none.
 
 The report schema must include a schema version; requested root/configuration/
@@ -633,10 +633,10 @@ Do not silently truncate diagnostics and report complete coverage. Measure cold
 latency, peak memory and repeated create/check/dispose behavior on the reference
 and a 100-owner fixture. Numeric budgets and the supported workload are recorded
 before the plan is accepted. Add a checked-in real-session setup fixture for
-the [memory probe](../../../scripts/memory-probe.mjs) and a repeated
+the [memory probe](../../../../scripts/memory-probe.mjs) and a repeated
 create/check/dispose workload; retain input fixtures, runtime/dependency versions
 and raw results with acceptance evidence. The
-[probe recipe](../../architecture/memory-lifecycle.md#repeatable-setup-measurements)
+[probe recipe](../../../architecture/memory-lifecycle.md#repeatable-setup-measurements)
 separates setup/disposal samples from peak and repeated-use measurements.
 Multi-context history/queue/lease measurements remain Plan 2 work.
 

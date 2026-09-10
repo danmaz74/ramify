@@ -14,9 +14,9 @@ testing-origin isolation that forwarding cannot bypass.
 
 ## Read first
 
-- [Importability principles](../../../model/cross-module-importability.principles.md):
+- [Importability principles](../../../../model/cross-module-importability.principles.md):
   tags, source areas, testing origin, same-owner exemption order.
-- [TypeScript interpretation principles](../../../model/typescript-source-interpretation.principles.md):
+- [TypeScript interpretation principles](../../../../model/typescript-source-interpretation.principles.md):
   unmarked purely type originals, testing-source isolation, stylesheet
   side-effect loads.
 - Main plan: matrix rows I1-12, I1-13, I1-15, I1-16, I1-17 and the

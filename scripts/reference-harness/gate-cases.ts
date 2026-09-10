@@ -60,7 +60,7 @@ async function toolkitTests(root: string, assertions: Assertions): Promise<strin
   const compiler = await compilerFiles(root);
   assertions.equal('all discovered tests remain whole-project compiler inputs', listed.filter(file => !compiler.includes(file)), []);
   for (const owner of ownerPaths) assertions.ok(`${owner || '.'}: owned tests remain discovered`, listed.some(file => file.startsWith(`${owner ? owner + '/' : ''}src/tests/`)));
-  const map = await readFile(join(root, 'docs/plans/iteration-1-project-verifier/move-map.md'), 'utf8');
+  const map = await readFile(join(root, 'docs/plans/done/iteration-1-project-verifier/move-map.md'), 'utf8');
   const destinations = { M: 'subs/analysis/subs/model/src/', P: 'subs/presentation/src/', L: 'subs/presentation/subs/layout/src/' };
   const migrated = map.split('\n').filter(line => /^\| `src\/.+\.test\.tsx?` \|/.test(line))
     .flatMap(line => [...line.split('|')[2].split('Move purely')[0].matchAll(/\b([MPL]) `(tests\/[^`]+\.test\.tsx?)`/g)]

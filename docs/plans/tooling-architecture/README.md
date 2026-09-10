@@ -1,7 +1,7 @@
 # Ramify implementation roadmap
 
 **Date:** 2026-09-10. **Status:** Plan 1's batch engine, CLI, self-check and full
-matrix providers are implemented; its [completion report](../iteration-1-project-verifier/iterations/iteration15-results.md)
+matrix providers are implemented; its [completion report](../done/iteration-1-project-verifier/iterations/iteration15-results.md)
 records executed acceptance evidence and remaining work. Plans 2–6 have the
 authoring briefs below and no detailed plan yet.
 Implementation completion must be established by each plan's evidence.
@@ -13,7 +13,7 @@ This roadmap owns the review process and sequence of working deliverables. Each
 deliverable has one plan, run as a sequence of iterations each sized for a
 single 250k-token implementation context; architecture review, migration and
 verification are tasks within those iterations. The first detailed plan is
-[Plan 1: Verify a real Ramify project](../iteration-1-project-verifier/main-plan.md).
+[Plan 1: Verify a real Ramify project](../done/iteration-1-project-verifier/main-plan.md).
 Batch delivery is followed by the resident daemon as a committed architectural
 capability, rather than treating retained analysis as an optional optimization.
 
@@ -147,7 +147,7 @@ their detailed plans are written before their implementation.
 
 | Plan | Working deliverable | Required predecessors | Plan artifact |
 | --- | --- | --- | --- |
-| [1. Verify a project](#plan-1-batch-project-verification) | Implemented batch engine/CLI checks the real reference and Ramify itself. | None. | [Detailed Plan 1](../iteration-1-project-verifier/main-plan.md); [completion evidence and limits](../iteration-1-project-verifier/iterations/iteration15-results.md). |
+| [1. Verify a project](#plan-1-batch-project-verification) | Implemented batch engine/CLI checks the real reference and Ramify itself. | None. | [Detailed Plan 1](../done/iteration-1-project-verifier/main-plan.md); [completion evidence and limits](../done/iteration-1-project-verifier/iterations/iteration15-results.md). |
 | [2. Keep verification current](#plan-2-resident-verification) | A resident daemon watches, reconciles and checks projects through local CLI commands. | Plan 1. | Brief below; detailed plan not yet written. |
 | [3. Understand a project](#plan-3-project-inspection) | CLI/service inspection of ownership, purpose, contracts, availability and observed dependencies. | Plans 1–2. | Brief below; detailed plan not yet written. |
 | [4. Use Ramify through MCP](#plan-4-mcp-access) | A host-launched stdio adapter exposes the daemon's checks and inspection. | Plan 2's service and Plan 3's queries for this deliverable's full scope. | Brief below; detailed plan not yet written. |
@@ -191,7 +191,7 @@ to match declared promises according to the definitive rules.
 
 ## Plan 1: Batch project verification
 
-**Detailed artifact:** [Plan 1: Verify a real Ramify project](../iteration-1-project-verifier/main-plan.md).
+**Detailed artifact:** [Plan 1: Verify a real Ramify project](../done/iteration-1-project-verifier/main-plan.md).
 Its iteration sequence and I1-01–I1-30 instance matrix are the completion
 authority for this deliverable. Do not duplicate or replace that matrix here.
 

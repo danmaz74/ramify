@@ -29,5 +29,5 @@ The uncompressed payload SHA-256 is
 
 Separate [batch measurement evidence](../../measurements/README.md) records
 resource costs and their exact runtime/fixture identities. The workflow
-[completion report](../../../docs/plans/iteration-1-project-verifier/iterations/iteration15-results.md)
+[completion report](../../../docs/plans/done/iteration-1-project-verifier/iterations/iteration15-results.md)
 distinguishes locally established results from automation-owned acceptance.

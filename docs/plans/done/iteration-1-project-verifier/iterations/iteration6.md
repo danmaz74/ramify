@@ -15,7 +15,7 @@ Compiler objects never leave this owner.
 
 ## Read first
 
-- [TypeScript interpretation principles](../../../model/typescript-source-interpretation.principles.md):
+- [TypeScript interpretation principles](../../../../model/typescript-source-interpretation.principles.md):
   originals, resources, effective export descriptions, forwarding aliases.
 - Main plan: Analysis path and contract review, the `SourceCatalog` row of
   the contract table, the risk table rows on compiler APIs and identity.

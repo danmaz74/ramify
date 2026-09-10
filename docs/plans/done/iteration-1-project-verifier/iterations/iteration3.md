@@ -15,8 +15,8 @@ diagrams until iteration 8.
 
 ## Read first
 
-- [Importability principles](../../../model/cross-module-importability.principles.md)
-  and [glossary](../../../model/glossary.md) in full.
+- [Importability principles](../../../../model/cross-module-importability.principles.md)
+  and [glossary](../../../../model/glossary.md) in full.
 - Main plan: Descriptions and model, the `ResolvedTagRegistry`, `ModuleId`,
   `SourceArea`, `OriginalId` and `ImportDecision` rows of the contract table,
   Exposure rules for the migration.

@@ -218,7 +218,7 @@ module unloading or combined multi-process budgets.
 The implemented [batch measurement recipe](../../scripts/measurements/README.md)
 and its retained raw results cover the unchanged reference and the reviewed
 100-owner fixture. They distinguish setup, combined process peak and the full
-25-report retention workload. The [Plan 1 completion report](../plans/iteration-1-project-verifier/iterations/iteration15-results.md)
+25-report retention workload. The [Plan 1 completion report](../plans/done/iteration-1-project-verifier/iterations/iteration15-results.md)
 records actual budget outcomes and their acceptance limits.
 
 The batch implementation releases compiler helpers after source fact extraction;

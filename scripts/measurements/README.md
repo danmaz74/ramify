@@ -34,7 +34,7 @@ the iteration-1 fixture. Each measurement owns a unique ignored temporary
 directory and removes only that directory. The reference is read unchanged;
 its authored content identity is checked again after measurement.
 
-The [scope budgets](../../docs/plans/iteration-1-project-verifier/scope.md)
+The [scope budgets](../../docs/plans/done/iteration-1-project-verifier/scope.md)
 remain the authority:
 
 | Measurement | Reference | 100 owners |

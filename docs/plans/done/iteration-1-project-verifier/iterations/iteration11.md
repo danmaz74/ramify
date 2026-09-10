@@ -14,7 +14,7 @@ visible coverage notes and never widen a selection.
 
 ## Read first
 
-- [TypeScript interpretation principles](../../../model/typescript-source-interpretation.principles.md):
+- [TypeScript interpretation principles](../../../../model/typescript-source-interpretation.principles.md):
   namespaces, star and namespace re-exports, dynamic import table, import
   types, side-effect loads, partial coverage policy.
 - Main plan: Source forms table rows three to seven; matrix rows I1-19 to

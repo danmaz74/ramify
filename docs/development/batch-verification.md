@@ -51,7 +51,7 @@ complete with partial coverage. See the [invocation contract](../architecture/cl
 Direct callers supply `AnalysisInputs`: an explicit project request, one resolved
 registry, requested capabilities and finite limits. There is no registry or scope
 configuration language to load. The reviewed limits and workload budgets are in
-[scope.md](../plans/iteration-1-project-verifier/scope.md#workload-measurements-and-proposed-initial-limits).
+[scope.md](../plans/done/iteration-1-project-verifier/scope.md#workload-measurements-and-proposed-initial-limits).
 
 ```ts
 import { createAnalysisSession } from 'ramify.ts/analysis';
@@ -93,7 +93,7 @@ under `.reference-work/reports/` record actual assertions, identities and limits
 The [measurement recipes](../../scripts/measurements/README.md) retain setup,
 cold-process peak and repeated-session results separately. These are additional
 completion requirements; passing the source matrix alone does not establish a
-memory budget. The [iteration 15 completion report](../plans/iteration-1-project-verifier/iterations/iteration15-results.md)
+memory budget. The [iteration 15 completion report](../plans/done/iteration-1-project-verifier/iterations/iteration15-results.md)
 records what actually ran, unresolved findings and Plan 2's starting contracts.
 
 Under Studio, follow the execution prompt's local-check policy. Automated

@@ -2,8 +2,8 @@
 
 **Prepared:** 2026-09-09. **State:** complete proposed final contracts for review,
 not declarations installed by this iteration and not evidence of acceptance.
-The definitive [description principles](../../model/module-description.principles.md)
-and [importability principles](../../model/cross-module-importability.principles.md)
+The definitive [description principles](../../../model/module-description.principles.md)
+and [importability principles](../../../model/cross-module-importability.principles.md)
 remain authoritative. The [contract definitions](contracts.md) fix source-file
 names and public signatures. Every edge in this tree is a physical `subs/` edge.
 
@@ -288,7 +288,7 @@ there is no placeholder daemon/contexts directory or exposure in these texts.
 
 ## Manual description review
 
-The [description validation rules](../../model/module-description.principles.md#validation-distinguishes-invalid-descriptions-from-ineffective-exposure)
+The [description validation rules](../../../model/module-description.principles.md#validation-distinguishes-invalid-descriptions-from-ineffective-exposure)
 were applied through the following review checklist on 2026-09-09. This is a manual contract review
 record; no unimplemented loader/linker result or architectural acceptance is claimed.
 

@@ -63,7 +63,7 @@ Select Cucumber scenarios through the example's runner and confirm selection in
 its output. The toolkit has no root `test:cucumber` script. The verifier gate
 registers all 308 reviewed instances, including the independent toolkit negative
 and external relocation. Registration is separate from successful execution; the
-[completion report](../plans/iteration-1-project-verifier/iterations/iteration15-results.md)
+[completion report](../plans/done/iteration-1-project-verifier/iterations/iteration15-results.md)
 records evidence and its limits. For reproducible batch resource measurements,
 use the [measurement recipes](../../scripts/measurements/README.md).
 

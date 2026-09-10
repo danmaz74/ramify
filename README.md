@@ -64,7 +64,7 @@ the version 1 parser, project acquisition, TypeScript adapter and definitive
 model. They report violations, warnings and analysis limits separately.
 Teaching diagrams use the same model. The toolkit self-check and all 308
 reference gate instances are implemented, including the independent toolkit
-negative and relocated installation. The [completion report](docs/plans/iteration-1-project-verifier/iterations/iteration15-results.md)
+negative and relocated installation. The [completion report](docs/plans/done/iteration-1-project-verifier/iterations/iteration15-results.md)
 records actual execution, resource measurements and remaining acceptance work.
 The resident daemon, Ramify MCP server, interactive explorer and browser verifier
 remain unavailable; browser tag matching is implemented.

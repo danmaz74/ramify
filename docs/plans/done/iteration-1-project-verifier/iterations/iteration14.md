@@ -16,7 +16,7 @@ the checker, and the reference's own regression tiers remain evidence.
 
 - Main plan: Harness implementation and evidence, Required commands table,
   matrix rows I1-01 and I1-30, Validation and completion conditions.
-- [Harness plan](../../reference-project/harness.md): execution tiers and the
+- [Harness plan](../../../reference-project/harness.md): execution tiers and the
   separation of execution from semantic readiness.
 - The current `scripts/reference-harness/report.ts`.
 

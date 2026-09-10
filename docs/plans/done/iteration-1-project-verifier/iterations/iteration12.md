@@ -19,7 +19,7 @@ disposal that leaves no compiler state behind a retained report.
   `AnalysisSession` rows of the contract table, Coherent inputs and later
   reuse, Reports and exit behavior (report schema), matrix rows I1-24,
   I1-27 and I1-29.
-- [Daemon architecture](../../../architecture/daemon.md): Revisions and
+- [Daemon architecture](../../../../architecture/daemon.md): Revisions and
   atomic publication, the six result dimensions.
 - Iteration 1's `scope.md` limits and report schema.
 - Its `owners.md` and package-entry activation stages for the analysis session.

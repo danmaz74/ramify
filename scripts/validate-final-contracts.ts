@@ -18,7 +18,7 @@ function manifest(document: DescriptionDocument): unknown {
 }
 
 export async function validateFinalContracts(root: string) {
-  const reviewed = await readFile(resolve(root, 'docs/plans/iteration-1-project-verifier/owners.md'), 'utf8');
+  const reviewed = await readFile(resolve(root, 'docs/plans/done/iteration-1-project-verifier/owners.md'), 'utf8');
   const blocks = [...reviewed.matchAll(/```ramify\n([\s\S]*?)\n```/g)].map(match => parseDescription('owners.md', match[1]));
   assert.equal(blocks.length, 9, 'All nine reviewed final owners must be present');
   const expected = new Map(blocks.map(block => {
@@ -36,7 +36,7 @@ export async function validateFinalContracts(root: string) {
     const document = module.description.document;
     assert.deepEqual(manifest(document), expected.get(document.module.name), `Final selections differ for ${module.id}`);
   }
-  const contracts = await readFile(resolve(root, 'docs/plans/iteration-1-project-verifier/contracts.md'), 'utf8');
+  const contracts = await readFile(resolve(root, 'docs/plans/done/iteration-1-project-verifier/contracts.md'), 'utf8');
   const metadata = JSON.parse([...contracts.matchAll(/```json\n([\s\S]*?)\n```/g)].map(match => match[1]).find(text => text.includes('"bin"'))!);
   const actual = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'));
   for (const key of ['type', 'main', 'types', 'bin', 'exports']) assert.deepEqual(actual[key], metadata[key], `Final package ${key}`);

@@ -15,11 +15,11 @@ toolkit source moves and no checker code is written here.
 - Main plan: Deliverable and completion boundary, Scope decisions,
   Implementation ownership and migration, Analysis path and contract review,
   Reports and exit behavior, Reference acceptance matrix.
-- [Daemon architecture](../../../architecture/daemon.md): Ramify's ownership
+- [Daemon architecture](../../../../architecture/daemon.md): Ramify's ownership
   tree, Responsibilities and public contracts, Exposure paths.
-- [Module-description principles](../../../model/module-description.principles.md)
+- [Module-description principles](../../../../model/module-description.principles.md)
   in full; the other model documents as the drafts require.
-- [Reference contract map](../../reference-project/contract-map.md) for the
+- [Reference contract map](../../../reference-project/contract-map.md) for the
   exposure statement IDs the matrix names.
 
 ## Deliverables
@@ -55,7 +55,7 @@ independent scripts scope selected by `tsconfig.scripts.json`.
    acquisition/work/report limits with their initial values, and the
    supported-platform consequences already decided in the plan. Root
    selection, configuration discovery, warnings and exits are fixed by the
-   [CLI invocation](../../../architecture/cli-invocation.spec.md) contract and are
+   [CLI invocation](../../../../architecture/cli-invocation.spec.md) contract and are
    not redecided here. Specify the deterministic output of
    `npm run production:files -- --root <dir>`, its independent script entry,
    the analysis inventory/profile contract it consumes, and the production

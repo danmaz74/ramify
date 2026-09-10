@@ -4,10 +4,10 @@
 iteration 1. This document freezes fixture causes and independent expectations;
 it does not establish implementation availability or architectural acceptance.
 The [main-plan matrix](main-plan.md#reference-acceptance-matrix),
-[reference contract map](../reference-project/contract-map.md), and authoritative
-[description](../../model/module-description.principles.md),
-[importability](../../model/cross-module-importability.principles.md), and
-[source](../../model/typescript-source-interpretation.principles.md) rules govern
+[reference contract map](../../reference-project/contract-map.md), and authoritative
+[description](../../../model/module-description.principles.md),
+[importability](../../../model/cross-module-importability.principles.md), and
+[source](../../../model/typescript-source-interpretation.principles.md) rules govern
 these records. The matrix's family mapping remains attached to every child
 instance; passing one instance never passes an entire family.
 
@@ -158,7 +158,7 @@ Reference owner abbreviations expand to these existing physical directories:
 | IT | `subs/integration-tests` |
 
 Reference statement IDs (C1, W1, W2, R3, etc.) resolve through the existing
-[contract map](../reference-project/contract-map.md#exposing-statements), never
+[contract map](../../reference-project/contract-map.md#exposing-statements), never
 line numbers copied from an older revision. For example W2 is
 `expose-sub createCatalogRouter, createCatalogTools, inspectRecord from catalog
 to parent`; removing its `createCatalogRouter` selection preserves its other
@@ -183,7 +183,7 @@ and dependent stages blocked, with no guessed permission graph. Warning-only
 rows assert no invented ownership or testing profile. Coverage notes assert that
 unknown work is neither allowed nor external; known decisions survive.
 Operational failure asserts retained partial findings, no completed result and
-resource release. The [CLI contract](../../architecture/cli-invocation.spec.md)
+resource release. The [CLI contract](../../../architecture/cli-invocation.spec.md)
 solely determines exits; stage rows do not pretend to execute a future CLI.
 
 ## Exact reason assertions
