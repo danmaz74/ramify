@@ -33,6 +33,29 @@ if (mode === 'observe-output') {
     }
   };
 }
+if (mode === 'interrupt-publication') {
+  // Admit stdout only through the document's last non-whitespace byte and
+  // interrupt there. Its trailing whitespace then meets a simulated full pipe
+  // until the signal has been handled, so the interruption always lands
+  // between the complete document and its newline.
+  const writeSync = fs.writeSync;
+  let boundary = false, handled = false;
+  fs.writeSync = function (fd, buffer, offset, length, ...rest) {
+    if (fd !== process.stdout.fd || !Buffer.isBuffer(buffer)) return Reflect.apply(writeSync, this, arguments);
+    if (boundary && !handled) throw Object.assign(new Error('Simulated full stdout pipe'), { code: 'EAGAIN' });
+    offset ??= 0; length ??= buffer.length - offset;
+    let end = buffer.length;
+    while (end > 0 && [0x20, 0x09, 0x0a, 0x0d].includes(buffer[end - 1])) end--;
+    const written = Reflect.apply(writeSync, this, [fd, buffer, offset, offset < end && offset + length > end ? end - offset : length, ...rest]);
+    if (!boundary && end < buffer.length && offset + written === end) {
+      boundary = true;
+      process.once('SIGINT', () => { handled = true; });
+      process.kill(process.pid, 'SIGINT');
+      record('barrier', { stage: 'publication', pending: buffer.length - end });
+    }
+    return written;
+  };
+}
 registerHooks({ load(url, context, nextLoad) {
   const loaded = nextLoad(url, context);
   record('load', { url }); return loaded;

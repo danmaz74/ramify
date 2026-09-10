@@ -75,6 +75,54 @@ import { value } from './api.js'; void value;`,
     expect(result.accesses.find(access => access.form === 'import')!.target.kind).toBe('external');
   }), 30_000);
 
+  // Node typings stay outside owned source, as the compiler would find them.
+  const nodeTypes = {
+    'tsconfig.json': JSON.stringify({ ...configuration, compilerOptions: { ...configuration.compilerOptions, types: ['node'] } }),
+    'node_modules/@types/node/package.json': '{"name":"@types/node","types":"./index.d.ts"}',
+    'node_modules/@types/node/index.d.ts': `interface ImportMeta { url: string }
+declare var require: (id: string) => any;
+declare module 'module' { export function createRequire(path: string | URL): (id: string) => any; const Module: { createRequire: typeof createRequire }; export default Module; }
+declare module 'node:module' { export * from 'module'; export { default } from 'module'; }`,
+    'src/setup.ts': 'const configured = true; void configured;',
+  };
+  it.each([
+    ['named node:module', "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url); require('./setup.js');"],
+    ['renamed module', "import { createRequire as make } from 'module'; const load = make(import.meta.url); void load('./setup.js');"],
+    ['namespace module', "import * as mod from 'module'; const require = mod.createRequire(import.meta.url); require('./setup.js');"],
+    ['default node:module', "import mod from 'node:module'; const evaluate = mod.createRequire(import.meta.url); evaluate('./setup.js');"],
+  ])('records Node createRequire loads through a %s import as CommonJS access', async (_name, use) => withCatalog({
+    ...nodeTypes, 'src/use.ts': use,
+  }, async ({ source }) => {
+    const result = await source.accesses();
+    const loads = result.accesses.filter(access => access.form === 'commonjs');
+    expect(loads).toHaveLength(1);
+    expect(loads[0]).toMatchObject({ specifier: './setup.js', runtimeLoad: true, selectionForm: 'unknown', selections: [],
+      target: { kind: 'application', origin: { file: 'src/setup.ts', area: { kind: 'ordinary' } } } });
+    expect(result.coverage.map(issue => issue.code)).toEqual(['unsupported-commonjs']);
+    expect(result.accesses.filter(access => access.form !== 'commonjs').every(access => access.target.kind === 'external')).toBe(true);
+  }), 30_000);
+
+  it('keeps a createRequire load of a module target unresolved like the ambient require', async () => withCatalog({
+    ...nodeTypes, 'src/api.ts': 'export const value = 1;',
+    'src/use.ts': "import { createRequire } from 'node:module'; const load = createRequire(import.meta.url); void require('./api.js'); void load('./api.js');",
+  }, async ({ source }) => {
+    const result = await source.accesses();
+    expect(result.accesses.filter(access => access.form === 'commonjs').map(access => [access.specifier, access.target.kind]))
+      .toEqual([['./api.js', 'unresolved'], ['./api.js', 'unresolved']]);
+    expect(result.coverage.map(issue => issue.code)).toEqual(['unsupported-commonjs', 'unresolved-target', 'unsupported-commonjs', 'unresolved-target']);
+  }), 30_000);
+
+  it.each([
+    ['require function', "function require(name: string) { return name; } void require('./setup.js');"],
+    ['createRequire function', "function createRequire(base: string) { return (name: string) => name; } const require = createRequire(import.meta.url); void require('./setup.js');"],
+  ])('does not treat an application %s as the CommonJS loader', async (_name, use) => withCatalog({
+    ...nodeTypes, 'src/use.ts': use,
+  }, async ({ source }) => {
+    const result = await source.accesses();
+    expect(result.accesses).toEqual([]);
+    expect(result.coverage).toEqual([]);
+  }), 30_000);
+
   it('retains known selections beside source resolution and compiler binding problems', async () => withCatalog({
     'src/api.ts': 'export const value = 1;',
     'src/broken.ts': "export { broken } from './missing.js';",

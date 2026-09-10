@@ -3,6 +3,7 @@ import { SymbolFlags, TypeFlags, type Project, type Symbol as CompilerSymbol, ty
 import { SyntaxKind, isExportDeclaration, isExportSpecifier, isImportDeclaration,
   isImportSpecifier, isImportClause, isNamespaceImport,
   isModuleDeclaration, isIdentifier, isStringLiteral, isExportAssignment, isCallExpression, isImportTypeNode, isLiteralTypeNode,
+  isVariableStatement, isFunctionDeclaration, isClassDeclaration, isEnumDeclaration, isInterfaceDeclaration, isTypeAliasDeclaration,
   type Node, type SourceFile } from 'typescript/unstable/ast';
 import { originalKey } from '../../model/src/identity.js';
 import type { OriginalId, SourceArea, SourceLocation, SourceOrigin } from '../../model/src/interfaces/model.js';
@@ -177,10 +178,23 @@ class CatalogBuilder {
           this.runtimeMembers(module, source, file.exports);
           this.stars(source, file, depth + 1);
         } else if (source.externalModuleIndicator) this.limit(file, 'incomplete-exports', 'Compiler did not supply an export description for this module', source);
+        else this.sharedGlobals(source, file);
       }
     }
     this.active.delete(path);
     return file;
+  }
+  /** A script's top-level declarations bind globals every owner can read. No
+   * request form represents that ownership or another owner's reads, so the
+   * script cannot claim complete coverage. String-named ambient modules are
+   * resource shims or external descriptions and follow their own rules. */
+  private sharedGlobals(source: SourceFile, file: MutableFile): void {
+    const declarations = source.statements.filter(statement => isVariableStatement(statement) || isFunctionDeclaration(statement)
+      || isClassDeclaration(statement) || isEnumDeclaration(statement) || isInterfaceDeclaration(statement) || isTypeAliasDeclaration(statement)
+      || (isModuleDeclaration(statement) && isIdentifier(statement.name)));
+    if (!declarations.length) return;
+    this.limit(file, 'shared-global', 'Script source declares shared globals; their ownership and cross-owner dependencies are not verified',
+      declarations[0], declarations.slice(1).map(statement => this.location(statement)));
   }
   private resource(file: MutableFile, inventory: InventoryFile, depth: number): void {
     const modules = this.resourceModules.get(inventory.path) ?? [];

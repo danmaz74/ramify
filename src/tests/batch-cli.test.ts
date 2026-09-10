@@ -46,7 +46,8 @@ describe('CLI with real batch sessions', () => {
 
   it('allows bounded coverage and warnings while retaining their structured evidence', async () => fixture(async root => {
     await put(root, 'tests/helper.ts', 'export const helper = 1;');
-    await put(root, 'subs/consumer/src/use.ts', "declare const path: string; void import(path);\n");
+    // A module: a script's ambient declaration would add a shared-global note.
+    await put(root, 'subs/consumer/src/use.ts', "declare const path: string; void import(path); export {};\n");
     const result = await invoke(root, ['check', '--format', 'json']);
     const report = JSON.parse(result.stdout) as AnalysisReport;
     expect(result.exitCode).toBe(0);

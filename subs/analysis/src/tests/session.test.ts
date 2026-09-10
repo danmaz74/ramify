@@ -499,6 +499,32 @@ describe('iteration 12 constraint remediation', () => {
       target: { kind: 'application', origin: expect.objectContaining({ file: 'subs/consumer/src/tests/theme.css' }) } })]);
   }), 15_000);
 
+  it.each(['testing', 'ordinary'] as const)('applies origin checks to Node createRequire loads of established %s targets', async area => fixture(async (root, inputs) => {
+    await put(root, 'tsconfig.json', JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'bundler',
+      types: ['node'], typeRoots: [fileURLToPath(new URL('../../../../node_modules/@types', import.meta.url))], skipLibCheck: true }, include: ['src', 'subs'] }));
+    await put(root, 'src/tests/hook.ts', "process.env.HOOKED = '1';\n");
+    await put(root, 'src/setup.ts', "process.env.CONFIGURED = '1';\n");
+    const target = area === 'testing' ? 'src/tests/hook.ts' : 'src/setup.ts';
+    await put(root, 'src/use.ts', `import { createRequire } from 'node:module';\nconst require = createRequire(import.meta.url);\nrequire('./${target.slice(4, -3)}.js');\n`);
+    await compilerValid(root);
+    const report = reported(await analyzeProject(inputs));
+    expect(report.outcome).toEqual({ execution: 'completed', check: area === 'testing' ? 'failed' : 'passed', coverage: 'partial' });
+    expect(report.summary).toMatchObject({ denied: area === 'testing' ? 1 : 0, errors: area === 'testing' ? 1 : 0, coverageNotes: 1 });
+    expect(report.coverage).toEqual([expect.objectContaining({ code: 'unsupported-commonjs', location: expect.objectContaining({ file: 'src/use.ts', line: 3 }) })]);
+    const loads = report.snapshot!.accesses.filter(access => access.form === 'commonjs');
+    expect(loads).toEqual([expect.objectContaining({ runtimeLoad: true, importer: expect.objectContaining({ file: 'src/use.ts' }),
+      target: { kind: 'application', origin: expect.objectContaining({ file: target, area: expect.objectContaining({ kind: area === 'testing' ? 'tests' : 'ordinary' }) }) } })]);
+    const result = report.snapshot!.results.find(result => result.accessId === loads[0]!.id);
+    if (area === 'testing') {
+      expect(result).toMatchObject({ outcome: 'mixed', decisions: [{ status: 'denied', reason: 'testing-origin' }] });
+      expect(report.diagnostics).toEqual([expect.objectContaining({ code: 'testing-origin', category: 'import',
+        location: expect.objectContaining({ file: 'src/use.ts', line: 3 }), importer: expect.objectContaining({ owner: 'fixture', kind: 'ordinary' }) })]);
+    } else {
+      expect(result).toMatchObject({ outcome: 'unverifiable', decisions: [], diagnostics: [] });
+      expect(report.diagnostics).toEqual([]);
+    }
+  }), 15_000);
+
   const selections = {
     static: (pattern: string) => `import * as ns from '../../../src/interfaces/api.js'; const { ${pattern} } = ns;`,
     awaited: (pattern: string) => `const { ${pattern} } = await import('../../../src/interfaces/api.js'); export {};`,

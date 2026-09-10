@@ -1,7 +1,7 @@
 import { rm } from 'node:fs/promises';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { SourceCatalog } from '../interfaces/source.js';
-import { analyze, childOwner, code, configuration, exported, file, fixture, original, withCatalog } from './fixtures.js';
+import { analyze, childOwner, code, configuration, exported, file, fixture, original, resource, withCatalog } from './fixtures.js';
 
 describe('compiler-derived code originals', () => {
   let root: string;
@@ -255,6 +255,65 @@ describe('export completeness and compiler limits', () => {
       expect(file(catalog, 'src/type-error.ts')).toMatchObject({ state: 'complete', issueIds: [] });
       expect(exported(catalog, 'src/type-error.ts', 'declaredNumber').original).toEqual(code('type-error.ts', 'declaredNumber'));
       expect(catalog.coverage).toEqual([]);
+    });
+  }, 30_000);
+});
+
+describe('shared globals declared by script source', () => {
+  it('reports a cross-owner script global as located coverage instead of a complete script', async () => {
+    const root = await fixture({
+      'src/globals.ts': 'var sharedSecret = 1;',
+      'subs/child/module.ramify': 'ramify 1\nmodule child tagged [ui]\n',
+      'subs/child/src/reader.ts': 'export const read = (): number => sharedSecret;',
+    }, [childOwner]);
+    let result: Awaited<ReturnType<typeof analyze>> | undefined;
+    try {
+      result = await analyze(root);
+      const { catalog } = result;
+      const notes = catalog.coverage.filter(limit => limit.code === 'shared-global');
+      expect(notes).toHaveLength(1);
+      expect(catalog.coverage).toEqual(notes);
+      expect(notes[0]).toMatchObject({ location: { file: 'src/globals.ts', line: 1, column: 1 }, related: [],
+        message: expect.stringContaining('shared globals') });
+      expect(file(catalog, 'src/globals.ts')).toMatchObject({ state: 'incomplete', exports: [], issueIds: [notes[0].id] });
+      expect(file(catalog, 'subs/child/src/reader.ts')).toMatchObject({ state: 'complete', issueIds: [] });
+      expect(exported(catalog, 'subs/child/src/reader.ts', 'read').original).toEqual(code('reader.ts', 'read', 'fixture/child'));
+    } finally { await result?.dispose(); await rm(root, { recursive: true, force: true }); }
+  }, 30_000);
+
+  it('records one note per script with every further declaration as related evidence', async () => {
+    await withCatalog({
+      'src/globals.ts': [
+        'var first = 1;', 'function second() { return first; }', 'class Third {}', 'enum Fourth { Member }',
+        'interface Fifth { readonly value: number }', 'type Sixth = Fifth;', 'namespace Seventh { export const member = 1; }',
+        'declare global { interface Window { readonly ramify: number } }', 'console.log(second());',
+      ].join('\n'),
+    }, ({ catalog }) => {
+      const notes = catalog.coverage.filter(limit => limit.code === 'shared-global');
+      expect(notes).toHaveLength(1);
+      expect(catalog.coverage).toEqual(notes);
+      expect(notes[0].location).toMatchObject({ file: 'src/globals.ts', line: 1, column: 1 });
+      expect(notes[0].related.map(location => [location.file, location.line])).toEqual([2, 3, 4, 5, 6, 7, 8].map(line => ['src/globals.ts', line]));
+      expect(file(catalog, 'src/globals.ts')).toMatchObject({ state: 'incomplete', exports: [], issueIds: [notes[0].id] });
+    });
+  }, 30_000);
+
+  it('keeps a side-effect-only script complete without a note', async () => {
+    await withCatalog({ 'src/boot.ts': "console.log('boot');\nglobalThis.console.log('again');" }, ({ catalog }) => {
+      expect(file(catalog, 'src/boot.ts')).toMatchObject({ state: 'complete', exports: [], issueIds: [] });
+      expect(catalog.coverage).toEqual([]);
+    });
+  }, 30_000);
+
+  it('does not treat string-named ambient module declarations as shared globals', async () => {
+    await withCatalog({
+      'src/shim.d.ts': 'declare module "*.svg" { const url: string; export default url; }\ndeclare module "virtual:icons";',
+      'src/icon.svg': '<svg xmlns="http://www.w3.org/2000/svg"></svg>',
+      'src/use.ts': 'export { default as icon } from "./icon.svg";',
+    }, ({ catalog }) => {
+      expect(catalog.coverage.some(limit => limit.code === 'shared-global')).toBe(false);
+      expect(file(catalog, 'src/shim.d.ts')).toMatchObject({ state: 'complete', exports: [], issueIds: [] });
+      expect(exported(catalog, 'src/use.ts', 'icon').original).toEqual(resource('icon.svg'));
     });
   }, 30_000);
 });

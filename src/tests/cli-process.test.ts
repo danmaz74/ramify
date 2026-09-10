@@ -56,6 +56,16 @@ describe('compiled CLI process lifetime', () => {
     }
   }), 20_000);
 
+  it('SIGINT between the complete JSON document and its trailing newline keeps the claimed result', async () => fixture(async root => {
+    const result = await cliProcess(root, ['check', '--format', 'json'], { mode: 'interrupt-publication' });
+    expect(result.events.filter(event => event.event === 'barrier' && event.pid === result.pid)).toEqual([expect.objectContaining({ stage: 'publication', pending: 1 })]);
+    expect([result.code, result.signal, result.stderr]).toEqual([0, null, '']);
+    expect(result.stdout.endsWith('}\n')).toBe(true);
+    expect(JSON.parse(result.stdout)).toMatchObject({ outcome: { execution: 'completed', check: 'passed' }, summary: { complete: true } });
+    expect(result.survivingChildren).toEqual([]);
+    expect(result.events.find(event => event.event === 'exit' && event.pid === result.pid)).toMatchObject({ handles: 0, signalListeners: 0 });
+  }), 20_000);
+
   it('returns a failed resolver report and releases acquired files and compiler state', async () => fixture(async root => {
     const result = await cliProcess(root, ['check', '--format', 'json'], { mode: 'fail-catalog' });
     expect([result.code, result.signal, result.stderr]).toEqual([2, null, '']);

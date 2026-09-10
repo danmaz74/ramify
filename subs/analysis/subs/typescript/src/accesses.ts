@@ -148,6 +148,7 @@ export function collectAccesses(project: Project, inputs: HelperInputs, host: Ca
         || commonjsExport(selected.base);
     };
     const loaderFactories = new Set<number>(), loaderNamespaces = new Set<number>(), loaders = new Set<number>();
+    const requireFactories = new Set<number>(), requireNamespaces = new Set<number>(), requireLoaders = new Set<number>();
     const symbolId = (node: Node): number | undefined => project.checker.getSymbolAtLocation(node)?.id;
     const commonjsRequire = (node: Node): boolean => {
       const symbol = project.checker.getSymbolAtLocation(node);
@@ -170,27 +171,34 @@ export function collectAccesses(project: Project, inputs: HelperInputs, host: Ca
     const indexed = (symbols: ReadonlySet<number>, node: Node): boolean => {
       const id = symbolId(node); return id !== undefined && symbols.has(id);
     };
+    // Jiti's default export is its factory; Node's default export is the
+    // Module namespace whose createRequire returns a CommonJS require.
     for (const statement of source.statements) {
-      if (!isImportDeclaration(statement) || !isStringLiteral(statement.moduleSpecifier) || statement.moduleSpecifier.text !== 'jiti') continue;
+      if (!isImportDeclaration(statement) || !isStringLiteral(statement.moduleSpecifier)) continue;
+      const jiti = statement.moduleSpecifier.text === 'jiti', builtin = ['module', 'node:module'].includes(statement.moduleSpecifier.text);
+      if (!jiti && !builtin) continue;
       const clause = statement.importClause;
       const remember = (symbols: Set<number>, node: Node): void => { const id = symbolId(node); if (id !== undefined) symbols.add(id); };
-      if (clause?.name) remember(loaderFactories, clause.name);
+      if (clause?.name) remember(jiti ? loaderFactories : requireNamespaces, clause.name);
       if (clause?.namedBindings && isNamedImports(clause.namedBindings)) for (const binding of clause.namedBindings.elements) {
-        if ((binding.propertyName ?? binding.name).text === 'createJiti') remember(loaderFactories, binding.name);
+        const name = (binding.propertyName ?? binding.name).text;
+        if (jiti && name === 'createJiti') remember(loaderFactories, binding.name);
+        if (builtin && name === 'createRequire') remember(requireFactories, binding.name);
       }
-      if (clause?.namedBindings && isNamespaceImport(clause.namedBindings)) remember(loaderNamespaces, clause.namedBindings.name);
+      if (clause?.namedBindings && isNamespaceImport(clause.namedBindings)) remember(jiti ? loaderNamespaces : requireNamespaces, clause.namedBindings.name);
     }
     const indexLoaders = (node: Node): void => {
       if (isVariableDeclaration(node) && isIdentifier(node.name) && node.initializer && isCallExpression(node.initializer)) {
         const expression = node.initializer.expression, selected = member(expression);
-        if (isIdentifier(expression) && indexed(loaderFactories, expression)
-          || selected?.name === 'createJiti' && indexed(loaderNamespaces, selected.base)) {
-          const id = symbolId(node.name); if (id !== undefined) loaders.add(id);
-        }
+        const created = (factories: ReadonlySet<number>, namespaces: ReadonlySet<number>, factory: string): boolean =>
+          isIdentifier(expression) && indexed(factories, expression) || selected?.name === factory && indexed(namespaces, selected.base);
+        const id = symbolId(node.name);
+        if (id !== undefined && created(loaderFactories, loaderNamespaces, 'createJiti')) loaders.add(id);
+        if (id !== undefined && created(requireFactories, requireNamespaces, 'createRequire')) requireLoaders.add(id);
       }
       node.forEachChild(child => { indexLoaders(child); });
     };
-    if (loaderFactories.size || loaderNamespaces.size) indexLoaders(source);
+    if (loaderFactories.size || loaderNamespaces.size || requireFactories.size || requireNamespaces.size) indexLoaders(source);
     const interpret = (node: Node, specifier: Node | undefined, form: WrittenForm, runtimeLoad: boolean, explicitType: boolean,
       runtimeOnly = false) => {
       let records = 0;
@@ -262,7 +270,9 @@ export function collectAccesses(project: Project, inputs: HelperInputs, host: Ca
       }
       if (isCallExpression(node)) {
         const selected = member(node.expression);
-        if (isIdentifier(node.expression) && node.expression.text === 'require' && commonjsRequire(node.expression)) {
+        // A require created by Node's factory loads like the ambient require.
+        if (isIdentifier(node.expression) && (node.expression.text === 'require' && commonjsRequire(node.expression)
+          || requireLoaders.size > 0 && indexed(requireLoaders, node.expression))) {
           record(node, node.arguments[0], 'commonjs', 'unknown', true, undefined,
             { code: 'unsupported-commonjs', message: 'CommonJS require access is outside the ECMAScript interpretation profile' });
         } else if (isIdentifier(node.expression) && loaders.size > 0 && indexed(loaders, node.expression)

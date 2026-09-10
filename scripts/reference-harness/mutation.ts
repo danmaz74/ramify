@@ -31,6 +31,15 @@ function isWithin(parent: string, path: string): boolean {
   return tail === '' || (!tail.startsWith(`..${sep}`) && tail !== '..' && !tail.startsWith(sep));
 }
 
+/**
+ * Matrix IDs contain a colon. It cannot be part of a fixture's directory:
+ * npm puts node_modules/.bin on PATH, where POSIX treats ':' as a separator.
+ * Preserved and mutated fixtures share this spelling.
+ */
+export function instanceDirectoryName(instanceId: string): string {
+  return instanceId.replaceAll(':', '-');
+}
+
 /** One owned mkdtemp directory per invocation, including concurrent instances. */
 export async function runIsolatedProject<T>(options: {
   readonly workRoot: string;
@@ -44,9 +53,7 @@ export async function runIsolatedProject<T>(options: {
   const workRoot = resolve(options.workRoot);
   await mkdir(workRoot, { recursive: true });
   const runDirectory = await mkdtemp(join(workRoot, 'run-'));
-  // Matrix IDs contain a colon. It cannot be part of a fixture's directory:
-  // npm puts node_modules/.bin on PATH, where POSIX treats ':' as a separator.
-  const root = join(runDirectory, options.instanceId.replaceAll(':', '-'), 'project');
+  const root = join(runDirectory, instanceDirectoryName(options.instanceId), 'project');
   let result: IsolatedResult<T>;
   try {
     await mkdir(root, { recursive: true });

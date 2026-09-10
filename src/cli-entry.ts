@@ -14,6 +14,9 @@ const pending: Promise<void>[] = [];
 const outputFailure = (): void => { outputFailed = true; controller.abort(); };
 const publish = async (text: string): Promise<void> => {
   const bytes = Buffer.from(text);
+  // The result is claimed once its last non-whitespace byte is written; only
+  // trailing whitespace may still be pending after that commit.
+  const document = Buffer.byteLength(text.trimEnd()) || bytes.length;
   let offset = 0;
   while (offset < bytes.length && !controller.signal.aborted) {
     try {
@@ -26,11 +29,12 @@ const publish = async (text: string): Promise<void> => {
       }
       await delay(10); continue;
     }
+    // No await separates the native write completing the document and this
+    // commit: a later SIGINT must retain the result's exit code rather than
+    // disown a published report, even while its trailing newline is pending.
+    if (offset >= document) published = true;
     if (offset < bytes.length) await yieldTurn();
   }
-  // No await separates the final native write and this commit: a later SIGINT
-  // must retain the result's exit code rather than disown a published report.
-  if (offset === bytes.length) published = true;
 };
 const write = (stream: NodeJS.WriteStream, text: string): void => {
   pending.push(new Promise<void>(done => {

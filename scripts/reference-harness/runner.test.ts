@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { plan1Instances } from './cases.js';
 import { verificationCapabilities } from './instances.js';
+import { instanceDirectoryName } from './mutation.js';
 import { readReviewedPlan } from './plan.js';
 import { Assertions, verifyInstances } from './runner.js';
 import type { HarnessRuntime, InstanceHandler } from './runner.js';
@@ -169,7 +170,7 @@ describe('project handler baseline, mutation and cleanup', () => {
     expect(result.status).toBe('failed');
     expect(result.reason).toBe(mode === 'unrun' ? 'unrun-baseline' : 'baseline-failed');
     expect(result.assertions).toEqual([]);
-    expect(await readFile(join(result.preservedDirectory!, id, 'project/module.ramify'), 'utf8')).toContain('module fixture');
+    expect(await readFile(join(result.preservedDirectory!, instanceDirectoryName(id), 'project/module.ramify'), 'utf8')).toContain('module fixture');
     expect(await readdir(workRoot)).toHaveLength(1);
   });
 });

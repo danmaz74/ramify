@@ -20,11 +20,13 @@ export interface TraceEvent {
   readonly closed?: number;
   readonly commonjs?: readonly string[];
   readonly signalListeners?: number;
+  readonly stage?: string;
+  readonly pending?: number;
 }
 
 /** Each process gets a private trace, a deadline and deterministic cleanup. */
 export async function cliProcess(cwd: string, argv: readonly string[], options: {
-  readonly mode?: 'fail-catalog' | 'interrupt-acquisition' | 'interrupt-catalog';
+  readonly mode?: 'fail-catalog' | 'interrupt-acquisition' | 'interrupt-catalog' | 'interrupt-publication';
   readonly readTarget?: string;
   readonly brokenStdout?: boolean;
   readonly backpressuredStdout?: 'interrupt' | 'resume';
