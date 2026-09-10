@@ -242,7 +242,7 @@ The results and checklist were written successfully through this active attempt 
 
 Inspection shows that update adds only `- **Regression Tests**: PASSED`, matching the accepted iteration-14 predecessor results supplied by the user. The agent did not edit or generate that check result. Its exact existing bytes are committed as control-plane bookkeeping so the accepted predecessor output is preserved and publication could be retried. This adds no iteration-15 passing-regression claim and changes no implementation or evidence.
 
-## Current publication blocker
+## Previous publication blocker (2026-09-10 07:23 UTC)
 
 The bookkeeping commit is `1132bc8`. The resubmission returned `FILE_POLICY_VIOLATION`: iteration14-check-results.md belongs to iteration 14, not 15. A read-only publication-status call confirms no pending accepted draft and retains that rejection. Both managed iteration-15 deliverables now exist and are committed; publication and subsequent acceptance have not succeeded.
 
@@ -256,3 +256,28 @@ The installed publication service explains the conflict:
 This is a control-plane attribution problem. No Ramify check failed. The supplied user policy reserves check-results files to the control plane, so the agent has not manually removed the passing regression line, rewritten accepted artifacts, changed workflow state, or patched/restarted the external service.
 
 Required recovery: the Studio control plane must reconcile the generated final iteration-14 regression result with iteration 14's accepted artifact/baseline, then retry iteration-15 publication. No available active-iteration-15 MCP tool owns that predecessor check output. The toolkit implementation, measurement evidence and both required deliverables are preserved on this branch. Full gate/regression acceptance and Plan 1 completion remain pending.
+
+## Current-attempt verification and submission (2026-09-10)
+
+Resumed from `dab085ff040e42d4e8f6c2a759153c8f8e5ca2a7` on the authoritative branch and checkout, with a clean working tree, under attempt `attempt_hkiwD3GLzUPhdpsteX-Eu`. Live workflow detail confirms iteration 14 completed and accepted, and iteration 15 running. The retained publication status describes the earlier predecessor-artifact rejection; this attempt will submit the existing implementation and both refreshed managed deliverables.
+
+No application source, tests, declarations, dependencies, fixtures, budgets or control-plane outputs were edited in this attempt. The existing implementation at `fd8a351` and its subsequent managed submission records were reviewed before verification.
+
+Fresh commands passed sequentially:
+
+- `npm run worktree:prepare`.
+- `npm run build`.
+- `npm run type-check` across toolkit, portable owners, scripts and harness.
+- `npx tsx scripts/validate-final-contracts.ts`: nine owners, 150 source/resource files, 59 expanded statements, seven package entries and the compiled CLI executable.
+- `npx tsx scripts/reference-harness/validate.ts`: all 308 reviewed records, pointers and prerequisites valid; no conformance assertion executed.
+- `npm run check:reference`: completed/passed/complete coverage; 15 owners, 54 source files, five resources, 294 accesses, 166 allowed and 128 external. Zero errors, denials or analysis limits; the two expected configuration warnings remain visible.
+- `npm run check:self`: completed/passed/complete coverage; nine owners, 143 source files, seven resources, 1,781 accesses, 1,320 allowed and 461 external. Zero errors, warnings, denials or analysis limits.
+- `git diff --check`.
+
+Logs are retained under `.reference-work/iteration15-current-*.log`; execution identity is in `.reference-work/iteration15-current-identity.json`. Source SHA remains `58bf210e7ade39cd87d2527622bb07f4fb8811aab633748f53584cc65d5a794d`. The rebuilt runtime SHA is `435bd02d03e953fd753479b086365e8e5a2570af9d8c9a6564b8412746df4cb4`, exactly matching the retained focused and measured runtime. The identity was captured with a clean working tree before these managed report/checklist updates.
+
+Read-only evidence validation passed: all eight measurement archives match their recorded raw/compressed hashes, byte lengths and zero gzip timestamps. Current manifest, lockfile, fixture generator, measurement scripts and memory-probe hashes match the final measurement inputs. Both final workloads satisfy the unchanged five-cold-sample latency/RSS budgets and 30-cycle repeated workloads, retaining 25 reports with distinct run identities and satisfying last-20 memory budgets. Final lifecycle counters return to zero, and file/helper opens and closes balance. These are validated retained measurements, not fresh performance samples.
+
+The focused archive's raw SHA and size match its documentation. It retains all 308 records, ten passing instances and 356 passing baseline/result assertions, with `planComplete: false`. The separate relocation smoke retains 61 passing assertions and explicitly excludes relocated toolkit regression. No retained evidence has been relabelled as a current exhaustive run.
+
+The supplied automation-only check policy remains in force. No local Vitest/Cucumber, scenario coverage, sealed-file checks, unfiltered gate or executing reference report ran during this attempt. Their outstanding status and the inherited CLI/loader findings remain as documented above. Both managed deliverables are written through this attempt's MCP tools and committed before draft publication. Submission does not claim Plan 1 completion or successful automated acceptance.
