@@ -1,0 +1,24 @@
+ramify 1
+module analysis
+
+expose-sub * from model to parent, descendants
+
+// A6: syntax vocabulary available to assembly and acquisition.
+expose-sub TextSpan, DescriptionToken, DescriptionIssue, NamedSelection, DescriptionSelection, DescriptionStatement, DescriptionDocument, ParsedDescription, DescriptionParser, LinkInputs, ExpandedSelection, LinkIssue, LinkedDescriptions from descriptions to parent, descendants
+
+// A7: project vocabulary supplied to assembly and children.
+expose-sub ProjectRequest, ProjectScope, CapturedInput, InventoryArea, ModulePurpose, InventoryModule, InventoryFile, ExactReference, OutsideSourceWarning, ProjectInventory, ProjectIssue, AcquisitionLimits, ProjectInputView, ProjectReadOptions, ProjectRead from project to parent, descendants
+
+// A8: current source catalog vocabulary.
+expose-sub CatalogOriginal, CatalogExport, FileExports, SourceCatalog, SourceTarget, WrittenForm, AccessSelection, SourceAccess, SourceLimit, SourceWorkLimits, SourceAnalysisInputs, SourceAnalysis from typescript to parent, descendants
+
+// A1/A4: validation operations and implemented analysis vocabulary.
+expose-src validateProject from "validation.ts" to parent
+expose-src * from "interfaces/analysis.ts" to parent
+
+// A2: inventory and source-profile assembly for production selection.
+expose-src acquireInventory from "inventory.ts" to parent
+
+// A3: disposable batch sessions and the direct service binding.
+expose-src createAnalysisSession from "session.ts" to parent
+expose-src analyzeProject from "analyze-project.ts" to parent

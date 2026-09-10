@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.publish_iteration",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": true,
+    "functionalRequirementsSatisfied": true,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-09T22:08:24Z",
+  "iteration": "10",
+  "notes": "Remediated cf-constraints-mtund816-eglv135x: exact paths candidates precede extension substitution while relative imports retain their compiler order. Six new compiler-trace cases and five existing resolution controls passed (11 focused tests); type-check passed. The original 201/201 intermediate gate was not rerun during remediation. Full regression and acceptance checks remain with workflow automation."
+}

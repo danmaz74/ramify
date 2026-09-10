@@ -1,5 +1,7 @@
 # ramify.ts
 
+Ramify assembles the command line entry and lazy batch analysis, maps completed reports to invocation results, and keeps executable dispatch separate from portable model and presentation entries.
+
 **Multi-file hierarchical modules for TypeScript.**
 
 TypeScript is modular at exactly one granularity, the file: above it, every
@@ -57,15 +59,48 @@ repository later. cucumber-viz will eventually become a consumer of this
 toolkit; the feasibility study of adopting the model there is in the host
 repository under `docs/analysis/2026-09-05-ramify-adoption-feasibility/`.
 
-The version 1 description language is specified; its filesystem loader and
-parser are not yet implemented. The evaluator currently accepts constructed
-module trees and implements the earlier module-only `testing`/`browser`
-model. The definitive specification uses a project-wide registry with two fixed
-tag kinds and ordinary defaults `testing`, `ui`, `dispatch`, and `browser`.
-The registry, separate `src/tests/` profile, and production-to-testing source
-restriction still require evaluator/source-checker implementation. TypeScript
-source interpretation is definitive within its stated bounded profile; a
-source checker is not yet implemented.
+The batch analysis session and CLI check descriptions and source imports using
+the version 1 parser, project acquisition, TypeScript adapter and definitive
+model. They report violations, warnings and analysis limits separately.
+Teaching diagrams use the same model. The toolkit self-check and all 308
+reference gate instances are implemented, including the independent toolkit
+negative and relocated installation. The [completion report](docs/plans/iteration-1-project-verifier/iterations/iteration15-results.md)
+records actual execution, resource measurements and remaining acceptance work.
+The resident daemon, Ramify MCP server, interactive explorer and browser verifier
+remain unavailable; browser tag matching is implemented.
+
+## Check a project
+
+Build this package with `npm run build`, then install it locally with
+`npm install /path/to/ramify` in a consuming package. Its `ramify` executable
+is available through npm's local bin directory:
+
+```sh
+npx ramify check
+npx ramify check --root /path/to/project --format json
+```
+
+From this checkout, the same executable can check the reference directly:
+
+```sh
+npm run check:reference
+npm run check:self
+npm run reference:verify -- --plan 1
+```
+
+`check` discovers the whole project and its compiler configuration from the
+working directory unless `--root` is given. It includes owned tests and
+resources. `--batch` is accepted; each invocation uses and disposes a fresh
+session. Human output is the default; JSON output is one versioned report on
+stdout. See the [CLI contract](docs/architecture/cli-invocation.spec.md) for
+scope and exit codes. `--help` and `--version` load no compiler or server.
+
+The reusable session is exported from `ramify.ts/analysis`; command handling
+with an injected batch operation is exported from `ramify.ts/cli`.
+Portable entries are `ramify.ts/model` and `ramify.ts/layout`;
+`ramify.ts/presentation` contains the teaching UI. See the
+[batch usage guide](docs/development/batch-verification.md) for direct session
+usage, production selection, gate evidence and measurement commands.
 
 ## Layout
 
@@ -88,7 +123,12 @@ source checker is not yet implemented.
   [Collection Review reference-project plan](docs/plans/reference-project/README.md)
   and its planned compatibility and regression cases, plus the
   [implementation roadmap and plan briefs](docs/plans/tooling-architecture/README.md).
-- `src/` - toolkit source; tests co-located as `src/**/*.test.ts`.
+- `src/` - the executable entry and lazy batch assembly.
+- `subs/analysis/` - batch validation and its declared model, descriptions,
+  project and TypeScript children.
+- `subs/presentation/` - teaching diagrams, React components and the neutral
+  layout child. Every owner's tests live in its own `src/tests/`.
+- `subs/cli/` - argument parsing, report formatting and injected command handling.
 - `examples/` - the [Collection Review reference project](examples/collection-review/README.md):
   a small runnable application whose fifteen owners carry the module
   descriptions, with its own package, lockfile and toolchain.
@@ -131,11 +171,11 @@ point readers to these documents in `docs/model/`.
 
 ### Portability discipline
 
-`site/` is a thin shell: configuration and MDX/Markdown pages only. Every
-component, all logic and all data are imported from `src/` (webpack alias
-`@ramify` → `../src`, set in `site/docusaurus.config.ts`); nothing is
-swizzled and no page body depends on theme-specific CSS class names, so
-switching site frameworks stays mechanical config work.
+`site/` consumes the presentation, model and layout entries through exact
+`@ramify/presentation`, `@ramify/model` and `@ramify/layout` aliases in
+`site/docusaurus.config.ts`. Diagrams and their model data remain with their
+declared owners. Nothing is swizzled and no page body depends on theme-specific
+CSS class names, so switching site frameworks stays mechanical config work.
 
 ## Conventions
 

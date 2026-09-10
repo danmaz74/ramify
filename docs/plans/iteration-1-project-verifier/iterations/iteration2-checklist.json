@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": true,
+    "functionalRequirementsSatisfied": true,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-09T10:03:50Z",
+  "iteration": "2",
+  "notes": "The focused self-assessment follow-up ran exactly the four new harness test files (instances, mutation, runner and verify) through their dedicated Vitest configuration on source revision 8107bb8: exit 0, 4 files passed, 48 tests passed, 618 ms reported duration. No code or test edits were needed. This supplies actual passing evidence for allNewTestsPass, including copied-project lifetimes, gate sabotage/positive controls and subprocess behavior. Earlier build/type-check/inventory/diagram/site results remain applicable. Existing family catalogue, toolkit and Cucumber regression suites remain automatic. No I1 semantic instance executed. Both artifacts updated through MCP; no publication call in this follow-up."
+}

@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.publish_iteration",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": true,
+    "functionalRequirementsSatisfied": true,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-09T13:21:07.000Z",
+  "iteration": "6",
+  "notes": "Corrected all three reported catalog constraints: cyclic-star ambiguity/downstream propagation, moduleSuffixes resource identity, and distinct same-spelling resource bindings. Added 28 passing regression cases; 88 distinct focused catalog/resource/retention/reference tests passed during remediation. Final type-check, build and diff checks passed. Full automated regression and constraints verification remain pending; no Plan 1 completion claim."
+}

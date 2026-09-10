@@ -1,0 +1,160 @@
+{
+  "probe": "reference-resolution",
+  "nodeVersion": "v22.23.2",
+  "compilerVersion": "7.0.2",
+  "projectCompilerVersion": "7.0.2",
+  "root": "examples/collection-review",
+  "configuration": "tsconfig.json",
+  "compilerSelectedFileCount": 56,
+  "compilerDiagnosticCount": 0,
+  "appRouter": {
+    "accessedFile": [
+      "src/interfaces/protocol.ts"
+    ],
+    "intermediateAliasFile": [
+      "src/interfaces/protocol.ts"
+    ],
+    "originalFile": [
+      "src/assembly.ts"
+    ],
+    "originalName": "AppRouter",
+    "explicitTypeOnly": true,
+    "existsAsValue": false
+  },
+  "css": [
+    {
+      "importer": "subs/workspace/subs/catalog/subs/ui/src/catalog-card.tsx",
+      "specifier": "./catalog-card.module.css",
+      "resource": "subs/workspace/subs/catalog/subs/ui/src/catalog-card.module.css",
+      "bytes": 525,
+      "effectiveExportNames": [
+        "default"
+      ],
+      "effectiveDescription": [
+        "node_modules/vite/client.d.ts"
+      ],
+      "existsAsValue": true,
+      "presentInCompilerSourceFiles": false
+    },
+    {
+      "importer": "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.tsx",
+      "specifier": "./review-result.module.css",
+      "resource": "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.module.css",
+      "bytes": 644,
+      "effectiveExportNames": [
+        "default"
+      ],
+      "effectiveDescription": [
+        "node_modules/vite/client.d.ts"
+      ],
+      "existsAsValue": true,
+      "presentInCompilerSourceFiles": false
+    }
+  ],
+  "sharedCompilerShimSymbol": true,
+  "vocabularyExports": [
+    {
+      "name": "Finding",
+      "originalFiles": [
+        "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+      ]
+    },
+    {
+      "name": "findingSchema",
+      "originalFiles": [
+        "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+      ]
+    },
+    {
+      "name": "InspectionReport",
+      "originalFiles": [
+        "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+      ]
+    },
+    {
+      "name": "inspectionReportSchema",
+      "originalFiles": [
+        "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+      ]
+    },
+    {
+      "name": "Observation",
+      "originalFiles": [
+        "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+      ]
+    },
+    {
+      "name": "ObservationCallback",
+      "originalFiles": [
+        "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+      ]
+    },
+    {
+      "name": "observationSchema",
+      "originalFiles": [
+        "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+      ]
+    },
+    {
+      "name": "RecordId",
+      "originalFiles": [
+        "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+      ]
+    },
+    {
+      "name": "recordIdSchema",
+      "originalFiles": [
+        "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+      ]
+    },
+    {
+      "name": "ReviewStatus",
+      "originalFiles": [
+        "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+      ]
+    },
+    {
+      "name": "reviewStatusSchema",
+      "originalFiles": [
+        "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+      ]
+    },
+    {
+      "name": "Revision",
+      "originalFiles": [
+        "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+      ]
+    },
+    {
+      "name": "RevisionChain",
+      "originalFiles": [
+        "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+      ]
+    },
+    {
+      "name": "revisionChainSchema",
+      "originalFiles": [
+        "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+      ]
+    },
+    {
+      "name": "revisionSchema",
+      "originalFiles": [
+        "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+      ]
+    },
+    {
+      "name": "RevisionScope",
+      "originalFiles": [
+        "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+      ]
+    },
+    {
+      "name": "revisionScopeSchema",
+      "originalFiles": [
+        "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+      ]
+    }
+  ],
+  "snapshotDisposed": true
+}

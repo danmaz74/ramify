@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.publish_iteration",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": true,
+    "functionalRequirementsSatisfied": true,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-09T11:23:12.730Z",
+  "iteration": "4",
+  "notes": "Complete reviewed version 1 text-only parser; D1/D2 and A6/R4 syntax relays activated. 175 owned tests and 4 focused harness tests pass. All 53 iteration-4 syntax variants pass with 2690 assertions; all 24 current descriptions match independent expected statements. Type-check/build, contract comparison, inventory and portable emitted-runtime checks pass. Broad regressions, Cucumber, scenario coverage and sealed-file checks are delegated to automation. No source/linking conformance or Plan 1 completion claimed."
+}

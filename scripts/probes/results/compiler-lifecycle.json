@@ -1,0 +1,22 @@
+{
+  "probe": "compiler-lifecycle",
+  "api": "typescript/unstable/sync",
+  "outcomes": [
+    {
+      "mode": "explicit-dispose",
+      "expectedFailureObserved": false,
+      "snapshotDisposed": true,
+      "closedClientRejectsRequest": true,
+      "repeatedCloseAccepted": true
+    },
+    {
+      "mode": "early-failure",
+      "expectedFailureObserved": true,
+      "snapshotDisposed": true,
+      "closedClientRejectsRequest": true,
+      "repeatedCloseAccepted": true
+    }
+  ],
+  "ramifySessionCancellationMeasured": false,
+  "nativeProcessPeakMemoryMeasured": false
+}

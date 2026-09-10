@@ -45,7 +45,7 @@ resource paths or the intended owner automatically.
    channels, interface wildcard expansion and forwarding aliases against the
    [format specification](../model/module-description.principles.md).
 3. Type-check and test affected consumers, then run available Ramify checks.
-   Until self-check exists, review ownership and exposures manually.
+   Use `npm run check:self` to verify current toolkit ownership and exposures.
 
 An export with no references in the loaded TypeScript program may still serve
 external consumers or a declared public contract. Check those uses before

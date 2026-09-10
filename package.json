@@ -4,12 +4,43 @@
   "private": true,
   "description": "Multi-file hierarchical modules for TypeScript: a toolkit to define, enforce, visualize, and help agents adhere to them.",
   "type": "module",
-  "main": "dist/index.js",
+  "bin": { "ramify": "dist/src/cli-entry.js" },
+  "exports": {
+    ".": {
+      "types": "./dist/subs/analysis/src/index.d.ts",
+      "import": "./dist/subs/analysis/src/index.js"
+    },
+    "./analysis": {
+      "types": "./dist/subs/analysis/src/index.d.ts",
+      "import": "./dist/subs/analysis/src/index.js"
+    },
+    "./analysis/inventory": {
+      "types": "./dist/subs/analysis/src/inventory-entry.d.ts",
+      "import": "./dist/subs/analysis/src/inventory-entry.js"
+    },
+    "./model": {
+      "types": "./dist/subs/analysis/subs/model/src/index.d.ts",
+      "import": "./dist/subs/analysis/subs/model/src/index.js"
+    },
+    "./presentation": {
+      "types": "./dist/subs/presentation/src/index.d.ts",
+      "import": "./dist/subs/presentation/src/index.js"
+    },
+    "./cli": {
+      "types": "./dist/subs/cli/src/index.d.ts",
+      "import": "./dist/subs/cli/src/index.js"
+    },
+    "./layout": {
+      "types": "./dist/subs/presentation/subs/layout/src/index.d.ts",
+      "import": "./dist/subs/presentation/subs/layout/src/index.js"
+    }
+  },
   "scripts": {
     "worktree:prepare": "npm --prefix examples/collection-review ci && npm --prefix site ci",
-    "build": "tsc",
-    "dev": "tsc --watch",
-    "type-check": "tsc --noEmit && tsc -p tsconfig.scripts.json",
+    "build": "tsx scripts/build-production.ts",
+    "production:files": "tsx scripts/production-files.ts",
+    "dev": "tsc --noEmit --watch",
+    "type-check": "tsc --noEmit && tsc -p tsconfig.portable.json && tsc -p tsconfig.scripts.json && tsc -p scripts/reference-harness/tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "diagrams": "tsx scripts/emit-diagrams.ts",
@@ -24,7 +55,11 @@
     "example:test": "npm --prefix examples/collection-review run test",
     "example:test:cucumber": "npm --prefix examples/collection-review run test:cucumber",
     "reference:cases": "vitest run -c scripts/reference-harness/vitest.config.ts",
-    "reference:report": "tsx scripts/reference-harness/report.ts"
+    "reference:report": "tsx scripts/reference-harness/report.ts",
+    "check:reference": "node dist/src/cli-entry.js check --root examples/collection-review",
+    "check:self": "node dist/src/cli-entry.js check --root .",
+    "measure:batch": "node scripts/measurements/run.mjs",
+    "reference:verify": "tsx scripts/reference-harness/verify.ts"
   },
   "devDependencies": {
     "@types/d3-hierarchy": "^3.1.7",
@@ -34,13 +69,15 @@
     "@types/react-dom": "^19.2.5",
     "jsdom": "^30.0.1",
     "tsx": "^4.23.13",
-    "typescript": "^7.0.2",
     "vitest": "^4.1.11"
   },
   "dependencies": {
     "d3-hierarchy": "^3.1.2",
     "d3-shape": "^3.2.0",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
-  }
+    "react-dom": "^19.2.8",
+    "typescript": "7.0.2"
+  },
+  "main": "./dist/subs/analysis/src/index.js",
+  "types": "./dist/subs/analysis/src/index.d.ts"
 }

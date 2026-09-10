@@ -5,9 +5,8 @@ import { defineConfig } from 'vitest/config';
 /**
  * The reference harness runs under its own Vitest configuration.
  *
- * The toolkit's `vitest.config.ts` collects `src/**\/*.test.ts` only, and it
- * stays that way: harness tests read the repository's own files and are not
- * toolkit unit tests. Run this suite explicitly:
+ * Toolkit tests collect legacy and nested owner source. Harness tests read
+ * repository files and keep this independent configuration. Run it explicitly:
  *
  *     npm run reference:cases
  */

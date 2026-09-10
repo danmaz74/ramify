@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.publish_iteration",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": true,
+    "functionalRequirementsSatisfied": true,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-09T12:00:43.272Z",
+  "iteration": "5",
+  "notes": "Both remaining constraints defects reproduced and corrected: exclude resolved declarationDir from discovery/exposure; end indented README code before following prose. Verification: 104 project tests; 790 full-suite tests; 88/88 required iteration-5 reference instances; type-check/build and diff checks pass. Historical failed constraints and skipped automatic regression are preserved. Studio commit-bound audit on a4aaa10 passes static and regression checks; agentic constraints were not rerun. Publication recovery pending; full Plan 1 remains incomplete."
+}

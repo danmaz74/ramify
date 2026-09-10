@@ -1,0 +1,6 @@
+ramify 1
+module typescript
+
+// T1-T2: compiler service and detached catalog vocabulary.
+expose-src createSourceAnalysis from "source-analysis.ts" to parent
+expose-src * from "interfaces/source.ts" to parent

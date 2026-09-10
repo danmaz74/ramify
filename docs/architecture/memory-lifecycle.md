@@ -214,3 +214,17 @@ later plans add resident, MCP and web workloads. Preserve their recipes, input
 fixtures and versioned raw results with acceptance evidence. The setup probe's
 post-disposal samples do not establish peak allocation, long-running plateaus,
 module unloading or combined multi-process budgets.
+
+The implemented [batch measurement recipe](../../scripts/measurements/README.md)
+and its retained raw results cover the unchanged reference and the reviewed
+100-owner fixture. They distinguish setup, combined process peak and the full
+25-report retention workload. The [Plan 1 completion report](../plans/iteration-1-project-verifier/iterations/iteration15-results.md)
+records actual budget outcomes and their acceptance limits.
+
+The batch implementation releases compiler helpers after source fact extraction;
+the captured view remains available for final consistency validation. Reports
+share equal frozen plain-data subtrees within one result to avoid retaining
+duplicate facts. Serialization still includes the complete report. No interning
+table, compiler handle or cross-run cache survives with that report; each later
+batch starts a fresh session. These implementation choices do not establish any
+resident context, history, queue or lease budget.

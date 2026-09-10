@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.publish_iteration",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": true,
+    "functionalRequirementsSatisfied": true,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-09T23:39:55.861Z",
+  "iteration": "12",
+  "notes": "Remediated both iteration-12 constraint findings. Compiler-valid public-session reproductions failed before correction; all 22 new cases and 17 affected existing cases now pass. Type-check, production build and current toolkit declaration/export validation pass. Original 268-instance iteration gate evidence is retained and was not rerun during remediation. Full regression and acceptance checks remain with workflow automation; no Plan 1 completion claim."
+}

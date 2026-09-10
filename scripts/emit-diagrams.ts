@@ -1,15 +1,15 @@
 /**
  * Emit the checked-in static diagrams.
  *
- * This is the only file in the project that touches the filesystem. It renders
+ * This independent build tool renders
  * the same React component the site embeds, with no selection, once per
  * checked-in diagram definition:
  *
  * - `site/static/diagrams/model-core.svg` - the shop, the retired first
- *   diagram (`src/viz/diagrams/shop.ts`): structure and propagation with
+ *   diagram (`subs/presentation/src/diagrams/shop.ts`): structure and propagation with
  *   its import chords composited;
  * - `site/static/diagrams/example1.svg` - Example 1
- *   (`src/viz/diagrams/example1.ts`): one decision, three reaches;
+ *   (`subs/presentation/src/diagrams/example1.ts`): one decision, three reaches;
  * - `site/static/diagrams/example1a.svg` / `example1b.svg` - the two
  *   build-up stages the site walks through before Example 1's full diagram;
  * - `site/static/diagrams/example2.svg` - Example 2: both channels at once;
@@ -18,7 +18,7 @@
  * - `site/static/diagrams/example4.svg` - Example 4: a promise about the
  *   closure (browser);
  * - `site/static/diagrams/shop-tree.svg` - the shop as a classic tree
- *   (`src/viz/diagrams/shop-tree.ts`);
+ *   (`subs/presentation/src/diagrams/shop-tree.ts`);
  * - `site/static/diagrams/shop-focus-payment.svg` - the view from inside
  *   `payment`: three cards and the tree at a distance.
  *
@@ -53,7 +53,7 @@ import {
   type DiagramDefinition,
   type FocusDiagramDefinition,
   type TreeDiagramDefinition,
-} from '../src/viz/index.js';
+} from '../subs/presentation/src/index.js';
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 

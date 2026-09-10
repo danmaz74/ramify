@@ -1,0 +1,16 @@
+ramify 1
+module layout tagged [browser]
+
+// L1: every interface definition is neutral and layout-owned.
+expose-src * from "interfaces/layout.ts" to parent
+// L2-L8: prepared inputs only; no model or parent UI types.
+expose-src placeNodes from "node-placement.ts" tagged [browser] to parent
+expose-src placeLanes from "lane-placement.ts" tagged [browser] to parent
+expose-src placeChords from "chord-placement.ts" tagged [browser] to parent
+expose-src placeLegend from "legend-placement.ts" tagged [browser] to parent
+expose-src placeTree from "tree-placement.ts" tagged [browser] to parent
+expose-src placeFocus from "focus-placement.ts" tagged [browser] to parent
+expose-src measureBounds from "bounds.ts" tagged [browser] to parent
+// L9-L10: the existing neutral geometry and viewport contract.
+expose-src LAYOUT, headerBandHeight, r, polyline, textWidth, rowLabelDx, wrapText from "geometry.ts" tagged [browser] to parent
+expose-src CENTER, DRAG_THRESHOLD, MAX_SCALE, MIN_SCALE, clampPan, isReset, normalizeWheelDelta, panBy, scaleOf, wheelFactor, zoomAt from "viewport.ts" tagged [browser] to parent

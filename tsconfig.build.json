@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "rootDir": ".",
+    "outDir": "dist",
+    "incremental": false
+  },
+  // scripts/build-production.ts supplies an explicit inventory-derived files
+  // list and temporary outDir. This file no longer chooses production files.
+  "files": [],
+  "include": []
+}
