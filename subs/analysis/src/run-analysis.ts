@@ -59,6 +59,7 @@ export async function runAnalysis(inputs: AnalysisInputs, cancellation: AbortSig
             }
             let view: ProjectInputView | undefined;
             let source: SourceAnalysis | undefined;
+            let sourceDisposalMs = 0;
             let retry = false;
             try {
               check(); draft.current = 'acquisition';
@@ -129,6 +130,12 @@ export async function runAnalysis(inputs: AnalysisInputs, cancellation: AbortSig
                     } else {
                       draft.patch({ model: model.value }); draft.stage('link', 'completed'); draft.current = 'access';
                       const accesses = await source.accesses(abort.signal);
+                      // Facts are detached at the adapter boundary. The compiler
+                      // is no longer needed during decisions or input sealing.
+                      const releaseStart = performance.now();
+                      await source.dispose(); source = undefined;
+                      sourceDisposalMs = performance.now() - releaseStart;
+                      if (sourceDisposalMs > inputs.limits.disposeTimeoutMs) throw new WorkLimit('disposeTimeoutMs', inputs.limits.disposeTimeoutMs, Math.ceil(sourceDisposalMs));
                       check(); draft.patch({ accesses: accesses.accesses }); draft.cover(accesses.coverage); draft.stage('access', 'completed');
                       draft.current = 'decide';
                       const results: AccessResult[] = [];
@@ -178,7 +185,8 @@ export async function runAnalysis(inputs: AnalysisInputs, cancellation: AbortSig
               try { await source?.dispose(); }
               finally { await view?.dispose(); }
               source = undefined; view = undefined;
-              if (performance.now() - disposalStart > inputs.limits.disposeTimeoutMs) throw new WorkLimit('disposeTimeoutMs', inputs.limits.disposeTimeoutMs, Math.ceil(performance.now() - disposalStart));
+              const disposalMs = sourceDisposalMs + performance.now() - disposalStart;
+              if (disposalMs > inputs.limits.disposeTimeoutMs) throw new WorkLimit('disposeTimeoutMs', inputs.limits.disposeTimeoutMs, Math.ceil(disposalMs));
             }
             if (!retry) break;
           }

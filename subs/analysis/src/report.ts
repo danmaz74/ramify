@@ -3,7 +3,8 @@ import type { SourceLocation } from '../subs/model/src/interfaces/model.js';
 import type { ProjectInventory, ProjectScope, OutsideSourceWarning } from '../subs/project/src/interfaces/project.js';
 import type { SourceLimit } from '../subs/typescript/src/interfaces/source.js';
 import type { AnalysisInputs, AnalysisDiagnostic, AnalysisReport, AnalysisSnapshot, Capability, StageExecution, StageId } from './interfaces/analysis.js';
-import { detached, diagnostic } from './report-data.js';
+import { diagnostic } from './report-data.js';
+import { copyReport } from './report-copy.js';
 
 export const stageOrder: readonly StageId[] = ['registry', 'acquisition', 'parse', 'catalog', 'link', 'access', 'decide', 'report'];
 export const availableCapabilities: readonly Capability[] = ['registry', 'layout', 'metadata', 'descriptions', 'source-catalog',
@@ -212,6 +213,6 @@ export class ReportDraft {
       // Never return arbitrary large caller metadata after dropping only the snapshot.
       reportBytes(report, Math.max(maximum, reserve));
     }
-    return detached(report);
+    return copyReport(report);
   }
 }

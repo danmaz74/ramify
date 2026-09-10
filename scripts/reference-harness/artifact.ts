@@ -28,7 +28,9 @@ async function hashFiles(root: string, files: readonly string[]): Promise<string
 export async function executionIdentity() {
   const git = (args: string[]) => execFileSync('git', args, { cwd: repositoryRoot, encoding: 'utf8' }).trim();
   const inputs = git(['ls-files', '--cached', '--others', '--exclude-standard', '-z', '--', 'src', 'subs', 'scripts',
-    'package.json', 'package-lock.json', 'tsconfig*.json', 'vitest.config.ts', 'examples/collection-review'])
+    'module.ramify', 'README.md', 'package.json', 'package-lock.json', 'tsconfig*.json', 'vitest.config.ts', 'examples/collection-review',
+    'docs/plans/iteration-1-project-verifier/main-plan.md', 'docs/plans/iteration-1-project-verifier/subcases.md',
+    'docs/plans/iteration-1-project-verifier/iterations/manifest.json'])
     .split('\0').filter(Boolean);
   const files = [...new Set(inputs)].filter(file => !file.includes('/node_modules/') && !file.includes('/.reference-work/'));
   const packageData = JSON.parse(await readFile(join(repositoryRoot, 'package.json'), 'utf8'));
@@ -41,7 +43,8 @@ export async function executionIdentity() {
 
 /** Preserve useful relative source paths while removing machine and scratch locations. */
 export function portableValue<T>(value: T, roots: readonly (readonly [string, string])[]): T {
-  const ordered = [...roots].filter(([root]) => root.length > 1).sort(([a], [b]) => b.length - a.length);
+  const ordered = roots.map(([root, label]) => [root.replace(/\/+$/, ''), label] as const)
+    .filter(([root]) => root.length > 1).sort(([a], [b]) => b.length - a.length);
   return JSON.parse(JSON.stringify(value, (_key, item: unknown) => {
     if (typeof item !== 'string') return item;
     let text = item;
@@ -59,8 +62,13 @@ export function pendingWork(report: VerificationReport) {
       scope: family.expected, matrixInstances: plan1Instances.filter(instance => instance.families.includes(family.id)).map(instance => instance.id),
       wholeFamilyClaim: 'not-established' as const })),
     nextPlan: 'Plan 2: resident daemon, IPC, watching, incremental invalidation and retained history',
-    completionObligations: ['Toolkit self-check and independent negative', 'Relocated build, installation and executable',
-      'Reference and 100-owner latency, memory and repeated disposal measurements'],
+    completionObligations: [
+      ...(!['I1-27:self-check', 'I1-27:self-negative'].every(id => report.instances.some(item => item.id === id && item.status === 'passed'))
+        ? ['Toolkit self-check and independent negative'] : []),
+      ...(!report.instances.some(item => item.id === 'I1-28:relocated-package' && item.status === 'passed')
+        ? ['Relocated build, installation and executable'] : []),
+      'Review separate reference and 100-owner measurement evidence against scope.md budgets',
+    ],
   };
 }
 
@@ -77,6 +85,7 @@ export async function persistGateReport(report: VerificationReport, context: {
     [tmpdir(), '<temporary>'], [homedir(), '<home>'], [process.execPath, 'node'],
   ];
   const artifact = portableValue({ ...report, evidence: { ...context, completedAt: new Date().toISOString(),
+    completionScope: 'Reviewed source matrix only; resource budgets and overall milestone acceptance require the completion report',
     requiredScope: 'Reviewed Plan 1 matrix; whole-project fixtures; all owned source and testing areas',
     instances: plan1Instances, pending: pendingWork(report) }, artifact: path }, roots);
   const text = JSON.stringify(artifact);

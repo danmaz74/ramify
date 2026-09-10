@@ -63,13 +63,14 @@ function expectBlocked(report: AnalysisReport, prerequisite: string, dependents:
 
 /** Inspect hidden properties and prototypes too: JSON equality alone would
  * miss a non-enumerable compiler handle or a getter retaining live state. */
-function expectFrozenPlainData(value: unknown, seen = new Set<object>()): void {
+function expectFrozenPlainData(value: unknown, active = new Set<object>(), verified = new Set<object>()): void {
   if (value === null || typeof value !== 'object') {
     expect(['string', 'number', 'boolean'].includes(typeof value) || value === null).toBe(true);
     return;
   }
-  expect(seen.has(value)).toBe(false);
-  seen.add(value);
+  expect(active.has(value)).toBe(false);
+  if (verified.has(value)) return;
+  active.add(value);
   expect(Object.getPrototypeOf(value)).toBe(Array.isArray(value) ? Array.prototype : Object.prototype);
   expect(Object.isFrozen(value)).toBe(true);
   expect(Object.getOwnPropertySymbols(value)).toEqual([]);
@@ -78,8 +79,10 @@ function expectFrozenPlainData(value: unknown, seen = new Set<object>()): void {
     expect(property.set).toBeUndefined();
     if (Array.isArray(value) && key === 'length') continue;
     expect(property.enumerable).toBe(true);
-    expectFrozenPlainData(property.value, seen);
+    expectFrozenPlainData(property.value, active, verified);
   }
+  active.delete(value);
+  verified.add(value);
 }
 
 describe('public disposable analysis session', () => {

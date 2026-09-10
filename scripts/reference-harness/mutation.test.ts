@@ -89,7 +89,7 @@ describe('isolated reference mutation copies', () => {
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error('Expected a failure');
     expect(result.preservedDirectory).toBeTruthy();
-    expect(await readFile(join(result.preservedDirectory!, 'I1-01:baseline/project/src/value.ts'), 'utf8')).toContain('value = 9');
+    expect(await readFile(join(result.preservedDirectory!, 'I1-01-baseline/project/src/value.ts'), 'utf8')).toContain('value = 9');
     expect(await readFile(join(sourceRoot, 'src/value.ts'), 'utf8')).toContain('value = 1');
     expect(await readdir(workRoot)).toHaveLength(2);
   });

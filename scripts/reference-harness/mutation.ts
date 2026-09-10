@@ -44,7 +44,9 @@ export async function runIsolatedProject<T>(options: {
   const workRoot = resolve(options.workRoot);
   await mkdir(workRoot, { recursive: true });
   const runDirectory = await mkdtemp(join(workRoot, 'run-'));
-  const root = join(runDirectory, options.instanceId, 'project');
+  // Matrix IDs contain a colon. It cannot be part of a fixture's directory:
+  // npm puts node_modules/.bin on PATH, where POSIX treats ':' as a separator.
+  const root = join(runDirectory, options.instanceId.replaceAll(':', '-'), 'project');
   let result: IsolatedResult<T>;
   try {
     await mkdir(root, { recursive: true });

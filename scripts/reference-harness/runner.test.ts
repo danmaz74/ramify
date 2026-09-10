@@ -43,9 +43,9 @@ describe('required capability and assertion execution gates', () => {
     expect(report.planComplete).toBe(false);
     expect(report.summary).toEqual({ required: 14, passed: 14, failed: 0, notExecuted: 294 });
     expect(report.availableCapabilities).toEqual([...verificationCapabilities].sort());
-    expect(referenceRuntime.handlers.size).toBe(305);
+    expect(referenceRuntime.handlers.size).toBe(308);
     expect(plan1Instances.filter(item => !referenceRuntime.handlers.has(item.id)).map(item => item.id))
-      .toEqual(['I1-27:self-check', 'I1-27:self-negative', 'I1-28:relocated-package']);
+      .toEqual([]);
     expect(await readdir(workRoot)).toEqual([]);
   });
 

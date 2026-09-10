@@ -13,11 +13,12 @@ export interface CommandResult {
 }
 
 /** Finite POSIX command lifetime, including npm's children on timeout. */
-export async function command(cwd: string, executable: string, args: readonly string[], timeoutMs = 120_000): Promise<CommandResult> {
+export async function command(cwd: string, executable: string, args: readonly string[], timeoutMs = 120_000,
+  environment: NodeJS.ProcessEnv = process.env): Promise<CommandResult> {
   const started = performance.now();
   return new Promise(resolve => {
     const child = spawn(executable, args, { cwd, detached: true, stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, NO_COLOR: '1', FORCE_COLOR: '0' } });
+      env: { ...environment, NO_COLOR: '1', FORCE_COLOR: '0' } });
     const stdout: Buffer[] = [], stderr: Buffer[] = [];
     let bytes = 0, error: string | null = null;
     const stop = (message: string) => {

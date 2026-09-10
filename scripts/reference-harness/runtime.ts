@@ -10,9 +10,11 @@ import { boundedHandlers } from './bounded-cases.js';
 import { sessionHandlers } from './session-cases.js';
 import { cliHandlers } from './cli-cases.js';
 import { gateHandlers } from './gate-cases.js';
+import { selfHandlers } from './self-cases.js';
+import { relocationHandlers } from './relocation.js';
 
-/** The full gate retains iteration 15's self-check and relocation obligations. */
+/** Every reviewed instance has a provider; only executed assertions prove a pass. */
 export const referenceRuntime: HarnessRuntime = {
   capabilities: new Set(['registry', 'parse', 'acquire', 'metadata', 'catalog', 'link', 'static-access', 'tags-origin', 'namespace', 'lazy', 'symbol-free', 'coverage', 'resources', 'session', 'cli', 'regression', 'build-selection', 'harness-gate']),
-  handlers: new Map([...modelHandlers, ...parserHandlers, ...projectHandlers, ...catalogHandlers, ...linkingHandlers, ...staticHandlers, ...tagsOriginHandlers, ...boundedHandlers, ...sessionHandlers, ...cliHandlers, ...gateHandlers]),
+  handlers: new Map([...modelHandlers, ...parserHandlers, ...projectHandlers, ...catalogHandlers, ...linkingHandlers, ...staticHandlers, ...tagsOriginHandlers, ...boundedHandlers, ...sessionHandlers, ...cliHandlers, ...gateHandlers, ...selfHandlers, ...relocationHandlers]),
 };

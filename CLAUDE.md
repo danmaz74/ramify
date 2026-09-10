@@ -60,7 +60,7 @@ ownership and tags, rejects foreign-owned exports, and includes added exports.
 effective to-parent contracts. The three forms use the same parent/descendants exposure
 channels. Read the specification before changing discovery, description parsing,
 source references, or documentation of the file format. It records the model's
-rules; the current toolkit does not yet implement the filesystem loader or parser.
+rules; the batch engine implements the version 1 parser and filesystem loader.
 
 One resolved registry defines tags for the entire evaluation. Ramify fixes
 two kinds: required importer and required symbol. The default registry defines
@@ -85,25 +85,26 @@ checks. Explicit namespace and lazy-import member selections check their
 selected originals. There is no general ban on symbol-free cross-module loads;
 known testing-source restrictions still apply. Definite violations fail;
 analysis limits are nonblocking coverage notes by default. Missing or unrun
-checker stages cannot pass as completed. No TypeScript source checker is
-implemented yet.
+checker stages cannot pass as completed. The implemented batch checker uses
+the project's captured inputs and configured TypeScript resolution.
 
 Module prose lives in `README.md` beside `module.ramify`; a tour reads its first
 top-level prose paragraph as a plain-text purpose summary and retains its path.
 Missing documentation is explicit, with no fallback to another owner's prose.
 README completeness is separate from module-description validity.
 
-The existing evaluator and examples predate the tag registry and the distinct
-classification of module-owned `src/tests/`. Updating these specifications does
-not establish implementation support; runtime, evaluator, and source-layout
-migration work must be explicitly scoped separately.
+The evaluator, teaching diagrams and toolkit source have migrated to the resolved
+tag registry and module-owned `src/tests/`. `npm run check:self` checks all nine
+toolkit owners, including owned tests. The independent scripts, site and example
+have separate compiler scopes. The [iteration 15 completion report](docs/plans/iteration-1-project-verifier/iterations/iteration15-results.md)
+records acceptance evidence and remaining limitations.
 
 ## Implementation Architecture
 
 The [architecture overview](docs/architecture/README.md) indexes the implementation
-design. The process split is decided: a lightweight CLI talks directly to the
-resident analysis daemon; a separate on-demand tRPC web process serves later
-visualization. Batch CLI execution uses a fresh session of the same engine.
+design. Current CLI checks use a fresh disposable batch session. The later
+process split has a lightweight CLI talking directly to a resident analysis
+daemon and a separate on-demand tRPC web process serving visualization.
 The later root child `mcp [dispatch]` serves stdio through a lazily loaded
 `ramify mcp` mode, using the same daemon client; it is independent of visualization.
 Optional MCP HTTP hosting can mount that module in the separate web process.
@@ -139,9 +140,9 @@ the daemon or other runtime clients.
 - Self-contained package: own `package.json` and toolchain; run npm commands
   from `ramify/`. Never import from cucumber-viz `src/`, and never add
   ramify to the host repo's build, test, or enforcement tooling.
-- ESM with `.js` extensions in source imports and strict TypeScript. Vitest
-  tests currently co-located under `src/` follow the active plan's migration
-  into declared test owners; use the model's test layout for new declared owners.
+- ESM with `.js` extensions in source imports and strict TypeScript. Put Vitest
+  tests in the owner's `src/tests/`; a separately declared testing module may
+  keep tests in ordinary `src/` under its complete header profile.
 - Model teaching and examples stay application-agnostic. Development guides
   and source-reuse analyses may reference cucumber-viz as an external tool or
   provenance source, without adopting its domain names or conventions as rules.

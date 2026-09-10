@@ -6,6 +6,8 @@
     "moduleResolution": "NodeNext",
     "jsx": "react-jsx",
     "strict": true,
+    // The owned ESM process probe participates in source analysis too.
+    "allowJs": true,
     "declaration": true,
     "outDir": "dist",
     "rootDir": ".",

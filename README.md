@@ -62,9 +62,12 @@ repository under `docs/analysis/2026-09-05-ramify-adoption-feasibility/`.
 The batch analysis session and CLI check descriptions and source imports using
 the version 1 parser, project acquisition, TypeScript adapter and definitive
 model. They report violations, warnings and analysis limits separately.
-Teaching diagrams use the same model. The full reference completion gate,
-self-check acceptance and relocation measurements remain in the active plan;
-the resident daemon and interactive clients belong to later plans.
+Teaching diagrams use the same model. The toolkit self-check and all 308
+reference gate instances are implemented, including the independent toolkit
+negative and relocated installation. The [completion report](docs/plans/iteration-1-project-verifier/iterations/iteration15-results.md)
+records actual execution, resource measurements and remaining acceptance work.
+The resident daemon, Ramify MCP server, interactive explorer and browser verifier
+remain unavailable; browser tag matching is implemented.
 
 ## Check a project
 
@@ -80,7 +83,9 @@ npx ramify check --root /path/to/project --format json
 From this checkout, the same executable can check the reference directly:
 
 ```sh
-node dist/src/cli-entry.js check --root examples/collection-review
+npm run check:reference
+npm run check:self
+npm run reference:verify -- --plan 1
 ```
 
 `check` discovers the whole project and its compiler configuration from the
@@ -92,6 +97,10 @@ scope and exit codes. `--help` and `--version` load no compiler or server.
 
 The reusable session is exported from `ramify.ts/analysis`; command handling
 with an injected batch operation is exported from `ramify.ts/cli`.
+Portable entries are `ramify.ts/model` and `ramify.ts/layout`;
+`ramify.ts/presentation` contains the teaching UI. See the
+[batch usage guide](docs/development/batch-verification.md) for direct session
+usage, production selection, gate evidence and measurement commands.
 
 ## Layout
 

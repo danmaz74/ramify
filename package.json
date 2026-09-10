@@ -57,6 +57,8 @@
     "reference:cases": "vitest run -c scripts/reference-harness/vitest.config.ts",
     "reference:report": "tsx scripts/reference-harness/report.ts",
     "check:reference": "node dist/src/cli-entry.js check --root examples/collection-review",
+    "check:self": "node dist/src/cli-entry.js check --root .",
+    "measure:batch": "node scripts/measurements/run.mjs",
     "reference:verify": "tsx scripts/reference-harness/verify.ts"
   },
   "devDependencies": {

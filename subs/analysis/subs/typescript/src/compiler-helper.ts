@@ -10,6 +10,8 @@ import type { HelperInputs, Operation } from './wire.js';
 // Only this finite helper blocks on synchronous pipe and native compiler calls.
 // The calling process owns all captured bytes, cancellation and deadlines.
 const sleeper = new Int32Array(new SharedArrayBuffer(4));
+// receive() is synchronous; retrying an empty pipe needs no new allocation.
+const readBuffer = Buffer.alloc(64 * 1024);
 let buffered = Buffer.alloc(0);
 let sequence = 0;
 
@@ -27,12 +29,11 @@ function send(value: unknown): void {
 
 function receive(): Record<string, unknown> {
   while (buffered.indexOf(10) < 0) {
-    const bytes = Buffer.alloc(64 * 1024);
     try {
-      const size = readSync(0, bytes, 0, bytes.length, null);
+      const size = readSync(0, readBuffer, 0, readBuffer.length, null);
       if (!size) throw new SourceFailure('read-failure', 'Source parent closed input');
       if (buffered.length + size > FRAME_BYTES) throw new SourceFailure('resource-limit', 'Source reply frame exceeds 1 MiB');
-      buffered = Buffer.concat([buffered, bytes.subarray(0, size)]);
+      buffered = Buffer.concat([buffered, readBuffer.subarray(0, size)]);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'EAGAIN') throw error;
       Atomics.wait(sleeper, 0, 0, 1);

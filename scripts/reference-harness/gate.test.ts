@@ -8,13 +8,13 @@ import { captureObservations, recordObservation } from './observations.js';
 import { portableValue } from './artifact.js';
 
 describe('reference gate registration and evidence', () => {
-  it('activates all fifteen reviewed variants and leaves exactly iteration 15 pending', () => {
+  it('activates all fifteen reference variants and preserves complete plan membership', () => {
     const assigned = plan1Instances.filter(instance => instance.iteration === 14);
     expect([...gateHandlers.keys()].sort()).toEqual(assigned.map(instance => instance.id).sort());
     expect(assigned).toHaveLength(15);
     for (const instance of assigned) expect(requiredCapabilities(instance).every(capability => referenceRuntime.capabilities.has(capability))).toBe(true);
     expect(plan1Instances.filter(instance => !referenceRuntime.handlers.has(instance.id)).map(instance => instance.id))
-      .toEqual(['I1-27:self-check', 'I1-27:self-negative', 'I1-28:relocated-package']);
+      .toEqual([]);
   });
 
   it('cannot present a zero violation total when the checker did not run', () => {
@@ -48,7 +48,7 @@ describe('reference gate registration and evidence', () => {
     const result = portableValue({ root: '/tmp/private/toolkit/example',
       diagnostic: '/tmp/private/toolkit/example/.reference-work/run-AbCd/I1-01:baseline/project/src/a.ts:3',
       original: 'subs/provider/src/api.ts', command: ['/usr/bin/node', '/tmp/private/toolkit/dist/src/cli-entry.js'] },
-    [['/tmp/private/toolkit', '<toolkit>'], ['/tmp/private/toolkit/example', '<reference>'], ['/usr/bin/node', 'node']]);
+    [['/tmp/private/toolkit/', '<toolkit>'], ['/tmp/private/toolkit/example/', '<reference>'], ['/usr/bin/node', 'node']]);
     expect(result).toEqual({ root: '<reference>', diagnostic: '<reference>/.reference-work/<run>/I1-01:baseline/project/src/a.ts:3',
       original: 'subs/provider/src/api.ts', command: ['node', '<toolkit>/dist/src/cli-entry.js'] });
   });

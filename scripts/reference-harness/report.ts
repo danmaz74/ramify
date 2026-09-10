@@ -33,9 +33,12 @@ async function main(): Promise<number> {
   const identity = dryRun ? undefined : await executionIdentity();
   // Regression handlers run the same four real example commands as the gate.
   // Each tier executes once, in its own copy, alongside the real source instances.
-  const report = await verifyInstances({ plan: readReviewedPlan(), records: plan1Instances,
+  const execution = await verifyInstances({ plan: readReviewedPlan(), records: plan1Instances,
     runtime: dryRun ? { capabilities: new Set(), handlers: new Map() } : referenceRuntime,
     workRoot: resolve(repositoryRoot, 'examples/collection-review/.reference-work') });
+  // This command reports supported execution; the explicit verification command
+  // owns the matrix completion claim, with measured budgets reviewed separately.
+  const report = { ...execution, planComplete: false };
   const observations = (id: string): readonly Observation[] => report.instances.find(item => item.id === id)?.observations ?? [];
   const baseline = observations('I1-01:baseline').find(item => item.kind === 'reference-baseline')?.data as AnalysisReport | undefined;
   const lines = ['Reference project: collection-review',
@@ -78,7 +81,7 @@ async function main(): Promise<number> {
   }
   console.log(lines.join('\n'));
   // This reports supported work; only reference:verify can claim plan completion.
-  return report.inventoryIssues.length || !dryRun && report.instances.some(item => item.iteration <= 14 && item.status !== 'passed') ? 1 : 0;
+  return report.inventoryIssues.length || !dryRun && !report.passed ? 1 : 0;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

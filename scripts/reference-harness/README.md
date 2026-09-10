@@ -2,8 +2,8 @@
 
 This independent Node tool inventories reference expectations, owns isolated
 mutation projects and requires assertions from the real checker. The runtime
-executes 305 of the 308 reviewed Plan 1 instances. Only iteration 15's toolkit
-self-check, independent negative and relocated package remain pending. A passed
+registers all 308 reviewed Plan 1 instances, including the toolkit self-check,
+independent negative and relocated package. Registration does not claim execution. A passed
 iteration gate does not claim plan completion or pass a whole reference family.
 
 Run these commands from the toolkit root after `npm run build`:
@@ -14,14 +14,17 @@ Run these commands from the toolkit root after `npm run build`:
 - `npm run reference:verify -- --plan 1 --iteration 14` executes and requires
   all 305 instances in iterations 3–14, including every prerequisite and syntax
   variant. Every required instance must execute assertions and pass.
-- `npm run reference:verify -- --plan 1` requires all 308 instances. Until
-  iteration 15, its exit 1 must be attributable only to the three pending
-  instances; any other missing or failed evidence is a regression.
+- `npm run check:self` invokes the compiled CLI against the toolkit, including
+  every owned source/test file and its ESM process probe.
+- `npm run reference:verify -- --plan 1` requires all 308 instances, including
+  fresh dependency installation, build, toolkit tests and an installed executable
+  in a relocated copy. Every missing or failed required result fails the gate.
 - `npm run reference:report` runs the source matrix and the example's actual
   type-check, Vitest, Vite build and Cucumber tiers. Each tier executes once in
   its own unchanged copy. The violation total and source coverage come from
   the compiled CLI baseline, and the report retains each family's larger scope.
-  This reporting command can succeed while iteration 15 remains pending.
+  This command now fails if any required matrix instance is missing or fails.
+  Batch measurement budgets remain separate acceptance evidence.
 - `npm run reference:report -- --dry-run` inventories without running providers,
   regression tiers or a checker. It reports violations as **not measured**.
 - `npm run reference:cases` runs independent inventory, gate, mutation and
@@ -75,7 +78,11 @@ assertion failure cannot manufacture a pass; assertion recording closes at
 completion.
 
 Each project invocation gets its own
-`examples/collection-review/.reference-work/run-*/<instance-id>/project/`.
+`examples/collection-review/.reference-work/run-*/<instance-directory>/project/`.
+The directory spelling replaces the instance ID's colon with a hyphen so local
+npm executable paths work under POSIX PATH semantics. Report IDs are unchanged.
+The relocation handler explicitly chooses an OS temporary parent outside the
+checkout and any enclosing repository; the same cleanup/preservation rules apply.
 `context.request` explicitly selects that copied root with configuration
 discovery and whole-project scope. The copier retains owned source and test
 nesting, excludes dependencies and generated outputs, and leaves dependency
@@ -190,3 +197,24 @@ requires 290 instances, with prerequisite closure covering iterations 1–13.
 The 18 later records remain unexecuted. `npx tsx scripts/validate-final-contracts.ts`
 compares all nine current declarations with the reviewed final selections, links
 them against real exports and resolves every installed package entry.
+
+
+Iteration 15 registers the last three instances. Self-check compares the compiled
+CLI and direct session over all nine owners and asserts that every owned source
+file is fully catalogued. The independent negative imports the root's exposed
+`BatchInvocation` type from the portable layout owner and requires the located
+`required-importer-tag` denial for `dispatch`, with visibility established.
+
+Relocation starts with no dependencies or output, installs the toolkit and
+reference from their own lockfiles, builds from source, type-checks and runs the
+relocated toolkit tests. It packs the package and installs the real archive into
+a separate consumer without development dependencies. Every package entry must
+resolve locally; installed clean, denied and restored CLI checks must preserve
+their independent expectations. The full handler has no successful skip mode.
+Its named smoke helpers can provide partial implementation feedback, but do not
+register an instance pass without the required relocated regression.
+
+See the [completion report](../../docs/plans/iteration-1-project-verifier/iterations/iteration15-results.md)
+for actual executed evidence, and the [measurement recipes](../measurements/README.md)
+for setup, combined process memory and repeated-session budgets. A source-matrix
+pass alone does not establish those resource requirements or later services.

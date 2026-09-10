@@ -49,6 +49,7 @@ example/site packages with `npm --prefix <directory> ci` as needed.
 | Command | Purpose |
 | --- | --- |
 | `npm run build` | Compile the toolkit. |
+| `npm run check:self`, `npm run check:reference` | Run the compiled architectural checker over all toolkit or reference owners and tests. |
 | `npm run type-check` | Type-check toolkit source and scripts. |
 | `npm test` | Run toolkit Vitest tests; append `-- <test-file>` for a focused run. |
 | `npm run reference:cases` | Validate the reference catalogue and harness using their separate test configuration. |
@@ -59,9 +60,12 @@ example/site packages with `npm --prefix <directory> ci` as needed.
 | `npm run diagrams`, `npm run site:build` | Check diagrams and the documentation site when affected. |
 
 Select Cucumber scenarios through the example's runner and confirm selection in
-its output. The toolkit has no root `test:cucumber` script yet. The verifier gate
-inventories all reviewed instances; self-check commands arrive at their scheduled
-stages in the active plan.
+its output. The toolkit has no root `test:cucumber` script. The verifier gate
+registers all 308 reviewed instances, including the independent toolkit negative
+and external relocation. Registration is separate from successful execution; the
+[completion report](../plans/iteration-1-project-verifier/iterations/iteration15-results.md)
+records evidence and its limits. For reproducible batch resource measurements,
+use the [measurement recipes](../../scripts/measurements/README.md).
 
 ## Regression scope and bug reproduction
 

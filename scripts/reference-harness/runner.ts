@@ -64,6 +64,8 @@ export type InstanceHandler =
   | {
     readonly kind: 'project';
     readonly fixture: ProjectFixture;
+    /** Relocation evidence must run outside the enclosing checkout. */
+    readonly workRoot?: string;
     /** Establish the documented positive baseline before its independent check. */
     readonly prepare?: (context: IsolatedProject) => Promise<void>;
     readonly baseline: (context: ProjectContext) => void | Promise<void>;
@@ -145,7 +147,7 @@ async function executeInstance(instance: ReferenceInstance, handler: InstanceHan
     if (handler.kind === 'memory') {
       await handler.run({ instance, assertions });
     } else {
-      const result = await runIsolatedProject({ ...options, instanceId: instance.id, fixture: handler.fixture }, async (project) => {
+      const result = await runIsolatedProject({ ...options, workRoot: handler.workRoot ?? options.workRoot, instanceId: instance.id, fixture: handler.fixture }, async (project) => {
         await handler.prepare?.(project);
         try {
           await handler.baseline({ ...project, instance, assertions: baseline });

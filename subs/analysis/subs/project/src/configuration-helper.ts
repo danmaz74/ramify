@@ -8,6 +8,8 @@ const [root, config, budgetText] = process.argv.slice(2);
 if (!root || !config || !budgetText) throw new Error('Missing private configuration helper arguments');
 const budget = Number(budgetText);
 const sleeper = new Int32Array(new SharedArrayBuffer(4));
+// receive() is synchronous; retrying an empty pipe needs no new allocation.
+const readBuffer = Buffer.alloc(64 * 1024);
 let buffered = Buffer.alloc(0);
 let sequence = 0;
 function send(value: unknown): void {
@@ -24,12 +26,11 @@ function send(value: unknown): void {
 }
 function receive(): { id: number; chunk?: string; more?: boolean; error?: string } {
   while (buffered.indexOf(10) < 0) {
-    const bytes = Buffer.alloc(64 * 1024);
     try {
-      const size = readSync(0, bytes, 0, bytes.length, null);
+      const size = readSync(0, readBuffer, 0, readBuffer.length, null);
       if (!size) throw new Error('Configuration parent closed input');
       if (buffered.length + size > FRAME_BYTES) throw new Error('Configuration reply byte limit exceeded');
-      buffered = Buffer.concat([buffered, bytes.subarray(0, size)]);
+      buffered = Buffer.concat([buffered, readBuffer.subarray(0, size)]);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'EAGAIN') throw error;
       Atomics.wait(sleeper, 0, 0, 1);
