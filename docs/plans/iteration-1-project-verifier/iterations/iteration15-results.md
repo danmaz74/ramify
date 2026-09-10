@@ -240,4 +240,19 @@ This active attempt restores the complete results and honest checklist through w
 
 The results and checklist were written successfully through this active attempt and committed as `bc6efd4` (`Restore iteration 15 results and submission checklist`). The first publication returned `WORKTREE_DIRTY`: its bookkeeping commit could not absorb the pre-existing generated iteration14-check-results.md update.
 
-Inspection shows that update adds only `- **Regression Tests**: PASSED`, matching the accepted iteration-14 predecessor results supplied by the user. The agent did not edit or generate that check result. Its exact existing bytes are committed as control-plane bookkeeping so the accepted predecessor output is preserved and publication can proceed. This adds no iteration-15 passing-regression claim and changes no implementation or evidence.
+Inspection shows that update adds only `- **Regression Tests**: PASSED`, matching the accepted iteration-14 predecessor results supplied by the user. The agent did not edit or generate that check result. Its exact existing bytes are committed as control-plane bookkeeping so the accepted predecessor output is preserved and publication could be retried. This adds no iteration-15 passing-regression claim and changes no implementation or evidence.
+
+## Current publication blocker
+
+The bookkeeping commit is `1132bc8`. The resubmission returned `FILE_POLICY_VIOLATION`: iteration14-check-results.md belongs to iteration 14, not 15. A read-only publication-status call confirms no pending accepted draft and retains that rejection. Both managed iteration-15 deliverables now exist and are committed; publication and subsequent acceptance have not succeeded.
+
+Read-only diagnosis confirms cucumber-viz 0.6.3, project root `/ramify`, this authoritative execution worktree, and the current attempt/session. The journal records successful draft writes at 07:22:39, 07:22:47 and 07:23:19 UTC, then publication failure at 07:23:27 UTC against base `5640de98f2f046aea3b266a781be58eaf811da6a` and draft `1132bc8754fe32466b69f32e34ca627f42924f36`.
+
+The installed publication service explains the conflict:
+
+- `commitPublishTimeBookkeeping` only absorbs status.md and artifacts belonging to iteration 15, but its dirty-file validation also rejects the unmatched iteration-14 check output.
+- After the instructed commit, `partitionAcceptedIterationFiles` rejects that same generated predecessor artifact unless it matches the stored accepted iteration-14 artifact. The final regression line does not match that stored projection.
+
+This is a control-plane attribution problem. No Ramify check failed. The supplied user policy reserves check-results files to the control plane, so the agent has not manually removed the passing regression line, rewritten accepted artifacts, changed workflow state, or patched/restarted the external service.
+
+Required recovery: the Studio control plane must reconcile the generated final iteration-14 regression result with iteration 14's accepted artifact/baseline, then retry iteration-15 publication. No available active-iteration-15 MCP tool owns that predecessor check output. The toolkit implementation, measurement evidence and both required deliverables are preserved on this branch. Full gate/regression acceptance and Plan 1 completion remain pending.
