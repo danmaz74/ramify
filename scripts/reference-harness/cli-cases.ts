@@ -13,6 +13,7 @@ import { repositoryRoot } from './plan.js';
 import type { Assertions, InstanceHandler, ProjectContext } from './runner.js';
 import { clean, sessionReport } from './session-expectations.js';
 import { compilerValid } from './static-expectations.js';
+import { analysisEvidence, recordObservation } from './observations.js';
 
 const referenceRoot = join(repositoryRoot, 'examples/collection-review');
 const handlers = new Map<string, InstanceHandler>();
@@ -41,6 +42,11 @@ function semantic(report: AnalysisReport): unknown {
   return data;
 }
 function processResult(context: ProjectContext, result: Awaited<ReturnType<typeof cliProcess>>, exit: number): void {
+  recordObservation('compiled-cli', { code: result.code, signal: result.signal, stderr: result.stderr, durationMs: result.durationMs });
+  if (result.stdout.startsWith('{')) {
+    const report = JSON.parse(result.stdout);
+    recordObservation('compiled-report', report.schemaVersion === 'ramify.analysis/1' ? analysisEvidence(report) : report);
+  }
   context.assertions.equal('actual subprocess exit and streams', [result.code, result.signal, result.stderr], [exit, null, '']);
   context.assertions.ok('finite subprocess completion', result.durationMs < 30_000);
 }

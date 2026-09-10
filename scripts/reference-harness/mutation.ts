@@ -51,18 +51,26 @@ export async function runIsolatedProject<T>(options: {
     if (options.fixture.kind === 'copy') {
       const sourceRoot = resolve(options.fixture.sourceRoot);
       if (isWithin(workRoot, sourceRoot)) throw new Error('Fixture source cannot be inside the mutation work directory');
-      // Copy entries separately: fs.cp rejects copying a directory into itself,
-      // even with a filter. The specified work area is beneath the example.
-      for (const entry of await readdir(sourceRoot)) {
-        const source = join(sourceRoot, entry);
-        if (excludedNames.has(entry) || isWithin(workRoot, source)) continue;
-        await cp(source, join(root, entry), {
+      // Descend along the work area's ancestor chain before using fs.cp:
+      // toolkit copies have examples/collection-review between source and work.
+      async function copyEntries(sourceDirectory: string, destination: string): Promise<void> {
+        await mkdir(destination, { recursive: true });
+        for (const entry of await readdir(sourceDirectory, { withFileTypes: true })) {
+          const source = join(sourceDirectory, entry.name), target = join(destination, entry.name);
+          if (excludedNames.has(entry.name) || isWithin(workRoot, source)) continue;
+          if (entry.isDirectory() && isWithin(source, workRoot)) {
+            await copyEntries(source, target);
+            continue;
+          }
+          await cp(source, target, {
           recursive: true,
           dereference: false,
           verbatimSymlinks: true,
           filter: (path) => !excludedNames.has(basename(path)) && !isWithin(workRoot, path),
-        });
+          });
+        }
       }
+      await copyEntries(sourceRoot, root);
     } else {
       await options.fixture.create(root);
     }

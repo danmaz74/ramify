@@ -1,6 +1,7 @@
 import { readFile, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { validateProject } from '../../subs/analysis/src/validation-entry.js';
+import { recordObservation } from './observations.js';
 import type { AnalysisCode } from '../../subs/analysis/src/validation-entry.js';
 import { originalKey } from '../../subs/analysis/subs/model/src/index.js';
 import { createProjectFixture, projectFixtureFiles, put } from './fixtures/plan1/project.js';
@@ -29,6 +30,7 @@ const pWildcard = (root: string, path: string, header = pHeader, tags = ''): Pro
 
 async function invalid(context: ProjectContext, code: AnalysisCode, file: string): Promise<void> {
   const result = await validateProject(validationInputs(context.root));
+  if (result.status !== 'valid') recordObservation('invalid-validation', result);
   const a = context.assertions;
   a.equal('invalid description result', result.status, 'invalid');
   if (result.status !== 'invalid') throw new Error(JSON.stringify(result));

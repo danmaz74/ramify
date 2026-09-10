@@ -12,6 +12,7 @@ import { evaluateAccesses } from '../../subs/analysis/src/evaluate-accesses.js';
 import { repositoryRoot } from './plan.js';
 import { validationInputs } from './linking-expectations.js';
 import type { Assertions } from './runner.js';
+import { recordObservation } from './observations.js';
 
 function valid<T>(result: ModelResult<T>): T {
   if (result.status !== 'valid') throw new Error(JSON.stringify(result));
@@ -44,6 +45,9 @@ export async function staticProject(root: string) {
     const decisions = allDecisions.filter(item => staticForms.has(item.access.form));
     const seal = await acquired.view.seal();
     if (seal.status !== 'coherent') throw new Error(JSON.stringify(seal));
+    recordObservation('source-check', { scope: inventory.scope, warnings: inventory.warnings,
+      diagnostics: evaluation.diagnostics, coverage: observed.coverage,
+      accesses: observed.accesses.length, decisions: allDecisions.filter(item => item.decision.status !== 'allowed') });
     return { inventory, catalog, linked, model, ...observed, ...evaluation, decisions, allDecisions };
   } finally {
     try { await source?.dispose(); } finally { await acquired.view.dispose(); }

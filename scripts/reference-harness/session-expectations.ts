@@ -2,6 +2,7 @@ import { analyzeProject } from '../../subs/analysis/src/index.js';
 import type { AnalysisInputs, AnalysisReport } from '../../subs/analysis/src/index.js';
 import { validationInputs } from './linking-expectations.js';
 import type { Assertions } from './runner.js';
+import { analysisEvidence, recordObservation } from './observations.js';
 
 export function sessionInputs(root: string): AnalysisInputs {
   return { ...validationInputs(root), capabilities: ['registry', 'layout', 'metadata', 'descriptions',
@@ -11,6 +12,7 @@ export function sessionInputs(root: string): AnalysisInputs {
 export async function sessionReport(root: string): Promise<AnalysisReport> {
   const run = await analyzeProject(sessionInputs(root));
   if (run.status !== 'reported') throw new Error(`Unexpected cancelled analysis of ${root}`);
+  recordObservation('analysis', analysisEvidence(run.report));
   return run.report;
 }
 export function completed(report: AnalysisReport, assertions: Assertions, coverage: 'complete' | 'partial' = 'complete', check: 'passed' | 'failed' = 'passed'): void {

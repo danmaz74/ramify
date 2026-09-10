@@ -7,6 +7,8 @@ import { runIsolatedProject } from './mutation.js';
 import type { IsolatedProject, ProjectFixture } from './mutation.js';
 import { requiredIterations, validateInstanceRecords } from './plan.js';
 import type { ReviewedPlan } from './plan.js';
+import { captureObservations } from './observations.js';
+import type { Observation } from './observations.js';
 
 export interface AssertionEvidence {
   readonly name: string;
@@ -111,6 +113,7 @@ export interface InstanceExecution {
   readonly durationMs: number;
   readonly error?: string;
   readonly preservedDirectory?: string;
+  readonly observations?: readonly Observation[];
 }
 
 export interface VerificationReport {
@@ -223,7 +226,8 @@ export async function verifyInstances(options: {
       instances.push({ ...empty, status: 'not-executed', reason: 'missing-handler' });
       continue;
     }
-    instances.push(await executeInstance(member, handler, options));
+    const execution = await captureObservations(() => executeInstance(member, handler, options));
+    instances.push({ ...execution.value, observations: execution.observations });
   }
   const passed = inventoryIssues.length === 0 && instances.every((item) => !item.required || item.status === 'passed');
   return {

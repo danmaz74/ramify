@@ -39,6 +39,19 @@ function copy(preserveOnFailure = false) {
 }
 
 describe('isolated reference mutation copies', () => {
+  it('copies a toolkit into a work area nested several directories below its root', async () => {
+    const nestedWork = join(sourceRoot, 'examples/demo/.reference-work');
+    await put(join(sourceRoot, 'examples/demo/src/entry.ts'), 'export {};');
+    await put(join(nestedWork, 'older/keep'));
+    const result = await runIsolatedProject({ ...copy(), workRoot: nestedWork }, async ({ root }) => {
+      expect(await readFile(join(root, 'examples/demo/src/entry.ts'), 'utf8')).toBe('export {};');
+      expect(existsSync(join(root, 'examples/demo/.reference-work'))).toBe(false);
+      expect(existsSync(join(root, 'node_modules'))).toBe(false);
+      return 'copied';
+    });
+    expect(result).toEqual({ ok: true, value: 'copied' });
+    expect(await readdir(nestedWork)).toEqual(['older']);
+  });
   it('copies into the example work area, resolves its own dependencies, mutates and removes only its copy', async () => {
     let copiedRoot = '';
     const result = await runIsolatedProject(copy(), async (project) => {

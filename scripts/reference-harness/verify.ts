@@ -6,6 +6,7 @@ import { readReviewedPlan, repositoryRoot, validateInstancePointers } from './pl
 import { referenceRuntime } from './runtime.js';
 import { verifyInstances } from './runner.js';
 import type { VerificationReport } from './runner.js';
+import { executionIdentity, persistGateReport } from './artifact.js';
 
 export interface VerifyOptions {
   readonly iteration?: number;
@@ -73,11 +74,20 @@ async function main(): Promise<number> {
   }
   const pointerIssues = validateInstancePointers(plan1Instances);
   if (pointerIssues.length) throw new Error(pointerIssues.join('\n'));
+  const startedAt = new Date().toISOString();
+  const started = performance.now();
+  const identity = await executionIdentity();
   const report = await verifyInstances({
     ...options, plan: readReviewedPlan(), records: plan1Instances, runtime: referenceRuntime,
     workRoot: resolve(repositoryRoot, 'examples/collection-review/.reference-work'),
   });
-  console.log(options.format === 'json' ? JSON.stringify(report) : formatVerification(report));
+  const after = await executionIdentity();
+  if (identity.sourceSha256 !== after.sourceSha256 || identity.buildSha256 !== after.buildSha256) {
+    throw new Error('Source or compiled build changed during verification; rerun on coherent inputs');
+  }
+  const artifact = await persistGateReport(report, { identity, startedAt,
+    command: ['npm', 'run', 'reference:verify', '--', ...process.argv.slice(2)], durationMs: Math.round(performance.now() - started) });
+  console.log(options.format === 'json' ? JSON.stringify(artifact) : `${formatVerification(artifact)}\nPortable report: ${artifact.artifact}`);
   return report.passed ? 0 : 1;
 }
 

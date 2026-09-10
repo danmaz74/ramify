@@ -11,6 +11,7 @@ import { createProjectFixture, projectFixtureFiles, put } from './fixtures/plan1
 import { replaceExactlyOnce } from './mutation.js';
 import { repositoryRoot } from './plan.js';
 import type { Assertions, InstanceHandler, ProjectContext } from './runner.js';
+import { recordObservation } from './observations.js';
 
 const limits: AcquisitionLimits = { attempts: 3, maxFiles: 50_000, maxApplicationFiles: 20_000,
   maxFileBytes: 8 * 1024 ** 2, maxInputBytes: 256 * 1024 ** 2, maxApplicationBytes: 64 * 1024 ** 2,
@@ -19,7 +20,11 @@ const provider = 'subs/provider/module.ramify';
 const api = 'subs/provider/src/interfaces/api.ts';
 const digest = (text: string) => createHash('sha256').update(text).digest('hex');
 async function read(root: string, request: Partial<ProjectRequest> = {}): Promise<ProjectRead> {
-  return readProject({ request: { cwd: root, root, scope: 'whole-project', configuration: 'discover', ...request }, parse: parseDescription, limits });
+  const result = await readProject({ request: { cwd: root, root, scope: 'whole-project', configuration: 'discover', ...request }, parse: parseDescription, limits });
+  recordObservation('acquisition', result.status === 'acquired'
+    ? { status: result.status, scope: result.view.inventory.scope, diagnostics: [], warnings: result.view.inventory.warnings }
+    : result);
+  return result;
 }
 async function acquired(context: ProjectContext, run: (view: ProjectInputView) => Promise<void> | void, request: Partial<ProjectRequest> = {}): Promise<void> {
   const result = await read(context.root, request);

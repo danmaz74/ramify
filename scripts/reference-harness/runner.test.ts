@@ -35,19 +35,19 @@ function verify(iteration: number | undefined, providers: HarnessRuntime, record
 }
 
 describe('required capability and assertion execution gates', () => {
-  // The full provider gate and its subprocess control can run concurrently.
-  // Keep their existing finite contention allowance as new providers activate.
-  it('runs all implemented providers and retains unavailable later capabilities in the full gate', async () => {
-    const report = await verify(undefined, referenceRuntime);
-    expect(report.passed).toBe(false);
+  // Exhaustive provider execution belongs to reference:verify. Keep inventory
+  // tests bounded while exercising the real runner with real model assertions.
+  it('executes real model providers and registers all implemented matrix obligations', async () => {
+    const report = await verify(3, referenceRuntime);
+    expect(report.passed).toBe(true);
     expect(report.planComplete).toBe(false);
-    expect(report.summary).toEqual({ required: 308, passed: 290, failed: 0, notExecuted: 18 });
-    expect(report.availableCapabilities).toEqual(['acquire', 'catalog', 'cli', 'coverage', 'lazy', 'link', 'metadata', 'namespace', 'parse', 'registry', 'resources', 'session', 'static-access', 'symbol-free', 'tags-origin']);
-    const pendingHandlers = ['I1-01:baseline', 'I1-27:self-check', 'I1-27:self-negative'];
-    expect(report.instances.filter((item) => item.status === 'not-executed' && item.reason === 'missing-handler').map(item => item.id)).toEqual(pendingHandlers);
-    expect(report.instances.filter((item) => item.status === 'not-executed' && !pendingHandlers.includes(item.id)).every(item => item.reason === 'missing-capability')).toBe(true);
+    expect(report.summary).toEqual({ required: 14, passed: 14, failed: 0, notExecuted: 294 });
+    expect(report.availableCapabilities).toEqual([...verificationCapabilities].sort());
+    expect(referenceRuntime.handlers.size).toBe(305);
+    expect(plan1Instances.filter(item => !referenceRuntime.handlers.has(item.id)).map(item => item.id))
+      .toEqual(['I1-27:self-check', 'I1-27:self-negative', 'I1-28:relocated-package']);
     expect(await readdir(workRoot)).toEqual([]);
-  }, 1_200_000);
+  });
 
   it('permits an intermediate positive control while all future members remain pending', async () => {
     const report = await verify(3, runtime(3));

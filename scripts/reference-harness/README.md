@@ -1,35 +1,52 @@
 # Reference harness
 
-This independent Node tool scope inventories reference expectations, owns
-temporary mutation projects and requires evidence from registered capabilities.
-The current runtime registers `registry`, `parse`, `acquire`, `metadata`,
-`catalog`, `link`, `static-access`, `tags-origin`, `namespace`, `lazy`,
-`symbol-free`, `resources`, `coverage` and `session` through the real providers
-and public analysis session. It executes 268 reviewed instances; 40 later
-instances remain unexecuted. Model
-assertions use constructed trees; source assertions use captured projects and
-the real compiler, linker and model. No stage result claims plan completion.
+This independent Node tool inventories reference expectations, owns isolated
+mutation projects and requires assertions from the real checker. The runtime
+executes 305 of the 308 reviewed Plan 1 instances. Only iteration 15's toolkit
+self-check, independent negative and relocated package remain pending. A passed
+iteration gate does not claim plan completion or pass a whole reference family.
 
-`npm run reference:cases` runs the family, instance, gate, mutation and invocation
-tests under this directory's Vitest configuration. The deterministic gate stubs
-in those tests verify harness behavior only; they never enter `runtime.ts`.
-`npx tsx scripts/reference-harness/validate.ts` validates the reviewed inventory
-and pointers without invoking Vitest or a checker.
+Run these commands from the toolkit root after `npm run build`:
 
-`npm run reference:report -- --dry-run` prints every family and instance without
-executing application tiers or reference assertions. The ordinary report still
-runs the example's existing tiers. Its old hand-reviewed violation count remains
-explicitly separate from checker evidence until iteration 14 replaces it.
+- `npm run check:reference` invokes the compiled CLI against the unchanged
+  example. The two configuration-file warnings remain visible. Append
+  `-- --format json` for its structured analysis report.
+- `npm run reference:verify -- --plan 1 --iteration 14` executes and requires
+  all 305 instances in iterations 3–14, including every prerequisite and syntax
+  variant. Every required instance must execute assertions and pass.
+- `npm run reference:verify -- --plan 1` requires all 308 instances. Until
+  iteration 15, its exit 1 must be attributable only to the three pending
+  instances; any other missing or failed evidence is a regression.
+- `npm run reference:report` runs the source matrix and the example's actual
+  type-check, Vitest, Vite build and Cucumber tiers. Each tier executes once in
+  its own unchanged copy. The violation total and source coverage come from
+  the compiled CLI baseline, and the report retains each family's larger scope.
+  This reporting command can succeed while iteration 15 remains pending.
+- `npm run reference:report -- --dry-run` inventories without running providers,
+  regression tiers or a checker. It reports violations as **not measured**.
+- `npm run reference:cases` runs independent inventory, gate, mutation and
+  invocation tests. It exercises bounded real prerequisite runs and deliberate
+  full/intermediate gate sabotage; it does not duplicate the full matrix inside
+  Vitest test timeouts. `npx tsx scripts/reference-harness/validate.ts` checks only
+  reviewed membership, pointers and prerequisite integrity.
 
-`npm run reference:verify -- --plan 1` requires every reviewed leaf and currently
-exits 1 for absent capabilities. Add `--iteration 3` to execute and require
-the 14 implemented model instances and their prerequisites, or `--iteration 4`
-for all 53 parser variants and prerequisite closure `[1, 2, 4]`. Parser execution
-is independent of the model. Every other instance remains not executed in
-that intermediate gate. Iteration verification never claims plan completion, even for
-iteration 15. `--format json` emits the same result as one JSON document;
-`--preserve-on-failure` keeps failed project copies for inspection. Invalid
-arguments exit 2.
+Verification and report commands automatically save unique portable JSON files
+under `.reference-work/reports/`. Verification `--format json` emits the same
+artifact to stdout; human output prints its path. Each artifact contains the
+revision, dirty-source hash, compiled build hash, runtime/compiler versions,
+command, timings, requested capabilities, independent instance expectations,
+executed assertions, observed diagnostics/coverage and retained pending work.
+Machine and scratch locations are replaced with scope labels; no environment
+variables or dependency inventories are recorded. Source or build changes
+during a run prevent publication of coherent evidence. Reports over 32 MiB fail
+explicitly instead of silently truncating. The files are ignored execution
+artifacts, not workflow control-plane outputs.
+
+`--preserve-on-failure` retains only failed mutation copies. Without it every
+owned copy is removed, including on baseline or command failure. Invalid
+verification arguments exit 2. Earlier `--iteration N` commands retain their
+reviewed transitive prerequisite sets. The full gate's required membership
+always comes from the reviewed plan, never available handlers.
 
 ## Activating an assigned instance
 
@@ -68,8 +85,7 @@ that invocation's directory, including after copying or setup fails. Concurrent
 runs never share a mutation directory. Preservation retains only a failed run
 and reports its location.
 
-The remaining fixture recipes, checked baselines and real assertions arrive
-with their assigned capabilities. Inventory commands and harness stubs do not
+Each fixture recipe and its checked baseline stays with its assigned capability. Inventory commands and harness stubs do not
 establish semantic outcomes. Actual model assertions are recorded individually
 by `model-cases.ts`, `parser-cases.ts` and `project-cases.ts`; the required gate membership remains
 in the reviewed plan.

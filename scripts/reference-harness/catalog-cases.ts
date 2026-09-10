@@ -12,6 +12,7 @@ import type { SourceAnalysis, SourceWorkLimits } from '../../subs/analysis/subs/
 import { createProjectFixture, put } from './fixtures/plan1/project.js';
 import { repositoryRoot } from './plan.js';
 import type { Assertions, InstanceHandler, ProjectContext } from './runner.js';
+import { recordObservation } from './observations.js';
 
 const acquisitionLimits: AcquisitionLimits = {
   attempts: 3, maxFiles: 50_000, maxApplicationFiles: 20_000, maxFileBytes: 8 * 1024 ** 2,
@@ -57,6 +58,8 @@ async function catalogued(context: ProjectContext, check: (catalog: SourceCatalo
     source = await createSourceAnalysis({ view: acquired.view, inventory: acquired.view.inventory,
       areas: sourceAreas(acquired.view.inventory), limits: sourceLimits });
     const catalog = await source.catalog();
+    recordObservation('catalog', { scope: acquired.view.inventory.scope, warnings: acquired.view.inventory.warnings,
+      files: catalog.files.length, originals: catalog.originals.length, coverage: catalog.coverage });
     check(catalog, acquired.view.inventory);
     context.assertions.equal('catalog includes every owned file', catalog.files.map(file => file.file).sort(),
       acquired.view.inventory.files.map(file => file.path).sort());

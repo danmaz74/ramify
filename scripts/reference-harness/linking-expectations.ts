@@ -4,6 +4,7 @@ import type { OriginalId } from '../../subs/analysis/subs/model/src/index.js';
 import { validateProject } from '../../subs/analysis/src/validation-entry.js';
 import type { AnalysisInputs, ValidationRun } from '../../subs/analysis/src/validation-entry.js';
 import type { Assertions } from './runner.js';
+import { recordObservation } from './observations.js';
 
 export type ValidProject = Extract<ValidationRun, { status: 'valid' }>;
 export function validationInputs(root: string): AnalysisInputs {
@@ -19,6 +20,10 @@ export function validationInputs(root: string): AnalysisInputs {
 }
 export async function validated(root: string, assertions: Assertions): Promise<ValidProject> {
   const result = await validateProject(validationInputs(root));
+  recordObservation('validation', result.status === 'valid'
+    ? { status: result.status, scope: result.input.inventory.scope, warnings: result.input.inventory.warnings,
+      diagnostics: [], coverage: result.catalog.coverage, statements: result.linked.selections.length }
+    : result);
   assertions.equal(`project valid${'diagnostics' in result ? ': ' + JSON.stringify(result.diagnostics) : ''}`, result.status, 'valid');
   if (result.status !== 'valid') throw new Error(JSON.stringify(result));
   assertions.ok('input sealed and identified', result.input.inputId.startsWith('input/1:'));
@@ -94,7 +99,8 @@ export const referenceContracts: readonly (readonly [id: string, owner: string, 
   ['W4', 'workspace', 2, 'reviews', 'expose-sub', 'named', ['parent'], [...reviewRouter, ...reviewTools, ...port]],
   ['W5', 'workspace', 4, 'shared-ui', 'expose-sub', 'wildcard', ['descendants'], badge],
 ];
-export function assertReference(result: ValidProject, assertions: Assertions, permutation?: string): void {
+export function assertReference(result: { input: Pick<ValidProject['input'], 'inventory'>;
+  catalog: ValidProject['catalog']; linked: ValidProject['linked'] }, assertions: Assertions, permutation?: string): void {
   assertions.equal('fifteen reference owners', result.input.inventory.modules.length, 15);
   assertions.equal('all reference source files catalogued', result.catalog.files.length, 59);
   assertions.equal('all 33 reference statements expanded', result.linked.selections.length, 33);
