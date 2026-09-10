@@ -4,7 +4,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
-import { fixture } from './fixture.js';
+import { fixture, put } from './fixture.js';
 import { cliProcess, repositoryRoot } from './process.js';
 
 describe('compiled CLI process lifetime', () => {
@@ -72,5 +72,27 @@ describe('compiled CLI process lifetime', () => {
     expect([result.code, result.signal, result.stdout]).toEqual([2, null, '']);
     expect(result.stderr).toContain('output-failure');
     expect(result.events.find(event => event.event === 'exit' && event.pid === result.pid)).toMatchObject({ handles: 0, signalListeners: 0 });
+  }), 20_000);
+
+  for (const action of ['resume', 'interrupt'] as const) it(`${action} during backpressured JSON publication keeps output and exit consistent`, async () => fixture(async root => {
+    const purpose = 'Large résumé 🧪 report purpose. '.repeat(64 * 1024);
+    await put(root, 'README.md', `# Fixture\n\n${purpose}\n`);
+    const result = await cliProcess(root, ['check', '--format', 'json'], { backpressuredStdout: action });
+    expect(result.events.filter(event => event.event === 'stdout-backpressure' && event.pid === result.pid)).toHaveLength(1);
+    expect(result.signal).toBeNull();
+    expect(result.survivingChildren).toEqual([]);
+    expect(result.events.find(event => event.event === 'exit' && event.pid === result.pid)).toMatchObject({ handles: 0, signalListeners: 0 });
+    if (action === 'resume') {
+      expect([result.code, result.stderr]).toEqual([0, '']);
+      const report = JSON.parse(result.stdout);
+      expect(report).toMatchObject({ outcome: { execution: 'completed', check: 'passed' }, summary: { complete: true } });
+      expect(result.stdout).toContain(purpose.trim());
+    } else {
+      expect([result.code, result.stderr]).toEqual([130, 'Interrupted; no result claimed.\n']);
+      expect.soft(result.exitedWhilePaused, 'SIGINT must not wait for stdout to resume').toBe(true);
+      expect.soft(result.interruptionMs).toBeLessThan(2000);
+      expect(result.stdout.length).toBeGreaterThan(0);
+      expect.soft(() => JSON.parse(result.stdout), 'exit 130 cannot publish a complete report').toThrow();
+    }
   }), 20_000);
 });

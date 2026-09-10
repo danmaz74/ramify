@@ -22,7 +22,7 @@ The supplied iteration-12 constraint finding about Node `createRequire` remains 
 - JSON writes one versioned document with no banner. Analysis results retain `ramify.analysis/1`; failures before an analysis report exists use a small `ramify.cli/1` envelope. Operational failures use stderr.
 - The injected-operation boundary cannot infer success from empty findings. Missing, blocked, failed or unrequested stages on a purported completed report produce explicit incomplete evidence and exit 2. Invalid declarations with correctly blocked dependent checking remain exit 1.
 - Output serialization measures UTF-8 size before writing. If an injected provider exceeds its result budget, the formatter omits the snapshot and retains a bounded diagnostic prefix with an explicit resource-limit failure. A known denial remains visible with exit 2.
-- SIGINT propagates cancellation, suppresses a claimed result and selects 130 after cleanup. The executable waits for output callbacks and sets `process.exitCode` instead of terminating early. Broken stdout selects exit 2 after session disposal; signal and stream listeners are released.
+- SIGINT propagates cancellation and selects 130 after cleanup when stdout publication has not completed. Output uses bounded native writes with event-loop yields and finite backpressure retries, so cancellation leaves no queued document to flush. Once the final byte is written, a later handled signal preserves the result's exit code. Broken stdout selects exit 2 after session disposal; signal and stream listeners are released. The focused remediation below supersedes the original output-callback implementation.
 - The production build marks declared bin artifacts executable while retaining existing dependency, typing and helper validation. A real local npm installation successfully invoked its `node_modules/.bin/ramify` through the shebang.
 - Activated root R1 and CLI C1/C2 without broadening exposure. Added executable validation against the reviewed final declaration/package manifests and refreshed usage documentation.
 
@@ -114,3 +114,24 @@ Ignored evidence is retained in `.reference-work/iteration13-*`: initial/final g
 - Carry forward the supplied iteration-12 finding in `subs/analysis/subs/typescript/src/accesses.ts`: compiler-resolved Node `createRequire` loaders reportedly omit CommonJS access/coverage and known testing-origin checks. Reproduce and repair it in the owning TypeScript scope with public-session controls. No checker rule or coverage expectation was weakened here.
 - Iteration 15 retains toolkit self-check/negative, relocated installation/build/run and reference/100-owner measurements. The local-bin test establishes installation and executable wiring in this checkout, not relocation independence.
 - Preserve report execution/check/coverage distinctions, disposal before successful delivery, lightweight help/version and the reviewed finite compiler process lifetimes. No daemon, listener, persistent cache, worker pool or alternate checker was introduced.
+
+## Constraint remediation (2026-09-10)
+
+Addressed **cf-constraints-mtusghl8-cpcakcnq** in the authoritative checkout, starting from checkpoint `693d349`. The earlier 290-instance gate and initial implementation evidence above were not rerun during this focused remediation.
+
+The executable previously queued the entire report in an asynchronous stdout write, waited for its callback despite SIGINT, then selected exit 130 after the complete successful report had drained. A real compiled subprocess regression reproduced both contradictions: the process remained alive until the reader resumed, and its eventual exit 130 accompanied a parseable complete report. The uninterrupted control passed.
+
+Root output publication now writes bounded byte chunks directly to the nonblocking POSIX stdout descriptor, yields between chunks, and retries backpressure with a finite 10 ms wait. Cancellation stops further writes without leaving the remainder of the document queued in a stream. The final successful native write and the publication marker occur in one JavaScript turn; a subsequently handled SIGINT cannot relabel that published result as cancelled. No analysis algorithm, public contract, declaration, package entry, scenario or matrix membership changed.
+
+Two new tests use a real temporary project and its real analysis report. They pause the subprocess stdout reader, observe actual output backpressure, and either resume reading or send SIGINT. The cancellation test requires process exit within two seconds **before** the reader resumes, exit 130, the interruption message, and an incomplete JSON prefix that cannot parse as a report. Already written bytes cannot be retracted. The control requires a complete passed report, exit 0, empty stderr, and intact Unicode metadata across byte chunks. Both retain the existing resource and child-process cleanup assertions.
+
+Verification:
+
+- Before the fix: `npx vitest run src/tests/cli-process.test.ts -t 'during backpressured JSON publication'` — **one control passed; one regression failed**, exposing all three assertions for prompt exit, duration and report completeness.
+- After the fix: the focused pair passed.
+- Final `npx vitest run src/tests/cli-process.test.ts` — **10 tests passed**, including the two new cases and existing installed-bin, lightweight help/version, ordinary completion, acquisition/catalog cancellation, failed resolver and broken-stdout cases.
+- `npm run type-check` — passed for toolkit, portable owners, scripts and harness.
+- `npm run build` — passed, including production selection and emitted dependency/helper checks.
+- `git diff --check` — passed.
+
+Before/after reproduction logs, the final process tests, type-check and build output are retained under ignored `.reference-work/iteration13-backpressure-*`. Full regression, scenario coverage, sealed-file and constraint acceptance checks remain with workflow automation.

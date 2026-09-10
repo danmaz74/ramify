@@ -13,6 +13,26 @@ const record = (event, data = {}) => fs.appendFileSync(trace, JSON.stringify({ p
 const parent = !process.argv[1]?.includes('-helper.');
 const mode = parent ? process.env.RAMIFY_CLI_PROBE : '';
 record('start', { argv: process.argv });
+if (mode === 'observe-output') {
+  let recorded = false;
+  const backpressure = () => {
+    if (!recorded) { recorded = true; record('stdout-backpressure'); }
+  };
+  const write = process.stdout.write;
+  process.stdout.write = function (...args) {
+    const ready = Reflect.apply(write, this, args);
+    if (!ready) backpressure();
+    return ready;
+  };
+  const writeSync = fs.writeSync;
+  fs.writeSync = function (...args) {
+    try { return Reflect.apply(writeSync, this, args); }
+    catch (error) {
+      if (args[0] === process.stdout.fd && ['EAGAIN', 'EWOULDBLOCK'].includes(error.code)) backpressure();
+      throw error;
+    }
+  };
+}
 registerHooks({ load(url, context, nextLoad) {
   const loaded = nextLoad(url, context);
   record('load', { url }); return loaded;

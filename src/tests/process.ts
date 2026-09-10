@@ -27,6 +27,7 @@ export async function cliProcess(cwd: string, argv: readonly string[], options: 
   readonly mode?: 'fail-catalog' | 'interrupt-acquisition' | 'interrupt-catalog';
   readonly readTarget?: string;
   readonly brokenStdout?: boolean;
+  readonly backpressuredStdout?: 'interrupt' | 'resume';
   readonly entry?: string;
   readonly nodeArgs?: readonly string[];
   readonly executable?: string;
@@ -37,26 +38,59 @@ export async function cliProcess(cwd: string, argv: readonly string[], options: 
   const traceFile = join(owned, 'trace.jsonl');
   const started = performance.now();
   try {
-    const result = await new Promise<{ code: number | null; signal: NodeJS.Signals | null; stdout: string; stderr: string; pid: number | undefined }>((accept, reject) => {
+    const result = await new Promise<{ code: number | null; signal: NodeJS.Signals | null; stdout: string; stderr: string; pid: number | undefined;
+      exitedWhilePaused: boolean; interruptionMs: number | null }>((accept, reject) => {
       const child = spawn(options.executable ?? process.execPath, options.executable ? [...argv]
         : [...options.nodeArgs ?? [], options.entry ?? compiledEntry, ...argv], {
         cwd, env: { ...process.env, NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import=${preload}`,
-          RAMIFY_CLI_TRACE: traceFile, RAMIFY_CLI_PROBE: options.mode ?? '', RAMIFY_CLI_READ_TARGET: options.readTarget ?? '' },
+          RAMIFY_CLI_TRACE: traceFile, RAMIFY_CLI_PROBE: options.backpressuredStdout ? 'observe-output' : options.mode ?? '',
+          RAMIFY_CLI_READ_TARGET: options.readTarget ?? '' },
         stdio: ['ignore', 'pipe', 'pipe'],
       });
-      let stdout = '', stderr = '', timedOut = false, tooLarge = false;
-      const timer = setTimeout(() => { timedOut = true; child.kill('SIGKILL'); }, 30_000);
-      child.on('error', error => { clearTimeout(timer); reject(error); });
+      let stdout = '', stderr = '', timedOut = false, tooLarge = false, exited = false;
+      let exitedWhilePaused = false, interruptedAt: number | null = null, interruptionMs: number | null = null;
+      let resumeTimer: NodeJS.Timeout | undefined, probeTimer: NodeJS.Timeout | undefined;
+      const timer = setTimeout(() => { timedOut = true; child.kill('SIGKILL'); child.stdout.resume(); }, 30_000);
+      child.on('error', error => {
+        exited = true; clearTimeout(timer); clearTimeout(resumeTimer); clearTimeout(probeTimer); reject(error);
+      });
+      child.stdout.setEncoding('utf8'); child.stderr.setEncoding('utf8');
       if (options.brokenStdout) child.stdout.destroy();
       else child.stdout.on('data', bytes => {
         stdout += String(bytes);
         if (stdout.length > 40 * 1024 ** 2) { tooLarge = true; child.kill('SIGKILL'); }
       });
+      if (options.backpressuredStdout) {
+        child.stdout.pause();
+        const observe = async (): Promise<void> => {
+          let trace = '';
+          try { trace = await readFile(traceFile, 'utf8'); }
+          catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') { child.kill('SIGKILL'); return; } }
+          if (exited) return;
+          if (trace.split('\n').some(line => line.includes(`"pid":${child.pid},"event":"stdout-backpressure"`))) {
+            if (options.backpressuredStdout === 'interrupt') {
+              interruptedAt = performance.now();
+              child.kill('SIGINT');
+              // A broken implementation gets drained after the deadline so its
+              // contradictory complete report is also available to assertions.
+              resumeTimer = setTimeout(() => child.stdout.resume(), 2000);
+            } else child.stdout.resume();
+          } else probeTimer = setTimeout(() => { void observe(); }, 10);
+        };
+        void observe();
+      }
       child.stderr.on('data', bytes => { stderr += String(bytes); });
+      child.once('exit', () => {
+        exited = true;
+        exitedWhilePaused = child.stdout.isPaused();
+        if (interruptedAt !== null) interruptionMs = performance.now() - interruptedAt;
+        clearTimeout(resumeTimer); clearTimeout(probeTimer);
+        child.stdout.resume();
+      });
       child.once('close', (code, signal) => {
-        clearTimeout(timer);
+        clearTimeout(timer); clearTimeout(resumeTimer); clearTimeout(probeTimer);
         if (timedOut || tooLarge) reject(new Error(`CLI ${timedOut ? 'deadline' : 'output limit'} exceeded`));
-        else accept({ code, signal, stdout, stderr, pid: child.pid });
+        else accept({ code, signal, stdout, stderr, pid: child.pid, exitedWhilePaused, interruptionMs });
       });
     });
     const events = (await readFile(traceFile, 'utf8')).trim().split('\n').filter(Boolean).map(line => JSON.parse(line) as TraceEvent);
