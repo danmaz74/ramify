@@ -214,3 +214,20 @@ Fresh checks in this resumed execution passed:
 The current source identity is `5a2fc273a733189c7faad657cdcdc0898f758857779aec11b706fd33812bccf3`. The build identity remains `7061287fabc0fdc63ebcb282413c84a99187c6506cc6c7769f78a1adcf90ee6e`, exactly matching the exhaustive evidence. The existing report explains the intervening test/documentation adjustments. No regression suite was repeated in this resumed execution; workflow automation owns those checks under the supplied policy.
 
 Both managed deliverables are resubmitted through the workflow MCP tools using this execution's attempt. Commit and draft publication follow their successful writes. Automated acceptance, the inherited CLI publication finding, the inherited TypeScript loader finding, and iteration-15 completion remain separate from this handoff.
+
+## Parser fixture regression remediation (2026-09-10 05:50:40 UTC)
+
+The automated post-commit regression reported three failures in `subs/analysis/subs/descriptions/src/tests/descriptions.test.ts`, for root, analysis and CLI descriptions. Its retained output is `.cucumber-viz/workflows/_JG0Ucx92X1f6WqRyuxxC/check-results/post_commit_regression-14-1789019261947-ef35bf/regression/output.log`. This failure supersedes any implication that the full toolkit regression had passed; the earlier harness and CLI evidence remains scoped as stated.
+
+The independent expected fixtures still documented iteration 9. The actual declarations include the reviewed iteration-12 analysis contracts and iteration-13 batch/CLI contracts. Compared each reported difference with root R1/R3, analysis A3 and CLI C1/C2 in `owners.md`, including its declaration activation table, before changing the expectations.
+
+Corrected only that test file:
+
+- Root now expects the `interfaces/batch.ts` wildcard to descendants and the complete explicitly named analysis vocabulary, including execution, snapshot, report and session types.
+- Analysis now expects `createAnalysisSession` from `session.ts` and `analyzeProject` from `analyze-project.ts`, both to parent.
+- CLI now expects `runCli` from `run-cli.ts` and the `interfaces/cli.ts` wildcard, both to parent.
+- Updated the fixture's stage comment to the reviewed final iteration-13 declarations.
+
+Expected selections remain independent, explicit fixture data. Exact statement equality, statement indices, token spans, module headers and all nine toolkit/fifteen reference owner checks are unchanged. No parser/runtime behavior, module declaration, model rule, matrix membership or scenario changed; no test was removed or relaxed. This addresses every reported mismatch.
+
+Local verification: `npx tsc --noEmit` passed for the toolkit including the changed owned test (log: `.reference-work/iteration14-parser-fixtures-type-check.log`), and `git diff --check` passed. Per the remediation check policy, Vitest/Cucumber, scenario coverage and sealed-file checks were not rerun locally. The supplied regression output is the failure evidence; automated regression must confirm the corrected expectations. No passing post-fix regression result is claimed.

@@ -20,8 +20,8 @@ const both = ['parent', 'descendants'] as const;
 const browser = ['browser'];
 const uiBrowser = ['ui', 'browser'];
 
-// Independent selections from the reference contract map and the reviewed I9
-// declaration stage. Read the actual authored texts, including their comments.
+// Independent selections from the reference contract map and the reviewed final
+// I13 declarations. Read the actual authored texts, including their comments.
 const modelNames = [
   'ModuleId', 'TagName', 'TagKind', 'TagDefinition', 'ResolvedTagRegistry', 'SourceLocation',
   'ModelIssue', 'ModelResult', 'SourceArea', 'ModuleRecord', 'OriginalId', 'SourceOrigin',
@@ -31,7 +31,10 @@ const modelNames = [
   'originalKey', 'buildModel', 'explainVisibility', 'explainImport',
 ];
 const linkingNames = ['LinkInputs', 'ExpandedSelection', 'LinkIssue', 'LinkedDescriptions'];
-const analysisNames = ['Capability', 'StageId', 'RunControl', 'AnalysisLimits', 'AnalysisInputs', 'InventoryInputs', 'InventorySnapshot', 'InventoryRun', 'ValidationRun', 'AnalysisCode', 'AnalysisDiagnostic'];
+const analysisNames = ['Capability', 'StageId', 'RunControl', 'AnalysisLimits', 'AnalysisInputs',
+  'InventoryInputs', 'InventorySnapshot', 'InventoryRun', 'ValidationRun', 'CapabilityExecution',
+  'StageExecution', 'AnalysisCode', 'AnalysisDiagnostic', 'AccessResult', 'AnalysisSnapshot',
+  'AnalysisSummary', 'AnalysisReport', 'AnalysisRun', 'AnalysisSession'];
 const syntaxNames = ['TextSpan', 'DescriptionToken', 'DescriptionIssue', 'NamedSelection',
   'DescriptionSelection', 'DescriptionStatement', 'DescriptionDocument', 'ParsedDescription', 'DescriptionParser'];
 
@@ -76,8 +79,8 @@ interface Fixture {
   statements: readonly ReturnType<typeof statement>[];
 }
 const toolkit: readonly Fixture[] = [
-  { path: '', name: 'ramify', tags: ['dispatch'], statements: [sub(modelNames, 'analysis', descendants), sub([...syntaxNames, ...linkingNames], 'analysis', descendants), sub(projectNames, 'analysis', descendants), sub(sourceNames, 'analysis', descendants), sub(analysisNames, 'analysis', descendants), sub(presentationNames, 'presentation', descendants)] },
-  { path: 'subs/analysis/', name: 'analysis', tags: [], statements: [sub('*', 'model', both), sub([...syntaxNames, ...linkingNames], 'descriptions', both), sub(projectNames, 'project', both), sub(sourceNames, 'typescript', both), src(['validateProject'], 'validation.ts'), src('*', 'interfaces/analysis.ts'), src(['acquireInventory'], 'inventory.ts')] },
+  { path: '', name: 'ramify', tags: ['dispatch'], statements: [src('*', 'interfaces/batch.ts', null, descendants), sub(modelNames, 'analysis', descendants), sub([...syntaxNames, ...linkingNames], 'analysis', descendants), sub(projectNames, 'analysis', descendants), sub(sourceNames, 'analysis', descendants), sub(analysisNames, 'analysis', descendants), sub(presentationNames, 'presentation', descendants)] },
+  { path: 'subs/analysis/', name: 'analysis', tags: [], statements: [sub('*', 'model', both), sub([...syntaxNames, ...linkingNames], 'descriptions', both), sub(projectNames, 'project', both), sub(sourceNames, 'typescript', both), src(['validateProject'], 'validation.ts'), src('*', 'interfaces/analysis.ts'), src(['acquireInventory'], 'inventory.ts'), src(['createAnalysisSession'], 'session.ts'), src(['analyzeProject'], 'analyze-project.ts')] },
   { path: 'subs/analysis/subs/descriptions/', name: 'descriptions', tags: browser, statements: [src(['parseDescription'], 'parse.ts', browser), src('*', 'interfaces/syntax.ts'), src(['linkDescriptions'], 'link.ts', browser), src('*', 'interfaces/linking.ts')] },
   { path: 'subs/analysis/subs/model/', name: 'model', tags: browser, statements: [
     src('*', 'interfaces/model.ts'), src(['resolveTagRegistry', 'createDefaultTagRegistry'], 'registry.ts', browser),
@@ -86,7 +89,7 @@ const toolkit: readonly Fixture[] = [
   ] },
   { path: 'subs/analysis/subs/project/', name: 'project', tags: [], statements: [src(['readProject'], 'read-project.ts'), src('*', 'interfaces/project.ts')] },
   { path: 'subs/analysis/subs/typescript/', name: 'typescript', tags: [], statements: [src(['createSourceAnalysis'], 'source-analysis.ts'), src('*', 'interfaces/source.ts')] },
-  { path: 'subs/cli/', name: 'cli', tags: ['dispatch'], statements: [] },
+  { path: 'subs/cli/', name: 'cli', tags: ['dispatch'], statements: [src(['runCli'], 'run-cli.ts'), src('*', 'interfaces/cli.ts')] },
   { path: 'subs/presentation/', name: 'presentation', tags: uiBrowser, statements: presentationStatements },
   { path: 'subs/presentation/subs/layout/', name: 'layout', tags: browser, statements: layoutStatements },
 ];
