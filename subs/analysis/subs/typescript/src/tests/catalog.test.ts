@@ -149,6 +149,80 @@ describe('export completeness and compiler limits', () => {
     });
   }, 30_000);
 
+  it('propagates an ambiguous namespace constituent through named forwarding and a later star export', async () => {
+    await withCatalog({
+      'src/a.ts': 'export const clash = 1; export const left = 1;',
+      'src/b.ts': 'export const clash = 2; export const right = 2;',
+      'src/conflict.ts': 'export * from "./a.js"; export * from "./b.js";',
+      'src/namespace.ts': 'export * as ns from "./conflict.js"; export const sibling = 1;',
+      'src/interfaces/api.ts': 'export { ns, sibling } from "../namespace.js";',
+      'src/public.ts': 'export * from "./interfaces/api.js";',
+    }, ({ catalog }) => {
+      expect(file(catalog, 'src/conflict.ts').state).toBe('ambiguous');
+      expect(file(catalog, 'src/namespace.ts').state).toBe('incomplete');
+      expect(catalog.coverage).toContainEqual(expect.objectContaining({ code: 'incomplete-exports',
+        location: expect.objectContaining({ file: 'src/interfaces/api.ts', line: 1, column: 10 }) }));
+      for (const path of ['src/interfaces/api.ts', 'src/public.ts']) {
+        const forwarder = file(catalog, path);
+        expect(forwarder.state, path).toBe('incomplete');
+        expect(catalog.coverage.some(limit => forwarder.issueIds.includes(limit.id)
+          && limit.code === 'incomplete-exports' && limit.location.file === path), path).toBe(true);
+        expect(exported(catalog, path, 'sibling').original, path).toEqual(code('namespace.ts', 'sibling'));
+        const namespace = exported(catalog, path, 'ns');
+        expect(namespace.original, path).toBeNull();
+        expect(namespace.namespace?.find(entry => entry.name === 'clash')?.original ?? null, path).toBeNull();
+        expect(namespace.namespace?.find(entry => entry.name === 'left')?.original, path).toEqual(code('a.ts', 'left'));
+        expect(namespace.namespace?.find(entry => entry.name === 'right')?.original, path).toEqual(code('b.ts', 'right'));
+      }
+      expect(catalog.originals.filter(entry => entry.id.binding === 'clash')).toHaveLength(2);
+    });
+  }, 30_000);
+
+  it('propagates an unresolved namespace constituent through a local alias, named forwarding and a later star export', async () => {
+    await withCatalog({
+      'src/partial.ts': 'export const known = 1; export { absent } from "./missing.js";',
+      'src/namespace.ts': 'export * as ns from "./partial.js"; export const sibling = 1;',
+      'src/interfaces/api.ts': 'import { ns, sibling } from "../namespace.js";\nexport { ns as forwarded, sibling };',
+      'src/public.ts': 'export * from "./interfaces/api.js";',
+    }, ({ catalog }) => {
+      expect(file(catalog, 'src/partial.ts').state).toBe('incomplete');
+      expect(file(catalog, 'src/namespace.ts').state).toBe('incomplete');
+      for (const path of ['src/interfaces/api.ts', 'src/public.ts']) {
+        const forwarder = file(catalog, path);
+        expect(forwarder.state, path).toBe('incomplete');
+        expect(catalog.coverage.some(limit => forwarder.issueIds.includes(limit.id)
+          && limit.code === 'incomplete-exports' && limit.location.file === path), path).toBe(true);
+        expect(exported(catalog, path, 'sibling').original, path).toEqual(code('namespace.ts', 'sibling'));
+        const namespace = exported(catalog, path, 'forwarded');
+        expect(namespace.namespace?.find(entry => entry.name === 'known')?.original, path).toEqual(code('partial.ts', 'known'));
+        expect(namespace.namespace?.find(entry => entry.name === 'absent')?.original ?? null, path).toBeNull();
+      }
+      expect(catalog.originals.some(entry => entry.id.binding === 'absent')).toBe(false);
+    });
+  }, 30_000);
+
+  it('propagates namespace completeness across three named forwarding hops', async () => {
+    await withCatalog({
+      'src/a.ts': 'export const clash = 1;',
+      'src/b.ts': 'export const clash = 2;',
+      'src/conflict.ts': 'export * from "./a.js"; export * from "./b.js";',
+      'src/namespace.ts': 'export * as ns from "./conflict.js";',
+      'src/first.ts': 'export { ns } from "./namespace.js"; export const first = 1;',
+      'src/second.ts': 'export { ns as renamed } from "./first.js"; export const second = 2;',
+      'src/third.ts': 'export { renamed as ns } from "./second.js"; export const third = 3;',
+    }, ({ catalog }) => {
+      for (const [path, name, own] of [['src/first.ts', 'ns', 'first'], ['src/second.ts', 'renamed', 'second'], ['src/third.ts', 'ns', 'third']] as const) {
+        const hop = file(catalog, path);
+        expect(hop.state, path).toBe('incomplete');
+        expect(catalog.coverage.some(limit => hop.issueIds.includes(limit.id) && limit.code === 'incomplete-exports'
+          && limit.location.file === path && limit.location.line === 1), path).toBe(true);
+        expect(exported(catalog, path, name).namespace?.find(entry => entry.name === 'clash')?.original ?? null, path).toBeNull();
+        expect(exported(catalog, path, own).original, path).toEqual(code(`${own}.ts`, own));
+      }
+      expect(catalog.originals.filter(entry => entry.id.binding === 'clash')).toHaveLength(2);
+    });
+  }, 30_000);
+
   it('does not merge one symbol across ordinary and testing declarations in the same owner', async () => {
     await withCatalog({
       'src/value.ts': 'export interface Value { value: number }',

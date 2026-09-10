@@ -516,6 +516,13 @@ class CatalogBuilder {
     }
     // Keep the arrays used by nonrecursive namespace descriptions intact.
     for (const [entry, result] of results) Object.assign(entry, result);
+    // A named selection that receives a module namespace forwards that module's
+    // whole export description, so its completeness follows the module's state.
+    for (const definition of definitions.values()) {
+      const selection = this.selections.get(definition.entry);
+      const module = definition.entry.namespace && namespaces.get(definition.entry.namespace);
+      if (selection && module) this.namespaceTargets.push({ file: definition.file, target: this.files.get(module)!, name: definition.entry.name, node: selection.node });
+    }
     changed = true;
     while (changed) {
       changed = false;
