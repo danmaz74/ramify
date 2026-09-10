@@ -2,7 +2,7 @@
 
 # Plan 1: Verify a real Ramify project — Iteration Status
 
-**Phase:** executing
+**Phase:** completed
 
 | # | Iteration | Status | Started | Ended | Elapsed |
 | --- | --- | --- | --- | --- | --- |
@@ -20,7 +20,7 @@
 | 12 | Resources, coverage and the analysis session | completed | 22:58:45 | 23:44:49 | 46m 4s |
 | 13 | CLI and process behavior | completed | 23:44:49 | 00:40:45 | 55m 55s |
 | 14 | Reference gate | completed | 05:44:30 | 05:53:23 | 8m 52s |
-| 15 | Self-check, relocation, measurements and completion | completed | 08:09:55 | 08:15:03 | 5m 8s |
+| 15 | Self-check, relocation, measurements and completion | completed | 08:09:55 | 08:16:16 | 6m 21s |
 
 ## Launch Affordance Measurements
 
@@ -70,6 +70,15 @@
 | 14 | attempt__Qxe2YLX2hL8XJv2p5f6w | off | final (v2) | in unavailable (launch-affordances-disabled); escape unavailable (launch-affordances-disabled); unaccounted unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | 1 | surface unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); search unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); expand unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) |
 | 15 | attempt_hkiwD3GLzUPhdpsteX-Eu | off | first-pass (v2) | in unavailable (launch-affordances-disabled); escape unavailable (launch-affordances-disabled); unaccounted unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | 0 | surface unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); search unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); expand unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) |
 | 15 | attempt_hkiwD3GLzUPhdpsteX-Eu | off | cumulative (v2) | in unavailable (launch-affordances-disabled); escape unavailable (launch-affordances-disabled); unaccounted unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | 0 | surface unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); search unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); expand unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) |
-| 15 | attempt_hkiwD3GLzUPhdpsteX-Eu | off | final (v2) | pending | pending | pending | pending | pending |
+| 15 | attempt_hkiwD3GLzUPhdpsteX-Eu | off | final (v2) | in unavailable (launch-affordances-disabled); escape unavailable (launch-affordances-disabled); unaccounted unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | 0 | surface unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); search unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); expand unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) |
 
-*Last updated: 2026-09-10T08:15:03.484Z*
+## Final Check Results
+
+| Check | Status |
+| --- | --- |
+| regression | PASS |
+| scopeReview | PASS |
+| sealedFiles | PASS |
+| static | PASS |
+
+*Last updated: 2026-09-10T09:31:37.572Z*
