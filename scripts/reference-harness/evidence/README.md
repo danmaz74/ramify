@@ -1,4 +1,24 @@
-# Iteration 15 local evidence
+# Reference harness evidence
+
+## Plan 1 completion gate on main
+
+`plan1-complete.json.gz` retains the portable report of the unfiltered
+`npm run reference:verify -- --plan 1` run on the merged `main` at
+`f5b0939d6dcce369375ea5b206f50c87ec510ac6` on 2026-09-10, with a clean tree.
+Result: passed, `planComplete: true`, 308 required, 308 passed, 0 failed,
+0 not executed, in 902,129 ms. Source SHA
+`5271fb2e34c4f4a6209d574f9242e681b085ca7529f56ca16c2f1322c461ddad`, build SHA
+`a2a0148124f14bad145e8779f0be66731ab3e6cdd83ebd41ea4b0b110f9c91b4`, Node v22.23.2,
+TypeScript 7.0.2. The payload is retained without edits: 11,607,583
+bytes, SHA-256 `9ef0d8f78897b9f337ac44c0b2ea94c0eb4e2653156c3e82bf040368864acbb0`; the gzip stream
+uses level 9 and timestamp zero, 967,269 bytes, SHA-256
+`205420f22e6bcfaa45d866712805554bf0a7ab92b9117a1c692d8035dceddcde`. Read it with:
+
+```sh
+gzip -dc scripts/reference-harness/evidence/plan1-complete.json.gz
+```
+
+## Iteration 15 local evidence
 
 `iteration15-local.json.gz` retains ten focused architectural/lifecycle instance
 executions and the separately labelled relocation smoke. Read it with:

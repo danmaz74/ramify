@@ -672,7 +672,269 @@
       "priorSharedReportSetupHeapDeltaBytes": 3507784,
       "uniqueObjects": 32456,
       "arrays": 6521
+    },
+    {
+      "file": "merged-main.json.gz",
+      "note": "Merged main at f5b0939 after the end-of-workflow fixes: every reviewed setup, cold, repeated retention and lifecycle requirement passed for both workloads on the build the completion gate recorded.",
+      "rawSha256": "adc0873774332bae3f7fd8775129a89b8fa256f1ee4d894d010e7b4dcc95ed7c",
+      "gzipSha256": "414a94218d20b6c89e3ee5b3477b527c96a08c942d0146ee7a3be8edd6453342",
+      "rawBytes": 4344516,
+      "gzipBytes": 219944,
+      "measuredAt": "2026-09-10T21:34:16.568Z",
+      "completedAt": "2026-09-10T21:40:35.968Z",
+      "phase": "all",
+      "passed": true,
+      "build": {
+        "files": 182,
+        "sha256": "37318ecc2077863ec924a2f15b4b9766c2a8c70f78aeb6561b25cc38a5316408"
+      },
+      "harnessBuildSha256": "a2a0148124f14bad145e8779f0be66731ab3e6cdd83ebd41ea4b0b110f9c91b4",
+      "harnessBuildAlgorithm": "sha256(sorted relative file name + NUL + bytes + NUL)",
+      "environment": {
+        "node": "v22.23.2",
+        "versions": {
+          "node": "22.23.2",
+          "acorn": "8.16.0",
+          "ada": "2.9.2",
+          "amaro": "1.1.8",
+          "ares": "1.34.6",
+          "brotli": "1.1.0",
+          "cjs_module_lexer": "2.2.0",
+          "cldr": "48.0",
+          "icu": "78.2",
+          "llhttp": "9.4.3",
+          "modules": "127",
+          "napi": "10",
+          "nbytes": "0.1.3",
+          "ncrypto": "0.0.1",
+          "nghttp2": "1.69.0",
+          "openssl": "3.5.7",
+          "simdjson": "4.5.0",
+          "simdutf": "6.4.2",
+          "sqlite": "3.51.3",
+          "tz": "2026a",
+          "undici": "6.28.0",
+          "unicode": "17.0",
+          "uv": "1.51.0",
+          "uvwasi": "0.0.23",
+          "v8": "12.4.254.21-node.56",
+          "zlib": "1.3.1-e00f703",
+          "zstd": "1.5.7"
+        },
+        "platform": "linux",
+        "release": "6.8.0-85-generic",
+        "arch": "x64",
+        "logicalCpus": 12,
+        "cpuModel": "Intel(R) Xeon(R) E-2176G CPU @ 3.70GHz",
+        "totalMemoryBytes": 67274752000
+      },
+      "dependencies": {
+        "typescript": "7.0.2",
+        "tsx": "4.23.13"
+      },
+      "budgets": {
+        "coldSamples": 5,
+        "sampleIntervalMs": 50,
+        "warmups": 5,
+        "cycles": 25,
+        "settledCycles": 20,
+        "reference": {
+          "medianColdMs": 5000,
+          "peakRssBytes": 536870912
+        },
+        "hundred-owners": {
+          "medianColdMs": 15000,
+          "peakRssBytes": 805306368
+        },
+        "heapGrowthBeyondReportBytes": 16777216,
+        "rssGrowthBytes": 67108864,
+        "disposalMs": 5000
+      },
+      "investigation": "RSS rises monotonically because all 25 full immutable reports intentionally remain reachable, as in the iteration 15 final run. Adjusted heap declines; disposed session WeakRefs and file/helper/native/timer counts are zero every cycle. Both RSS growth values meet 64 MiB without subtracting retained-report bytes or waiving the ceiling; the synthetic value is within 2 MiB of the ceiling. This finite workload is not a universal leak-free guarantee.",
+      "workloads": [
+        {
+          "name": "reference",
+          "passed": true,
+          "fixture": {
+            "files": 93,
+            "bytes": 181115,
+            "contentMapSha256": "626a8e7b81df9aae566b585c87b971e11d1e367d9fa4dded746bbd3839a04bff"
+          },
+          "cold": {
+            "medianMs": 3648.061633000001,
+            "peakCombinedRssBytes": 504221696,
+            "passed": true,
+            "samples": 5,
+            "owners": 15,
+            "sourceFiles": 54,
+            "resources": 5
+          },
+          "repeated": {
+            "assertions": {
+              "allCyclesAndLifecycle": true,
+              "heapBudget": true,
+              "rssBudget": true
+            },
+            "settled": {
+              "sampleCount": 20,
+              "heapGrowthBeyondReportBytes": -9891324,
+              "rssGrowthBytes": 22642688,
+              "monotonicallyIncreasingAdjustedHeap": false,
+              "monotonicallyIncreasingRss": true
+            },
+            "retainedReportBytes": 41032300,
+            "retainedReportCount": 25,
+            "cycles": 30,
+            "maxDisposalMs": 0.47365499999796157,
+            "finalLifecycle": {
+              "activeSessions": 0,
+              "liveWeakSessions": 0,
+              "fileHandles": 0,
+              "helperProcesses": 0,
+              "descendantProcesses": 0,
+              "analysisTimers": 0,
+              "filesOpened": 57990,
+              "filesClosed": 57990,
+              "helpersStarted": 60,
+              "helpersClosed": 60
+            }
+          },
+          "setup": [
+            {
+              "name": "empty",
+              "median": {
+                "ready": {
+                  "rss": 49938432,
+                  "heapTotal": 7446528,
+                  "heapUsed": 4588184,
+                  "external": 2091175,
+                  "arrayBuffers": 16619
+                },
+                "disposed": {
+                  "rss": 49938432,
+                  "heapTotal": 7708672,
+                  "heapUsed": 4588848,
+                  "external": 2091215,
+                  "arrayBuffers": 16619
+                }
+              },
+              "pairedMedianRetainedHeapBytes": -664
+            },
+            {
+              "name": "entry",
+              "median": {
+                "ready": {
+                  "rss": 153944064,
+                  "heapTotal": 44408832,
+                  "heapUsed": 8506136,
+                  "external": 2243572,
+                  "arrayBuffers": 24811
+                },
+                "disposed": {
+                  "rss": 153944064,
+                  "heapTotal": 42049536,
+                  "heapUsed": 7358800,
+                  "external": 2243612,
+                  "arrayBuffers": 24811
+                }
+              },
+              "pairedMedianRetainedHeapBytes": 1147336
+            }
+          ]
+        },
+        {
+          "name": "hundred-owners",
+          "passed": true,
+          "fixture": {
+            "generator": "scripts/probes/fixtures/hundred-owners.ts",
+            "contentMapSha256": "d5b77b9ff57c443b35f386f40598506ff20c51c4ec75b800371f0cec089c0897",
+            "files": 1402,
+            "bytes": 1164385
+          },
+          "cold": {
+            "medianMs": 6129.983649000002,
+            "peakCombinedRssBytes": 385650688,
+            "passed": true,
+            "samples": 5,
+            "owners": 100,
+            "sourceFiles": 1100,
+            "resources": 100
+          },
+          "repeated": {
+            "assertions": {
+              "allCyclesAndLifecycle": true,
+              "heapBudget": true,
+              "rssBudget": true
+            },
+            "settled": {
+              "sampleCount": 20,
+              "heapGrowthBeyondReportBytes": -79238958,
+              "rssGrowthBytes": 65294336,
+              "monotonicallyIncreasingAdjustedHeap": false,
+              "monotonicallyIncreasingRss": true
+            },
+            "retainedReportBytes": 174147450,
+            "retainedReportCount": 25,
+            "cycles": 30,
+            "maxDisposalMs": 0.5703300000022864,
+            "finalLifecycle": {
+              "activeSessions": 0,
+              "liveWeakSessions": 0,
+              "fileHandles": 0,
+              "helperProcesses": 0,
+              "descendantProcesses": 0,
+              "analysisTimers": 0,
+              "filesOpened": 129960,
+              "filesClosed": 129960,
+              "helpersStarted": 60,
+              "helpersClosed": 60
+            }
+          },
+          "setup": [
+            {
+              "name": "empty",
+              "median": {
+                "ready": {
+                  "rss": 49938432,
+                  "heapTotal": 7446528,
+                  "heapUsed": 4588184,
+                  "external": 2091175,
+                  "arrayBuffers": 16619
+                },
+                "disposed": {
+                  "rss": 49938432,
+                  "heapTotal": 7708672,
+                  "heapUsed": 4588848,
+                  "external": 2091215,
+                  "arrayBuffers": 16619
+                }
+              },
+              "pairedMedianRetainedHeapBytes": -664
+            },
+            {
+              "name": "entry",
+              "median": {
+                "ready": {
+                  "rss": 166301696,
+                  "heapTotal": 44933120,
+                  "heapUsed": 9325288,
+                  "external": 2239888,
+                  "arrayBuffers": 24811
+                },
+                "disposed": {
+                  "rss": 166432768,
+                  "heapTotal": 42311680,
+                  "heapUsed": 6506496,
+                  "external": 2239928,
+                  "arrayBuffers": 24811
+                }
+              },
+              "pairedMedianRetainedHeapBytes": 2818952
+            }
+          ]
+        }
+      ]
     }
   ],
-  "finalRecord": "compact-final.json.gz"
+  "finalRecord": "merged-main.json.gz"
 }

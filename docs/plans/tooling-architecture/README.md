@@ -1,8 +1,9 @@
 # Ramify implementation roadmap
 
-**Date:** 2026-09-10. **Status:** Plan 1's batch engine, CLI, self-check and full
-matrix providers are implemented; its [completion report](../done/iteration-1-project-verifier/iterations/iteration15-results.md)
-records executed acceptance evidence and remaining work. Plans 2–6 have the
+**Date:** 2026-09-10. **Status:** Plan 1 is complete. Its batch engine, CLI and
+self-check are merged on `main`, where the unfiltered 308-instance gate passed
+on 2026-09-10; the [completion report](../done/iteration-1-project-verifier/iterations/iteration15-results.md)
+records the evidence and the inputs carried forward. Plans 2–6 have the
 authoring briefs below and no detailed plan yet.
 Implementation completion must be established by each plan's evidence.
 
@@ -147,7 +148,7 @@ their detailed plans are written before their implementation.
 
 | Plan | Working deliverable | Required predecessors | Plan artifact |
 | --- | --- | --- | --- |
-| [1. Verify a project](#plan-1-batch-project-verification) | Implemented batch engine/CLI checks the real reference and Ramify itself. | None. | [Detailed Plan 1](../done/iteration-1-project-verifier/main-plan.md); [completion evidence and limits](../done/iteration-1-project-verifier/iterations/iteration15-results.md). |
+| [1. Verify a project](#plan-1-batch-project-verification) | Complete: the batch engine/CLI checks the real reference and Ramify itself, and the 308-instance gate passed on `main`. | None. | [Detailed Plan 1](../done/iteration-1-project-verifier/main-plan.md); [completion evidence and limits](../done/iteration-1-project-verifier/iterations/iteration15-results.md). |
 | [2. Keep verification current](#plan-2-resident-verification) | A resident daemon watches, reconciles and checks projects through local CLI commands. | Plan 1. | Brief below; detailed plan not yet written. |
 | [3. Understand a project](#plan-3-project-inspection) | CLI/service inspection of ownership, purpose, contracts, availability and observed dependencies. | Plans 1–2. | Brief below; detailed plan not yet written. |
 | [4. Use Ramify through MCP](#plan-4-mcp-access) | A host-launched stdio adapter exposes the daemon's checks and inspection. | Plan 2's service and Plan 3's queries for this deliverable's full scope. | Brief below; detailed plan not yet written. |
@@ -196,9 +197,10 @@ Its iteration sequence and I1-01–I1-30 instance matrix are the completion
 authority for this deliverable. Do not duplicate or replace that matrix here.
 
 **Delivered scope.** The package exposes the disposable analysis session,
-inventory, model, CLI, presentation and layout entries. All 308 matrix providers
-are registered, including toolkit and relocation evidence. Actual passes and
-batch resource costs are recorded in the completion report linked above.
+inventory, model, CLI, presentation and layout entries. All 308 matrix instances
+passed the unfiltered gate on `main` on 2026-09-10, including toolkit and
+relocation evidence, and the measured batch costs meet the reviewed budgets;
+the completion report linked above records the artifacts.
 Daemon, watching, incremental invalidation, Ramify MCP and browser verification
 remain unavailable. See the [batch usage guide](../../development/batch-verification.md).
 
@@ -223,8 +225,19 @@ provenance in results so Plan 3 can query it.
 
 ## Plan 2: Resident verification
 
-**Detailed plan:** not yet written. **Prerequisite:** Plan 1's completed batch
-engine, source scope, self-check and strict reference gate.
+**Detailed plan:** not yet written. **Prerequisite:** met on 2026-09-10; Plan 1's
+batch engine, source scope, self-check and strict reference gate are complete
+on `main`.
+
+**Inputs inherited from Plan 1.** Two analysis limits stay open in the batch
+engine that Plan 2 reuses, recorded on 2026-09-10 after the end-of-workflow
+fixes. A `require` target that is a module file is recorded with coverage
+notes but is not resolved, so no testing-origin denial fires for it; bare
+`require` shares that limit, and resolving it is a resolution design decision.
+`declare global` blocks inside module files pass silently, although the model
+treats them as unverifiable, so they should receive the same shared-global
+coverage note that script source receives. Decide both in the detailed plan or
+carry them as explicit coverage limits.
 
 **Working outcome.** A user runs `ramify check` against an explicitly selected
 project, edits source or a description, and obtains a result for verified

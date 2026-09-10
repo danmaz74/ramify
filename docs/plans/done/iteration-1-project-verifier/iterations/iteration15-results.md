@@ -2,7 +2,7 @@
 
 # Iteration 15 results: Self-check, relocation, measurements and Plan 1 handoff
 
-Status: implementation delivered and focused verification passed; full Plan 1 acceptance remains pending. This is the completion/handoff report beside the plan, not a claim that the unfiltered gate or automation-owned regression ran in this execution.
+Status: Plan 1 complete. The unfiltered 308-instance gate passed on the merged `main` at `f5b0939` on 2026-09-10; see [Plan 1 completion on main](#plan-1-completion-on-main-2026-09-10). The sections before it record this iteration's execution as it happened, while acceptance was still pending.
 
 ## Scope and verification policy
 
@@ -96,7 +96,7 @@ Cancellation reaches the actual acquisition/catalog barriers, returns no success
 
 Harness capabilities remain acquire, build-selection, catalog, cli, coverage, harness-gate, lazy, link, metadata, namespace, parse, registry, regression, resources, session, static-access, symbol-free and tags-origin. Availability is distinct from execution.
 
-Iteration 14's accepted 305-instance evidence is predecessor evidence at its recorded build. It is not combined with this run into a fictional current 308-instance pass. The final unfiltered gate must still run.
+Iteration 14's accepted 305-instance evidence is predecessor evidence at its recorded build. It is not combined with this run into a fictional current 308-instance pass. The final unfiltered gate must still run. It ran on `main` on 2026-09-10; see Plan 1 completion below.
 
 ## Batch measurements and agreed budgets
 
@@ -140,7 +140,7 @@ Passed in this execution:
 - `npm run site:build`: client/server build passed. Presentation/model/site inputs were unchanged by subsequent report-allocation edits.
 - Measurement script syntax/type checks; lossless validation of all eight measurement archives; `git diff --check`.
 
-No local Vitest/Cucumber, scenario coverage or sealed-file pass is claimed. The requested full validation sequence cannot be claimed as executed in order under the supplied automation policy. Current automatic regression, the unfiltered matrix gate and relocated toolkit tests remain required. Diagram artifact equality preserves existing emitted semantics; a site build does not independently prove browser interaction or browser-promise verification.
+No local Vitest/Cucumber, scenario coverage or sealed-file pass is claimed. The requested full validation sequence cannot be claimed as executed in order under the supplied automation policy. Current automatic regression, the unfiltered matrix gate and relocated toolkit tests remain required. All three ran afterwards on `main`; see Plan 1 completion below. Diagram artifact equality preserves existing emitted semantics; a site build does not independently prove browser interaction or browser-promise verification.
 
 ## Portable evidence and identity
 
@@ -161,16 +161,29 @@ Supporting ignored logs use `iteration15-submission-*`, `iteration15-final-insta
 
 | Main-plan obligation | Evidence / remaining work |
 | --- | --- |
-| Unchanged reference, fifteen owners and required source forms | Final compiled check is clean with complete reported coverage; iteration-14 independent baseline witnesses remain predecessor evidence. Full current gate pending. |
-| Every required I1 subcase executed independently | All 308 providers registered; ten focused cases passed here. Full current 308-instance execution, including relocated tests, pending. |
-| Invalid inputs, denials, warnings, limits and unavailable execution distinct | Implemented contracts preserved; focused denial, cancellation, read failure and retry evidence passed. Complete matrix rerun pending. |
-| Compiled CLI, direct API and harness agreement | Toolkit clean and independent negative compare complete semantic reports. Installed relocation clean/denied/restored controls passed. |
-| All implemented toolkit runtime and owned tests declared/checked | Passed self-check over nine owners and all 150 source/resource files; independent scopes absent. |
-| Application/protocol/Cucumber/toolkit/diagram/site regression | Diagrams and site passed; current Vitest/Cucumber and workflow checks pending. No predecessor test total reused as a fresh result. |
-| Package boundaries and lightweight startup | Seven relocated installed entries, portable type-check and final declarations pass. CLI startup implementation unchanged; full process matrix rerun pending. |
-| Cancellation, failures, repeated use and disposal budgets | Focused lifecycle cases and both complete measured workloads passed. |
-| Independent relocated install/build/test/run | Install/build/type-check/package/CLI passed; registered mandatory relocated npm test unrun locally. |
-| Completion report and Plan 2 inputs | This report and linked implementation/evidence provide the handoff; overall Plan 1 acceptance is not yet established. |
+| Unchanged reference, fifteen owners and required source forms | Passed in the gate on `main`: the compiled check is clean with complete coverage, and every I1-01–I1-30 instance executed and passed. |
+| Every required I1 subcase executed independently | 308 of 308 required instances passed with 11,917 assertions and 4,058 baseline assertions; none was skipped. |
+| Invalid inputs, denials, warnings, limits and unavailable execution distinct | All matrix instances covering these outcomes passed in the same run. |
+| Compiled CLI, direct API and harness agreement | Toolkit self-check, independent negative and installed relocation instances passed. |
+| All implemented toolkit runtime and owned tests declared/checked | Self-check over nine owners and 144 source files passed with no analysis limits; the audited Vitest runs pass all 961 toolkit tests. |
+| Application/protocol/Cucumber/toolkit/diagram/site regression | Reference type-check, Vitest, build and Cucumber tiers passed inside the gate and the report; diagrams and the site build passed on `e048d51`. |
+| Package boundaries and lightweight startup | The relocated package installed, built, type-checked and ran its own test suite inside the gate; the compiled CLI process instances passed. |
+| Cancellation, failures, repeated use and disposal budgets | Lifecycle instances passed; the merged-main measurement passed every reviewed budget. |
+| Independent relocated install/build/test/run | `I1-28:relocated-package` passed, including the relocated `npm test`. |
+| Completion report and Plan 2 inputs | This report; Plan 2 inputs are recorded below and in the roadmap. |
+
+## Plan 1 completion on main (2026-09-10)
+
+After this iteration was accepted, the end-of-workflow review produced four risk findings and left one constraint finding open. Commit `e048d51` fixed the four: the harness fixture path, the CLI's exit 130 window between the complete JSON document and its trailing newline, `createRequire` loader recording, and shared-global coverage notes for script source. Commit `581f2f3` fixed the constraint finding: a named selection that receives a module namespace now propagates that module's completeness, so forwarders of an incomplete or ambiguous namespace receive a located `incomplete-exports` note. Both commits were audited with the full toolkit Vitest suite and the type-check passing. The workflow branch was merged to `main` as `5b943e1`, and `f5b0939` committed the plan's relocation to `docs/plans/done/`.
+
+- Completion gate: `npm run reference:verify -- --plan 1` at `f5b0939` on a clean tree, from 21:19:02 to 21:34:04 UTC, 902,129 ms. Result passed, `planComplete: true`, 308 required, 308 passed, 0 failed, 0 not executed, no inventory issue, 11,917 assertions and 4,058 baseline assertions. Source SHA `5271fb2e34c4f4a6209d574f9242e681b085ca7529f56ca16c2f1322c461ddad`, harness build SHA `a2a0148124f14bad145e8779f0be66731ab3e6cdd83ebd41ea4b0b110f9c91b4`, Node v22.23.2, TypeScript 7.0.2. The portable report is archived as [plan1-complete.json.gz](../../../../../scripts/reference-harness/evidence/plan1-complete.json.gz); the [evidence README](../../../../../scripts/reference-harness/evidence/README.md) records its hashes.
+- Validation sequence on the built `e048d51`, every command exit 0: `check:reference` (two configuration-file warnings, no errors or limits), `check:self` (nine owners, no findings, no limits), `diagrams` (nine SVGs, unchanged), `site:build`, `reference:cases` (16 files, 241 tests), `reference:report` (0 violations, all four reference tiers passed, 308 instances passed) and `git diff --check`.
+- Batch measurement on the same build, `node scripts/measurements/run.mjs` from 21:34:16 to 21:40:35 UTC: passed every reviewed budget for both workloads. Reference: cold median 3.648 s of 5 s, peak combined RSS 480.863 MiB of 512 MiB, adjusted heap growth -9.433 MiB of 16 MiB, RSS growth 21.594 MiB of 64 MiB, maximum disposal 0.474 ms. 100 owners: cold median 6.130 s of 15 s, peak 367.785 MiB of 768 MiB, adjusted heap growth -75.568 MiB, RSS growth 62.270 MiB, maximum disposal 0.570 ms. Archived as [merged-main.json.gz](../../../../../scripts/measurements/results/merged-main.json.gz) in the [measurement archive](../../../../../scripts/measurements/results/README.md).
+
+Inputs carried to Plan 2, also recorded in the roadmap:
+
+1. A `require` target that is a module file is recorded with coverage notes but is not resolved, so no testing-origin denial fires for it. Bare `require` shares that limit; resolving it is a resolution design decision.
+2. `declare global` blocks inside module files pass silently. The model treats them as unverifiable, so they should receive the same shared-global coverage note that script source receives.
 
 ## Implemented contracts and Plan 2 starting requirements
 
@@ -192,12 +205,12 @@ Inspection stays Plan 3, Ramify MCP Plan 4, overlays Plan 5 and explorer/web Pla
 
 ## Recommendations for Next Iteration
 
-Carry forward two supplied predecessor findings. They were not repaired or independently reproduced here, and neither a clean self-check nor the existing matrix proves them closed:
+The two predecessor findings carried by this iteration, the CLI exit 130 publication boundary and the `createRequire` loader coverage, were repaired in `e048d51` with independent witnesses; see Plan 1 completion above. Plan 2 inherits two remaining analysis limits:
 
-1. CLI interruption when the final JSON closing brace exactly meets a chunk boundary, before trailing whitespace, may leave a complete successful JSON document with exit 130. Preserve its specific publication-boundary expectation.
-2. Compiler-resolved Node createRequire loaders reportedly omit CommonJS access/coverage and known testing-origin checks. Add the missing independent witness and correct the owning adapter through the bugfix process.
+1. A `require` target that is a module file is recorded with coverage notes but is not resolved, so no testing-origin denial fires for it. Bare `require` shares that limit; resolving it is a resolution design decision.
+2. `declare global` blocks inside module files pass silently. The model treats them as unverifiable, so they should receive the same shared-global coverage note that script source receives.
 
-Do not reinterpret these as accepted architectural exceptions. Complete the full current matrix and automation-owned regressions, including relocated npm test, before declaring Plan 1 complete or accepting Plan 2's prerequisite.
+Do not reinterpret these as accepted architectural exceptions; decide them in Plan 2's detailed plan or carry them as explicit coverage limits.
 
 The family catalogue remains broader than this matrix: K01–K04/K06 browser/tool execution, H02 interactive inspection, H04 and remaining composite-family obligations stay pending; P01–P06 remain non-normative probes. Remaining source adapters, compiler-source mapping, optional browser verification and independent policies are not completed by these instance passes. Keep per-instance execution and whole-family acceptance separate.
 

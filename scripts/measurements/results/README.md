@@ -1,6 +1,35 @@
 # Retained batch measurement evidence
 
-The final quiet run on 2026-09-10 passed every reviewed Plan 1 measurement
+## Merged main, 2026-09-10
+
+The run on the merged `main` at `f5b0939`, after the end-of-workflow fixes,
+passed every reviewed Plan 1 measurement target for both fixtures. It ran
+from 21:34:16 to 21:40:35 UTC on Linux x64, Node v22.23.2, TypeScript 7.0.2
+and tsx 4.23.13, with 182 build artifacts at measurement identity
+`37318ecc2077863ec924a2f15b4b9766c2a8c70f78aeb6561b25cc38a5316408` and harness identity
+`a2a0148124f14bad145e8779f0be66731ab3e6cdd83ebd41ea4b0b110f9c91b4`, the same build the completion
+gate recorded. The lossless payload is [merged-main.json.gz](merged-main.json.gz) and
+[index.json](index.json) names it as the final record.
+
+| Target | Reference result / limit | 100-owner result / limit |
+| --- | ---: | ---: |
+| Median of five cold compiled CLI checks | 3.648 s / 5 s | 6.130 s / 15 s |
+| Sampled combined parent/helper/native RSS peak | 480.863 MiB / 512 MiB | 367.785 MiB / 768 MiB |
+| Last 20 cycles: heap growth minus retained serialized report bytes | -9.433 MiB / 16 MiB | -75.568 MiB / 16 MiB |
+| Last 20 cycles: RSS growth | 21.594 MiB / 64 MiB | 62.270 MiB / 64 MiB |
+| Maximum disposal after a completed check | 0.474 ms / 5,000 ms | 0.570 ms / 5,000 ms |
+
+Both repeated workloads kept all 25 reports reachable: 41,032,300
+serialized bytes for the reference and 174,147,450 for the synthetic
+project. Every cycle returned zero active sessions, reachable disposed sessions,
+open captured-input handles, helper or native descendants and analysis timers;
+the reference opened and closed 57,990 file handles and the
+synthetic workload 129,960. RSS again rose monotonically in both workloads
+while adjusted heap declined, the same retained-report pattern investigated below.
+
+## Iteration 15 final run, 2026-09-10
+
+The final quiet run of iteration 15 on 2026-09-10 passed every reviewed Plan 1 measurement
 target for both fixtures. It ran from 06:35:06 to 06:41:49 UTC on Linux x64,
 Node v22.23.2, TypeScript 7.0.2 and tsx 4.23.13. Full hardware/runtime metadata,
 request, scope, configuration, registry, capabilities, stages and per-process
