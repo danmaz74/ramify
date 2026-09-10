@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readdir, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, mkdir, readdir, writeFile } from 'node:fs/promises';
 import { dirname, posix, resolve } from 'node:path';
 import { API } from 'typescript/unstable/sync';
 import { isCallExpression, isExportDeclaration, isIdentifier, isImportDeclaration, isImportTypeNode,
@@ -126,6 +126,12 @@ export async function promoteProductionArtifacts(root: string, staging: string, 
   const entries = packageEntries(manifest);
   for (const entry of entries.runtime) {
     if (!present.has(entry)) throw new Error(`Missing production package entry: ${entry}`);
+  }
+  const bins = typeof manifest.bin === 'string' ? [manifest.bin]
+    : manifest.bin && typeof manifest.bin === 'object' ? Object.values(manifest.bin) : [];
+  for (const bin of bins) {
+    if (typeof bin !== 'string') throw new Error('Package bin must name an executable file');
+    await chmod(resolve(promoted, bin.replace(/^\.\//, '').slice('dist/'.length)), 0o755);
   }
   const parsedFiles = new Map([...present].filter(file => /\.(?:[cm]?js|jsx)$/.test(file) || declaration.test(file))
     .map(file => [file, resolve(promoted, file)]));

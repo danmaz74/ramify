@@ -59,14 +59,39 @@ repository later. cucumber-viz will eventually become a consumer of this
 toolkit; the feasibility study of adopting the model there is in the host
 repository under `docs/analysis/2026-09-05-ramify-adoption-feasibility/`.
 
-The version 1 parser, project acquisition, TypeScript export catalog and
-description linker are implemented. The disposable `validateProject` operation
-validates current descriptions against actual exports through the
-[analysis validation entry](subs/analysis/src/validation-entry.ts).
-The definitive model implements the project-wide tag registry, derived
-`src/tests/` profiles and testing-origin restrictions. Teaching diagrams use
-that same evaluator. Source access checking, the public analysis session and
-installed CLI remain in later iterations of the active plan.
+The batch analysis session and CLI check descriptions and source imports using
+the version 1 parser, project acquisition, TypeScript adapter and definitive
+model. They report violations, warnings and analysis limits separately.
+Teaching diagrams use the same model. The full reference completion gate,
+self-check acceptance and relocation measurements remain in the active plan;
+the resident daemon and interactive clients belong to later plans.
+
+## Check a project
+
+Build this package with `npm run build`, then install it locally with
+`npm install /path/to/ramify` in a consuming package. Its `ramify` executable
+is available through npm's local bin directory:
+
+```sh
+npx ramify check
+npx ramify check --root /path/to/project --format json
+```
+
+From this checkout, the same executable can check the reference directly:
+
+```sh
+node dist/src/cli-entry.js check --root examples/collection-review
+```
+
+`check` discovers the whole project and its compiler configuration from the
+working directory unless `--root` is given. It includes owned tests and
+resources. `--batch` is accepted; each invocation uses and disposes a fresh
+session. Human output is the default; JSON output is one versioned report on
+stdout. See the [CLI contract](docs/architecture/cli-invocation.spec.md) for
+scope and exit codes. `--help` and `--version` load no compiler or server.
+
+The reusable session is exported from `ramify.ts/analysis`; command handling
+with an injected batch operation is exported from `ramify.ts/cli`.
 
 ## Layout
 
@@ -89,13 +114,12 @@ installed CLI remain in later iterations of the active plan.
   [Collection Review reference-project plan](docs/plans/reference-project/README.md)
   and its planned compatibility and regression cases, plus the
   [implementation roadmap and plan briefs](docs/plans/tooling-architecture/README.md).
-- `src/` - root-owned assembly entries, activated with the CLI iteration.
+- `src/` - the executable entry and lazy batch assembly.
 - `subs/analysis/` - batch validation and its declared model, descriptions,
   project and TypeScript children.
 - `subs/presentation/` - teaching diagrams, React components and the neutral
   layout child. Every owner's tests live in its own `src/tests/`.
-- `subs/cli/` - the declared CLI owner; implementation arrives in its assigned
-  iteration.
+- `subs/cli/` - argument parsing, report formatting and injected command handling.
 - `examples/` - the [Collection Review reference project](examples/collection-review/README.md):
   a small runnable application whose fifteen owners carry the module
   descriptions, with its own package, lockfile and toolchain.

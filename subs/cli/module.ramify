@@ -1,2 +1,5 @@
 ramify 1
 module cli tagged [dispatch]
+
+expose-src runCli from "run-cli.ts" to parent
+expose-src * from "interfaces/cli.ts" to parent

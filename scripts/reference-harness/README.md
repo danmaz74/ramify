@@ -159,3 +159,18 @@ iteration 15's reference and 100-owner workloads or compiled-entry measurements.
 `npm run reference:verify -- --plan 1 --iteration 12` requires 268 instances in
 prerequisite closure `[1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12]`. The remaining 40
 records stay unexecuted; this iteration does not establish Plan 1 completion.
+
+Iteration 13 registers 22 CLI and process instances. Real injected handlers and
+the compiled executable consume the public session report. Independent mutations
+exercise denied imports, invalid declarations, selected outside-source warnings,
+stray descriptions and unavailable invocation/configuration. Help/version trace
+loaded modules. Process probes record socket and process operations, captured
+handle counts and child termination; only the reviewed finite compiler helpers
+are permitted. Root-owned process tests additionally cover installed bin use,
+SIGINT during acquisition/catalog work and broken stdout pipes.
+
+After `npm run build`, `npm run reference:verify -- --plan 1 --iteration 13`
+requires 290 instances, with prerequisite closure covering iterations 1–13.
+The 18 later records remain unexecuted. `npx tsx scripts/validate-final-contracts.ts`
+compares all nine current declarations with the reviewed final selections, links
+them against real exports and resolves every installed package entry.

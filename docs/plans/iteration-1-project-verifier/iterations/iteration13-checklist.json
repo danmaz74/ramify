@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": true,
+    "functionalRequirementsSatisfied": true,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-10T00:24:30.333Z",
+  "iteration": "13",
+  "notes": "Implemented CLI/root batch dispatch and final declarations/package entries. Iteration gate passed 290/290 including 22 new instances; 43 CLI owner tests and one registration test passed. Final build/type-check, both reference CLI forms and all nine final declarations/seven package entries passed. Full regression, scenario/sealed checks and acceptance remain with automation. The supplied iteration-12 createRequire finding is carried forward without an out-of-scope checker change."
+}
