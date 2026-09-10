@@ -1,19 +1,21 @@
 # Daemon and analysis architecture
 
-**Date:** 2026-09-07. **Status:** The process/client split and memory/testing
-requirements are decided in the [architecture overview](README.md). Detailed
-engine contracts and the ownership tree below remain proposed for review.
-This document does not establish implementation support or authorize coding.
+**Date:** 2026-09-10. **Status:** The batch engine and nine owners are implemented.
+The resident daemon, contexts and incremental contracts below remain a design
+for later delivery. The process/client split and memory/testing requirements
+are decided in the [architecture overview](README.md). Implementation support is
+limited to batch verification; the [Plan 1 handoff](../plans/iteration-1-project-verifier/iterations/iteration15-results.md)
+records its evidence and outstanding acceptance work.
 
-Ramify runs a long-lived local backend that maintains the analyzed state of each
-active project, updates that state as files change, and serves architectural
-checks and queries from identified revisions. A reusable analysis engine supplies
+The resident design calls for a long-lived local backend that maintains the
+analyzed state of each active project, updates that state as files change, and
+serves architectural checks and queries from identified revisions. A reusable analysis engine supplies
 the same behavior in the daemon and in batch execution. CLI, editor, agent and
 visualization clients consume that shared analysis.
 
 ## Scope and authority
 
-This document owns the proposed module boundaries, exposure paths, engine
+This document owns the module boundaries, exposure paths, engine
 pipeline, context/revision semantics and semantic service operations.
 [Processes and clients](processes-and-clients.md) defines executable placement,
 CLI behavior and the separate tRPC web process;
@@ -69,9 +71,9 @@ existing facilities behind an adapter; it does not implement a new type system.
 
 ## Runtime structure
 
-CLI and external Node programs using the lightweight `connectDaemon` client
-connect to the daemon's local service. Editors and agents using MCP reach it
-through the separate stdio adapter. The future
+In the resident design, CLI and external Node programs using the lightweight
+`connectDaemon` client connect to the daemon's local service. Editors and agents
+using MCP reach it through the separate stdio adapter. The future
 browser connects through an on-demand web process that uses that same service.
 See the [process topology](processes-and-clients.md#process-topology).
 Inside the daemon, the analysis flow is:
@@ -95,16 +97,18 @@ updates before clients ask questions. Frequent queries should usually read an
 already analyzed revision. Required freshness is explicit; being long-lived does
 not make every answer automatically current.
 
-Batch execution creates a fresh session, analyzes the selected inputs and disposes
-it. It shares the discovery, linking, interpretation, evaluation and reporting
-implementation with incremental execution. Starting with batch implementation is
-a delivery step toward this architecture, not a decision to postpone the daemon
-indefinitely.
+Current batch execution creates a fresh session, analyzes the selected inputs and
+disposes it. `createAnalysisSession` admits one `analyze()` call and provides
+idempotent `dispose()`; `analyzeProject` creates and disposes that session for a
+single invocation. Incremental execution will reuse its discovery, linking,
+interpretation, evaluation and reporting implementation. Starting with batch
+implementation is a delivery step toward this architecture, not a decision to
+postpone the daemon indefinitely.
 
 ## Ramify's ownership tree
 
-These are eleven proposed owners for the batch and resident iterations within
-one toolkit package. The batch iteration implements nine; `daemon` and its
+These are eleven owners across the batch implementation and resident design within
+one toolkit package. The batch implementation has nine; `daemon` and its
 `contexts` child arrive in the resident iteration. Every implemented owner
 has `module.ramify`, a purpose `README.md` and its own `src/`, with optional
 `src/interfaces/` and `src/tests/`. Each edge below corresponds to placement under
@@ -113,14 +117,14 @@ The root's declared name is `ramify`, a reserved word, so its header must quote
 the name as `module "ramify" tagged [dispatch]`.
 
 ```text
-ramify [dispatch]                       executable assembly and client service contract
-├── analysis []                         reusable sessions, analysis and queries
+ramify [dispatch]                       executable assembly and batch invocation contract
+├── analysis []                         disposable batch sessions and reports
 │   ├── model [browser]                 identities, registry, exposure and decisions
 │   ├── descriptions [browser]          parsing and description linking
 │   ├── project []                      filesystem inventory, source reads and metadata
 │   └── typescript []                   compiler integration and source-derived facts
-├── daemon [dispatch]                   local protocol, process and watcher adapters
-│   └── contexts []                     context isolation, ordering and publication
+├── daemon [dispatch]                   planned: local protocol, process and watcher adapters
+│   └── contexts []                     planned: context isolation, ordering and publication
 ├── presentation [ui, browser]          reusable diagrams and interaction
 │   └── layout [browser]                framework-independent geometry
 └── cli [dispatch]                      commands, output and client behavior
@@ -141,22 +145,24 @@ web process. Its SDK and protocol state stay outside the resident daemon.
 
 ### Responsibilities and public contracts
 
-API names below are proposed. Complete signatures and exposure manifests belong
-to the contract review before code moves.
+Batch signatures and exposure manifests are implemented in the owners' source
+interfaces and `module.ramify` files. The table also retains the resident design:
+`daemon`, `contexts`, incremental updates, semantic queries and their APIs remain
+later work.
 
 | Owner | Responsibility | Principal to-parent contract |
 | --- | --- | --- |
-| `ramify` | Assemble CLI, daemon and later MCP/web serving entries; supply the CLI with a lightweight service client and lazily selected batch delivery. Own the shared client-facing service vocabulary. | No effective parent exposure; package entry points target the appropriate owners. |
-| `analysis` | Execute the analysis pipeline, maintain a reusable analysis session, select affected work and produce snapshots, reports and semantic queries. | `createAnalysisSession`, `analyzeProject`, `inspectModule`, `explainAccess`, and owned analysis vocabulary. |
+| `ramify` | Assemble the CLI and lazily load batch delivery; own `BatchInvocation` and `BatchResult`. Later assemble daemon and MCP/web entries and the shared client-facing service vocabulary. | No effective parent exposure; package entry points target the appropriate owners. |
+| `analysis` | Execute the batch pipeline and produce inventory, validation results, snapshots and reports. Affected-work selection and semantic queries remain resident/query work. | `createAnalysisSession`, `analyzeProject`, `validateProject`, `acquireInventory`, and owned analysis vocabulary; later `inspectModule` and `explainAccess`. |
 | `model` | Canonical model identities, registry and profile rules, mandatory symbol tags, exposure reach, availability and testing-origin decisions. | `buildModel`, `explainImport`, `explainVisibility`, model vocabulary and validation operations. |
 | `descriptions` | Parse version 1 with source locations and comments; resolve exact selections, exposed names and wildcard contracts; produce grounded declarations and diagnostics. | `parseDescription`, `linkDescriptions`, and their input/result vocabulary. |
-| `project` | Explicit-root inventory, containment/symlink and scope validation, coherent input reads and README purpose extraction. | `readProject`, project input/inventory and metadata contracts. |
-| `typescript` | Retain compiler integration state; resolve exports, originals and resources; interpret source accesses; obtain optional symbol details. | `createSourceAnalysis` and plain-data catalog, access and enrichment contracts. |
+| `project` | Select the root and compiler configuration, inventory ownership, validate containment/symlinks and scope, read coherent inputs and extract README purposes. | `readProject`, project input/inventory and metadata contracts. |
+| `typescript` | Own the source compiler helper; resolve exports, originals and resources and interpret source accesses. Retention across updates and optional symbol details remain later work. | `createSourceAnalysis` with `catalog()`, `accesses()` and `dispose()`, plus plain-data source contracts; enrichment remains later. |
 | `daemon` | Own the shared validated service implementation and its in-process binding, open/close the local endpoint, adapt filesystem events, handle startup/shutdown and connect clients. IPC delegates to that service; context work delegates to its child. | `startDaemon`, `connectDaemon`, the in-process service factory and dispatch-classified options/results; selected neutral context vocabulary is relayed unchanged. |
 | `contexts` | Select isolated contexts, serialize their updates, synchronize requested inputs, publish revisions, retain historical results and manage idle eviction. | `createContextManager`, context/revision/status vocabulary and its owned `AnalysisDriver` port. |
-| `presentation` | Render model/report data, interactions and teaching examples. | Selected components explicitly tagged `[ui, browser]` and owned props. |
+| `presentation` | Render model data, interactions and teaching examples; report views remain later work. | Selected components explicitly tagged `[ui, browser]` and owned props. |
 | `layout` | Calculate diagram geometry from supplied neutral data. | Selected functions explicitly tagged `[browser]` and owned layout vocabulary. |
-| `cli` | Parse commands, connect directly to the daemon, request freshness/check scope, render results and map execution status to exit behavior. Dispatch batch, MCP serving and explorer launch through supplied entry points. | `runCli` and its dispatch-classified vocabulary. |
+| `cli` | Parse arguments, invoke an injected batch operation, render results and map execution status to exits. Daemon requests, MCP serving and explorer launch remain later work. | `runCli` and its dispatch-classified vocabulary. |
 
 `analysis` owns computational invalidation; `contexts` owns scheduling and
 publication; `daemon` owns process and transport mechanics. There is one authority
@@ -183,8 +189,10 @@ filesystem and TypeScript implementation functions otherwise remain visible only
 to analysis. Analysis passes data between those children through their public
 input contracts.
 
-Root receives the analysis and daemon contracts. It relays selected analysis
-types to its descendants for clients and contexts, and portable model queries for diagrams.
+Root receives the analysis contracts and relays selected analysis types and
+portable model operations to descendants. Resident assembly will also receive
+daemon contracts. In that design, the relays serve clients and contexts as well
+as diagrams.
 The `AnalysisDriver` port travels from contexts to daemon and then to root;
 assembly does not import a private grandchild binding. Transport contracts owned
 by root carry `dispatch`, so untagged analysis and contexts source cannot import
@@ -249,21 +257,26 @@ description and layout values consumed by browser source need explicit `[browser
 assignments. UI values need `[ui, browser]`. Type-only vocabulary does not need a
 browser promise, but still retains its defining area's required-importer tags.
 
-Package exports are separate runtime entry points for the portable model, Node
-analysis, presentation and CLI. They confer no internal Ramify visibility. A single
-source barrel combining Node, UI and dispatch exports is unsuitable for the proposed
-classifications; the existing combined entry point needs migration.
+Package exports are separate runtime entry points for the portable model, layout,
+Node analysis, presentation and CLI. They confer no internal Ramify visibility.
+The combined `src/index.ts` entry has been removed. Both `ramify.ts` and
+`ramify.ts/analysis` select the analysis entry; `ramify.ts/analysis/inventory`,
+`ramify.ts/model`, `ramify.ts/presentation`, `ramify.ts/layout` and `ramify.ts/cli`
+select their respective owner entries. The executable is `dist/src/cli-entry.js`.
 The [entry-point dependency requirements](processes-and-clients.md#modules-and-executable-entry-points)
 also keep `connectDaemon` usable without importing daemon startup or compiler
 assembly. A legal exposure path alone does not establish low startup memory.
 
 ## Engine inputs and analysis pipeline
 
-An analysis session receives one explicit application root, application source
-set, discovery exclusions, TypeScript project configuration, supported source
-adapters and one immutable resolved tag registry. Independent examples and other
-applications use separate selected roots. Compiler-loaded dependencies do not
-automatically enter the application ownership tree.
+A batch session receives `AnalysisInputs`: a project request, one immutable
+resolved tag registry, requested capabilities and finite work limits. The project
+request supplies the working directory and an optional explicit root; scope is
+`whole-project` and compiler configuration is discovered. Selection follows
+[CLI invocation](cli-invocation.spec.md), with no per-invocation exclusions or
+configuration override. Independent examples and other applications use separate
+selected roots. Compiler-loaded dependencies do not automatically enter the
+application ownership tree.
 
 The initial pass, and any conservative full recomputation, follows this order:
 
@@ -295,9 +308,21 @@ TypeScript objects remain private to `typescript`. The model, contexts, clients
 and public snapshots use plain data and opaque identifiers, not `ts.Symbol`,
 compiler sessions, filesystem handles or live protocol objects.
 
-The proposed source adapter retains the TypeScript program/resolution state needed
-for repeated checks. The exact compiler API and cache representation require a
-focused contract/performance review. Optional signature rendering may use that
+The implemented adapter pins TypeScript 7.0.2 and uses `typescript/unstable/sync`
+inside a supervised helper. Project configuration and source resolution use
+separate finite helpers whose filesystem callbacks read the same captured input
+view. Analysis releases the source helper after extracting access facts, then
+seals the view before publishing a report. Changed inputs trigger a fresh
+acquisition within the configured retry limit or an explicit incomplete result.
+Compiler state is not retained across batch runs.
+
+Reports use schema `ramify.analysis/1`, a fresh `runId` and a captured `inputId`
+when established. They retain stage and capability execution, inventory, linked
+contracts, accesses, decisions, diagnostics, warnings and coverage as frozen
+plain data. These batch identities are not context generations or revisions.
+
+Retaining TypeScript program/resolution state for incremental checks still
+requires contract/performance review. Optional signature rendering may use that
 session or another adapter; a separate `tsserver` process is not a requirement.
 Loss of optional descriptions can degrade enrichment alone. Loss of required
 resolution capability cannot masquerade as a completed check.
@@ -546,12 +571,11 @@ checking and requested optional verifiers retain their separate status in both.
 ## Declaring and verifying the toolkit
 
 Each iteration reviews the declarations and purpose READMEs of the owners it
-implements before their code is moved or written. Until the loader exists,
-declarations receive manual checks and automated modularity status remains pending.
-Once linking works,
-Ramify validates its own descriptions; as source support lands it checks its own
-imports. Self-checking supplements independent fixtures and the reference project's
-reviewed mutation expectations.
+implements before their code is moved or written. `npm run check:self` now checks
+the descriptions and owned source of all nine toolkit owners through the compiled
+batch CLI. Self-checking supplements independent fixtures and the reference
+project's reviewed mutation expectations; the explicit Plan 1 gate remains
+`npm run reference:verify -- --plan 1`.
 
 Owned tests live in each module's `src/tests/`: model/description/layout tests
 derive `[testing]`, daemon/CLI tests `[testing, dispatch]`, and presentation tests
@@ -566,11 +590,17 @@ through direct adapters, alongside separate HTTP/IPC, process and browser tests.
 Its UI harness is introduced with later visualization; CLI/context integration
 and resource-lifecycle evidence accompany their initial implementations.
 
-Build and runner configuration must collect nested `subs/**/src/` and preserve
-portable/browser compilation boundaries separately from Node source. Runtime
-toolkit code cannot remain outside declared owners merely to avoid checking.
-Repository build scripts and independent projects have explicit scopes. Detailed
-file migration, package entries and diagram-emission placement belong to the
+The migrated model lives in `subs/analysis/subs/model/src/`; presentation lives in
+`subs/presentation/src/`, with neutral geometry in its `subs/layout/src/` child.
+Type-checking and test discovery collect root and nested owner source/tests;
+`tsconfig.portable.json` checks model, descriptions and layout without Node
+ambient types. The example, site and scripts have separate compiler scopes.
+`npm run production:files -- --root <dir>` selects source from resolved profiles,
+excluding every testing-classified area. `scripts/build-production.ts` consumes
+that selection and bootstraps from source without requiring existing `dist/`.
+Whole-project checking still includes owned tests. Runtime toolkit code cannot
+remain outside declared owners merely to avoid checking. Detailed file migration,
+package entries and diagram-emission placement belong to the
 [contract and migration step](../plans/tooling-architecture/README.md#contract-and-migration-review).
 
 ## Acceptance evidence
@@ -614,10 +644,12 @@ The process split, client roles and resource/testing requirements are recorded
 in the [architecture overview](README.md). Detailed implementation review still
 needs the following without reopening those decisions or the model rules:
 
-1. Complete TypeScript contracts and `module.ramify` manifests for the proposed
-   owners, package entry points and the source/test migration map.
-2. Exact TypeScript adapter API and invalidation dependencies, demonstrated on
+1. TypeScript contracts, `module.ramify` manifests and package entries for the
+   resident and later owners. The nine batch owners and source/test migration
+   are implemented.
+2. Incremental adapter contracts and invalidation dependencies, demonstrated on
    original resolution, resources, wildcard growth and unmarked interfaces.
+   Batch extraction uses the pinned TypeScript 7.0.2 helper integration above.
 3. Context-to-daemon grouping, endpoint discovery, wire schemas, compatibility
    handling, notification delivery and reconnect behavior. The separate web
    process and its tRPC API, and the separate stdio MCP adapter, are already
@@ -625,9 +657,11 @@ needs the following without reopening those decisions or the model rules:
    to be specified; optional HTTP hosting is a later extension.
 4. Overlay/base-revision protocol, synchronization boundaries and conflict results;
    which operations are included in each first delivery milestone.
-5. Numeric resource/retention limits, lease/idle durations and measured latency
-   budgets implementing the memory policy; optional persistent caches and
-   workers require evidence before adding their complexity.
+5. Resident resource/retention limits, lease/idle durations and measured latency
+   budgets implementing the memory policy. Batch work limits and measurement
+   outcomes are recorded in the Plan 1 handoff; they do not establish resident
+   budgets. Optional persistent caches and workers require evidence before
+   adding their complexity.
 6. Registry configuration serialization and ordinary-default replacement. Until
    specified, use defaults or the resolved registry API; invent no accepted syntax.
 7. Scope and algorithm of separate browser-promise verification and richer

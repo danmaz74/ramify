@@ -1,16 +1,23 @@
 # Processes and clients
 
-**Date:** 2026-09-07. **Status:** Decided architecture. Command spellings,
-complete contracts and wire details remain subject to implementation review.
+**Date:** 2026-09-10. **Status:** Batch checking, help and version are implemented.
+The resident/MCP/web topology is decided architecture for later delivery; its
+command spellings, complete contracts and wire details still require review.
 
-The analysis daemon is the resident backend. A separate, on-demand web process
-serves visualization. The CLI connects directly to the daemon for ordinary
-analysis commands and can run the same engine in batch mode. Its MCP serving
+In the resident design, the analysis daemon is the backend. A separate, on-demand
+web process serves visualization. The CLI connects directly to the daemon for
+ordinary analysis commands and can run the same engine in batch mode. Its MCP serving
 mode runs an adapter for an editor or agent host, also connecting directly to
 the daemon. This split keeps MCP and web allocations out of the daemon's
 resident lifetime.
 
 ## Process topology
+
+The current executable creates a fresh batch session for every check. Project
+configuration and source analysis run finite supervised compiler helpers; they
+return plain data and exit during the invocation. No daemon or listener is
+started. The diagram below retains the resident design; its daemon, external
+service client, MCP and web paths are not implemented yet.
 
 ```mermaid
 flowchart LR
@@ -33,6 +40,7 @@ flowchart LR
   subgraph BatchProcess[CLI process in batch mode]
     Batch[Batch command] --> Fresh[Fresh session of the same engine]
   end
+  Fresh --> Helpers[Finite compiler helpers]
 ```
 
 | Process | Owns at runtime | Lifetime |
@@ -62,6 +70,11 @@ It costs an additional runtime and serialization while visualization is active;
 the [memory lifecycle](memory-lifecycle.md) explains the tradeoff.
 
 ## Shared service boundary
+
+Batch delivery currently injects root's `runBatch` operation into `runCli`.
+It calls `analyzeProject`, which creates and disposes a real analysis session.
+The daemon-owned service and the two bindings described below remain resident
+work; the batch implementation has no context manager or `connectDaemon` entry.
 
 Define one versioned logical analysis service for context lifecycle, input
 synchronization, checks, inspection, explanations and change notifications.
@@ -104,9 +117,12 @@ project state and unavailable execution.
 
 ## CLI commands
 
-These names are proposed; their process behavior is part of the architecture.
-The invocation contract of `check`, covering root selection, configuration
-discovery, warnings and exits, is [CLI invocation](cli-invocation.spec.md).
+`check`, `--help` and `--version` are implemented. Every current check uses a
+fresh batch session, with or without `--batch`; other commands return an explicit
+unavailable invocation with exit 2. The table retains the resident command design:
+its daemon-backed `check` behavior and other command names remain later work.
+The implemented invocation contract of `check`, covering root selection,
+configuration discovery, warnings and exits, is [CLI invocation](cli-invocation.spec.md).
 
 | Command | Required behavior |
 | --- | --- |
@@ -131,9 +147,13 @@ Inspection identifies whether it reads a published revision, synchronized disk
 state or an overlay, according to the [freshness contract](daemon.md#freshness-saves-and-overlays).
 
 Commands render structured results consistently and map known denials and
-unavailable checking to unsuccessful enforcement. Exact output/exit-code schemas
-remain in contract review. An explicit machine-readable output mode should use
-the same result semantics as human-readable output.
+unavailable checking to unsuccessful enforcement. Current `check --format json`
+writes one versioned result to stdout, using the same report as human output.
+The [invocation contract](cli-invocation.spec.md#output-and-exit) fixes exits:
+0 for completed checking without definite errors, 1 for violations or invalid
+input, 2 for unavailable/incomplete execution and 130 for interruption.
+Warnings and analysis limits alone do not fail a completed check. Output schemas
+for later commands remain in contract review.
 
 Batch execution uses the same engine and rules as retained execution. It starts
 neither server. After bounded daemon recovery fails, a terminating CLI command
@@ -270,9 +290,15 @@ into the resident daemon.
 ## Modules and executable entry points
 
 Process placement is separate from the [Ramify ownership tree](daemon.md#ramifys-ownership-tree).
-The initial owners remain the engine, daemon/context, presentation/layout and
-CLI owners described there. Root owns assembly through distinct source entry
-files; it is not one eagerly imported application barrel.
+The nine implemented owners cover analysis, presentation/layout, CLI and root
+assembly; daemon/context owners remain later work. Root owns assembly through
+distinct source entry files; it is not one eagerly imported application barrel.
+`src/cli-entry.ts`, installed as `dist/src/cli-entry.js`, imports CLI handling and
+lazily imports `src/batch.ts` for a check. Help/version load no compiler or UI
+assembly. Package exports select separate analysis, inventory, model,
+presentation, layout and CLI entries; the package root selects analysis.
+
+The resident entry-point requirements remain:
 
 - Ordinary CLI entry loads command handling, the lightweight local client and
   formatting. The daemon-owned client implementation must be importable without
