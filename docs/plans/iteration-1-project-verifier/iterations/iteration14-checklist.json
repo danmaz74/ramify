@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": true,
+    "functionalRequirementsSatisfied": true,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-10T05:46:36Z",
+  "iteration": "14",
+  "notes": "Implementation committed at 9247480. Revalidated retained evidence: all 305 iteration-14 required instances passed, zero failures; the full gate lacks only I1-27:self-check, I1-27:self-negative and I1-28:relocated-package. Retained final reference:cases log records 235 passing tests. This resumed attempt freshly passed type-check, 308-record inventory validation, compiled check:reference and diff validation. No implementation changes or new tests were necessary. Exhaustive results precede final test/documentation adjustments as documented in the results; build identity still matches. Workflow acceptance and inherited findings remain separate. Both managed outputs submitted under the current attempt."
+}
