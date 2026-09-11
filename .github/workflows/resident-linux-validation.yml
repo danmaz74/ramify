@@ -1,4 +1,4 @@
-name: Resident Linux Plan 1 acceptance
+name: Resident Linux focused Plan 2 acceptance
 
 on:
   push:
@@ -8,7 +8,7 @@ permissions:
   contents: read
 
 jobs:
-  plan1-acceptance:
+  nonmeasurement-acceptance:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -22,58 +22,88 @@ jobs:
       - run: npm ci
       - run: npm run worktree:prepare
       - run: npm run build
-      - name: Complete Plan 1 with owned daemon cleanup
+      - name: Restore immutable composed Plan 1 dependencies
+        run: |
+          echo '7ffd608b1cf858698223a1af3b174adb29c5c0d979cbb97e8632eb48c81f69e4  docs/plans/iteration-2-resident-verification/evidence/linux-plan1-composed-20260911.zip' | sha256sum --check
+          echo '4aaabeb3068db31ffb74cefa99daa3e3b4e677e1ff6dbb00cc89e19105f1819d  docs/plans/iteration-2-resident-verification/evidence/linux-plan1-proof-history.bundle' | sha256sum --check
+          git fetch docs/plans/iteration-2-resident-verification/evidence/linux-plan1-proof-history.bundle refs/validation-evidence/plan1-focused-inputs
+          unzip -q docs/plans/iteration-2-resident-verification/evidence/linux-plan1-composed-20260911.zip
+      - name: Execute exact 167 nonmeasurement Plan 2 cases with owned cleanup
         shell: bash
         run: |
-          mkdir -p .reference-work
-          cat > .reference-work/linux-plan1.mjs <<'SCRIPT'
-          import { mkdtemp, writeFile, rm } from 'node:fs/promises';
-          import { createWriteStream } from 'node:fs';
+          cat > .reference-work/linux-nonmeasurement.mts <<'SCRIPT'
+          import assert from 'node:assert/strict';
+          import { mkdtemp, rm, writeFile } from 'node:fs/promises';
           import { spawn } from 'node:child_process';
-          const endpoint = await mkdtemp('/tmp/rl1-');
-          const env = { ...process.env, RAMIFY_ENDPOINT_DIR: endpoint };
-          const startedAt = new Date().toISOString();
-          const execute = (args, output) => new Promise((resolve, reject) => {
-            const child = spawn(args[0], args.slice(1), { env, stdio: ['ignore', 'pipe', 'pipe'] });
-            let stdout = '', stderr = '';
-            if (output) { child.stdout.pipe(output, { end: false }); child.stderr.pipe(output, { end: false }); }
-            else { child.stdout.on('data', b => stdout += b); child.stderr.on('data', b => stderr += b); }
-            child.once('error', reject);
-            child.once('close', (code, signal) => resolve({ code, signal, stdout, stderr }));
-          });
-          const log = createWriteStream('plan1-linux.log');
-          let result, stop, status;
-          try {
-            result = await execute(['npm', 'run', 'reference:verify', '--', '--plan', '1', '--preserve-on-failure', '--format', 'json'], log);
-          } finally {
-            await new Promise(resolve => log.end(resolve));
-            stop = await execute([process.execPath, 'dist/src/cli-entry.js', 'daemon', 'stop']);
-            status = await execute([process.execPath, 'dist/src/cli-entry.js', 'daemon', 'status', '--format', 'json']);
+          import { resolve } from 'node:path';
+                    import { executionIdentity } from '../scripts/reference-harness/artifact.js';
+          import { plan2Instances } from '../scripts/reference-harness/plan2-instances.js';
+          import { verifyPlan1Regression } from '../scripts/reference-harness/completion-regression.js';
+          import { evidenceRoots, portableValue } from '../scripts/reference-harness/portability.js';
+          import { readReviewedPlan2, repositoryRoot, validateInstancePointers } from '../scripts/reference-harness/plan.js';
+          import { plan2Runtime } from '../scripts/reference-harness/plan2-runtime.js';
+          import { verifyInstances } from '../scripts/reference-harness/runner.js';
+          
+          async function runNonmeasurement(output: string) {
+            assert.equal(process.platform, 'linux');
+            const prerequisite = await verifyPlan1Regression();
+            await writeFile('plan2-linux-plan1-consumed.json', JSON.stringify(prerequisite));
+            const plan = readReviewedPlan2();
+            const members = plan.members.filter(member => member[9]?.evidence !== 'measurement');
+            const selectedIds = members.map(member => member[0]);
+            assert.equal(selectedIds.length, 167);
+            const ids = new Set(selectedIds);
+            const records = plan2Instances.filter(item => ids.has(item.id));
+            assert.equal(records.length, 167);
+            assert.deepEqual(validateInstancePointers(records), []);
+            const endpoint = await mkdtemp('/tmp/rl2n-');
+            const previousEndpoint = process.env.RAMIFY_ENDPOINT_DIR;
+            process.env.RAMIFY_ENDPOINT_DIR = endpoint;
+            const identity = await executionIdentity();
+            const startedAt = new Date().toISOString(), started = performance.now();
+            const execute = (args: string[]) => new Promise<{ code: number | null; stdout: string; stderr: string }>((resolveRun, reject) => {
+              const child = spawn(process.execPath, ['dist/src/cli-entry.js', ...args], { cwd: repositoryRoot, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] });
+              let stdout = '', stderr = '';
+              child.stdout.on('data', bytes => stdout += bytes); child.stderr.on('data', bytes => stderr += bytes);
+              child.once('error', reject); child.once('close', code => resolveRun({ code, stdout, stderr }));
+            });
+            let report, stop, status;
+            try {
+              report = await verifyInstances({ plan: { ...plan, members }, records,
+                runtime: plan2Runtime, workRoot: resolve(repositoryRoot, 'examples/collection-review/.reference-work'), preserveOnFailure: true });
+            } finally {
+              stop = await execute(['daemon', 'stop']); status = await execute(['daemon', 'status', '--format', 'json']);
+              await writeFile('plan2-linux-cleanup.json', JSON.stringify({ endpoint, stop, status }));
             if (stop.code === 0) await rm(endpoint, { recursive: true, force: true });
-            await writeFile('plan1-linux-cleanup.json', JSON.stringify({ startedAt, completedAt: new Date().toISOString(), endpoint, result, stop, status }, null, 2));
+              if (previousEndpoint === undefined) delete process.env.RAMIFY_ENDPOINT_DIR; else process.env.RAMIFY_ENDPOINT_DIR = previousEndpoint;
+            }
+            const after = await executionIdentity();
+            assert.equal(after.sourceSha256, identity.sourceSha256, 'Source changed during focused execution');
+            assert.equal(after.buildSha256, identity.buildSha256, 'Build changed during focused execution');
+            const artifact = portableValue({ kind: 'linux-plan2-nonmeasurement-evidence', identity, platform: process.platform, selectedIds,
+              startedAt, completedAt: new Date().toISOString(), durationMs: performance.now() - started,
+              report: { ...report, planComplete: false }, cleanup: { stop, status } }, await evidenceRoots());
+            await writeFile(output, JSON.stringify(artifact) + '\n', { flag: 'wx' });
+            assert.equal(stop.code, 0); assert.equal(status.code, 0); assert.equal(JSON.parse(status.stdout).running, false);
+            assert.equal(report?.passed, true, JSON.stringify(report?.instances.filter(item => item.status !== 'passed')));
+            return artifact;
           }
-          console.log(JSON.stringify({ result, stop, status }));
-          process.exitCode = result?.code === 0 && stop?.code === 0 && status?.code === 0 && JSON.parse(status.stdout).running === false ? 0 : 1;
+          
+          const result = await runNonmeasurement('plan2-linux-nonmeasurement.json');
+          console.log(JSON.stringify({ summary: result.report.summary, identity: result.identity, durationMs: result.durationMs }));
           SCRIPT
-          node .reference-work/linux-plan1.mjs
-      - name: Independently consume the complete matching Plan 1 report
-        run: |
-          node --import tsx --input-type=module <<'SCRIPT'
-          import { writeFile } from 'node:fs/promises';
-          import { verifyPlan1Regression } from './scripts/reference-harness/completion-regression.ts';
-          const receipt = await verifyPlan1Regression();
-          await writeFile('plan1-linux-consumed.json', JSON.stringify(receipt, null, 2));
-          console.log(JSON.stringify(receipt));
-          SCRIPT
-      - name: Preserve gate and complete raw evidence
+          node --import tsx .reference-work/linux-nonmeasurement.mts 2>&1 | tee plan2-linux-nonmeasurement.log
+      - name: Preserve actual cases and complete raw evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: resident-linux-plan1-evidence
+          name: resident-linux-plan2-nonmeasurement-evidence
           path: |
-            plan1-linux.log
-            plan1-linux-cleanup.json
-            plan1-linux-consumed.json
+            plan2-linux-nonmeasurement.log
+            plan2-linux-nonmeasurement.json
+            plan2-linux-plan1-consumed.json
+            plan2-linux-cleanup.json
+            .reference-work/linux-nonmeasurement.mts
             .reference-work/reports/plan1-*.json
             .reference-work/evidence/**
           include-hidden-files: true
