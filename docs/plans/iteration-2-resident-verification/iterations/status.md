@@ -2,7 +2,7 @@
 
 # Plan 2: Keep verification current — Iteration Status
 
-**Phase:** executing
+**Phase:** completed
 
 | # | Iteration | Status | Started | Ended | Elapsed |
 | --- | --- | --- | --- | --- | --- |
@@ -21,7 +21,7 @@
 | 12 | Real process lifecycle and recovery suite | completed | 08:54:38 | 09:12:31 | 17m 53s |
 | 13 | Resident measurements and budgets | completed | 08:54:38 | 09:09:12 | 14m 33s |
 | converge-after-10 | Converge parallel group after-10 (system convergence) | completed | 09:19:51 | 09:19:51 | 0s |
-| 14 | Self-check, relocation, completion report | completed | 09:19:56 | 09:39:51 | 19m 55s |
+| 14 | Self-check, relocation, completion report | completed | 09:19:56 | 09:41:07 | 21m 11s |
 
 ## Launch Affordance Measurements
 
@@ -65,6 +65,15 @@
 | 13 | attempt_o-7nvsIn4wE1OU30Pg2-T | off | final (v2) | in unavailable (launch-affordances-disabled); escape unavailable (launch-affordances-disabled); unaccounted unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | 0 | surface unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); search unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); expand unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) |
 | 14 | attempt_uP7DYUG6YOX2LhU1QTlPd | off | first-pass (v2) | in unavailable (launch-affordances-disabled); escape unavailable (launch-affordances-disabled); unaccounted unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | 0 | surface unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); search unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); expand unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) |
 | 14 | attempt_uP7DYUG6YOX2LhU1QTlPd | off | cumulative (v2) | in unavailable (launch-affordances-disabled); escape unavailable (launch-affordances-disabled); unaccounted unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | 0 | surface unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); search unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); expand unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) |
-| 14 | attempt_uP7DYUG6YOX2LhU1QTlPd | off | final (v2) | pending | pending | pending | pending | pending |
+| 14 | attempt_uP7DYUG6YOX2LhU1QTlPd | off | final (v2) | in unavailable (launch-affordances-disabled); escape unavailable (launch-affordances-disabled); unaccounted unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | 0 | surface unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); search unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); expand unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) |
 
-*Last updated: 2026-09-11T09:39:51.806Z*
+## Final Check Results
+
+| Check | Status |
+| --- | --- |
+| regression | PASS |
+| scopeReview | PASS |
+| sealedFiles | PASS |
+| static | PASS |
+
+*Last updated: 2026-09-11T16:15:04.311Z*
