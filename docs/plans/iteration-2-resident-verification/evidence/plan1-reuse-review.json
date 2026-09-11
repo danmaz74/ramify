@@ -1,0 +1,63 @@
+{
+  "policy": "2026-09-11-reviewed-test-harness-remediation",
+  "baselineRevision": "438bc0327991901b8d9ddd72f747ced0423462e4",
+  "baselineSourceSha256": "d08856e362d7d3b49ffca77982e7bfcc9d94df8f7225cf4f75d9618f9ccb40c3",
+  "currentSourceSha256": "7f49d5a5676e1c7dfd7af8700c4c97d53f551932384680248b25252f478a5392",
+  "changes": [
+    {
+      "path": "scripts/measurements/resident-composition.mjs",
+      "beforeSha256": null,
+      "afterSha256": "9d6ce5b2707c74800ea9eda793a968beed6a076c9e18d1ac3e066cb36cd505b7"
+    },
+    {
+      "path": "scripts/measurements/resident-composition.test.mjs",
+      "beforeSha256": null,
+      "afterSha256": "5f46d608b45e9d230aef003d35d033b9338edd3123f9463a20c6e7cca81cba89"
+    },
+    {
+      "path": "scripts/measurements/verify-resident-evidence.mjs",
+      "beforeSha256": "fea2cdbec6cd7e8048364416fc87b4ffbaece607a75088eb17815d22e5adfd15",
+      "afterSha256": "91abb06c2e50ed022489714e30031e8df9abdfe91436fe6fc7872cf06d5816c8"
+    },
+    {
+      "path": "scripts/reference-harness/completion-composition.test.ts",
+      "beforeSha256": null,
+      "afterSha256": "0e13a18a8880e94d722686e2490cfd237dcfa17d9f10db515a1341771c27f7a6"
+    },
+    {
+      "path": "scripts/reference-harness/completion-composition.ts",
+      "beforeSha256": null,
+      "afterSha256": "a991d38d250197f26acbb77a6c0215e1caabb1dab6466fc4d2542a0c1a543754"
+    },
+    {
+      "path": "scripts/reference-harness/completion-regression.ts",
+      "beforeSha256": "578f1974327ee4e7156038bd7202c1094e34de3959f38401e5fa15d0f4f0122a",
+      "afterSha256": "76c0c092da6e2d0ef642ae300b698723ebf56d67a2897d888e8e316ef6e238ff"
+    },
+    {
+      "path": "scripts/reference-harness/evidence-reuse.test.ts",
+      "beforeSha256": null,
+      "afterSha256": "f45b8d0e72b7f20c3d28aecf5553141b60bac1d2e08d1aff77dd9fdbcacdc2d0"
+    },
+    {
+      "path": "scripts/reference-harness/evidence-reuse.ts",
+      "beforeSha256": null,
+      "afterSha256": "533782b48de3550f39d5f1d94560b304f480db807751004489d64da93fc2acb3"
+    },
+    {
+      "path": "scripts/reference-harness/linking-expectations.ts",
+      "beforeSha256": "91f81781adafca3a3409b0d2c69fdd6e6cc9fa6bec44e0b96686c6a8ce4758bc",
+      "afterSha256": "780baa3715153ca2c4590a477cc38e374925fb9a2c1690c1c4f2c22b0ce45627"
+    },
+    {
+      "path": "scripts/reference-harness/plan1-focused.ts",
+      "beforeSha256": null,
+      "afterSha256": "0eaa04951fc7612881d2ed08c778afa82f0181ad09faf457e813f03e50eb678c"
+    },
+    {
+      "path": "subs/analysis/subs/model/src/tests/decision-lookups.test.ts",
+      "beforeSha256": "c99516810d993fb3822efb13ff143db3823c5d5461828df982c0091b5d7507de",
+      "afterSha256": "4d90d134c72d70e3dada340986f729b3eb2b5c7a5c747bff08437f271de7bf5f"
+    }
+  ]
+}
