@@ -38,6 +38,32 @@ describe('Plan 2 final contract validator', () => {
     expect(() => assertOwner(declaration, '# Daemon\n\nWrong purpose.\n', owner)).toThrow('Final README purpose differs');
   });
 
+  it.each([
+    ['unordered list', '- Introductory item\ncontinued list text\n'],
+    ['ordered list', '1. Introductory item\n'],
+    ['table', '| Heading |\n| --- |\n| Introductory cell |\n'],
+    ['table without leading pipes', 'Heading | Value\n--- | ---\nIntroductory | cell\n'],
+    ['fenced code', '```md\nNot the purpose.\n\nStill code.\n```\n'],
+    ['tilde fenced code', '~~~~\nNot the purpose.\n~~~\nStill code.\n~~~~\n'],
+    ['indented code', '    Not the purpose.\n'],
+  ])('compares the first prose purpose after an introductory %s', async (_kind, introduction) => {
+    const [, text] = await reviews('owners.md');
+    const owner = reviewedOwners(...await reviews('owners.md')).get('daemon')!;
+    const declaration = /```ramify\n(ramify 1\nmodule daemon[\s\S]*?)\n```/.exec(text)![1];
+    expect(() => assertOwner(declaration, `# Daemon\n\n${introduction}\n${owner.purpose}\n\nLater paragraph.\n`, owner)).not.toThrow();
+    expect(() => assertOwner(declaration, `# Daemon\n\n${introduction}`, owner)).toThrow('Missing README prose paragraph');
+  });
+
+  it('converts the selected paragraph to plain text without substituting later prose', async () => {
+    const [, text] = await reviews('owners.md');
+    const owner = reviewedOwners(...await reviews('owners.md')).get('daemon')!;
+    const declaration = /```ramify\n(ramify 1\nmodule daemon[\s\S]*?)\n```/.exec(text)![1];
+    const formatted = owner.purpose.replace('Daemon owns the resident process', '**Daemon** owns the [resident](./resident.md) `process`')
+      .replace("root's", 'root&#39;s').replace(', the local', ',\nthe local');
+    expect(() => assertOwner(declaration, `# Daemon\n${formatted}\n`, owner)).not.toThrow();
+    expect(() => assertOwner(declaration, `# Daemon\n\nWrong first purpose.\n\n${owner.purpose}\n`, owner)).toThrow('Final README purpose differs');
+  });
+
   it('resolves all eight runtime and type targets from the supplied package and rejects missing or broken entries', async () => {
     const metadata = reviewedPackage(...await reviews('contracts.md'));
     expect(Object.keys(metadata.exports).sort()).toEqual(['.', './analysis', './analysis/inventory', './cli', './client', './layout', './model', './presentation']);

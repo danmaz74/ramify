@@ -130,3 +130,28 @@ No Vitest/Cucumber regression, scenario-coverage or sealed-file check was run lo
 - `allNewTestsPass: false`: no automated verdict is available; regression execution remains assigned to workflow automation.
 
 Both deliverables are updated through MCP, and the repair is committed in the authoritative checkout. No publication call is made in this remediation; validation reruns and subsequent publication belong to the workflow. The provider-restoration recommendations above remain necessary before iteration 10 can be completed.
+
+## Constraint remediation: README purpose selection
+
+**Recorded:** 2026-09-11T08:49:24.891Z. **Finding:** `cf-constraints-mtwpqtv5-kkypm6g3`. This focused repair started at `4f585a5` in the authoritative checkout. The supplied and generated check results identify the README paragraph-selection contradiction; static analysis, scope review and sealed files passed. They contain no regression-test verdict.
+
+The validator previously split README text on blank lines and selected the first block that did not begin with a heading marker. This incorrectly treated introductory lists, tables and fenced code as purpose prose, did not strip inline Markdown, and could discard prose placed immediately after a heading.
+
+Changed only `scripts/validate-final-contracts.ts` and its existing validator test: `assertOwner` now calls the project owner's existing `readPurpose` metadata parser. It requires a present top-level prose paragraph and compares the parser's plain-text summary with the independently reviewed purpose. A README without prose fails explicitly. The parser, model document, declarations and production entry behavior are unchanged; no new parser, dependency or public exposure was added.
+
+Added seven parameterized validator cases for unordered and ordered lists, tables with and without leading pipes, backtick and tilde fences, and indented code. Each verifies both a valid later purpose and rejection when no purpose exists. An additional case checks inline emphasis, links, code spans, entities and line joining, including prose immediately after a heading, and rejects an incorrect first paragraph even when a later paragraph matches.
+
+### Focused verification
+
+| Command | Result |
+| --- | --- |
+| `npx tsx .reference-work/iteration10-purpose-repair.ts` before the fix | Failed: the introductory list was compared with the reviewed purpose. Preserved in `iteration10-purpose-before.log`. |
+| Same focused command after the fix | Passed all seven introductory-block positive/negative pairs, inline plain-text conversion and first-paragraph mismatch controls. Preserved in `iteration10-purpose-after.log`. |
+| `npm run type-check` | Passed all four configurations with the new validator cases. |
+| `git diff --check` | Passed. |
+
+No Vitest/Cucumber regression, scenario-coverage, sealed-file or automated constraint check was run locally. The build and matrix gate were not repeated because this repair changes only the script's README comparison and its tests. Automated verification of the reported constraint remains with the workflow.
+
+The separate self-assessment finding `iteration-self-assessment:10` remains decision-pending: this README fix does not supply the missing predecessor resident providers, five final declarations, eighth real entry or three resident process witnesses. `functionalRequirementsSatisfied` remains false. `newCodeCoveredByTests` remains true, with eight additional authored validator cases. `allNewTestsPass` remains false because there is still no automated test-suite verdict; focused reproduction success is recorded separately.
+
+Both managed deliverables are updated via MCP and the focused fix is committed. Control-plane check-results were not edited. No publication call is made during this remediation.

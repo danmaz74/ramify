@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 import { validateProject } from '../subs/analysis/src/validation-entry.js';
 import { parseDescription } from '../subs/analysis/subs/descriptions/src/parse.js';
 import type { DescriptionDocument } from '../subs/analysis/subs/descriptions/src/interfaces/syntax.js';
+import { readPurpose } from '../subs/analysis/subs/project/src/purpose.js';
 import { validationInputs } from './reference-harness/linking-expectations.js';
 
 /** Compare atomic selections so grouping named statements creates no false drift. */
@@ -105,8 +106,9 @@ export function assertOwner(actual: string, readme: string, expected: ReviewedOw
   // Comments, line wrapping and grouping of equivalent selections are prose;
   // names, paths, tags, destinations and wildcard/named spelling are contracts.
   assert.deepEqual(manifest(description(actual)), manifest(expected.document), `Final selections differ: ${expected.directory}module.ramify`);
-  const paragraph = readme.trim().split(/\n\s*\n/).find(part => !part.startsWith('#'));
-  assert.equal(paragraph?.replace(/\s+/g, ' ').trim(), expected.purpose, `Final README purpose differs: ${expected.directory}`);
+  const purpose = readPurpose(`${expected.directory}README.md`, readme);
+  assert.equal(purpose.state, 'present', `Missing README prose paragraph: ${expected.directory}`);
+  if (purpose.state === 'present') assert.equal(purpose.paragraph, expected.purpose, `Final README purpose differs: ${expected.directory}`);
 }
 
 export async function validatePackageEntries(root: string, expected: PackageMetadata): Promise<number> {

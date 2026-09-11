@@ -9,7 +9,7 @@
     "functionalRequirementsSatisfied": false,
     "newCodeCoveredByTests": true
   },
-  "completedAt": "2026-09-11T08:46:27.664Z",
+  "completedAt": "2026-09-11T08:49:33.743Z",
   "iteration": "10",
-  "notes": "Single remediation repaired false acceptance of empty/incomplete package entries: required callable exports and actual types-condition resolution now checked; positive fixture and ten negative controls passed after a failing pre-fix reproduction. Type-check passed. Functional completion remains false: missing I3-I9 providers block five final declarations, real eighth entry and three resident boundary cases. Actual final validator still fails on those gaps. No automated iteration-10 test verdict is available; Vitest/Cucumber remain automation-only, so allNewTestsPass stays false. Previous matrix evidence remains 6/139 required passed, zero failed assertions, 133 required unexecuted; unchanged matrix not rerun. No publication in this remediation."
+  "notes": "Fixed constraint finding cf-constraints-mtwpqtv5-kkypm6g3: assertOwner now uses the existing README metadata parser to select top-level prose and convert it to plain text. Added eight validator cases covering introductory lists/tables/code, missing prose, inline markup and first-paragraph precedence. Focused reproduction failed before and passed after; all four type-check configurations passed. Regression/constraint rechecks remain with automation; no test-suite verdict is available, so allNewTestsPass remains false. Functional completion still depends on missing I3-I9 resident providers, five final declarations, eighth real entry and three process witnesses; the separate self-assessment finding remains decision-pending. No publication in this remediation."
 }
