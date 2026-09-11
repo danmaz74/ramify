@@ -1,9 +1,7 @@
 {
   "_cucumberViz": {
-    "editMode": "mcp-only",
     "generatedBy": "cucumber-viz",
-    "mcpTool": "planning.write_iteration_manifest",
-    "message": "Do not edit directly. Use the planning MCP tool.",
+    "mcpTool": "workflow.publish_iteration",
     "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
   },
   "createdAt": "2026-09-10T22:08:38.804Z",
