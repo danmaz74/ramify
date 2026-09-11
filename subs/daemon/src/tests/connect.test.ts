@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { createServer, type Socket } from 'node:net';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { connectDaemon } from '../connect-daemon.js';
 import { selectEndpoint } from '../discovery.js';
@@ -16,7 +15,7 @@ const options = { client: { name: 'connect-test', version: '0.0.0' }, engine: 'r
 
 describe('public lightweight connector lifecycle', () => {
   it('returns not-running without starting when no record exists', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'rc-')); dispose.push(() => rm(directory, { recursive: true, force: true }));
+    const directory = await mkdtemp('/tmp/rc-'); dispose.push(() => rm(directory, { recursive: true, force: true }));
     expect(await connectDaemon({ ...options, endpointDirectory: directory })).toEqual({ status: 'not-running' });
   });
 
@@ -38,7 +37,7 @@ describe('public lightweight connector lifecycle', () => {
   });
 
   it('bounds reconnect attempts after an unexpected transport loss', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'rc-')); dispose.push(() => rm(directory, { recursive: true, force: true }));
+    const directory = await mkdtemp('/tmp/rc-'); dispose.push(() => rm(directory, { recursive: true, force: true }));
     const endpoint = await selectEndpoint({ packageRoot: process.cwd(), version: options.client.version, endpointDirectory: directory });
     const instance = { instanceId: 'scripted-peer', pid: process.pid, buildKey: endpoint.buildKey, version: options.client.version, engine: options.engine };
     const sockets = new Set<Socket>();
@@ -71,7 +70,7 @@ describe('public lightweight connector lifecycle', () => {
     expect(result.connection.state).toBe('closed');
   });
   it('reports a legacy empty lock as unavailable without guessing ownership', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'rc-')); dispose.push(() => rm(directory, { recursive: true, force: true }));
+    const directory = await mkdtemp('/tmp/rc-'); dispose.push(() => rm(directory, { recursive: true, force: true }));
     const endpoint = await selectEndpoint({ packageRoot: process.cwd(), version: '0.0.0', endpointDirectory: directory });
     await writeFile(endpoint.lock, '', { mode: 0o600 });
     expect(await connectDaemon({ ...options, endpointDirectory: directory })).toMatchObject({

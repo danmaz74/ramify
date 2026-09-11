@@ -1,7 +1,6 @@
 import { once } from 'node:events';
 import { mkdtemp, realpath, rm } from 'node:fs/promises';
 import { createConnection, createServer, type Socket } from 'node:net';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 export async function eventually(predicate: () => boolean, timeoutMs = 3000): Promise<void> {
@@ -14,7 +13,7 @@ export async function eventually(predicate: () => boolean, timeoutMs = 3000): Pr
 
 /** A real Unix socket pair for private transport tests, with no service double. */
 export async function socketFixture() {
-  const directory = await realpath(await mkdtemp(join(tmpdir(), 'r8-')));
+  const directory = await realpath(await mkdtemp('/tmp/r8-'));
   const server = createServer();
   const sockets = new Map<Socket, Promise<void>>();
   function track(socket: Socket): Promise<void> {
