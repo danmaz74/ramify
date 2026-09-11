@@ -300,6 +300,47 @@ after replacing only `runId`. Each edit assertion rejects the unchanged baseline
 as a negative control. Future quick handlers can reuse these report assertions
 with the harness's recorded `Assertions`, adding their resident-specific checks.
 
+### Process equivalence sequences (iteration 11)
+
+`equivalence-sequences.ts` records the ten reference edits, five S100 edits,
+coverage/removal sequences and five live-watcher scenarios. Each step names its
+anchor and independent expected result. Reference wildcard removal reverses the
+added `ResidentVocabulary` export; it checks exact C1/W1 contraction. S100 starts
+from the frozen generator and adds explicit consumers during setup, before the
+clean baseline: root imports m001's exposed value, and m002's ordinary impl1
+imports its private run0. The five-step sequence removes the exposure, changes
+README/source, moves run0 into testing, then restores all bytes. The generator
+and its recorded identity remain unchanged.
+
+`equivalence-comparison.ts` accepts only the bare Plan 1 document, compares every
+member after replacing only top-level `runId`, and names the first differing
+path. Array order, input identities, coverage and expanded contracts are compared
+without filtering. Every batch, resident and watch report also meets the semantic
+oracle; equal reports alone do not pass a step.
+
+`equivalence-cases.ts` registers all nine I2-25/I2-26 process handlers under
+`equivalence`. Each handler owns its project, npm installation prefix, short
+Unix-socket endpoint directory and process trace. The installed bin must connect
+to that endpoint without loading the batch engine in the CLI. The reported daemon
+must load the compiled daemon entry and listen there. Cleanup invokes `daemon
+stop`, checks every observed child, kills leaks while failing the instance, and
+removes the endpoint and install. No shared user endpoint is used.
+
+`equivalence-watch.ts` consumes the actual CLI stream, checking the first revision
+after each edit before issuing any confirming check. It records the JSON line
+and arrival time, requires the same generation, an advancing revision, matching
+report/header input identities, exact changed paths, and the reviewed 4,600 ms
+debounce-plus-source target. A following resident/batch pair must equal the watch
+report. SIGINT must release the watch with exit 130.
+
+The current predecessor package cannot run these resident flows: its daemon
+status command reports an unavailable implementation. The handlers therefore fail
+their process prerequisite, rather than accepting two batch checks. Availability
+of the harness capability is separate from passing execution. The independent
+batch-oracle and corruption-control tests in `equivalence.test.ts` qualify the
+tooling only and receive no I2-25/I2-26 credit. Run the real gate with
+`npm run reference:verify -- --plan 2 --iteration 11` after restoring the providers.
+
 ### Process signal fixtures (Plan 2 iteration 12)
 
 `src/tests/lifecycle-process.ts` supplies `withProcessScope` for concurrently

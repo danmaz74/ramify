@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": false,
+    "functionalRequirementsSatisfied": false,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-11T09:16:21.572Z",
+  "iteration": "11",
+  "notes": "One focused remediation corrected fragmented watch stdout handling and exact line-size accounting. All seven direct subprocess controls pass with reaped children; type-check passes. Required predecessor resident providers remain absent, so no resident equivalence/live timing can be established within iteration 11's integration scope. AllNewTestsPass remains false because workflow automation has not supplied a regression verdict; local Vitest/Cucumber execution is prohibited by the check policy. Both managed deliverables updated; repair committed without publication."
+}

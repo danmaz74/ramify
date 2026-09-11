@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": true,
+    "functionalRequirementsSatisfied": false,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-11T09:10:21.324Z",
+  "iteration": "12",
+  "notes": "One focused remediation added the nine independent F project copies needed by the eviction workload, with isolation, overlapping-lifetime and cleanup coverage. All three new shared case bodies pass in the direct Linux runner after correcting a test callback error; the harness TypeScript configuration and diff checks pass. The nine unchanged process-control bodies retain their prior passing direct-run evidence. Functional completion remains false: the predecessor engine/context manager, complete service, client, daemon host/entry and resident CLI remain missing, so all 13 I2-18/I2-27 cases, actual leases/eviction and fixed daemon timing assertions remain unexecuted. Fixture preparation receives no lifecycle matrix credit. No full gate/regression/build was repeated for these fixture-only changes; Vitest/Cucumber automation and macOS evidence remain pending. Both deliverables updated; code committed locally; no publication call in this remediation."
+}

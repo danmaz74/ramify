@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": false,
+    "functionalRequirementsSatisfied": false,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-11T09:06:51.807Z",
+  "iteration": "13",
+  "notes": "One focused remediation repaired lost failure evidence when the raw output path is unwritable. Direct controls and end-to-end reproduction now pass, including independent raw/archive failures and cleanup. Resident providers, instrumentation, full workload driver and all nine I2-29 cases remain absent, so functionality is incomplete. No automated Vitest/Cucumber verdict is supplied; those runners remain reserved to workflow automation. Budgets unchanged; compiler-state trigger unevaluated. No publication call in this remediation."
+}
