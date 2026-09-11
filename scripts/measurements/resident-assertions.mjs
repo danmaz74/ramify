@@ -1,5 +1,6 @@
 import { residentBudgets as budgets } from './resident-plan.mjs';
 import { median } from './common.mjs';
+import { measuredReuse } from './resident-reuse.mjs';
 
 /** Correctness remains binding; empirical performance targets are advisory by user decision. */
 export function assertResidentWorkload(id, measurements) {
@@ -80,6 +81,10 @@ export function assertResidentWorkload(id, measurements) {
       check(`${kind}: positive command durations`, cycles?.every(value => Number.isFinite(value.durationMs) && value.durationMs > 0), cycles?.map(value => value.durationMs));
       target(`${kind}: median`, cycles?.length ? median(cycles.map(value => value.durationMs)) : null, limit[`${kind}Ms`]);
       check(`${kind}: recorded completed stage reuse`, cycles?.every(value => JSON.stringify([...value.reused].sort()) === JSON.stringify(expected)), cycles?.map(value => value.reused));
+      check(`${kind}: stage reuse is backed by the publication and raw increment`, cycles?.every(value => {
+        try { return JSON.stringify(measuredReuse(kind, value.report?.inputId, value.settled, value.afterSequence)) === JSON.stringify(value.reused); }
+        catch { return false; }
+      }), cycles?.length);
       if (kind !== 'unchanged') {
         check(`${kind}: every edited hash is captured`, cycles?.every(captured), cycles?.map(value => value.report?.captured));
         check(`${kind}: adjacent edit captures differ`, cycles?.every((value, index) => index === 0 || value.report?.inputId !== cycles[index - 1].report?.inputId), cycles?.map(value => value.report?.inputId));

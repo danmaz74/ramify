@@ -51,7 +51,8 @@ const session = value => {
   else if (value.event === 'disposed') { activeSessions--; totals.sessionsDisposed++; }
 };
 const incrementChannel = channel('ramify.analysis.increment');
-const increment = value => { if (increments.length >= 8) increments.shift(); increments.push(value); };
+let incrementSequence = 0;
+const increment = value => { if (increments.length >= 8) increments.shift(); increments.push({ ...value, sequence: ++incrementSequence }); };
 const serviceChannel = channel('ramify.daemon.service');
 const service = value => { if (services.length >= 128) services.shift(); services.push(value); };
 const outboundChannel = channel('ramify.daemon.outbound');
@@ -76,7 +77,7 @@ function snapshot() {
     filesystem.writeFileSync(metricsPath, JSON.stringify({ schemaVersion: 'ramify.measurement-counters/1', pid: process.pid,
       at: Date.now(), generation, memory: process.memoryUsage(), activeSessions, files: files.size,
       watchers: watchers.size, helpers: helpers.size, timers: timers.size, totals,
-      outboundMaximum, outbound: [...outbound.values()], services, increments }));
+      outboundMaximum, outbound: [...outbound.values()], services, increments, incrementSequence }));
   } finally { ownOperation = false; }
 }
 let settling = false;

@@ -8,6 +8,7 @@ import { Resident, command, controls, fixture, reportCommand, sampleMetrics, unw
 import { residentBudgets as budgets } from './resident-plan.mjs';
 import { packageRoot, median } from './common.mjs';
 import { treeIdentity } from './identities.mjs';
+import { measuredReuse } from './resident-reuse.mjs';
 
 const peak = samples => Math.max(0, ...samples.map(sample => sample.combinedRssBytes));
 function compactCli(sample, report) { return { pid: sample.pid, durationMs: sample.durationMs, code: sample.code, report,
@@ -39,6 +40,8 @@ export async function executeResidentWorkload(suffix, options, measurements, che
     catch (error) { await host.close(); throw error; }
   }
   async function cliCycle(project, host, kind, index) {
+    const before = await host.settled();
+    const afterSequence = before.instrumentation.incrementSequence;
     const expected = await project.edit(kind, index);
     const sample = await host.cli(project);
     const report = reportCommand(sample, project.owners, kind === 'exposure' && index % 2 === 0 ? 1 : 0, expected);
@@ -48,10 +51,8 @@ export async function executeResidentWorkload(suffix, options, measurements, che
     }
     host.lastInput = report.inputId;
     const settled = await host.settled();
-    const latest = settled.instrumentation.increments.at(-1);
-    assert.equal(latest?.execution, 'completed', 'Real increment trace required');
-    assert.equal(latest.inputId, report.inputId, 'Trace must identify this captured result');
-    return { ...compactCli(sample, report), expected, reused: latest.reused, settled: sampleMetrics(settled) };
+    const reused = measuredReuse(kind, report.inputId, settled, afterSequence);
+    return { ...compactCli(sample, report), expected, reused, afterSequence, settled: sampleMetrics(settled) };
   }
   if (suffix === 'entry-footprints') {
     const short = resident();
