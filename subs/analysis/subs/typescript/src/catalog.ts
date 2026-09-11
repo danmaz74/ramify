@@ -228,7 +228,9 @@ class CatalogBuilder {
         return [entry.name, entry.original, original && [original.hasValue, original.hasType]];
       }).sort((a, b) => order(String(a[0]), String(b[0])))));
       for (const handle of module.declarations) {
-        const path = relative(this.root, handle.path);
+        const declaration = handle.resolve(this.project);
+        if (!declaration) continue;
+        const path = relative(this.root, declaration.getSourceFile().fileName);
         if (!file.descriptionFiles.includes(path)) file.descriptionFiles.push(path);
       }
     }
@@ -291,7 +293,7 @@ class CatalogBuilder {
       for (const handle of symbol.declarations) {
         const node = handle.resolve(this.project);
         if (!node) continue;
-        const own = this.origin(relative(this.root, handle.path));
+        const own = this.origin(relative(this.root, node.getSourceFile().fileName));
         if (own && !forwarding.some(origin => origin.file === own.file)) forwarding.push(own);
         const specifier = this.moduleSpecifier(node);
         if (specifier) {
@@ -400,7 +402,10 @@ class CatalogBuilder {
   private stars(source: SourceFile, file: MutableFile, depth: number): void {
     const explicit = new Set<string>();
     for (const symbol of this.project.checker.getExportsOfModule(this.project.checker.getSymbolAtLocation(source)!)) {
-      if (symbol.declarations.some(handle => resolve(handle.path) === resolve(source.fileName))) explicit.add(symbol.name);
+      if (symbol.declarations.some(handle => {
+        const declaration = handle.resolve(this.project);
+        return declaration && resolve(declaration.getSourceFile().fileName) === resolve(source.fileName);
+      })) explicit.add(symbol.name);
     }
     const targets: Stars['targets'] = [];
     for (const statement of source.statements) {
