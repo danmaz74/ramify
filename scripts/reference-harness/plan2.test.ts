@@ -53,14 +53,14 @@ describe('Plan 2 inventory and gates', () => {
   });
 
   it('executes all four discipline handlers, keeps Plan 1 capabilities separate and fails the full gate', async () => {
-    expect([...plan2Runtime.capabilities]).toEqual(['harness-gate', 'cli', 'equivalence']);
+    expect([...plan2Runtime.capabilities]).toEqual(['harness-gate', 'cli', 'equivalence', 'completion']);
     const options = { plan, records: plan2Instances, runtime: plan2Runtime, workRoot: join(repositoryRoot, '.reference-work') };
     const intermediate = await verifyInstances({ ...options, iteration: 2 });
     expect(intermediate.summary).toEqual({ required: 4, passed: 4, failed: 0, notExecuted: 172 });
     expect([intermediate.plan, intermediate.passed, intermediate.planComplete]).toEqual([2, true, false]);
     expect(formatVerification(intermediate)).toContain('Plan 2 iteration verification: 2');
     const full = await verifyInstances(options);
-    expect(full.summary).toEqual({ required: 176, passed: 6, failed: 9, notExecuted: 161 });
+    expect(full.summary).toEqual({ required: 176, passed: 6, failed: 14, notExecuted: 156 });
     expect(full.instances.filter(item => item.id.startsWith('I2-25:') || item.id.startsWith('I2-26:'))
       .every(item => item.status === 'failed' && item.error?.includes('Resident prerequisite unavailable'))).toBe(true);
     for (const item of full.instances.filter(item => item.iteration === 11)) {
@@ -68,16 +68,20 @@ describe('Plan 2 inventory and gates', () => {
         .toMatchObject({ leaked: [], survivingAfterKill: [] });
     }
     expect([full.passed, full.planComplete]).toEqual([false, false]);
+    expect(full.instances.filter(item => item.iteration === 14 && item.status === 'failed').map(item => item.id))
+      .toEqual(['I2-30:self-check-eleven', 'I2-30:self-negative-contexts', 'I2-30:declarations-final',
+        'I2-30:package-entries', 'I2-30:relocated-resident']);
+    expect(full.instances.find(item => item.id === 'I2-30:plan1-regression')?.reason).toBe('missing-handler');
     expect(full.instances.find(item => item.id === 'I2-20:human')?.reason).toBe('missing-handler');
     expect(full.instances.filter(item => item.id.startsWith('I2-19:') && item.status === 'passed').map(item => item.id))
       .toEqual(['I2-19:help-version-unchanged', 'I2-19:batch-no-daemon']);
     expect(full.instances.filter(item => item.required && item.status === 'passed').every(item => item.assertions.length > 0)).toBe(true);
-  }, 60_000);
+  }, 600_000);
 
   it.each([['2', 0, 4], [undefined, 1, 176]] as const)('command emits its real gate exit and portable Plan 2 evidence for iteration %s', (iteration, code, required) => {
     const args = ['--import', 'tsx', join(repositoryRoot, 'scripts/reference-harness/verify.ts'), '--plan', '2', '--format', 'json'];
     if (iteration) args.push('--iteration', iteration);
-    const run = spawnSync(process.execPath, args, { cwd: repositoryRoot, encoding: 'utf8', timeout: 60_000, maxBuffer: 32 * 1024 ** 2 });
+    const run = spawnSync(process.execPath, args, { cwd: repositoryRoot, encoding: 'utf8', timeout: 600_000, maxBuffer: 32 * 1024 ** 2 });
     expect([run.error, run.status, run.stderr]).toEqual([undefined, code, '']);
     const report = JSON.parse(run.stdout);
     expect(report.plan).toBe(2);
@@ -86,7 +90,7 @@ describe('Plan 2 inventory and gates', () => {
     expect(report.evidence.instances).toHaveLength(176);
     expect(report.evidence.instances.every((item: { id: string }) => item.id.startsWith('I2-'))).toBe(true);
     expect(report.artifact).toMatch(/^\.reference-work\/reports\/plan2-/);
-  }, 65_000);
+  }, 605_000);
 
   it.each([
     ['main-plan.md', '| 2 | New owner skeletons', '| 2 | Changed owner skeletons'],

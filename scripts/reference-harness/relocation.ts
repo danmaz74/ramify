@@ -98,7 +98,8 @@ const installedRoot = (context: ProjectContext) => join(context.runDirectory, 'c
 const installedBin = (context: ProjectContext) => join(installedRoot(context), 'node_modules/.bin/ramify');
 
 /** Independently callable smoke setup; it does not register or pass a matrix instance. */
-export async function prepareRelocatedPackage(context: ProjectContext): Promise<void> {
+export async function prepareRelocatedPackage(context: ProjectContext,
+  requiredEntries: Readonly<Record<string, string>> = entryFunctions): Promise<void> {
   const { root, assertions, runDirectory } = context;
   const canonicalRoot = await realpath(root), canonicalSource = await realpath(repositoryRoot);
   assertions.equal('relocation package is outside the source checkout', within(canonicalSource, canonicalRoot), false);
@@ -141,7 +142,7 @@ export async function prepareRelocatedPackage(context: ProjectContext): Promise<
   const tarballs = JSON.parse(packed.stdout) as Array<{ filename: string; integrity: string; files: Array<{ path: string }> }>;
   assertions.equal('one real package archive created', tarballs.length, 1);
   const manifest = JSON.parse(await readFile(join(root, 'package.json'), 'utf8')) as { exports: Record<string, { types: string; import: string }> };
-  assertions.equal('every reviewed portable Node and UI package entry remains declared', Object.keys(manifest.exports).map(key => key === '.' ? 'ramify.ts' : `ramify.ts${key.slice(1)}`).sort(), Object.keys(entryFunctions).sort());
+  assertions.equal('every reviewed portable Node and UI package entry remains declared', Object.keys(manifest.exports).map(key => key === '.' ? 'ramify.ts' : `ramify.ts${key.slice(1)}`).sort(), Object.keys(requiredEntries).sort());
   for (const [entry, targets] of Object.entries(manifest.exports)) for (const [kind, path] of Object.entries(targets)) {
     assertions.ok(`${entry} ${kind}: actual tarball contains declared entry`, tarballs[0].files.some(file => file.path === path.replace(/^\.\//, '')));
   }
@@ -164,7 +165,7 @@ export async function prepareRelocatedPackage(context: ProjectContext): Promise<
   const probe = `import { relative, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 const root = process.cwd();
-const entries = ${JSON.stringify(entryFunctions)};
+const entries = ${JSON.stringify(requiredEntries)};
 const observed = [];
 for (const [entry, name] of Object.entries(entries)) {
   const resolved = relative(root, fileURLToPath(import.meta.resolve(entry)));
@@ -177,7 +178,8 @@ console.log(JSON.stringify(observed));
 `;
   await writeFile(join(consumer, 'entries.mjs'), probe);
   const imports = await run(context, 'import every installed public entry', consumer, process.execPath, ['entries.mjs']);
-  assertions.equal('all seven actual package entry imports executed', JSON.parse(imports.stdout).map((entry: { entry: string }) => entry.entry), Object.keys(entryFunctions));
+  assertions.equal(requiredEntries === entryFunctions ? 'all seven actual package entry imports executed' : 'all eight actual package entry imports executed',
+    JSON.parse(imports.stdout).map((entry: { entry: string }) => entry.entry), Object.keys(requiredEntries));
   observe(context, 'relocation-installed-entries', JSON.parse(imports.stdout));
   const installedCheck = await run(context, 'installed reference JSON', consumer, installedBin(context),
     ['check', '--batch', '--root', join(root, referencePath), '--format', 'json']);

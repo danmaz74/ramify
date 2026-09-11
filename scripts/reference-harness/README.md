@@ -383,3 +383,25 @@ three cases registered in `lifecycle-fixtures.test.ts`: nine complete F copies,
 independent edits and overlapping scopes, and cleanup preserving callback
 failures and caller-owned files. This qualifies the input fixture only; it does
 not execute `I2-27:eviction-under-many-contexts` or activate `lifecycle`.
+
+### Completion witnesses (Plan 2 iteration 14)
+
+`completion-cases.ts` registers five real I2-30 process handlers under
+`completion`. They require resident self-checking, a compiler-valid contexts
+import of the actual `RamifyService` with a visible R6 dispatch denial, strict
+final declarations, eight packed package entries, and relocated resident
+checking and stop. The self-check reuses Plan 1's full toolkit inventory
+assertions. The package handlers reuse the external bootstrap and npm-pack
+fixture with an independent eight-entry literal; its Plan 1 default remains
+seven until the provider activates the real client entry.
+
+The process scope can use that unpacked executable, isolated environment and
+copied preload without installing a link back to the source checkout. It retains
+failure and cleanup evidence, and checks the client closure in a separate empty
+process. `completion.test.ts` supplies closure-corruption and process-cleanup
+controls; fixture controls earn no product acceptance credit.
+
+`I2-30:plan1-regression` still has no handler. The other five handlers fail on
+the current missing providers, and registering them does not establish
+completion. The [readiness guide](../../docs/development/resident-verification.md)
+describes the remaining commands and automation-owned regression runs.

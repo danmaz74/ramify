@@ -27,7 +27,7 @@ function semantic(report: AnalysisReport): unknown {
   return data;
 }
 
-async function assertToolkit(report: AnalysisReport, root: string, assertions: Assertions): Promise<void> {
+export async function assertToolkit(report: AnalysisReport, root: string, assertions: Assertions): Promise<void> {
   clean(report, assertions);
   const snapshot = report.snapshot!;
   assertions.equal('exact eleven implemented owners', snapshot.inventory.modules.map(module => module.id), owners);

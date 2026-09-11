@@ -1,5 +1,34 @@
 # Reference harness evidence
 
+## Plan 2 iteration 14 incomplete checkpoint
+
+`plan2-iteration14-incomplete.json.gz` retains the unfiltered Plan 2 gate from
+2026-09-11: 176 required, six passed, fourteen failed and 156 not executed.
+`planComplete` is false. It records all independent instance metadata,
+assertions, process observations and source/build identities. It does not
+replace Plan 1's completion archive or establish resident acceptance.
+
+The five newly registered I2-30 handlers fail on the actual resident connection,
+service type, final declaration and eight-entry package requirements. The two
+external copies complete frozen dependency installation, build, type-check,
+compiled batch reference checks and `npm pack`, then fail the independent entry
+list before installing that incomplete archive. The contexts compiler diagnostic
+is retained. All eleven observed sequence/completion process lifetimes have no
+leaks. `I2-30:plan1-regression` remains unexecuted.
+
+The compressed report is an exact, lossless copy of
+`.reference-work/reports/plan2-full-fbbe2457-c208-4195-b36e-9ec23b7ceaeb.json`.
+The report's source identity precedes adding this archive and README entry;
+the compiled build is unchanged. Read the report with:
+
+```sh
+gzip -dc scripts/reference-harness/evidence/plan2-iteration14-incomplete.json.gz
+```
+
+The [iteration-14 report](../../../docs/plans/iteration-2-resident-verification/iterations/iteration14-results.md)
+separates these failures, the passing batch self-check, measurement checkpoint,
+automation-owned regression runs and the missing macOS evidence.
+
 ## Plan 1 completion gate on main
 
 `plan1-complete.json.gz` retains the portable report of the unfiltered

@@ -46,27 +46,35 @@ export function assertResidentTrace(events: readonly TraceEvent[], cliPid: numbe
 
 /** Installs the real local package into a private npm prefix, then invokes its
  * bin link. Every command and spawned daemon inherits the tracing preload. */
-export async function withSequenceProcess<T>(operation: (processes: SequenceProcess) => Promise<T>): Promise<T> {
-  const owned = await mkdtemp(join(tmpdir(), 'ri11-'));
+export async function withSequenceProcess<T>(operation: (processes: SequenceProcess) => Promise<T>, installation?: {
+  readonly executable: string;
+  readonly cwd: string;
+  readonly preload: string;
+  readonly environment: NodeJS.ProcessEnv;
+}): Promise<T> {
+  const owned = await realpath(await mkdtemp(join(tmpdir(), 'ri11-')));
   const endpoint = join(owned, 'endpoint'), traceFile = join(owned, 'trace.jsonl');
-  const prefix = join(owned, 'install'), executable = join(prefix, 'node_modules/.bin/ramify');
-  const environment: NodeJS.ProcessEnv = { ...process.env, RAMIFY_ENDPOINT_DIR: endpoint,
+  const prefix = join(owned, 'install'), executable = installation?.executable ?? join(prefix, 'node_modules/.bin/ramify');
+  const cwd = installation?.cwd ?? repositoryRoot;
+  const environment: NodeJS.ProcessEnv = { ...(installation?.environment ?? process.env), RAMIFY_ENDPOINT_DIR: endpoint,
     RAMIFY_CLI_TRACE: traceFile, RAMIFY_PROCESS_SOCKETS: 'allow', RAMIFY_CLI_PROBE: '',
-    NODE_OPTIONS: `--import=${join(repositoryRoot, 'src/tests/process-probe.mjs')}` };
+    NODE_OPTIONS: `--import=${installation?.preload ?? join(repositoryRoot, 'src/tests/process-probe.mjs')}` };
   let installed = false, failure: unknown, result: T | undefined;
   const run = (root: string, args: readonly string[]) => command(root, executable, args, 60_000, environment);
   try {
     await mkdir(endpoint, { mode: 0o700 });
-    const install = await command(repositoryRoot, 'npm', ['install', '--prefix', prefix, '--offline', '--ignore-scripts',
-      '--no-audit', '--no-fund', repositoryRoot], 30_000, { ...process.env, NODE_OPTIONS: '' });
-    assert.equal(install.error, null, install.stderr);
-    assert.equal(install.code, 0, install.stderr);
-    assert.equal(await realpath(executable), join(repositoryRoot, 'dist/src/cli-entry.js'));
+    if (!installation) {
+      const install = await command(repositoryRoot, 'npm', ['install', '--prefix', prefix, '--offline', '--ignore-scripts',
+        '--no-audit', '--no-fund', repositoryRoot], 30_000, { ...process.env, NODE_OPTIONS: '' });
+      assert.equal(install.error, null, install.stderr);
+      assert.equal(install.code, 0, install.stderr);
+      assert.equal(await realpath(executable), join(repositoryRoot, 'dist/src/cli-entry.js'));
+    }
     installed = true;
     const processes: SequenceProcess = {
       executable, environment, traceFile, endpoint, run,
       status: async () => {
-        const outcome = await run(repositoryRoot, ['daemon', 'status', '--format', 'json']);
+        const outcome = await run(cwd, ['daemon', 'status', '--format', 'json']);
         assert.equal(outcome.error, null);
         assert.equal(outcome.stderr, '');
         assert.equal(outcome.code, 0, `Resident prerequisite unavailable: daemon status exited ${outcome.code}: ${outcome.stdout}`);
@@ -99,7 +107,7 @@ export async function withSequenceProcess<T>(operation: (processes: SequenceProc
   const cleanupErrors: unknown[] = [];
   try {
     if (installed) {
-      const stop = await command(repositoryRoot, executable, ['daemon', 'stop', '--format', 'json'], 7000, environment);
+      const stop = await command(cwd, executable, ['daemon', 'stop', '--format', 'json'], 7000, environment);
       recordObservation('equivalence-stop', { code: stop.code, signal: stop.signal, error: stop.error, stdout: stop.stdout, stderr: stop.stderr });
       // If the provider was absent, retain that original failure. Once the
       // operation succeeds, graceful daemon stop is part of its exit criteria.

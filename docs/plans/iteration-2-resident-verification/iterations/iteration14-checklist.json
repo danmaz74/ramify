@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": false,
+    "functionalRequirementsSatisfied": false,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-11T09:31:23Z",
+  "iteration": "14",
+  "notes": "Incomplete checkpoint. Build, type-check, direct harness controls, batch self/reference checks, diagrams and site build pass. Unfiltered Plan 2: 176 required, 6 passed, 14 failed, 156 not executed. Five I2-30 handlers expose absent resident connection/service/final package providers; Plan 1 regression handler and same-build/macOS/resident measurement evidence remain absent. Vitest/Cucumber verdicts are reserved for workflow automation. See iteration14-results.md and the archived complete gate report."
+}

@@ -1218,6 +1218,70 @@
           "passed": false
         }
       ]
+    },
+    {
+      "file": "resident-2026-09-11T09-26-49.390Z-a323bf02-0031-45b6-bbbf-9129f33bac5d.json.gz",
+      "note": "Incomplete iteration 13 prerequisite checkpoint; CLI help observations only, no resident acceptance.",
+      "rawSha256": "7bd14617a61a78a18d35c123745ff84e62157db197874f953dc28c6828839911",
+      "gzipSha256": "e7b40f5a52d240be1f1e175b14a6f05483ab2f0e7eb16734a119bdbb954374b1",
+      "rawBytes": 17066,
+      "gzipBytes": 4228,
+      "measuredAt": "2026-09-11T09:26:49.390Z",
+      "completedAt": "2026-09-11T09:26:52.716Z",
+      "phase": "resident",
+      "passed": false,
+      "payloadSchema": "ramify.resident-measurements/1",
+      "build": {
+        "files": 214,
+        "sha256": "bf8ff4e40a1f465d31f06b0c28daff51ab5bd132880c817e582d1cf151cade74"
+      },
+      "workloads": [
+        {
+          "name": "I2-29:entry-footprints",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:cold-warm-broad-reference",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:cold-warm-broad-hundred",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:repeated-edit-plateau",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:many-contexts",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:slow-consumer",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:synthetic-500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:synthetic-1000",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:publication-peak",
+          "status": "not-executed",
+          "passed": false
+        }
+      ]
     }
   ],
   "finalRecord": "merged-main.json.gz"
