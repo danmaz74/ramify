@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { gunzipSync } from 'node:zlib';
-import { archiveMeasurement } from './archive.mjs';
+import { archiveMeasurement, persistMeasurement } from './archive.mjs';
 import { sha256 } from './common.mjs';
 import { measureProcess, processRows } from './process-observer.mjs';
 import { pendingResidentWorkloads, residentBudgets } from './resident-plan.mjs';
@@ -69,6 +69,35 @@ try {
   assert.throws(() => archiveMeasurement(report, archive, 'Must preserve corrupt index'));
   assert.equal(readFileSync(join(archive, 'index.json'), 'utf8'), '{invalid');
   assert.ok(!readdirSync(archive).includes('.archive.lock'));
+
+  const observations = { ...report, entryProbes: [{ samples: [run] }] };
+  const output = join(scratch, 'final.json');
+  const finalArchive = join(scratch, 'final-archive');
+  const saved = persistMeasurement(observations, output, finalArchive, 'Successful persistence control');
+  assert.ok(saved.rawWritten && saved.archive);
+  assert.deepEqual(readFileSync(output), gunzipSync(readFileSync(join(finalArchive, saved.archive.file))));
+
+  const unwritable = join(scratch, 'output-directory');
+  mkdirSync(unwritable);
+  const rawFailure = persistMeasurement(observations, unwritable, finalArchive, 'Raw failure control');
+  assert.equal(rawFailure.rawWritten, false);
+  const recovered = JSON.parse(gunzipSync(readFileSync(join(finalArchive, rawFailure.archive.file))));
+  assert.deepEqual(recovered.entryProbes, observations.entryProbes);
+  assert.equal(recovered.passed, false);
+  assert.match(recovered.failures.at(-1), /Raw output persistence failed: EISDIR/);
+
+  const indexBefore = readFileSync(join(finalArchive, 'index.json'));
+  writeFileSync(join(finalArchive, '.archive.lock'), 'held');
+  const archiveFailure = persistMeasurement(observations, output, finalArchive, 'Archive failure control');
+  assert.equal(archiveFailure.archive, null);
+  assert.ok(archiveFailure.rawWritten);
+  const workingCopy = JSON.parse(readFileSync(output));
+  assert.deepEqual(workingCopy.entryProbes, observations.entryProbes);
+  assert.match(workingCopy.failures.at(-1), /Archive persistence failed: EEXIST/);
+  assert.deepEqual(readFileSync(join(finalArchive, 'index.json')), indexBefore);
+  assert.throws(() => persistMeasurement(observations, unwritable, finalArchive, 'Both failures control'),
+    error => error instanceof AggregateError && error.errors.length === 2);
+  assert.equal(readFileSync(join(finalArchive, '.archive.lock'), 'utf8'), 'held');
 
   writeFileSync(join(scratch, 'package.json'), JSON.stringify({ exports: {} }));
   assert.ok(residentPrerequisites(scratch).every(item => !item.present));

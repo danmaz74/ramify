@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { arch, cpus, platform, release, totalmem } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
-import { archiveMeasurement } from './archive.mjs';
+import { persistMeasurement } from './archive.mjs';
 import { packageRoot, sha256 } from './common.mjs';
 import { filesUnder, treeIdentity } from './identities.mjs';
 import { measureProcess } from './process-observer.mjs';
@@ -111,10 +111,10 @@ try {
   // Cleanup precedes persistence so a failing archive write cannot leak fixtures.
   rmSync(scratch, { recursive: true, force: true });
   process.removeListener('SIGINT', onInterrupt); process.removeListener('SIGTERM', onInterrupt);
-  persist();
-  const archived = archiveMeasurement(portable(report), join(packageRoot, 'scripts/measurements/results'),
+  const saved = persistMeasurement(portable(report), output, join(packageRoot, 'scripts/measurements/results'),
     'Incomplete iteration 13 prerequisite checkpoint; CLI help observations only, no resident acceptance.');
-  process.stdout.write(JSON.stringify({ output, archive: `scripts/measurements/results/${archived.file}`,
-    status: report.status, passed: report.passed, failures: portable(report.failures) }, null, 2) + '\n');
+  process.stdout.write(JSON.stringify({ output: saved.rawWritten ? output : null,
+    archive: saved.archive ? `scripts/measurements/results/${saved.archive.file}` : null,
+    status: saved.report.status, passed: saved.report.passed, failures: saved.report.failures }, null, 2) + '\n');
 }
 process.exitCode = 1;

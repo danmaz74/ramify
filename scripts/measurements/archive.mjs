@@ -1,9 +1,46 @@
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { sha256 } from './common.mjs';
+
+/** Preserve final resident observations when either output destination fails.
+ * The caller releases measured resources before entering this function. */
+export function persistMeasurement(report, output, directory, note) {
+  const result = { report: structuredClone(report), rawWritten: false, archive: null };
+  const errors = [];
+  const failed = (destination, error) => {
+    errors.push(error);
+    result.report.passed = false;
+    result.report.status = 'incomplete';
+    result.report.failures ??= [];
+    // Filesystem codes explain the failure without embedding host paths in
+    // the portable report. Original errors remain available if both fail.
+    result.report.failures.push(`${destination} persistence failed: ${error.code ?? error.name}`);
+  };
+  const writeRaw = () => {
+    mkdirSync(dirname(output), { recursive: true });
+    writeFileSync(output, JSON.stringify(result.report, null, 2) + '\n');
+    result.rawWritten = true;
+  };
+  try { writeRaw(); }
+  catch (error) { failed('Raw output', error); }
+  try { result.archive = archiveMeasurement(result.report, directory, note); }
+  catch (error) {
+    failed('Archive', error);
+    if (result.rawWritten) {
+      // Keep the archive failure beside the observations in the working copy.
+      result.rawWritten = false;
+      try { writeRaw(); }
+      catch (retryError) { failed('Raw output retry', retryError); }
+    }
+  }
+  if (!result.rawWritten && !result.archive) {
+    throw new AggregateError(errors, 'Measurement could not be persisted to either destination');
+  }
+  return result;
+}
 
 /** Append lossless evidence using the batch archive's record format.
  * An exclusive lock prevents two measurement commands from losing records. */

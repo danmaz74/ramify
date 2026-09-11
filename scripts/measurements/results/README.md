@@ -143,3 +143,11 @@ establishing performance acceptance. Neither record replaces Plan 1's final
 record or revises a target. Both identify the same 214-file build using the
 original batch identity algorithm; the two earlier resident checkpoints used
 a different path sort and remain archived with their original recipe hashes.
+
+The [persistence repair reproduction](resident-2026-09-11T09-05-17.993Z-8750be52-ac7f-4b54-855c-c70afa881b63.json.gz)
+intentionally supplies a directory as the raw output file. It exits 1, preserves
+the EISDIR failure in the archive, and removes its scratch fixtures. Before the
+repair, this case failed without adding an archive record. No CLI help process
+or resident workload ran in this reproduction: the output failure happened at
+the first progress write, after fixture preparation. It is failure-handling
+evidence only and does not replace the last help observations above.

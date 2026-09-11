@@ -151,8 +151,11 @@ and lossless gzip beside the batch archives, appending a record to `results/inde
 The index's existing version and records are preserved; `phase: resident` and
 `payloadSchema: ramify.resident-measurements/1` distinguish these new records.
 The archive lock rejects concurrent index writers, and rename publishes a complete
-index. A stale lock is not automatically removed. Failures retain their raw
-observations; cleanup precedes persistence. No resident command or implicit batch
+index. A stale lock is not automatically removed. Final persistence attempts the
+raw file and archive independently: an unwritable raw path is recorded in the
+archive; an archive failure is recorded in the raw file. If both fail, the command
+reports both errors. Its summary uses null for any unavailable output destination.
+Cleanup precedes persistence. No resident command or implicit batch
 check is timed while these prerequisites are missing.
 
 `resident-plan.mjs` records all nine required I2-29 workloads, exact cycle counts
@@ -174,7 +177,8 @@ credit until all its independent expectations and binding budgets pass.
 
 `node scripts/measurements/verify-tooling.mjs` runs bounded direct controls for
 the shared observer, helper cleanup, timeout, interruption, spawn failure,
-lossless archive hashes, index preservation/locking, and absent prerequisites.
+lossless archive hashes, index preservation/locking, independent output failures,
+and absent prerequisites.
 The reference-harness test invokes these same controls. They are tooling
 verification, with no resident matrix credit. Run measurements without concurrent
 builds or matrix execution before using performance values for acceptance.
