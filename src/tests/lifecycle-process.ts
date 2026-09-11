@@ -1,6 +1,5 @@
 import { spawn } from 'node:child_process';
 import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { TraceEvent } from './process.js';
@@ -59,7 +58,7 @@ export interface ProcessScope {
  * Killing a leftover does not turn a successful callback with a leak into a pass.
  */
 export async function withProcessScope<T>(run: (scope: ProcessScope) => Promise<T>): Promise<T> {
-  const directory = await mkdtemp(join(tmpdir(), 'rl-'));
+  const directory = await mkdtemp('/tmp/rl-');
   const trace = join(directory, 'trace.jsonl');
   const processes: LiveProcess[] = [];
   const failures: Error[] = [];

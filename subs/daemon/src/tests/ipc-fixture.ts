@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { createConnection, type Socket } from 'node:net';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { createQuickEnvironment } from '../../../../src/tests/quick-environment.js';
 import type { DaemonBudgets, EndpointSelection, WireMessage } from '../interfaces/daemon.js';
 import { createFrameDecoder, encodeMessage, validateWireMessage } from '../codec.js';
@@ -13,7 +12,7 @@ import { connectDaemon } from '../connect-daemon.js';
 import type { AnalysisDriver } from '../context-types.js';
 
 export async function ipcFixture(overrides: Partial<DaemonBudgets> = {}, publicClient = false, driver?: AnalysisDriver) {
-  const directory = await mkdtemp(join(tmpdir(), 'ri-'));
+  const directory = await mkdtemp('/tmp/ri-');
   const project = join(directory, 'project');
   await mkdir(join(project, 'src'), { recursive: true });
   await writeFile(join(project, 'module.ramify'), 'ramify 1\nmodule example\n');

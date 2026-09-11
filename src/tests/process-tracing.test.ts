@@ -1,11 +1,10 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, it } from 'vitest';
 import { cliProcess, tracedProcess } from './process.js';
 
 it('traces socket listen/connect, argv, spawn, exits and loaded modules for an arbitrary entry', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'ramify-trace-'));
+  const root = await mkdtemp('/tmp/ramify-trace-');
   try {
     const entry = join(root, 'socket.mjs');
     const socket = join(root, 'test.sock');

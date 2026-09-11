@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { readFile, rm, writeFile } from 'node:fs/promises';
+import { readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
@@ -52,6 +52,7 @@ for (const instance of plan2Instances.filter(item => /^I2-(19|20|21|22):/.test(i
   handlers.set(instance.id, { kind: 'memory', run: async ({ assertions: a }) => {
     const isolated = await runIsolatedProject({ workRoot: join(tmpdir(), 'ramify-cli-acceptance'), instanceId: instance.id, fixture: referenceEditFixture }, async ({ root }) => {
       await prepareReferenceEdits(root);
+      const canonicalRoot = await realpath(root);
       if (instance.subcase === 'interrupt') {
         await withProcessScope(async scope => {
           const check = scope.start({ cwd: root, args: [compiledEntry, 'check', '--format', 'json'], timeoutMs: 30_000 });
@@ -109,7 +110,7 @@ for (const instance of plan2Instances.filter(item => /^I2-(19|20|21|22):/.test(i
           if (subcase === 'human') {
             const result = await command(p, cwd, ['check'], a, 'resident human check', expected);
             a.ok('resident mode includes real identity, revision and freshness', /Mode: resident \(daemon \d+; context ctx\/1:.*; revision \d+; synchronized/.test(result.stdout));
-            a.ok('Plan 1 human details retained', result.stdout.includes(`Root: ${root} (found from ${root})`) && result.stdout.includes('Execution: completed; check: passed; coverage: complete'));
+            a.ok('Plan 1 human details retained', result.stdout.includes(`Root: ${canonicalRoot} (found from ${canonicalRoot})`) && result.stdout.includes('Execution: completed; check: passed; coverage: complete'));
           } else {
             const result = await command(p, cwd, ['check', '--format', 'json'], a, 'resident JSON check', expected);
             const report = JSON.parse(result.stdout);
@@ -117,7 +118,7 @@ for (const instance of plan2Instances.filter(item => /^I2-(19|20|21|22):/.test(i
             const batch = await command(p, cwd, ['check', '--batch', '--format', 'json'], a, 'independent batch check', expected);
             a.equal('resident semantic report matches independent batch', semantic(report), semantic(JSON.parse(batch.stdout)));
             if (subcase === 'exit-denied' || subcase === 'synchronized-after-save') a.equal('provider edit yields exact located denial', report.diagnostics.map((issue: { code: string; location: { file: string } }) => [issue.code, issue.location.file]), [['not-visible', 'src/assembly.ts']]);
-            if (subcase === 'root-from-subdirectory') a.equal('root discovery retains caller selection', [report.scope.root, report.scope.selection], [root, 'found']);
+            if (subcase === 'root-from-subdirectory') a.equal('root discovery retains caller selection', [report.scope.root, report.scope.selection], [canonicalRoot, 'found']);
             if (subcase === 'exit-invalid') a.equal('description fault is invalid', report.outcome.execution, 'invalid');
             if (subcase === 'exit-unavailable') {
               const human = await command(p, root, ['check'], a, 'unavailable human check', 2);

@@ -6,7 +6,7 @@ import { delimiter, dirname, isAbsolute, join, relative, sep } from 'node:path';
 import type { AnalysisReport } from '../../subs/analysis/src/index.js';
 import { portableValue } from './artifact.js';
 import { replaceExactlyOnce } from './mutation.js';
-import { analysisEvidence, recordObservation } from './observations.js';
+import { analysisEvidence, archiveObservation, recordObservation } from './observations.js';
 import { repositoryRoot } from './plan.js';
 import { command } from './processes.js';
 import type { CommandResult } from './processes.js';
@@ -194,13 +194,19 @@ console.log(JSON.stringify(observed));
 /** Required by the full handler. There is deliberately no successful skip mode. */
 export async function testRelocatedPackage(context: ProjectContext): Promise<void> {
   const output = join(context.runDirectory, 'toolkit-tests.json');
-  await run(context, 'relocated toolkit regression', context.root, 'npm', ['test', '--', '--reporter=json', '--outputFile', output]);
-  const report = JSON.parse(await readFile(output, 'utf8'));
+  const result = await command(context.root, 'npm', ['test', '--', '--reporter=json', '--outputFile', output],
+    300_000, relocationEnvironment(context.runDirectory));
+  observe(context, 'relocation-command', { label: 'relocated toolkit regression', ...result });
+  // Preserve the inner regression evidence even when its process fails.
+  const text = await readFile(output, 'utf8').catch(error => { if (error.code === 'ENOENT') return null; throw error; });
+  const report = text === null ? null : JSON.parse(text);
+  if (report) observe(context, 'relocation-toolkit-tests', await archiveObservation('relocation-toolkit-tests', report));
+  context.assertions.equal('relocated toolkit regression: actual subprocess exit', [result.code, result.signal, result.error], [0, null, null]);
+  context.assertions.ok('relocated toolkit regression produced its assertion report', report);
   context.assertions.ok('relocated toolkit tests execute nonempty assertions', report.success && report.numTotalTests > 0 && report.numPassedTests === report.numTotalTests);
   context.assertions.equal('relocated toolkit has no failed pending or todo assertions', [report.numFailedTests, report.numPendingTests, report.numTodoTests], [0, 0, 0]);
   for (const file of report.testResults) context.assertions.ok(`${relative(context.root, file.name)}: relocated assertions ran`,
     file.assertionResults.length > 0 && file.assertionResults.every((item: { status: string }) => item.status === 'passed'));
-  observe(context, 'relocation-toolkit-tests', report);
 }
 
 export async function denyRelocatedReference({ root }: { root: string }): Promise<void> {
