@@ -1,90 +1,128 @@
 {
-  "planPath": "main-plan.md",
+  "_cucumberViz": {
+    "editMode": "mcp-only",
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "planning.write_iteration_manifest",
+    "message": "Do not edit directly. Use the planning MCP tool.",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
   "createdAt": "2026-09-10T22:08:38.804Z",
   "iterations": [
     {
-      "index": 1,
       "file": "iteration1.md",
-      "title": "Contract package, probes and review points",
-      "parallelGroup": null
+      "index": 1,
+      "parallelGroup": null,
+      "title": "Contract package, probes and review points"
     },
     {
-      "index": 2,
       "file": "iteration2.md",
-      "title": "New owner skeletons, harness `--plan 2` and synthetic generators",
-      "parallelGroup": null
+      "index": 2,
+      "parallelGroup": null,
+      "title": "New owner skeletons, harness `--plan 2` and synthetic generators"
     },
     {
-      "index": 3,
       "file": "iteration3.md",
-      "title": "Analysis increments and project resolution",
-      "parallelGroup": null
+      "index": 3,
+      "parallelGroup": null,
+      "title": "Analysis increments and project resolution"
     },
     {
-      "index": 4,
       "file": "iteration4.md",
-      "title": "Contexts owner",
-      "parallelGroup": null
+      "index": 4,
+      "parallelGroup": null,
+      "title": "Contexts owner"
     },
     {
-      "index": 5,
       "file": "iteration5.md",
-      "title": "Shared service, root interface and quick environment",
-      "parallelGroup": null
+      "index": 5,
+      "parallelGroup": null,
+      "title": "Shared service, root interface and quick environment"
     },
     {
-      "index": 6,
       "file": "iteration6.md",
-      "title": "Edit semantics through the quick service",
-      "parallelGroup": "after-5"
+      "index": 6,
+      "parallelGroup": "after-5",
+      "title": "Edit semantics through the quick service"
     },
     {
-      "index": 7,
       "file": "iteration7.md",
-      "title": "Codec, discovery and the lightweight client",
-      "parallelGroup": "after-5"
+      "index": 7,
+      "parallelGroup": "after-5",
+      "title": "Codec, discovery and the lightweight client"
     },
     {
-      "index": 8,
+      "contentMode": "generated-system-file",
+      "convergence": {
+        "groupId": "after-5",
+        "sourceIterationIndexes": [
+          6,
+          7
+        ]
+      },
+      "file": "converge-after-5.md",
+      "index": "converge-after-5",
+      "iterationType": "parallel-group-convergence",
+      "parallelGroup": null,
+      "title": "Converge parallel group after-5"
+    },
+    {
       "file": "iteration8.md",
-      "title": "Daemon host, records, process entry and real IPC",
-      "parallelGroup": null
+      "index": 8,
+      "parallelGroup": null,
+      "title": "Daemon host, records, process entry and real IPC"
     },
     {
-      "index": 9,
       "file": "iteration9.md",
-      "title": "CLI commands and fallback",
-      "parallelGroup": null
+      "index": 9,
+      "parallelGroup": null,
+      "title": "CLI commands and fallback"
     },
     {
-      "index": 10,
       "file": "iteration10.md",
-      "title": "Entries, final declarations and boundaries",
-      "parallelGroup": null
+      "index": 10,
+      "parallelGroup": null,
+      "title": "Entries, final declarations and boundaries"
     },
     {
-      "index": 11,
       "file": "iteration11.md",
-      "title": "Reference edit sequences and equivalence gate",
-      "parallelGroup": "after-10"
+      "index": 11,
+      "parallelGroup": "after-10",
+      "title": "Reference edit sequences and equivalence gate"
     },
     {
-      "index": 12,
       "file": "iteration12.md",
-      "title": "Real process lifecycle and recovery suite",
-      "parallelGroup": "after-10"
+      "index": 12,
+      "parallelGroup": "after-10",
+      "title": "Real process lifecycle and recovery suite"
     },
     {
-      "index": 13,
       "file": "iteration13.md",
-      "title": "Resident measurements and budgets",
-      "parallelGroup": "after-10"
+      "index": 13,
+      "parallelGroup": "after-10",
+      "title": "Resident measurements and budgets"
     },
     {
-      "index": 14,
+      "contentMode": "generated-system-file",
+      "convergence": {
+        "groupId": "after-10",
+        "sourceIterationIndexes": [
+          11,
+          12,
+          13
+        ]
+      },
+      "file": "converge-after-10.md",
+      "index": "converge-after-10",
+      "iterationType": "parallel-group-convergence",
+      "parallelGroup": null,
+      "title": "Converge parallel group after-10"
+    },
+    {
       "file": "iteration14.md",
-      "title": "Self-check, relocation, completion report",
-      "parallelGroup": null
+      "index": 14,
+      "parallelGroup": null,
+      "title": "Self-check, relocation, completion report"
     }
-  ]
+  ],
+  "planPath": "main-plan.md"
 }
