@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
-import { spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { measureProcess } from './process-observer.mjs';
+import { filesUnder as pathsUnder, treeIdentity } from './identities.mjs';
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { arch, platform, release, totalmem, cpus } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { budgets, fingerprint, median, packageRoot, sha256 } from './common.mjs';
@@ -30,17 +32,6 @@ function portable(value) {
   if (Array.isArray(value)) return value.map(portable);
   if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, portable(item)]));
   return value;
-}
-function pathsUnder(root) {
-  return readdirSync(root, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name)).flatMap(entry => {
-    if (entry.isSymbolicLink() || ['node_modules', 'dist', '.reference-work', '.git'].includes(entry.name)) return [];
-    const path = join(root, entry.name);
-    return entry.isDirectory() ? pathsUnder(path) : entry.isFile() ? [path] : [];
-  });
-}
-function treeIdentity(root) {
-  const entries = pathsUnder(root).map(path => [relative(root, path), sha256(readFileSync(path))]);
-  return { files: entries.length, sha256: sha256(JSON.stringify(entries)) };
 }
 function referenceIdentity(root) {
   const all = pathsUnder(root), owners = all.filter(path => path.endsWith('/module.ramify')).map(dirname);
@@ -90,82 +81,14 @@ function parseOutput(text, destination, key) {
     throw new Error(`Measurement ${key} output was not valid JSON: ${error.message}`);
   }
 }
-function ps() {
-  const listing = spawnSync('ps', ['-A', '-o', 'pid=,ppid=,pgid=,rss=,comm='], { encoding: 'utf8', timeout: 5000, maxBuffer: 8 * 1024 ** 2 });
-  assert.equal(listing.status, 0, listing.error?.message ?? listing.stderr);
-  return listing.stdout.trim().split('\n').filter(Boolean).map(line => {
-    const match = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(.+)$/.exec(line);
-    assert.ok(match, `Cannot parse POSIX ps row: ${line}`);
-    return { pid: Number(match[1]), ppid: Number(match[2]), pgid: Number(match[3]), rssBytes: Number(match[4]) * 1024, command: match[5] };
-  });
-}
-
-/** Parent observes itself and every helper/native descendant without a runtime hook. */
 async function measured(executable, argv, env = {}, timeoutMs = 130000) {
   assert.equal(cancelledBy, null, `Measurement interrupted by ${cancelledBy}`);
-  const started = performance.now();
-  const child = spawn(executable, argv, { cwd: packageRoot, detached: true,
-    env: { ...process.env, NODE_OPTIONS: '', NO_COLOR: '1', FORCE_COLOR: '0', ...env }, stdio: ['ignore', 'pipe', 'pipe', 'pipe'] });
-  const chunks = [[], [], []], samples = [], observed = new Set([child.pid]), groups = new Set([child.pid]), perProcess = new Map();
-  let bytes = 0, failure = null;
-  const stop = message => {
-    failure ??= message;
-    // Stop the owned parent first so it cannot start another detached helper
-    // between the last periodic sample and process-group cleanup.
-    if (child.pid) {
-      try { process.kill(-child.pid, 'SIGSTOP'); } catch (error) { if (error.code !== 'ESRCH') failure += `; ${error.message}`; }
-    }
-    try {
-      const rows = ps(); let changed = true;
-      while (changed) {
-        changed = false;
-        for (const row of rows) if ((observed.has(row.ppid) || groups.has(row.pgid)) && !observed.has(row.pid)) {
-          observed.add(row.pid); groups.add(row.pgid); changed = true;
-        }
-      }
-    } catch (error) { failure += `; process cleanup observation failed: ${error.message}`; }
-    for (const group of groups) if (group) {
-      try { process.kill(-group, 'SIGKILL'); } catch (error) { if (error.code !== 'ESRCH') throw error; }
-    }
-  };
-  cancelActive = stop;
-  child.once('error', error => { failure = error.message; });
-  [child.stdout, child.stderr, child.stdio[3]].forEach((pipe, index) => pipe.on('data', chunk => {
-    bytes += chunk.length;
-    if (bytes > 32 * 1024 ** 2) stop('Measurement subprocess output exceeds 32 MiB');
-    else chunks[index].push(chunk);
-    if (index === 1 && argv.includes('scripts/measurements/repeated.mjs')) process.stderr.write(chunk);
-  }));
-  const sample = () => {
-    try {
-      const rows = ps(); let changed = true;
-      while (changed) {
-        changed = false;
-        for (const row of rows) if ((observed.has(row.ppid) || groups.has(row.pgid)) && !observed.has(row.pid)) { observed.add(row.pid); groups.add(row.pgid); changed = true; }
-      }
-      const processes = rows.filter(row => observed.has(row.pid));
-      for (const item of processes) {
-        const prior = perProcess.get(item.pid);
-        perProcess.set(item.pid, { ...item, role: item.pid === child.pid ? 'parent' : item.ppid === child.pid ? 'helper' : 'native-or-helper-descendant',
-          peakRssBytes: Math.max(item.rssBytes, prior?.peakRssBytes ?? 0) });
-      }
-      samples.push({ elapsedMs: performance.now() - started, combinedRssBytes: processes.reduce((total, item) => total + item.rssBytes, 0),
-        processes: processes.map(({ pid, ppid, pgid, rssBytes }) => ({ pid, ppid, pgid, rssBytes })) });
-    } catch (error) { stop(error.message); }
-  };
-  sample();
-  const timer = setInterval(sample, budgets.sampleIntervalMs);
-  const deadline = setTimeout(() => stop(`Measurement subprocess exceeded ${timeoutMs} ms`), timeoutMs);
-  const ending = await new Promise(resolve => child.once('close', (code, signal) => resolve({ code, signal })));
-  const durationMs = performance.now() - started;
-  clearInterval(timer); clearTimeout(deadline);
-  const remaining = ps().filter(row => observed.has(row.pid) || groups.has(row.pgid));
-  if (remaining.length) stop(`Measurement left ${remaining.length} observed descendant processes alive`);
-  cancelActive = null;
-  const [stdout, stderr, data] = chunks.map(list => Buffer.concat(list).toString('utf8'));
-  return { ...ending, durationMs, failure, stdout, stderr, data,
-    peakCombinedRssBytes: Math.max(0, ...samples.map(sample => sample.combinedRssBytes)),
-    processes: [...perProcess.values()], samples, postExitObservedProcesses: remaining.length };
+  const controller = new AbortController();
+  cancelActive = () => controller.abort();
+  try {
+    return await measureProcess(executable, argv, { env, timeoutMs, signal: controller.signal,
+      onStderr: argv.includes('scripts/measurements/repeated.mjs') ? chunk => process.stderr.write(chunk) : undefined });
+  } finally { cancelActive = null; }
 }
 
 try {
@@ -196,7 +119,7 @@ try {
       result.cold = { samples: [] };
       for (let index = 0; index < budgets.coldSamples; index++) {
         process.stderr.write(`Measuring ${name}: cold ${index + 1}/${budgets.coldSamples}\n`);
-        const child = await measured(process.execPath, ['dist/src/cli-entry.js', 'check', '--root', root, '--format', 'json']);
+        const child = await measured(process.execPath, ['dist/src/cli-entry.js', 'check', '--batch', '--root', root, '--format', 'json']);
         const { stdout, data, ...measurements } = child;
         const sample = { ...measurements, stdoutBytes: Buffer.byteLength(stdout), stdoutSha256: sha256(stdout),
           inputId: null, outcome: null, summary: null, diagnostics: [], coverage: [] };

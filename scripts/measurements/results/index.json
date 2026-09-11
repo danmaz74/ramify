@@ -934,6 +934,226 @@
           ]
         }
       ]
+    },
+    {
+      "file": "resident-2026-09-11T08-58-53.470Z-9f38178f-0c5f-4482-8614-f5b7408ce858.json.gz",
+      "note": "Incomplete iteration 13 prerequisite checkpoint; CLI help observations only, no resident acceptance.",
+      "rawSha256": "bc7b7f1c151c9daa212d2237e905dbb2587abc55b174bd1f842bf0f12dead5d6",
+      "gzipSha256": "300ff2bafe45f73a6049c755926b693ebed2b1e1259230e26d370e8805cb3339",
+      "rawBytes": 17140,
+      "gzipBytes": 4288,
+      "measuredAt": "2026-09-11T08:58:53.470Z",
+      "completedAt": "2026-09-11T08:58:57.708Z",
+      "phase": "resident",
+      "passed": false,
+      "payloadSchema": "ramify.resident-measurements/1",
+      "build": {
+        "files": 214,
+        "sha256": "9856d2c2be3ce218eedab5ff9d26160c823c10da2a3cf30082393425c6b2e966"
+      },
+      "workloads": [
+        {
+          "name": "I2-29:entry-footprints",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:cold-warm-broad-reference",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:cold-warm-broad-hundred",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:repeated-edit-plateau",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:many-contexts",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:slow-consumer",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:synthetic-500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:synthetic-1000",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:publication-peak",
+          "status": "not-executed",
+          "passed": false
+        }
+      ]
+    },
+    {
+      "file": "batch-2026-09-11T08-59-43.581Z-101c1f03-25fc-4510-8e67-014b7efc55c8.json.gz",
+      "note": "Iteration 13 shared-observer validation. Five clean compiled batch checks and no observed leaks; 5.189 s median exceeds unchanged 5 s batch target. Concurrent Studio work was not isolated; not performance acceptance.",
+      "rawSha256": "2a7427fe99f78a935a918d3378f3b8cb57d5ba0b14c0c247209c9b152d34d8d8",
+      "gzipSha256": "c9bcc714d245305e5bf0c2ed41f3a26daba4cf954006de6e5c4a40b6733fe1b0",
+      "rawBytes": 410849,
+      "gzipBytes": 27164,
+      "measuredAt": "2026-09-11T08:59:43.581Z",
+      "completedAt": "2026-09-11T09:00:10.097Z",
+      "phase": "cold",
+      "passed": false,
+      "payloadSchema": "ramify.batch-measurements/1",
+      "build": {
+        "files": 214,
+        "sha256": "bf8ff4e40a1f465d31f06b0c28daff51ab5bd132880c817e582d1cf151cade74"
+      },
+      "workloads": [
+        {
+          "name": "reference",
+          "passed": false,
+          "fixture": {
+            "files": 93,
+            "bytes": 181115,
+            "contentMapSha256": "626a8e7b81df9aae566b585c87b971e11d1e367d9fa4dded746bbd3839a04bff"
+          }
+        }
+      ]
+    },
+    {
+      "file": "resident-2026-09-11T09-00-43.130Z-0792b780-4d4a-4988-b3bf-165b78d9fc69.json.gz",
+      "note": "Incomplete iteration 13 prerequisite checkpoint; CLI help observations only, no resident acceptance.",
+      "rawSha256": "c563621792fedec60027f2568d6e9566457c84c856748fa317ad70f80f88d39f",
+      "gzipSha256": "95118c68e4d5fa8aab75272ed809c7a808544c1da74fc179a9c85dadd17479ff",
+      "rawBytes": 17064,
+      "gzipBytes": 4252,
+      "measuredAt": "2026-09-11T09:00:43.130Z",
+      "completedAt": "2026-09-11T09:00:47.422Z",
+      "phase": "resident",
+      "passed": false,
+      "payloadSchema": "ramify.resident-measurements/1",
+      "build": {
+        "files": 214,
+        "sha256": "9856d2c2be3ce218eedab5ff9d26160c823c10da2a3cf30082393425c6b2e966"
+      },
+      "workloads": [
+        {
+          "name": "I2-29:entry-footprints",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:cold-warm-broad-reference",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:cold-warm-broad-hundred",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:repeated-edit-plateau",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:many-contexts",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:slow-consumer",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:synthetic-500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:synthetic-1000",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:publication-peak",
+          "status": "not-executed",
+          "passed": false
+        }
+      ]
+    },
+    {
+      "file": "resident-2026-09-11T09-01-16.314Z-dc5e0da8-3ed2-4257-bf75-d4161aa613fa.json.gz",
+      "note": "Incomplete iteration 13 prerequisite checkpoint; CLI help observations only, no resident acceptance.",
+      "rawSha256": "2affc94d4902e33a591ecdb26c247c7c3c9f44d593d74f18eae034e53a71a088",
+      "gzipSha256": "4a785b5775366b5ab855eabc3c1ac644ca49bcaed8aac9a7c28455b31ebd7a3d",
+      "rawBytes": 17067,
+      "gzipBytes": 4232,
+      "measuredAt": "2026-09-11T09:01:16.314Z",
+      "completedAt": "2026-09-11T09:01:19.931Z",
+      "phase": "resident",
+      "passed": false,
+      "payloadSchema": "ramify.resident-measurements/1",
+      "build": {
+        "files": 214,
+        "sha256": "bf8ff4e40a1f465d31f06b0c28daff51ab5bd132880c817e582d1cf151cade74"
+      },
+      "workloads": [
+        {
+          "name": "I2-29:entry-footprints",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:cold-warm-broad-reference",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:cold-warm-broad-hundred",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:repeated-edit-plateau",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:many-contexts",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:slow-consumer",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:synthetic-500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:synthetic-1000",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:publication-peak",
+          "status": "not-executed",
+          "passed": false
+        }
+      ]
     }
   ],
   "finalRecord": "merged-main.json.gz"
