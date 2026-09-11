@@ -13,12 +13,27 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run worktree:prepare
+      - name: Prove mixed-case regression on previous implementation
+        shell: bash
+        run: |
+          paths=(subs/analysis/subs/typescript/src/catalog.ts subs/analysis/subs/typescript/src/resolution.ts)
+          trap 'git restore -- "${paths[@]}"' EXIT
+          for path in "${paths[@]}"; do git show 5038a19:"$path" > "$path"; done
+          set +e
+          npm test -- subs/analysis/subs/typescript/src/tests/compiler-paths.test.ts > macos-paths-before.log 2>&1
+          result=$?
+          set -e
+          cat macos-paths-before.log
+          test "$result" -eq 1
+          git restore -- "${paths[@]}"
       - run: npm run build
       - name: Toolkit and real daemon process regressions
         run: npm test
@@ -73,6 +88,7 @@ jobs:
         with:
           name: resident-macos-process-evidence
           path: |
+            macos-paths-before.log
             plan1-macos.json
             macos-process.json
             .reference-work/reports/**
