@@ -40,7 +40,33 @@ jobs:
         run: npm test
       - name: Matching Plan 1 acceptance prerequisite
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: npm run reference:verify -- --plan 1 --format json > plan1-macos.json
+        shell: bash
+        run: |
+          set +e
+          npm run reference:verify -- --plan 1 --format json > plan1-macos.json
+          result=$?
+          set -e
+          node --input-type=module <<'SCRIPT'
+          import { readFileSync } from 'node:fs';
+          const line = readFileSync('plan1-macos.json', 'utf8').split('\n').find(line => line.startsWith('{'));
+          if (line) {
+            const report = JSON.parse(line);
+            console.log(JSON.stringify({ passed: report.passed, summary: report.summary,
+              failures: report.instances.filter(instance => instance.status !== 'passed') }, null, 2));
+          }
+          SCRIPT
+          exit "$result"
+      - name: Preserve Plan 1 evidence immediately
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: resident-macos-plan1-evidence
+          path: |
+            plan1-macos.json
+            .reference-work/reports/plan1-*.json
+            .reference-work/evidence/**
+          include-hidden-files: true
+          retention-days: 14
       - name: All reviewed process and IPC instances
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         shell: bash
