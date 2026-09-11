@@ -1,3 +1,5 @@
+import type { ServiceErrorCode } from '../../../../src/interfaces/service.js';
+
 // Independent lifecycle vocabulary from Plan 2. Service and connection types
 // follow when the real context manager and root service contract are available.
 export interface DaemonInstance {
@@ -55,3 +57,39 @@ export interface Handshake {
 }
 export type ConnectionState = 'connected' | 'reconnecting' | 'restarting' | 'stopped'
   | 'unavailable' | 'closed';
+
+export interface EndpointSelection {
+  readonly directory: string;
+  readonly buildKey: string;
+  readonly socket: string;
+  readonly record: string;
+  readonly lock: string;
+  readonly log: string;
+}
+export interface ConnectTimeouts {
+  readonly handshakeMs: number;
+  readonly startupMs: number;
+  readonly startAttempts: number;
+  readonly reconnectAttempts: number;
+  readonly reconnectBackoffMs: readonly number[];
+  readonly restartAttempts: number;
+  readonly totalRecoveryMs: number;
+}
+export type DisconnectReason =
+  | { readonly kind: 'idle-exit' }
+  | { readonly kind: 'explicit-stop'; readonly requestId: string | null }
+  | { readonly kind: 'failure'; readonly message: string }
+  | { readonly kind: 'slow-consumer' }
+  | { readonly kind: 'incompatible'; readonly daemon: string; readonly client: string }
+  | { readonly kind: 'rejected'; readonly code: ServiceErrorCode; readonly message: string }
+  | { readonly kind: 'closed' };
+export interface ConnectOptions {
+  readonly signal?: AbortSignal;
+  readonly client: { readonly name: string; readonly version: string };
+  readonly engine: string;
+  readonly start: 'if-needed' | 'never';
+  readonly daemonEntry: string | null;
+  readonly endpointDirectory?: string;
+  readonly timeouts?: Partial<ConnectTimeouts>;
+  readonly onState?: (state: ConnectionState, reason: DisconnectReason | null) => void;
+}
