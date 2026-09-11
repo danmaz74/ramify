@@ -9,7 +9,7 @@
     "functionalRequirementsSatisfied": false,
     "newCodeCoveredByTests": true
   },
-  "completedAt": "2026-09-11T08:12:22.296Z",
+  "completedAt": "2026-09-11T08:16:14.199Z",
   "iteration": "8",
-  "notes": "Incomplete checkpoint: private outbound writer and bounded log implemented with 19 owner cases. Final build, type-check, self-check and six direct smoke groups pass. Automated Vitest verdict pending under the supplied check policy. Missing predecessor service, context, codec/client and assembly providers block startDaemon, process entry and all 22 iteration-8 matrix instances. Gate: 86 required, 4 passed, 82 required not executed. No IPC/process acceptance credit claimed."
+  "notes": "Single remediation attempt fixed three reproduced outbound lifetime defects: disposal during classification, disposal during encoding, and listener retention on an already-closed socket. Added three regression cases; 22 owner cases total. Build, type-check, three direct reproduction checks and six existing smoke groups pass. Functional completion remains blocked by absent predecessor context/service, message codec/client and root assembly/quick-service providers; startDaemon, process entry and all 22 iteration-8 I2 instances remain unimplemented. Last gate: 86 required, 4 passed, 82 required not executed. allNewTestsPass remains false because the automated Vitest verdict is unavailable and the original check policy reserves that runner to automation. No publication call in this remediation."
 }

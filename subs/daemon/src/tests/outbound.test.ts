@@ -189,4 +189,44 @@ describe('private outbound socket writer', () => {
       expect(f.host.listenerCount('drain')).toBe(0);
     } finally { await f.dispose(); }
   });
+
+  it.each(['classify', 'encode'] as const)('does not admit a frame after its %s callback disposes the writer', async stage => {
+    const f = await socketFixture(), reasons: string[] = [];
+    let encoded = 0;
+    let writer: ReturnType<typeof createOutboundWriter<boolean>>;
+    writer = createOutboundWriter<boolean>({ socket: f.host, maxBytes: 1024, maxFrameBytes: 1024, maxFrames: 8,
+      event: () => { if (stage === 'classify') writer.dispose(); return null; },
+      encode: () => { encoded++; if (stage === 'encode') writer.dispose(); return encodeJsonFrame({ value: 'late' }, 1024); },
+      onClose: reason => reasons.push(reason) });
+    try {
+      expect(writer.send(false)).toBe('closed');
+      expect(encoded).toBe(stage === 'classify' ? 0 : 1);
+      expect(writer.status).toMatchObject({ bytes: 0, frames: 0, queued: 0, closed: true });
+      expect(reasons).toEqual(['closed']);
+      expect(writer.send(false)).toBe('closed');
+      await eventually(() => f.host.closed);
+      expect(f.host.listenerCount('drain')).toBe(0);
+      expect(f.host.listenerCount('close')).toBe(0);
+    } finally { writer.dispose(); await f.dispose(); }
+  });
+
+  it('starts closed without attaching listeners when the socket already emitted close', async () => {
+    const f = await socketFixture(), reasons: string[] = [];
+    f.host.destroy();
+    await eventually(() => f.host.closed);
+    const errorListeners = f.host.listenerCount('error');
+    const writer = createOutboundWriter({ socket: f.host, maxBytes: 10, maxFrameBytes: 10, maxFrames: 1,
+      event: () => { throw new Error('Must not classify'); },
+      encode: () => { throw new Error('Must not encode'); }, onClose: reason => reasons.push(reason) });
+    try {
+      expect(writer.status).toMatchObject({ closed: true, bytes: 0, frames: 0 });
+      expect(reasons).toEqual(['closed']);
+      expect(writer.send(null)).toBe('closed');
+      writer.dispose(); writer.dispose();
+      expect(reasons).toEqual(['closed']);
+      expect(f.host.listenerCount('drain')).toBe(0);
+      expect(f.host.listenerCount('close')).toBe(0);
+      expect(f.host.listenerCount('error')).toBe(errorListeners);
+    } finally { writer.dispose(); await f.dispose(); }
+  });
 });

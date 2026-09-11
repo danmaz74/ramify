@@ -93,15 +93,20 @@ export function createOutboundWriter<T>(options: OutboundOptions<T>) {
     socket.off('close', close);
     terminate('closed');
   }
-  socket.on('drain', drain);
-  socket.on('error', error);
-  socket.once('close', close);
+  if (socket.closed) terminate('closed');
+  else {
+    socket.on('drain', drain);
+    socket.on('error', error);
+    socket.once('close', close);
+  }
 
   return {
     send(value: T): 'accepted' | 'oversized' | 'closed' {
       if (closed) return 'closed';
       if (socket.destroyed || !socket.writable) { terminate('closed'); return 'closed'; }
       const event = classify!(value);
+      // The owning host can dispose while a callback is producing this frame.
+      if (closed) return 'closed';
       if (event && (!Number.isSafeInteger(event.coalesced) || event.coalesced < 0)) {
         throw new Error('Invalid coalesced event count');
       }
@@ -115,6 +120,7 @@ export function createOutboundWriter<T>(options: OutboundOptions<T>) {
         throw new Error('Outbound event counter exhausted');
       }
       const encoded = encode!(value, { sequence: nextSequence, coalesced });
+      if (closed) return 'closed';
       if (encoded.byteLength > maxFrameBytes) return 'oversized';
       const nextBytes = bytes - (previous?.bytes.byteLength ?? 0) + encoded.byteLength;
       const nextFrames = frames + (previous ? 0 : 1);
