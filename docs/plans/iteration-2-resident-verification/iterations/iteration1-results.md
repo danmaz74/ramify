@@ -129,3 +129,33 @@ index ce190c8..de77a39 100644
 +| Schedule-4 | Iteration 9 size | Keep commands and migration together, or split | Keep together: the migration is mechanical and the same iteration must prove the unchanged batch surface; no iteration or matrix renumbering. |
 +| Review-1 | Corrections beyond RP-1–RP-8 | Revised package or implement the original contradictions | Revised package: sealed invalid inputs, request-specific report facts, expectation coverage, coalescing/error vocabulary, staged relays, whole-runtime identity, live-lock preservation and cold retention are specified in contracts.md and scope.md. Architecture acceptance is still required before iteration 3. |
 ```
+
+## Single self-assessment remediation attempt (2026-09-11)
+
+This is the one focused remediation attempt requested after output validation found functionalRequirementsSatisfied false. The active checkout and branch remain unchanged. Live workflow detail reports iteration 1 at `validate_output_retry`; no architecture approval was supplied by the remediation request, and `reviewEachIteration` remains false.
+
+Re-read the original iteration goal, deliverables and exit criteria. Deliverable 1 explicitly permits a recorded revision in the four package documents, which is already present. Deliverables 2 and 3 additionally require the RP choices and scheduling decisions in the main plan's own table. The accepted-contract goal and the gate before iteration 3 are not established by the existing draft publication. The explicit instruction that presenting the package does not approve an unresolved contract change still applies.
+
+The focused recovery investigated the available supported write paths. The workflow tools can write this iteration's results/checklist/tracking artifacts and append iterations in their supported phases; none exposes an update to the active frozen main plan or an independent architecture-acceptance operation. The planning creation tool creates or normalizes plans; using it to replace this active execution's baseline would be a different operation, not a supported repair of the rejected iteration draft. Appending another iteration would not remove the same frozen-file restriction. No new plan, manifest change, synthetic approval, file-policy exception or external workflow modification was made.
+
+Fresh verification appropriate to this documentation/control-plane attempt passed:
+
+- Extracted the exact proposed patch from these managed results and ran `git apply --check --unidiff-zero -`. It applies cleanly to the current main plan; no patch was applied.
+- Confirmed main-plan.md is byte-identical to the original `b6f9c0447ccd73fab819aca840b10e362715b968` baseline.
+- Verified all five archived probe source hashes against the current scripts, and the warm worker/compiled pipeline hashes plus twenty samples per workload (forty total).
+- Revalidated 176 unique instance identities and relative links in the five supporting review documents.
+- Ran `git diff --check` after the managed deliverable updates.
+
+No application, probe, fixture, owner-test or compiler input changed in this attempt. Prior passing probes and static checks remain applicable to those unchanged bytes; they were not rerun or relabelled as new execution. There is no supplied failing test or missing executable behavior to repair within this review-only iteration. The reserved Vitest/Cucumber, scenario-coverage and sealed-file checks were not run.
+
+Both managed deliverables are refreshed through the workflow MCP tools. The real self-assessment remains:
+
+| Check | State | Reason |
+| --- | --- | --- |
+| functionalRequirementsSatisfied | false | The required main-plan update is still prohibited by the execution file policy, and the revised architecture package has not received acceptance. |
+| newCodeCoveredByTests | true | The prior executable probe assertions cover the added probe behavior; this attempt adds no executable code. |
+| allNewTestsPass | true | The existing passing probe evidence matches the current scripts; no new test or changed test requires execution. This does not claim an automated regression pass. |
+
+**Reviewable resolution:** approve the concrete revised contract package and have the plan-authoring/control-plane path apply the preserved main-plan patch before iteration 3. Alternatively, the user may explicitly revise the requirement that decisions reside in main-plan.md and accept the managed results as their authoritative location. Neither decision is inferred here. Iteration 2 may still use the draft inventory as the original scope permits.
+
+The pre-existing checklist working-tree change was publication-generated provenance metadata. Updating the checklist through MCP replaces that metadata through its owning tool. This attempt commits only the two current iteration deliverables on the authoritative branch; it does not call workflow.publish_iteration_draft. Validation and subsequent publication remain with the workflow.

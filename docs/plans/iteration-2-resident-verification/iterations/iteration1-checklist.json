@@ -9,7 +9,7 @@
     "functionalRequirementsSatisfied": false,
     "newCodeCoveredByTests": true
   },
-  "completedAt": "2026-09-11T05:26:36.180Z",
+  "completedAt": "2026-09-11T05:28:24.224Z",
   "iteration": "1",
-  "notes": "Five probes, final type-check, nine-owner self-check, and review-document validation pass. Architecture acceptance is pending. Publication rejected the required main-plan.md revisions as FILE_POLICY_VIOLATION; the exact proposed patch is preserved in managed results and the frozen file restored. A plan-authoring/control-plane revision must apply it before iteration 3. No I2 acceptance instance or reserved regression suite is claimed."
+  "notes": "One focused remediation attempt completed. The preserved main-plan patch applies cleanly; the frozen file remains baseline-identical. Five probe/source identities, forty warm samples, 176 unique instances and review-document links revalidated. No executable code changed or tests failed. functionalRequirementsSatisfied remains false: the workflow forbids the required main-plan.md update and offers no supported active-plan revision tool; architecture acceptance is still absent. User review must approve the package and arrange a control-plane plan revision, or explicitly revise the required decision location. Both deliverables updated through MCP; no publication call in this attempt."
 }
