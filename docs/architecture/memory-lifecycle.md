@@ -1,6 +1,6 @@
 # Memory lifecycle
 
-**Date:** 2026-09-07. **Status:** Decided resource-management requirements.
+**Date:** 2026-09-11. **Status:** Decided resource-management requirements.
 Numeric budgets, idle periods and detailed representations require measurement
 and review before implementation milestones claim these guarantees.
 
@@ -56,10 +56,9 @@ alone are insufficient when entries contain arbitrarily large source or results.
 
 | State | Owner and required policy |
 | --- | --- |
-| Compiler sessions and source inputs | Analysis/source adapter retains the current state required by each active context. Dispose inactive sessions; bound the number and total retained size of contexts. Do not create another session per MCP client, browser or query. |
+| Compiler sessions and source inputs | Analysis/source adapter retains the current state required by each active context, including the state that [fast incremental checks](daemon.md#fast-incremental-checks) depend on. Losing that state makes the next check slower and more conservative, never stale. Dispose inactive sessions; bound the number and total retained size of contexts. Do not create another session per MCP client, browser or query. |
 | Published and candidate analysis | Analysis/context publication retains the current revision and bounded in-flight work. Share unchanged immutable facts where practical; account for temporary overlap during publication. |
 | Historical revisions | Context retention has explicit byte/count/age limits and bounded request leases. Retain identifiers, evidence and supported historical content; do not keep a full compiler program per revision. |
-| Overlays | Bound clients, source bytes and retained bases. Close abandoned overlays and release their base references. A stale or evicted base returns a conflict/unavailable result. |
 | Optional enrichment and search | Use lazy, byte-bounded caches keyed by context/generation/revision and query. Cache eviction cannot alter completed enforcement results. |
 | Edit and analysis queues | Coalesce changes and supersede obsolete work. Bound queued bytes, concurrent analysis and enrichment; release canceled work's captured inputs. |
 | IPC/HTTP/MCP requests and responses | Bound message bodies, batches, result sizes and in-flight requests. Scope/page large queries so serialization does not create uncontrolled transient copies. |
@@ -139,7 +138,7 @@ Extend DA17 with the following measurements and acceptance witnesses:
 | --- | --- |
 | ML01 | Compare cold/idle CLI, batch, daemon with zero and active contexts, and web startup. Verify their runtime dependency boundaries. |
 | ML02 | A repeated edit/rebuild/query workload reaches a bounded memory plateau at fixed project size; old revisions, removed files and canceled tasks stop accumulating. |
-| ML03 | Repeated worktree/overlay open-close cycles evict eligible state. Global budgets apply across many individually small contexts. |
+| ML03 | Repeated worktree/context open-close cycles evict eligible state. Global budgets apply across many individually small contexts. |
 | ML04 | Oversized requests, rapid edits and slow subscribers exercise limits, reconciliation and explicit errors without losing enforcement semantics. |
 | ML05 | Repeated explorer open-close cycles terminate the idle web process, release its daemon leases and leave no additional compiler contexts or subscriptions. |
 | ML06 | Detail expansion, large result serialization and historical requests respect peak and retention budgets; unavailable enrichment remains distinguishable from zero/empty data. |

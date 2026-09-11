@@ -1,6 +1,6 @@
 # Processes and clients
 
-**Date:** 2026-09-10. **Status:** Batch checking, help and version are implemented.
+**Date:** 2026-09-11. **Status:** Batch checking, help and version are implemented.
 The resident/MCP/web topology is decided architecture for later delivery; its
 command spellings, complete contracts and wire details still require review.
 
@@ -61,8 +61,8 @@ role, not another Ramify-owned process or module.
 Direct clients, MCP and web adapters own no independent module discovery,
 compiler program or permissions catalog. They query the existing daemon. An MCP
 session or browser tab does not create another analysis context when it selects
-the same compatible project setup. Different worktrees, registries or overlays retain the isolation
-defined in [daemon and analysis](daemon.md).
+the same compatible project setup. Different worktrees or registries retain the
+isolation defined in [daemon and analysis](daemon.md).
 
 The ordinary daemon process does not host the web listener. This is a deliberate
 choice for memory reclamation, not a claim that HTTP requires another process.
@@ -126,7 +126,7 @@ configuration discovery, warnings and exits, is [CLI invocation](cli-invocation.
 
 | Command | Required behavior |
 | --- | --- |
-| `ramify check` | Connect to a compatible daemon, starting one if necessary; synchronize the requested inputs, obtain the check result, print it and exit. |
+| `ramify check` | Connect to a compatible daemon, starting one if necessary; synchronize the requested inputs, obtain the check result, print it and exit. Agent post-write hooks are its main use case and require the [fast incremental check](daemon.md#fast-incremental-checks) path. |
 | `ramify inspect ...`, `ramify explain ...` | Query the selected project's analysis with explicit freshness/revision semantics, print the result and exit. |
 | `ramify watch` | Keep a bounded subscription open and render published updates. The daemon owns watching and analysis. |
 | `ramify check --batch` | Load the engine only for this mode, create a fresh session, run the check and dispose it on exit. CI uses this independent mode. |
@@ -143,8 +143,8 @@ The watch command holds a live subscription, not an unbounded result history.
 
 Checking requests synchronized inputs explicitly. A watcher may be delayed, so
 the last published revision alone cannot prove that a just-saved file was checked.
-Inspection identifies whether it reads a published revision, synchronized disk
-state or an overlay, according to the [freshness contract](daemon.md#freshness-saves-and-overlays).
+Inspection identifies whether it reads a published revision or synchronized
+disk state, according to the [freshness contract](daemon.md#freshness-and-saves).
 
 Commands render structured results consistently and map known denials and
 unavailable checking to unsuccessful enforcement. Current `check --format json`
@@ -159,8 +159,9 @@ Batch execution uses the same engine and rules as retained execution. It starts
 neither server. After bounded daemon recovery fails, a terminating CLI command
 over reproducible disk inputs may use the batch fallback specified in
 [daemon recovery](daemon.md#transport-process-lifecycle-and-recovery).
-Report fallback use; do not silently substitute disk state for an overlay or
-current state for an unavailable historical revision.
+Report fallback use; do not silently substitute current state for an
+unavailable historical revision. Whether a hook-facing check may use this
+fallback is a [review item](daemon.md#decisions-still-requiring-review).
 Only terminating CLI commands may load the engine for in-process fallback;
 they dispose the session and exit. Watch, MCP, web and external service clients
 never load a fallback engine: they recover the daemon within the lifecycle
@@ -189,8 +190,8 @@ unavailable execution and known denials remain distinguishable. MCP session
 identity is separate from daemon context or revision identity; changing the
 selected project never silently reuses another worktree's state.
 
-The process releases its subscriptions, request references and owned overlay
-leases on stdio closure or termination, then exits. Abnormal process loss must
+The process releases its subscriptions and request references on stdio
+closure or termination, then exits. Abnormal process loss must
 also expire those daemon references. An open but idle MCP connection does not
 indefinitely pin historical revisions or require a warm compiler context without
 an active service lease. Subsequent requests can reopen an evicted context with

@@ -425,7 +425,7 @@ exists.
 ## Out of scope, deferred to later plans
 
 - Parser, loader, evaluator, and source checker: Phases 3 and 4, sequenced by
-  the [tooling architecture proposal](../tooling-architecture/README.md) once
+  the [tooling architecture proposal](../../roadmap.md) once
   it is approved.
 - Harness mutations and variants: E02's removed hop, E06, E08, E09, L02,
   L04, L05, L06, O03, O06, O07, R02's parent import of the private task

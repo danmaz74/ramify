@@ -1,6 +1,6 @@
 # Implementation workflow
 
-Each [roadmap](../plans/tooling-architecture/README.md) deliverable has a plan,
+Each [roadmap](../roadmap.md) deliverable has a plan,
 divided into implementation iterations. Follow the active plan's scope and
 acceptance criteria.
 
@@ -17,7 +17,7 @@ contracts and reports beside the plan; follow the
 ## Define the iterations
 
 Split a plan into iterations as the roadmap's
-[authoring rules](../plans/tooling-architecture/README.md#how-to-author-each-later-plan)
+[authoring rules](../roadmap.md#how-to-author-each-later-plan)
 require: one owner or one capability each, sized for a single 250k-token
 context, registered in `iterations/manifest.json` in dependency order. Each
 iteration file is self-contained and uses the headings of the existing ones:

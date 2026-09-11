@@ -1,24 +1,29 @@
 # Ramify implementation roadmap
 
-**Date:** 2026-09-10. **Status:** Plan 1 is complete. Its batch engine, CLI and
+**Date:** 2026-09-11. **Status:** Plan 1 is complete. Its batch engine, CLI and
 self-check are merged on `main`, where the unfiltered 308-instance gate passed
-on 2026-09-10; the [completion report](../done/iteration-1-project-verifier/iterations/iteration15-results.md)
-records the evidence and the inputs carried forward. Plans 2–6 have the
-authoring briefs below and no detailed plan yet.
+on 2026-09-10; the [completion report](plans/done/iteration-1-project-verifier/iterations/iteration15-results.md)
+records the evidence and the inputs carried forward. Plans 2–4 and 6 have
+the authoring briefs below; Plan 2 also has a draft detailed plan.
 Implementation completion must be established by each plan's evidence.
 
-The intended system is defined in the [architecture documents](../../architecture/README.md).
+**Provisional revision, 2026-09-11:** overlays are removed and Plan 5 is
+withdrawn. A deliverable for [fast incremental checks](#pending-fast-incremental-checks),
+whose main use case is agent post-write hooks, will be added; its brief and
+position in the sequence are not yet written.
+
+The intended system is defined in the [architecture documents](architecture/README.md).
 They own the decided process/client, resource and testing architecture, plus
 the proposed module tree, exposure paths, retained state and synchronization.
 This roadmap owns the review process and sequence of working deliverables. Each
 deliverable has one plan, run as a sequence of iterations each sized for a
 single 250k-token implementation context; architecture review, migration and
 verification are tasks within those iterations. The first detailed plan is
-[Plan 1: Verify a real Ramify project](../done/iteration-1-project-verifier/main-plan.md).
+[Plan 1: Verify a real Ramify project](plans/done/iteration-1-project-verifier/main-plan.md).
 Batch delivery is followed by the resident daemon as a committed architectural
 capability, rather than treating retained analysis as an optional optimization.
 
-Terminology: a **plan** is one of the six deliverables below; an **iteration**
+Terminology: a **plan** is one of the deliverables below; an **iteration**
 is a unit of work inside a plan, sized for one implementation context. The
 architecture documents' "batch iteration" and "resident iteration" refer to
 Plans 1 and 2. Plan directories keep the historical `iteration-N-` prefix.
@@ -34,9 +39,10 @@ authoritative for runtime behavior; this roadmap owns scheduling and handoffs.
 Deliver a reusable analysis engine and local daemon, with a CLI that can use the
 retained analysis or run the same checks in batch mode. Batch checking is the
 first deliverable; the next adds project contexts, file watching, exact-content
-synchronization and retained checks. Richer inspection and explanations, MCP,
-overlays and the explorer follow through the same analysis contracts. Keep the
-existing diagram/site behavior working throughout migration.
+synchronization and retained checks. Fast incremental checks for agent
+post-write hooks, richer inspection and explanations, MCP and the explorer
+follow through the same analysis contracts. Keep the existing diagram/site
+behavior working throughout migration.
 
 The decided process model is a lightweight CLI, resident analysis daemon and
 separate on-demand web process. Ordinary CLI commands use local IPC directly;
@@ -46,15 +52,15 @@ The later root-level `mcp [dispatch]` module serves stdio through the lazily loa
 `ramify mcp` mode and calls the same daemon directly. It can be implemented before
 visualization; optional MCP HTTP hosting can later use the separate web process.
 
-The [project-explorer reuse analysis](../../analysis/project-explorer-reuse.md)
+The [project-explorer reuse analysis](analysis/project-explorer-reuse.md)
 identifies source to lift during that later visualization phase. Review its
 required facts, query boundaries and revision guarantees in the initial contract
 review so the initial backend can support that client. UI extraction and browser transport
 remain later deliverables; no empty visualization modules are needed now.
 
-The [Collection Review plan](../reference-project/README.md), its
-[implementation plan](../reference-project/implementation.md), and the
-[reference harness](../reference-project/harness.md) remain independent work.
+The [Collection Review plan](plans/reference-project/README.md), its
+[implementation plan](plans/reference-project/implementation.md), and the
+[reference harness](plans/reference-project/harness.md) remain independent work.
 The reference application now has fifteen owners, including a standalone
 `integration-tests [testing, dispatch]` owner whose ordinary `src/` contains
 the Cucumber scenario. Re-inventory the actual project before each plan;
@@ -72,7 +78,7 @@ meaningful tests; existing APIs cannot override the definitive principles.
 
 ## Architecture review
 
-Review the [eleven-owner tree](../../architecture/daemon.md#ramifys-ownership-tree)
+Review the [eleven-owner tree](architecture/daemon.md#ramifys-ownership-tree)
 and the relevant contracts before coding. Nine owners are implemented in the
 batch plan; daemon and contexts complete that tree in Plan 2. In
 particular, confirm:
@@ -93,7 +99,7 @@ particular, confirm:
   evidence for actual IPC, HTTP, processes and browser behavior.
 
 Runtime decisions still requiring detail are listed in the architecture's
-[open decisions](../../architecture/daemon.md#decisions-still-requiring-review).
+[open decisions](architecture/daemon.md#decisions-still-requiring-review).
 Approval of this review does not resolve the unspecified registry configuration
 format or add any new importability rule.
 
@@ -119,7 +125,7 @@ contracts with their own delivery plan.
 4. Build, test and package configuration for the nested tree, preserving portable
    and browser boundaries separately from Node analysis and executable code.
 5. For the daemon plan: wire protocol, context identity, context-to-daemon
-   grouping/discovery, synchronization, overlay isolation and compatibility choices for the first
+   grouping/discovery, synchronization and compatibility choices for the first
    daemon milestone. Specify retention budgets, backpressure, client leases,
    idle disposal and recovery behavior. The separate web process is decided;
    its detailed HTTP/event wiring remains a later capability.
@@ -143,20 +149,22 @@ cannot import UI contracts. Do not weaken tags to preserve the old combined barr
 Each plan delivers a usable capability and has an explicit completion gate.
 A requested missing or unrun checker stage cannot count as passed. Completed
 bounded analysis with documented coverage limits is a different outcome, as
-specified by the source principles. Plans 2–6 below are the proposed sequence;
-their detailed plans are written before their implementation.
+specified by the source principles. Plans 2–4 and 6 below are the proposed
+sequence; their detailed plans are written before their implementation. Plan 5
+is withdrawn, and the pending fast-check deliverable has no position yet.
 
 | Plan | Working deliverable | Required predecessors | Plan artifact |
 | --- | --- | --- | --- |
-| [1. Verify a project](#plan-1-batch-project-verification) | Complete: the batch engine/CLI checks the real reference and Ramify itself, and the 308-instance gate passed on `main`. | None. | [Detailed Plan 1](../done/iteration-1-project-verifier/main-plan.md); [completion evidence and limits](../done/iteration-1-project-verifier/iterations/iteration15-results.md). |
-| [2. Keep verification current](#plan-2-resident-verification) | A resident daemon watches, reconciles and checks projects through local CLI commands. | Plan 1. | Brief below; detailed plan not yet written. |
+| [1. Verify a project](#plan-1-batch-project-verification) | Complete: the batch engine/CLI checks the real reference and Ramify itself, and the 308-instance gate passed on `main`. | None. | [Detailed Plan 1](plans/done/iteration-1-project-verifier/main-plan.md); [completion evidence and limits](plans/done/iteration-1-project-verifier/iterations/iteration15-results.md). |
+| [2. Keep verification current](#plan-2-resident-verification) | A resident daemon watches, reconciles and checks projects through local CLI commands. | Plan 1. | Brief below; [Detailed Plan 2](plans/iteration-2-resident-verification/main-plan.md), a draft awaiting its iteration 1 contract review. |
 | [3. Understand a project](#plan-3-project-inspection) | CLI/service inspection of ownership, purpose, contracts, availability and observed dependencies. | Plans 1–2. | Brief below; detailed plan not yet written. |
 | [4. Use Ramify through MCP](#plan-4-mcp-access) | A host-launched stdio adapter exposes the daemon's checks and inspection. | Plan 2's service and Plan 3's queries for this deliverable's full scope. | Brief below; detailed plan not yet written. |
-| [5. Check proposed changes](#plan-5-change-previews) | CLI/MCP clients check isolated unsaved edits and compare their effects. | Plans 2–3; Plan 4 for the MCP surface. | Brief below; detailed plan not yet written. |
-| [6. Explore visually](#plan-6-project-explorer) | A standalone live explorer through a separate tRPC web process. | Plans 2–3; optional integrations may consume Plans 4–5. | Brief below; detailed plan not yet written. |
+| [5. Withdrawn](#plan-5-withdrawn) | Checking unsaved proposed edits through overlays. Removed on 2026-09-11; Ramify checks saved files only. | — | None. |
+| [Pending: fast incremental checks](#pending-fast-incremental-checks) | Agent post-write hooks get fast checks after one or a few files change. | Plan 2. | Brief and position not yet written. |
+| [6. Explore visually](#plan-6-project-explorer) | A standalone live explorer through a separate tRPC web process. | Plans 2–3; optional integrations may consume Plan 4. | Brief below; detailed plan not yet written. |
 
 The numbering is the proposed implementation order. Dependency requirements
-are narrower: the explorer can be delivered without MCP or overlays, and a
+are narrower: the explorer can be delivered without MCP, and a
 check-only MCP adapter could be delivered after Plan 2. The planned Plan 4
 also exposes inspection, so its full gate includes Plan 3. Keep any rescheduling
 explicit rather than silently deleting capabilities from a plan.
@@ -168,12 +176,12 @@ Suggested future directories are `iteration-2-resident-verifier`,
 reserved names, not existing artifacts. Replace the brief's status with a real link when its plan is written;
 do not create empty plans or broken links in advance.
 
-Future identity, freshness, query and overlay requirements inform the first
+Future identity, freshness and query requirements inform the first
 engine contract review. Their complete protocols are reviewed with the relevant
 plan. Presentation migration accompanies its changed model dependencies;
 existing diagrams do not wait for the explorer.
 
-MCP delivery does not depend on overlays or visualization. Streamable HTTP is
+MCP delivery does not depend on visualization. Streamable HTTP is
 optional and requires its own session/lifecycle plan; it is not required by
 Plan 4 or Plan 6.
 
@@ -182,9 +190,9 @@ capabilities is completed only when all its scheduled parts have evidence:
 
 | Case family | Plans 1–2 | Later plans |
 | --- | --- | --- |
-| [PC01–PC10](../../architecture/processes-and-clients.md#acceptance-evidence) | 1: batch/help startup and applicable PC01 checks. 2: PC01–PC04/PC09, daemon parts of PC06, local-service PC07 and CLI/direct-client PC10. | 3: query-client equivalence; 4: PC08 and MCP portions of PC06–PC07/PC10; 6: PC05 and web portions including PC10. Optional HTTP MCP cases apply only when implemented. |
-| [ML01–ML08](../../architecture/memory-lifecycle.md#measurement-and-acceptance) | 1: batch peak memory, result retention and disposal. 2: resident entry footprint, context/history/work bounds, repeated edits and local slow consumers. | 3: bounded inspection/enrichment; 4: ML08 stdio portions; 5: overlay limits; 6: web/browser footprint, serialization and ML05 open-close cycles. |
-| [QT01–QT08](../../architecture/quick-testing.spec.md#complementary-verification) | 1: batch QT01/QT03 and actual CLI process cases. 2: IPC QT04, daemon QT05 and relevant resource QT07. | 3: real query flows; 4: QT08; 5: real overlay flows; 6: QT02/QT06, HTTP QT04, web QT05 and remaining resource QT07. |
+| [PC01–PC10](architecture/processes-and-clients.md#acceptance-evidence) | 1: batch/help startup and applicable PC01 checks. 2: PC01–PC04/PC09, daemon parts of PC06, local-service PC07 and CLI/direct-client PC10. | 3: query-client equivalence; 4: PC08 and MCP portions of PC06–PC07/PC10; 6: PC05 and web portions including PC10. Optional HTTP MCP cases apply only when implemented. |
+| [ML01–ML08](architecture/memory-lifecycle.md#measurement-and-acceptance) | 1: batch peak memory, result retention and disposal. 2: resident entry footprint, context/history/work bounds, repeated edits and local slow consumers. | 3: bounded inspection/enrichment; 4: ML08 stdio portions; 6: web/browser footprint, serialization and ML05 open-close cycles. |
+| [QT01–QT08](architecture/quick-testing.spec.md#complementary-verification) | 1: batch QT01/QT03 and actual CLI process cases. 2: IPC QT04, daemon QT05 and relevant resource QT07. | 3: real query flows; 4: QT08; 6: QT02/QT06, HTTP QT04, web QT05 and remaining resource QT07. |
 
 Browser-promise verification is a separate capability. Plan and implement its
 algorithm explicitly before claiming it ran; the availability checker continues
@@ -192,7 +200,7 @@ to match declared promises according to the definitive rules.
 
 ## Plan 1: Batch project verification
 
-**Detailed artifact:** [Plan 1: Verify a real Ramify project](../done/iteration-1-project-verifier/main-plan.md).
+**Detailed artifact:** [Plan 1: Verify a real Ramify project](plans/done/iteration-1-project-verifier/main-plan.md).
 Its iteration sequence and I1-01–I1-30 instance matrix are the completion
 authority for this deliverable. Do not duplicate or replace that matrix here.
 
@@ -202,7 +210,7 @@ passed the unfiltered gate on `main` on 2026-09-10, including toolkit and
 relocation evidence, and the measured batch costs meet the reviewed budgets;
 the completion report linked above records the artifacts.
 Daemon, watching, incremental invalidation, Ramify MCP and browser verification
-remain unavailable. See the [batch usage guide](../../development/batch-verification.md).
+remain unavailable. See the [batch usage guide](development/batch-verification.md).
 
 **Working outcome.** `ramify check`, run inside the project or given
 `--root`, checks real descriptions,
@@ -225,7 +233,8 @@ provenance in results so Plan 3 can query it.
 
 ## Plan 2: Resident verification
 
-**Detailed plan:** not yet written. **Prerequisite:** met on 2026-09-10; Plan 1's
+**Detailed plan:** [Plan 2: Keep verification current](plans/iteration-2-resident-verification/main-plan.md),
+a draft awaiting its iteration 1 contract review. **Prerequisite:** met on 2026-09-10; Plan 1's
 batch engine, source scope, self-check and strict reference gate are complete
 on `main`.
 
@@ -300,14 +309,15 @@ no owner or independent analyzer.
    idle exit; an explicit stop suppresses restart by existing clients. Specify
    finite retry/startup limits. Only terminating CLI commands may use visible
    in-process batch fallback; watch and other long-lived clients report unavailable
-   after exhausted recovery. Never substitute disk/current state for an operation
-   that requires an unavailable overlay or historical input.
+   after exhausted recovery. Never substitute current state for an operation
+   that requires an unavailable historical input.
 8. User-facing command arguments, output and exits, preserving Plan 1's
    distinction between denial, incomplete execution and bounded coverage.
 
-Overlay execution, new inspection commands, MCP and HTTP are excluded.
-Keep future overlay/query fields extensible and advertise the exact current
-capabilities; no unimplemented mode can pass a request.
+New inspection commands, MCP and HTTP are excluded. Plan 2's stage reuse is
+the starting point for the pending fast-check deliverable, which Plan 2 does
+not complete. Keep future query fields extensible and advertise the exact
+current capabilities; no unimplemented mode can pass a request.
 
 ### Required evidence and next-plan inputs
 
@@ -334,7 +344,7 @@ local-service PC07, CLI/direct-client PC10 and the applicable ML/QT cases. Inclu
   warm and broad rebuilds plus 100/500/1,000-owner fixtures; include queued bytes,
   history, contexts, heap, buffers, RSS and peak publication allocations.
   Check in measurement fixtures and preserve versioned raw results using the
-  [measurement recipe](../../architecture/memory-lifecycle.md#repeatable-setup-measurements)
+  [measurement recipe](architecture/memory-lifecycle.md#repeatable-setup-measurements)
   and separately instrumented resident workloads.
 
 Hand off a documented client API, lifecycle/error tables, codecs, revision and
@@ -393,7 +403,7 @@ usage and unused available exports in contract inspection.
 7. Query cache limits and keys, enrichment scheduling/cancellation and reporting
    completion to clients. Unknown/missing information must not become zero.
 
-The [reuse analysis](../../analysis/project-explorer-reuse.md#what-to-lift-from-cucumber-viz)
+The [reuse analysis](analysis/project-explorer-reuse.md#what-to-lift-from-cucumber-viz)
 identifies declaration extraction, surface rendering and bounded search helpers
 to evaluate here. Lift useful algorithms with their tests and adapt them to
 Ramify originals and revision inputs. Do not copy barrel discovery, automatic
@@ -463,7 +473,7 @@ resources and does not stop the resident daemon.
    and focused tests that launch the actual stdio executable.
 7. Aggregate memory bounds with several simultaneous hosts, not just one adapter.
 
-Follow the [MCP placement and lifetime](../../architecture/processes-and-clients.md#mcp-server)
+Follow the [MCP placement and lifetime](architecture/processes-and-clients.md#mcp-server)
 already selected. Streamable HTTP, prompts for new agent workflows, agent
 launching and write automation are not required by this plan.
 
@@ -485,77 +495,39 @@ fixtures, dependency/runtime versions and raw multi-host memory results.
 
 Hand off tool/resource schemas, host launch configuration, protocol compatibility
 rules, real-client test helpers, error examples and lifecycle measurements.
-Plan 5 adds overlay operations through this same adapter.
 
-## Plan 5: Change previews
+## Plan 5: Withdrawn
 
-**Detailed plan:** not yet written. **Prerequisites:** Plan 2's contexts,
-history/freshness contracts and budgets; Plan 3's inspection queries; Plan 4 for MCP
-delivery. A CLI-only implementation can precede MCP if scheduling is revised.
+Plan 5, *Change previews*, would have checked unsaved proposed edits in
+isolated overlays. It was withdrawn on 2026-09-11, and overlays are removed
+from the architecture: Ramify checks saved files only. Plans 1–4 and 6 keep
+their numbers.
 
-**Working outcome.** A user or agent supplies proposed edits, checks their
-architectural effects and inspects changed contracts/findings without writing
-the project. Two simultaneous proposals remain isolated from disk and each other.
+## Pending: fast incremental checks
 
-### Ownership and required implementation
+**Detailed plan:** not yet written; this entry is provisional.
+**Prerequisite:** Plan 2's contexts, synchronized checks, stage reuse and
+measured limits.
 
-Extend contexts with overlay lifecycle/versioning, project input views with
-virtual file content/membership, and analysis with overlay checking using the
-same parser, resolver and model. Root service contracts, CLI and MCP expose the
-operations. No parallel overlay evaluator or application write service is added.
+The [fast incremental check](architecture/daemon.md#fast-incremental-checks)
+requirement is the reason the checker stays resident. When one or a few files
+change, a synchronized check must do work proportional to the change and
+finish quickly. The main use case is agent post-write hooks, which run a check
+after every file an agent writes and return violations before the agent
+continues.
 
-The minimum useful preview supports source and description edits, additions,
-deletions and renames, with resource existence and resolution using that same
-view. This permits previews of exposure edits and source-area/module moves.
-Freeze any additional configuration/registry-edit capabilities explicitly;
-an unsupported input class must be rejected as unavailable rather than ignored.
-
-### Resolve while writing the detailed plan
-
-1. Overlay identifiers, owning client/session, base context/generation/revision,
-   per-file client versions, change representation and overlay revision tokens.
-2. Create/update/check/query/compare/close operations and concrete CLI/MCP
-   input formats. Select whole-file bytes or a precise patch contract, including
-   addition/deletion/rename semantics and validation.
-3. Base retention and staleness: when disk/base changes cause a conflict, whether
-   explicit rebasing is offered, and how an evicted base or restarted daemon is
-   reported. No automatic merge or disk substitution is implied.
-4. Virtual discovery, configuration/resource reads and compiler input coherence.
-   A proposed new `module.ramify` must affect ownership in the overlay; files
-   removed in the overlay must not reappear through a disk fallback read.
-5. Comparison semantics for findings, coverage, expanded contracts and affected
-   consumers. Binding identity is not guaranteed through arbitrary renames:
-   label additions/removals unless an explicit mapping establishes continuity.
-6. Limits on overlay count, source bytes, base/history leases, concurrent checks,
-   idle lifetime and output size. Define cleanup on cancellation/client loss.
-7. Exact saved-disk versus unsaved-overlay mode behavior. A successful preview
-   does not claim the same inputs have been saved or authorize writes.
-
-### Required evidence and next-plan inputs
-
-Execute DA11, overlay portions of DA02–DA04/DA10/DA12/DA15/DA17,
-ML03–ML04/ML06–ML08 and the applicable CLI/MCP lifecycle tests.
-
-Demonstrate independent overlays with opposite exposure changes; edits to an
-unchanged consumer's provider; adding an interface export; production/testing
-source moves; removed resources; and invalid proposed declarations. Assert
-that disk bytes and other clients' results are unchanged.
-
-Compare overlay results with a fresh batch check of an isolated materialization
-of exactly those effective inputs. Deliberately stale bases, conflicting client
-versions, context restart, cancellation, abandoned clients and memory pressure
-must produce their named outcomes and release eligible state.
-
-Hand off the overlay change format, lifecycle/error table, comparison result
-schema, capability restrictions, temporary-materialization oracle and resource
-measurements. Any later preview UI can consume these contracts; this plan
-does not require adding that UI.
+A brief for this deliverable will be added once its design is reviewed. It
+will fix the deliverable's position in the sequence, owners, decisions to
+resolve, evidence and handoff. Its evidence starts from DA11, the hook-latency
+portions of DA17 and the architecture's
+[open review item](architecture/daemon.md#decisions-still-requiring-review)
+for the hook path.
 
 ## Plan 6: Project explorer
 
 **Detailed plan:** not yet written. **Prerequisites:** Plan 2's revisioned
-service/notifications and Plan 3's inspection/evidence queries. MCP and overlays
-are optional integrations, not prerequisites for the core explorer.
+service/notifications and Plan 3's inspection/evidence queries. MCP is an
+optional integration, not a prerequisite for the core explorer.
 
 **Working outcome.** `ramify explore <root>` starts or reuses the separate
 web process and opens a live module explorer. A user navigates the ownership
@@ -577,7 +549,7 @@ rendering and interactions supplied with neutral data and UI callbacks.
 Geometry uses layout through legal exposure; root may declaration-relay UI
 contracts without importing UI values.
 
-Use the [source reuse analysis](../../analysis/project-explorer-reuse.md)
+Use the [source reuse analysis](analysis/project-explorer-reuse.md)
 as the extraction inventory. Reinspect the actual source and tests when
 authoring this plan; the analysis records a point-in-time investigation.
 
@@ -621,9 +593,9 @@ counting and global semantic caches. The web process owns no second analyzer.
    plus a direct event channel. Define the separate actual HTTP/process/browser
    suite for behavior that this harness cannot establish.
 
-Streamable HTTP MCP hosting and an overlay preview screen require explicit
-additional scope if desired. If HTTP MCP hosting is included, active MCP leases
-participate in web lifetime; browser closure alone cannot stop their server.
+Streamable HTTP MCP hosting requires explicit additional scope if desired. If
+it is included, active MCP leases participate in web lifetime; browser closure
+alone cannot stop their server.
 
 ### Required evidence and next-plan inputs
 
@@ -660,8 +632,8 @@ source/architecture document; do not depend on conversation history.
 | Plan 1 | Implemented package/session/report contracts; canonical source/export facts and exposure evidence; reference instance map; scope/configuration/compiler decisions; self-check and batch resource results. | All later plans. |
 | Plan 2 | Context/generation/revision and freshness contracts; local codecs/client; event ordering and distinct idle-exit/crash/explicit-stop rules; restricted fallback policy; daemon-owned direct-service harness; measured limits and per-platform transport details. | Plans 3–6. |
 | Plan 3 | Inspection/availability/query schemas; source and original drill-down IDs; usage/counting definitions; detail/cursor/error states; bounded enrichment and consumer fixtures. | Plans 4–6. |
-| Plan 4 | MCP tool/resource schemas and host launch setup; protocol/session lifecycle; actual and in-memory protocol clients; capability and error mapping. | Plan 5 and optional later MCP hosting. |
-| Plan 5 | Overlay input/lifecycle/version contract; comparison result schema; supported edit classes; conflict/eviction examples and materialized-input batch oracle. | Optional explorer preview UI and future editor integrations. |
+| Plan 4 | MCP tool/resource schemas and host launch setup; protocol/session lifecycle; actual and in-memory protocol clients; capability and error mapping. | Optional later MCP hosting. |
+| Fast incremental checks (pending) | Defined with its brief; provisionally the hook-facing check contract, latency measurements and retained-state bounds. | Check clients, including agent hooks and MCP. |
 | Plan 6 | Reusable view exports/props, web lifecycle and query-to-view contracts; extraction provenance; quick/HTTP/browser evidence and measured memory behavior. | Consuming applications and later visualization features. |
 
 Across every handoff, preserve the distinctions between original and accessed
@@ -724,7 +696,7 @@ A plan's detailed matrix may refine the scheduling map, but must explain any
 changed scope and retain unresolved portions. Plan creation, passing metadata
 validation or a clean build is not implementation completion.
 
-## Work outside the six baseline deliverables
+## Work outside the baseline deliverables
 
 The roadmap does not imply that every reference family, runtime construct or
 separate policy is complete after Plan 6. Keep the following visible when
@@ -738,7 +710,7 @@ writing future plans; they do not block the current Plan 1 gate.
 | Reference browser/tool compatibility | The reference application's K cases exercise its own runtime. They are distinct from tests of Ramify's explorer; existing Cucumber execution does not establish every browser/tool case. | Extend the independent reference harness when those fixtures are implemented; attach source assertions only when the corresponding adapter exists. |
 | Browser-promise verification | Matching the declared browser tag is part of ordinary checking. Proving the promise is a separate verifier with its own capability, coverage and owner findings. | A separately scoped plan if verification is requested. Until then, requesting it returns unavailable. |
 | MCP Streamable HTTP | Optional hosting of the same MCP module in the web process; no MCP-to-tRPC forwarding layer. | Only when HTTP hosting is needed; specify MCP sessions, cancellation/reconnect, local access policy and shared web lifetime. |
-| Preview UI, discussion and host/editor integrations | Overlay service operations and injected UI integration points can be reused. Agent launching, write authority and host workflow lifecycle remain separate responsibilities. | Concrete consumer needs justify their own adapters and cases, including remaining H04 portions. |
+| Discussion and host/editor integrations | Injected UI integration points can be reused. Agent launching, write authority and host workflow lifecycle remain separate responsibilities. | Concrete consumer needs justify their own adapters and cases, including remaining H04 portions. |
 | Advanced search, metrics and placement suggestions | Query facts are reusable; ranking, complexity formulas and proposed architecture edits are additional features. Availability alone does not approve a new exposure or a write. | After defining the user workflow, counting/scoring semantics, scope and output limits. |
 | Persistent caches, worker pools and process recycling | No requirement to add them speculatively. They must preserve context generations, input identity and explicit unavailable/recovery results. | Only after measurements identify a problem and demonstrate a useful improvement. |
 | Design probes P01–P06 and independent policies X01–X02 | Probes are not adopted rules. Naming/API quality, cycles and build/bundling policies are not importability checks. | Separate explicit design or policy work; do not turn them into baseline acceptance failures. |
@@ -763,9 +735,9 @@ because both modes share the same engine.
 
 Measure cold analysis, warm edits, provider/description/configuration changes,
 query latency and memory with representative projects and synthetic owner counts.
-Use the [memory measurement requirements](../../architecture/memory-lifecycle.md#measurement-and-acceptance)
+Use the [memory measurement requirements](architecture/memory-lifecycle.md#measurement-and-acceptance)
 for repeated-use plateaus, peak allocation, global budgets and reclamation.
-Start setup comparisons with the [checked-in probe](../../../scripts/memory-probe.mjs),
+Start setup comparisons with the [checked-in probe](../scripts/memory-probe.mjs),
 then add real-entry fixtures and runtime workloads as each plan is implemented.
 Retain exact recipes, input fixtures, environment/dependency versions and raw
 results; the historical setup figures alone are not acceptance evidence.

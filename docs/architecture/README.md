@@ -21,9 +21,10 @@ connection. Ordinary CLI commands, MCP and web adapters consume the same daemon
 service. Batch execution runs the same engine independently inside the CLI
 process.
 
-The daemon retains useful analysis state within explicit resource limits. MCP,
-web and development dependencies have separate lifetimes, so an adapter can exit
-and reclaim its memory without discarding warm analysis.
+The daemon retains analysis state within explicit resource limits so that a
+check after a small edit is fast; agent post-write hooks are the main use case.
+MCP, web and development dependencies have separate lifetimes, so an adapter can
+exit and reclaim its memory without discarding warm analysis.
 
 ## Document responsibilities
 
@@ -35,7 +36,7 @@ and reclaim its memory without discarding warm analysis.
 | [Quick testing](quick-testing.spec.md) | In-process execution of real client/service flows, the boundaries replaced in quick mode, and complementary transport/process tests. |
 | [CLI invocation](cli-invocation.spec.md) | How `ramify check` selects the project, finds the compiler configuration, treats files outside modules, reports and exits. |
 
-The [tooling roadmap](../plans/tooling-architecture/README.md) owns migration and
+The [tooling roadmap](../roadmap.md) owns migration and
 delivery order. Its first detailed plan is
 [batch project verification](../plans/done/iteration-1-project-verifier/main-plan.md),
 followed by resident checking. The [project-explorer reuse analysis](../analysis/project-explorer-reuse.md)
