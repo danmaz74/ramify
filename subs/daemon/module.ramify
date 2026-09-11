@@ -1,13 +1,17 @@
 ramify 1
 module daemon tagged [dispatch]
 
-// N1: real ports; the service awaits the context manager.
+// N1: in-process service binding and real ports.
+expose-src createDaemonService, dispatchServiceRequest from "service.ts" to parent
 expose-src createFilesystemWatcher from "filesystem-watcher.ts" to parent
 expose-src createSystemClock from "system-clock.ts" to parent
-// N2: discovery is independent of the missing wire and service providers.
+// N2: lightweight client, codec and discovery.
+expose-src connectDaemon from "connect-daemon.ts" to parent
+expose-src encodeMessage, decodeMessage from "codec.ts" to parent
 expose-src selectEndpoint, readDaemonRecord from "discovery.ts" to parent
-// N4: implemented independent lifecycle vocabulary only.
+// N3: the process host.
+expose-src startDaemon from "start-daemon.ts" to parent
+// N4: owned transport, lifecycle and service-binding vocabulary.
 expose-src * from "interfaces/daemon.ts" to parent
-
-// N5: only the context vocabulary and controlled ports currently implemented.
-expose-sub ContextId, GenerationId, RevisionId, LeaseId, ContextToken, ContextSetup, ContextSelection, InputFingerprints, WatchEvent, WatcherHandle, WatcherPort, ClockPort, createControlledWatcher, createControlledClock, ControlledWatcher, ControlledClock from contexts to parent
+// N5: neutral context vocabulary, ports and controlled test ports relayed unchanged.
+expose-sub AnalysisDriver, ContextId, GenerationId, RevisionId, LeaseId, ContextToken, ContextSetup, ContextSelection, InputFingerprints, RevisionCause, ContextRevision, ContextState, SynchronizationState, ContextStatus, ExpectedContent, Freshness, FreshnessRecord, CheckRequest, UnavailableReason, Unavailable, CheckOutcome, OpenOutcome, ContextEvent, SubscriptionHandle, WatchEvent, WatcherHandle, WatcherPort, ClockPort, ContextBudgets, ContextManagerOptions, ContextManager, createControlledWatcher, createControlledClock, ControlledWatcher, ControlledClock from contexts to parent

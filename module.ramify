@@ -3,8 +3,10 @@ module "ramify" tagged [dispatch]
 
 // R1: invocation vocabulary for the injected CLI operation.
 expose-src * from "interfaces/batch.ts" to descendants
-// R6: implemented independent service vocabulary; the full interface awaits contexts.
+// R6: dispatch-facing service vocabulary, implemented by daemon.
 expose-src * from "interfaces/service.ts" to descendants
+// R8: testing-only quick environment for CLI, daemon and root tests.
+expose-test createQuickEnvironment, QuickEnvironment from "quick-environment.ts" to descendants
 
 expose-sub ModuleId, TagName, TagKind, TagDefinition, ResolvedTagRegistry, SourceLocation, ModelIssue, ModelResult, SourceArea, ModuleRecord, OriginalId, SourceOrigin, Original, Destination, Exposure, ModelInput, Model, ExposureHop, VisibilityDecision, BindingRequest, ImportQuestion, TagRequirement, ImportReason, ImportDecision, resolveTagRegistry, createDefaultTagRegistry, deriveSourceAreas, assignOriginalTags, originalKey, buildModel, explainVisibility, explainImport from analysis to descendants
 
@@ -12,16 +14,16 @@ expose-sub ModuleId, TagName, TagKind, TagDefinition, ResolvedTagRegistry, Sourc
 expose-sub TextSpan, DescriptionToken, DescriptionIssue, NamedSelection, DescriptionSelection, DescriptionStatement, DescriptionDocument, ParsedDescription, DescriptionParser, LinkInputs, ExpandedSelection, LinkIssue, LinkedDescriptions from analysis to descendants
 
 // R4: project vocabulary relayed unchanged from analysis.
-expose-sub ProjectRequest, ProjectScope, CapturedInput, InventoryArea, ModulePurpose, InventoryModule, InventoryFile, ExactReference, OutsideSourceWarning, ProjectInventory, ProjectIssue, AcquisitionLimits, ProjectInputView, ProjectReadOptions, ProjectRead from analysis to descendants
+expose-sub ProjectRequest, ProjectScope, CapturedInput, InventoryArea, ModulePurpose, InventoryModule, InventoryFile, ExactReference, OutsideSourceWarning, ProjectInventory, ProjectIssue, AcquisitionLimits, ProjectInputView, ProjectReadOptions, ProjectRead, ProjectResolution, RetainedConfiguration from analysis to descendants
 
 // R4: source catalog vocabulary relayed unchanged from analysis.
 expose-sub CatalogOriginal, CatalogExport, FileExports, SourceCatalog, SourceTarget, WrittenForm, AccessSelection, SourceAccess, SourceLimit, SourceWorkLimits, SourceAnalysisInputs, SourceAnalysis from analysis to descendants
 
 // R3: complete analysis report and operation vocabulary.
-expose-sub Capability, StageId, RunControl, AnalysisLimits, AnalysisInputs, InventoryInputs, InventorySnapshot, InventoryRun, ValidationRun, CapabilityExecution, StageExecution, AnalysisCode, AnalysisDiagnostic, AccessResult, AnalysisSnapshot, AnalysisSummary, AnalysisReport, AnalysisRun, AnalysisSession from analysis to descendants
+expose-sub Capability, StageId, RunControl, AnalysisLimits, AnalysisInputs, InventoryInputs, InventorySnapshot, InventoryRun, ValidationRun, CapabilityExecution, StageExecution, AnalysisCode, AnalysisDiagnostic, AccessResult, AnalysisSnapshot, AnalysisSummary, AnalysisReport, AnalysisRun, AnalysisSession, InputChange, RetainedStageId, RetainedStage, RetainedAnalysis, IncrementInputs, IncrementRun from analysis to descendants
 
 // R5: declaration-only UI relay; root source imports none of these.
 expose-sub DiagramDefinition, TreeDiagramDefinition, FocusDiagramDefinition, ModelDiagramProps, ModelDiagramInteractiveProps, TreeDiagramProps, FocusDiagramProps, ModelDiagram, ModelDiagramSvg, TreeDiagram, TreeDiagramSvg, FocusDiagram, FocusDiagramSvg, shopDiagram, example1Diagram, example1aDiagram, example1bDiagram, example2Diagram, example3Diagram, example4Diagram, shopTreeDiagram, shopFocusDiagram from presentation to descendants
 
-// R7: all implemented resident vocabulary and controlled test ports; remaining names await providers.
-expose-sub ContextId, GenerationId, RevisionId, LeaseId, ContextToken, ContextSetup, ContextSelection, InputFingerprints, WatchEvent, WatcherHandle, WatcherPort, ClockPort, DaemonInstance, LogEntry, DaemonBudgets, EndpointSelection, DaemonRecord, StopDisposition, Handshake, ConnectTimeouts, ConnectOptions, ConnectionState, DisconnectReason, createControlledWatcher, createControlledClock, ControlledWatcher, ControlledClock from daemon to descendants
+// R7: resident vocabulary and controlled test ports relayed unchanged from daemon.
+expose-sub ContextId, GenerationId, RevisionId, LeaseId, ContextToken, ContextSetup, ContextSelection, InputFingerprints, RevisionCause, ContextRevision, ContextState, SynchronizationState, ContextStatus, ExpectedContent, Freshness, FreshnessRecord, CheckRequest, UnavailableReason, Unavailable, CheckOutcome, OpenOutcome, ContextEvent, SubscriptionHandle, WatchEvent, WatcherHandle, WatcherPort, ClockPort, ContextBudgets, DaemonInstance, LogEntry, DaemonBudgets, EndpointSelection, DaemonRecord, StopDisposition, Handshake, Welcome, ConnectTimeouts, ConnectOptions, ConnectionState, DisconnectReason, RecoveryOutcome, ServiceConnection, ConnectOutcome, ServiceConnector, WireMessage, createControlledWatcher, createControlledClock, ControlledWatcher, ControlledClock from daemon to descendants

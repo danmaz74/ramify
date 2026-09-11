@@ -70,8 +70,7 @@ function freshness(value: unknown): boolean {
   }, 10_000);
 }
 
-/** Structural validation only; the future service dispatches validated requests
- * to its real manager. This function owns no context, lease or outcome substitute. */
+/** Shared structural validation before dispatch to the real context manager. */
 export function validateServiceRequest(operation: unknown, params: unknown): ServiceError | null {
   if (!text(operation) || !operations.has(operation)) {
     return { code: 'unsupported-operation', message: 'Unsupported service operation', details: {} };

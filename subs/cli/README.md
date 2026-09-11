@@ -2,33 +2,34 @@
 
 The CLI parses supported arguments, reaches the resident daemon through an injected connector or runs an injected batch operation, formats completed reports, streamed revisions and daemon status, and selects the documented process exit code. It contains no checking algorithm and keeps help, version and status independent of compiler and server startup.
 
-This is the final owner responsibility. The current dispatch supports batch
-checks, help and version; resident commands still require the missing providers.
-
 `runCli(argv, environment, control?)` accepts output sinks, a working directory,
-the package version and a `BatchOperation`. Root supplies the lazy real-session
-binding and owns SIGINT and stream cleanup. The handler validates the complete
-invocation before dispatch and checks stage completion before reporting success.
-It preserves the analysis report in JSON and formats its diagnostics, warnings,
-coverage and scope for humans. Pre-analysis invocation failures use the
-`ramify.cli/1` envelope; analysis results retain `ramify.analysis/1`.
+the package version, a service connector and a `BatchOperation`. Root supplies
+the real connector and lazy batch binding, and owns SIGINT and stream cleanup.
+The handler validates the complete invocation before dispatch and checks stage
+completion before reporting success. Pre-analysis invocation failures use
+`ramify.cli/1`; check results retain the bare `ramify.analysis/1` document.
 
-Human checks print `Mode: batch` immediately after `Configuration:`; JSON
-reports contain no mode member. Both ordinary checks and `--batch` still use
-the existing batch operation until the resident providers are available.
+An ordinary `check` opens a context and requests synchronized freshness. Its
+human `Mode:` line identifies the daemon, context and revision, or explicitly
+says no context when resolution fails. `--batch` uses an independent disposable
+session. A check falls back to batch only after unexpected daemon failure has
+exhausted recovery; the fallback is visible on stdout in human mode and stderr
+in JSON mode. Explicit stop, incompatible peers and rejected requests retain
+their errors. Neither watch nor the client entry falls back.
 
-The private argument parser recognizes the planned `watch [--root <dir>]
-[--format json]` and `daemon status|stop [--format json]` syntax, including
-command-specific option and duplicate validation. Dispatch still rejects these
-commands with `invalid-invocation` and exit 2 because the service connector,
-daemon entry and quick environment are absent. Parsing these commands does not
-establish resident availability. The connector integration, streamed documents,
-recovery and fallback policy remain unimplemented.
+`watch` subscribes to context events and fetches each reported revision by its
+exact id. JSON output is one `ramify.watch/1` object per line; an evicted report
+has an explicit `revision-evicted` line. A bounded queue coalesces replaceable
+updates. Recovery resubscribes once after unexpected loss, and context eviction
+allows one reopen. SIGINT releases the subscription and exits 130.
 
-The private error adapter translates the existing service and disconnect
-vocabulary into CLI failures, retaining the source as the error cause. It maps
-`stopping` to `stopped` and preserves other service codes. The command exception
-boundary renders translated errors with their code while keeping unexpected
-exceptions internal; cancellation and output failures retain precedence.
-This adapter does not select recovery or fallback, and its tests supply no
-resident service or lifecycle evidence.
+`daemon status` and `daemon stop` use discovery without startup. Status exposes
+the actual instance, contexts, budgets and counters. Stop names the observed
+instance and waits for that process to exit; absent daemons make both commands
+succeed without launching anything.
+
+The error adapter preserves service and disconnect codes and causes. The
+command exception boundary renders those failures while cancellation and
+output failures retain precedence. Root serializes publication writes and
+bounds queued stdout bytes so streamed documents cannot interleave or grow
+without a limit.

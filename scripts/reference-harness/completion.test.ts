@@ -15,10 +15,10 @@ describe('completion evidence controls', () => {
   const preload = '/tmp/toolkit/src/tests/process-probe.mjs';
   const load = (path: string): TraceEvent => ({ pid: 123, event: 'load', url: pathToFileURL(path).href });
   const baseline: TraceEvent[] = [load(preload), load(join(consumer, '[eval1]')), { pid: 123, event: 'load', url: 'node:net' },
-    ...['client-entry', 'connect-daemon', 'connection', 'codec', 'discovery', 'records', 'launcher']
+    ...['client-entry', 'connect-daemon', 'connection', 'codec', 'discovery', 'records', 'launcher', 'start-coordination']
       .map(name => load(join(installed, `dist/subs/daemon/src/${name}.js`)))];
   it('accepts the reviewed closure and rejects missing, foreign, engine, host and context loads', () => {
-    expect(assertClientClosure(baseline, installed, preload, consumer, new Assertions())).toHaveLength(7);
+    expect(assertClientClosure(baseline, installed, preload, consumer, new Assertions())).toHaveLength(8);
     expect(() => assertClientClosure([], installed, preload, consumer, new Assertions())).toThrow();
     for (const path of ['subs/daemon/src/host.js', 'subs/daemon/subs/contexts/src/manager.js',
       'subs/analysis/src/index.js', '../node_modules/typescript/index.js', '/outside/client-entry.js']) {

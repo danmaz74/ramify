@@ -1,7 +1,8 @@
 # Plan 2 executable instance inventory
 
 **Status:** reviewed and revised 2026-09-11; all 176 identities and iteration
-counts retained. Architecture acceptance is pending; no instance has executed.
+counts retained. Direct remediation was authorized on 2026-09-11; execution
+evidence is recorded by the gates, not inferred from this inventory.
 This document freezes fixture causes and independent expectations; it does not
 establish implementation availability or architectural acceptance. The
 [main-plan matrix](main-plan.md#acceptance-matrix), the architecture's

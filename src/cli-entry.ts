@@ -5,12 +5,19 @@ import { dirname, resolve } from 'node:path';
 import { setImmediate as yieldTurn, setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { runCli } from '../subs/cli/src/run-cli.js';
+import { createServiceConnector } from './client.js';
 
 const controller = new AbortController();
 let published = false;
-const interrupt = (): void => { if (!published) controller.abort(); };
+const streaming = process.argv[2] === 'watch';
+const interrupt = (): void => { if (streaming || !published) controller.abort(); };
 let outputFailed = false;
-const pending: Promise<void>[] = [];
+const pending = new Set<Promise<void>>();
+let publication = Promise.resolve(), queuedBytes = 0;
+function track(task: Promise<void>): void {
+  pending.add(task);
+  void task.then(() => pending.delete(task), () => { pending.delete(task); outputFailure(); });
+}
 const outputFailure = (): void => { outputFailed = true; controller.abort(); };
 const publish = async (text: string): Promise<void> => {
   const bytes = Buffer.from(text);
@@ -37,7 +44,7 @@ const publish = async (text: string): Promise<void> => {
   }
 };
 const write = (stream: NodeJS.WriteStream, text: string): void => {
-  pending.push(new Promise<void>(done => {
+  track(new Promise<void>(done => {
     try { stream.write(text, error => { if (error) outputFailure(); done(); }); }
     catch { outputFailure(); done(); }
   }));
@@ -49,14 +56,23 @@ try {
   // The installed entry preserves dist/src; package metadata lives beside dist.
   const manifest = JSON.parse(await readFile(resolve(dirname(fileURLToPath(import.meta.url)), '../../package.json'), 'utf8')) as { version: string };
   process.exitCode = await runCli(process.argv.slice(2), { cwd: process.cwd(), version: manifest.version,
-    stdout: text => { pending.push(publish(text)); }, stderr: text => write(process.stderr, text),
+    stdout: text => {
+      const bytes = Buffer.byteLength(text);
+      if (queuedBytes + bytes > 64 * 1024 ** 2) {
+        outputFailure(); throw new Error('CLI output queue exceeded 64 MiB');
+      }
+      queuedBytes += bytes;
+      publication = publication.then(() => publish(text)).finally(() => { queuedBytes -= bytes; });
+      track(publication);
+    }, stderr: text => write(process.stderr, text),
+    connect: createServiceConnector(manifest.version),
     batch: async (invocation, control) => (await import('./batch.js')).runBatch(invocation, control),
   }, { signal: controller.signal });
 } catch (error) {
   process.exitCode = controller.signal.aborted ? 130 : 2;
   write(process.stderr, `Error [internal-error]: ${error instanceof Error ? error.message : String(error)}\n`);
 } finally {
-  await Promise.all(pending);
+  await Promise.allSettled(pending);
   if (controller.signal.aborted && !outputFailed && process.exitCode !== 130) {
     process.exitCode = 130;
     await new Promise<void>(done => process.stderr.write('Interrupted; no result claimed.\n', () => done()));

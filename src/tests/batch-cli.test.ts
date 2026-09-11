@@ -158,7 +158,7 @@ describe('CLI with real batch sessions', () => {
 
   it('handles synchronous output failures after a real session releases its resources', async () => fixture(async root => {
     const errors: string[] = [];
-    expect(await runCli(['check', '--batch', '--format', 'json'], { cwd: root, version: '1', batch: runBatch,
+    expect(await runCli(['check', '--batch', '--format', 'json'], { cwd: root, version: '1', connect: async () => { throw new Error('Unexpected daemon connection'); }, batch: runBatch,
       stdout: () => { throw new Error('Broken sink'); }, stderr: text => { errors.push(text); } })).toBe(2);
     expect(errors.join('')).toContain('output-failure');
   }), 15_000);

@@ -1,9 +1,9 @@
 # Plan 2 owners, declarations and placement
 
 **Prepared:** 2026-09-10. **Reviewed and revised:** 2026-09-11. **State:**
-manual declaration review passed for the revised package; architecture
-acceptance is pending. These are final declaration texts to implement, not
-installed declarations. See [contracts.md](contracts.md) and the
+manual declaration review passed; direct implementation of the revised package
+was authorized on 2026-09-11. These are the required final declaration texts.
+Implementation and acceptance evidence are verified separately. See [contracts.md](contracts.md) and the
 [review record](probes.md#contract-review). The
 definitive [description principles](../../model/module-description.principles.md)
 and [importability principles](../../model/cross-module-importability.principles.md)
@@ -174,7 +174,7 @@ ramify 1
 module daemon tagged [dispatch]
 
 // N1: in-process service binding and real ports.
-expose-src createDaemonService from "service.ts" to parent
+expose-src createDaemonService, dispatchServiceRequest from "service.ts" to parent
 expose-src createFilesystemWatcher from "filesystem-watcher.ts" to parent
 expose-src createSystemClock from "system-clock.ts" to parent
 // N2: lightweight client, codec and discovery.
@@ -280,7 +280,7 @@ iteration 14's final validation compares them with these texts.
 | --- | --- | --- |
 | `.`, `./analysis` | `dist/subs/analysis/src/index.js` | As in Plan 1, plus the two new operations. No daemon, contexts, CLI, React, d3, MCP or web module. |
 | `./analysis/inventory`, `./model`, `./presentation`, `./layout`, `./cli` | Unchanged | Unchanged. `./cli` still imports no engine, compiler, daemon host or server value; its connector type is erased. |
-| `./client` (new) | `dist/subs/daemon/src/client-entry.js` | Daemon `connect-daemon`, `connection`, `launcher`, `discovery`, `codec`, `records` and Node built-ins only. Loading it must not load `service.js`, `start-daemon.js`, `host.js`, any contexts, analysis or compiler module. |
+| `./client` (new) | `dist/subs/daemon/src/client-entry.js` | Daemon `connect-daemon`, `connection`, `launcher`, `start-coordination`, `discovery`, `codec`, `records` and Node built-ins only. Loading it must not load `service.js`, `start-daemon.js`, `host.js`, any contexts, analysis or compiler module. |
 | `bin.ramify` | `dist/src/cli-entry.js` | CLI, root `client.js` and the `./client` closure. `src/batch.js` loads only for `--batch` or an eligible fallback. |
 | Daemon process entry (not exported) | `dist/src/daemon-entry.js` | Root `resident-assembly.js`, daemon `service`, `start-daemon`, `host`, `filesystem-watcher`, `system-clock`, `records`, `codec`, contexts, analysis and its children. Never `cli`, `presentation`, `layout`, React, d3, MCP or web modules. |
 

@@ -1,7 +1,7 @@
 # Plan 2 scope and lifecycle decisions
 
 **Status:** reviewed and revised 2026-09-11 for [Plan 2](main-plan.md);
-architecture acceptance is pending. This
+active for the direct remediation authorized on 2026-09-11. This
 document fixes the deployment arrangement, endpoint discovery, lifecycle
 outcomes, the invalidation dependency model, budgets and deferrals in
 reviewable form. [contracts.md](contracts.md) owns the exact signatures and
@@ -207,6 +207,10 @@ means it is neither an upper nor a lower bound on heap or RSS. The measurement
 rows below enforce actual memory limits separately.
 
 ### Latency and memory targets
+
+Current measured values and raw evidence are recorded in the
+[remediation verification record](remediation-2026-09-11.md#outstanding-acceptance-evidence).
+Keep these binding targets unchanged while measuring.
 
 Iteration 1 revision, 2026-09-11: the measured full-recompute medians are
 **3.442 s reference / 5.723 s S100**, from twenty serial compiled in-process

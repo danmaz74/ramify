@@ -43,7 +43,9 @@ describe('required capability and assertion execution gates', () => {
     expect(report.passed).toBe(true);
     expect(report.planComplete).toBe(false);
     expect(report.summary).toEqual({ required: 14, passed: 14, failed: 0, notExecuted: 294 });
-    expect(report.availableCapabilities).toEqual([...verificationCapabilities].sort());
+    expect(report.availableCapabilities).toEqual(['acquire', 'build-selection', 'catalog', 'cli', 'coverage',
+      'harness-gate', 'lazy', 'link', 'metadata', 'namespace', 'parse', 'registry', 'regression',
+      'resources', 'session', 'static-access', 'symbol-free', 'tags-origin']);
     expect(referenceRuntime.handlers.size).toBe(308);
     expect(plan1Instances.filter(item => !referenceRuntime.handlers.has(item.id)).map(item => item.id))
       .toEqual([]);

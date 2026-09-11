@@ -130,7 +130,7 @@ never an external package.
 ## Output and exit
 
 The human report prints the root and how it was selected, the compiler
-configuration in use, a `Mode: batch` line, failures first, then warnings, then
+configuration in use, a `Mode:` line, failures first, then warnings, then
 analysis limits, then the completed scope. `--format json` writes the unchanged
 `ramify.analysis/1` report to stdout, without the human mode line or an added mode
 member. Invocation failures use a `ramify.cli/1` diagnostic document. Logging goes
@@ -147,16 +147,20 @@ to the root regardless of the working directory. Ordering is deterministic.
 Exit 0 is never chosen from an empty finding list without confirming that
 every required stage completed.
 
-## Before the daemon exists
+## Resident and batch execution
 
-Until Plan 2 delivers the resident daemon, `ramify check` runs a fresh
-analysis session in its own process and disposes it on exit. `--batch` is
-accepted and changes nothing. Once the daemon exists, `ramify check` uses it
-and `--batch` forces the fresh in-process session instead. Neither form starts
-a server.
+`ramify check` connects to a compatible resident daemon, starts it when needed,
+and requests a synchronized check after opening the project context. `--batch`
+selects a fresh session in the CLI process and disposes it on exit. Both modes
+preserve the analysis report and exit-code contract above; human output names
+the selected mode. Help and version load neither the engine nor a daemon host.
 
-`--help` and `--version` complete without loading the compiler or any later
-adapter.
+`ramify watch` streams versioned revision and status events, fetches each
+report by its exact revision id, and releases its subscription on SIGINT.
+`ramify daemon status` and `ramify daemon stop` never start a daemon. The
+[resident contracts](../plans/iteration-2-resident-verification/contracts.md)
+define those documents, bounded recovery and visible batch fallback after
+exhausted unexpected-failure recovery. Explicit stop never causes fallback.
 
 ## Decisions recorded here
 

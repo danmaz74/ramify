@@ -41,15 +41,7 @@ export async function assertToolkit(report: AnalysisReport, root: string, assert
   assertions.ok('owned ESM process probe is compiler input', complete.has('src/tests/process-probe.mjs'));
   assertions.ok('owned ESM process probe imports are checked', snapshot.accesses.some(access => access.location.file === 'src/tests/process-probe.mjs'));
   for (const owner of owners) {
-    const skeletonPath = owner === 'ramify/daemon' ? 'subs/daemon'
-      : owner === 'ramify/daemon/contexts' ? 'subs/daemon/subs/contexts' : null;
-    if (skeletonPath && !source.some(file => file.owner === owner)) {
-      // Iteration 2 adds headers only. Once an owner has source, it must meet
-      // the same owned-test requirement as every implemented owner.
-      assertions.equal(`${owner}: header-only owner contains exactly its empty source/test placeholders`,
-        snapshot.inventory.files.filter(file => file.owner === owner).map(file => file.path).sort(),
-        [`${skeletonPath}/src/.gitkeep`, `${skeletonPath}/src/tests/.gitkeep`]);
-    } else assertions.ok(`${owner}: tests remain owned and analyzed`, source.some(file => file.owner === owner && file.area === 'tests'));
+    assertions.ok(`${owner}: tests remain owned and analyzed`, source.some(file => file.owner === owner && file.area === 'tests'));
   }
   const independent = /^(?:examples|scripts|site)\//;
   assertions.equal('independent application and tool sources never enter catalog', snapshot.catalog!.files.filter(file => independent.test(file.file)), []);

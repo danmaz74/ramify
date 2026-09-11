@@ -29,6 +29,8 @@ async function watchTree(root: string, listener: (events: readonly WatchEvent[])
   let closed = false;
   let starting = true;
   let dirty = false;
+  let rescanAll = true;
+  const changedDirectories = new Set<string>();
   let timer: ReturnType<typeof setTimeout> | undefined;
   let scanning: Promise<void> | undefined;
   let closing: Promise<void> | undefined;
@@ -56,7 +58,10 @@ async function watchTree(root: string, listener: (events: readonly WatchEvent[])
     timer = undefined;
     if (closed) return;
     if (dirty && !starting && !scanning) {
-      scanning = refresh().catch(failure).finally(() => { scanning = undefined; });
+      scanning = refresh().catch(failure).finally(() => {
+        scanning = undefined;
+        if (dirty && !closed) timer ??= setTimeout(flush, batchMs);
+      });
     }
     const events: WatchEvent[] = [
       ...[...signals].sort().map(kind => ({ path: '', kind })),
@@ -77,17 +82,17 @@ async function watchTree(root: string, listener: (events: readonly WatchEvent[])
     };
     const changed = (kind: string, filename: string | Buffer | null): void => {
       if (closed || requestedClose) return;
-      if (filename === null) { dirty = true; enqueue('', 'overflow'); return; }
+      if (filename === null) { dirty = true; rescanAll = true; enqueue('', 'overflow'); return; }
       const name = filename.toString();
       const path = relative(canonicalRoot, join(directory, name));
       if (isAbsolute(name) || !name || path === '..' || path.startsWith(`..${sep}`) || isAbsolute(path)) {
-        dirty = true; enqueue('', 'overflow'); return;
+        dirty = true; rescanAll = true; enqueue('', 'overflow'); return;
       }
       if (path.split(sep).some(part => excluded.has(part))) return;
-      if (kind === 'rename') dirty = true;
+      if (kind === 'rename') { dirty = true; changedDirectories.add(directory); }
       enqueue(path, kind === 'rename' ? 'renamed' : 'changed');
     };
-    const failed = (error: Error): void => { if (!requestedClose) failure(error); };
+    const failed = (error: Error): void => { if (!requestedClose) { dirty = true; rescanAll = true; failure(error); } };
     watcher.on('change', changed);
     watcher.on('error', failed);
     watcher.once('close', () => {
@@ -101,43 +106,68 @@ async function watchTree(root: string, listener: (events: readonly WatchEvent[])
   }
 
   async function refresh(): Promise<void> {
-    do {
-      dirty = false;
-      const seen = new Set<string>();
-      async function visit(directory: string): Promise<void> {
-        if (closed) return;
-        let stat;
-        try { stat = await lstat(directory); }
-        catch (error) {
-          if (directory !== canonicalRoot && error instanceof Error && 'code' in error && error.code === 'ENOENT') return;
-          throw error;
+    // One bounded pass per batching window. Known rename events only inspect
+    // that directory; unchanged descendants retain their existing handles.
+    const full = rescanAll;
+    rescanAll = false; dirty = false;
+    const targets = full ? [canonicalRoot] : [...changedDirectories];
+    changedDirectories.clear();
+    async function removeTree(directory: string): Promise<void> {
+      for (const [path, handle] of directories) {
+        if (path === directory || path.startsWith(`${directory}${sep}`)) await handle.close();
+      }
+    }
+    async function visit(directory: string, recursive: boolean): Promise<void> {
+      if (closed) return;
+      let stat;
+      try { stat = await lstat(directory); }
+      catch (error) {
+        if (directory !== canonicalRoot && error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+          await removeTree(directory); return;
         }
-        if (closed) return;
-        if (!stat.isDirectory() || stat.isSymbolicLink()) {
-          if (directory === canonicalRoot) throw new Error('Watcher root is not a directory');
-          return;
+        throw error;
+      }
+      if (closed) return;
+      if (!stat.isDirectory() || stat.isSymbolicLink()) {
+        if (directory === canonicalRoot) throw new Error('Watcher root is not a directory');
+        await removeTree(directory); return;
+      }
+      const identity = `${stat.dev}:${stat.ino}`;
+      const previous = directories.get(directory);
+      if (previous && previous.identity !== identity) { await removeTree(directory); recursive = true; }
+      if (closed) return;
+      if (!directories.has(directory)) { directories.set(directory, attach(directory, identity)); recursive = true; }
+      let entries;
+      try { entries = await readdir(directory, { withFileTypes: true }); }
+      catch (error) {
+        if (directory !== canonicalRoot && error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+          await removeTree(directory); return;
         }
-        seen.add(directory);
-        const identity = `${stat.dev}:${stat.ino}`;
-        const previous = directories.get(directory);
-        if (previous && previous.identity !== identity) await previous.close();
-        if (closed) return;
-        if (!directories.has(directory)) directories.set(directory, attach(directory, identity));
-        let entries;
-        try { entries = await readdir(directory, { withFileTypes: true }); }
-        catch (error) {
-          if (directory !== canonicalRoot && error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-            seen.delete(directory); return;
+        throw error;
+      }
+      const children = new Set<string>();
+      for (const entry of entries) {
+        if (entry.isDirectory() && !entry.isSymbolicLink() && !excluded.has(entry.name)) {
+          const path = join(directory, entry.name); children.add(path);
+          // Re-stat direct children on rename so replacement of an existing
+          // directory cannot keep a watcher attached to its old inode.
+          if (recursive || !directories.has(path)) await visit(path, recursive);
+          else {
+            const child = await lstat(path).catch(() => null);
+            if (!child || `${child.dev}:${child.ino}` !== directories.get(path)!.identity) await visit(path, true);
           }
-          throw error;
-        }
-        for (const entry of entries) {
-          if (entry.isDirectory() && !entry.isSymbolicLink() && !excluded.has(entry.name)) await visit(join(directory, entry.name));
         }
       }
-      await visit(canonicalRoot);
-      for (const [directory, handle] of directories) if (!seen.has(directory)) await handle.close();
-    } while (dirty && !closed);
+      const removed = new Set<string>();
+      for (const path of directories.keys()) {
+        if (path !== directory && path.startsWith(`${directory}${sep}`)) {
+          const first = join(directory, relative(directory, path).split(sep)[0]);
+          if (!children.has(first)) removed.add(first);
+        }
+      }
+      for (const first of removed) await removeTree(first);
+    }
+    for (const directory of targets) await visit(directory, full);
   }
 
   function close(): Promise<void> {
@@ -145,7 +175,7 @@ async function watchTree(root: string, listener: (events: readonly WatchEvent[])
     closed = true;
     deliver = undefined;
     clearTimeout(timer); timer = undefined;
-    pending.clear(); signals.clear();
+    pending.clear(); signals.clear(); changedDirectories.clear();
     closing = (async () => {
       await scanning;
       await Promise.all([...directories.values()].map(handle => handle.close()));
@@ -157,6 +187,7 @@ async function watchTree(root: string, listener: (events: readonly WatchEvent[])
   try {
     await refresh();
     starting = false;
+    if (dirty && !closed) timer ??= setTimeout(flush, batchMs);
     return { close };
   } catch (error) {
     await close();

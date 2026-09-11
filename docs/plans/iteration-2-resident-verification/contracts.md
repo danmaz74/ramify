@@ -1,9 +1,9 @@
 # Plan 2 contract review package
 
 **Prepared:** 2026-09-10. **Reviewed and revised:** 2026-09-11 in iteration 1.
-**State:** revised contract package, awaiting architecture acceptance before iteration 3 of
-[Plan 2](main-plan.md). These are definitions to implement, not implemented
-capabilities. The [owner manifest](owners.md), [scope and lifecycle decisions](scope.md)
+**State:** active contract package for the direct remediation authorized on
+2026-09-11 for [Plan 2](main-plan.md). Final acceptance still requires the
+complete verification gates; declaration availability alone is not delivery. The [owner manifest](owners.md), [scope and lifecycle decisions](scope.md)
 and [instance inventory](subcases.md) form one review package with this
 document. Changing a signature, a wire schema or an activation stage revises
 this package before its consumers change.
@@ -17,6 +17,30 @@ is extended here, as that review anticipated.
 The [iteration 1 review record](probes.md#contract-review) identifies the
 corrections made before consumers exist. Probe success and draft publication
 do not constitute architecture acceptance.
+
+## Direct remediation authority and clarifications
+
+After reviewing the workflow findings and the concrete revised package, the user
+instructed: "use subagents to fix all issues" on 2026-09-11. Direct remediation
+therefore implements this package, including the recorded 4.5 s reference source
+edit and 5.5 s broad rebuild targets. The four supporting package documents are
+the current decision location; the Studio-managed main plan remains the frozen
+execution baseline, and its proposed patch remains preserved in iteration 1's
+results. This records the user's implementation authorization, not a claim of
+an independent review or passing acceptance evidence.
+
+Two test-boundary gaps are clarified before their consumers are wired:
+
+- The service owns `dispatchServiceRequest`, shared by the IPC host and direct
+  adapter. A request's wire `op` is a nonempty string; the service validates it
+  against `ServiceOperation` and returns `unsupported-operation` for an unknown
+  name. Other malformed wire data remains a protocol violation. This permits
+  the already required I2-13 unknown-operation case through the actual channel.
+- The testing-only quick environment accepts optional explicit instance and
+  analysis-driver fixtures and exposes a raw `request` method through that same
+  codec and dispatch function. This supports real keyed IPC service fixtures
+  and the required synchronous/asynchronous driver-failure cases. Its defaults
+  still use the real analysis driver and shared service.
 
 ## Conventions and dependency direction
 
@@ -88,7 +112,7 @@ batch report. `ProjectReadOptions.retained` is optional.
 `subs/analysis/subs/project/src/resolve-root.ts` (iteration 3):
 
 ```ts
-export declare function resolveProjectRoot(request: ProjectRequest): Promise<ProjectResolution>;
+export declare function resolveProjectRoot(request: ProjectRequest, signal?: AbortSignal): Promise<ProjectResolution>;
 ```
 
 `resolveProjectRoot` performs exactly the root climb and configuration
@@ -153,7 +177,7 @@ export type IncrementRun =
 
 ```ts
 export declare function analyzeIncrement(inputs: IncrementInputs, control?: RunControl): Promise<IncrementRun>;
-export declare function resolveProject(request: ProjectRequest): Promise<ProjectResolution>;
+export declare function resolveProject(request: ProjectRequest, control?: RunControl): Promise<ProjectResolution>;
 ```
 
 `analyzeIncrement` creates one fresh single-use session internally, runs the
@@ -670,9 +694,11 @@ export interface QuickEnvironment {
   readonly clock: ControlledClock;
   readonly connect: ServiceConnector;
   readonly batch: BatchOperation;
+  request(operation: string, params: unknown, control?: RunControl): Promise<ServiceResult<unknown>>;
   dispose(): Promise<void>;
 }
-export declare function createQuickEnvironment(options?: Partial<ContextBudgets>): Promise<QuickEnvironment>;
+export declare function createQuickEnvironment(options?: Partial<ContextBudgets>,
+  fixture?: { readonly instance?: DaemonInstance; readonly driver?: AnalysisDriver }): Promise<QuickEnvironment>;
 ```
 
 Its `connect` yields an in-process `ServiceConnection` whose every request and
@@ -857,6 +883,9 @@ Operations and defining files:
 ```ts
 // service.ts — iteration 5: validation, dispatch to a context manager it creates, leases.
 export declare function createDaemonService(options: DaemonServiceOptions): DaemonService;
+export declare function dispatchServiceRequest(service: RamifyService, operation: string,
+  params: unknown, control?: RunControl, listener?: (event: ContextEvent) => void,
+  requestId?: string): Promise<ServiceResult<unknown>>;
 // filesystem-watcher.ts and system-clock.ts — iteration 5: real ports.
 export declare function createFilesystemWatcher(): WatcherPort;
 export declare function createSystemClock(): ClockPort;
@@ -909,7 +938,7 @@ export type WireMessage =
   | { readonly type: 'hello'; readonly handshake: Handshake }
   | { readonly type: 'welcome'; readonly welcome: Welcome }
   | { readonly type: 'reject'; readonly error: ServiceError; readonly daemon: DaemonInstance }
-  | { readonly type: 'request'; readonly id: string; readonly op: ServiceOperation;
+  | { readonly type: 'request'; readonly id: string; readonly op: string;
       readonly params: unknown }
   | { readonly type: 'cancel'; readonly id: string }
   | { readonly type: 'response'; readonly id: string; readonly result: ServiceResult<unknown> }
@@ -931,7 +960,12 @@ A `hello` arriving while `maxConnections` connections are open is answered
 with `reject` carrying `resource-unavailable` before any `welcome`; the client
 reports `unavailable` with `DisconnectReason` `rejected` and starts no
 recovery. Requests carry client-chosen `id` values unique per connection; a
-duplicate is `invalid-request`; a request arriving while `maxRequestsInFlight`
+duplicate is `invalid-request`. Each connection retains at most 100,000 distinct
+request identities. At that lifetime admission bound, the host sends `goodbye`
+with `failure` and an explicit instruction to reconnect; it dispatches no further
+request on that connection. A fresh connection starts a new bounded identity
+table. This prevents arbitrary client-chosen IDs from growing process memory
+without weakening duplicate detection. A request arriving while `maxRequestsInFlight`
 requests are open on the connection is answered with a `resource-unavailable`
 error. `cancel` aborts the request's `RunControl` signal; the
 daemon still sends the final `response`, whose value is a `cancelled` outcome
@@ -992,9 +1026,15 @@ and package version are unchanged. Missing/incomplete build files are
 `DaemonInstance.engine` and `--engine` carry. File names are `daemon-<buildKey>.sock`,
 `.json`, `.lock` and `.log`. A socket path longer than 100 bytes is
 `unavailable` with a message naming the override, because macOS limits
-`sun_path` to 104 bytes. The lock is created with `O_CREAT|O_EXCL`; it
-contains the holder pid and time and is reclaimable only after verifying
-the pid dead. Age over 30 s triggers a liveness check, never removal of a
+`sun_path` to 104 bytes. Lock ownership is prewritten to a private file created with `O_CREAT|O_EXCL`
+and published with an atomic exclusive hard link. Child ownership transfers
+by atomic rename under a recoverable process-id bakery gate; competing callers
+cannot observe an empty lock between creation and writing. The lock contains
+the holder pid and time and is reclaimable only after verifying the pid dead.
+New gate participants name their pid before ticket publication, so crashes
+before that publication can also be reclaimed by proving the pid dead.
+Legacy empty or malformed locks without provable ownership remain explicitly
+unavailable; age alone never authorizes deleting them. Age over 30 s triggers a liveness check, never removal of a
 live holder. A malformed record or ambiguous liveness is `unavailable`. Records are written to a temporary file and renamed
 into place. Liveness uses `process.kill(pid, 0)`. The daemon is spawned
 detached with `stdio` `ignore`/log/log and `unref()`, with argv
@@ -1082,7 +1122,7 @@ The final package map adds one entry and changes no existing target:
 
 | Entry | Activation | Permitted transitive runtime dependencies |
 | --- | --- | --- |
-| `./client` | I7 | `connect-daemon.ts`, `connection.ts`, `launcher.ts`, `discovery.ts`, `codec.ts`, `records.ts` and Node `net`, `fs`, `path`, `crypto`, `child_process`, `os`. No analysis, contexts, compiler, React, d3, MCP or web module. Type re-exports of root service, contexts and analysis vocabulary only. |
+| `./client` | I7 | `connect-daemon.ts`, `connection.ts`, `launcher.ts`, `start-coordination.ts`, `discovery.ts`, `codec.ts`, `records.ts` and Node `net`, `fs`, `path`, `crypto`, `child_process`, `os`. Startup coordination owns the recoverable lock gate. No analysis, contexts, compiler, React, d3, MCP or web module. Type re-exports of root service, contexts and analysis vocabulary only. |
 | `dist/src/daemon-entry.js` | I8; spawned by path, not a package export | Root resident assembly, daemon host and service, contexts, analysis and its children. The TypeScript package is loaded only inside the finite helpers, as in Plan 1. No CLI, React, d3, MCP or web module. |
 | `bin.ramify` | I9 | CLI, root client assembly and `./client`'s closure until a check dispatches; `--batch` and eligible fallback dynamically import `src/batch.js`. `watch`, `daemon status` and `daemon stop` never import `src/batch.js`. |
 | `.`, `./analysis` | I3 adds `analyzeIncrement`, `resolveProject` and the new types | Unchanged closure. |

@@ -1,10 +1,12 @@
 import { spawn } from 'node:child_process';
 import { constants } from 'node:fs';
-import { open, unlink } from 'node:fs/promises';
+import { link, open, unlink, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import { createConnection } from 'node:net';
 import { isAbsolute } from 'node:path';
 import type { DaemonRecord, EndpointSelection } from './interfaces/daemon.js';
 import { processAlive, readControlFile, readRecord, verifyEndpoint } from './records.js';
+import { coordinateStart } from './start-coordination.js';
 
 interface StartLock { readonly pid: number; readonly at: number }
 interface LaunchOptions {
@@ -41,23 +43,60 @@ function lockData(content: string): StartLock {
   return value;
 }
 
+/** Read ownership without changing any file; ambiguity is an explicit error. */
+export async function readStartOwner(endpoint: EndpointSelection): Promise<number | null> {
+  const content = await readControlFile(endpoint.lock);
+  if (content === null) return null;
+  if (!content) throw new Error('Empty legacy daemon start lock; ownership cannot be established');
+  return lockData(content).pid;
+}
+
 async function removeIfPresent(path: string): Promise<void> {
   await unlink(path).catch(error => { if (error.code !== 'ENOENT') throw error; });
 }
 
-/** Re-read under a second exclusive guard so simultaneous reclaimers cannot
- * unlink a newly acquired lock. An abandoned guard fails closed; it is never
- * reclaimed using an uncoordinated check-and-unlink of its own. */
-async function reclaimLock(endpoint: EndpointSelection): Promise<void> {
-  const guard = `${endpoint.lock}.reclaim`;
-  let handle;
-  try { handle = await open(guard, 'wx', 0o600); }
-  catch (error) { if ((error as NodeJS.ErrnoException).code === 'EEXIST') return; throw error; }
+/** Publish complete ownership atomically; no exclusive empty-file interval is
+ * observable, including when the creator dies before publishing its lock. */
+async function createLock(endpoint: EndpointSelection): Promise<Awaited<ReturnType<typeof open>>> {
+  const temporary = `${endpoint.lock}.${process.pid}-${randomUUID()}.tmp`;
   try {
-    await handle.writeFile(JSON.stringify({ pid: process.pid, at: Date.now() }));
-    const current = await readControlFile(endpoint.lock);
-    if (current && !processAlive(lockData(current).pid)) await removeIfPresent(endpoint.lock);
-  } finally { await handle.close(); await removeIfPresent(guard); }
+    await writeFile(temporary, JSON.stringify({ pid: process.pid, at: Date.now() }), { flag: 'wx', mode: 0o600 });
+    await link(temporary, endpoint.lock);
+    return await open(endpoint.lock, 'r+');
+  } finally { await removeIfPresent(temporary); }
+}
+
+async function acquireLock(endpoint: EndpointSelection, deadline: number, signal?: AbortSignal) {
+  return coordinateStart(endpoint, deadline, signal, async () => {
+    // This guard was written by older launchers. Dead holders can be cleaned;
+    // malformed ownership remains explicitly unavailable, never guessed dead.
+    const guard = `${endpoint.lock}.reclaim`;
+    const guarded = await readControlFile(guard);
+    if (guarded !== null) {
+      if (!guarded) throw new Error('Empty legacy daemon reclaim guard; ownership cannot be established');
+      if (processAlive(lockData(guarded).pid)) return null;
+      await removeIfPresent(guard);
+    }
+    const content = await readControlFile(endpoint.lock);
+    if (content !== null) {
+      if (!content) throw new Error('Empty legacy daemon start lock; ownership cannot be established');
+      if (processAlive(lockData(content).pid)) return null;
+      await removeIfPresent(endpoint.lock);
+    }
+    return createLock(endpoint);
+  });
+}
+
+async function terminateUnreadyChild(child: ReturnType<typeof spawn>, endpoint: EndpointSelection): Promise<void> {
+  const record = await readRecord(endpoint);
+  if (record?.state === 'running' && record.pid === child.pid) return;
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  child.kill('SIGTERM');
+  await new Promise<void>(resolve => {
+    const timer = setTimeout(() => { child.kill('SIGKILL'); }, 1000);
+    child.once('exit', () => { clearTimeout(timer); resolve(); });
+    if (child.exitCode !== null || child.signalCode !== null) { clearTimeout(timer); resolve(); }
+  });
 }
 
 async function acceptsSocket(endpoint: EndpointSelection, deadline: number, signal?: AbortSignal): Promise<boolean> {
@@ -109,20 +148,13 @@ export async function launchDaemon(options: LaunchOptions): Promise<{ readonly r
     checkDeadline(deadline, options.signal);
     const running = await runningRecord(options, deadline);
     if (running) return { record: running, started: false };
-    try { lock = await open(endpoint.lock, 'wx', 0o600); }
-    catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-      const content = await readControlFile(endpoint.lock);
-      // An exclusive creator may still be writing its small lock document.
-      if (content) { if (!processAlive(lockData(content).pid)) await reclaimLock(endpoint); }
-      await pause(deadline, options.signal);
-    }
+    lock = await acquireLock(endpoint, deadline, options.signal);
+    if (!lock) await pause(deadline, options.signal);
   }
   let keepLock = false;
   let child: ReturnType<typeof spawn> | undefined;
   let ready = false;
   try {
-    await lock.writeFile(JSON.stringify({ pid: process.pid, at: Date.now() }));
     const running = await runningRecord(options, deadline);
     if (running) return { record: running, started: false };
     const previous = await readRecord(endpoint);
@@ -159,8 +191,12 @@ export async function launchDaemon(options: LaunchOptions): Promise<{ readonly r
       // If a caller cancels before readiness, preserve a lock naming the child.
       // Future callers can wait for its record or reclaim only after it is dead.
       const content = JSON.stringify({ pid: child.pid!, at: Date.now() });
-      await lock.truncate(0);
-      await lock.write(content, 0, 'utf8');
+      await coordinateStart(endpoint, Math.max(deadline, performance.now() + 2000), undefined, async () => {
+        const replacement = `${endpoint.lock}.${randomUUID()}.tmp`;
+        await writeFile(replacement, content, { flag: 'wx', mode: 0o600 });
+        const { rename } = await import('node:fs/promises');
+        await rename(replacement, endpoint.lock);
+      });
     } finally { await log.close(); }
     while (true) {
       checkDeadline(deadline, options.signal);
@@ -169,9 +205,20 @@ export async function launchDaemon(options: LaunchOptions): Promise<{ readonly r
       if (child.exitCode !== null || child.signalCode !== null) throw new Error(`Daemon entry exited before readiness (${child.exitCode ?? child.signalCode})`);
       await pause(deadline, options.signal);
     }
+  } catch (error) {
+    if (child && !options.signal?.aborted) {
+      await terminateUnreadyChild(child, endpoint);
+      keepLock = child.exitCode === null && child.signalCode === null;
+    }
+    throw error;
   } finally {
     await lock.close();
     // A cancelled connector never kills a shared process or permits a duplicate.
-    if (!keepLock || ready || child?.exitCode !== null || child?.signalCode !== null) await removeIfPresent(endpoint.lock);
+    if (!keepLock || ready || child?.exitCode !== null || child?.signalCode !== null) {
+      await coordinateStart(endpoint, performance.now() + 2000, undefined, async () => {
+        const content = await readControlFile(endpoint.lock);
+        if (content && [process.pid, child?.pid].includes(lockData(content).pid)) await removeIfPresent(endpoint.lock);
+      });
+    }
   }
 }

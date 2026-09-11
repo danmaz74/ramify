@@ -76,6 +76,16 @@ net.Socket.prototype.connect = function (...args) {
   record('connect', { path: socketPath(args) });
   return Reflect.apply(connect, this, args);
 };
+const socketWrite = net.Socket.prototype.write;
+net.Socket.prototype.write = function (chunk, ...args) {
+  if (Buffer.isBuffer(chunk) && chunk.length >= 5 && chunk.readUInt32BE(0) === chunk.length - 4) {
+    try {
+      const message = JSON.parse(chunk.subarray(4).toString('utf8'));
+      if (message.type === 'cancel') record('wire-cancel', { requestId: message.id });
+    } catch { /* Only complete, valid outgoing frames provide evidence. */ }
+  }
+  return Reflect.apply(socketWrite, this, [chunk, ...args]);
+};
 dgram.Socket.prototype.bind = function () { record('bind'); throw new Error('CLI attempted to bind'); };
 
 const originalSpawn = childProcesses.spawn;

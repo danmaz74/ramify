@@ -18,7 +18,7 @@ const withoutRouter = 'expose-sub createCatalogTools, inspectRecord from catalog
 const entryFunctions = {
   'ramify.ts': 'createAnalysisSession', 'ramify.ts/analysis': 'analyzeProject',
   'ramify.ts/analysis/inventory': 'acquireInventory', 'ramify.ts/model': 'createDefaultTagRegistry',
-  'ramify.ts/layout': 'placeNodes', 'ramify.ts/presentation': 'ModelDiagram', 'ramify.ts/cli': 'runCli',
+  'ramify.ts/layout': 'placeNodes', 'ramify.ts/presentation': 'ModelDiagram', 'ramify.ts/cli': 'runCli', 'ramify.ts/client': 'connectDaemon',
 } as const;
 
 function within(root: string, path: string): boolean {
@@ -178,7 +178,7 @@ console.log(JSON.stringify(observed));
 `;
   await writeFile(join(consumer, 'entries.mjs'), probe);
   const imports = await run(context, 'import every installed public entry', consumer, process.execPath, ['entries.mjs']);
-  assertions.equal(requiredEntries === entryFunctions ? 'all seven actual package entry imports executed' : 'all eight actual package entry imports executed',
+  assertions.equal('all eight actual package entry imports executed',
     JSON.parse(imports.stdout).map((entry: { entry: string }) => entry.entry), Object.keys(requiredEntries));
   observe(context, 'relocation-installed-entries', JSON.parse(imports.stdout));
   const installedCheck = await run(context, 'installed reference JSON', consumer, installedBin(context),

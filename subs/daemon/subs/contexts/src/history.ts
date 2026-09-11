@@ -14,7 +14,7 @@ export interface RevisionHistory<Revision> {
   readonly oldest: HistoryEntry<Revision> | undefined;
   get(revision: RevisionId): HistoryEntry<Revision> | undefined;
   /** Reject an oversized candidate before changing the retained history. */
-  append(revision: Revision, report: AnalysisReport): boolean;
+  append(revision: Revision, report: AnalysisReport, availableBytes?: number): boolean;
   /** Remove the oldest historical report, never the current publication. */
   discardOldest(): HistoryEntry<Revision> | undefined;
   retainPublished(): void;
@@ -23,7 +23,7 @@ export interface RevisionHistory<Revision> {
 
 /** Owner-private storage. The manager supplies immutable revision headers and
  * reports and owns publication eligibility, lastValid and retained products.
- * The header parameter will be ContextRevision when its provider types exist. */
+ * Revision headers remain opaque to storage apart from their identity. */
 export function createHistory<Revision extends { readonly revision: RevisionId }>(
   maxRevisions: number, maxBytes: number,
 ): RevisionHistory<Revision> {
@@ -53,15 +53,16 @@ export function createHistory<Revision extends { readonly revision: RevisionId }
     get published() { return published; },
     get oldest() { return oldest(); },
     get: revision => entries.get(revision),
-    append(revision, report) {
+    append(revision, report, availableBytes = maxBytes) {
       if (disposed) throw new Error('History is disposed');
       if (entries.has(revision.revision)) throw new Error('Revision is already retained');
       const reportBytes = Buffer.byteLength(JSON.stringify(report), 'utf8');
-      if (maxRevisions === 0 || reportBytes > maxBytes) return false;
+      const bound = Math.min(maxBytes, availableBytes);
+      if (maxRevisions === 0 || reportBytes > bound) return false;
       const entry = Object.freeze({ revision, report, bytes: reportBytes });
       // Check the prospective sum before adding to keep accounting within the
       // configured bound (and safe integer range) throughout replacement.
-      while (entries.size >= maxRevisions || bytes > maxBytes - reportBytes) {
+      while (entries.size >= maxRevisions || bytes > bound - reportBytes) {
         const removed = oldest()!;
         entries.delete(removed.revision.revision);
         bytes -= removed.bytes;

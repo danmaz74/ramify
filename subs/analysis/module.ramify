@@ -7,7 +7,7 @@ expose-sub * from model to parent, descendants
 expose-sub TextSpan, DescriptionToken, DescriptionIssue, NamedSelection, DescriptionSelection, DescriptionStatement, DescriptionDocument, ParsedDescription, DescriptionParser, LinkInputs, ExpandedSelection, LinkIssue, LinkedDescriptions from descriptions to parent, descendants
 
 // A7: project vocabulary supplied to assembly and children.
-expose-sub ProjectRequest, ProjectScope, CapturedInput, InventoryArea, ModulePurpose, InventoryModule, InventoryFile, ExactReference, OutsideSourceWarning, ProjectInventory, ProjectIssue, AcquisitionLimits, ProjectInputView, ProjectReadOptions, ProjectRead from project to parent, descendants
+expose-sub ProjectRequest, ProjectScope, CapturedInput, InventoryArea, ModulePurpose, InventoryModule, InventoryFile, ExactReference, OutsideSourceWarning, ProjectInventory, ProjectIssue, AcquisitionLimits, ProjectInputView, ProjectReadOptions, ProjectRead, ProjectResolution, RetainedConfiguration from project to parent, descendants
 
 // A8: current source catalog vocabulary.
 expose-sub CatalogOriginal, CatalogExport, FileExports, SourceCatalog, SourceTarget, WrittenForm, AccessSelection, SourceAccess, SourceLimit, SourceWorkLimits, SourceAnalysisInputs, SourceAnalysis from typescript to parent, descendants
@@ -22,3 +22,6 @@ expose-src acquireInventory from "inventory.ts" to parent
 // A3: disposable batch sessions and the direct service binding.
 expose-src createAnalysisSession from "session.ts" to parent
 expose-src analyzeProject from "analyze-project.ts" to parent
+
+expose-src analyzeIncrement from "increment.ts" to parent
+expose-src resolveProject from "resolve-project.ts" to parent

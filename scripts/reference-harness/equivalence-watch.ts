@@ -4,7 +4,7 @@ import type { AnalysisReport } from '../../subs/analysis/src/index.js';
 import { object } from './equivalence-process.js';
 import type { SequenceProcess } from './equivalence-process.js';
 import { parseAnalysisDocument } from './equivalence-comparison.js';
-import { recordObservation } from './observations.js';
+import { analysisEvidence, archiveObservation, recordObservation } from './observations.js';
 
 // Reviewed scope: 100 ms debounce + the iteration-1 reference source target.
 export const watchEditTargetMs = 100 + 4500;
@@ -61,7 +61,10 @@ export async function withLiveWatch<T>(processes: SequenceProcess, root: string,
     const line = queued.shift();
     assert.ok(line, closed ? `Watch exited before its next line: ${stderr}` : `Watch event exceeded ${timeoutMs} ms`);
     queuedBytes -= line.bytes;
-    recordObservation('watch-line', line);
+    const raw = await archiveObservation('watch-line', line);
+    recordObservation('watch-line', { arrivedAt: line.arrivedAt, bytes: line.bytes, raw,
+      value: { ...line.value, ...(line.value.event === 'revision'
+        ? { report: analysisEvidence(line.value.report as AnalysisReport) } : {}) } });
     return line;
   };
   let failure: unknown, result: T | undefined;

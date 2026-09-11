@@ -2,9 +2,6 @@
 
 Ramify assembles the command line, the resident daemon and lazy batch analysis from its owners, defines the dispatch-facing service vocabulary that the daemon implements, and keeps executable dispatch separate from portable model and presentation entries.
 
-This is the final owner responsibility. The current implementation runs batch
-checks; resident assembly, the daemon entry and client wiring remain incomplete.
-
 **Multi-file hierarchical modules for TypeScript.**
 
 TypeScript is modular at exactly one granularity, the file: above it, every
@@ -69,8 +66,11 @@ Teaching diagrams use the same model. The toolkit self-check and all 308
 reference gate instances are implemented, including the independent toolkit
 negative and relocated installation. The [completion report](docs/plans/done/iteration-1-project-verifier/iterations/iteration15-results.md)
 records actual execution, resource measurements and remaining acceptance work.
-The resident daemon, Ramify MCP server, interactive explorer and browser verifier
-remain unavailable; browser tag matching is implemented.
+Resident checks, streamed watch revisions, daemon status/stop and the lightweight
+`ramify.ts/client` entry are implemented. Plan 2 acceptance requires the current
+reference gates, resource measurements and both supported process platforms.
+The Ramify MCP server, interactive explorer and browser verifier remain future
+work; browser tag matching is implemented.
 
 ## Check a project
 
@@ -81,6 +81,10 @@ is available through npm's local bin directory:
 ```sh
 npx ramify check
 npx ramify check --root /path/to/project --format json
+npx ramify check --batch
+npx ramify watch --format json
+npx ramify daemon status
+npx ramify daemon stop
 ```
 
 From this checkout, the same executable can check the reference directly:
@@ -93,13 +97,13 @@ npm run reference:verify -- --plan 1
 
 `check` discovers the whole project and its compiler configuration from the
 working directory unless `--root` is given. It includes owned tests and
-resources. `--batch` is accepted; each invocation uses and disposes a fresh
+resources. `--batch` uses and disposes a fresh
 session. Human output is the default; JSON output is one versioned report on
 stdout. See the [CLI contract](docs/architecture/cli-invocation.spec.md) for
 scope and exit codes. `--help` and `--version` load no compiler or server.
 
 The reusable session is exported from `ramify.ts/analysis`; command handling
-with an injected batch operation is exported from `ramify.ts/cli`.
+with an injected service connector and batch operation is exported from `ramify.ts/cli`.
 Portable entries are `ramify.ts/model` and `ramify.ts/layout`;
 `ramify.ts/presentation` contains the teaching UI. See the
 [batch usage guide](docs/development/batch-verification.md) for direct session
@@ -126,7 +130,7 @@ usage, production selection, gate evidence and measurement commands.
   [Collection Review reference-project plan](docs/plans/reference-project/README.md)
   and its planned compatibility and regression cases, plus the
   [implementation roadmap and plan briefs](docs/plans/tooling-architecture/README.md).
-- `src/` - the executable entry and lazy batch assembly.
+- `src/` - CLI and daemon executable entries, resident assembly and lazy batch assembly.
 - `subs/analysis/` - batch validation and its declared model, descriptions,
   project and TypeScript children.
 - `subs/presentation/` - teaching diagrams, React components and the neutral

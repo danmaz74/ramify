@@ -348,7 +348,7 @@ describe('shared globals declared by application source', () => {
       expect(notes[0]).toMatchObject({ location: { file: 'src/globals.ts', line: 2, column: 1 },
         message: expect.stringContaining('shared globals') });
       expect(notes[0].related.map(location => [location.file, location.line])).toEqual([['src/globals.ts', 3]]);
-      expect(file(catalog, 'src/globals.ts')).toMatchObject({ state: 'incomplete', issueIds: [notes[0].id] });
+      expect(file(catalog, 'src/globals.ts')).toMatchObject({ state: 'complete', issueIds: [notes[0].id] });
       expect(exported(catalog, 'src/globals.ts', 'local').original).toEqual(code('globals.ts', 'local'));
     });
   }, 30_000);

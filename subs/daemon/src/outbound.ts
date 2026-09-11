@@ -1,4 +1,7 @@
 import type { Socket } from 'node:net';
+import { channel } from 'node:diagnostics_channel';
+const observation = channel('ramify.daemon.outbound');
+let connectionSerial = 0;
 import { encodeJsonFrame } from './codec.js';
 
 // Transport metadata only. The host must validate WireMessage and derive these
@@ -36,6 +39,8 @@ export function createOutboundWriter<T>(options: OutboundOptions<T>) {
     if (!Number.isSafeInteger(value) || value < 1) throw new Error('Invalid outbound limit');
   }
   const { socket, maxFrameBytes, maxBytes, maxFrames } = options;
+  const connectionId = String(++connectionSerial);
+  let finalReason: CloseReason = 'closed';
   let classify: OutboundOptions<T>['event'] | null = options.event;
   let encode: OutboundOptions<T>['encode'] | null = options.encode;
   let onClose: OutboundOptions<T>['onClose'] | null = options.onClose;
@@ -48,7 +53,7 @@ export function createOutboundWriter<T>(options: OutboundOptions<T>) {
 
   function terminate(reason: CloseReason): void {
     if (closed) return;
-    closed = true;
+    closed = true; finalReason = reason;
     clearImmediate(scheduled);
     scheduled = undefined;
     queue = [];
@@ -88,6 +93,7 @@ export function createOutboundWriter<T>(options: OutboundOptions<T>) {
   function drain(): void { blocked = false; schedule(); }
   function error(): void { terminate('failure'); }
   function close(): void {
+    if (observation.hasSubscribers) observation.publish({ event: 'closed', connectionId, reason: finalReason, at: performance.now(), bytes, frames });
     clearTimeout(deadline);
     socket.off('error', error);
     socket.off('close', close);
@@ -125,6 +131,7 @@ export function createOutboundWriter<T>(options: OutboundOptions<T>) {
       const nextBytes = bytes - (previous?.bytes.byteLength ?? 0) + encoded.byteLength;
       const nextFrames = frames + (previous ? 0 : 1);
       if (nextBytes > maxBytes || nextFrames > maxFrames) {
+        if (observation.hasSubscribers) observation.publish({ event: 'overflow', connectionId, reason: 'slow-consumer', at: performance.now(), bytes, frames, attemptedBytes: nextBytes });
         terminate('slow-consumer');
         return 'closed';
       }
@@ -133,6 +140,7 @@ export function createOutboundWriter<T>(options: OutboundOptions<T>) {
       if (previous) { queue.splice(index, 1); coalescedEvents++; }
       queue.push(frame);
       bytes = nextBytes; frames = nextFrames;
+      if (observation.hasSubscribers) observation.publish({ event: 'admitted', connectionId, at: performance.now(), bytes, frames });
       if (nextSequence !== null) sequence = nextSequence;
       schedule();
       return 'accepted';

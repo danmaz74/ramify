@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { command } from './processes.js';
 import type { CommandResult } from './processes.js';
 import { repositoryRoot } from './plan.js';
-import { recordObservation } from './observations.js';
+import { archiveObservation, recordObservation, traceEvidence } from './observations.js';
 import { parseAnalysisDocument } from './equivalence-comparison.js';
 import type { TraceEvent } from '../../src/tests/process.js';
 
@@ -108,7 +108,8 @@ export async function withSequenceProcess<T>(operation: (processes: SequenceProc
   try {
     if (installed) {
       const stop = await command(cwd, executable, ['daemon', 'stop', '--format', 'json'], 7000, environment);
-      recordObservation('equivalence-stop', { code: stop.code, signal: stop.signal, error: stop.error, stdout: stop.stdout, stderr: stop.stderr });
+      recordObservation('equivalence-stop', { code: stop.code, signal: stop.signal, error: stop.error,
+        stdoutBytes: Buffer.byteLength(stop.stdout), stderr: stop.stderr, raw: await archiveObservation('equivalence-stop', stop) });
       // If the provider was absent, retain that original failure. Once the
       // operation succeeds, graceful daemon stop is part of its exit criteria.
       if (!failure) assert.equal(stop.code, 0, 'Owned daemon did not stop successfully');
@@ -127,7 +128,8 @@ export async function withSequenceProcess<T>(operation: (processes: SequenceProc
     const killedDeadline = performance.now() + 2000;
     while (leaked.some(alive) && performance.now() < killedDeadline) await new Promise(done => setTimeout(done, 20));
     const survivingAfterKill = leaked.filter(alive);
-    recordObservation('equivalence-process-cleanup', { pids, leaked, survivingAfterKill, events });
+    recordObservation('equivalence-process-cleanup', { pids, leaked, survivingAfterKill, trace: traceEvidence(events),
+      raw: await archiveObservation('equivalence-process-cleanup', { pids, leaked, survivingAfterKill, events }) });
     if (leaked.length) cleanupErrors.push(new Error(`Processes survived daemon stop: ${leaked.join(', ')}`));
   } catch (error) { cleanupErrors.push(error); }
   try { await rm(owned, { recursive: true, force: true }); }

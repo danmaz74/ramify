@@ -28,7 +28,7 @@ export async function fixture(run: (root: string) => Promise<void>): Promise<voi
 }
 export async function invoke(root: string, argv: readonly string[], batch: BatchOperation = runBatch, control?: RunControl) {
   const stdout: string[] = [], stderr: string[] = [];
-  const exitCode = await runCli(argv, { cwd: root, version: '1.2.3', stdout: text => { stdout.push(text); },
+  const exitCode = await runCli(argv, { cwd: root, version: '1.2.3', connect: async () => { throw new Error('Unexpected daemon connection'); }, stdout: text => { stdout.push(text); },
     stderr: text => { stderr.push(text); }, batch }, control);
   return { exitCode, stdout: stdout.join(''), stderr: stderr.join(''), writes: stdout.length };
 }

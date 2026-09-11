@@ -42,7 +42,7 @@ describe('CLI service and disconnect errors', () => {
     ] as const) {
       const stdout: string[] = [], stderr: string[] = [];
       let calls = 0;
-      const environment: CliEnvironment = { cwd: '/project', version: '1',
+      const environment: CliEnvironment = { cwd: '/project', version: '1', connect: async () => { throw new Error('Unexpected daemon connection'); },
         stdout: text => { stdout.push(text); }, stderr: text => { stderr.push(text); },
         // Exercise the command exception boundary only; this supplies no service.
         batch: async () => { calls++; throw failure; },
@@ -63,7 +63,7 @@ describe('CLI service and disconnect errors', () => {
   it.each([['--help'], ['check', '--batch', '--format', 'json']])('keeps output failures above translated errors for %s', async (...argv) => {
     const stderr: string[] = [];
     const failure = serviceFailure({ code: 'stopping', message: 'test stop', details: {} });
-    const exit = await runCli(argv, { cwd: '/project', version: '1',
+    const exit = await runCli(argv, { cwd: '/project', version: '1', connect: async () => { throw new Error('Unexpected daemon connection'); },
       stdout: () => { throw failure; }, stderr: text => { stderr.push(text); }, batch: async () => { throw failure; } });
     expect(exit).toBe(2);
     expect(stderr.join('')).toContain('Error [output-failure]:');
@@ -73,7 +73,7 @@ describe('CLI service and disconnect errors', () => {
   it('keeps an interruption above a translated error and publishes no document', async () => {
     const controller = new AbortController();
     const stdout: string[] = [], stderr: string[] = [];
-    const exit = await runCli(['check', '--batch', '--format', 'json'], { cwd: '/project', version: '1',
+    const exit = await runCli(['check', '--batch', '--format', 'json'], { cwd: '/project', version: '1', connect: async () => { throw new Error('Unexpected daemon connection'); },
       stdout: text => { stdout.push(text); }, stderr: text => { stderr.push(text); }, batch: async () => {
         controller.abort(); throw disconnectFailure({ kind: 'failure', message: 'cancelled socket' });
       } }, { signal: controller.signal });

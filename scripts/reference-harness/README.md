@@ -229,10 +229,10 @@ and all fourteen sequence indices, titles and prerequisite assignments. The
 Plan 1 reader and its 308 records remain independent.
 
 `npm run reference:verify -- --plan 2 --iteration 2` executes the four I2-28
-harness controls. The full `--plan 2` gate requires all 176 and currently fails:
-only `harness-gate` is available in `plan2-runtime.ts`. A Plan 1 capability never
-activates its Plan 2 counterpart. Later providers add their capability and exact
-handlers there; registration never establishes execution. `--iteration 5`
+harness controls. The full `--plan 2` gate requires all 176. `plan2-runtime.ts` registers the
+real incremental, context, service, IPC, process and CLI providers. A Plan 1
+capability never activates its Plan 2 counterpart; registration never
+establishes execution or a passing gate. `--iteration 5`
 requires 64 instances from iterations 2–5; `--iteration 9` requires 134 from
 2–9 (iteration 7 has owner tests only). All other records stay `not-executed`.
 
@@ -242,14 +242,11 @@ both inventories without running conformance assertions. The report command
 lists Plan 2 capability availability without executing resident instances;
 `reference:verify --plan 2` owns their execution and portable evidence files.
 
-The eleven-owner skeleton requires the existing Plan 1 acquisition count and
-self-check owner list to change in iteration 2. Their literal expectations now
-include daemon and contexts; an owner with no source is accepted only when it is
-one of these two owners and contains exactly its source/test `.gitkeep` files.
-Once either gains source, the existing owned-test assertion applies. All 308
-Plan 1 instance records, permission expectations and package entries remain
-unchanged; the resident CLI and package-entry migration still belongs to later
-iterations.
+The eleven-owner acquisition and self-check expectations include daemon and
+contexts. Every owner must contain real source and owned tests; there is no
+skeleton exception. The 308 Plan 1 instance records remain unchanged. Its
+reviewed package expectation resolves all eight actual entries, including the
+lightweight client, and its owner expectations name all eleven owners.
 
 ### Resident edit fixtures (iteration 6)
 
@@ -392,8 +389,8 @@ import of the actual `RamifyService` with a visible R6 dispatch denial, strict
 final declarations, eight packed package entries, and relocated resident
 checking and stop. The self-check reuses Plan 1's full toolkit inventory
 assertions. The package handlers reuse the external bootstrap and npm-pack
-fixture with an independent eight-entry literal; its Plan 1 default remains
-seven until the provider activates the real client entry.
+fixture with an independent eight-entry literal; the Plan 1 relocation
+expectation also names all eight real package entries.
 
 The process scope can use that unpacked executable, isolated environment and
 copied preload without installing a link back to the source checkout. It retains
@@ -409,7 +406,7 @@ report's hash and rejects missing evidence or a newer failure for those inputs.
 It starts no nested regression runner. The frozen Plan 1 archive supplies only
 definitions; its old build cannot earn current regression credit.
 
-The other five handlers fail on the current missing providers, and the required
-current Plan 1 report is absent. Registration does not establish completion.
+Every completion claim requires a successful current execution. Registration
+and historical reports do not establish completion.
 The [readiness guide](../../docs/development/resident-verification.md) describes
 the remaining commands and automation-owned regression runs.

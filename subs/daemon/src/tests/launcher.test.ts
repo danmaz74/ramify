@@ -60,12 +60,12 @@ describe('private coordinated launcher with a fake entry', () => {
     await expect(readFile(value.endpoint.log)).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
-  it('preserves a stale lock when another reclaimer holds the guard', async () => {
+  it('reports malformed legacy guard ownership without removing its lock', async () => {
     const value = await fixture();
     const content = JSON.stringify({ pid: await deadPid(), at: 0 });
     await writeFile(value.endpoint.lock, content, { mode: 0o600 });
     await writeFile(`${value.endpoint.lock}.reclaim`, 'interrupted reclamation', { mode: 0o600 });
-    await expect(launchDaemon({ ...value.launch, startupMs: 100 })).rejects.toThrow('timed out');
+    await expect(launchDaemon({ ...value.launch, startupMs: 100 })).rejects.toThrow();
     expect(await readFile(value.endpoint.lock, 'utf8')).toBe(content);
   });
 
@@ -106,5 +106,35 @@ describe('private coordinated launcher with a fake entry', () => {
     await expect(readFile(value.endpoint.lock)).rejects.toMatchObject({ code: 'ENOENT' });
     await expect(launchDaemon({ ...value.launch, startupMs: Infinity })).rejects.toThrow('Invalid daemon launch');
     await expect(launchDaemon({ ...value.launch, daemonEntry: './relative.js' })).rejects.toThrow('Invalid daemon launch');
+  });
+});
+
+
+describe('startup crash recovery regressions', () => {
+  it('terminates its own timed-out unready child before releasing the start lock', async () => {
+    const value = await fixture(fakeEntry.slice(0, fakeEntry.indexOf('const server')) + 'setInterval(() => {}, 1000);');
+    const result = launchDaemon({ ...value.launch, startupMs: 300 }).catch(error => error);
+    const pid = await waitForPid(value.endpoint.record);
+    expect(await result).toHaveProperty('message', 'Daemon startup timed out');
+    expect(processAlive(pid)).toBe(false);
+    await expect(readFile(value.endpoint.lock)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('serializes reclamation of a dead legacy guard and dead lock among eight contenders', async () => {
+    const value = await fixture();
+    const content = JSON.stringify({ pid: await deadPid(), at: 0 });
+    await writeFile(value.endpoint.lock, content, { mode: 0o600 });
+    await writeFile(`${value.endpoint.lock}.reclaim`, content, { mode: 0o600 });
+    const results = await Promise.all(Array.from({ length: 8 }, () => launchDaemon(value.launch)));
+    expect(results.filter(result => result.started)).toHaveLength(1);
+    expect(new Set(results.map(result => result.record.pid)).size).toBe(1);
+    await expect(readFile(`${value.endpoint.lock}.reclaim`)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('reports an ambiguous legacy empty lock immediately instead of retrying to timeout', async () => {
+    const value = await fixture();
+    await writeFile(value.endpoint.lock, '', { mode: 0o600 });
+    await expect(launchDaemon(value.launch)).rejects.toThrow('Empty legacy daemon start lock');
+    expect(await readFile(value.endpoint.lock, 'utf8')).toBe('');
   });
 });

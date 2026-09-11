@@ -8,6 +8,8 @@ import { sha256 } from './common.mjs';
 import { measureProcess, processRows } from './process-observer.mjs';
 import { pendingResidentWorkloads, residentBudgets } from './resident-plan.mjs';
 import { residentPrerequisites } from './resident-prerequisites.mjs';
+import { assertResidentWorkload } from './resident-assertions.mjs';
+import { verifyResidentEvidence } from './verify-resident-evidence.mjs';
 
 // Direct, bounded tooling controls. These exercise real child processes and
 // archive I/O, and never claim resident engine or I2 matrix evidence.
@@ -45,6 +47,26 @@ try {
   assert.ok(workloads.every(item => item.status === 'not-executed' && item.measurements === null && !item.passed));
   assert.equal(residentBudgets.reference.sourceMs, 4500);
   assert.equal(residentBudgets.S100.sourceMs, 8000);
+  for (const workload of workloads) {
+    assert.ok(assertResidentWorkload(workload.id, null).some(row => !row.passed));
+    assert.ok(assertResidentWorkload(workload.id, {}).some(row => !row.passed));
+  }
+  const footprints = Object.fromEntries(['help', 'client', 'daemonEmpty', 'daemonReference', 'cliReference', 'cliS100']
+    .map(name => [name, { rssBytes: 1 }]));
+  assert.ok(assertResidentWorkload('I2-29:entry-footprints', footprints).some(row => !row.passed), 'Aggregates without actual samples cannot pass');
+  footprints.client.rssBytes = residentBudgets.clientBytes + 1;
+  assert.ok(assertResidentWorkload('I2-29:entry-footprints', footprints).some(row => !row.passed));
+  const falsePeak = { cold: { durationMs: 1 }, source: { durationMs: 1 }, peakBytes: 1,
+    samples: [{ combinedRssBytes: residentBudgets.S500.peakBytes + 1, processes: [{ pid: 42, rssBytes: residentBudgets.S500.peakBytes + 1 }] }] };
+  assert.ok(assertResidentWorkload('I2-29:synthetic-500', falsePeak).some(row => !row.passed), 'Stale saved peak cannot hide raw budget miss');
+  const falseStatus = { status: { service: Array(20).fill(51), cli: Array(20).fill(301), medianServiceMs: 1, medianCliMs: 1 } };
+  const statusAssertions = assertResidentWorkload('I2-29:cold-warm-broad-reference', falseStatus);
+  assert.ok(statusAssertions.some(row => row.name === 'service-side contextStatus median' && !row.passed));
+  assert.ok(statusAssertions.some(row => row.name === 'end-to-end CLI daemon status median' && !row.passed));
+  delete footprints.client;
+  assert.ok(assertResidentWorkload('I2-29:entry-footprints', footprints).some(row => !row.passed));
+  assert.throws(() => verifyResidentEvidence({ schemaVersion: 'ramify.resident-measurements/1', evidenceKind: 'measurement',
+    inputs: { build: 'stale' }, passed: true }, 'I2-29:entry-footprints', { build: 'current' }, {}), /current source/);
   const report = { schemaVersion: 'ramify.resident-measurements/1', measuredAt: new Date().toISOString(),
     completedAt: new Date().toISOString(), passed: false, inputs: { build: { files: 0, sha256: 'test-only' } }, workloads };
   const archive = join(scratch, 'archive');

@@ -2,106 +2,16 @@
 
 Daemon owns the resident process: the validated in-process service that implements the root's service interface over its contexts child, the local socket host and its discovery records, the lightweight client that other processes use to reach it, the wire codec, and the real filesystem watcher and clock ports.
 
-The filesystem watcher and system clock are implemented. The watcher attaches
-one native handle per directory, skipping `node_modules`, `.git`, `dist` and
-`.reference-work` at every depth and never descending through symlinks. It
-refreshes directory handles after rename or unknown-path notifications, including
-replacement of a directory at the same path. Events carry root-relative paths;
-native rename notifications remain `renamed`, without guessing create/delete.
-Unknown paths and queue overflow emit `overflow` at the empty root-relative
-path; watcher failures emit `error` there (native resource exhaustion also emits
-`overflow`). Batches are frozen, deduplicated and delivered within a 100 ms
-window, bounded to 10,000 distinct paths plus conservative signals. Closing a
-watch cancels pending delivery, waits for scans and native handle closure, and
-removes listeners. No event guarantees that disk inputs are current; synchronized
-and periodic captures remain the context manager's responsibility.
+`createDaemonService` validates each operation and binds it to a context manager. `startDaemon` hosts that same service over framed Unix sockets, enforces connection, request and notification limits, publishes atomic lifecycle records, and releases leases on disconnect or shutdown. Requests and published results retain their context, generation and revision identities across IPC.
 
-The clock uses wall-clock timestamps and cancellable timers. Long waits are
-split into supported native timer durations instead of overflowing Node's
-32-bit timeout. Callers own each cancellation function.
+The separate `client-entry.ts` exports discovery, codec and `connectDaemon` without importing the service, host, contexts, analysis or compiler. Recovery is bounded and preserves explicit stop: automatic recovery does not restart an explicitly stopped daemon. Endpoint identity covers the complete production build; private endpoint permissions and process liveness are verified before reuse or cleanup.
 
-`interfaces/daemon.ts` contains the independent instance, log, budget, record,
-stop, handshake, connection-state, disconnect-reason, endpoint and client-option
-declarations. N1 exposes the two real ports, N2 exposes discovery and record
-reads, and N4 exposes only existing types. Root R7 relays the implemented
-discovery and client-option types. The contexts vocabulary and controlled ports
-remain relayed through N5.
+The filesystem watcher prunes generated and dependency directories, batches hints, and reconciles directory handles after renames or uncertain events. A synchronized request still validates a fresh captured view through the analysis driver.
 
-`selectEndpoint` selects the private endpoint directory and hashes the real
-package path, version, package.json and sorted production runtime bytes without
-importing them. It requires the daemon entry, declared runtime package entries
-and an owner runtime tree, so the present build without `daemon-entry.js` cannot
-select a resident endpoint. Tests provide an independent fake build. Missing
-files, unsafe directory permissions and paths exceeding 100 socket bytes fail
-explicitly. File hashing establishes the selected bytes, while dependency
-completeness is the production build's responsibility.
+Owner tests exercise service validation, real filesystem events, framing, socket request dispatch, backpressure, discovery and coordinated startup. The root owns tests spawning the compiled daemon entry.
 
-`readDaemonRecord` validates the complete record, including its selected group,
-socket and stop disposition. The private writer uses a 0600 temporary file and
-same-directory rename. Reads recheck directory permissions, reject symlinks and
-non-regular files, bound input to 64 KiB, and reject malformed UTF-8 or JSON.
-Missing records return null; invalid records are errors.
+Startup ownership is written completely before an atomic exclusive link publishes the lock. A recoverable process-id ticket gate serializes lock replacement, dead-owner reclamation and listener startup. The launcher terminates its own child when startup times out before any running record, and never terminates a compatible running daemon. Cancellation leaves the child's ownership visible. Existing legacy empty or malformed lock files cannot prove a dead owner and return an explicit diagnostic; their removal requires an independent ownership check.
 
-The private `launchDaemon` coordinates one start attempt with an exclusive lock,
-detached child and bounded readiness wait. It passes the reviewed endpoint,
-build, version and engine arguments, redirects output to a private log and
-releases its descriptors. Stale cleanup requires a proven dead pid; a live pid
-with a refused socket remains unavailable. Concurrent stale-lock reclamation
-uses a temporary exclusive `.lock.reclaim` guard. An interrupted guard is left
-intact and fails closed until explicitly inspected and removed; age alone never
-authorizes removal. Cancellation does not kill a shared child: before readiness
-the lock names that child so another caller cannot spawn a duplicate. A later
-running record is usable even while that lock exists, and the lock becomes
-reclaimable after the child dies. The future connector owns attempt counts,
-handshake, recovery authorization and service requests. Fake-entry tests prove
-only this private launcher's behavior, with no IPC or process matrix credit.
+Known rename hints refresh only the affected directory and newly discovered subtrees. Unknown watcher events trigger one full reconciliation per batching window, preventing continuous churn from trapping startup in an unbounded rescan loop.
 
-The private request validator checks every operation's parameter shape,
-including token identifiers, freshness variants, printable request IDs and
-bounded content expectations. It rejects unknown properties and non-data
-objects, and permits arbitrary string registry/capability names structurally:
-the future service must return unsupported setups as domain outcomes. Root's
-R6 exposure currently provides only the five independent service operation,
-capability, error and result declarations that this validator consumes.
-
-Iteration 3's increment and project-resolution operations and iteration 4's
-context manager are still absent. The shared service, complete root interface and
-assembly, WireMessage schema, complete connection vocabulary and quick environment therefore
-remain unimplemented. No `daemon-service` harness capability is registered.
-
-The private byte-framing portion of `codec.ts` is implemented independently of
-those providers. It writes a four-byte big-endian UTF-8 JSON length and payload,
-decodes exact frames, and assembles fragmented or concatenated frames with at
-most one bounded pending body. Zero/oversized lengths fail on the completed
-header before body allocation. Malformed UTF-8 or JSON, extra frame bytes and
-truncated streams fail explicitly. Decoder disposal drops the pending body and
-listener; a parse or listener error closes the decoder. Decoded values remain
-`unknown`: JSON syntax is not a WireMessage schema check. The future message
-wrappers must perform that validation, and the socket owner must send failure
-goodbye and close when decoding throws. No N2 codec exposure or client entry is
-activated by these private helpers.
-
-Iteration 8 adds the private outbound socket writer and JSON-line log writer.
-`outbound.ts` accepts an encoder and transport event labels from its future host.
-It stores encoded frames, moves replaceable events to the newest queue position,
-adds their coalescing counts and assigns increasing event sequence numbers.
-Context, subscription and event type jointly identify replacements; eviction and
-control frames remain ordered. Bytes handed to Node remain accounted until their
-write callbacks complete, and backpressure pauses further writes until `drain`.
-Exceeding either queue bound releases pending frames, notifies the owner once,
-attempts a slow-consumer goodbye and destroys the socket within one second.
-Oversized individual frames are returned to the caller for its future service
-error response. This helper does not validate messages or release service leases.
-
-`daemon-log.ts` opens a private regular log file without following symlinks or
-accepting hard links. It appends complete JSON lines synchronously, caps its file
-at 8 MiB by truncating on rollover, and omits a single oversized entry whole.
-Rollover preserves the inode used by inherited append descriptors. Its own writes
-are bounded; unrelated writes to stdout/stderr are outside this helper's bound.
-Close is idempotent and releases the descriptor.
-
-These helpers have owner tests, including real socket backpressure. The service,
-message schema, client and assembly providers are still absent, so `host.ts`,
-`startDaemon`, `daemon-entry.ts` and their real service IPC/process evidence remain
-unimplemented. N3 and the `ipc`, `client` and `daemon-process` capabilities are
-not activated by private transport tests.
+The host remembers at most 100,000 distinct request IDs per connection for exact duplicate rejection. At that lifetime admission bound it sends a failure goodbye requiring reconnect before admitting another request. Opening a fresh connection resets that bounded identity table.

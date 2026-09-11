@@ -57,7 +57,7 @@ class CatalogBuilder {
   }
   private at(file: string): SourceLocation { return { file, start: 0, end: 0, line: 1, column: 1 }; }
   private limit(file: MutableFile, code: SourceLimit['code'], message: string, node?: Node,
-    related: readonly SourceLocation[] = [], compilerCode?: number, precise?: SourceLocation): void {
+    related: readonly SourceLocation[] = [], compilerCode?: number, precise?: SourceLocation, affectsExports = true): void {
     const location = precise ?? (node ? this.location(node) : this.at(file.file));
     // Synthetic witness names are implementation inputs, never report locations.
     const reported = resolve(this.root, location.file) === this.host.resourceWitness ? this.at(file.file) : location;
@@ -70,7 +70,7 @@ class CatalogBuilder {
     }
     if (!file.issueIds.includes(key)) file.issueIds.push(key);
     if (code === 'ambiguous-original') file.state = 'ambiguous';
-    else if (file.state === 'complete') file.state = 'incomplete';
+    else if (affectsExports && file.state === 'complete') file.state = 'incomplete';
   }
   private check(depth: number, record = false): void {
     if (depth > this.inputs.limits.maxForwardingDepth) throw new SourceFailure('resource-limit', 'Source forwarding depth limit exceeded');
@@ -193,7 +193,7 @@ class CatalogBuilder {
       .map(name => name.parent);
     if (!declarations.length) return;
     this.limit(file, 'shared-global', 'Module source declares shared globals; their ownership and cross-owner dependencies are not verified',
-      declarations[0], declarations.slice(1).map(statement => this.location(statement)));
+      declarations[0], declarations.slice(1).map(statement => this.location(statement)), undefined, undefined, false);
   }
   /** A script's top-level declarations bind globals every owner can read. No
    * request form represents that ownership or another owner's reads, so the

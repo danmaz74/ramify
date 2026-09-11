@@ -33,7 +33,7 @@ function add(id: string, fixture: 'R' | 'F', mutate: Handler['mutate'], run: Han
 async function direct(root: string, format: 'human' | 'json', batch: BatchOperation = runBatch) {
   const stdout: string[] = [], stderr: string[] = [];
   const code = await runCli(['check', '--batch', '--root', root, ...(format === 'json' ? ['--format', 'json'] : [])], {
-    cwd: root, version: 'test', stdout: text => { stdout.push(text); }, stderr: text => { stderr.push(text); }, batch,
+    cwd: root, version: 'test', connect: async () => { throw new Error('Unexpected daemon connection'); }, stdout: text => { stdout.push(text); }, stderr: text => { stderr.push(text); }, batch,
   });
   return { code, stdout: stdout.join(''), stderr: stderr.join(''), writes: stdout.length };
 }

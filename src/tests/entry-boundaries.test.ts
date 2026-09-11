@@ -15,6 +15,5 @@ describe('compiled entry boundaries', () => {
   it('keeps explicit batch independent of the daemon and preserves report bytes', async () => {
     await fixture(root => batchBoundary(root, assertions).then(() => {}));
   }, 60_000);
-  // The daemon entry, resident check and successful daemon status need the
-  // missing I3-I9 providers. No fake or skipped test supplies those witnesses.
+  // The independent Plan 2 process gate exercises daemon and resident boundaries.
 });

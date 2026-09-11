@@ -4,7 +4,9 @@
   "private": true,
   "description": "Multi-file hierarchical modules for TypeScript: a toolkit to define, enforce, visualize, and help agents adhere to them.",
   "type": "module",
-  "bin": { "ramify": "dist/src/cli-entry.js" },
+  "bin": {
+    "ramify": "dist/src/cli-entry.js"
+  },
   "exports": {
     ".": {
       "types": "./dist/subs/analysis/src/index.d.ts",
@@ -33,6 +35,10 @@
     "./layout": {
       "types": "./dist/subs/presentation/subs/layout/src/index.d.ts",
       "import": "./dist/subs/presentation/subs/layout/src/index.js"
+    },
+    "./client": {
+      "types": "./dist/subs/daemon/src/client-entry.d.ts",
+      "import": "./dist/subs/daemon/src/client-entry.js"
     }
   },
   "scripts": {

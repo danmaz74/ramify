@@ -5,5 +5,5 @@ import { runCli } from '../../subs/cli/src/index.js';
 // isolated process probe, never from a substitute catalog/checker.
 const argv = process.argv.slice(2);
 if (argv[0] === 'check' && !argv.includes('--batch')) argv.splice(1, 0, '--batch');
-process.exitCode = await runCli(argv, { cwd: process.cwd(), version: 'test',
+process.exitCode = await runCli(argv, { cwd: process.cwd(), version: 'test', connect: async () => { throw new Error('Unexpected daemon connection'); },
   stdout: text => { process.stdout.write(text); }, stderr: text => { process.stderr.write(text); }, batch: runBatch });

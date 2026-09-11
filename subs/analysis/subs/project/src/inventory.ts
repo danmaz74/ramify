@@ -1,6 +1,6 @@
 import { basename, join, relative } from 'node:path';
 import { Capture } from './capture.js';
-import { AcquisitionError, byteOrder, freeze, within } from './data.js';
+import { AcquisitionError, byteOrder, freeze, hash, within } from './data.js';
 import { readPurpose } from './purpose.js';
 import { exactReferences } from './references.js';
 import type { DescriptionParser } from '../../descriptions/src/interfaces/syntax.js';
@@ -8,9 +8,10 @@ import type { ConfigurationData } from './configuration-data.js';
 import type { ExactReference, InventoryFile, InventoryModule, ProjectInventory, ProjectIssue, ProjectScope } from './interfaces/project.js';
 
 const compilerSource = /\.(?:[cm]?[jt]sx?)$/;
+type Metadata = Record<string, { identity: string; purpose: InventoryModule['purpose'] }>;
 interface Boundary { directory: string; module: InventoryModule | null; depth: number }
 interface Walk { directory: string; boundary: Boundary | null }
-type InventoryRead = { inventory: ProjectInventory; issues: ProjectIssue[] }
+type InventoryRead = { inventory: ProjectInventory; issues: ProjectIssue[]; metadata: Metadata; metadataReused: boolean }
   & ({ status: 'complete' } | { status: 'failed'; error: unknown });
 
 function excludedDirectory(path: string, config: ConfigurationData): boolean {
@@ -25,7 +26,18 @@ function excludedDirectory(path: string, config: ConfigurationData): boolean {
       || join(exclusion.directory, pattern) === path));
 }
 export async function inventoryProject(capture: Capture, scope: Omit<ProjectScope, 'walkedAreas' | 'independentScopes'>,
-  config: ConfigurationData, parse: DescriptionParser): Promise<InventoryRead> {
+  config: ConfigurationData, parse: DescriptionParser, previousMetadata?: Metadata): Promise<InventoryRead> {
+  const metadata: Metadata = {};
+  let metadataReused = true;
+  async function purpose(readme: string): Promise<InventoryModule['purpose']> {
+    const path = relative(capture.root, readme), text = await capture.readFile(readme, 'readme');
+    const identity = text === undefined ? 'absent' : hash(text);
+    const previous = previousMetadata?.[path];
+    const product = previous?.identity === identity ? previous.purpose : readPurpose(path, text);
+    if (previous?.identity !== identity) metadataReused = false;
+    metadata[path] = { identity, purpose: product };
+    return product;
+  }
   const modules: InventoryModule[] = [], files: InventoryFile[] = [], issues: ProjectIssue[] = [];
   const references: ExactReference[] = [];
   let outsideModuleFiles: string[] = [];
@@ -99,7 +111,7 @@ export async function inventoryProject(capture: Capture, scope: Omit<ProjectScop
                 { owner: id, kind: 'ordinary', root: join(moduleDirectory, 'src'), present: await capture.kind(join(directory, 'src')) === 'directory' },
                 { owner: id, kind: 'tests', root: join(moduleDirectory, 'src/tests'), present: await capture.kind(join(directory, 'src/tests')) === 'directory' },
               ],
-              purpose: readPurpose(relative(capture.root, readme), await capture.readFile(readme, 'readme')),
+              purpose: await purpose(readme),
             };
             const previous = names.get(id);
             if (previous) {
@@ -147,7 +159,7 @@ export async function inventoryProject(capture: Capture, scope: Omit<ProjectScop
     // Selected outside source is captured as input, but receives no owner/area.
     for (const file of outsideModuleFiles) await capture.readFile(file, 'dependency');
   } catch (error) {
-    return { status: 'failed', inventory: snapshot(), issues, error };
+    return { status: 'failed', inventory: snapshot(), issues, metadata, metadataReused, error };
   }
-  return { status: 'complete', inventory: snapshot(), issues };
+  return { status: 'complete', inventory: snapshot(), issues, metadata, metadataReused };
 }

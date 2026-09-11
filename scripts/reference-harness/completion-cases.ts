@@ -19,8 +19,7 @@ import { completed } from './session-expectations.js';
 import { Assertions } from './runner.js';
 import type { InstanceHandler, ProjectContext } from './runner.js';
 
-// Independent Plan 2 literal. The Plan 1 relocation expectation remains at its
-// staged seven entries until the real eighth entry is activated by its owner.
+// Independent Plan 2 literal, also required by the revised Plan 1 relocation.
 export const completionEntries = {
   'ramify.ts': 'createAnalysisSession', 'ramify.ts/analysis': 'analyzeProject',
   'ramify.ts/analysis/inventory': 'acquireInventory', 'ramify.ts/model': 'createDefaultTagRegistry',
@@ -37,7 +36,7 @@ export function assertClientClosure(events: readonly TraceEvent[], installed: st
   const files = loads.filter(event => event.url?.startsWith('file:')).map(event => fileURLToPath(event.url!))
     .filter(path => path !== preload && path !== join(consumer, '[eval1]'));
   const closure = files.map(path => relative(join(installed, 'dist'), path));
-  const allowed = ['client-entry', 'connect-daemon', 'connection', 'launcher', 'discovery', 'codec', 'records']
+  const allowed = ['client-entry', 'connect-daemon', 'connection', 'launcher', 'discovery', 'codec', 'records', 'start-coordination']
     .map(name => `subs/daemon/src/${name}.js`);
   assertions.equal('client loads only its reviewed closure', closure.filter(path => !allowed.includes(path)), []);
   assertions.ok('the real client entry and connector are loaded', ['client-entry', 'connect-daemon']

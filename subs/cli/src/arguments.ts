@@ -1,14 +1,16 @@
 export const help = `Usage: ramify check [--root <dir>] [--format json] [--batch]
+       ramify watch [--root <dir>] [--format json]
+       ramify daemon status|stop [--format json]
        ramify --help
        ramify --version
 
 Check every owned source area in one project. The root and tsconfig.json
 are discovered from the working directory; --root gives an explicit root.
---batch is accepted; each check currently uses a fresh analysis session.
+Checks reuse a resident daemon. --batch uses an independent analysis session.
+Watch streams revisions until interrupted. Status and stop never start a daemon.
 
 Exit codes: 0 completed, 1 violations or invalid input, 2 unable to complete,
 130 interrupted. Warnings and analysis limits alone do not fail a check.
-Only check, help and version are available in this release.
 `;
 
 type Arguments = { readonly command: 'help' | 'version' }

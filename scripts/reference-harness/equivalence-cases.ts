@@ -3,14 +3,14 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { AnalysisReport } from '../../subs/analysis/src/index.js';
-import { assertEquivalentReports } from './equivalence-comparison.js';
+import { assertEquivalentReports, parseAnalysisDocument } from './equivalence-comparison.js';
 import { withSequenceProcess, object, readTrace } from './equivalence-process.js';
 import type { SequenceProcess } from './equivalence-process.js';
 import { applySequenceStep, assertSequenceReport, equivalenceSequences, prepareSequence, sequenceFixture } from './equivalence-sequences.js';
 import type { EditSequence, SequenceName, SequenceStep } from './equivalence-sequences.js';
 import { watchEditTargetMs, watchRevision, withLiveWatch } from './equivalence-watch.js';
 import { runIsolatedProject } from './mutation.js';
-import { analysisEvidence, recordObservation } from './observations.js';
+import { analysisEvidence, archiveObservation, recordObservation } from './observations.js';
 import { repositoryRoot } from './plan.js';
 import { filesBelow } from './reference-baseline.js';
 import { Assertions } from './runner.js';
@@ -34,7 +34,8 @@ async function compare(processes: SequenceProcess, root: string, fixture: EditSe
   assertions.ok(`${name}: complete reports equal except runId`, true);
   const digest = (report: AnalysisReport) => createHash('sha256').update(JSON.stringify({ ...report, runId: 'comparison' })).digest('hex');
   recordObservation('equivalent-reports', { step: name, anchor: step?.anchor, batchSha256: digest(batch), residentSha256: digest(resident),
-    evidence: analysisEvidence(resident), expandedContracts: resident.snapshot?.linked });
+    evidence: analysisEvidence(resident), linkedStatus: resident.snapshot?.linked?.status,
+    raw: await archiveObservation('equivalent-reports', { step: name, anchor: step?.anchor, batch, resident }) });
   return resident;
 }
 
@@ -80,6 +81,10 @@ export async function runEquivalenceSequence(name: SequenceName, root: string, a
         const current = object(first.value.current), published = object(current.published);
         assertions.equal('watch starts on the baseline input', object(published.fingerprints).inputId, baseline.inputId);
         assertions.equal('real watcher is active', current.watcher, 'active');
+        let initial = await next(30_000);
+        while (initial.value.event === 'status') initial = await next(30_000);
+        assertions.equal('initial watch revision matches published status', initial.value.revision, published);
+        assertEquivalentReports(parseAnalysisDocument(JSON.stringify(initial.value.report)), baseline);
         let previousSequence = Number(published.sequence), previousInput = baseline.inputId;
         const importer = sequence.fixture === 'F' ? await readFile(join(root, 'subs/consumer/src/probe.ts'), 'utf8') : null;
         for (const step of sequence.steps) {

@@ -25,7 +25,7 @@ describe('shared globals through the public batch session', () => {
   it.each([
     { kind: 'script', source: fixtureFiles['src/globals.ts'], line: 1 },
     { kind: 'module augmentation', source: 'export {};\ndeclare global { var sharedSecret: number; }\n', line: 2 },
-  ])('reports a cross-owner $kind as partial coverage', async ({ source, line }) => {
+  ])('reports a cross-owner $kind as partial coverage', async ({ kind, source, line }) => {
     const root = await mkdtemp(join(tmpdir(), 'ramify-shared-globals-'));
     try {
       for (const [path, text] of Object.entries({ ...fixtureFiles, 'src/globals.ts': source })) {
@@ -50,7 +50,7 @@ describe('shared globals through the public batch session', () => {
       expect(run.report.coverage).toEqual([expect.objectContaining({ code: 'shared-global',
         location: expect.objectContaining({ file: 'src/globals.ts', line, column: 1 }), related: [] })]);
       expect(run.report.stages.every(stage => stage.status === 'completed')).toBe(true);
-      expect(run.report.snapshot!.catalog!.files.find(entry => entry.file === 'src/globals.ts')).toMatchObject({ state: 'incomplete', exports: [] });
+      expect(run.report.snapshot!.catalog!.files.find(entry => entry.file === 'src/globals.ts')).toMatchObject({ state: kind === 'script' ? 'incomplete' : 'complete', exports: [] });
     } finally { await rm(root, { recursive: true, force: true }); }
   }, 20_000);
 });
