@@ -9,7 +9,7 @@
     "functionalRequirementsSatisfied": false,
     "newCodeCoveredByTests": true
   },
-  "completedAt": "2026-09-11T08:49:33.743Z",
+  "completedAt": "2026-09-11T08:53:03.077Z",
   "iteration": "10",
-  "notes": "Fixed constraint finding cf-constraints-mtwpqtv5-kkypm6g3: assertOwner now uses the existing README metadata parser to select top-level prose and convert it to plain text. Added eight validator cases covering introductory lists/tables/code, missing prose, inline markup and first-paragraph precedence. Focused reproduction failed before and passed after; all four type-check configurations passed. Regression/constraint rechecks remain with automation; no test-suite verdict is available, so allNewTestsPass remains false. Functional completion still depends on missing I3-I9 resident providers, five final declarations, eighth real entry and three process witnesses; the separate self-assessment finding remains decision-pending. No publication in this remediation."
+  "notes": "Fixed the reported regression by updating the descriptions owner's independent root fixture from the old four-name R7 relay to all 27 implemented names in its final statement position. Exact statement, alias, tag, destination, index, token-span and owner-inventory assertions remain intact. Toolkit npx tsc --noEmit and diff checks passed; automated regression rerun is pending, so allNewTestsPass stays false. The prior README constraint is resolved by workflow verification. Functional completion remains blocked by missing I3-I9 resident providers, five final declarations, eighth real entry and three resident process witnesses. No regression runner or publication call was invoked during this remediation."
 }

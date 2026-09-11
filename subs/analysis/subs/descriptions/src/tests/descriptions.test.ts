@@ -79,7 +79,18 @@ interface Fixture {
   statements: readonly ReturnType<typeof statement>[];
 }
 const toolkit: readonly Fixture[] = [
-  { path: '', name: 'ramify', tags: ['dispatch'], statements: [src('*', 'interfaces/batch.ts', null, descendants), src('*', 'interfaces/service.ts', null, descendants), sub(['EndpointSelection', 'ConnectTimeouts', 'ConnectOptions', 'DisconnectReason'], 'daemon', descendants), sub(modelNames, 'analysis', descendants), sub([...syntaxNames, ...linkingNames], 'analysis', descendants), sub(projectNames, 'analysis', descendants), sub(sourceNames, 'analysis', descendants), sub(analysisNames, 'analysis', descendants), sub(presentationNames, 'presentation', descendants)] },
+  { path: '', name: 'ramify', tags: ['dispatch'], statements: [
+    src('*', 'interfaces/batch.ts', null, descendants), src('*', 'interfaces/service.ts', null, descendants),
+    sub(modelNames, 'analysis', descendants), sub([...syntaxNames, ...linkingNames], 'analysis', descendants),
+    sub(projectNames, 'analysis', descendants), sub(sourceNames, 'analysis', descendants),
+    sub(analysisNames, 'analysis', descendants), sub(presentationNames, 'presentation', descendants),
+    // Plan 2 I10 activates R7's available originals after the existing relays.
+    sub(['ContextId', 'GenerationId', 'RevisionId', 'LeaseId', 'ContextToken', 'ContextSetup',
+      'ContextSelection', 'InputFingerprints', 'WatchEvent', 'WatcherHandle', 'WatcherPort', 'ClockPort',
+      'DaemonInstance', 'LogEntry', 'DaemonBudgets', 'EndpointSelection', 'DaemonRecord', 'StopDisposition',
+      'Handshake', 'ConnectTimeouts', 'ConnectOptions', 'ConnectionState', 'DisconnectReason',
+      'createControlledWatcher', 'createControlledClock', 'ControlledWatcher', 'ControlledClock'], 'daemon', descendants),
+  ] },
   { path: 'subs/analysis/', name: 'analysis', tags: [], statements: [sub('*', 'model', both), sub([...syntaxNames, ...linkingNames], 'descriptions', both), sub(projectNames, 'project', both), sub(sourceNames, 'typescript', both), src(['validateProject'], 'validation.ts'), src('*', 'interfaces/analysis.ts'), src(['acquireInventory'], 'inventory.ts'), src(['createAnalysisSession'], 'session.ts'), src(['analyzeProject'], 'analyze-project.ts')] },
   { path: 'subs/analysis/subs/descriptions/', name: 'descriptions', tags: browser, statements: [src(['parseDescription'], 'parse.ts', browser), src('*', 'interfaces/syntax.ts'), src(['linkDescriptions'], 'link.ts', browser), src('*', 'interfaces/linking.ts')] },
   { path: 'subs/analysis/subs/model/', name: 'model', tags: browser, statements: [

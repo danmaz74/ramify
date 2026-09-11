@@ -155,3 +155,15 @@ No Vitest/Cucumber regression, scenario-coverage, sealed-file or automated const
 The separate self-assessment finding `iteration-self-assessment:10` remains decision-pending: this README fix does not supply the missing predecessor resident providers, five final declarations, eighth real entry or three resident process witnesses. `functionalRequirementsSatisfied` remains false. `newCodeCoveredByTests` remains true, with eight additional authored validator cases. `allNewTestsPass` remains false because there is still no automated test-suite verdict; focused reproduction success is recorded separately.
 
 Both managed deliverables are updated via MCP and the focused fix is committed. Control-plane check-results were not edited. No publication call is made during this remediation.
+
+## Regression remediation: root declaration parser fixture
+
+**Recorded:** 2026-09-11T08:52:53.998Z. This repair started at `475c3cb`. The supplied automated regression output reports one failing test: `descriptions.test.ts > parses module.ramify to the reviewed statements`. The previous README constraint finding is now marked resolved, and the generated check results report constraints passed.
+
+The regression was introduced when iteration 10 expanded root R7 to all 27 implemented resident names and moved it after the existing relays, without updating the descriptions owner's independent exact-statement fixture. The fixture still expected the four-name discovery relay in its former third position. Inspection confirmed the new declaration follows owners.md's staged R7 contract and that its names are already exported through daemon's N4/N5 contracts.
+
+Updated only the root fixture in `subs/analysis/subs/descriptions/src/tests/descriptions.test.ts`: it now independently enumerates all 27 names in the declared order and expects the daemon relay last. The other eight root statements retain their existing expectations. Exact statement equality, aliases, destinations, tags, statement indices, raw token spans and the eleven-toolkit/fifteen-reference inventory checks are unchanged. No parser implementation, declaration, public API or .viz.feature scenario changed.
+
+Verification: `npx tsc --noEmit` passed for the toolkit configuration that includes the affected test; `git diff --check` passed. The supplied automated failure is the reproduction evidence. No Vitest/Cucumber, scenario-coverage or sealed-file check was run locally, and no broader build or matrix gate was repeated for this fixture-only correction. The automated regression rerun must establish the passing verdict.
+
+The earlier functional prerequisite gaps remain outside this regression repair. Checklist state remains `functionalRequirementsSatisfied: false`, `newCodeCoveredByTests: true`, and `allNewTestsPass: false` pending a successful automated rerun and the outstanding test evidence. Both managed deliverables are updated through MCP, and the fixture correction is committed in the authoritative checkout. No check-results file was edited and no publication call was made.
