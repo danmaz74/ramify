@@ -333,7 +333,40 @@ describe('export completeness and compiler limits', () => {
   }, 30_000);
 });
 
-describe('shared globals declared by script source', () => {
+describe('shared globals declared by application source', () => {
+  it('reports module global augmentations while preserving the module exports', async () => {
+    await withCatalog({
+      'src/globals.ts': [
+        'export const local = 1;',
+        'declare global { interface Window { readonly ramify: number } }',
+        'declare global { var shared: number; }',
+      ].join('\n'),
+    }, ({ catalog }) => {
+      const notes = catalog.coverage.filter(limit => limit.code === 'shared-global');
+      expect(notes).toHaveLength(1);
+      expect(catalog.coverage).toEqual(notes);
+      expect(notes[0]).toMatchObject({ location: { file: 'src/globals.ts', line: 2, column: 1 },
+        message: expect.stringContaining('shared globals') });
+      expect(notes[0].related.map(location => [location.file, location.line])).toEqual([['src/globals.ts', 3]]);
+      expect(file(catalog, 'src/globals.ts')).toMatchObject({ state: 'incomplete', issueIds: [notes[0].id] });
+      expect(exported(catalog, 'src/globals.ts', 'local').original).toEqual(code('globals.ts', 'local'));
+    });
+  }, 30_000);
+
+  it('recognizes import-only module augmentations without flagging local namespaces named global', async () => {
+    await withCatalog({
+      'src/globals.d.ts': 'import "./local.js";\ndeclare global { interface Window { readonly ramify: number } }',
+      'src/local.ts': 'export namespace global { export const value = 1; }\ndeclare module global { export const local: number; }',
+      'src/augmentation.d.ts': 'export {};\ndeclare module "./local.js" { export const extra: number; }',
+    }, ({ catalog }) => {
+      const notes = catalog.coverage.filter(limit => limit.code === 'shared-global');
+      expect(notes).toHaveLength(1);
+      expect(notes[0]).toMatchObject({ location: { file: 'src/globals.d.ts', line: 2, column: 1 }, related: [] });
+      expect(file(catalog, 'src/local.ts')).toMatchObject({ state: 'complete', issueIds: [] });
+      expect(file(catalog, 'src/augmentation.d.ts')).toMatchObject({ state: 'complete', issueIds: [] });
+    });
+  }, 30_000);
+
   it('reports a cross-owner script global as located coverage instead of a complete script', async () => {
     const root = await fixture({
       'src/globals.ts': 'var sharedSecret = 1;',

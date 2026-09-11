@@ -171,6 +171,7 @@ class CatalogBuilder {
           this.limit(file, 'compiler-blocked', `Compiler could not establish an unambiguous declaration (TS${diagnostic.code})`, undefined, [], diagnostic.code, location);
         }
         const module = this.project.checker.getSymbolAtLocation(source);
+        if (module || source.externalModuleIndicator) this.sharedAugmentations(source, file);
         if (module) {
           for (const symbol of this.project.checker.getExportsOfModule(module)) {
             this.check(depth, true); file.exports.push(this.export(symbol, symbol.name, file, depth + 1));
@@ -183,6 +184,16 @@ class CatalogBuilder {
     }
     this.active.delete(path);
     return file;
+  }
+  /** The compiler distinguishes global augmentations from ordinary namespaces
+   * named global and string-named external module augmentations. */
+  private sharedAugmentations(source: SourceFile, file: MutableFile): void {
+    const declarations = source.moduleAugmentations
+      .filter(name => isIdentifier(name) && name.text === 'global' && isModuleDeclaration(name.parent))
+      .map(name => name.parent);
+    if (!declarations.length) return;
+    this.limit(file, 'shared-global', 'Module source declares shared globals; their ownership and cross-owner dependencies are not verified',
+      declarations[0], declarations.slice(1).map(statement => this.location(statement)));
   }
   /** A script's top-level declarations bind globals every owner can read. No
    * request form represents that ownership or another owner's reads, so the

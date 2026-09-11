@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": false,
+    "functionalRequirementsSatisfied": false,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-11T06:04:14.442Z",
+  "iteration": "3",
+  "notes": "Partial checkpoint only; iteration 3 is not complete. Architecture acceptance of iteration 1's revised package is still pending, and no response to the explicit approval request has arrived. The independently specified declare-global coverage fix and a necessary React test setup compatibility correction are implemented. Both direct source-helper smoke checks, build, full type-check, reference/self checks, and 268 Plan 1 iteration-12 instances pass. The 18 I2-10/I2-11 increment instances remain unimplemented; the iteration-3 gate fails for missing increment capability. Two new Vitest tests are authored and type-checked but not run because workflow automation owns regression execution, so allNewTestsPass is not claimed. completedAt records the checkpoint time, not completion. Do not publish or schedule iteration 4 from this checkpoint."
+}
