@@ -16,7 +16,7 @@
 | converge-after-5 | Converge parallel group after-5 (system convergence) | completed | 08:03:44 | 08:03:44 | 0s |
 | 8 | Daemon host, records, process entry and real IPC | completed | 08:03:46 | 08:23:05 | 19m 18s |
 | 9 | CLI commands and fallback | completed | 08:23:05 | 08:35:21 | 12m 15s |
-| 10 | Entries, final declarations and boundaries | completed | 08:35:21 | 08:50:28 | 15m 6s |
+| 10 | Entries, final declarations and boundaries | completed | 08:35:21 | 08:51:48 | 16m 27s |
 | 11 | Reference edit sequences and equivalence gate | pending | - | - | - |
 | 12 | Real process lifecycle and recovery suite | pending | - | - | - |
 | 13 | Resident measurements and budgets | pending | - | - | - |
@@ -55,4 +55,4 @@
 | 10 | attempt_Oxupa-ZPa1-jNOuUf0to5 | off | cumulative (v2) | in unavailable (launch-affordances-disabled); escape unavailable (launch-affordances-disabled); unaccounted unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | 1 | surface unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); search unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); expand unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) |
 | 10 | attempt_Oxupa-ZPa1-jNOuUf0to5 | off | final (v2) | pending | pending | pending | pending | pending |
 
-*Last updated: 2026-09-11T08:50:28.174Z*
+*Last updated: 2026-09-11T08:51:48.841Z*
