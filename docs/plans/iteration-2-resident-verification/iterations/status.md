@@ -7,7 +7,7 @@
 | # | Iteration | Status | Started | Ended | Elapsed |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Contract package, probes and review points | completed | 05:11:31 | 05:30:29 | 18m 58s |
-| 2 | New owner skeletons, harness `--plan 2` and synthetic generators | completed | 05:30:29 | 05:41:45 | 11m 15s |
+| 2 | New owner skeletons, harness `--plan 2` and synthetic generators | completed | 05:30:29 | 05:43:23 | 12m 53s |
 | 3 | Analysis increments and project resolution | pending | - | - | - |
 | 4 | Contexts owner | pending | - | - | - |
 | 5 | Shared service, root interface and quick environment | pending | - | - | - |
@@ -34,4 +34,4 @@
 | 2 | attempt_k6kQOW1eWJM6hPIWhPrwT | off | cumulative (v2) | in unavailable (launch-affordances-disabled); escape unavailable (launch-affordances-disabled); unaccounted unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | 0 | surface unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); search unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); expand unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) |
 | 2 | attempt_k6kQOW1eWJM6hPIWhPrwT | off | final (v2) | pending | pending | pending | pending | pending |
 
-*Last updated: 2026-09-11T05:41:45.018Z*
+*Last updated: 2026-09-11T05:43:23.493Z*
