@@ -66,5 +66,17 @@ capability, error and result declarations that this validator consumes.
 
 Iteration 3's increment and project-resolution operations and iteration 4's
 context manager are still absent. The shared service, complete root interface and
-assembly, codec, complete connection vocabulary and quick environment therefore
+assembly, WireMessage schema, complete connection vocabulary and quick environment therefore
 remain unimplemented. No `daemon-service` harness capability is registered.
+
+The private byte-framing portion of `codec.ts` is implemented independently of
+those providers. It writes a four-byte big-endian UTF-8 JSON length and payload,
+decodes exact frames, and assembles fragmented or concatenated frames with at
+most one bounded pending body. Zero/oversized lengths fail on the completed
+header before body allocation. Malformed UTF-8 or JSON, extra frame bytes and
+truncated streams fail explicitly. Decoder disposal drops the pending body and
+listener; a parse or listener error closes the decoder. Decoded values remain
+`unknown`: JSON syntax is not a WireMessage schema check. The future message
+wrappers must perform that validation, and the socket owner must send failure
+goodbye and close when decoding throws. No N2 codec exposure or client entry is
+activated by these private helpers.
