@@ -1,4 +1,4 @@
-name: Resident macOS process acceptance
+name: Resident macOS focused acceptance
 
 on:
   push:
@@ -8,73 +8,51 @@ permissions:
   contents: read
 
 jobs:
-  process-acceptance:
+  focused-acceptance:
     runs-on: macos-latest
-    timeout-minutes: 90
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.23.2
           cache: npm
       - run: npm ci
       - run: npm run worktree:prepare
-      - name: Prove mixed-case regression on previous implementation
-        shell: bash
-        run: |
-          paths=(subs/analysis/subs/typescript/src/catalog.ts subs/analysis/subs/typescript/src/resolution.ts)
-          trap 'git restore -- "${paths[@]}"' EXIT
-          for path in "${paths[@]}"; do git show 5038a19:"$path" > "$path"; done
-          set +e
-          npm test -- subs/analysis/subs/typescript/src/tests/compiler-paths.test.ts > macos-paths-before.log 2>&1
-          result=$?
-          set -e
-          cat macos-paths-before.log
-          test "$result" -eq 1
-          git restore -- "${paths[@]}"
       - run: npm run build
-        id: build
-      - name: Toolkit and real daemon process regressions
-        run: npm test
-      - name: Matching Plan 1 acceptance prerequisite
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+      - name: Verify corrected lookup instrumentation
+        run: npm test -- subs/analysis/subs/model/src/tests/decision-lookups.test.ts
+      - name: Restore immutable original evidence
+        run: |
+          python3 - <<'PY'
+          import zipfile,pathlib,hashlib
+          archive=pathlib.Path('docs/plans/iteration-2-resident-verification/evidence/macos-remediation-baseline-34610976201.zip')
+          assert hashlib.sha256(archive.read_bytes()).hexdigest()=='1eb7393661dcc12e6822826c7c980d29ea94832bfd41f21eba1fc621bb1fd9a1'
+          with zipfile.ZipFile(archive) as z:
+              for name in z.namelist():
+                  if name.startswith('.reference-work/'):
+                      z.extract(name)
+          PY
+          cp docs/plans/iteration-2-resident-verification/evidence/plan1-reuse-review.json .reference-work/reports/
+      - name: Run nine affected Plan 1 cases
+        run: node --import tsx scripts/reference-harness/plan1-focused.ts .reference-work/reports/plan1-focused-macos.json
+      - name: Validate composed Plan 1 acceptance
+        run: >-
+          node --import tsx scripts/reference-harness/completion-composition.ts
+          .reference-work/reports
+          plan1-full-83505f4b-1a63-4f8d-bffa-aff6f49e04c4.json
+          plan1-focused-macos.json
+          plan1-reuse-review.json
+          plan1-composed-macos-20260911.json
+      - name: Run three affected resident process cases
         shell: bash
         run: |
-          set +e
-          npm run reference:verify -- --plan 1 --format json > plan1-macos.json
-          result=$?
-          set -e
-          node --input-type=module <<'SCRIPT'
-          import { readFileSync } from 'node:fs';
-          const line = readFileSync('plan1-macos.json', 'utf8').split('\n').find(line => line.startsWith('{'));
-          if (line) {
-            const report = JSON.parse(line);
-            console.log(JSON.stringify({ passed: report.passed, summary: report.summary,
-              failures: report.instances.filter(instance => instance.status !== 'passed') }, null, 2));
-          }
-          SCRIPT
-          exit "$result"
-      - name: Preserve Plan 1 evidence immediately
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: resident-macos-plan1-evidence
-          path: |
-            plan1-macos.json
-            .reference-work/reports/plan1-*.json
-            .reference-work/evidence/**
-          include-hidden-files: true
-          retention-days: 14
-      - name: All reviewed process and IPC instances
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        shell: bash
-        run: |
-          mkdir -p .reference-work
-          cat > .reference-work/macos-process.mts <<'SCRIPT'
+          cat > .reference-work/macos-focused.mts <<'SCRIPT'
           import assert from 'node:assert/strict';
-          import { writeFile } from 'node:fs/promises';
+          import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+          import { spawn } from 'node:child_process';
           import { resolve } from 'node:path';
           import { release } from 'node:os';
           import { plan2Instances } from '../scripts/reference-harness/plan2-instances.js';
@@ -83,44 +61,49 @@ jobs:
           import { verifyInstances } from '../scripts/reference-harness/runner.js';
           import { executionIdentity } from '../scripts/reference-harness/artifact.js';
           import { evidenceRoots, portableValue } from '../scripts/reference-harness/portability.js';
-
-          assert.equal(process.platform, 'darwin', 'Requires actual macOS');
-          const plan = readReviewedPlan2();
-          const members = plan.members.filter(member => ['process', 'ipc'].includes(member[9]?.evidence ?? ''));
-          const ids = new Set(members.map(member => member[0]));
+          assert.equal(process.platform, 'darwin');
+          const selectedIds = ['I2-30:self-check-eleven', 'I2-30:self-negative-contexts', 'I2-30:plan1-regression'];
+          const ids = new Set(selectedIds), plan = readReviewedPlan2();
+          const members = plan.members.filter(member => ids.has(member[0]));
           const records = plan2Instances.filter(record => ids.has(record.id));
-          assert.equal(members.length, 78, 'Reviewed process and IPC membership changed');
-          assert.deepEqual(validateInstancePointers(records), []);
-          const identity = await executionIdentity();
-          const startedAt = new Date().toISOString();
-          const started = performance.now();
-          const result = await verifyInstances({ plan: { ...plan, members }, records,
-            runtime: plan2Runtime, workRoot: resolve(repositoryRoot, 'examples/collection-review/.reference-work'),
-            preserveOnFailure: true });
+          assert.equal(members.length, 3); assert.deepEqual(validateInstancePointers(records), []);
+          const endpoint = await mkdtemp('/tmp/rmf-');
+          process.env.RAMIFY_ENDPOINT_DIR = endpoint;
+          const command = (args: string[]) => new Promise<any>((resolveRun, reject) => {
+            const child = spawn(process.execPath, ['dist/src/cli-entry.js', ...args], { cwd: repositoryRoot, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] });
+            let stdout = '', stderr = '';
+            child.stdout.on('data', value => stdout += value); child.stderr.on('data', value => stderr += value);
+            child.once('error', reject); child.once('close', code => resolveRun({ code, stdout, stderr }));
+          });
+          const identity = await executionIdentity(), startedAt = new Date().toISOString(), started = performance.now();
+          let result, stop, status;
+          try {
+            result = await verifyInstances({ plan: { ...plan, members }, records, runtime: plan2Runtime,
+              workRoot: resolve(repositoryRoot, 'examples/collection-review/.reference-work'), preserveOnFailure: true });
+          } finally {
+            stop = await command(['daemon', 'stop']); status = await command(['daemon', 'status', '--format', 'json']);
+            if (stop.code === 0) await rm(endpoint, { recursive: true, force: true });
+          }
           const after = await executionIdentity();
-          assert.equal(after.sourceSha256, identity.sourceSha256, 'Source changed during process suite');
-          assert.equal(after.buildSha256, identity.buildSha256, 'Build changed during process suite');
-          const artifact = portableValue({ ...result, planComplete: false,
-            evidence: { kind: 'macos-process-acceptance', platform: process.platform, architecture: process.arch,
-              osRelease: release(), identity, startedAt, completedAt: new Date().toISOString(),
-              durationMs: performance.now() - started, selectedIds: [...ids],
-              scope: 'All reviewed Plan 2 process and IPC instances; full Plan 2 acceptance and measurements remain separate.' } }, await evidenceRoots());
-          await writeFile('macos-process.json', JSON.stringify(artifact) + '\n');
-          console.log(JSON.stringify({ passed: artifact.passed, summary: artifact.summary,
-            failures: artifact.instances.filter(instance => instance.status !== 'passed') }, null, 2));
-          if (!artifact.passed) process.exitCode = 1;
+          assert.equal(after.sourceSha256, identity.sourceSha256); assert.equal(after.buildSha256, identity.buildSha256);
+          const artifact = portableValue({ ...result, planComplete: false, cleanup: { stop, status }, evidence: {
+            kind: 'macos-focused-process-acceptance', platform: process.platform, architecture: process.arch,
+            osRelease: release(), identity, startedAt, completedAt: new Date().toISOString(), durationMs: performance.now() - started,
+            selectedIds, scope: 'Three affected cases; 75 unchanged executions remain in original run 34610976201.' } }, await evidenceRoots());
+          await writeFile('.reference-work/macos-focused.json', JSON.stringify(artifact) + '\n');
+          console.log(JSON.stringify({ passed: result?.passed, summary: result?.summary, failures: result?.instances.filter(x => x.status !== 'passed'), cleanup: { stop, status } }));
+          assert.equal(stop.code, 0); assert.equal(status.code, 0); assert.equal(JSON.parse(status.stdout).running, false);
+          assert.equal(result?.passed, true);
           SCRIPT
-          node --import tsx .reference-work/macos-process.mts
-      - name: Preserve acceptance reports and raw process evidence
+          node --import tsx .reference-work/macos-focused.mts
+      - name: Preserve focused results and all raw evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: resident-macos-process-evidence
+          name: resident-macos-focused-evidence
           path: |
-            macos-paths-before.log
-            plan1-macos.json
-            macos-process.json
             .reference-work/reports/**
             .reference-work/evidence/**
+            .reference-work/macos-focused.json
           include-hidden-files: true
           retention-days: 14
