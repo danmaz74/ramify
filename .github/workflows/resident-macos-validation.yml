@@ -35,11 +35,14 @@ jobs:
           test "$result" -eq 1
           git restore -- "${paths[@]}"
       - run: npm run build
+        id: build
       - name: Toolkit and real daemon process regressions
         run: npm test
       - name: Matching Plan 1 acceptance prerequisite
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: npm run reference:verify -- --plan 1 --format json > plan1-macos.json
       - name: All reviewed process and IPC instances
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         shell: bash
         run: |
           mkdir -p .reference-work
