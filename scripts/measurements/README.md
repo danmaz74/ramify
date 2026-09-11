@@ -170,7 +170,7 @@ over ten S100 publications; cold/source checks on S500 and S1000; and publicatio
 and serialization peaks. Stage reuse comes from the actual analysis increment.
 Every check must complete with its independently expected owner, denial and
 coverage outcomes. The slow peer also requests real published reports without
-reading them, since ten publication headers alone do not fill the 64 MiB queue.
+reading them, since ten publication headers alone do not fill the 128 MiB queue.
 
 A separate measurement daemon entry observes the production operations through
 bounded diagnostic channels and OS resource hooks. It records actual session,

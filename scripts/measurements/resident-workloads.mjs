@@ -158,7 +158,7 @@ export async function executeResidentWorkload(suffix, options, measurements, che
       for (let index = 0; index < budgets.slowConsumer.publications; index++) {
         const expected = await project.edit('source', index);
         const publication = await host.check(project, token, expected); measurements.publications.push(publication);
-        // Headers alone fit comfortably in 64 MiB. Also request actual retained
+        // Headers alone fit comfortably in the bounded outbound queue. Request actual retained
         // reports while refusing their reads, using at most 16 admitted requests.
         // The responses exercise the same bounded queue as publication events.
         for (let request = 0; request < 16 && !peer.socket.destroyed; request++) peer.send({ type: 'request', id: `report-${index}-${request}`,
@@ -176,7 +176,7 @@ async function slowSubscriber(host, token) {
   const record = JSON.parse(await readFile(join(host.endpoint, `daemon-${host.instance.buildKey}.json`), 'utf8'));
   const socket = createConnection(record.socket); let serial = 0, sent = 0;
   const pending = new Map(); let welcome;
-  const decoder = createFrameDecoder(32 * 1024 ** 2 + 64 * 1024, message => {
+  const decoder = createFrameDecoder(budgets.frameBytes, message => {
     if (message.type === 'welcome') welcome?.resolve(message);
     else if (message.type === 'ping') socket.write(encodeJsonFrame({ type: 'pong' }, 1024));
     else if (message.type === 'response') { pending.get(message.id)?.resolve(message.result); pending.delete(message.id); }

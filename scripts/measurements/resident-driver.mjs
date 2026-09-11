@@ -21,7 +21,7 @@ export async function command(executable, args, { cwd = packageRoot, env = {}, o
   if (child.pid) observer?.add(child.pid);
   const stop = message => { failure ??= message; if (child.pid) { try { process.kill(-child.pid, 'SIGKILL'); } catch (error) { if (error.code !== 'ESRCH') throw error; } } };
   for (const [stream, chunks] of [[child.stdout, out], [child.stderr, err]]) stream.on('data', chunk => {
-    bytes += chunk.length; if (bytes > 40 * 1024 ** 2) stop('Measured command output exceeds finite buffer'); else chunks.push(chunk);
+    bytes += chunk.length; if (bytes > 128 * 1024 ** 2) stop('Measured command output exceeds finite 128 MiB buffer'); else chunks.push(chunk);
   });
   child.once('error', error => { failure = error.message; });
   const deadline = setTimeout(() => stop(`Measured command exceeded ${timeoutMs} ms`), timeoutMs);

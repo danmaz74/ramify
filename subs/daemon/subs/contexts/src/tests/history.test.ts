@@ -48,6 +48,23 @@ describe('report history storage (publication eligibility belongs to the manager
     } finally { dispose(history); }
   });
 
+  it('publishes a 70 MiB report and replaces it within a 128 MiB history bound', () => {
+    const bytes = 70 * 1024 ** 2;
+    const history = createHistory<Header>(8, 128 * 1024 ** 2);
+    const report = sizedReport(bytes);
+    try {
+      expect(history.append(header(1), report)).toBe(true);
+      expect(history.append(header(2), report)).toBe(true);
+      expect(history.count).toBe(1);
+      expect(history.bytes).toBe(bytes);
+      expect(history.get(header(1).revision)).toBeUndefined();
+      expect(history.published?.revision.sequence).toBe(2);
+      // A caller's lower admission allowance remains binding and cannot replace publication.
+      expect(history.append(header(3), report, bytes - 1)).toBe(false);
+      expect(history.published?.revision.sequence).toBe(2);
+    } finally { dispose(history); }
+  });
+
   it('counts UTF-8 bytes and returns the exact stored header and report', () => {
     const history = createHistory<Header>(2, 1024 ** 2);
     const plain = historyReport('a');

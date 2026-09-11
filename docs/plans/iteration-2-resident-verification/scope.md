@@ -8,7 +8,8 @@ reviewable form. [contracts.md](contracts.md) owns the exact signatures and
 wire schemas; [owners.md](owners.md) owns declarations and placement. Plan 1's
 [scope decisions](../done/iteration-1-project-verifier/scope.md) remain in
 force for everything they cover: configurations, compiler integration, the
-captured input view, report schema, production selection and batch limits.
+captured input view, report schema and production selection. Batch and resident
+analysis use the same limits, including the large-report capacity amendment below.
 The temporary performance decision below applies to current batch and resident
 measurement commands and empirical targets consumed by current acceptance,
 including inherited Plan 1 measurements. Historical reports are unchanged.
@@ -191,6 +192,29 @@ those transitions, such as the extra five seconds in the idle-disposal row,
 are advisory. Tests must still establish the transition and cleanup within a
 separate finite hang guard.
 
+### Large-report capacity amendment (2026-09-11)
+
+The actual 500-owner report contains 34,792,550 bytes before the report guard,
+including 9,501 accesses and their complete decisions. The old 32 MiB limit
+rejected that valid evidence. The complete 1,000-owner JSON output contains
+69,571,145 bytes (including its newline) and 19,001 accesses. Actual cold and
+source-edit checks completed with these reports.
+These are linear, repeated public facts, not an exposure-pair explosion.
+
+Preserve the `AnalysisReport` shape and raise its shared batch/resident dispatch
+allowance to 96 MiB. Reserve a further 64 KiB for the IPC response envelope,
+with 128 MiB limits for a connection's outbound queue, a context's history and
+the CLI's pending stdout publications. CLI admission counts the publication
+currently flushing; exceeding it remains an output failure.
+The codec has a 128 MiB ceiling; negotiated response limits still apply before
+admission. The 512 MiB global retention bound, 96 MiB retained-product bound,
+request counts, connection counts and lifecycle deadlines remain enforced.
+This is a bounded capacity correction, separate from advisory timing targets.
+The measured 1,000-owner publication accounted for 69,571,144 history bytes,
+80,591,333 retained-product bytes and 69,572,559 outbound bytes. Both large
+fixtures passed cold/edit checks with complete coverage and no surviving
+processes. Final full-workload evidence must match the committed inputs.
+
 ### Context and daemon budgets
 
 Fixed defaults assembled by root; tests override them through
@@ -201,7 +225,7 @@ syntax is added.
 | --- | ---: | --- |
 | `maxContexts` | 8 | Evict the least recently active unleased context; if all are leased, `resource-unavailable`. |
 | `maxHistoryRevisions` | 8 per context | Drop oldest reports, keeping `published`; `lastValid` remains a historical header even when its report is evicted. Reject a candidate that alone cannot fit. |
-| `maxHistoryBytes` | 64 MiB per context | Same. |
+| `maxHistoryBytes` | 128 MiB per context | Same. |
 | `maxRetainedBytesPerContext` | 96 MiB of `RetainedAnalysis` | Drop retained products; the next revision recomputes conservatively. |
 | `maxRetainedBytesGlobal` | 512 MiB of history plus products | Evict history oldest-first across contexts, then cold contexts, then `resource-unavailable`. |
 | `maxQueuedPaths` | 10,000 distinct pending paths per context | Mark conservative and pass `changes: null`. |
@@ -210,13 +234,13 @@ syntax is added.
 | `debounceMs` | 100 | — |
 | `verificationIntervalMs` | 60,000 | — |
 | `maxConnections` | 64 | `reject` with `resource-unavailable` before `welcome`; the client starts no recovery. |
-| `maxRequestBytes` / `maxResponseBytes` | 1 MiB / 32 MiB + 64 KiB | Protocol violation / `resource-unavailable` response. |
-| `maxOutboundBytes` / `maxOutboundFrames` | 64 MiB / 256 per connection | Disconnect as slow consumer. |
+| `maxRequestBytes` / `maxResponseBytes` | 1 MiB / 96 MiB + 64 KiB | Protocol violation / `resource-unavailable` response. |
+| `maxOutboundBytes` / `maxOutboundFrames` | 128 MiB / 256 per connection | Disconnect as slow consumer. |
 | `maxRequestsInFlight` | 16 per connection | `resource-unavailable` error for the request that exceeds it. |
 | `leaseMs` / `pingMs` | 45,000 / 15,000 | Release the connection's lease. |
 | `idleExitMs` | 1,800,000 | Daemon exits with reason `idle`. |
 | `shutdownGraceMs` | 5,000 | Force close. |
-| Plan 1 `AnalysisLimits` | unchanged | Unchanged outcomes inside each revision. |
+| Shared batch/resident `AnalysisLimits.maxReportBytes` | 96 MiB | Explicit incomplete report; other analysis limits remain unchanged. |
 
 Accounting unit: `bytes` of a report or `RetainedAnalysis` is the UTF-8 length
 of its JSON serialization, computed once at publication. It counts repeated
@@ -268,7 +292,7 @@ mandatory.
 | CLI process RSS for `ramify check` via daemon, reference / 100 owners | ≤ 96 MiB / ≤ 160 MiB | I2-29 `entry-footprints` |
 | `./client` entry loaded in an empty process | ≤ 64 MiB | same |
 | Repeated edits: 200 alternating source-edit/revert cycles, last 100 | RSS growth ≤ 64 MiB; heap growth beyond the history-bytes delta ≤ 16 MiB; history and product counters at their budgets; watchers, helpers, timers and sessions balanced | I2-29 `repeated-edit-plateau` |
-| Slow consumer | Outbound queue never exceeds 64 MiB; disconnect within 2 s of exceeding; daemon RSS returns within 32 MiB of its pre-test settled value | I2-29 `slow-consumer` |
+| Slow consumer | Outbound queue never exceeds 128 MiB; disconnect within 2 s of exceeding; daemon RSS returns within 32 MiB of its pre-test settled value | I2-29 `slow-consumer` |
 | Idle disposal | Watcher handles, helpers, analysis timers and retained products reach zero within `warmIdleMs` plus 5 s; the published report and cold/idle timers persist until eviction/exit. All context history reaches zero at eviction after `coldRetainMs`; process exits within `idleExitMs` plus 5 s | I2-27 `idle-disposal-releases` |
 
 ### Resident measurement recipe
