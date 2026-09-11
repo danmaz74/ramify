@@ -1,0 +1,81 @@
+name: Resident macOS process acceptance
+
+on:
+  push:
+    branches: [validation/resident-macos-20260911]
+
+permissions:
+  contents: read
+
+jobs:
+  process-acceptance:
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run worktree:prepare
+      - run: npm run build
+      - name: Toolkit and real daemon process regressions
+        run: npm test
+      - name: Matching Plan 1 acceptance prerequisite
+        run: npm run reference:verify -- --plan 1 --format json > plan1-macos.json
+      - name: All reviewed process and IPC instances
+        shell: bash
+        run: |
+          mkdir -p .reference-work
+          cat > .reference-work/macos-process.mts <<'SCRIPT'
+          import assert from 'node:assert/strict';
+          import { writeFile } from 'node:fs/promises';
+          import { resolve } from 'node:path';
+          import { release } from 'node:os';
+          import { plan2Instances } from '../scripts/reference-harness/plan2-instances.js';
+          import { plan2Runtime } from '../scripts/reference-harness/plan2-runtime.js';
+          import { readReviewedPlan2, repositoryRoot, validateInstancePointers } from '../scripts/reference-harness/plan.js';
+          import { verifyInstances } from '../scripts/reference-harness/runner.js';
+          import { executionIdentity } from '../scripts/reference-harness/artifact.js';
+          import { evidenceRoots, portableValue } from '../scripts/reference-harness/portability.js';
+
+          assert.equal(process.platform, 'darwin', 'Requires actual macOS');
+          const plan = readReviewedPlan2();
+          const members = plan.members.filter(member => ['process', 'ipc'].includes(member[9]?.evidence ?? ''));
+          const ids = new Set(members.map(member => member[0]));
+          const records = plan2Instances.filter(record => ids.has(record.id));
+          assert.equal(members.length, 78, 'Reviewed process and IPC membership changed');
+          assert.deepEqual(validateInstancePointers(records), []);
+          const identity = await executionIdentity();
+          const startedAt = new Date().toISOString();
+          const started = performance.now();
+          const result = await verifyInstances({ plan: { ...plan, members }, records,
+            runtime: plan2Runtime, workRoot: resolve(repositoryRoot, 'examples/collection-review/.reference-work'),
+            preserveOnFailure: true });
+          const after = await executionIdentity();
+          assert.equal(after.sourceSha256, identity.sourceSha256, 'Source changed during process suite');
+          assert.equal(after.buildSha256, identity.buildSha256, 'Build changed during process suite');
+          const artifact = portableValue({ ...result, planComplete: false,
+            evidence: { kind: 'macos-process-acceptance', platform: process.platform, architecture: process.arch,
+              osRelease: release(), identity, startedAt, completedAt: new Date().toISOString(),
+              durationMs: performance.now() - started, selectedIds: [...ids],
+              scope: 'All reviewed Plan 2 process and IPC instances; full Plan 2 acceptance and measurements remain separate.' } }, await evidenceRoots());
+          await writeFile('macos-process.json', JSON.stringify(artifact) + '\n');
+          console.log(JSON.stringify({ passed: artifact.passed, summary: artifact.summary,
+            failures: artifact.instances.filter(instance => instance.status !== 'passed') }, null, 2));
+          if (!artifact.passed) process.exitCode = 1;
+          SCRIPT
+          node --import tsx .reference-work/macos-process.mts
+      - name: Preserve acceptance reports and raw process evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resident-macos-process-evidence
+          path: |
+            plan1-macos.json
+            macos-process.json
+            .reference-work/reports/**
+            .reference-work/evidence/**
+          include-hidden-files: true
+          retention-days: 14
