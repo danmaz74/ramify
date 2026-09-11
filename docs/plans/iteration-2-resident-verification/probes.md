@@ -125,7 +125,11 @@ recommended alternatives with the measured RP-7 revision. The three required
 scheduling decisions remain: contexts after analysis, message codec/connect
 vocabulary in 5 before framing/client in 7, and host/all IPC in 8. Iteration 9
 remains one iteration; its batch migration is mechanical and belongs with the
-command change. The main plan records each decision separately.
+command change. The requested main-plan decision table and probe corrections
+are preserved as an exact patch in the managed
+[iteration results](iterations/iteration1-results.md#publication-policy-and-preserved-main-plan-revision):
+workflow publication rejected edits to the frozen main-plan.md. Applying that
+plan revision remains pending; the iteration does not bypass the file policy.
 
 Manual review of daemon N1–N5 and contexts X1–X3 passes: exact source/test
 roots, owned-only interface wildcards, direct-child relay chains, preserved
