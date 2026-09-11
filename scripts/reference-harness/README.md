@@ -250,3 +250,52 @@ Once either gains source, the existing owned-test assertion applies. All 308
 Plan 1 instance records, permission expectations and package entries remain
 unchanged; the resident CLI and package-entry migration still belongs to later
 iterations.
+
+### Resident edit fixtures (iteration 6)
+
+`fixtures/plan2/project.ts` prepares four F variants without changing the frozen
+Plan 1 recipe: an unmarked `Type` import, an aliased default, a consumer using the
+existing `@provider/*` mapping, and an unresolved `./later.js` import. The alias
+baseline uses `export default value`, with consistent browser tags on both
+exposures of that original; changing it to `export { value as default }` therefore
+preserves identity. Replacing the recipe's separate `defaultValue` function would
+test an original replacement instead.
+
+`fixtures/plan2/reference.ts` supplies R copies and dependency preparation. The
+shim variant copies Vite into the disposable fixture and links its other
+dependencies. Edit only that copy's `node_modules/vite/client.d.ts`; the ordinary
+R dependency symlink points at shared installed bytes and the shim mutation rejects
+it. Removing the shim's default
+export affects both CSS-module consumers while their resource targets remain the
+same.
+
+`resident-mutations.ts` defines the guarded W2 removal/restoration, K header and
+invalid-description edits, C1/W1 vocabulary changes, README edit, F edits, shim
+edit and helper move. `applyTextMutation(root, edit, true)` performs the exact
+reverse for repair/recovery controls. Every text edit checks one anchor before
+writing. The helper move checks both importer anchors and the absent destination
+before changing files, then repairs relative imports at the new depth; its reverse
+restores the initial bytes. `createLaterFile` checks its importer anchor and uses
+exclusive creation. Returned paths describe fixture edits only: the acceptance
+handlers must assert the real driver's `changed`, never supply these hints as
+observed evidence.
+
+`resident-fixtures.test.ts`, discovered by `npm run reference:cases`, checks the
+fixture causes, exact restoration, drift rejection, dependency isolation and
+selected batch effects. It registers no Plan 2 handler. At this checkpoint the
+increment operations, context manager, shared service and `createQuickEnvironment`
+are absent, so all twenty iteration-6 quick instances remain unexecuted. Complete
+those providers before wiring these fixtures through the real direct channel.
+Every sealed synchronized delivery must assert `verified: true`, ordering and
+the expected reuse; the incomplete acquisition-failure delivery must instead
+assert `verified: false`, as the reviewed contracts require. The driver failure
+wrapper and all service assertions remain work for the resumed iteration.
+
+The seven reference text-edit tests also call `resident-expectations.ts` to
+assert their report effects: root's W2 denial; every core original's added `ui`
+tag and the adapter's denied values; exact C1/W1 growth or shrinkage; located
+foreign-original and missing-file errors without permissions; and changed README
+metadata with preserved decisions. Restoration compares the entire batch report
+after replacing only `runId`. Each edit assertion rejects the unchanged baseline
+as a negative control. Future quick handlers can reuse these report assertions
+with the harness's recorded `Assertions`, adding their resident-specific checks.
