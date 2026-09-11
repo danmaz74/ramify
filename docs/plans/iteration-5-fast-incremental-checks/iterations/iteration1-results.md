@@ -2,7 +2,7 @@
 
 # Iteration 1 results: Contract package, probes and review points
 
-**Date:** 2026-09-11. **Outcome:** review package revised; five Linux probes executed and archived; RP-1 to RP-7 and the schedule recorded. RP-4 and RP-6 are **proposed, awaiting the user's acceptance**, which this non-interactive session could not obtain. No I5 acceptance instance ran and no owner source, harness, daemon code or model document changed.
+**Date:** 2026-09-11. **Outcome:** review package revised; five Linux probes executed and archived; RP-1 to RP-7 and the schedule recorded. RP-4 and RP-6 are **proposed, awaiting the user's acceptance**, which this non-interactive session could not obtain. No I5 acceptance instance ran and no owner source, harness, daemon code or model document changed. A single remediation attempt ([below](#single-self-assessment-remediation-attempt-2026-09-11)) confirmed that the two remaining items require the user.
 
 ## Scope and execution
 
@@ -73,6 +73,31 @@ Not run locally, per the check policy: `npm test`, Vitest, Cucumber, `reference:
 - Iteration 2 must actually hoist interpreter setup out of each call; P5-3 shows setup is ~95% of a one-file call at S1000.
 - Iterations 4 and 5 must implement merged acquisition-plus-compiler observation under concurrent change; P5-5 establishes equality only for a quiescent replay.
 - Iteration 12 should measure compact revision clone cost, two-hot/six-warm memory and the 200-cycle plateau, none of which the probes established.
+
+## Single self-assessment remediation attempt (2026-09-11)
+
+This is the one focused attempt requested after output validation found `functionalRequirementsSatisfied` false. Re-reading the iteration's goal, deliverables and exit criteria confirms that every executable and document deliverable is present; the remaining gaps are two decisions that belong to the user, not missing implementation. The original instructions delegate implementation to Codex, but there is no source, test or probe work to delegate: no failing test, missing probe or incomplete document section exists.
+
+Checks made in this attempt:
+
+- Live workflow detail reports iteration 1 at `validate_output_retry`, `reviewEachIteration: false`, and records no user decision on RP-4 or RP-6. No acceptance was supplied with the remediation request.
+- `main-plan.md` is byte-identical to `HEAD`; `git apply --check --unidiff-zero` of the preserved patch below still succeeds.
+- The only working-tree change before this attempt was publication-generated provenance metadata in `iteration1-checklist.json` (`mcpTool` set by publication); rewriting the checklist through its owning MCP tool replaces it.
+
+Why the two items stay open:
+
+1. **RP-4 and RP-6.** The iteration itself states they "need the user's acceptance and are not settled by this iteration alone". Recording acceptance without it would misrepresent the plan's authority, so both remain "proposed, awaiting the user's acceptance".
+2. **Decisions in `main-plan.md`.** Publication rejects main-plan edits in iteration drafts, and none of the available workflow tools revises the active plan. No file policy was bypassed, and no manifest, status output, workflow state or approval was fabricated.
+
+No application, probe, fixture or document content changed in this attempt, so no probe or static check was rerun; the earlier passing evidence applies to unchanged bytes.
+
+| Check | State | Reason |
+| --- | --- | --- |
+| functionalRequirementsSatisfied | false | RP-4 and RP-6 lack the user's acceptance, and the frozen main plan cannot carry the decision table through an iteration draft. |
+| newCodeCoveredByTests | true | The probe scripts' own assertions ran and passed; no owner code was added. |
+| allNewTestsPass | true | All five probes and the document validator pass on the committed bytes; no regression pass is claimed. |
+
+**Reviewable resolution:** the user accepts (or revises) RP-4 and RP-6 and has the patch below applied through a plan revision before iteration 3. Alternatively, the user explicitly accepts [probes.md](../probes.md) and these results as the authoritative location of the review decisions. Neither decision is inferred here. Iteration 2 can start from the revised package as drafted, since only iteration 9 depends on RP-4 and only iteration 12 on RP-6.
 
 ## Publication policy and preserved main-plan revision
 
