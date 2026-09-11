@@ -1,5 +1,11 @@
 ramify 1
 module daemon tagged [dispatch]
 
+// N1: real ports; the service awaits the context manager.
+expose-src createFilesystemWatcher from "filesystem-watcher.ts" to parent
+expose-src createSystemClock from "system-clock.ts" to parent
+// N4: implemented independent lifecycle vocabulary only.
+expose-src * from "interfaces/daemon.ts" to parent
+
 // N5: only the context vocabulary and controlled ports currently implemented.
 expose-sub ContextId, GenerationId, RevisionId, LeaseId, ContextToken, ContextSetup, ContextSelection, InputFingerprints, WatchEvent, WatcherHandle, WatcherPort, ClockPort, createControlledWatcher, createControlledClock, ControlledWatcher, ControlledClock from contexts to parent

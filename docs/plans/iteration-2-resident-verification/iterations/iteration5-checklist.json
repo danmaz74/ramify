@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": false,
+    "functionalRequirementsSatisfied": false,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-11T07:37:58.030Z",
+  "iteration": "5",
+  "notes": "Incomplete checkpoint: real daemon watcher and clock, seven independent lifecycle types, 20 owner test cases and exact declaration fixture are implemented. Build, type-check, direct owner smoke and eleven-owner self-check pass. Iteration gate has 64 required, 4 passed, 60 required unexecuted because increment, contexts and daemon-service are absent. No service/codec/root assembly/quick environment is claimed. Vitest/Cucumber, scenario coverage and sealed checks are delegated to automation; allNewTestsPass is false for missing runner evidence, not an observed failure. See iteration5-results.md for provider gaps and successor requirements."
+}
