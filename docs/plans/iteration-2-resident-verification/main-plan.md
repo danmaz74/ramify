@@ -1,7 +1,7 @@
 # Plan 2: Keep verification current
 
 **Date:** 2026-09-10. **Status:** Detailed implementation plan for review,
-authored from the roadmap's [Plan 2 brief](../tooling-architecture/README.md#plan-2-resident-verification)
+authored from the roadmap's [Plan 2 brief](../../roadmap.md#plan-2-resident-verification)
 and Plan 1's [completion evidence](../done/iteration-1-project-verifier/iterations/iteration15-results.md).
 No daemon implementation or passing resident evidence is established by this
 document. The plan runs as fourteen iterations, listed under
@@ -57,7 +57,7 @@ Inspection commands remain Plan 3, MCP Plan 4, overlays Plan 5 and the
 explorer Plan 6. This plan hands them the context, generation, revision and
 freshness contracts, the client, the codec, the direct-service harness and
 the measured limits the roadmap's
-[handoff table](../tooling-architecture/README.md#information-to-preserve-between-plans)
+[handoff table](../../roadmap.md#information-to-preserve-between-plans)
 requires.
 
 ## Authority and supporting documents
@@ -70,7 +70,7 @@ requires.
 | [Memory lifecycle](../../architecture/memory-lifecycle.md) | Dependency boundaries, retention and backpressure policy, measurement recipe and ML01–ML08. |
 | [Quick testing](../../architecture/quick-testing.spec.md) | Direct-adapter flows, harness boundaries and QT01–QT08. |
 | [CLI invocation](../../architecture/cli-invocation.spec.md) | Root and configuration discovery, warnings, output order and exits of `ramify check`, unchanged. |
-| [Tooling roadmap](../tooling-architecture/README.md) | The brief, the nine authoring rules and the scheduling map for DA/PC/ML/QT. |
+| [Tooling roadmap](../../roadmap.md) | The brief, the nine authoring rules and the scheduling map for DA/PC/ML/QT. |
 | [Plan 1 contracts](../done/iteration-1-project-verifier/contracts.md), [owners](../done/iteration-1-project-verifier/owners.md), [scope](../done/iteration-1-project-verifier/scope.md) and [handoff](../done/iteration-1-project-verifier/iterations/iteration15-results.md#implemented-contracts-and-plan-2-starting-requirements) | Implemented names, entries, limits and measured budgets this plan preserves. |
 | [Reference cases](../reference-project/cases.md), [contract map](../reference-project/contract-map.md) and [harness](../reference-project/harness.md) | Independent expectations and statement IDs for the edit sequences. |
 

@@ -6,7 +6,7 @@ description: Author or revise Ramify roadmap plans, iteration breakdowns and con
 # Planning
 
 Read the project's [agent instructions](../../../CLAUDE.md), the relevant
-[roadmap brief](../../../docs/plans/tooling-architecture/README.md) and
+[roadmap brief](../../../docs/roadmap.md) and
 [implementation workflow](../../../docs/development/implementation-workflow.md).
 Load the model and architecture documents needed by the actual change.
 

@@ -47,7 +47,7 @@ same identities, facts and decisions in later plans.
 | [Architecture](../../../architecture/README.md) and [daemon design](../../../architecture/daemon.md) | Ownership boundaries, reusable engine, coherent inputs and later resident service. |
 | [Processes](../../../architecture/processes-and-clients.md), [memory](../../../architecture/memory-lifecycle.md) and [quick testing](../../../architecture/quick-testing.spec.md) | Entry-point separation, resource cleanup and real-service verification. |
 | [CLI invocation](../../../architecture/cli-invocation.spec.md) | Root and configuration discovery, scope, warnings, output and exit behavior of `ramify check`. |
-| [Tooling roadmap](../../tooling-architecture/README.md) | Delivery order across the six plans. |
+| [Tooling roadmap](../../../roadmap.md) | Delivery order across the six plans. |
 | [Reference cases](../../reference-project/cases.md), [contract map](../../reference-project/contract-map.md) and [harness](../../reference-project/harness.md) | Independent expected outcomes, actual exposure witnesses and mutation discipline. |
 
 This plan selects implementation scope and evidence; it does not revise the

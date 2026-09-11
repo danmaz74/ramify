@@ -20,7 +20,7 @@ completion report Plans 3 to 6 start from.
   I2-30; the self-checking risk row; harness item 8.
 - [owners.md](../owners.md): Unchanged owners; Package entries and their
   runtime closures; Manual description review.
-- [Tooling roadmap](../../tooling-architecture/README.md): Plan 2: Resident
+- [Tooling roadmap](../../../roadmap.md): Plan 2: Resident
   verification (Required evidence and next-plan inputs); Information to
   preserve between plans; authoring rule 9.
 - Plan 1's [iteration 15](../../done/iteration-1-project-verifier/iterations/iteration15.md)

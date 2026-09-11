@@ -129,7 +129,7 @@ usage, production selection, gate evidence and measurement commands.
 - `docs/plans/` - ramify's own planning artifacts, including the
   [Collection Review reference-project plan](docs/plans/reference-project/README.md)
   and its planned compatibility and regression cases, plus the
-  [implementation roadmap and plan briefs](docs/plans/tooling-architecture/README.md).
+  [implementation roadmap and plan briefs](docs/roadmap.md).
 - `src/` - CLI and daemon executable entries, resident assembly and lazy batch assembly.
 - `subs/analysis/` - batch validation and its declared model, descriptions,
   project and TypeScript children.

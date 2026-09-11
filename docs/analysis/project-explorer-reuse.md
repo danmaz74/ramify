@@ -12,7 +12,7 @@ that later client consume the engine without introducing another analyzer.
 This analysis identifies source worth lifting, the assumptions that need to
 change, and the provisions to review before implementing the backend. The
 [architecture documents](../architecture/README.md) own runtime decisions and
-the proposed module tree; the [tooling plan](../plans/tooling-architecture/README.md)
+the proposed module tree; the [tooling plan](../roadmap.md)
 owns delivery order. This document supplies reuse evidence and adaptations.
 It does not add initial UI modules, require browser transport in the first daemon
 release, or establish implemented capabilities.

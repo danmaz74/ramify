@@ -15,6 +15,11 @@ serves architectural checks and queries from identified revisions. A reusable an
 the same behavior in the daemon and in batch execution. CLI, editor, agent and
 visualization clients consume that shared analysis.
 
+Keeping analysis resident exists to make checks fast when one or a few files
+change. The main use case is agent post-write hooks: a hook runs a check after
+each file an agent writes and returns violations before the agent continues.
+[Fast incremental checks](#fast-incremental-checks) states the requirement.
+
 ## Scope and authority
 
 This document owns the module boundaries, exposure paths, engine
@@ -23,7 +28,7 @@ pipeline, context/revision semantics and semantic service operations.
 CLI behavior and the separate tRPC web process;
 [memory lifecycle](memory-lifecycle.md) defines retention and resource policy;
 [quick testing](quick-testing.spec.md) defines test execution boundaries.
-The [tooling plan](../plans/tooling-architecture/README.md) owns review steps,
+The [tooling plan](../roadmap.md) owns review steps,
 migration and delivery order. The
 [reference project](../plans/reference-project/README.md) is an independent
 application used to exercise the implementation.
@@ -325,8 +330,9 @@ when established. They retain stage and capability execution, inventory, linked
 contracts, accesses, decisions, diagnostics, warnings and coverage as frozen
 plain data. These batch identities are not context generations or revisions.
 
-Retaining TypeScript program/resolution state for incremental checks still
-requires contract/performance review. Optional signature rendering may use that
+[Fast incremental checks](#fast-incremental-checks) are expected to need
+TypeScript program/resolution state retained between revisions; its adapter
+contract and performance still require review. Optional signature rendering may use that
 session or another adapter; a separate `tsserver` process is not a requirement.
 Loss of optional descriptions can degrade enrichment alone. Loss of required
 resolution capability cannot masquerade as a completed check.
@@ -334,8 +340,8 @@ resolution capability cannot masquerade as a completed check.
 ## Context identity and retained state
 
 A context identifies a selected application root in a particular worktree and
-analysis setup. Canonical roots, explicit scope/configuration selections and any
-overlay identity distinguish contexts. Branch names and shared Git directories
+analysis setup. Canonical roots and explicit scope/configuration selections
+distinguish contexts. Branch names and shared Git directories
 are insufficient. A request always names its context; there is no fallback to
 another root's analysis.
 
@@ -372,8 +378,8 @@ carry an implicit cross-revision identity guarantee.
 
 Every result identifies its context, context generation and monotonically
 increasing revision, plus the input fingerprints used by that revision:
-declarations, source/configuration, registry, tool/adapter versions and overlays
-where applicable. A restart or eviction creates a new generation so an old token
+declarations, source/configuration, registry and tool/adapter versions. A
+restart or eviction creates a new generation so an old token
 cannot accidentally identify a new result.
 
 There is one ordered update stream per context. Analysis constructs a candidate
@@ -410,28 +416,25 @@ access queries cannot answer from that model as if it described the new source.
 They return the current invalid/unavailable result. Source facts that remain
 useful may be displayed as evidence without a current permission claim.
 
-## Freshness, saves and overlays
+## Freshness and saves
 
 Watching is a change feed, not a synchronization guarantee. Filesystem events may
 be delayed, coalesced or lost; requests needing particular content establish their
 own freshness point.
 
-Three read modes make that distinction explicit:
+Two read modes make that distinction explicit:
 
 - **Published revision:** read an identified analyzed snapshot, with pending/dirty
   status attached when newer inputs are known. This does not claim disk freshness.
 - **Synchronized disk check:** reconcile the requested input scope and check a
   captured filesystem view, reporting its verified content identities.
-- **Overlay check:** analyze explicitly supplied unsaved content in an isolated
-  overlay view, with its base revision and client versions attached.
 
-A changed-file request supplies context, requested stages/scope, file paths,
-client versions and content hashes; it can include content, deletions and renames.
-For saved-disk mode, verify that the requested content corresponds to the disk
-view being checked. If it no longer does, report a conflict/superseded request or
-require resynchronization. Supplied bytes do not silently turn a disk check into
-an overlay check. For overlay mode, retain and label those bytes without writing
-them to the project or mixing them into another client's disk view.
+Ramify checks saved files only; it does not accept unsaved content in place of
+disk. A changed-file request supplies context, requested stages/scope, the
+changed file paths and their expected content hashes; it can name deletions and
+renames. Verify that the expected content corresponds to the disk view being
+checked. If it no longer does, report a conflict/superseded request or require
+resynchronization.
 
 Synchronize pending influencing changes too. Checking a consumer's new bytes
 against an old exposure declaration or a changed provider would still be stale.
@@ -449,11 +452,6 @@ allowed, but an acknowledged request must receive its own revision result or an
 explicit cancellation/supersession outcome. Expensive obsolete work may be
 cancelled. It must never publish over a newer generation or return another
 revision's findings under the old request token.
-
-Multiple overlays are isolated by client/session and base revision. Updating or
-closing an overlay invalidates only that view's derived state. Unsupported overlay
-operations return an explicit capability result; they never fall back silently
-to disk analysis.
 
 ## Incremental updates and analysis depth
 
@@ -490,10 +488,12 @@ identifies that checked set. A workspace-completion claim requires all requested
 stages for the workspace, not only the edited files.
 
 The incremental path uses the same linking and rule functions as a fresh pass.
-Conservative recomputation is valid when precise invalidation is not implemented
-or not trustworthy. Avoid a cheaper parallel checker that approximates the rules.
+Conservative recomputation remains correct when precise invalidation is not
+trustworthy, but it does not meet the fast-check requirement below for ordinary
+small edits. Avoid a cheaper parallel checker that approximates the rules.
 Persistent disk caches and worker pools are optional later optimizations; retained
-sessions, watching and correct invalidation are part of this architecture.
+sessions, watching, correct invalidation and fast incremental checks are part of
+this architecture.
 
 Full TypeScript compilation, exhaustive runtime analysis and browser-promise
 verification are distinct capabilities. Do not treat a change-local Ramify check
@@ -501,6 +501,32 @@ as evidence that they ran. Browser-promise findings belong to the declaring owne
 and carry their own coverage/execution status; ordinary matching still uses the
 declared promise. No general transitive path-tag or runtime-load prohibition is
 introduced by the daemon.
+
+### Fast incremental checks
+
+The resident daemon exists to answer a synchronized check quickly when one or a
+few files change. The main use case is agent post-write hooks. After a coding
+agent writes a file, its host runs a hook that checks the change and returns any
+violations to the agent before it continues. The hook runs on every write and
+the agent waits for it, so the check must take a small fraction of the time of
+a fresh batch check.
+
+- For an edit to one or a few source files in a warm context, a synchronized
+  check does work proportional to the changed files and the results they
+  affect, not to the project. Rebuilding whole-project analysis or compiler
+  state for such an edit does not meet this requirement.
+- Fast results are exact: they equal a fresh pass over the same captured
+  inputs, including findings, coverage and the checked set. An edit whose
+  effects cannot be bounded takes the broader path, and its report identifies
+  the wider checked set.
+- A hook-facing check has a bounded response time. When it cannot be met, for
+  example in a cold context or during daemon recovery, the outcome is explicit
+  and never a pass.
+- Hook latency budgets are agreed from measurements, like the other resident
+  budgets.
+
+A hook check verifies saved files. It does not check unsaved content, block a
+write before it happens or revert the agent's edit.
 
 ## Service operations and client behavior
 
@@ -510,7 +536,7 @@ schemas and transport framing are review items, not new `module.ramify` syntax.
 | Family | Operations and guarantees |
 | --- | --- |
 | Context lifecycle | Open an explicit project/setup, inspect status, synchronize, close; all requests route to an identified context/generation. |
-| Checks | Check changed content or the workspace with requested capabilities and freshness; return covered inputs, stages, findings and coverage. |
+| Checks | Check changed files or the workspace with requested capabilities and freshness; return covered inputs, stages, findings and coverage. Changed-file checks meet the [fast incremental check](#fast-incremental-checks) requirement. |
 | Module inspection | List modules, identify a file's owner/source area, read purpose metadata and expanded contracts, and inspect visibility versus value/type availability. |
 | Explanations | Explain an original binding's exposure and tag/origin decisions for a specified consumer area, or drill into a recorded source occurrence. |
 | Change notifications | Announce published revisions, status changes and updated findings; a reconnect can fetch a complete snapshot without replaying an unbounded event history. |
@@ -563,9 +589,10 @@ inputs may use in-process batch fallback, disposing its session before exit.
 Watch, MCP, web and external service clients report unavailable execution instead
 of loading or spawning another analyzer. Preserve root, input setup, registry,
 requested capabilities and exact content when falling back. If
-an overlay or historical request cannot be reproduced, return unavailable instead
-of substituting disk/current state. Report when fallback was used. An unavailable
-checker never produces successful enforcement.
+a historical request cannot be reproduced, return unavailable instead of
+substituting current state. Report when fallback was used. An unavailable
+checker never produces successful enforcement. Whether a hook-facing check may
+use batch fallback within its bounded response time is a review item.
 
 CI and an explicit batch option use a fresh engine session without starting a
 daemon. Batch and daemon results over identical inputs must agree after normalizing
@@ -605,7 +632,7 @@ that selection and bootstraps from source without requiring existing `dist/`.
 Whole-project checking still includes owned tests. Runtime toolkit code cannot
 remain outside declared owners merely to avoid checking. Detailed file migration,
 package entries and diagram-emission placement belong to the
-[contract and migration step](../plans/tooling-architecture/README.md#contract-and-migration-review).
+[contract and migration step](../roadmap.md#contract-and-migration-review).
 
 ## Acceptance evidence
 
@@ -633,7 +660,7 @@ accompany the separately deliverable adapter.
 | DA08 | An original changes from pure type to a runtime-bearing merged binding; its unchanged unmarked importer receives the new value check. Original and resource identities survive legal aliases. |
 | DA09 | Configuration, resource shim, package resolution or previously missing file changes invalidate affected results. Ambiguous invalidation and watcher overflow trigger conservative reconciliation. |
 | DA10 | The same edit sequence and final inputs produce equivalent batch and incremental findings, coverage, expanded contracts and query answers, including removals. |
-| DA11 | Independent overlays do not change disk or each other; stale base versions, conflicts, closure and unsupported overlay fallback have explicit outcomes. |
+| DA11 | In a warm context, a synchronized check after a one-file source edit, as run by an agent post-write hook, meets the agreed hook latency budget and does work bounded by the change. Its results equal a fresh batch check of the same inputs. Edits with unbounded effects report their wider checked set; an unmet deadline is explicit, never a pass. |
 | DA12 | CLI and service queries agree with enforcement for the same consumer area and revision. Import suggestions also pass resolved-path testing-origin checks. |
 | DA13 | A README edit updates purpose/missing metadata without changing importability. Missing purpose never borrows another owner's prose. |
 | DA14 | Enrichment failure leaves completed checks available; required resolver/stage failure cannot report completion. A known denial still fails alongside nonblocking coverage notes. |
@@ -659,8 +686,10 @@ needs the following without reopening those decisions or the model rules:
    process and its tRPC API, and the separate stdio MCP adapter, are already
    selected. MCP tool/resource schemas and negotiated protocol details remain
    to be specified; optional HTTP hosting is a later extension.
-4. Overlay/base-revision protocol, synchronization boundaries and conflict results;
-   which operations are included in each first delivery milestone.
+4. The [fast incremental check](#fast-incremental-checks) path for agent
+   post-write hooks: hook invocation and output, deadline, behavior in a cold
+   context or during recovery (including whether batch fallback is allowed)
+   and the measured latency budget.
 5. Resident resource/retention limits, lease/idle durations and measured latency
    budgets implementing the memory policy. Batch work limits and measurement
    outcomes are recorded in the Plan 1 handoff; they do not establish resident
