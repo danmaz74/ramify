@@ -1,0 +1,384 @@
+{
+  "probe": "worker-session",
+  "recordedAt": "2026-09-11T20:55:31.230Z",
+  "host": {
+    "hostname": "243168472f39",
+    "platform": "linux",
+    "arch": "x64",
+    "release": "6.8.0-85-generic",
+    "cpu": "Intel(R) Xeon(R) E-2176G CPU @ 3.70GHz"
+  },
+  "node": "v22.23.2",
+  "typescript": "7.0.2",
+  "scriptSha256": "d46e50f3e2df33f724d5562384fb6cbe83ad6a96f6b6f8727609898add445ee2",
+  "commonSha256": "bddbe40e5d0e581a84daa10bd4141faa7f8946081ded5fc3feb37d6a2bf89fdd",
+  "repetitions": 3,
+  "preflight": {
+    "inherited": "--max-old-space-size=8192",
+    "requestedMiB": 16,
+    "observed": {
+      "reportedResourceLimits": {
+        "maxYoungGenerationSizeMb": 48,
+        "maxOldGenerationSizeMb": 16,
+        "codeRangeSizeMb": 0,
+        "stackSizeMb": 4
+      },
+      "heapSizeLimitBytes": 8640266240
+    }
+  },
+  "priorAttempt": {
+    "outcome": "Terminated by probe author after observing inherited 8192 MiB override during the requested 16 MiB heap witness",
+    "signal": "SIGTERM",
+    "observedProcessRssBytes": 8129638400,
+    "noCompilerChildAtTermination": true
+  },
+  "runs": [
+    {
+      "kind": "opened",
+      "coldMs": 21470.607097,
+      "coldWorkerHeapUsed": 195174520,
+      "coldProcessRss": 360071168,
+      "fixture": {
+        "root": "/tmp/worktrees/ramify-67e9dd0f/iteration-5-fast-incremental-checks/.reference-work/P5-S1000",
+        "owners": 1000,
+        "sourceFiles": 11000,
+        "ownedContentSha256": "6c7bbe1d5500935c1105f11efb0c4f03d58416d449f1f8126b8db65ba0392ae9",
+        "configurationSha256": "da0993c79f25dbbf3dea90e4cc0216dda47baf80d04fa9cc9e166c3aa6412bc9"
+      },
+      "compilerPid": 2336701,
+      "compilerRss": 336846848,
+      "workerHeapUsed": 316558920,
+      "processRss": 523825152,
+      "payloadBytes": 82274359,
+      "payloadSha256": "ee910c03dff54d89b7d1fa77b6d2eea92789e05b33ffcf7a91fb88bfccb78979",
+      "openWallMs": 23529.761852,
+      "ticks": 2331,
+      "tickPeriodMs": 10,
+      "maxGapMs": 13.027780000000348,
+      "tickGaps": {
+        "count": 2331,
+        "medianMs": 10.10321599999952,
+        "p95Ms": 10.128295000002254,
+        "p99Ms": 10.147791999999754,
+        "maxMs": 13.027780000000348,
+        "histogram": [
+          {
+            "lowerExclusiveMs": 0,
+            "upperInclusiveMs": 10,
+            "count": 31
+          },
+          {
+            "lowerExclusiveMs": 10,
+            "upperInclusiveMs": 15,
+            "count": 2300
+          },
+          {
+            "lowerExclusiveMs": 15,
+            "upperInclusiveMs": 20,
+            "count": 0
+          },
+          {
+            "lowerExclusiveMs": 20,
+            "upperInclusiveMs": 50,
+            "count": 0
+          },
+          {
+            "lowerExclusiveMs": 50,
+            "upperInclusiveMs": 100,
+            "count": 0
+          },
+          {
+            "lowerExclusiveMs": 100,
+            "upperInclusiveMs": 250,
+            "count": 0
+          },
+          {
+            "lowerExclusiveMs": 250,
+            "upperInclusiveMs": 1000,
+            "count": 0
+          },
+          {
+            "lowerExclusiveMs": 1000,
+            "upperInclusiveMs": null,
+            "count": 0
+          }
+        ]
+      },
+      "clone": {
+        "samples": [
+          1260.4553840000008,
+          1136.8867260000006,
+          1261.8935239999992,
+          983.4463419999993,
+          980.2748060000013
+        ],
+        "medianMs": 1136.8867260000006,
+        "minMs": 980.2748060000013,
+        "maxMs": 1261.8935239999992
+      },
+      "postMessage": {
+        "samples": [
+          390.76991700000144,
+          359.84890000000087,
+          366.8453929999996,
+          377.68218999999954,
+          365.9271940000035
+        ],
+        "medianMs": 366.8453929999996,
+        "minMs": 359.84890000000087,
+        "maxMs": 390.76991700000144
+      },
+      "receivedHash": "ee910c03dff54d89b7d1fa77b6d2eea92789e05b33ffcf7a91fb88bfccb78979",
+      "exitCode": 0,
+      "compilerGone": true
+    },
+    {
+      "kind": "opened",
+      "coldMs": 21705.010099000003,
+      "coldWorkerHeapUsed": 189939416,
+      "coldProcessRss": 569995264,
+      "fixture": {
+        "root": "/tmp/worktrees/ramify-67e9dd0f/iteration-5-fast-incremental-checks/.reference-work/P5-S1000",
+        "owners": 1000,
+        "sourceFiles": 11000,
+        "ownedContentSha256": "6c7bbe1d5500935c1105f11efb0c4f03d58416d449f1f8126b8db65ba0392ae9",
+        "configurationSha256": "da0993c79f25dbbf3dea90e4cc0216dda47baf80d04fa9cc9e166c3aa6412bc9"
+      },
+      "compilerPid": 2336796,
+      "compilerRss": 363491328,
+      "workerHeapUsed": 316565216,
+      "processRss": 700887040,
+      "payloadBytes": 82274359,
+      "payloadSha256": "ee910c03dff54d89b7d1fa77b6d2eea92789e05b33ffcf7a91fb88bfccb78979",
+      "openWallMs": 23740.032694999998,
+      "ticks": 2348,
+      "tickPeriodMs": 10,
+      "maxGapMs": 61.88825999999972,
+      "tickGaps": {
+        "count": 2348,
+        "medianMs": 10.085109499996179,
+        "p95Ms": 10.113373000000138,
+        "p99Ms": 10.13463000000047,
+        "maxMs": 61.88825999999972,
+        "histogram": [
+          {
+            "lowerExclusiveMs": 0,
+            "upperInclusiveMs": 10,
+            "count": 22
+          },
+          {
+            "lowerExclusiveMs": 10,
+            "upperInclusiveMs": 15,
+            "count": 2325
+          },
+          {
+            "lowerExclusiveMs": 15,
+            "upperInclusiveMs": 20,
+            "count": 0
+          },
+          {
+            "lowerExclusiveMs": 20,
+            "upperInclusiveMs": 50,
+            "count": 0
+          },
+          {
+            "lowerExclusiveMs": 50,
+            "upperInclusiveMs": 100,
+            "count": 1
+          },
+          {
+            "lowerExclusiveMs": 100,
+            "upperInclusiveMs": 250,
+            "count": 0
+          },
+          {
+            "lowerExclusiveMs": 250,
+            "upperInclusiveMs": 1000,
+            "count": 0
+          },
+          {
+            "lowerExclusiveMs": 1000,
+            "upperInclusiveMs": null,
+            "count": 0
+          }
+        ]
+      },
+      "clone": {
+        "samples": [
+          1195.3042029999997,
+          1147.0924139999988,
+          971.6871309999988,
+          993.9620189999987,
+          1002.0063940000036
+        ],
+        "medianMs": 1002.0063940000036,
+        "minMs": 971.6871309999988,
+        "maxMs": 1195.3042029999997
+      },
+      "postMessage": {
+        "samples": [
+          380.8761119999981,
+          366.76754600000277,
+          364.33000699999684,
+          379.0160639999958,
+          368.2705730000016
+        ],
+        "medianMs": 368.2705730000016,
+        "minMs": 364.33000699999684,
+        "maxMs": 380.8761119999981
+      },
+      "receivedHash": "ee910c03dff54d89b7d1fa77b6d2eea92789e05b33ffcf7a91fb88bfccb78979",
+      "exitCode": 0,
+      "compilerGone": true
+    },
+    {
+      "kind": "opened",
+      "coldMs": 21513.941254000005,
+      "coldWorkerHeapUsed": 184404680,
+      "coldProcessRss": 573992960,
+      "fixture": {
+        "root": "/tmp/worktrees/ramify-67e9dd0f/iteration-5-fast-incremental-checks/.reference-work/P5-S1000",
+        "owners": 1000,
+        "sourceFiles": 11000,
+        "ownedContentSha256": "6c7bbe1d5500935c1105f11efb0c4f03d58416d449f1f8126b8db65ba0392ae9",
+        "configurationSha256": "da0993c79f25dbbf3dea90e4cc0216dda47baf80d04fa9cc9e166c3aa6412bc9"
+      },
+      "compilerPid": 2336888,
+      "compilerRss": 345329664,
+      "workerHeapUsed": 316374912,
+      "processRss": 689152000,
+      "payloadBytes": 82274359,
+      "payloadSha256": "ee910c03dff54d89b7d1fa77b6d2eea92789e05b33ffcf7a91fb88bfccb78979",
+      "openWallMs": 23573.705901999994,
+      "ticks": 2330,
+      "tickPeriodMs": 10,
+      "maxGapMs": 73.48279300000286,
+      "tickGaps": {
+        "count": 2330,
+        "medianMs": 10.094153999998525,
+        "p95Ms": 10.112495000008494,
+        "p99Ms": 10.156096000006073,
+        "maxMs": 73.48279300000286,
+        "histogram": [
+          {
+            "lowerExclusiveMs": 0,
+            "upperInclusiveMs": 10,
+            "count": 24
+          },
+          {
+            "lowerExclusiveMs": 10,
+            "upperInclusiveMs": 15,
+            "count": 2304
+          },
+          {
+            "lowerExclusiveMs": 15,
+            "upperInclusiveMs": 20,
+            "count": 1
+          },
+          {
+            "lowerExclusiveMs": 20,
+            "upperInclusiveMs": 50,
+            "count": 0
+          },
+          {
+            "lowerExclusiveMs": 50,
+            "upperInclusiveMs": 100,
+            "count": 1
+          },
+          {
+            "lowerExclusiveMs": 100,
+            "upperInclusiveMs": 250,
+            "count": 0
+          },
+          {
+            "lowerExclusiveMs": 250,
+            "upperInclusiveMs": 1000,
+            "count": 0
+          },
+          {
+            "lowerExclusiveMs": 1000,
+            "upperInclusiveMs": null,
+            "count": 0
+          }
+        ]
+      },
+      "clone": {
+        "samples": [
+          1237.3790270000027,
+          1072.542558000001,
+          958.0268989999895,
+          1013.1945219999907,
+          981.8925020000024
+        ],
+        "medianMs": 1013.1945219999907,
+        "minMs": 958.0268989999895,
+        "maxMs": 1237.3790270000027
+      },
+      "postMessage": {
+        "samples": [
+          377.9453849999991,
+          369.7709909999976,
+          366.69176999999036,
+          372.98670599999605,
+          364.55903799999214
+        ],
+        "medianMs": 369.7709909999976,
+        "minMs": 364.55903799999214,
+        "maxMs": 377.9453849999991
+      },
+      "receivedHash": "ee910c03dff54d89b7d1fa77b6d2eea92789e05b33ffcf7a91fb88bfccb78979",
+      "exitCode": 0,
+      "compilerGone": true
+    }
+  ],
+  "cold": {
+    "samples": [
+      21470.607097,
+      21705.010099000003,
+      21513.941254000005
+    ],
+    "medianMs": 21513.941254000005,
+    "minMs": 21470.607097,
+    "maxMs": 21705.010099000003
+  },
+  "openWall": {
+    "samples": [
+      23529.761852,
+      23740.032694999998,
+      23573.705901999994
+    ],
+    "medianMs": 23573.705901999994,
+    "minMs": 23529.761852,
+    "maxMs": 23740.032694999998
+  },
+  "heapLimit": {
+    "oldGenerationMiB": 16,
+    "youngGenerationMiB": 4,
+    "repetitions": 3,
+    "errors": [
+      {
+        "code": "ERR_WORKER_OUT_OF_MEMORY",
+        "exit": 1,
+        "ready": true
+      },
+      {
+        "code": "ERR_WORKER_OUT_OF_MEMORY",
+        "exit": 1,
+        "ready": true
+      },
+      {
+        "code": "ERR_WORKER_OUT_OF_MEMORY",
+        "exit": 1,
+        "ready": true
+      }
+    ]
+  },
+  "method": "Three independent workers with a 512 MiB old-generation limit cold-acquire S1000 and retain a real compiler snapshot, catalog and access facts. Cold work excludes payload construction; main-thread ticks cover worker launch through payload preparation. Five structured-clone deliveries per worker of a report-sized stand-in made of distinct copies of actual S1000 objects, at least 66 MiB JSON; each hash checked. Separate workers force heap exhaustion by retained JavaScript arrays.",
+  "limitations": [
+    "This branch has no retained-session product. Cold open measures acquisition plus compiler/catalog/access extraction, excluding linking, decisions, observer and publication.",
+    "The inherited --max-old-space-size flag overrides resourceLimits. This probe relaunches without that flag after recording effective limits; production must reject or isolate such an environment.",
+    "resourceLimits bounds the worker V8 heap, not ArrayBuffer storage, process RSS, or the native compiler child. Compiler PID/RSS must be accounted separately and combined once with process RSS; worker RSS is process-wide.",
+    "Heap-limit witness forces allocation independently of the compiler to avoid orphaning a native server; production compiler cleanup after worker failure still needs I5-08.",
+    "Large-message clone cost is a report-sized upper workload, not compact-revision latency; report construction and checksum verification are excluded from clone timing."
+  ]
+}

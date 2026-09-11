@@ -1,10 +1,19 @@
 # Plan 5 contract review package
 
-**Prepared:** 2026-09-11. **State:** draft for iteration 1's review of
-[Plan 5](main-plan.md). The [owner manifest](owners.md), [scope and lifecycle
-decisions](scope.md) and [instance inventory](subcases.md) form one review
-package with this document. Changing a signature, a wire schema or an
-activation stage revises this package before its consumers change.
+**Prepared:** 2026-09-11. **Reviewed and revised:** 2026-09-11. **State:**
+revised contract package; RP-4 and RP-6 await the user's acceptance before
+implementation of [Plan 5](main-plan.md). The [owner manifest](owners.md),
+[scope and lifecycle decisions](scope.md) and
+[instance inventory](subcases.md) form one review package with this
+document. Changing a signature, a wire schema or an activation stage revises
+this package before its consumers change.
+
+These contract definitions govern where the frozen main plan differs,
+including covering-request freshness and historical reports.
+The corresponding main-plan text is revised by the exact patch preserved in
+[iteration results](iterations/iteration1-results.md#publication-policy-and-preserved-main-plan-revision).
+Applying it remains pending a plan revision; iteration drafts cannot edit
+main-plan.md.
 
 Every name implemented by Plans 1 and 2 is reused exactly as recorded in
 their contracts unless a section below names it as revised or removed.
@@ -13,9 +22,11 @@ renamed.
 
 ## Conventions and dependency direction
 
-- Plain data only crosses owner boundaries, the worker boundary and the
-  wire: no compiler objects, handles, source-file objects or functions.
-  Revisions and facts are frozen and acyclic.
+- Facts, revisions and wire messages are frozen, acyclic plain data. Live
+  ports (`ProjectObserver`, `AccessInterpreter`, `RetainedSession`) may cross
+  in-process owner boundaries but are never serialized. Compiler objects,
+  native snapshots and source-file objects stay private to `typescript`.
+  Structured cloning does not preserve freezing; receivers freeze messages.
 - Paths inside a project are root-relative with forward slashes, as in
   `CapturedInput.path`; external inputs keep the `external:` labels of Plan 1.
 - Identities are SHA-256 hex strings as in `CapturedInput.sha256`; diagnostic
@@ -56,9 +67,9 @@ export interface CatalogDelta {
 }
 export interface AccessInterpreter {
   interpret(files: readonly string[], signal?: AbortSignal): Promise<{ readonly accesses: readonly SourceAccess[];
-    readonly coverage: readonly SourceLimit[]; readonly candidates: ReadonlyMap<string, readonly string[]> }>;
+    readonly coverage: readonly SourceLimit[]; readonly candidates: readonly { readonly file: string; readonly paths: readonly string[] }[] }>;
   replaceDescriptions(descriptions: readonly FileDescription[], removed: readonly string[]): void;
-  dispose(): void;
+  dispose(): Promise<void>;
 }
 export interface SourceChangeSet {
   readonly changed: readonly string[];
@@ -88,27 +99,40 @@ export interface RetainedSourceAnalysis {
 }
 ```
 
-`subs/analysis/subs/typescript/src/descriptions.ts` (iteration 3) exports
-`describeFiles(project, inputs, host, files)` and `assembleCatalog(descriptions)`;
-`buildCatalog` becomes `assembleCatalog(describeFiles(..., allOwnedFiles))`
-and the batch helper calls it unchanged from the outside. `describe` on the
-retained adapter starts from the named files, adds every file whose
-description depends on a recomputed file whose description changed by value,
-runs the star, selection and incompleteness propagation of today's
-`resolveExports` over that set until nothing changes, and returns the delta.
-Files outside the set keep their descriptions by identity.
+The public factories take owned ports and plain inputs, never a compiler
+`Project`, `CatalogHost` or runtime map:
 
-`subs/analysis/subs/typescript/src/access-interpreter.ts` (iteration 2)
-exports `createAccessInterpreter(project, inputs, host, catalog, runtime)`;
-`collectAccesses` becomes `createAccessInterpreter(...).interpret(allOwnedFiles)`
-for batch. Setup that today runs per call, the maps over catalog files and
-originals and the sorted inventory, is built once and maintained through
-`replaceDescriptions`. `interpret(files)` yields exactly the accesses and
-notes a whole-project pass yields for those files, plus the resolution
-candidates each file probed, keyed by file. `namespace-uses.ts` (iteration 2)
-builds its identifier index by spelling on first use and resolves one spelling
-through the array overload of `getSymbolAtLocation`; the shorthand-property
-and export-specifier readings are unchanged.
+```ts
+// descriptions.ts, iteration 3
+export declare function describeFiles(inputs: SourceAnalysisInputs, files: readonly string[]): Promise<readonly FileDescription[]>;
+export declare function assembleCatalog(descriptions: readonly FileDescription[]): SourceCatalog;
+// access-interpreter.ts, iteration 2
+export declare function createAccessInterpreter(inputs: SourceAnalysisInputs): Promise<AccessInterpreter>;
+```
+
+These standalone operations own a finite compiler lifetime. `describeFiles`
+disposes it before returning; the interpreter releases it through `dispose`.
+They do not dispose the caller's input view. The compiler-bearing constructors
+and description functions are private to `typescript`, shared by the finite
+helper and retained adapter. `buildCatalog` keeps its current private signature
+and uses that same per-file implementation. Analysis's retained audit calls
+`adapter.describe(allOwnedFiles)` and `adapter.interpreter().interpret(...)`,
+then `assembleCatalog`; it never receives a native project.
+
+`describe` on the retained adapter starts from the named files, adds every file
+whose description depends on a recomputed file whose description changed by
+value, runs the existing star, selection and incompleteness fixed point and
+returns the delta. Files outside the set retain their descriptions by identity.
+The adapter owns interpreter setup and refreshes its private snapshot reference
+on every update; inventory and original maps are updated for created/deleted
+files and description deltas. `replaceDescriptions` updates descriptions and
+originals without rebuilding unaffected maps. `interpret(files)` returns the
+same accesses and notes as a whole pass restricted to those files, plus each
+file's resolution candidates as plain records. `collectAccesses` remains a
+private helper wrapper. `namespace-uses.ts` builds its spelling index lazily
+and batches `getSymbolAtLocation`; shorthand and export-specifier readings
+remain unchanged. P5-3 measures a fixed-snapshot prototype, not this complete
+maintenance contract.
 
 `subs/analysis/subs/typescript/src/retained-source-analysis.ts` (iteration 5)
 exports `createRetainedSourceAnalysis(inputs)`. It runs in the caller's
@@ -117,7 +141,8 @@ filesystem callbacks that read the disk directly and report every read,
 existence probe, directory listing, realpath and absence to `inputs.sink`.
 The synthetic configuration and resource witness are virtual files
 regenerated from `changes.inventory` when it is non-null. Exactly one
-snapshot is live; `update` disposes the previous one before returning.
+snapshot remains live between calls; replacement may briefly hold the old and
+new snapshots, and `update` disposes the previous one before returning.
 `releaseCompiler` closes the server and disposes the snapshot; the next
 `update` reopens with `invalidateAll` semantics and the same observations.
 Loss of the server between calls rejects the next call with a
@@ -139,6 +164,7 @@ export interface ObservationSink {
   file(path: string, sha256: string | null, bytes: number, role: 'source' | 'resource' | 'configuration' | 'dependency'): void;
   directory(path: string, entries: readonly string[]): void;
   absent(path: string): void;
+  probe(path: string, operation: 'fileExists' | 'directoryExists' | 'realPath'): void;
 }
 export type InputChangeKind = 'changed' | 'created' | 'deleted' | 'unknown';
 export interface ObservedChange { readonly path: string; readonly kind: InputChangeKind }
@@ -166,8 +192,19 @@ export type ProjectObserve =
   | Exclude<ProjectRead, { readonly status: 'acquired' }>;
 ```
 
+`ObservationSink` is a synchronous port within the worker. `file` records
+actual read bytes; a null hash means no bytes were read, not an absent path.
+`probe` records existence/kind or canonical-path observation separately from a
+read. `directory` records enumerated membership, while a directory existence
+probe does not. The observer preserves the capture recipe for stat signatures,
+symlink targets, exact-name checks, external labels and role precedence. Virtual
+compiler files are excluded; their real-name occupancy checks are included.
+Compiler callbacks are merged with acquisition observations, never substituted
+for them. Coherence is validated before publication; a concurrent change yields
+an explicit incomplete outcome or bounded retry.
+
 `subs/analysis/subs/project/src/observer.ts` exports
-`observeProject(options: ProjectReadOptions)`. It performs Plan 1's
+`observeProject(options: ProjectReadOptions): Promise<ProjectObserve>`. It performs Plan 1's
 acquisition once, keeps the observations instead of sealing and disposing,
 and thereafter updates them: a change inside an existing area re-observes
 that path, re-parses a description or re-reads a README, and returns a
@@ -178,7 +215,8 @@ returns `incomplete`. `reobserve` stats every observed path, hashes the ones
 whose signature changed and returns their changes. `inputId` is computed by
 the same recipe as `run-analysis.ts` over the current observations, so a
 session revision and a batch report over the same inputs carry the same
-identity. `readProject` and `resolveProjectRoot` are unchanged.
+identity. After an invalid update, `inventory` remains the last valid inventory;
+that stale inventory is never used to publish valid facts. `readProject` and `resolveProjectRoot` are unchanged.
 
 ## Analysis: the retained session
 
@@ -236,16 +274,18 @@ export interface SessionStatus {
   readonly sequence: number;
   readonly observedInputs: number;
   readonly factBytes: number;
-  readonly worker: { readonly heapUsed: number; readonly rss: number };
+  readonly worker: { readonly heapUsed: number; readonly rss: number }; // rss is process-wide, not additive per worker
   readonly compiler: { readonly pid: number | null; readonly rss: number | null };
   readonly lastSweepAt: number | null;
 }
 export interface RetainedSession {
   readonly current: SessionRevision | null;
-  update(changes: readonly SessionChange[], control?: RunControl): Promise<SessionUpdate>;
+  update(changes: readonly SessionChange[], control?: RunControl,
+    invocation?: Pick<AnalysisInputs, 'project' | 'capabilities'>): Promise<SessionUpdate>;
   sweep(control?: RunControl): Promise<SessionUpdate | { readonly status: 'unchanged' }>;
   verify(control?: RunControl): Promise<VerifyOutcome>;
-  report(control?: RunControl): Promise<AnalysisReport>;
+  report(control?: RunControl, sequence?: number): Promise<AnalysisReport | null>;
+  releaseRevision(sequence: number): Promise<void>;
   status(): SessionStatus;
   releaseCompiler(): Promise<void>;
   dispose(): Promise<void>;
@@ -264,25 +304,43 @@ Rules:
   interface file is. It starts the worker from `subs/analysis/src/session-worker.ts`
   with `resourceLimits` from `session.workerHeapMiB`; the worker observes the
   project, creates the retained adapter with the observer's sink, runs the
-  cold path and posts revision 1. An invalid, incomplete or unavailable cold
-  result returns `reported` with the batch-shaped report and no session.
+  cold path and posts revision 1. A cold
+  incomplete or unavailable result returns `reported` with the batch-shaped
+  report and no session. A coherent invalid capture opens a session and
+  publishes an invalid revision, preserving Plan 2 invalid-current behavior.
+  If acquisition returns sealed invalid inputs before an observer exists, the
+  session retains those inputs without a compiler and retries `observeProject`
+  on the next update or sweep. Incomplete inputs never take this path.
 - `update` runs the revision step of [scope.md](scope.md#paths-of-an-update).
   `identical: true` means every named change had an unchanged identity and
   the revision object is the current one, not a new sequence. `changed` lists
   the observed paths whose identity differed. Deadlines are the caller's:
-  the session always completes an update; contexts answer requests.
+  the session completes an update unless cancelled or failed; contexts answer requests.
+  The optional invocation preserves the requesting lease's original project
+  request and capability order. It must resolve to this session's canonical
+  root/configuration and the same capability set; otherwise the update reports
+  `invalid-invocation`. An invocation change reacquires its input envelope and
+  publishes a new sequence even with no file changes. It replaces acquisition
+  observations, rather than unioning observations from different callers, and
+  reuses compiler facts only where their dependencies are unchanged.
 - `report` materializes the `ramify.analysis/1` report of the current
-  revision from retained facts; it equals `analyzeProject` over the same
-  inputs except `runId`. It is the only large message across the worker
-  boundary and is never sent unrequested.
+  revision from retained facts, or the named sequence; null means that
+  sequence's facts have been released. It equals `analyzeProject` over the
+  same inputs except `runId`. Immutable historical fact versions remain
+  inside the worker, share unchanged data and count against retention limits.
+  `releaseRevision` releases an unpinned historical version; releasing the
+  current version is rejected. Historical and published reports preserve the
+  invocation facts of their own sequence. A report is never sent unrequested; revisions
+  also contain complete input and diagnostic lists and have measured byte
+  bounds, so they are not assumed constant-size.
 - `verify` recomputes descriptions, accesses, model and decisions for every
   file from the warm compiler and compares them field by field with the
   retained facts; on mismatch it publishes the recomputed facts as a new
   revision and returns the differing fields.
 - Positions: when a file's description and access facts are equal by value
   ignoring positions but positions differ, the revision is `unchanged-surface`,
-  the accesses selecting that file's moved originals are decided again from
-  the retained model so their evidence and diagnostic identities match a
+  declaration evidence in the retained model is replaced before the accesses
+  selecting that file's moved originals are decided again so their evidence and diagnostic identities match a
   fresh pass, and `delta.positionOnly` lists the identities that changed for
   that reason.
 - Facts and indexes are frozen plain data inside the worker; `factBytes` is
@@ -290,6 +348,12 @@ Rules:
   `maxRetainedFactBytes`; exceeding it fails the update with the engine's
   `resource-limit` diagnostic in a `reported` outcome.
 - `releaseCompiler` demotes to warm; `status().level` reports it.
+
+A coherent invalid revision uses Plan 2's sealed-invalid resident identity
+when the unchanged batch report has null `inputId`; its report projection keeps
+that null and the batch input envelope. Session identity is metadata, not a
+rewrite of the batch schema. `RunControl` cancellation still cancels; request
+deadlines only bound the contexts wait and do not cancel an active update.
 
 `increment.ts`, `retained-products.ts`, the retained input of
 `run-analysis.ts` and `session.ts` and the increment types are removed in
@@ -366,18 +430,30 @@ carries the extended header.
 Manager rules (iteration 9):
 
 - `open` calls `driver.open` once per context and holds the session handle;
-  reopening after eviction opens a new session and generation.
+  reopening after eviction opens a new session and generation. Each lease
+  retains its opening project request and capability order. A synchronized
+  request freezes them at acknowledgment and passes them as the update's
+  invocation; different invocation facts cannot share a covering revision.
+  Published reads keep the selected revision's original invocation facts,
+  preserving Plan 2's request/report rules.
 - Watcher batches and sweep results become `session.update` calls; the
   manager keeps Plan 2's queue, debounce, cancellation and supersession
   rules. A synchronized request whose `expect` identities are all covered by
-  the published revision is answered from it without an update, with
-  `reusedRevision: true`; otherwise its paths join the next update.
-- History stores `ContextRevision` headers and each revision's
-  `SessionRevision.diagnostics`, `warnings`, `coverage` and `delta`, bounded
-  by the Plan 2 history limits measured on those values; reports are
-  materialized through `session.report` for `scope: 'report'` and for
-  `published` reads naming a revision, and cached for the current revision
-  only while a request holds it.
+  the published revision is answered from it without an update only when no
+  known influencing change or required sweep is pending, with
+  `reusedRevision: true`; otherwise its paths join the next update. An empty
+  `expect` on a synchronized plain check requires a sweep begun after
+  acknowledgment; it cannot pass by vacuous coverage.
+- History stores headers, diagnostics, warnings, coverage and deltas. The
+  corresponding immutable fact versions stay in the session worker until
+  contexts evicts that revision and calls `releaseRevision`. Count and byte
+  limits include both locations, current/candidate overlap and request pins;
+  shared facts are counted once. Reports are materialized with the exact
+  sequence through `session.report(control, sequence)` only on demand. Null
+  maps to `evicted-revision`, never to the current report. Before cold disposal,
+  contexts explicitly requests the published report and retains that detached
+  report under the existing history budget; older revisions are evicted.
+
 - `CheckDelta.findings` is the covering revision's complete diagnostic list;
   `new` is true for an identity absent from the `since` revision's list, or
   from the previous retained revision when `since` is omitted; `removed`
@@ -386,6 +462,12 @@ Manager rules (iteration 9):
 - A request whose deadline passes before the covering revision is answered
   `cold` when the context has no published revision, otherwise
   `deadline-exceeded`; the update continues and publishes.
+- `FreshnessRecord` keeps its wire shape. A covered delta request records
+  `captureStarted: null`, `verified: true`, `reusedRevision: true`: coverage
+  is established from coherent observations, not an invented new capture
+  timestamp. An update or required sweep records its real start lower bound;
+  published reads remain `verified: false`. The covering rule amends Plan 2's
+  capture-after-acknowledgment rule only for nonempty delta expectations.
 - `maxHotContexts` is enforced on open and on activity: the least recently
   used hot context beyond the bound receives `session.releaseCompiler()`.
   `warmIdleMs` demotes hot to warm; `coldRetainMs` disposes the session.
@@ -434,10 +516,12 @@ export interface CheckDocument {
   readonly since: RevisionId | null;
   readonly changed: readonly { readonly path: string; readonly sha256: string | null; readonly covered: boolean }[];
   readonly outcome: 'checked' | 'not-checked';
-  readonly reason: 'cold' | 'deadline-exceeded' | 'unobserved-input' | 'superseded' | 'incomplete' | 'unavailable' | 'stopped' | 'incompatible' | null;
+  readonly reason: 'cold' | 'deadline-exceeded' | 'unobserved-input' | 'superseded' | 'incomplete' | 'unavailable' | 'stopped' | 'incompatible' | 'evicted-revision' | 'resource-unavailable' | 'analysis-failed' | 'unknown-context' | 'expired-generation' | 'unsupported-setup' | 'disposed' | null;
   readonly execution: AnalysisReport['outcome']['execution'] | null;
   readonly findings: readonly (AnalysisDiagnostic & { readonly new: boolean })[];
   readonly removed: readonly string[];
+  readonly warnings: readonly OutsideSourceWarning[];
+  readonly coverage: readonly SourceLimit[];
   readonly checked: CheckedSet | null;
   readonly timings: { readonly daemon: RevisionTimings | null; readonly waitedMs: number; readonly totalMs: number };
   readonly exitCode: 0 | 1 | 2;
@@ -479,3 +563,16 @@ description lines, 4 the observer lines together with `ObservationSink` and
 its A7 relay, 5 the retained adapter lines, 6 to 8 the session lines, 9 the revised contexts port and the removals, 10 the
 service and CLI lines, and 13 verifies the final texts through
 `scripts/validate-final-contracts.ts`.
+
+## Iteration 1 review outcome
+
+Revised from draft on 2026-09-11; RP-4 and RP-6 remain proposed and await the
+user's acceptance. The eight rows of the main plan's contract table were
+reviewed against these definitions. Corrections separate live ports from
+serialized data, keep compiler-bearing factories private, give the observation
+sink an explicit probe operation, preserve exact historical report reads and
+nonempty covering-request freshness and per-lease invocation facts,
+refresh model declaration evidence, preserve coherent invalid publication and
+complete the CLI reason union. Activation remains 2/3/4/5/6–8/9/10/13.
+The [probe record](probes.md) records measured feasibility and remaining gaps;
+this review does not establish an I5 acceptance instance.

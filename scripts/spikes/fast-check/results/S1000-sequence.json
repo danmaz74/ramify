@@ -1,0 +1,332 @@
+{
+  "fixture": "S1000",
+  "root": ".reference-work/S1000",
+  "repeats": 3,
+  "auditMode": "once",
+  "node": "v22.23.2",
+  "summary": {
+    "programFiles": 11064,
+    "accesses": 19000,
+    "originals": 11000,
+    "sourceFiles": 11000,
+    "owners": 1000,
+    "observations": 19004
+  },
+  "coldMedianMs": 27106.8,
+  "coldSteps": {
+    "acquire": 12884,
+    "compiler": 1689.3,
+    "catalog": 5695.6,
+    "access": 4802.2,
+    "link": 988,
+    "decide": 1047.4
+  },
+  "byClass": [
+    {
+      "klass": "cold",
+      "name": "cold open",
+      "samples": 1,
+      "path": "cold",
+      "medianMs": 30657.1,
+      "minMs": 30657.1,
+      "maxMs": 30657.1,
+      "steps": {
+        "acquire": 14961.8,
+        "compiler": 1794.4,
+        "catalog": 6518.6,
+        "access": 5007.6,
+        "link": 1154,
+        "decide": 1106.8
+      },
+      "checkedFiles": 11000,
+      "checkedAccesses": 19000,
+      "findings": 0,
+      "audits": 1,
+      "auditsEqual": 1,
+      "expectationFailures": []
+    },
+    {
+      "klass": "body",
+      "name": "body edit",
+      "samples": 3,
+      "path": "source",
+      "medianMs": 6483.9,
+      "minMs": 6423,
+      "maxMs": 7386.6,
+      "steps": {
+        "classify": 0,
+        "snapshot": 43.6,
+        "catalog": 4998.1,
+        "access": 55.4,
+        "link": 1141,
+        "decide": 59.8
+      },
+      "checkedFiles": 1,
+      "checkedAccesses": 1,
+      "findings": 0,
+      "audits": 1,
+      "auditsEqual": 1,
+      "expectationFailures": []
+    },
+    {
+      "klass": "body-in-place",
+      "name": "body edit in place",
+      "samples": 3,
+      "path": "unchanged-surface",
+      "medianMs": 5279.6,
+      "minMs": 5062.9,
+      "maxMs": 5489.6,
+      "steps": {
+        "classify": 0,
+        "snapshot": 27.8,
+        "catalog": 4986.5,
+        "access": 63.3
+      },
+      "checkedFiles": 1,
+      "checkedAccesses": 0,
+      "findings": 0,
+      "audits": 1,
+      "auditsEqual": 1,
+      "expectationFailures": []
+    },
+    {
+      "klass": "add-export",
+      "name": "add an export",
+      "samples": 3,
+      "path": "source",
+      "medianMs": 6286.2,
+      "minMs": 6213.4,
+      "maxMs": 6299.6,
+      "steps": {
+        "classify": 0,
+        "snapshot": 25.1,
+        "catalog": 4858.6,
+        "access": 108.9,
+        "link": 1012.5,
+        "decide": 51.5
+      },
+      "checkedFiles": 2,
+      "checkedAccesses": 0,
+      "findings": 0,
+      "audits": 1,
+      "auditsEqual": 1,
+      "expectationFailures": []
+    }
+  ],
+  "observations": [
+    {
+      "step": "cold open",
+      "klass": "cold",
+      "repetition": 1,
+      "path": "cold",
+      "ms": 30657.116030999998,
+      "steps": {
+        "acquire": 14961.765768,
+        "compiler": 1794.3875739999985,
+        "catalog": 6518.647881000001,
+        "access": 5007.631012999998,
+        "link": 1154.0022189999981,
+        "decide": 1106.8317889999998
+      },
+      "checkedFiles": 11000,
+      "checkedAccesses": 19000,
+      "findings": 0,
+      "added": 0,
+      "removed": 0,
+      "audit": {
+        "equal": true,
+        "batchMs": 52227,
+        "differences": []
+      }
+    },
+    {
+      "step": "body edit",
+      "klass": "body",
+      "repetition": 1,
+      "path": "source",
+      "ms": 7386.642189000006,
+      "steps": {
+        "classify": 0.03190599998924881,
+        "snapshot": 43.58930999999575,
+        "catalog": 5694.506821000003,
+        "access": 86.1446869999927,
+        "link": 1190.1312809999945,
+        "decide": 59.832657999999356
+      },
+      "checkedFiles": 1,
+      "checkedAccesses": 1,
+      "findings": 0,
+      "added": 0,
+      "removed": 0,
+      "audit": {
+        "equal": true,
+        "batchMs": 51212,
+        "differences": []
+      }
+    },
+    {
+      "step": "body edit in place",
+      "klass": "body-in-place",
+      "repetition": 1,
+      "path": "unchanged-surface",
+      "ms": 5489.566531999997,
+      "steps": {
+        "classify": 0.018517999997129664,
+        "snapshot": 34.156505999999354,
+        "catalog": 5187.729488000012,
+        "access": 63.267296000005445
+      },
+      "checkedFiles": 1,
+      "checkedAccesses": 0,
+      "findings": 0,
+      "added": 0,
+      "removed": 0,
+      "audit": {
+        "equal": true,
+        "batchMs": 48519,
+        "differences": []
+      }
+    },
+    {
+      "step": "add an export",
+      "klass": "add-export",
+      "repetition": 1,
+      "path": "source",
+      "ms": 6299.600287000008,
+      "steps": {
+        "classify": 0.021951000002445653,
+        "snapshot": 36.942431000003126,
+        "catalog": 4907.396043000015,
+        "access": 122.9894230000209,
+        "link": 1000.6066009999777,
+        "decide": 49.1392389999819
+      },
+      "checkedFiles": 2,
+      "checkedAccesses": 0,
+      "findings": 0,
+      "added": 0,
+      "removed": 0,
+      "audit": {
+        "equal": true,
+        "batchMs": 47377,
+        "differences": []
+      }
+    },
+    {
+      "step": "body edit",
+      "klass": "body",
+      "repetition": 2,
+      "path": "source",
+      "ms": 6483.916336000024,
+      "steps": {
+        "classify": 0.01973200001521036,
+        "snapshot": 45.80565400002524,
+        "catalog": 4963.183323999983,
+        "access": 55.408952999976464,
+        "link": 1140.9706570000271,
+        "decide": 58.72834699996747
+      },
+      "checkedFiles": 1,
+      "checkedAccesses": 1,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "body edit in place",
+      "klass": "body-in-place",
+      "repetition": 2,
+      "path": "unchanged-surface",
+      "ms": 5062.898210000014,
+      "steps": {
+        "classify": 0.03559899999527261,
+        "snapshot": 24.046979999984615,
+        "catalog": 4795.039426000032,
+        "access": 54.68525900004897
+      },
+      "checkedFiles": 1,
+      "checkedAccesses": 0,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "add an export",
+      "klass": "add-export",
+      "repetition": 2,
+      "path": "source",
+      "ms": 6213.359059999988,
+      "steps": {
+        "classify": 0.020703000016510487,
+        "snapshot": 25.105718999984674,
+        "catalog": 4823.025969000009,
+        "access": 106.30867699999362,
+        "link": 1012.495391000004,
+        "decide": 52.58488400001079
+      },
+      "checkedFiles": 2,
+      "checkedAccesses": 0,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "body edit",
+      "klass": "body",
+      "repetition": 3,
+      "path": "source",
+      "ms": 6423.012427999987,
+      "steps": {
+        "classify": 0.08357299998169765,
+        "snapshot": 28.42437500000233,
+        "catalog": 4998.074628999981,
+        "access": 50.568032999988645,
+        "link": 1086.1784660000121,
+        "decide": 71.46267400000943
+      },
+      "checkedFiles": 1,
+      "checkedAccesses": 1,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "body edit in place",
+      "klass": "body-in-place",
+      "repetition": 3,
+      "path": "unchanged-surface",
+      "ms": 5279.602124999976,
+      "steps": {
+        "classify": 0.033531000022776425,
+        "snapshot": 27.807526000018697,
+        "catalog": 4986.533915999986,
+        "access": 63.71577399998205
+      },
+      "checkedFiles": 1,
+      "checkedAccesses": 0,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "add an export",
+      "klass": "add-export",
+      "repetition": 3,
+      "path": "source",
+      "ms": 6286.187693999964,
+      "steps": {
+        "classify": 0.03000699996482581,
+        "snapshot": 23.007283000042662,
+        "catalog": 4858.555014999991,
+        "access": 108.90302700002212,
+        "link": 1066.2504610000178,
+        "decide": 51.53183200000785
+      },
+      "checkedFiles": 2,
+      "checkedAccesses": 0,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "root": "/tmp/worktrees/ramify-67e9dd0f/spike-fast-check-retained-session/examples/collection-review",
+  "iterations": 30,
+  "cycles": 200,
+  "socket": "/tmp/ramify-spike-hook-2299899.sock",
+  "node": "v22.23.2",
+  "ready": {
+    "ready": true,
+    "socket": "/tmp/ramify-spike-hook-2299899.sock",
+    "revision": 1,
+    "coldMs": 929,
+    "accesses": 294,
+    "pid": 2299917
+  },
+  "nodeStartupMs": 28.4,
+  "immediate": {
+    "samples": 30,
+    "medianMs": 130.5,
+    "p95Ms": 160.1,
+    "maxMs": 164,
+    "medianUpdateMs": 51.7,
+    "medianWaitedMs": 51.9
+  },
+  "settled": {
+    "samples": 30,
+    "medianMs": 78,
+    "p95Ms": 89.8,
+    "maxMs": 97.2,
+    "medianUpdateMs": 52.6,
+    "medianWaitedMs": 0.1
+  },
+  "cycleWallMs": {
+    "median": 133.5,
+    "p95": 149.9
+  },
+  "memory": {
+    "openSessionRss": 55.8046875,
+    "openCompilerRss": 112.9296875,
+    "sessionRss": 54.21484375,
+    "compilerRss": 128.87890625
+  },
+  "outcomes": {
+    "immediate": {
+      "checked/source/exit0": 1,
+      "checked/unchanged-surface/exit0": 29
+    },
+    "settled": {
+      "checked/unchanged-surface/exit0": 30
+    }
+  }
+}

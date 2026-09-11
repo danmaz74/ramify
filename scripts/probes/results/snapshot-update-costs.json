@@ -1,0 +1,226 @@
+{
+  "probe": "snapshot-update-costs",
+  "recordedAt": "2026-09-11T20:40:05.334Z",
+  "host": {
+    "hostname": "243168472f39",
+    "platform": "linux",
+    "arch": "x64",
+    "release": "6.8.0-85-generic",
+    "cpu": "Intel(R) Xeon(R) E-2176G CPU @ 3.70GHz"
+  },
+  "node": "v22.23.2",
+  "typescript": "7.0.2",
+  "scriptSha256": "2d9e1948e18ef62ca7b54234d4e4b4cdbdaa1f43d74bd0609ef584b85a63306a",
+  "commonSha256": "bddbe40e5d0e581a84daa10bd4141faa7f8946081ded5fc3feb37d6a2bf89fdd",
+  "repetitions": 5,
+  "method": "Virtual body insertion and added import; updateSnapshot plus previous snapshot disposal timed, source query outside timing. Created-file trials first notify creation without root regeneration, then regenerate explicit roots; cleanup between samples. invalidateAll uses unchanged disk. Acquisition and cold open excluded; no warmup discarded.",
+  "fixtures": [
+    {
+      "name": "R",
+      "root": "/tmp/worktrees/ramify-67e9dd0f/iteration-5-fast-incremental-checks/examples/collection-review",
+      "owners": 15,
+      "sourceFiles": 54,
+      "ownedContentSha256": "95c62810f748d46382977f16daa846523e11a595925035f94154908e038a32f4",
+      "configurationSha256": "4050f9725f7014705ef88b4b44b52ad185b02821b599bf7084e872728ed606e3",
+      "target": "src/assembly.ts",
+      "importSpecifier": "./interfaces/protocol.js",
+      "repetitions": 5,
+      "createdWithoutRegeneration": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "createdReferencedWithoutRegeneration": true,
+      "timing": {
+        "body": {
+          "samples": [
+            1.5960609999999633,
+            0.9253929999999855,
+            0.8848760000000766,
+            0.761019000000033,
+            0.699493000000075
+          ],
+          "medianMs": 0.8848760000000766,
+          "minMs": 0.699493000000075,
+          "maxMs": 1.5960609999999633
+        },
+        "importList": {
+          "samples": [
+            154.38496900000007,
+            153.28729900000008,
+            143.33654100000012,
+            142.21195800000032,
+            147.7680049999999
+          ],
+          "medianMs": 147.7680049999999,
+          "minMs": 142.21195800000032,
+          "maxMs": 154.38496900000007
+        },
+        "createdWithConfiguration": {
+          "samples": [
+            144.92162099999996,
+            142.8252070000001,
+            137.4938699999998,
+            152.04204299999992,
+            166.63792700000067
+          ],
+          "medianMs": 144.92162099999996,
+          "minMs": 137.4938699999998,
+          "maxMs": 166.63792700000067
+        },
+        "invalidateAll": {
+          "samples": [
+            276.98400400000014,
+            271.4379710000003,
+            280.64185599999973,
+            270.9863409999998,
+            326.03983099999914
+          ],
+          "medianMs": 276.98400400000014,
+          "minMs": 270.9863409999998,
+          "maxMs": 326.03983099999914
+        }
+      }
+    },
+    {
+      "name": "S100",
+      "root": "/tmp/worktrees/ramify-67e9dd0f/iteration-5-fast-incremental-checks/.reference-work/P5-S100",
+      "owners": 100,
+      "sourceFiles": 1100,
+      "ownedContentSha256": "daa8a2e190fee520df0ed2a0874519ebeacd7aac4238c2ac133bb374f7236c22",
+      "configurationSha256": "da0993c79f25dbbf3dea90e4cc0216dda47baf80d04fa9cc9e166c3aa6412bc9",
+      "target": "src/impl0.ts",
+      "importSpecifier": "./impl1.js",
+      "repetitions": 5,
+      "createdWithoutRegeneration": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "createdReferencedWithoutRegeneration": true,
+      "timing": {
+        "body": {
+          "samples": [
+            1.6137399999997797,
+            1.3645229999992807,
+            0.8870649999989837,
+            1.0469229999998788,
+            0.9345659999999043
+          ],
+          "medianMs": 1.0469229999998788,
+          "minMs": 0.8870649999989837,
+          "maxMs": 1.6137399999997797
+        },
+        "importList": {
+          "samples": [
+            124.28950499999974,
+            156.65782200000012,
+            132.52274000000034,
+            163.1873140000007,
+            143.68707499999982
+          ],
+          "medianMs": 143.68707499999982,
+          "minMs": 124.28950499999974,
+          "maxMs": 163.1873140000007
+        },
+        "createdWithConfiguration": {
+          "samples": [
+            146.9119040000005,
+            127.00673900000038,
+            146.78949400000056,
+            141.4055559999997,
+            163.65107999999964
+          ],
+          "medianMs": 146.78949400000056,
+          "minMs": 127.00673900000038,
+          "maxMs": 163.65107999999964
+        },
+        "invalidateAll": {
+          "samples": [
+            216.30997799999932,
+            223.2457400000003,
+            213.2551029999995,
+            194.0285649999987,
+            213.10989999999947
+          ],
+          "medianMs": 213.2551029999995,
+          "minMs": 194.0285649999987,
+          "maxMs": 223.2457400000003
+        }
+      }
+    },
+    {
+      "name": "S1000",
+      "root": "/tmp/worktrees/ramify-67e9dd0f/iteration-5-fast-incremental-checks/.reference-work/P5-S1000",
+      "owners": 1000,
+      "sourceFiles": 11000,
+      "ownedContentSha256": "6c7bbe1d5500935c1105f11efb0c4f03d58416d449f1f8126b8db65ba0392ae9",
+      "configurationSha256": "da0993c79f25dbbf3dea90e4cc0216dda47baf80d04fa9cc9e166c3aa6412bc9",
+      "target": "src/impl0.ts",
+      "importSpecifier": "./impl1.js",
+      "repetitions": 5,
+      "createdWithoutRegeneration": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "createdReferencedWithoutRegeneration": true,
+      "timing": {
+        "body": {
+          "samples": [
+            13.265588999998727,
+            11.713936999996804,
+            11.374534999995376,
+            23.344448000003467,
+            13.067243000004964
+          ],
+          "medianMs": 13.067243000004964,
+          "minMs": 11.374534999995376,
+          "maxMs": 23.344448000003467
+        },
+        "importList": {
+          "samples": [
+            1389.277768,
+            1476.6569249999993,
+            1424.4826079999984,
+            1512.0430409999972,
+            1482.267770999999
+          ],
+          "medianMs": 1476.6569249999993,
+          "minMs": 1389.277768,
+          "maxMs": 1512.0430409999972
+        },
+        "createdWithConfiguration": {
+          "samples": [
+            1547.1718440000004,
+            1504.2739560000045,
+            1432.0089230000012,
+            1563.5479429999978,
+            1537.540396000004
+          ],
+          "medianMs": 1537.540396000004,
+          "minMs": 1432.0089230000012,
+          "maxMs": 1563.5479429999978
+        },
+        "invalidateAll": {
+          "samples": [
+            1955.0039380000017,
+            1839.7292220000018,
+            1960.442256000002,
+            2102.3420409999962,
+            1915.564419000002
+          ],
+          "medianMs": 1955.0039380000017,
+          "minMs": 1839.7292220000018,
+          "maxMs": 2102.3420409999962
+        }
+      }
+    }
+  ]
+}

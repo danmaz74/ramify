@@ -1,0 +1,1321 @@
+{
+  "probe": "description-closure",
+  "recordedAt": "2026-09-11T20:53:33.015Z",
+  "host": {
+    "hostname": "243168472f39",
+    "platform": "linux",
+    "arch": "x64",
+    "release": "6.8.0-85-generic",
+    "cpu": "Intel(R) Xeon(R) E-2176G CPU @ 3.70GHz"
+  },
+  "node": "v22.23.2",
+  "typescript": "7.0.2",
+  "scriptSha256": "863a1fcb3a957face57648785ef79c15dac37facf062892a33ddb6eb3337a094",
+  "commonSha256": "bddbe40e5d0e581a84daa10bd4141faa7f8946081ded5fc3feb37d6a2bf89fdd",
+  "method": "Direct compiler AST scan of explicit star, named and namespace export declarations plus locally re-exported imported bindings; configured Resolution resolves each module target. Reverse transitive reach includes the changed file, counts all source files (including isolated ones). Three graph traversals; source scan once. This measures forwarding graph reach, not the future dynamic dependency recorder; shim/absence, type-inference and ambiguity dependencies need I5-03 closure-superset.",
+  "fixtures": [
+    {
+      "name": "R",
+      "root": "/tmp/worktrees/ramify-67e9dd0f/iteration-5-fast-incremental-checks/examples/collection-review",
+      "owners": 15,
+      "sourceFiles": 54,
+      "ownedContentSha256": "95c62810f748d46382977f16daa846523e11a595925035f94154908e038a32f4",
+      "configurationSha256": "4050f9725f7014705ef88b4b44b52ad185b02821b599bf7084e872728ed606e3",
+      "repetitions": 3,
+      "edgeCounts": {
+        "star": 0,
+        "forwarding": 1,
+        "namespace": 0
+      },
+      "edges": [
+        {
+          "from": "src/interfaces/protocol.ts",
+          "to": "src/assembly.ts",
+          "kind": "forwarding"
+        }
+      ],
+      "unresolved": [],
+      "medianClosure": 1,
+      "largestClosure": 2,
+      "p90Closure": 1,
+      "p99Closure": 2,
+      "top50": [
+        {
+          "file": "src/assembly.ts",
+          "size": 2
+        },
+        {
+          "file": "src/interfaces/protocol.ts",
+          "size": 1
+        },
+        {
+          "file": "src/main.ts",
+          "size": 1
+        },
+        {
+          "file": "src/protocol.ts",
+          "size": 1
+        },
+        {
+          "file": "src/server.ts",
+          "size": 1
+        },
+        {
+          "file": "src/tests/assembly.test.ts",
+          "size": 1
+        },
+        {
+          "file": "src/tests/http.test.ts",
+          "size": 1
+        },
+        {
+          "file": "src/tests/protocol-typing.test.ts",
+          "size": 1
+        },
+        {
+          "file": "src/tests/setup.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/integration-tests/src/steps/collection-review.steps.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/integration-tests/src/support/hooks.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/integration-tests/src/support/initialization.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/integration-tests/src/support/world.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/src/app.tsx",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/src/client.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/src/main.tsx",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/src/tests/shell.test.tsx",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/subs/catalog/src/mcp.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/subs/catalog/src/router.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/subs/catalog/src/tests/adapters.test.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/subs/catalog/subs/core/src/catalog.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/subs/catalog/subs/core/src/history.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/subs/catalog/subs/core/src/records.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/subs/catalog/subs/core/src/tests/catalog.test.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/subs/catalog/subs/core/src/tests/fixture.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/subs/catalog/subs/ui/src/catalog-card.tsx",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/subs/catalog/subs/ui/src/tests/catalog-card.test.tsx",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/subs/contracts/src/tests/vocabulary.test.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/subs/reviews/src/mcp.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/subs/reviews/src/router.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/subs/reviews/src/session.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/subs/reviews/src/tests/router.test.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/subs/reviews/src/tests/sessions.test.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/subs/reviews/src/tests/typing.test.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/subs/reviews/subs/core/src/interfaces/port.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/subs/reviews/subs/core/src/runtime.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/subs/reviews/subs/core/src/tests/runtime.test.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/subs/reviews/subs/core/subs/controller/src/controller.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/subs/reviews/subs/core/subs/controller/src/tests/controller.test.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/subs/reviews/subs/core/subs/tasks/src/inspection-task.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/subs/reviews/subs/core/subs/tasks/src/result.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/subs/reviews/subs/core/subs/tasks/src/tests/inspection-task.test.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/subs/reviews/subs/core/subs/tasks/src/tests/result.test.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/subs/reviews/subs/ui/src/review-panel.tsx",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/subs/reviews/subs/ui/src/tests/review-panel.test.tsx",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/format.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.tsx",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/tests/format.test.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/tests/review-result.test.tsx",
+          "size": 1
+        }
+      ],
+      "details": {
+        "path": ".reference-work/probe-details/description-closure/R.json",
+        "sha256": "a833d890fb97f93adcd3119fb1bd1f4a30355fb550e331e08fb5ec6d57364aa6"
+      },
+      "closureHistogram": {
+        "1": 53,
+        "2": 1
+      },
+      "timing": {
+        "samples": [
+          0.04896399999995538,
+          0.016210000000000946,
+          0.01670400000000427
+        ],
+        "medianMs": 0.01670400000000427,
+        "minMs": 0.016210000000000946,
+        "maxMs": 0.04896399999995538
+      }
+    },
+    {
+      "name": "T",
+      "root": "/tmp/worktrees/ramify-67e9dd0f/iteration-5-fast-incremental-checks",
+      "owners": 11,
+      "sourceFiles": 229,
+      "ownedContentSha256": "bf96ffa760c7ea6253fe2b5d3d7691e6c394d4adc68cc93ae42eafc0f8a4aaf1",
+      "configurationSha256": "ae19553773973b089ab4e4965380b5bc3f7c0c607084a3e5a1db13c88690e2e4",
+      "repetitions": 3,
+      "edgeCounts": {
+        "star": 13,
+        "forwarding": 54,
+        "namespace": 0
+      },
+      "edges": [
+        {
+          "from": "subs/analysis/src/index.ts",
+          "to": "subs/analysis/src/session.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/analysis/src/index.ts",
+          "to": "subs/analysis/src/analyze-project.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/analysis/src/index.ts",
+          "to": "subs/analysis/src/validation.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/analysis/src/index.ts",
+          "to": "subs/analysis/src/inventory.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/analysis/src/index.ts",
+          "to": "subs/analysis/src/interfaces/analysis.ts",
+          "kind": "star"
+        },
+        {
+          "from": "subs/analysis/src/index.ts",
+          "to": "subs/analysis/subs/model/src/interfaces/model.ts",
+          "kind": "star"
+        },
+        {
+          "from": "subs/analysis/src/index.ts",
+          "to": "subs/analysis/subs/descriptions/src/interfaces/syntax.ts",
+          "kind": "star"
+        },
+        {
+          "from": "subs/analysis/src/index.ts",
+          "to": "subs/analysis/subs/descriptions/src/interfaces/linking.ts",
+          "kind": "star"
+        },
+        {
+          "from": "subs/analysis/src/index.ts",
+          "to": "subs/analysis/subs/project/src/interfaces/project.ts",
+          "kind": "star"
+        },
+        {
+          "from": "subs/analysis/src/index.ts",
+          "to": "subs/analysis/subs/typescript/src/interfaces/source.ts",
+          "kind": "star"
+        },
+        {
+          "from": "subs/analysis/src/index.ts",
+          "to": "subs/analysis/src/increment.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/analysis/src/index.ts",
+          "to": "subs/analysis/src/resolve-project.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/analysis/src/inventory-entry.ts",
+          "to": "subs/analysis/src/inventory.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/analysis/src/inventory-entry.ts",
+          "to": "subs/analysis/src/interfaces/analysis.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/analysis/src/inventory-entry.ts",
+          "to": "subs/analysis/subs/model/src/interfaces/model.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/analysis/src/inventory-entry.ts",
+          "to": "subs/analysis/subs/project/src/interfaces/project.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/analysis/src/validation-entry.ts",
+          "to": "subs/analysis/src/validation.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/analysis/src/validation-entry.ts",
+          "to": "subs/analysis/src/interfaces/analysis.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/analysis/src/validation-entry.ts",
+          "to": "subs/analysis/subs/descriptions/src/interfaces/linking.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/analysis/src/validation-entry.ts",
+          "to": "subs/analysis/subs/project/src/interfaces/project.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/analysis/src/validation-entry.ts",
+          "to": "subs/analysis/subs/typescript/src/interfaces/source.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/analysis/subs/model/src/index.ts",
+          "to": "subs/analysis/subs/model/src/interfaces/model.ts",
+          "kind": "star"
+        },
+        {
+          "from": "subs/analysis/subs/model/src/index.ts",
+          "to": "subs/analysis/subs/model/src/registry.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/analysis/subs/model/src/index.ts",
+          "to": "subs/analysis/subs/model/src/profiles.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/analysis/subs/model/src/index.ts",
+          "to": "subs/analysis/subs/model/src/identity.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/analysis/subs/model/src/index.ts",
+          "to": "subs/analysis/subs/model/src/model.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/analysis/subs/model/src/index.ts",
+          "to": "subs/analysis/subs/model/src/decisions.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/cli/src/index.ts",
+          "to": "subs/cli/src/run-cli.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/cli/src/index.ts",
+          "to": "subs/cli/src/interfaces/cli.ts",
+          "kind": "star"
+        },
+        {
+          "from": "subs/daemon/src/client-entry.ts",
+          "to": "subs/daemon/src/connect-daemon.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/daemon/src/client-entry.ts",
+          "to": "subs/daemon/src/discovery.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/daemon/src/client-entry.ts",
+          "to": "subs/daemon/src/codec.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/daemon/src/client-entry.ts",
+          "to": "subs/daemon/src/interfaces/daemon.ts",
+          "kind": "star"
+        },
+        {
+          "from": "subs/daemon/src/client-entry.ts",
+          "to": "subs/daemon/src/context-types.ts",
+          "kind": "star"
+        },
+        {
+          "from": "subs/daemon/src/client-entry.ts",
+          "to": "src/interfaces/service.ts",
+          "kind": "star"
+        },
+        {
+          "from": "subs/daemon/src/context-types.ts",
+          "to": "subs/daemon/subs/contexts/src/interfaces/contexts.ts",
+          "kind": "star"
+        },
+        {
+          "from": "subs/presentation/src/index.ts",
+          "to": "subs/presentation/src/ModelDiagram.tsx",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/presentation/src/index.ts",
+          "to": "subs/presentation/src/ModelDiagram.tsx",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/presentation/src/index.ts",
+          "to": "subs/presentation/src/TreeDiagram.tsx",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/presentation/src/index.ts",
+          "to": "subs/presentation/src/TreeDiagram.tsx",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/presentation/src/index.ts",
+          "to": "subs/presentation/src/FocusDiagram.tsx",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/presentation/src/index.ts",
+          "to": "subs/presentation/src/FocusDiagram.tsx",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/presentation/src/index.ts",
+          "to": "subs/presentation/src/diagram-definition.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/presentation/src/index.ts",
+          "to": "subs/presentation/src/diagram-definition.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/presentation/src/index.ts",
+          "to": "subs/presentation/src/tree-diagram.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/presentation/src/index.ts",
+          "to": "subs/presentation/src/focus-diagram.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/presentation/src/index.ts",
+          "to": "subs/presentation/src/diagrams/shop.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/presentation/src/index.ts",
+          "to": "subs/presentation/src/diagrams/example1.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/presentation/src/index.ts",
+          "to": "subs/presentation/src/diagrams/example1a.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/presentation/src/index.ts",
+          "to": "subs/presentation/src/diagrams/example1b.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/presentation/src/index.ts",
+          "to": "subs/presentation/src/diagrams/example2.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/presentation/src/index.ts",
+          "to": "subs/presentation/src/diagrams/example3.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/presentation/src/index.ts",
+          "to": "subs/presentation/src/diagrams/example4.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/presentation/src/index.ts",
+          "to": "subs/presentation/src/diagrams/shop-tree.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/presentation/src/index.ts",
+          "to": "subs/presentation/src/layout.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/presentation/src/index.ts",
+          "to": "subs/presentation/src/layout.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/presentation/src/model-access.ts",
+          "to": "subs/analysis/subs/model/src/index.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/presentation/subs/layout/src/index.ts",
+          "to": "subs/presentation/subs/layout/src/interfaces/layout.ts",
+          "kind": "star"
+        },
+        {
+          "from": "subs/presentation/subs/layout/src/index.ts",
+          "to": "subs/presentation/subs/layout/src/node-placement.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/presentation/subs/layout/src/index.ts",
+          "to": "subs/presentation/subs/layout/src/lane-placement.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/presentation/subs/layout/src/index.ts",
+          "to": "subs/presentation/subs/layout/src/chord-placement.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/presentation/subs/layout/src/index.ts",
+          "to": "subs/presentation/subs/layout/src/legend-placement.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/presentation/subs/layout/src/index.ts",
+          "to": "subs/presentation/subs/layout/src/tree-placement.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/presentation/subs/layout/src/index.ts",
+          "to": "subs/presentation/subs/layout/src/focus-placement.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/presentation/subs/layout/src/index.ts",
+          "to": "subs/presentation/subs/layout/src/bounds.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/presentation/subs/layout/src/index.ts",
+          "to": "subs/presentation/subs/layout/src/geometry.ts",
+          "kind": "forwarding"
+        },
+        {
+          "from": "subs/presentation/subs/layout/src/index.ts",
+          "to": "subs/presentation/subs/layout/src/viewport.ts",
+          "kind": "forwarding"
+        }
+      ],
+      "unresolved": [],
+      "medianClosure": 1,
+      "largestClosure": 5,
+      "p90Closure": 2,
+      "p99Closure": 4,
+      "top50": [
+        {
+          "file": "subs/analysis/subs/model/src/interfaces/model.ts",
+          "size": 5
+        },
+        {
+          "file": "subs/analysis/src/interfaces/analysis.ts",
+          "size": 4
+        },
+        {
+          "file": "subs/analysis/subs/project/src/interfaces/project.ts",
+          "size": 4
+        },
+        {
+          "file": "subs/analysis/src/inventory.ts",
+          "size": 3
+        },
+        {
+          "file": "subs/analysis/src/validation.ts",
+          "size": 3
+        },
+        {
+          "file": "subs/analysis/subs/descriptions/src/interfaces/linking.ts",
+          "size": 3
+        },
+        {
+          "file": "subs/analysis/subs/model/src/decisions.ts",
+          "size": 3
+        },
+        {
+          "file": "subs/analysis/subs/model/src/identity.ts",
+          "size": 3
+        },
+        {
+          "file": "subs/analysis/subs/model/src/model.ts",
+          "size": 3
+        },
+        {
+          "file": "subs/analysis/subs/model/src/profiles.ts",
+          "size": 3
+        },
+        {
+          "file": "subs/analysis/subs/model/src/registry.ts",
+          "size": 3
+        },
+        {
+          "file": "subs/analysis/subs/typescript/src/interfaces/source.ts",
+          "size": 3
+        },
+        {
+          "file": "subs/daemon/subs/contexts/src/interfaces/contexts.ts",
+          "size": 3
+        },
+        {
+          "file": "src/interfaces/service.ts",
+          "size": 2
+        },
+        {
+          "file": "subs/analysis/src/analyze-project.ts",
+          "size": 2
+        },
+        {
+          "file": "subs/analysis/src/increment.ts",
+          "size": 2
+        },
+        {
+          "file": "subs/analysis/src/resolve-project.ts",
+          "size": 2
+        },
+        {
+          "file": "subs/analysis/src/session.ts",
+          "size": 2
+        },
+        {
+          "file": "subs/analysis/subs/descriptions/src/interfaces/syntax.ts",
+          "size": 2
+        },
+        {
+          "file": "subs/analysis/subs/model/src/index.ts",
+          "size": 2
+        },
+        {
+          "file": "subs/cli/src/interfaces/cli.ts",
+          "size": 2
+        },
+        {
+          "file": "subs/cli/src/run-cli.ts",
+          "size": 2
+        },
+        {
+          "file": "subs/daemon/src/codec.ts",
+          "size": 2
+        },
+        {
+          "file": "subs/daemon/src/connect-daemon.ts",
+          "size": 2
+        },
+        {
+          "file": "subs/daemon/src/context-types.ts",
+          "size": 2
+        },
+        {
+          "file": "subs/daemon/src/discovery.ts",
+          "size": 2
+        },
+        {
+          "file": "subs/daemon/src/interfaces/daemon.ts",
+          "size": 2
+        },
+        {
+          "file": "subs/presentation/src/FocusDiagram.tsx",
+          "size": 2
+        },
+        {
+          "file": "subs/presentation/src/ModelDiagram.tsx",
+          "size": 2
+        },
+        {
+          "file": "subs/presentation/src/TreeDiagram.tsx",
+          "size": 2
+        },
+        {
+          "file": "subs/presentation/src/diagram-definition.ts",
+          "size": 2
+        },
+        {
+          "file": "subs/presentation/src/diagrams/example1.ts",
+          "size": 2
+        },
+        {
+          "file": "subs/presentation/src/diagrams/example1a.ts",
+          "size": 2
+        },
+        {
+          "file": "subs/presentation/src/diagrams/example1b.ts",
+          "size": 2
+        },
+        {
+          "file": "subs/presentation/src/diagrams/example2.ts",
+          "size": 2
+        },
+        {
+          "file": "subs/presentation/src/diagrams/example3.ts",
+          "size": 2
+        },
+        {
+          "file": "subs/presentation/src/diagrams/example4.ts",
+          "size": 2
+        },
+        {
+          "file": "subs/presentation/src/diagrams/shop-tree.ts",
+          "size": 2
+        },
+        {
+          "file": "subs/presentation/src/diagrams/shop.ts",
+          "size": 2
+        },
+        {
+          "file": "subs/presentation/src/focus-diagram.ts",
+          "size": 2
+        },
+        {
+          "file": "subs/presentation/src/layout.ts",
+          "size": 2
+        },
+        {
+          "file": "subs/presentation/src/tree-diagram.ts",
+          "size": 2
+        },
+        {
+          "file": "subs/presentation/subs/layout/src/bounds.ts",
+          "size": 2
+        },
+        {
+          "file": "subs/presentation/subs/layout/src/chord-placement.ts",
+          "size": 2
+        },
+        {
+          "file": "subs/presentation/subs/layout/src/focus-placement.ts",
+          "size": 2
+        },
+        {
+          "file": "subs/presentation/subs/layout/src/geometry.ts",
+          "size": 2
+        },
+        {
+          "file": "subs/presentation/subs/layout/src/interfaces/layout.ts",
+          "size": 2
+        },
+        {
+          "file": "subs/presentation/subs/layout/src/lane-placement.ts",
+          "size": 2
+        },
+        {
+          "file": "subs/presentation/subs/layout/src/legend-placement.ts",
+          "size": 2
+        },
+        {
+          "file": "subs/presentation/subs/layout/src/node-placement.ts",
+          "size": 2
+        }
+      ],
+      "details": {
+        "path": ".reference-work/probe-details/description-closure/T.json",
+        "sha256": "d77c586eda903eeda4d8a2a8f74e12cae24be2327f4bd72bef8a7e1ef145403b"
+      },
+      "closureHistogram": {
+        "1": 177,
+        "2": 39,
+        "3": 10,
+        "4": 2,
+        "5": 1
+      },
+      "timing": {
+        "samples": [
+          0.07954500000005282,
+          0.0723480000001473,
+          0.07248600000002625
+        ],
+        "medianMs": 0.07248600000002625,
+        "minMs": 0.0723480000001473,
+        "maxMs": 0.07954500000005282
+      }
+    },
+    {
+      "name": "S100",
+      "root": "/tmp/worktrees/ramify-67e9dd0f/iteration-5-fast-incremental-checks/.reference-work/P5-S100",
+      "owners": 100,
+      "sourceFiles": 1100,
+      "ownedContentSha256": "daa8a2e190fee520df0ed2a0874519ebeacd7aac4238c2ac133bb374f7236c22",
+      "configurationSha256": "da0993c79f25dbbf3dea90e4cc0216dda47baf80d04fa9cc9e166c3aa6412bc9",
+      "repetitions": 3,
+      "edgeCounts": {
+        "star": 0,
+        "forwarding": 0,
+        "namespace": 0
+      },
+      "edges": [],
+      "unresolved": [],
+      "medianClosure": 1,
+      "largestClosure": 1,
+      "p90Closure": 1,
+      "p99Closure": 1,
+      "top50": [
+        {
+          "file": "src/impl0.ts",
+          "size": 1
+        },
+        {
+          "file": "src/impl1.ts",
+          "size": 1
+        },
+        {
+          "file": "src/impl2.ts",
+          "size": 1
+        },
+        {
+          "file": "src/impl3.ts",
+          "size": 1
+        },
+        {
+          "file": "src/impl4.ts",
+          "size": 1
+        },
+        {
+          "file": "src/impl5.ts",
+          "size": 1
+        },
+        {
+          "file": "src/impl6.ts",
+          "size": 1
+        },
+        {
+          "file": "src/impl7.ts",
+          "size": 1
+        },
+        {
+          "file": "src/impl8.ts",
+          "size": 1
+        },
+        {
+          "file": "src/interfaces/api.ts",
+          "size": 1
+        },
+        {
+          "file": "src/tests/impl.test.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m001/src/impl0.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m001/src/impl1.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m001/src/impl2.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m001/src/impl3.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m001/src/impl4.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m001/src/impl5.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m001/src/impl6.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m001/src/impl7.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m001/src/impl8.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m001/src/interfaces/api.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m001/src/tests/impl.test.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m002/src/impl0.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m002/src/impl1.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m002/src/impl2.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m002/src/impl3.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m002/src/impl4.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m002/src/impl5.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m002/src/impl6.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m002/src/impl7.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m002/src/impl8.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m002/src/interfaces/api.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m002/src/tests/impl.test.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m003/src/impl0.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m003/src/impl1.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m003/src/impl2.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m003/src/impl3.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m003/src/impl4.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m003/src/impl5.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m003/src/impl6.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m003/src/impl7.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m003/src/impl8.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m003/src/interfaces/api.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m003/src/tests/impl.test.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m004/src/impl0.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m004/src/impl1.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m004/src/impl2.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m004/src/impl3.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m004/src/impl4.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m004/src/impl5.ts",
+          "size": 1
+        }
+      ],
+      "details": {
+        "path": ".reference-work/probe-details/description-closure/S100.json",
+        "sha256": "c4e5ba63dd6501e6802efe649e62b6f17a187213fbbb456604b3dce7be0efd4d"
+      },
+      "closureHistogram": {
+        "1": 1100
+      },
+      "timing": {
+        "samples": [
+          0.31374200000027486,
+          0.29189499999984037,
+          0.2842160000000149
+        ],
+        "medianMs": 0.29189499999984037,
+        "minMs": 0.2842160000000149,
+        "maxMs": 0.31374200000027486
+      }
+    },
+    {
+      "name": "S1000",
+      "root": "/tmp/worktrees/ramify-67e9dd0f/iteration-5-fast-incremental-checks/.reference-work/P5-S1000",
+      "owners": 1000,
+      "sourceFiles": 11000,
+      "ownedContentSha256": "6c7bbe1d5500935c1105f11efb0c4f03d58416d449f1f8126b8db65ba0392ae9",
+      "configurationSha256": "da0993c79f25dbbf3dea90e4cc0216dda47baf80d04fa9cc9e166c3aa6412bc9",
+      "repetitions": 3,
+      "edgeCounts": {
+        "star": 0,
+        "forwarding": 0,
+        "namespace": 0
+      },
+      "edges": [],
+      "unresolved": [],
+      "medianClosure": 1,
+      "largestClosure": 1,
+      "p90Closure": 1,
+      "p99Closure": 1,
+      "top50": [
+        {
+          "file": "src/impl0.ts",
+          "size": 1
+        },
+        {
+          "file": "src/impl1.ts",
+          "size": 1
+        },
+        {
+          "file": "src/impl2.ts",
+          "size": 1
+        },
+        {
+          "file": "src/impl3.ts",
+          "size": 1
+        },
+        {
+          "file": "src/impl4.ts",
+          "size": 1
+        },
+        {
+          "file": "src/impl5.ts",
+          "size": 1
+        },
+        {
+          "file": "src/impl6.ts",
+          "size": 1
+        },
+        {
+          "file": "src/impl7.ts",
+          "size": 1
+        },
+        {
+          "file": "src/impl8.ts",
+          "size": 1
+        },
+        {
+          "file": "src/interfaces/api.ts",
+          "size": 1
+        },
+        {
+          "file": "src/tests/impl.test.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m001/src/impl0.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m001/src/impl1.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m001/src/impl2.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m001/src/impl3.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m001/src/impl4.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m001/src/impl5.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m001/src/impl6.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m001/src/impl7.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m001/src/impl8.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m001/src/interfaces/api.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m001/src/tests/impl.test.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m002/src/impl0.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m002/src/impl1.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m002/src/impl2.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m002/src/impl3.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m002/src/impl4.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m002/src/impl5.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m002/src/impl6.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m002/src/impl7.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m002/src/impl8.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m002/src/interfaces/api.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m002/src/tests/impl.test.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m003/src/impl0.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m003/src/impl1.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m003/src/impl2.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m003/src/impl3.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m003/src/impl4.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m003/src/impl5.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m003/src/impl6.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m003/src/impl7.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m003/src/impl8.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m003/src/interfaces/api.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m003/src/tests/impl.test.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m004/src/impl0.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m004/src/impl1.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m004/src/impl2.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m004/src/impl3.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m004/src/impl4.ts",
+          "size": 1
+        },
+        {
+          "file": "subs/m004/src/impl5.ts",
+          "size": 1
+        }
+      ],
+      "details": {
+        "path": ".reference-work/probe-details/description-closure/S1000.json",
+        "sha256": "4ad35bb6fa14de7eb8944ed8fcf4704f99238faae8486f80967a11c928e7614e"
+      },
+      "closureHistogram": {
+        "1": 11000
+      },
+      "timing": {
+        "samples": [
+          1.6697510000012699,
+          3.31770300000062,
+          1.3707240000003367
+        ],
+        "medianMs": 1.6697510000012699,
+        "minMs": 1.3707240000003367,
+        "maxMs": 3.31770300000062
+      }
+    }
+  ]
+}

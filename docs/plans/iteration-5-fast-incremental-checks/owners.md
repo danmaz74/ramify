@@ -1,20 +1,29 @@
 # Plan 5 owners, declarations and placement
 
-**Prepared:** 2026-09-11. **State:** draft review package for
-[Plan 5](main-plan.md); iteration 1 accepts it or records its revision. These
-are the required final declaration texts and the source and test placement the
-retained session adds or removes. Implementation and acceptance evidence are
-verified separately by the gates. [contracts.md](contracts.md) holds the exact
-signatures and wire schemas, [scope.md](scope.md) the lifecycle decisions and
-[subcases.md](subcases.md) the executable instances. The definitive
+**Prepared:** 2026-09-11. **Reviewed and revised:** 2026-09-11. **State:**
+manual declaration review passed with the revisions below; RP-4 and RP-6
+await the user's acceptance for [Plan 5](main-plan.md); implementation
+remains gated on package acceptance. These are the required final
+declaration texts and the source and test placement the retained session
+adds or removes. Implementation and acceptance evidence are verified
+separately by the gates. [contracts.md](contracts.md) holds the exact
+signatures and wire schemas, [scope.md](scope.md) the lifecycle decisions
+and [subcases.md](subcases.md) the executable instances. The definitive
 [description principles](../../model/module-description.principles.md) and
 [importability principles](../../model/cross-module-importability.principles.md)
 remain authoritative. Plan 1's nine declarations and Plan 2's eleven-owner
 completion are the implemented starting point:
 [Plan 1 owners](../done/iteration-1-project-verifier/owners.md) and
-[Plan 2 owners](../done/iteration-2-resident-verification/owners.md). The texts
-below repeat an owner in full where this plan changes it and mark the owners
-it leaves untouched.
+[Plan 2 owners](../done/iteration-2-resident-verification/owners.md). The
+texts below repeat an owner in full where this plan changes it and mark the
+owners it leaves untouched.
+
+This manifest governs ownership where the frozen main plan differs:
+`CheckDocument` (`ramify.check/1`) belongs to CLI, not root.
+The corresponding main-plan text is revised by the exact patch preserved in
+[iteration results](iterations/iteration1-results.md#publication-policy-and-preserved-main-plan-revision).
+Applying it remains pending a plan revision; iteration drafts cannot edit
+main-plan.md.
 
 No owner is added: the eleven-owner tree stands, and every edge is a physical
 `subs/` edge. The session worker is a source file of `analysis`, the way
@@ -266,10 +275,12 @@ expose-src createRetainedSourceAnalysis from "retained-source-analysis.ts" to pa
 ```
 
 T1 and T2 are unchanged. T3, T4 and T5 are new in iterations 2, 3 and 5.
-Analysis names `createRetainedSourceAnalysis` to open the session's adapter,
-`assembleCatalog` to project a report from the descriptions the session
-retains, and `describeFiles` and `createAccessInterpreter` in the audit that
-recomputes from the warm compiler. `interfaces/source.ts` gains
+Analysis names `createRetainedSourceAnalysis` to open the session's adapter
+and `assembleCatalog` to project a report. Its audit uses the adapter's
+`describe` and `interpreter` ports. The standalone `describeFiles` and
+`createAccessInterpreter` factories take `SourceAnalysisInputs` and own finite
+compiler lifetimes; compiler-bearing constructors stay private to typescript.
+No `Project`, `CatalogHost` or runtime map crosses this exposure. `interfaces/source.ts` gains
 `AccessInterpreter` (iteration 2), `DescriptionDependencies`,
 `FileDescription` and `CatalogDelta` (iteration 3) and `SourceChangeSet`,
 `RetainedSourceInputs` and `RetainedSourceAnalysis` (iteration 5) inside the
@@ -433,12 +444,12 @@ preserves the original owner and tags.
 | Consumer | Foreign originals it names | Named exposure path | Form and tags |
 | --- | --- | --- | --- |
 | TypeScript | `ObservationSink` in `interfaces/source.ts` and `src/retained-source-analysis.ts`, beside the `ProjectInventory`, `InventoryFile` and `SourceArea` it names today | project P2 → analysis A7 → descendants | Type `[]`. |
-| Analysis | `FileDescription`, `DescriptionDependencies`, `CatalogDelta`, `AccessInterpreter`, `SourceChangeSet`, `RetainedSourceInputs`, `RetainedSourceAnalysis`, `createRetainedSourceAnalysis`, `describeFiles`, `assembleCatalog`, `createAccessInterpreter` | typescript T2 to T5 → analysis | Types `[]`; values `[]`. |
+| Analysis | `SourceAnalysisInputs` through existing A8, `FileDescription`, `DescriptionDependencies`, `CatalogDelta`, `AccessInterpreter`, `SourceChangeSet`, `RetainedSourceInputs`, `RetainedSourceAnalysis`, `createRetainedSourceAnalysis`, `describeFiles`, `assembleCatalog`, `createAccessInterpreter` | typescript T2 to T5 → analysis | Types `[]`; values `[]`. |
 | Analysis | `ProjectObserver`, `ObservedChange`, `InventoryUpdate`, `ProjectObserve`, `ObservationSink`, `observeProject` | project P2, P4 → analysis | Types `[]`; value `[]`. |
 | Contexts | `SessionOpen`, `RetainedSession`, `SessionRevision`, `SessionUpdate`, `SessionStatus`, `SessionChange`, `CheckedSet`, `FindingDelta`, `RevisionTimings`, `RevisionPath`, `VerifyOutcome`, `ObservedChange`; never `SessionInputs` or `SessionLimits`, because the driver supplies them | analysis A11 → root R3 → descendants; project P2 → analysis A7 → root R4 → descendants | Type imports `[]`; no engine value. |
 | Daemon | `CheckDelta` in `interfaces/daemon.ts` and `service.ts` validation | contexts X2 → daemon N5 | Type `[]` into daemon `[dispatch]`. |
 | Root assembly | `openRetainedSession`, `SessionInputs`, `SessionLimits`, `SessionOpen`, `RetainedSession`, `resolveProject`, `createDefaultTagRegistry` | analysis A9, A11, A12, A5 → root | Values `[]` and `[browser]`; root has no required-symbol constraint. |
-| CLI | `CheckDelta`, `CheckedSet`, `RevisionPath`, `RevisionTimings`, `RevisionId`, `AnalysisDiagnostic` in `interfaces/cli.ts` and `check-command.ts` | daemon N5 → root R7 → descendants; analysis A11 → root R3 → descendants | Dispatch types into CLI `[dispatch]`; untagged types freely. No engine or daemon value import. |
+| CLI | `CheckDelta`, `RevisionId`; `CheckedSet`, `RevisionPath`, `RevisionTimings`; `AnalysisDiagnostic` in `interfaces/cli.ts` and `check-command.ts` | contexts X2 → daemon N5 → root R7 → descendants; analysis A11 → root R3 → descendants; analysis A4 → root R3 → descendants, respectively | These originals are types `[]`; CLI `[dispatch]` is compatible. No engine or daemon value import. |
 | Harness, probes and measurement scripts | Owner source they import directly, as Plan 1 and Plan 2 do | Separate compiler scopes | Package access and script scopes are not internal exposure. |
 
 Node's `Worker`, `MessagePort` and `ChildProcess` stay external vocabulary
@@ -453,7 +464,7 @@ wrapped by owned public types: the worker boundary is invisible to a caller of
 | 2 | model | None; indexed lookups sit behind M5 and M6 with no name change. |
 | 3 | typescript | T4 activated with `describeFiles` and `assembleCatalog`; `DescriptionDependencies`, `FileDescription` and `CatalogDelta` join the T2 wildcard. |
 | 4 | project | P4 activated with `observeProject`; `ObservationSink`, `InputChangeKind`, `ObservedChange`, `InventoryUpdate`, `ProjectObserver` and `ProjectObserve` join the P2 wildcard. |
-| 4 | analysis | A7 extended with the same six names, so root relays them and `typescript` receives the sink its adapter reports to. |
+| 4 | analysis | A7 extended with the same six names; `typescript` receives the sink in 4. Root adds its five observer relays in 9 and never relays the sink. |
 | 5 | typescript | T5 activated with `createRetainedSourceAnalysis`; `SourceChangeSet`, `RetainedSourceInputs` and `RetainedSourceAnalysis` join the T2 wildcard. |
 | 6 | analysis | A11 activated with `interfaces/session.ts`; A12 activated with `openRetainedSession`. |
 | 7 | analysis | None; the description, metadata and broad paths, positions and `verify` complete the A11 vocabulary. |
@@ -473,12 +484,30 @@ wrapped by owned public types: the worker boundary is invisible to a caller of
 | Review obligation | Review finding, 2026-09-11 |
 | --- | --- |
 | Valid physical boundaries | No owner is added or moved; every description stays beside its owner's `src/`, and the new source files are ordinary `src/` files of their owners. |
-| Exact paths and real staged exports | Each of the six new lines is an `expose-src` naming one explicit `.ts` file relative to `src/`: `access-interpreter.ts`, `descriptions.ts`, `retained-source-analysis.ts`, `observer.ts`, `interfaces/session.ts` and `retained-session.ts`. The activation manifest pairs each with the iteration that implements its export. |
+| Exact paths and real staged exports | Compared with all eleven current `module.ramify` files. Each of the six new lines is an `expose-src` naming one explicit `.ts` file relative to `src/`: `access-interpreter.ts`, `descriptions.ts`, `retained-source-analysis.ts`, `observer.ts`, `interfaces/session.ts` and `retained-session.ts`. The activation manifest pairs each with the iteration that implements its export. They are absent today, as expected; this is a review of future declarations, not a claim that their exports already exist. |
 | Owned wildcards select only owned originals | `interfaces/session.ts` contains locally defined types only; its foreign imports are `import type` and are never re-exported. The same holds for `interfaces/source.ts`, `interfaces/project.ts`, `interfaces/contexts.ts`, `interfaces/service.ts` and `interfaces/cli.ts`. |
 | Foreign signatures need independent paths | The foreign signature table names every foreign type each consumer adds; A7, A11, R3, R4, R7 and N5 enumerate them. |
 | Expose-sub names direct children and complete hops | A7 names `project`, a direct child, and reaches `typescript` through analysis alone, which is the path `ProjectInventory` and `InventoryFile` already take. No statement names a grandchild or a sibling. |
-| Exposure and availability remain separate | Contexts receives the session vocabulary through root R3 and names it; it still cannot import an analysis value, because the session handle arrives through the driver port. |
+| Exposure and availability remain separate | Contexts receives types through root R3; no analysis engine operation is relayed there. It invokes the injected session port without importing an engine operation. |
 | Mandatory tags | Every new value defaults to its owner's header tags: typescript, project and analysis values `[]`; no new line uses `tagged`. `ObservationSink` is a type and carries no promise. |
 | Profile derivation and testing origin | Every new test lives in its owner's `src/tests/`, whose profile is the owner's header tags plus `testing`. No test needs a tag its owner does not declare, so no testing module under `subs/` is required. |
 | Names, destinations and collisions | Each added name has one original: `CheckDelta` is contexts', `CheckedSet` and `RevisionTimings` are analysis', `ObservationSink` and `ObservedChange` are project's. `SessionChange` is analysis' alias of `ObservedChange` and is relayed separately. |
 | Empty and growth semantics | Adding an export to `interfaces/source.ts`, `interfaces/project.ts`, `interfaces/analysis.ts`, `interfaces/contexts.ts`, `interfaces/service.ts` or `interfaces/cli.ts` deliberately expands that wildcard contract, which is why every addition is listed here with its iteration. |
+
+## Iteration 1 review revisions
+
+All existing declaration names and paths were compared read-only with the eleven
+real files: root R1–R8, analysis A1–A9, project P1–P3, typescript T1–T2,
+daemon N1–N5, contexts X1–X3, CLI C1–C2 and the four unchanged owners. The six
+added lines are T3, T4, T5, P4, A11 and A12; only A11 uses `*`, beneath the
+owner's `src/interfaces/`. A9's increment line is the sole deletion. Revised
+relay lists A7, R3, project R4, N5 and R7 preserve direct-child paths and tags.
+
+The review corrected A7's staging prose (root receives its new explicit relay
+in 9), the CLI foreign-type paths, and the compiler-bearing factory signatures
+in contracts.md. All names in the new signature fragments have an explicit
+owned or relayed type path. `ObservationSink.probe`, asynchronous interpreter
+disposal and historical report/release methods add members to existing owned
+types, not new exposure lines. Interface wildcards must contain locally
+defined originals; their foreign signature imports are not re-exported.
+No real declaration, source export or package entry was changed in iteration 1.

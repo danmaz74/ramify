@@ -1,0 +1,2817 @@
+{
+  "fixture": "reference",
+  "root": "examples/collection-review",
+  "repeats": 10,
+  "auditMode": "first",
+  "node": "v22.23.2",
+  "summary": {
+    "programFiles": 817,
+    "accesses": 294,
+    "originals": 89,
+    "sourceFiles": 54,
+    "owners": 15,
+    "observations": 170
+  },
+  "coldMedianMs": 781.4,
+  "coldSteps": {
+    "acquire": 244.5,
+    "compiler": 285.6,
+    "catalog": 129.4,
+    "access": 87,
+    "link": 20.8,
+    "decide": 13.6
+  },
+  "byClass": [
+    {
+      "klass": "cold",
+      "name": "cold open",
+      "samples": 1,
+      "path": "cold",
+      "medianMs": 1067.7,
+      "minMs": 1067.7,
+      "maxMs": 1067.7,
+      "steps": {
+        "acquire": 303.4,
+        "compiler": 329.8,
+        "catalog": 199.4,
+        "access": 153.4,
+        "link": 49.6,
+        "decide": 27.3
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 294,
+      "findings": 0,
+      "audits": 1,
+      "auditsEqual": 1,
+      "expectationFailures": []
+    },
+    {
+      "klass": "body",
+      "name": "body edit",
+      "samples": 10,
+      "path": "source",
+      "medianMs": 78.6,
+      "minMs": 57.8,
+      "maxMs": 120.6,
+      "steps": {
+        "classify": 0,
+        "snapshot": 2,
+        "catalog": 49.1,
+        "access": 0.7,
+        "link": 20.2,
+        "decide": 1.1
+      },
+      "checkedFiles": 1,
+      "checkedAccesses": 2,
+      "findings": 0,
+      "audits": 2,
+      "auditsEqual": 2,
+      "expectationFailures": []
+    },
+    {
+      "klass": "body-in-place",
+      "name": "body edit in place",
+      "samples": 10,
+      "path": "unchanged-surface",
+      "medianMs": 58.7,
+      "minMs": 44.8,
+      "maxMs": 82.3,
+      "steps": {
+        "classify": 0,
+        "snapshot": 1.8,
+        "catalog": 51.5,
+        "access": 1
+      },
+      "checkedFiles": 1,
+      "checkedAccesses": 0,
+      "findings": 0,
+      "audits": 2,
+      "auditsEqual": 2,
+      "expectationFailures": []
+    },
+    {
+      "klass": "import-exposed",
+      "name": "import an exposed symbol",
+      "samples": 10,
+      "path": "source",
+      "medianMs": 183.2,
+      "minMs": 155.5,
+      "maxMs": 204.7,
+      "steps": {
+        "classify": 0,
+        "snapshot": 93.3,
+        "catalog": 53,
+        "access": 6.9,
+        "link": 23.8,
+        "decide": 1.1
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 4,
+      "findings": 0,
+      "audits": 2,
+      "auditsEqual": 2,
+      "expectationFailures": []
+    },
+    {
+      "klass": "add-export",
+      "name": "add an export",
+      "samples": 10,
+      "path": "source",
+      "medianMs": 83.6,
+      "minMs": 75.7,
+      "maxMs": 99.7,
+      "steps": {
+        "classify": 0,
+        "snapshot": 1.9,
+        "catalog": 48.3,
+        "access": 7,
+        "link": 22,
+        "decide": 0.8
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 0,
+      "findings": 0,
+      "audits": 2,
+      "auditsEqual": 2,
+      "expectationFailures": []
+    },
+    {
+      "klass": "denied-import",
+      "name": "import that violates exposure",
+      "samples": 10,
+      "path": "source",
+      "medianMs": 183.8,
+      "minMs": 161.9,
+      "maxMs": 208.6,
+      "steps": {
+        "classify": 0,
+        "snapshot": 94.2,
+        "catalog": 51.3,
+        "access": 6.6,
+        "link": 22.3,
+        "decide": 1.5
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 5,
+      "findings": 1,
+      "audits": 2,
+      "auditsEqual": 2,
+      "expectationFailures": []
+    },
+    {
+      "klass": "denial-removed",
+      "name": "remove the violating import",
+      "samples": 10,
+      "path": "source",
+      "medianMs": 174.8,
+      "minMs": 150.4,
+      "maxMs": 233,
+      "steps": {
+        "classify": 0,
+        "snapshot": 94.3,
+        "catalog": 53.4,
+        "access": 5.2,
+        "link": 23.1,
+        "decide": 1
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 4,
+      "findings": 0,
+      "audits": 2,
+      "auditsEqual": 2,
+      "expectationFailures": []
+    },
+    {
+      "klass": "description",
+      "name": "description removes an exposure",
+      "samples": 10,
+      "path": "description",
+      "medianMs": 292.2,
+      "minMs": 258.1,
+      "maxMs": 363.2,
+      "steps": {
+        "classify": 0,
+        "acquire": 250.4,
+        "link": 20.4,
+        "decide": 18.3
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 56,
+      "audits": 2,
+      "auditsEqual": 2,
+      "expectationFailures": []
+    },
+    {
+      "klass": "description-revert",
+      "name": "description reverted",
+      "samples": 10,
+      "path": "description",
+      "medianMs": 272.1,
+      "minMs": 241.9,
+      "maxMs": 374.5,
+      "steps": {
+        "classify": 0,
+        "acquire": 239,
+        "link": 21.4,
+        "decide": 12.4
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "audits": 2,
+      "auditsEqual": 2,
+      "expectationFailures": []
+    },
+    {
+      "klass": "create",
+      "name": "create an importing file",
+      "samples": 10,
+      "path": "broad",
+      "medianMs": 525.5,
+      "minMs": 458.6,
+      "maxMs": 583.8,
+      "steps": {
+        "classify": 0,
+        "acquire": 229.4,
+        "snapshot": 97.7,
+        "catalog": 57.7,
+        "access": 95.4,
+        "link": 26.1,
+        "decide": 12.7
+      },
+      "checkedFiles": 55,
+      "checkedAccesses": 296,
+      "findings": 0,
+      "audits": 2,
+      "auditsEqual": 2,
+      "expectationFailures": []
+    },
+    {
+      "klass": "delete",
+      "name": "delete that file",
+      "samples": 10,
+      "path": "broad",
+      "medianMs": 515.4,
+      "minMs": 443.9,
+      "maxMs": 584.7,
+      "steps": {
+        "classify": 0,
+        "acquire": 231.4,
+        "snapshot": 100.3,
+        "catalog": 54.4,
+        "access": 91,
+        "link": 26.3,
+        "decide": 15.4
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "audits": 2,
+      "auditsEqual": 2,
+      "expectationFailures": []
+    },
+    {
+      "klass": "readme",
+      "name": "README edit",
+      "samples": 10,
+      "path": "description",
+      "medianMs": 287.6,
+      "minMs": 263.2,
+      "maxMs": 327,
+      "steps": {
+        "classify": 0,
+        "acquire": 246.6,
+        "link": 25.4,
+        "decide": 16.1
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "audits": 2,
+      "auditsEqual": 2,
+      "expectationFailures": []
+    },
+    {
+      "klass": "configuration",
+      "name": "configuration touch",
+      "samples": 10,
+      "path": "broad",
+      "medianMs": 580,
+      "minMs": 504.1,
+      "maxMs": 611,
+      "steps": {
+        "classify": 0,
+        "acquire": 243.6,
+        "snapshot": 131.8,
+        "catalog": 50.2,
+        "access": 99.4,
+        "link": 25.8,
+        "decide": 18
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "audits": 2,
+      "auditsEqual": 2,
+      "expectationFailures": []
+    }
+  ],
+  "observations": [
+    {
+      "step": "cold open",
+      "klass": "cold",
+      "repetition": 1,
+      "path": "cold",
+      "ms": 1067.7124800000001,
+      "steps": {
+        "acquire": 303.399223,
+        "compiler": 329.7530740000001,
+        "catalog": 199.38691400000005,
+        "access": 153.41833700000007,
+        "link": 49.62817300000006,
+        "decide": 27.25637199999983
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 294,
+      "findings": 0,
+      "added": 0,
+      "removed": 0,
+      "audit": {
+        "equal": true,
+        "batchMs": 4964,
+        "differences": []
+      }
+    },
+    {
+      "step": "body edit",
+      "klass": "body",
+      "repetition": 1,
+      "path": "source",
+      "ms": 120.56534699999975,
+      "steps": {
+        "classify": 0.04924699999992299,
+        "snapshot": 3.4256270000005316,
+        "catalog": 74.46334500000012,
+        "access": 1.3579790000003413,
+        "link": 32.426314000000275,
+        "decide": 1.5416370000002644
+      },
+      "checkedFiles": 1,
+      "checkedAccesses": 2,
+      "findings": 0,
+      "added": 0,
+      "removed": 0,
+      "audit": {
+        "equal": true,
+        "batchMs": 4582,
+        "differences": []
+      }
+    },
+    {
+      "step": "body edit in place",
+      "klass": "body-in-place",
+      "repetition": 1,
+      "path": "unchanged-surface",
+      "ms": 82.28939799999898,
+      "steps": {
+        "classify": 0.0499550000004092,
+        "snapshot": 2.574421999999686,
+        "catalog": 73.70559400000093,
+        "access": 1.2667899999996735
+      },
+      "checkedFiles": 1,
+      "checkedAccesses": 0,
+      "findings": 0,
+      "added": 0,
+      "removed": 0,
+      "audit": {
+        "equal": true,
+        "batchMs": 4545,
+        "differences": []
+      }
+    },
+    {
+      "step": "import an exposed symbol",
+      "klass": "import-exposed",
+      "repetition": 1,
+      "path": "source",
+      "ms": 197.08953400000064,
+      "steps": {
+        "classify": 0.031183999999484513,
+        "snapshot": 96.35523000000103,
+        "catalog": 56.531528999999864,
+        "access": 7.485891000000265,
+        "link": 31.62910700000066,
+        "decide": 0.9544930000010936
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 4,
+      "findings": 0,
+      "added": 0,
+      "removed": 0,
+      "audit": {
+        "equal": true,
+        "batchMs": 4406,
+        "differences": []
+      }
+    },
+    {
+      "step": "add an export",
+      "klass": "add-export",
+      "repetition": 1,
+      "path": "source",
+      "ms": 87.10466699999961,
+      "steps": {
+        "classify": 0.04225199999928009,
+        "snapshot": 2.0366810000014084,
+        "catalog": 47.56787700000132,
+        "access": 6.983758999998827,
+        "link": 25.20260899999994,
+        "decide": 0.9549340000012307
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 0,
+      "findings": 0,
+      "added": 0,
+      "removed": 0,
+      "audit": {
+        "equal": true,
+        "batchMs": 4610,
+        "differences": []
+      }
+    },
+    {
+      "step": "import that violates exposure",
+      "klass": "denied-import",
+      "repetition": 1,
+      "path": "source",
+      "ms": 208.63047599999845,
+      "steps": {
+        "classify": 0.05092100000183564,
+        "snapshot": 104.00903800000015,
+        "catalog": 62.639564999997674,
+        "access": 7.044522000000143,
+        "link": 26.16972800000076,
+        "decide": 3.870420000002923
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 5,
+      "findings": 1,
+      "added": 1,
+      "removed": 0,
+      "audit": {
+        "equal": true,
+        "batchMs": 4511,
+        "differences": []
+      }
+    },
+    {
+      "step": "remove the violating import",
+      "klass": "denial-removed",
+      "repetition": 1,
+      "path": "source",
+      "ms": 192.2292290000005,
+      "steps": {
+        "classify": 0.029599000001326203,
+        "snapshot": 94.25408799999786,
+        "catalog": 58.503866000002745,
+        "access": 6.511867000001075,
+        "link": 27.829415000000154,
+        "decide": 1.1191839999992226
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 4,
+      "findings": 0,
+      "added": 0,
+      "removed": 1,
+      "audit": {
+        "equal": true,
+        "batchMs": 4953,
+        "differences": []
+      }
+    },
+    {
+      "step": "description removes an exposure",
+      "klass": "description",
+      "repetition": 1,
+      "path": "description",
+      "ms": 296.25682300000335,
+      "steps": {
+        "classify": 0.0956850000002305,
+        "acquire": 248.90643800000544,
+        "link": 23.169637999999395,
+        "decide": 22.369612000002235
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 56,
+      "added": 56,
+      "removed": 0,
+      "audit": {
+        "equal": true,
+        "batchMs": 4998,
+        "differences": []
+      }
+    },
+    {
+      "step": "description reverted",
+      "klass": "description-revert",
+      "repetition": 1,
+      "path": "description",
+      "ms": 289.96501900000294,
+      "steps": {
+        "classify": 0.038804999996500555,
+        "acquire": 238.5918359999996,
+        "link": 31.196446999994805,
+        "decide": 18.855366000003414
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 56,
+      "audit": {
+        "equal": true,
+        "batchMs": 4893,
+        "differences": []
+      }
+    },
+    {
+      "step": "create an importing file",
+      "klass": "create",
+      "repetition": 1,
+      "path": "broad",
+      "ms": 583.5853970000026,
+      "steps": {
+        "classify": 0.01711799999611685,
+        "acquire": 248.84225100000185,
+        "snapshot": 108.30379600000015,
+        "catalog": 60.52993100000458,
+        "access": 110.89570399999502,
+        "link": 33.14491999999882,
+        "decide": 19.513557000005676
+      },
+      "checkedFiles": 55,
+      "checkedAccesses": 296,
+      "findings": 0,
+      "added": 0,
+      "removed": 0,
+      "audit": {
+        "equal": true,
+        "batchMs": 4677,
+        "differences": []
+      }
+    },
+    {
+      "step": "delete that file",
+      "klass": "delete",
+      "repetition": 1,
+      "path": "broad",
+      "ms": 544.0060749999975,
+      "steps": {
+        "classify": 0.027616999999736436,
+        "acquire": 243.95841199999995,
+        "snapshot": 88.92858600000181,
+        "catalog": 51.61720300000161,
+        "access": 107.67631800000527,
+        "link": 34.9636559999999,
+        "decide": 15.094391999999061
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 0,
+      "audit": {
+        "equal": true,
+        "batchMs": 4703,
+        "differences": []
+      }
+    },
+    {
+      "step": "README edit",
+      "klass": "readme",
+      "repetition": 1,
+      "path": "description",
+      "ms": 287.96699799999624,
+      "steps": {
+        "classify": 0.022643000003881752,
+        "acquire": 252.335742999996,
+        "link": 22.704301000005216,
+        "decide": 11.900400999998965
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 0,
+      "audit": {
+        "equal": true,
+        "batchMs": 4580,
+        "differences": []
+      }
+    },
+    {
+      "step": "configuration touch",
+      "klass": "configuration",
+      "repetition": 1,
+      "path": "broad",
+      "ms": 607.3790139999983,
+      "steps": {
+        "classify": 0.041973999999754597,
+        "acquire": 244.33884699999908,
+        "snapshot": 142.40912299999763,
+        "catalog": 62.10376100000576,
+        "access": 105.63058399999863,
+        "link": 32.40120100000058,
+        "decide": 18.565864000003785
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 0,
+      "audit": {
+        "equal": true,
+        "batchMs": 4846,
+        "differences": []
+      }
+    },
+    {
+      "step": "body edit",
+      "klass": "body",
+      "repetition": 2,
+      "path": "source",
+      "ms": 84.42593100000522,
+      "steps": {
+        "classify": 0.05556599999545142,
+        "snapshot": 1.9313200000033248,
+        "catalog": 54.99168899998767,
+        "access": 1.041600999989896,
+        "link": 20.97296900000947,
+        "decide": 0.7700139999942621
+      },
+      "checkedFiles": 1,
+      "checkedAccesses": 2,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "body edit in place",
+      "klass": "body-in-place",
+      "repetition": 2,
+      "path": "unchanged-surface",
+      "ms": 58.21070000001055,
+      "steps": {
+        "classify": 0.02494699999806471,
+        "snapshot": 1.9230090000055498,
+        "catalog": 51.053031999996165,
+        "access": 1.0856219999986934
+      },
+      "checkedFiles": 1,
+      "checkedAccesses": 0,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "import an exposed symbol",
+      "klass": "import-exposed",
+      "repetition": 2,
+      "path": "source",
+      "ms": 178.3488190000062,
+      "steps": {
+        "classify": 0.02645900000061374,
+        "snapshot": 92.03687900000659,
+        "catalog": 46.66693400000804,
+        "access": 7.422586000000592,
+        "link": 26.220338999992236,
+        "decide": 1.110395999989123
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 4,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "add an export",
+      "klass": "add-export",
+      "repetition": 2,
+      "path": "source",
+      "ms": 95.63238399999682,
+      "steps": {
+        "classify": 0.03170700000191573,
+        "snapshot": 2.0026279999874532,
+        "catalog": 53.111212000003434,
+        "access": 7.239376999990782,
+        "link": 27.92211600000155,
+        "decide": 0.8593090000067605
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 0,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "import that violates exposure",
+      "klass": "denied-import",
+      "repetition": 2,
+      "path": "source",
+      "ms": 170.71319400001084,
+      "steps": {
+        "classify": 0.038606999994954094,
+        "snapshot": 91.3005850000045,
+        "catalog": 51.983047000001534,
+        "access": 5.479332000002614,
+        "link": 16.567371999990428,
+        "decide": 2.0603850000043167
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 5,
+      "findings": 1,
+      "added": 1,
+      "removed": 0
+    },
+    {
+      "step": "remove the violating import",
+      "klass": "denial-removed",
+      "repetition": 2,
+      "path": "source",
+      "ms": 165.5529499999975,
+      "steps": {
+        "classify": 0.02272100000118371,
+        "snapshot": 95.65061599999899,
+        "catalog": 44.874357000007876,
+        "access": 5.258103000000119,
+        "link": 16.02264300000388,
+        "decide": 0.9297709999955259
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 4,
+      "findings": 0,
+      "added": 0,
+      "removed": 1
+    },
+    {
+      "step": "description removes an exposure",
+      "klass": "description",
+      "repetition": 2,
+      "path": "description",
+      "ms": 291.48786900000414,
+      "steps": {
+        "classify": 0.018912999992608093,
+        "acquire": 254.79403699999966,
+        "link": 15.846032000001287,
+        "decide": 19.632536999997683
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 56,
+      "added": 56,
+      "removed": 0
+    },
+    {
+      "step": "description reverted",
+      "klass": "description-revert",
+      "repetition": 2,
+      "path": "description",
+      "ms": 267.8359250000067,
+      "steps": {
+        "classify": 0.01781799999298528,
+        "acquire": 237.16919000000053,
+        "link": 16.326834999999846,
+        "decide": 13.356092000001809
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 56
+    },
+    {
+      "step": "create an importing file",
+      "klass": "create",
+      "repetition": 2,
+      "path": "broad",
+      "ms": 510.82208700000774,
+      "steps": {
+        "classify": 0.018727999995462596,
+        "acquire": 230.81007399999362,
+        "snapshot": 91.49982499999169,
+        "catalog": 58.267141999996966,
+        "access": 94.30248699999356,
+        "link": 22.62099299998954,
+        "decide": 11.039602999997442
+      },
+      "checkedFiles": 55,
+      "checkedAccesses": 296,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "delete that file",
+      "klass": "delete",
+      "repetition": 2,
+      "path": "broad",
+      "ms": 584.6693970000051,
+      "steps": {
+        "classify": 0.01510999999300111,
+        "acquire": 248.82806900001015,
+        "snapshot": 105.95061299999361,
+        "catalog": 56.155655000009574,
+        "access": 125.09672400000272,
+        "link": 27.57797600000049,
+        "decide": 19.301754999993136
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "README edit",
+      "klass": "readme",
+      "repetition": 2,
+      "path": "description",
+      "ms": 279.2817340000038,
+      "steps": {
+        "classify": 0.026198999999905936,
+        "acquire": 246.44859099999303,
+        "link": 17.145433999990928,
+        "decide": 14.589720000003581
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "configuration touch",
+      "klass": "configuration",
+      "repetition": 2,
+      "path": "broad",
+      "ms": 540.3784920000035,
+      "steps": {
+        "classify": 0.02142200000525918,
+        "acquire": 253.41405900000245,
+        "snapshot": 127.800522000005,
+        "catalog": 38.34041299999808,
+        "access": 86.7204619999975,
+        "link": 15.247684000001755,
+        "decide": 17.177469999995083
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "body edit",
+      "klass": "body",
+      "repetition": 3,
+      "path": "source",
+      "ms": 84.8636300000071,
+      "steps": {
+        "classify": 0.023409000001265667,
+        "snapshot": 2.016724000000977,
+        "catalog": 49.98591800000577,
+        "access": 0.98005299999204,
+        "link": 26.755206000001635,
+        "decide": 1.3865050000022165
+      },
+      "checkedFiles": 1,
+      "checkedAccesses": 2,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "body edit in place",
+      "klass": "body-in-place",
+      "repetition": 3,
+      "path": "unchanged-surface",
+      "ms": 59.146185999998124,
+      "steps": {
+        "classify": 0.02502000000094995,
+        "snapshot": 1.4853200000070501,
+        "catalog": 51.91440500000317,
+        "access": 0.9291950000042561
+      },
+      "checkedFiles": 1,
+      "checkedAccesses": 0,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "import an exposed symbol",
+      "klass": "import-exposed",
+      "repetition": 3,
+      "path": "source",
+      "ms": 178.271338999999,
+      "steps": {
+        "classify": 0.021240000001853332,
+        "snapshot": 91.25793399999384,
+        "catalog": 48.310659999988275,
+        "access": 7.161781999995583,
+        "link": 26.733389000000898,
+        "decide": 0.8632939999952214
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 4,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "add an export",
+      "klass": "add-export",
+      "repetition": 3,
+      "path": "source",
+      "ms": 94.57680799999798,
+      "steps": {
+        "classify": 0.01811499999894295,
+        "snapshot": 1.579144000002998,
+        "catalog": 54.09592500000144,
+        "access": 7.376056000008248,
+        "link": 26.3316679999989,
+        "decide": 0.9219829999929061
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 0,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "import that violates exposure",
+      "klass": "denied-import",
+      "repetition": 3,
+      "path": "source",
+      "ms": 162.37394700000004,
+      "steps": {
+        "classify": 0.02142400000593625,
+        "snapshot": 85.13905300000624,
+        "catalog": 47.3182669999951,
+        "access": 6.817809000000125,
+        "link": 18.37359699999797,
+        "decide": 1.0829389999998966
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 5,
+      "findings": 1,
+      "added": 1,
+      "removed": 0
+    },
+    {
+      "step": "remove the violating import",
+      "klass": "denial-removed",
+      "repetition": 3,
+      "path": "source",
+      "ms": 193.12572999999975,
+      "steps": {
+        "classify": 0.03057299999636598,
+        "snapshot": 94.6107170000032,
+        "catalog": 56.805200000002515,
+        "access": 7.128585000013118,
+        "link": 28.666087000005064,
+        "decide": 1.6548599999950966
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 4,
+      "findings": 0,
+      "added": 0,
+      "removed": 1
+    },
+    {
+      "step": "description removes an exposure",
+      "klass": "description",
+      "repetition": 3,
+      "path": "description",
+      "ms": 363.2183589999913,
+      "steps": {
+        "classify": 0.03695799999695737,
+        "acquire": 294.5158119999978,
+        "link": 29.384502999993856,
+        "decide": 37.58471100000315
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 56,
+      "added": 56,
+      "removed": 0
+    },
+    {
+      "step": "description reverted",
+      "klass": "description-revert",
+      "repetition": 3,
+      "path": "description",
+      "ms": 374.46159599999373,
+      "steps": {
+        "classify": 0.025437000003876165,
+        "acquire": 343.7870430000039,
+        "link": 19.497910999998567,
+        "decide": 10.076735000009649
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 56
+    },
+    {
+      "step": "create an importing file",
+      "klass": "create",
+      "repetition": 3,
+      "path": "broad",
+      "ms": 540.7933899999916,
+      "steps": {
+        "classify": 0.016485999993165024,
+        "acquire": 242.91399700001057,
+        "snapshot": 101.85048200000892,
+        "catalog": 62.12280500000634,
+        "access": 96.49165999999968,
+        "link": 24.848150000005262,
+        "decide": 10.685385000004317
+      },
+      "checkedFiles": 55,
+      "checkedAccesses": 296,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "delete that file",
+      "klass": "delete",
+      "repetition": 3,
+      "path": "broad",
+      "ms": 508.8238960000017,
+      "steps": {
+        "classify": 0.011568000001716428,
+        "acquire": 208.2267520000023,
+        "snapshot": 106.21582800000033,
+        "catalog": 54.68803200000548,
+        "access": 91.1919329999946,
+        "link": 28.248265000001993,
+        "decide": 18.496098000003258
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "README edit",
+      "klass": "readme",
+      "repetition": 3,
+      "path": "description",
+      "ms": 305.67473600000085,
+      "steps": {
+        "classify": 0.022354999993694946,
+        "acquire": 255.09473199999775,
+        "link": 31.01644999999553,
+        "decide": 17.99170700000832
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "configuration touch",
+      "klass": "configuration",
+      "repetition": 3,
+      "path": "broad",
+      "ms": 584.673965000009,
+      "steps": {
+        "classify": 0.021882999993977137,
+        "acquire": 260.97250799999165,
+        "snapshot": 126.74278400000185,
+        "catalog": 50.101788999993005,
+        "access": 99.27193200000329,
+        "link": 27.08804699999746,
+        "decide": 18.748154999993858
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "body edit",
+      "klass": "body",
+      "repetition": 4,
+      "path": "source",
+      "ms": 90.25388499999826,
+      "steps": {
+        "classify": 0.028637000010348856,
+        "snapshot": 1.8881540000002133,
+        "catalog": 58.8219320000062,
+        "access": 0.7350339999975404,
+        "link": 24.094616999995196,
+        "decide": 1.0772029999934603
+      },
+      "checkedFiles": 1,
+      "checkedAccesses": 2,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "body edit in place",
+      "klass": "body-in-place",
+      "repetition": 4,
+      "path": "unchanged-surface",
+      "ms": 62.806838999997126,
+      "steps": {
+        "classify": 0.027382000000216067,
+        "snapshot": 2.386056000003009,
+        "catalog": 55.23038499998802,
+        "access": 1.0212270000047283
+      },
+      "checkedFiles": 1,
+      "checkedAccesses": 0,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "import an exposed symbol",
+      "klass": "import-exposed",
+      "repetition": 4,
+      "path": "source",
+      "ms": 184.60506599998916,
+      "steps": {
+        "classify": 0.042322000008425675,
+        "snapshot": 101.6342319999967,
+        "catalog": 52.993310000005295,
+        "access": 6.171415999997407,
+        "link": 19.0202019999997,
+        "decide": 0.9948860000004061
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 4,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "add an export",
+      "klass": "add-export",
+      "repetition": 4,
+      "path": "source",
+      "ms": 75.72095300001092,
+      "steps": {
+        "classify": 0.03176500000699889,
+        "snapshot": 1.6212559999985388,
+        "catalog": 49.07465099998808,
+        "access": 5.585067000007257,
+        "link": 15.935640000010608,
+        "decide": 0.4743690000032075
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 0,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "import that violates exposure",
+      "klass": "denied-import",
+      "repetition": 4,
+      "path": "source",
+      "ms": 183.2444259999902,
+      "steps": {
+        "classify": 0.030983000004198402,
+        "snapshot": 98.92806299999938,
+        "catalog": 45.06133799999952,
+        "access": 6.075356000015745,
+        "link": 27.630005000013625,
+        "decide": 1.5537550000008196
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 5,
+      "findings": 1,
+      "added": 1,
+      "removed": 0
+    },
+    {
+      "step": "remove the violating import",
+      "klass": "denial-removed",
+      "repetition": 4,
+      "path": "source",
+      "ms": 180.81396900000982,
+      "steps": {
+        "classify": 0.04248099999676924,
+        "snapshot": 94.33355299998948,
+        "catalog": 51.900301999994554,
+        "access": 6.9084079999884125,
+        "link": 23.401331000000937,
+        "decide": 0.8607840000040596
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 4,
+      "findings": 0,
+      "added": 0,
+      "removed": 1
+    },
+    {
+      "step": "description removes an exposure",
+      "klass": "description",
+      "repetition": 4,
+      "path": "description",
+      "ms": 258.1067780000012,
+      "steps": {
+        "classify": 0.024598000003607012,
+        "acquire": 225.12937100000272,
+        "link": 15.126787999994121,
+        "decide": 16.657399999996414
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 56,
+      "added": 56,
+      "removed": 0
+    },
+    {
+      "step": "description reverted",
+      "klass": "description-revert",
+      "repetition": 4,
+      "path": "description",
+      "ms": 241.91767799999798,
+      "steps": {
+        "classify": 0.022076000008382834,
+        "acquire": 208.835447999998,
+        "link": 20.821566999991774,
+        "decide": 11.181989999997313
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 56
+    },
+    {
+      "step": "create an importing file",
+      "klass": "create",
+      "repetition": 4,
+      "path": "broad",
+      "ms": 485.7316839999985,
+      "steps": {
+        "classify": 0.01723599999968428,
+        "acquire": 227.88886799999455,
+        "snapshot": 99.37385299999733,
+        "catalog": 49.97056400000292,
+        "access": 75.05148400001053,
+        "link": 19.696372000005795,
+        "decide": 11.787972999998601
+      },
+      "checkedFiles": 55,
+      "checkedAccesses": 296,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "delete that file",
+      "klass": "delete",
+      "repetition": 4,
+      "path": "broad",
+      "ms": 478.83333900000434,
+      "steps": {
+        "classify": 0.01568799999949988,
+        "acquire": 216.4408359999943,
+        "snapshot": 91.91945200000191,
+        "catalog": 54.13335499999812,
+        "access": 90.80701299999782,
+        "link": 15.862726999999722,
+        "decide": 8.529360000000452
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "README edit",
+      "klass": "readme",
+      "repetition": 4,
+      "path": "description",
+      "ms": 263.20278900000267,
+      "steps": {
+        "classify": 0.0344150000018999,
+        "acquire": 213.06242499999644,
+        "link": 29.96933400000853,
+        "decide": 18.907558000006247
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "configuration touch",
+      "klass": "configuration",
+      "repetition": 4,
+      "path": "broad",
+      "ms": 611.0260870000056,
+      "steps": {
+        "classify": 0.021166999998968095,
+        "acquire": 243.7231630000024,
+        "snapshot": 150.4091260000132,
+        "catalog": 61.68944799999008,
+        "access": 104.06854999999632,
+        "link": 30.56355700000131,
+        "decide": 18.829423999995925
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "body edit",
+      "klass": "body",
+      "repetition": 5,
+      "path": "source",
+      "ms": 63.18867800000589,
+      "steps": {
+        "classify": 0.02774700000009034,
+        "snapshot": 1.2877149999985704,
+        "catalog": 42.616649000003235,
+        "access": 0.6125500000052853,
+        "link": 15.583824000001187,
+        "decide": 0.7008930000010878
+      },
+      "checkedFiles": 1,
+      "checkedAccesses": 2,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "body edit in place",
+      "klass": "body-in-place",
+      "repetition": 5,
+      "path": "unchanged-surface",
+      "ms": 44.8228769999987,
+      "steps": {
+        "classify": 0.03361399999994319,
+        "snapshot": 1.741319000007934,
+        "catalog": 40.05511300000944,
+        "access": 0.6955369999923278
+      },
+      "checkedFiles": 1,
+      "checkedAccesses": 0,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "import an exposed symbol",
+      "klass": "import-exposed",
+      "repetition": 5,
+      "path": "source",
+      "ms": 155.45825100000366,
+      "steps": {
+        "classify": 0.028894000002765097,
+        "snapshot": 80.06564000000071,
+        "catalog": 43.85790099999576,
+        "access": 6.327084000004106,
+        "link": 21.208220000000438,
+        "decide": 0.960627000007662
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 4,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "add an export",
+      "klass": "add-export",
+      "repetition": 5,
+      "path": "source",
+      "ms": 80.1847759999946,
+      "steps": {
+        "classify": 0.035195000004023314,
+        "snapshot": 1.7839180000009947,
+        "catalog": 47.48071699999855,
+        "access": 6.207429000001866,
+        "link": 19.734972999998718,
+        "decide": 0.4867519999970682
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 0,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "import that violates exposure",
+      "klass": "denied-import",
+      "repetition": 5,
+      "path": "source",
+      "ms": 165.3410489999951,
+      "steps": {
+        "classify": 0.030994000000646338,
+        "snapshot": 92.91240800000378,
+        "catalog": 47.376018000009935,
+        "access": 5.185157999992953,
+        "link": 16.212641000005533,
+        "decide": 0.8541929999919375
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 5,
+      "findings": 1,
+      "added": 1,
+      "removed": 0
+    },
+    {
+      "step": "remove the violating import",
+      "klass": "denial-removed",
+      "repetition": 5,
+      "path": "source",
+      "ms": 150.44837800000096,
+      "steps": {
+        "classify": 0.03011599999445025,
+        "snapshot": 84.56980099999055,
+        "catalog": 42.09715300000971,
+        "access": 4.398360999999568,
+        "link": 15.519425000005867,
+        "decide": 1.0723960000032093
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 4,
+      "findings": 0,
+      "added": 0,
+      "removed": 1
+    },
+    {
+      "step": "description removes an exposure",
+      "klass": "description",
+      "repetition": 5,
+      "path": "description",
+      "ms": 258.65191400000185,
+      "steps": {
+        "classify": 0.02217900000687223,
+        "acquire": 224.32919800000673,
+        "link": 15.857388000003994,
+        "decide": 17.19413600000553
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 56,
+      "added": 56,
+      "removed": 0
+    },
+    {
+      "step": "description reverted",
+      "klass": "description-revert",
+      "repetition": 5,
+      "path": "description",
+      "ms": 291.4989879999921,
+      "steps": {
+        "classify": 0.01938900000823196,
+        "acquire": 243.1685460000008,
+        "link": 28.388578999991296,
+        "decide": 18.31739799999923
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 56
+    },
+    {
+      "step": "create an importing file",
+      "klass": "create",
+      "repetition": 5,
+      "path": "broad",
+      "ms": 550.6088009999949,
+      "steps": {
+        "classify": 0.022069999991799705,
+        "acquire": 224.2427999999927,
+        "snapshot": 100.89958699999261,
+        "catalog": 57.059748999992735,
+        "access": 118.86710000000312,
+        "link": 27.596974000000046,
+        "decide": 19.80576000000292
+      },
+      "checkedFiles": 55,
+      "checkedAccesses": 296,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "delete that file",
+      "klass": "delete",
+      "repetition": 5,
+      "path": "broad",
+      "ms": 522.0513329999958,
+      "steps": {
+        "classify": 0.018055000007734634,
+        "acquire": 245.89801000000443,
+        "snapshot": 101.74317999999039,
+        "catalog": 51.7327890000015,
+        "access": 93.92693499999586,
+        "link": 16.50067899998976,
+        "decide": 11.005331000007573
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "README edit",
+      "klass": "readme",
+      "repetition": 5,
+      "path": "description",
+      "ms": 288.74638199999754,
+      "steps": {
+        "classify": 0.03461000000243075,
+        "acquire": 246.80309200000193,
+        "link": 22.930546999996295,
+        "decide": 17.6150639999978
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "configuration touch",
+      "klass": "configuration",
+      "repetition": 5,
+      "path": "broad",
+      "ms": 566.5184920000029,
+      "steps": {
+        "classify": 0.0242969999962952,
+        "acquire": 237.00212300001294,
+        "snapshot": 131.60450400000263,
+        "catalog": 50.37865800000145,
+        "access": 98.79465199999686,
+        "link": 29.471351999993203,
+        "decide": 17.406773000009707
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "body edit",
+      "klass": "body",
+      "repetition": 6,
+      "path": "source",
+      "ms": 100.44866000000911,
+      "steps": {
+        "classify": 0.04066899999452289,
+        "snapshot": 1.9776469999924302,
+        "catalog": 62.048664000001736,
+        "access": 1.0890309999958845,
+        "link": 30.330157999997027,
+        "decide": 1.2214629999944009
+      },
+      "checkedFiles": 1,
+      "checkedAccesses": 2,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "body edit in place",
+      "klass": "body-in-place",
+      "repetition": 6,
+      "path": "unchanged-surface",
+      "ms": 63.07148199999938,
+      "steps": {
+        "classify": 0.0398680000071181,
+        "snapshot": 1.6726909999997588,
+        "catalog": 56.776009999986854,
+        "access": 1.0082319999928586
+      },
+      "checkedFiles": 1,
+      "checkedAccesses": 0,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "import an exposed symbol",
+      "klass": "import-exposed",
+      "repetition": 6,
+      "path": "source",
+      "ms": 183.99166699999478,
+      "steps": {
+        "classify": 0.040084000007482246,
+        "snapshot": 91.53447499999311,
+        "catalog": 52.98824099999911,
+        "access": 6.589580999992904,
+        "link": 27.07595099999162,
+        "decide": 1.5685609999927692
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 4,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "add an export",
+      "klass": "add-export",
+      "repetition": 6,
+      "path": "source",
+      "ms": 97.08903699999792,
+      "steps": {
+        "classify": 0.038908999995328486,
+        "snapshot": 1.9968599999992875,
+        "catalog": 64.61225000000559,
+        "access": 8.5740519999963,
+        "link": 16.675852000000305,
+        "decide": 0.6488190000090981
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 0,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "import that violates exposure",
+      "klass": "denied-import",
+      "repetition": 6,
+      "path": "source",
+      "ms": 196.73811700000078,
+      "steps": {
+        "classify": 0.037166000009165145,
+        "snapshot": 107.83591799999704,
+        "catalog": 50.68320900000981,
+        "access": 6.481103999991319,
+        "link": 26.56861000000208,
+        "decide": 1.3474149999965448
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 5,
+      "findings": 1,
+      "added": 1,
+      "removed": 0
+    },
+    {
+      "step": "remove the violating import",
+      "klass": "denial-removed",
+      "repetition": 6,
+      "path": "source",
+      "ms": 232.98432499999763,
+      "steps": {
+        "classify": 0.03231700000469573,
+        "snapshot": 137.54243299999507,
+        "catalog": 61.46506699999736,
+        "access": 5.2386570000089705,
+        "link": 23.49692999999388,
+        "decide": 1.3757199999963632
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 4,
+      "findings": 0,
+      "added": 0,
+      "removed": 1
+    },
+    {
+      "step": "description removes an exposure",
+      "klass": "description",
+      "repetition": 6,
+      "path": "description",
+      "ms": 292.8234070000035,
+      "steps": {
+        "classify": 0.026068000006489456,
+        "acquire": 251.80624000000535,
+        "link": 22.343714000002365,
+        "decide": 17.604205000010552
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 56,
+      "added": 56,
+      "removed": 0
+    },
+    {
+      "step": "description reverted",
+      "klass": "description-revert",
+      "repetition": 6,
+      "path": "description",
+      "ms": 333.8904610000027,
+      "steps": {
+        "classify": 0.020470999996177852,
+        "acquire": 283.9033530000015,
+        "link": 31.010272000014083,
+        "decide": 17.74634500000684
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 56
+    },
+    {
+      "step": "create an importing file",
+      "klass": "create",
+      "repetition": 6,
+      "path": "broad",
+      "ms": 540.2450099999987,
+      "steps": {
+        "classify": 0.022805000000516884,
+        "acquire": 228.0381020000059,
+        "snapshot": 93.2557259999885,
+        "catalog": 63.669143999999505,
+        "access": 108.01150199999392,
+        "link": 27.2941620000056,
+        "decide": 18.351055999999517
+      },
+      "checkedFiles": 55,
+      "checkedAccesses": 296,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "delete that file",
+      "klass": "delete",
+      "repetition": 6,
+      "path": "broad",
+      "ms": 457.5586270000058,
+      "steps": {
+        "classify": 0.02102099999319762,
+        "acquire": 216.92378500000632,
+        "snapshot": 88.63995699999214,
+        "catalog": 55.44529099999636,
+        "access": 67.42536699998891,
+        "link": 17.84289699999499,
+        "decide": 10.035253000009106
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "README edit",
+      "klass": "readme",
+      "repetition": 6,
+      "path": "description",
+      "ms": 265.12510599999223,
+      "steps": {
+        "classify": 0.022350999992340803,
+        "acquire": 227.9296949999989,
+        "link": 21.442318999994313,
+        "decide": 14.793344999998226
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "configuration touch",
+      "klass": "configuration",
+      "repetition": 6,
+      "path": "broad",
+      "ms": 592.2053600000072,
+      "steps": {
+        "classify": 0.02385699999285862,
+        "acquire": 224.1244949999964,
+        "snapshot": 142.23843000001216,
+        "catalog": 59.355632999999216,
+        "access": 118.33987500000512,
+        "link": 24.549640000012005,
+        "decide": 21.70695799999521
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "body edit",
+      "klass": "body",
+      "repetition": 7,
+      "path": "source",
+      "ms": 71.37808100000257,
+      "steps": {
+        "classify": 0.03444699999818113,
+        "snapshot": 1.9955539999937173,
+        "catalog": 45.33460399998876,
+        "access": 0.6321789999929024,
+        "link": 19.38278200000059,
+        "decide": 1.2032150000013644
+      },
+      "checkedFiles": 1,
+      "checkedAccesses": 2,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "body edit in place",
+      "klass": "body-in-place",
+      "repetition": 7,
+      "path": "unchanged-surface",
+      "ms": 52.89753299999575,
+      "steps": {
+        "classify": 0.045405999990180135,
+        "snapshot": 1.93834799999604,
+        "catalog": 46.631561000001966,
+        "access": 1.0015500000008615
+      },
+      "checkedFiles": 1,
+      "checkedAccesses": 0,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "import an exposed symbol",
+      "klass": "import-exposed",
+      "repetition": 7,
+      "path": "source",
+      "ms": 185.93102299999737,
+      "steps": {
+        "classify": 0.03779899999790359,
+        "snapshot": 98.29965600000287,
+        "catalog": 57.213861999989604,
+        "access": 6.873485999996774,
+        "link": 18.78631499999028,
+        "decide": 1.5255489999981364
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 4,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "add an export",
+      "klass": "add-export",
+      "repetition": 7,
+      "path": "source",
+      "ms": 99.69824899999367,
+      "steps": {
+        "classify": 0.02601600000343751,
+        "snapshot": 1.4557140000106301,
+        "catalog": 58.32930899999337,
+        "access": 7.039751999996952,
+        "link": 27.842831999994814,
+        "decide": 0.8778549999988172
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 0,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "import that violates exposure",
+      "klass": "denied-import",
+      "repetition": 7,
+      "path": "source",
+      "ms": 205.38126600001124,
+      "steps": {
+        "classify": 0.03815300000132993,
+        "snapshot": 99.69879100000253,
+        "catalog": 63.265159999995376,
+        "access": 6.812792999990052,
+        "link": 29.77700800000457,
+        "decide": 1.5926679999975022
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 5,
+      "findings": 1,
+      "added": 1,
+      "removed": 0
+    },
+    {
+      "step": "remove the violating import",
+      "klass": "denial-removed",
+      "repetition": 7,
+      "path": "source",
+      "ms": 168.16470200000913,
+      "steps": {
+        "classify": 0.04145499999867752,
+        "snapshot": 91.66553099999146,
+        "catalog": 44.67753499999526,
+        "access": 4.860524000003352,
+        "link": 22.771842999994988,
+        "decide": 0.8375620000006165
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 4,
+      "findings": 0,
+      "added": 0,
+      "removed": 1
+    },
+    {
+      "step": "description removes an exposure",
+      "klass": "description",
+      "repetition": 7,
+      "path": "description",
+      "ms": 302.0403030000016,
+      "steps": {
+        "classify": 0.019592999989981763,
+        "acquire": 259.8257389999926,
+        "link": 21.971401000002516,
+        "decide": 18.907855000012205
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 56,
+      "added": 56,
+      "removed": 0
+    },
+    {
+      "step": "description reverted",
+      "klass": "description-revert",
+      "repetition": 7,
+      "path": "description",
+      "ms": 276.4523080000072,
+      "steps": {
+        "classify": 0.02400099999795202,
+        "acquire": 242.3987119999947,
+        "link": 21.97229900000093,
+        "decide": 10.747965000002296
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 56
+    },
+    {
+      "step": "create an importing file",
+      "klass": "create",
+      "repetition": 7,
+      "path": "broad",
+      "ms": 489.882786999995,
+      "steps": {
+        "classify": 0.017550000004121102,
+        "acquire": 220.79970399999002,
+        "snapshot": 85.88946299999952,
+        "catalog": 44.58510300000489,
+        "access": 92.06935399999202,
+        "link": 31.06954599999881,
+        "decide": 13.627104999992298
+      },
+      "checkedFiles": 55,
+      "checkedAccesses": 296,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "delete that file",
+      "klass": "delete",
+      "repetition": 7,
+      "path": "broad",
+      "ms": 541.9149849999958,
+      "steps": {
+        "classify": 0.015549000003375113,
+        "acquire": 235.85954199999105,
+        "snapshot": 108.71006399999897,
+        "catalog": 59.583608999993885,
+        "access": 90.00865799999156,
+        "link": 28.514309000005596,
+        "decide": 17.511440999995102
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "README edit",
+      "klass": "readme",
+      "repetition": 7,
+      "path": "description",
+      "ms": 303.5369629999914,
+      "steps": {
+        "classify": 0.022928000005776994,
+        "acquire": 263.784421999997,
+        "link": 27.881540999995195,
+        "decide": 10.641184000007343
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "configuration touch",
+      "klass": "configuration",
+      "repetition": 7,
+      "path": "broad",
+      "ms": 602.2447229999962,
+      "steps": {
+        "classify": 0.016862999997101724,
+        "acquire": 265.0410120000015,
+        "snapshot": 142.59429999999702,
+        "catalog": 62.563598000007914,
+        "access": 99.52523300000757,
+        "link": 19.577628999992157,
+        "decide": 11.409115000002203
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "body edit",
+      "klass": "body",
+      "repetition": 8,
+      "path": "source",
+      "ms": 61.68407100001059,
+      "steps": {
+        "classify": 0.034333999996306375,
+        "snapshot": 1.5118619999993825,
+        "catalog": 41.15290500000992,
+        "access": 0.6031280000024708,
+        "link": 15.179875999994692,
+        "decide": 0.7907839999970747
+      },
+      "checkedFiles": 1,
+      "checkedAccesses": 2,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "body edit in place",
+      "klass": "body-in-place",
+      "repetition": 8,
+      "path": "unchanged-surface",
+      "ms": 53.07233699999051,
+      "steps": {
+        "classify": 0.03144299999985378,
+        "snapshot": 1.565958999999566,
+        "catalog": 47.41566199999943,
+        "access": 0.9642800000001444
+      },
+      "checkedFiles": 1,
+      "checkedAccesses": 0,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "import an exposed symbol",
+      "klass": "import-exposed",
+      "repetition": 8,
+      "path": "source",
+      "ms": 182.48249899999064,
+      "steps": {
+        "classify": 0.03956299999845214,
+        "snapshot": 94.62717100000009,
+        "catalog": 54.639234000002034,
+        "access": 7.023010999997496,
+        "link": 21.349618000007467,
+        "decide": 1.0825860000040848
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 4,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "add an export",
+      "klass": "add-export",
+      "repetition": 8,
+      "path": "source",
+      "ms": 78.94247599999653,
+      "steps": {
+        "classify": 0.03278599999612197,
+        "snapshot": 1.6341580000007525,
+        "catalog": 41.98971799999708,
+        "access": 6.404957000006107,
+        "link": 24.20873099999153,
+        "decide": 0.8949799999973038
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 0,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "import that violates exposure",
+      "klass": "denied-import",
+      "repetition": 8,
+      "path": "source",
+      "ms": 184.3973709999991,
+      "steps": {
+        "classify": 0.03494399999908637,
+        "snapshot": 93.61113599999226,
+        "catalog": 60.727470999991056,
+        "access": 7.783821999997599,
+        "link": 17.02070399999502,
+        "decide": 1.01212499999383
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 5,
+      "findings": 1,
+      "added": 1,
+      "removed": 0
+    },
+    {
+      "step": "remove the violating import",
+      "klass": "denial-removed",
+      "repetition": 8,
+      "path": "source",
+      "ms": 228.06578200000513,
+      "steps": {
+        "classify": 0.02308999998786021,
+        "snapshot": 115.92035600000236,
+        "catalog": 69.78359700000146,
+        "access": 7.627152999993996,
+        "link": 28.416050999992876,
+        "decide": 1.6073730000061914
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 4,
+      "findings": 0,
+      "added": 0,
+      "removed": 1
+    },
+    {
+      "step": "description removes an exposure",
+      "klass": "description",
+      "repetition": 8,
+      "path": "description",
+      "ms": 301.8092739999993,
+      "steps": {
+        "classify": 0.025253999992855825,
+        "acquire": 263.8479110000044,
+        "link": 18.917821000010008,
+        "decide": 17.559080999999424
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 56,
+      "added": 56,
+      "removed": 0
+    },
+    {
+      "step": "description reverted",
+      "klass": "description-revert",
+      "repetition": 8,
+      "path": "description",
+      "ms": 259.7975129999977,
+      "steps": {
+        "classify": 0.026637999995728023,
+        "acquire": 219.0046590000129,
+        "link": 22.21174699999392,
+        "decide": 16.991567999997642
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 56
+    },
+    {
+      "step": "create an importing file",
+      "klass": "create",
+      "repetition": 8,
+      "path": "broad",
+      "ms": 495.707430999988,
+      "steps": {
+        "classify": 0.02456200000597164,
+        "acquire": 231.90863100001297,
+        "snapshot": 93.3409740000061,
+        "catalog": 56.335021000006236,
+        "access": 86.27609200000006,
+        "link": 16.592697999993106,
+        "decide": 9.511467000003904
+      },
+      "checkedFiles": 55,
+      "checkedAccesses": 296,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "delete that file",
+      "klass": "delete",
+      "repetition": 8,
+      "path": "broad",
+      "ms": 499.9521139999997,
+      "steps": {
+        "classify": 0.019453999993856996,
+        "acquire": 226.858659000005,
+        "snapshot": 105.97152500000084,
+        "catalog": 43.15082299998903,
+        "access": 78.44609599999967,
+        "link": 26.519176000001607,
+        "decide": 17.2976939999935
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "README edit",
+      "klass": "readme",
+      "repetition": 8,
+      "path": "description",
+      "ms": 287.21662500000093,
+      "steps": {
+        "classify": 0.02010399999562651,
+        "acquire": 240.31299999999464,
+        "link": 28.419289999990724,
+        "decide": 17.362607999995816
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "configuration touch",
+      "klass": "configuration",
+      "repetition": 8,
+      "path": "broad",
+      "ms": 535.4445399999968,
+      "steps": {
+        "classify": 0.02156500000273809,
+        "acquire": 230.3197899999941,
+        "snapshot": 132.0060969999904,
+        "catalog": 48.51411399999051,
+        "access": 93.66058100000373,
+        "link": 15.28628000000026,
+        "decide": 14.189050000000861
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "body edit",
+      "klass": "body",
+      "repetition": 9,
+      "path": "source",
+      "ms": 72.71017700000084,
+      "steps": {
+        "classify": 0.03231799999775831,
+        "snapshot": 2.277132999995956,
+        "catalog": 48.22331600000325,
+        "access": 0.6085980000061681,
+        "link": 17.372661000001244,
+        "decide": 1.2670890000008512
+      },
+      "checkedFiles": 1,
+      "checkedAccesses": 2,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "body edit in place",
+      "klass": "body-in-place",
+      "repetition": 9,
+      "path": "unchanged-surface",
+      "ms": 50.157437000001664,
+      "steps": {
+        "classify": 0.04274900000018533,
+        "snapshot": 1.6205239999981131,
+        "catalog": 44.49704499999643,
+        "access": 0.9097279999987222
+      },
+      "checkedFiles": 1,
+      "checkedAccesses": 0,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "import an exposed symbol",
+      "klass": "import-exposed",
+      "repetition": 9,
+      "path": "source",
+      "ms": 173.5891469999915,
+      "steps": {
+        "classify": 0.028720000002067536,
+        "snapshot": 91.8001179999992,
+        "catalog": 51.91020600000047,
+        "access": 6.340738999992027,
+        "link": 18.430540999994264,
+        "decide": 1.3528079999960028
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 4,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "add an export",
+      "klass": "add-export",
+      "repetition": 9,
+      "path": "source",
+      "ms": 76.18835499999113,
+      "steps": {
+        "classify": 0.03225399999064393,
+        "snapshot": 2.0588969999953406,
+        "catalog": 47.4624829999957,
+        "access": 6.76503799999773,
+        "link": 15.477083000005223,
+        "decide": 0.5534760000009555
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 0,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "import that violates exposure",
+      "klass": "denied-import",
+      "repetition": 9,
+      "path": "source",
+      "ms": 187.19859699999506,
+      "steps": {
+        "classify": 0.030360999997355975,
+        "snapshot": 94.77168700000038,
+        "catalog": 51.98102700000163,
+        "access": 7.819170999995549,
+        "link": 26.347559000001638,
+        "decide": 1.758406000008108
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 5,
+      "findings": 1,
+      "added": 1,
+      "removed": 0
+    },
+    {
+      "step": "remove the violating import",
+      "klass": "denial-removed",
+      "repetition": 9,
+      "path": "source",
+      "ms": 168.8295519999956,
+      "steps": {
+        "classify": 0.039250000001629815,
+        "snapshot": 90.0158550000051,
+        "catalog": 54.91598299999896,
+        "access": 4.093141999997897,
+        "link": 15.95836099999724,
+        "decide": 0.9374839999945834
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 4,
+      "findings": 0,
+      "added": 0,
+      "removed": 1
+    },
+    {
+      "step": "description removes an exposure",
+      "klass": "description",
+      "repetition": 9,
+      "path": "description",
+      "ms": 262.60210700001335,
+      "steps": {
+        "classify": 0.01959500000521075,
+        "acquire": 227.1787159999949,
+        "link": 16.64274199999636,
+        "decide": 17.754969000001438
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 56,
+      "added": 56,
+      "removed": 0
+    },
+    {
+      "step": "description reverted",
+      "klass": "description-revert",
+      "repetition": 9,
+      "path": "description",
+      "ms": 267.63132100000803,
+      "steps": {
+        "classify": 0.020002000004751608,
+        "acquire": 239.3504699999903,
+        "link": 17.197523999988334,
+        "decide": 10.132105999990017
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 56
+    },
+    {
+      "step": "create an importing file",
+      "klass": "create",
+      "repetition": 9,
+      "path": "broad",
+      "ms": 583.8266980000044,
+      "steps": {
+        "classify": 0.018384999988484196,
+        "acquire": 259.90881200000877,
+        "snapshot": 107.37692799999786,
+        "catalog": 60.72592799999984,
+        "access": 104.91627000000153,
+        "link": 31.300923000002513,
+        "decide": 17.84260400000494
+      },
+      "checkedFiles": 55,
+      "checkedAccesses": 296,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "delete that file",
+      "klass": "delete",
+      "repetition": 9,
+      "path": "broad",
+      "ms": 564.7700560000085,
+      "steps": {
+        "classify": 0.017204000003403053,
+        "acquire": 272.7819210000016,
+        "snapshot": 98.92938600000343,
+        "catalog": 56.43519699999888,
+        "access": 93.43654799999786,
+        "link": 26.08763199999521,
+        "decide": 15.72749200000544
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "README edit",
+      "klass": "readme",
+      "repetition": 9,
+      "path": "description",
+      "ms": 327.01714399999764,
+      "steps": {
+        "classify": 0.01817700000538025,
+        "acquire": 275.4053130000102,
+        "link": 31.557906999994884,
+        "decide": 18.777772000001278
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "configuration touch",
+      "klass": "configuration",
+      "repetition": 9,
+      "path": "broad",
+      "ms": 575.2370720000035,
+      "steps": {
+        "classify": 0.023717000003671274,
+        "acquire": 243.40008900000248,
+        "snapshot": 125.05998000000545,
+        "catalog": 47.01601099999971,
+        "access": 110.97658899999806,
+        "link": 28.04462400000193,
+        "decide": 19.01425300000119
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 0
+    },
+    {
+      "step": "body edit",
+      "klass": "body",
+      "repetition": 10,
+      "path": "source",
+      "ms": 57.83477099999436,
+      "steps": {
+        "classify": 0.13037500000791624,
+        "snapshot": 1.43996600000537,
+        "catalog": 35.45703799999319,
+        "access": 0.5742330000066431,
+        "link": 17.27876600000309,
+        "decide": 0.6999540000106208
+      },
+      "checkedFiles": 1,
+      "checkedAccesses": 2,
+      "findings": 0,
+      "added": 0,
+      "removed": 0,
+      "audit": {
+        "equal": true,
+        "batchMs": 4192,
+        "differences": []
+      }
+    },
+    {
+      "step": "body edit in place",
+      "klass": "body-in-place",
+      "repetition": 10,
+      "path": "unchanged-surface",
+      "ms": 63.11802200000966,
+      "steps": {
+        "classify": 0.03338400000939146,
+        "snapshot": 1.8542030000098748,
+        "catalog": 56.966222000002745,
+        "access": 0.973587000000407
+      },
+      "checkedFiles": 1,
+      "checkedAccesses": 0,
+      "findings": 0,
+      "added": 0,
+      "removed": 0,
+      "audit": {
+        "equal": true,
+        "batchMs": 4887,
+        "differences": []
+      }
+    },
+    {
+      "step": "import an exposed symbol",
+      "klass": "import-exposed",
+      "repetition": 10,
+      "path": "source",
+      "ms": 204.70804500000668,
+      "steps": {
+        "classify": 0.03639100000145845,
+        "snapshot": 98.22453599999426,
+        "catalog": 61.77337799999805,
+        "access": 9.81582299999718,
+        "link": 28.862400999991223,
+        "decide": 1.4955289999925299
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 4,
+      "findings": 0,
+      "added": 0,
+      "removed": 0,
+      "audit": {
+        "equal": true,
+        "batchMs": 4496,
+        "differences": []
+      }
+    },
+    {
+      "step": "add an export",
+      "klass": "add-export",
+      "repetition": 10,
+      "path": "source",
+      "ms": 75.67090300000564,
+      "steps": {
+        "classify": 0.025250000006053597,
+        "snapshot": 1.9677690000098664,
+        "catalog": 42.66161499998998,
+        "access": 7.076211999999941,
+        "link": 19.279500999997254,
+        "decide": 0.49250300000130665
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 0,
+      "findings": 0,
+      "added": 0,
+      "removed": 0,
+      "audit": {
+        "equal": true,
+        "batchMs": 4261,
+        "differences": []
+      }
+    },
+    {
+      "step": "import that violates exposure",
+      "klass": "denied-import",
+      "repetition": 10,
+      "path": "source",
+      "ms": 161.8586789999972,
+      "steps": {
+        "classify": 0.03232199999911245,
+        "snapshot": 85.20646499999566,
+        "catalog": 48.79573399999936,
+        "access": 6.2622080000146525,
+        "link": 17.586232000001473,
+        "decide": 1.1047990000079153
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 5,
+      "findings": 1,
+      "added": 1,
+      "removed": 0,
+      "audit": {
+        "equal": true,
+        "batchMs": 4481,
+        "differences": []
+      }
+    },
+    {
+      "step": "remove the violating import",
+      "klass": "denial-removed",
+      "repetition": 10,
+      "path": "source",
+      "ms": 160.6261930000037,
+      "steps": {
+        "classify": 0.04013700000359677,
+        "snapshot": 90.07670900000085,
+        "catalog": 42.053595999997924,
+        "access": 5.012315000014496,
+        "link": 19.609894000008353,
+        "decide": 0.9042469999985769
+      },
+      "checkedFiles": 3,
+      "checkedAccesses": 4,
+      "findings": 0,
+      "added": 0,
+      "removed": 1,
+      "audit": {
+        "equal": true,
+        "batchMs": 4096,
+        "differences": []
+      }
+    },
+    {
+      "step": "description removes an exposure",
+      "klass": "description",
+      "repetition": 10,
+      "path": "description",
+      "ms": 282.57313799999247,
+      "steps": {
+        "classify": 0.024631999986013398,
+        "acquire": 230.78155899999547,
+        "link": 24.390897999997833,
+        "decide": 26.096401000002516
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 56,
+      "added": 56,
+      "removed": 0,
+      "audit": {
+        "equal": true,
+        "batchMs": 4221,
+        "differences": []
+      }
+    },
+    {
+      "step": "description reverted",
+      "klass": "description-revert",
+      "repetition": 10,
+      "path": "description",
+      "ms": 250.05571300000884,
+      "steps": {
+        "classify": 0.019763999996939674,
+        "acquire": 219.33596399999806,
+        "link": 18.44503599999007,
+        "decide": 11.402421000006143
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 56,
+      "audit": {
+        "equal": true,
+        "batchMs": 4011,
+        "differences": []
+      }
+    },
+    {
+      "step": "create an importing file",
+      "klass": "create",
+      "repetition": 10,
+      "path": "broad",
+      "ms": 458.6045549999981,
+      "steps": {
+        "classify": 0.018741999985650182,
+        "acquire": 219.09854900001665,
+        "snapshot": 96.02130600000964,
+        "catalog": 41.52543599999626,
+        "access": 76.2985650000046,
+        "link": 14.946942999988096,
+        "decide": 9.627319000021089
+      },
+      "checkedFiles": 55,
+      "checkedAccesses": 296,
+      "findings": 0,
+      "added": 0,
+      "removed": 0,
+      "audit": {
+        "equal": true,
+        "batchMs": 4373,
+        "differences": []
+      }
+    },
+    {
+      "step": "delete that file",
+      "klass": "delete",
+      "repetition": 10,
+      "path": "broad",
+      "ms": 443.87240999998176,
+      "steps": {
+        "classify": 0.02452499998616986,
+        "acquire": 202.4969830000191,
+        "snapshot": 81.47435999999288,
+        "catalog": 44.96310500000254,
+        "access": 82.91403899999568,
+        "link": 21.379311000026064,
+        "decide": 9.139028000005055
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 0,
+      "audit": {
+        "equal": true,
+        "batchMs": 4278,
+        "differences": []
+      }
+    },
+    {
+      "step": "README edit",
+      "klass": "readme",
+      "repetition": 10,
+      "path": "description",
+      "ms": 272.86334300000453,
+      "steps": {
+        "classify": 0.02708500000881031,
+        "acquire": 236.01287399997818,
+        "link": 22.590485000022454,
+        "decide": 13.219802000006894
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 0,
+      "audit": {
+        "equal": true,
+        "batchMs": 4330,
+        "differences": []
+      }
+    },
+    {
+      "step": "configuration touch",
+      "klass": "configuration",
+      "repetition": 10,
+      "path": "broad",
+      "ms": 504.14226799999597,
+      "steps": {
+        "classify": 0.026111000013770536,
+        "acquire": 212.34806800002116,
+        "snapshot": 121.50774000000092,
+        "catalog": 46.63500799998292,
+        "access": 92.22954099997878,
+        "link": 19.231703000026755,
+        "decide": 10.584994999982882
+      },
+      "checkedFiles": 54,
+      "checkedAccesses": 295,
+      "findings": 0,
+      "added": 0,
+      "removed": 0,
+      "audit": {
+        "equal": true,
+        "batchMs": 3754,
+        "differences": []
+      }
+    }
+  ]
+}
