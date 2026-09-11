@@ -9,3 +9,15 @@ invocation before dispatch and checks stage completion before reporting success.
 It preserves the analysis report in JSON and formats its diagnostics, warnings,
 coverage and scope for humans. Pre-analysis invocation failures use the
 `ramify.cli/1` envelope; analysis results retain `ramify.analysis/1`.
+
+Human checks print `Mode: batch` immediately after `Configuration:`; JSON
+reports contain no mode member. Both ordinary checks and `--batch` still use
+the existing batch operation until the resident providers are available.
+
+The private argument parser recognizes the planned `watch [--root <dir>]
+[--format json]` and `daemon status|stop [--format json]` syntax, including
+command-specific option and duplicate validation. Dispatch still rejects these
+commands with `invalid-invocation` and exit 2 because the service connector,
+daemon entry and quick environment are absent. Parsing these commands does not
+establish resident availability. The connector integration, streamed documents,
+recovery and fallback policy remain unimplemented.

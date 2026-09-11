@@ -16,7 +16,7 @@ const probe = 'subs/presentation/subs/layout/src/__i1_probe.ts';
 const original = { kind: 'code', owner: 'ramify', file: 'interfaces/batch.ts', binding: 'BatchInvocation' };
 
 async function cliReport(root: string, assertions: Assertions, exit: number): Promise<AnalysisReport> {
-  const result = await command(root, process.execPath, [join(repositoryRoot, 'dist/src/cli-entry.js'), 'check', '--root', root, '--format', 'json']);
+  const result = await command(root, process.execPath, [join(repositoryRoot, 'dist/src/cli-entry.js'), 'check', '--batch', '--root', root, '--format', 'json']);
   assertions.equal('compiled self-check exit and streams', [result.code, result.signal, result.error, result.stderr], [exit, null, null, '']);
   const report = JSON.parse(result.stdout) as AnalysisReport;
   recordObservation('compiled-toolkit', { command: result.command, durationMs: result.durationMs, ...analysisEvidence(report) });

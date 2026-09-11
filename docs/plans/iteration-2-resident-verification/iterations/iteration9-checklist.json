@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": false,
+    "functionalRequirementsSatisfied": false,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-11T08:28:59.076Z",
+  "iteration": "9",
+  "notes": "Incomplete checkpoint: command grammar, Mode: batch and explicit Plan 1 batch argv migration implemented with 36 added cases. Build, type-check, five direct smoke groups and batch self/reference checks pass. Vitest awaits automation. The real increment/context/service/connector/host providers and quick environment are absent; all 28 iteration-9 matrix instances are unexecuted. Filtered gate: 134 required, 4 passed, 130 required not executed. Full Plan 1 gate, connector environments, resident commands/fallback and eighth client entry remain outstanding."
+}

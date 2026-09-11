@@ -129,7 +129,7 @@ export async function prepareRelocatedPackage(context: ProjectContext): Promise<
   await run(context, 'relocated whole type-check', root, 'npm', ['run', 'type-check']);
   assertions.equal('build creates the actual executable', await exists(join(root, 'dist/src/cli-entry.js')), true);
   const compiled = await run(context, 'relocated compiled reference', root, process.execPath,
-    ['dist/src/cli-entry.js', 'check', '--root', referencePath, '--format', 'json']);
+    ['dist/src/cli-entry.js', 'check', '--batch', '--root', referencePath, '--format', 'json']);
   assertions.equal('compiled JSON has clean stderr', compiled.stderr, '');
   const baseline = JSON.parse(compiled.stdout) as AnalysisReport;
   assertClean(context, baseline, 'compiled baseline');
@@ -180,11 +180,11 @@ console.log(JSON.stringify(observed));
   assertions.equal('all seven actual package entry imports executed', JSON.parse(imports.stdout).map((entry: { entry: string }) => entry.entry), Object.keys(entryFunctions));
   observe(context, 'relocation-installed-entries', JSON.parse(imports.stdout));
   const installedCheck = await run(context, 'installed reference JSON', consumer, installedBin(context),
-    ['check', '--root', join(root, referencePath), '--format', 'json']);
+    ['check', '--batch', '--root', join(root, referencePath), '--format', 'json']);
   const installedReport = JSON.parse(installedCheck.stdout) as AnalysisReport;
   assertClean(context, installedReport, 'installed baseline');
   assertions.equal('installed and copied compiled engine agree', semantic(installedReport), semantic(baseline));
-  const human = await run(context, 'installed reference implicit-root human output', join(root, referencePath), installedBin(context), ['check']);
+  const human = await run(context, 'installed reference implicit-root human output', join(root, referencePath), installedBin(context), ['check', '--batch']);
   assertions.ok('installed human command reports completed whole reference', human.stdout.includes('15 owners') && human.stdout.includes('check: passed'));
   assertions.equal('installed commands keep stdout separate from stderr', [installedCheck.stderr, human.stderr], ['', '']);
 }
@@ -209,7 +209,7 @@ export async function assertRelocatedDenial(context: ProjectContext): Promise<vo
   const reference = join(context.root, referencePath);
   await run(context, 'relocated negative remains valid TypeScript', reference, 'npm', ['run', 'type-check']);
   const result = await run(context, 'installed reference denial', installedRoot(context), installedBin(context),
-    ['check', '--root', reference, '--format', 'json'], 1);
+    ['check', '--batch', '--root', reference, '--format', 'json'], 1);
   const report = JSON.parse(result.stdout) as AnalysisReport;
   context.assertions.equal('installed negative is a completed failed check', [report.outcome.execution, report.outcome.check, report.summary.denied], ['completed', 'failed', 1]);
   context.assertions.equal('installed independent W2 negative retains located original and importer', report.diagnostics.map(issue =>
@@ -218,7 +218,7 @@ export async function assertRelocatedDenial(context: ProjectContext): Promise<vo
   context.assertions.ok('installed denial keeps declaration evidence and useful location', report.diagnostics[0].location!.line > 0 && report.diagnostics[0].related.length > 0);
   observe(context, 'relocation-analysis', { label: 'installed negative', report: analysisEvidence(report) });
   await replaceExactlyOnce(join(reference, 'subs/workspace/module.ramify'), withoutRouter, relay);
-  const restored = await run(context, 'installed restored control', reference, installedBin(context), ['check', '--format', 'json']);
+  const restored = await run(context, 'installed restored control', reference, installedBin(context), ['check', '--batch', '--format', 'json']);
   assertClean(context, JSON.parse(restored.stdout) as AnalysisReport, 'restored baseline');
 }
 

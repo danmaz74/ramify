@@ -6,17 +6,34 @@ import type { AnalysisDiagnostic, AnalysisReport } from '../../subs/analysis/src
 import { fixture, invoke, put } from './fixture.js';
 
 describe('CLI with real batch sessions', () => {
+  for (const selection of ['resolved', 'unresolved'] as const) it(`labels ${selection} batch output without altering the JSON report`, async () => fixture(async root => {
+    const cwd = selection === 'resolved' ? root : '/';
+    const expected = await runBatch({ cwd, capabilities: ['static-access'] });
+    if (expected.status !== 'reported') throw new Error('Expected real batch report');
+    const batch = async () => expected;
+    const human = await invoke(cwd, ['check', '--batch'], batch);
+    const json = await invoke(cwd, ['check', '--batch', '--format', 'json'], batch);
+    expect([human.exitCode, json.exitCode]).toEqual([selection === 'resolved' ? 0 : 2, selection === 'resolved' ? 0 : 2]);
+    expect([human.stderr, json.stderr]).toEqual(['', '']);
+    const lines = human.stdout.split('\n');
+    expect(lines[1]).toBe(`Configuration: ${expected.report.scope?.configuration ?? 'unavailable'}`);
+    expect(lines[2]).toBe('Mode: batch');
+    expect(lines.filter(line => line.startsWith('Mode:'))).toEqual(['Mode: batch']);
+    expect(json.stdout).toBe(JSON.stringify(expected.report) + '\n');
+    expect(json.writes).toBe(1);
+  }), 20_000);
+
   it('preserves the public report in JSON and formats the same completed evidence for humans', async () => fixture(async root => {
     const result = await runBatch({ cwd: root, root, capabilities: ['static-access'] });
     expect(result.status).toBe('reported');
     if (result.status !== 'reported') throw new Error('Expected report');
-    const json = await invoke(root, ['check', '--root', root, '--format', 'json']);
+    const json = await invoke(root, ['check', '--batch', '--root', root, '--format', 'json']);
     const report = JSON.parse(json.stdout) as AnalysisReport;
     expect(json).toMatchObject({ exitCode: 0, stderr: '', writes: 1 });
     expect(report.outcome).toEqual({ execution: 'completed', check: 'passed', coverage: 'complete' });
     expect(report.summary).toEqual(result.report.summary);
     expect(report.snapshot).toEqual(result.report.snapshot);
-    const human = await invoke(root, ['check', '--root', root], async () => ({ ...result, report }));
+    const human = await invoke(root, ['check', '--batch', '--root', root], async () => ({ ...result, report }));
     expect(human).toMatchObject({ exitCode: 0, stderr: '' });
     expect(human.stdout).toContain(`Root: ${root} (given)`);
     expect(human.stdout).toContain(`Configuration: ${root}/tsconfig.json`);
@@ -33,7 +50,7 @@ describe('CLI with real batch sessions', () => {
   it('prints failures before outside-source warnings, coverage and the completed scope', async () => fixture(async root => {
     await put(root, 'tests/helper.ts', 'export const helper = 1;');
     await put(root, 'subs/consumer/src/use.ts', "import { privateValue } from '../../../src/interfaces/api.js'; void privateValue; declare const target: string; void import(target);\n");
-    const result = await invoke(root, ['check']);
+    const result = await invoke(root, ['check', '--batch']);
     expect(result.exitCode).toBe(1);
     const ordered = ['Error [not-visible] subs/consumer/src/use.ts:1:', 'Warning [outside-module-source] tests: 1',
       'Analysis limit [nonliteral-target]', 'Completed scope:'];
@@ -48,7 +65,7 @@ describe('CLI with real batch sessions', () => {
     await put(root, 'tests/helper.ts', 'export const helper = 1;');
     // A module: a script's ambient declaration would add a shared-global note.
     await put(root, 'subs/consumer/src/use.ts', "declare const path: string; void import(path); export {};\n");
-    const result = await invoke(root, ['check', '--format', 'json']);
+    const result = await invoke(root, ['check', '--batch', '--format', 'json']);
     const report = JSON.parse(result.stdout) as AnalysisReport;
     expect(result.exitCode).toBe(0);
     expect(report.outcome).toEqual({ execution: 'completed', check: 'passed', coverage: 'partial' });
@@ -59,7 +76,7 @@ describe('CLI with real batch sessions', () => {
 
   it('fails invalid descriptions with blocked checking as exit 1', async () => fixture(async root => {
     await put(root, 'module.ramify', 'ramify 1\nmodule fixture\nexpose-src value from "missing.ts" to descendants\n');
-    const result = await invoke(root, ['check', '--format', 'json']);
+    const result = await invoke(root, ['check', '--batch', '--format', 'json']);
     expect(result.exitCode).toBe(1);
     expect(JSON.parse(result.stdout)).toMatchObject({ outcome: { execution: 'invalid', check: 'failed' },
       diagnostics: expect.arrayContaining([expect.objectContaining({ code: 'missing-file' })]),
@@ -68,7 +85,7 @@ describe('CLI with real batch sessions', () => {
 
   it('reports no project without searching described projects below the working directory', async () => fixture(async root => {
     // Explicitly place the working directory outside all described ancestors.
-    const result = await invoke('/', ['check', '--format', 'json']);
+    const result = await invoke('/', ['check', '--batch', '--format', 'json']);
     expect(result.exitCode).toBe(2);
     expect(JSON.parse(result.stdout).diagnostics.some((issue: AnalysisDiagnostic) => issue.message.includes('/'))).toBe(true);
   }), 15_000);
@@ -81,7 +98,7 @@ describe('CLI with real batch sessions', () => {
   }), 15_000);
 
   for (const status of ['missing', 'not-requested', 'blocked', 'failed'] as const) it(`rejects an injected ${status} access stage with empty findings`, async () => fixture(async root => {
-    const result = await invoke(root, ['check', '--format', 'json'], async (invocation, control) => {
+    const result = await invoke(root, ['check', '--batch', '--format', 'json'], async (invocation, control) => {
       const baseline = await runBatch(invocation, control);
       if (baseline.status !== 'reported') throw new Error('Expected report');
       expect(baseline.exitCode).toBe(0);
@@ -96,7 +113,7 @@ describe('CLI with real batch sessions', () => {
 
   it('keeps existing denials when a later report failure supersedes exit 1', async () => fixture(async root => {
     await put(root, 'subs/consumer/src/use.ts', "import { privateValue } from '../../../src/interfaces/api.js'; void privateValue;\n");
-    const result = await invoke(root, ['check', '--format', 'json'], async (invocation, control) => {
+    const result = await invoke(root, ['check', '--batch', '--format', 'json'], async (invocation, control) => {
       const baseline = await runBatch(invocation, control);
       if (baseline.status !== 'reported') throw new Error('Expected report');
       expect(baseline.exitCode).toBe(1);
@@ -114,7 +131,7 @@ describe('CLI with real batch sessions', () => {
 
   it('suppresses results when cancellation arrives through the injected binding', async () => fixture(async root => {
     const controller = new AbortController();
-    const result = await invoke(root, ['check', '--format', 'json'], async (invocation, control) => {
+    const result = await invoke(root, ['check', '--batch', '--format', 'json'], async (invocation, control) => {
       const completed = await runBatch(invocation, control); controller.abort(); return completed;
     }, { signal: controller.signal });
     expect(result).toMatchObject({ exitCode: 130, stdout: '', stderr: 'Interrupted; no result claimed.\n' });
@@ -122,7 +139,7 @@ describe('CLI with real batch sessions', () => {
 
   it('retains a known denial when an injected report exceeds the output budget', async () => fixture(async root => {
     await put(root, 'subs/consumer/src/use.ts', "import { privateValue } from '../../../src/interfaces/api.js'; void privateValue;\n");
-    const result = await invoke(root, ['check', '--format', 'json'], async (invocation, control) => {
+    const result = await invoke(root, ['check', '--batch', '--format', 'json'], async (invocation, control) => {
       const baseline = await runBatch(invocation, control);
       if (baseline.status !== 'reported' || !baseline.report.snapshot) throw new Error('Expected denied baseline');
       expect(baseline.exitCode).toBe(1);
@@ -141,7 +158,7 @@ describe('CLI with real batch sessions', () => {
 
   it('handles synchronous output failures after a real session releases its resources', async () => fixture(async root => {
     const errors: string[] = [];
-    expect(await runCli(['check', '--format', 'json'], { cwd: root, version: '1', batch: runBatch,
+    expect(await runCli(['check', '--batch', '--format', 'json'], { cwd: root, version: '1', batch: runBatch,
       stdout: () => { throw new Error('Broken sink'); }, stderr: text => { errors.push(text); } })).toBe(2);
     expect(errors.join('')).toContain('output-failure');
   }), 15_000);

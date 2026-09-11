@@ -29,9 +29,12 @@ export async function runCli(argv: readonly string[], environment: CliEnvironmen
   let phase: 'invocation' | 'execution' | 'output' = 'invocation';
   try {
     const args = parseArguments(argv);
-    if (args.command !== 'check') {
+    if (args.command === 'help' || args.command === 'version') {
       phase = 'output'; environment.stdout(args.command === 'help' ? help : `${environment.version}\n`); return 0;
     }
+    // Grammar is ready for the resident commands; dispatch requires the
+    // daemon-owned ServiceConnector and its real service implementation.
+    if (args.command !== 'check') throw new Error(`Unavailable command: ${args.command}. Resident service is not implemented.`);
     phase = 'execution';
     const result = await environment.batch({ cwd: environment.cwd, ...(args.root === undefined ? {} : { root: args.root }), capabilities }, control);
     if (result.status === 'cancelled' || control.signal?.aborted) return interrupted();
@@ -41,7 +44,7 @@ export async function runCli(argv: readonly string[], environment: CliEnvironmen
       || result.exitCode === 2 || report.stages.some(stage => stage.status === 'failed' || stage.status === 'unavailable');
     const exitCode = failed ? 2 : report.outcome.execution === 'invalid' || report.outcome.check === 'failed'
       || report.diagnostics.length || report.summary.denied || result.exitCode === 1 ? 1 : 0;
-    environment.stdout(args.format === 'json' ? serialized + '\n' : formatHuman(report));
+    environment.stdout(args.format === 'json' ? serialized + '\n' : formatHuman(report, 'batch'));
     return exitCode;
   } catch (error) {
     if (phase !== 'output' && control.signal?.aborted) return interrupted();

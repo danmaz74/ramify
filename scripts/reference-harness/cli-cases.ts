@@ -32,7 +32,7 @@ function add(id: string, fixture: 'R' | 'F', mutate: Handler['mutate'], run: Han
 }
 async function direct(root: string, format: 'human' | 'json', batch: BatchOperation = runBatch) {
   const stdout: string[] = [], stderr: string[] = [];
-  const code = await runCli(['check', '--root', root, ...(format === 'json' ? ['--format', 'json'] : [])], {
+  const code = await runCli(['check', '--batch', '--root', root, ...(format === 'json' ? ['--format', 'json'] : [])], {
     cwd: root, version: 'test', stdout: text => { stdout.push(text); }, stderr: text => { stderr.push(text); }, batch,
   });
   return { code, stdout: stdout.join(''), stderr: stderr.join(''), writes: stdout.length };
@@ -70,10 +70,10 @@ function humanEvidence(context: ProjectContext, text: string, report: AnalysisRe
 
 add('I1-26:human-json', 'R', unchanged, async context => {
   const report = await sessionReport(context.root);
-  const human = await cliProcess(context.root, ['check', '--root', context.root]);
+  const human = await cliProcess(context.root, ['check', '--batch', '--root', context.root]);
   processResult(context, human, 0);
   humanEvidence(context, human.stdout, report);
-  const json = await cliProcess(context.root, ['check', '--root', context.root, '--format', 'json']);
+  const json = await cliProcess(context.root, ['check', '--batch', '--root', context.root, '--format', 'json']);
   context.assertions.equal('JSON subprocess exit and stderr', [json.code, json.stderr], [0, '']);
   context.assertions.equal('compiled CLI and direct API preserve identical semantic report', semantic(JSON.parse(json.stdout)), semantic(report));
   const injected = await direct(context.root, 'json');
@@ -93,7 +93,7 @@ add('I1-26:missing-stage', 'F', unchanged, async context => {
   context.assertions.equal('unrun access retained in stage evidence', report.stages.find(stage => stage.stage === 'access')?.status, 'not-requested');
 });
 add('I1-26:failed-resolver', 'F', unchanged, async context => {
-  const result = await cliProcess(context.root, ['check', '--root', context.root, '--format', 'json'], { mode: 'fail-catalog',
+  const result = await cliProcess(context.root, ['check', '--batch', '--root', context.root, '--format', 'json'], { mode: 'fail-catalog',
     entry: join(repositoryRoot, 'scripts/reference-harness/cli-direct-worker.ts'), nodeArgs: ['--import', import.meta.resolve('tsx')] });
   processResult(context, result, 2);
   const report = JSON.parse(result.stdout) as AnalysisReport;
@@ -141,7 +141,7 @@ for (const kind of ['clean', 'denied', 'invalid'] as const) for (const format of
     : replaceExactlyOnce(join(root, 'subs/workspace/subs/contracts/module.ramify'), 'from "interfaces/vocabulary.ts"', 'from "interfaces/missing.ts"'), async context => {
     if (kind === 'denied') await compilerValid(context.root, context.assertions);
     const expected = await sessionReport(context.root);
-    const result = await cliProcess(context.root, ['check', '--root', context.root, ...(format === 'json' ? ['--format', 'json'] : [])], { executable: compiledEntry });
+    const result = await cliProcess(context.root, ['check', '--batch', '--root', context.root, ...(format === 'json' ? ['--format', 'json'] : [])], { executable: compiledEntry });
     processResult(context, result, kind === 'clean' ? 0 : 1);
     if (format === 'json') context.assertions.equal('versioned JSON matches real API semantics', semantic(JSON.parse(result.stdout)), semantic(expected));
     else humanEvidence(context, result.stdout, expected);
@@ -173,7 +173,7 @@ for (const variant of ['no-config', 'references', 'command', 'format']) add(`I1-
       isolated = await mkdtemp(join(tmpdir(), 'ramify-cli-no-config-'));
       root = join(isolated, 'project'); await cp(context.root, root, { recursive: true });
     }
-    const result = await cliProcess(root, [variant === 'command' ? 'inspect' : 'check', '--root', root,
+    const result = await cliProcess(root, [variant === 'command' ? 'inspect' : 'check', '--batch', '--root', root,
       '--format', variant === 'format' ? 'xml' : 'json']);
     context.assertions.equal('actual unavailable exit', [result.code, result.signal], [2, null]);
     if (variant === 'format') context.assertions.ok('invalid format clearly reported', result.stderr.includes('Unsupported format: xml'));
@@ -194,7 +194,7 @@ for (const stray of [false, true]) for (const format of ['human', 'json'] as con
   if (stray) await put(root, 'tests/module.ramify', 'ramify 1\nmodule stray\n');
 }, async context => {
   const expected = await sessionReport(context.root);
-  const result = await cliProcess(context.root, ['check', '--root', context.root, ...(format === 'json' ? ['--format', 'json'] : [])]);
+  const result = await cliProcess(context.root, ['check', '--batch', '--root', context.root, ...(format === 'json' ? ['--format', 'json'] : [])]);
   processResult(context, result, stray ? 1 : 0);
   if (format === 'json') context.assertions.equal('structured output matches API warning/layout evidence', semantic(JSON.parse(result.stdout)), semantic(expected));
   else humanEvidence(context, result.stdout, expected);
@@ -205,7 +205,7 @@ for (const stray of [false, true]) for (const format of ['human', 'json'] as con
   else context.assertions.equal('warning does not create a layout failure', expected.diagnostics, []);
 });
 add('I1-28:no-servers', 'R', unchanged, async context => {
-  const result = await cliProcess(context.root, ['check', '--root', context.root, '--format', 'json']);
+  const result = await cliProcess(context.root, ['check', '--batch', '--root', context.root, '--format', 'json']);
   processResult(context, result, 0);
   context.assertions.equal('no socket listen/bind or alternate process launcher', result.events.filter(event => ['listen', 'bind', 'other-launch'].includes(event.event)), []);
   const children = result.events.filter(event => event.event === 'spawn');
