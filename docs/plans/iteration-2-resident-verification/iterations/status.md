@@ -9,7 +9,7 @@
 | 1 | Contract package, probes and review points | completed | 05:11:31 | 05:30:29 | 18m 58s |
 | 2 | New owner skeletons, harness `--plan 2` and synthetic generators | completed | 05:30:29 | 05:46:33 | 16m 3s |
 | 3 | Analysis increments and project resolution | completed | 05:46:33 | 06:09:51 | 23m 18s |
-| 4 | Contexts owner | completed | 07:12:59 | 07:24:42 | 11m 42s |
+| 4 | Contexts owner | completed | 07:12:59 | 07:25:58 | 12m 58s |
 | 5 | Shared service, root interface and quick environment | pending | - | - | - |
 | 6 | Edit semantics through the quick service | pending | - | - | - |
 | 7 | Codec, discovery and the lightweight client | pending | - | - | - |
@@ -37,4 +37,4 @@
 | 4 | attempt_m1sXZU9_XbsqW3r5TeFQI | off | cumulative (v2) | in unavailable (launch-affordances-disabled); escape unavailable (launch-affordances-disabled); unaccounted unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | 0 | surface unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); search unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); expand unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) |
 | 4 | attempt_m1sXZU9_XbsqW3r5TeFQI | off | final (v2) | pending | pending | pending | pending | pending |
 
-*Last updated: 2026-09-11T07:24:42.790Z*
+*Last updated: 2026-09-11T07:25:58.098Z*
