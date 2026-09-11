@@ -290,3 +290,12 @@ Every sealed synchronized delivery must assert `verified: true`, ordering and
 the expected reuse; the incomplete acquisition-failure delivery must instead
 assert `verified: false`, as the reviewed contracts require. The driver failure
 wrapper and all service assertions remain work for the resumed iteration.
+
+The seven reference text-edit tests also call `resident-expectations.ts` to
+assert their report effects: root's W2 denial; every core original's added `ui`
+tag and the adapter's denied values; exact C1/W1 growth or shrinkage; located
+foreign-original and missing-file errors without permissions; and changed README
+metadata with preserved decisions. Restoration compares the entire batch report
+after replacing only `runId`. Each edit assertion rejects the unchanged baseline
+as a negative control. Future quick handlers can reuse these report assertions
+with the harness's recorded `Assertions`, adding their resident-specific checks.

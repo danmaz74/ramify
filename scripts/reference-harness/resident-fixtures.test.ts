@@ -7,6 +7,8 @@ import { coreDescription, coreDirectory, cssShim, prepareReferenceEdits, referen
   vocabulary, workspaceDescription } from './fixtures/plan2/reference.js';
 import { projectFixtureFiles } from './fixtures/plan1/project.js';
 import { applyTextMutation, createLaterFile, moveHistoryToTesting, residentTextMutations as edits } from './resident-mutations.js';
+import { assertReferenceEditReport, assertRestoredReferenceReport } from './resident-expectations.js';
+import { Assertions } from './runner.js';
 import { runIsolatedProject } from './mutation.js';
 import type { ProjectFixture } from './mutation.js';
 import { filesBelow } from './reference-baseline.js';
@@ -117,17 +119,25 @@ describe('reference resident mutations', () => {
     ['remove-hop', workspaceDescription], ['tag-change', coreDescription], ['wildcard-add', vocabulary],
     ['wildcard-remove', vocabulary], ['foreign-wildcard-invalid', vocabulary],
     ['readme-edit', 'subs/workspace/README.md'], ['invalid-description', coreDescription],
-  ] as const)('%s changes exactly its authored file and reverses byte-for-byte', async (name, path) => {
+  ] as const)('%s has its independent report effect and reverses byte-for-byte', async (name, path) => {
     await inFixture(referenceEditFixture, async root => {
+      await prepareReferenceEdits(root);
       const before = await fileMap(root);
+      const baseline = await sessionReport(root);
+      expect(() => assertReferenceEditReport(name, baseline, baseline, new Assertions())).toThrow();
       expect(await applyTextMutation(root, edits[name])).toEqual([path]);
+      const report = await sessionReport(root);
+      const assertions = new Assertions();
+      assertReferenceEditReport(name, baseline, report, assertions);
+      expect(assertions.finish().every(a => a.status === 'passed')).toBe(true);
       const after = await fileMap(root);
       expect(Object.keys(after).filter(file => after[file] !== before[file])).toEqual([path]);
       await applyTextMutation(root, edits[name], true);
       expect(await fileMap(root)).toEqual(before);
       expect(await readFile(join(referenceRoot, path), 'utf8')).toBe(before[path]);
+      assertRestoredReferenceReport(baseline, await sessionReport(root), new Assertions());
     });
-  });
+  }, 60_000);
 
   it('rejects missing and repeated W2 anchors before writing', async () => {
     await inFixture(referenceEditFixture, async root => {
