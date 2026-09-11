@@ -88,3 +88,15 @@ This brings the self-check shape migration forward from iteration 9 and corrects
 - Add each capability and exact handlers to plan2-runtime.ts; use the named iteration gate and retain required evidence kinds. The remaining 172 instances are not implemented or executed.
 - Reuse tracedProcess and isolated endpoint directories for later process cases. No daemon or client was started by this iteration.
 - Iteration 13 supplies measured resident recipes over the three synthetic sizes. No budgets changed and no macOS evidence is claimed.
+
+## Reported regression remediation (2026-09-11)
+
+The workflow's post-commit Vitest run reported 979 passed and one failed test. The failure was the descriptions owner's exact fixture-membership check: its independent toolkit fixture list still contained nine declarations, while iteration 2 correctly installed eleven. The two missing paths were `subs/daemon/module.ramify` and `subs/daemon/subs/contexts/module.ramify`.
+
+The focused correction is confined to `subs/analysis/subs/descriptions/src/tests/descriptions.test.ts`: add literal daemon and contexts fixture records with their exact names, tags ([dispatch] and [] respectively) and empty exposure statements; update the test title and explicit toolkit count to eleven. The existing exact path-set equality, all fifteen reference fixtures, parsed-document/statement checks and token-span assertions remain intact. The fixture loop now adds one parser test for each new owner. No parser implementation, declaration or feature scenario changed.
+
+Focused static verification passed:
+`npx tsc --ignoreConfig --noEmit --target ES2022 --module NodeNext --strict --skipLibCheck --types node subs/analysis/subs/descriptions/src/tests/descriptions.test.ts`
+and `git diff --check`.
+
+Two initial standalone compiler invocations needed invocation fixes: TypeScript required `--ignoreConfig` when naming a file, then explicit Node ambient types. The final command above passed without further source changes. The supplied automated failure is the regression evidence; Vitest/Cucumber, scenario coverage and sealed-file checks were not rerun locally, as the remediation prompt reserves them to workflow automation. Their post-fix verdict remains pending.

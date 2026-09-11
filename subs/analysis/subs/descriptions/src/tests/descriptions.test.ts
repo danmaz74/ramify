@@ -90,6 +90,8 @@ const toolkit: readonly Fixture[] = [
   { path: 'subs/analysis/subs/project/', name: 'project', tags: [], statements: [src(['readProject'], 'read-project.ts'), src('*', 'interfaces/project.ts')] },
   { path: 'subs/analysis/subs/typescript/', name: 'typescript', tags: [], statements: [src(['createSourceAnalysis'], 'source-analysis.ts'), src('*', 'interfaces/source.ts')] },
   { path: 'subs/cli/', name: 'cli', tags: ['dispatch'], statements: [src(['runCli'], 'run-cli.ts'), src('*', 'interfaces/cli.ts')] },
+  { path: 'subs/daemon/', name: 'daemon', tags: ['dispatch'], statements: [] },
+  { path: 'subs/daemon/subs/contexts/', name: 'contexts', tags: [], statements: [] },
   { path: 'subs/presentation/', name: 'presentation', tags: uiBrowser, statements: presentationStatements },
   { path: 'subs/presentation/subs/layout/', name: 'layout', tags: browser, statements: layoutStatements },
 ];
@@ -159,7 +161,7 @@ describe('all current project descriptions as exact-text parser fixtures', () =>
     }
   }
 
-  it('covers exactly nine toolkit and fifteen reference descriptions without omitting an owner', async () => {
+  it('covers exactly eleven toolkit and fifteen reference descriptions without omitting an owner', async () => {
     // This fixture inventory walk is not application acquisition or an ownership implementation.
     async function nestedDescriptions(directory: URL): Promise<string[]> {
       const entries = await readdir(directory, { withFileTypes: true });
@@ -169,7 +171,7 @@ describe('all current project descriptions as exact-text parser fixtures', () =>
       }));
       return [...entries.filter((entry) => entry.isFile() && entry.name === 'module.ramify').map((entry) => entry.name), ...nested.flat()];
     }
-    expect(toolkit).toHaveLength(9);
+    expect(toolkit).toHaveLength(11);
     expect(reference).toHaveLength(15);
     for (const [prefix, fixtures] of [['', toolkit], ['examples/collection-review/', reference]] as const) {
       const actual = ['module.ramify', ...(await nestedDescriptions(new URL(`${prefix}subs/`, root))).map((path) => `subs/${path}`)];
