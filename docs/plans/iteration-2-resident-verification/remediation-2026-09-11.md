@@ -53,9 +53,19 @@ replace the separate full acceptance gates or measurement evidence.
 
 Four batch/resident edit sequences passed, as did three live watch sequences.
 Live source-edit checks exposed a wildcard-growth report deadline miss and an
-exact changed-path mismatch when moving a source file into tests. The path
-mismatch remains a correctness issue; changing performance acceptance does not
-resolve it.
+exact changed-path mismatch when moving a source file into tests. Independent
+review corrected the initial diagnosis: the runtime matches the
+[changed-input contract](contracts.md), which includes captured
+directory membership identities. Moving `history.ts` changes both existing
+parent directories as well as the four edited file paths. The harness omitted
+the two directories from its expected list; filtering them from runtime output
+would violate the contract. The correction preserves exact path comparison and
+independently checks changed directory membership, with negative controls for
+missing directory entries and unrelated paths. The new harness regression failed
+before the correction and passed after it; all six retained-analysis tests
+passed, including an independent filesystem-membership witness and fresh-batch
+equivalence. The actual `I2-26:testing-move-live` process case then passed all
+48 assertions, including the expected testing-origin denial and process cleanup.
 
 The user subsequently requested “for now let's relax any performance targets”.
 Empirical latency, RSS, heap and growth targets are now advisory for current
@@ -73,7 +83,6 @@ evidence, inconsistent raw observations and an oversized outbound queue.
 
 - A fresh commit audit after subsequent source changes; the audit above covers
   `dba3d40` only.
-- Correction and verification of the live-watch exact changed-path mismatch.
 - Full current Plan 1 gate (308 cases), followed by the full Plan 2 gate on the
   same source, build and runtime inputs.
 - An idle-host execution of all nine measurement workloads and their advisory

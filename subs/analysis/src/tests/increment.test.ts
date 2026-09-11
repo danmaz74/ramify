@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
@@ -34,6 +34,28 @@ async function equalBatch(inputs: AnalysisInputs, run: ReturnType<typeof reporte
   if (batch.status === 'reported') expect({ ...run.report, runId: '' }).toEqual({ ...batch.report, runId: '' });
 }
 describe('retained analysis', () => {
+  it('reports captured parent-directory membership changes along with a source move', () => fixture(async (root, inputs) => {
+    await mkdir(join(root, 'src/tests'), { recursive: true });
+    await writeFile(join(root, 'src/history.ts'), 'export const history = 1;\n');
+    await writeFile(join(root, 'src/tests/stable.ts'), 'export const stable = 1;\n');
+    expect((await readdir(join(root, 'src'))).sort()).toEqual(['history.ts', 'interfaces', 'tests']);
+    expect(await readdir(join(root, 'src/tests'))).toEqual(['stable.ts']);
+    const first = reported(await analyzeIncrement({ inputs, previous: null, changes: [] }));
+    await rename(join(root, 'src/history.ts'), join(root, 'src/tests/history.ts'));
+    expect((await readdir(join(root, 'src'))).sort()).toEqual(['interfaces', 'tests']);
+    expect((await readdir(join(root, 'src/tests'))).sort()).toEqual(['history.ts', 'stable.ts']);
+    const next = reported(await analyzeIncrement({ inputs, previous: first.retained, changes: [] }));
+    expect(next.changed).toEqual(['src', 'src/history.ts', 'src/tests', 'src/tests/history.ts']);
+    for (const path of ['src', 'src/tests']) {
+      const before = first.retained!.inputs.find(input => input.path === path)!;
+      const after = next.retained!.inputs.find(input => input.path === path)!;
+      expect(before.role).toBe('directory'); expect(after.role).toBe('directory');
+      expect(after.sha256).not.toBe(before.sha256);
+    }
+    expect(next.changed).not.toContain('src/interfaces');
+    expect(next.changed).not.toContain('src/tests/stable.ts');
+    await equalBatch(inputs, next);
+  }), 120_000);
   it('reuses unchanged products and preserves batch reports through README, exposure and source edits', () => fixture(async (root, inputs) => {
     let run = reported(await analyzeIncrement({ inputs, previous: null, changes: null }));
     expect(run.report.outcome.execution).toBe('completed'); expect(run.retained).not.toBeNull();

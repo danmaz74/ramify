@@ -92,7 +92,7 @@ export function watchRevision(line: ArrivedLine, token: unknown, previousSequenc
   assert.ok(typeof revision.sequence === 'number' && revision.sequence > previousSequence, 'Revision sequence must advance');
   assert.ok(typeof revision.revision === 'string' && revision.revision.startsWith('rev/1:'), 'Missing revision token');
   assert.equal(revision.cause, 'watch', 'Edit must be published by the real watcher');
-  assert.deepEqual(revision.changed, expectedPaths, 'Changed paths must describe the edit, not all rechecked consumers');
+  assert.deepEqual(revision.changed, expectedPaths, 'Changed paths must name exactly the changed captured inputs');
   const report = parseAnalysisDocument(JSON.stringify(line.value.report));
   assert.equal(object(revision.fingerprints).inputId, report.inputId, 'Watch header and report describe different inputs');
   assert.deepEqual(revision.summary, report.summary);

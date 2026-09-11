@@ -18,6 +18,8 @@ export interface SequenceStep {
   /** Stable statement or source anchor description; exact bytes live in edits. */
   readonly anchor: string;
   readonly edits: readonly Edit[];
+  /** Independent captured-input oracle when edits also change directory membership. */
+  readonly expectedChangedPaths?: readonly string[];
   readonly expected: 'baseline' | 'router' | 'wildcard' | 'readme' | 'tags' | 'readme-restored-tags'
     | 'source' | 'configuration' | 'coverage' | 'coverage-wildcard' | 'router-coverage'
     | 'testing' | 'merge' | 's100-exposure' | 's100-readme' | 's100-source' | 's100-testing' | 's100-restored';
@@ -85,7 +87,9 @@ export const equivalenceSequences = {
     { name: 'merge', anchor: 'provider Type interface', edits: [text(edits['type-to-runtime-merge'])], expected: 'merge' },
   ] },
   'testing-move-live': { fixture: 'R', steps: [
-    { name: 'testing-move', anchor: 'history helper and its two importers', edits: [{ kind: 'reference-move' }], expected: 'testing' },
+    { name: 'testing-move', anchor: 'history helper and its two importers', edits: [{ kind: 'reference-move' }], expected: 'testing',
+      expectedChangedPaths: [`${coreDirectory}/src`, `${coreDirectory}/src/catalog.ts`, `${coreDirectory}/src/history.ts`,
+        `${coreDirectory}/src/tests`, `${coreDirectory}/src/tests/catalog.test.ts`, `${coreDirectory}/src/tests/history.ts`] },
   ] },
 } as const satisfies Readonly<Record<string, EditSequence>>;
 export type SequenceName = keyof typeof equivalenceSequences;

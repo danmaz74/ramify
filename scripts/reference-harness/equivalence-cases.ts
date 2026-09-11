@@ -92,7 +92,7 @@ export async function runEquivalenceSequence(name: SequenceName, root: string, a
           const paths = await applySequenceStep(root, step);
           let line = await next(watchCompletionTimeoutMs - (performance.now() - startedAt));
           while (line.value.event === 'status') line = await next(watchCompletionTimeoutMs - (performance.now() - startedAt));
-          const watched = watchRevision(line, current.token, previousSequence, startedAt, paths);
+          const watched = watchRevision(line, current.token, previousSequence, startedAt, step.expectedChangedPaths ?? paths);
           assertions.ok(`${step.name}: watcher publishes within the completion guard`, watched.elapsedMs <= watchCompletionTimeoutMs);
           assertions.ok(`${step.name}: watcher captured changed inputs`, watched.report.inputId !== previousInput);
           oracle(`${step.name}/watch`, sequence.fixture, step, baseline, watched.report, assertions);

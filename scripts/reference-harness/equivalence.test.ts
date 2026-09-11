@@ -6,7 +6,7 @@ import { assertEquivalentReports, firstDifference, parseAnalysisDocument } from 
 import { assertResidentTrace } from './equivalence-process.js';
 import type { SequenceProcess } from './equivalence-process.js';
 import { applySequenceStep, assertSequenceReport, equivalenceSequences, prepareSequence, sequenceFixture } from './equivalence-sequences.js';
-import type { SequenceName } from './equivalence-sequences.js';
+import type { SequenceName, SequenceStep } from './equivalence-sequences.js';
 import { watchEditTargetMs, watchRevision, withLiveWatch } from './equivalence-watch.js';
 import { filesBelow } from './reference-baseline.js';
 import { runIsolatedProject } from './mutation.js';
@@ -104,6 +104,21 @@ describe('watch stdout reader controls without a daemon', () => {
 
 // Materialization and batch-oracle coverage only; these tests never credit I2-25/I2-26.
 describe('recorded edit sequences', () => {
+  it('expects changed directory observations for the testing move without accepting unrelated paths', () => {
+    const step: SequenceStep = equivalenceSequences['testing-move-live'].steps[0];
+    const base = 'subs/workspace/subs/catalog/subs/core/src';
+    const expected = [base, `${base}/catalog.ts`, `${base}/history.ts`, `${base}/tests`,
+      `${base}/tests/catalog.test.ts`, `${base}/tests/history.ts`];
+    expect(step.expectedChangedPaths).toEqual(expected);
+    const token = { context: 'ctx/1:c', generation: 'gen/1:g' };
+    const line = (changed: readonly string[]) => ({ arrivedAt: 200, value: { event: 'revision',
+      revision: { token, revision: 'rev/1:r', sequence: 2, cause: 'watch', changed,
+        fingerprints: { inputId: document.inputId }, summary: {}, outcome: {} }, report: document } });
+    expect(() => watchRevision(line(expected), token, 1, 100, step.expectedChangedPaths!)).not.toThrow();
+    expect(() => watchRevision(line(expected.filter(path => path !== base)), token, 1, 100, expected)).toThrow('Changed paths');
+    expect(() => watchRevision(line([...expected, `${base}/unchanged.ts`]), token, 1, 100, expected)).toThrow('Changed paths');
+    expect(() => watchRevision(line([...expected, `${base}/interfaces`]), token, 1, 100, expected)).toThrow('Changed paths');
+  });
   it('keeps the reviewed sequence lengths and every explicit anchor', () => {
     expect(Object.keys(equivalenceSequences)).toHaveLength(9);
     expect(equivalenceSequences['reference-sequence'].steps).toHaveLength(10);
