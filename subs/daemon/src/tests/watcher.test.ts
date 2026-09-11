@@ -78,6 +78,7 @@ describe('filesystem watcher', () => {
       await symlink(join(root, 'src', 'nested'), join(root, 'linked'), 'dir');
       await state.open();
       expect(state.paths.map(path => relative(root, path)).sort()).toEqual(['', 'src', join('src', 'nested')]);
+      state.native[state.paths.indexOf(root)]!.emit('change', 'rename', 'linked');
       for (const parent of [root, join(root, 'src')]) {
         for (const name of ['node_modules', '.git', 'dist', '.reference-work']) {
           await writeFile(join(parent, name, 'child', 'ignored.ts'), 'after');
@@ -85,7 +86,13 @@ describe('filesystem watcher', () => {
       }
       await writeFile(join(root, 'src', 'nested', 'value.ts'), 'positive control');
       await until(() => state.batches.flat().some(event => event.path.endsWith('value.ts')));
-      expect(state.batches.flat().some(event => event.path.split(sep).some(part => ['node_modules', '.git', 'dist', '.reference-work', 'linked'].includes(part)))).toBe(false);
+      const events = state.batches.flat();
+      expect(events).toContainEqual({ path: 'linked', kind: 'renamed' });
+      expect(events.some(event => event.path.split(sep).some(part => ['node_modules', '.git', 'dist', '.reference-work'].includes(part)))).toBe(false);
+      // A parent watcher may report the symlink entry itself (including delayed
+      // native creation events). That hint does not mean its target was watched.
+      expect(events.some(event => event.path.startsWith(`linked${sep}`))).toBe(false);
+      expect(state.paths.map(path => relative(root, path)).sort()).toEqual(['', 'src', join('src', 'nested')]);
     });
   });
 
