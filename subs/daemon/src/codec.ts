@@ -112,7 +112,8 @@ export function createFrameDecoder(maximumBytes: number, receive: (value: unknow
 
 import type { WireMessage } from './interfaces/daemon.js';
 
-const maximumMessageBytes = 64 * 1024 * 1024;
+// A bounded codec ceiling; negotiated response and outbound limits remain stricter.
+const maximumMessageBytes = 128 * 1024 * 1024;
 function shape(value: unknown, keys: readonly string[]): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
     && Object.keys(value).length === keys.length && keys.every(key => Object.hasOwn(value, key));

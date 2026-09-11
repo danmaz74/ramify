@@ -11,7 +11,11 @@ function requireModule(model: Model, id: ModuleId) {
 
 function requireOriginal(model: Model, id: OriginalId) {
   const key = originalKey(id);
-  const original = model.originals.find((candidate) => originalKey(candidate.id) === key);
+  // buildModel already validates every canonical candidate. Compare those
+  // fields directly instead of validating and serializing the full catalogue
+  // again for each individual access.
+  const original = model.originals.find(({ id: candidate }) => candidate.kind === id.kind
+    && candidate.owner === id.owner && candidate.file === id.file && candidate.binding === id.binding);
   if (!original) throw new TypeError(`Unknown original ${key}`);
   return original;
 }
@@ -23,6 +27,11 @@ function pathOrder(a: readonly ExposureHop[], b: readonly ExposureHop[]): number
 export function explainVisibility(model: Model, importer: ModuleId, original: OriginalId): VisibilityDecision {
   const receiver = requireModule(model, importer);
   const owned = requireOriginal(model, original);
+  return visibilityFor(model, receiver, owned);
+}
+
+function visibilityFor(model: Model, receiver: Model['modules'][number], owned: Model['originals'][number]): VisibilityDecision {
+  const importer = receiver.id;
   const exposures = model.exposures.filter((exposure) => originalKey(exposure.original) === originalKey(owned.id));
   const ancestors = new Set<ModuleId>();
   let parent = receiver.parent;
@@ -97,7 +106,7 @@ export function explainImport(model: Model, question: ImportQuestion): ImportDec
   }
   if (blockingOrigins.length) return decision('denied', 'testing-origin');
   if (!original) return decision('allowed', 'symbol-free');
-  const visibility = explainVisibility(model, importer.area.owner, original.id);
+  const visibility = visibilityFor(model, requireModule(model, importer.area.owner), original);
   if (original.id.owner === importer.area.owner) return decision('allowed', 'same-owner', visibility);
   if (!visibility.visible) return decision('denied', 'not-visible', visibility);
   const requirements: TagRequirement[] = [];

@@ -5,6 +5,7 @@ const MiB = 1024 ** 2;
 // runtime retention and queue limits and missing evidence remain binding.
 export const residentBudgets = {
   sampleIntervalMs: 50, coldSamples: 5, editCycles: 20,
+  frameBytes: 96 * MiB + 64 * 1024,
   reference: { coldMs: 6000, unchangedMs: 1500, readmeMs: 1000, exposureMs: 2500,
     sourceMs: 4500, configurationMs: 5500, peakBytes: 512 * MiB, cliBytes: 96 * MiB },
   S100: { coldMs: 16000, unchangedMs: 3000, readmeMs: 2000, exposureMs: 5000,
@@ -16,8 +17,8 @@ export const residentBudgets = {
   manyContexts: { contexts: 8, rssBytes: 1024 * MiB, retainedBytes: 512 * MiB },
   plateau: { cycles: 200, settledCycles: 100, rssGrowthBytes: 64 * MiB,
     heapGrowthBeyondHistoryBytes: 16 * MiB },
-  slowConsumer: { publications: 10, outboundBytes: 64 * MiB, disconnectMs: 2000, rssRecoveryBytes: 32 * MiB },
-  retention: { contexts: 8, revisionsPerContext: 8, historyBytesPerContext: 64 * MiB,
+  slowConsumer: { publications: 10, outboundBytes: 128 * MiB, disconnectMs: 2000, rssRecoveryBytes: 32 * MiB },
+  retention: { contexts: 8, revisionsPerContext: 8, historyBytesPerContext: 128 * MiB,
     productsBytesPerContext: 96 * MiB, globalBytes: 512 * MiB },
 };
 

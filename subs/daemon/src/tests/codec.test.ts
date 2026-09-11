@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createFrameDecoder, decodeJsonFrame, encodeJsonFrame } from '../codec.js';
+import { createFrameDecoder, decodeJsonFrame, encodeJsonFrame, encodeMessage, decodeMessage } from '../codec.js';
 
 function rawFrame(payload: Uint8Array): Uint8Array {
   const frame = new Uint8Array(4 + payload.byteLength);
@@ -124,5 +124,28 @@ describe('private JSON byte framing', () => {
     const reentrant = createFrameDecoder(32, () => reentrant.push(encodeJsonFrame(null, 32)));
     expect(() => reentrant.push(encodeJsonFrame(null, 32))).toThrow('Reentrant');
     expect(() => reentrant.push(new Uint8Array())).toThrow('closed');
+  });
+});
+
+
+describe('large bounded service messages', () => {
+  it('round-trips a message above the former 64 MiB codec ceiling', () => {
+    const message = { type: 'goodbye' as const, reason: { kind: 'failure' as const, message: 'x'.repeat(65 * 1024 ** 2) } };
+    expect(() => encodeJsonFrame(message, 32 * 1024 ** 2 + 64 * 1024)).toThrow('exceeds');
+    const frame = encodeMessage(message);
+    expect(decodeJsonFrame(frame, 96 * 1024 ** 2 + 64 * 1024)).toEqual(message);
+    expect(frame.byteLength).toBeGreaterThan(64 * 1024 ** 2);
+    const decoded = decodeMessage(frame);
+    expect(decoded.type).toBe('goodbye');
+    if (decoded.type !== 'goodbye' || decoded.reason.kind !== 'failure') throw new Error('Wrong message');
+    expect(decoded.reason.message).toBe(message.reason.message);
+  });
+
+  it('rejects a declared payload above the 128 MiB codec ceiling before allocation', () => {
+    const header = Buffer.alloc(4);
+    header.writeUInt32BE(128 * 1024 ** 2 + 1);
+    expect(() => decodeMessage(header)).toThrow('exceeds 134217728 bytes');
+    header.writeUInt32BE(96 * 1024 ** 2 + 64 * 1024 + 1);
+    expect(() => decodeJsonFrame(header, 96 * 1024 ** 2 + 64 * 1024)).toThrow('exceeds');
   });
 });
