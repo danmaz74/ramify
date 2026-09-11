@@ -1,0 +1,80 @@
+name: Resident Linux Plan 1 acceptance
+
+on:
+  push:
+    branches: [validation/resident-linux-20260911]
+
+permissions:
+  contents: read
+
+jobs:
+  plan1-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.2
+          cache: npm
+      - run: npm ci
+      - run: npm run worktree:prepare
+      - run: npm run build
+      - name: Complete Plan 1 with owned daemon cleanup
+        shell: bash
+        run: |
+          mkdir -p .reference-work
+          cat > .reference-work/linux-plan1.mjs <<'SCRIPT'
+          import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+          import { createWriteStream } from 'node:fs';
+          import { spawn } from 'node:child_process';
+          const endpoint = await mkdtemp('/tmp/rl1-');
+          const env = { ...process.env, RAMIFY_ENDPOINT_DIR: endpoint };
+          const startedAt = new Date().toISOString();
+          const execute = (args, output) => new Promise((resolve, reject) => {
+            const child = spawn(args[0], args.slice(1), { env, stdio: ['ignore', 'pipe', 'pipe'] });
+            let stdout = '', stderr = '';
+            if (output) { child.stdout.pipe(output, { end: false }); child.stderr.pipe(output, { end: false }); }
+            else { child.stdout.on('data', b => stdout += b); child.stderr.on('data', b => stderr += b); }
+            child.once('error', reject);
+            child.once('close', (code, signal) => resolve({ code, signal, stdout, stderr }));
+          });
+          const log = createWriteStream('plan1-linux.log');
+          let result, stop, status;
+          try {
+            result = await execute(['npm', 'run', 'reference:verify', '--', '--plan', '1', '--preserve-on-failure', '--format', 'json'], log);
+          } finally {
+            await new Promise(resolve => log.end(resolve));
+            stop = await execute([process.execPath, 'dist/src/cli-entry.js', 'daemon', 'stop']);
+            status = await execute([process.execPath, 'dist/src/cli-entry.js', 'daemon', 'status', '--format', 'json']);
+            if (stop.code === 0) await rm(endpoint, { recursive: true, force: true });
+            await writeFile('plan1-linux-cleanup.json', JSON.stringify({ startedAt, completedAt: new Date().toISOString(), endpoint, result, stop, status }, null, 2));
+          }
+          console.log(JSON.stringify({ result, stop, status }));
+          process.exitCode = result?.code === 0 && stop?.code === 0 && status?.code === 0 && JSON.parse(status.stdout).running === false ? 0 : 1;
+          SCRIPT
+          node .reference-work/linux-plan1.mjs
+      - name: Independently consume the complete matching Plan 1 report
+        run: |
+          node --import tsx --input-type=module <<'SCRIPT'
+          import { writeFile } from 'node:fs/promises';
+          import { verifyPlan1Regression } from './scripts/reference-harness/completion-regression.ts';
+          const receipt = await verifyPlan1Regression();
+          await writeFile('plan1-linux-consumed.json', JSON.stringify(receipt, null, 2));
+          console.log(JSON.stringify(receipt));
+          SCRIPT
+      - name: Preserve gate and complete raw evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resident-linux-plan1-evidence
+          path: |
+            plan1-linux.log
+            plan1-linux-cleanup.json
+            plan1-linux-consumed.json
+            .reference-work/reports/plan1-*.json
+            .reference-work/evidence/**
+          include-hidden-files: true
+          retention-days: 14
