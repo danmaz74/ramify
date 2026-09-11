@@ -6,9 +6,6 @@ expose-src * from "interfaces/batch.ts" to descendants
 // R6: implemented independent service vocabulary; the full interface awaits contexts.
 expose-src * from "interfaces/service.ts" to descendants
 
-// R7: implemented discovery and client-option vocabulary.
-expose-sub EndpointSelection, ConnectTimeouts, ConnectOptions, DisconnectReason from daemon to descendants
-
 expose-sub ModuleId, TagName, TagKind, TagDefinition, ResolvedTagRegistry, SourceLocation, ModelIssue, ModelResult, SourceArea, ModuleRecord, OriginalId, SourceOrigin, Original, Destination, Exposure, ModelInput, Model, ExposureHop, VisibilityDecision, BindingRequest, ImportQuestion, TagRequirement, ImportReason, ImportDecision, resolveTagRegistry, createDefaultTagRegistry, deriveSourceAreas, assignOriginalTags, originalKey, buildModel, explainVisibility, explainImport from analysis to descendants
 
 // R4: syntax vocabulary relayed unchanged from analysis.
@@ -25,3 +22,6 @@ expose-sub Capability, StageId, RunControl, AnalysisLimits, AnalysisInputs, Inve
 
 // R5: declaration-only UI relay; root source imports none of these.
 expose-sub DiagramDefinition, TreeDiagramDefinition, FocusDiagramDefinition, ModelDiagramProps, ModelDiagramInteractiveProps, TreeDiagramProps, FocusDiagramProps, ModelDiagram, ModelDiagramSvg, TreeDiagram, TreeDiagramSvg, FocusDiagram, FocusDiagramSvg, shopDiagram, example1Diagram, example1aDiagram, example1bDiagram, example2Diagram, example3Diagram, example4Diagram, shopTreeDiagram, shopFocusDiagram from presentation to descendants
+
+// R7: all implemented resident vocabulary and controlled test ports; remaining names await providers.
+expose-sub ContextId, GenerationId, RevisionId, LeaseId, ContextToken, ContextSetup, ContextSelection, InputFingerprints, WatchEvent, WatcherHandle, WatcherPort, ClockPort, DaemonInstance, LogEntry, DaemonBudgets, EndpointSelection, DaemonRecord, StopDisposition, Handshake, ConnectTimeouts, ConnectOptions, ConnectionState, DisconnectReason, createControlledWatcher, createControlledClock, ControlledWatcher, ControlledClock from daemon to descendants

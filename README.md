@@ -1,6 +1,9 @@
 # ramify.ts
 
-Ramify assembles the command line entry and lazy batch analysis, maps completed reports to invocation results, and keeps executable dispatch separate from portable model and presentation entries.
+Ramify assembles the command line, the resident daemon and lazy batch analysis from its owners, defines the dispatch-facing service vocabulary that the daemon implements, and keeps executable dispatch separate from portable model and presentation entries.
+
+This is the final owner responsibility. The current implementation runs batch
+checks; resident assembly, the daemon entry and client wiring remain incomplete.
 
 **Multi-file hierarchical modules for TypeScript.**
 

@@ -53,18 +53,20 @@ describe('Plan 2 inventory and gates', () => {
   });
 
   it('executes all four discipline handlers, keeps Plan 1 capabilities separate and fails the full gate', async () => {
-    expect([...plan2Runtime.capabilities]).toEqual(['harness-gate']);
+    expect([...plan2Runtime.capabilities]).toEqual(['harness-gate', 'cli']);
     const options = { plan, records: plan2Instances, runtime: plan2Runtime, workRoot: join(repositoryRoot, '.reference-work') };
     const intermediate = await verifyInstances({ ...options, iteration: 2 });
     expect(intermediate.summary).toEqual({ required: 4, passed: 4, failed: 0, notExecuted: 172 });
     expect([intermediate.plan, intermediate.passed, intermediate.planComplete]).toEqual([2, true, false]);
     expect(formatVerification(intermediate)).toContain('Plan 2 iteration verification: 2');
     const full = await verifyInstances(options);
-    expect(full.summary).toEqual({ required: 176, passed: 4, failed: 0, notExecuted: 172 });
+    expect(full.summary).toEqual({ required: 176, passed: 6, failed: 0, notExecuted: 170 });
     expect([full.passed, full.planComplete]).toEqual([false, false]);
-    expect(full.instances.find(item => item.id === 'I2-20:human')?.missingCapabilities).toEqual(['cli']);
+    expect(full.instances.find(item => item.id === 'I2-20:human')?.reason).toBe('missing-handler');
+    expect(full.instances.filter(item => item.id.startsWith('I2-19:') && item.status === 'passed').map(item => item.id))
+      .toEqual(['I2-19:help-version-unchanged', 'I2-19:batch-no-daemon']);
     expect(full.instances.filter(item => item.required && item.status === 'passed').every(item => item.assertions.length > 0)).toBe(true);
-  });
+  }, 60_000);
 
   it.each([['2', 0, 4], [undefined, 1, 176]] as const)('command emits its real gate exit and portable Plan 2 evidence for iteration %s', (iteration, code, required) => {
     const args = ['--import', 'tsx', join(repositoryRoot, 'scripts/reference-harness/verify.ts'), '--plan', '2', '--format', 'json'];
@@ -74,7 +76,7 @@ describe('Plan 2 inventory and gates', () => {
     const report = JSON.parse(run.stdout);
     expect(report.plan).toBe(2);
     expect(report.summary.required).toBe(required);
-    expect(report.summary.passed).toBe(4);
+    expect(report.summary.passed).toBe(iteration === '2' ? 4 : 6);
     expect(report.evidence.instances).toHaveLength(176);
     expect(report.evidence.instances.every((item: { id: string }) => item.id.startsWith('I2-'))).toBe(true);
     expect(report.artifact).toMatch(/^\.reference-work\/reports\/plan2-/);

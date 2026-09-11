@@ -1,6 +1,9 @@
 # CLI
 
-The CLI parses supported arguments, invokes an injected batch operation, formats its completed report and selects the documented process exit code. It contains no checking algorithm and keeps help and version independent of compiler and server startup.
+The CLI parses supported arguments, reaches the resident daemon through an injected connector or runs an injected batch operation, formats completed reports, streamed revisions and daemon status, and selects the documented process exit code. It contains no checking algorithm and keeps help, version and status independent of compiler and server startup.
+
+This is the final owner responsibility. The current dispatch supports batch
+checks, help and version; resident commands still require the missing providers.
 
 `runCli(argv, environment, control?)` accepts output sinks, a working directory,
 the package version and a `BatchOperation`. Root supplies the lazy real-session

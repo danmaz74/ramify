@@ -1,6 +1,9 @@
 # Analysis
 
-Analysis composes one captured project view, source facts, descriptions and model decisions into disposable batch work and immutable reports. It owns stage outcomes and input identity so every client consumes the same completed analysis.
+Analysis composes one captured project view, source facts, descriptions and model decisions into disposable batch work, immutable reports and retained stage products that a later run over unchanged inputs may reuse. It owns stage outcomes, input identity and computational invalidation so every client consumes the same completed analysis.
+
+This is the final owner responsibility. Batch analysis is implemented;
+`analyzeIncrement`, retained stage products and `resolveProject` remain incomplete.
 
 Iteration 7 provides `validateProject(inputs, control?)` through
 `src/validation-entry.ts`. Supply the reviewed project request, resolved registry

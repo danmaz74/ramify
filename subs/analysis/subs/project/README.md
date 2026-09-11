@@ -1,7 +1,9 @@
 # Project
 
-Project selects and acquires one real project, validates its physical ownership layout and exact paths, and supplies coherent captured input reads. It records raw source areas, configuration selection, outside-module warnings and README purpose metadata without deciding import permissions.
+Project selects and acquires one real project, validates its physical ownership layout and exact paths, and supplies coherent captured input reads. It resolves the root and compiler configuration on request, records raw source areas, configuration selection, outside-module warnings and README purpose metadata, and can reuse its configuration product when its captured dependencies are unchanged, without deciding import permissions.
 
+This is the final owner responsibility. Acquisition is implemented; the separate
+`resolveProjectRoot` operation and retained configuration reuse remain incomplete.
 
 `src/read-project.ts` exposes `readProject` through the reviewed vocabulary in
 `src/interfaces/project.ts`. Supply a whole-project request, the text-only
