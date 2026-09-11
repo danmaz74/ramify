@@ -21,9 +21,40 @@ split into supported native timer durations instead of overflowing Node's
 32-bit timeout. Callers own each cancellation function.
 
 `interfaces/daemon.ts` contains the independent instance, log, budget, record,
-stop, handshake and connection-state declarations. N1 exposes the two real
-ports and N4 exposes only those existing types. The contexts vocabulary and
-controlled ports remain relayed through N5.
+stop, handshake, connection-state, disconnect-reason, endpoint and client-option
+declarations. N1 exposes the two real ports, N2 exposes discovery and record
+reads, and N4 exposes only existing types. Root R7 relays the implemented
+discovery and client-option types. The contexts vocabulary and controlled ports
+remain relayed through N5.
+
+`selectEndpoint` selects the private endpoint directory and hashes the real
+package path, version, package.json and sorted production runtime bytes without
+importing them. It requires the daemon entry, declared runtime package entries
+and an owner runtime tree, so the present build without `daemon-entry.js` cannot
+select a resident endpoint. Tests provide an independent fake build. Missing
+files, unsafe directory permissions and paths exceeding 100 socket bytes fail
+explicitly. File hashing establishes the selected bytes, while dependency
+completeness is the production build's responsibility.
+
+`readDaemonRecord` validates the complete record, including its selected group,
+socket and stop disposition. The private writer uses a 0600 temporary file and
+same-directory rename. Reads recheck directory permissions, reject symlinks and
+non-regular files, bound input to 64 KiB, and reject malformed UTF-8 or JSON.
+Missing records return null; invalid records are errors.
+
+The private `launchDaemon` coordinates one start attempt with an exclusive lock,
+detached child and bounded readiness wait. It passes the reviewed endpoint,
+build, version and engine arguments, redirects output to a private log and
+releases its descriptors. Stale cleanup requires a proven dead pid; a live pid
+with a refused socket remains unavailable. Concurrent stale-lock reclamation
+uses a temporary exclusive `.lock.reclaim` guard. An interrupted guard is left
+intact and fails closed until explicitly inspected and removed; age alone never
+authorizes removal. Cancellation does not kill a shared child: before readiness
+the lock names that child so another caller cannot spawn a duplicate. A later
+running record is usable even while that lock exists, and the lock becomes
+reclaimable after the child dies. The future connector owns attempt counts,
+handshake, recovery authorization and service requests. Fake-entry tests prove
+only this private launcher's behavior, with no IPC or process matrix credit.
 
 The private request validator checks every operation's parameter shape,
 including token identifiers, freshness variants, printable request IDs and

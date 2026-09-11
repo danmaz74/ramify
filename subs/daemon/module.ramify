@@ -4,6 +4,8 @@ module daemon tagged [dispatch]
 // N1: real ports; the service awaits the context manager.
 expose-src createFilesystemWatcher from "filesystem-watcher.ts" to parent
 expose-src createSystemClock from "system-clock.ts" to parent
+// N2: discovery is independent of the missing wire and service providers.
+expose-src selectEndpoint, readDaemonRecord from "discovery.ts" to parent
 // N4: implemented independent lifecycle vocabulary only.
 expose-src * from "interfaces/daemon.ts" to parent
 
