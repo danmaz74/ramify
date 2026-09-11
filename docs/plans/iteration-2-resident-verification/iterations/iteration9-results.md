@@ -2,7 +2,7 @@
 
 # Iteration 9 results: CLI grammar and batch migration; resident integration blocked
 
-**Recorded:** 2026-09-11. **Status:** incomplete. The argument parser and batch display/migration are implemented. The missing resident providers prevent the command integration and all 28 assigned matrix instances.
+**Recorded:** 2026-09-11. **Status:** incomplete after the single self-assessment remediation below. The argument parser, batch display/migration and independent error adapter are implemented. The missing resident providers prevent the command integration and all 28 assigned matrix instances.
 
 Work was performed in the authoritative checkout `/tmp/worktrees/ramify-67e9dd0f/iteration-2-resident-verification`, branch `workflow/iteration-2-resident-verification`, starting at `41239a9`.
 
@@ -92,3 +92,47 @@ Checklist: `functionalRequirementsSatisfied: false`; `newCodeCoveredByTests: tru
 Restore the missing providers in their owning tasks: incremental/project resolution, contexts manager, shared service and root assembly/quick environment, complete codec/client, then host and daemon entry. Resolve the predecessor contract-review disposition through the owning workflow if it remains pending.
 
 Resume iteration 9 against those public contracts. Replace the explicit unavailable-dispatch guard with real command handlers, supply the required connectors, activate the client entry and relocation expectation, and execute every assigned matrix instance with isolated endpoints and verified daemon cleanup. Complete iteration 9 before relying on iteration 10's entry-boundary evidence. macOS process evidence remains required by the plan.
+
+## Single self-assessment remediation attempt
+
+Re-read the original iteration 9 scope, the iteration-work and testing skills, the service/connect contracts, current interfaces and the original check policy. This repair started at `8cf1a8a` in the same authoritative checkout and branch. Live workflow detail reports iteration 9 at `validate_output_retry`. No iteration-9 check-results file or automated runner verdict is available in this checkout.
+
+The missing increment, contexts, complete service, connector, host/entry and quick-environment providers remain absent. They still prevent the CLI from consuming the specified public contracts. Implementing those entire predecessor owners or inventing replacement service types would exceed this iteration's scope. This attempt completes the independent error adapter named by deliverable 1.
+
+### Implemented error adapter
+
+Added private `subs/cli/src/errors.ts`, using the already implemented and exposed root ServiceError/ServiceErrorCode and daemon DisconnectReason types through type-only imports.
+
+- `serviceFailure` retains the service message and source cause, preserves the existing codes, and translates `stopping` to CLI `stopped`.
+- `disconnectFailure` preserves explicit-stop request identities, separates idle exit, unexpected failure, slow consumer, incompatibility, rejection and closed-lease messages, and retains the source reason as the cause. Rejected stopping is also rendered as stopped.
+- The private `CliFailure` class identifies deliberately translated command failures. `runCli` renders these with their code and exit 2 in the existing human or ramify.cli/1 format. Unexpected exceptions, including ordinary errors carrying a coincidental code property, remain internal-error.
+- Invocation, output-failure and interruption handling retain precedence. In particular, a sink throwing a translated error is still output-failure; an aborted operation emits no result and exits 130.
+
+The adapter does not decide recovery, prove exhaustion, start a fallback, or supply a service. Its terminal slow-consumer/idle messages do not implement watch recovery or make idle exit a normal CLI outcome. The unavailable resident-command guard remains; the required live stopped/no-fallback behavior is still unimplemented.
+
+Updated the CLI README. No declaration, foreign owner, package entry, Plan 1 expectation or harness registration changed.
+
+### Added coverage and verification
+
+`subs/cli/src/tests/errors.test.ts` adds 25 cases: eleven service codes, nine disconnect variants, two human/JSON exception-boundary cases, two output-failure precedence cases and an interruption case. The boundary tests deliberately inject exceptions into runCli; they supply no resident service and receive no I2 matrix credit. Iteration 9 now has 61 added cases in total, all authored and type-checked.
+
+| Command | Result |
+| --- | --- |
+| `npm run type-check` | Passed all four configurations. |
+| `npx tsx .reference-work/iteration9-errors-smoke.ts` | Passed four groups: all eleven service codes/causes; every disconnect kind and rejection/stop variants; human/JSON translated and unexpected errors; output-failure and interruption precedence. |
+| `npm run build` | Passed. |
+| `npx tsx .reference-work/iteration9-smoke.ts` | Passed all five existing direct groups after the new runtime error import, including compiled lightweight paths, batch output and cancellation cleanup. |
+| `npm run check:self` under an owned temporary RAMIFY_ENDPOINT_DIR | Passed in batch mode: 11 owners, 176 source files, 11 resources, 2,043 accesses; zero errors, warnings, denials or limits. The endpoint stayed empty and was removed in finally. |
+| `git diff --check` | Passed. |
+
+New ignored evidence: `.reference-work/iteration9-errors-smoke.ts`, `iteration9-errors-smoke.json` and `iteration9-errors-self-check.log`. The original five-group smoke report was refreshed. The focused error smoke ran on Linux, Node v22.23.2.
+
+No Vitest/Cucumber regression, scenario-coverage or sealed-file check was run locally, following the original automation-only policy. No failing new-test output was supplied. The direct smoke is not an automated test-suite verdict. The unchanged matrix gate was not rerun: the last result remains four of 134 required instances passed, with all 28 assigned iteration-9 instances unexecuted. The full Plan 1 regression gate is still outstanding.
+
+### Current checklist and handoff
+
+- `functionalRequirementsSatisfied: false`: the error adapter is ready, but the missing provider chain still blocks the resident default, command handlers, quick/process evidence, connector environments, lifecycle/fallback behavior and eighth client entry.
+- `newCodeCoveredByTests: true`: all implemented additions have authored coverage, now including error classification, streams and precedence.
+- `allNewTestsPass: false`: the 61 added cases await an available automated runner verdict; passing type-check and direct smoke groups do not establish it.
+
+Both managed deliverables are updated via MCP and this focused repair is committed in the authoritative checkout. No publication call is made in this remediation; validation reruns and publication belong to the workflow. The provider-restoration recommendations above remain required before completing iteration 9.

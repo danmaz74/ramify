@@ -2,6 +2,7 @@ import type { AnalysisDiagnostic, AnalysisReport, Capability, RunControl } from 
 import type { CliEnvironment, CliExitCode } from './interfaces/cli.js';
 import { help, parseArguments } from './arguments.js';
 import { formatHuman, serializeReport } from './format.js';
+import { CliFailure } from './errors.js';
 
 const capabilities: readonly Capability[] = ['registry', 'layout', 'metadata', 'descriptions', 'source-catalog',
   'exposure-linking', 'static-access', 'tags-origin', 'namespace-access', 'lazy-access', 'symbol-free-access', 'resource-access', 'coverage'];
@@ -48,7 +49,8 @@ export async function runCli(argv: readonly string[], environment: CliEnvironmen
     return exitCode;
   } catch (error) {
     if (phase !== 'output' && control.signal?.aborted) return interrupted();
-    const code = phase === 'invocation' ? 'invalid-invocation' : phase === 'output' ? 'output-failure' : 'internal-error';
+    const code = phase === 'invocation' ? 'invalid-invocation' : phase === 'output' ? 'output-failure'
+      : error instanceof CliFailure ? error.code : 'internal-error';
     const message = error instanceof Error ? error.message : String(error);
     if (json && phase !== 'output') {
       try { environment.stdout(JSON.stringify({ schemaVersion: 'ramify.cli/1', status: 'unavailable',

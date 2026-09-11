@@ -21,3 +21,11 @@ commands with `invalid-invocation` and exit 2 because the service connector,
 daemon entry and quick environment are absent. Parsing these commands does not
 establish resident availability. The connector integration, streamed documents,
 recovery and fallback policy remain unimplemented.
+
+The private error adapter translates the existing service and disconnect
+vocabulary into CLI failures, retaining the source as the error cause. It maps
+`stopping` to `stopped` and preserves other service codes. The command exception
+boundary renders translated errors with their code while keeping unexpected
+exceptions internal; cancellation and output failures retain precedence.
+This adapter does not select recovery or fallback, and its tests supply no
+resident service or lifecycle evidence.

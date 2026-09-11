@@ -9,7 +9,7 @@
     "functionalRequirementsSatisfied": false,
     "newCodeCoveredByTests": true
   },
-  "completedAt": "2026-09-11T08:28:59.076Z",
+  "completedAt": "2026-09-11T08:33:09.733Z",
   "iteration": "9",
-  "notes": "Incomplete checkpoint: command grammar, Mode: batch and explicit Plan 1 batch argv migration implemented with 36 added cases. Build, type-check, five direct smoke groups and batch self/reference checks pass. Vitest awaits automation. The real increment/context/service/connector/host providers and quick environment are absent; all 28 iteration-9 matrix instances are unexecuted. Filtered gate: 134 required, 4 passed, 130 required not executed. Full Plan 1 gate, connector environments, resident commands/fallback and eighth client entry remain outstanding."
+  "notes": "Single remediation completed the independent CLI service/disconnect error adapter and added 25 cases (61 total). Stopping maps to stopped; cause, message and other codes survive; unexpected errors stay internal; cancellation/output failures take precedence. Type-check, build, four error-smoke groups, five existing smoke groups and eleven-owner batch self-check pass. No automated Vitest verdict is available, and the original policy reserves regression to automation. Increment/context/service/connector/host/quick providers remain absent outside iteration 9's owner scope. All 28 assigned instances remain unexecuted; last gate was 134 required, 4 passed, 130 required not executed. Resident commands, connect environments, lifecycle/fallback and eighth client entry remain incomplete. No publication call in this repair."
 }
