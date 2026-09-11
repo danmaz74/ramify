@@ -1,2 +1,5 @@
 ramify 1
 module daemon tagged [dispatch]
+
+// N5: only the context vocabulary and controlled ports currently implemented.
+expose-sub ContextId, GenerationId, RevisionId, LeaseId, ContextToken, ContextSetup, ContextSelection, InputFingerprints, WatchEvent, WatcherHandle, WatcherPort, ClockPort, createControlledWatcher, createControlledClock, ControlledWatcher, ControlledClock from contexts to parent

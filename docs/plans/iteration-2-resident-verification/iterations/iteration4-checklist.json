@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": false,
+    "functionalRequirementsSatisfied": false,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-11T07:19:05.755Z",
+  "iteration": "4",
+  "notes": "Incomplete prerequisite: iteration 3 supplies no IncrementRun/InputChange/RetainedAnalysis/RetainedStageId/ProjectResolution contracts or increment capability. Implemented independent token/fingerprint helpers, controlled watcher/clock ports, 24 authored owner test cases and partial X2/X3/N5 declarations. Type-check, build, primitive smoke, self-check and diff check pass. Plan 2 iteration 4 gate fails: 49 required, 4 passed; 18 increment and 27 contexts instances unexecuted. Vitest/Cucumber execution is reserved for workflow automation; no new-test runner verdict is claimed."
+}
