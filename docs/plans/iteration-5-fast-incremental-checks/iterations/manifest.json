@@ -1,4 +1,11 @@
 {
+  "_cucumberViz": {
+    "editMode": "mcp-only",
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "planning.write_iteration_manifest",
+    "message": "Do not edit directly. Use the planning MCP tool.",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
   "createdAt": "2026-09-11T18:57:12.612Z",
   "iterations": [
     {
@@ -24,6 +31,21 @@
       "index": 4,
       "parallelGroup": "after-2",
       "title": "Project observer and incremental acquisition"
+    },
+    {
+      "contentMode": "generated-system-file",
+      "convergence": {
+        "groupId": "after-2",
+        "sourceIterationIndexes": [
+          3,
+          4
+        ]
+      },
+      "file": "converge-after-2.md",
+      "index": "converge-after-2",
+      "iterationType": "parallel-group-convergence",
+      "parallelGroup": null,
+      "title": "Converge parallel group after-2"
     },
     {
       "file": "iteration5.md",
@@ -72,6 +94,21 @@
       "index": 12,
       "parallelGroup": "after-10",
       "title": "Hook and session measurements"
+    },
+    {
+      "contentMode": "generated-system-file",
+      "convergence": {
+        "groupId": "after-10",
+        "sourceIterationIndexes": [
+          11,
+          12
+        ]
+      },
+      "file": "converge-after-10.md",
+      "index": "converge-after-10",
+      "iterationType": "parallel-group-convergence",
+      "parallelGroup": null,
+      "title": "Converge parallel group after-10"
     },
     {
       "file": "iteration13.md",
