@@ -14,7 +14,7 @@ describe('reference verification invocation', () => {
   });
 
   it.each([
-    [], ['--plan', '2'], ['--plan', '1', '--iteration', '3.5'],
+    [], ['--plan', '3'], ['--plan', '1', '--iteration', '3.5'],
     ['--plan', '1', '--iteration', '0'], ['--plan', '1', '--iteration', '16'],
     ['--plan', '1', '--iteration'], ['--plan', '1', '--plan', '1'],
     ['--plan', '1', '--unknown'], ['--plan', '1', '--format', 'xml'],

@@ -105,3 +105,26 @@ orchestrator sets `RAMIFY_MEASUREMENT_ROOT` and `RAMIFY_MEASUREMENT_OWNERS` for
 the synthetic run. The existing probe keeps its three fresh processes, 100 ms
 settling delays, two GC calls and 30-second per-sample timeout. Its setup and
 post-disposal values do not establish peak or repeated-use memory limits.
+
+## Synthetic fixtures for resident work
+
+The parameterized [generator](../probes/fixtures/synthetic-owners.ts) materializes
+S100, S500 and S1000. The original hundred-owner map remains frozen; a test
+compares every S100 path and byte against it and the original content hash.
+Each owner contributes eleven TypeScript files (including one nested test), one
+CSS resource, its declaration and README. Every tenth non-root owner is tagged
+`testing`; root remains `dispatch`.
+
+```sh
+mkdir -p .reference-work
+npx tsx scripts/measurements/materialize.ts .reference-work/S100 S100
+npx tsx scripts/measurements/materialize.ts .reference-work/S500 S500
+npx tsx scripts/measurements/materialize.ts .reference-work/S1000 S1000
+```
+
+Supply a new destination under ignored scratch space; the command refuses an
+existing directory and prints the owner count, file count, bytes and content-map
+SHA-256. Omitted fixture selection preserves the S100 default used by batch
+measurements. Callers own cleanup. Generated trees are never checked in, and
+materialization alone establishes no performance or resident acceptance result.
+Iteration 13 supplies the resident measurement recipe over these fixtures.

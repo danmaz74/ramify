@@ -102,7 +102,7 @@ Iteration 5 registers `acquire` and `metadata` using the public `readProject`
 operation with the real injected description parser. Its 35 filesystem instances
 materialize the reviewed F recipe in `fixtures/plan1/project.ts` or copy the
 unchanged reference. Both reference scope variants also acquire the toolkit and
-assert its nine owners. Syntax, source export resolution and permission checking
+assert its eleven owners, including the two Plan 2 header-only owners. Syntax, source export resolution and permission checking
 remain distinct capabilities.
 
 Iteration 9 registers 26 static-access instances across I1-06, I1-07, I1-08 and
@@ -195,12 +195,13 @@ SIGINT during acquisition/catalog work and broken stdout pipes.
 After `npm run build`, `npm run reference:verify -- --plan 1 --iteration 13`
 requires 290 instances, with prerequisite closure covering iterations 1–13.
 The 18 later records remain unexecuted. `npx tsx scripts/validate-final-contracts.ts`
-compares all nine current declarations with the reviewed final selections, links
-them against real exports and resolves every installed package entry.
+compares the nine Plan 1 declarations with their reviewed final selections, links
+them against real exports and resolves every installed package entry. Plan 2
+iteration 10 extends that separate final-declaration validator.
 
 
 Iteration 15 registers the last three instances. Self-check compares the compiled
-CLI and direct session over all nine owners and asserts that every owned source
+CLI and direct session over all eleven current owners and asserts that every owned source
 file is fully catalogued. The independent negative imports the root's exposed
 `BatchInvocation` type from the portable layout owner and requires the located
 `required-importer-tag` denial for `dispatch`, with visibility established.
@@ -218,3 +219,34 @@ See the [completion report](../../docs/plans/done/iteration-1-project-verifier/i
 for actual executed evidence, and the [measurement recipes](../measurements/README.md)
 for setup, combined process memory and repeated-session budgets. A source-matrix
 pass alone does not establish those resource requirements or later services.
+
+## Plan 2 resident verification
+
+`plan2-instances.ts` transcribes all 176 reviewed leaves, including exact fixture
+selections, evidence kinds, mutations and independent expectations. `plan.ts`
+validates them against the Plan 2 inventory, the thirty main-plan matrix groups,
+and all fourteen sequence indices, titles and prerequisite assignments. The
+Plan 1 reader and its 308 records remain independent.
+
+`npm run reference:verify -- --plan 2 --iteration 2` executes the four I2-28
+harness controls. The full `--plan 2` gate requires all 176 and currently fails:
+only `harness-gate` is available in `plan2-runtime.ts`. A Plan 1 capability never
+activates its Plan 2 counterpart. Later providers add their capability and exact
+handlers there; registration never establishes execution. `--iteration 5`
+requires 64 instances from iterations 2–5; `--iteration 9` requires 134 from
+2–9 (iteration 7 has owner tests only). All other records stay `not-executed`.
+
+`npm run reference:cases` includes Plan 2 inventory, sabotage, command, generator
+and prerequisite tests. `npx tsx scripts/reference-harness/validate.ts` validates
+both inventories without running conformance assertions. The report command
+lists Plan 2 capability availability without executing resident instances;
+`reference:verify --plan 2` owns their execution and portable evidence files.
+
+The eleven-owner skeleton requires the existing Plan 1 acquisition count and
+self-check owner list to change in iteration 2. Their literal expectations now
+include daemon and contexts; an owner with no source is accepted only when it is
+one of these two owners and contains exactly its source/test `.gitkeep` files.
+Once either gains source, the existing owned-test assertion applies. All 308
+Plan 1 instance records, permission expectations and package entries remain
+unchanged; the resident CLI and package-entry migration still belongs to later
+iterations.

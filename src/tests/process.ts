@@ -10,6 +10,7 @@ export interface TraceEvent {
   readonly pid: number;
   readonly event: string;
   readonly url?: string;
+  readonly path?: string;
   readonly argv?: readonly string[];
   readonly args?: readonly string[];
   readonly command?: string;
@@ -33,6 +34,9 @@ export async function cliProcess(cwd: string, argv: readonly string[], options: 
   readonly entry?: string;
   readonly nodeArgs?: readonly string[];
   readonly executable?: string;
+  readonly env?: NodeJS.ProcessEnv;
+  readonly allowSockets?: boolean;
+  readonly timeoutMs?: number;
 } = {}) {
   const work = join(repositoryRoot, '.reference-work');
   await mkdir(work, { recursive: true });
@@ -44,7 +48,8 @@ export async function cliProcess(cwd: string, argv: readonly string[], options: 
       exitedWhilePaused: boolean; interruptionMs: number | null }>((accept, reject) => {
       const child = spawn(options.executable ?? process.execPath, options.executable ? [...argv]
         : [...options.nodeArgs ?? [], options.entry ?? compiledEntry, ...argv], {
-        cwd, env: { ...process.env, NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import=${preload}`,
+        cwd, env: { ...process.env, ...options.env, NODE_OPTIONS: `${options.env?.NODE_OPTIONS ?? process.env.NODE_OPTIONS ?? ''} --import=${preload}`,
+          RAMIFY_PROCESS_SOCKETS: options.allowSockets ? 'allow' : 'forbid',
           RAMIFY_CLI_TRACE: traceFile, RAMIFY_CLI_PROBE: options.backpressuredStdout ? 'observe-output' : options.mode ?? '',
           RAMIFY_CLI_READ_TARGET: options.readTarget ?? '' },
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -52,7 +57,7 @@ export async function cliProcess(cwd: string, argv: readonly string[], options: 
       let stdout = '', stderr = '', timedOut = false, tooLarge = false, exited = false;
       let exitedWhilePaused = false, interruptedAt: number | null = null, interruptionMs: number | null = null;
       let resumeTimer: NodeJS.Timeout | undefined, probeTimer: NodeJS.Timeout | undefined;
-      const timer = setTimeout(() => { timedOut = true; child.kill('SIGKILL'); child.stdout.resume(); }, 30_000);
+      const timer = setTimeout(() => { timedOut = true; child.kill('SIGKILL'); child.stdout.resume(); }, options.timeoutMs ?? 30_000);
       child.on('error', error => {
         exited = true; clearTimeout(timer); clearTimeout(resumeTimer); clearTimeout(probeTimer); reject(error);
       });
@@ -127,4 +132,14 @@ export async function cliProcess(cwd: string, argv: readonly string[], options: 
     }
     await rm(owned, { recursive: true, force: true });
   }
+}
+
+/** Trace any entry using the same bounded capture and descendant cleanup as CLI tests.
+ * The caller owns its endpoint directory and removes it after the process exits. */
+export function tracedProcess(entry: string, argv: readonly string[], options: {
+  readonly cwd: string;
+  readonly env: NodeJS.ProcessEnv & { readonly RAMIFY_ENDPOINT_DIR: string };
+  readonly timeoutMs?: number;
+}) {
+  return cliProcess(options.cwd, argv, { entry, env: options.env, allowSockets: true, timeoutMs: options.timeoutMs });
 }

@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": true,
+    "functionalRequirementsSatisfied": true,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-11T05:40:36.420Z",
+  "iteration": "2",
+  "notes": "All iteration deliverables implemented. Four I2-28 handlers, static checks, eleven-owner self-check, S100/S500/S1000 materialization and tracing smoke pass. Focused affected Plan 1 handlers pass. Full Plan 2 gate correctly fails with 172 future instances not executed. New Vitest coverage is authored and type-checked; Vitest/Cucumber, scenario coverage and seals are reserved to workflow automation, so this self-assessment does not claim those runners executed locally. Results document the necessary early owner-shape expectation migration and temporary wrapper ordering correction. Iteration 1 architecture acceptance remains required before iteration 3."
+}

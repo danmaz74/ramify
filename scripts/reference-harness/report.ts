@@ -1,6 +1,8 @@
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { AnalysisReport } from '../../subs/analysis/src/index.js';
+import { plan2Instances } from './plan2-instances.js';
+import { plan2Runtime } from './plan2-runtime.js';
 import { plan1Instances, referenceCases } from './cases.js';
 import { executionIdentity, persistGateReport } from './artifact.js';
 import type { Observation } from './observations.js';
@@ -70,6 +72,11 @@ async function main(): Promise<number> {
     lines.push(`  ${family.id} [${family.authority.join(',')}] ${family.intent}`,
       `    Plan 1 instances: ${outcomes.filter(item => item.status === 'passed').length}/${members.length} passed; ${outcomes.filter(item => item.status === 'failed').length} failed; ${outcomes.filter(item => item.status === 'not-executed').length} not executed`,
       `    Full family expectation (not claimed by a partial matrix slice): ${family.expected}`);
+  }
+  lines.push('', 'Plan 2 capability inventory (availability only; no Plan 2 instance executed by this command)');
+  for (const capability of [...new Set(plan2Instances.flatMap(instance => instance.requiredCapabilities))].sort()) {
+    const count = plan2Instances.filter(instance => instance.requiredCapabilities.includes(capability)).length;
+    lines.push(`  ${capability}: ${plan2Runtime.capabilities.has(capability) ? 'available' : 'unavailable'}; ${count} instances not executed`);
   }
   lines.push('', 'Plan 1 instance execution (separate from family scope)', formatVerification(report));
   if (identity) {

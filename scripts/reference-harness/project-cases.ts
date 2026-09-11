@@ -269,7 +269,7 @@ export const projectHandlers: ReadonlyMap<string, InstanceHandler> = new Map([
       const toolkit = await read(repositoryRoot);
       c.assertions.equal('toolkit acquired', toolkit.status, 'acquired');
       if (toolkit.status === 'acquired') {
-        try { c.assertions.equal('nine toolkit skeleton owners', toolkit.view.inventory.modules.length, 9); c.assertions.equal('toolkit independent scopes silent', toolkit.view.inventory.warnings, []); }
+        try { c.assertions.equal('eleven toolkit skeleton owners', toolkit.view.inventory.modules.length, 11); c.assertions.equal('toolkit independent scopes silent', toolkit.view.inventory.warnings, []); }
         finally { await toolkit.view.dispose(); }
       }
     }, selection === 'found' ? { root: undefined, cwd: join(c.root, 'subs/workspace/src') } : {}),

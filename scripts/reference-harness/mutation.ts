@@ -47,7 +47,7 @@ export async function runIsolatedProject<T>(options: {
   readonly fixture: ProjectFixture;
   readonly preserveOnFailure?: boolean;
 }, operation: (project: IsolatedProject) => Promise<T>): Promise<IsolatedResult<T>> {
-  if (!/^I1-\d{2}:[A-Za-z0-9-]+(?:\/[A-Za-z0-9-]+)?$/.test(options.instanceId)) {
+  if (!/^I[12]-\d{2}:[A-Za-z0-9-]+(?:\/[A-Za-z0-9-]+)?$/.test(options.instanceId)) {
     throw new Error(`Invalid instance directory ID: ${options.instanceId}`);
   }
   const workRoot = resolve(options.workRoot);

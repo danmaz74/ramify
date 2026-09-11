@@ -60,7 +60,22 @@ registerHooks({ load(url, context, nextLoad) {
   const loaded = nextLoad(url, context);
   record('load', { url }); return loaded;
 } });
-net.Server.prototype.listen = function () { record('listen'); throw new Error('CLI attempted to listen'); };
+const socketPath = args => {
+  // Socket.connect normalizes its arguments before calling the prototype too.
+  const first = Array.isArray(args[0]) ? args[0][0] : args[0];
+  return typeof first === 'string' ? first : first?.path;
+};
+const listen = net.Server.prototype.listen;
+net.Server.prototype.listen = function (...args) {
+  record('listen', { path: socketPath(args) });
+  if (process.env.RAMIFY_PROCESS_SOCKETS !== 'allow') throw new Error('CLI attempted to listen');
+  return Reflect.apply(listen, this, args);
+};
+const connect = net.Socket.prototype.connect;
+net.Socket.prototype.connect = function (...args) {
+  record('connect', { path: socketPath(args) });
+  return Reflect.apply(connect, this, args);
+};
 dgram.Socket.prototype.bind = function () { record('bind'); throw new Error('CLI attempted to bind'); };
 
 const originalSpawn = childProcesses.spawn;
