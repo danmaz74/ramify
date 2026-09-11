@@ -10,7 +10,7 @@ import { residentInputs, residentDependencies } from './resident-inputs.mjs';
 import { residentBudgets, residentWorkloads } from './resident-plan.mjs';
 import { assertResidentWorkload } from './resident-assertions.mjs';
 
-export function verifyResidentEvidence(report, id, expectedInputs = residentInputs(), dependencies = residentDependencies()) {
+export function verifyResidentEvidence(report, id, expectedInputs = residentInputs(), dependencies = residentDependencies(), completedRowReuse = false) {
   assert.equal(report.schemaVersion, 'ramify.resident-measurements/1');
   assert.equal(report.evidenceKind, 'measurement');
   assert.deepEqual(report.inputs, expectedInputs, 'Resident evidence must identify the current source, build, scope, fixtures and recipes');
@@ -20,19 +20,30 @@ export function verifyResidentEvidence(report, id, expectedInputs = residentInpu
   assert.equal(report.environment.arch, arch(), 'Resident evidence architecture changed');
   assert.deepEqual(report.budgets, residentBudgets, 'Resident reference targets or runtime limits changed');
   assert.equal(report.sampling.intervalMs, 50);
-  assert.equal(report.interrupted, false);
-  assert.deepEqual(report.failures, []);
+  if (completedRowReuse && report.interrupted) {
+    assert.equal(report.status, 'incomplete');
+    assert.equal(report.failures.length, 1);
+    assert.match(report.failures[0], /^Error: Resident measurements interrupted\n/,
+      'Input drift or another parent failure cannot be reused');
+  } else {
+    assert.equal(report.interrupted, false);
+    assert.deepEqual(report.failures, []);
+  }
   assert.ok(report.completedAt && report.measuredAt && Date.parse(report.completedAt) >= Date.parse(report.measuredAt));
   assert.deepEqual(report.workloads.map(row => row.id).sort(), residentWorkloads.map(row => row.id).sort());
   const row = report.workloads.find(value => value.id === id);
   assert.ok(row, `No real resident workload for ${id}`);
   assert.equal(row.status, 'measured', `${id} has not completed the real workload`);
+  assert.equal(row.passed, true, 'A failed workload cannot be reused');
   assert.deepEqual(row.failures, []);
   assert.equal(row.interrupted, false);
   assert.equal(row.controllerObservation.failure, null, 'Measurement worker failed');
   assert.equal(row.controllerObservation.signal, null, 'Measurement worker was interrupted');
   assert.equal(row.controllerObservation.postExitObservedProcesses, 0, 'Measurement leaked an observed process');
-  assert.ok([0, 1].includes(row.controllerObservation.code));
+  assert.equal(row.controllerObservation.code, 0, 'Measurement worker did not succeed');
+  assert.ok(Date.parse(row.startedAt) >= Date.parse(report.measuredAt)
+    && Date.parse(row.completedAt) >= Date.parse(row.startedAt)
+    && Date.parse(report.completedAt) >= Date.parse(row.completedAt), 'Invalid workload completion window');
   const assertions = assertResidentWorkload(id, row.measurements);
   assert.ok(assertions.length > 0);
   // Recompute from raw samples; never grant credit from a saved passed flag.
@@ -53,7 +64,7 @@ function readEvidence(path, record) {
   }
   return { report: JSON.parse(raw), artifact: path, rawSha256: sha256(raw), rawBytes: raw.length };
 }
-function run() {
+async function run() {
   const [id, provided] = process.argv.slice(2);
   assert.ok(residentWorkloads.some(row => row.id === id), 'Expected a reviewed I2-29 instance id');
   const inputs = residentInputs(), dependencies = residentDependencies();
@@ -70,11 +81,13 @@ function run() {
     }
     assert.ok(evidence, 'No current resident measurements. On an idle host run npm run measure:resident, then set RAMIFY_RESIDENT_MEASUREMENT_REPORT to its raw report or use its archive.');
   }
-  const result = verifyResidentEvidence(evidence.report, id, inputs, dependencies);
+  const result = evidence.report.schemaVersion === 'ramify.resident-composition/1'
+    ? await (await import('./resident-composition.mjs')).verifyResidentComposition(evidence.report, evidence.artifact, id)
+    : verifyResidentEvidence(evidence.report, id, inputs, dependencies);
   process.stdout.write(JSON.stringify({ ...result, artifact: evidence.artifact, rawSha256: evidence.rawSha256, rawBytes: evidence.rawBytes }) + '\n');
   process.exitCode = result.passed ? 0 : 1;
 }
 if (import.meta.url === pathToFileURL(resolve(process.argv[1] ?? '.')).href) {
-  try { run(); }
+  try { await run(); }
   catch (error) { process.stdout.write(JSON.stringify({ passed: false, error: error.stack ?? String(error) }) + '\n'); process.exitCode = 1; }
 }
