@@ -1,6 +1,6 @@
 import { createHook } from 'node:async_hooks';
 import { execFile } from 'node:child_process';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,7 +28,7 @@ async function put(root: string, path: string, text: string | Uint8Array): Promi
 }
 
 async function fixture(check: (root: string, inputs: AnalysisInputs) => Promise<void>): Promise<void> {
-  const root = await mkdtemp(join(tmpdir(), 'ramify-public-session-'));
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'ramify-public-session-')));
   try {
     for (const [path, text] of Object.entries(fixtureFiles)) await put(root, path, text);
     await check(root, {

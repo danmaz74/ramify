@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, realpath, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { command } from './processes.js';
 import type { CommandResult } from './processes.js';
@@ -52,7 +51,9 @@ export async function withSequenceProcess<T>(operation: (processes: SequenceProc
   readonly preload: string;
   readonly environment: NodeJS.ProcessEnv;
 }): Promise<T> {
-  const owned = await realpath(await mkdtemp(join(tmpdir(), 'ri11-')));
+  // The native socket pathname is bounded to 100 bytes on both platforms.
+  // macOS's per-user TMPDIR is too long once endpoint/install nesting is added.
+  const owned = await realpath(await mkdtemp('/tmp/ri11-'));
   const endpoint = join(owned, 'endpoint'), traceFile = join(owned, 'trace.jsonl');
   const prefix = join(owned, 'install'), executable = installation?.executable ?? join(prefix, 'node_modules/.bin/ramify');
   const cwd = installation?.cwd ?? repositoryRoot;

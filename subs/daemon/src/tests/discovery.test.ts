@@ -40,7 +40,10 @@ describe('endpoint selection', () => {
   });
 
   it('prefers the option, RAMIFY_ENDPOINT_DIR, XDG_RUNTIME_DIR/ramify, then the user temporary directory', async () => {
-    const value = await fixture();
+    // macOS's per-user TMPDIR can leave insufficient space for this nested
+    // precedence fixture under the independently enforced 100-byte socket bound.
+    const value = await discoveryFixture(undefined, '/tmp');
+    fixtures.push(value);
     const environmentDirectory = join(value.root, 'env');
     vi.stubEnv('RAMIFY_ENDPOINT_DIR', environmentDirectory);
     vi.stubEnv('XDG_RUNTIME_DIR', join(value.root, 'xdg'));
