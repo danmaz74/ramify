@@ -1,0 +1,84 @@
+{
+  "createdAt": "2026-09-11T18:57:12.612Z",
+  "iterations": [
+    {
+      "file": "iteration1.md",
+      "index": 1,
+      "parallelGroup": null,
+      "title": "Contract package, probes and review points"
+    },
+    {
+      "file": "iteration2.md",
+      "index": 2,
+      "parallelGroup": null,
+      "title": "Engine changes and the `--plan 5` harness"
+    },
+    {
+      "file": "iteration3.md",
+      "index": 3,
+      "parallelGroup": "after-2",
+      "title": "Per-file export descriptions"
+    },
+    {
+      "file": "iteration4.md",
+      "index": 4,
+      "parallelGroup": null,
+      "title": "Retained compiler adapter and observed reads"
+    },
+    {
+      "file": "iteration5.md",
+      "index": 5,
+      "parallelGroup": "after-2",
+      "title": "Project observer and incremental acquisition"
+    },
+    {
+      "file": "iteration6.md",
+      "index": 6,
+      "parallelGroup": null,
+      "title": "Retained session: facts and source-edit paths"
+    },
+    {
+      "file": "iteration7.md",
+      "index": 7,
+      "parallelGroup": null,
+      "title": "Retained session: description, broad and metadata paths, positions and the audit"
+    },
+    {
+      "file": "iteration8.md",
+      "index": 8,
+      "parallelGroup": null,
+      "title": "Session hosting: worker thread, sweep, deadlines, hot and warm"
+    },
+    {
+      "file": "iteration9.md",
+      "index": 9,
+      "parallelGroup": null,
+      "title": "Contexts on the session driver and Plan 2 engine removal"
+    },
+    {
+      "file": "iteration10.md",
+      "index": 10,
+      "parallelGroup": null,
+      "title": "Compact reply, `check --changed` and the host adapter"
+    },
+    {
+      "file": "iteration11.md",
+      "index": 11,
+      "parallelGroup": "after-10",
+      "title": "Live equivalence gate"
+    },
+    {
+      "file": "iteration12.md",
+      "index": 12,
+      "parallelGroup": "after-10",
+      "title": "Hook and session measurements"
+    },
+    {
+      "file": "iteration13.md",
+      "index": 13,
+      "parallelGroup": null,
+      "title": "Declarations, document revisions, self-check and completion"
+    }
+  ],
+  "planPath": "main-plan.md"
+}
