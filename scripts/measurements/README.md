@@ -127,4 +127,58 @@ existing directory and prints the owner count, file count, bytes and content-map
 SHA-256. Omitted fixture selection preserves the S100 default used by batch
 measurements. Callers own cleanup. Generated trees are never checked in, and
 materialization alone establishes no performance or resident acceptance result.
-Iteration 13 supplies the resident measurement recipe over these fixtures.
+The resident command below records their identities using this same generator.
+
+## Resident measurement checkpoint
+
+```sh
+npm run build
+npm run measure:resident
+```
+
+This build has no resident service, context manager, connector or daemon entry.
+`measure:resident` therefore exits **1**: it is an incomplete measurement
+checkpoint, not the completed Plan 2 recipe. It audits the required compiled
+entries, materializes the existing S100/S500/S1000 generators for content
+identities, records dependency versions and hashes the build, scripts, manifests
+and binding scope. Three fresh compiled CLI help processes supply actual RSS
+samples through the shared batch process observer at a 50 ms target interval.
+Each has its own endpoint directory, which must remain empty. The help row has
+no numeric budget and cannot pass the full `entry-footprints` instance.
+
+The command writes raw JSON under `.reference-work/reports/` (or `--output FILE`)
+and lossless gzip beside the batch archives, appending a record to `results/index.json`.
+The index's existing version and records are preserved; `phase: resident` and
+`payloadSchema: ramify.resident-measurements/1` distinguish these new records.
+The archive lock rejects concurrent index writers, and rename publishes a complete
+index. A stale lock is not automatically removed. Final persistence attempts the
+raw file and archive independently: an unwritable raw path is recorded in the
+archive; an archive failure is recorded in the raw file. If both fail, the command
+reports both errors. Its summary uses null for any unavailable output destination.
+Cleanup precedes persistence. No resident command or implicit batch
+check is timed while these prerequisites are missing.
+
+`resident-plan.mjs` records all nine required I2-29 workloads, exact cycle counts
+and the unchanged iteration-1 targets. Their measurements remain `null` with
+`not-executed` status; the compiler-state trigger remains `not-evaluated`.
+Restoring the prerequisites does **not** automatically enable this checkpoint:
+the real workload driver, instrumented daemon counters, budget assertions and
+`resident-measure` harness handlers still need implementation against those
+providers. In particular, help measurements cannot establish daemon memory,
+stage reuse, a plateau, slow-consumer behavior, or large-fixture performance.
+
+The remaining recipe must drive five cold starts and twenty cycles of every edit
+class on the reference and S100; 200 alternating edits on each; eight warm S100
+contexts; a non-reading subscriber over ten S100 publications; cold/source cycles
+on S500 and S1000; and publication/serialization peaks. It must read heap,
+external, history, products and lifecycle counters from the separately
+instrumented real daemon and stop every daemon in finally. No workload receives
+credit until all its independent expectations and binding budgets pass.
+
+`node scripts/measurements/verify-tooling.mjs` runs bounded direct controls for
+the shared observer, helper cleanup, timeout, interruption, spawn failure,
+lossless archive hashes, index preservation/locking, independent output failures,
+and absent prerequisites.
+The reference-harness test invokes these same controls. They are tooling
+verification, with no resident matrix credit. Run measurements without concurrent
+builds or matrix execution before using performance values for acceptance.
