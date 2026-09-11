@@ -1,6 +1,7 @@
 # Plan 2: Keep verification current
 
-**Date:** 2026-09-10. **Status:** Detailed implementation plan for review,
+**Date:** 2026-09-10. **Iteration 1 review revision:** 2026-09-11.
+**Status:** Revised implementation package awaiting architecture acceptance,
 authored from the roadmap's [Plan 2 brief](../tooling-architecture/README.md#plan-2-resident-verification)
 and Plan 1's [completion evidence](../done/iteration-1-project-verifier/iterations/iteration15-results.md).
 No daemon implementation or passing resident evidence is established by this
@@ -9,7 +10,9 @@ document. The plan runs as fourteen iterations, listed under
 within one 250k-token context, and the plan's completion gate is the last
 iteration's exit. The [contracts](contracts.md), [owners](owners.md),
 [scope](scope.md) and [instance inventory](subcases.md) beside this plan form
-its review package.
+its review package. The [probe and contract review record](probes.md) records
+the five Linux probes, concrete corrections and the single RP-7 budget revision.
+Publication of iteration 1 does not approve those contract revisions.
 
 ## Deliverable and completion boundary
 
@@ -344,7 +347,7 @@ requirements constrain them.
 
 | Contract | Owner | Required information / behavior |
 | --- | --- | --- |
-| `ProjectResolution`, `resolveProjectRoot`, `RetainedConfiguration` | project | Root climb and configuration discovery without capture; configuration-helper reuse keyed on captured dependencies including absence and directory observations. |
+| `ProjectResolution`, `resolveProjectRoot`, `RetainedConfiguration` | project | Root climb and configuration discovery without source acquisition; a short-lived configuration capture classifies references-only setups; configuration-helper reuse keyed on captured dependencies including absence and directory observations; resolution may use the finite configuration helper to classify references-only setups. |
 | `InputChange`, `RetainedAnalysis`, `IncrementInputs`, `IncrementRun`, `analyzeIncrement`, `resolveProject` | analysis | Frozen plain products with per-stage dependency keys and accounted bytes; equal reports with and without reuse; `changes: null` means conservative. |
 | `ContextToken`, `ContextRevision`, `ContextStatus`, `InputFingerprints`, `Freshness`, `CheckOutcome`, `OpenOutcome`, `ContextEvent`, `ContextBudgets`, `AnalysisDriver`, `WatcherPort`, `ClockPort`, `ContextManager` | contexts | Identity, ordering, publication, retention and eviction semantics stated as rules, testable with fakes. |
 | `RamifyService`, `ServiceResult`, `ServiceError`, `DaemonStatus`, `StopAcknowledged` | root | Plain-data operations shared by the in-process binding and the IPC client; domain outcomes are values, transport failures are errors. |
@@ -498,6 +501,7 @@ to stderr instead of stdout. Resident facts reach JSON consumers through
 | Daemon over budget | `resource-unavailable` value or error | `Error [resource-unavailable]: …`, exit 2; no fallback | same |
 | Engine result delivered unpublished (coherent view not sealed, acquisition or stage failure, resource limit inside the engine) | `reported` with `published: false` | `Mode: resident (…; unpublished; synchronized)` then Plan 1's incomplete rendering | Plan 1's report with `outcome.execution` `incomplete` or `unavailable`, exit 2 |
 | Unresolved selection (no root, no configuration, references-only configuration, invalid layout) | `OpenOutcome` `unresolved` with the engine's report | `Mode: resident (daemon <pid>; no context)` then Plan 1's rendering, the same diagnostics as `--batch` | Plan 1's report; exit 1 for invalid, 2 for unavailable |
+| Expectation path not observed in a sealed capture | `unobserved-input` | `Error [unobserved-input]: path was not captured`, exit 2; no fallback or guessed absence | `ramify.cli/1` envelope, exit 2 |
 | Driver threw or rejected | `unavailable` with `analysis-failed` | `Error [analysis-failed]: …` | `ramify.cli/1` envelope, exit 2 |
 | Daemon lost, recovered | none | stderr `Reconnected to daemon <pid> (restarted: yes; generations changed)` | continues |
 | Daemon lost, recovery exhausted; coordinated start failed | `DisconnectReason` `failure` | `check`: `Mode: batch fallback (daemon unavailable: …)`; `watch`: `Error [unavailable]: daemon unavailable after 3 reconnects and 1 restart` | `check`: the batch report on stdout and the fallback line on stderr; `watch` line `unavailable` |
@@ -717,8 +721,8 @@ and each archiving `scripts/probes/results/<name>.json`, as Plan 1's
 
 | Script | Result file | Must establish before iteration 3 |
 | --- | --- | --- |
-| `unix-socket-framing.ts` | `results/unix-socket-framing.json` | Length-prefixed frames round-trip over a socket pair at 1 MiB and 32 MiB with partial reads; a `sun_path` over 100 bytes fails as expected; a `0700` directory with a foreign owner or group/other bits is detectable before use. |
-| `fs-watch-recursive.ts` | `results/fs-watch-recursive.json` | Recursive `fs.watch` on a reference copy delivers root-relative paths, honors the excluded subtrees, batches 100 rapid edits within the 100 ms debounce, and surfaces overflow and error events and close semantics. |
+| `unix-socket-framing.ts` | `results/unix-socket-framing.json` | Length-prefixed frames round-trip over a socket pair at 1 MiB and 32 MiB with partial reads; the portable guard rejects paths over 100 bytes before Node (raw OS acceptance/truncation is recorded); a `0700` directory with a foreign owner or group/other bits is detectable before use. |
+| `fs-watch-recursive.ts` | `results/fs-watch-recursive.json` | Recursive `fs.watch` on a reference copy delivers root-relative paths, demonstrates callback filtering versus truly pruned per-directory watches, batches 100 rapid edits within the 100 ms debounce, and records bounded-queue overflow, injected errors, real missing-root failure and close semantics separately from unobservable kernel loss. |
 | `atomic-record.ts` | `results/atomic-record.json` | A temporary file plus `rename` is never observed partially written by a concurrent reader; `O_CREAT|O_EXCL` lock creation serializes eight contenders; a lock with a dead pid is detectable. |
 | `detached-spawn.ts` | `results/detached-spawn.json` | A detached, unreferenced child outlives its parent, its exit code propagates to the record, `process.kill(pid, 0)` reports liveness correctly, and a second start against a bound socket can detect the live peer. |
 | `warm-recompute.ts` | `results/warm-recompute.json` | The median wall time and per-stage split of twenty in-process full Plan 1 pipeline runs on the reference and the 100-owner fixture: the floor from which the warm latency targets are revised. |
@@ -812,14 +816,19 @@ Review points for iteration 1, each with the recommended choice:
 
 | ID | Question | Alternatives | Recommendation or decision |
 | --- | --- | --- | --- |
-| RP-1 | JSON output of `ramify check` | (a) bare `ramify.analysis/1` in both modes, resident facts only in the human `Mode:` line, the `watch` lines and `daemon status`; (b) a wrapping envelope document in both modes; (c) an additive `resident` member inside `ramify.analysis/1` | Decided in this revision: (a). Plan 1's `scripts/reference-harness/cli-cases.ts` (I1-26) and `self-cases.ts` compare the compiled `ramify check --format json` document with the API report by deep equality after removing only `runId`, and every compiled run asserts empty stderr; an envelope or an additional member would fail I2-30 `plan1-regression`, whose records harness item 1 leaves untouched apart from the two tree-shape expectations. The sealed [invocation contract](../../architecture/cli-invocation.spec.md#output-and-exit) and every other consumer (`src/tests/batch-cli.test.ts`, `relocation.ts`, `gate-cases.ts`) read named members and are unaffected either way. Plan 3 defines revision-qualified JSON for its own commands. |
-| RP-2 | Compiler state across revisions | (a) defer, reuse stage products keyed on inputs; (b) keep one long-lived helper snapshot per context | (a): the helper contract is one-shot and its close guarantees are weak; revisit when iteration 13 misses the source-edit target. |
-| RP-3 | Terminating `check` when the daemon is explicitly stopped mid-flight | (a) exit 2 `stopped`; (b) visible batch fallback | Decided in this revision: (a). The architecture ties in-process fallback to exhausted automatic recovery and makes an explicit stop a user decision that existing clients report as stopped; the `check` prints `Error [stopped]: …` and exits 2 with no fallback. |
-| RP-4 | Daemon grouping | (a) one daemon per user; (b) one per user and installation | (b): concurrent checkouts and rebuilt `dist/` never fight; the old group idles out. |
-| RP-5 | Watching `node_modules` | (a) recursive watch of everything; (b) exclude dependency trees, rehash on synchronized captures, verify every 60 s | (b): recursive watches of dependency trees are expensive and unreliable; synchronized correctness does not depend on the watcher. |
-| RP-6 | Concurrent analyses | (a) one per context; (b) one per daemon | (b): each analysis spawns compiler helpers with a measured 480 MiB combined peak; raise it only with two-helper-set measurements. |
-| RP-7 | Provisional latency and memory targets | Fix them now, or after the iteration 1 probe | Revise them once from the warm-recompute probe in iteration 1; they are binding from iteration 1's exit, iteration 13 asserts them and records the measured values, and a missed target is a reviewed revision of scope.md, never a relaxed assertion. |
-| RP-8 | `watch` exit on SIGINT | 0 or 130 | 130: the invocation contract defines it as interruption with no claimed result, and scripts can distinguish it from failure. |
+| RP-1 | JSON output of `ramify check` | (a) bare `ramify.analysis/1` in both modes, resident facts only in the human `Mode:` line, the `watch` lines and `daemon status`; (b) a wrapping envelope document in both modes; (c) an additive `resident` member inside `ramify.analysis/1` | Confirmed in iteration 1: (a), unchanged. Plan 1's `scripts/reference-harness/cli-cases.ts` (I1-26) and `self-cases.ts` compare the compiled `ramify check --format json` document with the API report by deep equality after removing only `runId`, and every compiled run asserts empty stderr; an envelope or an additional member would fail I2-30 `plan1-regression`, whose records harness item 1 leaves untouched apart from the two tree-shape expectations. The sealed [invocation contract](../../architecture/cli-invocation.spec.md#output-and-exit) and every other consumer (`src/tests/batch-cli.test.ts`, `relocation.ts`, `gate-cases.ts`) read named members and are unaffected either way. Plan 3 defines revision-qualified JSON for its own commands. |
+| RP-2 | Compiler state across revisions | (a) defer, reuse stage products keyed on inputs; (b) keep one long-lived helper snapshot per context | Iteration 1 choice: (a). Measured floors 3.442 s / 5.723 s support revised targets; helpers remain finite. Revisit only through a reviewed contract if iteration 13 misses the source-edit target. |
+| RP-3 | Terminating `check` when the daemon is explicitly stopped mid-flight | (a) exit 2 `stopped`; (b) visible batch fallback | Confirmed in iteration 1: (a), unchanged. The architecture ties in-process fallback to exhausted automatic recovery and makes an explicit stop a user decision that existing clients report as stopped; the `check` prints `Error [stopped]: …` and exits 2 with no fallback. |
+| RP-4 | Daemon grouping | (a) one daemon per user; (b) one per user and installation | Iteration 1 choice: (b). Hash the entire production runtime file set, not only the entry, so a rebuilt engine changes groups; the old group idles out. |
+| RP-5 | Watching `node_modules` | (a) recursive watch of everything; (b) exclude dependency trees, rehash on synchronized captures, verify every 60 s | Iteration 1 choice: (b). Use recursive enumeration with pruned non-recursive handles; callback filtering still watches excluded trees. Verify every 60 s even while the watcher is unavailable. |
+| RP-6 | Concurrent analyses | (a) one per context; (b) one per daemon | Iteration 1 choice: (b), one analysis per daemon. Keep batch-derived peak ceilings; the recompute probe is not a two-helper-set memory measurement. |
+| RP-7 | Provisional latency and memory targets | Fix them now, or after the iteration 1 probe | Iteration 1 revision: reference source 4.5 s and broad 5.5 s, from the 3.442 s / 5.723 s recompute medians; other latency and memory targets retained. scope.md records the formula and values, binding from iteration 1 exit subject to package acceptance. Iteration 13 asserts them without silent relaxation. |
+| RP-8 | `watch` exit on SIGINT | 0 or 130 | Iteration 1 choice: 130, preserving the invocation contract and distinguishing interruption from failure. |
+| Schedule-1 | Contexts prerequisites | Iteration 4 after 3, or parallel | Confirmed: 4 follows 3; its port consumes the real analysis/project types. |
+| Schedule-2 | Codec and connect vocabulary | Message codec in 5, or all codec work in 7 | Confirmed: message codec and connect vocabulary in 5, framing/discovery/client in 7. Corrected root R7 activation: contexts/fakes and connect/service slices in 5, remaining client slice in 7. |
+| Schedule-3 | Socket host and IPC evidence | Host in 8, or earlier socket tests | Confirmed: `startDaemon`, host and every IPC instance in 8, after the client. |
+| Schedule-4 | Iteration 9 size | Keep commands and migration together, or split | Keep together: the migration is mechanical and the same iteration must prove the unchanged batch surface; no iteration or matrix renumbering. |
+| Review-1 | Corrections beyond RP-1–RP-8 | Revised package or implement the original contradictions | Revised package: sealed invalid inputs, request-specific report facts, expectation coverage, coalescing/error vocabulary, staged relays, whole-runtime identity, live-lock preservation and cold retention are specified in contracts.md and scope.md. Architecture acceptance is still required before iteration 3. |
 
 Do not add persistent caches, worker pools, a configuration language, a
 second checker or an inspection command to resolve schedule pressure. If a

@@ -1,0 +1,819 @@
+{
+  "probe": "warm-recompute",
+  "recordedAt": "2026-09-11T05:17:31.189Z",
+  "nodeVersion": "v22.23.2",
+  "platform": "linux",
+  "architecture": "x64",
+  "typescript": "7.0.2",
+  "baseCommit": "b6f9c0447ccd73fab819aca840b10e362715b968",
+  "scriptSha256": "72d2d5a9fcf8d87ea06151eddbcb837428742ca207a3a26b91e5fab7f2c50e45",
+  "evidence": {
+    "recipe": "One fresh compiled worker per workload; twenty serial in-process runBatch calls; no retained engine or compiler state; no warmup omitted; imports and fixture creation outside timing.",
+    "instrumentation": "In-memory load hook inserts phase marks in the compiled Plan 1 pipeline. Parse callback time is subtracted from acquisition. Access includes source-helper disposal; seal/dispose and report assembly are separate. No owner file is edited.",
+    "workerSha256": "ff96f8108343c18f7d0d71a5462d8e13536543fa8c821e65039bb4db06e6c843",
+    "fixtureSha256": "d5b77b9ff57c443b35f386f40598506ff20c51c4ec75b800371f0cec089c0897",
+    "samples": [
+      {
+        "workload": "reference",
+        "samples": [
+          {
+            "iteration": 1,
+            "wallMs": 3800.657952,
+            "phasesMs": {
+              "registry": 1.8084169999999986,
+              "acquisition": 212.87598400000005,
+              "catalog": 2421.361927,
+              "link": 23.09903200000008,
+              "access": 606.8095969999999,
+              "decide": 57.083574000000226,
+              "seal-dispose": 319.00159299999996,
+              "report": 155.85175600000002,
+              "parse": 2.7580699999999467
+            },
+            "rssAfter": 157495296,
+            "inputId": "input/1:297f01c25bd4b96dc01db39b3d18b9d4f3790b6748e8e20f1abbae59962b3cdf",
+            "owners": 15,
+            "reportBytes": 1641877
+          },
+          {
+            "iteration": 2,
+            "wallMs": 3466.9327649999996,
+            "phasesMs": {
+              "registry": 0.27681299999994735,
+              "acquisition": 181.15644900000007,
+              "catalog": 2147.8848949999997,
+              "link": 16.684259999999995,
+              "access": 622.7631220000003,
+              "decide": 47.984555,
+              "seal-dispose": 333.4815289999997,
+              "report": 115.03965400000016,
+              "parse": 1.6564760000001115
+            },
+            "rssAfter": 167866368,
+            "inputId": "input/1:297f01c25bd4b96dc01db39b3d18b9d4f3790b6748e8e20f1abbae59962b3cdf",
+            "owners": 15,
+            "reportBytes": 1641877
+          },
+          {
+            "iteration": 3,
+            "wallMs": 3416.04072,
+            "phasesMs": {
+              "registry": 0.1866680000002816,
+              "acquisition": 173.79761899999994,
+              "catalog": 2137.03903,
+              "link": 16.436374000000797,
+              "access": 601.3981299999996,
+              "decide": 47.24139099999957,
+              "seal-dispose": 324.19221599999946,
+              "report": 114.39021000000139,
+              "parse": 1.3535719999999856
+            },
+            "rssAfter": 168189952,
+            "inputId": "input/1:297f01c25bd4b96dc01db39b3d18b9d4f3790b6748e8e20f1abbae59962b3cdf",
+            "owners": 15,
+            "reportBytes": 1641877
+          },
+          {
+            "iteration": 4,
+            "wallMs": 3541.243633,
+            "phasesMs": {
+              "registry": 0.4744460000001709,
+              "acquisition": 165.31186900000284,
+              "catalog": 2185.3264899999995,
+              "link": 15.72320899999977,
+              "access": 637.2073980000005,
+              "decide": 48.5114109999995,
+              "seal-dispose": 375.4706440000009,
+              "report": 112.00362099999984,
+              "parse": 1.2092039999970439
+            },
+            "rssAfter": 172904448,
+            "inputId": "input/1:297f01c25bd4b96dc01db39b3d18b9d4f3790b6748e8e20f1abbae59962b3cdf",
+            "owners": 15,
+            "reportBytes": 1641877
+          },
+          {
+            "iteration": 5,
+            "wallMs": 3388.737848999999,
+            "phasesMs": {
+              "registry": 0.47060099999907834,
+              "acquisition": 171.66568700000062,
+              "catalog": 2124.947698,
+              "link": 17.349863999999798,
+              "access": 601.0322720000004,
+              "decide": 48.12132399999973,
+              "seal-dispose": 312.26322699999946,
+              "report": 112.11206800000218,
+              "parse": 0.7698019999988901
+            },
+            "rssAfter": 172941312,
+            "inputId": "input/1:297f01c25bd4b96dc01db39b3d18b9d4f3790b6748e8e20f1abbae59962b3cdf",
+            "owners": 15,
+            "reportBytes": 1641877
+          },
+          {
+            "iteration": 6,
+            "wallMs": 3455.257841999999,
+            "phasesMs": {
+              "registry": 0.47881000000052154,
+              "acquisition": 170.7255100000075,
+              "catalog": 2115.952294999999,
+              "link": 16.060406000000512,
+              "access": 644.4999209999987,
+              "decide": 49.77013100000113,
+              "seal-dispose": 345.53541100000075,
+              "report": 111.50415000000066,
+              "parse": 0.7259399999929883
+            },
+            "rssAfter": 173608960,
+            "inputId": "input/1:297f01c25bd4b96dc01db39b3d18b9d4f3790b6748e8e20f1abbae59962b3cdf",
+            "owners": 15,
+            "reportBytes": 1641877
+          },
+          {
+            "iteration": 7,
+            "wallMs": 3564.6602249999996,
+            "phasesMs": {
+              "registry": 0.1591359999983979,
+              "acquisition": 171.6387319999958,
+              "catalog": 2103.695144999998,
+              "link": 14.731191999999282,
+              "access": 691.3459509999993,
+              "decide": 79.17080400000123,
+              "seal-dispose": 387.25773200000185,
+              "report": 115.67667099999744,
+              "parse": 0.9788260000059381
+            },
+            "rssAfter": 173621248,
+            "inputId": "input/1:297f01c25bd4b96dc01db39b3d18b9d4f3790b6748e8e20f1abbae59962b3cdf",
+            "owners": 15,
+            "reportBytes": 1641877
+          },
+          {
+            "iteration": 8,
+            "wallMs": 3451.016982000001,
+            "phasesMs": {
+              "registry": 0.16345800000271993,
+              "acquisition": 171.57651099999566,
+              "catalog": 2141.021783,
+              "link": 15.45997499999794,
+              "access": 595.7521990000023,
+              "decide": 47.11552799999845,
+              "seal-dispose": 365.9187889999994,
+              "report": 113.09579400000075,
+              "parse": 0.9076570000033826
+            },
+            "rssAfter": 173477888,
+            "inputId": "input/1:297f01c25bd4b96dc01db39b3d18b9d4f3790b6748e8e20f1abbae59962b3cdf",
+            "owners": 15,
+            "reportBytes": 1641877
+          },
+          {
+            "iteration": 9,
+            "wallMs": 3492.742334999999,
+            "phasesMs": {
+              "registry": 0.46529199999713455,
+              "acquisition": 173.0955250000079,
+              "catalog": 2139.8047750000005,
+              "link": 15.643928999998025,
+              "access": 619.3663500000002,
+              "decide": 46.939164000003075,
+              "seal-dispose": 386.19520099999863,
+              "report": 110.41517400000157,
+              "parse": 0.8143059999929392
+            },
+            "rssAfter": 173395968,
+            "inputId": "input/1:297f01c25bd4b96dc01db39b3d18b9d4f3790b6748e8e20f1abbae59962b3cdf",
+            "owners": 15,
+            "reportBytes": 1641877
+          },
+          {
+            "iteration": 10,
+            "wallMs": 3428.658195,
+            "phasesMs": {
+              "registry": 0.16938500000105705,
+              "acquisition": 164.55468999999357,
+              "catalog": 2112.225417999998,
+              "link": 17.017391000001226,
+              "access": 637.0387210000044,
+              "decide": 47.25021699999343,
+              "seal-dispose": 336.296199000004,
+              "report": 113.40099899999768,
+              "parse": 0.7027660000057949
+            },
+            "rssAfter": 173449216,
+            "inputId": "input/1:297f01c25bd4b96dc01db39b3d18b9d4f3790b6748e8e20f1abbae59962b3cdf",
+            "owners": 15,
+            "reportBytes": 1641877
+          },
+          {
+            "iteration": 11,
+            "wallMs": 3433.4606589999967,
+            "phasesMs": {
+              "registry": 0.4537949999939883,
+              "acquisition": 180.49545699999726,
+              "catalog": 2116.8764840000003,
+              "link": 15.866704000000027,
+              "access": 642.0064570000031,
+              "decide": 58.71128399999725,
+              "seal-dispose": 296.625982000005,
+              "report": 121.71170199999324,
+              "parse": 0.7092810000031022
+            },
+            "rssAfter": 173633536,
+            "inputId": "input/1:297f01c25bd4b96dc01db39b3d18b9d4f3790b6748e8e20f1abbae59962b3cdf",
+            "owners": 15,
+            "reportBytes": 1641877
+          },
+          {
+            "iteration": 12,
+            "wallMs": 3416.020598999996,
+            "phasesMs": {
+              "registry": 0.4236869999949704,
+              "acquisition": 174.37818399999378,
+              "catalog": 2142.1390119999996,
+              "link": 16.38308799999504,
+              "access": 595.8795190000019,
+              "decide": 47.78900299999805,
+              "seal-dispose": 315.4025840000031,
+              "report": 122.69732600000134,
+              "parse": 0.9249180000115302
+            },
+            "rssAfter": 173641728,
+            "inputId": "input/1:297f01c25bd4b96dc01db39b3d18b9d4f3790b6748e8e20f1abbae59962b3cdf",
+            "owners": 15,
+            "reportBytes": 1641877
+          },
+          {
+            "iteration": 13,
+            "wallMs": 3417.1753020000033,
+            "phasesMs": {
+              "registry": 0.15911500000220258,
+              "acquisition": 168.04745700000785,
+              "catalog": 2129.7470820000017,
+              "link": 21.226811000000453,
+              "access": 610.8154619999987,
+              "decide": 50.91037700000015,
+              "seal-dispose": 318.19969200000196,
+              "report": 117.38020899999538,
+              "parse": 0.6846149999910267
+            },
+            "rssAfter": 173907968,
+            "inputId": "input/1:297f01c25bd4b96dc01db39b3d18b9d4f3790b6748e8e20f1abbae59962b3cdf",
+            "owners": 15,
+            "reportBytes": 1641877
+          },
+          {
+            "iteration": 14,
+            "wallMs": 3597.651410999999,
+            "phasesMs": {
+              "registry": 0.4339170000021113,
+              "acquisition": 166.8832229999971,
+              "catalog": 2166.803031000003,
+              "link": 26.624273000001267,
+              "access": 733.8577420000001,
+              "decide": 48.464624000000185,
+              "seal-dispose": 325.54874800000107,
+              "report": 128.14594699999725,
+              "parse": 0.8859949999969103
+            },
+            "rssAfter": 175222784,
+            "inputId": "input/1:297f01c25bd4b96dc01db39b3d18b9d4f3790b6748e8e20f1abbae59962b3cdf",
+            "owners": 15,
+            "reportBytes": 1641877
+          },
+          {
+            "iteration": 15,
+            "wallMs": 3491.7289450000026,
+            "phasesMs": {
+              "registry": 0.1529080000036629,
+              "acquisition": 171.66697899997962,
+              "catalog": 2178.0485689999987,
+              "link": 16.570723999997426,
+              "access": 629.8203770000036,
+              "decide": 54.52296699999715,
+              "seal-dispose": 320.41695400000026,
+              "report": 119.87749500000064,
+              "parse": 0.648488000020734
+            },
+            "rssAfter": 175190016,
+            "inputId": "input/1:297f01c25bd4b96dc01db39b3d18b9d4f3790b6748e8e20f1abbae59962b3cdf",
+            "owners": 15,
+            "reportBytes": 1641877
+          },
+          {
+            "iteration": 16,
+            "wallMs": 3385.339660999998,
+            "phasesMs": {
+              "registry": 0.4349999999976717,
+              "acquisition": 161.3856259999884,
+              "catalog": 2101.1174020000035,
+              "link": 15.105116999999154,
+              "access": 599.1838859999989,
+              "decide": 47.038791999999376,
+              "seal-dispose": 337.376479999999,
+              "report": 123.03000099999917,
+              "parse": 0.6638280000115628
+            },
+            "rssAfter": 175280128,
+            "inputId": "input/1:297f01c25bd4b96dc01db39b3d18b9d4f3790b6748e8e20f1abbae59962b3cdf",
+            "owners": 15,
+            "reportBytes": 1641877
+          },
+          {
+            "iteration": 17,
+            "wallMs": 3397.8425810000044,
+            "phasesMs": {
+              "registry": 0.14650000000256114,
+              "acquisition": 184.54398899999796,
+              "catalog": 2130.4369090000037,
+              "link": 14.693823999994493,
+              "access": 605.8753490000017,
+              "decide": 49.30731000000378,
+              "seal-dispose": 298.80528299999423,
+              "report": 113.28348600000027,
+              "parse": 0.7462400000003981
+            },
+            "rssAfter": 175136768,
+            "inputId": "input/1:297f01c25bd4b96dc01db39b3d18b9d4f3790b6748e8e20f1abbae59962b3cdf",
+            "owners": 15,
+            "reportBytes": 1641877
+          },
+          {
+            "iteration": 18,
+            "wallMs": 3452.6260049999983,
+            "phasesMs": {
+              "registry": 0.4282539999985602,
+              "acquisition": 172.45349399999395,
+              "catalog": 2150.1613769999967,
+              "link": 15.646945000000414,
+              "access": 640.5807650000061,
+              "decide": 51.51272299999982,
+              "seal-dispose": 296.40254699999787,
+              "report": 124.72282899999846,
+              "parse": 0.7135670000061509
+            },
+            "rssAfter": 175415296,
+            "inputId": "input/1:297f01c25bd4b96dc01db39b3d18b9d4f3790b6748e8e20f1abbae59962b3cdf",
+            "owners": 15,
+            "reportBytes": 1641877
+          },
+          {
+            "iteration": 19,
+            "wallMs": 3388.046359,
+            "phasesMs": {
+              "registry": 0.1750319999991916,
+              "acquisition": 163.47987599999033,
+              "catalog": 2093.280460999995,
+              "link": 15.59574799999973,
+              "access": 623.3323049999963,
+              "decide": 49.00337600000785,
+              "seal-dispose": 331.58149799999956,
+              "report": 110.90347599999222,
+              "parse": 0.6917080000130227
+            },
+            "rssAfter": 175185920,
+            "inputId": "input/1:297f01c25bd4b96dc01db39b3d18b9d4f3790b6748e8e20f1abbae59962b3cdf",
+            "owners": 15,
+            "reportBytes": 1641877
+          },
+          {
+            "iteration": 20,
+            "wallMs": 3373.9434889999975,
+            "phasesMs": {
+              "registry": 0.15039799999794923,
+              "acquisition": 171.87104700000782,
+              "catalog": 2098.362657000005,
+              "link": 15.205346999995527,
+              "access": 594.9032140000054,
+              "decide": 46.62124599999515,
+              "seal-dispose": 326.77424800000153,
+              "report": 119.28558399999747,
+              "parse": 0.7666609999869252
+            },
+            "rssAfter": 175435776,
+            "inputId": "input/1:297f01c25bd4b96dc01db39b3d18b9d4f3790b6748e8e20f1abbae59962b3cdf",
+            "owners": 15,
+            "reportBytes": 1641877
+          }
+        ],
+        "medianWallMs": 3442.238820499999,
+        "medianPhasesMs": {
+          "registry": 0.35024999999745887,
+          "acquisition": 171.66633299999012,
+          "catalog": 2133.737969500002,
+          "link": 15.96355500000027,
+          "access": 621.0647360000003,
+          "decide": 48.48801749999984,
+          "seal-dispose": 326.1614980000013,
+          "report": 115.3581624999988,
+          "parse": 0.7682314999929076
+        },
+        "compiledPipelineSha256": "8534f5292c155214baa50b552bfcc8ed9171d5dacb77f1bb8e1ffd0482d12788"
+      },
+      {
+        "workload": "hundred-owners",
+        "samples": [
+          {
+            "iteration": 1,
+            "wallMs": 6189.131935,
+            "phasesMs": {
+              "registry": 1.7987389999999976,
+              "acquisition": 1017.6943819999995,
+              "catalog": 1772.195687,
+              "link": 122.11893000000009,
+              "access": 659.2539879999999,
+              "decide": 1661.0883249999997,
+              "seal-dispose": 343.5252250000003,
+              "report": 607.2358260000001,
+              "parse": 4.212983000000634
+            },
+            "rssAfter": 177000448,
+            "inputId": "input/1:e1336e363d69c36045a56e614367421a0d41d425f5ac85a0e30f201af51d9fce",
+            "owners": 100,
+            "reportBytes": 6966258
+          },
+          {
+            "iteration": 2,
+            "wallMs": 5759.003406000001,
+            "phasesMs": {
+              "registry": 0.8671889999995983,
+              "acquisition": 917.9156969999958,
+              "catalog": 1578.1982659999994,
+              "link": 89.4440480000012,
+              "access": 670.4492559999999,
+              "decide": 1579.0009379999992,
+              "seal-dispose": 336.02761199999986,
+              "report": 584.6749280000004,
+              "parse": 2.4204130000043733
+            },
+            "rssAfter": 186318848,
+            "inputId": "input/1:e1336e363d69c36045a56e614367421a0d41d425f5ac85a0e30f201af51d9fce",
+            "owners": 100,
+            "reportBytes": 6966258
+          },
+          {
+            "iteration": 3,
+            "wallMs": 5735.588514000001,
+            "phasesMs": {
+              "registry": 0.8119129999995494,
+              "acquisition": 915.099351000008,
+              "catalog": 1555.9837210000005,
+              "link": 86.2541880000008,
+              "access": 667.0298389999989,
+              "decide": 1613.6262360000019,
+              "seal-dispose": 318.8150590000005,
+              "report": 576.3220799999981,
+              "parse": 1.6410419999920123
+            },
+            "rssAfter": 196284416,
+            "inputId": "input/1:e1336e363d69c36045a56e614367421a0d41d425f5ac85a0e30f201af51d9fce",
+            "owners": 100,
+            "reportBytes": 6966258
+          },
+          {
+            "iteration": 4,
+            "wallMs": 5717.675089,
+            "phasesMs": {
+              "registry": 0.8055629999980738,
+              "acquisition": 848.6111209999945,
+              "catalog": 1570.4026220000014,
+              "link": 90.84465700000146,
+              "access": 663.5096679999988,
+              "decide": 1614.4476319999994,
+              "seal-dispose": 341.3979250000011,
+              "report": 586.0934669999988,
+              "parse": 1.5564770000055432
+            },
+            "rssAfter": 204361728,
+            "inputId": "input/1:e1336e363d69c36045a56e614367421a0d41d425f5ac85a0e30f201af51d9fce",
+            "owners": 100,
+            "reportBytes": 6966258
+          },
+          {
+            "iteration": 5,
+            "wallMs": 5928.375129,
+            "phasesMs": {
+              "registry": 0.7682009999989532,
+              "acquisition": 925.4598609999885,
+              "catalog": 1710.1516620000002,
+              "link": 89.36150400000042,
+              "access": 670.6090249999979,
+              "decide": 1600.8820870000018,
+              "seal-dispose": 351.6343080000006,
+              "report": 577.711586999998,
+              "parse": 1.791614000012487
+            },
+            "rssAfter": 210653184,
+            "inputId": "input/1:e1336e363d69c36045a56e614367421a0d41d425f5ac85a0e30f201af51d9fce",
+            "owners": 100,
+            "reportBytes": 6966258
+          },
+          {
+            "iteration": 6,
+            "wallMs": 5812.019159000003,
+            "phasesMs": {
+              "registry": 0.8127490000006219,
+              "acquisition": 876.0137459999787,
+              "catalog": 1573.9534139999996,
+              "link": 96.72346400000242,
+              "access": 662.2271340000007,
+              "decide": 1688.3531289999955,
+              "seal-dispose": 334.96782100000564,
+              "report": 577.3110349999988,
+              "parse": 1.651679000020522
+            },
+            "rssAfter": 216158208,
+            "inputId": "input/1:e1336e363d69c36045a56e614367421a0d41d425f5ac85a0e30f201af51d9fce",
+            "owners": 100,
+            "reportBytes": 6966258
+          },
+          {
+            "iteration": 7,
+            "wallMs": 5631.597095000005,
+            "phasesMs": {
+              "registry": 0.7436510000043199,
+              "acquisition": 905.0691459999653,
+              "catalog": 1506.879449,
+              "link": 86.09502600000269,
+              "access": 663.2182729999986,
+              "decide": 1588.3015379999997,
+              "seal-dispose": 301.3993069999997,
+              "report": 578.3534359999976,
+              "parse": 1.5318330000300193
+            },
+            "rssAfter": 217948160,
+            "inputId": "input/1:e1336e363d69c36045a56e614367421a0d41d425f5ac85a0e30f201af51d9fce",
+            "owners": 100,
+            "reportBytes": 6966258
+          },
+          {
+            "iteration": 8,
+            "wallMs": 5689.948495000004,
+            "phasesMs": {
+              "registry": 0.7724860000016633,
+              "acquisition": 840.058772000004,
+              "catalog": 1559.7750019999949,
+              "link": 79.65436000000045,
+              "access": 657.909255999999,
+              "decide": 1592.6449190000058,
+              "seal-dispose": 368.7165479999967,
+              "report": 588.9396350000025,
+              "parse": 1.4721209999988787
+            },
+            "rssAfter": 217849856,
+            "inputId": "input/1:e1336e363d69c36045a56e614367421a0d41d425f5ac85a0e30f201af51d9fce",
+            "owners": 100,
+            "reportBytes": 6966258
+          },
+          {
+            "iteration": 9,
+            "wallMs": 6010.7630260000005,
+            "phasesMs": {
+              "registry": 0.8765330000023823,
+              "acquisition": 963.8151809999908,
+              "catalog": 1729.526420999995,
+              "link": 81.53831000000355,
+              "access": 703.7692349999998,
+              "decide": 1604.2981020000007,
+              "seal-dispose": 338.98656199999823,
+              "report": 586.0861760000043,
+              "parse": 1.86284900001192
+            },
+            "rssAfter": 217997312,
+            "inputId": "input/1:e1336e363d69c36045a56e614367421a0d41d425f5ac85a0e30f201af51d9fce",
+            "owners": 100,
+            "reportBytes": 6966258
+          },
+          {
+            "iteration": 10,
+            "wallMs": 5675.788802000003,
+            "phasesMs": {
+              "registry": 0.5772960000031162,
+              "acquisition": 877.6593770000109,
+              "catalog": 1524.0664340000003,
+              "link": 81.47835499999928,
+              "access": 670.4157750000013,
+              "decide": 1601.3940799999982,
+              "seal-dispose": 343.2777900000001,
+              "report": 575.4867630000008,
+              "parse": 1.4302959999913583
+            },
+            "rssAfter": 218120192,
+            "inputId": "input/1:e1336e363d69c36045a56e614367421a0d41d425f5ac85a0e30f201af51d9fce",
+            "owners": 100,
+            "reportBytes": 6966258
+          },
+          {
+            "iteration": 11,
+            "wallMs": 5679.207673000004,
+            "phasesMs": {
+              "registry": 0.5494610000023386,
+              "acquisition": 888.9314179999492,
+              "catalog": 1535.7078660000043,
+              "link": 78.54439699999784,
+              "access": 667.7670530000032,
+              "decide": 1573.7708700000003,
+              "seal-dispose": 348.85542200000054,
+              "report": 583.422369999993,
+              "parse": 1.6557500000490109
+            },
+            "rssAfter": 218259456,
+            "inputId": "input/1:e1336e363d69c36045a56e614367421a0d41d425f5ac85a0e30f201af51d9fce",
+            "owners": 100,
+            "reportBytes": 6966258
+          },
+          {
+            "iteration": 12,
+            "wallMs": 5724.723392,
+            "phasesMs": {
+              "registry": 0.47729500000423286,
+              "acquisition": 921.876277999967,
+              "catalog": 1582.7419949999967,
+              "link": 85.4367740000016,
+              "access": 667.5290789999999,
+              "decide": 1571.3680250000034,
+              "seal-dispose": 311.8501819999947,
+              "report": 581.9530320000049,
+              "parse": 1.4870630000295932
+            },
+            "rssAfter": 218324992,
+            "inputId": "input/1:e1336e363d69c36045a56e614367421a0d41d425f5ac85a0e30f201af51d9fce",
+            "owners": 100,
+            "reportBytes": 6966258
+          },
+          {
+            "iteration": 13,
+            "wallMs": 5902.429510000002,
+            "phasesMs": {
+              "registry": 0.5337080000026617,
+              "acquisition": 826.3008419999824,
+              "catalog": 1671.7762959999964,
+              "link": 121.75253800000064,
+              "access": 779.9817540000076,
+              "decide": 1594.0274720000016,
+              "seal-dispose": 320.9310089999926,
+              "report": 585.8858659999969,
+              "parse": 1.2360300000145799
+            },
+            "rssAfter": 218476544,
+            "inputId": "input/1:e1336e363d69c36045a56e614367421a0d41d425f5ac85a0e30f201af51d9fce",
+            "owners": 100,
+            "reportBytes": 6966258
+          },
+          {
+            "iteration": 14,
+            "wallMs": 5691.085628999994,
+            "phasesMs": {
+              "registry": 0.5800000000017462,
+              "acquisition": 895.0008799999487,
+              "catalog": 1555.6853569999948,
+              "link": 82.49154200000339,
+              "access": 664.694696999999,
+              "decide": 1580.4831569999951,
+              "seal-dispose": 323.00837100000354,
+              "report": 587.9325379999937,
+              "parse": 1.2055250000557862
+            },
+            "rssAfter": 218562560,
+            "inputId": "input/1:e1336e363d69c36045a56e614367421a0d41d425f5ac85a0e30f201af51d9fce",
+            "owners": 100,
+            "reportBytes": 6966258
+          },
+          {
+            "iteration": 15,
+            "wallMs": 5662.490762999994,
+            "phasesMs": {
+              "registry": 0.509239000006346,
+              "acquisition": 879.3853690000251,
+              "catalog": 1534.5171639999899,
+              "link": 79.20465900001,
+              "access": 699.0077919999894,
+              "decide": 1588.0464140000113,
+              "seal-dispose": 296.0163279999979,
+              "report": 584.405144999997,
+              "parse": 1.395301999975345
+            },
+            "rssAfter": 218632192,
+            "inputId": "input/1:e1336e363d69c36045a56e614367421a0d41d425f5ac85a0e30f201af51d9fce",
+            "owners": 100,
+            "reportBytes": 6966258
+          },
+          {
+            "iteration": 16,
+            "wallMs": 5661.093101000006,
+            "phasesMs": {
+              "registry": 0.5164309999963734,
+              "acquisition": 836.2547279999271,
+              "catalog": 1560.9626779999962,
+              "link": 78.57175600000483,
+              "access": 661.4566939999931,
+              "decide": 1608.5220180000033,
+              "seal-dispose": 328.5895889999956,
+              "report": 585.0299110000051,
+              "parse": 1.186136000076658
+            },
+            "rssAfter": 218808320,
+            "inputId": "input/1:e1336e363d69c36045a56e614367421a0d41d425f5ac85a0e30f201af51d9fce",
+            "owners": 100,
+            "reportBytes": 6966258
+          },
+          {
+            "iteration": 17,
+            "wallMs": 5875.197103999992,
+            "phasesMs": {
+              "registry": 0.5323119999957271,
+              "acquisition": 858.132728000026,
+              "catalog": 1560.328920999993,
+              "link": 81.05448700000125,
+              "access": 819.0213300000032,
+              "decide": 1639.283209000001,
+              "seal-dispose": 319.74916399999347,
+              "report": 595.8517930000089,
+              "parse": 1.2397839999757707
+            },
+            "rssAfter": 219070464,
+            "inputId": "input/1:e1336e363d69c36045a56e614367421a0d41d425f5ac85a0e30f201af51d9fce",
+            "owners": 100,
+            "reportBytes": 6966258
+          },
+          {
+            "iteration": 18,
+            "wallMs": 5685.936224999998,
+            "phasesMs": {
+              "registry": 0.573778999998467,
+              "acquisition": 853.4702200000465,
+              "catalog": 1532.680435000002,
+              "link": 78.97521499999857,
+              "access": 723.8872990000091,
+              "decide": 1587.3428599999897,
+              "seal-dispose": 327.77878500000224,
+              "report": 579.9835020000028,
+              "parse": 1.239774999950896
+            },
+            "rssAfter": 219111424,
+            "inputId": "input/1:e1336e363d69c36045a56e614367421a0d41d425f5ac85a0e30f201af51d9fce",
+            "owners": 100,
+            "reportBytes": 6966258
+          },
+          {
+            "iteration": 19,
+            "wallMs": 5721.334543999998,
+            "phasesMs": {
+              "registry": 0.5134410000027856,
+              "acquisition": 949.9566830000258,
+              "catalog": 1535.2660459999897,
+              "link": 83.30066000000807,
+              "access": 656.3581929999928,
+              "decide": 1582.499330000006,
+              "seal-dispose": 334.0748949999979,
+              "report": 578.1661900000036,
+              "parse": 1.1959609999757959
+            },
+            "rssAfter": 219107328,
+            "inputId": "input/1:e1336e363d69c36045a56e614367421a0d41d425f5ac85a0e30f201af51d9fce",
+            "owners": 100,
+            "reportBytes": 6966258
+          },
+          {
+            "iteration": 20,
+            "wallMs": 5781.655329000001,
+            "phasesMs": {
+              "registry": 0.6414479999948526,
+              "acquisition": 830.324328000017,
+              "catalog": 1654.402500000011,
+              "link": 88.16731900000013,
+              "access": 672.67496199999,
+              "decide": 1625.8339419999975,
+              "seal-dispose": 314.1587770000042,
+              "report": 594.1362950000039,
+              "parse": 1.3129279999848222
+            },
+            "rssAfter": 219201536,
+            "inputId": "input/1:e1336e363d69c36045a56e614367421a0d41d425f5ac85a0e30f201af51d9fce",
+            "owners": 100,
+            "reportBytes": 6966258
+          }
+        ],
+        "medianWallMs": 5723.028967999999,
+        "medianPhasesMs": {
+          "registry": 0.6107239999982994,
+          "acquisition": 884.1583934999871,
+          "catalog": 1560.6457994999946,
+          "link": 84.36871700000484,
+          "access": 667.6480660000016,
+          "decide": 1597.4547795000017,
+          "seal-dispose": 331.33224199999677,
+          "report": 584.5400364999987,
+          "parse": 1.479592000014236
+        },
+        "compiledPipelineSha256": "8534f5292c155214baa50b552bfcc8ed9171d5dacb77f1bb8e1ffd0482d12788"
+      }
+    ],
+    "limitations": [
+      "In-process recompute floor, not resident acceptance or cold CLI latency.",
+      "Per-stage medians need not sum to median total.",
+      "RSS is parent-only end-of-call; no peak or memory acceptance claim."
+    ]
+  }
+}

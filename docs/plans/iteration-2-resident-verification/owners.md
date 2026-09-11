@@ -1,8 +1,10 @@
 # Plan 2 owners, declarations and placement
 
-**Prepared:** 2026-09-10. **State:** complete proposed final declarations for
-the eleven-owner tree, for review with [contracts.md](contracts.md); not
-declarations installed by this document and not evidence of acceptance. The
+**Prepared:** 2026-09-10. **Reviewed and revised:** 2026-09-11. **State:**
+manual declaration review passed for the revised package; architecture
+acceptance is pending. These are final declaration texts to implement, not
+installed declarations. See [contracts.md](contracts.md) and the
+[review record](probes.md#contract-review). The
 definitive [description principles](../../model/module-description.principles.md)
 and [importability principles](../../model/cross-module-importability.principles.md)
 remain authoritative. Plan 1's nine declarations are the
@@ -150,7 +152,7 @@ module project
 // P1-P2: acquisition service and owned vocabulary.
 expose-src readProject from "read-project.ts" to parent
 expose-src * from "interfaces/project.ts" to parent
-// P3: root and configuration resolution without acquisition.
+// P3: root and configuration resolution without source acquisition.
 expose-src resolveProjectRoot from "resolve-root.ts" to parent
 ```
 
@@ -305,9 +307,8 @@ means exposure to the direct parent followed by that parent's explicit relay.
 | CLI tests | `createQuickEnvironment`, `QuickEnvironment`, controlled ports | root R8/R7 → descendants | `[testing, dispatch]` and `[testing]` originals into CLI `[testing, dispatch]` tests. |
 | Independent scripts, harness and external Node hosts | `./client` entry values and types; `./analysis` operations | Supported package entries | Separate compiler scopes; package access is not internal exposure. |
 
-Node's `net.Socket`, `child_process.ChildProcess`, `AbortSignal` and `fs`
-watcher handles are external vocabulary that never appears in an owned public
-type; `WatcherHandle`, `ClockPort` and `ServiceConnection` wrap them.
+Node's `net.Socket`, `child_process.ChildProcess`, `fs` watcher handles are external vocabulary wrapped by owned public
+types; `AbortSignal` remains explicit in cancellation options; `WatcherHandle`, `ClockPort` and `ServiceConnection` wrap them.
 
 ## Activation manifest
 
@@ -316,9 +317,9 @@ type; `WatcherHandle`, `ClockPort` and `ServiceConnection` wrap them.
 | 2 | `subs/daemon/module.ramify` and `subs/daemon/subs/contexts/module.ramify` headers, READMEs, empty `src/` and `src/tests/`; no exposure statements | Empty owners; `npm run check:self` reports eleven owners with no findings. |
 | 3 | Project P3 and the new P2 names; analysis A9 and the new A4 names; root R3/R4 additions; the `typescript` source fix with no new name | Real `resolveProjectRoot`, `analyzeIncrement`, `resolveProject`; `./analysis` entry extended. |
 | 4 | Contexts X1–X3; daemon N5 | Real manager and fakes; daemon has only its header plus N5. |
-| 5 | Root R6 and R8; daemon N1; N2's codec line (`encodeMessage`, `decodeMessage`, message encoding only; framing follows in iteration 7 under the same names); the service, instance, budget, log, record, handshake, wire and connect portion of N4 (`DaemonInstance`, `LogEntry`, `DaemonServiceOptions`, `ServiceLease`, `DaemonService`, `DaemonBudgets`, `DaemonRecord`, `StopDisposition`, `Handshake`, `Welcome`, `WireMessage`, `ConnectionState`, `DisconnectReason`, `RecoveryOutcome`, `ServiceConnection`, `ConnectOutcome`, `ServiceConnector`); root `resident-assembly.ts` | Quick environment usable by daemon, CLI and root tests; its connector passes every message through the exposed codec, and root's `quick-environment.ts` names `ServiceConnector` through N4. |
+| 5 | Root R6 and R8 and the available R7 contexts/fakes and connect/service slices; daemon N1; N2's codec line (`encodeMessage`, `decodeMessage`, message encoding only; framing follows in iteration 7 under the same names); the service, instance, budget, log, record, handshake, wire and connect portion of N4 (`DaemonInstance`, `LogEntry`, `DaemonServiceOptions`, `ServiceLease`, `DaemonService`, `DaemonBudgets`, `DaemonRecord`, `StopDisposition`, `Handshake`, `Welcome`, `WireMessage`, `ConnectionState`, `DisconnectReason`, `RecoveryOutcome`, `ServiceConnection`, `ConnectOutcome`, `ServiceConnector`); root `resident-assembly.ts` | Quick environment usable by daemon, CLI and root tests; its connector passes every message through the exposed codec, and root's `quick-environment.ts` names `ServiceConnector` through N4. |
 | 6 | No new originals or exposures | Edit-semantics handlers over the quick environment. |
-| 7 | Daemon N2's remaining lines (`selectEndpoint`, `readDaemonRecord`, `connectDaemon`), framing added to the codec, and the discovery and client-option portion of N4 (`EndpointSelection`, `ConnectTimeouts`, `ConnectOptions`); root R7; `./client` package entry | Real framed codec and client; no socket host yet. |
+| 7 | Daemon N2's remaining lines (`selectEndpoint`, `readDaemonRecord`, `connectDaemon`), framing added to the codec, and the discovery and client-option portion of N4 (`EndpointSelection`, `ConnectTimeouts`, `ConnectOptions`); remaining root R7 client slice; `./client` package entry | Real framed codec and client; no socket host yet. |
 | 8 | Daemon N3 and the host portion of N4, with private `host.ts`; root `daemon-entry.ts` | Real detached daemon process; real socket pairs for every `ipc` instance. |
 | 9 | CLI C1/C2 with the extended `CliEnvironment`, the `watch` and `daemon status` documents and the `Mode:` line; root `client.ts`; `cli-entry.ts` wiring | Resident `check`, `watch`, `daemon status` and `daemon stop` from the installed executable. |
 | 10 | No new originals; every remaining pending exposure line activated | All eleven final declarations complete; `npx tsx scripts/validate-final-contracts.ts` extended to eleven owners and eight package entries. |
@@ -326,7 +327,7 @@ type; `WatcherHandle`, `ClockPort` and `ServiceConnection` wrap them.
 
 ## Manual description review
 
-| Review obligation | Evidence in this draft |
+| Review obligation | Review finding, 2026-09-11 |
 | --- | --- |
 | Valid physical boundaries | `subs/daemon/` and `subs/daemon/subs/contexts/` lie beneath their parents' `subs/`; no description in any `src/`. |
 | Exact paths and real staged exports | Every `from` names one explicit `.ts` file relative to `src/` or, for `expose-test`, `src/tests/`. The manifest activates each line only with its real export. |
@@ -334,7 +335,7 @@ type; `WatcherHandle`, `ClockPort` and `ServiceConnection` wrap them.
 | Foreign signatures need independent paths | The table above names every foreign type each consumer imports; R3/R4/R7 and N5 enumerate them. |
 | Expose-sub names direct children and complete hops | Daemon refers only to `contexts`; root refers to `analysis`, `presentation` and `daemon`. Contexts vocabulary reaches CLI through daemon N5 then root R7. |
 | Exposure and availability remain separate | Root receives contexts vocabulary through daemon and may name it in its dispatch interface; contexts cannot import that interface because R6 originals carry `dispatch`. |
-| Mandatory tags | Daemon and root values default `[dispatch]`; contexts values `[]`; controlled ports and the quick environment carry `[testing]` from their defining areas. No relay uses `tagged`. |
+| Mandatory tags | Daemon and root values default `[dispatch]`; contexts values `[]`; controlled ports carry `[testing]`; the root quick environment carries `[testing, dispatch]` from its defining area. No relay uses `tagged`. |
 | Profile derivation and testing origin | Contexts tests `[testing]`; daemon, CLI and root tests `[testing, dispatch]`. The quick environment and controlled ports are new testing-owned bindings, not retagged forwarding aliases. |
 | Names, destinations and collisions | Every public name has one original; R7 and N5 lists contain no duplicate names; `ContextStatus` and `DaemonStatus` are distinct originals of contexts and root. |
-| Empty and growth semantics | Header-only daemon and contexts owners are valid in iteration 2. Adding an export to an owned interface file deliberately expands that contract and requires package review. |
+| Empty and growth semantics | Header-only daemon and contexts owners are valid in iteration 2. Adding an export to an owned interface file deliberately expands that contract and requires package review. R7 is staged in slices with its providers, never delayed until after consumer tests need it. |

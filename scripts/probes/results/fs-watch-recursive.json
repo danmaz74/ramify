@@ -1,0 +1,41 @@
+{
+  "probe": "fs-watch-recursive",
+  "recordedAt": "2026-09-11T05:24:44.806Z",
+  "nodeVersion": "v22.23.2",
+  "platform": "linux",
+  "architecture": "x64",
+  "typescript": "7.0.2",
+  "baseCommit": "b6f9c0447ccd73fab819aca840b10e362715b968",
+  "scriptSha256": "51a6b363c559bc089f16f82b26aa696b0d873857726954a533ab903224178fd5",
+  "evidence": {
+    "recursive": {
+      "changedPaths": 100,
+      "burstBatches": 1,
+      "editDurationMs": 23.904121000000032,
+      "debounceMs": 100,
+      "rootRelative": true,
+      "excludedEventsFiltered": 16
+    },
+    "prunedArrangement": {
+      "handles": 57,
+      "excludedHandles": 0,
+      "excludedEvents": 0,
+      "positiveControl": true
+    },
+    "overflow": {
+      "source": "probe-owned bounded queue over actual events",
+      "maximumPaths": 16,
+      "overflows": 6,
+      "nativeKernelOverflowObserved": false
+    },
+    "errors": {
+      "injectedEventDelivered": true,
+      "realMissingRootError": "ENOENT"
+    },
+    "close": {
+      "everyHandleEmittedClose": true,
+      "callbacksAfterClose": 0
+    },
+    "decision": "Use pruned per-directory fs.watch handles; unknown names, queue overflow and errors trigger conservative capture. Periodic and synchronized verification remain necessary because native event loss is not reliably signalled."
+  }
+}

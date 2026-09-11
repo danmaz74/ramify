@@ -1,0 +1,71 @@
+{
+  "probe": "atomic-record",
+  "recordedAt": "2026-09-11T05:19:03.304Z",
+  "nodeVersion": "v22.23.2",
+  "platform": "linux",
+  "architecture": "x64",
+  "typescript": "7.0.2",
+  "baseCommit": "b6f9c0447ccd73fab819aca840b10e362715b968",
+  "scriptSha256": "890136438e8e18adb4d4be36160377182aa52da0d06fbcd401b5d9263a61fd0e",
+  "evidence": {
+    "readers": 1,
+    "reads": 3539,
+    "distinctSequencesObserved": 161,
+    "replacements": 160,
+    "partialRecords": 0,
+    "contenders": [
+      {
+        "index": 0,
+        "pid": 1170494,
+        "writes": 20,
+        "collisions": 216
+      },
+      {
+        "index": 1,
+        "pid": 1170495,
+        "writes": 20,
+        "collisions": 129
+      },
+      {
+        "index": 2,
+        "pid": 1170500,
+        "writes": 20,
+        "collisions": 209
+      },
+      {
+        "index": 3,
+        "pid": 1170506,
+        "writes": 20,
+        "collisions": 135
+      },
+      {
+        "index": 4,
+        "pid": 1170508,
+        "writes": 20,
+        "collisions": 181
+      },
+      {
+        "index": 5,
+        "pid": 1170514,
+        "writes": 20,
+        "collisions": 20
+      },
+      {
+        "index": 6,
+        "pid": 1170520,
+        "writes": 20,
+        "collisions": 140
+      },
+      {
+        "index": 7,
+        "pid": 1170526,
+        "writes": 20,
+        "collisions": 74
+      }
+    ],
+    "overlappingCriticalSections": 0,
+    "deadPidDetected": true,
+    "livePidDetected": true,
+    "decision": "Same-directory rename is atomic to readers; exclusive creation serializes eight processes. Reclaim only dead-pid locks; age alone must not break a live holder."
+  }
+}

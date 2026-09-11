@@ -1,6 +1,7 @@
 # Plan 2 scope and lifecycle decisions
 
-**Status:** review draft prepared 2026-09-10 for [Plan 2](main-plan.md). This
+**Status:** reviewed and revised 2026-09-11 for [Plan 2](main-plan.md);
+architecture acceptance is pending. This
 document fixes the deployment arrangement, endpoint discovery, lifecycle
 outcomes, the invalidation dependency model, budgets and deferrals in
 reviewable form. [contracts.md](contracts.md) owns the exact signatures and
@@ -36,11 +37,11 @@ except by the `client.name` they present.
 
 | Step | Rule |
 | --- | --- |
-| Group key | `buildKey` = first 16 hex characters of SHA-256 over `[package root real path, package version, buildIdentity]`; `buildIdentity` is the SHA-256 of `package.json` and `dist/src/daemon-entry.js` bytes and is distinct from the `engine` string the handshake compares. A rebuilt `dist/` is a new group; the old daemon idles out. |
+| Group key | `buildKey` = first 16 hex characters of SHA-256 over `[package root real path, package version, buildIdentity]`; `buildIdentity` hashes package.json and the sorted path/content hashes of all production `.js`/`.mjs` files under `dist/src/` and `dist/subs/`, as contracts.md specifies and is distinct from the `engine` string the handshake compares. A rebuilt `dist/` is a new group; the old daemon idles out. |
 | Record | `DaemonRecord` written atomically at `starting`, `running` and `stopped`. It is the authority for the stop reason a client may have missed. |
-| Liveness | `process.kill(pid, 0)` plus a connection attempt. A `running` record whose pid is dead or whose socket refuses connections is stale. |
+| Liveness | `process.kill(pid, 0)` plus a connection attempt. A dead pid establishes a stale record. A refused socket with a live or ambiguous pid returns unavailable; refusal alone never authorizes unlinking. |
 | Stale cleanup | Only a client that verified the pid dead removes the stale socket and record, and only while holding the start lock. |
-| Start lock | `daemon-<buildKey>.lock` created `O_CREAT|O_EXCL` with holder pid and time; stale when its pid is dead or it is older than 30 s. The holder spawns; waiters poll the record and socket every 50 ms for up to 10 s. |
+| Start lock | `daemon-<buildKey>.lock` created `O_CREAT|O_EXCL` with holder pid and time; reclaimable only when its pid is verified dead; age over 30 s triggers a liveness check, never removal of a live holder. Malformed/ambiguous locks return unavailable. The holder spawns; waiters poll the record and socket every 50 ms for up to 10 s. |
 | Duplicate daemon | A daemon entry that can connect to a live peer on its socket exits with code 3 and writes nothing; the launcher then connects to the peer. |
 | Path length | A socket path over 100 bytes is `unavailable`, naming `RAMIFY_ENDPOINT_DIR` as the override. |
 | Permissions | A directory not owned by the uid, or with group/other bits, is `unavailable`; a socket is never used across users. |
@@ -145,11 +146,11 @@ revisions is deferred with a trigger recorded under [deferrals](#explicit-deferr
 
 | Guarantee | Rule |
 | --- | --- |
-| Synchronized check | The report comes from a capture started at or after the request's acknowledgment; the outcome states `captureStarted`, `verified: true` and whether an equal published revision was reused. |
+| Synchronized check | The report comes from a capture started at or after the request's acknowledgment; the outcome states the driver-start lower bound `captureStarted`, `verified: true` only for a sealed capture, and whether an equal published revision and report were reused. |
 | Published read | Returns the current published revision with the context's `synchronization` state and pending counts attached; it never claims disk freshness. |
 | Published read naming a revision | Returns exactly that revision and its report while history retains it, otherwise `evicted-revision`; `wait` is ignored and the current revision is never substituted. `watch` fetches every report this way, so an event header and its report always belong to the same revision. |
 | Delayed or lost watcher | Cannot affect a synchronized check; may delay background publication, visible as `reconciling` or `conservative` in status. |
-| Client-supplied content identities | `expect` mismatches return `superseded` with observed identities; supplied bytes are never accepted and never turn a disk check into an overlay. |
+| Client-supplied content identities | `expect` mismatches return `superseded` with observed identities; a path without a sealed content/absence observation returns `unobserved-input`; supplied bytes are never accepted and never turn a disk check into an overlay. |
 | Concurrent saves during capture | Plan 1's coherent-view retry applies (three attempts, 30 s total); exhaustion is the engine's incomplete report with the `changed-input` diagnostics, delivered `reported` with `published: false` and never a mixed view or a revision. |
 | Engine results without a sealed capture, or with incomplete execution | Delivered to the requester as `reported` with `published: false` and the engine's report; the published revision and `lastValid` are unchanged and the context is `reconciling` until a later publication. |
 | Acknowledged requests | Never coalesced away; each receives `reported`, `superseded`, `cancelled` or `unavailable` under its own `requestId`. |
@@ -181,7 +182,7 @@ syntax is added.
 | Budget | Value | Exceeding it |
 | --- | ---: | --- |
 | `maxContexts` | 8 | Evict the least recently active unleased context; if all are leased, `resource-unavailable`. |
-| `maxHistoryRevisions` | 8 per context | Drop oldest revisions, keeping `published` and `lastValid`. |
+| `maxHistoryRevisions` | 8 per context | Drop oldest reports, keeping `published`; `lastValid` remains a historical header even when its report is evicted. Reject a candidate that alone cannot fit. |
 | `maxHistoryBytes` | 64 MiB per context | Same. |
 | `maxRetainedBytesPerContext` | 96 MiB of `RetainedAnalysis` | Drop retained products; the next revision recomputes conservatively. |
 | `maxRetainedBytesGlobal` | 512 MiB of history plus products | Evict history oldest-first across contexts, then cold contexts, then `resource-unavailable`. |
@@ -200,16 +201,28 @@ syntax is added.
 | Plan 1 `AnalysisLimits` | unchanged | Unchanged outcomes inside each revision. |
 
 Accounting unit: `bytes` of a report or `RetainedAnalysis` is the UTF-8 length
-of its JSON serialization, computed once at publication. It over-counts heap
-because reports share frozen subtrees; the measurement rows below relate it to
-RSS.
+of its JSON serialization, computed once at publication. It counts repeated
+subtrees even when their heap representation is shared, but object overhead
+means it is neither an upper nor a lower bound on heap or RSS. The measurement
+rows below enforce actual memory limits separately.
 
 ### Latency and memory targets
 
-Provisional values until iteration 1's exit, when the warm rows are revised
-from the probe's in-process full-recompute median; binding from then on. The
-measurement in the last column asserts each in iteration 13 and records the
-measured value beside it.
+Iteration 1 revision, 2026-09-11: the measured full-recompute medians are
+**3.442 s reference / 5.723 s S100**, from twenty serial compiled in-process
+runs each ([raw evidence](../../../scripts/probes/results/warm-recompute.json),
+[recipe and stage split](probes.md#warm-recompute)). Source targets allow at
+least 1.25 times that floor and broad targets at least 1.5 times it, rounded
+up to the next 0.5 s where an existing target was lower. Thus reference source
+moves from 4.0 to 4.5 s and reference broad from 5.0 to 5.5 s. S100's existing
+8/12 s targets already provide that margin. Reuse targets stay unchanged:
+this probe does not implement reuse or measure its latency. Memory targets
+remain unchanged from the reviewed batch evidence; end-of-call parent RSS
+is not a combined peak measurement and cannot justify raising them.
+
+These are the single RP-7 revision proposed for acceptance and binding from
+iteration 1's exit. Iteration 13 must assert every target and record measured
+values; there is no automatic budget relaxation on failure.
 
 | Workload | Target | Fixed by |
 | --- | ---: | --- |
@@ -217,8 +230,8 @@ measured value beside it.
 | Warm synchronized check, unchanged inputs, reference / 100 owners | ≤ 1.5 s / ≤ 3 s median of twenty | same |
 | README-only edit, then check | ≤ 1.0 s / ≤ 2 s | same |
 | Exposure-only description edit, then check | ≤ 2.5 s / ≤ 5 s | same |
-| Source edit, then check | ≤ 4.0 s / ≤ 8 s | same; iteration 1 probe fixes the full-recompute floor |
-| Broad rebuild (configuration edit), then check | ≤ 5 s / ≤ 12 s | same |
+| Source edit, then check | ≤ 4.5 s / ≤ 8 s | same; iteration 1 probe fixes the full-recompute floor |
+| Broad rebuild (configuration edit), then check | ≤ 5.5 s / ≤ 12 s | same |
 | `contextStatus` service-side / `ramify daemon status` end to end | ≤ 50 ms / ≤ 300 ms | same |
 | Watch event after a save, reference | ≤ debounce + source-edit target | I2-21 timing record |
 | 500 owners: cold / source edit / combined peak | ≤ 45 s / ≤ 30 s / ≤ 1.5 GiB | I2-29 `synthetic-500` |
@@ -231,7 +244,7 @@ measured value beside it.
 | `./client` entry loaded in an empty process | ≤ 64 MiB | same |
 | Repeated edits: 200 alternating source-edit/revert cycles, last 100 | RSS growth ≤ 64 MiB; heap growth beyond the history-bytes delta ≤ 16 MiB; history and product counters at their budgets; watchers, helpers, timers and sessions balanced | I2-29 `repeated-edit-plateau` |
 | Slow consumer | Outbound queue never exceeds 64 MiB; disconnect within 2 s of exceeding; daemon RSS returns within 32 MiB of its pre-test settled value | I2-29 `slow-consumer` |
-| Idle disposal | Watcher handles, helper processes, timers and retained bytes reach zero within `warmIdleMs` plus 5 s under a controlled clock; the process exits within `idleExitMs` plus 5 s | I2-27 `idle-disposal-releases` |
+| Idle disposal | Watcher handles, helpers, analysis timers and retained products reach zero within `warmIdleMs` plus 5 s; the published report and cold/idle timers persist until eviction/exit. All context history reaches zero at eviction after `coldRetainMs`; process exits within `idleExitMs` plus 5 s | I2-27 `idle-disposal-releases` |
 
 ### Resident measurement recipe
 
@@ -283,12 +296,20 @@ shared engine defect cannot pass both sides.
 
 ## Supported platform consequences
 
-Linux and macOS only, as Plan 1 fixed. Unix domain sockets, `O_EXCL` lock
-creation, `rename` atomicity within one directory, `process.kill(pid, 0)`
-liveness and detached `spawn` with `unref()` behave the same on both.
-`fs.watch` with `recursive: true` is supported by Node 22 on both platforms;
-the watcher excludes `node_modules`, `.git`, `dist` and `.reference-work`
-subtrees and relies on periodic verification and synchronized captures for
-the influencing inputs there. Plan 2's actual measurements establish Linux
+Linux and macOS only, as Plan 1 fixed. The selected primitives are Unix domain sockets, `O_EXCL` lock creation,
+same-directory `rename`, `process.kill(pid, 0)` and detached `spawn` with
+`unref()`. Linux probe evidence does not establish macOS execution.
+Node 22 supports native recursive `fs.watch`, but callback filtering still
+attaches native watches beneath excluded subtrees. The reviewed port uses
+recursive directory enumeration with non-recursive handles, pruning
+`node_modules`, `.git`, `dist` and `.reference-work` before attaching; it
+rescans membership on directory changes. Unknown filenames, port queue
+overflow and errors trigger conservative reconciliation. Native event loss
+has no guaranteed signal, so periodic verification also runs when watching
+is unavailable. The [probe record](probes.md) separates raw platform
+observations, injected failures and the pruned arrangement. The portable
+100-byte socket bound is enforced before Node: Linux accepted 101 bytes and
+truncated a longer path during this probe. A detached zombie may still answer
+`kill(pid, 0)`; that is ambiguous liveness, never permission to unlink. Plan 2's actual measurements establish Linux
 evidence; the process suite must pass on macOS before acceptance, and any
 fixture depending on `/proc`, GNU-only flags or macOS case folding is invalid.

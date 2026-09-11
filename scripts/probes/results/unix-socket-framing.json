@@ -1,0 +1,48 @@
+{
+  "probe": "unix-socket-framing",
+  "recordedAt": "2026-09-11T05:22:32.031Z",
+  "nodeVersion": "v22.23.2",
+  "platform": "linux",
+  "architecture": "x64",
+  "typescript": "7.0.2",
+  "baseCommit": "b6f9c0447ccd73fab819aca840b10e362715b968",
+  "scriptSha256": "042c9a7776b4db57c2bd71f0a12fde90cebc3523cbc32bf0ff44e433a85da967",
+  "evidence": {
+    "sent": [
+      {
+        "bytes": 1048576,
+        "sha256": "9a0a2a51df0699027c0a68f2854ed250e4005dc0cfbe0ecfb6bff016dbd26b06"
+      },
+      {
+        "bytes": 33554432,
+        "sha256": "2d610fb20d334c14a2ff591f20949bd009e894eaf5a55251fd0ebf37476ffce5"
+      }
+    ],
+    "chunks": 1064,
+    "partialHeaders": 6,
+    "partialBodies": 1056,
+    "rawPathObservations": [
+      {
+        "requestedBytes": 101,
+        "outcome": "listened",
+        "createdPathBytes": [
+          101
+        ]
+      },
+      {
+        "requestedBytes": 180,
+        "outcome": "listened",
+        "createdPathBytes": [
+          108
+        ]
+      }
+    ],
+    "portablePathGuard": "Both 101-byte and 180-byte paths rejected before listen; raw platform behavior is recorded, not assumed.",
+    "permissions": {
+      "accepted0700": true,
+      "rejected0755": true,
+      "foreignUidPredicateRejected": true,
+      "foreignOwnershipEvidence": "Real stat metadata compared to a different effective uid; no chown capability required."
+    }
+  }
+}

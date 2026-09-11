@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": true,
+    "functionalRequirementsSatisfied": false,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-11T05:25:55.132Z",
+  "iteration": "1",
+  "notes": "All five executable probes, final type-check, current nine-owner self-check and document review validation pass. The four package documents carry the completed review revision. Architecture acceptance of the revised contracts and RP-7 budgets is pending explicit approval before iteration 3; publication is not that approval. No I2 instance or locally reserved Vitest/Cucumber regression check is claimed."
+}

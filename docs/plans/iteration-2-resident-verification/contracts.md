@@ -1,7 +1,7 @@
 # Plan 2 contract review package
 
-**Prepared:** 2026-09-10. **State:** proposed for architecture and contract
-review; acceptance is required before iteration 3 of
+**Prepared:** 2026-09-10. **Reviewed and revised:** 2026-09-11 in iteration 1.
+**State:** revised contract package, awaiting architecture acceptance before iteration 3 of
 [Plan 2](main-plan.md). These are definitions to implement, not implemented
 capabilities. The [owner manifest](owners.md), [scope and lifecycle decisions](scope.md)
 and [instance inventory](subcases.md) form one review package with this
@@ -13,6 +13,10 @@ Every name implemented by Plan 1 is reused exactly as recorded in its
 is renamed. The `AnalysisDriver` draft reviewed there as
 [type only](../done/iteration-1-project-verifier/contracts.md#future-contexts-boundary-type-review-only)
 is extended here, as that review anticipated.
+
+The [iteration 1 review record](probes.md#contract-review) identifies the
+corrections made before consumers exist. Probe success and draft publication
+do not constitute architecture acceptance.
 
 ## Conventions and dependency direction
 
@@ -66,7 +70,8 @@ export type ProjectRead =
   | { readonly status: 'acquired'; readonly view: ProjectInputView;
       readonly configuration: RetainedConfiguration; readonly reusedConfiguration: boolean }
   | { readonly status: 'invalid' | 'unavailable' | 'incomplete';
-      readonly inventory: ProjectInventory | null; readonly issues: readonly ProjectIssue[] }
+      readonly inventory: ProjectInventory | null; readonly issues: readonly ProjectIssue[];
+      readonly sealedInputs: readonly CapturedInput[] | null }
   | { readonly status: 'cancelled' };
 ```
 
@@ -74,9 +79,11 @@ Migration for the extended `ProjectRead`: the `acquired` variant's new
 `configuration` and `reusedConfiguration` members are required, and
 `read-project.ts` is the only constructor of that variant, so it populates
 them; `run-analysis.ts`, `validation.ts`, `inventory.ts` and the harness read
-`view` and ignore the new members unchanged. No test or script constructs an
-`acquired` value. `ProjectReadOptions.retained` is optional, so every Plan 1
-call site is unchanged.
+`view` and ignore the new members unchanged. Failed acquisition constructors
+also set `sealedInputs`: final coherent observations for an invalid inventory,
+or null when coherence was not established. This detached field survives
+view disposal and lets increments retain invalid inputs without changing the
+batch report. `ProjectReadOptions.retained` is optional.
 
 `subs/analysis/subs/project/src/resolve-root.ts` (iteration 3):
 
@@ -86,8 +93,11 @@ export declare function resolveProjectRoot(request: ProjectRequest): Promise<Pro
 
 `resolveProjectRoot` performs exactly the root climb and configuration
 discovery of the [CLI invocation contract](../../architecture/cli-invocation.spec.md#selecting-the-project)
-and returns canonical real absolute paths. It reads no description contents,
-starts no helper and captures nothing. `readProject` continues to perform the
+and returns canonical real absolute paths. It reads no description contents
+and builds no source catalog. Root/path discovery alone cannot identify a
+references-only configuration: resolution uses a short-lived configuration
+capture and the existing finite configuration helper for that classification,
+then disposes both. The subsequent analysis captures inputs afresh. `readProject` continues to perform the
 same selection internally; the two must agree, which iteration 3 asserts.
 `ProjectResolution` classifies exactly as Plan 1's `readProject` does:
 `root-not-found`, `configuration-not-found` and `references-only-configuration`
@@ -121,6 +131,7 @@ export interface RetainedAnalysis {
   readonly schemaVersion: 'ramify.retained/1';
   readonly inputId: string;
   readonly engine: string;
+  readonly inputs: readonly CapturedInput[];
   readonly bytes: number;
   readonly stages: readonly RetainedStage[];
   readonly products: Readonly<Partial<Record<RetainedStageId, unknown>>>;
@@ -171,6 +182,16 @@ is the UTF-8 length of its JSON serialization and is the unit the daemon
 accounts against budgets. Retained products contain no compiler objects,
 handles or the input view; compiler helpers are still started and released
 within each call that recomputes `catalog` or `access`.
+
+`inputs` contains the complete sealed observations, including invalid
+acquisitions whose unchanged Plan 1 report has null `inputId` or empty
+`snapshot.inputs`. For those invalid captures, `RetainedAnalysis.inputId` is
+`input/1:` plus SHA-256 of canonical JSON `[canonicalRoot, scope,
+configuration, registryIdentity, engine, sortedCapturedInputs]`; otherwise
+it is the report's existing input id. This identity is resident metadata and
+does not modify `ramify.analysis/1`. A self-accounted `bytes` member is filled
+by iterating serialization length until the integer reaches a fixed point;
+the field itself is included, exactly once.
 
 ## Contexts: isolation, ordering, publication and the analysis port
 
@@ -263,7 +284,7 @@ export interface CheckRequest {
   readonly requestId: string;
   readonly freshness: Freshness;
 }
-export type UnavailableReason = 'unknown-context' | 'expired-generation' | 'evicted-revision'
+export type UnavailableReason = 'unknown-context' | 'expired-generation' | 'evicted-revision' | 'unobserved-input'
   | 'resource-unavailable' | 'analysis-failed' | 'unsupported-setup' | 'disposed';
 export interface Unavailable {
   readonly status: 'unavailable';
@@ -292,7 +313,8 @@ export type OpenOutcome =
 export type ContextEvent =
   | { readonly type: 'revision-published'; readonly token: ContextToken;
       readonly revision: ContextRevision; readonly coalesced: number }
-  | { readonly type: 'status-changed'; readonly token: ContextToken; readonly current: ContextStatus }
+  | { readonly type: 'status-changed'; readonly token: ContextToken; readonly current: ContextStatus;
+      readonly coalesced: number }
   | { readonly type: 'context-evicted'; readonly token: ContextToken;
       readonly reason: 'idle' | 'pressure' | 'disposed' };
 export interface SubscriptionHandle {
@@ -358,8 +380,8 @@ export interface ContextManager {
 export declare function createContextManager(options: ContextManagerOptions): ContextManager;
 ```
 
-Driver port. `check` takes the context's own selection: the opening
-`ProjectRequest`, the `ContextSetup`, the retained products of the last
+Driver port. `check` takes the context's own selection: the requesting lease's opening
+`ProjectRequest`, its `ContextSetup`, the retained products of the last
 publication or `null`, and the bounded change list or `null`. Contexts cannot
 construct an `AnalysisInputs` (its `registry` is a resolved registry value
 and its `limits` are the engine's), so the driver, not the manager, builds
@@ -393,12 +415,14 @@ analysis diagnostics:
 | `analysis-failed` | The driver threw or rejected instead of returning an `IncrementRun`. |
 | `unsupported-setup` | The registry or a capability is outside Plan 2's implemented set. |
 | `disposed` | The manager was disposed while the request was pending. |
+| `unobserved-input` | A synchronized expectation names no file/absence observation in the sealed capture. Unknown is never treated as absent. |
 
 Every engine-produced result, including an incomplete or unavailable report
 and an unresolved selection, is delivered with its `AnalysisReport` and never
 as `Unavailable`. `fingerprints.inputId` is Plan 1's
-`input/1:` identity; the other five are SHA-256 over the sorted captured
-inputs of the named class (`declarations`: role `description`; `source`:
+`input/1:` identity from `retained.inputId` (including sealed invalid inputs);
+the other five are SHA-256 over the sorted captured
+inputs in `retained.inputs` of the named class (`declarations`: role `description`; `source`:
 roles `source`, `resource`, `dependency`, `directory`, `absent`;
 `configuration`: role `configuration`), the registry identity and the engine
 string `ramify.ts@<version>+typescript@7.0.2`.
@@ -408,8 +432,8 @@ requests in acknowledgment order and at most one pending background
 reconciliation. A synchronized request is satisfied only by a capture whose
 `captureStarted` is at or after the request's `acknowledged` time, and the
 report is computed from that capture; two acknowledged requests may share one
-capture when both precede its start. If the capture's fingerprints equal the
-published revision's, no new revision is published and the outcome carries the
+capture when both precede its start. If the capture's fingerprints and the complete report except `runId` equal
+the published revision's, no new revision is published and the outcome carries the
 published revision with `reusedRevision: true` and `verified: true`. A run
 whose driver returns `retained: null` is delivered to every request it
 satisfies as `reported` with `published: false` and `revision: null`; it
@@ -440,10 +464,10 @@ Watcher rules. Events are root-relative paths batched by the port. The manager
 debounces for `debounceMs`, then runs one background reconciliation with cause
 `watch` and `changes` set to the distinct paths. An `overflow` or `error`
 event, more than `maxQueuedPaths` distinct pending paths, or a lost watcher
-marks the context `conservative` and passes `changes: null`. The manager never
+marks the context `conservative` and passes `changes: null`. Errors additionally mark the watcher unavailable. The manager never
 reads or stats a project file itself; the driver's acquisition is the only
-reader. While a context is warm and its watcher is active, every
-`verificationIntervalMs` since the last publication the manager queues one
+reader. While a context is warm, including when its watcher is unavailable, every
+`verificationIntervalMs` after the last completed reconciliation the manager queues one
 background reconciliation with cause `verify` and `changes: []`: the driver's
 fresh capture recomputes every input identity and reuses every stage whose key
 is equal, so an unchanged project publishes nothing, while a changed input
@@ -451,11 +475,15 @@ beneath the watcher's excluded subtrees (a dependency declaration, a
 configuration the `extends` chain reaches) publishes a revision whose
 `changed` names the paths the driver reports. `ContextRevision.changed` is
 the driver's `changed` for every cause, `null` on the first revision of a
-generation or after a conservative run.
+generation or when previous products were discarded. A conservative run with
+previous products may still report the observed changed paths.
 
 Retention rules. History keeps the newest `maxHistoryRevisions` revisions and
 at most `maxHistoryBytes` of accounted report bytes per context, always
-including the published revision and, when it differs, `lastValid`. A context
+including the published revision. `lastValid` is a historical header; its
+report may be evicted, and an exact read then returns `evicted-revision`.
+If the candidate report alone exceeds the count/byte budget, publication
+fails with `resource-unavailable`; no limit is exceeded to pin a report. A context
 without leases or subscriptions for `warmIdleMs` becomes `cold`: its watcher,
 retained analysis products and history other than `published` are released.
 A request to a cold context re-warms it: the manager reattaches the watcher,
@@ -470,6 +498,51 @@ Exceeding `maxRetainedBytesGlobal` evicts history oldest-first across contexts,
 then cold contexts, then reports `resource-unavailable` for the requesting
 context. Eviction of a context creates a new generation on reopen.
 
+### Review corrections to request and capture semantics
+
+Each lease remembers its own opening `ProjectRequest` and capability order.
+A queued synchronized check freezes those invocation facts at acknowledgment
+and sends them to the driver. Sharing a canonical context never changes a
+caller's `cwd`, root spelling, `selection`, `invokedFrom` or requested
+capability order in the unchanged batch report. Reuse requires equality of
+the whole report except `runId`, as well as fingerprints. Requests with
+different invocation facts do not share a capture. Published reads retain
+the original revision's invocation facts. The service owns a separate manager
+lease per client/context pair; `closeContext` releases only that pair, while
+connection release releases every pair.
+
+The manager records `captureStarted` with its clock immediately before
+calling the driver, after the request was acknowledged. The real driver
+starts its fresh acquisition during that call; the timestamp is a lower bound
+on acquisition start in the same clock domain. No prestarted acquisition may
+satisfy it. `verified` is true only with a coherent sealed capture; an
+unpublished incomplete/unavailable engine report has `verified: false` and
+is delivered before attempting any expectation comparison.
+
+Expectation paths use captured root-relative labels with `/` separators;
+absolute, escaping and duplicate paths are invalid. Directory-only
+observations cannot establish file content or absence. A
+captured `absent` observation compares as null; a captured content observation
+compares by its sha256. A path lacking either observation yields
+`unavailable` / `unobserved-input`, not a guessed absence or fresh success.
+This is an explicit Plan 2 limit on expectations; it accepts no extra bytes
+and adds no independent reader. For sealed invalid inputs the manager uses
+`retained.inputs`, never an old report's inputs.
+
+The real watcher recursively enumerates eligible directories and attaches
+non-recursive `fs.watch` handles, pruning `node_modules`, `.git`, `dist` and
+`.reference-work` before attaching. It rescans directory membership on
+rename/create notifications, closes removed handles and observes new eligible
+directories. A missing filename, bounded queue overflow or watcher error
+produces an explicit conservative event. Callback filtering of a single
+native recursive watcher does not avoid watching excluded trees. Native
+kernel event loss is not guaranteed to be signalled: periodic verification
+also runs while the watcher is unavailable, and synchronized requests remain
+independent of delivery. A watcher error sets `watcher-unavailable`, queues
+conservative work and attempts reattachment after the next successful sealed
+reconciliation, including revision reuse. Each completed verification schedules the next interval even
+when it reuses a revision.
+
 ## Root: the dispatch-facing service interface
 
 Root `src/interfaces/service.ts` (iteration 5) imports as types: analysis
@@ -483,7 +556,7 @@ export type ServiceOperation = 'openContext' | 'contextStatus' | 'check' | 'subs
 export type ServiceCapability = 'contexts' | 'check' | 'subscribe' | 'daemon-control';
 export type ServiceErrorCode = 'invalid-request' | 'unsupported-operation'
   | 'unknown-context' | 'expired-generation' | 'resource-unavailable'
-  | 'unknown-subscription' | 'wrong-instance' | 'stopping' | 'cancelled' | 'internal-error';
+  | 'unknown-subscription' | 'wrong-instance' | 'stopping' | 'cancelled' | 'internal-error' | 'incompatible';
 export interface ServiceError {
   readonly code: ServiceErrorCode;
   readonly message: string;
@@ -558,8 +631,8 @@ without a domain outcome type:
 | --- | --- | --- |
 | `unknown-context`, `expired-generation` | `openContext`, `check` (`Unavailable`) | `contextStatus`, `subscribe`, `closeContext` on a token the manager does not hold |
 | `resource-unavailable` | `openContext`, `check` (`Unavailable`) | The host: connection limit at `hello`, `maxRequestsInFlight`, a response over `maxResponseBytes` |
-| `evicted-revision`, `unsupported-setup` | `check`, `openContext` (`Unavailable`) | Never an error; no other operation can produce them |
-| `invalid-request`, `unsupported-operation`, `unknown-subscription`, `wrong-instance`, `stopping`, `cancelled`, `internal-error` | Never a value | Validation, dispatch, `unsubscribe`, `stopDaemon`, shutdown, abort and host defects |
+| `evicted-revision`, `unsupported-setup`, `unobserved-input` | `check`, `openContext` (`Unavailable`) | Never an error; no other operation can produce them |
+| `invalid-request`, `unsupported-operation`, `unknown-subscription`, `wrong-instance`, `stopping`, `cancelled`, `internal-error`, `incompatible` | Never a value | Validation, dispatch, `unsubscribe`, `stopDaemon`, shutdown, abort and host defects |
 
 Root `src/resident-assembly.ts` (iteration 5) builds the analysis-backed
 driver and the in-process service; `src/daemon-entry.ts` (iteration 8) and
@@ -620,7 +693,8 @@ iteration 7.
 ## Daemon: service binding, client, host and records
 
 `subs/daemon/src/interfaces/daemon.ts` (iterations 5, 7 and 8) imports as types:
-root `RamifyService`, `ServiceCapability`, `ServiceResult`, `ServiceError`;
+root `RamifyService`, `ServiceOperation`, `ServiceCapability`, `ServiceResult`,
+`ServiceError`, `ServiceErrorCode`;
 contexts `AnalysisDriver`, `WatcherPort`, `ClockPort`, `ContextBudgets`,
 `ContextEvent`, `ContextToken`; analysis `RunControl`.
 
@@ -722,6 +796,7 @@ export interface ConnectTimeouts {
   readonly totalRecoveryMs: number;
 }
 export interface ConnectOptions {
+  readonly signal?: AbortSignal;
   readonly client: { readonly name: string; readonly version: string };
   readonly engine: string;
   readonly start: 'if-needed' | 'never';
@@ -819,7 +894,7 @@ answers `DaemonHost.stop`. `failed` is written by the host's fatal path only:
 when the listener cannot be bound after the `starting` record was written,
 or when `daemon-entry.ts` receives an uncaught exception or unhandled
 rejection while `running`; the host writes the record, sends `goodbye`
-`{ kind: 'failure' }` on every socket still writable and exits with code 1.
+`{ kind: 'failure', message: <diagnostic> }` on every socket still writable and exits with code 1.
 A daemon killed by a signal writes nothing, so its record stays `running`
 with a dead pid. `retired` has no writer in Plan 2.
 
@@ -850,7 +925,7 @@ UTF-8 JSON encoding exactly one `WireMessage`. A frame longer than
 `maxRequestBytes` (client to daemon) or `maxResponseBytes` (daemon to client),
 a length of zero, invalid UTF-8 or JSON, or a message failing the structural
 schema is a protocol violation: the receiver sends `goodbye` with
-`{ kind: 'failure' }` when possible and closes. The first client frame must be
+`{ kind: 'failure', message: <diagnostic> }` when possible and closes. The first client frame must be
 `hello`; the daemon answers `welcome` or `reject` and then closes on reject.
 A `hello` arriving while `maxConnections` connections are open is answered
 with `reject` carrying `resource-unavailable` before any `welcome`; the client
@@ -891,7 +966,8 @@ within 1,000 ms, destroys the socket and releases the lease.
 
 | Discovery state | `start: 'if-needed'` | `start: 'never'` |
 | --- | --- | --- |
-| No record, or record `stopped` with reason `idle`, `retired` or `failed` | Acquire the start lock, spawn the daemon entry, wait for `running`, connect and handshake. | Return `not-running`. |
+| No record | Acquire the start lock, spawn the daemon entry, wait for `running`, connect and handshake. | Return `not-running`. |
+| Record `stopped` with reason `idle`, `retired` or `failed` | Start as above. | Return `stopped` with the record. |
 | Record `stopped` with reason `explicit` | A fresh call is a newly invoked explicit command: start as above. An existing connection's `recover('automatic')` returns `stopped`; only `recover('explicit')` starts. | Return `stopped` with the record. |
 | Record `running`, socket accepts, handshake ok | `connected`, `started: false`. | Same. |
 | Record `running`, socket accepts, `reject` | `unavailable` with `incompatible` (protocol, `buildKey` or engine mismatch) or `rejected` (`resource-unavailable` at the connection limit); nothing is started, stopped or retried. | Same. |
@@ -905,16 +981,21 @@ endpoint directory is `$RAMIFY_ENDPOINT_DIR` when set, else
 owned by the current uid or with group/other permission bits is
 `unavailable`, never used. `buildKey` is the first 16 hex characters of the
 SHA-256 of `[packageRoot real path, version, buildIdentity]`, where
-`buildIdentity` is the SHA-256 of the package's `package.json` and
-`dist/src/daemon-entry.js` bytes, computed by `selectEndpoint` from
-`packageRoot`. It is distinct from the `engine` string
+`buildIdentity` is the SHA-256 of canonical JSON containing the package.json hash and sorted
+`[package-relative path, sha256(bytes)]` pairs for every production `.js` and
+`.mjs` file under `dist/src/` and `dist/subs/`, computed by `selectEndpoint`
+from `packageRoot`. This is file hashing, never importing the engine. Changes
+in imported analysis code must create a new group even when the entry bytes
+and package version are unchanged. Missing/incomplete build files are
+`unavailable`; a live daemon validates the same identity at startup. It is distinct from the `engine` string
 `ramify.ts@<version>+typescript@7.0.2` that `Handshake.engine`,
 `DaemonInstance.engine` and `--engine` carry. File names are `daemon-<buildKey>.sock`,
 `.json`, `.lock` and `.log`. A socket path longer than 100 bytes is
 `unavailable` with a message naming the override, because macOS limits
 `sun_path` to 104 bytes. The lock is created with `O_CREAT|O_EXCL`; it
-contains the holder pid and time and is stale when the pid is dead or the
-entry is older than 30 s. Records are written to a temporary file and renamed
+contains the holder pid and time and is reclaimable only after verifying
+the pid dead. Age over 30 s triggers a liveness check, never removal of a
+live holder. A malformed record or ambiguous liveness is `unavailable`. Records are written to a temporary file and renamed
 into place. Liveness uses `process.kill(pid, 0)`. The daemon is spawned
 detached with `stdio` `ignore`/log/log and `unref()`, with argv
 `--endpoint-dir`, `--build-key`, `--version`, `--engine` and, for tests only,
@@ -931,7 +1012,10 @@ and `slow-consumer` and returns `stopped` without starting anything for
 `explicit-stop` and `idle-exit`; `incompatible`, `rejected` and `closed` are
 final and start no recovery. `recover` never loads or spawns an engine in the
 calling process. `close` sends `goodbye` `{ kind: 'closed' }`, releases local
-listeners and resolves when the socket is closed.
+listeners and resolves after the host releases the lease and closes its side
+of the socket. On loss it closes locally and lease expiry is the upper bound.
+`ConnectOptions.signal` aborts discovery, startup waiting and handshake; a
+shared compatible daemon is never killed by one cancelled connector.
 
 ## CLI: commands, environment and output documents
 
@@ -1016,9 +1100,9 @@ an interrupt.
 | --- | --- |
 | 3 | Project `ProjectResolution`, `RetainedConfiguration`, extended `ProjectReadOptions`/`ProjectRead`, `resolveProjectRoot`; analysis `InputChange`, `RetainedStageId`, `RetainedStage`, `RetainedAnalysis`, `IncrementInputs`, `IncrementRun`, `analyzeIncrement`, `resolveProject`; root R4/R3 relays of the new names; the `typescript` owner's `shared-global` fix adds no public name. |
 | 4 | Contexts X1 and X2 in full; contexts testing fakes X3; daemon relay of contexts vocabulary to root (N5) as a header-plus-relay declaration so root's service interface can name them. |
-| 5 | Root R6 service interface; daemon `createDaemonService`, `createFilesystemWatcher`, `createSystemClock` (N1); `encodeMessage`, `decodeMessage` with message encoding only (N2's codec line); the service, instance, budget, log, record, handshake, wire and connect types of N4 (`DaemonInstance`, `LogEntry`, `DaemonServiceOptions`, `ServiceLease`, `DaemonService`, `DaemonBudgets`, `DaemonRecord`, `StopDisposition`, `Handshake`, `Welcome`, `WireMessage`, `ConnectionState`, `DisconnectReason`, `RecoveryOutcome`, `ServiceConnection`, `ConnectOutcome`, `ServiceConnector`); root `resident-assembly.ts` and `src/tests/quick-environment.ts` with R8. |
+| 5 | Root R6 service interface; daemon `createDaemonService`, `createFilesystemWatcher`, `createSystemClock` (N1); `encodeMessage`, `decodeMessage` with message encoding only (N2's codec line); the service, instance, budget, log, record, handshake, wire and connect types of N4 (`DaemonInstance`, `LogEntry`, `DaemonServiceOptions`, `ServiceLease`, `DaemonService`, `DaemonBudgets`, `DaemonRecord`, `StopDisposition`, `Handshake`, `Welcome`, `WireMessage`, `ConnectionState`, `DisconnectReason`, `RecoveryOutcome`, `ServiceConnection`, `ConnectOutcome`, `ServiceConnector`); root `resident-assembly.ts` and `src/tests/quick-environment.ts` with R8 and the available R7 contexts/fakes and connect/service slices. |
 | 6 | No new public originals; harness handlers over the quick environment. |
-| 7 | Daemon framing added to the codec under its iteration 5 names; `selectEndpoint`, `readDaemonRecord` and `connectDaemon` (the rest of N2); `EndpointSelection`, `ConnectTimeouts` and `ConnectOptions` (the discovery and client-option portion of N4); `./client` entry; root R7 relay of the daemon vocabulary. |
+| 7 | Daemon framing added to the codec under its iteration 5 names; `selectEndpoint`, `readDaemonRecord` and `connectDaemon` (the rest of N2); `EndpointSelection`, `ConnectTimeouts` and `ConnectOptions` (the discovery and client-option portion of N4); `./client` entry; root R7 relay of the remaining daemon vocabulary (its contexts/fakes and connect/service slices are active in iteration 5). |
 | 8 | Daemon `startDaemon` (N3), host types and private `host.ts`; root `daemon-entry.ts`. |
 | 9 | CLI C1/C2 extended with the `watch` and `daemon status` documents and `connect`; root `client.ts`; `cli-entry.ts` wiring. |
 | 10 | No new public originals; all eleven declarations and eight package entries completed and validated. |
