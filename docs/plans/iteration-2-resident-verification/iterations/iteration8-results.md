@@ -128,3 +128,30 @@ No Vitest/Cucumber regression, scenario-coverage or sealed-file check was run lo
 - `allNewTestsPass: false`: all 22 Vitest owner cases await an available automated runner verdict. Passing type-check and nine direct assertion groups cannot establish that verdict.
 
 Both managed deliverables are updated through MCP and the repair is committed in this checkout. No publication call is made in this remediation; validation and subsequent publication belong to the workflow. The provider restoration recommendations above remain required before completing the host or proceeding to CLI integration.
+
+## Reported regression remediation: await socket close events
+
+The supplied automated run reports 59 test files, 58 passing and one failing; 1,102 tests passed and two failed. Both failures are the callback-disposal variants in `outbound.test.ts`, asserting zero close listeners after polling `socket.closed`. The workflow identifies output artifact `.cucumber-viz/workflows/_V45arOkcMxXlHArekIG8/check-results/post_commit_regression-8-1789114621744-38ae8f/regression/output.log`; that path is absent from this checkout, so the supplied full failure output is the evidence used here.
+
+The cause is test/fixture synchronization. On this Node build, `destroy()` sets `socket.closed` before emitting the asynchronous close event. Awaiting an already-satisfied predicate can resume before the writer's close handler runs. A focused real-socket reproduction observed exactly the reported state in both callback stages: closed true, one writer close listener and its error listener still attached, with zero retained frames. The same writer removes its listeners when the close event actually runs. Removing the production error listener prematurely would lose its protection against errors during socket destruction.
+
+Changed only the testing-owned socket fixture and its affected lifecycle waits:
+
+- The fixture records a promise for each socket's actual close event as soon as it acquires the socket and exposes `hostClosed`.
+- Fixture disposal destroys its sockets and awaits those recorded promises, including when the closed property was already set.
+- Both failing variants await `hostClosed` before their unchanged zero-drain/zero-close-listener assertions. The related peer-loss and already-emitted-close setup use the same event promise.
+
+No production behavior, assertion expectation, case count, feature scenario or provider contract changed. There remain 22 owner cases. The incomplete functional self-assessment is unchanged and remains a separate decision-pending finding; this regression repair does not implement the missing preceding owners or host.
+
+Focused verification:
+
+| Command | Result |
+| --- | --- |
+| `npx tsx .reference-work/iteration8-close-event-smoke.ts` before correction | Failed for both callback stages, reproducing the premature listener assertions. |
+| `npx tsx .reference-work/iteration8-close-event-smoke.ts --actual-close` after correction | Passed both callback stages: zero writer close/drain listeners, only the fixture's protective error listener, zero retained frames/bytes. |
+| `npm run type-check` | Passed all four configurations. |
+| `git diff --check` | Passed. |
+
+Before/after observations are preserved in `.reference-work/iteration8-close-event-before.json` and `iteration8-close-event-after.json`. No automatic regression, scenario-coverage or sealed-file check was rerun locally. Production build and unrelated smoke groups were not rerun for this test-only correction.
+
+Both workflow artifacts are updated and the fix is committed in the authoritative checkout. `newCodeCoveredByTests` remains true. `allNewTestsPass` remains false until the automatic rerun supplies a passing verdict; the latest available full run is the failed run above. `functionalRequirementsSatisfied` remains false for the existing provider/host gaps. No publication call is made.

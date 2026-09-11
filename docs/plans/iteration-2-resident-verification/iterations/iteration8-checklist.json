@@ -9,7 +9,7 @@
     "functionalRequirementsSatisfied": false,
     "newCodeCoveredByTests": true
   },
-  "completedAt": "2026-09-11T08:16:14.199Z",
+  "completedAt": "2026-09-11T08:20:51.567Z",
   "iteration": "8",
-  "notes": "Single remediation attempt fixed three reproduced outbound lifetime defects: disposal during classification, disposal during encoding, and listener retention on an already-closed socket. Added three regression cases; 22 owner cases total. Build, type-check, three direct reproduction checks and six existing smoke groups pass. Functional completion remains blocked by absent predecessor context/service, message codec/client and root assembly/quick-service providers; startDaemon, process entry and all 22 iteration-8 I2 instances remain unimplemented. Last gate: 86 required, 4 passed, 82 required not executed. allNewTestsPass remains false because the automated Vitest verdict is unavailable and the original check policy reserves that runner to automation. No publication call in this remediation."
+  "notes": "Fixed the two reported regression failures by awaiting actual socket close events: socket.closed becomes true before close handlers run. The fixture now tracks close promises and awaits them during teardown; callback-disposal, peer-loss and already-closed setup preserve all assertions while using the correct event boundary. Both reported paths reproduced before correction and pass the focused direct check afterward; type-check and diff check pass. 22 owner cases remain. Last automated regression was 1102 passed/2 failed; allNewTestsPass stays false pending the automatic rerun. Functional self-assessment remains a separate decision-pending finding: absent predecessor context/service, complete codec/client and root assembly/quick-service providers still block startDaemon, process entry and all 22 iteration-8 I2 instances. No regression suite or publication call was run locally."
 }

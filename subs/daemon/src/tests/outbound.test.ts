@@ -155,7 +155,7 @@ describe('private outbound socket writer', () => {
       f.writer.dispose(); f.writer.dispose();
       expect(f.reasons).toHaveLength(1);
       expect(f.writer.status).toMatchObject({ bytes: 0, frames: 0, queued: 0 });
-      await eventually(() => f.host.closed);
+      await f.hostClosed;
       expect(f.host.listenerCount('drain')).toBe(0);
       expect(f.host.listenerCount('close')).toBe(0);
       // The fixture's one protective error listener remains owned by the fixture.
@@ -204,7 +204,7 @@ describe('private outbound socket writer', () => {
       expect(writer.status).toMatchObject({ bytes: 0, frames: 0, queued: 0, closed: true });
       expect(reasons).toEqual(['closed']);
       expect(writer.send(false)).toBe('closed');
-      await eventually(() => f.host.closed);
+      await f.hostClosed;
       expect(f.host.listenerCount('drain')).toBe(0);
       expect(f.host.listenerCount('close')).toBe(0);
     } finally { writer.dispose(); await f.dispose(); }
@@ -213,7 +213,7 @@ describe('private outbound socket writer', () => {
   it('starts closed without attaching listeners when the socket already emitted close', async () => {
     const f = await socketFixture(), reasons: string[] = [];
     f.host.destroy();
-    await eventually(() => f.host.closed);
+    await f.hostClosed;
     const errorListeners = f.host.listenerCount('error');
     const writer = createOutboundWriter({ socket: f.host, maxBytes: 10, maxFrameBytes: 10, maxFrames: 1,
       event: () => { throw new Error('Must not classify'); },
