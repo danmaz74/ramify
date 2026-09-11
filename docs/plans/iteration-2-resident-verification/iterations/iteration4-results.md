@@ -1,6 +1,6 @@
 <!-- cucumber-viz: managed artifact — use MCP tool "workflow.write_iteration_results" to make changes -->
 
-# Iteration 4 results: independent context primitives; manager incomplete
+# Iteration 4 results: context primitives and report history; manager incomplete
 
 **Date:** 2026-09-11. **Status:** incomplete. The iteration 3 provider contracts are absent, so the context manager and all 27 contexts acceptance instances remain unimplemented.
 
@@ -31,7 +31,7 @@ All source changes are within the assigned contexts owner; the only other owner 
 
 These are the independent parts of deliverables 1, 2 and 5, with corresponding partial declaration work. No `contexts` harness capability or matrix handler was registered. Token helper tests do not establish manager generation-on-reopen, publication sequencing or any other I2 instance.
 
-## Verification
+## Initial checkpoint verification
 
 | Command | Result and scope |
 | --- | --- |
@@ -55,13 +55,45 @@ Evidence is in ignored scratch space:
 
 ## Remaining exit criteria
 
-The complete contexts interface and `AnalysisDriver`, `createContextManager`, context state machine, queue, history accounting, publication, freshness/expectation handling, leases, background cancellation/debounce/verification, idle re-warming and eviction remain absent. There is no scripted analysis driver, no manager owner tests and no implementation of the 27 I2-05/I2-06/I2-07/I2-08/I2-12 handlers. Full X1–X3 and N5 activation remains incomplete.
+The complete contexts interface and `AnalysisDriver`, `createContextManager`, context state machine, queue, manager integration of history and retained-product accounting, publication, freshness/expectation handling, leases, background cancellation/debounce/verification, idle re-warming and eviction remain absent. The standalone report-history store implemented in this remediation does not supply those manager behaviors. There is no scripted analysis driver, no manager owner tests and no implementation of the 27 I2-05/I2-06/I2-07/I2-08/I2-12 handlers. Full X1–X3 and N5 activation remains incomplete.
 
 The checklist deliberately records:
 
 - `functionalRequirementsSatisfied: false`: missing provider contracts and manager behavior.
-- `newCodeCoveredByTests: true`: the implemented primitives and controls have owner tests.
+- `newCodeCoveredByTests: true`: the implemented primitives, controls and report-history storage have owner tests.
 - `allNewTestsPass: false`: direct smoke and type-check pass, but Vitest execution is delegated to automation and no runner verdict is available.
+
+## Single self-assessment remediation attempt
+
+Re-read iteration4.md, its retention rules, the two false checklist items, and the actual provider interfaces. The source still lacks all five named prerequisite types and the increment operations. Live workflow detail reports iteration 4 at `validate_output_retry`; no `iteration4-check-results.md` exists in this checkout and no new Vitest verdict was supplied. The remediation instruction leaves the owner boundary and automation-only regression policy in force.
+
+The focused implementation completed the independent report-storage portion of `src/history.ts`, using the existing `AnalysisReport` type. A private generic header preserves the caller's exact revision object without defining a substitute `ContextRevision` or analysis/product contract. The store:
+
+- Retains reports by exact revision id; missing ids return no entry and never the current report.
+- Accounts actual serialized UTF-8 report bytes and keeps the newest entries within both count and byte limits.
+- Rejects an individually oversized candidate before modifying current or past entries.
+- Exposes oldest-first historical removal for later global-pressure coordination, protecting the current publication.
+- Drops past reports for later cold-context integration and clears all entries and counters on idempotent disposal.
+- Rejects duplicate retained identifiers and writes after disposal.
+
+Publication eligibility, invalid-current/lastValid handling, generation checks, global context selection and `RetainedAnalysis.bytes` remain the future manager's responsibilities. In particular, storing a fixture report does not establish that an incomplete report may be published by the manager.
+
+Added `src/tests/history.test.ts` with seven cases and the private `src/tests/history-fixture.ts`. The fixture is a plain, explicitly unexecuted report; it imports no engine value. Tests cover eight-of-twelve retention, actual 10 MiB report accounting under 32 MiB, UTF-8 sizes and exact object lookup, atomic rejection, oldest-first removal with the current entry protected, cold-history release, zero capacity, duplicate ids and disposal. All tests release their histories in finally. There are now 31 authored owner cases across the three test files, with no new harness registration.
+
+The owner README describes this additional implemented storage and the remaining integration gap. No provider, public context interface, declaration, harness, manifest or other owner's source changed in this remediation. The pre-existing iteration 3 checklist edit remains preserved and unstaged.
+
+### Remediation verification
+
+- Initial `npm run type-check` failed because the new storage fixture used a nonexistent `ResolvedTagRegistry.tags` field. The fixture was corrected to the existing `id`, `definitions` and `isDefault` contract; no provider change or cast was introduced.
+- Final `npm run type-check`: passed all four configurations, including the seven new cases.
+- `npx tsx .reference-work/iteration4-history-smoke.ts`: passed five direct assertion groups over the new store, including three actual 10 MiB reports retained under a 32 MiB cap, exact lookup, atomic oversized-candidate rejection and zero entries/bytes after disposal. Evidence: `.reference-work/iteration4-history-smoke.json`; the reproducible script is beside it.
+- `npm run build`: passed.
+- `npm run check:self`: passed with completed execution, complete coverage, 11 owners, 153 source files, 11 resources and 1,849 accesses; zero errors, warnings, denials or analysis limits. Evidence: `.reference-work/iteration4-remediation-self-check.log`.
+- `git diff --check`: passed.
+
+The original gate result above belongs to the initial checkpoint and was not rerun: no capability, handler or prerequisite changed. No Vitest/Cucumber regression, scenario-coverage or sealed-file check was run locally. The 31 owner cases still have no runner verdict; the direct smoke does not replace that verdict or execute any I2 instance.
+
+This is partial remediation. `functionalRequirementsSatisfied` remains false for the missing providers and manager; `newCodeCoveredByTests` remains true for implemented code; `allNewTestsPass` remains false for unavailable runner evidence.
 
 ## Recommendations for Next Iteration
 
@@ -69,4 +101,4 @@ Restore the iteration 3 prerequisite through its owning workflow task: resolve i
 
 Iteration 5 must not treat these primitives or the successful self-check as an available context manager. The controlled ports are ready for later consumer tests, but no quick-service or resident correctness evidence exists yet.
 
-This partial checkpoint is prepared for the requested commit and draft publication. Publication is a workflow submission, not a claim that the iteration's acceptance criteria passed.
+The initial checkpoint was committed as `88b22b5` and its draft publication succeeded. This single remediation updates the two managed deliverables and commits its source changes without calling `workflow.publish_iteration_draft`, as requested. The workflow owns validation reruns and finding disposition; neither submission nor a passing self-check establishes iteration completion.

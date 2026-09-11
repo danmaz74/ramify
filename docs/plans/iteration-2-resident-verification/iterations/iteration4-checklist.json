@@ -9,7 +9,7 @@
     "functionalRequirementsSatisfied": false,
     "newCodeCoveredByTests": true
   },
-  "completedAt": "2026-09-11T07:19:05.755Z",
+  "completedAt": "2026-09-11T07:23:42.957Z",
   "iteration": "4",
-  "notes": "Incomplete prerequisite: iteration 3 supplies no IncrementRun/InputChange/RetainedAnalysis/RetainedStageId/ProjectResolution contracts or increment capability. Implemented independent token/fingerprint helpers, controlled watcher/clock ports, 24 authored owner test cases and partial X2/X3/N5 declarations. Type-check, build, primitive smoke, self-check and diff check pass. Plan 2 iteration 4 gate fails: 49 required, 4 passed; 18 increment and 27 contexts instances unexecuted. Vitest/Cucumber execution is reserved for workflow automation; no new-test runner verdict is claimed."
+  "notes": "Single focused remediation completed standalone report-history storage: exact revision lookup, actual UTF-8 accounting, count/byte bounds, atomic oversized-candidate rejection, oldest-first removal, cold-history release and disposal. Added seven owner cases (31 total). Corrected an initial test-fixture registry type error; final type-check, history smoke, build, self-check and diff check pass. Functional completion remains false: iteration 3 still lacks IncrementRun/InputChange/RetainedAnalysis/RetainedStageId/ProjectResolution and increment operations; the manager, integration and all 27 contexts handlers remain absent. The initial 49-required/4-passed gate was not rerun because no capability or prerequisite changed. allNewTestsPass remains false because Vitest/Cucumber execution is reserved to workflow automation and no runner verdict or iteration4 check-result artifact is available. Direct smoke is not a Vitest or I2-instance verdict. Changes are committed without publishing, as requested."
 }
