@@ -146,7 +146,8 @@ Extend DA17 with the following measurements and acceptance witnesses:
 | ML07 | Idle disposal and recovery release sessions, watchers, timers and child processes. An idle open client does not cause restart churn; the next real request may restart, while an active watch lease prevents idle exit. Long-lived clients do not acquire compiler allocations during failed recovery; unavailable checking cannot pass. |
 | ML08 | Repeated MCP connect/call/disconnect cycles and several simultaneous hosts keep adapter buffers and daemon leases bounded. Stdio process loss releases resources without duplicate analysis contexts. Failed daemon recovery never loads a fallback compiler into the adapter. Optional HTTP hosting retains the web process only for its valid client leases. |
 
-Use representative projects and the planned 100/500/1,000-owner fixtures. Agree
+Use representative projects and the implemented
+[100/500/1,000-owner fixture generator](../../scripts/probes/fixtures/synthetic-owners.ts). Agree
 numeric ceilings and acceptable settled growth before accepting the corresponding
 runtime milestone. Set limits for timeouts, retained bytes, concurrent work and
 active contexts; this document does not invent configuration syntax for them.
@@ -228,3 +229,11 @@ duplicate facts. Serialization still includes the complete report. No interning
 table, compiler handle or cross-run cache survives with that report; each later
 batch starts a fresh session. These implementation choices do not establish any
 resident context, history, queue or lease budget.
+
+Plan 2 adds private byte/count-bounded report history and outbound socket helpers,
+but neither is wired into a context manager or daemon host. The
+[resident measurement tooling](../../scripts/measurements/README.md#resident-measurement-checkpoint)
+now archives prerequisite checks, fixture identities and compiled CLI help probes.
+`npm run measure:resident` exits 1 with incomplete evidence: the resident workload
+driver and all nine complete I2-29 measurements remain unimplemented. Its archived
+targets and helper tests do not establish resident budget acceptance.

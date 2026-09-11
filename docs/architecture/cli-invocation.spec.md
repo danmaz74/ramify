@@ -130,11 +130,12 @@ never an external package.
 ## Output and exit
 
 The human report prints the root and how it was selected, the compiler
-configuration in use, failures first, then warnings, then analysis limits,
-then the completed scope. `--format json` writes one versioned document to
-stdout with the same content and logging on stderr; nothing else is written
-to stdout in that mode. Locations are relative to the root regardless of the
-working directory. Ordering is deterministic.
+configuration in use, a `Mode: batch` line, failures first, then warnings, then
+analysis limits, then the completed scope. `--format json` writes the unchanged
+`ramify.analysis/1` report to stdout, without the human mode line or an added mode
+member. Invocation failures use a `ramify.cli/1` diagnostic document. Logging goes
+to stderr; nothing else is written to stdout in that mode. Locations are relative
+to the root regardless of the working directory. Ordering is deterministic.
 
 | Exit | Meaning |
 | --- | --- |

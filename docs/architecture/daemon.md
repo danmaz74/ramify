@@ -1,11 +1,13 @@
 # Daemon and analysis architecture
 
-**Date:** 2026-09-10. **Status:** The batch engine and nine owners are implemented.
-The resident daemon, contexts and incremental contracts below remain a design
-for later delivery. The process/client split and memory/testing requirements
-are decided in the [architecture overview](README.md). Implementation support is
-limited to batch verification; the [Plan 1 handoff](../plans/done/iteration-1-project-verifier/iterations/iteration15-results.md)
-records its evidence and outstanding acceptance work.
+**Date:** 2026-09-11. **Status:** The batch engine is implemented and eleven owners
+are declared. The daemon and contexts owners contain supporting helpers, but
+incremental analysis, context management and the resident service remain
+unimplemented. The process/client split and memory/testing requirements
+are decided in the [architecture overview](README.md). The
+[Plan 1 handoff](../plans/done/iteration-1-project-verifier/iterations/iteration15-results.md)
+records batch evidence; the [Plan 2 checkpoint](../plans/iteration-2-resident-verification/iterations/iteration14-results.md)
+records the missing resident providers and outstanding acceptance work.
 
 The resident design calls for a long-lived local backend that maintains the
 analyzed state of each active project, updates that state as files change, and
@@ -107,9 +109,9 @@ postpone the daemon indefinitely.
 
 ## Ramify's ownership tree
 
-These are eleven owners across the batch implementation and resident design within
-one toolkit package. The batch implementation has nine; `daemon` and its
-`contexts` child arrive in the resident iteration. Every implemented owner
+These eleven owners are declared within one toolkit package. The nine batch
+owners are joined by `daemon` and its `contexts` child, whose declarations expose
+only the implemented subset of resident contracts. Every declared owner
 has `module.ramify`, a purpose `README.md` and its own `src/`, with optional
 `src/interfaces/` and `src/tests/`. Each edge below corresponds to placement under
 the parent's `subs/`. Brackets show module-header tags, not additional syntax.
@@ -123,8 +125,8 @@ ramify [dispatch]                       executable assembly and batch invocation
 │   ├── descriptions [browser]          parsing and description linking
 │   ├── project []                      filesystem inventory, source reads and metadata
 │   └── typescript []                   compiler integration and source-derived facts
-├── daemon [dispatch]                   planned: local protocol, process and watcher adapters
-│   └── contexts []                     planned: context isolation, ordering and publication
+├── daemon [dispatch]                   watcher, clock, discovery and private transport helpers
+│   └── contexts []                     identity, fingerprints, history and controlled test ports
 ├── presentation [ui, browser]          reusable diagrams and interaction
 │   └── layout [browser]                framework-independent geometry
 └── cli [dispatch]                      commands, output and client behavior
@@ -145,21 +147,21 @@ web process. Its SDK and protocol state stay outside the resident daemon.
 
 ### Responsibilities and public contracts
 
-Batch signatures and exposure manifests are implemented in the owners' source
-interfaces and `module.ramify` files. The table also retains the resident design:
-`daemon`, `contexts`, incremental updates, semantic queries and their APIs remain
-later work.
+Batch signatures and staged resident exposure manifests are implemented in the
+owners' source interfaces and `module.ramify` files. The table distinguishes the
+available resident helpers from the service, context management, incremental
+updates and semantic queries that remain unimplemented.
 
 | Owner | Responsibility | Principal to-parent contract |
 | --- | --- | --- |
-| `ramify` | Assemble the CLI and lazily load batch delivery; own `BatchInvocation` and `BatchResult`. Later assemble daemon and MCP/web entries and the shared client-facing service vocabulary. | No effective parent exposure; package entry points target the appropriate owners. |
+| `ramify` | Assemble the CLI and lazily load batch delivery; own `BatchInvocation`, `BatchResult` and independent service operation/capability/error/result vocabulary. The complete service interface and daemon assembly remain unimplemented; MCP/web entries are later work. | No effective parent exposure; package entry points target the appropriate owners. |
 | `analysis` | Execute the batch pipeline and produce inventory, validation results, snapshots and reports. Affected-work selection and semantic queries remain resident/query work. | `createAnalysisSession`, `analyzeProject`, `validateProject`, `acquireInventory`, and owned analysis vocabulary; later `inspectModule` and `explainAccess`. |
 | `model` | Canonical model identities, registry and profile rules, mandatory symbol tags, exposure reach, availability and testing-origin decisions. | `buildModel`, `explainImport`, `explainVisibility`, model vocabulary and validation operations. |
 | `descriptions` | Parse version 1 with source locations and comments; resolve exact selections, exposed names and wildcard contracts; produce grounded declarations and diagnostics. | `parseDescription`, `linkDescriptions`, and their input/result vocabulary. |
 | `project` | Select the root and compiler configuration, inventory ownership, validate containment/symlinks and scope, read coherent inputs and extract README purposes. | `readProject`, project input/inventory and metadata contracts. |
 | `typescript` | Own the source compiler helper; resolve exports, originals and resources and interpret source accesses. Retention across updates and optional symbol details remain later work. | `createSourceAnalysis` with `catalog()`, `accesses()` and `dispose()`, plus plain-data source contracts; enrichment remains later. |
-| `daemon` | Own the shared validated service implementation and its in-process binding, open/close the local endpoint, adapt filesystem events, handle startup/shutdown and connect clients. IPC delegates to that service; context work delegates to its child. | `startDaemon`, `connectDaemon`, the in-process service factory and dispatch-classified options/results; selected neutral context vocabulary is relayed unchanged. |
-| `contexts` | Select isolated contexts, serialize their updates, synchronize requested inputs, publish revisions, retain historical results and manage idle eviction. | `createContextManager`, context/revision/status vocabulary and its owned `AnalysisDriver` port. |
+| `daemon` | Implement filesystem watcher and clock ports, discovery, records and private validation, framing, launch, outbound and log helpers. The shared service, in-process binding, host and client remain unimplemented; IPC will delegate to the service and context work to its child. | `createFilesystemWatcher`, `createSystemClock`, `selectEndpoint`, `readDaemonRecord`, independent lifecycle vocabulary and relayed context types/test ports; `startDaemon`, `connectDaemon` and the service factory remain unavailable. |
+| `contexts` | Implement identity/fingerprint primitives, bounded report history and controlled test ports. Context selection, queues, synchronization, publication, leases and eviction remain unimplemented. | Independent identity, selection, fingerprint and port vocabulary, plus controlled test ports; `createContextManager`, complete revision/status contracts and `AnalysisDriver` remain unavailable. |
 | `presentation` | Render model data, interactions and teaching examples; report views remain later work. | Selected components explicitly tagged `[ui, browser]` and owned props. |
 | `layout` | Calculate diagram geometry from supplied neutral data. | Selected functions explicitly tagged `[browser]` and owned layout vocabulary. |
 | `cli` | Parse arguments, invoke an injected batch operation, render results and map execution status to exits. Daemon requests, MCP serving and explorer launch remain later work. | `runCli` and its dispatch-classified vocabulary. |
@@ -190,15 +192,17 @@ to analysis. Analysis passes data between those children through their public
 input contracts.
 
 Root receives the analysis contracts and relays selected analysis types and
-portable model operations to descendants. Resident assembly will also receive
-daemon contracts. In that design, the relays serve clients and contexts as well
-as diagrams.
-The `AnalysisDriver` port travels from contexts to daemon and then to root;
-assembly does not import a private grandchild binding. Transport contracts owned
-by root carry `dispatch`, so untagged analysis and contexts source cannot import
+portable model operations to descendants. It also relays the implemented daemon
+and context vocabulary and controlled test ports through daemon's to-parent
+contract. Resident assembly remains unimplemented.
+In the resident design, the `AnalysisDriver` port travels from contexts to daemon
+and then to root; assembly does not import a private grandchild binding. Transport
+contracts owned by root carry `dispatch`, so untagged analysis and contexts source cannot import
 them even when they are visible from above.
-Root exposes the service interface to its descendants, and `daemon [dispatch]`
-imports and implements it for both IPC delivery and the in-process binding.
+Root currently exposes independent service operation, capability, error and result
+types to descendants. The complete `RamifyService` interface and daemon bindings
+remain unimplemented; in the resident design, `daemon [dispatch]` imports and
+implements that interface for both IPC delivery and the in-process binding.
 Root assembly supplies dependencies; the shared validation and routing stay
 inside daemon, as specified by the [service boundary](processes-and-clients.md#shared-service-boundary).
 
@@ -209,8 +213,8 @@ other compatible UI owners. Named relays make the chosen audience explicit;
 there is no selected-branch permission.
 
 For example, these fragments describe the planned analysis-driver path. Paths
-are relative to the toolkit root; source files and full manifests are not yet
-implemented.
+are relative to the toolkit root; the shown driver/service declarations are not
+implemented in the current source or staged manifests.
 
 At `subs/daemon/subs/contexts/module.ramify`:
 
@@ -645,8 +649,8 @@ in the [architecture overview](README.md). Detailed implementation review still
 needs the following without reopening those decisions or the model rules:
 
 1. TypeScript contracts, `module.ramify` manifests and package entries for the
-   resident and later owners. The nine batch owners and source/test migration
-   are implemented.
+   resident and later owners. Eleven owners and staged exposures now exist;
+   the complete resident contracts and client package entry remain unavailable.
 2. Incremental adapter contracts and invalidation dependencies, demonstrated on
    original resolution, resources, wildcard growth and unmarked interfaces.
    Batch extraction uses the pinned TypeScript 7.0.2 helper integration above.

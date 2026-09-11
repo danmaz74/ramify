@@ -1,12 +1,15 @@
 # Ramify implementation architecture
 
-**Date:** 2026-09-10. **Status:** Batch project verification and the nine-owner
-toolkit migration are implemented. The process split, client roles, lightweight
-resident design, MCP adapter and tRPC/quick-testing approach below remain the
-decided architecture for later delivery. Their contracts, wire schemas and
+**Date:** 2026-09-11. **Status:** Batch project verification is implemented, and
+eleven toolkit owners are declared. The new daemon and contexts owners contain
+supporting helpers; resident execution remains unavailable. The process split,
+client roles, lightweight resident design, MCP adapter and tRPC/quick-testing
+approach below remain the decided architecture for later delivery. Their contracts, wire schemas and
 resident resource budgets still require review. The
 [Plan 1 handoff](../plans/done/iteration-1-project-verifier/iterations/iteration15-results.md)
 records implemented behavior and outstanding acceptance evidence.
+The [Plan 2 checkpoint](../plans/iteration-2-resident-verification/iterations/iteration14-results.md)
+records the partial resident implementation and its missing providers.
 
 The current CLI runs `ramify check` through a fresh disposable analysis session;
 `--batch` selects the same behavior. It supports human and JSON reports without
@@ -30,7 +33,7 @@ and reclaim its memory without discarding warm analysis.
 | Document | Defines |
 | --- | --- |
 | [Processes and clients](processes-and-clients.md) | Process boundaries, CLI commands, the MCP adapter, tRPC web delivery, startup, shutdown and compatibility. |
-| [Daemon and analysis](daemon.md) | Implemented batch ownership and engine pipeline, exposure channels and source facts; proposed resident contexts, revision semantics and semantic acceptance cases. |
+| [Daemon and analysis](daemon.md) | Implemented batch pipeline, staged resident ownership, exposure channels and source facts; proposed context management, revision semantics and semantic acceptance cases. |
 | [Memory lifecycle](memory-lifecycle.md) | Resident dependency boundaries, retention and work limits, memory reclamation and measurement requirements. |
 | [Quick testing](quick-testing.spec.md) | In-process execution of real client/service flows, the boundaries replaced in quick mode, and complementary transport/process tests. |
 | [CLI invocation](cli-invocation.spec.md) | How `ramify check` selects the project, finds the compiler configuration, treats files outside modules, reports and exits. |
@@ -71,7 +74,9 @@ cover resident contracts and manifests, incremental compiler integration,
 endpoint discovery and protocols. Resident resource budgets and grace periods
 must be agreed from measurements. Batch contracts, package entries, compiler
 integration and configured work limits are implemented; their acceptance evidence
-is recorded in the Plan 1 handoff. Command spellings beyond the implemented
-`check`, `--help` and `--version` remain proposed names for decided behavioral roles.
+is recorded in the Plan 1 handoff. The parser now recognizes `watch` and
+`daemon status`/`stop`, but these commands return exit 2 because the resident
+service is missing. Other command spellings remain proposed names for decided
+behavioral roles.
 These details do not reopen the separate daemon/web-process decision or make
 visualization part of the first implementation milestone.

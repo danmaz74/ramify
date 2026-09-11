@@ -1,6 +1,8 @@
 # Processes and clients
 
-**Date:** 2026-09-10. **Status:** Batch checking, help and version are implemented.
+**Date:** 2026-09-11. **Status:** Batch checking, help and version are implemented.
+Daemon discovery, record and transport helpers exist, but the service, host,
+client and executable daemon entry remain unimplemented.
 The resident/MCP/web topology is decided architecture for later delivery; its
 command spellings, complete contracts and wire details still require review.
 
@@ -75,6 +77,9 @@ Batch delivery currently injects root's `runBatch` operation into `runCli`.
 It calls `analyzeProject`, which creates and disposes a real analysis session.
 The daemon-owned service and the two bindings described below remain resident
 work; the batch implementation has no context manager or `connectDaemon` entry.
+Root's `src/interfaces/service.ts` currently exports only independent operation,
+capability, error and result types. Daemon's private validator checks request
+shapes, but no service dispatch or complete `RamifyService` interface exists.
 
 Define one versioned logical analysis service for context lifecycle, input
 synchronization, checks, inspection, explanations and change notifications.
@@ -97,12 +102,17 @@ not duplicate service routing. `contexts` keeps its own neutral vocabulary and
 The lightweight `connectDaemon` entry remains separate from this host/direct
 binding, so importing the client does not load context or compiler assembly.
 
-The local socket/named-pipe transport remains the preferred IPC mechanism.
-Its exact framing, endpoint-discovery scheme and context-to-process grouping
-are contract-review items. The web/daemon split is fixed independently of those
-details. Selecting tRPC for the browser does not require loading the web router
-or Express into the daemon or ordinary CLI. The MCP SDK and protocol adapter
-are likewise loaded only by an MCP-serving entry point.
+The implemented discovery and launcher helpers use Unix domain sockets in a
+private endpoint directory, grouped by package path, version and production
+runtime bytes. Discovery requires a compiled daemon entry, so it rejects the
+current incomplete build. The private codec frames UTF-8 JSON with a four-byte
+big-endian length; decoded values remain `unknown` until message-schema
+validation is implemented. These helpers do not establish a working client or
+service protocol. Their source and limits are described in the
+[daemon owner](../../subs/daemon/README.md). The web/daemon split is fixed
+independently of those details. Selecting tRPC for the browser does not require
+loading the web router or Express into the daemon or ordinary CLI. The MCP SDK
+and protocol adapter are likewise loaded only by an MCP-serving entry point.
 
 Both call boundaries preserve context/generation/revision identity, freshness,
 coverage, cancellation and explicit errors. Domain results are plain data;
@@ -118,9 +128,12 @@ project state and unavailable execution.
 ## CLI commands
 
 `check`, `--help` and `--version` are implemented. Every current check uses a
-fresh batch session, with or without `--batch`; other commands return an explicit
-unavailable invocation with exit 2. The table retains the resident command design:
-its daemon-backed `check` behavior and other command names remain later work.
+fresh batch session, with or without `--batch`, and human output includes
+`Mode: batch`. The parser recognizes `watch` and `daemon status`/`stop`, but
+dispatch reports that the resident service is not implemented, with exit 2.
+Other commands remain unavailable invocations. The table retains the resident
+command design: its daemon-backed `check` behavior and other command names remain
+later work.
 The implemented invocation contract of `check`, covering root selection,
 configuration discovery, warnings and exits, is [CLI invocation](cli-invocation.spec.md).
 
@@ -290,13 +303,15 @@ into the resident daemon.
 ## Modules and executable entry points
 
 Process placement is separate from the [Ramify ownership tree](daemon.md#ramifys-ownership-tree).
-The nine implemented owners cover analysis, presentation/layout, CLI and root
-assembly; daemon/context owners remain later work. Root owns assembly through
+Eleven owners are declared: the batch owners plus daemon and contexts with
+staged vocabulary, ports and private helpers. Root owns assembly through
 distinct source entry files; it is not one eagerly imported application barrel.
 `src/cli-entry.ts`, installed as `dist/src/cli-entry.js`, imports CLI handling and
 lazily imports `src/batch.ts` for a check. Help/version load no compiler or UI
 assembly. Package exports select separate analysis, inventory, model,
-presentation, layout and CLI entries; the package root selects analysis.
+presentation, layout and CLI entries; the package root selects analysis. These
+are still seven package exports. `src/client.ts`, `src/resident-assembly.ts`,
+`src/daemon-entry.ts` and the `./client` package export remain absent.
 
 The resident entry-point requirements remain:
 
