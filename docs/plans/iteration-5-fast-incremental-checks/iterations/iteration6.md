@@ -1,8 +1,8 @@
 # Iteration 6: Retained session: facts and source-edit paths
 
 **Plan:** [Plan 5: Fast incremental checks](../main-plan.md).
-**Prerequisites:** iterations 4 and 5 (`compiler`: the retained adapter with
-observed reads; `observer`: `observeProject` and its updates). **Owners:**
+**Prerequisites:** iterations 4 and 5 (`observer`: `observeProject` and its
+updates; `compiler`: the retained adapter with observed reads). **Owners:**
 `subs/analysis/`.
 
 ## Goal
@@ -29,8 +29,8 @@ fresh batch analysis.
   [Harness implementation and evidence](../main-plan.md#harness-implementation-and-evidence)
   item 2; matrix row I5-06; the position-drift risk row.
 - Source: `subs/analysis/src/{run-analysis,analyze-project,session,report,report-data,report-copy,evaluate-accesses}.ts`
-  and `src/interfaces/analysis.ts`; the typescript adapter and the project
-  observer from iterations 4 and 5.
+  and `src/interfaces/analysis.ts`; the project observer from iteration 4 and
+  the typescript adapter from iteration 5.
 - [Daemon and analysis](../../../architecture/daemon.md): Incremental updates
   and analysis depth; Revisions and atomic publication.
 

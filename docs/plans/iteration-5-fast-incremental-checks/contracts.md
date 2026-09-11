@@ -25,12 +25,12 @@ renamed.
   `cli` name root's service vocabulary. No owner imports a sibling's
   unexposed source: `typescript` names project's relayed vocabulary, which
   analysis exposes to its descendants, as `resolution.ts` names
-  `ProjectInventory` and `InventoryFile` today and
-  `retained-source-analysis.ts` names `ObservationSink` from iteration 4.
+  `ProjectInventory` and `InventoryFile` today and, from iteration 5,
+  `retained-source-analysis.ts` names project's `ObservationSink`.
 
 ## TypeScript: descriptions, the interpreter and the retained adapter
 
-`subs/analysis/subs/typescript/src/interfaces/source.ts` (iterations 2 to 4)
+`subs/analysis/subs/typescript/src/interfaces/source.ts` (iterations 2, 3 and 5)
 adds the following to Plan 1's vocabulary.
 
 ```ts
@@ -110,7 +110,7 @@ builds its identifier index by spelling on first use and resolves one spelling
 through the array overload of `getSymbolAtLocation`; the shorthand-property
 and export-specifier readings are unchanged.
 
-`subs/analysis/subs/typescript/src/retained-source-analysis.ts` (iteration 4)
+`subs/analysis/subs/typescript/src/retained-source-analysis.ts` (iteration 5)
 exports `createRetainedSourceAnalysis(inputs)`. It runs in the caller's
 thread, which is the session worker, and creates the API client with
 filesystem callbacks that read the disk directly and report every read,
@@ -130,9 +130,9 @@ own.
 
 ## Project: the observer
 
-`subs/analysis/subs/project/src/interfaces/project.ts` adds `ObservationSink`
-in iteration 4, because the retained adapter is its first consumer, and the
-rest in iteration 5 with the observer that implements it:
+`subs/analysis/subs/project/src/interfaces/project.ts` (iteration 4) adds,
+with the observer that implements the sink the retained adapter of iteration 5
+reports to:
 
 ```ts
 export interface ObservationSink {
@@ -475,8 +475,7 @@ agent; the notice names the reason. It imports no toolkit source.
 No package entry is added or removed; the eight entries and `bin` stand.
 [owners.md](owners.md) lists the activation stage of every declaration line:
 iteration 2 activates the interpreter and namespace lines, 3 the
-description lines, 4 the retained adapter lines together with
-`ObservationSink` in project's vocabulary and its A7 relay, 5 the observer
-lines, 6 to 8 the session lines, 9 the revised contexts port and the removals, 10 the
+description lines, 4 the observer lines together with `ObservationSink` and
+its A7 relay, 5 the retained adapter lines, 6 to 8 the session lines, 9 the revised contexts port and the removals, 10 the
 service and CLI lines, and 13 verifies the final texts through
 `scripts/validate-final-contracts.ts`.

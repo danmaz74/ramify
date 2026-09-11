@@ -525,7 +525,7 @@ The plan runs as thirteen iterations, each written to be implemented within
 a single 250k-token context: one owner or one capability, a bounded slice of
 the matrix, its own verification commands and exit criteria. The iteration
 files under [`iterations/`](iterations/manifest.json) follow the existing
-headings. Iterations 3 and 5 may run in parallel after 2; iterations 11 and
+headings. Iterations 3 and 4 may run in parallel after 2; iterations 11 and
 12 may run in parallel after 10. The completion gate is iteration 13's exit.
 
 | # | Iteration | Owners | Requires | Executes |
@@ -533,8 +533,8 @@ headings. Iterations 3 and 5 may run in parallel after 2; iterations 11 and
 | 1 | Contract package, probes and review points | none | none | review only: accept contracts.md, owners.md, scope.md, subcases.md; run the five [probes](#probes); settle RP-2 to RP-7 |
 | 2 | Engine changes and the `--plan 5` harness | typescript, model; harness | 1 | I5-01, I5-02 |
 | 3 | Per-file export descriptions | typescript | 2 | I5-03 |
-| 4 | Retained compiler adapter and observed reads | typescript | 3 | I5-04 |
-| 5 | Project observer and incremental acquisition | project | 2 | I5-05 |
+| 4 | Project observer and incremental acquisition | project | 2 | I5-05 |
+| 5 | Retained compiler adapter and observed reads | typescript | 3, 4 | I5-04 |
 | 6 | Retained session: facts and source-edit paths | analysis | 4, 5 | I5-06 |
 | 7 | Retained session: description, broad and metadata paths, positions and the audit | analysis | 6 | I5-07 |
 | 8 | Session hosting: worker thread, sweep, deadlines, hot and warm | analysis | 7 | I5-08 |
@@ -547,8 +547,10 @@ headings. Iterations 3 and 5 may run in parallel after 2; iterations 11 and
 Iteration 1 is a review gate: iteration 2 onward implements the reviewed
 contracts, and a change to them revises iteration 1's package first.
 Iteration 2's harness registration lists every instance as not executed.
-Iteration 5 depends only on iteration 2 because the observer uses no
-compiler change; iteration 6 needs both the adapter and the observer.
+Iteration 4 depends only on iteration 2 because the observer uses no
+compiler change; iteration 5 needs the per-file descriptions of iteration 3
+and the observation sink of iteration 4; iteration 6 needs both the observer
+and the adapter.
 Iteration 9 is the only iteration that deletes Plan 2 source, and it lands
 the supersession amendment in the same commit as the deletion.
 
@@ -627,7 +629,7 @@ The plan is complete only when all of these hold:
 | --- | --- |
 | The per-file fixed point misses a dependency and a description goes stale | Every description records what it read; I5-03 `closure-superset` compares each recomputed set with a whole recompute on three fixtures; I5-07 and I5-12 audit after every step. |
 | Positions carried into decisions drift after a move | I5-06 `position-only-refresh` is a required instance, and the audit compares `results[].decisions[].original.declarations`. |
-| The session's observed set is smaller than a batch capture's | P5-5 establishes feasibility before iteration 4; I5-04 `observed-reads-complete` and I5-05 `input-id-equals-batch` assert equality; the sweep covers what the watcher cannot. |
+| The session's observed set is smaller than a batch capture's | P5-5 establishes feasibility before iteration 5; I5-04 `observed-reads-complete` and I5-05 `input-id-equals-batch` assert equality; the sweep covers what the watcher cannot. |
 | `updateSnapshot` costs 65–133 ms when import lists or the configuration change | P5-1 measures the alternatives; the source and broad budgets account for it; the unchanged-surface path pays 2–3 ms. |
 | The worker thread hides a compiler crash or exhausts memory | `resourceLimits`, explicit `resource-unavailable` and `analysis-failed` outcomes, and I5-08 `resource-limit-explicit` and `dispose-releases`. |
 | Retiring I2 instances weakens Plan 2's gate | Only the nine `analyzeIncrement` reuse instances and `I2-11:reuse-equal` are superseded, each by a named I5 instance; every context, IPC, process, lifecycle and equivalence instance stays required (RP-4). |

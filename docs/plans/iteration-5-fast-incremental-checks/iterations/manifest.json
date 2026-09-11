@@ -22,14 +22,14 @@
     {
       "file": "iteration4.md",
       "index": 4,
-      "parallelGroup": null,
-      "title": "Retained compiler adapter and observed reads"
+      "parallelGroup": "after-2",
+      "title": "Project observer and incremental acquisition"
     },
     {
       "file": "iteration5.md",
       "index": 5,
-      "parallelGroup": "after-2",
-      "title": "Project observer and incremental acquisition"
+      "parallelGroup": null,
+      "title": "Retained compiler adapter and observed reads"
     },
     {
       "file": "iteration6.md",

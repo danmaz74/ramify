@@ -96,7 +96,7 @@ Plan 1's capture. The retained compiler adapter reports every filesystem
 callback to the observer's sink, so the compiler's reads are observed inputs
 too. The observer's `inputId` is computed exactly as `readProject`'s over the
 same inputs; probe P5-5 establishes that the two sets coincide before
-iteration 4, and I5-04 and I5-05 assert it.
+iteration 5, and I5-04 and I5-05 assert it.
 
 ### Live updates and the covering rule
 
@@ -257,6 +257,6 @@ superseded by the implemented architecture where they differ.
 | Proportional relink of the model | Whole-project link and model are 20–26 ms on the reference and 1.0–1.1 s on S1000. Trigger: iteration 12 misses the S500 or S1000 description budget after the per-file catalog lands; then declaration evidence becomes patchable per original before any partial relink. |
 | Resolution-bounded narrowing for created and deleted files | The broad path is exact and measured at 525 ms on the reference. Trigger: iteration 12 misses the created-file budget on S100. |
 | Syntactic pre-filter before re-extraction | Trigger: the spelling-filtered, batched extraction of one file exceeds 10 ms on S1000 in iteration 12. |
-| Persistent checkpoints of retained facts | Trigger: S1000 cold open exceeds its budget after iterations 3 and 5 land. |
+| Persistent checkpoints of retained facts | Trigger: S1000 cold open exceeds its budget after iterations 3 and 4 land. |
 | Child-process session host | Trigger: P5-4 or iteration 12 shows a worker limit that cannot be enforced or a clone cost that cannot be bounded. |
 | Windows, registry serialization, browser-promise verification, strict configuration | Unchanged from Plans 1 and 2. |

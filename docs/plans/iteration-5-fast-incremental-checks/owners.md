@@ -166,12 +166,12 @@ expose-src openRetainedSession from "retained-session.ts" to parent
 
 Lines this plan changes:
 
-- A7 gains `ObservationSink` in iteration 4, so `typescript`'s retained
-  adapter can name the sink it reports to, exactly as `resolution.ts` names
-  `ProjectInventory` and `InventoryFile` today, and the five observer names in
-  iteration 5, so analysis's own session source names the observer. Both
-  destinations stay as they are: to parent, so root relays the vocabulary
-  onward, and to descendants, so `typescript` receives the sink.
+- A7 gains `ObservationSink` and the five observer names in iteration 4, so
+  analysis's own session source names the observer and the retained adapter
+  of iteration 5 names the sink it reports to, exactly as `resolution.ts`
+  names `ProjectInventory` and `InventoryFile` today. Both destinations stay
+  as they are: to parent, so root relays the vocabulary onward, and to
+  descendants, so `typescript` receives the sink.
 - A11 and A12 are new in iteration 6 with `interfaces/session.ts` and
   `openRetainedSession`. Iterations 7 and 8 complete the session vocabulary
   inside the A11 wildcard and add the worker host behind A12, with no further
@@ -224,19 +224,17 @@ expose-src resolveProjectRoot from "resolve-root.ts" to parent
 expose-src observeProject from "observer.ts" to parent
 ```
 
-P4 is new in iteration 5 with `observeProject`; P1, P2 and P3 are unchanged.
-`interfaces/project.ts` gains `ObservationSink` inside the P2 wildcard in
-iteration 4, because the retained adapter is its first consumer, and
-`InputChangeKind`, `ObservedChange`, `InventoryUpdate`, `ProjectObserver` and
-`ProjectObserve` in iteration 5 with the observer that implements the sink.
-Iterations 4 and 5 run on parallel branches from iteration 2, so whichever
-lands first adds the four-line `ObservationSink` declaration and the
-convergence keeps exactly one copy of it.
+P4 is new in iteration 4 with `observeProject`; P1, P2 and P3 are unchanged.
+`interfaces/project.ts` gains `ObservationSink`, `InputChangeKind`,
+`ObservedChange`, `InventoryUpdate`, `ProjectObserver` and `ProjectObserve`
+inside the P2 wildcard in the same iteration. The observer implements the
+sink, and iteration 5's retained adapter reports its filesystem callbacks to
+it.
 
 New source: `src/observer.ts` (`observeProject`, the observation table, local
 and structural updates and the sweep) and private `src/observations.ts`
 (recorded roles, identities, signatures and the `inputId` recipe shared with
-`read-project.ts`), both iteration 5. `src/read-project.ts`,
+`read-project.ts`), both iteration 4. `src/read-project.ts`,
 `src/capture.ts`, `src/configuration.ts`, `src/inventory.ts`, `src/purpose.ts`
 and `src/resolve-root.ts` keep their roles; the observer performs Plan 1's
 acquisition once through them. New tests: `src/tests/observer.test.ts` (local,
@@ -267,21 +265,21 @@ expose-src describeFiles, assembleCatalog from "descriptions.ts" to parent
 expose-src createRetainedSourceAnalysis from "retained-source-analysis.ts" to parent
 ```
 
-T1 and T2 are unchanged. T3, T4 and T5 are new in iterations 2, 3 and 4.
+T1 and T2 are unchanged. T3, T4 and T5 are new in iterations 2, 3 and 5.
 Analysis names `createRetainedSourceAnalysis` to open the session's adapter,
 `assembleCatalog` to project a report from the descriptions the session
 retains, and `describeFiles` and `createAccessInterpreter` in the audit that
 recomputes from the warm compiler. `interfaces/source.ts` gains
 `AccessInterpreter` (iteration 2), `DescriptionDependencies`,
 `FileDescription` and `CatalogDelta` (iteration 3) and `SourceChangeSet`,
-`RetainedSourceInputs` and `RetainedSourceAnalysis` (iteration 4) inside the
+`RetainedSourceInputs` and `RetainedSourceAnalysis` (iteration 5) inside the
 T2 wildcard. `RetainedSourceInputs.sink` names project's `ObservationSink`,
 received through analysis A7, the way `resolution.ts` names `ProjectInventory`
 and `InventoryFile` today; this owner defines no observation type.
 
 New source: `src/access-interpreter.ts` (iteration 2),
 `src/descriptions.ts` (iteration 3) and `src/retained-source-analysis.ts`
-(iteration 4). Changed source: `src/namespace-uses.ts` (the lazy
+(iteration 5). Changed source: `src/namespace-uses.ts` (the lazy
 spelling-filtered identifier index) and `src/accesses.ts` (`collectAccesses`
 becomes a private wrapper over the interpreter) in iteration 2;
 `src/catalog.ts` (`buildCatalog` becomes `assembleCatalog(describeFiles(...))`
@@ -454,11 +452,9 @@ wrapped by owned public types: the worker boundary is invisible to a caller of
 | 2 | typescript | T3 activated with `createAccessInterpreter`; `AccessInterpreter` joins the T2 wildcard. |
 | 2 | model | None; indexed lookups sit behind M5 and M6 with no name change. |
 | 3 | typescript | T4 activated with `describeFiles` and `assembleCatalog`; `DescriptionDependencies`, `FileDescription` and `CatalogDelta` join the T2 wildcard. |
-| 4 | typescript | T5 activated with `createRetainedSourceAnalysis`; `SourceChangeSet`, `RetainedSourceInputs` and `RetainedSourceAnalysis` join the T2 wildcard. |
-| 4 | project | `ObservationSink` joins the P2 wildcard as a type, ahead of the observer that implements it. |
-| 4 | analysis | A7 extended with `ObservationSink`, so `typescript` receives the sink its adapter reports to. |
-| 5 | project | P4 activated with `observeProject`; the five observer types join the P2 wildcard. |
-| 5 | analysis | A7 extended with `InputChangeKind`, `ObservedChange`, `InventoryUpdate`, `ProjectObserver` and `ProjectObserve`. |
+| 4 | project | P4 activated with `observeProject`; `ObservationSink`, `InputChangeKind`, `ObservedChange`, `InventoryUpdate`, `ProjectObserver` and `ProjectObserve` join the P2 wildcard. |
+| 4 | analysis | A7 extended with the same six names, so root relays them and `typescript` receives the sink its adapter reports to. |
+| 5 | typescript | T5 activated with `createRetainedSourceAnalysis`; `SourceChangeSet`, `RetainedSourceInputs` and `RetainedSourceAnalysis` join the T2 wildcard. |
 | 6 | analysis | A11 activated with `interfaces/session.ts`; A12 activated with `openRetainedSession`. |
 | 7 | analysis | None; the description, metadata and broad paths, positions and `verify` complete the A11 vocabulary. |
 | 8 | analysis | None; the worker host and `SessionLimits` sit behind A11 and A12. |

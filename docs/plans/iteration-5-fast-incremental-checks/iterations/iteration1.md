@@ -90,13 +90,14 @@ or daemon code is written here.
    reference and S100 hook rows are the binding targets iteration 12 asserts,
    and the S500, S1000 and memory rows stay advisory.
 6. The scheduling decisions confirmed or revised in the same table: iterations
-   3 and 5 may run in parallel after iteration 2; iterations 11 and 12 may run
-   in parallel after iteration 10; iteration 5 depends only on iteration 2
-   because the observer uses no compiler change; iteration 6 needs both the
-   adapter of iteration 4 and the observer of iteration 5; iteration 9 is the
+   3 and 4 may run in parallel after iteration 2; iterations 11 and 12 may run
+   in parallel after iteration 10; iteration 4 depends only on iteration 2
+   because the observer uses no compiler change; iteration 5 needs the
+   descriptions of iteration 3 and the observation sink of iteration 4;
+   iteration 6 needs both the observer and the adapter; iteration 9 is the
    only iteration that deletes Plan 2 source and lands the supersession
-   amendment in the same commit. A different decision revises iterations 3, 5,
-   6, 9, 11 and 12 before they start.
+   amendment in the same commit. A different decision revises iterations 3, 4,
+   5, 6, 9, 11 and 12 before they start.
 
 ## Matrix rows executed here
 

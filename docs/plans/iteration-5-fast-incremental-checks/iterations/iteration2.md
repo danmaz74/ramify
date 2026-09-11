@@ -100,7 +100,7 @@ executed, and execute the engine and harness rows.
   identities unchanged).
 - I5-02: `required-membership` (103 registered leaves, every group and count
   matching); `removed-record-fails`; `failing-assertion-fails`;
-  `iteration-filter` (`--iteration 5` requires 2 and 5; `--iteration 9`
+  `iteration-filter` (`--iteration 4` requires 2 and 4; `--iteration 9`
   requires 2 to 9).
 
 ## Verification
@@ -141,7 +141,7 @@ iteration, never a comparison tolerance.
 ## Handoff
 
 Iteration 3 describes files over this interpreter and replaces `buildCatalog`
-with the assembly of per-file descriptions; iteration 5 needs nothing from
+with the assembly of per-file descriptions; iteration 4 needs nothing from
 here beyond the registered gate, which is why it may start in parallel with
 iteration 3. `AccessInterpreter.replaceDescriptions` is the seam iteration 6
 uses to keep access facts current, and the registered capabilities are the

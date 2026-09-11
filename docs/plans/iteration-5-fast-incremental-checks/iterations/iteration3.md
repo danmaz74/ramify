@@ -3,7 +3,7 @@
 **Plan:** [Plan 5: Fast incremental checks](../main-plan.md).
 **Prerequisites:** iteration 2 (`engine`: the hoisted interpreter, the lazy
 namespace index and the registered `--plan 5` gate). This iteration may run in
-parallel with iteration 5, which depends only on iteration 2. **Owners:**
+parallel with iteration 4, which depends only on iteration 2. **Owners:**
 `subs/analysis/subs/typescript/`.
 
 ## Goal
@@ -111,7 +111,7 @@ recomputing less is not.
 
 ## Handoff
 
-Iteration 4 gives these descriptions a warm compiler and one live snapshot;
+Iteration 5 gives these descriptions a warm compiler and one live snapshot;
 iteration 6 keeps them as retained facts and drives access re-interpretation
 from `CatalogDelta.changed` and `CatalogDelta.moved`, so the two lists are
 the contract between the catalog and the session.
