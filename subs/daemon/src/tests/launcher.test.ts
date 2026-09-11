@@ -69,12 +69,14 @@ describe('private coordinated launcher with a fake entry', () => {
     expect(await readFile(value.endpoint.lock, 'utf8')).toBe(content);
   });
 
-  it('never removes a refused socket or record while its pid is alive', async () => {
+  it('never removes an occupied endpoint or record while its pid is alive', async () => {
     const value = await fixture();
     await writeDaemonRecord(value.endpoint, daemonRecord(value.endpoint));
     await writeFile(value.endpoint.socket, 'occupied');
     const before = await readFile(value.endpoint.record, 'utf8');
-    await expect(launchDaemon({ ...value.launch, startupMs: 100 })).rejects.toThrow('timed out');
+    // Connecting to a regular file gives ECONNREFUSED on Linux (bounded retry)
+    // and ENOTSOCK on macOS (immediate failure); neither permits deleting it.
+    await expect(launchDaemon({ ...value.launch, startupMs: 100 })).rejects.toThrow(/timed out|ENOTSOCK/);
     expect(await readFile(value.endpoint.record, 'utf8')).toBe(before);
     expect(await readFile(value.endpoint.socket, 'utf8')).toBe('occupied');
   });

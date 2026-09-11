@@ -1,5 +1,5 @@
 import { writeFileSync } from 'node:fs';
-import { mkdtemp, rm, symlink } from 'node:fs/promises';
+import { mkdtemp, realpath, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -9,7 +9,7 @@ import { fixture, limits, put, syntax } from './fixtures.js';
 
 let work: string, root: string;
 const views: ProjectInputView[] = [];
-beforeEach(async () => { work = await mkdtemp(join(tmpdir(), 'ramify-project-')); root = join(work, 'project'); await fixture(root); });
+beforeEach(async () => { work = await realpath(await mkdtemp(join(tmpdir(), 'ramify-project-'))); root = join(work, 'project'); await fixture(root); });
 afterEach(async () => { for (const view of views.splice(0)) await view.dispose(); await rm(work, { recursive: true, force: true }); });
 async function read(changes: Partial<ProjectReadOptions> = {}): Promise<ProjectRead> {
   const result = await readProject({ request: { cwd: root, root, configuration: 'discover', scope: 'whole-project' }, parse: syntax, limits, ...changes });

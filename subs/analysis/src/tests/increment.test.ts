@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readdir, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, realpath, mkdir, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
@@ -14,7 +14,7 @@ const files = {
   'subs/child/src/use.ts': 'import { value } from "../../../src/interfaces/api.js"; void value;\n',
 };
 async function fixture(check: (root: string, inputs: AnalysisInputs) => Promise<void>): Promise<void> {
-  const root = await mkdtemp(join(tmpdir(), 'ramify-increment-'));
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'ramify-increment-')));
   try {
     for (const [path, text] of Object.entries(files)) { await mkdir(dirname(join(root, path)), { recursive: true }); await writeFile(join(root, path), text); }
     await check(root, { project: { cwd: root, root, scope: 'whole-project', configuration: 'discover' },

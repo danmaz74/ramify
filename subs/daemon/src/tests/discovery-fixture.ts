@@ -27,8 +27,8 @@ server.listen(record.socket, () => {
 process.on('SIGTERM', () => server.close(() => process.exit(0)));
 `;
 
-export async function discoveryFixture(entry = fakeEntry) {
-  const root = await realpath(await mkdtemp(join(tmpdir(), 'r7-')));
+export async function discoveryFixture(entry = fakeEntry, temporaryDirectory = tmpdir()) {
+  const root = await realpath(await mkdtemp(join(temporaryDirectory, 'r7-')));
   const packageRoot = join(root, 'pkg'), endpointDirectory = join(root, 'e');
   await mkdir(join(packageRoot, 'dist/src'), { recursive: true });
   await mkdir(join(packageRoot, 'dist/subs/analysis/src'), { recursive: true });
