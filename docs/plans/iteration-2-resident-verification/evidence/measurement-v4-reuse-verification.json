@@ -1,0 +1,4207 @@
+[
+  {
+    "id": "I2-29:entry-footprints",
+    "passed": true,
+    "assertions": [
+      {
+        "name": "client: complete actual process samples",
+        "passed": true,
+        "observed": 5,
+        "maximum": null
+      },
+      {
+        "name": "client: reported RSS equals raw observation",
+        "passed": true,
+        "observed": 50417664,
+        "maximum": null
+      },
+      {
+        "name": "client: RSS",
+        "passed": true,
+        "observed": 50417664,
+        "maximum": 67108864,
+        "enforcement": "advisory",
+        "targetMet": true
+      },
+      {
+        "name": "daemonEmpty: actual daemon memory observation",
+        "passed": true,
+        "observed": {
+          "rss": 65921024,
+          "heapUsed": 6453072,
+          "external": 2282805
+        },
+        "maximum": null
+      },
+      {
+        "name": "daemonEmpty: reported RSS equals raw observation",
+        "passed": true,
+        "observed": 65921024,
+        "maximum": null
+      },
+      {
+        "name": "daemonEmpty: RSS",
+        "passed": true,
+        "observed": 65921024,
+        "maximum": 100663296,
+        "enforcement": "advisory",
+        "targetMet": true
+      },
+      {
+        "name": "daemonReference: actual daemon memory observation",
+        "passed": true,
+        "observed": {
+          "rss": 160894976,
+          "heapUsed": 10434072,
+          "external": 2277745
+        },
+        "maximum": null
+      },
+      {
+        "name": "daemonReference: reported RSS equals raw observation",
+        "passed": true,
+        "observed": 160894976,
+        "maximum": null
+      },
+      {
+        "name": "daemonReference: RSS",
+        "passed": true,
+        "observed": 160894976,
+        "maximum": 201326592,
+        "enforcement": "advisory",
+        "targetMet": true
+      },
+      {
+        "name": "cliReference: complete actual process samples",
+        "passed": true,
+        "observed": 48,
+        "maximum": null
+      },
+      {
+        "name": "cliReference: reported RSS equals raw observation",
+        "passed": true,
+        "observed": 71122944,
+        "maximum": null
+      },
+      {
+        "name": "cliReference: RSS",
+        "passed": true,
+        "observed": 71122944,
+        "maximum": 100663296,
+        "enforcement": "advisory",
+        "targetMet": true
+      },
+      {
+        "name": "cliS100: complete actual process samples",
+        "passed": true,
+        "observed": 70,
+        "maximum": null
+      },
+      {
+        "name": "cliS100: reported RSS equals raw observation",
+        "passed": true,
+        "observed": 102834176,
+        "maximum": null
+      },
+      {
+        "name": "cliS100: RSS",
+        "passed": true,
+        "observed": 102834176,
+        "maximum": 167772160,
+        "enforcement": "advisory",
+        "targetMet": true
+      },
+      {
+        "name": "help: complete actual process samples",
+        "passed": true,
+        "observed": 3,
+        "maximum": null
+      },
+      {
+        "name": "help contains real externally sampled RSS",
+        "passed": true,
+        "observed": 57790464,
+        "maximum": null
+      }
+    ],
+    "performancePolicy": "advisory-by-user-request-2026-09-11",
+    "advisoryMisses": [],
+    "measuredAt": "2026-09-11T14:34:43.586Z",
+    "completedAt": "2026-09-11T14:35:14.551Z",
+    "inputs": {
+      "build": {
+        "files": 266,
+        "sha256": "5511bef5097f23f1726ec1d0a397f9d6bfc837968899f433f495e7b187bd3672"
+      },
+      "source": {
+        "root": {
+          "files": 30,
+          "sha256": "fe22f8d2e525d5c419febf78d142ab93703c5712572eadf9dcfd29dc7d274acb"
+        },
+        "owners": {
+          "files": 226,
+          "sha256": "100de0120c5f5255f8975e56ca9d9c19df720eb8d471c029399b5384087e3a2c"
+        }
+      },
+      "manifests": [
+        {
+          "path": "package.json",
+          "sha256": "523760a518361b265794561bd2ce2362339c2e8b0e1436d281d035cc42cb720e"
+        },
+        {
+          "path": "package-lock.json",
+          "sha256": "166bf7c006ed6ff26612cefefc2243112ef48d9f7bc7ba6c2558182a3688e556"
+        },
+        {
+          "path": "module.ramify",
+          "sha256": "a5ed2c145ecc2e77dc8efe03035884f3bad0ef09bb9cb438270f7ec0b6104ac9"
+        },
+        {
+          "path": "docs/plans/iteration-2-resident-verification/scope.md",
+          "sha256": "0a9fd407035661093fb153e2fc06957e5424883a1b9654f3aef8c89fd4e2fa69"
+        }
+      ],
+      "recipes": [
+        {
+          "path": "scripts/measurements/archive.mjs",
+          "sha256": "c060a206efba37e1c88dda392e9240a2df645aa6048353fc58bb3ed6b37e157d"
+        },
+        {
+          "path": "scripts/measurements/common.mjs",
+          "sha256": "4b038b0ad4c6b473e8f64866f9e6b31b30576694d2949d2d03a9a0f6a9199bb4"
+        },
+        {
+          "path": "scripts/measurements/identities.mjs",
+          "sha256": "9a61b897259173b43dc2ef4a90e6095c251af1a8e03edceeb050518af4c314e8"
+        },
+        {
+          "path": "scripts/measurements/materialize.ts",
+          "sha256": "48e05872d21bed60b53516182f84516c7984f1445efe8660141bfa5a58bc4f1f"
+        },
+        {
+          "path": "scripts/measurements/process-observer.mjs",
+          "sha256": "647a7f0f8e37b67af31373f1f8dd2ae73d3b3cb92cfd1a37f1c2c2f99a971001"
+        },
+        {
+          "path": "scripts/measurements/repeated.mjs",
+          "sha256": "678b7c7db72bc51e3c9cf5dd4a7cb8751a166b23ca4ec60ac0e18a2a11f8ae24"
+        },
+        {
+          "path": "scripts/measurements/resident-assertions.mjs",
+          "sha256": "094071dc8e98ed08ad935e5b3ae2b9e4a400542b2ecc9208e1ed3bd3463da744"
+        },
+        {
+          "path": "scripts/measurements/resident-daemon.mjs",
+          "sha256": "eb3bb80e486f8b22e98e65f92c141d5a0c5c4bd76c5da2fd287e95c975a61c2a"
+        },
+        {
+          "path": "scripts/measurements/resident-driver.mjs",
+          "sha256": "f2880a7df71c8e4b96495d3c1dd069a048af403ecf2aeac7362f6eb825ff7923"
+        },
+        {
+          "path": "scripts/measurements/resident-failure.mjs",
+          "sha256": "efbd9fe6808828bd3f1a44c17cf7eef36ecfa60a607add6212aa4ea1c2f36c7a"
+        },
+        {
+          "path": "scripts/measurements/resident-failure.test.mjs",
+          "sha256": "d20fd4e5ffc21517306928a4f787f8f1e32d15567f1d36ca62ef2d80234a842d"
+        },
+        {
+          "path": "scripts/measurements/resident-inputs.mjs",
+          "sha256": "91d12194547132d1e11c903885d8abbb33fc4b3c40c851645c498d1f94559232"
+        },
+        {
+          "path": "scripts/measurements/resident-observer.mjs",
+          "sha256": "b830f927221ee38e776c228652526d74a1f5a4d91df0b8ccac87de11fd046185"
+        },
+        {
+          "path": "scripts/measurements/resident-plan.mjs",
+          "sha256": "baaa05e9045c357503334c95dbc297ec9f21e3eb05cefdd60b938d8f97b4f6dd"
+        },
+        {
+          "path": "scripts/measurements/resident-prerequisites.mjs",
+          "sha256": "17bcfd87818aa1c21c21bc50439aa319f60e4da13605c04f83fb3d498563ecf6"
+        },
+        {
+          "path": "scripts/measurements/resident-reuse.mjs",
+          "sha256": "5bd661ad8d77c6c7cfd4d369cf327956cf6d13da5dcb645a38b6182f55286c5d"
+        },
+        {
+          "path": "scripts/measurements/resident-reuse.test.mjs",
+          "sha256": "5dd8419bade46d6b05be330085591ea30618439ed78e5da4e39d33fd90e58852"
+        },
+        {
+          "path": "scripts/measurements/resident-worker.mjs",
+          "sha256": "d93ac22951ba98008a1f4608cbd914a86e5bfcc1dd8aa87d2429b77077659993"
+        },
+        {
+          "path": "scripts/measurements/resident-workloads.mjs",
+          "sha256": "406d74e60f36a4859ca8c7f43eb8cf1a16c29b4240968c6d9d2a668d9b55d022"
+        },
+        {
+          "path": "scripts/measurements/resident.mjs",
+          "sha256": "2714667c109b6976859b5bf52eff5761a8f31d5d00a3d26b044b7b10ae04e64b"
+        },
+        {
+          "path": "scripts/measurements/run.mjs",
+          "sha256": "0a2b14a867f9ff57660240c65eb912da701892778e440fec3d6579aaf882c5ee"
+        },
+        {
+          "path": "scripts/measurements/session-setup.mjs",
+          "sha256": "27699b0379a424a5017f65e331e0c49754c872186c31323f1626888951651c17"
+        },
+        {
+          "path": "scripts/measurements/verify-resident-evidence.mjs",
+          "sha256": "fea2cdbec6cd7e8048364416fc87b4ffbaece607a75088eb17815d22e5adfd15"
+        },
+        {
+          "path": "scripts/measurements/verify-tooling.mjs",
+          "sha256": "4f786b7407a42f0bce11a8f089b50e2d5eaf7fc787451c8dbd86bdc8fecd06d3"
+        }
+      ],
+      "fixtureGenerator": {
+        "path": "scripts/probes/fixtures/synthetic-owners.ts",
+        "sha256": "6176043d908baee456c8a7a56f1ba3946e04350f61c76dad082df5c917d3ddee"
+      },
+      "reference": {
+        "files": 96,
+        "sha256": "52b291488fd5894ae8ff826f29c461aeecca4b83ea80a31b0d8a3751ef5f2bbb"
+      }
+    },
+    "samples": {
+      "processes": 195,
+      "controller": 534
+    },
+    "compilerStateTrigger": {
+      "status": "not-evaluated",
+      "reason": "Source-edit workloads have not both completed."
+    },
+    "provenance": {
+      "artifact": "/tmp/worktrees/ramify-67e9dd0f/iteration-2-resident-verification/scripts/measurements/results/resident-2026-09-11T14-34-43.586Z-c4a3d367-410e-4b9c-a9ea-dabe6f074295.json.gz",
+      "fileSha256": "f5d57ff39fab3a3ac6968b206e88ef1771626148ec3ec0ce6480c4159a76cf8b",
+      "rawSha256": "0046c732ec3a09b4463254695d4d2d4de648d70cba3683978e948d79fa8e5630",
+      "originalStatus": "incomplete",
+      "originalInterrupted": true,
+      "compatibility": {
+        "authorization": "user-approved-blast-radius-reuse-2026-09-11",
+        "policyReference": "User-approved evidence blast-radius policy, 2026-09-11",
+        "sourceTestChanges": [
+          {
+            "path": "subs/analysis/subs/model/src/tests/decision-lookups.test.ts",
+            "before": "c99516810d993fb3822efb13ff143db3823c5d5461828df982c0091b5d7507de",
+            "after": "4d90d134c72d70e3dada340986f729b3eb2b5c7a5c747bff08437f271de7bf5f"
+          }
+        ],
+        "orchestrationChanges": [
+          {
+            "path": "scripts/measurements/resident-composition.mjs",
+            "before": null,
+            "after": "9d6ce5b2707c74800ea9eda793a968beed6a076c9e18d1ac3e066cb36cd505b7"
+          },
+          {
+            "path": "scripts/measurements/resident-composition.test.mjs",
+            "before": null,
+            "after": "5f46d608b45e9d230aef003d35d033b9338edd3123f9463a20c6e7cca81cba89"
+          },
+          {
+            "path": "scripts/measurements/verify-resident-evidence.mjs",
+            "before": "fea2cdbec6cd7e8048364416fc87b4ffbaece607a75088eb17815d22e5adfd15",
+            "after": "91abb06c2e50ed022489714e30031e8df9abdfe91436fe6fc7872cf06d5816c8"
+          }
+        ],
+        "reasons": {
+          "subs/analysis/subs/model/src/tests/decision-lookups.test.ts": "Namespace spy changed to named-import module mock only in an owned test. No production file or compiled build bytes changed.",
+          "scripts/measurements/resident-composition.mjs": "Archive composition/verification infrastructure only, not imported by the unchanged measurement controller, workers or runtime.",
+          "scripts/measurements/resident-composition.test.mjs": "Archive composition/verification infrastructure only, not imported by the unchanged measurement controller, workers or runtime.",
+          "scripts/measurements/verify-resident-evidence.mjs": "Archive composition/verification infrastructure only, not imported by the unchanged measurement controller, workers or runtime."
+        }
+      }
+    }
+  },
+  {
+    "id": "I2-29:cold-warm-broad-reference",
+    "passed": true,
+    "assertions": [
+      {
+        "name": "five independent cold starts",
+        "passed": true,
+        "observed": 5,
+        "maximum": 5
+      },
+      {
+        "name": "cold starts use five daemon instances",
+        "passed": true,
+        "observed": [
+          "a555a045-0223-4a8a-9343-e1a66be6272d",
+          "85799fe2-f7ca-4a04-989b-bbf71ab0aca3",
+          "c21509ec-e516-4083-9b11-34c6ca3e891d",
+          "5f45c4b9-cb9e-4f78-b02e-09254e0c9a11",
+          "4f3d7cbf-f0a0-4209-8bef-2892744ed148"
+        ],
+        "maximum": null
+      },
+      {
+        "name": "cold timings are actual positive durations",
+        "passed": true,
+        "observed": [
+          8412.850027999999,
+          8773.866358,
+          8301.841751000004,
+          8514.908714000001,
+          8526.839204999997
+        ],
+        "maximum": null
+      },
+      {
+        "name": "cold median",
+        "passed": true,
+        "observed": 8514.908714000001,
+        "maximum": 6000,
+        "enforcement": "advisory",
+        "targetMet": false
+      },
+      {
+        "name": "unchanged: twenty actual cycles",
+        "passed": true,
+        "observed": 20,
+        "maximum": 20
+      },
+      {
+        "name": "unchanged: positive command durations",
+        "passed": true,
+        "observed": [
+          2562.238661999996,
+          2386.3774580000027,
+          2417.232772000003,
+          2159.283626999997,
+          2340.5321080000067,
+          2288.399375999994,
+          2299.2705799999967,
+          2537.220591999998,
+          2340.955866999997,
+          2307.6162989999866,
+          2300.7109469999996,
+          2199.071597999995,
+          2305.2903319999896,
+          2001.3921319999936,
+          1908.437346000006,
+          1891.2323640000104,
+          1696.075474000012,
+          1914.4674360000063,
+          1799.9060129999998,
+          1767.3818489999976
+        ],
+        "maximum": null
+      },
+      {
+        "name": "unchanged: median",
+        "passed": true,
+        "observed": 2299.2705799999967,
+        "maximum": 1500,
+        "enforcement": "advisory",
+        "targetMet": false
+      },
+      {
+        "name": "unchanged: recorded completed stage reuse",
+        "passed": true,
+        "observed": [
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ]
+        ],
+        "maximum": null
+      },
+      {
+        "name": "unchanged: stage reuse is backed by the publication and raw increment",
+        "passed": true,
+        "observed": 20,
+        "maximum": null
+      },
+      {
+        "name": "unchanged cycles preserve one captured identity",
+        "passed": true,
+        "observed": [
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f"
+        ],
+        "maximum": null
+      },
+      {
+        "name": "readme: twenty actual cycles",
+        "passed": true,
+        "observed": 20,
+        "maximum": 20
+      },
+      {
+        "name": "readme: positive command durations",
+        "passed": true,
+        "observed": [
+          3185.644589000003,
+          3203.883323999995,
+          1758.0420450000092,
+          3143.994003999993,
+          1730.6507050000073,
+          3159.4800810000015,
+          3398.45061,
+          1701.62279400001,
+          3192.7813500000047,
+          3204.9729389999993,
+          1748.5216329999967,
+          3197.444114999991,
+          3213.1357270000153,
+          3201.8189640000055,
+          3265.180533000006,
+          3186.322414000024,
+          3104.023258000001,
+          3246.4182239999936,
+          3303.33093299999,
+          3236.6141739999875
+        ],
+        "maximum": null
+      },
+      {
+        "name": "readme: median",
+        "passed": true,
+        "observed": 3197.444114999991,
+        "maximum": 1000,
+        "enforcement": "advisory",
+        "targetMet": false
+      },
+      {
+        "name": "readme: recorded completed stage reuse",
+        "passed": true,
+        "observed": [
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ]
+        ],
+        "maximum": null
+      },
+      {
+        "name": "readme: stage reuse is backed by the publication and raw increment",
+        "passed": true,
+        "observed": 20,
+        "maximum": null
+      },
+      {
+        "name": "readme: every edited hash is captured",
+        "passed": true,
+        "observed": [
+          [
+            {
+              "path": "subs/workspace/README.md",
+              "sha256": "9eceb123fc807348e3cda72e6458ff76eab0d8334cda9370dd4a232b16f1aadd"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/README.md",
+              "sha256": "f5cdda73289e0ff31f3b1d2d5942640a78a4224497474462fc26eef5d7546e56"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/README.md",
+              "sha256": "9eceb123fc807348e3cda72e6458ff76eab0d8334cda9370dd4a232b16f1aadd"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/README.md",
+              "sha256": "f5cdda73289e0ff31f3b1d2d5942640a78a4224497474462fc26eef5d7546e56"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/README.md",
+              "sha256": "9eceb123fc807348e3cda72e6458ff76eab0d8334cda9370dd4a232b16f1aadd"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/README.md",
+              "sha256": "f5cdda73289e0ff31f3b1d2d5942640a78a4224497474462fc26eef5d7546e56"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/README.md",
+              "sha256": "9eceb123fc807348e3cda72e6458ff76eab0d8334cda9370dd4a232b16f1aadd"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/README.md",
+              "sha256": "f5cdda73289e0ff31f3b1d2d5942640a78a4224497474462fc26eef5d7546e56"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/README.md",
+              "sha256": "9eceb123fc807348e3cda72e6458ff76eab0d8334cda9370dd4a232b16f1aadd"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/README.md",
+              "sha256": "f5cdda73289e0ff31f3b1d2d5942640a78a4224497474462fc26eef5d7546e56"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/README.md",
+              "sha256": "9eceb123fc807348e3cda72e6458ff76eab0d8334cda9370dd4a232b16f1aadd"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/README.md",
+              "sha256": "f5cdda73289e0ff31f3b1d2d5942640a78a4224497474462fc26eef5d7546e56"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/README.md",
+              "sha256": "9eceb123fc807348e3cda72e6458ff76eab0d8334cda9370dd4a232b16f1aadd"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/README.md",
+              "sha256": "f5cdda73289e0ff31f3b1d2d5942640a78a4224497474462fc26eef5d7546e56"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/README.md",
+              "sha256": "9eceb123fc807348e3cda72e6458ff76eab0d8334cda9370dd4a232b16f1aadd"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/README.md",
+              "sha256": "f5cdda73289e0ff31f3b1d2d5942640a78a4224497474462fc26eef5d7546e56"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/README.md",
+              "sha256": "9eceb123fc807348e3cda72e6458ff76eab0d8334cda9370dd4a232b16f1aadd"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/README.md",
+              "sha256": "f5cdda73289e0ff31f3b1d2d5942640a78a4224497474462fc26eef5d7546e56"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/README.md",
+              "sha256": "9eceb123fc807348e3cda72e6458ff76eab0d8334cda9370dd4a232b16f1aadd"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/README.md",
+              "sha256": "f5cdda73289e0ff31f3b1d2d5942640a78a4224497474462fc26eef5d7546e56"
+            }
+          ]
+        ],
+        "maximum": null
+      },
+      {
+        "name": "readme: adjacent edit captures differ",
+        "passed": true,
+        "observed": [
+          "input/1:0289bbd001f7029fdfd5eca666dd7ec946ec0b5d614fd6849af7410da78998b1",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:0289bbd001f7029fdfd5eca666dd7ec946ec0b5d614fd6849af7410da78998b1",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:0289bbd001f7029fdfd5eca666dd7ec946ec0b5d614fd6849af7410da78998b1",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:0289bbd001f7029fdfd5eca666dd7ec946ec0b5d614fd6849af7410da78998b1",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:0289bbd001f7029fdfd5eca666dd7ec946ec0b5d614fd6849af7410da78998b1",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:0289bbd001f7029fdfd5eca666dd7ec946ec0b5d614fd6849af7410da78998b1",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:0289bbd001f7029fdfd5eca666dd7ec946ec0b5d614fd6849af7410da78998b1",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:0289bbd001f7029fdfd5eca666dd7ec946ec0b5d614fd6849af7410da78998b1",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:0289bbd001f7029fdfd5eca666dd7ec946ec0b5d614fd6849af7410da78998b1",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:0289bbd001f7029fdfd5eca666dd7ec946ec0b5d614fd6849af7410da78998b1",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f"
+        ],
+        "maximum": null
+      },
+      {
+        "name": "exposure: twenty actual cycles",
+        "passed": true,
+        "observed": 20,
+        "maximum": 20
+      },
+      {
+        "name": "exposure: positive command durations",
+        "passed": true,
+        "observed": [
+          3356.124803999992,
+          1933.0511250000272,
+          3393.307224999997,
+          3329.532608999987,
+          3308.6008750000037,
+          3339.5078700000013,
+          3258.810786999995,
+          3354.048167000001,
+          3567.818053999974,
+          3254.716988,
+          3291.7031619999907,
+          3295.0511989999795,
+          3299.4842209999915,
+          3407.3264040000213,
+          3295.0973329999833,
+          3538.1243559999857,
+          3294.4508410000126,
+          3336.5163190000167,
+          3307.6531539999996,
+          3297.9400190000015
+        ],
+        "maximum": null
+      },
+      {
+        "name": "exposure: median",
+        "passed": true,
+        "observed": 3308.6008750000037,
+        "maximum": 2500,
+        "enforcement": "advisory",
+        "targetMet": false
+      },
+      {
+        "name": "exposure: recorded completed stage reuse",
+        "passed": true,
+        "observed": [
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ]
+        ],
+        "maximum": null
+      },
+      {
+        "name": "exposure: stage reuse is backed by the publication and raw increment",
+        "passed": true,
+        "observed": 20,
+        "maximum": null
+      },
+      {
+        "name": "exposure: every edited hash is captured",
+        "passed": true,
+        "observed": [
+          [
+            {
+              "path": "subs/workspace/module.ramify",
+              "sha256": "45716be614cc67f8ce0848acf7bb5fcd807ea65bbc045772f97b4621cd14dce4"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/module.ramify",
+              "sha256": "8001ff07a43de6416d4c8f484eee8c096b6289ad2e37a41cea1f63645fb4e65b"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/module.ramify",
+              "sha256": "45716be614cc67f8ce0848acf7bb5fcd807ea65bbc045772f97b4621cd14dce4"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/module.ramify",
+              "sha256": "8001ff07a43de6416d4c8f484eee8c096b6289ad2e37a41cea1f63645fb4e65b"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/module.ramify",
+              "sha256": "45716be614cc67f8ce0848acf7bb5fcd807ea65bbc045772f97b4621cd14dce4"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/module.ramify",
+              "sha256": "8001ff07a43de6416d4c8f484eee8c096b6289ad2e37a41cea1f63645fb4e65b"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/module.ramify",
+              "sha256": "45716be614cc67f8ce0848acf7bb5fcd807ea65bbc045772f97b4621cd14dce4"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/module.ramify",
+              "sha256": "8001ff07a43de6416d4c8f484eee8c096b6289ad2e37a41cea1f63645fb4e65b"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/module.ramify",
+              "sha256": "45716be614cc67f8ce0848acf7bb5fcd807ea65bbc045772f97b4621cd14dce4"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/module.ramify",
+              "sha256": "8001ff07a43de6416d4c8f484eee8c096b6289ad2e37a41cea1f63645fb4e65b"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/module.ramify",
+              "sha256": "45716be614cc67f8ce0848acf7bb5fcd807ea65bbc045772f97b4621cd14dce4"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/module.ramify",
+              "sha256": "8001ff07a43de6416d4c8f484eee8c096b6289ad2e37a41cea1f63645fb4e65b"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/module.ramify",
+              "sha256": "45716be614cc67f8ce0848acf7bb5fcd807ea65bbc045772f97b4621cd14dce4"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/module.ramify",
+              "sha256": "8001ff07a43de6416d4c8f484eee8c096b6289ad2e37a41cea1f63645fb4e65b"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/module.ramify",
+              "sha256": "45716be614cc67f8ce0848acf7bb5fcd807ea65bbc045772f97b4621cd14dce4"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/module.ramify",
+              "sha256": "8001ff07a43de6416d4c8f484eee8c096b6289ad2e37a41cea1f63645fb4e65b"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/module.ramify",
+              "sha256": "45716be614cc67f8ce0848acf7bb5fcd807ea65bbc045772f97b4621cd14dce4"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/module.ramify",
+              "sha256": "8001ff07a43de6416d4c8f484eee8c096b6289ad2e37a41cea1f63645fb4e65b"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/module.ramify",
+              "sha256": "45716be614cc67f8ce0848acf7bb5fcd807ea65bbc045772f97b4621cd14dce4"
+            }
+          ],
+          [
+            {
+              "path": "subs/workspace/module.ramify",
+              "sha256": "8001ff07a43de6416d4c8f484eee8c096b6289ad2e37a41cea1f63645fb4e65b"
+            }
+          ]
+        ],
+        "maximum": null
+      },
+      {
+        "name": "exposure: adjacent edit captures differ",
+        "passed": true,
+        "observed": [
+          "input/1:0229f11bd2cc6427fa2579efb32d80db2c3ad4a66353075fa698baf221fa1c13",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:0229f11bd2cc6427fa2579efb32d80db2c3ad4a66353075fa698baf221fa1c13",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:0229f11bd2cc6427fa2579efb32d80db2c3ad4a66353075fa698baf221fa1c13",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:0229f11bd2cc6427fa2579efb32d80db2c3ad4a66353075fa698baf221fa1c13",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:0229f11bd2cc6427fa2579efb32d80db2c3ad4a66353075fa698baf221fa1c13",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:0229f11bd2cc6427fa2579efb32d80db2c3ad4a66353075fa698baf221fa1c13",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:0229f11bd2cc6427fa2579efb32d80db2c3ad4a66353075fa698baf221fa1c13",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:0229f11bd2cc6427fa2579efb32d80db2c3ad4a66353075fa698baf221fa1c13",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:0229f11bd2cc6427fa2579efb32d80db2c3ad4a66353075fa698baf221fa1c13",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:0229f11bd2cc6427fa2579efb32d80db2c3ad4a66353075fa698baf221fa1c13",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f"
+        ],
+        "maximum": null
+      },
+      {
+        "name": "source: twenty actual cycles",
+        "passed": true,
+        "observed": 20,
+        "maximum": 20
+      },
+      {
+        "name": "source: positive command durations",
+        "passed": true,
+        "observed": [
+          6317.2406399999745,
+          6397.7466330000025,
+          4957.170108999999,
+          6458.691793000005,
+          6399.495660999994,
+          6344.533168999973,
+          6294.5185799999745,
+          6283.968068999995,
+          6513.928639999998,
+          5019.208830000018,
+          5014.718881000008,
+          6551.37760800001,
+          6647.7969710000325,
+          6458.854937999975,
+          4961.542697999976,
+          6394.687964000041,
+          6490.996469000005,
+          6244.893952000013,
+          6312.594166000024,
+          6350.339185999997
+        ],
+        "maximum": null
+      },
+      {
+        "name": "source: median",
+        "passed": true,
+        "observed": 6350.339185999997,
+        "maximum": 4500,
+        "enforcement": "advisory",
+        "targetMet": false
+      },
+      {
+        "name": "source: recorded completed stage reuse",
+        "passed": true,
+        "observed": [
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ]
+        ],
+        "maximum": null
+      },
+      {
+        "name": "source: stage reuse is backed by the publication and raw increment",
+        "passed": true,
+        "observed": 20,
+        "maximum": null
+      },
+      {
+        "name": "source: every edited hash is captured",
+        "passed": true,
+        "observed": [
+          [
+            {
+              "path": "src/assembly.ts",
+              "sha256": "08c9e697b61a22000b79e1b840740bfecbef96530c3e2ef1df6a2dbb90dc0dcb"
+            }
+          ],
+          [
+            {
+              "path": "src/assembly.ts",
+              "sha256": "d227db8f9aeb4280294d1f24709e7494fe0c3f552f199cc982b18d4fa89fa32d"
+            }
+          ],
+          [
+            {
+              "path": "src/assembly.ts",
+              "sha256": "08c9e697b61a22000b79e1b840740bfecbef96530c3e2ef1df6a2dbb90dc0dcb"
+            }
+          ],
+          [
+            {
+              "path": "src/assembly.ts",
+              "sha256": "d227db8f9aeb4280294d1f24709e7494fe0c3f552f199cc982b18d4fa89fa32d"
+            }
+          ],
+          [
+            {
+              "path": "src/assembly.ts",
+              "sha256": "08c9e697b61a22000b79e1b840740bfecbef96530c3e2ef1df6a2dbb90dc0dcb"
+            }
+          ],
+          [
+            {
+              "path": "src/assembly.ts",
+              "sha256": "d227db8f9aeb4280294d1f24709e7494fe0c3f552f199cc982b18d4fa89fa32d"
+            }
+          ],
+          [
+            {
+              "path": "src/assembly.ts",
+              "sha256": "08c9e697b61a22000b79e1b840740bfecbef96530c3e2ef1df6a2dbb90dc0dcb"
+            }
+          ],
+          [
+            {
+              "path": "src/assembly.ts",
+              "sha256": "d227db8f9aeb4280294d1f24709e7494fe0c3f552f199cc982b18d4fa89fa32d"
+            }
+          ],
+          [
+            {
+              "path": "src/assembly.ts",
+              "sha256": "08c9e697b61a22000b79e1b840740bfecbef96530c3e2ef1df6a2dbb90dc0dcb"
+            }
+          ],
+          [
+            {
+              "path": "src/assembly.ts",
+              "sha256": "d227db8f9aeb4280294d1f24709e7494fe0c3f552f199cc982b18d4fa89fa32d"
+            }
+          ],
+          [
+            {
+              "path": "src/assembly.ts",
+              "sha256": "08c9e697b61a22000b79e1b840740bfecbef96530c3e2ef1df6a2dbb90dc0dcb"
+            }
+          ],
+          [
+            {
+              "path": "src/assembly.ts",
+              "sha256": "d227db8f9aeb4280294d1f24709e7494fe0c3f552f199cc982b18d4fa89fa32d"
+            }
+          ],
+          [
+            {
+              "path": "src/assembly.ts",
+              "sha256": "08c9e697b61a22000b79e1b840740bfecbef96530c3e2ef1df6a2dbb90dc0dcb"
+            }
+          ],
+          [
+            {
+              "path": "src/assembly.ts",
+              "sha256": "d227db8f9aeb4280294d1f24709e7494fe0c3f552f199cc982b18d4fa89fa32d"
+            }
+          ],
+          [
+            {
+              "path": "src/assembly.ts",
+              "sha256": "08c9e697b61a22000b79e1b840740bfecbef96530c3e2ef1df6a2dbb90dc0dcb"
+            }
+          ],
+          [
+            {
+              "path": "src/assembly.ts",
+              "sha256": "d227db8f9aeb4280294d1f24709e7494fe0c3f552f199cc982b18d4fa89fa32d"
+            }
+          ],
+          [
+            {
+              "path": "src/assembly.ts",
+              "sha256": "08c9e697b61a22000b79e1b840740bfecbef96530c3e2ef1df6a2dbb90dc0dcb"
+            }
+          ],
+          [
+            {
+              "path": "src/assembly.ts",
+              "sha256": "d227db8f9aeb4280294d1f24709e7494fe0c3f552f199cc982b18d4fa89fa32d"
+            }
+          ],
+          [
+            {
+              "path": "src/assembly.ts",
+              "sha256": "08c9e697b61a22000b79e1b840740bfecbef96530c3e2ef1df6a2dbb90dc0dcb"
+            }
+          ],
+          [
+            {
+              "path": "src/assembly.ts",
+              "sha256": "d227db8f9aeb4280294d1f24709e7494fe0c3f552f199cc982b18d4fa89fa32d"
+            }
+          ]
+        ],
+        "maximum": null
+      },
+      {
+        "name": "source: adjacent edit captures differ",
+        "passed": true,
+        "observed": [
+          "input/1:1fb28dfc6e09ab6824ca3b9e100eafba77ef31ddd48bca71d108b9309325bf7f",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:1fb28dfc6e09ab6824ca3b9e100eafba77ef31ddd48bca71d108b9309325bf7f",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:1fb28dfc6e09ab6824ca3b9e100eafba77ef31ddd48bca71d108b9309325bf7f",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:1fb28dfc6e09ab6824ca3b9e100eafba77ef31ddd48bca71d108b9309325bf7f",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:1fb28dfc6e09ab6824ca3b9e100eafba77ef31ddd48bca71d108b9309325bf7f",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:1fb28dfc6e09ab6824ca3b9e100eafba77ef31ddd48bca71d108b9309325bf7f",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:1fb28dfc6e09ab6824ca3b9e100eafba77ef31ddd48bca71d108b9309325bf7f",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:1fb28dfc6e09ab6824ca3b9e100eafba77ef31ddd48bca71d108b9309325bf7f",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:1fb28dfc6e09ab6824ca3b9e100eafba77ef31ddd48bca71d108b9309325bf7f",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:1fb28dfc6e09ab6824ca3b9e100eafba77ef31ddd48bca71d108b9309325bf7f",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f"
+        ],
+        "maximum": null
+      },
+      {
+        "name": "configuration: twenty actual cycles",
+        "passed": true,
+        "observed": 20,
+        "maximum": 20
+      },
+      {
+        "name": "configuration: positive command durations",
+        "passed": true,
+        "observed": [
+          6180.632946000027,
+          5992.9409640000085,
+          5991.325781000021,
+          6040.720149000001,
+          6016.1220450000255,
+          5962.597546999983,
+          5997.556002999947,
+          6058.003601000004,
+          5953.4654970000265,
+          6000.818245999981,
+          5999.518938999972,
+          6097.119590999966,
+          5907.818926000036,
+          5853.315393999976,
+          5934.0052109999815,
+          6200.442703999986,
+          5991.326616000035,
+          5882.1407689999905,
+          4505.784631000017,
+          6155.143357000023
+        ],
+        "maximum": null
+      },
+      {
+        "name": "configuration: median",
+        "passed": true,
+        "observed": 5997.556002999947,
+        "maximum": 5500,
+        "enforcement": "advisory",
+        "targetMet": false
+      },
+      {
+        "name": "configuration: recorded completed stage reuse",
+        "passed": true,
+        "observed": [
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ]
+        ],
+        "maximum": null
+      },
+      {
+        "name": "configuration: stage reuse is backed by the publication and raw increment",
+        "passed": true,
+        "observed": 20,
+        "maximum": null
+      },
+      {
+        "name": "configuration: every edited hash is captured",
+        "passed": true,
+        "observed": [
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "d4125d790f4c4402701c728435ea3ec87deac725e6ea63a40c514076a0d9c3f2"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "4050f9725f7014705ef88b4b44b52ad185b02821b599bf7084e872728ed606e3"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "d4125d790f4c4402701c728435ea3ec87deac725e6ea63a40c514076a0d9c3f2"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "4050f9725f7014705ef88b4b44b52ad185b02821b599bf7084e872728ed606e3"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "d4125d790f4c4402701c728435ea3ec87deac725e6ea63a40c514076a0d9c3f2"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "4050f9725f7014705ef88b4b44b52ad185b02821b599bf7084e872728ed606e3"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "d4125d790f4c4402701c728435ea3ec87deac725e6ea63a40c514076a0d9c3f2"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "4050f9725f7014705ef88b4b44b52ad185b02821b599bf7084e872728ed606e3"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "d4125d790f4c4402701c728435ea3ec87deac725e6ea63a40c514076a0d9c3f2"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "4050f9725f7014705ef88b4b44b52ad185b02821b599bf7084e872728ed606e3"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "d4125d790f4c4402701c728435ea3ec87deac725e6ea63a40c514076a0d9c3f2"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "4050f9725f7014705ef88b4b44b52ad185b02821b599bf7084e872728ed606e3"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "d4125d790f4c4402701c728435ea3ec87deac725e6ea63a40c514076a0d9c3f2"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "4050f9725f7014705ef88b4b44b52ad185b02821b599bf7084e872728ed606e3"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "d4125d790f4c4402701c728435ea3ec87deac725e6ea63a40c514076a0d9c3f2"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "4050f9725f7014705ef88b4b44b52ad185b02821b599bf7084e872728ed606e3"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "d4125d790f4c4402701c728435ea3ec87deac725e6ea63a40c514076a0d9c3f2"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "4050f9725f7014705ef88b4b44b52ad185b02821b599bf7084e872728ed606e3"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "d4125d790f4c4402701c728435ea3ec87deac725e6ea63a40c514076a0d9c3f2"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "4050f9725f7014705ef88b4b44b52ad185b02821b599bf7084e872728ed606e3"
+            }
+          ]
+        ],
+        "maximum": null
+      },
+      {
+        "name": "configuration: adjacent edit captures differ",
+        "passed": true,
+        "observed": [
+          "input/1:dd5aa06921cacaf3a0aff221958a0a24ad027d6c6546e0f732b35c36a19b1e90",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:dd5aa06921cacaf3a0aff221958a0a24ad027d6c6546e0f732b35c36a19b1e90",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:dd5aa06921cacaf3a0aff221958a0a24ad027d6c6546e0f732b35c36a19b1e90",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:dd5aa06921cacaf3a0aff221958a0a24ad027d6c6546e0f732b35c36a19b1e90",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:dd5aa06921cacaf3a0aff221958a0a24ad027d6c6546e0f732b35c36a19b1e90",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:dd5aa06921cacaf3a0aff221958a0a24ad027d6c6546e0f732b35c36a19b1e90",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:dd5aa06921cacaf3a0aff221958a0a24ad027d6c6546e0f732b35c36a19b1e90",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:dd5aa06921cacaf3a0aff221958a0a24ad027d6c6546e0f732b35c36a19b1e90",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:dd5aa06921cacaf3a0aff221958a0a24ad027d6c6546e0f732b35c36a19b1e90",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f",
+          "input/1:dd5aa06921cacaf3a0aff221958a0a24ad027d6c6546e0f732b35c36a19b1e90",
+          "input/1:3378345b5dce5b8d7767af5d4271ae7056e33260aa4e8a09e61f07c952baa00f"
+        ],
+        "maximum": null
+      },
+      {
+        "name": "service-side status samples",
+        "passed": true,
+        "observed": 20,
+        "maximum": 20
+      },
+      {
+        "name": "CLI status samples",
+        "passed": true,
+        "observed": 20,
+        "maximum": 20
+      },
+      {
+        "name": "raw status timings are finite nonnegative durations",
+        "passed": true,
+        "observed": {
+          "service": [
+            0.0870920000015758,
+            0.052549000014550984,
+            0.05368700000690296,
+            0.052656999963801354,
+            0.053016999969258904,
+            0.046971999981906265,
+            0.04980099998647347,
+            0.04767100000753999,
+            0.05587099998956546,
+            0.052479000005405396,
+            0.05043399997521192,
+            0.05228399997577071,
+            0.049014999996870756,
+            0.04789400001754984,
+            0.04666300001554191,
+            0.046787000028416514,
+            0.04992999997921288,
+            0.04653900000266731,
+            0.04828399996040389,
+            0.05173599999397993
+          ],
+          "ipc": [
+            14.173230000014883,
+            0.48850400000810623,
+            0.5234550000168383,
+            0.48439300002064556,
+            0.4967629999737255,
+            0.4507579999626614,
+            0.47405600000638515,
+            0.4577569999964908,
+            0.48265099996933714,
+            0.4900459999917075,
+            0.471391000028234,
+            0.4758149999543093,
+            0.46916899998905137,
+            0.41670200001681224,
+            0.47735800000373274,
+            0.4601150000235066,
+            0.5085240000043996,
+            0.4222919999738224,
+            0.4649310000240803,
+            0.47724599996581674
+          ],
+          "cli": [
+            86.411764999968,
+            86.71042000001762,
+            84.16529700002866,
+            85.73764899995876,
+            85.64546899998095,
+            86.45616299996618,
+            83.25145899999188,
+            85.54225200001383,
+            84.67298800003482,
+            84.95784400001867,
+            84.87719699996524,
+            86.26126700005261,
+            84.45874400000321,
+            86.54165199998533,
+            83.94018699997105,
+            85.94306900002994,
+            86.038973000017,
+            84.72659299999941,
+            85.21436300000641,
+            85.46479300002102
+          ],
+          "medianServiceMs": 0.05043399997521192,
+          "medianIpcMs": 0.47724599996581674,
+          "medianCliMs": 85.54225200001383
+        },
+        "maximum": null
+      },
+      {
+        "name": "service median equals raw timings",
+        "passed": true,
+        "observed": 0.05043399997521192,
+        "maximum": null
+      },
+      {
+        "name": "CLI median equals raw timings",
+        "passed": true,
+        "observed": 85.54225200001383,
+        "maximum": null
+      },
+      {
+        "name": "service-side contextStatus median",
+        "passed": true,
+        "observed": 0.05043399997521192,
+        "maximum": 50,
+        "enforcement": "advisory",
+        "targetMet": true
+      },
+      {
+        "name": "end-to-end CLI daemon status median",
+        "passed": true,
+        "observed": 85.54225200001383,
+        "maximum": 300,
+        "enforcement": "advisory",
+        "targetMet": true
+      }
+    ],
+    "performancePolicy": "advisory-by-user-request-2026-09-11",
+    "advisoryMisses": [
+      {
+        "name": "cold median",
+        "passed": true,
+        "observed": 8514.908714000001,
+        "maximum": 6000,
+        "enforcement": "advisory",
+        "targetMet": false
+      },
+      {
+        "name": "unchanged: median",
+        "passed": true,
+        "observed": 2299.2705799999967,
+        "maximum": 1500,
+        "enforcement": "advisory",
+        "targetMet": false
+      },
+      {
+        "name": "readme: median",
+        "passed": true,
+        "observed": 3197.444114999991,
+        "maximum": 1000,
+        "enforcement": "advisory",
+        "targetMet": false
+      },
+      {
+        "name": "exposure: median",
+        "passed": true,
+        "observed": 3308.6008750000037,
+        "maximum": 2500,
+        "enforcement": "advisory",
+        "targetMet": false
+      },
+      {
+        "name": "source: median",
+        "passed": true,
+        "observed": 6350.339185999997,
+        "maximum": 4500,
+        "enforcement": "advisory",
+        "targetMet": false
+      },
+      {
+        "name": "configuration: median",
+        "passed": true,
+        "observed": 5997.556002999947,
+        "maximum": 5500,
+        "enforcement": "advisory",
+        "targetMet": false
+      }
+    ],
+    "measuredAt": "2026-09-11T14:34:43.586Z",
+    "completedAt": "2026-09-11T14:43:11.664Z",
+    "inputs": {
+      "build": {
+        "files": 266,
+        "sha256": "5511bef5097f23f1726ec1d0a397f9d6bfc837968899f433f495e7b187bd3672"
+      },
+      "source": {
+        "root": {
+          "files": 30,
+          "sha256": "fe22f8d2e525d5c419febf78d142ab93703c5712572eadf9dcfd29dc7d274acb"
+        },
+        "owners": {
+          "files": 226,
+          "sha256": "100de0120c5f5255f8975e56ca9d9c19df720eb8d471c029399b5384087e3a2c"
+        }
+      },
+      "manifests": [
+        {
+          "path": "package.json",
+          "sha256": "523760a518361b265794561bd2ce2362339c2e8b0e1436d281d035cc42cb720e"
+        },
+        {
+          "path": "package-lock.json",
+          "sha256": "166bf7c006ed6ff26612cefefc2243112ef48d9f7bc7ba6c2558182a3688e556"
+        },
+        {
+          "path": "module.ramify",
+          "sha256": "a5ed2c145ecc2e77dc8efe03035884f3bad0ef09bb9cb438270f7ec0b6104ac9"
+        },
+        {
+          "path": "docs/plans/iteration-2-resident-verification/scope.md",
+          "sha256": "0a9fd407035661093fb153e2fc06957e5424883a1b9654f3aef8c89fd4e2fa69"
+        }
+      ],
+      "recipes": [
+        {
+          "path": "scripts/measurements/archive.mjs",
+          "sha256": "c060a206efba37e1c88dda392e9240a2df645aa6048353fc58bb3ed6b37e157d"
+        },
+        {
+          "path": "scripts/measurements/common.mjs",
+          "sha256": "4b038b0ad4c6b473e8f64866f9e6b31b30576694d2949d2d03a9a0f6a9199bb4"
+        },
+        {
+          "path": "scripts/measurements/identities.mjs",
+          "sha256": "9a61b897259173b43dc2ef4a90e6095c251af1a8e03edceeb050518af4c314e8"
+        },
+        {
+          "path": "scripts/measurements/materialize.ts",
+          "sha256": "48e05872d21bed60b53516182f84516c7984f1445efe8660141bfa5a58bc4f1f"
+        },
+        {
+          "path": "scripts/measurements/process-observer.mjs",
+          "sha256": "647a7f0f8e37b67af31373f1f8dd2ae73d3b3cb92cfd1a37f1c2c2f99a971001"
+        },
+        {
+          "path": "scripts/measurements/repeated.mjs",
+          "sha256": "678b7c7db72bc51e3c9cf5dd4a7cb8751a166b23ca4ec60ac0e18a2a11f8ae24"
+        },
+        {
+          "path": "scripts/measurements/resident-assertions.mjs",
+          "sha256": "094071dc8e98ed08ad935e5b3ae2b9e4a400542b2ecc9208e1ed3bd3463da744"
+        },
+        {
+          "path": "scripts/measurements/resident-daemon.mjs",
+          "sha256": "eb3bb80e486f8b22e98e65f92c141d5a0c5c4bd76c5da2fd287e95c975a61c2a"
+        },
+        {
+          "path": "scripts/measurements/resident-driver.mjs",
+          "sha256": "f2880a7df71c8e4b96495d3c1dd069a048af403ecf2aeac7362f6eb825ff7923"
+        },
+        {
+          "path": "scripts/measurements/resident-failure.mjs",
+          "sha256": "efbd9fe6808828bd3f1a44c17cf7eef36ecfa60a607add6212aa4ea1c2f36c7a"
+        },
+        {
+          "path": "scripts/measurements/resident-failure.test.mjs",
+          "sha256": "d20fd4e5ffc21517306928a4f787f8f1e32d15567f1d36ca62ef2d80234a842d"
+        },
+        {
+          "path": "scripts/measurements/resident-inputs.mjs",
+          "sha256": "91d12194547132d1e11c903885d8abbb33fc4b3c40c851645c498d1f94559232"
+        },
+        {
+          "path": "scripts/measurements/resident-observer.mjs",
+          "sha256": "b830f927221ee38e776c228652526d74a1f5a4d91df0b8ccac87de11fd046185"
+        },
+        {
+          "path": "scripts/measurements/resident-plan.mjs",
+          "sha256": "baaa05e9045c357503334c95dbc297ec9f21e3eb05cefdd60b938d8f97b4f6dd"
+        },
+        {
+          "path": "scripts/measurements/resident-prerequisites.mjs",
+          "sha256": "17bcfd87818aa1c21c21bc50439aa319f60e4da13605c04f83fb3d498563ecf6"
+        },
+        {
+          "path": "scripts/measurements/resident-reuse.mjs",
+          "sha256": "5bd661ad8d77c6c7cfd4d369cf327956cf6d13da5dcb645a38b6182f55286c5d"
+        },
+        {
+          "path": "scripts/measurements/resident-reuse.test.mjs",
+          "sha256": "5dd8419bade46d6b05be330085591ea30618439ed78e5da4e39d33fd90e58852"
+        },
+        {
+          "path": "scripts/measurements/resident-worker.mjs",
+          "sha256": "d93ac22951ba98008a1f4608cbd914a86e5bfcc1dd8aa87d2429b77077659993"
+        },
+        {
+          "path": "scripts/measurements/resident-workloads.mjs",
+          "sha256": "406d74e60f36a4859ca8c7f43eb8cf1a16c29b4240968c6d9d2a668d9b55d022"
+        },
+        {
+          "path": "scripts/measurements/resident.mjs",
+          "sha256": "2714667c109b6976859b5bf52eff5761a8f31d5d00a3d26b044b7b10ae04e64b"
+        },
+        {
+          "path": "scripts/measurements/run.mjs",
+          "sha256": "0a2b14a867f9ff57660240c65eb912da701892778e440fec3d6579aaf882c5ee"
+        },
+        {
+          "path": "scripts/measurements/session-setup.mjs",
+          "sha256": "27699b0379a424a5017f65e331e0c49754c872186c31323f1626888951651c17"
+        },
+        {
+          "path": "scripts/measurements/verify-resident-evidence.mjs",
+          "sha256": "fea2cdbec6cd7e8048364416fc87b4ffbaece607a75088eb17815d22e5adfd15"
+        },
+        {
+          "path": "scripts/measurements/verify-tooling.mjs",
+          "sha256": "4f786b7407a42f0bce11a8f089b50e2d5eaf7fc787451c8dbd86bdc8fecd06d3"
+        }
+      ],
+      "fixtureGenerator": {
+        "path": "scripts/probes/fixtures/synthetic-owners.ts",
+        "sha256": "6176043d908baee456c8a7a56f1ba3946e04350f61c76dad082df5c917d3ddee"
+      },
+      "reference": {
+        "files": 96,
+        "sha256": "52b291488fd5894ae8ff826f29c461aeecca4b83ea80a31b0d8a3751ef5f2bbb"
+      }
+    },
+    "samples": {
+      "processes": 1246,
+      "controller": 9539
+    },
+    "compilerStateTrigger": {
+      "status": "not-evaluated",
+      "reason": "Source-edit workloads have not both completed."
+    },
+    "provenance": {
+      "artifact": "/tmp/worktrees/ramify-67e9dd0f/iteration-2-resident-verification/scripts/measurements/results/resident-2026-09-11T14-34-43.586Z-c4a3d367-410e-4b9c-a9ea-dabe6f074295.json.gz",
+      "fileSha256": "f5d57ff39fab3a3ac6968b206e88ef1771626148ec3ec0ce6480c4159a76cf8b",
+      "rawSha256": "0046c732ec3a09b4463254695d4d2d4de648d70cba3683978e948d79fa8e5630",
+      "originalStatus": "incomplete",
+      "originalInterrupted": true,
+      "compatibility": {
+        "authorization": "user-approved-blast-radius-reuse-2026-09-11",
+        "policyReference": "User-approved evidence blast-radius policy, 2026-09-11",
+        "sourceTestChanges": [
+          {
+            "path": "subs/analysis/subs/model/src/tests/decision-lookups.test.ts",
+            "before": "c99516810d993fb3822efb13ff143db3823c5d5461828df982c0091b5d7507de",
+            "after": "4d90d134c72d70e3dada340986f729b3eb2b5c7a5c747bff08437f271de7bf5f"
+          }
+        ],
+        "orchestrationChanges": [
+          {
+            "path": "scripts/measurements/resident-composition.mjs",
+            "before": null,
+            "after": "9d6ce5b2707c74800ea9eda793a968beed6a076c9e18d1ac3e066cb36cd505b7"
+          },
+          {
+            "path": "scripts/measurements/resident-composition.test.mjs",
+            "before": null,
+            "after": "5f46d608b45e9d230aef003d35d033b9338edd3123f9463a20c6e7cca81cba89"
+          },
+          {
+            "path": "scripts/measurements/verify-resident-evidence.mjs",
+            "before": "fea2cdbec6cd7e8048364416fc87b4ffbaece607a75088eb17815d22e5adfd15",
+            "after": "91abb06c2e50ed022489714e30031e8df9abdfe91436fe6fc7872cf06d5816c8"
+          }
+        ],
+        "reasons": {
+          "subs/analysis/subs/model/src/tests/decision-lookups.test.ts": "Namespace spy changed to named-import module mock only in an owned test. No production file or compiled build bytes changed.",
+          "scripts/measurements/resident-composition.mjs": "Archive composition/verification infrastructure only, not imported by the unchanged measurement controller, workers or runtime.",
+          "scripts/measurements/resident-composition.test.mjs": "Archive composition/verification infrastructure only, not imported by the unchanged measurement controller, workers or runtime.",
+          "scripts/measurements/verify-resident-evidence.mjs": "Archive composition/verification infrastructure only, not imported by the unchanged measurement controller, workers or runtime."
+        }
+      }
+    }
+  },
+  {
+    "id": "I2-29:cold-warm-broad-hundred",
+    "passed": true,
+    "assertions": [
+      {
+        "name": "five independent cold starts",
+        "passed": true,
+        "observed": 5,
+        "maximum": 5
+      },
+      {
+        "name": "cold starts use five daemon instances",
+        "passed": true,
+        "observed": [
+          "e033658c-67c1-4616-9dab-de6e88c9f997",
+          "3b27d84e-96d6-423f-ba56-673462158740",
+          "4bc068ff-c465-4fb1-bee9-1d629b22006f",
+          "2318a137-2f12-4449-b3f2-6d537460ce56",
+          "baae268c-ae56-44c0-99b8-e6b7bae7e12b"
+        ],
+        "maximum": null
+      },
+      {
+        "name": "cold timings are actual positive durations",
+        "passed": true,
+        "observed": [
+          8779.595661,
+          8780.232113,
+          8369.687307,
+          8417.270106000004,
+          8818.262834000001
+        ],
+        "maximum": null
+      },
+      {
+        "name": "cold median",
+        "passed": true,
+        "observed": 8779.595661,
+        "maximum": 16000,
+        "enforcement": "advisory",
+        "targetMet": true
+      },
+      {
+        "name": "unchanged: twenty actual cycles",
+        "passed": true,
+        "observed": 20,
+        "maximum": 20
+      },
+      {
+        "name": "unchanged: positive command durations",
+        "passed": true,
+        "observed": [
+          2909.3779189999987,
+          2748.1126250000016,
+          2760.5981850000026,
+          2908.9145979999957,
+          2801.184095000004,
+          2798.7558770000032,
+          2782.5249810000096,
+          2750.53082,
+          2803.697628000009,
+          2749.140846999988,
+          2782.696763,
+          3139.776600000012,
+          2751.3809000000037,
+          2847.032036999997,
+          3109.9293279999983,
+          3065.4537509999936,
+          3013.541366000005,
+          3158.597345000002,
+          3000.0433279999997,
+          3014.5741550000093
+        ],
+        "maximum": null
+      },
+      {
+        "name": "unchanged: median",
+        "passed": true,
+        "observed": 2847.032036999997,
+        "maximum": 3000,
+        "enforcement": "advisory",
+        "targetMet": true
+      },
+      {
+        "name": "unchanged: recorded completed stage reuse",
+        "passed": true,
+        "observed": [
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ]
+        ],
+        "maximum": null
+      },
+      {
+        "name": "unchanged: stage reuse is backed by the publication and raw increment",
+        "passed": true,
+        "observed": 20,
+        "maximum": null
+      },
+      {
+        "name": "unchanged cycles preserve one captured identity",
+        "passed": true,
+        "observed": [
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95"
+        ],
+        "maximum": null
+      },
+      {
+        "name": "readme: twenty actual cycles",
+        "passed": true,
+        "observed": 20,
+        "maximum": 20
+      },
+      {
+        "name": "readme: positive command durations",
+        "passed": true,
+        "observed": [
+          4855.61387999999,
+          4805.285067000004,
+          4862.197765000004,
+          5158.490094000008,
+          5156.179096999986,
+          5109.007121000002,
+          4705.307958999998,
+          4683.243652000005,
+          4861.050597000023,
+          4708.2858580000175,
+          4746.3257830000075,
+          4709.417389000009,
+          4700.343281000009,
+          5308.577387999976,
+          5098.855303999997,
+          5035.401438000001,
+          5088.097691999981,
+          5605.946866000013,
+          5116.734733000019,
+          5105.916715999978
+        ],
+        "maximum": null
+      },
+      {
+        "name": "readme: median",
+        "passed": true,
+        "observed": 5035.401438000001,
+        "maximum": 2000,
+        "enforcement": "advisory",
+        "targetMet": false
+      },
+      {
+        "name": "readme: recorded completed stage reuse",
+        "passed": true,
+        "observed": [
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ],
+          [
+            "parse",
+            "configuration",
+            "catalog",
+            "link",
+            "access",
+            "decide"
+          ]
+        ],
+        "maximum": null
+      },
+      {
+        "name": "readme: stage reuse is backed by the publication and raw increment",
+        "passed": true,
+        "observed": 20,
+        "maximum": null
+      },
+      {
+        "name": "readme: every edited hash is captured",
+        "passed": true,
+        "observed": [
+          [
+            {
+              "path": "subs/m001/README.md",
+              "sha256": "8da574068593964ec4331e79f451ebae1590974c17563362dd4e4c59c1d3d785"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/README.md",
+              "sha256": "a21a34645f38175940b3a2fc4f7fcca03554513f7f826f86b238122f50109338"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/README.md",
+              "sha256": "8da574068593964ec4331e79f451ebae1590974c17563362dd4e4c59c1d3d785"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/README.md",
+              "sha256": "a21a34645f38175940b3a2fc4f7fcca03554513f7f826f86b238122f50109338"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/README.md",
+              "sha256": "8da574068593964ec4331e79f451ebae1590974c17563362dd4e4c59c1d3d785"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/README.md",
+              "sha256": "a21a34645f38175940b3a2fc4f7fcca03554513f7f826f86b238122f50109338"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/README.md",
+              "sha256": "8da574068593964ec4331e79f451ebae1590974c17563362dd4e4c59c1d3d785"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/README.md",
+              "sha256": "a21a34645f38175940b3a2fc4f7fcca03554513f7f826f86b238122f50109338"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/README.md",
+              "sha256": "8da574068593964ec4331e79f451ebae1590974c17563362dd4e4c59c1d3d785"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/README.md",
+              "sha256": "a21a34645f38175940b3a2fc4f7fcca03554513f7f826f86b238122f50109338"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/README.md",
+              "sha256": "8da574068593964ec4331e79f451ebae1590974c17563362dd4e4c59c1d3d785"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/README.md",
+              "sha256": "a21a34645f38175940b3a2fc4f7fcca03554513f7f826f86b238122f50109338"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/README.md",
+              "sha256": "8da574068593964ec4331e79f451ebae1590974c17563362dd4e4c59c1d3d785"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/README.md",
+              "sha256": "a21a34645f38175940b3a2fc4f7fcca03554513f7f826f86b238122f50109338"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/README.md",
+              "sha256": "8da574068593964ec4331e79f451ebae1590974c17563362dd4e4c59c1d3d785"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/README.md",
+              "sha256": "a21a34645f38175940b3a2fc4f7fcca03554513f7f826f86b238122f50109338"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/README.md",
+              "sha256": "8da574068593964ec4331e79f451ebae1590974c17563362dd4e4c59c1d3d785"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/README.md",
+              "sha256": "a21a34645f38175940b3a2fc4f7fcca03554513f7f826f86b238122f50109338"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/README.md",
+              "sha256": "8da574068593964ec4331e79f451ebae1590974c17563362dd4e4c59c1d3d785"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/README.md",
+              "sha256": "a21a34645f38175940b3a2fc4f7fcca03554513f7f826f86b238122f50109338"
+            }
+          ]
+        ],
+        "maximum": null
+      },
+      {
+        "name": "readme: adjacent edit captures differ",
+        "passed": true,
+        "observed": [
+          "input/1:0c85be30bf4fc8c6df54b596cb464c9a2b17bba252b5e251c70e4f04266889ae",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:0c85be30bf4fc8c6df54b596cb464c9a2b17bba252b5e251c70e4f04266889ae",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:0c85be30bf4fc8c6df54b596cb464c9a2b17bba252b5e251c70e4f04266889ae",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:0c85be30bf4fc8c6df54b596cb464c9a2b17bba252b5e251c70e4f04266889ae",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:0c85be30bf4fc8c6df54b596cb464c9a2b17bba252b5e251c70e4f04266889ae",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:0c85be30bf4fc8c6df54b596cb464c9a2b17bba252b5e251c70e4f04266889ae",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:0c85be30bf4fc8c6df54b596cb464c9a2b17bba252b5e251c70e4f04266889ae",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:0c85be30bf4fc8c6df54b596cb464c9a2b17bba252b5e251c70e4f04266889ae",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:0c85be30bf4fc8c6df54b596cb464c9a2b17bba252b5e251c70e4f04266889ae",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:0c85be30bf4fc8c6df54b596cb464c9a2b17bba252b5e251c70e4f04266889ae",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95"
+        ],
+        "maximum": null
+      },
+      {
+        "name": "exposure: twenty actual cycles",
+        "passed": true,
+        "observed": 20,
+        "maximum": 20
+      },
+      {
+        "name": "exposure: positive command durations",
+        "passed": true,
+        "observed": [
+          5484.659625,
+          5564.596707999997,
+          5537.401848999987,
+          5483.454748999997,
+          5485.198975000007,
+          5497.29738600002,
+          6060.569610999984,
+          5700.316927999986,
+          5548.16640799999,
+          5517.105446999951,
+          5495.224961999978,
+          5744.645821999991,
+          5662.93817800004,
+          5403.687573000032,
+          5556.242931999965,
+          5347.609854999988,
+          5495.889352999977,
+          5410.103828000021,
+          5646.5716679999605,
+          5347.090854000009
+        ],
+        "maximum": null
+      },
+      {
+        "name": "exposure: median",
+        "passed": true,
+        "observed": 5517.105446999951,
+        "maximum": 5000,
+        "enforcement": "advisory",
+        "targetMet": false
+      },
+      {
+        "name": "exposure: recorded completed stage reuse",
+        "passed": true,
+        "observed": [
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ],
+          [
+            "configuration",
+            "metadata",
+            "catalog",
+            "access"
+          ]
+        ],
+        "maximum": null
+      },
+      {
+        "name": "exposure: stage reuse is backed by the publication and raw increment",
+        "passed": true,
+        "observed": 20,
+        "maximum": null
+      },
+      {
+        "name": "exposure: every edited hash is captured",
+        "passed": true,
+        "observed": [
+          [
+            {
+              "path": "subs/m001/module.ramify",
+              "sha256": "b2b6ad2ff2b0ecf7dffebcde0bcace080b07acbdf498037f03ec1a9be034d372"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/module.ramify",
+              "sha256": "3c27cb5a5fa41b2fa49dfb9d37f7ad1f61a9a79d374690525615c25a9e36413f"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/module.ramify",
+              "sha256": "b2b6ad2ff2b0ecf7dffebcde0bcace080b07acbdf498037f03ec1a9be034d372"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/module.ramify",
+              "sha256": "3c27cb5a5fa41b2fa49dfb9d37f7ad1f61a9a79d374690525615c25a9e36413f"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/module.ramify",
+              "sha256": "b2b6ad2ff2b0ecf7dffebcde0bcace080b07acbdf498037f03ec1a9be034d372"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/module.ramify",
+              "sha256": "3c27cb5a5fa41b2fa49dfb9d37f7ad1f61a9a79d374690525615c25a9e36413f"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/module.ramify",
+              "sha256": "b2b6ad2ff2b0ecf7dffebcde0bcace080b07acbdf498037f03ec1a9be034d372"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/module.ramify",
+              "sha256": "3c27cb5a5fa41b2fa49dfb9d37f7ad1f61a9a79d374690525615c25a9e36413f"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/module.ramify",
+              "sha256": "b2b6ad2ff2b0ecf7dffebcde0bcace080b07acbdf498037f03ec1a9be034d372"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/module.ramify",
+              "sha256": "3c27cb5a5fa41b2fa49dfb9d37f7ad1f61a9a79d374690525615c25a9e36413f"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/module.ramify",
+              "sha256": "b2b6ad2ff2b0ecf7dffebcde0bcace080b07acbdf498037f03ec1a9be034d372"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/module.ramify",
+              "sha256": "3c27cb5a5fa41b2fa49dfb9d37f7ad1f61a9a79d374690525615c25a9e36413f"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/module.ramify",
+              "sha256": "b2b6ad2ff2b0ecf7dffebcde0bcace080b07acbdf498037f03ec1a9be034d372"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/module.ramify",
+              "sha256": "3c27cb5a5fa41b2fa49dfb9d37f7ad1f61a9a79d374690525615c25a9e36413f"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/module.ramify",
+              "sha256": "b2b6ad2ff2b0ecf7dffebcde0bcace080b07acbdf498037f03ec1a9be034d372"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/module.ramify",
+              "sha256": "3c27cb5a5fa41b2fa49dfb9d37f7ad1f61a9a79d374690525615c25a9e36413f"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/module.ramify",
+              "sha256": "b2b6ad2ff2b0ecf7dffebcde0bcace080b07acbdf498037f03ec1a9be034d372"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/module.ramify",
+              "sha256": "3c27cb5a5fa41b2fa49dfb9d37f7ad1f61a9a79d374690525615c25a9e36413f"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/module.ramify",
+              "sha256": "b2b6ad2ff2b0ecf7dffebcde0bcace080b07acbdf498037f03ec1a9be034d372"
+            }
+          ],
+          [
+            {
+              "path": "subs/m001/module.ramify",
+              "sha256": "3c27cb5a5fa41b2fa49dfb9d37f7ad1f61a9a79d374690525615c25a9e36413f"
+            }
+          ]
+        ],
+        "maximum": null
+      },
+      {
+        "name": "exposure: adjacent edit captures differ",
+        "passed": true,
+        "observed": [
+          "input/1:5cfbd0f2a99be4d1f0bc3123eb88c8c2a7bf4feabda98453f2c9cefd2ec9353a",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:5cfbd0f2a99be4d1f0bc3123eb88c8c2a7bf4feabda98453f2c9cefd2ec9353a",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:5cfbd0f2a99be4d1f0bc3123eb88c8c2a7bf4feabda98453f2c9cefd2ec9353a",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:5cfbd0f2a99be4d1f0bc3123eb88c8c2a7bf4feabda98453f2c9cefd2ec9353a",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:5cfbd0f2a99be4d1f0bc3123eb88c8c2a7bf4feabda98453f2c9cefd2ec9353a",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:5cfbd0f2a99be4d1f0bc3123eb88c8c2a7bf4feabda98453f2c9cefd2ec9353a",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:5cfbd0f2a99be4d1f0bc3123eb88c8c2a7bf4feabda98453f2c9cefd2ec9353a",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:5cfbd0f2a99be4d1f0bc3123eb88c8c2a7bf4feabda98453f2c9cefd2ec9353a",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:5cfbd0f2a99be4d1f0bc3123eb88c8c2a7bf4feabda98453f2c9cefd2ec9353a",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:5cfbd0f2a99be4d1f0bc3123eb88c8c2a7bf4feabda98453f2c9cefd2ec9353a",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95"
+        ],
+        "maximum": null
+      },
+      {
+        "name": "source: twenty actual cycles",
+        "passed": true,
+        "observed": 20,
+        "maximum": 20
+      },
+      {
+        "name": "source: positive command durations",
+        "passed": true,
+        "observed": [
+          8759.176939999976,
+          9158.587254000013,
+          8865.340324999997,
+          8764.504659000027,
+          9009.645667999983,
+          8868.97483599995,
+          9159.194420000014,
+          8845.199281000008,
+          10496.143587000028,
+          9645.100321000034,
+          9600.272175999999,
+          9756.976533000008,
+          9661.002959000005,
+          9653.792056999984,
+          9412.891806000029,
+          9656.116194000002,
+          13459.911369999987,
+          13259.805553999962,
+          12845.829415999993,
+          11963.233537000022
+        ],
+        "maximum": null
+      },
+      {
+        "name": "source: median",
+        "passed": true,
+        "observed": 9645.100321000034,
+        "maximum": 8000,
+        "enforcement": "advisory",
+        "targetMet": false
+      },
+      {
+        "name": "source: recorded completed stage reuse",
+        "passed": true,
+        "observed": [
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ],
+          [
+            "parse",
+            "configuration",
+            "metadata"
+          ]
+        ],
+        "maximum": null
+      },
+      {
+        "name": "source: stage reuse is backed by the publication and raw increment",
+        "passed": true,
+        "observed": 20,
+        "maximum": null
+      },
+      {
+        "name": "source: every edited hash is captured",
+        "passed": true,
+        "observed": [
+          [
+            {
+              "path": "src/impl0.ts",
+              "sha256": "77178d65a2c969e1e0a4e02ed027950caef129e031b3746d6483f9190aa8c612"
+            }
+          ],
+          [
+            {
+              "path": "src/impl0.ts",
+              "sha256": "c15cb8a68b9586f0457677e41380ffd3d1cf5fd56f210ae20873b378e0dbde11"
+            }
+          ],
+          [
+            {
+              "path": "src/impl0.ts",
+              "sha256": "77178d65a2c969e1e0a4e02ed027950caef129e031b3746d6483f9190aa8c612"
+            }
+          ],
+          [
+            {
+              "path": "src/impl0.ts",
+              "sha256": "c15cb8a68b9586f0457677e41380ffd3d1cf5fd56f210ae20873b378e0dbde11"
+            }
+          ],
+          [
+            {
+              "path": "src/impl0.ts",
+              "sha256": "77178d65a2c969e1e0a4e02ed027950caef129e031b3746d6483f9190aa8c612"
+            }
+          ],
+          [
+            {
+              "path": "src/impl0.ts",
+              "sha256": "c15cb8a68b9586f0457677e41380ffd3d1cf5fd56f210ae20873b378e0dbde11"
+            }
+          ],
+          [
+            {
+              "path": "src/impl0.ts",
+              "sha256": "77178d65a2c969e1e0a4e02ed027950caef129e031b3746d6483f9190aa8c612"
+            }
+          ],
+          [
+            {
+              "path": "src/impl0.ts",
+              "sha256": "c15cb8a68b9586f0457677e41380ffd3d1cf5fd56f210ae20873b378e0dbde11"
+            }
+          ],
+          [
+            {
+              "path": "src/impl0.ts",
+              "sha256": "77178d65a2c969e1e0a4e02ed027950caef129e031b3746d6483f9190aa8c612"
+            }
+          ],
+          [
+            {
+              "path": "src/impl0.ts",
+              "sha256": "c15cb8a68b9586f0457677e41380ffd3d1cf5fd56f210ae20873b378e0dbde11"
+            }
+          ],
+          [
+            {
+              "path": "src/impl0.ts",
+              "sha256": "77178d65a2c969e1e0a4e02ed027950caef129e031b3746d6483f9190aa8c612"
+            }
+          ],
+          [
+            {
+              "path": "src/impl0.ts",
+              "sha256": "c15cb8a68b9586f0457677e41380ffd3d1cf5fd56f210ae20873b378e0dbde11"
+            }
+          ],
+          [
+            {
+              "path": "src/impl0.ts",
+              "sha256": "77178d65a2c969e1e0a4e02ed027950caef129e031b3746d6483f9190aa8c612"
+            }
+          ],
+          [
+            {
+              "path": "src/impl0.ts",
+              "sha256": "c15cb8a68b9586f0457677e41380ffd3d1cf5fd56f210ae20873b378e0dbde11"
+            }
+          ],
+          [
+            {
+              "path": "src/impl0.ts",
+              "sha256": "77178d65a2c969e1e0a4e02ed027950caef129e031b3746d6483f9190aa8c612"
+            }
+          ],
+          [
+            {
+              "path": "src/impl0.ts",
+              "sha256": "c15cb8a68b9586f0457677e41380ffd3d1cf5fd56f210ae20873b378e0dbde11"
+            }
+          ],
+          [
+            {
+              "path": "src/impl0.ts",
+              "sha256": "77178d65a2c969e1e0a4e02ed027950caef129e031b3746d6483f9190aa8c612"
+            }
+          ],
+          [
+            {
+              "path": "src/impl0.ts",
+              "sha256": "c15cb8a68b9586f0457677e41380ffd3d1cf5fd56f210ae20873b378e0dbde11"
+            }
+          ],
+          [
+            {
+              "path": "src/impl0.ts",
+              "sha256": "77178d65a2c969e1e0a4e02ed027950caef129e031b3746d6483f9190aa8c612"
+            }
+          ],
+          [
+            {
+              "path": "src/impl0.ts",
+              "sha256": "c15cb8a68b9586f0457677e41380ffd3d1cf5fd56f210ae20873b378e0dbde11"
+            }
+          ]
+        ],
+        "maximum": null
+      },
+      {
+        "name": "source: adjacent edit captures differ",
+        "passed": true,
+        "observed": [
+          "input/1:22913f0b132b6e73e1f931462e61d4d9d3e62e9d0a0a444c91f009d1508906f4",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:22913f0b132b6e73e1f931462e61d4d9d3e62e9d0a0a444c91f009d1508906f4",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:22913f0b132b6e73e1f931462e61d4d9d3e62e9d0a0a444c91f009d1508906f4",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:22913f0b132b6e73e1f931462e61d4d9d3e62e9d0a0a444c91f009d1508906f4",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:22913f0b132b6e73e1f931462e61d4d9d3e62e9d0a0a444c91f009d1508906f4",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:22913f0b132b6e73e1f931462e61d4d9d3e62e9d0a0a444c91f009d1508906f4",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:22913f0b132b6e73e1f931462e61d4d9d3e62e9d0a0a444c91f009d1508906f4",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:22913f0b132b6e73e1f931462e61d4d9d3e62e9d0a0a444c91f009d1508906f4",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:22913f0b132b6e73e1f931462e61d4d9d3e62e9d0a0a444c91f009d1508906f4",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:22913f0b132b6e73e1f931462e61d4d9d3e62e9d0a0a444c91f009d1508906f4",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95"
+        ],
+        "maximum": null
+      },
+      {
+        "name": "configuration: twenty actual cycles",
+        "passed": true,
+        "observed": 20,
+        "maximum": 20
+      },
+      {
+        "name": "configuration: positive command durations",
+        "passed": true,
+        "observed": [
+          13522.880246999906,
+          12817.189758999972,
+          12624.104759000009,
+          12673.493543999968,
+          12274.33516300004,
+          12118.18577900005,
+          11866.999175000004,
+          12336.470374999917,
+          12116.022694000043,
+          12486.274990999955,
+          10970.043485000031,
+          11666.539744000067,
+          10892.533837999916,
+          10596.657076000003,
+          11505.706656000111,
+          11522.702013000031,
+          10953.779472999973,
+          11066.482120000059,
+          10914.997829,
+          11042.413589000003
+        ],
+        "maximum": null
+      },
+      {
+        "name": "configuration: median",
+        "passed": true,
+        "observed": 11866.999175000004,
+        "maximum": 12000,
+        "enforcement": "advisory",
+        "targetMet": true
+      },
+      {
+        "name": "configuration: recorded completed stage reuse",
+        "passed": true,
+        "observed": [
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ],
+          [
+            "parse",
+            "metadata"
+          ]
+        ],
+        "maximum": null
+      },
+      {
+        "name": "configuration: stage reuse is backed by the publication and raw increment",
+        "passed": true,
+        "observed": 20,
+        "maximum": null
+      },
+      {
+        "name": "configuration: every edited hash is captured",
+        "passed": true,
+        "observed": [
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "61fa457b8c34228fd8db88fc838daa62fffc1580a841a8479987ffcd2686a511"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "da0993c79f25dbbf3dea90e4cc0216dda47baf80d04fa9cc9e166c3aa6412bc9"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "61fa457b8c34228fd8db88fc838daa62fffc1580a841a8479987ffcd2686a511"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "da0993c79f25dbbf3dea90e4cc0216dda47baf80d04fa9cc9e166c3aa6412bc9"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "61fa457b8c34228fd8db88fc838daa62fffc1580a841a8479987ffcd2686a511"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "da0993c79f25dbbf3dea90e4cc0216dda47baf80d04fa9cc9e166c3aa6412bc9"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "61fa457b8c34228fd8db88fc838daa62fffc1580a841a8479987ffcd2686a511"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "da0993c79f25dbbf3dea90e4cc0216dda47baf80d04fa9cc9e166c3aa6412bc9"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "61fa457b8c34228fd8db88fc838daa62fffc1580a841a8479987ffcd2686a511"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "da0993c79f25dbbf3dea90e4cc0216dda47baf80d04fa9cc9e166c3aa6412bc9"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "61fa457b8c34228fd8db88fc838daa62fffc1580a841a8479987ffcd2686a511"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "da0993c79f25dbbf3dea90e4cc0216dda47baf80d04fa9cc9e166c3aa6412bc9"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "61fa457b8c34228fd8db88fc838daa62fffc1580a841a8479987ffcd2686a511"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "da0993c79f25dbbf3dea90e4cc0216dda47baf80d04fa9cc9e166c3aa6412bc9"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "61fa457b8c34228fd8db88fc838daa62fffc1580a841a8479987ffcd2686a511"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "da0993c79f25dbbf3dea90e4cc0216dda47baf80d04fa9cc9e166c3aa6412bc9"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "61fa457b8c34228fd8db88fc838daa62fffc1580a841a8479987ffcd2686a511"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "da0993c79f25dbbf3dea90e4cc0216dda47baf80d04fa9cc9e166c3aa6412bc9"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "61fa457b8c34228fd8db88fc838daa62fffc1580a841a8479987ffcd2686a511"
+            }
+          ],
+          [
+            {
+              "path": "tsconfig.json",
+              "sha256": "da0993c79f25dbbf3dea90e4cc0216dda47baf80d04fa9cc9e166c3aa6412bc9"
+            }
+          ]
+        ],
+        "maximum": null
+      },
+      {
+        "name": "configuration: adjacent edit captures differ",
+        "passed": true,
+        "observed": [
+          "input/1:c6cc5eecc79d6c3f5cec2782146d1a92b37460b05f1347d0b5a3a30aecaba4b9",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:c6cc5eecc79d6c3f5cec2782146d1a92b37460b05f1347d0b5a3a30aecaba4b9",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:c6cc5eecc79d6c3f5cec2782146d1a92b37460b05f1347d0b5a3a30aecaba4b9",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:c6cc5eecc79d6c3f5cec2782146d1a92b37460b05f1347d0b5a3a30aecaba4b9",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:c6cc5eecc79d6c3f5cec2782146d1a92b37460b05f1347d0b5a3a30aecaba4b9",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:c6cc5eecc79d6c3f5cec2782146d1a92b37460b05f1347d0b5a3a30aecaba4b9",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:c6cc5eecc79d6c3f5cec2782146d1a92b37460b05f1347d0b5a3a30aecaba4b9",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:c6cc5eecc79d6c3f5cec2782146d1a92b37460b05f1347d0b5a3a30aecaba4b9",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:c6cc5eecc79d6c3f5cec2782146d1a92b37460b05f1347d0b5a3a30aecaba4b9",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95",
+          "input/1:c6cc5eecc79d6c3f5cec2782146d1a92b37460b05f1347d0b5a3a30aecaba4b9",
+          "input/1:257afd3869488a042bba16a634ef7ed4118a8494531e3d441a7b1e4ce05dab95"
+        ],
+        "maximum": null
+      },
+      {
+        "name": "service-side status samples",
+        "passed": true,
+        "observed": 20,
+        "maximum": 20
+      },
+      {
+        "name": "CLI status samples",
+        "passed": true,
+        "observed": 20,
+        "maximum": 20
+      },
+      {
+        "name": "raw status timings are finite nonnegative durations",
+        "passed": true,
+        "observed": {
+          "service": [
+            0.10228899994399399,
+            0.06911500007845461,
+            0.06108599994331598,
+            0.06539499992504716,
+            0.07845300005283207,
+            0.08890800003428012,
+            0.0732079999288544,
+            0.05761199991684407,
+            0.06120200001168996,
+            0.050724999979138374,
+            0.057511000079102814,
+            0.05093399994075298,
+            0.06409500003792346,
+            0.05284500005654991,
+            0.0658640000037849,
+            0.05061099992599338,
+            0.06120899994857609,
+            0.06203200004529208,
+            0.05164399999193847,
+            0.053395999944768846
+          ],
+          "ipc": [
+            17.266444000066258,
+            0.581990999984555,
+            0.7833040000405163,
+            0.533519999939017,
+            0.6637529999716207,
+            0.7785650000441819,
+            0.6205589999444783,
+            0.5669579999521375,
+            0.5915180000010878,
+            0.5981069999979809,
+            0.550453000003472,
+            0.5249670000048354,
+            0.5606610000832006,
+            0.5463040000759065,
+            0.6086730000097305,
+            0.5270350000355393,
+            0.6181949999881908,
+            0.6108849999727681,
+            0.47755599999800324,
+            0.47274200001265854
+          ],
+          "cli": [
+            100.63236499996856,
+            91.81073899997864,
+            95.13384100003168,
+            85.83940300007816,
+            89.47638000000734,
+            95.2399860000005,
+            104.1547749999445,
+            90.38127699994948,
+            106.58191000006627,
+            99.07752399996389,
+            86.76140099996701,
+            98.99789300002158,
+            94.88040400005411,
+            94.94886700005736,
+            86.73254500003532,
+            109.99750800000038,
+            87.82656399998814,
+            90.57304599997588,
+            88.18941500002984,
+            100.85199700004887
+          ],
+          "medianServiceMs": 0.06120899994857609,
+          "medianIpcMs": 0.5915180000010878,
+          "medianCliMs": 94.94886700005736
+        },
+        "maximum": null
+      },
+      {
+        "name": "service median equals raw timings",
+        "passed": true,
+        "observed": 0.06120899994857609,
+        "maximum": null
+      },
+      {
+        "name": "CLI median equals raw timings",
+        "passed": true,
+        "observed": 94.94886700005736,
+        "maximum": null
+      },
+      {
+        "name": "service-side contextStatus median",
+        "passed": true,
+        "observed": 0.06120899994857609,
+        "maximum": 50,
+        "enforcement": "advisory",
+        "targetMet": true
+      },
+      {
+        "name": "end-to-end CLI daemon status median",
+        "passed": true,
+        "observed": 94.94886700005736,
+        "maximum": 300,
+        "enforcement": "advisory",
+        "targetMet": true
+      }
+    ],
+    "performancePolicy": "advisory-by-user-request-2026-09-11",
+    "advisoryMisses": [
+      {
+        "name": "readme: median",
+        "passed": true,
+        "observed": 5035.401438000001,
+        "maximum": 2000,
+        "enforcement": "advisory",
+        "targetMet": false
+      },
+      {
+        "name": "exposure: median",
+        "passed": true,
+        "observed": 5517.105446999951,
+        "maximum": 5000,
+        "enforcement": "advisory",
+        "targetMet": false
+      },
+      {
+        "name": "source: median",
+        "passed": true,
+        "observed": 9645.100321000034,
+        "maximum": 8000,
+        "enforcement": "advisory",
+        "targetMet": false
+      }
+    ],
+    "measuredAt": "2026-09-11T14:34:43.586Z",
+    "completedAt": "2026-09-11T14:56:16.464Z",
+    "inputs": {
+      "build": {
+        "files": 266,
+        "sha256": "5511bef5097f23f1726ec1d0a397f9d6bfc837968899f433f495e7b187bd3672"
+      },
+      "source": {
+        "root": {
+          "files": 30,
+          "sha256": "fe22f8d2e525d5c419febf78d142ab93703c5712572eadf9dcfd29dc7d274acb"
+        },
+        "owners": {
+          "files": 226,
+          "sha256": "100de0120c5f5255f8975e56ca9d9c19df720eb8d471c029399b5384087e3a2c"
+        }
+      },
+      "manifests": [
+        {
+          "path": "package.json",
+          "sha256": "523760a518361b265794561bd2ce2362339c2e8b0e1436d281d035cc42cb720e"
+        },
+        {
+          "path": "package-lock.json",
+          "sha256": "166bf7c006ed6ff26612cefefc2243112ef48d9f7bc7ba6c2558182a3688e556"
+        },
+        {
+          "path": "module.ramify",
+          "sha256": "a5ed2c145ecc2e77dc8efe03035884f3bad0ef09bb9cb438270f7ec0b6104ac9"
+        },
+        {
+          "path": "docs/plans/iteration-2-resident-verification/scope.md",
+          "sha256": "0a9fd407035661093fb153e2fc06957e5424883a1b9654f3aef8c89fd4e2fa69"
+        }
+      ],
+      "recipes": [
+        {
+          "path": "scripts/measurements/archive.mjs",
+          "sha256": "c060a206efba37e1c88dda392e9240a2df645aa6048353fc58bb3ed6b37e157d"
+        },
+        {
+          "path": "scripts/measurements/common.mjs",
+          "sha256": "4b038b0ad4c6b473e8f64866f9e6b31b30576694d2949d2d03a9a0f6a9199bb4"
+        },
+        {
+          "path": "scripts/measurements/identities.mjs",
+          "sha256": "9a61b897259173b43dc2ef4a90e6095c251af1a8e03edceeb050518af4c314e8"
+        },
+        {
+          "path": "scripts/measurements/materialize.ts",
+          "sha256": "48e05872d21bed60b53516182f84516c7984f1445efe8660141bfa5a58bc4f1f"
+        },
+        {
+          "path": "scripts/measurements/process-observer.mjs",
+          "sha256": "647a7f0f8e37b67af31373f1f8dd2ae73d3b3cb92cfd1a37f1c2c2f99a971001"
+        },
+        {
+          "path": "scripts/measurements/repeated.mjs",
+          "sha256": "678b7c7db72bc51e3c9cf5dd4a7cb8751a166b23ca4ec60ac0e18a2a11f8ae24"
+        },
+        {
+          "path": "scripts/measurements/resident-assertions.mjs",
+          "sha256": "094071dc8e98ed08ad935e5b3ae2b9e4a400542b2ecc9208e1ed3bd3463da744"
+        },
+        {
+          "path": "scripts/measurements/resident-daemon.mjs",
+          "sha256": "eb3bb80e486f8b22e98e65f92c141d5a0c5c4bd76c5da2fd287e95c975a61c2a"
+        },
+        {
+          "path": "scripts/measurements/resident-driver.mjs",
+          "sha256": "f2880a7df71c8e4b96495d3c1dd069a048af403ecf2aeac7362f6eb825ff7923"
+        },
+        {
+          "path": "scripts/measurements/resident-failure.mjs",
+          "sha256": "efbd9fe6808828bd3f1a44c17cf7eef36ecfa60a607add6212aa4ea1c2f36c7a"
+        },
+        {
+          "path": "scripts/measurements/resident-failure.test.mjs",
+          "sha256": "d20fd4e5ffc21517306928a4f787f8f1e32d15567f1d36ca62ef2d80234a842d"
+        },
+        {
+          "path": "scripts/measurements/resident-inputs.mjs",
+          "sha256": "91d12194547132d1e11c903885d8abbb33fc4b3c40c851645c498d1f94559232"
+        },
+        {
+          "path": "scripts/measurements/resident-observer.mjs",
+          "sha256": "b830f927221ee38e776c228652526d74a1f5a4d91df0b8ccac87de11fd046185"
+        },
+        {
+          "path": "scripts/measurements/resident-plan.mjs",
+          "sha256": "baaa05e9045c357503334c95dbc297ec9f21e3eb05cefdd60b938d8f97b4f6dd"
+        },
+        {
+          "path": "scripts/measurements/resident-prerequisites.mjs",
+          "sha256": "17bcfd87818aa1c21c21bc50439aa319f60e4da13605c04f83fb3d498563ecf6"
+        },
+        {
+          "path": "scripts/measurements/resident-reuse.mjs",
+          "sha256": "5bd661ad8d77c6c7cfd4d369cf327956cf6d13da5dcb645a38b6182f55286c5d"
+        },
+        {
+          "path": "scripts/measurements/resident-reuse.test.mjs",
+          "sha256": "5dd8419bade46d6b05be330085591ea30618439ed78e5da4e39d33fd90e58852"
+        },
+        {
+          "path": "scripts/measurements/resident-worker.mjs",
+          "sha256": "d93ac22951ba98008a1f4608cbd914a86e5bfcc1dd8aa87d2429b77077659993"
+        },
+        {
+          "path": "scripts/measurements/resident-workloads.mjs",
+          "sha256": "406d74e60f36a4859ca8c7f43eb8cf1a16c29b4240968c6d9d2a668d9b55d022"
+        },
+        {
+          "path": "scripts/measurements/resident.mjs",
+          "sha256": "2714667c109b6976859b5bf52eff5761a8f31d5d00a3d26b044b7b10ae04e64b"
+        },
+        {
+          "path": "scripts/measurements/run.mjs",
+          "sha256": "0a2b14a867f9ff57660240c65eb912da701892778e440fec3d6579aaf882c5ee"
+        },
+        {
+          "path": "scripts/measurements/session-setup.mjs",
+          "sha256": "27699b0379a424a5017f65e331e0c49754c872186c31323f1626888951651c17"
+        },
+        {
+          "path": "scripts/measurements/verify-resident-evidence.mjs",
+          "sha256": "fea2cdbec6cd7e8048364416fc87b4ffbaece607a75088eb17815d22e5adfd15"
+        },
+        {
+          "path": "scripts/measurements/verify-tooling.mjs",
+          "sha256": "4f786b7407a42f0bce11a8f089b50e2d5eaf7fc787451c8dbd86bdc8fecd06d3"
+        }
+      ],
+      "fixtureGenerator": {
+        "path": "scripts/probes/fixtures/synthetic-owners.ts",
+        "sha256": "6176043d908baee456c8a7a56f1ba3946e04350f61c76dad082df5c917d3ddee"
+      },
+      "reference": {
+        "files": 96,
+        "sha256": "52b291488fd5894ae8ff826f29c461aeecca4b83ea80a31b0d8a3751ef5f2bbb"
+      }
+    },
+    "samples": {
+      "processes": 1290,
+      "controller": 15686
+    },
+    "compilerStateTrigger": {
+      "status": "not-evaluated",
+      "reason": "Source-edit workloads have not both completed."
+    },
+    "provenance": {
+      "artifact": "/tmp/worktrees/ramify-67e9dd0f/iteration-2-resident-verification/scripts/measurements/results/resident-2026-09-11T14-34-43.586Z-c4a3d367-410e-4b9c-a9ea-dabe6f074295.json.gz",
+      "fileSha256": "f5d57ff39fab3a3ac6968b206e88ef1771626148ec3ec0ce6480c4159a76cf8b",
+      "rawSha256": "0046c732ec3a09b4463254695d4d2d4de648d70cba3683978e948d79fa8e5630",
+      "originalStatus": "incomplete",
+      "originalInterrupted": true,
+      "compatibility": {
+        "authorization": "user-approved-blast-radius-reuse-2026-09-11",
+        "policyReference": "User-approved evidence blast-radius policy, 2026-09-11",
+        "sourceTestChanges": [
+          {
+            "path": "subs/analysis/subs/model/src/tests/decision-lookups.test.ts",
+            "before": "c99516810d993fb3822efb13ff143db3823c5d5461828df982c0091b5d7507de",
+            "after": "4d90d134c72d70e3dada340986f729b3eb2b5c7a5c747bff08437f271de7bf5f"
+          }
+        ],
+        "orchestrationChanges": [
+          {
+            "path": "scripts/measurements/resident-composition.mjs",
+            "before": null,
+            "after": "9d6ce5b2707c74800ea9eda793a968beed6a076c9e18d1ac3e066cb36cd505b7"
+          },
+          {
+            "path": "scripts/measurements/resident-composition.test.mjs",
+            "before": null,
+            "after": "5f46d608b45e9d230aef003d35d033b9338edd3123f9463a20c6e7cca81cba89"
+          },
+          {
+            "path": "scripts/measurements/verify-resident-evidence.mjs",
+            "before": "fea2cdbec6cd7e8048364416fc87b4ffbaece607a75088eb17815d22e5adfd15",
+            "after": "91abb06c2e50ed022489714e30031e8df9abdfe91436fe6fc7872cf06d5816c8"
+          }
+        ],
+        "reasons": {
+          "subs/analysis/subs/model/src/tests/decision-lookups.test.ts": "Namespace spy changed to named-import module mock only in an owned test. No production file or compiled build bytes changed.",
+          "scripts/measurements/resident-composition.mjs": "Archive composition/verification infrastructure only, not imported by the unchanged measurement controller, workers or runtime.",
+          "scripts/measurements/resident-composition.test.mjs": "Archive composition/verification infrastructure only, not imported by the unchanged measurement controller, workers or runtime.",
+          "scripts/measurements/verify-resident-evidence.mjs": "Archive composition/verification infrastructure only, not imported by the unchanged measurement controller, workers or runtime."
+        }
+      }
+    }
+  }
+]

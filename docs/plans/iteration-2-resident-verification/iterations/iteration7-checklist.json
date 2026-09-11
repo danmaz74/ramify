@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.publish_iteration",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": false,
+    "functionalRequirementsSatisfied": false,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-11T08:01:28.017Z",
+  "iteration": "7",
+  "notes": "One focused remediation implemented private bounded JSON byte framing in codec.ts with twelve new owner cases (32 total). Final build, four type-check configurations, five compiled framing smoke groups, private-module runtime tracing and eleven-owner self-check passed. Functional completion remains false: earlier iterations still lack ContextEvent/WireMessage/RamifyService and the quick connector, blocking complete message validation, connection state machine and ./client. The prior required gate remains 4/64, with 60 missing prerequisite-capability instances; no provider or harness changed. allNewTestsPass remains false because Vitest/Cucumber are reserved to automation and no iteration-7 runner verdict exists. The prior interrupted-reclamation-guard limitation remains documented. Draft code is committed; publication is left to the workflow after validation reruns."
+}

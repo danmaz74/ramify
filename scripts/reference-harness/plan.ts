@@ -2,8 +2,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { instanceFromSeed, inventoryDocument, planDirectory } from './instances.js';
-import type { FixtureCode, InstanceSeed, ReferenceInstance } from './instances.js';
+import { instanceFromSeed, inventoryDocument, planDirectory, plan2Directory, plan2InventoryDocument, verificationCapabilities } from './instances.js';
+import type { EvidenceKind, FixtureCode, InstanceSeed, ReferenceInstance } from './instances.js';
 
 export const repositoryRoot = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -15,6 +15,7 @@ export const iterationPrerequisites: Readonly<Record<number, readonly number[]>>
 };
 
 export interface ReviewedPlan {
+  readonly number?: 1 | 2;
   readonly members: readonly InstanceSeed[];
   readonly prerequisites: Readonly<Record<number, readonly number[]>>;
 }
@@ -140,12 +141,83 @@ export function validateInstancePointers(records: readonly ReferenceInstance[], 
   const families = new Set([
     'docs/plans/reference-project/cases.md', 'docs/architecture/daemon.md',
     'docs/architecture/processes-and-clients.md', 'docs/architecture/quick-testing.spec.md',
+    'docs/architecture/memory-lifecycle.md',
   ].flatMap((path) => tableRows(readFileSync(resolve(root, path), 'utf8'))
     .filter((row) => /^[A-Z]+\d{2}$/.test(row[0])).map((row) => row[0])));
   for (const record of records) {
     for (const family of record.families) {
+      if (family === 'harness' && record.matrixId === 'I2-28') continue;
       if (!families.has(family)) issues.push(`Unknown family ${family}: ${record.id}`);
     }
   }
   return issues;
+}
+
+/** Plan 2 scheduling is independent of Plan 1 and of available handlers. */
+export const plan2Prerequisites: Readonly<Record<number, readonly number[]>> = {
+  1: [], 2: [1], 3: [2], 4: [3], 5: [4], 6: [5], 7: [5],
+  8: [7], 9: [6, 8], 10: [9], 11: [10], 12: [10], 13: [10], 14: [11, 12, 13],
+};
+const plan2Titles = [
+  'Contract package, probes and review points',
+  'New owner skeletons, harness `--plan 2` and synthetic generators',
+  'Analysis increments and project resolution', 'Contexts owner',
+  'Shared service, root interface and quick environment',
+  'Edit semantics through the quick service', 'Codec, discovery and the lightweight client',
+  'Daemon host, records, process entry and real IPC', 'CLI commands and fallback',
+  'Entries, final declarations and boundaries', 'Reference edit sequences and equivalence gate',
+  'Real process lifecycle and recovery suite', 'Resident measurements and budgets',
+  'Self-check, relocation, completion report',
+];
+const plan2Counts = [0, 4, 18, 27, 15, 20, 0, 22, 28, 5, 9, 13, 9, 6];
+
+export function readReviewedPlan2(root = repositoryRoot): ReviewedPlan {
+  const require = (condition: unknown, message: string): void => {
+    if (!condition) throw new Error(`Invalid reviewed Plan 2 inventory: ${message}`);
+  };
+  const read = (path: string) => readFileSync(resolve(root, path), 'utf8');
+  const inventory = read(plan2InventoryDocument);
+  const rows = tableRows(inventory);
+  const main = tableRows(read(`${plan2Directory}/main-plan.md`));
+  const leaves = rows.filter(row => /^I2-\d{2}:/.test(row[0]));
+  require(leaves.length === 176 && new Set(leaves.map(row => row[0])).size === 176
+    && leaves.every(row => row.length === 8), 'expected 176 distinct complete leaves');
+  const matrixRows = main.filter(row => /^I2-\d{2}$/.test(row[0]));
+  const matrix = new Map(matrixRows.map(row => [row[0], row]));
+  require(matrixRows.length === 30 && matrix.size === 30, 'expected 30 distinct matrix groups');
+  const sequence = main.filter(row => /^\d+$/.test(row[0]) && row.length === 5);
+  require(sequence.length === 14, 'expected fourteen sequence rows');
+  const members: InstanceSeed[] = leaves.map(([id, iteration, families, capability, selection, evidence, mutation, expectation]) => {
+    const group = matrix.get(id.split(':')[0]);
+    require(group && group[2].includes('`' + id.split(':')[1] + '`'), `missing matrix subcase ${id}`);
+    const code = selection.split(/[/,×]/)[0];
+    require(['R', 'F', 'T', 'S100', 'S500', 'S1000', 'Q', 'M', 'P', 'H', '—'].includes(code), `unknown fixture ${selection}`);
+    require(['api', 'unit', 'quick', 'ipc', 'process', 'measurement'].includes(evidence), `unknown evidence ${evidence}`);
+    require(verificationCapabilities.includes(capability as typeof verificationCapabilities[number]), `unknown capability ${capability}`);
+    require(/^(?:[2-9]|1[0-4])$/.test(iteration) && iteration !== '7', `invalid implementing iteration for ${id}`);
+    return [id, Number(iteration), families.split(', '), capability, code as FixtureCode,
+      mutation, expectation, null, null, { selection, evidence: evidence as EvidenceKind }];
+  });
+  for (let offset = 0; offset < 14; offset++) {
+    const index = offset + 1;
+    const row = sequence[offset];
+    require(row[0] === String(index) && row[1] === plan2Titles[offset], `sequence index/title differs at ${index}`);
+    const prerequisites = row[3].match(/\d+/g)?.map(Number) ?? [];
+    require(JSON.stringify(prerequisites) === JSON.stringify(plan2Prerequisites[index]), `iteration ${index} prerequisites differ from main plan`);
+    const assigned = members.filter(member => member[1] === index);
+    require(assigned.length === plan2Counts[offset], `iteration ${index} instance count differs`);
+    if (index === 1) continue;
+    const draft = rows.filter(candidate => candidate[0] === String(index) && candidate.length === 3);
+    require(draft.length === 1 && JSON.stringify(draft[0][1].match(/\d+/g)?.map(Number) ?? []) === JSON.stringify(prerequisites),
+      `iteration ${index} prerequisites differ from subcase list`);
+    const groups = [...new Set(assigned.map(member => member[0].split(':')[0]))].sort();
+    for (const cell of [row[4], draft[0]?.[2] ?? '']) {
+      require(JSON.stringify(cell.match(/I2-\d{2}/g)?.sort() ?? []) === JSON.stringify(groups), `iteration ${index} matrix assignments differ`);
+    }
+    const count = rows.filter(candidate => candidate.length === 2 && candidate[0] === String(index));
+    require(count.length === 1 && Number(count[0][1]) === assigned.length, `iteration ${index} declared count differs`);
+  }
+  for (const group of matrix.keys()) require(members.some(member => member[0].startsWith(group + ':')), `empty matrix group ${group}`);
+  require(rows.some(row => row[0] === 'Total' && row[1] === '176'), 'declared total differs');
+  return { number: 2, members, prerequisites: plan2Prerequisites };
 }

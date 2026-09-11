@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.publish_iteration",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": false,
+    "functionalRequirementsSatisfied": false,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-11T07:59:11.787Z",
+  "iteration": "6",
+  "notes": "Single remediation completed the reusable semantic report assertions for seven reference edits and wired them into the 18 authored harness cases, retaining byte restoration and adding unchanged-report rejection plus full report restoration. Final type-check and focused direct smoke pass (67 recorded assertions, seven negative controls); a new canonical-provider lookup error was corrected without changing membership expectations. Missing increment, context manager, shared service and createQuickEnvironment providers still block all 20 required quick instances and the real-driver failure wrapper. No capability or handler was fabricated. No iteration-6 automated regression verdict exists, and Vitest/Cucumber execution remains delegated to automation, so allNewTestsPass remains false. The unchanged gate remains 4/84 required passed. Results updated and code committed on the assigned branch; no publication call in this repair."
+}

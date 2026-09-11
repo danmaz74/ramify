@@ -19,16 +19,11 @@ import { example3Diagram } from '../diagrams/example3.js';
 import { example4Diagram } from '../diagrams/example4.js';
 import { ModelDiagram, TOUR_DWELL_MS } from '../ModelDiagram.js';
 
-declare global {
-  // eslint-disable-next-line no-var
-  var IS_REACT_ACT_ENVIRONMENT: boolean | undefined;
-}
-
 let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
-  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);

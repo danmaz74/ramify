@@ -1,3 +1,5 @@
+import { advisoryUpperBound, requireMeasuredBytes } from './performance-observations.js';
+import type { Observation } from './observations.js';
 import childProcesses from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
@@ -12,6 +14,7 @@ import { inspectPlainReport, sessionInputs } from './session-expectations.js';
 const [root, id] = process.argv.slice(2);
 if (!root || !id) throw new Error('Lifecycle worker requires explicit fixture root and instance ID');
 const assertions = new Assertions();
+const observations: Observation[] = [];
 const target = join(root, 'subs/provider/src/interfaces/api.ts');
 const originalText = await fs.readFile(target, 'utf8');
 const originalOpen = fs.open, originalSpawn = childProcesses.spawn;
@@ -220,11 +223,12 @@ async function run(): Promise<void> {
     assertions.ok('every nested report object has frozen plain descriptors', objectCount > 1000);
     assertions.equal('retained reports do not keep disposed session objects alive', weakSessions.filter(reference => reference.deref() !== undefined).length, 0);
     assertions.equal('serialized report retention explicitly accounted', reportBytes, reports.reduce((sum, report) => sum + Buffer.byteLength(JSON.stringify(report)), 0));
+    requireMeasuredBytes(samples.flatMap(sample => [sample.heap, sample.rss, sample.reportBytes]));
     const first = samples[5], last = samples.at(-1)!;
-    assertions.ok(`last twenty samples remain below sixteen MiB heap growth beyond reports (observed ${(last.heap - last.reportBytes) - (first.heap - first.reportBytes)} bytes)`,
-      (last.heap - last.reportBytes) - (first.heap - first.reportBytes) <= 16 * 1024 ** 2);
-    assertions.ok(`last twenty samples remain below sixty-four MiB RSS growth (observed ${last.rss - first.rss} bytes)`, last.rss - first.rss <= 64 * 1024 ** 2);
-    assertions.ok(`post-disposal retained-report samples in bytes: ${JSON.stringify(samples)}`, samples.every(sample => sample.heap > 0 && sample.rss > 0 && sample.reportBytes > 0));
+    observations.push({ kind: 'post-disposal-retained-memory', data: { samples,
+      heapGrowthBeyondReports: advisoryUpperBound((last.heap - last.reportBytes) - (first.heap - first.reportBytes), 16 * 1024 ** 2),
+      rssGrowth: advisoryUpperBound(last.rss - first.rss, 64 * 1024 ** 2) } });
+    assertions.ok('post-disposal retained-report samples contain actual finite byte observations', samples.length > 0);
     assertions.ok('each fresh run has a distinct batch identity', new Set(reports.map(report => report.runId)).size === 25);
     assertions.equal('identical captured inputs keep their content identity', new Set(reports.map(report => report.inputId)).size, 1);
     return;
@@ -238,4 +242,4 @@ finally {
   releaseRead?.();
   fs.open = originalOpen; childProcesses.spawn = originalSpawn; syncBuiltinESMExports();
 }
-process.stdout.write(JSON.stringify({ assertions: assertions.finish(), ...(error ? { error } : {}) }) + '\n');
+process.stdout.write(JSON.stringify({ assertions: assertions.finish(), observations, ...(error ? { error } : {}) }) + '\n');

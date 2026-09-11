@@ -1,0 +1,22 @@
+{
+  "probe": "detached-spawn",
+  "recordedAt": "2026-09-11T05:19:02.913Z",
+  "nodeVersion": "v22.23.2",
+  "platform": "linux",
+  "architecture": "x64",
+  "typescript": "7.0.2",
+  "baseCommit": "b6f9c0447ccd73fab819aca840b10e362715b968",
+  "scriptSha256": "1ef82e2279a9e34838015c3c6b0dc8167d7a55e671e90c9ae495e2bf2020a766",
+  "evidence": {
+    "detachedUnref": true,
+    "outlivedParent": true,
+    "runningKillZero": true,
+    "reapedParentKillZero": false,
+    "duplicateExitCode": 3,
+    "recordUnchangedByDuplicate": true,
+    "actualExitHookCode": 23,
+    "finalProcessState": "absent",
+    "finalKillZero": false,
+    "limitation": "A container init may leave an orphan zombie. kill(pid, 0) then reports an existing pid, not usable service liveness. Never unlink on connection refusal alone; preserve a live/ambiguous pid and return unavailable."
+  }
+}

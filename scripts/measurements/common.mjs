@@ -28,7 +28,7 @@ export async function sessionInputs(root) {
         maxApplicationBytes: 64 * 1024 ** 2, maxOwners: 1000, maxDepth: 128, deadlineMs: 30000 },
       source: { maxExports: 250000, maxAccesses: 250000, maxSelections: 1000000,
         maxForwardingDepth: 256, deadlineMs: 90000 },
-      maxExposurePairs: 1000000, maxDiagnostics: 100000, maxReportBytes: 32 * 1024 ** 2,
+      maxExposurePairs: 1000000, maxDiagnostics: 100000, maxReportBytes: 96 * 1024 ** 2,
       disposeTimeoutMs: 5000, deadlineMs: 120000,
     },
   };

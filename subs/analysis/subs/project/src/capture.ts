@@ -62,7 +62,10 @@ export class Capture {
       let canonical: string | undefined;
       try { canonical = await realpath(path); } catch (error) { if (!missing(error)) throw error; }
       return { path, kind, canonical, role: kind === 'directory' ? 'directory' : 'dependency',
-        signature: JSON.stringify([kind, stat.dev, stat.ino, stat.mode, stat.size, stat.mtimeMs, stat.ctimeMs, canonical]),
+        // A kind/existence lookup does not depend on directory membership.
+        // Enumerated membership is captured and validated separately below.
+        signature: JSON.stringify(kind === 'directory' ? [kind, stat.dev, stat.ino, stat.mode, canonical]
+          : [kind, stat.dev, stat.ino, stat.mode, stat.size, stat.mtimeMs, stat.ctimeMs, canonical]),
         ...(kind === 'symlink' ? { link: await readlink(path) } : {}) };
     } catch (error) {
       if (missing(error)) return { path, kind: 'absent', canonical: undefined, signature: 'absent', role: 'absent' };
@@ -191,6 +194,19 @@ export class Capture {
       this.#applicationBytes += bytes.length;
     }
     return { sha256: hash(bytes), bytes: bytes.length };
+  }
+  /** Private replay recipe retains absolute addresses, never filesystem handles. */
+  observations(): readonly { path: string; role: Role; read: boolean; directory: boolean; exact: boolean }[] {
+    return [...this.#observations.values()].map(entry => ({ path: entry.path, role: entry.role,
+      read: entry.bytes !== undefined, directory: entry.entries !== undefined, exact: entry.exactName !== undefined }));
+  }
+  async replay(observations: ReturnType<Capture['observations']>): Promise<void> {
+    for (const entry of observations) {
+      await this.observe(entry.path);
+      if (entry.exact) await this.hasExactEntry(entry.path);
+      if (entry.read) await this.readFile(entry.path, entry.role);
+      if (entry.directory) await this.readDirectory(entry.path);
+    }
   }
   get inputs(): readonly CapturedInput[] {
     return freeze([...this.#observations.values()].map(entry => ({ path: this.label(entry.path), role: entry.role,

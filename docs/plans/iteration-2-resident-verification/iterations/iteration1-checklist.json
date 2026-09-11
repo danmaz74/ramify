@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": true,
+    "functionalRequirementsSatisfied": false,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-11T05:28:24.224Z",
+  "iteration": "1",
+  "notes": "One focused remediation attempt completed. The preserved main-plan patch applies cleanly; the frozen file remains baseline-identical. Five probe/source identities, forty warm samples, 176 unique instances and review-document links revalidated. No executable code changed or tests failed. functionalRequirementsSatisfied remains false: the workflow forbids the required main-plan.md update and offers no supported active-plan revision tool; architecture acceptance is still absent. User review must approve the package and arrange a control-plane plan revision, or explicitly revise the required decision location. Both deliverables updated through MCP; no publication call in this attempt."
+}

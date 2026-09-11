@@ -38,11 +38,12 @@ export function serializeReport(input: AnalysisReport): { report: AnalysisReport
   return { report, json };
 }
 
-export function formatHuman(report: AnalysisReport): string {
+export function formatHuman(report: AnalysisReport, mode: string): string {
   const lines = report.scope ? [
     `Root: ${report.scope.root} (${report.scope.selection === 'given' ? 'given' : `found from ${report.scope.invokedFrom}`})`,
     `Configuration: ${report.scope.configuration}`,
   ] : [`Root: unavailable (requested ${report.request.project.root ?? `from ${report.request.project.cwd}`})`, 'Configuration: unavailable'];
+  lines.push(`Mode: ${mode}`);
   for (const issue of report.diagnostics) {
     lines.push(`Error [${issue.code}]${issue.location ? ` ${location(issue.location)}` : ''}: ${issue.message}`);
     if (issue.importer) lines.push(`  Importer: ${issue.importer.owner} (${issue.importer.kind}; tags: ${issue.importer.profile.join(', ') || 'none'})`);

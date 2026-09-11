@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.publish_iteration",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": false,
+    "functionalRequirementsSatisfied": false,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-11T06:07:31.329Z",
+  "iteration": "3",
+  "notes": "One focused self-assessment remediation attempt completed. Added public batch tests for a module declare-global block and require calls to existing ordinary/testing module files. Full type-check and four direct batch cases with independent TypeScript validity checks passed. No production implementation changed this turn. functionalRequirementsSatisfied remains false: architecture acceptance of iteration 1's revised package is still pending, and incremental/resolution APIs, retained products, relays and all 18 I2-10/I2-11 instances remain unimplemented. newCodeCoveredByTests is true for the implemented catalog fix and its owner/public-API coverage. allNewTestsPass remains false because five newly authored Vitest cases have no runner verdict; the unchanged check policy reserves Vitest/Cucumber to workflow automation. This is a verification gap, not an observed failure of the direct checks. The prior 268-instance Plan 1 pass is preserved as historical checkpoint evidence and was not rerun for these test-only edits. Both deliverables record the unresolved items for workflow validation and a reviewable finding. No publication call was made, per the remediation instruction. completedAt records this attempt's completion, not completion of iteration 3."
+}

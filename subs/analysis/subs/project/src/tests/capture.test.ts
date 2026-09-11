@@ -33,6 +33,20 @@ describe('one captured filesystem view', () => {
     expect((await capture.seal()).status).toBe('coherent');
     expect(capture.inputs.map(input => input.path)).toEqual(['module.ramify']);
   });
+  it('ignores membership changes in a directory whose contents were never read', async () => {
+    await put(root, '.reference-work/existing.txt', 'existing');
+    expect(await capture.directoryExists('.reference-work')).toBe(true);
+    const before = capture.inputs;
+    await put(root, '.reference-work/new-run/trace.txt', 'new');
+    expect(await capture.seal()).toEqual({ status: 'coherent', inputs: before });
+  });
+  it('still detects replacement of an unenumerated directory by a file', async () => {
+    await put(root, '.reference-work/existing.txt', 'existing');
+    expect(await capture.directoryExists('.reference-work')).toBe(true);
+    await rm(join(root, '.reference-work'), { recursive: true });
+    await put(root, '.reference-work', 'replacement');
+    expect(await capture.seal()).toEqual({ status: 'changed', paths: ['.reference-work'] });
+  });
   it('retains directory membership and detects growth without reading new source', async () => {
     await put(root, 'src/a.ts', 'a');
     expect(await capture.readDirectory('src')).toEqual([join(root, 'src/a.ts')]);

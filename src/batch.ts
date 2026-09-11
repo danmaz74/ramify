@@ -1,16 +1,17 @@
+import { reportCapacity } from './report-capacity.js';
 import { analyzeProject } from '../subs/analysis/src/index.js';
 import type { AnalysisLimits, RunControl } from '../subs/analysis/src/interfaces/analysis.js';
 import { createDefaultTagRegistry } from '../subs/analysis/subs/model/src/registry.js';
 import type { BatchInvocation, BatchResult } from './interfaces/batch.js';
 
-/** Reviewed Plan 1 defaults, chosen by dispatch rather than by a CLI flag. */
+/** Shared batch/resident dispatch limits, including the reviewed large-report capacity. */
 const limits: AnalysisLimits = {
   acquisition: { attempts: 3, maxFiles: 50_000, maxApplicationFiles: 20_000,
     maxFileBytes: 8 * 1024 ** 2, maxInputBytes: 256 * 1024 ** 2,
     maxApplicationBytes: 64 * 1024 ** 2, maxOwners: 1000, maxDepth: 128, deadlineMs: 30_000 },
   source: { maxExports: 250_000, maxAccesses: 250_000, maxSelections: 1_000_000,
     maxForwardingDepth: 256, deadlineMs: 90_000 },
-  maxExposurePairs: 1_000_000, maxDiagnostics: 100_000, maxReportBytes: 32 * 1024 ** 2,
+  maxExposurePairs: 1_000_000, maxDiagnostics: 100_000, maxReportBytes: reportCapacity.reportBytes,
   disposeTimeoutMs: 5000, deadlineMs: 120_000,
 };
 

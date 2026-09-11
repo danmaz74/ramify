@@ -34,14 +34,14 @@ describe('iteration 7 integration evidence', () => {
       expect(assertions.finish().every(item => item.status === 'passed')).toBe(true);
     });
   }, 90_000);
-  it('validates all nine current toolkit descriptions against actual final exports', async () => {
+  it('validates all eleven current toolkit descriptions against actual final exports', async () => {
     await isolated(repositoryRoot, async root => {
     const result = await validateProject(validationInputs(root));
     expect(result.status, JSON.stringify('diagnostics' in result ? result.diagnostics : '')).toBe('valid');
     if (result.status !== 'valid') throw new Error(JSON.stringify(result));
     expect(result.input.inventory.modules.map(module => module.id).sort()).toEqual([
       'ramify', 'ramify/analysis', 'ramify/analysis/model', 'ramify/analysis/descriptions', 'ramify/analysis/project',
-      'ramify/analysis/typescript', 'ramify/presentation', 'ramify/presentation/layout', 'ramify/cli',
+      'ramify/analysis/typescript', 'ramify/daemon', 'ramify/daemon/contexts', 'ramify/presentation', 'ramify/presentation/layout', 'ramify/cli',
     ].sort());
     expect(result.linked.selections.some(item => item.pairs.some(pair => pair.name === 'validateProject'))).toBe(true);
     expect(result.linked.selections.flatMap(item => item.pairs).some(pair => pair.name === 'createAnalysisSession')).toBe(true);

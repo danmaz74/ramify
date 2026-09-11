@@ -1,6 +1,11 @@
 # Analysis
 
-Analysis composes one captured project view, source facts, descriptions and model decisions into disposable batch work and immutable reports. It owns stage outcomes and input identity so every client consumes the same completed analysis.
+Analysis composes one captured project view, source facts, descriptions and model decisions into disposable batch work, immutable reports and retained stage products that a later run over unchanged inputs may reuse. It owns stage outcomes, input identity and computational invalidation so every client consumes the same completed analysis.
+
+`analyzeIncrement` runs the same disposable pipeline over a fresh capture and
+reuses frozen stage products only when their recorded dependencies match. Unknown
+changes permit only per-file description and README reuse. `resolveProject`
+selects the canonical root and configuration without reading module descriptions.
 
 Iteration 7 provides `validateProject(inputs, control?)` through
 `src/validation-entry.ts`. Supply the reviewed project request, resolved registry

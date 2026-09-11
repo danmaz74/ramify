@@ -139,3 +139,21 @@ export interface AnalysisSession {
   analyze(control?: RunControl): Promise<AnalysisRun>;
   dispose(): Promise<void>;
 }
+export interface InputChange {
+  readonly path: string;
+  readonly kind: 'changed' | 'created' | 'deleted' | 'unknown';
+}
+export type RetainedStageId = 'configuration' | 'parse' | 'metadata' | 'catalog' | 'access' | 'link' | 'decide';
+export interface RetainedStage { readonly stage: RetainedStageId; readonly key: string; readonly bytes: number }
+export interface RetainedAnalysis {
+  readonly schemaVersion: 'ramify.retained/1'; readonly inputId: string; readonly engine: string;
+  readonly inputs: readonly CapturedInput[]; readonly bytes: number; readonly stages: readonly RetainedStage[];
+  readonly products: Readonly<Partial<Record<RetainedStageId, unknown>>>;
+}
+export interface IncrementInputs {
+  readonly inputs: AnalysisInputs; readonly previous: RetainedAnalysis | null; readonly changes: readonly InputChange[] | null;
+}
+export type IncrementRun =
+  | { readonly status: 'reported'; readonly report: AnalysisReport; readonly retained: RetainedAnalysis | null;
+      readonly reused: readonly RetainedStageId[]; readonly changed: readonly string[] | null }
+  | { readonly status: 'cancelled' };

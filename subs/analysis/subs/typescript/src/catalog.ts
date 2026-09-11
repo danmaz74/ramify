@@ -57,7 +57,7 @@ class CatalogBuilder {
   }
   private at(file: string): SourceLocation { return { file, start: 0, end: 0, line: 1, column: 1 }; }
   private limit(file: MutableFile, code: SourceLimit['code'], message: string, node?: Node,
-    related: readonly SourceLocation[] = [], compilerCode?: number, precise?: SourceLocation): void {
+    related: readonly SourceLocation[] = [], compilerCode?: number, precise?: SourceLocation, affectsExports = true): void {
     const location = precise ?? (node ? this.location(node) : this.at(file.file));
     // Synthetic witness names are implementation inputs, never report locations.
     const reported = resolve(this.root, location.file) === this.host.resourceWitness ? this.at(file.file) : location;
@@ -70,7 +70,7 @@ class CatalogBuilder {
     }
     if (!file.issueIds.includes(key)) file.issueIds.push(key);
     if (code === 'ambiguous-original') file.state = 'ambiguous';
-    else if (file.state === 'complete') file.state = 'incomplete';
+    else if (affectsExports && file.state === 'complete') file.state = 'incomplete';
   }
   private check(depth: number, record = false): void {
     if (depth > this.inputs.limits.maxForwardingDepth) throw new SourceFailure('resource-limit', 'Source forwarding depth limit exceeded');
@@ -171,6 +171,7 @@ class CatalogBuilder {
           this.limit(file, 'compiler-blocked', `Compiler could not establish an unambiguous declaration (TS${diagnostic.code})`, undefined, [], diagnostic.code, location);
         }
         const module = this.project.checker.getSymbolAtLocation(source);
+        if (module || source.externalModuleIndicator) this.sharedAugmentations(source, file);
         if (module) {
           for (const symbol of this.project.checker.getExportsOfModule(module)) {
             this.check(depth, true); file.exports.push(this.export(symbol, symbol.name, file, depth + 1));
@@ -183,6 +184,16 @@ class CatalogBuilder {
     }
     this.active.delete(path);
     return file;
+  }
+  /** The compiler distinguishes global augmentations from ordinary namespaces
+   * named global and string-named external module augmentations. */
+  private sharedAugmentations(source: SourceFile, file: MutableFile): void {
+    const declarations = source.moduleAugmentations
+      .filter(name => isIdentifier(name) && name.text === 'global' && isModuleDeclaration(name.parent))
+      .map(name => name.parent);
+    if (!declarations.length) return;
+    this.limit(file, 'shared-global', 'Module source declares shared globals; their ownership and cross-owner dependencies are not verified',
+      declarations[0], declarations.slice(1).map(statement => this.location(statement)), undefined, undefined, false);
   }
   /** A script's top-level declarations bind globals every owner can read. No
    * request form represents that ownership or another owner's reads, so the
@@ -217,7 +228,9 @@ class CatalogBuilder {
         return [entry.name, entry.original, original && [original.hasValue, original.hasType]];
       }).sort((a, b) => order(String(a[0]), String(b[0])))));
       for (const handle of module.declarations) {
-        const path = relative(this.root, handle.path);
+        const declaration = handle.resolve(this.project);
+        if (!declaration) continue;
+        const path = relative(this.root, declaration.getSourceFile().fileName);
         if (!file.descriptionFiles.includes(path)) file.descriptionFiles.push(path);
       }
     }
@@ -280,7 +293,7 @@ class CatalogBuilder {
       for (const handle of symbol.declarations) {
         const node = handle.resolve(this.project);
         if (!node) continue;
-        const own = this.origin(relative(this.root, handle.path));
+        const own = this.origin(relative(this.root, node.getSourceFile().fileName));
         if (own && !forwarding.some(origin => origin.file === own.file)) forwarding.push(own);
         const specifier = this.moduleSpecifier(node);
         if (specifier) {
@@ -389,7 +402,10 @@ class CatalogBuilder {
   private stars(source: SourceFile, file: MutableFile, depth: number): void {
     const explicit = new Set<string>();
     for (const symbol of this.project.checker.getExportsOfModule(this.project.checker.getSymbolAtLocation(source)!)) {
-      if (symbol.declarations.some(handle => resolve(handle.path) === resolve(source.fileName))) explicit.add(symbol.name);
+      if (symbol.declarations.some(handle => {
+        const declaration = handle.resolve(this.project);
+        return declaration && resolve(declaration.getSourceFile().fileName) === resolve(source.fileName);
+      })) explicit.add(symbol.name);
     }
     const targets: Stars['targets'] = [];
     for (const statement of source.statements) {

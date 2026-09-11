@@ -122,3 +122,32 @@ object allocation. Serialized findings and retained report byte counts stay
 unchanged. No target, fixture, cycle count or source capability was reduced.
 Run the [documented recipe](../README.md) to produce fresh measurements; daemon,
 MCP, web, revision history, queues and leases remain later-plan work.
+# Resident prerequisite checkpoint (iteration 13)
+
+The latest [resident raw record](resident-2026-09-11T09-01-16.314Z-dc5e0da8-3ed2-4257-bf75-d4161aa613fa.json.gz)
+is **incomplete**, with all nine I2-29 workloads unexecuted. This build lacks
+the client package entry, daemon entry, client/host implementations and resident
+assembly. The measurement driver also remains incomplete. Its only actual entry
+observations are three fresh CLI help processes: sampled peak RSS 32.375 MiB,
+zero observed processes after exit, and empty owned endpoint directories.
+The commands finish within the 50 ms sampling interval, so the sampled peak
+does not establish a settled footprint. Scope defines no numeric help budget.
+No resident latency, retention, queue or compiler-state-trigger result is claimed.
+
+The [batch observer diagnostic](batch-2026-09-11T08-59-43.581Z-101c1f03-25fc-4510-8e67-014b7efc55c8.json.gz)
+contains five clean 15-owner checks, with helpers/native descendants observed
+and none remaining at exit. Median 5.189 s exceeds the unchanged 5 s target;
+combined peak RSS is 501.855 MiB. Other Studio work was not isolated, so this
+run verifies observer operation and retains its budget failure, without
+establishing performance acceptance. Neither record replaces Plan 1's final
+record or revises a target. Both identify the same 214-file build using the
+original batch identity algorithm; the two earlier resident checkpoints used
+a different path sort and remain archived with their original recipe hashes.
+
+The [persistence repair reproduction](resident-2026-09-11T09-05-17.993Z-8750be52-ac7f-4b54-855c-c70afa881b63.json.gz)
+intentionally supplies a directory as the raw output file. It exits 1, preserves
+the EISDIR failure in the archive, and removes its scratch fixtures. Before the
+repair, this case failed without adding an archive record. No CLI help process
+or resident workload ran in this reproduction: the output failure happened at
+the first progress write, after fixture preparation. It is failure-handling
+evidence only and does not replace the last help observations above.

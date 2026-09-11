@@ -6,7 +6,7 @@ import { delimiter, dirname, isAbsolute, join, relative, sep } from 'node:path';
 import type { AnalysisReport } from '../../subs/analysis/src/index.js';
 import { portableValue } from './artifact.js';
 import { replaceExactlyOnce } from './mutation.js';
-import { analysisEvidence, recordObservation } from './observations.js';
+import { analysisEvidence, archiveObservation, recordObservation } from './observations.js';
 import { repositoryRoot } from './plan.js';
 import { command } from './processes.js';
 import type { CommandResult } from './processes.js';
@@ -18,7 +18,7 @@ const withoutRouter = 'expose-sub createCatalogTools, inspectRecord from catalog
 const entryFunctions = {
   'ramify.ts': 'createAnalysisSession', 'ramify.ts/analysis': 'analyzeProject',
   'ramify.ts/analysis/inventory': 'acquireInventory', 'ramify.ts/model': 'createDefaultTagRegistry',
-  'ramify.ts/layout': 'placeNodes', 'ramify.ts/presentation': 'ModelDiagram', 'ramify.ts/cli': 'runCli',
+  'ramify.ts/layout': 'placeNodes', 'ramify.ts/presentation': 'ModelDiagram', 'ramify.ts/cli': 'runCli', 'ramify.ts/client': 'connectDaemon',
 } as const;
 
 function within(root: string, path: string): boolean {
@@ -98,7 +98,8 @@ const installedRoot = (context: ProjectContext) => join(context.runDirectory, 'c
 const installedBin = (context: ProjectContext) => join(installedRoot(context), 'node_modules/.bin/ramify');
 
 /** Independently callable smoke setup; it does not register or pass a matrix instance. */
-export async function prepareRelocatedPackage(context: ProjectContext): Promise<void> {
+export async function prepareRelocatedPackage(context: ProjectContext,
+  requiredEntries: Readonly<Record<string, string>> = entryFunctions): Promise<void> {
   const { root, assertions, runDirectory } = context;
   const canonicalRoot = await realpath(root), canonicalSource = await realpath(repositoryRoot);
   assertions.equal('relocation package is outside the source checkout', within(canonicalSource, canonicalRoot), false);
@@ -129,7 +130,7 @@ export async function prepareRelocatedPackage(context: ProjectContext): Promise<
   await run(context, 'relocated whole type-check', root, 'npm', ['run', 'type-check']);
   assertions.equal('build creates the actual executable', await exists(join(root, 'dist/src/cli-entry.js')), true);
   const compiled = await run(context, 'relocated compiled reference', root, process.execPath,
-    ['dist/src/cli-entry.js', 'check', '--root', referencePath, '--format', 'json']);
+    ['dist/src/cli-entry.js', 'check', '--batch', '--root', referencePath, '--format', 'json']);
   assertions.equal('compiled JSON has clean stderr', compiled.stderr, '');
   const baseline = JSON.parse(compiled.stdout) as AnalysisReport;
   assertClean(context, baseline, 'compiled baseline');
@@ -141,7 +142,7 @@ export async function prepareRelocatedPackage(context: ProjectContext): Promise<
   const tarballs = JSON.parse(packed.stdout) as Array<{ filename: string; integrity: string; files: Array<{ path: string }> }>;
   assertions.equal('one real package archive created', tarballs.length, 1);
   const manifest = JSON.parse(await readFile(join(root, 'package.json'), 'utf8')) as { exports: Record<string, { types: string; import: string }> };
-  assertions.equal('every reviewed portable Node and UI package entry remains declared', Object.keys(manifest.exports).map(key => key === '.' ? 'ramify.ts' : `ramify.ts${key.slice(1)}`).sort(), Object.keys(entryFunctions).sort());
+  assertions.equal('every reviewed portable Node and UI package entry remains declared', Object.keys(manifest.exports).map(key => key === '.' ? 'ramify.ts' : `ramify.ts${key.slice(1)}`).sort(), Object.keys(requiredEntries).sort());
   for (const [entry, targets] of Object.entries(manifest.exports)) for (const [kind, path] of Object.entries(targets)) {
     assertions.ok(`${entry} ${kind}: actual tarball contains declared entry`, tarballs[0].files.some(file => file.path === path.replace(/^\.\//, '')));
   }
@@ -164,7 +165,7 @@ export async function prepareRelocatedPackage(context: ProjectContext): Promise<
   const probe = `import { relative, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 const root = process.cwd();
-const entries = ${JSON.stringify(entryFunctions)};
+const entries = ${JSON.stringify(requiredEntries)};
 const observed = [];
 for (const [entry, name] of Object.entries(entries)) {
   const resolved = relative(root, fileURLToPath(import.meta.resolve(entry)));
@@ -177,14 +178,15 @@ console.log(JSON.stringify(observed));
 `;
   await writeFile(join(consumer, 'entries.mjs'), probe);
   const imports = await run(context, 'import every installed public entry', consumer, process.execPath, ['entries.mjs']);
-  assertions.equal('all seven actual package entry imports executed', JSON.parse(imports.stdout).map((entry: { entry: string }) => entry.entry), Object.keys(entryFunctions));
+  assertions.equal('all eight actual package entry imports executed',
+    JSON.parse(imports.stdout).map((entry: { entry: string }) => entry.entry), Object.keys(requiredEntries));
   observe(context, 'relocation-installed-entries', JSON.parse(imports.stdout));
   const installedCheck = await run(context, 'installed reference JSON', consumer, installedBin(context),
-    ['check', '--root', join(root, referencePath), '--format', 'json']);
+    ['check', '--batch', '--root', join(root, referencePath), '--format', 'json']);
   const installedReport = JSON.parse(installedCheck.stdout) as AnalysisReport;
   assertClean(context, installedReport, 'installed baseline');
   assertions.equal('installed and copied compiled engine agree', semantic(installedReport), semantic(baseline));
-  const human = await run(context, 'installed reference implicit-root human output', join(root, referencePath), installedBin(context), ['check']);
+  const human = await run(context, 'installed reference implicit-root human output', join(root, referencePath), installedBin(context), ['check', '--batch']);
   assertions.ok('installed human command reports completed whole reference', human.stdout.includes('15 owners') && human.stdout.includes('check: passed'));
   assertions.equal('installed commands keep stdout separate from stderr', [installedCheck.stderr, human.stderr], ['', '']);
 }
@@ -192,13 +194,19 @@ console.log(JSON.stringify(observed));
 /** Required by the full handler. There is deliberately no successful skip mode. */
 export async function testRelocatedPackage(context: ProjectContext): Promise<void> {
   const output = join(context.runDirectory, 'toolkit-tests.json');
-  await run(context, 'relocated toolkit regression', context.root, 'npm', ['test', '--', '--reporter=json', '--outputFile', output]);
-  const report = JSON.parse(await readFile(output, 'utf8'));
+  const result = await command(context.root, 'npm', ['test', '--', '--reporter=json', '--outputFile', output],
+    300_000, relocationEnvironment(context.runDirectory));
+  observe(context, 'relocation-command', { label: 'relocated toolkit regression', ...result });
+  // Preserve the inner regression evidence even when its process fails.
+  const text = await readFile(output, 'utf8').catch(error => { if (error.code === 'ENOENT') return null; throw error; });
+  const report = text === null ? null : JSON.parse(text);
+  if (report) observe(context, 'relocation-toolkit-tests', await archiveObservation('relocation-toolkit-tests', report));
+  context.assertions.equal('relocated toolkit regression: actual subprocess exit', [result.code, result.signal, result.error], [0, null, null]);
+  context.assertions.ok('relocated toolkit regression produced its assertion report', report);
   context.assertions.ok('relocated toolkit tests execute nonempty assertions', report.success && report.numTotalTests > 0 && report.numPassedTests === report.numTotalTests);
   context.assertions.equal('relocated toolkit has no failed pending or todo assertions', [report.numFailedTests, report.numPendingTests, report.numTodoTests], [0, 0, 0]);
   for (const file of report.testResults) context.assertions.ok(`${relative(context.root, file.name)}: relocated assertions ran`,
     file.assertionResults.length > 0 && file.assertionResults.every((item: { status: string }) => item.status === 'passed'));
-  observe(context, 'relocation-toolkit-tests', report);
 }
 
 export async function denyRelocatedReference({ root }: { root: string }): Promise<void> {
@@ -209,7 +217,7 @@ export async function assertRelocatedDenial(context: ProjectContext): Promise<vo
   const reference = join(context.root, referencePath);
   await run(context, 'relocated negative remains valid TypeScript', reference, 'npm', ['run', 'type-check']);
   const result = await run(context, 'installed reference denial', installedRoot(context), installedBin(context),
-    ['check', '--root', reference, '--format', 'json'], 1);
+    ['check', '--batch', '--root', reference, '--format', 'json'], 1);
   const report = JSON.parse(result.stdout) as AnalysisReport;
   context.assertions.equal('installed negative is a completed failed check', [report.outcome.execution, report.outcome.check, report.summary.denied], ['completed', 'failed', 1]);
   context.assertions.equal('installed independent W2 negative retains located original and importer', report.diagnostics.map(issue =>
@@ -218,7 +226,7 @@ export async function assertRelocatedDenial(context: ProjectContext): Promise<vo
   context.assertions.ok('installed denial keeps declaration evidence and useful location', report.diagnostics[0].location!.line > 0 && report.diagnostics[0].related.length > 0);
   observe(context, 'relocation-analysis', { label: 'installed negative', report: analysisEvidence(report) });
   await replaceExactlyOnce(join(reference, 'subs/workspace/module.ramify'), withoutRouter, relay);
-  const restored = await run(context, 'installed restored control', reference, installedBin(context), ['check', '--format', 'json']);
+  const restored = await run(context, 'installed restored control', reference, installedBin(context), ['check', '--batch', '--format', 'json']);
   assertClean(context, JSON.parse(restored.stdout) as AnalysisReport, 'restored baseline');
 }
 

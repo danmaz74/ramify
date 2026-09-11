@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": true,
+    "functionalRequirementsSatisfied": false,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-11T07:29:02.928Z",
+  "iteration": "4",
+  "notes": "Regression repair updated only the descriptions owner's two stale exact-text fixture expectations for the implemented daemon N5 and contexts X2/X3 declarations. Strict equality, all names, destinations, tags, order, spans and inventory coverage remain intact. Type-check and diff check pass; the corrected regression suite awaits workflow rerun. allNewTestsPass is now true: automated run post_commit_regression-4-1789111482843-f8c75c and its matching Vitest cache confirm tokens (15), controlled ports (9) and history (7) passed; all 31 new cases and their implementation are unchanged in this repair. The original run's only two failures were the pre-existing parser fixtures corrected here; no complete post-repair regression pass is claimed. functionalRequirementsSatisfied remains false: iteration 3 provider contracts and increment operations remain absent, so manager integration and all 27 contexts handlers remain unimplemented. The existing decision-pending self-assessment finding is not resolved by the fixture repair. Both deliverables updated and changes committed; no publication call."
+}

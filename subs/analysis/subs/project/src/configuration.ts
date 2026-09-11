@@ -1,3 +1,6 @@
+import { createHash } from 'node:crypto';
+import type { RetainedConfiguration } from './interfaces/project.js';
+import { freeze } from './data.js';
 import { spawn } from 'node:child_process';
 import { basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -125,4 +128,30 @@ export async function readConfiguration(capture: Capture, config: string): Promi
     child.stdin.destroy(); child.stdout.destroy(); child.stderr.destroy();
     pending = undefined; resultChunks.length = 0;
   }
+}
+
+/** A rejected recipe must be retried with an empty capture: obsolete dependencies
+ * must never leak into the next batch-compatible input identity. */
+export class ConfigurationChanged extends Error {}
+export async function acquireConfiguration(capture: Capture, config: string, previous?: RetainedConfiguration | null): Promise<{
+  data: ConfigurationData; retained: RetainedConfiguration; reused: boolean;
+}> {
+  const key = (dependencies: RetainedConfiguration['dependencies']): string => createHash('sha256')
+    .update(JSON.stringify([capture.root, config, dependencies.map(({ path, role, sha256 }) => [path, role, sha256])])).digest('hex');
+  if (previous?.key && previous.product.root === capture.root && previous.product.config === config) {
+    await capture.replay(previous.product.observations as ReturnType<Capture['observations']>);
+    const fresh = new Map(capture.inputs.map(input => [input.path, input]));
+    const dependencies = previous.dependencies.map(input => fresh.get(input.path));
+    if (dependencies.every((input, i) => input && input.role === previous.dependencies[i]!.role
+      && input.sha256 === previous.dependencies[i]!.sha256) && key(previous.dependencies) === previous.key) {
+      return { data: previous.product.data as unknown as ConfigurationData, retained: previous, reused: true };
+    }
+    throw new ConfigurationChanged();
+  }
+  const data = await readConfiguration(capture, config);
+  const dependencies = capture.inputs.filter(input => input.role === 'configuration' || input.role === 'directory'
+    || input.role === 'absent' || input.role === 'dependency' && input.bytes > 0);
+  const product = { root: capture.root, config, data, observations: capture.observations() };
+  return { data, reused: false, retained: freeze({ key: key(dependencies), dependencies,
+    bytes: Buffer.byteLength(JSON.stringify(product)), product }) };
 }

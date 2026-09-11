@@ -89,9 +89,13 @@ const capabilityPrerequisites: Readonly<Record<VerificationCapability, readonly 
     'tags-origin', 'namespace', 'lazy', 'symbol-free', 'resources', 'coverage'],
   cli: ['session'], 'build-selection': ['registry', 'parse', 'acquire', 'metadata'],
   regression: [], 'harness-gate': [],
+  increment: [], contexts: [], 'daemon-service': [], ipc: [], client: [],
+  'daemon-process': [], lifecycle: [], equivalence: [], 'resident-measure': [], completion: [],
 };
 
 export function requiredCapabilities(instance: ReferenceInstance): VerificationCapability[] {
+  // Plan 2 capabilities are complete evidence providers, not Plan 1 pipeline stages.
+  if (instance.id.startsWith('I2-')) return [...instance.requiredCapabilities].sort();
   const needed = new Set<VerificationCapability>();
   function visit(capability: VerificationCapability): void {
     if (needed.has(capability)) return;
@@ -120,7 +124,7 @@ export interface InstanceExecution {
 
 export interface VerificationReport {
   readonly schemaVersion: 1;
-  readonly plan: 1;
+  readonly plan: 1 | 2;
   readonly mode: 'plan-verification' | 'iteration-verification';
   readonly iteration: number | null;
   readonly requiredIterations: readonly number[];
@@ -233,7 +237,7 @@ export async function verifyInstances(options: {
   }
   const passed = inventoryIssues.length === 0 && instances.every((item) => !item.required || item.status === 'passed');
   return {
-    schemaVersion: 1, plan: 1,
+    schemaVersion: 1, plan: options.plan.number ?? 1,
     mode: options.iteration === undefined ? 'plan-verification' : 'iteration-verification',
     iteration: options.iteration ?? null, requiredIterations: iterations,
     availableCapabilities: [...options.runtime.capabilities].sort(),

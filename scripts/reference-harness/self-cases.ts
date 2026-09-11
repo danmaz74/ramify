@@ -11,12 +11,12 @@ import { clean, completed, sessionReport } from './session-expectations.js';
 import { compilerValid } from './static-expectations.js';
 
 const owners = ['ramify', 'ramify/analysis', 'ramify/analysis/descriptions', 'ramify/analysis/model',
-  'ramify/analysis/project', 'ramify/analysis/typescript', 'ramify/cli', 'ramify/presentation', 'ramify/presentation/layout'];
+  'ramify/analysis/project', 'ramify/analysis/typescript', 'ramify/cli', 'ramify/daemon', 'ramify/daemon/contexts', 'ramify/presentation', 'ramify/presentation/layout'];
 const probe = 'subs/presentation/subs/layout/src/__i1_probe.ts';
 const original = { kind: 'code', owner: 'ramify', file: 'interfaces/batch.ts', binding: 'BatchInvocation' };
 
 async function cliReport(root: string, assertions: Assertions, exit: number): Promise<AnalysisReport> {
-  const result = await command(root, process.execPath, [join(repositoryRoot, 'dist/src/cli-entry.js'), 'check', '--root', root, '--format', 'json']);
+  const result = await command(root, process.execPath, [join(repositoryRoot, 'dist/src/cli-entry.js'), 'check', '--batch', '--root', root, '--format', 'json']);
   assertions.equal('compiled self-check exit and streams', [result.code, result.signal, result.error, result.stderr], [exit, null, null, '']);
   const report = JSON.parse(result.stdout) as AnalysisReport;
   recordObservation('compiled-toolkit', { command: result.command, durationMs: result.durationMs, ...analysisEvidence(report) });
@@ -27,10 +27,10 @@ function semantic(report: AnalysisReport): unknown {
   return data;
 }
 
-async function assertToolkit(report: AnalysisReport, root: string, assertions: Assertions): Promise<void> {
+export async function assertToolkit(report: AnalysisReport, root: string, assertions: Assertions): Promise<void> {
   clean(report, assertions);
   const snapshot = report.snapshot!;
-  assertions.equal('exact nine implemented owners', snapshot.inventory.modules.map(module => module.id), owners);
+  assertions.equal('exact eleven implemented owners', snapshot.inventory.modules.map(module => module.id), owners);
   assertions.equal('no outside-source warnings or invented ownership', [report.warnings, snapshot.inventory.outsideModuleFiles], [[], []]);
   const disk = (await Promise.all(['src', 'subs'].map(directory => filesBelow(root, directory))))
     .flat().filter(file => /(?:^|\/)src\//.test(file)).sort();
@@ -40,7 +40,9 @@ async function assertToolkit(report: AnalysisReport, root: string, assertions: A
   assertions.equal('every owned source loaded and catalogued completely', source.filter(file => !complete.has(file.path)), []);
   assertions.ok('owned ESM process probe is compiler input', complete.has('src/tests/process-probe.mjs'));
   assertions.ok('owned ESM process probe imports are checked', snapshot.accesses.some(access => access.location.file === 'src/tests/process-probe.mjs'));
-  for (const owner of owners) assertions.ok(`${owner}: tests remain owned and analyzed`, source.some(file => file.owner === owner && file.area === 'tests'));
+  for (const owner of owners) {
+    assertions.ok(`${owner}: tests remain owned and analyzed`, source.some(file => file.owner === owner && file.area === 'tests'));
+  }
   const independent = /^(?:examples|scripts|site)\//;
   assertions.equal('independent application and tool sources never enter catalog', snapshot.catalog!.files.filter(file => independent.test(file.file)), []);
   assertions.equal('independent scopes never produce source accesses', snapshot.accesses.filter(access => independent.test(access.importer.file)), []);

@@ -60,7 +60,32 @@ registerHooks({ load(url, context, nextLoad) {
   const loaded = nextLoad(url, context);
   record('load', { url }); return loaded;
 } });
-net.Server.prototype.listen = function () { record('listen'); throw new Error('CLI attempted to listen'); };
+const socketPath = args => {
+  // Socket.connect normalizes its arguments before calling the prototype too.
+  const first = Array.isArray(args[0]) ? args[0][0] : args[0];
+  return typeof first === 'string' ? first : first?.path;
+};
+const listen = net.Server.prototype.listen;
+net.Server.prototype.listen = function (...args) {
+  record('listen', { path: socketPath(args) });
+  if (process.env.RAMIFY_PROCESS_SOCKETS !== 'allow') throw new Error('CLI attempted to listen');
+  return Reflect.apply(listen, this, args);
+};
+const connect = net.Socket.prototype.connect;
+net.Socket.prototype.connect = function (...args) {
+  record('connect', { path: socketPath(args) });
+  return Reflect.apply(connect, this, args);
+};
+const socketWrite = net.Socket.prototype.write;
+net.Socket.prototype.write = function (chunk, ...args) {
+  if (Buffer.isBuffer(chunk) && chunk.length >= 5 && chunk.readUInt32BE(0) === chunk.length - 4) {
+    try {
+      const message = JSON.parse(chunk.subarray(4).toString('utf8'));
+      if (message.type === 'cancel') record('wire-cancel', { requestId: message.id });
+    } catch { /* Only complete, valid outgoing frames provide evidence. */ }
+  }
+  return Reflect.apply(socketWrite, this, [chunk, ...args]);
+};
 dgram.Socket.prototype.bind = function () { record('bind'); throw new Error('CLI attempted to bind'); };
 
 const originalSpawn = childProcesses.spawn;

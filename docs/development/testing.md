@@ -49,13 +49,16 @@ example/site packages with `npm --prefix <directory> ci` as needed.
 | Command | Purpose |
 | --- | --- |
 | `npm run build` | Compile the toolkit. |
-| `npm run check:self`, `npm run check:reference` | Run the compiled architectural checker over all toolkit or reference owners and tests. |
+| `npm run check:self`, `npm run check:reference` | Check all eleven toolkit owners or fifteen reference owners, including owned tests. Both commands use the resident default; isolate their endpoint and stop the owned daemon after verification. |
 | `npm run type-check` | Type-check toolkit source and scripts. |
 | `npm test` | Run toolkit Vitest tests; append `-- <test-file>` for a focused run. |
 | `npm run reference:cases` | Validate the reference catalogue and harness using their separate test configuration. |
 | `npm run reference:report -- --dry-run` | Inventory reference cases without executing the example tiers. |
 | `npm run reference:report` | Run current example tiers and report capability/coverage status. |
 | `npm run reference:verify -- --plan 1` | Require all reviewed Plan 1 instances; fails while required capabilities or assertions are absent. Add `--iteration <n>` for the named iteration and its transitive prerequisites. |
+| `npm run reference:verify -- --plan 2` | Require all 176 resident instances, including current measurement evidence and a passing same-input Plan 1 gate. Add `--iteration <n>` to include that iteration and its prerequisites. |
+| `npx tsx scripts/validate-final-contracts.ts` | Require the eleven final declarations, their real exports and all eight package entries. |
+| `npm run measure:resident` | Run all nine real resident workloads and archive observations. Performance targets are advisory; missing evidence, runtime-limit violations and cleanup failures remain blocking. |
 | `npm run example:type-check`, `npm run example:test`, `npm run example:build`, `npm run example:test:cucumber` | Check the reference application's types, runtime, build and Cucumber workflows. |
 | `npm run diagrams`, `npm run site:build` | Check diagrams and the documentation site when affected. |
 
@@ -66,6 +69,25 @@ and external relocation. Registration is separate from successful execution; the
 [completion report](../plans/done/iteration-1-project-verifier/iterations/iteration15-results.md)
 records evidence and its limits. For reproducible batch resource measurements,
 use the [measurement recipes](../../scripts/measurements/README.md).
+
+For the resident-plan remediation, the approved
+[acceptance evidence reuse amendment](../plans/iteration-2-resident-verification/acceptance-evidence-policy.md)
+permits provenance-backed composition of unchanged executions and focused
+reruns. It retains all required cases and workload counts. Historical artifacts
+remain unchanged; a composed receipt identifies their original inputs separately
+from the current checkout. Other plans retain their own acceptance contracts.
+
+See [resident verification readiness](resident-verification.md) for current
+command availability and the endpoint isolation convention. `check:self` and `check:reference` retain their existing script
+text and use the resident default. Scripts and harnesses must then set an owned
+`RAMIFY_ENDPOINT_DIR`, stop their daemon in `finally` and fail if it survives.
+An implicit batch result cannot satisfy a resident instance.
+
+For Studio iterations, the supplied check policy takes precedence over the
+command list. If regression runners are reserved for automation, leave
+`npm test`, `reference:cases`, the full Plan 1 gate and the non-dry
+`reference:report` to that automation: the latter two invoke Vitest/Cucumber
+internally. Record them as unrun locally, with the automatic verdict separately.
 
 ## Regression scope and bug reproduction
 

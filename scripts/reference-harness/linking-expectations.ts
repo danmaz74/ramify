@@ -15,7 +15,8 @@ export function validationInputs(root: string): AnalysisInputs {
       maxFileBytes: 8 * 1024 ** 2, maxInputBytes: 256 * 1024 ** 2, maxApplicationBytes: 64 * 1024 ** 2,
       maxOwners: 1000, maxDepth: 128, deadlineMs: 30_000 }, source: { maxExports: 250_000,
       maxAccesses: 250_000, maxSelections: 1_000_000, maxForwardingDepth: 256, deadlineMs: 90_000 },
-    maxExposurePairs: 1_000_000, maxDiagnostics: 100_000, maxReportBytes: 32 * 1024 ** 2,
+    // Match the reviewed dispatch capacity when comparing direct API and CLI reports.
+    maxExposurePairs: 1_000_000, maxDiagnostics: 100_000, maxReportBytes: 96 * 1024 ** 2,
     disposeTimeoutMs: 5000, deadlineMs: 120_000 } };
 }
 export async function validated(root: string, assertions: Assertions): Promise<ValidProject> {

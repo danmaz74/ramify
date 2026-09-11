@@ -118,10 +118,15 @@ const settled = first && last ? {
 } : null;
 const assertions = {
   allCyclesAndLifecycle: !failure && samples.length === budgets.warmups + budgets.cycles,
+  heapObservations: settled !== null && settled.sampleCount === budgets.settledCycles && Number.isFinite(settled.heapGrowthBeyondReportBytes),
+  rssObservations: settled !== null && settled.sampleCount === budgets.settledCycles && Number.isFinite(settled.rssGrowthBytes),
+};
+const targets = {
   heapBudget: settled !== null && settled.sampleCount === budgets.settledCycles && settled.heapGrowthBeyondReportBytes <= budgets.heapGrowthBeyondReportBytes,
   rssBudget: settled !== null && settled.sampleCount === budgets.settledCycles && settled.rssGrowthBytes <= budgets.rssGrowthBytes,
 };
-writeFileSync(3, JSON.stringify({ passed: Object.values(assertions).every(Boolean), assertions,
+writeFileSync(3, JSON.stringify({ passed: Object.values(assertions).every(Boolean), assertions, targets,
+  performancePolicy: 'advisory-by-user-request-2026-09-11',
   ...(failure ? { failure } : {}), budgets, samples, settled, inspectedPlainObjects: inspectObjects,
   retainedReportBytes: retainedBytes, retainedReportCount: reports.length,
   reportSummary: reports[0]?.summary ?? null, inputId: reports[0]?.inputId ?? null,

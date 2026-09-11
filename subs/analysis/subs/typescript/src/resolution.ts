@@ -27,7 +27,13 @@ export class Resolution {
     const module = this.project.checker.getSymbolAtLocation(node);
     const specifier = isStringLiteral(node) ? node.text : '';
     const declarations = module?.declarations ?? [];
-    const paths = [...new Set(declarations.map(declaration => resolve(declaration.path)))];
+    // NodeHandle.path is the compiler's canonical key, which can be case-folded.
+    // Physical ownership follows the resolved source's original filename.
+    const declarationNodes = declarations.flatMap(declaration => {
+      const node = declaration.resolve(this.project);
+      return node ? [node] : [];
+    });
+    const paths = [...new Set(declarationNodes.map(node => resolve(node.getSourceFile().fileName)))];
     const candidates: string[] = [];
     const pathSpecifier = specifier === '.' || specifier === '..' || specifier.startsWith('./')
       || specifier.startsWith('../') || isAbsolute(specifier);
@@ -55,8 +61,8 @@ export class Resolution {
     }
     // JSON and ordinary ESM code resolve to actual source files. Ambient module
     // declarations instead name their describing source file, handled below.
-    const sourcePaths = paths.filter(path => declarations.some(declaration =>
-      declaration.path === path && declaration.resolve(this.project)?.kind === SyntaxKind.SourceFile));
+    const sourcePaths = [...new Set(declarationNodes.filter(node => node.kind === SyntaxKind.SourceFile)
+      .map(node => resolve(node.getSourceFile().fileName)))];
     const describedResources: string[] = [];
     for (const path of sourcePaths) {
       // An import naming the declaration itself still names code. A compiler

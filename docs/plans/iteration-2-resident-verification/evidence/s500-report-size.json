@@ -1,0 +1,723 @@
+{
+  "pid": 1983828,
+  "invocation": 1,
+  "totalBytes": 34792550,
+  "report": {
+    "schemaVersion": {
+      "bytes": 19
+    },
+    "runId": {
+      "bytes": 38
+    },
+    "inputId": {
+      "bytes": 74
+    },
+    "request": {
+      "bytes": 1270
+    },
+    "scope": {
+      "bytes": 19274
+    },
+    "registry": {
+      "bytes": 390
+    },
+    "capabilities": {
+      "bytes": 1132,
+      "count": 14,
+      "firstBytes": 75
+    },
+    "stages": {
+      "bytes": 596,
+      "count": 8,
+      "firstBytes": 75
+    },
+    "outcome": {
+      "bytes": 64
+    },
+    "snapshot": {
+      "bytes": 34769338
+    },
+    "diagnostics": {
+      "bytes": 2,
+      "count": 0,
+      "firstBytes": 0
+    },
+    "warnings": {
+      "bytes": 2,
+      "count": 0,
+      "firstBytes": 0
+    },
+    "coverage": {
+      "bytes": 2,
+      "count": 0,
+      "firstBytes": 0
+    },
+    "summary": {
+      "bytes": 180
+    }
+  },
+  "snapshot": {
+    "inventory": {
+      "bytes": 1754402
+    },
+    "areas": {
+      "bytes": 83433,
+      "count": 1000,
+      "firstBytes": 71
+    },
+    "inputs": {
+      "bytes": 1617805,
+      "count": 11566,
+      "firstBytes": 117
+    },
+    "catalog": {
+      "bytes": 3437355
+    },
+    "linked": {
+      "bytes": 2123489
+    },
+    "model": {
+      "bytes": 2123084
+    },
+    "accesses": {
+      "bytes": 8521152,
+      "count": 9501,
+      "firstBytes": 869
+    },
+    "results": {
+      "bytes": 15108532,
+      "count": 9501,
+      "firstBytes": 1686
+    }
+  },
+  "details": {
+    "catalog": {
+      "originals": {
+        "bytes": 1846523,
+        "count": 5500,
+        "firstBytes": 300
+      },
+      "files": {
+        "bytes": 1419316,
+        "count": 6000,
+        "firstBytes": 217
+      },
+      "coverage": {
+        "bytes": 171481,
+        "count": 500,
+        "firstBytes": 322
+      }
+    },
+    "linked": {
+      "status": {
+        "bytes": 7
+      },
+      "modelInput": {
+        "bytes": 2123084
+      },
+      "selections": {
+        "bytes": 359,
+        "count": 1,
+        "firstBytes": 357
+      }
+    },
+    "model": {
+      "registry": {
+        "bytes": 390
+      },
+      "modules": {
+        "bytes": 122377,
+        "count": 500,
+        "firstBytes": 236
+      },
+      "originals": {
+        "bytes": 1999984,
+        "count": 5500,
+        "firstBytes": 337
+      },
+      "exposures": {
+        "bytes": 283,
+        "count": 1,
+        "firstBytes": 281
+      }
+    }
+  },
+  "samples": {
+    "accesses": [
+      {
+        "id": "access/1:c39d0a77debc58a06770c83e9762d09940d61b9340cbe8610789daa5b4685801",
+        "location": {
+          "file": "src/impl0.ts",
+          "start": 0,
+          "end": 71,
+          "line": 1,
+          "column": 1
+        },
+        "importer": {
+          "file": "src/impl0.ts",
+          "area": {
+            "owner": "bench",
+            "kind": "ordinary",
+            "root": "src",
+            "profile": [
+              "dispatch"
+            ]
+          }
+        },
+        "specifier": "../subs/m001/src/interfaces/api.js",
+        "form": "import",
+        "selectionForm": "named",
+        "runtimeLoad": true,
+        "target": {
+          "kind": "application",
+          "origin": {
+            "file": "subs/m001/src/interfaces/api.ts",
+            "area": {
+              "owner": "bench/m001",
+              "kind": "ordinary",
+              "root": "subs/m001/src",
+              "profile": []
+            }
+          }
+        },
+        "selections": [
+          {
+            "location": {
+              "file": "src/impl0.ts",
+              "start": 9,
+              "end": 26,
+              "line": 1,
+              "column": 10
+            },
+            "exportedName": "value",
+            "localName": "supplied",
+            "explicitType": false,
+            "request": "value",
+            "status": "resolved",
+            "original": {
+              "kind": "code",
+              "owner": "bench/m001",
+              "file": "interfaces/api.ts",
+              "binding": "value"
+            },
+            "forwarding": []
+          }
+        ],
+        "coverageIds": []
+      },
+      {
+        "id": "access/1:3f2d14a14ccb163f949120fc45e83161be3e6206927326e68f8ebe3cb83f59d0",
+        "location": {
+          "file": "src/impl0.ts",
+          "start": 87,
+          "end": 143,
+          "line": 2,
+          "column": 1
+        },
+        "importer": {
+          "file": "src/impl0.ts",
+          "area": {
+            "owner": "bench",
+            "kind": "ordinary",
+            "root": "src",
+            "profile": [
+              "dispatch"
+            ]
+          }
+        },
+        "specifier": "./interfaces/api.js",
+        "form": "import",
+        "selectionForm": "named",
+        "runtimeLoad": true,
+        "target": {
+          "kind": "application",
+          "origin": {
+            "file": "src/interfaces/api.ts",
+            "area": {
+              "owner": "bench",
+              "kind": "ordinary",
+              "root": "src",
+              "profile": [
+                "dispatch"
+              ]
+            }
+          }
+        },
+        "selections": [
+          {
+            "location": {
+              "file": "src/impl0.ts",
+              "start": 96,
+              "end": 101,
+              "line": 2,
+              "column": 10
+            },
+            "exportedName": "value",
+            "localName": "value",
+            "explicitType": false,
+            "request": "value",
+            "status": "resolved",
+            "original": {
+              "kind": "code",
+              "owner": "bench",
+              "file": "interfaces/api.ts",
+              "binding": "value"
+            },
+            "forwarding": []
+          }
+        ],
+        "coverageIds": []
+      },
+      {
+        "id": "access/1:5e4e1eed5e05045dd37fc04dcf58ccc3fdd967d271b60bebea701b17c8465a02",
+        "location": {
+          "file": "src/impl0.ts",
+          "start": 87,
+          "end": 143,
+          "line": 2,
+          "column": 1
+        },
+        "importer": {
+          "file": "src/impl0.ts",
+          "area": {
+            "owner": "bench",
+            "kind": "ordinary",
+            "root": "src",
+            "profile": [
+              "dispatch"
+            ]
+          }
+        },
+        "specifier": "./interfaces/api.js",
+        "form": "inline-type-import",
+        "selectionForm": "named",
+        "runtimeLoad": true,
+        "target": {
+          "kind": "application",
+          "origin": {
+            "file": "src/interfaces/api.ts",
+            "area": {
+              "owner": "bench",
+              "kind": "ordinary",
+              "root": "src",
+              "profile": [
+                "dispatch"
+              ]
+            }
+          }
+        },
+        "selections": [
+          {
+            "location": {
+              "file": "src/impl0.ts",
+              "start": 103,
+              "end": 113,
+              "line": 2,
+              "column": 17
+            },
+            "exportedName": "Input",
+            "localName": "Input",
+            "explicitType": true,
+            "request": "type-only",
+            "status": "resolved",
+            "original": {
+              "kind": "code",
+              "owner": "bench",
+              "file": "interfaces/api.ts",
+              "binding": "Input"
+            },
+            "forwarding": []
+          }
+        ],
+        "coverageIds": []
+      }
+    ],
+    "results": [
+      {
+        "accessId": "access/1:c39d0a77debc58a06770c83e9762d09940d61b9340cbe8610789daa5b4685801",
+        "decisions": [
+          {
+            "status": "allowed",
+            "reason": "exposed",
+            "question": {
+              "importer": {
+                "file": "src/impl0.ts",
+                "area": {
+                  "owner": "bench",
+                  "kind": "ordinary",
+                  "root": "src",
+                  "profile": [
+                    "dispatch"
+                  ]
+                }
+              },
+              "target": {
+                "file": "subs/m001/src/interfaces/api.ts",
+                "area": {
+                  "owner": "bench/m001",
+                  "kind": "ordinary",
+                  "root": "subs/m001/src",
+                  "profile": []
+                }
+              },
+              "forwarding": [],
+              "location": {
+                "file": "src/impl0.ts",
+                "start": 9,
+                "end": 26,
+                "line": 1,
+                "column": 10
+              },
+              "selection": {
+                "original": {
+                  "kind": "code",
+                  "owner": "bench/m001",
+                  "file": "interfaces/api.ts",
+                  "binding": "value"
+                },
+                "request": "value"
+              }
+            },
+            "original": {
+              "id": {
+                "kind": "code",
+                "owner": "bench/m001",
+                "file": "interfaces/api.ts",
+                "binding": "value"
+              },
+              "origin": {
+                "file": "subs/m001/src/interfaces/api.ts",
+                "area": {
+                  "owner": "bench/m001",
+                  "kind": "ordinary",
+                  "root": "subs/m001/src",
+                  "profile": []
+                }
+              },
+              "hasValue": true,
+              "hasType": false,
+              "tags": [],
+              "declarations": [
+                {
+                  "file": "subs/m001/src/interfaces/api.ts",
+                  "start": 63,
+                  "end": 72,
+                  "line": 2,
+                  "column": 14
+                }
+              ],
+              "tagEvidence": []
+            },
+            "visibility": {
+              "visible": true,
+              "importer": "bench",
+              "original": {
+                "kind": "code",
+                "owner": "bench/m001",
+                "file": "interfaces/api.ts",
+                "binding": "value"
+              },
+              "paths": [
+                [
+                  {
+                    "module": "bench/m001",
+                    "destination": "parent",
+                    "evidence": [
+                      {
+                        "file": "subs/m001/module.ramify",
+                        "start": 33,
+                        "end": 84,
+                        "line": 3,
+                        "column": 1
+                      }
+                    ]
+                  }
+                ]
+              ],
+              "ineffective": []
+            },
+            "requirements": [],
+            "checkedOrigins": [
+              {
+                "file": "subs/m001/src/interfaces/api.ts",
+                "area": {
+                  "owner": "bench/m001",
+                  "kind": "ordinary",
+                  "root": "subs/m001/src",
+                  "profile": []
+                }
+              },
+              {
+                "file": "subs/m001/src/interfaces/api.ts",
+                "area": {
+                  "owner": "bench/m001",
+                  "kind": "ordinary",
+                  "root": "subs/m001/src",
+                  "profile": []
+                }
+              }
+            ],
+            "blockingOrigins": []
+          }
+        ],
+        "outcome": "checked",
+        "diagnostics": [],
+        "coverage": []
+      },
+      {
+        "accessId": "access/1:3f2d14a14ccb163f949120fc45e83161be3e6206927326e68f8ebe3cb83f59d0",
+        "decisions": [
+          {
+            "status": "allowed",
+            "reason": "same-owner",
+            "question": {
+              "importer": {
+                "file": "src/impl0.ts",
+                "area": {
+                  "owner": "bench",
+                  "kind": "ordinary",
+                  "root": "src",
+                  "profile": [
+                    "dispatch"
+                  ]
+                }
+              },
+              "target": {
+                "file": "src/interfaces/api.ts",
+                "area": {
+                  "owner": "bench",
+                  "kind": "ordinary",
+                  "root": "src",
+                  "profile": [
+                    "dispatch"
+                  ]
+                }
+              },
+              "forwarding": [],
+              "location": {
+                "file": "src/impl0.ts",
+                "start": 96,
+                "end": 101,
+                "line": 2,
+                "column": 10
+              },
+              "selection": {
+                "original": {
+                  "kind": "code",
+                  "owner": "bench",
+                  "file": "interfaces/api.ts",
+                  "binding": "value"
+                },
+                "request": "value"
+              }
+            },
+            "original": {
+              "id": {
+                "kind": "code",
+                "owner": "bench",
+                "file": "interfaces/api.ts",
+                "binding": "value"
+              },
+              "origin": {
+                "file": "src/interfaces/api.ts",
+                "area": {
+                  "owner": "bench",
+                  "kind": "ordinary",
+                  "root": "src",
+                  "profile": [
+                    "dispatch"
+                  ]
+                }
+              },
+              "hasValue": true,
+              "hasType": false,
+              "tags": [
+                "dispatch"
+              ],
+              "declarations": [
+                {
+                  "file": "src/interfaces/api.ts",
+                  "start": 63,
+                  "end": 72,
+                  "line": 2,
+                  "column": 14
+                }
+              ],
+              "tagEvidence": []
+            },
+            "visibility": {
+              "visible": true,
+              "importer": "bench",
+              "original": {
+                "kind": "code",
+                "owner": "bench",
+                "file": "interfaces/api.ts",
+                "binding": "value"
+              },
+              "paths": [
+                []
+              ],
+              "ineffective": []
+            },
+            "requirements": [],
+            "checkedOrigins": [
+              {
+                "file": "src/interfaces/api.ts",
+                "area": {
+                  "owner": "bench",
+                  "kind": "ordinary",
+                  "root": "src",
+                  "profile": [
+                    "dispatch"
+                  ]
+                }
+              },
+              {
+                "file": "src/interfaces/api.ts",
+                "area": {
+                  "owner": "bench",
+                  "kind": "ordinary",
+                  "root": "src",
+                  "profile": [
+                    "dispatch"
+                  ]
+                }
+              }
+            ],
+            "blockingOrigins": []
+          }
+        ],
+        "outcome": "checked",
+        "diagnostics": [],
+        "coverage": []
+      },
+      {
+        "accessId": "access/1:5e4e1eed5e05045dd37fc04dcf58ccc3fdd967d271b60bebea701b17c8465a02",
+        "decisions": [
+          {
+            "status": "allowed",
+            "reason": "same-owner",
+            "question": {
+              "importer": {
+                "file": "src/impl0.ts",
+                "area": {
+                  "owner": "bench",
+                  "kind": "ordinary",
+                  "root": "src",
+                  "profile": [
+                    "dispatch"
+                  ]
+                }
+              },
+              "target": {
+                "file": "src/interfaces/api.ts",
+                "area": {
+                  "owner": "bench",
+                  "kind": "ordinary",
+                  "root": "src",
+                  "profile": [
+                    "dispatch"
+                  ]
+                }
+              },
+              "forwarding": [],
+              "location": {
+                "file": "src/impl0.ts",
+                "start": 103,
+                "end": 113,
+                "line": 2,
+                "column": 17
+              },
+              "selection": {
+                "original": {
+                  "kind": "code",
+                  "owner": "bench",
+                  "file": "interfaces/api.ts",
+                  "binding": "Input"
+                },
+                "request": "type-only"
+              }
+            },
+            "original": {
+              "id": {
+                "kind": "code",
+                "owner": "bench",
+                "file": "interfaces/api.ts",
+                "binding": "Input"
+              },
+              "origin": {
+                "file": "src/interfaces/api.ts",
+                "area": {
+                  "owner": "bench",
+                  "kind": "ordinary",
+                  "root": "src",
+                  "profile": [
+                    "dispatch"
+                  ]
+                }
+              },
+              "hasValue": false,
+              "hasType": true,
+              "tags": [
+                "dispatch"
+              ],
+              "declarations": [
+                {
+                  "file": "src/interfaces/api.ts",
+                  "start": 0,
+                  "end": 49,
+                  "line": 1,
+                  "column": 1
+                }
+              ],
+              "tagEvidence": []
+            },
+            "visibility": {
+              "visible": true,
+              "importer": "bench",
+              "original": {
+                "kind": "code",
+                "owner": "bench",
+                "file": "interfaces/api.ts",
+                "binding": "Input"
+              },
+              "paths": [
+                []
+              ],
+              "ineffective": []
+            },
+            "requirements": [],
+            "checkedOrigins": [
+              {
+                "file": "src/interfaces/api.ts",
+                "area": {
+                  "owner": "bench",
+                  "kind": "ordinary",
+                  "root": "src",
+                  "profile": [
+                    "dispatch"
+                  ]
+                }
+              },
+              {
+                "file": "src/interfaces/api.ts",
+                "area": {
+                  "owner": "bench",
+                  "kind": "ordinary",
+                  "root": "src",
+                  "profile": [
+                    "dispatch"
+                  ]
+                }
+              }
+            ],
+            "blockingOrigins": []
+          }
+        ],
+        "outcome": "checked",
+        "diagnostics": [],
+        "coverage": []
+      }
+    ]
+  }
+}

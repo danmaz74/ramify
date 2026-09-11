@@ -102,7 +102,7 @@ Iteration 5 registers `acquire` and `metadata` using the public `readProject`
 operation with the real injected description parser. Its 35 filesystem instances
 materialize the reviewed F recipe in `fixtures/plan1/project.ts` or copy the
 unchanged reference. Both reference scope variants also acquire the toolkit and
-assert its nine owners. Syntax, source export resolution and permission checking
+assert its eleven owners, including the two Plan 2 header-only owners. Syntax, source export resolution and permission checking
 remain distinct capabilities.
 
 Iteration 9 registers 26 static-access instances across I1-06, I1-07, I1-08 and
@@ -195,12 +195,13 @@ SIGINT during acquisition/catalog work and broken stdout pipes.
 After `npm run build`, `npm run reference:verify -- --plan 1 --iteration 13`
 requires 290 instances, with prerequisite closure covering iterations 1–13.
 The 18 later records remain unexecuted. `npx tsx scripts/validate-final-contracts.ts`
-compares all nine current declarations with the reviewed final selections, links
-them against real exports and resolves every installed package entry.
+compares the nine Plan 1 declarations with their reviewed final selections, links
+them against real exports and resolves every installed package entry. Plan 2
+iteration 10 extends that separate final-declaration validator.
 
 
 Iteration 15 registers the last three instances. Self-check compares the compiled
-CLI and direct session over all nine owners and asserts that every owned source
+CLI and direct session over all eleven current owners and asserts that every owned source
 file is fully catalogued. The independent negative imports the root's exposed
 `BatchInvocation` type from the portable layout owner and requires the located
 `required-importer-tag` denial for `dispatch`, with visibility established.
@@ -218,3 +219,194 @@ See the [completion report](../../docs/plans/done/iteration-1-project-verifier/i
 for actual executed evidence, and the [measurement recipes](../measurements/README.md)
 for setup, combined process memory and repeated-session budgets. A source-matrix
 pass alone does not establish those resource requirements or later services.
+
+## Plan 2 resident verification
+
+`plan2-instances.ts` transcribes all 176 reviewed leaves, including exact fixture
+selections, evidence kinds, mutations and independent expectations. `plan.ts`
+validates them against the Plan 2 inventory, the thirty main-plan matrix groups,
+and all fourteen sequence indices, titles and prerequisite assignments. The
+Plan 1 reader and its 308 records remain independent.
+
+`npm run reference:verify -- --plan 2 --iteration 2` executes the four I2-28
+harness controls. The full `--plan 2` gate requires all 176. `plan2-runtime.ts` registers the
+real incremental, context, service, IPC, process and CLI providers. A Plan 1
+capability never activates its Plan 2 counterpart; registration never
+establishes execution or a passing gate. `--iteration 5`
+requires 64 instances from iterations 2–5; `--iteration 9` requires 134 from
+2–9 (iteration 7 has owner tests only). All other records stay `not-executed`.
+
+`npm run reference:cases` includes Plan 2 inventory, sabotage, command, generator
+and prerequisite tests. `npx tsx scripts/reference-harness/validate.ts` validates
+both inventories without running conformance assertions. The report command
+lists Plan 2 capability availability without executing resident instances;
+`reference:verify --plan 2` owns their execution and portable evidence files.
+
+The eleven-owner acquisition and self-check expectations include daemon and
+contexts. Every owner must contain real source and owned tests; there is no
+skeleton exception. The 308 Plan 1 instance records remain unchanged. Its
+reviewed package expectation resolves all eight actual entries, including the
+lightweight client, and its owner expectations name all eleven owners.
+
+### Resident edit fixtures (iteration 6)
+
+`fixtures/plan2/project.ts` prepares four F variants without changing the frozen
+Plan 1 recipe: an unmarked `Type` import, an aliased default, a consumer using the
+existing `@provider/*` mapping, and an unresolved `./later.js` import. The alias
+baseline uses `export default value`, with consistent browser tags on both
+exposures of that original; changing it to `export { value as default }` therefore
+preserves identity. Replacing the recipe's separate `defaultValue` function would
+test an original replacement instead.
+
+`fixtures/plan2/reference.ts` supplies R copies and dependency preparation. The
+shim variant copies Vite into the disposable fixture and links its other
+dependencies. Edit only that copy's `node_modules/vite/client.d.ts`; the ordinary
+R dependency symlink points at shared installed bytes and the shim mutation rejects
+it. Removing the shim's default
+export affects both CSS-module consumers while their resource targets remain the
+same.
+
+`resident-mutations.ts` defines the guarded W2 removal/restoration, K header and
+invalid-description edits, C1/W1 vocabulary changes, README edit, F edits, shim
+edit and helper move. `applyTextMutation(root, edit, true)` performs the exact
+reverse for repair/recovery controls. Every text edit checks one anchor before
+writing. The helper move checks both importer anchors and the absent destination
+before changing files, then repairs relative imports at the new depth; its reverse
+restores the initial bytes. `createLaterFile` checks its importer anchor and uses
+exclusive creation. Returned paths describe fixture edits only: the acceptance
+handlers must assert the real driver's `changed`, never supply these hints as
+observed evidence.
+
+`resident-fixtures.test.ts`, discovered by `npm run reference:cases`, checks the
+fixture causes, exact restoration, drift rejection, dependency isolation and
+selected batch effects. It registers no Plan 2 handler. At this checkpoint the
+increment operations, context manager, shared service and `createQuickEnvironment`
+are absent, so all twenty iteration-6 quick instances remain unexecuted. Complete
+those providers before wiring these fixtures through the real direct channel.
+Every sealed synchronized delivery must assert `verified: true`, ordering and
+the expected reuse; the incomplete acquisition-failure delivery must instead
+assert `verified: false`, as the reviewed contracts require. The driver failure
+wrapper and all service assertions remain work for the resumed iteration.
+
+The seven reference text-edit tests also call `resident-expectations.ts` to
+assert their report effects: root's W2 denial; every core original's added `ui`
+tag and the adapter's denied values; exact C1/W1 growth or shrinkage; located
+foreign-original and missing-file errors without permissions; and changed README
+metadata with preserved decisions. Restoration compares the entire batch report
+after replacing only `runId`. Each edit assertion rejects the unchanged baseline
+as a negative control. Future quick handlers can reuse these report assertions
+with the harness's recorded `Assertions`, adding their resident-specific checks.
+
+### Process equivalence sequences (iteration 11)
+
+`equivalence-sequences.ts` records the ten reference edits, five S100 edits,
+coverage/removal sequences and five live-watcher scenarios. Each step names its
+anchor and independent expected result. Reference wildcard removal reverses the
+added `ResidentVocabulary` export; it checks exact C1/W1 contraction. S100 starts
+from the frozen generator and adds explicit consumers during setup, before the
+clean baseline: root imports m001's exposed value, and m002's ordinary impl1
+imports its private run0. The five-step sequence removes the exposure, changes
+README/source, moves run0 into testing, then restores all bytes. The generator
+and its recorded identity remain unchanged.
+
+`equivalence-comparison.ts` accepts only the bare Plan 1 document, compares every
+member after replacing only top-level `runId`, and names the first differing
+path. Array order, input identities, coverage and expanded contracts are compared
+without filtering. Every batch, resident and watch report also meets the semantic
+oracle; equal reports alone do not pass a step.
+
+`equivalence-cases.ts` registers all nine I2-25/I2-26 process handlers under
+`equivalence`. Each handler owns its project, npm installation prefix, short
+Unix-socket endpoint directory and process trace. The installed bin must connect
+to that endpoint without loading the batch engine in the CLI. The reported daemon
+must load the compiled daemon entry and listen there. Cleanup invokes `daemon
+stop`, checks every observed child, kills leaks while failing the instance, and
+removes the endpoint and install. No shared user endpoint is used.
+
+`equivalence-watch.ts` consumes the actual CLI stream, checking the first revision
+after each edit before issuing any confirming check. It records the JSON line
+and arrival time, requires the same generation, an advancing revision, matching
+report/header input identities, exact changed paths, and the reviewed 4,600 ms
+debounce-plus-source target. A following resident/batch pair must equal the watch
+report. SIGINT must release the watch with exit 130.
+
+The current predecessor package cannot run these resident flows: its daemon
+status command reports an unavailable implementation. The handlers therefore fail
+their process prerequisite, rather than accepting two batch checks. Availability
+of the harness capability is separate from passing execution. The independent
+batch-oracle and corruption-control tests in `equivalence.test.ts` qualify the
+tooling only and receive no I2-25/I2-26 credit. Run the real gate with
+`npm run reference:verify -- --plan 2 --iteration 11` after restoring the providers.
+
+### Process signal fixtures (Plan 2 iteration 12)
+
+`src/tests/lifecycle-process.ts` supplies `withProcessScope` for concurrently
+running traced processes. Each scope creates a private, mode-0700 temporary
+endpoint directory and injects the existing process preload into Node entries
+and installed executables. Callers can observe output while a process runs,
+send input, deliver SIGSTOP/SIGCONT/SIGINT/SIGKILL and wait for bounded exits.
+The trace preserves socket, module, launch and exit observations. It does not
+infer a daemon stop reason from a signal or socket closure.
+
+Every successful callback must finish its processes. Teardown kills and checks
+known descendants, including detached helpers, removes the endpoint directory,
+and fails a callback that left processes alive even when cleanup killed them.
+Failure paths resume suspended parents to reap their children, preserve the
+original failure, and report cleanup failures. Output and trace reads are bounded
+at 40 MiB. This helper uses Node process signals and pid liveness, without
+`/proc` or platform-specific command flags.
+
+`npx tsx scripts/reference-harness/lifecycle-process-smoke.ts` executes the same
+nine fixture cases that `src/tests/lifecycle-process.test.ts` registers with
+Vitest. The smoke reports its OS and Node version and establishes process-control
+mechanics only. It starts no Ramify daemon and earns no I2 instance credit.
+On this checkpoint the resident entry, host, service, connector and watch handler
+remain absent. `lifecycle` therefore remains unavailable; all eight I2-18 and
+five I2-27 instances remain unexecuted. Resume the actual lifecycle handlers
+against those providers, including record-derived stop reasons, fixed timing
+bounds, nine-context eviction, installed CLI/direct-client recovery and macOS
+execution. Fixture success cannot substitute for that evidence.
+
+`fixtures/plan2/lifecycle.ts` adds `withLifecycleProjects(workRoot, run)` for
+I2-27's nine-context workload. It creates nine independent copies of the frozen
+F recipe, returns their roots in stable opening order, and uses the existing
+mutation scope to clean them after success or failure. Overlapping calls own
+separate directories even under the same work root. The caller must still open
+the actual contexts, acquire and release real leases in order, observe daemon
+status and assert eviction; this helper performs no service operation.
+
+`npx tsx scripts/reference-harness/lifecycle-fixture-smoke.ts` runs the same
+three cases registered in `lifecycle-fixtures.test.ts`: nine complete F copies,
+independent edits and overlapping scopes, and cleanup preserving callback
+failures and caller-owned files. This qualifies the input fixture only; it does
+not execute `I2-27:eviction-under-many-contexts` or activate `lifecycle`.
+
+### Completion witnesses (Plan 2 iteration 14)
+
+`completion-cases.ts` registers all six I2-30 process handlers under
+`completion`. They require resident self-checking, a compiler-valid contexts
+import of the actual `RamifyService` with a visible R6 dispatch denial, strict
+final declarations, eight packed package entries, and relocated resident
+checking and stop. The self-check reuses Plan 1's full toolkit inventory
+assertions. The package handlers reuse the external bootstrap and npm-pack
+fixture with an independent eight-entry literal; the Plan 1 relocation
+expectation also names all eight real package entries.
+
+The process scope can use that unpacked executable, isolated environment and
+copied preload without installing a link back to the source checkout. It retains
+failure and cleanup evidence, and checks the client closure in a separate empty
+process. `completion.test.ts` supplies closure-corruption and process-cleanup
+controls; fixture controls earn no product acceptance credit.
+
+`completion-regression.ts` implements `I2-30:plan1-regression` by validating the
+preceding full Plan 1 report from `.reference-work/reports`. It requires the same
+source/build/runtime, all 308 passing assertion records, the frozen 305 unaffected
+definitions and eleven-owner/eight-entry observations. It records the consumed
+report's hash and rejects missing evidence or a newer failure for those inputs.
+It starts no nested regression runner. The frozen Plan 1 archive supplies only
+definitions; its old build cannot earn current regression credit.
+
+Every completion claim requires a successful current execution. Registration
+and historical reports do not establish completion.
+The [readiness guide](../../docs/development/resident-verification.md) describes
+the remaining commands and automation-owned regression runs.

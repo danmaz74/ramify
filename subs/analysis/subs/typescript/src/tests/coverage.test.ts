@@ -2,6 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { configuration, withCatalog } from './fixtures.js';
 
 describe('iteration 12 source coverage boundaries', () => {
+  it('keeps definite missing exports precise when a module also augments globals', async () => withCatalog({
+    'src/api.ts': 'export const value = 1;\ndeclare global { interface Window { ramify: number } }',
+    'src/use.ts': "import { value, missing } from './api.js'; void value; void missing;",
+  }, async ({ catalog, source }) => {
+    expect(catalog.files.find(file => file.file === 'src/api.ts')!.state).toBe('complete');
+    expect(catalog.coverage.map(note => note.code)).toEqual(['shared-global']);
+    const accesses = await source.accesses();
+    expect(accesses.accesses.flatMap(access => access.selections.map(selection => [selection.exportedName, selection.status])))
+      .toEqual([['value', 'resolved'], ['missing', 'missing-export']]);
+  }), 30_000);
+
   it('separates proven package and builtin scope from unresolved names and outside-module files', async () => withCatalog({
     'node_modules/pkg/package.json': '{"name":"pkg","type":"module","types":"./index.d.ts"}',
     'node_modules/pkg/index.d.ts': 'export declare const value: number;',

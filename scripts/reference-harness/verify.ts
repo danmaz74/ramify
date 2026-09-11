@@ -1,14 +1,17 @@
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+import { plan2Instances } from './plan2-instances.js';
+import { plan2Runtime } from './plan2-runtime.js';
 import { plan1Instances } from './cases.js';
-import { readReviewedPlan, repositoryRoot, validateInstancePointers } from './plan.js';
+import { readReviewedPlan, readReviewedPlan2, repositoryRoot, validateInstancePointers } from './plan.js';
 import { referenceRuntime } from './runtime.js';
 import { verifyInstances } from './runner.js';
 import type { VerificationReport } from './runner.js';
 import { executionIdentity, persistGateReport } from './artifact.js';
 
 export interface VerifyOptions {
+  readonly planNumber?: 2;
   readonly iteration?: number;
   readonly preserveOnFailure: boolean;
   readonly format: 'human' | 'json';
@@ -41,13 +44,14 @@ export function parseVerifyArguments(args: readonly string[]): VerifyOptions {
       format = value;
     }
   }
-  if (plan !== '1') throw new Error('Specify --plan 1');
-  return { ...(iteration === undefined ? {} : { iteration }), preserveOnFailure, format };
+  if (plan !== '1' && plan !== '2') throw new Error('Specify --plan 1 or --plan 2');
+  if (plan === '2' && iteration === 15) throw new Error('Plan 2 iteration must be from 1 to 14');
+  return { ...(plan === '2' ? { planNumber: 2 as const } : {}), ...(iteration === undefined ? {} : { iteration }), preserveOnFailure, format };
 }
 
 export function formatVerification(report: VerificationReport): string {
   const title = report.mode === 'iteration-verification'
-    ? `Plan 1 iteration verification: ${report.iteration}` : 'Plan 1 completion verification';
+    ? `Plan ${report.plan} iteration verification: ${report.iteration}` : `Plan ${report.plan} completion verification`;
   const lines = [title, `Result: ${report.passed ? 'passed' : 'failed'}`,
     `Plan complete: ${report.planComplete ? 'yes' : 'no'}`,
     `Required iterations: ${report.requiredIterations.join(', ')}`,
@@ -69,16 +73,18 @@ async function main(): Promise<number> {
     options = parseVerifyArguments(process.argv.slice(2));
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
-    console.error('Usage: reference:verify -- --plan 1 [--iteration N] [--preserve-on-failure] [--format human|json]');
+    console.error('Usage: reference:verify -- --plan 1|2 [--iteration N] [--preserve-on-failure] [--format human|json]');
     return 2;
   }
-  const pointerIssues = validateInstancePointers(plan1Instances);
+  const records = options.planNumber === 2 ? plan2Instances : plan1Instances;
+  const pointerIssues = validateInstancePointers(records);
   if (pointerIssues.length) throw new Error(pointerIssues.join('\n'));
   const startedAt = new Date().toISOString();
   const started = performance.now();
   const identity = await executionIdentity();
   const report = await verifyInstances({
-    ...options, plan: readReviewedPlan(), records: plan1Instances, runtime: referenceRuntime,
+    ...options, plan: options.planNumber === 2 ? readReviewedPlan2() : readReviewedPlan(), records,
+    runtime: options.planNumber === 2 ? plan2Runtime : referenceRuntime,
     workRoot: resolve(repositoryRoot, 'examples/collection-review/.reference-work'),
   });
   const after = await executionIdentity();

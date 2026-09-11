@@ -4,3 +4,5 @@ module project
 // P1-P2: acquisition service and owned vocabulary.
 expose-src readProject from "read-project.ts" to parent
 expose-src * from "interfaces/project.ts" to parent
+
+expose-src resolveProjectRoot from "resolve-root.ts" to parent

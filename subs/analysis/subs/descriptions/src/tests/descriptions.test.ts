@@ -21,7 +21,7 @@ const browser = ['browser'];
 const uiBrowser = ['ui', 'browser'];
 
 // Independent selections from the reference contract map and the reviewed final
-// I13 declarations. Read the actual authored texts, including their comments.
+// Plan 2 owner contracts. Read the actual authored texts, including their comments.
 const modelNames = [
   'ModuleId', 'TagName', 'TagKind', 'TagDefinition', 'ResolvedTagRegistry', 'SourceLocation',
   'ModelIssue', 'ModelResult', 'SourceArea', 'ModuleRecord', 'OriginalId', 'SourceOrigin',
@@ -34,13 +34,25 @@ const linkingNames = ['LinkInputs', 'ExpandedSelection', 'LinkIssue', 'LinkedDes
 const analysisNames = ['Capability', 'StageId', 'RunControl', 'AnalysisLimits', 'AnalysisInputs',
   'InventoryInputs', 'InventorySnapshot', 'InventoryRun', 'ValidationRun', 'CapabilityExecution',
   'StageExecution', 'AnalysisCode', 'AnalysisDiagnostic', 'AccessResult', 'AnalysisSnapshot',
-  'AnalysisSummary', 'AnalysisReport', 'AnalysisRun', 'AnalysisSession'];
+  'AnalysisSummary', 'AnalysisReport', 'AnalysisRun', 'AnalysisSession', 'InputChange', 'RetainedStageId', 'RetainedStage',
+  'RetainedAnalysis', 'IncrementInputs', 'IncrementRun'];
 const syntaxNames = ['TextSpan', 'DescriptionToken', 'DescriptionIssue', 'NamedSelection',
   'DescriptionSelection', 'DescriptionStatement', 'DescriptionDocument', 'ParsedDescription', 'DescriptionParser'];
 
 const projectNames = ['ProjectRequest', 'ProjectScope', 'CapturedInput', 'InventoryArea', 'ModulePurpose',
   'InventoryModule', 'InventoryFile', 'ExactReference', 'OutsideSourceWarning', 'ProjectInventory',
-  'ProjectIssue', 'AcquisitionLimits', 'ProjectInputView', 'ProjectReadOptions', 'ProjectRead'];
+  'ProjectIssue', 'AcquisitionLimits', 'ProjectInputView', 'ProjectReadOptions', 'ProjectRead', 'ProjectResolution', 'RetainedConfiguration'];
+
+// Independent literal selections from Plan 2 owners.md R7 and N5.
+const contextNames = ['ContextId', 'GenerationId', 'RevisionId', 'LeaseId', 'ContextToken', 'ContextSetup',
+  'ContextSelection', 'InputFingerprints', 'RevisionCause', 'ContextRevision', 'ContextState', 'SynchronizationState',
+  'ContextStatus', 'ExpectedContent', 'Freshness', 'FreshnessRecord', 'CheckRequest', 'UnavailableReason', 'Unavailable',
+  'CheckOutcome', 'OpenOutcome', 'ContextEvent', 'SubscriptionHandle', 'WatchEvent', 'WatcherHandle', 'WatcherPort',
+  'ClockPort', 'ContextBudgets'];
+const controlledNames = ['createControlledWatcher', 'createControlledClock', 'ControlledWatcher', 'ControlledClock'];
+const residentNames = ['DaemonInstance', 'LogEntry', 'DaemonBudgets', 'EndpointSelection', 'DaemonRecord',
+  'StopDisposition', 'Handshake', 'Welcome', 'ConnectTimeouts', 'ConnectOptions', 'ConnectionState', 'DisconnectReason',
+  'RecoveryOutcome', 'ServiceConnection', 'ConnectOutcome', 'ServiceConnector', 'WireMessage'];
 
 const sourceNames = ['CatalogOriginal', 'CatalogExport', 'FileExports', 'SourceCatalog', 'SourceTarget', 'WrittenForm', 'AccessSelection', 'SourceAccess', 'SourceLimit',
   'SourceWorkLimits', 'SourceAnalysisInputs', 'SourceAnalysis'];
@@ -79,17 +91,40 @@ interface Fixture {
   statements: readonly ReturnType<typeof statement>[];
 }
 const toolkit: readonly Fixture[] = [
-  { path: '', name: 'ramify', tags: ['dispatch'], statements: [src('*', 'interfaces/batch.ts', null, descendants), sub(modelNames, 'analysis', descendants), sub([...syntaxNames, ...linkingNames], 'analysis', descendants), sub(projectNames, 'analysis', descendants), sub(sourceNames, 'analysis', descendants), sub(analysisNames, 'analysis', descendants), sub(presentationNames, 'presentation', descendants)] },
-  { path: 'subs/analysis/', name: 'analysis', tags: [], statements: [sub('*', 'model', both), sub([...syntaxNames, ...linkingNames], 'descriptions', both), sub(projectNames, 'project', both), sub(sourceNames, 'typescript', both), src(['validateProject'], 'validation.ts'), src('*', 'interfaces/analysis.ts'), src(['acquireInventory'], 'inventory.ts'), src(['createAnalysisSession'], 'session.ts'), src(['analyzeProject'], 'analyze-project.ts')] },
+  { path: '', name: 'ramify', tags: ['dispatch'], statements: [
+    src('*', 'interfaces/batch.ts', null, descendants), src('*', 'interfaces/service.ts', null, descendants),
+    statement('expose-test', ['createQuickEnvironment', 'QuickEnvironment'], 'quick-environment.ts', descendants),
+    sub(modelNames, 'analysis', descendants), sub([...syntaxNames, ...linkingNames], 'analysis', descendants),
+    sub(projectNames, 'analysis', descendants), sub(sourceNames, 'analysis', descendants),
+    sub(analysisNames, 'analysis', descendants), sub(presentationNames, 'presentation', descendants),
+    sub([...contextNames, ...residentNames, ...controlledNames], 'daemon', descendants),
+  ] },
+  { path: 'subs/analysis/', name: 'analysis', tags: [], statements: [sub('*', 'model', both), sub([...syntaxNames, ...linkingNames], 'descriptions', both), sub(projectNames, 'project', both), sub(sourceNames, 'typescript', both), src(['validateProject'], 'validation.ts'), src('*', 'interfaces/analysis.ts'), src(['acquireInventory'], 'inventory.ts'), src(['createAnalysisSession'], 'session.ts'), src(['analyzeProject'], 'analyze-project.ts'), src(['analyzeIncrement'], 'increment.ts'), src(['resolveProject'], 'resolve-project.ts')] },
   { path: 'subs/analysis/subs/descriptions/', name: 'descriptions', tags: browser, statements: [src(['parseDescription'], 'parse.ts', browser), src('*', 'interfaces/syntax.ts'), src(['linkDescriptions'], 'link.ts', browser), src('*', 'interfaces/linking.ts')] },
   { path: 'subs/analysis/subs/model/', name: 'model', tags: browser, statements: [
     src('*', 'interfaces/model.ts'), src(['resolveTagRegistry', 'createDefaultTagRegistry'], 'registry.ts', browser),
     src(['deriveSourceAreas', 'assignOriginalTags'], 'profiles.ts', browser), src(['originalKey'], 'identity.ts', browser),
     src(['buildModel'], 'model.ts', browser), src(['explainVisibility', 'explainImport'], 'decisions.ts', browser),
   ] },
-  { path: 'subs/analysis/subs/project/', name: 'project', tags: [], statements: [src(['readProject'], 'read-project.ts'), src('*', 'interfaces/project.ts')] },
+  { path: 'subs/analysis/subs/project/', name: 'project', tags: [], statements: [src(['readProject'], 'read-project.ts'), src('*', 'interfaces/project.ts'), src(['resolveProjectRoot'], 'resolve-root.ts')] },
   { path: 'subs/analysis/subs/typescript/', name: 'typescript', tags: [], statements: [src(['createSourceAnalysis'], 'source-analysis.ts'), src('*', 'interfaces/source.ts')] },
   { path: 'subs/cli/', name: 'cli', tags: ['dispatch'], statements: [src(['runCli'], 'run-cli.ts'), src('*', 'interfaces/cli.ts')] },
+  { path: 'subs/daemon/', name: 'daemon', tags: ['dispatch'], statements: [
+    src(['createDaemonService', 'dispatchServiceRequest'], 'service.ts'),
+    src(['createFilesystemWatcher'], 'filesystem-watcher.ts'),
+    src(['createSystemClock'], 'system-clock.ts'),
+    src(['connectDaemon'], 'connect-daemon.ts'),
+    src(['encodeMessage', 'decodeMessage'], 'codec.ts'),
+    src(['selectEndpoint', 'readDaemonRecord'], 'discovery.ts'),
+    src(['startDaemon'], 'start-daemon.ts'),
+    src('*', 'interfaces/daemon.ts'),
+    sub(['AnalysisDriver', ...contextNames, 'ContextManagerOptions', 'ContextManager', ...controlledNames], 'contexts'),
+  ] },
+  { path: 'subs/daemon/subs/contexts/', name: 'contexts', tags: [], statements: [
+    src(['createContextManager'], 'context-manager.ts'),
+    src('*', 'interfaces/contexts.ts'),
+    statement('expose-test', controlledNames, 'controlled-ports.ts'),
+  ] },
   { path: 'subs/presentation/', name: 'presentation', tags: uiBrowser, statements: presentationStatements },
   { path: 'subs/presentation/subs/layout/', name: 'layout', tags: browser, statements: layoutStatements },
 ];
@@ -159,7 +194,7 @@ describe('all current project descriptions as exact-text parser fixtures', () =>
     }
   }
 
-  it('covers exactly nine toolkit and fifteen reference descriptions without omitting an owner', async () => {
+  it('covers exactly eleven toolkit and fifteen reference descriptions without omitting an owner', async () => {
     // This fixture inventory walk is not application acquisition or an ownership implementation.
     async function nestedDescriptions(directory: URL): Promise<string[]> {
       const entries = await readdir(directory, { withFileTypes: true });
@@ -169,7 +204,7 @@ describe('all current project descriptions as exact-text parser fixtures', () =>
       }));
       return [...entries.filter((entry) => entry.isFile() && entry.name === 'module.ramify').map((entry) => entry.name), ...nested.flat()];
     }
-    expect(toolkit).toHaveLength(9);
+    expect(toolkit).toHaveLength(11);
     expect(reference).toHaveLength(15);
     for (const [prefix, fixtures] of [['', toolkit], ['examples/collection-review/', reference]] as const) {
       const actual = ['module.ramify', ...(await nestedDescriptions(new URL(`${prefix}subs/`, root))).map((path) => `subs/${path}`)];

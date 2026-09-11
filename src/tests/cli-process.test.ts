@@ -14,7 +14,7 @@ describe('compiled CLI process lifetime', () => {
       await writeFile(join(installation, 'package.json'), '{"private":true}');
       await promisify(execFile)('npm', ['install', '--offline', '--ignore-scripts', '--no-audit', '--no-fund', '--no-package-lock', repositoryRoot],
         { cwd: installation, timeout: 20_000 });
-      const result = await cliProcess(root, ['check', '--format', 'json'], { executable: join(installation, 'node_modules/.bin/ramify') });
+      const result = await cliProcess(root, ['check', '--batch', '--format', 'json'], { executable: join(installation, 'node_modules/.bin/ramify') });
       expect([result.code, result.signal, result.stderr]).toEqual([0, null, '']);
       expect(JSON.parse(result.stdout)).toMatchObject({ schemaVersion: 'ramify.analysis/1', summary: { complete: true, owners: 2 } });
       expect(result.survivingChildren).toEqual([]);
@@ -32,7 +32,7 @@ describe('compiled CLI process lifetime', () => {
   });
 
   it('finishes a real check and closes only its finite compiler helpers', async () => fixture(async root => {
-    const result = await cliProcess(root, ['check', '--format', 'json']);
+    const result = await cliProcess(root, ['check', '--batch', '--format', 'json']);
     expect([result.code, result.signal, result.stderr]).toEqual([0, null, '']);
     expect(JSON.parse(result.stdout).summary.complete).toBe(true);
     expect(result.events.filter(event => ['listen', 'bind', 'other-launch'].includes(event.event))).toEqual([]);
@@ -46,7 +46,7 @@ describe('compiled CLI process lifetime', () => {
   }), 20_000);
 
   for (const stage of ['acquisition', 'catalog'] as const) it(`SIGINT during ${stage} exits 130 after disposal without a result`, async () => fixture(async root => {
-    const result = await cliProcess(root, ['check', '--format', 'json'], { mode: `interrupt-${stage}`, readTarget: join(root, 'src/interfaces/api.ts') });
+    const result = await cliProcess(root, ['check', '--batch', '--format', 'json'], { mode: `interrupt-${stage}`, readTarget: join(root, 'src/interfaces/api.ts') });
     expect(result.events.some(event => event.event === 'barrier')).toBe(true);
     expect([result.code, result.signal, result.stdout]).toEqual([130, null, '']);
     expect(result.stderr).toBe('Interrupted; no result claimed.\n');
@@ -57,7 +57,7 @@ describe('compiled CLI process lifetime', () => {
   }), 20_000);
 
   it('SIGINT between the complete JSON document and its trailing newline keeps the claimed result', async () => fixture(async root => {
-    const result = await cliProcess(root, ['check', '--format', 'json'], { mode: 'interrupt-publication' });
+    const result = await cliProcess(root, ['check', '--batch', '--format', 'json'], { mode: 'interrupt-publication' });
     expect(result.events.filter(event => event.event === 'barrier' && event.pid === result.pid)).toEqual([expect.objectContaining({ stage: 'publication', pending: 1 })]);
     expect([result.code, result.signal, result.stderr]).toEqual([0, null, '']);
     expect(result.stdout.endsWith('}\n')).toBe(true);
@@ -67,7 +67,7 @@ describe('compiled CLI process lifetime', () => {
   }), 20_000);
 
   it('returns a failed resolver report and releases acquired files and compiler state', async () => fixture(async root => {
-    const result = await cliProcess(root, ['check', '--format', 'json'], { mode: 'fail-catalog' });
+    const result = await cliProcess(root, ['check', '--batch', '--format', 'json'], { mode: 'fail-catalog' });
     expect([result.code, result.signal, result.stderr]).toEqual([2, null, '']);
     expect(result.events.filter(event => event.event === 'resolver-fault')).toHaveLength(1);
     expect(JSON.parse(result.stdout)).toMatchObject({ outcome: { execution: 'incomplete', check: 'not-run' },
@@ -78,7 +78,7 @@ describe('compiled CLI process lifetime', () => {
   }), 20_000);
 
   it('reports a broken stdout pipe as exit 2 after completing session disposal', async () => fixture(async root => {
-    const result = await cliProcess(root, ['check', '--format', 'json'], { brokenStdout: true });
+    const result = await cliProcess(root, ['check', '--batch', '--format', 'json'], { brokenStdout: true });
     expect([result.code, result.signal, result.stdout]).toEqual([2, null, '']);
     expect(result.stderr).toContain('output-failure');
     expect(result.events.find(event => event.event === 'exit' && event.pid === result.pid)).toMatchObject({ handles: 0, signalListeners: 0 });
@@ -87,7 +87,7 @@ describe('compiled CLI process lifetime', () => {
   for (const action of ['resume', 'interrupt'] as const) it(`${action} during backpressured JSON publication keeps output and exit consistent`, async () => fixture(async root => {
     const purpose = 'Large résumé 🧪 report purpose. '.repeat(64 * 1024);
     await put(root, 'README.md', `# Fixture\n\n${purpose}\n`);
-    const result = await cliProcess(root, ['check', '--format', 'json'], { backpressuredStdout: action });
+    const result = await cliProcess(root, ['check', '--batch', '--format', 'json'], { backpressuredStdout: action });
     expect(result.events.filter(event => event.event === 'stdout-backpressure' && event.pid === result.pid)).toHaveLength(1);
     expect(result.signal).toBeNull();
     expect(result.survivingChildren).toEqual([]);

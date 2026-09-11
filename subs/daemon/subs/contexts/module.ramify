@@ -1,0 +1,8 @@
+ramify 1
+module contexts
+
+// X1 and X2: context manager and transport-independent vocabulary.
+expose-src createContextManager from "context-manager.ts" to parent
+expose-src * from "interfaces/contexts.ts" to parent
+// X3: controlled ports for consumer tests.
+expose-test createControlledWatcher, createControlledClock, ControlledWatcher, ControlledClock from "controlled-ports.ts" to parent

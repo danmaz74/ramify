@@ -1,0 +1,44 @@
+{
+  "path": "../../../../scripts/measurements/results/resident-2026-09-11T14-34-43.586Z-c4a3d367-410e-4b9c-a9ea-dabe6f074295.json.gz",
+  "fileSha256": "f5d57ff39fab3a3ac6968b206e88ef1771626148ec3ec0ce6480c4159a76cf8b",
+  "rawSha256": "0046c732ec3a09b4463254695d4d2d4de648d70cba3683978e948d79fa8e5630",
+  "workloadIds": [
+    "I2-29:entry-footprints",
+    "I2-29:cold-warm-broad-reference",
+    "I2-29:cold-warm-broad-hundred"
+  ],
+  "compatibility": {
+    "authorization": "user-approved-blast-radius-reuse-2026-09-11",
+    "policyReference": "User-approved evidence blast-radius policy, 2026-09-11",
+    "sourceTestChanges": [
+      {
+        "path": "subs/analysis/subs/model/src/tests/decision-lookups.test.ts",
+        "before": "c99516810d993fb3822efb13ff143db3823c5d5461828df982c0091b5d7507de",
+        "after": "4d90d134c72d70e3dada340986f729b3eb2b5c7a5c747bff08437f271de7bf5f"
+      }
+    ],
+    "orchestrationChanges": [
+      {
+        "path": "scripts/measurements/resident-composition.mjs",
+        "before": null,
+        "after": "9d6ce5b2707c74800ea9eda793a968beed6a076c9e18d1ac3e066cb36cd505b7"
+      },
+      {
+        "path": "scripts/measurements/resident-composition.test.mjs",
+        "before": null,
+        "after": "5f46d608b45e9d230aef003d35d033b9338edd3123f9463a20c6e7cca81cba89"
+      },
+      {
+        "path": "scripts/measurements/verify-resident-evidence.mjs",
+        "before": "fea2cdbec6cd7e8048364416fc87b4ffbaece607a75088eb17815d22e5adfd15",
+        "after": "91abb06c2e50ed022489714e30031e8df9abdfe91436fe6fc7872cf06d5816c8"
+      }
+    ],
+    "reasons": {
+      "subs/analysis/subs/model/src/tests/decision-lookups.test.ts": "Namespace spy changed to named-import module mock only in an owned test. No production file or compiled build bytes changed.",
+      "scripts/measurements/resident-composition.mjs": "Archive composition/verification infrastructure only, not imported by the unchanged measurement controller, workers or runtime.",
+      "scripts/measurements/resident-composition.test.mjs": "Archive composition/verification infrastructure only, not imported by the unchanged measurement controller, workers or runtime.",
+      "scripts/measurements/verify-resident-evidence.mjs": "Archive composition/verification infrastructure only, not imported by the unchanged measurement controller, workers or runtime."
+    }
+  }
+}

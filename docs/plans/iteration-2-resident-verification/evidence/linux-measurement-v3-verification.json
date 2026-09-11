@@ -1,0 +1,131 @@
+[
+  {
+    "id": "I2-29:entry-footprints",
+    "status": "measured",
+    "passed": true,
+    "rawAssertions": 17,
+    "rawFailures": [],
+    "advisoryMisses": [],
+    "controllerPostExit": 0,
+    "controllerFailure": null
+  },
+  {
+    "id": "I2-29:cold-warm-broad-reference",
+    "status": "measured",
+    "passed": true,
+    "rawAssertions": 45,
+    "rawFailures": [],
+    "advisoryMisses": [
+      "cold median",
+      "unchanged: median",
+      "readme: median",
+      "exposure: median",
+      "source: median",
+      "configuration: median"
+    ],
+    "controllerPostExit": 0,
+    "controllerFailure": null
+  },
+  {
+    "id": "I2-29:cold-warm-broad-hundred",
+    "status": "measured",
+    "passed": true,
+    "rawAssertions": 45,
+    "rawFailures": [],
+    "advisoryMisses": [
+      "readme: median",
+      "exposure: median",
+      "source: median"
+    ],
+    "controllerPostExit": 0,
+    "controllerFailure": null
+  },
+  {
+    "id": "I2-29:repeated-edit-plateau",
+    "status": "measured",
+    "passed": true,
+    "rawAssertions": 1218,
+    "rawFailures": [],
+    "advisoryMisses": [],
+    "controllerPostExit": 0,
+    "controllerFailure": null
+  },
+  {
+    "id": "I2-29:many-contexts",
+    "status": "measured",
+    "passed": true,
+    "rawAssertions": 30,
+    "rawFailures": [],
+    "advisoryMisses": [],
+    "controllerPostExit": 0,
+    "controllerFailure": null
+  },
+  {
+    "id": "I2-29:slow-consumer",
+    "status": "measured",
+    "passed": true,
+    "rawAssertions": 11,
+    "rawFailures": [],
+    "advisoryMisses": [
+      "RSS recovery after slow peer release"
+    ],
+    "controllerPostExit": 0,
+    "controllerFailure": null
+  },
+  {
+    "id": "I2-29:synthetic-500",
+    "status": "failed",
+    "passed": false,
+    "rawAssertions": 7,
+    "rawFailures": [
+      "cold complete check",
+      "source edit complete check",
+      "large-fixture source edit captured expected content",
+      "large-fixture source capture differs from cold result",
+      "synthetic-500: complete actual process samples",
+      "saved peak agrees with raw samples",
+      "combined daemon/helper/native peak"
+    ],
+    "advisoryMisses": [
+      "cold complete check",
+      "source edit complete check",
+      "combined daemon/helper/native peak"
+    ],
+    "controllerPostExit": 0,
+    "controllerFailure": null
+  },
+  {
+    "id": "I2-29:synthetic-1000",
+    "status": "failed",
+    "passed": false,
+    "rawAssertions": 7,
+    "rawFailures": [
+      "cold complete check",
+      "source edit complete check",
+      "large-fixture source edit captured expected content",
+      "large-fixture source capture differs from cold result",
+      "synthetic-1000: complete actual process samples",
+      "saved peak agrees with raw samples",
+      "combined daemon/helper/native peak"
+    ],
+    "advisoryMisses": [
+      "cold complete check",
+      "source edit complete check",
+      "combined daemon/helper/native peak"
+    ],
+    "controllerPostExit": 0,
+    "controllerFailure": null
+  },
+  {
+    "id": "I2-29:publication-peak",
+    "status": "measured",
+    "passed": true,
+    "rawAssertions": 10,
+    "rawFailures": [],
+    "advisoryMisses": [
+      "reference: combined publication peak"
+    ],
+    "controllerPostExit": 0,
+    "controllerFailure": null
+  }
+]

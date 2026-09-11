@@ -46,8 +46,13 @@ Before visualization exists, exercise CLI handlers and service flows through
 the same in-process binding. Use real output formatting and assert the selected
 freshness, structured findings and exit behavior. UI providers and browser
 packages are introduced only in the later UI test scope.
-The daemon-owned binding arrives with the resident iteration; the preceding
-batch-only iteration injects real analysis sessions without a context manager.
+Current CLI tests inject real batch analysis sessions without a context manager.
+Plan 2 has added contexts-owned controlled watcher and clock ports, exposed to
+root through daemon, plus owner tests for history, framing and socket
+backpressure. The daemon-owned service binding and root's `createQuickEnvironment`
+remain unimplemented; helper tests do not establish resident service flows.
+The [resident readiness guide](../development/resident-verification.md) records
+the missing providers and completion witnesses.
 
 MCP tests use the real MCP registration, input validation and response mapping
 with an injected in-process analysis service. Exercise a protocol client/server

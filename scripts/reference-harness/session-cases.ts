@@ -1,3 +1,5 @@
+import { recordObservation } from './observations.js';
+import type { Observation } from './observations.js';
 import { execFile } from 'node:child_process';
 import { readFile, rm, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -201,7 +203,8 @@ for (const id of ['I1-27:cancel/acquisition', 'I1-27:cancel/catalog', 'I1-27:rea
       join(repositoryRoot, 'scripts/reference-harness/session-lifecycle.ts'), context.root, id],
     { cwd: repositoryRoot, timeout: id.endsWith('report-retention') ? 120_000 : 30_000, maxBuffer: 2 * 1024 ** 2 });
     context.assertions.equal('isolated lifecycle worker stderr', result.stderr, '');
-    const evidence = JSON.parse(result.stdout) as { assertions: AssertionEvidence[]; error?: string };
+    const evidence = JSON.parse(result.stdout) as { assertions: AssertionEvidence[]; observations?: Observation[]; error?: string };
+    for (const observation of evidence.observations ?? []) recordObservation(observation.kind, observation.data);
     context.assertions.ok('lifecycle worker returned actual assertions', evidence.assertions.length > 0);
     for (const assertion of evidence.assertions) context.assertions.equal(`${assertion.name}${assertion.error ? ': ' + assertion.error : ''}`, assertion.status, 'passed');
     context.assertions.equal('lifecycle worker completed without hidden failure', evidence.error, undefined);

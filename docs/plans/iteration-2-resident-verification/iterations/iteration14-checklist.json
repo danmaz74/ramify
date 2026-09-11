@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": false,
+    "functionalRequirementsSatisfied": false,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-11T09:38:12Z",
+  "iteration": "14",
+  "notes": "Single focused remediation implemented the previously missing I2-30:plan1-regression handler. It validates a full same-source/build/runtime Plan 1 report, all 308 passing assertion records, 305 unchanged definitions and eleven-owner/eight-entry observations, without rerunning regression. Type-check and 23 direct controls pass; the real checkout correctly rejects absent matching evidence. Functional completion still lacks the predecessor resident provider chain, passing resident cases, current Plan 1 report, measured budgets and macOS evidence. All-new-test success remains unestablished because the automation-owned runner verdict is unavailable. The previous full Plan 2 result (6 passed, 14 failed, 156 unexecuted) predates this reader change; it was not rerun. No publication in this remediation."
+}

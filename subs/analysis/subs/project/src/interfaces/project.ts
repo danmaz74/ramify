@@ -109,9 +109,23 @@ export interface ProjectReadOptions {
   readonly parse: DescriptionParser;
   readonly limits: AcquisitionLimits;
   readonly signal?: AbortSignal;
+  readonly retained?: RetainedConfiguration | null;
 }
 export type ProjectRead =
-  | { readonly status: 'acquired'; readonly view: ProjectInputView }
+  | { readonly status: 'acquired'; readonly view: ProjectInputView;
+      readonly configuration: RetainedConfiguration; readonly reusedConfiguration: boolean }
   | { readonly status: 'invalid' | 'unavailable' | 'incomplete';
-      readonly inventory: ProjectInventory | null; readonly issues: readonly ProjectIssue[] }
+      readonly inventory: ProjectInventory | null; readonly issues: readonly ProjectIssue[];
+      readonly sealedInputs: readonly CapturedInput[] | null }
   | { readonly status: 'cancelled' };
+
+export type ProjectResolution =
+  | { readonly status: 'resolved'; readonly root: string; readonly selection: 'given' | 'found';
+      readonly invokedFrom: string; readonly configuration: string }
+  | { readonly status: 'invalid' | 'unavailable'; readonly issues: readonly ProjectIssue[] };
+export interface RetainedConfiguration {
+  readonly key: string;
+  readonly dependencies: readonly CapturedInput[];
+  readonly bytes: number;
+  readonly product: Readonly<Record<string, unknown>>;
+}

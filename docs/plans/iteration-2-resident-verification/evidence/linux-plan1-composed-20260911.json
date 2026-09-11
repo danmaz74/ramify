@@ -1,0 +1,26 @@
+{
+  "kind": "linux-plan1-composed-archive",
+  "policy": "2026-09-11-reviewed-test-harness-remediation",
+  "summary": {
+    "accepted": 308,
+    "reused": 299,
+    "rerun": 9,
+    "rawSidecarsVerified": 1
+  },
+  "sourceSha256": "7f49d5a5676e1c7dfd7af8700c4c97d53f551932384680248b25252f478a5392",
+  "buildSha256": "495ef420a136e63b116b77a48f44b99c0cbc116319a3987266019fbf53ea34b4",
+  "baselineRun": "https://github.com/danmaz74/ramify/actions/runs/34611509976",
+  "files": [
+    {
+      "file": "linux-plan1-composed-20260911.zip",
+      "sha256": "7ffd608b1cf858698223a1af3b174adb29c5c0d979cbb97e8632eb48c81f69e4",
+      "bytes": 1071465
+    },
+    {
+      "file": "linux-plan1-proof-history.bundle",
+      "sha256": "4aaabeb3068db31ffb74cefa99daa3e3b4e677e1ff6dbb00cc89e19105f1819d",
+      "bytes": 17107
+    }
+  ],
+  "verification": "All five immutable report/proof siblings archived; every referenced gzip sidecar independently checked for compressed and raw SHA256, byte lengths and valid JSON. Original failed full run remains unchanged; actual Plan1 consumer accepted the separate composition receipt."
+}

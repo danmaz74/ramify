@@ -94,7 +94,7 @@ Missing documentation is explicit, with no fallback to another owner's prose.
 README completeness is separate from module-description validity.
 
 The evaluator, teaching diagrams and toolkit source have migrated to the resolved
-tag registry and module-owned `src/tests/`. `npm run check:self` checks all nine
+tag registry and module-owned `src/tests/`. `npm run check:self` checks all eleven
 toolkit owners, including owned tests. The independent scripts, site and example
 have separate compiler scopes. The [iteration 15 completion report](docs/plans/done/iteration-1-project-verifier/iterations/iteration15-results.md)
 records acceptance evidence and remaining limitations.
@@ -102,9 +102,10 @@ records acceptance evidence and remaining limitations.
 ## Implementation Architecture
 
 The [architecture overview](docs/architecture/README.md) indexes the implementation
-design. Current CLI checks use a fresh disposable batch session. The later
-process split has a lightweight CLI talking directly to a resident analysis
-daemon and a separate on-demand tRPC web process serving visualization.
+design. CLI checks use a lightweight client talking directly to the resident analysis
+daemon. `--batch` selects an independent disposable session. Watch, status and
+stop use the same client. The planned on-demand tRPC web process for
+visualization remains separate.
 The later root child `mcp [dispatch]` serves stdio through a lazily loaded
 `ramify mcp` mode, using the same daemon client; it is independent of visualization.
 Optional MCP HTTP hosting can mount that module in the separate web process.

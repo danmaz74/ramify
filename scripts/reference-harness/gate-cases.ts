@@ -27,7 +27,7 @@ const referenceFixture: Pick<ProjectHandler, 'kind' | 'fixture' | 'prepare' | 'b
 };
 
 handlers.set('I1-01:baseline', { ...referenceFixture, run: async ({ root, assertions }: ProjectContext) => {
-  const result = await command(repositoryRoot, process.execPath, [join(repositoryRoot, 'dist/src/cli-entry.js'), 'check', '--root', root, '--format', 'json']);
+  const result = await command(repositoryRoot, process.execPath, [join(repositoryRoot, 'dist/src/cli-entry.js'), 'check', '--batch', '--root', root, '--format', 'json']);
   assertions.equal('compiled CLI exit and clean stderr', [result.code, result.signal, result.error, result.stderr], [0, null, null, '']);
   await assertBaseline(JSON.parse(result.stdout) as AnalysisReport, assertions, root);
 } });

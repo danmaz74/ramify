@@ -7,16 +7,18 @@ import { linkDescriptions } from '../subs/descriptions/src/link.js';
 import { buildModel, deriveSourceAreas, resolveTagRegistry } from '../subs/model/src/index.js';
 import type { SourceArea } from '../subs/model/src/interfaces/model.js';
 import { readProject } from '../subs/project/src/read-project.js';
-import type { ProjectInputView } from '../subs/project/src/interfaces/project.js';
+import type { RetainedConfiguration, ProjectInputView } from '../subs/project/src/interfaces/project.js';
 import { createSourceAnalysis } from '../subs/typescript/src/source-analysis.js';
 import type { SourceAnalysis } from '../subs/typescript/src/interfaces/source.js';
 import type { AccessResult, AnalysisInputs, AnalysisRun } from './interfaces/analysis.js';
 import { evaluateAccessesAsync } from './evaluate-accesses.js';
 import { availableCapabilities, byteOrder, ReportDraft, WorkLimit } from './report.js';
 import { diagnostic, projectDiagnostics } from './report-data.js';
+import { captureReads, dependencyKey, identity, recordProduct, replayReads, sourceDependencies } from './retained-products.js';
+import type { RetainedWork, ParseProduct, CatalogProduct, AccessProduct, ReadCall } from './retained-products.js';
 
 /** The session owns composition and disposal; children keep compiler/filesystem mechanics. */
-export async function runAnalysis(inputs: AnalysisInputs, cancellation: AbortSignal): Promise<AnalysisRun> {
+export async function runAnalysis(inputs: AnalysisInputs, cancellation: AbortSignal, retained?: RetainedWork): Promise<AnalysisRun> {
   let draft = new ReportDraft(inputs);
   if (cancellation.aborted) return { status: 'cancelled' };
   const abort = new AbortController();
@@ -30,6 +32,7 @@ export async function runAnalysis(inputs: AnalysisInputs, cancellation: AbortSig
   };
   const remaining = (maximum: number): number => Math.max(1, Math.ceil(Math.min(maximum, deadline - performance.now())));
   let acquisitionElapsed = 0;
+  let permitSourceReuse = retained?.changes !== null;
   try {
     if (Object.values(inputs.limits).flatMap(value => typeof value === 'object' ? Object.values(value) : [value])
       .some(value => !Number.isSafeInteger(value) || value <= 0) || inputs.limits.acquisition.attempts > 3) {
@@ -57,6 +60,7 @@ export async function runAnalysis(inputs: AnalysisInputs, cancellation: AbortSig
               const next = new ReportDraft(inputs, draft.runId);
               draft = next; draft.registry = registry.value; draft.stage('registry', 'completed');
             }
+            if (retained) { retained.products = {}; retained.keys = {}; retained.reused = []; retained.sealed = null; }
             let view: ProjectInputView | undefined;
             let source: SourceAnalysis | undefined;
             let sourceDisposalMs = 0;
@@ -65,14 +69,28 @@ export async function runAnalysis(inputs: AnalysisInputs, cancellation: AbortSig
               check(); draft.current = 'acquisition';
               if (acquisitionElapsed >= inputs.limits.acquisition.deadlineMs) throw new WorkLimit('acquisition.deadlineMs', inputs.limits.acquisition.deadlineMs, Math.ceil(acquisitionElapsed));
               const parsed = new Map<string, ParsedDescription>();
+              const parseProducts: ParseProduct = {};
+              const previousConfiguration = retained?.previous?.products.configuration as RetainedConfiguration | undefined;
+              const sameRegistry = !previousConfiguration || previousConfiguration.product.analysisRegistry === registry.value.id;
+              const oldParse = sameRegistry ? retained?.previous?.products.parse as ParseProduct | undefined : undefined;
+              let parseReused = true;
+              const oldConfiguration = sameRegistry ? previousConfiguration : undefined;
               const acquisitionStart = performance.now();
               const acquired = await readProject({ request: inputs.project,
-                parse: (file, text) => { const result = parseDescription(file, text); parsed.set(file, result); return result; },
+                parse: (file, text) => {
+                  const hash = identity(text), old = oldParse?.[file];
+                  const result = old?.hash === hash ? old.value : parseDescription(file, text);
+                  if (old?.hash !== hash) parseReused = false;
+                  parseProducts[file] = { hash, value: result }; parsed.set(file, result); return result;
+                },
+                retained: oldConfiguration && (retained?.changes === null ? { ...oldConfiguration, key: '' } : oldConfiguration),
                 limits: { ...inputs.limits.acquisition, attempts: 1, deadlineMs: remaining(inputs.limits.acquisition.deadlineMs - acquisitionElapsed) }, signal: abort.signal });
               acquisitionElapsed += performance.now() - acquisitionStart;
+              recordProduct(retained, 'parse', identity(Object.entries(parseProducts).map(([path, product]) => [path, product.hash])), parseProducts, parseReused && Object.keys(parseProducts).length > 0);
               check();
               if (acquired.status === 'cancelled') throw Object.assign(new Error('Project acquisition was cancelled'), { code: 'cancelled' });
               if (acquired.status !== 'acquired') {
+                if (retained) retained.sealed = acquired.sealedInputs;
                 if (acquired.inventory) draft.inventory(acquired.inventory);
                 draft.record(projectDiagnostics(acquired.inventory, acquired.issues, parsed));
                 draft.stage('acquisition', acquired.status === 'incomplete' ? 'failed' : acquired.status, draft.diagnostics);
@@ -81,6 +99,10 @@ export async function runAnalysis(inputs: AnalysisInputs, cancellation: AbortSig
                 retry = acquired.issues.some(issue => issue.code === 'changed-input');
               } else {
                 view = acquired.view;
+                const configurationProduct = { ...acquired.configuration.product, analysisRegistry: registry.value.id };
+                recordProduct(retained, 'configuration', acquired.configuration.key, { ...acquired.configuration, product: configurationProduct,
+                  bytes: Buffer.byteLength(JSON.stringify(configurationProduct)) }, acquired.reusedConfiguration);
+                recordProduct(retained, 'metadata', identity(acquired.configuration.product.metadata), acquired.configuration.product.metadata, acquired.configuration.product.metadataReused === true);
                 draft.inventory(view.inventory);
                 draft.stage('acquisition', 'completed'); draft.stage('parse', 'completed'); draft.current = 'parse';
                 const areas: SourceArea[] = [];
@@ -96,11 +118,34 @@ export async function runAnalysis(inputs: AnalysisInputs, cancellation: AbortSig
                   draft.stage('parse', 'invalid', draft.diagnostics); draft.execution = 'invalid';
                 } else {
                   draft.current = 'catalog';
-                  source = await createSourceAnalysis({ view, inventory: view.inventory, areas,
+                  const context = identity({ registry: registry.value.id, areas,
+                    root: view.inventory.scope.root, configuration: view.inventory.scope.configuration,
+                    files: view.inventory.files.map(({ path, owner, area, kind }) => ({ path, owner, area, kind })),
+                    limits: inputs.limits, capabilities: inputs.capabilities });
+                  const oldCatalog = retained?.previous?.products.catalog as CatalogProduct | undefined;
+                  const oldAccess = retained?.previous?.products.access as AccessProduct | undefined;
+                  const calls: ReadCall[] = [];
+                  let reusedSource = false;
+                  if (permitSourceReuse && acquired.reusedConfiguration && oldCatalog?.context === context && oldAccess) {
+                    await replayReads(view, oldCatalog.calls);
+                    const fresh = sourceDependencies(view.inputs);
+                    if (dependencyKey(fresh) === dependencyKey(oldCatalog.dependencies)) {
+                      reusedSource = true; calls.push(...oldCatalog.calls);
+                    } else {
+                      // Old imports may no longer be dependencies. Discard their
+                      // preflight capture before recomputing the batch pipeline.
+                      permitSourceReuse = false;
+                      throw Object.assign(new Error('Retained source dependencies changed'), { code: 'retained-changed' });
+                    }
+                  }
+                  if (!reusedSource) source = await createSourceAnalysis({ view: captureReads(view, calls), inventory: view.inventory, areas,
                     limits: { ...inputs.limits.source, deadlineMs: remaining(inputs.limits.source.deadlineMs) }, signal: abort.signal });
                   check();
-                  const catalog = await source.catalog(abort.signal);
+                  const catalog = reusedSource ? oldCatalog!.value : await source!.catalog(abort.signal);
                   check(); draft.patch({ catalog });
+                  let catalogKey = identity([context, sourceDependencies(view.inputs)]);
+                  const catalogProduct: CatalogProduct = { value: catalog, calls, dependencies: sourceDependencies(view.inputs), context };
+                  recordProduct(retained, 'catalog', catalogKey, catalogProduct, reusedSource);
                   // Opaque inventoried resources (HTML, feature files) need no export
                   // interpretation until an import or declaration selects them. Their
                   // catalog state remains retained; accesses report any relevant gap.
@@ -108,7 +153,10 @@ export async function runAnalysis(inputs: AnalysisInputs, cancellation: AbortSig
                     || view!.inventory.references.some(reference => reference.normalized === note.location.file)));
                   draft.stage('catalog', 'completed');
                   draft.current = 'link';
-                  const linked = linkDescriptions({ registry: registry.value, inventory: view.inventory, catalog });
+                  const linkKey = identity([catalogKey, dependencyKey(view.inputs.filter(input => input.role === 'description')), registry.value.id]);
+                  const oldLink = retained?.previous?.products.link as { linked: ReturnType<typeof linkDescriptions>; model: ReturnType<typeof buildModel> } | undefined;
+                  const reuseLink = reusedSource && retained?.previous?.stages.some(stage => stage.stage === 'link' && stage.key === linkKey) && oldLink;
+                  const linked = reuseLink ? oldLink!.linked : linkDescriptions({ registry: registry.value, inventory: view.inventory, catalog });
                   check();
                   if (linked.status === 'invalid') {
                     draft.patch({ linked });
@@ -122,27 +170,39 @@ export async function runAnalysis(inputs: AnalysisInputs, cancellation: AbortSig
                       if (pairs > inputs.limits.maxExposurePairs) throw new WorkLimit('maxExposurePairs', inputs.limits.maxExposurePairs, pairs);
                     }
                     draft.patch({ linked });
-                    const model = buildModel(linked.modelInput);
+                    const model = reuseLink ? oldLink!.model : buildModel(linked.modelInput);
                     check();
                     if (model.status === 'invalid') {
                       draft.record(model.issues.map(issue => diagnostic(issue.code, issue.message, 'description', issue.locations)));
                       draft.stage('link', 'invalid', draft.diagnostics); draft.execution = 'invalid';
                     } else {
                       draft.patch({ model: model.value }); draft.stage('link', 'completed'); draft.current = 'access';
-                      const accesses = await source.accesses(abort.signal);
+                      recordProduct(retained, 'link', linkKey, { linked, model }, Boolean(reuseLink));
+                      const accesses = reusedSource ? oldAccess! : await source!.accesses(abort.signal);
                       // Facts are detached at the adapter boundary. The compiler
                       // is no longer needed during decisions or input sealing.
                       const releaseStart = performance.now();
-                      await source.dispose(); source = undefined;
+                      await source?.dispose(); source = undefined;
+                      // Access extraction may observe additional resolver inputs.
+                      // Catalog and access share their cumulative final dependencies.
+                      catalogKey = identity([context, sourceDependencies(view.inputs)]);
+                      recordProduct(retained, 'catalog', catalogKey, { ...catalogProduct, dependencies: sourceDependencies(view.inputs) }, reusedSource);
+                      recordProduct(retained, 'access', catalogKey, accesses, reusedSource);
+                      const finalLinkKey = identity([catalogKey, dependencyKey(view.inputs.filter(input => input.role === 'description')), registry.value.id]);
+                      recordProduct(retained, 'link', finalLinkKey, { linked, model }, Boolean(reuseLink));
                       sourceDisposalMs = performance.now() - releaseStart;
                       if (sourceDisposalMs > inputs.limits.disposeTimeoutMs) throw new WorkLimit('disposeTimeoutMs', inputs.limits.disposeTimeoutMs, Math.ceil(sourceDisposalMs));
                       check(); draft.patch({ accesses: accesses.accesses }); draft.cover(accesses.coverage); draft.stage('access', 'completed');
                       draft.current = 'decide';
                       const results: AccessResult[] = [];
                       draft.patch({ results });
-                      await evaluateAccessesAsync(model.value, accesses.accesses, inputs.limits.maxDiagnostics, {
+                      const oldDecide = retained?.previous?.products.decide as { results: AccessResult[]; diagnostics: typeof draft.diagnostics } | undefined;
+                      const reuseDecide = reuseLink && oldDecide && retained?.previous?.stages.some(stage => stage.stage === 'decide' && stage.key === finalLinkKey);
+                      if (reuseDecide) { results.push(...oldDecide!.results); draft.record(oldDecide!.diagnostics); }
+                      else await evaluateAccessesAsync(model.value, accesses.accesses, inputs.limits.maxDiagnostics, {
                         diagnostic: item => draft.record([item]), result: item => results.push(item), checkpoint: check,
                       });
+                      recordProduct(retained, 'decide', finalLinkKey, { results, diagnostics: [...draft.diagnostics] }, Boolean(reuseDecide));
                       draft.stage('decide', 'completed', draft.diagnostics); draft.execution = 'completed';
                     }
                   }
@@ -156,6 +216,7 @@ export async function runAnalysis(inputs: AnalysisInputs, cancellation: AbortSig
                 if (seal.status === 'changed') {
                   throw Object.assign(new Error(`Inputs changed during analysis: ${seal.paths.join(', ')}`), { code: 'changed-input' });
                 }
+                if (retained) retained.sealed = seal.inputs;
                 const captured = [...seal.inputs].sort((a, b) => byteOrder(a.path, b.path) || byteOrder(a.role, b.role));
                 draft.patch({ inputs: captured });
                 draft.inputId = `input/1:${createHash('sha256').update(JSON.stringify({ scope: view.inventory.scope,
@@ -166,7 +227,8 @@ export async function runAnalysis(inputs: AnalysisInputs, cancellation: AbortSig
               }
             } catch (error) {
               const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
-              retry = code === 'changed-input';
+              if (code === 'retained-changed') { attempt--; retry = true; }
+              else retry = code === 'changed-input';
               if (view) draft.patch({ inputs: [...view.inputs] });
               if (retry) {
                 // An incoherent candidate is never a valid graph or a checked source prefix.
@@ -178,7 +240,7 @@ export async function runAnalysis(inputs: AnalysisInputs, cancellation: AbortSig
                 const path = relative(draft.snapshot.inventory.scope.root, error.path);
                 if (!isAbsolute(path) && !path.startsWith('../')) Object.assign(error, { path });
               }
-              draft.failure(error, retry ? 'acquisition' : draft.current);
+              if (code !== 'retained-changed') draft.failure(error, retry ? 'acquisition' : draft.current);
             } finally {
               draft.current = 'report';
               const disposalStart = performance.now();
