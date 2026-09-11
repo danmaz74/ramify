@@ -299,3 +299,46 @@ metadata with preserved decisions. Restoration compares the entire batch report
 after replacing only `runId`. Each edit assertion rejects the unchanged baseline
 as a negative control. Future quick handlers can reuse these report assertions
 with the harness's recorded `Assertions`, adding their resident-specific checks.
+
+### Process signal fixtures (Plan 2 iteration 12)
+
+`src/tests/lifecycle-process.ts` supplies `withProcessScope` for concurrently
+running traced processes. Each scope creates a private, mode-0700 temporary
+endpoint directory and injects the existing process preload into Node entries
+and installed executables. Callers can observe output while a process runs,
+send input, deliver SIGSTOP/SIGCONT/SIGINT/SIGKILL and wait for bounded exits.
+The trace preserves socket, module, launch and exit observations. It does not
+infer a daemon stop reason from a signal or socket closure.
+
+Every successful callback must finish its processes. Teardown kills and checks
+known descendants, including detached helpers, removes the endpoint directory,
+and fails a callback that left processes alive even when cleanup killed them.
+Failure paths resume suspended parents to reap their children, preserve the
+original failure, and report cleanup failures. Output and trace reads are bounded
+at 40 MiB. This helper uses Node process signals and pid liveness, without
+`/proc` or platform-specific command flags.
+
+`npx tsx scripts/reference-harness/lifecycle-process-smoke.ts` executes the same
+nine fixture cases that `src/tests/lifecycle-process.test.ts` registers with
+Vitest. The smoke reports its OS and Node version and establishes process-control
+mechanics only. It starts no Ramify daemon and earns no I2 instance credit.
+On this checkpoint the resident entry, host, service, connector and watch handler
+remain absent. `lifecycle` therefore remains unavailable; all eight I2-18 and
+five I2-27 instances remain unexecuted. Resume the actual lifecycle handlers
+against those providers, including record-derived stop reasons, fixed timing
+bounds, nine-context eviction, installed CLI/direct-client recovery and macOS
+execution. Fixture success cannot substitute for that evidence.
+
+`fixtures/plan2/lifecycle.ts` adds `withLifecycleProjects(workRoot, run)` for
+I2-27's nine-context workload. It creates nine independent copies of the frozen
+F recipe, returns their roots in stable opening order, and uses the existing
+mutation scope to clean them after success or failure. Overlapping calls own
+separate directories even under the same work root. The caller must still open
+the actual contexts, acquire and release real leases in order, observe daemon
+status and assert eviction; this helper performs no service operation.
+
+`npx tsx scripts/reference-harness/lifecycle-fixture-smoke.ts` runs the same
+three cases registered in `lifecycle-fixtures.test.ts`: nine complete F copies,
+independent edits and overlapping scopes, and cleanup preserving callback
+failures and caller-owned files. This qualifies the input fixture only; it does
+not execute `I2-27:eviction-under-many-contexts` or activate `lifecycle`.
