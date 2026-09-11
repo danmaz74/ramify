@@ -42,7 +42,11 @@ export function capturedExpected(report, expected) {
 export function reportCommand(result, owners, denied = 0, expected = []) {
   assert.equal(result.failure, null); assert.equal(result.signal, null);
   assert.equal(result.stderr, '', 'Resident command must not fall back or recover');
-  assert.equal(result.code, denied ? 1 : 0);
+  if (result.code !== (denied ? 1 : 0)) {
+    let detail = '';
+    try { detail = JSON.parse(result.stdout).diagnostics?.map(item => `${item.code}: ${item.message}`).join('; ') ?? ''; } catch {}
+    assert.fail(`Resident command exited ${result.code}; expected ${denied ? 1 : 0}${detail ? `: ${detail.slice(0, 4096)}` : ''}`);
+  }
   const report = JSON.parse(result.stdout);
   assert.equal(report.schemaVersion, 'ramify.analysis/1');
   assert.deepEqual(report.outcome, { execution: 'completed', check: denied ? 'failed' : 'passed', coverage: 'complete' });

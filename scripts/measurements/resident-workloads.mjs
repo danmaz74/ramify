@@ -9,6 +9,7 @@ import { residentBudgets as budgets } from './resident-plan.mjs';
 import { packageRoot, median } from './common.mjs';
 import { treeIdentity } from './identities.mjs';
 import { measuredReuse } from './resident-reuse.mjs';
+import { coldCommand, withResident } from './resident-failure.mjs';
 
 const peak = samples => Math.max(0, ...samples.map(sample => sample.combinedRssBytes));
 function compactCli(sample, report) { return { pid: sample.pid, durationMs: sample.durationMs, code: sample.code, report,
@@ -26,13 +27,11 @@ export async function executeResidentWorkload(suffix, options, measurements, che
   async function cold(project) {
     const host = resident();
     await import('node:fs/promises').then(fs => fs.mkdir(host.endpoint, { recursive: true, mode: 0o700 }));
-    try {
-      const sample = await host.cli(project);
-      const report = reportCommand(sample, project.owners);
-      await host.connect('never');
+    return withResident(host, async () => {
+      const { sample, report } = await coldCommand(host, project, measurements);
       return { ...compactCli(sample, report), daemonPid: host.pid, instanceId: host.instance.instanceId,
         settled: sampleMetrics(await host.settled()) };
-    } finally { await host.close(); }
+    });
   }
   async function warmed(project) {
     const host = resident();
@@ -127,9 +126,8 @@ export async function executeResidentWorkload(suffix, options, measurements, che
     const project = await prepared(suffix === 'synthetic-500' ? 'S500' : 'S1000');
     const host = resident();
     await import('node:fs/promises').then(fs => fs.mkdir(host.endpoint, { recursive: true, mode: 0o700 }));
-    try {
-      const initial = await host.cli(project), report = reportCommand(initial, project.owners);
-      await host.connect('never');
+    await withResident(host, async () => {
+      const { sample: initial, report } = await coldCommand(host, project, measurements);
       host.lastInput = report.inputId;
       const coldSamples = initial.processes.map(sample => ({ ...sample, processes: sample.processes.filter(p => p.pid !== initial.pid),
         combinedRssBytes: sample.processes.filter(p => p.pid !== initial.pid).reduce((sum, p) => sum + p.rssBytes, 0) }));
@@ -138,7 +136,7 @@ export async function executeResidentWorkload(suffix, options, measurements, che
       measurements.source = await cliCycle(project, host, 'source', 0);
       const sourceSamples = host.observer.since(mark, [measurements.source.pid]);
       measurements.samples = [...coldSamples, ...sourceSamples]; measurements.peakBytes = peak(measurements.samples);
-    } finally { await host.close(); }
+    });
   } else if (suffix === 'publication-peak') {
     for (const name of ['reference', 'S100']) {
       const project = await prepared(name), { host, token } = await warmed(project);
