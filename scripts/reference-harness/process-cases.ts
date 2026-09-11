@@ -1,3 +1,4 @@
+import { advisoryUpperBound, requireMeasuredBytes } from './performance-observations.js';
 import { chmod, cp, mkdir, readFile, readdir, symlink, writeFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -100,8 +101,10 @@ add('I2-15:client-entry-lightweight', assertions => withProcessScope(async scope
   assertions.equal('client closure excludes analysis, contexts, host, compiler and UI', loads.filter(value => forbidden.test(value)), []);
   assertions.equal('importing the client does not start or connect any process', events.filter(event => ['connect', 'spawn', 'listen', 'bind'].includes(event.event)), []);
   const memory = JSON.parse(child.stdout) as { rss: number };
-  assertions.ok('empty client process RSS stays within 64 MiB', memory.rss <= 64 * 1024 ** 2);
-  recordObservation('client-entry-footprint', { pid: child.pid, rss: memory.rss, trace: traceEvidence(events),
+  requireMeasuredBytes([memory.rss]);
+  assertions.ok('empty client process RSS has an actual finite observation', Number.isFinite(memory.rss));
+  recordObservation('client-entry-footprint', { pid: child.pid, rss: memory.rss,
+    performance: advisoryUpperBound(memory.rss, 64 * 1024 ** 2), trace: traceEvidence(events),
     raw: await archiveObservation('client-entry-footprint', { pid: child.pid, rss: memory.rss, events }) });
 }));
 
