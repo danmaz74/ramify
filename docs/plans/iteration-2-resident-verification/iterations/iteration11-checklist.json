@@ -1,7 +1,7 @@
 {
   "_cucumberViz": {
     "generatedBy": "cucumber-viz",
-    "mcpTool": "workflow.write_iteration_checklist",
+    "mcpTool": "workflow.publish_iteration",
     "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
   },
   "checks": {
