@@ -5,11 +5,11 @@
     "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
   },
   "checks": {
-    "allNewTestsPass": false,
+    "allNewTestsPass": true,
     "functionalRequirementsSatisfied": false,
     "newCodeCoveredByTests": true
   },
-  "completedAt": "2026-09-11T07:23:42.957Z",
+  "completedAt": "2026-09-11T07:29:02.928Z",
   "iteration": "4",
-  "notes": "Single focused remediation completed standalone report-history storage: exact revision lookup, actual UTF-8 accounting, count/byte bounds, atomic oversized-candidate rejection, oldest-first removal, cold-history release and disposal. Added seven owner cases (31 total). Corrected an initial test-fixture registry type error; final type-check, history smoke, build, self-check and diff check pass. Functional completion remains false: iteration 3 still lacks IncrementRun/InputChange/RetainedAnalysis/RetainedStageId/ProjectResolution and increment operations; the manager, integration and all 27 contexts handlers remain absent. The initial 49-required/4-passed gate was not rerun because no capability or prerequisite changed. allNewTestsPass remains false because Vitest/Cucumber execution is reserved to workflow automation and no runner verdict or iteration4 check-result artifact is available. Direct smoke is not a Vitest or I2-instance verdict. Changes are committed without publishing, as requested."
+  "notes": "Regression repair updated only the descriptions owner's two stale exact-text fixture expectations for the implemented daemon N5 and contexts X2/X3 declarations. Strict equality, all names, destinations, tags, order, spans and inventory coverage remain intact. Type-check and diff check pass; the corrected regression suite awaits workflow rerun. allNewTestsPass is now true: automated run post_commit_regression-4-1789111482843-f8c75c and its matching Vitest cache confirm tokens (15), controlled ports (9) and history (7) passed; all 31 new cases and their implementation are unchanged in this repair. The original run's only two failures were the pre-existing parser fixtures corrected here; no complete post-repair regression pass is claimed. functionalRequirementsSatisfied remains false: iteration 3 provider contracts and increment operations remain absent, so manager integration and all 27 contexts handlers remain unimplemented. The existing decision-pending self-assessment finding is not resolved by the fixture repair. Both deliverables updated and changes committed; no publication call."
 }

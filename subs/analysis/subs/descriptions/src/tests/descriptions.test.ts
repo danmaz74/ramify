@@ -90,8 +90,16 @@ const toolkit: readonly Fixture[] = [
   { path: 'subs/analysis/subs/project/', name: 'project', tags: [], statements: [src(['readProject'], 'read-project.ts'), src('*', 'interfaces/project.ts')] },
   { path: 'subs/analysis/subs/typescript/', name: 'typescript', tags: [], statements: [src(['createSourceAnalysis'], 'source-analysis.ts'), src('*', 'interfaces/source.ts')] },
   { path: 'subs/cli/', name: 'cli', tags: ['dispatch'], statements: [src(['runCli'], 'run-cli.ts'), src('*', 'interfaces/cli.ts')] },
-  { path: 'subs/daemon/', name: 'daemon', tags: ['dispatch'], statements: [] },
-  { path: 'subs/daemon/subs/contexts/', name: 'contexts', tags: [], statements: [] },
+  // Plan 2 iteration 4's implemented X2/X3 subset and N5 relay.
+  { path: 'subs/daemon/', name: 'daemon', tags: ['dispatch'], statements: [
+    sub(['ContextId', 'GenerationId', 'RevisionId', 'LeaseId', 'ContextToken', 'ContextSetup',
+      'ContextSelection', 'InputFingerprints', 'WatchEvent', 'WatcherHandle', 'WatcherPort', 'ClockPort',
+      'createControlledWatcher', 'createControlledClock', 'ControlledWatcher', 'ControlledClock'], 'contexts'),
+  ] },
+  { path: 'subs/daemon/subs/contexts/', name: 'contexts', tags: [], statements: [
+    src('*', 'interfaces/contexts.ts'),
+    statement('expose-test', ['createControlledWatcher', 'createControlledClock', 'ControlledWatcher', 'ControlledClock'], 'controlled-ports.ts'),
+  ] },
   { path: 'subs/presentation/', name: 'presentation', tags: uiBrowser, statements: presentationStatements },
   { path: 'subs/presentation/subs/layout/', name: 'layout', tags: browser, statements: layoutStatements },
 ];
