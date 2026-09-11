@@ -25,7 +25,15 @@ stop, handshake and connection-state declarations. N1 exposes the two real
 ports and N4 exposes only those existing types. The contexts vocabulary and
 controlled ports remain relayed through N5.
 
+The private request validator checks every operation's parameter shape,
+including token identifiers, freshness variants, printable request IDs and
+bounded content expectations. It rejects unknown properties and non-data
+objects, and permits arbitrary string registry/capability names structurally:
+the future service must return unsupported setups as domain outcomes. Root's
+R6 exposure currently provides only the five independent service operation,
+capability, error and result declarations that this validator consumes.
+
 Iteration 3's increment and project-resolution operations and iteration 4's
-context manager are still absent. The shared service, root interface and
+context manager are still absent. The shared service, complete root interface and
 assembly, codec, complete connection vocabulary and quick environment therefore
 remain unimplemented. No `daemon-service` harness capability is registered.

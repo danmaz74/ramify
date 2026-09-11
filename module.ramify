@@ -3,6 +3,8 @@ module "ramify" tagged [dispatch]
 
 // R1: invocation vocabulary for the injected CLI operation.
 expose-src * from "interfaces/batch.ts" to descendants
+// R6: implemented independent service vocabulary; the full interface awaits contexts.
+expose-src * from "interfaces/service.ts" to descendants
 
 expose-sub ModuleId, TagName, TagKind, TagDefinition, ResolvedTagRegistry, SourceLocation, ModelIssue, ModelResult, SourceArea, ModuleRecord, OriginalId, SourceOrigin, Original, Destination, Exposure, ModelInput, Model, ExposureHop, VisibilityDecision, BindingRequest, ImportQuestion, TagRequirement, ImportReason, ImportDecision, resolveTagRegistry, createDefaultTagRegistry, deriveSourceAreas, assignOriginalTags, originalKey, buildModel, explainVisibility, explainImport from analysis to descendants
 
