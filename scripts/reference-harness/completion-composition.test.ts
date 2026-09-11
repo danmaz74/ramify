@@ -28,6 +28,8 @@ it('composes only the reviewed repaired cases while preserving all original evid
     evidence: { ...archived.evidence, identity: before }, summary: { required: 308, passed: 300, failed: 8, notExecuted: 0 },
     instances: passed.map(item => (affectedPlan1Ids as readonly string[]).includes(item.id) ? { ...item, status: 'failed', reason: 'assertion-failed', error: 'original failure' } : item) };
   const focused: FocusedPlan1Evidence = { kind: 'plan1-focused-evidence', identity: current, platform: process.platform,
+    startedAt: '2026-09-11T00:00:00Z', completedAt: '2026-09-11T00:00:01Z', durationMs: 1000,
+    cleanup: { stop: { code: 0, stderr: '' }, status: { code: 0, stdout: '{\"running\":false}', stderr: '' } },
     selectedIds: focusedPlan1Ids, report: { ...archived, planComplete: false, instances: passed.filter(item => focusedPlan1Ids.includes(item.id)),
       summary: { required: 9, passed: 9, failed: 0, notExecuted: 0 } } };
   const proof: SourceTransition = { policy: reusePolicy, baselineRevision: 'a'.repeat(40), baselineSourceSha256: 'before', currentSourceSha256: 'current',
@@ -51,6 +53,22 @@ it('composes only the reviewed repaired cases while preserving all original evid
   expect(() => check(baseline, { ...focused, identity: { ...current, sourceSha256: 'stale' } })).toThrow('Focused evidence');
   expect(() => check(baseline, { ...focused, platform: 'other' })).toThrow('platform');
   expect(() => check({ ...baseline, instances: baseline.instances.map((item, i) => i ? item : { ...item, status: 'failed' }) })).toThrow('eight-case');
+  expect(() => check(baseline, { ...focused, cleanup: { ...focused.cleanup, stop: { code: 1, stderr: '' } } })).toThrow('stop failed');
+  expect(() => check(baseline, { ...focused, cleanup: { ...focused.cleanup, status: { code: 0, stdout: '{"running":true}', stderr: '' } } })).toThrow('survived');
+  expect(() => check(baseline, { ...focused, startedAt: 'missing' })).toThrow('timing evidence');
+  const intermediate = { ...focused, identity: { ...current, sourceSha256: 'intermediate' } };
+  const migration: SourceTransition = { ...proof, baselineSourceSha256: 'intermediate', changes: [
+    { path: 'scripts/reference-harness/completion-composition.ts', beforeSha256: 'a'.repeat(64), afterSha256: 'b'.repeat(64) },
+    { path: 'scripts/reference-harness/completion-composition.test.ts', beforeSha256: 'c'.repeat(64), afterSha256: 'd'.repeat(64) },
+  ] };
+  const migratedReceipt = { ...receipt, focusedTransition: ref };
+  expect(() => assertPlan1Composition(migratedReceipt, baseline, intermediate, proof, proof, current, archived.evidence.instances,
+    { reviewed: migration, actual: migration })).not.toThrow();
+  const broad = { ...migration, changes: [...migration.changes, { ...migration.changes[0], path: 'scripts/reference-harness/session-cases.ts' }] };
+  expect(() => assertPlan1Composition(migratedReceipt, baseline, intermediate, proof, proof, current, archived.evidence.instances,
+    { reviewed: broad, actual: broad })).toThrow('exceeds cleanup');
+  expect(() => assertPlan1Composition(migratedReceipt, baseline, intermediate, proof, proof, current, archived.evidence.instances,
+    { reviewed: migration, actual: { ...migration, baselineSourceSha256: 'wrong' } })).toThrow('reviewed digests');
   const invalidPass = { ...baseline, instances: baseline.instances.map((item, i) => i ? item : { ...item, assertions: [{ name: 'tampered', status: 'failed' as const }] }) };
   expect(() => check(invalidPass)).toThrow();
   expect(() => check(baseline, focused, { ...receipt, sources: receipt.sources.slice(1) })).toThrow();
