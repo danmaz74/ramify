@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "runUrl": "https://github.com/danmaz74/ramify/actions/runs/34599155866",
+  "conclusion": "success",
+  "platform": "darwin",
+  "architecture": "arm64",
+  "identity": {
+    "revision": "1e0201d16566c0c15c548ad08e0cd985600b8c71",
+    "dirty": true,
+    "sourceSha256": "c96ce172b06dd3dc39858d22841bf597c1478af6c923d69fce1a24709376e43d",
+    "buildSha256": "2d6e1152c866fddb3b8a16777ae133c753dbdaaef1058092e194b78fb6ba6cbb",
+    "packageVersion": "0.0.0",
+    "nodeVersion": "v22.23.2",
+    "typescriptVersion": "7.0.2"
+  },
+  "counts": {
+    "plan1": {
+      "required": 308,
+      "passed": 308,
+      "failed": 0,
+      "notExecuted": 0
+    },
+    "processIpc": {
+      "required": 78,
+      "passed": 78,
+      "failed": 0,
+      "notExecuted": 0,
+      "assertionsPassed": 1422
+    },
+    "verifiedRawSidecars": 178
+  },
+  "scope": "Full Plan 1 plus all reviewed Plan 2 process and IPC members. This does not replace full Plan 2 acceptance or measurement evidence.",
+  "files": [
+    {
+      "path": "macos-acceptance-34599155866.zip",
+      "sha256": "93ffffd6123f3c9e1028d54f3a563a0a9dcd806939f2bdc09510967534e67511",
+      "bytes": 18657613
+    },
+    {
+      "path": "macos-independent-verification-34599155866.json",
+      "sha256": "af139d9d148005713089f9b02ed6b56cd57316492d4c483f0a3521439f357e19",
+      "bytes": 871
+    }
+  ],
+  "archiveContents": {
+    "plan1Report": ".reference-work/reports/plan1-full-f3dee114-67a7-4580-ac64-09796681627b.json",
+    "processIpcReport": "macos-process.json",
+    "rawEvidenceDirectory": ".reference-work/evidence/"
+  }
+}

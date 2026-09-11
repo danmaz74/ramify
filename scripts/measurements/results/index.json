@@ -1282,6 +1282,262 @@
           "passed": false
         }
       ]
+    },
+    {
+      "file": "resident-2026-09-11T10-52-15.933Z-d2c27f93-9509-424e-8244-bf2f9ee62063.json.gz",
+      "note": "Real resident workload observations; fixed iteration-1 budgets, missing and failing evidence retained.",
+      "rawSha256": "e772edd39ee4553c42c39daec07d2194c589ab34c62b337b38689b2193d5ada7",
+      "gzipSha256": "9b32acfb2d0021081f841432960ec737b5e39f57169e2e6b1848336e71f6dc46",
+      "rawBytes": 412515,
+      "gzipBytes": 25702,
+      "measuredAt": "2026-09-11T10:52:15.933Z",
+      "completedAt": "2026-09-11T10:52:41.579Z",
+      "phase": "resident",
+      "passed": false,
+      "payloadSchema": "ramify.resident-measurements/1",
+      "build": {
+        "files": 262,
+        "sha256": "2732d1d3519969aa67da609753dee420e33d9a893889fcfb1a58d5e357958d16"
+      },
+      "workloads": [
+        {
+          "name": "I2-29:entry-footprints",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2-29:cold-warm-broad-reference",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:cold-warm-broad-hundred",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:repeated-edit-plateau",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:many-contexts",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:slow-consumer",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:synthetic-500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:synthetic-1000",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:publication-peak",
+          "status": "not-executed",
+          "passed": false
+        }
+      ]
+    },
+    {
+      "file": "resident-2026-09-11T11-34-20.920Z-17d8e0fb-1988-42a4-9a50-f5297c5da3b2.json.gz",
+      "note": "Real resident workload observations; advisory performance targets, binding runtime limits, missing and failing evidence retained.",
+      "rawSha256": "8031ad0f18acc4c2d55a2c153cec5706b7c4592e692ec12141ab249589ff0567",
+      "gzipSha256": "a50c9b3a78367d05a8b047e213ac76a91c7fadfeba2159a660c76fb6230256dd",
+      "rawBytes": 12538752,
+      "gzipBytes": 560706,
+      "measuredAt": "2026-09-11T11:34:20.920Z",
+      "completedAt": "2026-09-11T11:40:35.626Z",
+      "phase": "resident",
+      "passed": false,
+      "payloadSchema": "ramify.resident-measurements/1",
+      "build": {
+        "files": 262,
+        "sha256": "2732d1d3519969aa67da609753dee420e33d9a893889fcfb1a58d5e357958d16"
+      },
+      "workloads": [
+        {
+          "name": "I2-29:entry-footprints",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2-29:cold-warm-broad-reference",
+          "status": "failed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:cold-warm-broad-hundred",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:repeated-edit-plateau",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:many-contexts",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:slow-consumer",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:synthetic-500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:synthetic-1000",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:publication-peak",
+          "status": "not-executed",
+          "passed": false
+        }
+      ]
+    },
+    {
+      "file": "resident-2026-09-11T12-06-08.112Z-484ef098-70fc-4569-bf12-ee9761e96ec6.json.gz",
+      "note": "Real resident workload observations; advisory performance targets, binding runtime limits, missing and failing evidence retained.",
+      "rawSha256": "c28090bfaa3deee8e823361d932153ae6a145e017438c781744f04a4dc086496",
+      "gzipSha256": "f642a9d4aff6a4580a15da5467c7b517e264ce414a531bd2f7ab99396821e84b",
+      "rawBytes": 21927460,
+      "gzipBytes": 955579,
+      "measuredAt": "2026-09-11T12:06:08.112Z",
+      "completedAt": "2026-09-11T12:16:36.646Z",
+      "phase": "resident",
+      "passed": false,
+      "payloadSchema": "ramify.resident-measurements/1",
+      "build": {
+        "files": 262,
+        "sha256": "54091d9b44392eaec6ef3d2bf2a40d58d9eee878ad3274e8db71b74b3cb28773"
+      },
+      "workloads": [
+        {
+          "name": "I2-29:entry-footprints",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2-29:cold-warm-broad-reference",
+          "status": "measured",
+          "passed": false
+        },
+        {
+          "name": "I2-29:cold-warm-broad-hundred",
+          "status": "failed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:repeated-edit-plateau",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:many-contexts",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:slow-consumer",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:synthetic-500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:synthetic-1000",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:publication-peak",
+          "status": "not-executed",
+          "passed": false
+        }
+      ]
+    },
+    {
+      "file": "resident-2026-09-11T12-29-49.293Z-f947427c-9195-465b-94a2-3c586323375b.json.gz",
+      "note": "Real resident workload observations; advisory performance targets, binding runtime limits, missing and failing evidence retained.",
+      "rawSha256": "d88ff056e515f8a86941007ba0279f91241fb1e071786b1fba3d7d83ac4270c2",
+      "gzipSha256": "14661997e1ed950d9cefacb358280fe772bd4a6e6153e5da9ca4dadda886d187",
+      "rawBytes": 148501192,
+      "gzipBytes": 6228917,
+      "measuredAt": "2026-09-11T12:29:49.293Z",
+      "completedAt": "2026-09-11T13:55:21.765Z",
+      "phase": "resident",
+      "passed": false,
+      "payloadSchema": "ramify.resident-measurements/1",
+      "build": {
+        "files": 262,
+        "sha256": "54091d9b44392eaec6ef3d2bf2a40d58d9eee878ad3274e8db71b74b3cb28773"
+      },
+      "workloads": [
+        {
+          "name": "I2-29:entry-footprints",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2-29:cold-warm-broad-reference",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2-29:cold-warm-broad-hundred",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2-29:repeated-edit-plateau",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2-29:many-contexts",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2-29:slow-consumer",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2-29:synthetic-500",
+          "status": "failed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:synthetic-1000",
+          "status": "failed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:publication-peak",
+          "status": "measured",
+          "passed": true
+        }
+      ]
     }
   ],
   "finalRecord": "merged-main.json.gz"
