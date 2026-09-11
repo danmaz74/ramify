@@ -499,6 +499,28 @@ describe('iteration 12 constraint remediation', () => {
       target: { kind: 'application', origin: expect.objectContaining({ file: 'subs/consumer/src/tests/theme.css' }) } })]);
   }), 15_000);
 
+  it.each(['testing', 'ordinary'] as const)('retains the CommonJS coverage limit for a require of an existing %s module file', async area => fixture(async (root, inputs) => {
+    await put(root, 'tsconfig.json', JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'bundler',
+      types: ['node'], typeRoots: [fileURLToPath(new URL('../../../../node_modules/@types', import.meta.url))], skipLibCheck: true }, include: ['src', 'subs'] }));
+    const target = area === 'testing' ? 'src/tests/private.ts' : 'src/private.ts';
+    await put(root, target, 'export const hidden = 1;\n');
+    await put(root, importer, `const api = require('../../../${target.replace(/\.ts$/, '.js')}');\nvoid api;\nexport {};\n`);
+    await compilerValid(root);
+    const report = reported(await analyzeProject(inputs));
+    expect(report.outcome).toEqual({ execution: 'completed', check: 'passed', coverage: 'partial' });
+    expect(report.summary).toMatchObject({ denied: 0, errors: 0 });
+    expect(report.diagnostics).toEqual([]);
+    expect(report.coverage).toContainEqual(expect.objectContaining({ code: 'unsupported-commonjs',
+      location: expect.objectContaining({ file: importer, line: 1 }) }));
+    expect(report.coverage).toContainEqual(expect.objectContaining({ code: 'unresolved-target',
+      location: expect.objectContaining({ file: importer, line: 1 }) }));
+    expect(report.snapshot!.catalog!.files.find(file => file.file === target)).toMatchObject({
+      state: 'complete', exports: [expect.objectContaining({ name: 'hidden' })],
+    });
+    expect(report.snapshot!.accesses).toEqual([expect.objectContaining({ form: 'commonjs', target: { kind: 'unresolved' } })]);
+    expect(report.snapshot!.results).toEqual([expect.objectContaining({ outcome: 'unverifiable', decisions: [], diagnostics: [] })]);
+  }), 15_000);
+
   it.each(['testing', 'ordinary'] as const)('applies origin checks to Node createRequire loads of established %s targets', async area => fixture(async (root, inputs) => {
     await put(root, 'tsconfig.json', JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'bundler',
       types: ['node'], typeRoots: [fileURLToPath(new URL('../../../../node_modules/@types', import.meta.url))], skipLibCheck: true }, include: ['src', 'subs'] }));

@@ -22,10 +22,13 @@ const fixtureFiles = {
 };
 
 describe('shared globals through the public batch session', () => {
-  it('reports a cross-owner script global as partial coverage rather than a complete check', async () => {
+  it.each([
+    { kind: 'script', source: fixtureFiles['src/globals.ts'], line: 1 },
+    { kind: 'module augmentation', source: 'export {};\ndeclare global { var sharedSecret: number; }\n', line: 2 },
+  ])('reports a cross-owner $kind as partial coverage', async ({ source, line }) => {
     const root = await mkdtemp(join(tmpdir(), 'ramify-shared-globals-'));
     try {
-      for (const [path, text] of Object.entries(fixtureFiles)) {
+      for (const [path, text] of Object.entries({ ...fixtureFiles, 'src/globals.ts': source })) {
         await mkdir(dirname(join(root, path)), { recursive: true });
         await writeFile(join(root, path), text);
       }
@@ -45,7 +48,8 @@ describe('shared globals through the public batch session', () => {
       expect(run.report.outcome).toEqual({ execution: 'completed', check: 'passed', coverage: 'partial' });
       expect(run.report.summary).toMatchObject({ owners: 2, accesses: 0, denied: 0, errors: 0, warnings: 0, coverageNotes: 1 });
       expect(run.report.coverage).toEqual([expect.objectContaining({ code: 'shared-global',
-        location: expect.objectContaining({ file: 'src/globals.ts', line: 1, column: 1 }), related: [] })]);
+        location: expect.objectContaining({ file: 'src/globals.ts', line, column: 1 }), related: [] })]);
+      expect(run.report.stages.every(stage => stage.status === 'completed')).toBe(true);
       expect(run.report.snapshot!.catalog!.files.find(entry => entry.file === 'src/globals.ts')).toMatchObject({ state: 'incomplete', exports: [] });
     } finally { await rm(root, { recursive: true, force: true }); }
   }, 20_000);
