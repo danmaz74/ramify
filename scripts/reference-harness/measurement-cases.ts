@@ -11,7 +11,7 @@ const workloads = ['entry-footprints', 'cold-warm-broad-reference', 'cold-warm-b
 interface Evidence {
   readonly passed: boolean;
   readonly error?: string;
-  readonly assertions?: readonly { readonly name: string; readonly passed: boolean; readonly observed: unknown; readonly maximum: unknown }[];
+  readonly assertions?: readonly { readonly name: string; readonly passed: boolean; readonly observed: unknown; readonly maximum: unknown; readonly enforcement?: string; readonly targetMet?: boolean }[];
 }
 export const measurementHandlers: ReadonlyMap<string, InstanceHandler> = new Map(workloads.map(suffix => {
   const id = `I2-29:${suffix}`;
@@ -23,8 +23,8 @@ export const measurementHandlers: ReadonlyMap<string, InstanceHandler> = new Map
     const evidence = JSON.parse(result.stdout) as Evidence;
     recordObservation('resident-measurement-evidence', evidence);
     assertions.equal('same-input raw resident evidence is available and verified', evidence.error ?? null, null);
-    assertions.ok('fixed independent budget predicates ran', evidence.assertions?.length);
-    for (const item of evidence.assertions ?? []) assertions.ok(`${item.name}; observed=${JSON.stringify(item.observed)}; maximum=${JSON.stringify(item.maximum)}`, item.passed);
+    assertions.ok('independent evidence predicates ran', evidence.assertions?.length);
+    for (const item of evidence.assertions ?? []) assertions.ok(`${item.name}; observed=${JSON.stringify(item.observed)}; maximum=${JSON.stringify(item.maximum)}; enforcement=${item.enforcement ?? 'binding'}; targetMet=${item.targetMet ?? 'n/a'}`, item.passed);
     assertions.equal('all binding resident workload predicates pass', [result.code, evidence.passed], [0, true]);
   } } satisfies InstanceHandler];
 }));

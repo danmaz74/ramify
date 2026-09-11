@@ -141,7 +141,12 @@ try {
       }
       result.cold.medianMs = median(result.cold.samples.map(sample => sample.durationMs));
       result.cold.peakCombinedRssBytes = Math.max(...result.cold.samples.map(sample => sample.peakCombinedRssBytes));
-      result.cold.passed = result.cold.medianMs <= budgets[name].medianColdMs && result.cold.peakCombinedRssBytes <= budgets[name].peakRssBytes;
+      result.cold.performancePolicy = 'advisory-by-user-request-2026-09-11';
+      result.cold.targets = {
+        latency: { observed: result.cold.medianMs, maximum: budgets[name].medianColdMs, targetMet: result.cold.medianMs <= budgets[name].medianColdMs },
+        rss: { observed: result.cold.peakCombinedRssBytes, maximum: budgets[name].peakRssBytes, targetMet: result.cold.peakCombinedRssBytes <= budgets[name].peakRssBytes },
+      };
+      result.cold.passed = [result.cold.medianMs, result.cold.peakCombinedRssBytes].every(value => Number.isFinite(value) && value > 0);
       persist();
     }
     if (phase === 'all' || phase === 'repeated') {

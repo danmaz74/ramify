@@ -8,7 +8,7 @@ import { withSequenceProcess, object, readTrace } from './equivalence-process.js
 import type { SequenceProcess } from './equivalence-process.js';
 import { applySequenceStep, assertSequenceReport, equivalenceSequences, prepareSequence, sequenceFixture } from './equivalence-sequences.js';
 import type { EditSequence, SequenceName, SequenceStep } from './equivalence-sequences.js';
-import { watchEditTargetMs, watchRevision, withLiveWatch } from './equivalence-watch.js';
+import { watchCompletionTimeoutMs, watchEditTargetMs, watchRevision, withLiveWatch } from './equivalence-watch.js';
 import { runIsolatedProject } from './mutation.js';
 import { analysisEvidence, archiveObservation, recordObservation } from './observations.js';
 import { repositoryRoot } from './plan.js';
@@ -90,10 +90,10 @@ export async function runEquivalenceSequence(name: SequenceName, root: string, a
         for (const step of sequence.steps) {
           const startedAt = performance.now();
           const paths = await applySequenceStep(root, step);
-          let line = await next(watchEditTargetMs - (performance.now() - startedAt));
-          while (line.value.event === 'status') line = await next(watchEditTargetMs - (performance.now() - startedAt));
+          let line = await next(watchCompletionTimeoutMs - (performance.now() - startedAt));
+          while (line.value.event === 'status') line = await next(watchCompletionTimeoutMs - (performance.now() - startedAt));
           const watched = watchRevision(line, current.token, previousSequence, startedAt, paths);
-          assertions.ok(`${step.name}: watcher meets ${watchEditTargetMs} ms target`, watched.elapsedMs <= watchEditTargetMs);
+          assertions.ok(`${step.name}: watcher publishes within the completion guard`, watched.elapsedMs <= watchCompletionTimeoutMs);
           assertions.ok(`${step.name}: watcher captured changed inputs`, watched.report.inputId !== previousInput);
           oracle(`${step.name}/watch`, sequence.fixture, step, baseline, watched.report, assertions);
           const checked = await compare(processes, root, sequence.fixture, step, baseline, assertions);
@@ -101,7 +101,7 @@ export async function runEquivalenceSequence(name: SequenceName, root: string, a
           assertions.ok(`${step.name}: subsequent synchronized check confirms watch report`, true);
           if (importer !== null) assertions.equal(`${step.name}: unmarked importer bytes are unchanged`,
             await readFile(join(root, 'subs/consumer/src/probe.ts'), 'utf8'), importer);
-          recordObservation('watch-edit-timing', { step: step.name, elapsedMs: watched.elapsedMs, targetMs: watchEditTargetMs, paths });
+          recordObservation('watch-edit-timing', { step: step.name, elapsedMs: watched.elapsedMs, targetMs: watchEditTargetMs, enforcement: 'advisory', targetMet: watched.elapsedMs <= watchEditTargetMs, paths });
           previousSequence = watched.sequence; previousInput = watched.report.inputId;
         }
       });

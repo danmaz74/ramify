@@ -1,7 +1,8 @@
 const MiB = 1024 ** 2;
 
-// Transcribed from the iteration-1 revision of scope.md. No command-line
-// overrides: missing observations and missed targets must remain failures.
+// Original numeric baselines from scope.md are retained for comparison.
+// Empirical performance targets are advisory by user decision, 2026-09-11;
+// runtime retention and queue limits and missing evidence remain binding.
 export const residentBudgets = {
   sampleIntervalMs: 50, coldSamples: 5, editCycles: 20,
   reference: { coldMs: 6000, unchangedMs: 1500, readmeMs: 1000, exposureMs: 2500,

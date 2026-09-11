@@ -55,7 +55,7 @@ describe('strict equivalence comparison controls', () => {
       expect(() => assertResidentTrace([connect, { pid: 10, event: 'load', url }], 10, '/owned')).toThrow('batch/analysis');
     }
   });
-  it('rejects stale, late, substituted and incorrectly attributed watch revisions', () => {
+  it('keeps timing advisory while rejecting stale, substituted and incorrectly attributed watch revisions', () => {
     const token = { context: 'ctx/1:c', generation: 'gen/1:g' };
     const value = { event: 'revision', revision: { token, revision: 'rev/1:r', sequence: 2, cause: 'watch',
       changed: ['source.ts'], fingerprints: { inputId: document.inputId }, summary: {}, outcome: {} }, report: document };
@@ -64,7 +64,8 @@ describe('strict equivalence comparison controls', () => {
     expect(() => watchRevision(line, token, 2, 100, ['source.ts'])).toThrow('advance');
     expect(() => watchRevision(line, {}, 1, 100, ['source.ts'])).toThrow('generation');
     expect(() => watchRevision(line, token, 1, 100, ['other.ts'])).toThrow('Changed paths');
-    expect(() => watchRevision({ ...line, arrivedAt: 101 + watchEditTargetMs }, token, 1, 100, ['source.ts'])).toThrow('target');
+    expect(watchRevision({ ...line, arrivedAt: 101 + watchEditTargetMs }, token, 1, 100, ['source.ts']).elapsedMs).toBe(watchEditTargetMs + 1);
+    expect(() => watchRevision({ ...line, arrivedAt: NaN }, token, 1, 100, ['source.ts'])).toThrow('finite');
     expect(() => watchRevision({ ...line, value: { ...value, report: { ...document, inputId: 'stale' } } }, token, 1, 100, ['source.ts']))
       .toThrow('different inputs');
   });

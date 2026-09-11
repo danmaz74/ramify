@@ -61,8 +61,16 @@ try {
   assert.ok(assertResidentWorkload('I2-29:synthetic-500', falsePeak).some(row => !row.passed), 'Stale saved peak cannot hide raw budget miss');
   const falseStatus = { status: { service: Array(20).fill(51), cli: Array(20).fill(301), medianServiceMs: 1, medianCliMs: 1 } };
   const statusAssertions = assertResidentWorkload('I2-29:cold-warm-broad-reference', falseStatus);
-  assert.ok(statusAssertions.some(row => row.name === 'service-side contextStatus median' && !row.passed));
-  assert.ok(statusAssertions.some(row => row.name === 'end-to-end CLI daemon status median' && !row.passed));
+  assert.ok(statusAssertions.some(row => row.name === 'service-side contextStatus median' && row.passed && row.enforcement === 'advisory' && !row.targetMet));
+  assert.ok(statusAssertions.some(row => row.name === 'end-to-end CLI daemon status median' && row.passed && !row.targetMet));
+  assert.ok(statusAssertions.some(row => row.name === 'service median equals raw timings' && !row.passed));
+  const huge = residentBudgets.S500.peakBytes + 1;
+  const peakAssertions = assertResidentWorkload('I2-29:synthetic-500', { ...falsePeak, peakBytes: huge });
+  assert.ok(peakAssertions.some(row => row.name === 'combined daemon/helper/native peak' && row.passed && !row.targetMet));
+  const queueAssertions = assertResidentWorkload('I2-29:slow-consumer', {
+    after: { instrumentation: { outboundMaximum: huge, outbound: [{ peakBytes: huge }] } },
+  });
+  assert.ok(queueAssertions.some(row => row.name === 'maximum admitted outbound queue' && !row.passed));
   delete footprints.client;
   assert.ok(assertResidentWorkload('I2-29:entry-footprints', footprints).some(row => !row.passed));
   assert.throws(() => verifyResidentEvidence({ schemaVersion: 'ramify.resident-measurements/1', evidenceKind: 'measurement',

@@ -9,6 +9,9 @@ wire schemas; [owners.md](owners.md) owns declarations and placement. Plan 1's
 [scope decisions](../done/iteration-1-project-verifier/scope.md) remain in
 force for everything they cover: configurations, compiler integration, the
 captured input view, report schema, production selection and batch limits.
+The temporary performance decision below applies to current batch and resident
+measurement commands and empirical targets consumed by current acceptance,
+including inherited Plan 1 measurements. Historical reports are unchanged.
 
 ## Deployment arrangement
 
@@ -166,12 +169,27 @@ revisions is deferred with a trigger recorded under [deferrals](#explicit-deferr
 Starting values come from Plan 1's [agreed batch budgets](../done/iteration-1-project-verifier/iterations/iteration15-results.md#batch-measurements-and-agreed-budgets):
 5 s and 15 s cold checks, 512 MiB and 768 MiB combined peaks, and 16 MiB heap
 and 64 MiB RSS settled growth over the last twenty cycles. Resident values
-below replace them where the resident workload differs. The moment they
-become binding is fixed once: the provisional latency and memory targets are
-revised from iteration 1's warm-recompute probe and are binding from
-iteration 1's exit; iteration 13 asserts them through I2-29 and records the
-measured values in this document; a missed target is a reviewed revision of
-these tables, never a relaxed assertion.
+below replace them where the resident workload differs.
+
+**Temporary decision, 2026-09-11:** the user requested “for now let's relax any
+performance targets”. Empirical latency, RSS, heap and memory-growth targets
+are advisory for current batch and resident measurement commands and acceptance
+gates. Keep their numeric baselines and record actual measurements and misses; an advisory result does not establish
+that its target was met. This decision supersedes the earlier requirement that
+these targets block acceptance from iteration 1's exit. Reinstating performance
+acceptance requires an explicit later decision.
+
+Runtime protocol, queue, retention and concurrency limits remain enforced, as
+do lifecycle deadlines, cancellation, correctness, eventual publication and
+verified resource cleanup. Finite harness hang guards remain; a hung operation,
+missing evidence, invalid report or leaked resource is still a failure. Timing
+observations such as save-to-report latency and slow-consumer disconnect delay
+are advisory; they do not remove the required publication or disconnection.
+For example, `warmIdleMs`, `coldRetainMs`, `idleExitMs`, lease expiry and shutdown
+grace still determine runtime lifecycle behavior. Empirical allowances around
+those transitions, such as the extra five seconds in the idle-disposal row,
+are advisory. Tests must still establish the transition and cleanup within a
+separate finite hang guard.
 
 ### Context and daemon budgets
 
@@ -204,13 +222,14 @@ Accounting unit: `bytes` of a report or `RetainedAnalysis` is the UTF-8 length
 of its JSON serialization, computed once at publication. It counts repeated
 subtrees even when their heap representation is shared, but object overhead
 means it is neither an upper nor a lower bound on heap or RSS. The measurement
-rows below enforce actual memory limits separately.
+rows below record actual memory use separately against advisory baselines.
 
 ### Latency and memory targets
 
 Current measured values and raw evidence are recorded in the
 [remediation verification record](remediation-2026-09-11.md#outstanding-acceptance-evidence).
-Keep these binding targets unchanged while measuring.
+Keep the numeric baseline targets unchanged while measuring; apply the
+temporary advisory policy above when deciding acceptance.
 
 Iteration 1 revision, 2026-09-11: the measured full-recompute medians are
 **3.442 s reference / 5.723 s S100**, from twenty serial compiled in-process
@@ -224,9 +243,11 @@ this probe does not implement reuse or measure its latency. Memory targets
 remain unchanged from the reviewed batch evidence; end-of-call parent RSS
 is not a combined peak measurement and cannot justify raising them.
 
-These are the single RP-7 revision proposed for acceptance and binding from
-iteration 1's exit. Iteration 13 must assert every target and record measured
-values; there is no automatic budget relaxation on failure.
+These numeric baselines retain the RP-7 revision proposed at iteration 1's
+exit. Iteration 13 must record every measurement and comparison. Under the
+explicit temporary decision above, empirical target misses are advisory, while
+structural limits and correctness and cleanup requirements in mixed rows remain
+mandatory.
 
 | Workload | Target | Fixed by |
 | --- | ---: | --- |
@@ -288,7 +309,7 @@ shared engine defect cannot pass both sides.
 | Inspection and explanation commands, published-revision reads from the CLI beyond `watch` and `daemon status` | Plan 3, which reuses `ContextRevision` and `contextStatus`. |
 | MCP stdio adapter and HTTP hosting | Plans 4 and later; the daemon never loads either. |
 | Web process, tRPC, browser notifications | Plan 6. |
-| Compiler-state retention across revisions | Deferred. Trigger: iteration 13 shows the source-edit target missed with stage reuse in place; then a reviewed adapter contract is written before any long-lived helper is added. |
+| Compiler-state retention across revisions | Deferred. Source-edit target misses with stage reuse in place remain evidence for review, including while performance is advisory. Any long-lived helper still requires a reviewed adapter contract; a target miss does not authorize adding one. |
 | Retiring a daemon group | `StopDisposition.reason` `retired` is reserved; no Plan 2 operation produces it and `DaemonHost.stop` accepts only `explicit`. |
 | Persistent disk caches, worker pools, process recycling | Not added; require measured need. |
 | Event replay | `replay: 'not-available'` in Plan 2; a bounded sequence replay is a later capability. |

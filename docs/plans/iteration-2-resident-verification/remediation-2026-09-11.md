@@ -40,20 +40,45 @@ The first broad owner run passed 1,221 of 1,229 tests; its failures identified
 stale description/global expectations, the old compiled shutdown defect and a
 source/build input-identity mismatch. Those causes were fixed. The first harness
 run passed 347 of 352 tests; remaining reruns cover corrected owner access,
-capability/closure expectations and gate input stability. Final commit-bound
-results must come from the MCP audit and subsequent acceptance artifacts.
+capability/closure expectations and gate input stability. The focused rerun
+passed all 43 tests across those four harness files.
+
+Source commit `dba3d40c38a91e1c6956d2311eef78e491613658` passed the MCP commit
+audit on 2026-09-11: all 1,241 regression tests across 75 files, dependency
+preparation and all four type-check scopes passed. The audit reported no fresh
+audit required for that commit. Sealed-file checks were skipped because no check
+phase was supplied. The audit is recorded at
+`refs/audited/runs/2026-09-11T10-51-50Z-dba3d40`; this configured audit does not
+replace the separate full acceptance gates or measurement evidence.
 
 Four batch/resident edit sequences passed, as did three live watch sequences.
-Two live source-edit timing cases exceeded their target while other tests were
-running; they still require an isolated run. No latency target was relaxed.
+Live source-edit checks exposed a wildcard-growth report deadline miss and an
+exact changed-path mismatch when moving a source file into tests. The path
+mismatch remains a correctness issue; changing performance acceptance does not
+resolve it.
+
+The user subsequently requested “for now let's relax any performance targets”.
+Empirical latency, RSS, heap and growth targets are now advisory for current
+batch and resident measurement commands and acceptance gates under the
+[scope decision](scope.md#budgets). Numeric baselines and actual measurements
+remain visible; no target is claimed met without evidence. Runtime limits,
+correctness, eventual updates, resource cleanup and finite hang guards remain
+enforced. The old 4.6-second watch target therefore no longer blocks acceptance
+by itself; the correct report must still arrive within the 120-second harness
+hang guard. The wildcard-growth live-watch case then passed all 78 correctness
+assertions. Measurement tooling controls passed, including rejection of missing
+evidence, inconsistent raw observations and an oversized outbound queue.
 
 ## Outstanding acceptance evidence
 
-- Full MCP commit audit and the final broad regression results.
+- A fresh commit audit after subsequent source changes; the audit above covers
+  `dba3d40` only.
+- Correction and verification of the live-watch exact changed-path mismatch.
 - Full current Plan 1 gate (308 cases), followed by the full Plan 2 gate on the
   same source, build and runtime inputs.
-- An idle-host execution of all nine measurement workloads and their fixed
-  budget checks. Measured values and raw artifact links will be added here.
+- An idle-host execution of all nine measurement workloads and their advisory
+  target comparisons plus mandatory evidence, correctness and cleanup checks.
+  Measured values and raw artifact links will be added here.
 - macOS process evidence. The available execution environment is Linux; no
   macOS runner has been supplied.
 

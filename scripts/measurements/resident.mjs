@@ -15,7 +15,7 @@ import { residentInputs, residentDependencies } from './resident-inputs.mjs';
 const args = process.argv.slice(2);
 if (args.length === 1 && args[0] === '--help') {
   process.stdout.write('Usage: npm run measure:resident -- [--output FILE] [--workload all|I2-29-suffix]\n'
-    + 'Runs real installed CLI/daemon workloads, archives raw 50ms observations, and fails missing evidence or binding budgets. Run on an idle host after building.\n');
+    + 'Runs real installed CLI/daemon workloads, archives raw 50ms observations, and fails missing evidence or runtime limits; performance targets are advisory. Run on an idle host after building.\n');
   process.exit(0);
 }
 const options = new Map();
@@ -43,7 +43,7 @@ const report = {
     concurrentActivity: process.env.RAMIFY_MEASUREMENT_ACTIVITY ?? 'No operator annotation; review recorded process census before latency acceptance.',
     processCensus: processRows() },
   dependencies: {}, inputs: { build: null }, prerequisites: [], fixtures: [],
-  budgets: residentBudgets,
+  budgets: residentBudgets, performancePolicy: 'advisory-by-user-request-2026-09-11',
   sampling: { intervalMs: 50, source: 'External POSIX ps observer follows actual daemon/helper/native and CLI processes',
     settling: 'Two diagnostic GC passes across event-loop turns in the instrumented daemon; no budget or product operation overrides.',
     limits: 'Sampled peaks can miss sub-interval peaks; summed RSS counts shared mappings repeatedly. Worker memory is excluded from workload acceptance peaks.' },
@@ -108,7 +108,7 @@ try {
     const observed = timed.map(row => ({ id: row.id, medianSourceMs: row.measurements.medians.source,
       targetMs: row.id.endsWith('reference') ? residentBudgets.reference.sourceMs : residentBudgets.S100.sourceMs }));
     report.compilerStateTrigger = { status: observed.some(value => value.medianSourceMs > value.targetMs) ? 'triggered' : 'not-triggered', observed,
-      reason: 'Measured source-edit latency with retained stage products; missing targets require review or an owner fix, never automatic budget relaxation.' };
+      reason: 'Measured source-edit latency with retained stage products; missed reference targets are advisory under the user decision of 2026-09-11.' };
   }
   report.passed = report.workloads.every(row => row.passed);
   report.status = report.passed ? 'passed' : report.workloads.some(row => row.status === 'not-executed') ? 'incomplete' : 'failed';
@@ -119,11 +119,12 @@ finally {
   rmSync(scratch, { recursive: true, force: true });
   process.removeListener('SIGINT', onInterrupt); process.removeListener('SIGTERM', onInterrupt);
   const saved = persistMeasurement(portable(report), output, join(packageRoot, 'scripts/measurements/results'),
-    'Real resident workload observations; fixed iteration-1 budgets, missing and failing evidence retained.');
+    'Real resident workload observations; advisory performance targets, binding runtime limits, missing and failing evidence retained.');
   process.stdout.write(JSON.stringify({ output: saved.rawWritten ? output : null,
     archive: saved.archive ? `scripts/measurements/results/${saved.archive.file}` : null, status: saved.report.status,
     passed: saved.report.passed, failures: saved.report.failures,
     workloads: saved.report.workloads.map(row => ({ id: row.id, status: row.status, passed: row.passed,
+      advisoryMisses: row.assertions?.filter(assertion => assertion.enforcement === 'advisory' && !assertion.targetMet).map(assertion => assertion.name),
       failedAssertions: row.assertions?.filter(assertion => !assertion.passed).map(assertion => assertion.name) })) }, null, 2) + '\n');
   process.exitCode = saved.report.passed ? 0 : 1;
 }

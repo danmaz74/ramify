@@ -1,5 +1,15 @@
 # Batch measurements
 
+The user's 2026-09-11 decision makes empirical latency, RSS, heap and
+memory-growth targets advisory for current batch and resident measurement
+commands and acceptance gates, including inherited Plan 1 comparisons. See the [active scope decision](../../docs/plans/iteration-2-resident-verification/scope.md#budgets).
+The numbers below remain comparison baselines. Record actual values and target
+misses without claiming performance acceptance. Runtime protocol, queue and
+retention limits, correctness, resource cleanup and finite harness hang guards
+remain enforced. The configured lease, idle and shutdown timers still determine
+lifecycle behavior; measured completion delays around those transitions are
+advisory. Historical Plan 1 measurements retain their original results.
+
 These independent tools measure the compiled batch checker and its public
 analysis session. They do not load the toolkit through `tsx` during a measured
 check. The setup probe, cold processes and repeated workload produce separate
@@ -35,7 +45,7 @@ directory and removes only that directory. The reference is read unchanged;
 its authored content identity is checked again after measurement.
 
 The [scope budgets](../../docs/plans/done/iteration-1-project-verifier/scope.md)
-remain the authority:
+provide the retained numeric baselines:
 
 | Measurement | Reference | 100 owners |
 | --- | ---: | ---: |
@@ -72,7 +82,8 @@ session/compiler references as well as non-JSON objects. Per-cycle samples
 include RSS, heap, external bytes and array-buffer bytes. Array-buffer bytes
 are included in external bytes; do not add them twice. Strict monotonic heap
 or RSS growth is recorded for investigation even below the numeric budget.
-It does not add an unreviewed numeric threshold or silently waive one.
+The same advisory policy applies to these growth observations; neither an
+advisory result nor successful cleanup establishes that a numeric target was met.
 
 The [results summary](results/README.md) records final outcomes and investigates
 the retained-report RSS growth. The [measurement archive](results/index.json) identifies each lossless
@@ -171,11 +182,15 @@ real daemon and helper/native descendants; controller memory is excluded from
 acceptance peaks. Sampled peaks can miss shorter spikes, and summed RSS counts
 shared mappings repeatedly.
 
-All values in `resident-plan.mjs` remain the binding iteration-1 budgets. Missing
-samples, workload errors, leaked processes and budget misses fail; no flags
-relax limits. The compiler-state trigger is evaluated from actual source-edit
-medians. Each workload retains partial raw observations on failure. Every owned
-daemon is stopped in finally, and cleanup is verified before persistence.
+The values in `resident-plan.mjs` retain the numeric iteration-1 baselines.
+Empirical latency, RSS, heap and growth misses are advisory under the active
+scope decision. Missing samples, workload errors, invalid outcomes, exceeded
+runtime queue or retention limits, and leaked resources still fail. Finite
+hang guards remain in force. The compiler-state trigger is evaluated and
+recorded from actual source-edit medians without turning an advisory miss into
+an automatic architecture change. Each workload retains partial raw observations
+on failure. Every owned daemon is stopped in finally, and cleanup is verified
+before persistence.
 
 Raw JSON is written under `.reference-work/reports/` (or `--output FILE`), with a
 lossless gzip archive and a new record in `results/index.json`. Archive hashes,
@@ -197,6 +212,6 @@ starts an hour of timing work concurrently with compiler fixtures. Missing or
 stale evidence fails and identifies the required measurement command.
 
 `node scripts/measurements/verify-tooling.mjs` runs bounded process-observer,
-cleanup, timeout, interruption, archive-integrity and missing/stale/budget-miss
+cleanup, timeout, interruption, archive-integrity and missing/stale/target-miss
 controls. These controls provide no resident matrix credit. Run acceptance
 measurements on an otherwise idle host after source, build and scope are frozen.

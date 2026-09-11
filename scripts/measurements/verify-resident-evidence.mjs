@@ -18,7 +18,7 @@ export function verifyResidentEvidence(report, id, expectedInputs = residentInpu
   assert.equal(report.environment.node, process.version, 'Resident evidence Node runtime changed');
   assert.equal(report.environment.platform, platform(), 'Resident evidence platform changed');
   assert.equal(report.environment.arch, arch(), 'Resident evidence architecture changed');
-  assert.deepEqual(report.budgets, residentBudgets, 'Binding resident budgets changed');
+  assert.deepEqual(report.budgets, residentBudgets, 'Resident reference targets or runtime limits changed');
   assert.equal(report.sampling.intervalMs, 50);
   assert.equal(report.interrupted, false);
   assert.deepEqual(report.failures, []);
@@ -37,6 +37,8 @@ export function verifyResidentEvidence(report, id, expectedInputs = residentInpu
   assert.ok(assertions.length > 0);
   // Recompute from raw samples; never grant credit from a saved passed flag.
   return { id, passed: assertions.every(value => value.passed), assertions,
+    performancePolicy: 'advisory-by-user-request-2026-09-11',
+    advisoryMisses: assertions.filter(value => value.enforcement === 'advisory' && !value.targetMet),
     measuredAt: report.measuredAt, completedAt: row.completedAt, inputs: report.inputs,
     samples: { processes: row.controllerObservation.processes.length,
       controller: row.controllerObservation.samples.length },

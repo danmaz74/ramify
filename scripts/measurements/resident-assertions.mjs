@@ -1,12 +1,18 @@
 import { residentBudgets as budgets } from './resident-plan.mjs';
 import { median } from './common.mjs';
 
-/** Fixed independent acceptance predicates. Missing samples never become zero. */
+/** Correctness remains binding; empirical performance targets are advisory by user decision. */
 export function assertResidentWorkload(id, measurements) {
   const assertions = [];
   const check = (name, passed, observed, maximum = null) => assertions.push({ name, passed: Boolean(passed), observed: observed ?? null, maximum });
   const within = (name, observed, maximum) => check(name, Number.isFinite(observed) && observed <= maximum, observed, maximum);
   const bytes = (name, observed, maximum) => check(name, Number.isFinite(observed) && observed > 0 && observed <= maximum, observed, maximum);
+  const target = (name, observed, maximum, positive = false) => {
+    const valid = Number.isFinite(observed) && (!positive || observed > 0);
+    assertions.push({ name, passed: valid, observed: observed ?? null, maximum,
+      enforcement: 'advisory', targetMet: valid && observed <= maximum });
+  };
+  const targetBytes = (name, observed, maximum) => target(name, observed, maximum, true);
   const rawPeak = (name, samples, pid) => {
     const complete = Array.isArray(samples) && samples.length > 0 && samples.every(sample =>
       Array.isArray(sample.processes) && sample.processes.every(item => Number.isSafeInteger(item.pid) && item.pid > 0
@@ -51,7 +57,7 @@ export function assertResidentWorkload(id, measurements) {
         : rawPeak(name, measurement?.samples, name.startsWith('cli') ? measurement?.pid : undefined);
       if (name.startsWith('daemon')) settledMemory(name, measurement?.settled);
       check(`${name}: reported RSS equals raw observation`, observed === measurement?.rssBytes, measurement?.rssBytes);
-      bytes(`${name}: RSS`, observed, limit);
+      targetBytes(`${name}: RSS`, observed, limit);
     }
     const helpPeak = rawPeak('help', measurements.help?.samples);
     check('help contains real externally sampled RSS', helpPeak > 0 && helpPeak === measurements.help?.rssBytes, helpPeak);
@@ -61,7 +67,7 @@ export function assertResidentWorkload(id, measurements) {
     check('cold starts use five daemon instances', new Set(measurements.cold?.map(value => value.instanceId)).size === budgets.coldSamples,
       measurements.cold?.map(value => value.instanceId));
     check('cold timings are actual positive durations', measurements.cold?.every(value => Number.isFinite(value.durationMs) && value.durationMs > 0), measurements.cold?.map(value => value.durationMs));
-    within('cold median', measurements.cold?.length ? median(measurements.cold.map(value => value.durationMs)) : null, limit.coldMs);
+    target('cold median', measurements.cold?.length ? median(measurements.cold.map(value => value.durationMs)) : null, limit.coldMs);
     const expectedReuse = {
       unchanged: ['access', 'catalog', 'configuration', 'decide', 'link', 'metadata', 'parse'],
       readme: ['access', 'catalog', 'configuration', 'decide', 'link', 'parse'],
@@ -72,7 +78,7 @@ export function assertResidentWorkload(id, measurements) {
       const cycles = measurements.cycles?.[kind];
       count(`${kind}: twenty actual cycles`, cycles, budgets.editCycles);
       check(`${kind}: positive command durations`, cycles?.every(value => Number.isFinite(value.durationMs) && value.durationMs > 0), cycles?.map(value => value.durationMs));
-      within(`${kind}: median`, cycles?.length ? median(cycles.map(value => value.durationMs)) : null, limit[`${kind}Ms`]);
+      target(`${kind}: median`, cycles?.length ? median(cycles.map(value => value.durationMs)) : null, limit[`${kind}Ms`]);
       check(`${kind}: recorded completed stage reuse`, cycles?.every(value => JSON.stringify([...value.reused].sort()) === JSON.stringify(expected)), cycles?.map(value => value.reused));
       if (kind !== 'unchanged') {
         check(`${kind}: every edited hash is captured`, cycles?.every(captured), cycles?.map(value => value.report?.captured));
@@ -88,8 +94,8 @@ export function assertResidentWorkload(id, measurements) {
     const cliMedian = measurements.status?.cli?.length ? median(measurements.status.cli) : null;
     check('service median equals raw timings', serviceMedian === measurements.status?.medianServiceMs, measurements.status?.medianServiceMs);
     check('CLI median equals raw timings', cliMedian === measurements.status?.medianCliMs, measurements.status?.medianCliMs);
-    within('service-side contextStatus median', serviceMedian, budgets.contextStatusMs);
-    within('end-to-end CLI daemon status median', cliMedian, budgets.cliStatusMs);
+    target('service-side contextStatus median', serviceMedian, budgets.contextStatusMs);
+    target('end-to-end CLI daemon status median', cliMedian, budgets.cliStatusMs);
   } else if (suffix === 'repeated-edit-plateau') {
     for (const name of ['reference', 'S100']) {
       const cycles = measurements[name]?.cycles;
@@ -101,8 +107,8 @@ export function assertResidentWorkload(id, measurements) {
       count(`${name}: last 100 settled observations`, settled, budgets.plateau.settledCycles);
       const first = settled[0]?.settled, last = settled.at(-1)?.settled;
       const history = sample => sample?.contexts?.reduce((sum, context) => sum + context.history.bytes, 0);
-      within(`${name}: settled RSS growth`, last && first ? last.memory.rss - first.memory.rss : null, budgets.plateau.rssGrowthBytes);
-      within(`${name}: heap growth beyond history bytes`, last && first ? last.memory.heapUsed - first.memory.heapUsed - (history(last) - history(first)) : null,
+      target(`${name}: settled RSS growth`, last && first ? last.memory.rss - first.memory.rss : null, budgets.plateau.rssGrowthBytes);
+      target(`${name}: heap growth beyond history bytes`, last && first ? last.memory.heapUsed - first.memory.heapUsed - (history(last) - history(first)) : null,
         budgets.plateau.heapGrowthBeyondHistoryBytes);
       check(`${name}: all real session and helper lifetimes balanced`, cycles?.every(({ settled: sample }) => {
         const m = sample.instrumentation;
@@ -126,7 +132,7 @@ export function assertResidentWorkload(id, measurements) {
     count('eight warm contexts', measurements.settled?.contexts, budgets.manyContexts.contexts);
     check('every context is warm and published', measurements.settled?.contexts?.every(context => context.state === 'warm' && context.published), measurements.settled?.contexts?.map(context => context.state));
     settledMemory('eight contexts', measurements.settled);
-    bytes('eight-context settled RSS', measurements.settled?.memory?.rss, budgets.manyContexts.rssBytes);
+    targetBytes('eight-context settled RSS', measurements.settled?.memory?.rss, budgets.manyContexts.rssBytes);
     retained('eight warm contexts', measurements.settled);
   } else if (suffix === 'slow-consumer') {
     count('ten real S100 publications', measurements.publications, budgets.slowConsumer.publications);
@@ -139,27 +145,27 @@ export function assertResidentWorkload(id, measurements) {
     const overflow = measurements.after?.instrumentation?.outbound?.find(value => value.overflow);
     check('non-reading peer really exceeded admission', overflow?.overflow?.attemptedBytes > budgets.slowConsumer.outboundBytes, overflow?.overflow?.attemptedBytes);
     check('slow peer really disconnected', overflow?.closed?.reason === 'slow-consumer' && measurements.after?.counters?.disconnectedSlowConsumers > 0, overflow?.closed);
-    within('actual server socket disconnect after overflow', overflow?.closed && overflow?.overflow ? overflow.closed.at - overflow.overflow.at : null, budgets.slowConsumer.disconnectMs);
-    within('RSS recovery after slow peer release', measurements.after && measurements.before ? measurements.after.memory.rss - measurements.before.memory.rss : null,
+    target('actual server socket disconnect after overflow', overflow?.closed && overflow?.overflow ? overflow.closed.at - overflow.overflow.at : null, budgets.slowConsumer.disconnectMs);
+    target('RSS recovery after slow peer release', measurements.after && measurements.before ? measurements.after.memory.rss - measurements.before.memory.rss : null,
       budgets.slowConsumer.rssRecoveryBytes);
     settledMemory('before slow peer', measurements.before); settledMemory('after slow peer', measurements.after);
   } else if (suffix === 'synthetic-500' || suffix === 'synthetic-1000') {
     const limit = budgets[suffix === 'synthetic-500' ? 'S500' : 'S1000'];
-    within('cold complete check', measurements.cold?.durationMs, limit.coldMs);
-    within('source edit complete check', measurements.source?.durationMs, limit.sourceMs);
+    target('cold complete check', measurements.cold?.durationMs, limit.coldMs);
+    target('source edit complete check', measurements.source?.durationMs, limit.sourceMs);
     check('large-fixture source edit captured expected content', captured(measurements.source), measurements.source?.report?.captured);
     check('large-fixture source capture differs from cold result', measurements.source?.report?.inputId !== measurements.cold?.report?.inputId,
       measurements.source?.report?.inputId);
     const observed = rawPeak(suffix, measurements.samples);
     check('saved peak agrees with raw samples', observed === measurements.peakBytes, measurements.peakBytes);
-    bytes('combined daemon/helper/native peak', observed, limit.peakBytes);
+    targetBytes('combined daemon/helper/native peak', observed, limit.peakBytes);
   } else if (suffix === 'publication-peak') {
     for (const name of ['reference', 'S100']) {
       const observed = rawPeak(name, measurements[name]?.samples);
       check(`${name}: saved peak agrees with raw samples`, observed === measurements[name]?.peakBytes, measurements[name]?.peakBytes);
       check(`${name}: publication and serialization completed`, measurements[name]?.revision?.sequence > 0 && measurements[name]?.reportBytes > 0, measurements[name]?.revision);
       check(`${name}: publication captured the actual source edit`, advances([measurements[name]]), measurements[name]?.captured);
-      bytes(`${name}: combined publication peak`, observed, budgets[name].peakBytes);
+      targetBytes(`${name}: combined publication peak`, observed, budgets[name].peakBytes);
     }
   } else check('known reviewed workload', false, id);
   return assertions;
