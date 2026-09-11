@@ -27,16 +27,21 @@ export async function withLiveWatch<T>(processes: SequenceProcess, root: string,
   child.stdout.on('data', (chunk: string) => {
     try {
       pending += chunk;
-      assert.ok(Buffer.byteLength(pending) <= 32 * 1024 ** 2 + 65536, 'Watch line exceeds response bound');
       for (let index = pending.indexOf('\n'); index !== -1; index = pending.indexOf('\n')) {
         const line = pending.slice(0, index); pending = pending.slice(index + 1);
+        // The limit belongs to each JSON line, excluding its delimiter. A
+        // read may finish one line and also contain bytes from the next one.
+        assert.ok(Buffer.byteLength(line) <= 32 * 1024 ** 2 + 65536, 'Watch line exceeds response bound');
         const value = object(JSON.parse(line));
         assert.equal(value.schemaVersion, 'ramify.watch/1', 'Watch must emit versioned JSON lines');
         queuedBytes += Buffer.byteLength(line);
         assert.ok(queued.length < 256 && queuedBytes <= 64 * 1024 ** 2, 'Watch evidence consumer fell behind');
         queued.push({ value, arrivedAt: performance.now(), bytes: Buffer.byteLength(line) });
       }
-      wake?.();
+      assert.ok(Buffer.byteLength(pending) <= 32 * 1024 ** 2 + 65536, 'Watch line exceeds response bound');
+      // Partial reads are not completed waits. Only a complete line, stream
+      // failure, close or the actual deadline may release the consumer.
+      if (queued.length) wake?.();
     } catch (cause) { fail(cause); }
   });
   child.stderr.on('data', (chunk: string) => {

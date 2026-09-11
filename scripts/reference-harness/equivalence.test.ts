@@ -1,12 +1,13 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { AnalysisReport } from '../../subs/analysis/src/index.js';
 import { assertEquivalentReports, firstDifference, parseAnalysisDocument } from './equivalence-comparison.js';
 import { assertResidentTrace } from './equivalence-process.js';
+import type { SequenceProcess } from './equivalence-process.js';
 import { applySequenceStep, assertSequenceReport, equivalenceSequences, prepareSequence, sequenceFixture } from './equivalence-sequences.js';
 import type { SequenceName } from './equivalence-sequences.js';
-import { watchEditTargetMs, watchRevision } from './equivalence-watch.js';
+import { watchEditTargetMs, watchRevision, withLiveWatch } from './equivalence-watch.js';
 import { filesBelow } from './reference-baseline.js';
 import { runIsolatedProject } from './mutation.js';
 import { repositoryRoot } from './plan.js';
@@ -67,6 +68,37 @@ describe('strict equivalence comparison controls', () => {
     expect(() => watchRevision({ ...line, value: { ...value, report: { ...document, inputId: 'stale' } } }, token, 1, 100, ['source.ts']))
       .toThrow('different inputs');
   });
+});
+
+describe('watch stdout reader controls without a daemon', () => {
+  it.each(['fragmented', 'coalesced', 'exact-boundary', 'oversized', 'malformed', 'partial-exit', 'silent'])
+  ('handles %s without confusing chunks with lines', async mode => {
+    const work = join(repositoryRoot, '.reference-work');
+    await mkdir(work, { recursive: true });
+    const owned = await mkdtemp(join(work, 'watch-reader-')), pidFile = join(owned, 'pid');
+    const unused = async (): Promise<never> => { throw new Error('Reader controls cannot call daemon operations'); };
+    const fixture: SequenceProcess = {
+      executable: join(repositoryRoot, 'scripts/reference-harness/fixtures/plan2/watch-stream.mjs'),
+      environment: { ...process.env, NODE_OPTIONS: '', RAMIFY_WATCH_CONTROL: mode, RAMIFY_WATCH_CONTROL_PID: pidFile },
+      traceFile: '', endpoint: '', run: unused, check: unused, status: unused,
+    };
+    try {
+      const run = withLiveWatch(fixture, owned, async next => {
+        const first = await next(30_000);
+        expect(first.value.index).toBe(1);
+        if (mode === 'silent') await next(100);
+        if (mode === 'exact-boundary') expect(Buffer.byteLength(JSON.stringify(first.value))).toBe(32 * 1024 ** 2 + 65536);
+        if (mode === 'coalesced' || mode === 'exact-boundary') expect((await next(5000)).value.index).toBe(2);
+      });
+      if (mode === 'oversized') await expect(run).rejects.toThrow('Watch line exceeds response bound');
+      else if (mode === 'malformed') await expect(run).rejects.toBeInstanceOf(SyntaxError);
+      else if (mode === 'partial-exit') await expect(run).rejects.toThrow('Watch exited before its next line');
+      else if (mode === 'silent') await expect(run).rejects.toThrow('Watch event exceeded 100 ms');
+      else await run; // Also requires exit 130, empty stderr and no partial line.
+      const pid = Number(await readFile(pidFile, 'utf8'));
+      expect(() => process.kill(pid, 0)).toThrowError(expect.objectContaining({ code: 'ESRCH' }));
+    } finally { await rm(owned, { recursive: true, force: true }); }
+  }, 40_000);
 });
 
 // Materialization and batch-oracle coverage only; these tests never credit I2-25/I2-26.
