@@ -386,7 +386,7 @@ not execute `I2-27:eviction-under-many-contexts` or activate `lifecycle`.
 
 ### Completion witnesses (Plan 2 iteration 14)
 
-`completion-cases.ts` registers five real I2-30 process handlers under
+`completion-cases.ts` registers all six I2-30 process handlers under
 `completion`. They require resident self-checking, a compiler-valid contexts
 import of the actual `RamifyService` with a visible R6 dispatch denial, strict
 final declarations, eight packed package entries, and relocated resident
@@ -401,7 +401,15 @@ failure and cleanup evidence, and checks the client closure in a separate empty
 process. `completion.test.ts` supplies closure-corruption and process-cleanup
 controls; fixture controls earn no product acceptance credit.
 
-`I2-30:plan1-regression` still has no handler. The other five handlers fail on
-the current missing providers, and registering them does not establish
-completion. The [readiness guide](../../docs/development/resident-verification.md)
-describes the remaining commands and automation-owned regression runs.
+`completion-regression.ts` implements `I2-30:plan1-regression` by validating the
+preceding full Plan 1 report from `.reference-work/reports`. It requires the same
+source/build/runtime, all 308 passing assertion records, the frozen 305 unaffected
+definitions and eleven-owner/eight-entry observations. It records the consumed
+report's hash and rejects missing evidence or a newer failure for those inputs.
+It starts no nested regression runner. The frozen Plan 1 archive supplies only
+definitions; its old build cannot earn current regression credit.
+
+The other five handlers fail on the current missing providers, and the required
+current Plan 1 report is absent. Registration does not establish completion.
+The [readiness guide](../../docs/development/resident-verification.md) describes
+the remaining commands and automation-owned regression runs.

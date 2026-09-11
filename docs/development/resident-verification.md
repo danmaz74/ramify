@@ -41,7 +41,7 @@ the directory is empty. Remove that owned directory after confirming exit.
 
 ## Completion witnesses
 
-`scripts/reference-harness/completion-cases.ts` supplies five I2-30 handlers.
+`scripts/reference-harness/completion-cases.ts` supplies all six I2-30 handlers.
 The self-check requires the compiled CLI to connect to its own endpoint and
 keeps the existing full-file catalogue assertions. The contexts negative
 requires the real `RamifyService` export and compiler-valid source, then checks
@@ -54,7 +54,14 @@ client import closure. Relocation additionally requires equal batch/resident
 reports, an installed daemon entry listening on the private socket, and stop
 with process cleanup. Current provider failures receive no matrix credit.
 
-The same-build Plan 1 regression handler remains unimplemented. The old
-308-instance archive describes the Plan 1 build, so it cannot establish this
-checkpoint's regression result. The unfiltered Plan 2 gate remains mandatory
-and failing. macOS process evidence and all resident budgets also remain open.
+The Plan 1 regression handler reads the complete report produced by the preceding
+`reference:verify -- --plan 1` command. Source, build and runtime identities must
+match, all 308 instances must carry passing assertions, the 305 unaffected record
+definitions must match the frozen archive, and the toolkit/package observations
+must show eleven owners and eight entries. It never starts another regression
+run. A newer failure for the same inputs blocks an older pass.
+
+The old 308-instance archive describes the Plan 1 build and cannot establish
+this checkpoint's regression result. A current full report is still missing.
+The unfiltered Plan 2 gate remains mandatory and failing. macOS process evidence
+and all resident budgets also remain open.

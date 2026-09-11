@@ -60,7 +60,7 @@ describe('Plan 2 inventory and gates', () => {
     expect([intermediate.plan, intermediate.passed, intermediate.planComplete]).toEqual([2, true, false]);
     expect(formatVerification(intermediate)).toContain('Plan 2 iteration verification: 2');
     const full = await verifyInstances(options);
-    expect(full.summary).toEqual({ required: 176, passed: 6, failed: 14, notExecuted: 156 });
+    expect(full.summary).toEqual({ required: 176, passed: 6, failed: 15, notExecuted: 155 });
     expect(full.instances.filter(item => item.id.startsWith('I2-25:') || item.id.startsWith('I2-26:'))
       .every(item => item.status === 'failed' && item.error?.includes('Resident prerequisite unavailable'))).toBe(true);
     for (const item of full.instances.filter(item => item.iteration === 11)) {
@@ -70,8 +70,8 @@ describe('Plan 2 inventory and gates', () => {
     expect([full.passed, full.planComplete]).toEqual([false, false]);
     expect(full.instances.filter(item => item.iteration === 14 && item.status === 'failed').map(item => item.id))
       .toEqual(['I2-30:self-check-eleven', 'I2-30:self-negative-contexts', 'I2-30:declarations-final',
-        'I2-30:package-entries', 'I2-30:relocated-resident']);
-    expect(full.instances.find(item => item.id === 'I2-30:plan1-regression')?.reason).toBe('missing-handler');
+        'I2-30:package-entries', 'I2-30:relocated-resident', 'I2-30:plan1-regression']);
+    expect(full.instances.find(item => item.id === 'I2-30:plan1-regression')?.error).toContain('No full Plan 1 gate');
     expect(full.instances.find(item => item.id === 'I2-20:human')?.reason).toBe('missing-handler');
     expect(full.instances.filter(item => item.id.startsWith('I2-19:') && item.status === 'passed').map(item => item.id))
       .toEqual(['I2-19:help-version-unchanged', 'I2-19:batch-no-daemon']);

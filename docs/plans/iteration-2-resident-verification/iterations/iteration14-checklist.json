@@ -9,7 +9,7 @@
     "functionalRequirementsSatisfied": false,
     "newCodeCoveredByTests": true
   },
-  "completedAt": "2026-09-11T09:31:23Z",
+  "completedAt": "2026-09-11T09:38:12Z",
   "iteration": "14",
-  "notes": "Incomplete checkpoint. Build, type-check, direct harness controls, batch self/reference checks, diagrams and site build pass. Unfiltered Plan 2: 176 required, 6 passed, 14 failed, 156 not executed. Five I2-30 handlers expose absent resident connection/service/final package providers; Plan 1 regression handler and same-build/macOS/resident measurement evidence remain absent. Vitest/Cucumber verdicts are reserved for workflow automation. See iteration14-results.md and the archived complete gate report."
+  "notes": "Single focused remediation implemented the previously missing I2-30:plan1-regression handler. It validates a full same-source/build/runtime Plan 1 report, all 308 passing assertion records, 305 unchanged definitions and eleven-owner/eight-entry observations, without rerunning regression. Type-check and 23 direct controls pass; the real checkout correctly rejects absent matching evidence. Functional completion still lacks the predecessor resident provider chain, passing resident cases, current Plan 1 report, measured budgets and macOS evidence. All-new-test success remains unestablished because the automation-owned runner verdict is unavailable. The previous full Plan 2 result (6 passed, 14 failed, 156 unexecuted) predates this reader change; it was not rerun. No publication in this remediation."
 }

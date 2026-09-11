@@ -6,6 +6,7 @@ import type { AnalysisReport } from '../../subs/analysis/src/index.js';
 import type { TraceEvent } from '../../src/tests/process.js';
 import { reviewedPackage, validatePackageEntries } from '../validate-final-contracts.js';
 import { assertEquivalentReports } from './equivalence-comparison.js';
+import { verifyPlan1Regression } from './completion-regression.js';
 import { object, readTrace, withSequenceProcess } from './equivalence-process.js';
 import { put } from './fixtures/plan1/project.js';
 import { runIsolatedProject } from './mutation.js';
@@ -133,6 +134,12 @@ async function packed(context: ProjectContext, resident: boolean): Promise<void>
 }
 
 export const completionHandlers: ReadonlyMap<string, InstanceHandler> = new Map<string, InstanceHandler>([
+  ['I2-30:plan1-regression', { kind: 'memory', run: async ({ assertions }) => {
+    const receipt = await verifyPlan1Regression();
+    assertions.equal('same-input Plan 1 process gate passed every required instance', receipt.summary,
+      { required: 308, passed: 308, failed: 0, notExecuted: 0 });
+    assertions.equal('all unaffected Plan 1 definitions preserved', receipt.unchangedRecords, 305);
+  } }],
   ...(['self-check-eleven', 'self-negative-contexts'] as const).map(name => [`I2-30:${name}`, {
     kind: 'memory' as const, run: async ({ assertions }: { assertions: Assertions }) => {
       const result = await runIsolatedProject({ workRoot: join(repositoryRoot, '.reference-work'), instanceId: `I2-30:${name}`,

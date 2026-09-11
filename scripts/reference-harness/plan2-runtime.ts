@@ -9,8 +9,8 @@ import type { HarnessRuntime } from './runner.js';
  * Resident commands and all other CLI instances remain missing-handler.
  * Equivalence handlers fail at their real-process prerequisite until the
  * predecessor daemon and resident CLI providers are implemented.
- * Completion handlers likewise require actual providers; Plan 1 regression
- * remains unavailable until its full same-build gate can be established. */
+ * Completion handlers likewise require actual providers. Plan 1 regression
+ * requires its prior full gate on identical source/build/runtime inputs. */
 export const plan2Runtime: HarnessRuntime = {
   capabilities: new Set(['harness-gate', 'cli', 'equivalence', 'completion']),
   handlers: new Map([...plan2GateHandlers, ...entryBoundaryHandlers, ...equivalenceHandlers, ...completionHandlers]),

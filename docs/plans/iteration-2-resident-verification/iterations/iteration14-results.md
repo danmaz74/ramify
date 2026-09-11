@@ -2,7 +2,7 @@
 
 # Iteration 14 results: completion witnesses and incomplete resident handoff
 
-**Recorded:** 2026-09-11. **Status: incomplete.** Five completion process handlers, their controls, command documentation and retained evidence are implemented. The resident package is still absent. The unfiltered Plan 2 gate requires 176 instances and reports **6 passed, 14 failed, 156 not executed**. No I2-30 instance passes, and Plan 2 cannot be closed or described as delivered.
+**Recorded:** 2026-09-11. **Status: incomplete.** Six completion handlers, their controls, command documentation and retained evidence are implemented after the single remediation below. The resident package is still absent. The last unfiltered Plan 2 gate, before that remediation, required 176 instances and reported **6 passed, 14 failed, 156 not executed**. The full matrix was not rerun for the focused evidence-reader change. No I2-30 instance passes, and Plan 2 cannot be closed or described as delivered.
 
 Work stayed in the authoritative checkout `/tmp/worktrees/ramify-67e9dd0f/iteration-2-resident-verification`, branch `workflow/iteration-2-resident-verification`, starting at `cb4a53c2b91875e9bbbff603717a72169be6d541`. This submission is an incomplete implementation checkpoint, not functional acceptance.
 
@@ -24,7 +24,7 @@ Ordinary check still dispatches batch. No service or analyzer substitute was add
 
 ### Self-check and independent negative
 
-Added `scripts/reference-harness/completion-cases.ts` and registered five I2-30 handlers. The resident self-check uses the actual installed CLI, requires a connection to its owned endpoint, and rejects a CLI that loads the batch engine or spawns compiler helpers itself. On a genuine resident result it reuses Plan 1's independent eleven-owner, full-file inventory, complete catalogue and access-evaluation assertions, exported from `self-cases.ts` without changing those assertions.
+Initially added `scripts/reference-harness/completion-cases.ts` with five I2-30 handlers; the single remediation below registers the sixth, Plan 1 regression evidence validation. The resident self-check uses the actual installed CLI, requires a connection to its owned endpoint, and rejects a CLI that loads the batch engine or spawns compiler helpers itself. On a genuine resident result it reuses Plan 1's independent eleven-owner, full-file inventory, complete catalogue and access-evaluation assertions, exported from `self-cases.ts` without changing those assertions.
 
 The contexts negative first checks a clean toolkit copy through compiled batch analysis. It then writes only that copy's `subs/daemon/subs/contexts/src/__i2_probe.ts`, importing the actual root `RamifyService` type. A real compiler subprocess must accept the import before the checker negative can count. The subsequent assertions require exactly the located contexts-to-root `required-importer-tag` denial, explicit type-only selection, independently visible R6 path and unsatisfied `dispatch` requirement. Batch and resident reports must agree after replacing only runId.
 
@@ -54,7 +54,7 @@ Updated the development testing command list and added `docs/development/residen
 
 The roadmap has not been advanced to delivered: that would contradict the gate and prerequisites. Its stale “detailed plan not yet written” wording still needs an authorized plan-document update linking this existing plan and incomplete evidence; no plan artifact was edited directly. No MCP, overlay, inspection or explorer claim was added.
 
-## Executed instance outcomes
+## Executed instance outcomes before the single remediation
 
 All required metadata and observations are retained in [the complete gate archive](../../../../scripts/reference-harness/evidence/plan2-iteration14-incomplete.json.gz).
 
@@ -77,7 +77,7 @@ The four unit passes are I2-28's existing harness controls. The two process pass
 | declarations-final | Failed: five final declaration mismatches and missing eighth package export. |
 | package-entries | Twenty-two assertions passed before the actual packed package failed the eight-entry expectation. |
 | relocated-resident | Twenty-two assertions passed before the same package prerequisite failure; no installed daemon started. |
-| plan1-regression | Not executed: handler remains absent, and no same-build Plan 1 gate is available. |
+| plan1-regression | Not executed in this archived run. The subsequent remediation implements the handler, but a same-input Plan 1 gate remains unavailable. |
 
 All eleven traced equivalence/completion process lifetimes in the final gate report have empty leaked and surviving-after-kill lists. This is cleanup evidence for the executed failure paths, not a daemon lifecycle acceptance claim.
 
@@ -206,14 +206,60 @@ Plan 3 must wait for the real context, revision/freshness, service, client, code
 
 Restore the predecessor provider chain through its owning iterations, beginning with incremental analysis/project resolution, then contexts, shared service/root assembly, validated client/codec, host/daemon entry and resident CLI. Resolve the architecture-review disposition through its owning workflow. Activate the five remaining declarations, real client entry and Plan 1's reviewed eighth-entry literal when those providers exist.
 
-Finish and register the same-build Plan 1 regression handler; preserve the 305 unaffected expectations and execute all 308 records with owned daemon cleanup. Complete the real lifecycle and measurement handlers, obtain macOS process evidence, and run the two unfiltered gates on one build. Exercise the currently unreachable positive paths of the five new completion handlers against those implementations. Any budget change requires the reviewed plan revision process.
+Produce a qualifying same-input Plan 1 gate for the implemented regression evidence handler; preserve the 305 unaffected expectations and execute all 308 records with owned daemon cleanup. Complete the real lifecycle and measurement handlers, obtain macOS process evidence, and run the two unfiltered gates on one build. Exercise the currently unreachable positive paths of the five new completion handlers against those implementations. Any budget change requires the reviewed plan revision process.
 
 Only then update the roadmap to delivered, enter measured budgets in the plan, and replace this incomplete checkpoint with the evidence-backed completion handoff.
 
 ## Checklist disposition
 
 - functionalRequirementsSatisfied: false — missing prerequisite providers and no passing I2-30 instance.
-- newCodeCoveredByTests: true — seven authored controls plus updated strict matrix expectations.
+- newCodeCoveredByTests: true — the original seven tests, the new regression-evidence control test and updated strict matrix expectations.
 - allNewTestsPass: false — direct controls and static checks pass, but the automation-owned runner verdict is not available.
 
 Results and checklist are written through workflow MCP. Draft code and evidence are committed on the assigned branch before publication. Publication of this checkpoint must not be interpreted as satisfaction of the plan's exit criteria.
+
+## Single self-assessment remediation attempt
+
+**Recorded:** 2026-09-11 09:38:12 UTC. This focused attempt began at `d6ccb26` in the same authoritative checkout and branch. Re-read the assigned iteration, iteration-work/testing/bugfixing skills, relevant evidence and current harness. Workflow detail reports iteration 14 at validate_output_retry. No automated regression verdict or failing-new-test output was supplied. The existing checklist metadata change was generated by the previous publication.
+
+### Missing integration completed: Plan 1 regression evidence handler
+
+Implemented `completion-regression.ts` and registered `I2-30:plan1-regression`. The main validation sequence already runs the full Plan 1 gate before Plan 2. The new handler consumes that complete report from the ignored `.reference-work/reports` directory; it starts no second regression suite and does not bypass the automation-only test policy.
+
+Acceptance requires:
+
+- Identical source SHA, compiled-build SHA, package version, Node version and TypeScript version. Commit metadata alone cannot qualify a report.
+- A passing unfiltered Plan 1 gate with all fifteen required iterations, no inventory errors and exactly 308 unique execution slots matching the current reviewed inventory.
+- Actual nonempty passing assertion evidence for every slot, with no failed baseline or execution.
+- The 305 unaffected serialized record definitions identical to the frozen Plan 1 archive. That archive supplies definitions only; its old successful build cannot earn current regression credit.
+- Both toolkit cases asserting eleven owners and retaining that exact owner observation; the relocated package asserting eight actual imports and retaining the eight expected callable bindings.
+- Source/build identities remaining unchanged while evidence is inspected.
+
+The bounded reader selects the newest report for matching inputs. A newer failed report blocks an older pass; malformed evidence is reported rather than hidden. Stale reports are never substituted. A successful receipt records the source file, content hash, identity and counters without embedding another full report.
+
+All six I2-30 handlers now exist. Updated the readiness guide, harness README and the existing gate test expectations: with the present missing evidence, plan1-regression is an executed failure rather than a missing handler. Those full-gate assertions are prepared for automation; their projected six-pass/fifteen-fail/155-unexecuted summary is not claimed as a newly executed full gate.
+
+### Verification of the focused change
+
+Added `completion-regression-controls.ts` and one Vitest wrapper. Direct execution covered 23 named checks: positive and restored schema fixtures; the actual old-build archive; each changed source/build/runtime identity; filtered and failed reports; removed/duplicate instances; empty/failed assertions; missing metadata; old owner/package expectations; missing actual observations; altered frozen definitions; no report; stale report selection; preservation of a newer matching failure; malformed JSON. Synthetic schema fixtures live only in their own temporary directory and never enter the real report directory.
+
+The first type-check found TS2345 in the new control code's `assert.throws` overload. Corrected its argument form. The final type-check and direct controls pass.
+
+| Command / check | Result |
+| --- | --- |
+| `npm run type-check` after the correction | Passed all four configurations. |
+| Direct `npx tsx --eval` invocation of `completionRegressionControls()` | Passed all 23 checks; log `.reference-work/iteration14-regression-controls-final.log`. |
+| Direct `npx tsx --eval` invocation of `verifyPlan1Regression()`, requiring rejection | Passed the real-checkout negative: no full Plan 1 gate exists for current source/build/runtime. Log `.reference-work/iteration14-regression-missing.log`. |
+| `git diff --check` | Passed. |
+
+The direct verification commands import the checked-in functions, use Node assertions and preserve rejected outcomes. They do not execute Vitest, Cucumber or Plan 1 regression. The unchanged build, batch checks, external relocation and full Plan 2 matrix were not rerun for this scripts-only evidence reader. Their earlier observations remain historical evidence. No production source, package export, declaration, runtime budget or model rule changed.
+
+### Remaining self-assessment
+
+functionalRequirementsSatisfied remains **false**. The missing regression handler is fixed, but its required current report is absent. The incremental/contexts/service/client/host/CLI provider chain, successful resident completion paths, same-build regression, real resident measurements and macOS process evidence are still missing. Implementing those predecessor owners exceeds this bounded integration attempt.
+
+newCodeCoveredByTests remains **true**. The new evidence reader has positive and corruption/selection controls, alongside the previously authored completion tests.
+
+allNewTestsPass remains **false**. The direct controls and type-check pass, but the automation-owned runner verdict for all new tests, including the revised full-gate test, is unavailable. No check was changed to true on the basis of unrun assertions.
+
+Both deliverables are updated through workflow MCP and the focused changes are committed in this checkout. No publication call is made in this remediation; validation reruns and subsequent publication remain with the workflow.
