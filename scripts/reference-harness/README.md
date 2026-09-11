@@ -328,3 +328,17 @@ five I2-27 instances remain unexecuted. Resume the actual lifecycle handlers
 against those providers, including record-derived stop reasons, fixed timing
 bounds, nine-context eviction, installed CLI/direct-client recovery and macOS
 execution. Fixture success cannot substitute for that evidence.
+
+`fixtures/plan2/lifecycle.ts` adds `withLifecycleProjects(workRoot, run)` for
+I2-27's nine-context workload. It creates nine independent copies of the frozen
+F recipe, returns their roots in stable opening order, and uses the existing
+mutation scope to clean them after success or failure. Overlapping calls own
+separate directories even under the same work root. The caller must still open
+the actual contexts, acquire and release real leases in order, observe daemon
+status and assert eviction; this helper performs no service operation.
+
+`npx tsx scripts/reference-harness/lifecycle-fixture-smoke.ts` runs the same
+three cases registered in `lifecycle-fixtures.test.ts`: nine complete F copies,
+independent edits and overlapping scopes, and cleanup preserving callback
+failures and caller-owned files. This qualifies the input fixture only; it does
+not execute `I2-27:eviction-under-many-contexts` or activate `lifecycle`.
