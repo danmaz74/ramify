@@ -53,14 +53,20 @@ describe('Plan 2 inventory and gates', () => {
   });
 
   it('executes all four discipline handlers, keeps Plan 1 capabilities separate and fails the full gate', async () => {
-    expect([...plan2Runtime.capabilities]).toEqual(['harness-gate', 'cli']);
+    expect([...plan2Runtime.capabilities]).toEqual(['harness-gate', 'cli', 'equivalence']);
     const options = { plan, records: plan2Instances, runtime: plan2Runtime, workRoot: join(repositoryRoot, '.reference-work') };
     const intermediate = await verifyInstances({ ...options, iteration: 2 });
     expect(intermediate.summary).toEqual({ required: 4, passed: 4, failed: 0, notExecuted: 172 });
     expect([intermediate.plan, intermediate.passed, intermediate.planComplete]).toEqual([2, true, false]);
     expect(formatVerification(intermediate)).toContain('Plan 2 iteration verification: 2');
     const full = await verifyInstances(options);
-    expect(full.summary).toEqual({ required: 176, passed: 6, failed: 0, notExecuted: 170 });
+    expect(full.summary).toEqual({ required: 176, passed: 6, failed: 9, notExecuted: 161 });
+    expect(full.instances.filter(item => item.id.startsWith('I2-25:') || item.id.startsWith('I2-26:'))
+      .every(item => item.status === 'failed' && item.error?.includes('Resident prerequisite unavailable'))).toBe(true);
+    for (const item of full.instances.filter(item => item.iteration === 11)) {
+      expect(item.observations?.find(o => o.kind === 'equivalence-process-cleanup')?.data)
+        .toMatchObject({ leaked: [], survivingAfterKill: [] });
+    }
     expect([full.passed, full.planComplete]).toEqual([false, false]);
     expect(full.instances.find(item => item.id === 'I2-20:human')?.reason).toBe('missing-handler');
     expect(full.instances.filter(item => item.id.startsWith('I2-19:') && item.status === 'passed').map(item => item.id))

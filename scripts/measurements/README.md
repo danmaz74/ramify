@@ -128,3 +128,11 @@ SHA-256. Omitted fixture selection preserves the S100 default used by batch
 measurements. Callers own cleanup. Generated trees are never checked in, and
 materialization alone establishes no performance or resident acceptance result.
 Iteration 13 supplies the resident measurement recipe over these fixtures.
+
+`materialize.ts` also exports `materializeSynthetic(newDirectory, fixture)` with
+the same no-overwrite rule, default and metadata. Importing it performs no writes.
+Iteration 11's materialized edit oracle is in
+[`equivalence-sequences.ts`](../reference-harness/equivalence-sequences.ts): use
+`prepareSequence` for its explicit consumer setup, then `applySequenceStep` for
+each recorded edit. These edits apply to a private copy, never to generator bytes
+or a fixture used concurrently by another measurement.
