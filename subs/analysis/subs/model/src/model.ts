@@ -8,10 +8,24 @@ function sameNames(a: readonly string[], b: readonly string[]): boolean {
   return JSON.stringify(sortedNames(a)) === JSON.stringify(sortedNames(b));
 }
 
+const moduleIndexes = new WeakMap<readonly ModuleRecord[], ReadonlyMap<string, ModuleRecord>>();
+
+function ownerOf(modules: readonly ModuleRecord[], id: string): ModuleRecord | undefined {
+  // Mutable caller arrays cannot safely retain an index. Published model
+  // arrays and the validated construction array are immutable.
+  if (!Object.isFrozen(modules)) return modules.find(module => module.id === id);
+  let index = moduleIndexes.get(modules);
+  if (!index) {
+    index = new Map(modules.map(module => [module.id, module]));
+    moduleIndexes.set(modules, index);
+  }
+  return index.get(id);
+}
+
 /** A supplied origin must use the area's actual profile, including tests precedence. */
 export function canonicalOrigin(modules: readonly ModuleRecord[], origin: SourceOrigin): SourceOrigin | undefined {
   if (!origin || !validPath(origin.file) || !origin.area) return undefined;
-  const owner = modules.find(({ id }) => id === origin.area.owner);
+  const owner = ownerOf(modules, origin.area.owner);
   const ordinary = owner?.areas.find(({ kind }) => kind === 'ordinary');
   if (!ordinary || !origin.file.startsWith(`${ordinary.root}/`)) return undefined;
   const relative = origin.file.slice(ordinary.root.length + 1);
@@ -91,7 +105,7 @@ export function buildModel(input: ModelInput): ModelResult<Model> {
     }
   }
   if (issues.length) return immutable({ status: 'invalid', issues });
-  const moduleList = [...modules.values()].sort((a, b) => compare(a.id, b.id));
+  const moduleList = Object.freeze([...modules.values()].sort((a, b) => compare(a.id, b.id)));
   for (let index = 0; index < moduleList.length; index++) {
     const root = moduleList[index].areas[0].root;
     for (const other of moduleList.slice(index + 1)) {
@@ -172,7 +186,8 @@ export function buildModel(input: ModelInput): ModelResult<Model> {
   if (issues.length) return immutable({ status: 'invalid', issues });
   // A child's complete name set exists even when its to-parent contract is empty.
   // Resolve leaves first; a claimed effective bit cannot manufacture a missing hop.
-  const byModule = new Map(moduleList.map((module) => [module.id, exposures.filter(({ module: id }) => id === module.id)]));
+  const byModule = new Map(moduleList.map(module => [module.id, [] as Exposure[]]));
+  for (const exposure of exposures) byModule.get(exposure.module)!.push(exposure);
   const toParent = new Map<string, Set<string>>();
   for (const module of [...moduleList].sort((a, b) => b.id.split('/').length - a.id.split('/').length || compare(a.id, b.id))) {
     const received = new Set<string>();

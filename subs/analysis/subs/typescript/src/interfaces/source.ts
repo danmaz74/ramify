@@ -95,3 +95,21 @@ export interface SourceAnalysis {
     readonly coverage: readonly SourceLimit[] }>;
   dispose(): Promise<void>;
 }
+
+/** Per-file interpretation over one owned compiler lifetime. */
+export interface AccessInterpreter {
+  interpret(files: readonly string[], signal?: AbortSignal): Promise<{
+    readonly accesses: readonly SourceAccess[];
+    readonly coverage: readonly SourceLimit[];
+    readonly candidates: readonly { readonly file: string; readonly paths: readonly string[] }[];
+  }>;
+  // The structural description input accepts iteration 3's FileDescription
+  // without activating that iteration's additional public names early.
+  replaceDescriptions(descriptions: readonly {
+    readonly file: string;
+    readonly exports: FileExports;
+    readonly originals: readonly CatalogOriginal[];
+    readonly coverage: readonly SourceLimit[];
+  }[], removed: readonly string[]): void;
+  dispose(): Promise<void>;
+}

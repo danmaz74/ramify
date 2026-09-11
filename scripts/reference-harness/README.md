@@ -410,3 +410,39 @@ Every completion claim requires a successful current execution. Registration
 and historical reports do not establish completion.
 The [readiness guide](../../docs/development/resident-verification.md) describes
 the remaining commands and automation-owned regression runs.
+
+## Plan 5 fast incremental checks
+
+`plan5-instances.ts` transcribes all 103 reviewed leaves of the
+[Plan 5 inventory](../../docs/plans/iteration-5-fast-incremental-checks/subcases.md),
+including exact fixture selections, evidence kinds, mutations and independent
+expectations. `readReviewedPlan5` in `plan.ts` validates them against that
+inventory, the fourteen main-plan matrix groups, the thirteen sequence rows
+with their titles and prerequisites, the per-iteration membership table and
+the per-iteration counts. It accepts the fixture codes `R`, `T`, `F`, `S100`,
+`S500`, `S1000`, `Q`, `M`, `W`, `A`, `P` and `H` and the evidence kinds `api`,
+`unit`, `session`, `quick`, `ipc`, `process` and `measurement`. The Plan 1 and
+Plan 2 readers and their records remain independent.
+
+`npm run reference:verify -- --plan 5 --iteration 2` executes the six I5-01
+engine instances and the four I5-02 harness controls; its work root is the
+toolkit's `.reference-work/`. `plan5-runtime.ts` makes only `engine` and
+`harness-gate` available at iteration 2. The capabilities `catalog`,
+`compiler`, `observer`, `session`, `hosting`, `contexts`, `supersession`,
+`hook-cli`, `live-equivalence`, `fast-measure` and `completion` are registered
+names whose instances report `not-executed` until the iteration that
+implements them adds a provider; registration never establishes execution.
+`--iteration 4` requires the 18 instances of iterations 2 and 4; `--iteration 9`
+requires the 74 of iterations 2 to 9. The unfiltered `--plan 5` gate requires
+all 103 and is expected to fail until iteration 13.
+
+`plan5-engine-cases.ts` compares the current batch engine with the recorded
+pre-change engine on the same fixture copies: `plan5-baseline-loader.mjs`
+replays the pinned commit's `model` and `typescript` sources over the built
+`dist/` through a module load hook, and `plan5-report-worker.mjs` runs
+`analyzeProject` in a separate process for each engine. The reports must be
+equal except `runId`; the toolkit fixture is a `git archive` of the pinned
+commit so the recorded 229-file, 2,744-access baseline stays fixed.
+`plan5-engine-fixture.ts` instruments the owner's synchronous
+`AccessInterpretation` inside a real compiler snapshot for the query-count and
+setup-count instances. No Plan 5 engine instance starts a daemon.

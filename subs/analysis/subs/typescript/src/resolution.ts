@@ -19,6 +19,7 @@ export interface ResolvedModule {
 /** Compiler declarations establish code targets. Resource descriptions need an
  * additional captured, physical target; an ambient wildcard alone proves none. */
 export class Resolution {
+  onCandidate: ((path: string) => void) | undefined;
   readonly files: ReadonlyMap<string, InventoryFile>;
   constructor(readonly project: Project, readonly inventory: ProjectInventory, readonly host: CatalogHost) {
     this.files = new Map(inventory.files.map(file => [resolve(inventory.scope.root, file.path), file]));
@@ -59,6 +60,9 @@ export class Resolution {
       if (isAbsolute(selected)) candidates.push(selected);
       else if (base && isAbsolute(base)) candidates.push(resolve(base, selected));
     }
+    paths.forEach(path => this.onCandidate?.(path));
+    candidates.forEach(path => this.onCandidate?.(path));
+    const exists = (path: string): boolean => { this.onCandidate?.(path); return this.host.fileExists(path); };
     // JSON and ordinary ESM code resolve to actual source files. Ambient module
     // declarations instead name their describing source file, handled below.
     const sourcePaths = [...new Set(declarationNodes.filter(node => node.kind === SyntaxKind.SourceFile)
@@ -114,7 +118,7 @@ export class Resolution {
     }
     if (describedResources.length) {
       for (const path of describedResources) {
-        if (!this.host.fileExists(path)) continue;
+        if (!exists(path)) continue;
         const owned = this.files.get(path);
         if (owned?.kind === 'resource') return { kind: 'application', module, file: owned.path, resource: owned };
         return sourcePaths.every(path => this.external(path))
@@ -146,7 +150,7 @@ export class Resolution {
         for (const ending of matches[0] ? [extension, ...endings] : endings) {
           for (const suffix of options.moduleSuffixes ?? ['']) {
             const path = `${candidate.slice(0, -extension.length)}${suffix}${ending}`;
-            if (this.host.fileExists(path)) { selected = path; break; }
+            if (exists(path)) { selected = path; break; }
           }
           if (selected) break;
         }
@@ -161,10 +165,10 @@ export class Resolution {
     }
     for (const candidate of candidates) {
       const file = this.files.get(resolve(candidate));
-      if (file?.kind === 'resource' && this.host.fileExists(candidate)) {
+      if (file?.kind === 'resource' && exists(candidate)) {
         return { kind: 'application', module, file: file.path, resource: file };
       }
-      if (!file && this.host.fileExists(candidate)) {
+      if (!file && exists(candidate)) {
         return { kind: 'outside-module', module, file: relative(this.inventory.scope.root, candidate), resource: null };
       }
     }

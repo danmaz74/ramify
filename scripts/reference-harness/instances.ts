@@ -5,12 +5,15 @@ export const verificationCapabilities = [
   'resources', 'coverage', 'session', 'cli', 'build-selection', 'regression',
   'harness-gate',
   'increment', 'contexts', 'daemon-service', 'ipc', 'client', 'daemon-process',
+  'engine', 'compiler', 'observer', 'hosting', 'supersession', 'hook-cli', 'live-equivalence', 'fast-measure',
   'lifecycle', 'equivalence', 'resident-measure', 'completion',
 ] as const;
 
 export type VerificationCapability = (typeof verificationCapabilities)[number];
-export type FixtureCode = 'R' | 'F' | 'J' | 'T' | 'M' | 'H' | 'Q' | 'P' | 'S100' | 'S500' | 'S1000' | '—';
-export type EvidenceKind = 'api' | 'unit' | 'quick' | 'ipc' | 'process' | 'measurement';
+export type FixtureCode = 'A' | 'W' | 'R' | 'F' | 'J' | 'T' | 'M' | 'H' | 'Q' | 'P' | 'S100' | 'S500' | 'S1000' | '—';
+export type EvidenceKind = 'api' | 'unit' | 'session' | 'quick' | 'ipc' | 'process' | 'measurement';
+export const plan5Directory = 'docs/plans/iteration-5-fast-incremental-checks';
+export const plan5InventoryDocument = `${plan5Directory}/subcases.md`;
 export const plan2Directory = 'docs/plans/iteration-2-resident-verification';
 export const plan2InventoryDocument = `${plan2Directory}/subcases.md`;
 
@@ -69,7 +72,14 @@ export function capabilitiesFor(scope: string, iteration: number): VerificationC
 }
 
 export function instanceFromSeed(seed: InstanceSeed): ReferenceInstance {
-  if (seed[9]) return plan2InstanceFromSeed(seed);
+  if (seed[9]) {
+    const record = plan2InstanceFromSeed(seed);
+    if (!seed[0].startsWith('I5-')) return record;
+    const relocate = (pointer: string): string => pointer.replace(plan2Directory, plan5Directory);
+    return { ...record, fixture: { ...record.fixture, recipe: relocate(record.fixture.recipe) },
+      expectedCoverage: { ...record.expectedCoverage, convention: relocate(record.expectedCoverage.convention) },
+      pointers: record.pointers.map(relocate) };
+  }
   const [id, iteration, families, capabilityScope, code, mutation, expectation,
     variantMutation, variantExpectation] = seed;
   const [group, variant = null] = id.split('/');

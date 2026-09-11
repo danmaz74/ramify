@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": true,
+    "functionalRequirementsSatisfied": true,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-11T23:22:00Z",
+  "iteration": "2",
+  "notes": "All exit criteria are met on the final bytes. The interpreter, lazy namespace index and indexed model lookups are in place and every recorded batch report is equal except runId; T3 is active with its real export and collectAccesses is private. 'npm run reference:verify -- --plan 5 --iteration 2' passes (required 10, passed 10, failed 0, not executed 93, no inventory issue). The previously outstanding criterion is now closed: 'npm run reference:verify -- --plan 1' ran to completion in this turn and passes with 308 of 308 instances and planComplete true, recorded against this build's source and build hashes. The earlier attempt had reported it unfinished only because it looked for the report under examples/collection-review/.reference-work/reports; persistGateReport writes every plan's report to .reference-work/reports. check:reference (15 owners, 294 accesses, 2 warnings, 0 errors) and check:self (11 owners, 232 source files, 2,774 accesses, no finding) pass under owned endpoint directories with the daemon stopped afterwards. Type-check passes in all four scopes; 76 focused owner tests and 30 harness tests pass. New code is covered by access-interpreter.test.ts, the added accesses.test.ts and decision-lookups.test.ts cases and the ten executed I5-01/I5-02 gate instances. npm test was not run by hand, per the project's check policy; the workflow's automatic regression check covers it."
+}

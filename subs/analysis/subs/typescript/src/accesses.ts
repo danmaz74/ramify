@@ -10,7 +10,7 @@ import { SyntaxKind, isCallExpression, isExportDeclaration, isImportDeclaration,
   isBinaryExpression, isElementAccessExpression, isMetaProperty, type Node } from 'typescript/unstable/ast';
 import { originalKey } from '../../model/src/identity.js';
 import type { SourceLocation, SourceOrigin } from '../../model/src/interfaces/model.js';
-import type { AccessSelection, CatalogExport, SourceAccess, SourceAnalysis, SourceCatalog, SourceLimit, SourceTarget, WrittenForm } from './interfaces/source.js';
+import type { AccessSelection, CatalogExport, SourceAccess, AccessInterpreter, CatalogOriginal, FileExports, SourceCatalog, SourceLimit, SourceTarget, WrittenForm } from './interfaces/source.js';
 import { NamespaceUses, type NamespaceSink } from './namespace-uses.js';
 import { Resolution, type CatalogHost, type ResolvedModule } from './resolution.js';
 import { SourceFailure, type HelperInputs } from './wire.js';
@@ -18,20 +18,125 @@ import { SourceFailure, type HelperInputs } from './wire.js';
 const order = (a: string, b: string): number => Buffer.compare(Buffer.from(a), Buffer.from(b));
 const identity = (kind: string, value: unknown): string => `${kind}/1:${createHash('sha256').update(JSON.stringify(value)).digest('hex')}`;
 
-/** Interpret the captured compiler program in its supervised lifetime. Catalog
- * selections supply originals, including local aliases and forwarding paths. */
-export function collectAccesses(project: Project, inputs: HelperInputs, host: CatalogHost,
-  catalog: SourceCatalog, runtime: ReadonlyMap<CatalogExport, boolean>): Awaited<ReturnType<SourceAnalysis['accesses']>> {
+/** Compiler-bearing setup stays private to this owner. */
+export class AccessInterpretation {
+  readonly resolution: Resolution;
+  readonly files: Map<string, FileExports>;
+  readonly originals: Map<string, CatalogOriginal>;
+  readonly inventory: Map<string, HelperInputs['inventory']['files'][number]>;
+  readonly ordered: readonly string[];
+  readonly areas: Map<string, SourceOrigin['area']>;
+  readonly coverageByFile = new Map<string, SourceLimit[]>();
+  readonly coverageById = new Map<string, SourceLimit>();
+  private readonly originalKeysByFile = new Map<string, string[]>();
+  private readonly runtimePaths = new Map<string, ReadonlyMap<string, boolean>>();
+  private readonly replacedRuntime = new WeakMap<CatalogExport, boolean>();
+  private closed = false;
+
+  constructor(readonly project: Project, readonly inputs: HelperInputs, host: CatalogHost,
+    catalog: SourceCatalog, readonly runtime: ReadonlyMap<CatalogExport, boolean>) {
+    this.resolution = new Resolution(project, inputs.inventory, host);
+    this.files = new Map(catalog.files.map(file => [file.file, file]));
+    this.originals = new Map(catalog.originals.map(original => [originalKey(original.id), original]));
+    this.inventory = new Map(inputs.inventory.files.map(file => [file.path, file]));
+    this.ordered = [...this.inventory.keys()].sort(order);
+    this.areas = new Map(inputs.areas.map(area => [JSON.stringify([area.owner, area.kind]), area]));
+    for (const [key, original] of this.originals) {
+      const keys = this.originalKeysByFile.get(original.origin.file) ?? [];
+      keys.push(key); this.originalKeysByFile.set(original.origin.file, keys);
+    }
+    for (const file of catalog.files) {
+      const flags = new Map<string, boolean>();
+      const visit = (entries: readonly CatalogExport[], prefix: readonly string[]): void => {
+        for (const entry of entries) {
+          const path = [...prefix, entry.name], value = runtime.get(entry);
+          if (value !== undefined) flags.set(JSON.stringify(path), value);
+          if (entry.namespace) visit(entry.namespace, path);
+        }
+      };
+      visit(file.exports, []); this.runtimePaths.set(file.file, flags);
+    }
+    for (const issue of catalog.coverage) this.addCoverage(issue);
+  }
+
+  private addCoverage(issue: SourceLimit): void {
+    const issues = this.coverageByFile.get(issue.location.file) ?? [];
+    issues.push(issue); this.coverageByFile.set(issue.location.file, issues);
+    this.coverageById.set(issue.id, issue);
+  }
+
+  replaceDescriptions(descriptions: Parameters<AccessInterpreter['replaceDescriptions']>[0], removed: readonly string[]): void {
+    this.check();
+    for (const file of new Set([...removed, ...descriptions.map(description => description.file)])) {
+      this.files.delete(file);
+      for (const key of this.originalKeysByFile.get(file) ?? []) this.originals.delete(key);
+      this.originalKeysByFile.delete(file);
+      for (const issue of this.coverageByFile.get(file) ?? []) this.coverageById.delete(issue.id);
+      this.coverageByFile.delete(file);
+    }
+    for (const description of descriptions) {
+      this.files.set(description.file, description.exports);
+      // Detached replacement entries lose native map identity. Runtime export
+      // paths still belong to this compiler snapshot, including erased relays.
+      const flags = this.runtimePaths.get(description.file);
+      const restoreRuntime = (entries: readonly CatalogExport[], prefix: readonly string[]): void => {
+        for (const entry of entries) {
+          const path = [...prefix, entry.name], value = flags?.get(JSON.stringify(path));
+          if (value !== undefined) this.replacedRuntime.set(entry, value);
+          if (entry.namespace) restoreRuntime(entry.namespace, path);
+        }
+      };
+      restoreRuntime(description.exports.exports, []);
+      const keys: string[] = [];
+      for (const original of description.originals) {
+        if (original.origin.file !== description.file) {
+          throw new SourceFailure('invalid-description', `Original ${originalKey(original.id)} is not defined in ${description.file}`);
+        }
+        const key = originalKey(original.id);
+        keys.push(key); this.originals.set(key, original);
+      }
+      this.originalKeysByFile.set(description.file, keys);
+      description.coverage.forEach(issue => this.addCoverage(issue));
+    }
+  }
+
+  interpret(paths: readonly string[]): Awaited<ReturnType<AccessInterpreter['interpret']>> {
+    this.check();
+    const selected = [...new Set(paths)].sort(order).map(path => {
+      const file = this.inventory.get(path);
+      if (!file) throw new SourceFailure('unavailable', `Cannot interpret non-owned file ${path}`);
+      return file;
+    });
+    return interpretAccesses(this, selected);
+  }
+
+  runtimeValue(entry: CatalogExport): boolean | undefined {
+    return this.runtime.get(entry) ?? this.replacedRuntime.get(entry);
+  }
+
+  private check(): void {
+    if (this.closed) throw new SourceFailure('disposed', 'Access interpreter has been disposed');
+  }
+
+  dispose(): void {
+    this.closed = true;
+    this.files.clear(); this.originals.clear(); this.inventory.clear(); this.areas.clear();
+    this.originalKeysByFile.clear(); this.coverageByFile.clear(); this.coverageById.clear(); this.runtimePaths.clear();
+  }
+}
+
+/** Interpretation rules shared by finite batch and subset operations. */
+function interpretAccesses(setup: AccessInterpretation,
+  selected: readonly HelperInputs['inventory']['files'][number][]): Awaited<ReturnType<AccessInterpreter['interpret']>> {
+  const { project, inputs, resolution, files, originals } = setup;
   const root = inputs.inventory.scope.root;
-  const resolution = new Resolution(project, inputs.inventory, host);
-  const files = new Map(catalog.files.map(file => [file.file, file]));
-  const originals = new Map(catalog.originals.map(original => [originalKey(original.id), original]));
+  const candidates: { file: string; paths: readonly string[] }[] = [];
   const accesses: SourceAccess[] = [];
   const coverage = new Map<string, SourceLimit>();
   let selectionCount = 0;
   const origin = (file: string): SourceOrigin => {
     const entry = resolution.files.get(resolve(root, file));
-    const area = entry && inputs.areas.find(area => area.owner === entry.owner && area.kind === entry.area);
+    const area = entry && setup.areas.get(JSON.stringify([entry.owner, entry.area]));
     if (!entry || !area) throw new SourceFailure('unavailable', `Missing resolved source area for ${file}`);
     return { file: entry.path, area };
   };
@@ -105,7 +210,7 @@ export function collectAccesses(project: Project, inputs: HelperInputs, host: Ca
       // A problem with another local binding does not prevent this selection
       // from resolving. Problems at the shared module target affect each one.
       const relevantLocations = specifierNode ? [selectedAt, location(specifierNode)] : [selectedAt];
-      const blocked = catalog.coverage.filter(issue => issue.code === 'compiler-blocked'
+      const blocked = (setup.coverageByFile.get(at.file) ?? []).filter(issue => issue.code === 'compiler-blocked'
         && relevantLocations.some(at => issue.location.file === at.file
           && issue.location.start < at.end && (issue.location.end > at.start
             || issue.location.start === issue.location.end && issue.location.start >= at.start)));
@@ -120,7 +225,7 @@ export function collectAccesses(project: Project, inputs: HelperInputs, host: Ca
       if (status === 'unresolved' && target.kind === 'application') coverageIds.push(limit(
         blocked.length ? 'compiler-blocked' : !entry && !found.complete ? 'incomplete-exports' : 'unresolved-original', selectedAt,
         `Cannot establish original for selected export ${selection.name}`,
-        [...blocked.map(issue => issue.location), ...found.issueIds.flatMap(id => catalog.coverage.filter(issue => issue.id === id).map(issue => issue.location))]));
+        [...blocked.map(issue => issue.location), ...found.issueIds.flatMap(id => { const issue = setup.coverageById.get(id); return issue ? [issue.location] : []; })]));
     }
     const value = { location: at, importer: origin(at.file), specifier, form, selectionForm, runtimeLoad,
       target, selections, coverageIds };
@@ -128,7 +233,10 @@ export function collectAccesses(project: Project, inputs: HelperInputs, host: Ca
     accesses.push({ id: identity('access', [at, form, selectionForm, selections.map(item => [item.location, item.exportedName]),
       selection?.path ?? (selection ? [selection.name] : [])]), ...value });
   };
-  for (const file of [...inputs.inventory.files].sort((a, b) => order(a.path, b.path))) {
+  for (const file of selected) {
+    const paths = new Set<string>();
+    resolution.onCandidate = path => paths.add(relative(root, path));
+    candidates.push({ file: file.path, paths: [] });
     if (file.kind !== 'source') continue;
     const source = project.program.getSourceFile(resolve(root, file.path));
     if (!source) {
@@ -235,7 +343,7 @@ export function collectAccesses(project: Project, inputs: HelperInputs, host: Ca
         }
         for (const entry of entries) {
           if (excludeDefault && entry.name === 'default') continue;
-          if (runtimeOnly && runtime.get(entry) === false) continue;
+          if (runtimeOnly && setup.runtimeValue(entry) === false) continue;
           const next = [...path, entry.name];
           if (entry.namespace && !entry.original) whole(next, selectionForm, false, depth + 1);
           else {
@@ -384,8 +492,10 @@ export function collectAccesses(project: Project, inputs: HelperInputs, host: Ca
       node.forEachChild(child => { visit(child); });
     };
     visit(source);
+    candidates[candidates.length - 1] = { file: file.path, paths: [...paths].sort(order) };
   }
-  return { accesses: accesses.sort((a, b) => order(a.location.file, b.location.file) || a.location.start - b.location.start
+  resolution.onCandidate = undefined;
+  return { candidates, accesses: accesses.sort((a, b) => order(a.location.file, b.location.file) || a.location.start - b.location.start
       || (a.selections[0]?.location.start ?? 0) - (b.selections[0]?.location.start ?? 0) || order(a.id, b.id)),
     coverage: [...coverage.values()].sort((a, b) => order(a.location.file, b.location.file) || a.location.start - b.location.start || order(a.id, b.id)) };
 }

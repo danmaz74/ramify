@@ -2,12 +2,13 @@
 
 # Plan 5: Fast incremental checks — Iteration Status
 
-**Phase:** executing
+**Phase:** drafting_interrupted
+**Error:** session-errored
 
 | # | Iteration | Status | Started | Ended | Elapsed |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Contract package, probes and review points | completed | 20:25:55 | 21:06:55 | 41m 0s |
-| 2 | Engine changes and the `--plan 5` harness | pending | - | - | - |
+| 1 | Contract package, probes and review points | completed | 20:25:55 | 21:08:22 | 42m 26s |
+| 2 | Engine changes and the `--plan 5` harness | stopped | 22:05:04 | 22:40:00 | 34m 55s |
 | 3 | Per-file export descriptions | pending | - | - | - |
 | 4 | Project observer and incremental acquisition | pending | - | - | - |
 | converge-after-2 | Converge parallel group after-2 (system convergence) | pending | - | - | - |
@@ -28,6 +29,9 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | attempt_R9VDPfvdGsvDlR4KUNKhR | off | first-pass (v2) | in unavailable (launch-affordances-disabled); escape unavailable (launch-affordances-disabled); unaccounted unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | 0 | surface unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); search unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); expand unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) |
 | 1 | attempt_R9VDPfvdGsvDlR4KUNKhR | off | cumulative (v2) | in unavailable (launch-affordances-disabled); escape unavailable (launch-affordances-disabled); unaccounted unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | 0 | surface unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); search unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); expand unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) |
-| 1 | attempt_R9VDPfvdGsvDlR4KUNKhR | off | final (v2) | pending | pending | pending | pending | pending |
+| 1 | attempt_R9VDPfvdGsvDlR4KUNKhR | off | final (v2) | in unavailable (launch-affordances-disabled); escape unavailable (launch-affordances-disabled); unaccounted unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | 0 | surface unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); search unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); expand unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) |
+| 2 | attempt_XI0j3J0-l13WygzX22APy | off | first-pass (v2) | in unavailable (launch-affordances-disabled); escape unavailable (launch-affordances-disabled); unaccounted unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | 0 | surface unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); search unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); expand unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) |
+| 2 | attempt_XI0j3J0-l13WygzX22APy | off | cumulative (v2) | in unavailable (launch-affordances-disabled); escape unavailable (launch-affordances-disabled); unaccounted unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | 0 | surface unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); search unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); expand unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) |
+| 2 | attempt_XI0j3J0-l13WygzX22APy | off | final (v2) | in unavailable (launch-affordances-disabled); escape unavailable (launch-affordances-disabled); unaccounted unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | 0 | surface unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); search unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); expand unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) |
 
-*Last updated: 2026-09-11T21:06:55.580Z*
+*Last updated: 2026-09-11T22:40:00.668Z*

@@ -1,3 +1,5 @@
+import { buildModel } from '../model.js';
+import { recorded } from './recorded-decisions.js';
 import { expect, it, vi } from 'vitest';
 import { explainImport, explainVisibility } from '../decisions.js';
 import { originalKey } from '../identity.js';
@@ -34,4 +36,21 @@ it('keeps all four identity fields distinct and validates requested identities',
   }
   expect(() => explainVisibility(model, owner.id, { ...symbols[0].id, file: '../api.ts' })).toThrow('Invalid canonical');
   expect(() => explainVisibility(model, owner.id, { ...symbols[0].id, binding: 'absent' })).toThrow('Unknown original');
+});
+
+it('equals the pre-change decisions in order, including denied paths and evidence identities', () => {
+  const built = buildModel(recorded.model);
+  expect(built.status).toBe('valid');
+  if (built.status !== 'valid') throw new Error(JSON.stringify(built));
+  for (let pass = 0; pass < 20; pass++) {
+    expect(recorded.questions.map(question => explainImport(built.value, question))).toEqual(recorded.decisions);
+  }
+  expect(recorded.decisions.map(decision => decision.reason)).toEqual([
+    'same-owner', 'exposed', 'not-visible', 'testing-origin', 'symbol-free',
+  ]);
+  // An independent immutable model must not reuse another model's exposures.
+  const hidden = buildModel({ ...recorded.model, exposures: [] });
+  if (hidden.status !== 'valid') throw new Error(JSON.stringify(hidden));
+  expect(explainImport(hidden.value, recorded.questions[1]).reason).toBe('not-visible');
+  expect(explainImport(built.value, recorded.questions[1])).toEqual(recorded.decisions[1]);
 });

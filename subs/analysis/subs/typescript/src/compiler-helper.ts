@@ -2,8 +2,8 @@ import { readSync, writeSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { API } from 'typescript/unstable/sync';
 import { buildCatalog } from './catalog.js';
-import { collectAccesses } from './accesses.js';
-import type { CatalogExport, SourceCatalog } from './interfaces/source.js';
+import { AccessInterpretation } from './accesses.js';
+import type { AccessInterpreter, CatalogExport, SourceCatalog } from './interfaces/source.js';
 import { CHUNK_BYTES, FILE_BYTES, FRAME_BYTES, READ_RESPONSE_BYTES, RESULT_BYTES, SourceFailure, decodeChunk, encode } from './wire.js';
 import type { HelperInputs, Operation } from './wire.js';
 
@@ -145,6 +145,14 @@ try {
   // neither change original identities nor extend the public catalog contract.
   const runtime = new Map<CatalogExport, boolean>();
   const currentCatalog = (): SourceCatalog => catalog ??= buildCatalog(project, inputs, { fileExists, readFile, resourceWitness }, runtime);
+  let interpreter: AccessInterpretation | undefined;
+  const currentInterpreter = (): AccessInterpretation => interpreter ??= new AccessInterpretation(
+    project, inputs, { fileExists, readFile, resourceWitness }, currentCatalog(), runtime);
+  const collectAccesses = () => {
+    const current = currentInterpreter();
+    const { accesses, coverage } = current.interpret(current.ordered);
+    return { accesses, coverage };
+  };
   result('ready', null);
   for (;;) {
     const command = receive();
@@ -152,8 +160,18 @@ try {
     if (command.command === 'catalog') {
       result('catalog', currentCatalog());
     } else if (command.command === 'accesses') {
-      result('accesses', collectAccesses(project, inputs, { fileExists, readFile, resourceWitness }, currentCatalog(), runtime));
+      result('accesses', collectAccesses());
+    } else if (command.command === 'interpreter') {
+      currentInterpreter(); result('interpreter', null);
+    } else if (command.command === 'interpret') {
+      const data = request('interpret-inputs', root) as { files: string[]; replacements: {
+        descriptions: Parameters<AccessInterpreter['replaceDescriptions']>[0]; removed: string[];
+      }[] };
+      const current = currentInterpreter();
+      for (const replacement of data.replacements) current.replaceDescriptions(replacement.descriptions, replacement.removed);
+      result('interpret', current.interpret(data.files));
     } else if (command.command === 'dispose') {
+      interpreter?.dispose(); interpreter = undefined;
       snapshot.dispose(); snapshot = undefined;
       api.close(); api = undefined;
       virtual.clear(); runtime.clear(); catalog = undefined;

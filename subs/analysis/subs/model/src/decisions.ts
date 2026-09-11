@@ -3,19 +3,39 @@ import { compare, immutable, locations, validLocation } from './data.js';
 import { originalKey } from './identity.js';
 import { canonicalOrigin } from './model.js';
 
+interface DecisionIndex {
+  readonly modules: ReadonlyMap<ModuleId, Model['modules'][number]>;
+  readonly originals: ReadonlyMap<string, Model['originals'][number]>;
+  readonly exposures: ReadonlyMap<string, readonly Exposure[]>;
+}
+const indexes = new WeakMap<Model, DecisionIndex>();
+// Stored identities have already passed buildModel validation.
+const storedKey = (id: OriginalId): string => JSON.stringify([id.kind, id.owner, id.file, id.binding]);
+function indexFor(model: Model): DecisionIndex {
+  let index = indexes.get(model);
+  if (!index) {
+    const exposures = new Map<string, Exposure[]>();
+    for (const exposure of model.exposures) {
+      const key = storedKey(exposure.original), entries = exposures.get(key) ?? [];
+      entries.push(exposure); exposures.set(key, entries);
+    }
+    index = { modules: new Map(model.modules.map(module => [module.id, module])),
+      originals: new Map(model.originals.map(original => [storedKey(original.id), original])), exposures };
+    // Only a model whose arrays cannot change may retain an index.
+    if ([model, model.modules, model.originals, model.exposures].every(Object.isFrozen)) indexes.set(model, index);
+  }
+  return index;
+}
+
 function requireModule(model: Model, id: ModuleId) {
-  const module = model.modules.find((candidate) => candidate.id === id);
+  const module = indexFor(model).modules.get(id);
   if (!module) throw new TypeError(`Unknown module "${id}"`);
   return module;
 }
 
 function requireOriginal(model: Model, id: OriginalId) {
   const key = originalKey(id);
-  // buildModel already validates every canonical candidate. Compare those
-  // fields directly instead of validating and serializing the full catalogue
-  // again for each individual access.
-  const original = model.originals.find(({ id: candidate }) => candidate.kind === id.kind
-    && candidate.owner === id.owner && candidate.file === id.file && candidate.binding === id.binding);
+  const original = indexFor(model).originals.get(key);
   if (!original) throw new TypeError(`Unknown original ${key}`);
   return original;
 }
@@ -32,7 +52,7 @@ export function explainVisibility(model: Model, importer: ModuleId, original: Or
 
 function visibilityFor(model: Model, receiver: Model['modules'][number], owned: Model['originals'][number]): VisibilityDecision {
   const importer = receiver.id;
-  const exposures = model.exposures.filter((exposure) => originalKey(exposure.original) === originalKey(owned.id));
+  const exposures = indexFor(model).exposures.get(storedKey(owned.id)) ?? [];
   const ancestors = new Set<ModuleId>();
   let parent = receiver.parent;
   while (parent !== null) {

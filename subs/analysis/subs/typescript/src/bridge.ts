@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { CHUNK_BYTES, DISPOSAL_MS, FILE_BYTES, FRAME_BYTES, INPUT_BYTES, READ_RESPONSE_BYTES,
   RESULT_BYTES, SourceFailure, decodeChunk, encode, freezeData } from './wire.js';
 import type { Operation } from './wire.js';
-import type { SourceAnalysis, SourceAnalysisInputs, SourceCatalog } from './interfaces/source.js';
+import type { AccessInterpreter, SourceAnalysis, SourceAnalysisInputs, SourceCatalog } from './interfaces/source.js';
 
 interface PendingOperation {
   name: Operation;
@@ -34,6 +34,8 @@ export class CompilerBridge {
   #lastId = 0;
   #pending: { id: number; bytes: Buffer; offset: number } | undefined;
   #stderr = '';
+  #interpretationInputs: unknown;
+  #replacements: { descriptions: Parameters<AccessInterpreter['replaceDescriptions']>[0]; removed: readonly string[] }[] = [];
   #derivedBytes = 0;
   #derivedCount = 0;
   #capturedBytes = 0;
@@ -83,7 +85,28 @@ export class CompilerBridge {
     return this.#query('accesses', signal) as ReturnType<SourceAnalysis['accesses']>;
   }
 
-  async #query(name: 'catalog' | 'accesses', signal?: AbortSignal): Promise<unknown> {
+  async prepareInterpreter(): Promise<void> { await this.#query('interpreter'); }
+
+  replaceDescriptions(descriptions: Parameters<AccessInterpreter['replaceDescriptions']>[0], removed: readonly string[]): void {
+    this.#check();
+    if (this.#operation) throw new SourceFailure('concurrent-operation', 'A source operation is already running');
+    const replacement = { descriptions, removed };
+    // Snapshot caller data synchronously and apply the ordered deltas before
+    // the next interpretation in the supervised helper.
+    const encoded = encode([...this.#replacements, replacement], RESULT_BYTES);
+    this.#replacements = JSON.parse(encoded.toString('utf8'));
+  }
+
+  async interpret(files: readonly string[], signal?: AbortSignal): ReturnType<AccessInterpreter['interpret']> {
+    this.#check();
+    if (this.#operation) throw new SourceFailure('concurrent-operation', 'A source operation is already running');
+    this.#interpretationInputs = { files: [...files], replacements: this.#replacements };
+    try {
+      return await this.#query('interpret', signal) as Awaited<ReturnType<AccessInterpreter['interpret']>>;
+    } finally { this.#interpretationInputs = undefined; this.#replacements = []; }
+  }
+
+  async #query(name: 'catalog' | 'accesses' | 'interpreter' | 'interpret', signal?: AbortSignal): Promise<unknown> {
     if (this.#terminal) await this.#cleanup();
     this.#check();
     if (this.#operation) throw new SourceFailure('concurrent-operation', 'A source operation is already running');
@@ -181,6 +204,7 @@ export class CompilerBridge {
       this.#child.stdin.destroy(); this.#child.stdout.destroy(); this.#child.stderr.destroy();
       this.#lifetime?.removeEventListener('abort', this.#abortLifetime);
       this.#lifetime = undefined; this.#inputs = undefined;
+      this.#interpretationInputs = undefined; this.#replacements = [];
       this.#pending = undefined; this.#buffer = Buffer.alloc(0); this.#stderr = '';
       this.#readPaths.clear(); this.#capturedBytes = 0;
     }
@@ -239,7 +263,9 @@ export class CompilerBridge {
     if (frame.kind === 'result') {
       const operation = this.#operation;
       if (frame.operation !== operation.name || typeof frame.more !== 'boolean') throw new SourceFailure('protocol-error', 'Unexpected source result');
-      if (!operation.size) this.#capturedBytes = this.#inputs!.view.inputs.reduce((total, input) => total + input.bytes, 0);
+      // Subset calls account new reads as they arrive. Re-materializing the
+      // captured input list here would rehash and sort the entire project.
+      if (!operation.size && operation.name !== 'interpret') this.#capturedBytes = this.#inputs!.view.inputs.reduce((total, input) => total + input.bytes, 0);
       const bytes = decodeChunk(frame.chunk);
       if (operation.size + bytes.length > RESULT_BYTES) throw new SourceFailure('resource-limit', 'Source result byte limit exceeded');
       operation.size += bytes.length; operation.chunks.push(bytes);
@@ -280,6 +306,7 @@ export class CompilerBridge {
         this.#admitInFlight(0);
         return null;
       }
+      case 'interpret-inputs': return this.#interpretationInputs;
       case 'inputs': return { inventory: inputs.inventory, areas: inputs.areas, limits: inputs.limits };
       case 'readFile': {
         const text = await view.readFile(path) ?? null;

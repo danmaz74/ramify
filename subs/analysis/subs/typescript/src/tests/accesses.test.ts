@@ -1,5 +1,8 @@
+import type { Project } from 'typescript/unstable/sync';
+import type { SourceFile } from 'typescript/unstable/ast';
+import { NamespaceUses } from '../namespace-uses.js';
 import { rm } from 'node:fs/promises';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createSourceAnalysis } from '../source-analysis.js';
 import { acquire, areasFor, code, configuration, fixture, sourceLimits, withCatalog } from './fixtures.js';
 
@@ -214,3 +217,40 @@ function shadow(group: { missing: number }) { return group.missing; }
     } finally { await source?.dispose(); await view.dispose(); await rm(root, { recursive: true, force: true }); }
   }, 30_000);
 });
+
+it('keeps a shadowed namespace local out of member selections', async () => withCatalog({
+  'src/api.ts': api,
+  'src/use.ts': `import * as api from './api.js';
+function shadow() { const api = { value: 2 }; return api.value; }
+function outer() { return api.value; }
+`,
+}, async ({ source }) => {
+  const result = await source.accesses();
+  expect(result.coverage).toEqual([]);
+  expect(result.accesses).toHaveLength(1);
+  expect(result.accesses[0].selections[0]).toMatchObject({ exportedName: 'value', location: { line: 3 } });
+}), 30_000);
+
+it('issues no identifier symbol queries or index traversal without a namespace binding', () => {
+  const query = vi.fn(), visit = vi.fn();
+  const project = { checker: { getSymbolAtLocation: query } } as unknown as Project;
+  const source = { forEachChild: visit } as unknown as SourceFile;
+  new NamespaceUses(project, source);
+  expect(query).not.toHaveBeenCalled();
+  expect(visit).not.toHaveBeenCalled();
+});
+
+it('retains shorthand and local export namespace readings', async () => withCatalog({
+  'src/api.ts': api,
+  'src/use.ts': `import * as api from './api.js';
+const object = { api };
+export { api };
+void api.value;
+`,
+}, async ({ source }) => {
+  const result = await source.accesses();
+  expect(result.accesses.filter(access => access.selectionForm === 'direct-member')).toHaveLength(1);
+  expect(result.coverage.map(issue => [issue.code, issue.location.line])).toEqual([
+    ['namespace-escape', 2], ['namespace-escape', 3],
+  ]);
+}), 30_000);

@@ -14,27 +14,44 @@ export interface NamespaceSink {
   unknown(node: Node, code: 'unknown-key' | 'namespace-escape'): void;
 }
 
-/** Index lexical references by compiler symbol, never by identifier spelling.
+/** Spelling narrows the batched query; compiler symbols establish lexical identity.
  * No symbol or AST node crosses the helper's lifetime. */
 export class NamespaceUses {
-  private readonly references = new Map<number, Identifier[]>();
-  constructor(private readonly project: Project, source: SourceFile) {
-    const visit = (node: Node): void => {
-      if (isIdentifier(node)) {
-        const symbol = isShorthandPropertyAssignment(node.parent) && node.parent.name === node
-          ? project.checker.getShorthandAssignmentValueSymbol(node.parent)
-          : isExportSpecifier(node.parent) && isExportDeclaration(node.parent.parent.parent) && !node.parent.parent.parent.moduleSpecifier
-            && (node.parent.propertyName ?? node.parent.name) === node
-            ? project.checker.getExportSpecifierLocalTargetSymbol(node.parent)
-          : project.checker.getSymbolAtLocation(node);
-        if (symbol) {
-          const nodes = this.references.get(symbol.id) ?? [];
-          nodes.push(node); this.references.set(symbol.id, nodes);
+  private identifiers: Map<string, Identifier[]> | undefined;
+  private readonly references = new Map<string, Map<number, Identifier[]>>();
+  constructor(private readonly project: Project, private readonly source: SourceFile) {}
+
+  private referencesFor(spelling: string): Map<number, Identifier[]> {
+    const cached = this.references.get(spelling);
+    if (cached) return cached;
+    if (!this.identifiers) {
+      this.identifiers = new Map();
+      const visit = (node: Node): void => {
+        if (isIdentifier(node)) {
+          const nodes = this.identifiers!.get(node.text) ?? [];
+          nodes.push(node); this.identifiers!.set(node.text, nodes);
         }
+        node.forEachChild(child => { visit(child); });
+      };
+      visit(this.source);
+    }
+    const nodes = this.identifiers.get(spelling) ?? [];
+    const symbols = this.project.checker.getSymbolAtLocation(nodes);
+    const references = new Map<number, Identifier[]>();
+    nodes.forEach((node, index) => {
+      const symbol = isShorthandPropertyAssignment(node.parent) && node.parent.name === node
+        ? this.project.checker.getShorthandAssignmentValueSymbol(node.parent)
+        : isExportSpecifier(node.parent) && isExportDeclaration(node.parent.parent.parent) && !node.parent.parent.parent.moduleSpecifier
+          && (node.parent.propertyName ?? node.parent.name) === node
+          ? this.project.checker.getExportSpecifierLocalTargetSymbol(node.parent)
+          : symbols[index];
+      if (symbol) {
+        const selected = references.get(symbol.id) ?? [];
+        selected.push(node); references.set(symbol.id, selected);
       }
-      node.forEachChild(child => { visit(child); });
-    };
-    visit(source);
+    });
+    this.references.set(spelling, references);
+    return references;
   }
 
   binding(name: BindingName, sink: NamespaceSink, path: readonly string[] = [], then = false): void {
@@ -59,7 +76,7 @@ export class NamespaceUses {
     } else if (isIdentifier(name)) {
       const symbol = this.project.checker.getSymbolAtLocation(name);
       if (!symbol) { sink.unknown(name, 'namespace-escape'); return; }
-      for (const reference of this.references.get(symbol.id) ?? []) {
+      for (const reference of this.referencesFor(name.text).get(symbol.id) ?? []) {
         if (reference === name) continue;
         this.expression(reference, sink, path, then);
       }

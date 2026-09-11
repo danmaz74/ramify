@@ -4,6 +4,7 @@ import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { repositoryRoot } from './plan.js';
 import type { VerificationReport } from './runner.js';
+import { plan5Instances } from './plan5-instances.js';
 import { plan2Instances } from './plan2-instances.js';
 import { plan1Instances, referenceCases } from './cases.js';
 import { evidenceRoots, portableValue } from './portability.js';
@@ -33,6 +34,7 @@ export async function executionIdentity() {
     'module.ramify', 'README.md', 'package.json', 'package-lock.json', 'tsconfig*.json', 'vitest.config.ts', 'examples/collection-review',
     'docs/plans/done/iteration-1-project-verifier/main-plan.md', 'docs/plans/done/iteration-1-project-verifier/subcases.md',
     'docs/plans/done/iteration-1-project-verifier/iterations/manifest.json',
+    'docs/plans/iteration-5-fast-incremental-checks/main-plan.md', 'docs/plans/iteration-5-fast-incremental-checks/subcases.md',
     'docs/plans/iteration-2-resident-verification/main-plan.md', 'docs/plans/iteration-2-resident-verification/subcases.md'])
     .split('\0').filter(Boolean);
   const deleted = new Set(git(['ls-files', '--deleted', '-z']).split('\0').filter(Boolean));
@@ -50,6 +52,17 @@ export async function executionIdentity() {
 }
 
 export function pendingWork(report: VerificationReport) {
+  if (report.plan === 5) return {
+    instances: report.instances.filter(instance => instance.status !== 'passed').map(instance => ({
+      id: instance.id, iteration: instance.iteration, status: instance.status, reason: instance.reason ?? null,
+    })),
+    families: [...new Set(plan5Instances.flatMap(instance => instance.families))].map(id => ({
+      id, matrixInstances: plan5Instances.filter(instance => instance.families.includes(id)).map(instance => instance.id),
+      wholeFamilyClaim: 'not-established' as const,
+    })),
+    nextPlan: 'Plan 5 remaining iterations',
+    completionObligations: ['All 103 reviewed instances and the iteration 13 completion review'],
+  };
   if (report.plan === 2) return {
     instances: report.instances.filter(instance => instance.status !== 'passed').map(instance => ({
       id: instance.id, iteration: instance.iteration, status: instance.status, reason: instance.reason ?? null,
@@ -94,7 +107,7 @@ export async function persistGateReport(report: VerificationReport, context: {
   const artifact = portableValue({ ...report, evidence: { ...context, completedAt: new Date().toISOString(),
     completionScope: 'Reviewed source matrix only; resource budgets and overall milestone acceptance require the completion report',
     requiredScope: `Reviewed Plan ${report.plan} matrix; whole-project fixtures; all owned source and testing areas`,
-    instances: report.plan === 2 ? plan2Instances : plan1Instances, pending: pendingWork(report) }, artifact: path }, roots);
+    instances: report.plan === 5 ? plan5Instances : report.plan === 2 ? plan2Instances : plan1Instances, pending: pendingWork(report) }, artifact: path }, roots);
   const text = JSON.stringify(artifact);
   if (Buffer.byteLength(text) > 32 * 1024 ** 2) throw new Error('Portable gate report exceeds 32 MiB; no complete report published');
   await mkdir(dirname(join(repositoryRoot, path)), { recursive: true });

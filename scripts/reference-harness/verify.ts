@@ -1,17 +1,19 @@
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+import { plan5Instances } from './plan5-instances.js';
+import { plan5Runtime } from './plan5-runtime.js';
 import { plan2Instances } from './plan2-instances.js';
 import { plan2Runtime } from './plan2-runtime.js';
 import { plan1Instances } from './cases.js';
-import { readReviewedPlan, readReviewedPlan2, repositoryRoot, validateInstancePointers } from './plan.js';
+import { readReviewedPlan, readReviewedPlan2, readReviewedPlan5, repositoryRoot, validateInstancePointers } from './plan.js';
 import { referenceRuntime } from './runtime.js';
 import { verifyInstances } from './runner.js';
 import type { VerificationReport } from './runner.js';
 import { executionIdentity, persistGateReport } from './artifact.js';
 
 export interface VerifyOptions {
-  readonly planNumber?: 2;
+  readonly planNumber?: 2 | 5;
   readonly iteration?: number;
   readonly preserveOnFailure: boolean;
   readonly format: 'human' | 'json';
@@ -44,9 +46,10 @@ export function parseVerifyArguments(args: readonly string[]): VerifyOptions {
       format = value;
     }
   }
-  if (plan !== '1' && plan !== '2') throw new Error('Specify --plan 1 or --plan 2');
+  if (plan !== '1' && plan !== '2' && plan !== '5') throw new Error('Specify --plan 1, --plan 2 or --plan 5');
+  if (plan === '5' && iteration !== undefined && iteration > 13) throw new Error('Plan 5 iteration must be from 1 to 13');
   if (plan === '2' && iteration === 15) throw new Error('Plan 2 iteration must be from 1 to 14');
-  return { ...(plan === '2' ? { planNumber: 2 as const } : {}), ...(iteration === undefined ? {} : { iteration }), preserveOnFailure, format };
+  return { ...(plan === '5' ? { planNumber: 5 as const } : plan === '2' ? { planNumber: 2 as const } : {}), ...(iteration === undefined ? {} : { iteration }), preserveOnFailure, format };
 }
 
 export function formatVerification(report: VerificationReport): string {
@@ -73,19 +76,19 @@ async function main(): Promise<number> {
     options = parseVerifyArguments(process.argv.slice(2));
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
-    console.error('Usage: reference:verify -- --plan 1|2 [--iteration N] [--preserve-on-failure] [--format human|json]');
+    console.error('Usage: reference:verify -- --plan 1|2|5 [--iteration N] [--preserve-on-failure] [--format human|json]');
     return 2;
   }
-  const records = options.planNumber === 2 ? plan2Instances : plan1Instances;
+  const records = options.planNumber === 5 ? plan5Instances : options.planNumber === 2 ? plan2Instances : plan1Instances;
   const pointerIssues = validateInstancePointers(records);
   if (pointerIssues.length) throw new Error(pointerIssues.join('\n'));
   const startedAt = new Date().toISOString();
   const started = performance.now();
   const identity = await executionIdentity();
   const report = await verifyInstances({
-    ...options, plan: options.planNumber === 2 ? readReviewedPlan2() : readReviewedPlan(), records,
-    runtime: options.planNumber === 2 ? plan2Runtime : referenceRuntime,
-    workRoot: resolve(repositoryRoot, 'examples/collection-review/.reference-work'),
+    ...options, plan: options.planNumber === 5 ? readReviewedPlan5() : options.planNumber === 2 ? readReviewedPlan2() : readReviewedPlan(), records,
+    runtime: options.planNumber === 5 ? plan5Runtime : options.planNumber === 2 ? plan2Runtime : referenceRuntime,
+    workRoot: resolve(repositoryRoot, options.planNumber === 5 ? '.reference-work' : 'examples/collection-review/.reference-work'),
   });
   const after = await executionIdentity();
   if (identity.sourceSha256 !== after.sourceSha256 || identity.buildSha256 !== after.buildSha256) {

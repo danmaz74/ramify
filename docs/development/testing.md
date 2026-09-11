@@ -57,6 +57,7 @@ example/site packages with `npm --prefix <directory> ci` as needed.
 | `npm run reference:report` | Run current example tiers and report capability/coverage status. |
 | `npm run reference:verify -- --plan 1` | Require all reviewed Plan 1 instances; fails while required capabilities or assertions are absent. Add `--iteration <n>` for the named iteration and its transitive prerequisites. |
 | `npm run reference:verify -- --plan 2` | Require all 176 resident instances, including current measurement evidence and a passing same-input Plan 1 gate. Add `--iteration <n>` to include that iteration and its prerequisites. |
+| `npm run reference:verify -- --plan 5` | Require all 103 fast-incremental-check instances; expected to fail until Plan 5's iteration 13. Add `--iteration <n>` (1 to 13) to require that iteration and its transitive prerequisites only. |
 | `npx tsx scripts/validate-final-contracts.ts` | Require the eleven final declarations, their real exports and all eight package entries. |
 | `npm run measure:resident` | Run all nine real resident workloads and archive observations. Performance targets are advisory; missing evidence, runtime-limit violations and cleanup failures remain blocking. |
 | `npm run example:type-check`, `npm run example:test`, `npm run example:build`, `npm run example:test:cucumber` | Check the reference application's types, runtime, build and Cucumber workflows. |

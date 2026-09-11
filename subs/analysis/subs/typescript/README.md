@@ -7,6 +7,18 @@ supplies a captured project view, its inventory, resolved source areas and finit
 work limits. The view remains caller-owned: seal it after the compiler has made
 its influencing reads, and dispose it after releasing the source analysis.
 
+`createAccessInterpreter` takes the same inputs and owns a finite compiler
+lifetime whose access-interpretation setup is built once: the catalog file and
+original maps, the sorted inventory and the resolved areas. `interpret(files)`
+returns exactly the accesses and coverage notes a whole pass yields for those
+files, plus the resolution candidates each file probed, and
+`replaceDescriptions` updates the retained descriptions and originals of named
+files without rebuilding the rest. The whole-project `accesses()` operation is a
+private wrapper over the same interpreter. Namespace member selection indexes a
+file's identifiers by spelling on first use and resolves one spelling with a
+single batched symbol query, so a file that binds no namespace issues no
+identifier symbol query at all.
+
 The supervised helper uses the pinned TypeScript 7.0.2 native API. Its in-memory
 configuration extends the project's configuration and includes every owned
 compiler source, including tests omitted by ordinary compiler selection. A
