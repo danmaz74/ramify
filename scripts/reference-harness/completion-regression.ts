@@ -67,7 +67,7 @@ export function assertPlan1Regression(report: Plan1GateArtifact, identity: Ident
  * must not be hidden by selecting an older passing one. Never run nested tests. */
 export async function readPlan1Regression(directory: string, identity: Identity, archivedRecords: typeof plan1Instances) {
   let names: string[];
-  try { names = (await readdir(directory)).filter(name => /^plan1-full-[\w-]+\.json$/.test(name)); }
+  try { names = (await readdir(directory)).filter(name => /^plan1-(?:full|composed)-[\w-]+\.json$/.test(name)); }
   catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') names = []; else throw error; }
   const files = await Promise.all(names.map(async name => ({ name, ...(await stat(join(directory, name))) })));
   files.sort((a, b) => b.mtimeMs - a.mtimeMs || b.name.localeCompare(a.name));
@@ -75,6 +75,13 @@ export async function readPlan1Regression(directory: string, identity: Identity,
     assert.ok(file.size <= 32 * 1024 ** 2, `Plan 1 evidence exceeds the archive bound: ${file.name}`);
     const raw = await readFile(join(directory, file.name));
     assert.ok(raw.byteLength <= 32 * 1024 ** 2, `Plan 1 evidence grew beyond its bound: ${file.name}`);
+    if (file.name.startsWith('plan1-composed-')) {
+      const composition = JSON.parse(raw.toString('utf8')) as { identity?: Identity };
+      assert.ok(composition.identity, `Composed Plan 1 evidence lacks identity: ${file.name}`);
+      if (!sameInputs(composition.identity, identity)) continue;
+      const { readPlan1Composition } = await import('./completion-composition.js');
+      return readPlan1Composition(directory, file.name, identity, archivedRecords);
+    }
     const report = JSON.parse(raw.toString('utf8')) as Plan1GateArtifact;
     assert.ok(report.evidence?.identity, `Plan 1 evidence lacks input identity: ${file.name}`);
     if (!sameInputs(report.evidence.identity, identity)) continue;

@@ -1,13 +1,16 @@
 import { expect, it, vi } from 'vitest';
 import { explainImport, explainVisibility } from '../decisions.js';
-import * as identity from '../identity.js';
+import { originalKey } from '../identity.js';
 import { modelOf, moduleRecord, original, question } from './fixtures.js';
+
+vi.mock('../identity.js', { spy: true });
 
 it('does not revalidate every established identity for each import decision', () => {
   const owner = moduleRecord('app');
   const model = modelOf([owner], Array.from({ length: 128 }, (_, i) => original(owner, `binding${i}`)));
   const selected = model.originals.at(-1)!;
-  const key = vi.spyOn(identity, 'originalKey');
+  const key = vi.mocked(originalKey);
+  key.mockClear();
   try {
     const decision = explainImport(model, question(owner, selected));
     expect(decision).toMatchObject({ status: 'allowed', reason: 'same-owner', original: selected,
