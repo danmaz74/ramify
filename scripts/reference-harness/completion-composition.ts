@@ -27,12 +27,16 @@ export const focusedPlan1Ids: readonly string[] = [...affectedPlan1Ids, 'I1-27:r
 export interface FocusedPlan1Evidence {
   readonly kind: 'plan1-focused-evidence'; readonly identity: EvidenceIdentity; readonly platform: string;
   readonly selectedIds: readonly string[]; readonly report: VerificationReport;
+  readonly startedAt: string; readonly completedAt: string; readonly durationMs: number;
+  readonly cleanup: { readonly stop: { readonly code: number | null; readonly stderr: string };
+    readonly status: { readonly code: number | null; readonly stdout: string; readonly stderr: string } };
 }
 interface ArtifactReference { readonly file: string; readonly sha256: string }
 export interface Plan1Composition {
   readonly schemaVersion: 1; readonly kind: 'plan1-composed-evidence'; readonly policy: typeof reusePolicy;
   readonly identity: EvidenceIdentity; readonly platform: string;
   readonly baseline: ArtifactReference; readonly rerun: ArtifactReference; readonly reviewedTransition: ArtifactReference;
+  readonly focusedTransition?: ArtifactReference;
   readonly summary: { readonly required: 308; readonly passed: 308; readonly failed: 0; readonly notExecuted: 0 };
   readonly sources: readonly { readonly id: string; readonly from: 'baseline' | 'focused-rerun' }[];
   readonly limitation: string;
@@ -43,12 +47,30 @@ const summary = { required: 308, passed: 308, failed: 0, notExecuted: 0 } as con
  * remains byte-for-byte intact; persisted acceptance is explicitly composed. */
 export function assertPlan1Composition(composition: Plan1Composition, baseline: Plan1GateArtifact,
   focused: FocusedPlan1Evidence, reviewed: SourceTransition, actual: SourceTransition,
-  current: EvidenceIdentity, archivedRecords: typeof plan1Instances): void {
+  current: EvidenceIdentity, archivedRecords: typeof plan1Instances,
+  focusedMigration?: { readonly reviewed: SourceTransition; readonly actual: SourceTransition }): void {
   assert.deepEqual([composition.schemaVersion, composition.kind, composition.policy], [1, 'plan1-composed-evidence', reusePolicy]);
   for (const key of ['sourceSha256', 'buildSha256', 'packageVersion', 'nodeVersion', 'typescriptVersion'] as const) {
     assert.equal(composition.identity[key], current[key], `Composition identity differs: ${key}`);
-    assert.equal(focused.identity[key], current[key], `Focused evidence identity differs: ${key}`);
+    if (key !== 'sourceSha256') assert.equal(focused.identity[key], current[key], `Focused evidence identity differs: ${key}`);
   }
+  if (focused.identity.sourceSha256 !== current.sourceSha256) {
+    assert.ok(focusedMigration && composition.focusedTransition, 'Focused evidence identity differs without an exact reviewed migration');
+    const { reviewed: migration, actual: actualMigration } = focusedMigration;
+    assert.deepEqual(actualMigration, migration, 'Focused migration differs from reviewed digests');
+    assert.equal(migration.policy, reusePolicy);
+    assert.equal(migration.baselineSourceSha256, focused.identity.sourceSha256, 'Focused Git bytes differ from executed inputs');
+    assert.equal(migration.currentSourceSha256, current.sourceSha256);
+    const paths = ['scripts/reference-harness/completion-composition.ts', 'scripts/reference-harness/completion-composition.test.ts'];
+    assert.deepEqual(migration.changes.map(change => change.path).sort(), paths.sort(), 'Focused migration exceeds cleanup validator and its tests');
+  }
+  const started = Date.parse(focused.startedAt), completed = Date.parse(focused.completedAt);
+  assert.ok(Number.isFinite(started) && Number.isFinite(completed) && completed >= started
+    && Number.isFinite(focused.durationMs) && focused.durationMs > 0, 'Focused execution lacks valid timing evidence');
+  assert.equal(focused.cleanup.stop.code, 0, 'Focused daemon stop failed');
+  assert.equal(focused.cleanup.status.code, 0, 'Focused daemon status failed');
+  assert.equal(focused.cleanup.stop.stderr, ''); assert.equal(focused.cleanup.status.stderr, '');
+  assert.equal(JSON.parse(focused.cleanup.status.stdout).running, false, 'Focused daemon survived cleanup');
   assert.equal(composition.platform, focused.platform, 'Focused execution platform differs');
   assert.ok(reviewedPlan1Baselines.some(item => item.platform === composition.platform && item.sha256 === composition.baseline.sha256),
     'Baseline digest lacks reviewed platform provenance');
@@ -92,32 +114,37 @@ export async function readPlan1Composition(directory: string, file: string, curr
   const focused = await referenced<FocusedPlan1Evidence>(directory, composition.rerun);
   const reviewed = await referenced<SourceTransition>(directory, composition.reviewedTransition);
   const actual = await captureSourceTransition(reviewed.baselineRevision);
-  assertPlan1Composition(composition, baseline, focused, reviewed, actual, current, archivedRecords);
+  const migration = composition.focusedTransition ? await referenced<SourceTransition>(directory, composition.focusedTransition) : undefined;
+  assertPlan1Composition(composition, baseline, focused, reviewed, actual, current, archivedRecords,
+    migration ? { reviewed: migration, actual: await captureSourceTransition(migration.baselineRevision) } : undefined);
   return { file, sha256: sha256(raw), identity: current, summary: composition.summary, unchangedRecords: 305,
     revisedExpectationRecords: ['I1-27:self-check', 'I1-27:self-negative', 'I1-28:relocated-package'],
     acceptance: 'composed' as const, policy: composition.policy, baseline: composition.baseline, rerun: composition.rerun,
-    reviewedTransition: composition.reviewedTransition, reusedExecutions: 299, rerunExecutions: focusedPlan1Ids.length };
+    reviewedTransition: composition.reviewedTransition, focusedTransition: composition.focusedTransition, reusedExecutions: 299, rerunExecutions: focusedPlan1Ids.length };
 }
 
 /** CLI accepts baseline/rerun/review files already copied into one evidence
  * directory. A reviewer must approve the exact transition before publication. */
-export async function publishPlan1Composition(directory: string, baselineFile: string, rerunFile: string, reviewFile: string, outputFile: string) {
+export async function publishPlan1Composition(directory: string, baselineFile: string, rerunFile: string, reviewFile: string, outputFile: string, focusedReviewFile?: string) {
   const reference = async (file: string): Promise<ArtifactReference> => ({ file, sha256: sha256(await readFile(join(directory, file))) });
   const current = await executionIdentity();
   const rerun = JSON.parse(await readFile(join(directory, rerunFile), 'utf8')) as FocusedPlan1Evidence;
   const composition: Plan1Composition = { schemaVersion: 1, kind: 'plan1-composed-evidence', policy: reusePolicy, identity: current,
     platform: rerun.platform, baseline: await reference(baselineFile), rerun: await reference(rerunFile), reviewedTransition: await reference(reviewFile),
+    ...(focusedReviewFile ? { focusedTransition: await reference(focusedReviewFile) } : {}),
     summary, sources: plan1Instances.map(item => ({ id: item.id, from: focusedPlan1Ids.includes(item.id) ? 'focused-rerun' : 'baseline' })),
     limitation: '299 unchanged executions reused from the preserved 300/308 full run; eight repaired cases and one retained-report control executed again. This is composed acceptance, not a new full run.' };
   const archive = JSON.parse(gunzipSync(await readFile(join(repositoryRoot, 'scripts/reference-harness/evidence/plan1-complete.json.gz'))).toString('utf8')) as Plan1GateArtifact;
   const baseline = await referenced<Plan1GateArtifact>(directory, composition.baseline);
   const reviewed = await referenced<SourceTransition>(directory, composition.reviewedTransition);
-  assertPlan1Composition(composition, baseline, rerun, reviewed, await captureSourceTransition(reviewed.baselineRevision), current, archive.evidence.instances);
+  const migration = focusedReviewFile ? await referenced<SourceTransition>(directory, composition.focusedTransition!) : undefined;
+  assertPlan1Composition(composition, baseline, rerun, reviewed, await captureSourceTransition(reviewed.baselineRevision), current, archive.evidence.instances,
+    migration ? { reviewed: migration, actual: await captureSourceTransition(migration.baselineRevision) } : undefined);
   await writeFile(join(directory, outputFile), JSON.stringify(composition) + '\n', { flag: 'wx' });
   return readPlan1Composition(directory, outputFile, current, archive.evidence.instances);
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  const [directory, baseline, rerun, review, output] = process.argv.slice(2);
-  assert.ok(directory && baseline && rerun && review && output, 'Usage: completion-composition.ts DIRECTORY BASELINE RERUN REVIEW OUTPUT');
-  console.log(JSON.stringify(await publishPlan1Composition(directory, baseline, rerun, review, output)));
+  const [directory, baseline, rerun, review, output, focusedReview] = process.argv.slice(2);
+  assert.ok(directory && baseline && rerun && review && output, 'Usage: completion-composition.ts DIRECTORY BASELINE RERUN REVIEW OUTPUT [FOCUSED_REVIEW]');
+  console.log(JSON.stringify(await publishPlan1Composition(directory, baseline, rerun, review, output, focusedReview)));
 }
