@@ -92,3 +92,41 @@ Checklist: functionalRequirementsSatisfied false; newCodeCoveredByTests true; al
 Restore the missing providers in their owning iterations, in dependency order: analysis/project resolution and retention; contexts; shared service and root assembly/quick environment; validated messages and client; host/daemon entry; resident CLI command and recovery integration. Resolve the recorded architecture-review disposition through the owning workflow.
 
 Then complete the five declarations and client package entry, execute the remaining three I2-19 witnesses with real compiled processes and isolated endpoints, and rerun the strict validator, resident self-check and iteration-10 gate. Iterations 11–14 cannot rely on a completed resident package from this checkpoint. Retain the independent expectations and do not weaken the final-contract or matrix gates to accept these missing providers.
+
+## Single self-assessment remediation attempt
+
+**Recorded:** 2026-09-11T08:46:18.837Z. This attempt began at `dc6210e` in the same authoritative checkout and branch. Re-read iteration 10's scope, the implementation/testing/bugfixing skills, package activation contracts, current entry sources and the existing validator coverage. Live workflow detail reports iteration 10 at `validate_output_retry`. No iteration-10 check-results file or automated regression verdict is available in this checkout.
+
+The prerequisite audit is unchanged: incremental/project resolution, context manager, complete service/message/connector contracts, resident assembly, client and daemon entries, and resident CLI dispatch are absent. Completing those predecessor owners remains outside this iteration's final-declaration/package-validation/boundary scope. Their absent exports still prevent five final declarations, the eighth real package entry and three I2-19 process witnesses.
+
+### Focused repair: reject incomplete package entry exports
+
+Found and reproduced a gap in iteration 10's own validator: an eight-entry package whose client file contained only `export {}` was accepted because the probe verified file resolution and import success but never checked the public bindings. The pre-fix direct reproduction failed with `Missing expected rejection`, proving the false acceptance.
+
+The validator now requires independently enumerated callable exports at every entry. It preserves Plan 1's representative portable entry witnesses, checks the six analysis operations (including `analyzeIncrement` and `resolveProject`) at both analysis aliases, and checks all five client exports specified in the package activation contract: `connectDaemon`, `selectEndpoint`, `readDaemonRecord`, `encodeMessage` and `decodeMessage`.
+
+A second bounded Node probe resolves each entry under the `types` condition and compares it to the declared .d.ts target without executing that file. This detects condition ordering that would select the JavaScript target even though the types file exists. Both probes resolve from the supplied package directory.
+
+Extended the existing validator test with callable fixture modules and controls for an empty client entry, each missing client export, a non-callable connector, either missing incremental analysis operation, and incorrect type-condition ordering. The valid eight-entry fixture passes before and after the mutations. These are validator fixtures only; they do not substitute for the missing resident service or receive matrix credit.
+
+### Verification for this repair
+
+| Command | Result |
+| --- | --- |
+| `npx tsx .reference-work/iteration10-entry-repair.ts` before the repair | Failed at the empty-client negative control with Missing expected rejection; the incomplete entry was accepted. Preserved in `iteration10-entry-before.log`. |
+| Same direct command after the repair | Passed eight-entry import/type resolution and all ten missing-export/type-order negative controls, with a passing restored package. Preserved in `iteration10-entry-after.log`. |
+| `npm run type-check` | Passed all four configurations, including the extended validator test. |
+| `npx tsx scripts/validate-final-contracts.ts` | Exit 1 on the actual checkout: the same five declaration mismatches and missing eighth package export. Preserved in `iteration10-repair-contracts.log`. |
+| `git diff --check` | Passed. |
+
+All new reproduction fixtures were removed in finally. Only the validator and its existing test changed; no production source, description, README, package map, process handler or Plan 1 expectation changed in this repair. Build, self-check and the unchanged matrix were not rerun for this scripts-only repair. The previous gate result remains historical evidence: six of 139 required instances passed, zero failed assertions, 133 required unexecuted.
+
+No Vitest/Cucumber regression, scenario-coverage or sealed-file check was run locally, following the original automation-only policy. There is no supplied failing-test output to repair or passing runner verdict to claim. The direct reproduction and type-check establish the focused correction, not the automated test-suite result. The five authored iteration-10 test cases, including this extended validator case, still await that verdict.
+
+### Current checklist and handoff
+
+- `functionalRequirementsSatisfied: false`: the validator gap is repaired, but the prerequisite provider chain and three resident boundary witnesses remain absent.
+- `newCodeCoveredByTests: true`: the validator repair has positive and negative authored coverage.
+- `allNewTestsPass: false`: no automated verdict is available; regression execution remains assigned to workflow automation.
+
+Both deliverables are updated through MCP, and the repair is committed in the authoritative checkout. No publication call is made in this remediation; validation reruns and subsequent publication belong to the workflow. The provider-restoration recommendations above remain necessary before iteration 10 can be completed.

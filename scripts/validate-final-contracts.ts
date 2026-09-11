@@ -28,6 +28,16 @@ interface PackageMetadata {
   readonly exports: Readonly<Record<string, { readonly types: string; readonly import: string }>>;
 }
 
+// Independent entry expectations: Plan 1's portable entry witnesses plus
+// the analysis and client exports required by Plan 2's activation contract.
+const entryFunctions = {
+  '.': ['createAnalysisSession', 'analyzeProject', 'validateProject', 'acquireInventory', 'analyzeIncrement', 'resolveProject'],
+  './analysis': ['createAnalysisSession', 'analyzeProject', 'validateProject', 'acquireInventory', 'analyzeIncrement', 'resolveProject'],
+  './analysis/inventory': ['acquireInventory'], './model': ['createDefaultTagRegistry'],
+  './presentation': ['ModelDiagram'], './layout': ['placeNodes'], './cli': ['runCli'],
+  './client': ['connectDaemon', 'selectEndpoint', 'readDaemonRecord', 'encodeMessage', 'decodeMessage'],
+};
+
 function description(text: string): DescriptionDocument {
   const parsed = parseDescription('reviewed module.ramify', text);
   assert.equal(parsed.status, 'valid', 'Reviewed declaration must parse without abbreviations');
@@ -111,14 +121,24 @@ export async function validatePackageEntries(root: string, expected: PackageMeta
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 const metadata = JSON.parse(process.argv[1]);
+const condition = process.argv[2];
+const required = JSON.parse(process.argv[3]);
 for (const [name, entry] of Object.entries(metadata.exports)) {
   const specifier = name === '.' ? metadata.name : metadata.name + name.slice(1);
   const url = import.meta.resolve(specifier);
-  assert.equal(fileURLToPath(url), resolve(entry.import), specifier);
-  await import(url);
+  assert.equal(fileURLToPath(url), resolve(entry[condition]), specifier + ' ' + condition + ' target');
+  if (condition === 'import') {
+    const values = await import(url);
+    for (const binding of required[name]) assert.equal(typeof values[binding], 'function', 'Missing callable export: ' + specifier + '#' + binding);
+  }
 }`;
-  await promisify(execFile)(process.execPath, ['--input-type=module', '--eval', probe, JSON.stringify(actual)],
+  for (const condition of ['import', 'types']) {
+    // Type targets are resolved, never executed. In particular, putting an
+    // import condition before types must not silently select the JS target.
+    await promisify(execFile)(process.execPath, [...condition === 'types' ? ['--conditions=types'] : [],
+      '--input-type=module', '--eval', probe, JSON.stringify(actual), condition, JSON.stringify(entryFunctions)],
     { cwd: root, timeout: 30_000, maxBuffer: 1024 * 1024 });
+  }
   assert.ok((await readFile(resolve(root, actual.bin.ramify), 'utf8')).startsWith('#!/usr/bin/env node\n'));
   return Object.keys(expected.exports).length;
 }

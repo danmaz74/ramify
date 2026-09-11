@@ -9,7 +9,7 @@
     "functionalRequirementsSatisfied": false,
     "newCodeCoveredByTests": true
   },
-  "completedAt": "2026-09-11T08:43:11.561Z",
+  "completedAt": "2026-09-11T08:46:27.664Z",
   "iteration": "10",
-  "notes": "Incomplete checkpoint. Validator and all eleven README purposes implemented; root relays all 27 existing resident names. Two I2-19 process cases passed. Final gate: 6/139 required passed, zero failed assertions, 133 required unexecuted. Five declarations, eighth package entry and three resident boundary cases depend on missing I3-I9 providers. Build/type-check, direct smoke and batch self-check passed. Five authored tests await workflow automation; no Vitest/Cucumber, scenario coverage or sealed checks run locally."
+  "notes": "Single remediation repaired false acceptance of empty/incomplete package entries: required callable exports and actual types-condition resolution now checked; positive fixture and ten negative controls passed after a failing pre-fix reproduction. Type-check passed. Functional completion remains false: missing I3-I9 providers block five final declarations, real eighth entry and three resident boundary cases. Actual final validator still fails on those gaps. No automated iteration-10 test verdict is available; Vitest/Cucumber remain automation-only, so allNewTestsPass stays false. Previous matrix evidence remains 6/139 required passed, zero failed assertions, 133 required unexecuted; unchanged matrix not rerun. No publication in this remediation."
 }

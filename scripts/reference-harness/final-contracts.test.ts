@@ -44,11 +44,21 @@ describe('Plan 2 final contract validator', () => {
     const root = await mkdtemp(join(tmpdir(), 'ramify-final-entries-'));
     const manifest = { name: 'ramify.ts', ...metadata };
     const put = async (path: string, text: string) => { await mkdir(dirname(join(root, path)), { recursive: true }); await writeFile(join(root, path), text); };
+    // Independent fixtures contain callable bindings, not an empty module
+    // that could mask a missing public entry re-export.
+    const functions: Record<string, readonly string[]> = {
+      '.': ['createAnalysisSession', 'analyzeProject', 'validateProject', 'acquireInventory', 'analyzeIncrement', 'resolveProject'],
+      './analysis': ['createAnalysisSession', 'analyzeProject', 'validateProject', 'acquireInventory', 'analyzeIncrement', 'resolveProject'],
+      './analysis/inventory': ['acquireInventory'], './model': ['createDefaultTagRegistry'],
+      './presentation': ['ModelDiagram'], './layout': ['placeNodes'], './cli': ['runCli'],
+      './client': ['connectDaemon', 'selectEndpoint', 'readDaemonRecord', 'encodeMessage', 'decodeMessage'],
+    };
+    const source = (names: readonly string[]) => names.map(name => `export function ${name}() {}`).join('\n');
     try {
       await put('package.json', JSON.stringify(manifest));
-      for (const entry of Object.values(metadata.exports)) {
-        await put(entry.types, 'export declare const marker: string;\n');
-        await put(entry.import, 'export const marker = "fixture";\n');
+      for (const [name, entry] of Object.entries(metadata.exports)) {
+        await put(entry.types, functions[name].map(name => `export declare function ${name}(): void;`).join('\n'));
+        await put(entry.import, source(functions[name]));
       }
       await put(metadata.bin.ramify, '#!/usr/bin/env node\n');
       expect(await validatePackageEntries(root, metadata)).toBe(8);
@@ -59,10 +69,28 @@ describe('Plan 2 final contract validator', () => {
       await put(client.import, 'throw new Error("supplied package was imported");\n');
       await expect(validatePackageEntries(root, metadata)).rejects.toThrow('supplied package was imported');
       await put(client.import, 'export {};\n');
+      await expect(validatePackageEntries(root, metadata)).rejects.toThrow('Missing callable export: ramify.ts/client#connectDaemon');
+      for (const missing of functions['./client']) {
+        await put(client.import, source(functions['./client'].filter(name => name !== missing)));
+        await expect(validatePackageEntries(root, metadata)).rejects.toThrow(`Missing callable export: ramify.ts/client#${missing}`);
+      }
+      await put(client.import, source(functions['./client'].filter(name => name !== 'connectDaemon')) + '\nexport const connectDaemon = "not callable";');
+      await expect(validatePackageEntries(root, metadata)).rejects.toThrow('Missing callable export: ramify.ts/client#connectDaemon');
+      await put(client.import, source(functions['./client']));
+      for (const missing of ['analyzeIncrement', 'resolveProject']) {
+        await put(metadata.exports['.'].import, source(functions['.'].filter(name => name !== missing)));
+        await expect(validatePackageEntries(root, metadata)).rejects.toThrow(`Missing callable export: ramify.ts#${missing}`);
+      }
+      await put(metadata.exports['.'].import, source(functions['.']));
       const { './client': _client, ...seven } = metadata.exports;
       await put('package.json', JSON.stringify({ ...manifest, exports: seven }));
       await expect(validatePackageEntries(root, metadata)).rejects.toThrow('Final package exports');
       await put('package.json', JSON.stringify(manifest));
+      const misordered = { ...manifest, exports: { ...metadata.exports, './client': { import: client.import, types: client.types } } };
+      await put('package.json', JSON.stringify(misordered));
+      await expect(validatePackageEntries(root, metadata)).rejects.toThrow('ramify.ts/client types target');
+      await put('package.json', JSON.stringify(manifest));
+      expect(await validatePackageEntries(root, metadata)).toBe(8);
       await put(metadata.bin.ramify, '// missing shebang\n');
       await expect(validatePackageEntries(root, metadata)).rejects.toThrow();
     } finally { await rm(root, { recursive: true, force: true }); }
