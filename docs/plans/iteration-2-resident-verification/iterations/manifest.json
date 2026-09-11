@@ -1,0 +1,90 @@
+{
+  "planPath": "main-plan.md",
+  "createdAt": "2026-09-10T22:08:38.804Z",
+  "iterations": [
+    {
+      "index": 1,
+      "file": "iteration1.md",
+      "title": "Contract package, probes and review points",
+      "parallelGroup": null
+    },
+    {
+      "index": 2,
+      "file": "iteration2.md",
+      "title": "New owner skeletons, harness `--plan 2` and synthetic generators",
+      "parallelGroup": null
+    },
+    {
+      "index": 3,
+      "file": "iteration3.md",
+      "title": "Analysis increments and project resolution",
+      "parallelGroup": null
+    },
+    {
+      "index": 4,
+      "file": "iteration4.md",
+      "title": "Contexts owner",
+      "parallelGroup": null
+    },
+    {
+      "index": 5,
+      "file": "iteration5.md",
+      "title": "Shared service, root interface and quick environment",
+      "parallelGroup": null
+    },
+    {
+      "index": 6,
+      "file": "iteration6.md",
+      "title": "Edit semantics through the quick service",
+      "parallelGroup": "after-5"
+    },
+    {
+      "index": 7,
+      "file": "iteration7.md",
+      "title": "Codec, discovery and the lightweight client",
+      "parallelGroup": "after-5"
+    },
+    {
+      "index": 8,
+      "file": "iteration8.md",
+      "title": "Daemon host, records, process entry and real IPC",
+      "parallelGroup": null
+    },
+    {
+      "index": 9,
+      "file": "iteration9.md",
+      "title": "CLI commands and fallback",
+      "parallelGroup": null
+    },
+    {
+      "index": 10,
+      "file": "iteration10.md",
+      "title": "Entries, final declarations and boundaries",
+      "parallelGroup": null
+    },
+    {
+      "index": 11,
+      "file": "iteration11.md",
+      "title": "Reference edit sequences and equivalence gate",
+      "parallelGroup": "after-10"
+    },
+    {
+      "index": 12,
+      "file": "iteration12.md",
+      "title": "Real process lifecycle and recovery suite",
+      "parallelGroup": "after-10"
+    },
+    {
+      "index": 13,
+      "file": "iteration13.md",
+      "title": "Resident measurements and budgets",
+      "parallelGroup": "after-10"
+    },
+    {
+      "index": 14,
+      "file": "iteration14.md",
+      "title": "Self-check, relocation, completion report",
+      "parallelGroup": null
+    }
+  ]
+}
