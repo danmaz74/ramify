@@ -80,3 +80,28 @@ listener; a parse or listener error closes the decoder. Decoded values remain
 wrappers must perform that validation, and the socket owner must send failure
 goodbye and close when decoding throws. No N2 codec exposure or client entry is
 activated by these private helpers.
+
+Iteration 8 adds the private outbound socket writer and JSON-line log writer.
+`outbound.ts` accepts an encoder and transport event labels from its future host.
+It stores encoded frames, moves replaceable events to the newest queue position,
+adds their coalescing counts and assigns increasing event sequence numbers.
+Context, subscription and event type jointly identify replacements; eviction and
+control frames remain ordered. Bytes handed to Node remain accounted until their
+write callbacks complete, and backpressure pauses further writes until `drain`.
+Exceeding either queue bound releases pending frames, notifies the owner once,
+attempts a slow-consumer goodbye and destroys the socket within one second.
+Oversized individual frames are returned to the caller for its future service
+error response. This helper does not validate messages or release service leases.
+
+`daemon-log.ts` opens a private regular log file without following symlinks or
+accepting hard links. It appends complete JSON lines synchronously, caps its file
+at 8 MiB by truncating on rollover, and omits a single oversized entry whole.
+Rollover preserves the inode used by inherited append descriptors. Its own writes
+are bounded; unrelated writes to stdout/stderr are outside this helper's bound.
+Close is idempotent and releases the descriptor.
+
+These helpers have owner tests, including real socket backpressure. The service,
+message schema, client and assembly providers are still absent, so `host.ts`,
+`startDaemon`, `daemon-entry.ts` and their real service IPC/process evidence remain
+unimplemented. N3 and the `ipc`, `client` and `daemon-process` capabilities are
+not activated by private transport tests.

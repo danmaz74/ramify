@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": false,
+    "functionalRequirementsSatisfied": false,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-11T08:12:22.296Z",
+  "iteration": "8",
+  "notes": "Incomplete checkpoint: private outbound writer and bounded log implemented with 19 owner cases. Final build, type-check, self-check and six direct smoke groups pass. Automated Vitest verdict pending under the supplied check policy. Missing predecessor service, context, codec/client and assembly providers block startDaemon, process entry and all 22 iteration-8 matrix instances. Gate: 86 required, 4 passed, 82 required not executed. No IPC/process acceptance credit claimed."
+}
