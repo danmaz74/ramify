@@ -14,7 +14,7 @@
 | 6 | Edit semantics through the quick service | completed | 07:44:25 | 08:01:43 | 17m 17s |
 | 7 | Codec, discovery and the lightweight client | completed | 07:44:25 | 08:03:44 | 19m 18s |
 | converge-after-5 | Converge parallel group after-5 (system convergence) | completed | 08:03:44 | 08:03:44 | 0s |
-| 8 | Daemon host, records, process entry and real IPC | completed | 08:03:46 | 08:17:01 | 13m 14s |
+| 8 | Daemon host, records, process entry and real IPC | completed | 08:03:46 | 08:18:17 | 14m 30s |
 | 9 | CLI commands and fallback | pending | - | - | - |
 | 10 | Entries, final declarations and boundaries | pending | - | - | - |
 | 11 | Reference edit sequences and equivalence gate | pending | - | - | - |
@@ -49,4 +49,4 @@
 | 8 | attempt_GynNelV0SDTQOcALaWB89 | off | cumulative (v2) | in unavailable (launch-affordances-disabled); escape unavailable (launch-affordances-disabled); unaccounted unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | unavailable (launch-affordances-disabled) | 0 | surface unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); search unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); expand unavailable (launch-affordances-disabled)/unavailable (launch-affordances-disabled); foreign unavailable (launch-affordances-disabled) |
 | 8 | attempt_GynNelV0SDTQOcALaWB89 | off | final (v2) | pending | pending | pending | pending | pending |
 
-*Last updated: 2026-09-11T08:17:01.689Z*
+*Last updated: 2026-09-11T08:18:17.249Z*
