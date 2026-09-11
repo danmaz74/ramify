@@ -145,17 +145,28 @@ export class Resident {
     }
   }
   async settled() {
-    const previous = (await this.metrics()).generation;
-    process.kill(this.pid, 'SIGUSR2');
-    const deadline = performance.now() + 5000;
-    let instrumentation;
-    do { await delay(20); instrumentation = await this.metrics(); assert.ok(performance.now() < deadline, 'Instrumented settling exceeded 5s'); }
-    while (instrumentation.generation <= previous);
-    const status = unwrap(await this.connection.daemonStatus());
-    const resident = { pid: this.pid, memory: status.memory, contexts: status.contexts, counters: status.counters,
-      connections: status.connections, subscriptions: status.subscriptions, instrumentation };
-    assert.equal(instrumentation.pid, this.pid); this.observer.mark();
-    return resident;
+    const deadline = performance.now() + 120_000;
+    const idle = status => status.contexts.every(context => !context.pending.analysisRunning
+      && context.pending.requests === 0 && context.pending.changedPaths === 0);
+    for (;;) {
+      assert.ok(performance.now() < deadline, 'Resident did not become idle within the finite 120s guard');
+      const before = unwrap(await this.connection.daemonStatus());
+      if (!idle(before)) { await delay(20); continue; }
+      const previous = (await this.metrics()).generation;
+      process.kill(this.pid, 'SIGUSR2');
+      const snapshotDeadline = performance.now() + 5000;
+      let instrumentation;
+      do { await delay(20); instrumentation = await this.metrics(); assert.ok(performance.now() < snapshotDeadline, 'Instrumented settling exceeded 5s'); }
+      while (instrumentation.generation <= previous);
+      const status = unwrap(await this.connection.daemonStatus());
+      // A watcher may start a second analysis after the command returns. Sample
+      // its eventual idle state, while keeping all real lifetime counters intact.
+      if (!idle(status) || before.counters.analyses !== status.counters.analyses) continue;
+      const resident = { pid: this.pid, memory: status.memory, contexts: status.contexts, counters: status.counters,
+        connections: status.connections, subscriptions: status.subscriptions, instrumentation };
+      assert.equal(instrumentation.pid, this.pid); this.observer.mark();
+      return resident;
+    }
   }
   async statusTimings(project, token, count = 20) {
     const service = [], ipc = [], cli = [];
@@ -199,5 +210,5 @@ export class Resident {
 }
 export function sampleMetrics(value) {
   const { instrumentation, ...status } = value;
-  return { ...status, instrumentation: { ...instrumentation, services: undefined, outbound: undefined, increments: instrumentation.increments.slice(-1) } };
+  return { ...status, instrumentation: { ...instrumentation, services: undefined, outbound: undefined, increments: instrumentation.increments } };
 }
