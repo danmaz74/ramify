@@ -1,0 +1,366 @@
+{
+  "kind": "macos-composed-acceptance",
+  "platform": "darwin",
+  "architecture": "arm64",
+  "identity": {
+    "revision": "279fc33282d76aed92de7148061adf298ef24dd0",
+    "dirty": false,
+    "sourceSha256": "7f49d5a5676e1c7dfd7af8700c4c97d53f551932384680248b25252f478a5392",
+    "buildSha256": "495ef420a136e63b116b77a48f44b99c0cbc116319a3987266019fbf53ea34b4",
+    "packageVersion": "0.0.0",
+    "nodeVersion": "v22.23.2",
+    "typescriptVersion": "7.0.2"
+  },
+  "process": {
+    "required": 78,
+    "passed": 78,
+    "failed": 0,
+    "notExecuted": 0,
+    "reusedExecutions": 75,
+    "focusedExecutions": 3
+  },
+  "plan1": {
+    "required": 308,
+    "passed": 308,
+    "failed": 0,
+    "notExecuted": 0,
+    "reusedExecutions": 299,
+    "focusedExecutions": 9
+  },
+  "baseline": {
+    "run": 34610976201,
+    "reportSha256": "6d60a57696eb7ae81b21e6b14007a95cb3dcec5c3c09862f38a24e543c25efc7",
+    "originalSummary": {
+      "required": 78,
+      "passed": 75,
+      "failed": 3,
+      "notExecuted": 0
+    }
+  },
+  "focused": {
+    "reportSha256": "cc28f6fcd3e9ed87519c9116b70c3c2b44c9c91a119ac277fc2300c665fae4ce",
+    "plan1CompositionSha256": "9882519770e63a102c2ffe7cfab9ecff5fad49ced8a35de6ef09afb27232c417",
+    "workflowRun": "https://github.com/danmaz74/ramify/actions/runs/34615302017",
+    "archive": "macos-focused-34615302017.zip",
+    "archiveSha256": "6336461ea106255f4c5d03d9552dd864132072abb3b019aa89d8a69922e319b0",
+    "archiveExtraction": "ZIP root corresponds to .reference-work/"
+  },
+  "rawArtifactsVerified": 183,
+  "cleanupVerified": true,
+  "sources": [
+    {
+      "id": "I2-14:framing-roundtrip",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-14:malformed-frame",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-14:oversized-request",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-14:oversized-response",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-14:error-preservation",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-14:token-preservation",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-14:handshake-incompatible",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-14:cancel-frame",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-15:connect-validation",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-15:lease-release-on-close",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-15:abrupt-host-loss",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-15:client-entry-lightweight",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-16:ordering-per-context",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-16:coalesce-replaceable",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-16:non-replaceable-kept",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-16:slow-consumer-disconnect",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-16:reconnect-no-replay",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-17:simultaneous-start",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-17:stale-record",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-17:stale-lock",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-17:already-running-exit",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-17:directory-ownership",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-18:idle-exit",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-18:restart-after-idle",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-18:crash-recovery",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-18:explicit-stop",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-18:missed-stop-notification",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-18:new-command-after-stop",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-18:watch-lease-prevents-idle",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-18:incompatible-bounded",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-19:daemon-entry-boundary",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-19:cli-check-boundary",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-19:help-version-unchanged",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-19:status-no-start",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-19:batch-no-daemon",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-20:human",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-20:json-bare-report",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-20:exit-clean",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-20:exit-denied",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-20:exit-invalid",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-20:exit-unavailable",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-20:synchronized-after-save",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-20:root-from-subdirectory",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-20:interrupt",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-21:stream-updates",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-21:bounded-burst",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-21:interrupt-release",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-21:json-lines",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-22:status-none",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-22:status-running",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-22:stop-running",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-22:stop-none",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-22:stop-wrong-instance",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-23:check-fallback-visible",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-23:stop-no-fallback",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-23:watch-no-fallback",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-23:client-no-fallback",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-23:fallback-disposes",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-25:reference-sequence",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-25:hundred-owner-sequence",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-25:contracts-and-coverage-equal",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-25:removals",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-26:remove-hop-live",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-26:restore-hop-live",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-26:wildcard-growth-live",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-26:merge-live",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-26:testing-move-live",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-27:watch-exit-releases",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-27:command-exit-releases",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-27:idle-disposal-releases",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-27:eviction-under-many-contexts",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-27:reconnect-after-crash-live",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-30:self-check-eleven",
+      "from": "focused"
+    },
+    {
+      "id": "I2-30:self-negative-contexts",
+      "from": "focused"
+    },
+    {
+      "id": "I2-30:declarations-final",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-30:package-entries",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-30:relocated-resident",
+      "from": "baseline"
+    },
+    {
+      "id": "I2-30:plan1-regression",
+      "from": "focused"
+    }
+  ],
+  "limitation": "Composed acceptance under the explicitly approved reuse policy; original failed reports remain unchanged.",
+  "policy": "../acceptance-evidence-policy.md"
+}

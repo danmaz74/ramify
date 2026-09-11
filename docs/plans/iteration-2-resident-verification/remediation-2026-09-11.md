@@ -157,9 +157,9 @@ completed, but the report exceeded `maxReportBytes=33554432`. An external
 diagnostic wrapper measured a 34,792,550-byte report, including a 34,769,338-byte
 snapshot. Results and accesses account for approximately 15.1 MB and 8.5 MB.
 This is linear verbose public evidence, not a timing-target failure or a
-quadratic exposure error. Raising capacity requires coordinated report,
-response-frame, outbound-queue and retained-history limits; no such change or
-large-project waiver has been made. The merge-scope decision remains pending.
+quadratic exposure error. It required coordinated report, response-frame,
+outbound-queue and retained-history limits, as implemented below. No
+large-project acceptance requirement was waived.
 Raw evidence and independent checks are retained under [evidence](evidence/).
 
 The measurement harness previously connected only after validating a cold
@@ -169,6 +169,49 @@ cleanup errors separately. Focused regressions preserve the resource-limit
 diagnostic. A real after-fix S500 run instead hit the unchanged 130-second
 command guard; that actual primary error remained visible, and zero processes
 survived cleanup. This is cleanup evidence, not a passing large-project check.
+
+## Large-project capacity correction
+
+Commit `028515b` preserves the public report and protocol schemas while sharing
+a 96 MiB report allowance between batch and resident dispatch, with 64 KiB of
+response-envelope headroom and 128 MiB bounds for the codec, outbound queue,
+history and CLI publication queue. Product retention remains 96 MiB per context
+and global retention remains 512 MiB. All analysis, command, cancellation and
+lifecycle deadlines remain unchanged. The [scope amendment](scope.md#large-report-capacity-amendment-2026-09-11)
+records the measured basis and hard limits.
+
+A separate S1000 diagnostic also exposed repeated canonical identity validation
+inside every decision lookup. One question in a 128-symbol model performed
+258 validations. The correction validates the requested identity once, compares
+the four established canonical fields directly and reuses the resolved original
+for visibility. It adds no global cache or public API. The regression failed
+before the correction; all 242 model/access tests passed afterward. Report,
+codec and history boundary tests passed 24/24; CLI process and publication queue
+tests passed 14/14, including interrupts, broken pipes and bounded admission.
+Independent reviewers found no blocking issues.
+
+Actual focused S500 and S1000 cold/source workloads then passed every assertion
+with zero surviving processes. S500 completed in 39.99/41.84 seconds and S1000
+in 85.45/87.76 seconds. The full S1000 JSON output was 69,571,145 bytes with
+19,001 allowed accesses, zero findings and complete coverage. Its history,
+retained products and outbound peak used 69,571,144, 80,591,333 and 69,572,559
+bytes respectively, within the new hard bounds. The source-edit timing target
+remains an advisory miss. These focused results do not replace the final
+same-input gates and all-workload measurement below.
+
+## Remaining empirical memory targets
+
+Commit `438bc03` applies the approved advisory policy to three remaining
+reference-harness targets: client entry RSS, retained-report heap growth and
+session RSS growth. The harness records each observed value, target and whether
+the target was met. Missing or non-finite observations still fail, as do resource
+cleanup, report accounting, exact execution counts and leaked sessions.
+
+Two focused tests passed: finite measurements above the target remain valid
+observations, while missing, non-finite and invalid raw measurements are rejected.
+The reference-harness TypeScript scope also passed. These harness-only changes
+do not alter production code, the build or measurement recipes. Fresh Linux and
+macOS acceptance runs use this commit's harness.
 
 ## Linux acceptance before the measurement correction
 
@@ -187,17 +230,78 @@ build SHA-256
 `2d6e1152c866fddb3b8a16777ae133c753dbdaaef1058092e194b78fb6ba6cbb`;
 Node 22.23.2; TypeScript 7.0.2.
 
-## Outstanding acceptance evidence
+## Acceptance reuse amendment
 
-- A fresh commit audit after subsequent source changes; the audit above covers
-  source through `cc4785a`, before the later fixture and evidence corrections.
-- Fresh full Plan 1 and Plan 2 gates on matching source, build and runtime
-  inputs; the measurement recipe correction changes the earlier source identity.
-- An idle-host execution of all nine measurement workloads and their advisory
-  target comparisons plus mandatory evidence, correctness and cleanup checks
-  on the final inputs. The completed run above passed seven; S500 and S1000
-  remain blocked by report capacity until support is extended or explicitly
-  deferred.
+The user approved [evidence reuse with focused reruns](acceptance-evidence-policy.md)
+after the latest Linux and macOS Plan 1 runs each passed 300/308 cases. Six
+failures came from the direct API harness retaining the previous 32 MiB request
+allowance while the CLI used the approved 96 MiB allowance. Two self-check
+failures came from a namespace escape in the new test spy; production decisions
+completed successfully with zero denials, but coverage was correctly partial.
+
+The corrected spy retains the complexity regression: the prior implementation
+still fails with 258 canonicalizations, and both tests pass on the optimized
+implementation. An actual self-check then completed with all eleven owners,
+1,952 allowed accesses, zero denials and no coverage notes; its owned daemon was
+stopped and its endpoint removed. All nine focused Linux cases passed, including the six CLI comparisons, both
+self-checks and a retained-report control. The original eight failed cases are
+replaced only in the separately validated acceptance view. Original failed and interrupted reports remain
+unchanged. The interrupted fourth measurement run completed three workloads
+successfully and released all observed processes.
+
+## Current composed acceptance
+
+Linux Plan 1 now has verified coverage of all 308 required cases: 299 executions
+retained from the original run and nine focused reruns. The actual Plan 2
+prerequisite consumer accepted the receipt, including all 305 unchanged reviewed
+record definitions. The [Linux evidence index](evidence/linux-plan1-composed-20260911.json)
+links the original failed report, focused execution, exact source transitions
+and raw evidence. Focused daemon stop/status checks passed with no survivor.
+
+macOS also has composed Plan 1 coverage of 308 cases (299 retained plus nine
+focused) and all 78 resident process/IPC cases (75 retained plus three focused).
+[Focused CI run 34615302017](https://github.com/danmaz74/ramify/actions/runs/34615302017)
+passed on actual Darwin arm64, Node 22.23.2 and TypeScript 7.0.2. Independent
+verification checked all 183 referenced raw artifacts and clean daemon shutdown.
+The [macOS evidence index](evidence/macos-composed-acceptance-20260911.json)
+records every process case's origin and preserves the original failed baseline.
+Neither composed result is represented as a newly executed full suite.
+
+Current source identity:
+`7f49d5a5676e1c7dfd7af8700c4c97d53f551932384680248b25252f478a5392`.
+Production build identity:
+`495ef420a136e63b116b77a48f44b99c0cbc116319a3987266019fbf53ea34b4`.
+The approved changes preserve production and workload inputs. The original
+focused Linux run's identity is also preserved through an exact two-file
+cleanup-validator transition; its cases were not repeated for that validator edit.
+
+## Final behavioral acceptance and measurement waiver
+
+The 167 Linux non-measurement Plan 2 cases passed in
+[CI run 34615535499](https://github.com/danmaz74/ramify/actions/runs/34615535499).
+Independent verification confirmed every reviewed case and assertion, matching
+source/build/runtime identities, clean shutdown and all 179 raw sidecars.
+[Evidence index](evidence/linux-nonmeasurement-34615535499.json).
+
+At the user's instruction to stop further performance-only tests, the remaining
+measurement queue was stopped. Five workloads are verified with 1,355 raw
+assertions: entry footprints, reference cold/warm/broad checks, S100
+cold/warm/broad checks, all 400 repeated-edit cycles, and all eight contexts.
+The interrupted slow-consumer measurement is not counted as passed. The queued
+S500, S1000 and publication-peak measurements were not started. The earlier
+large-project preflights above retain their actual results and input identities.
+
+The [policy amendment](acceptance-evidence-policy.md#stop-performance-only-execution-amendment)
+waives these four unfinished measurement requirements and execution of the nine
+measurement-only consumers. No full 176-case Plan 2 pass is claimed. Behavioral
+slow-consumer and process-cleanup coverage remains established by the accepted
+Linux and macOS suites. The interruption evidence preserves the two processes
+observed immediately after stopping and their subsequent cleanup; the final
+independent process check found zero owned survivors.
+
+The configured commit audit and final finding dispositions are recorded separately
+against the final commit and workflow. The [measurement evidence index](evidence/measurement-acceptance-with-waiver-20260911.json)
+records the completed workloads, explicit waivers and preserved interruption.
 
 The duplicate risk finding was waived during the initial review. Genuine
 findings must retain their evidence-based disposition; unfinished acceptance
