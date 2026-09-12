@@ -47,6 +47,7 @@ class Observer implements ProjectObserver {
     this.#inventory = acquired.inventory;
     this.#configuration = acquired.configuration;
     this.#configurationData = acquired.configurationData;
+    this.#capture.retainAcquisition();
   }
 
   get inventory(): ProjectInventory { return this.#inventory; }
@@ -79,7 +80,12 @@ class Observer implements ProjectObserver {
       signal?.throwIfAborted();
       try {
         await this.#promote();
-        return await this.#update(changes, signal);
+        const update = await this.#update(changes, signal);
+        if (update.kind === 'local' && (update.created.length || update.deleted.length)) {
+          await this.#capture.retireReported();
+          this.#reported.clear();
+        }
+        return update;
       } catch (error) {
         if (error instanceof Cancelled || signal?.aborted) throw signal?.reason ?? error;
         return this.#incomplete(error);
@@ -118,6 +124,9 @@ class Observer implements ProjectObserver {
    * state no longer matches what the reporter saw is an observed change.
    */
   async #promote(): Promise<readonly ObservedChange[]> {
+    return this.#capture.reported(() => this.#promoteReported());
+  }
+  async #promoteReported(): Promise<readonly ObservedChange[]> {
     const changes: ObservedChange[] = [];
     for (const observation of this.#reported.take()) {
       const path = this.#capture.path(observation.path);
@@ -207,7 +216,7 @@ class Observer implements ProjectObserver {
       signal?.throwIfAborted();
       const label = relative(this.#capture.root, item.path);
       if (item.kind === 'ignored') continue;
-      if (item.kind === 'input') { await this.#capture.refresh(item.path); changed.push(label); continue; }
+      if (item.kind === 'input') { await this.#capture.reported(() => this.#capture.refresh(item.path)); changed.push(label); continue; }
       if (item.kind === 'description') {
         const module = this.#moduleAt(item.directory)!;
         await this.#capture.refresh(item.path);
@@ -246,7 +255,7 @@ class Observer implements ProjectObserver {
       if (outcome === 'structural') return this.#rebuild(signal);
       if (outcome === 'created') { created.push(label); relink = true; }
       else if (outcome === 'deleted') { deleted.push(label); relink = true; }
-      else changed.push(label);
+      else if (outcome === 'changed') changed.push(label);
     }
     if (issues.length) return freeze({ kind: 'invalid', inventory: null, issues: issues.sort(issueOrder) });
 
@@ -275,15 +284,25 @@ class Observer implements ProjectObserver {
 
   /** One owned path inside an existing source area, created, deleted or edited. */
   async #owned(path: string, module: InventoryModule, files: Map<string, InventoryFile>,
-    modules: Map<string, InventoryModule>): Promise<'created' | 'deleted' | 'changed' | 'structural'> {
+    modules: Map<string, InventoryModule>): Promise<'created' | 'deleted' | 'changed' | 'structural' | 'unchanged'> {
     const label = relative(this.#capture.root, path);
     const moduleRoot = join(this.#capture.root, module.directory);
     for (let directory = dirname(path); within(join(moduleRoot, 'src'), directory); directory = dirname(directory)) {
       if (excludedDirectory(directory, this.#configurationData)) return 'structural';
     }
-    await this.#capture.refresh(path);
+    const known = files.get(label);
+    const observed = this.#capture.recorded(path);
+    if (known) await this.#capture.refresh(path);
+    else await this.#capture.reported(() => this.#capture.refresh(path));
     const kind = this.#capture.recorded(path)?.kind ?? 'absent';
     if (kind === 'absent') {
+      // A hook can name a file after its deletion was already published.
+      // Only an inventoried file can be deleted; preserve any compiler-owned
+      // absence probe and discard an otherwise unobserved request path.
+      if (!known) {
+        if (!observed) await this.#capture.forget(path);
+        return 'unchanged';
+      }
       await this.#refreshChain(path, moduleRoot);
       await this.#capture.forget(path);
       files.delete(label);
@@ -293,7 +312,6 @@ class Observer implements ProjectObserver {
     // Plan 1 observes but never traverses a symlink, and never invents an owner
     // for one. A new non-file entry is a layout change, not a local edit.
     if (kind !== 'file') return 'structural';
-    const known = files.get(label);
     if (!known) {
       await this.#refreshChain(path, moduleRoot);
       if (!await this.#capture.hasExactEntry(path)) return 'structural';
@@ -342,15 +360,11 @@ class Observer implements ProjectObserver {
     this.#inventory = result.acquired.inventory;
     this.#configuration = result.acquired.configuration;
     this.#configurationData = result.acquired.configurationData;
+    this.#capture.retainAcquisition();
     await previous.dispose();
-    // Reported callbacks are merged into every acquisition, never dropped.
-    for (const observation of this.#reported.promoted) {
-      const path = this.#capture.path(observation.path);
-      const entry = await this.#capture.observe(path);
-      if (entry.kind === 'absent') continue;
-      if (observation.shape === 'file') await this.#capture.readFile(path, observation.role);
-      if (observation.shape === 'directory') await this.#capture.readDirectory(path);
-    }
+    // The broad compiler update supplies the current dependency observations;
+    // callbacks from a removed module must not enter this new acquisition.
+    this.#reported.clear();
     return freeze({ kind: 'structural', inventory: this.#inventory });
   }
 }

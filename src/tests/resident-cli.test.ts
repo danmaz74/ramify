@@ -149,6 +149,9 @@ describe('changed-file CLI through the real resident service', () => {
     const quick = await createQuickEnvironment();
     try {
       const path = 'subs/consumer/src/use.ts';
+      // Keep a real compiler probe of the deleted path in the current inputs.
+      // An unreferenced deleted source is no longer observed by batch or session.
+      await put(root, 'subs/consumer/src/keep.ts', "import './use.js';\n");
       const args = ['check', '--changed', path, '--format', 'json'];
       expect(checkDocument(await invokeResident(quick, root, args)).exitCode).toBe(0);
       await rm(join(root, path));
@@ -156,6 +159,8 @@ describe('changed-file CLI through the real resident service', () => {
       expect(result.requests[0]?.freshness).toEqual({ mode: 'synchronized', expect: [{ path, sha256: null }] });
       expect(deleted).toMatchObject({ outcome: 'checked', exitCode: 0, findings: [],
         changed: [{ path, sha256: null, covered: true }] });
+      expect(deleted.coverage).toEqual([expect.objectContaining({ code: 'unresolved-target',
+        location: expect.objectContaining({ file: 'subs/consumer/src/keep.ts' }) })]);
 
       for (const unobserved of ['never-observed.txt', '../outside.ts']) {
         const unchecked = checkDocument(await invokeResident(quick, root,
