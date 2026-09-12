@@ -31,6 +31,7 @@ export class Capture {
   #disposed = false;
   #bytes = 0;
   #files = 0;
+  #enumerations = 0;
   #application = new Set<string>();
   #applicationBytes = 0;
   root: string;
@@ -168,6 +169,7 @@ export class Capture {
     const operation = (async () => {
       try {
         const entries: string[] = [];
+        this.#enumerations++;
         const directory = await opendir(entry.path);
         for await (const child of directory) {
           this.check();
@@ -213,10 +215,65 @@ export class Capture {
       sha256: hash(entry.bytes ?? JSON.stringify([entry.signature, entry.link, entry.entries, entry.exactName])), bytes: entry.bytes?.length ?? 0,
     })).sort((a, b) => byteOrder(a.path, b.path)));
   }
+  /** Enumerations actually performed; a cached listing costs none. */
+  get enumerations(): number { return this.#enumerations; }
+  /** What was recorded about one path, without re-reading it. */
+  recorded(input: string): { path: string; kind: Kind; role: Role; read: boolean; directory: boolean; exact: boolean; entries: readonly string[] | undefined } | undefined {
+    const entry = this.#observations.get(this.path(input));
+    if (!entry) return undefined;
+    return { path: entry.path, kind: entry.kind, role: entry.role, read: entry.bytes !== undefined,
+      directory: entry.entries !== undefined, exact: entry.exactName !== undefined, entries: entry.entries };
+  }
+  digest(input: string): string | undefined {
+    const entry = this.#observations.get(this.path(input));
+    return entry?.bytes === undefined ? undefined : hash(entry.bytes);
+  }
+  async #settle(path: string): Promise<void> {
+    await Promise.allSettled([this.#pending.get(path), this.#reads.get(path), this.#directories.get(path)]);
+  }
+  /** Release one observation and its reserved bytes so it can be observed again. */
+  #forget(path: string): Observation | undefined {
+    const old = this.#observations.get(path);
+    if (!old) return undefined;
+    this.#observations.delete(path);
+    if (old.kind === 'file') this.#files--;
+    this.#bytes -= Buffer.byteLength(path) + Buffer.byteLength(old.signature) + (old.bytes?.length ?? 0)
+      + (old.entries?.reduce((total, entry) => total + Buffer.byteLength(entry) * 2 + 4, 0) ?? 0);
+    if (this.#application.delete(path)) this.#applicationBytes -= old.bytes?.length ?? 0;
+    return old;
+  }
+  async forget(input: string): Promise<void> {
+    const path = this.path(input);
+    await this.#settle(path);
+    this.#forget(path);
+  }
+  /** Re-observe one input in place, repeating exactly the reads made of it. */
+  async refresh(input: string): Promise<void> {
+    const path = this.path(input);
+    await this.#settle(path);
+    const old = this.#forget(path);
+    if (!old) { await this.observe(path); return; }
+    // A link's bytes live on its resolved target; both records must move.
+    if (old.kind === 'symlink' && old.canonical) { await this.#settle(old.canonical); this.#forget(old.canonical); }
+    const application = this.#application.has(path);
+    const observation = await this.observe(path);
+    if (old.exactName !== undefined) await this.hasExactEntry(path);
+    if (observation.kind === 'absent') return;
+    // Re-observation reads bytes; decoding belongs to the caller that needs text.
+    if (old.bytes !== undefined) {
+      if (application && (old.role === 'source' || old.role === 'resource')) await this.application(path, old.role);
+      else await this.bytes(path, old.role);
+    }
+    if (old.entries !== undefined) await this.readDirectory(path);
+  }
   /** Validate without sealing so a later compiler stage can add its first reads. */
   async validate(): Promise<readonly string[]> {
+    return (await this.changes()).map(change => this.label(change.path)).sort(byteOrder);
+  }
+  /** Stat every observed path and report the ones whose recorded state moved. */
+  async changes(): Promise<readonly { path: string; kind: 'changed' | 'created' | 'deleted' }[]> {
     await Promise.all([...this.#pending.values(), ...this.#reads.values(), ...this.#directories.values()]);
-    const changed: string[] = [];
+    const changed: { path: string; kind: 'changed' | 'created' | 'deleted' }[] = [];
     for (const entry of this.#observations.values()) {
       this.check();
       const current = await this.#disk(entry.path);
@@ -235,9 +292,12 @@ export class Capture {
           different = digest !== hash(entry.bytes);
         } finally { await handle.close(); }
       }
-      if (different) changed.push(this.label(entry.path));
+      if (different) {
+        changed.push({ path: entry.path, kind: entry.kind === 'absent' ? 'created'
+          : current.kind === 'absent' ? 'deleted' : 'changed' });
+      }
     }
-    return changed.sort(byteOrder);
+    return changed.sort((a, b) => byteOrder(a.path, b.path));
   }
   async seal(): Promise<{ readonly status: 'coherent'; readonly inputs: readonly CapturedInput[] } | { readonly status: 'changed'; readonly paths: readonly string[] }> {
     this.check();

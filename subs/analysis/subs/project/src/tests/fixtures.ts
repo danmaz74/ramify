@@ -20,3 +20,25 @@ export async function fixture(root: string): Promise<void> {
   await put(root, 'tsconfig.json', '{"compilerOptions":{"types":[],"module":"ESNext","moduleResolution":"bundler"},"include":["src"]}\n');
   await put(root, 'src/value.ts', 'export const value = 1;\n');
 }
+
+/**
+ * A local header parser for observer tests: it reflects the declared name and
+ * tags of real bytes, so a renamed or broken header is a distinguishable fact.
+ */
+export const declaration: ProjectReadOptions['parse'] = (file, text) => {
+  const lines = text.split('\n');
+  const index = lines.findIndex(line => /^module\s/.test(line));
+  const start = index < 0 ? 0 : lines.slice(0, index).reduce((total, line) => total + line.length + 1, 0);
+  const header = index < 0 ? null : /^module\s+"?([A-Za-z0-9_-]+)"?(?:\s+tagged\s+\[([^\]]*)\])?\s*$/.exec(lines[index]!);
+  if (!header) {
+    const line = Math.min(2, lines.length);
+    const offset = lines.slice(0, line - 1).reduce((total, entry) => total + entry.length + 1, 0);
+    const word = /^\S*/.exec(lines[line - 1] ?? '')![0];
+    return { status: 'invalid', file, tokens: [],
+      issues: [{ code: 'missing-header', message: 'Expected a module header', file,
+        span: { start: offset, end: offset + word.length, line, column: 1 } }] };
+  }
+  return { status: 'valid', document: { file, version: 1, tokens: [], statements: [],
+    module: { name: header[1]!, tags: (header[2] ?? '').split(',').map(tag => tag.trim()).filter(Boolean),
+      span: { start, end: start + lines[index]!.length, line: index + 1, column: 1 } } } };
+};
