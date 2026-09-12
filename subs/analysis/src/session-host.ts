@@ -1,4 +1,4 @@
-import { Worker } from 'node:worker_threads';
+import { SessionWorker as Worker } from './session-supervisor.js';
 import type { AnalysisInputs, AnalysisReport, RunControl } from './interfaces/analysis.js';
 import type { RetainedSession, SessionChange, SessionInputs, SessionOpen, SessionRevision, SessionStatus, SessionUpdate, VerifyOutcome } from './interfaces/session.js';
 import type { SessionCommand, WorkerMessage, WorkerOpen, WorkerResult } from './session-messages.js';
@@ -154,15 +154,18 @@ class SessionHost implements RetainedSession {
       } catch { /* The unconditional termination and child cleanup still run. */ }
       finally {
         if (timer) clearTimeout(timer);
+        let released = false;
         try {
-          // On a disposal timeout, kill children while their worker loop can
-          // still reap them. Killing the worker first loses that opportunity.
-          await releaseSessionChildren([...this.#children], this.#inputs.limits.disposeTimeoutMs);
-        } finally {
+          // The supervisor ends the worker's owning process when necessary,
+          // then awaits its process group and observed children being reaped.
           await this.#worker.terminate();
+          await releaseSessionChildren([...this.#children], this.#inputs.limits.disposeTimeoutMs);
+          released = true;
+        } finally {
           await this.#exit;
           await this.#messages;
-          this.#children.clear(); this.#worker.removeAllListeners();
+          if (released) this.#children.clear();
+          this.#worker.removeAllListeners();
           this.#rejectPending(failure('session-disposed', 'Retained session is disposed'));
           this.#current = null;
           this.#status = deepFreeze({ ...emptyStatus(), sequence: this.#status.sequence, lastSweepAt: this.#status.lastSweepAt });

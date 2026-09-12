@@ -62,13 +62,9 @@ export async function processRss(pid: number): Promise<number | null> {
   return null;
 }
 
-/** Used after worker exit as well as normal disposal. The host owns these
- * child identities even if the worker cannot run its own finally block. */
+/** Verify the host's observations after the supervisor has reaped its children.
+ * Do not signal cached identities after supervision has already ended. */
 export async function releaseSessionChildren(pids: readonly number[], timeoutMs: number): Promise<void> {
-  for (const pid of pids) {
-    try { process.kill(pid, 'SIGKILL'); }
-    catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error; }
-  }
   const until = Date.now() + timeoutMs;
   while (pids.some(processAlive)) {
     if (Date.now() >= until) throw new Error('Session child process survived disposal');

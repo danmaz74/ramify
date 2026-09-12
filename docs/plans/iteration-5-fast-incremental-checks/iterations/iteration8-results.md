@@ -1,104 +1,77 @@
 <!-- cucumber-viz: managed artifact — use MCP tool "workflow.write_iteration_results" to make changes -->
 
-# Iteration 8 results: Worker session hosting
+# Iteration 8 results: Worker session hosting and surviving compiler supervision
 
-**Date:** 2026-09-12. **Outcome:** incomplete. Normal worker hosting and the I5-08 behavior are implemented, but abrupt worker termination leaves an unreaped compiler child. Abrupt-loss and heap-exhaustion cleanup regressions remain failing. This iteration is not ready for acceptance; no cleanup requirement or test has been waived.
+**Date:** 2026-09-12. **Outcome:** the reported lifecycle failures are fixed. Forced worker termination, genuine heap exhaustion before and after compiler startup, and forced supervisor termination now produce explicit unavailable outcomes and release their owned processes. Focused verification passes; independent workflow acceptance remains pending. No failure assertion or cleanup requirement was waived.
 
-## One focused self-assessment follow-up
+## Reported failure and correction
 
-The requested follow-up does not complete the iteration. Production hosting, the compiler provider and the reviewed contracts are unchanged. This attempt adds a deterministic reproduction of heap failure after compiler startup and corrects the failing tests' own cleanup handling.
+The prior host retained compiler PIDs but lost the native child wait handles when the worker died. Sending SIGKILL from another isolate could stop the compiler without reaping it. The prior self-assessment therefore correctly remained incomplete: the combined session run passed 42 of 44 tests, and the subsequent focused follow-up passed one of four lifecycle cases. Those historical failures are retained in their receipts; they are not passing evidence.
 
-The new case opens a real session with a 64 MiB worker limit, establishes a live observed compiler PID, then submits 40,000 ordinary changed-path records with 2,048-character prefixes through `session.update`. Deserializing the real request exhausts the worker heap after its compiler exists. The case independently asserts an unavailable resource-limit report, no new revision reply, a cleared current revision and a terminated worker. It then fails the independent disposal-success and child-gone assertions. No synthetic worker error, new production command, skipped failure or zombie-as-gone predicate supplies the result.
+This remediation implements the constraint finding's direction to make supervision survive worker failure. Analysis now starts a dedicated supervisor process containing the real, resource-limited session worker. The observer, retained compiler adapter and facts still live in that worker. The caller owns the supervisor's ChildProcess handle, an isolated Unix process group and the reported child identities independently of the worker's lifetime. This is an internal hosting change with an additional process and serialization cost; it is not described as the original in-process topology remaining unchanged.
 
-The abrupt-loss test now settles both disposal calls and always restores its diagnostic listeners and spies. Soft cleanup assertions still fail the test, but they no longer mask an earlier report assertion or prevent the test's own cleanup from running. The deterministic heap test uses the same assertion ordering.
+On worker failure, the supervisor closes its recorded children and exits. Ending the process that lost the worker's native wait handles allows the system reaper to reap those children. The caller awaits the supervisor's close and verifies that both its process group and reported child PIDs have disappeared. The process group also covers the compiler's synchronous spawn-to-PID-notification gap. If the supervisor itself dies, the caller performs the same group cleanup. A zombie still counts as a surviving process; timeout or inspection failure rejects disposal instead of reporting success.
 
-Verification for this test-only follow-up:
-
-- `NODE_OPTIONS='' npx vitest run subs/analysis/src/tests/session-worker.test.ts -t 'abrupt worker loss|heap exhaustion|disposes while work is queued'`: four selected cases executed, **one passed and three failed**, ten unrelated cases not selected. Queued/in-flight normal disposal passes. Forced termination, deterministic heap exhaustion after startup, and the existing 16 MiB cold-heap case fail child cleanup. The report and no-stale-revision assertions passed before those cleanup failures. Receipt: `.reference-work/reports/iteration8-followup-lifecycle.json`.
-- `npm run type-check` and `git diff --check`: pass.
-- The initial isolated execution of the newly added case also failed cleanup; receipt `.reference-work/reports/iteration8-followup-late-heap.json`.
-- No production source changed. The prior build, complete session-suite and 61-instance prerequisite evidence below belongs to the pre-follow-up snapshot. This attempt does not claim to have rerun those broad checks; full regression, scenario and seal checks remain reserved for automation.
-
-`functionalRequirementsSatisfied` and `allNewTestsPass` remain false; `newCodeCoveredByTests` remains true. The remaining capability is surviving ownership of native compiler launch and reaping when the session worker disappears. The existing provider port has no launcher/reaper handoff, while the assigned implementation still requires the worker host. A reviewed hosting or provider change is therefore still needed. The workflow should record this as a reviewable finding; this follow-up requests no waiver and does not publish another draft.
+Worker exit invalidates the public current revision and status immediately, independently of the process cleanup promise. Repeated disposal shares that promise. Child tracking is cleared only after successful cleanup. Inspection failures receive bounded retries; failed cleanup retains evidence, but a finished cleanup attempt cannot later signal cached numeric IDs that the OS may recycle. The host's final child verification no longer sends another signal after the supervisor has completed ownership.
 
 ## Scope and contracts
 
-All edits, commands and Git operations use `/tmp/worktrees/ramify-67e9dd0f/iteration-5-fast-incremental-checks`, on `workflow/iteration-5-fast-incremental-checks`. Changes are confined to analysis source, same-owner tests and the reference harness. The pre-existing managed modification to iteration7-check-results.md is preserved without editing or staging it. No dependency-owner source, settled public session type, declaration, package entry, CLI or daemon source changes.
+All edits, checks and Git operations use `/tmp/worktrees/ramify-67e9dd0f/iteration-5-fast-incremental-checks`, on `workflow/iteration-5-fast-incremental-checks`. Changes are confined to analysis source, same-owner tests and reference-harness support/documentation. There are no changes to dependency-owner source, public session/provider shapes, declarations, package entries, CLI, daemon or model rules. Managed results and checklist are written through workflow tools; control-plane outputs are not edited.
 
-The reviewed contract assigns caller deadline replies and sweep scheduling to contexts in iteration 9. `RunControl` still carries only cancellation. The session completes work unless cancelled or failed, while the harness races the same update promise with a caller deadline. `sweep()` performs the required observation and update; this implementation adds no independent scheduler that could race contexts' future queue.
+The reviewed session port remains unchanged. `RunControl` carries cancellation; contexts in iteration 9 owns request deadlines and scheduling. A caller may stop waiting without aborting an update, which continues and publishes. `sweep()` performs observation and ordinary updates when invoked; the session adds no competing periodic scheduler.
 
-## Implemented behavior
+## Implemented iteration behavior
 
-- `retained-session.ts` retains the public factory and opens one analysis-owned worker. The existing engine lives in `session-engine.ts`; batch analysis remains unchanged.
-- The private protocol carries detached, recursively frozen commands, revisions and outcomes. AbortSignal remains local to each side, connected by cancellation messages. Successful report projections cross the boundary only in response to `report()`. Historical projections, exact sequence release and identical-revision object identity are preserved.
-- The host configures `resourceLimits.maxOldGenerationSizeMb`, constrains young generation size and checks the worker's effective V8 heap ceiling before allowing engine imports or project observation. The inherited `NODE_OPTIONS=--max-old-space-size=8192` is correctly rejected when it overrides the requested limit. Worker sizes below 8 MiB are rejected before startup because a 1 MiB bootstrap was observed to abort the entire Node process.
-- Heap exhaustion maps to an unavailable, unpublished report with a `resource-limit` diagnostic. Worker failures clear the host's current revision. The retained-fact admission boundary remains in the engine and preserves the previous published facts and historical projection on rejection.
-- Node's per-isolate child-process diagnostic channel records child identities without importing compiler-private evidence. Status checkpoints include worker heap, process-wide worker RSS, compiler PID/RSS, sequence, fact bytes, observed input count and last sweep time. Compiler RSS is measured separately on Linux and macOS.
-- Normal demotion releases and reaps the compiler while keeping facts, indexes, observations and historical versions. The next update rebuilds broadly, including an empty update with unchanged identities.
-- Sweeps use the observer's reobserve operation, handle cancellation and acquisition failures, and retry observation for a cold invalid capture that has no observer.
-- Normal disposal cancels queued operations, waits for compiler exit before closing the worker, clears retained facts and observations, removes listeners and timers, and tolerates repeated calls. Timeout cleanup signals children before forcibly ending their worker, so that the live worker still has an opportunity to reap them.
+- The public `openRetainedSession` factory opens the analysis-owned bounded worker through the new supervisor. Source execution uses the existing local TypeScript loader; compiled execution uses emitted ESM and no development runtime. The production build includes the private supervisor entry.
+- Detached plain commands, revisions and outcomes are recursively frozen at the worker/public boundaries. Reports are projected only on explicit request. Historical projections, exact sequence release, cancellation and identical-revision object identity are preserved. A private MessagePort bridge supports the existing harness inspection channel without adding a public testing operation.
+- Worker old/young-generation limits and the effective V8 heap preflight remain enforced. An inherited overriding V8 flag is rejected before engine loading or compiler startup. Unsafe bootstrap limits below 8 MiB are rejected before a worker starts.
+- Heap exhaustion produces an unavailable, unpublished resource-limit report; abrupt loss produces analysis-failed. No failed worker retains a published current revision. Retained-fact admission continues to preserve the prior published facts on an oversized engine candidate.
+- Hot/warm transitions retain facts, indexes, observations and history while releasing the compiler. The next update rebuilds broadly, including an empty update.
+- Sweeps find observed input and configuration changes, track newly observed files, record their completion time, and recover from a cold invalid acquisition without an existing observer.
+- Status carries sequence, observed count, fact bytes, worker heap/RSS, compiler PID/RSS and last sweep time. Worker RSS now describes the containing supervisor process, including its worker; compiler RSS remains separate.
+- Successful disposal releases worker, supervisor, compiler, ports, pipes, timers, listeners, observations and history, including failure and repeated-disposal paths.
 
-Source execution uses Node's TypeScript transformation with a local .js-to-.ts resolver; compiled workers load emitted ESM directly and load no development runtime. Production dependency validation verifies the worker and loader assets.
+## Regression coverage
 
-## Unfinished requirement: abrupt worker loss
+The original abrupt-loss, cold-heap and deterministic late-heap assertions remain enabled. The late-heap case opens a real 64 MiB worker and compiler, then sends 40,000 ordinary changed paths with 2,048-character prefixes through `session.update`. Real message deserialization exhausts the worker heap. It independently asserts resource-unavailable, no new revision, cleared current state, successful disposal and vanished compiler PID.
 
-The real regression is:
+The abrupt-loss case additionally asserts that public state clears at worker exit before the cleanup promise resolves, and that an ended cleanup cannot issue further process signals. A new case kills the supervisor itself after opening the real compiler and requires the same unavailable outcome and actual process disappearance. Cleanup assertions settle disposal and restore listeners even on an assertion failure.
 
-```sh
-NODE_OPTIONS='' npx vitest run subs/analysis/src/tests/session-worker.test.ts -t 'abrupt worker loss'
-```
+The harness observes real thread-created/online/exit messages through a dedicated Ramify diagnostic channel. It asserts real positive thread IDs, terminated final IDs, supervisor and compiler disappearance, and destruction of process, pipe, message-port, timer and watcher resources. No native Worker diagnostic is fabricated.
 
-After opening a real worker and live compiler, it terminates the worker, requests an update and checks disposal. It fails with `Session child process survived disposal`. The host kills the compiler, but its process remains a zombie until the host process exits. This is not a completed disposal and cannot be counted as passing. The host now catches cleanup failure and includes it in the explicit unavailable report, so the update does not reject instead of returning its engine outcome. The child cleanup assertion and disposal still fail.
+## Verification for this remediation
 
-The original normal-disposal defect had the same cause but was fixable: the worker closed before the compiler's exit event had been reaped. Waiting inside the still-live worker fixes normal shutdown and warm demotion. It cannot repair a worker whose V8 isolate and libuv loop are already gone.
+| Check | Result |
+| --- | --- |
+| `npm run build && npm run type-check` | Pass; production assets and all four TypeScript scopes. Type-check also passed after the final added regression. |
+| Four-file session command: worker, retained-session, revision and audit suites | **45/45 pass**, including all three formerly failing worker/compiler cleanup cases. Receipt: `.reference-work/reports/iteration8-supervised-sessions-final.json`. |
+| Newly added supervisor-loss regression | **1/1 pass**; 14 unrelated worker cases not selected in this additional run. Receipt: `.reference-work/reports/iteration8-supervisor-loss.json`. Together with the preceding run, all 46 current tests in the four files have passed. |
+| Focused harness: I5-07 audit-detects-drift; I5-08 worker-nonblocking, resource-limit-explicit, dispose-releases | **4/4 selected handlers pass, 50 assertions**. Receipt: `.reference-work/reports/iteration8-supervision-harness-1789209708560.json`. |
+| `npm run check:self`, with an owned endpoint | Resident execution, **11 owners, 261 source files, 3,345 accesses; zero errors, warnings or analysis limits; complete coverage**. The daemon was explicitly stopped and the temporary endpoint cleaned in finally. Log: `.reference-work/iteration8-supervised-self-check.log`. |
+| `git diff --check` | Pass. |
 
-Libuv documents that closing a Unix process handle before child exit creates a zombie requiring waitpid. Its reaper only visits handles retained by the owning loop. The host's PID list can signal a child but cannot recreate that handle through supported Node APIs. See [libuv process lifetime](https://docs.libuv.org/en/v1.x/process.html#c.uv_spawn) and [the Unix process implementation](https://raw.githubusercontent.com/libuv/libuv/v1.x/src/unix/process.c). A separate read-only review reached the same conclusion.
+The focused harness deliberately selects four of the 61 prerequisites, so its overall report has passed=false for unexecuted prerequisites; this is not represented as a full gate pass. The selected audit case verifies private inspection through the supervisor, actual drift repair and full batch equality. The selected resource/disposal cases verify the new thread/process accounting.
 
-The final combined focused run also reproduces the same cleanup defect during genuine 16 MiB heap exhaustion after a child has started: the unavailable resource-limit report is returned, but the recorded child PID remains alive. Earlier heap witnesses that failed before this phase passed; that does not establish late-crash cleanup.
+The current cold S1000 witness materializes 1,000 owners, uses default 512 MiB worker/96 MiB fact capacities, records 3,331 timer ticks with a maximum gap of 21.23 ms, and receives a 3,545,490-byte frozen revision containing 23,079 objects. This establishes host responsiveness through the new transport. These observations are behavioral evidence, not iteration 12 latency or memory acceptance.
 
-There is also an early-failure gap: the Node child creation diagnostic precedes PID assignment, so notification currently runs on a microtask or spawn event. A failure in the adapter's synchronous startup before that turn can occur before the host receives the compiler PID.
+An earlier intermediate remediation run passed all 24 worker/retained-session cases, and the first targeted cleanup rerun passed all four previously selected lifecycle cases. The final receipts above supersede those intermediate runs for their covered behavior.
 
-The iteration-work skill states that neither Studio nor direct work "permits changing a settled contract" (`.agents/skills/iteration-work/SKILL.md:14–17`), and the user-supplied Plan 5 requires a change to the reviewed contracts to revise iteration 1's package first (`main-plan.md:547–548`). The assigned owner remains analysis. These constraints are the reason a broader hosting/provider change requires a review decision.
+Full `npm test`, Cucumber regression, scenario coverage and sealed-file checks were not run locally, as required by the supplied check policy. The complete prerequisite gate was not repeated during this focused remediation. Independent automatic revalidation remains required. No draft publication is requested by this turn.
 
-The robust architectural requirement is surviving ownership of compiler spawning and reaping, established before fallible analysis work. The current RetainedSourceInputs/RetainedSourceAnalysis public port supplies no launch or transport operation, and the installed synchronous compiler client creates its own child. Changing that provider contract exceeds this iteration's analysis-only write scope. The planned child-process session fallback is a candidate, but it must pass the same abrupt-failure test, including container child reaping, before it can be accepted. The self-assessment follow-up leaves this supervision choice for a reviewable workflow finding; no fallback implementation was authorized or applied.
+## Existing prerequisite and matrix evidence
 
-An isolated real-session experiment tested the planned direction without changing production hosting. A dedicated Node process opened the actual worker and compiler, terminated the worker, killed the compiler and observed a zombie. After that dedicated Node process exited, the container's docker-init reaper removed the compiler. This establishes Linux feasibility for process isolation in this environment, not a completed fallback implementation or portable acceptance. Receipt: `.reference-work/reports/session-supervisor-probe-20260912.json`; probe source: `.reference-work/session-supervisor-probe.mjs`. The production contract remains unchanged.
+Before the supervision repair, a coherent `NODE_OPTIONS='' npm run reference:verify -- --plan 5 --iteration 8` run executed **61/61 required instances successfully**, including all eight I5-08 handlers, with 42 future instances not executed. Receipt: `.reference-work/reports/plan5-iteration8-0b254b2b-b33f-4fb6-b3f4-9fefa1abc3e5.json`. This is historical evidence on the prior topology, not a claim that the full gate ran on this commit. Its success never waived the failing same-owner lifecycle tests.
 
-## Implementation evidence before the follow-up
+That run covered cold S1000 responsiveness, heap failure, W/R warm rebuild, dependency/configuration sweeps, S1000 deadline continuation, timings and normal disposal. The deadline witness uses explicitly enlarged test capacities of 1,024 MiB worker heap and 256 MiB retained facts to hold broad historical versions and an audit candidate; production defaults remain unchanged. Current focused session suites recheck warm rebuild, sweep/configuration, deadline continuation, cancellation and projections through the supervisor. The selected current harness checks are listed separately above.
 
-- `npm run worktree:prepare`: nested example and site dependencies provisioned from this checkout.
-- `npm run build && npm run type-check`: passed after correcting source-only loader URLs to respect production dependency validation; all four TypeScript scopes passed.
-- The existing ten retained-session tests pass through the public worker with their original assertions unchanged. Under an inherited V8 override, a test-only wrapper runs the complete file in a sanitized child process and propagates failures.
-- The required four-file session command on the pre-follow-up source executed 44 tests: 42 passed and 2 failed. Both failures are in session-worker.test.ts: abrupt worker loss and actual heap exhaustion after a child was started. Receipt: `.reference-work/reports/iteration8-sessions-coherent-20260912.json`. An earlier full worker-only run passed 12 and failed 1; the later heap-exhaustion failure demonstrates that compiler cleanup also depends on when the worker exhausts memory. No failing test is excluded from the final result.
-- `NODE_OPTIONS='' npx vitest run subs/analysis/src/tests/session-revision.test.ts subs/analysis/src/tests/session-audit.test.ts`: 21 passed. Private fault-injection probes keep direct access to the internal engine; all I5-06 and I5-07 acceptance handlers now execute through the worker host.
-- `npx vitest run -c scripts/reference-harness/vitest.config.ts scripts/reference-harness/plan5.test.ts`: 10 passed.
-- Focused worker inspection smokes: description subtree 20 assertions; injected audit drift 19 assertions, including actual worker/compiler disposal.
-- `npm run check:reference`, with an owned endpoint: resident path, 15 owners, 54 source files, 294 accesses, no errors, two expected warnings and complete coverage.
-- `npm run check:self`, with the same owned endpoint: resident path, 11 owners, 258 source files, 3,324 accesses, no findings or analysis limits and complete coverage.
-- The owned daemon was explicitly stopped and its endpoint removed. `git diff --check` passes.
-- Full `npm test`, Cucumber regressions, scenario coverage and sealed-file checks remain reserved for automation under the supplied policy. The known abrupt-loss and heap-exhaustion cleanup failures prevent a passing full regression suite.
-
-I5-08 registration contains eight handlers; total registration is now 61 across iterations 2–8. The unfiltered gate still has 42 future instances and is not claimed complete.
-
-The first focused hosting run preserved six failures: the normal-disposal bug masked otherwise passing behavior, two fixture assumptions needed correction (JSONC configuration and relative dependency paths), and the S1000 deadline witness required explicit capacity for retained broad versions. Corrected W/R runs pass all four warm/sweep/timing handlers with 100 assertions. The S1000 deadline witness passes 13 assertions with a 200.63 ms caller wait, subsequent broad publication, equal audit, full batch equality and compiler cleanup.
-
-The deadline witness explicitly sets workerHeapMiB=1024 and maxRetainedFactBytes=256 MiB, while production defaults remain 512 and 96 MiB. A default cold S1000 session serialized approximately 82.38 MB of retained facts, so two complete broad versions exceed the default fact limit. These enlarged capacities establish continued-work behavior only; they do not establish memory or latency budget acceptance.
-
-All eight I5-08 handlers now pass focused execution: 139 assertions across these current receipts:
-- `.reference-work/reports/plan5-hosting-reference-1789206456342.json` (warm, sweeps, timing paths; 100 assertions).
-- `.reference-work/reports/plan5-hosting-deadline-1789206628893.json` (S1000 caller deadline; 13 assertions).
-- `.reference-work/reports/plan5-hosting-lifecycle-1789206693696.json` (cold responsiveness, actual low-heap failure and normal disposal; 26 assertions).
-
-The corrected cold S1000 run records a maximum 10 ms timer gap of 23.95 ms, a 3,545,479-byte revision with 23,079 frozen objects, and the default 512 MiB / 96 MiB capacities. These focused receipts have overall passed=false because each intentionally executes only its named subset of the 61 required instances; all eight executed hosting handlers pass independently. The initial failed receipt is `.reference-work/reports/plan5-hosting-focused-1789206286243.json`; it remains separate from the corrected executions.
-
-A follow-up focused queued-disposal test passes after moving timeout cleanup before forced thread termination. An initial mistyped filter selected zero tests and is not evidence.
-
-The first full prerequisite-gate run was rejected because source changed during verification (the disposal fix landed while it ran); it supplies no passing evidence. A second run was stopped explicitly when final review identified a status/RSS race; its owned descendants were stopped. The race is corrected by rechecking worker failure after the asynchronous RSS read. The pre-follow-up `NODE_OPTIONS='' npm run reference:verify -- --plan 5 --iteration 8` run passed on stable source and compiled output: required 61, passed 61, failed 0, not executed 42. Every I5-08 handler and all prerequisites ran. Receipt: `.reference-work/reports/plan5-iteration8-0b254b2b-b33f-4fb6-b3f4-9fefa1abc3e5.json`. The gate and its owned children exited. This passing matrix gate does not waive the two failing same-owner lifecycle tests.
+Previous reference checking reported 15 owners, 54 source files, 294 accesses, no errors, two expected warnings and complete coverage. This historical reference check is not represented as a new run in the remediation. The unfiltered Plan 5 gate remains a later completion requirement.
 
 ## Recommendations for Next Iteration
 
-1. Resolve the worker/compiler supervision blocker before accepting this iteration or integrating its handle into contexts. Keep the abrupt-after-compiler-start regression and the early PID-notification race in the acceptance evidence.
-2. Keep sweep scheduling, deadline/cold replies, compact context history, hot-context budgets and idle audit scheduling in iteration 9, as the reviewed contract assigns.
-3. Preserve iteration 7's project-observer disagreement-propagation gap; no project-owner change or concurrent-writer guarantee is added here.
-4. Revisit S1000 retained-history/candidate accounting and effective worker memory with iteration 12 measurements. The enlarged behavioral-test limits are not a change to production defaults or a memory waiver.
-5. Run the process/worker suites on macOS before platform acceptance. This execution establishes Linux evidence only.
+1. Include the dedicated supervisor process and extra IPC serialization in iteration 12's memory, repeated-edit and end-to-end measurements. Worker status RSS now includes its containing supervisor, while compiler RSS remains separate; do not double count it or omit it. Internal supervision has changed without a public session/provider contract change.
+2. Keep request deadline/cold replies, sweep and idle-audit scheduling, compact context history and hot-context budgets in iteration 9.
+3. Preserve iteration 7's documented project-observer disagreement-propagation gap. This analysis-only repair adds no concurrent-writer guarantee or project-owner fix.
+4. Revisit S1000 retained-history/candidate capacity with measured evidence. Enlarged behavioral-test capacities are not a production-default change or a memory waiver.
+5. Run worker/process suites on macOS before platform acceptance. This repair establishes Linux evidence in the current environment and explicitly verifies actual OS reaping; it does not claim macOS execution.
+
+Both previously false self-assessment checks can now be true on the focused evidence: the missing supervision behavior is implemented and all current new session tests have passed. Workflow acceptance and future plan capabilities remain separate.

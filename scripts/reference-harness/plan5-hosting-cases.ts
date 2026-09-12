@@ -1,4 +1,5 @@
 import { createHook } from 'node:async_hooks';
+import { channel } from 'node:diagnostics_channel';
 import { cp, mkdir, readFile, readdir, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
@@ -6,6 +7,7 @@ import { analyzeProject } from '../../subs/analysis/src/analyze-project.js';
 import type { AnalysisReport } from '../../subs/analysis/src/interfaces/analysis.js';
 import type { RetainedSession, SessionInputs, SessionRevision, SessionUpdate } from '../../subs/analysis/src/interfaces/session.js';
 import { openRetainedSession } from '../../subs/analysis/src/retained-session.js';
+import type { SessionWorker } from '../../subs/analysis/src/session-supervisor.js';
 import { materializeSynthetic } from '../measurements/materialize.js';
 import { firstDifference } from './equivalence-comparison.js';
 import { coreDirectory, referenceRoot } from './fixtures/plan2/reference.js';
@@ -25,6 +27,32 @@ const zodDeclaration = 'node_modules/zod/index.d.cts';
 const timingKeys = ['accesses', 'classify', 'compiler', 'decide', 'descriptions', 'inventory', 'link', 'publish', 'total'];
 const comparable = (report: AnalysisReport): unknown => ({ ...report, runId: 'compared' });
 const pause = (milliseconds: number): Promise<void> => new Promise(resolve => setTimeout(resolve, milliseconds));
+
+interface WorkerObservation {
+  readonly worker: SessionWorker;
+  readonly threads: number[];
+  readonly online: number[];
+  readonly exits: number[];
+}
+
+/** The parent handle reports the real thread's lifecycle from its supervisor. */
+function observeWorkers(): { readonly workers: WorkerObservation[]; readonly stop: () => void } {
+  const workers: WorkerObservation[] = [];
+  const detach: (() => void)[] = [];
+  const capture = (message: unknown): void => {
+    const worker = (message as { worker: SessionWorker }).worker;
+    const observation: WorkerObservation = { worker, threads: [], online: [], exits: [] };
+    workers.push(observation);
+    const created = (id: number): void => { observation.threads.push(id); };
+    const online = (): void => { observation.online.push(worker.threadId); };
+    const exited = (code: number): void => { observation.exits.push(code); };
+    worker.on('thread-created', created); worker.on('online', online); worker.on('exit', exited);
+    detach.push(() => { worker.off('thread-created', created); worker.off('online', online); worker.off('exit', exited); });
+  };
+  const events = channel('ramify:session-worker');
+  events.subscribe(capture);
+  return { workers, stop: () => { events.unsubscribe(capture); for (const remove of detach) remove(); } };
+}
 
 function inputs(root: string, limits = sessionLimits): SessionInputs {
   return { ...sessionInputs(root), session: limits };
@@ -162,18 +190,27 @@ handlers.set('I5-08:worker-nonblocking', {
 handlers.set('I5-08:resource-limit-explicit', {
   ...syntheticHandler,
   run: async ({ root, assertions }: ProjectContext) => {
-    let workers = 0;
-    const hook = createHook({ init(_id, type) { if (type === 'WORKER') workers++; } }).enable();
-    const opened = await openRetainedSession(inputs(join(root, 'synthetic'), { ...sessionLimits, workerHeapMiB: 8 })).finally(() => hook.disable());
+    const observation = observeWorkers();
+    let opened: Awaited<ReturnType<typeof openRetainedSession>> | undefined;
     try {
+      opened = await openRetainedSession(inputs(join(root, 'synthetic'), { ...sessionLimits, workerHeapMiB: 8 }));
       assertions.equal('an undersized S1000 worker produces an unpublished engine report', opened.status, 'reported');
       if (opened.status !== 'reported') throw new Error('The undersized worker did not report resource unavailability');
-      assertions.ok('the attempt starts a real resource-limited worker', workers > 0);
+      assertions.equal('the attempt creates exactly one supervised worker handle', observation.workers.length, 1);
+      assertions.ok('the supervisor reports a real resource-limited thread before failure',
+        observation.workers.every(item => item.threads.length === 1 && item.threads[0] > 0));
+      assertions.ok('the failed worker exits and its supervisor process is reaped',
+        observation.workers.every(item => item.worker.threadId === -1 && item.exits.length === 1 && !alive(item.worker.pid)));
       assertions.equal('the failed worker cannot claim completed execution', opened.report.outcome.execution, 'unavailable');
       assertions.ok('the report contains the explicit resource-limit diagnostic', opened.report.diagnostics.some(item => item.code === 'resource-limit'));
       assertions.equal('no session handle or published revision escapes the failed open', ['session' in opened, 'revision' in opened], [false, false]);
-      recordObservation('plan5-worker-resource-limit', { fixture: 'S1000', workerHeapMiB: 8, workers, outcome: opened.report.outcome, diagnostics: opened.report.diagnostics });
-    } finally { if (opened.status === 'opened') await opened.session.dispose(); }
+      recordObservation('plan5-worker-resource-limit', { fixture: 'S1000', workerHeapMiB: 8,
+        workers: observation.workers.map(item => ({ supervisorPid: item.worker.pid, threadIds: item.threads, onlineIds: item.online,
+          exitCodes: item.exits, finalThreadId: item.worker.threadId })), outcome: opened.report.outcome, diagnostics: opened.report.diagnostics });
+    } finally {
+      try { if (opened?.status === 'opened') await opened.session.dispose(); }
+      finally { observation.stop(); }
+    }
   },
 });
 
@@ -302,16 +339,20 @@ handlers.set('I5-08:timings-recorded', {
 handlers.set('I5-08:dispose-releases', {
   ...referenceHandler,
   run: async (context: ProjectContext) => {
+    const observation = observeWorkers();
     const resources = new Map<number, { readonly type: string; destroyed: boolean }>();
     const hook = createHook({
-      init(id, type) { if (['WORKER', 'MESSAGEPORT', 'Timeout', 'FSEVENTWRAP'].includes(type)) resources.set(id, { type, destroyed: false }); },
+      init(id, type) { if (['WORKER', 'PROCESSWRAP', 'PIPEWRAP', 'MESSAGEPORT', 'Timeout', 'FSEVENTWRAP'].includes(type)) resources.set(id, { type, destroyed: false }); },
       destroy(id) { const resource = resources.get(id); if (resource) resource.destroyed = true; },
     }).enable();
     let opened: Awaited<ReturnType<typeof open>> | undefined;
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       opened = await open(context.root, context.assertions);
-      context.assertions.ok('the session owns a live worker thread', [...resources.values()].some(resource => resource.type === 'WORKER' && !resource.destroyed));
+      context.assertions.equal('the session owns exactly one supervised worker handle', observation.workers.length, 1);
+      context.assertions.ok('the supervisor reports a live worker thread and online event', observation.workers.every(item =>
+        item.threads.length === 1 && item.online.length === 1 && item.worker.threadId === item.threads[0]
+        && item.online[0] === item.worker.threadId && item.worker.threadId > 0 && alive(item.worker.pid)));
       const session = opened.session;
       // Sweep scheduling is owned by the caller. Its timer has the same
       // lifetime as its session and is cancelled before releasing the handle.
@@ -323,11 +364,20 @@ handlers.set('I5-08:dispose-releases', {
       opened = undefined;
       // Resource destroy callbacks are delivered after termination settles.
       for (let index = 0; index < 4; index++) await new Promise<void>(resolve => setImmediate(resolve));
-      context.assertions.equal('every worker and message port created by the session was destroyed', [...resources.values()].filter(resource => ['WORKER', 'MESSAGEPORT'].includes(resource.type) && !resource.destroyed), []);
+      context.assertions.ok('every real worker exited and every supervisor process was reaped', observation.workers.every(item =>
+        item.worker.threadId === -1 && item.exits.length === 1 && !alive(item.worker.pid)));
+      context.assertions.equal('every process, worker, pipe and message port created by the session was destroyed',
+        [...resources.values()].filter(resource => ['WORKER', 'PROCESSWRAP', 'PIPEWRAP', 'MESSAGEPORT'].includes(resource.type) && !resource.destroyed), []);
       context.assertions.equal('no session timer or watcher handle remains', [...resources.values()].filter(resource => ['Timeout', 'FSEVENTWRAP'].includes(resource.type) && !resource.destroyed), []);
       context.assertions.equal('the cancelled sweep never runs after disposal', sweeps, 0);
-      recordObservation('plan5-worker-disposal', { resources: [...resources.values()], compilerGone: true, timerCancelled: true });
-    } finally { if (timer) clearTimeout(timer); if (opened) await opened.session.dispose(); hook.disable(); }
+      recordObservation('plan5-worker-disposal', { resources: [...resources.values()],
+        workers: observation.workers.map(item => ({ supervisorPid: item.worker.pid, threadIds: item.threads, onlineIds: item.online,
+          exitCodes: item.exits, finalThreadId: item.worker.threadId })), compilerGone: true, timerCancelled: true });
+    } finally {
+      if (timer) clearTimeout(timer);
+      try { if (opened) await opened.session.dispose(); }
+      finally { hook.disable(); observation.stop(); }
+    }
   },
 });
 

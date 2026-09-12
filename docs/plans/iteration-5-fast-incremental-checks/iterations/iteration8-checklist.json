@@ -5,11 +5,11 @@
     "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
   },
   "checks": {
-    "allNewTestsPass": false,
-    "functionalRequirementsSatisfied": false,
+    "allNewTestsPass": true,
+    "functionalRequirementsSatisfied": true,
     "newCodeCoveredByTests": true
   },
-  "completedAt": "2026-09-12T10:26:01.491Z",
+  "completedAt": "2026-09-12T10:43:46Z",
   "iteration": "8",
-  "notes": "One focused follow-up completed; iteration remains incomplete. Added a deterministic real-API heap-exhaustion test after compiler startup and fixed test cleanup so disposal rejection cannot mask report assertions or skip listener restoration. Selected lifecycle run: 1 passed, 3 failed, 10 not selected. Forced worker termination, late heap exhaustion, and cold heap exhaustion still leave unreaped children; unavailable reports and no-new-revision assertions pass. Type-check and diff checks pass. Production source and reviewed contracts unchanged. Completing cleanup requires surviving compiler launch/reap ownership via a reviewed hosting/provider change. Record a reviewable finding; no waiver and no publication in this follow-up. Prior 61/61 gate and 42/44 full focused-suite results belong to the pre-follow-up snapshot."
+  "notes": "Reported lifecycle failures fixed with an analysis-owned supervisor containing the real bounded worker. Disposal awaits supervisor, process-group and child disappearance; failed cleanup retains evidence. Abrupt worker loss, real cold and late heap exhaustion, and forced supervisor loss pass without weakening assertions. Four session suites passed 45/45; the subsequently added supervisor-loss regression passed 1/1, covering all 46 current tests. Four selected harness handlers passed 50 assertions, including S1000 responsiveness and thread/process/handle cleanup. Build, final type-check and eleven-owner self-check pass. Full regression and prerequisite gate are reserved for automatic revalidation; the earlier 61/61 gate is historical evidence. Extra supervisor memory/serialization costs and macOS verification remain later acceptance work. No publication requested."
 }

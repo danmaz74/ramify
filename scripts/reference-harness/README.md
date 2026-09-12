@@ -456,12 +456,15 @@ link and decision work. The dependency mutation owns a copy of Zod and verifies
 that the shared reference package remains unchanged.
 
 `plan5-session-inspection.ts` opens the production worker host with a
-harness-only worker entry. A load hook inside that worker matches the engine
+harness-only worker entry. An analysis-owned supervisor process contains the
+bounded worker so compiler cleanup survives thread failure. The caller retains
+the supervisor process handle, its process group and observed child identities
+until their actual exit is verified. A load hook inside that worker matches the engine
 factory exactly and removes itself and its capture symbol after construction.
-A separate private MessagePort returns stable decision-object identity stamps
+A separate private MessagePort, bridged through the supervisor, returns stable decision-object identity stamps
 and injects one frozen access corruption to test audit repair. No private
 facts or testing operations cross the production message protocol. Every I5-07
-handler verifies worker termination, compiler exit, released observations and
+handler verifies worker termination, supervisor and compiler exit, released observations and
 historical versions, and unavailable report projection after disposal.
 Audit repair is identified by the `verify()` result; the settled session
 revision type carries no `cause` member, and contexts assigns that cause later.
@@ -471,7 +474,7 @@ The last valid projection is asserted through its historical sequence; no
 `plan5-hosting-cases.ts` registers the eight I5-08 `hosting` instances in
 iteration 8. They use the real worker over reference and materialized S1000
 copies, verify responsive cold startup, explicit heap failure, hot/warm
-transitions, requested sweeps, caller deadline independence, timings and normal
+transitions, requested sweeps, caller deadline independence, timings and
 disposal. Sweep scheduling and deadline replies remain contexts' iteration 9
 responsibility: the harness schedules the public sweep and races its own wait.
 The S1000 deadline case records enlarged test limits (1,024 MiB worker heap,
@@ -482,9 +485,11 @@ Worker heap tests must start with enforced V8 limits. Use `NODE_OPTIONS=''`
 when running this gate if the surrounding environment specifies a heap override;
 the production host explicitly rejects an ineffective bound. Same-owner Vitest
 worker suites relaunch their complete file in an isolated process under that
-condition and propagate every failed assertion. Abrupt worker loss has its own
-same-owner regression in addition to these matrix instances; passing the matrix
-alone does not waive that cleanup requirement.
+condition and propagate every failed assertion. Same-owner regressions additionally
+force worker termination and genuine heap exhaustion both during cold startup and
+after the compiler is observed. They require successful disposal and vanished child
+PIDs; a zombie still counts as a surviving process. The extra supervisor RSS and
+IPC serialization cost belong in iteration 12's measurements.
 
 The capabilities `contexts`, `supersession`, `hook-cli`,
 `live-equivalence`, `fast-measure` and `completion` are registered names whose

@@ -1,18 +1,19 @@
 import { channel } from 'node:diagnostics_channel';
-import { MessageChannel, Worker } from 'node:worker_threads';
+import { MessageChannel } from 'node:worker_threads';
 import type { MessagePort } from 'node:worker_threads';
 import type { RetainedSession, SessionInputs, SessionRevision } from '../../subs/analysis/src/interfaces/session.js';
 import { openWorkerSession } from '../../subs/analysis/src/session-host.js';
+import { SessionWorker } from '../../subs/analysis/src/session-supervisor.js';
 import type { Assertions } from './runner.js';
 
 /** Test-only RPC through a separate port; production messages stay untouched. */
 export class SessionInspection {
-  readonly #worker: Worker;
+  readonly #worker: SessionWorker;
   readonly #port: MessagePort;
   readonly #pending = new Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void }>();
   #nextId = 0;
   #closed = false;
-  constructor(worker: Worker, port: MessagePort) {
+  constructor(worker: SessionWorker, port: MessagePort) {
     this.#worker = worker; this.#port = port;
     port.on('message', (message: { id: number; result?: unknown; error?: string }) => {
       const pending = this.#pending.get(message.id);
@@ -24,6 +25,7 @@ export class SessionInspection {
     port.once('close', () => this.close());
   }
   get threadId(): number { return this.#worker.threadId; }
+  get supervisorPid(): number { return this.#worker.pid; }
   decisions(): Promise<Readonly<Record<string, number>>> {
     return this.#request('decisions') as Promise<Readonly<Record<string, number>>>;
   }
@@ -54,11 +56,11 @@ export class SessionInspection {
 export async function openInspectedSession(inputs: SessionInputs): Promise<{
   readonly session: RetainedSession; readonly revision: SessionRevision; readonly inspection: SessionInspection;
 }> {
-  const workers = channel('worker_threads');
+  const workers = channel('ramify:session-worker');
   let inspection: SessionInspection | undefined;
   const capture = (message: unknown): void => {
-    const worker = (message as { worker: Worker }).worker;
-    if (!(worker instanceof Worker)) throw new Error('The worker diagnostic has no Worker');
+    const worker = (message as { worker: SessionWorker }).worker;
+    if (!(worker instanceof SessionWorker)) throw new Error('The session diagnostic has no supervised worker');
     const ports = new MessageChannel();
     inspection = new SessionInspection(worker, ports.port1);
     worker.postMessage({ kind: 'plan5-inspection', port: ports.port2 }, [ports.port2]);
@@ -91,6 +93,7 @@ export async function disposeInspectedSession(session: RetainedSession, inspecti
   const until = Date.now() + 5_000;
   while (pid !== null && alive(pid) && Date.now() < until) await new Promise(resolve => setTimeout(resolve, 10));
   assertions.equal('disposal releases the worker thread', inspection.threadId, -1);
+  assertions.ok('disposal reaps the worker supervisor process', !alive(inspection.supervisorPid));
   assertions.equal('disposal releases the observer and compiler handles',
     [session.status().observedInputs, session.status().compiler.pid], [0, null]);
   assertions.equal('disposal releases all historical versions', session.status().factBytes, 0);

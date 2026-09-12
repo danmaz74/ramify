@@ -1,7 +1,7 @@
 import { readFile, rm } from 'node:fs/promises';
 import { channel } from 'node:diagnostics_channel';
 import { join } from 'node:path';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { openRetainedSession } from '../retained-session.js';
 import type { SessionInputs } from '../interfaces/session.js';
 import { comparable, equalToBatch, fixture, fixtureFiles, ownedFiles, paths, put, replace, timeout } from './session-test-fixture.js';
@@ -201,7 +201,16 @@ workerSuite('retained session worker', import.meta.url, () => {
     const pid = handle.status().compiler.pid!;
     try {
       expect(alive(pid)).toBe(true);
-      await worker.terminate();
+      let cleanupCompleted = false;
+      let exitState: { current: unknown; factBytes: number; cleanupCompleted: boolean } | undefined;
+      worker.once('exit', () => { exitState = { current: handle.current, factBytes: handle.status().factBytes, cleanupCompleted }; });
+      await worker.terminate().then(() => { cleanupCompleted = true; });
+      expect(exitState).toEqual({ current: null, factBytes: 0, cleanupCompleted: false });
+      const signal = vi.spyOn(process, 'kill');
+      try {
+        worker.killOwnedProcesses();
+        expect(signal).not.toHaveBeenCalled();
+      } finally { signal.mockRestore(); }
       const result = await handle.update([]);
       expect(result.status).toBe('reported');
       if (result.status !== 'reported') throw new Error(JSON.stringify(result));
@@ -218,6 +227,30 @@ workerSuite('retained session worker', import.meta.url, () => {
       // Keep cleanup assertions visible without masking a prior report failure.
       expect.soft(disposed.map(result => result.status)).toEqual(['fulfilled', 'fulfilled']);
       expect.soft(alive(pid)).toBe(false);
+    }
+  }), timeout);
+
+  it('reports supervisor loss and reaps its worker and compiler process group', () => fixture(async (_root, inputs) => {
+    const observation = await opened(inputs);
+    const { handle, worker } = observation;
+    const pid = handle.status().compiler.pid!;
+    try {
+      const exited = new Promise<void>(resolve => worker.once('exit', () => resolve()));
+      process.kill(worker.pid, 'SIGKILL');
+      await exited;
+      expect(handle.current).toBeNull();
+      const result = await handle.update([]);
+      expect(result.status).toBe('reported');
+      if (result.status !== 'reported') throw new Error(JSON.stringify(result));
+      expect(result.report.outcome.execution).toBe('unavailable');
+      expect(result.report.diagnostics.some(item => item.message.includes('analysis-failed'))).toBe(true);
+      expect(worker.threadId).toBe(-1);
+    } finally {
+      const disposed = await Promise.allSettled([handle.dispose()]);
+      observation.cleanup();
+      expect.soft(disposed.map(result => result.status)).toEqual(['fulfilled']);
+      expect.soft(alive(pid)).toBe(false);
+      expect.soft(alive(worker.pid)).toBe(false);
     }
   }), timeout);
 
@@ -271,7 +304,7 @@ workerSuite('retained session worker', import.meta.url, () => {
   it('rejects a heap too small for Node bootstrap without starting a worker', () => fixture(async (_root, inputs) => {
     let workers = 0;
     const created = (): void => { workers++; };
-    const events = channel('worker_threads');
+    const events = channel('ramify:session-worker');
     events.subscribe(created);
     try {
       const result = await openRetainedSession({ ...inputs, session: { ...inputs.session, workerHeapMiB: 1 } });
@@ -288,7 +321,7 @@ workerSuite('retained session worker', import.meta.url, () => {
     const script = `
       import { channel } from 'node:diagnostics_channel';
       let children = 0;
-      channel('worker_threads').subscribe(({ worker }) => worker.on('message', message => {
+      channel('ramify:session-worker').subscribe(({ worker }) => worker.on('message', message => {
         if (message.kind === 'child' && message.active) children++;
       }));
       const { openRetainedSession } = await import(process.argv[2]);

@@ -1,11 +1,11 @@
 import { spawn } from 'node:child_process';
 import { channel } from 'node:diagnostics_channel';
 import { fileURLToPath } from 'node:url';
-import type { Worker } from 'node:worker_threads';
 import { describe, expect, it, vi } from 'vitest';
 import { openRetainedSession } from '../retained-session.js';
 import type { SessionInputs, SessionOpen } from '../interfaces/session.js';
 import type { WorkerMessage } from '../session-messages.js';
+import type { SessionWorker } from '../session-supervisor.js';
 
 /** V8 heap flags inherited by Vitest override Worker.resourceLimits. Relaunch
  * the entire file in a fresh test process; no assertion is skipped or mocked. */
@@ -55,15 +55,15 @@ export async function nodeProcess(args: readonly string[], env: NodeJS.ProcessEn
   }
 }
 
-/** Observe the actual Worker without replacing its implementation or entry. */
+/** Observe the supervised worker handle without replacing its worker entry. */
 export async function observedOpen(inputs: SessionInputs): Promise<{
-  opened: SessionOpen; worker: Worker; messages: WorkerMessage[]; requests: unknown[]; cleanup: () => void;
+  opened: SessionOpen; worker: SessionWorker; messages: WorkerMessage[]; requests: unknown[]; cleanup: () => void;
 }> {
-  const workers: Worker[] = [], messages: WorkerMessage[] = [], requests: unknown[] = [];
+  const workers: SessionWorker[] = [], messages: WorkerMessage[] = [], requests: unknown[] = [];
   const restores: (() => void)[] = [];
   const record = (message: WorkerMessage): void => { messages.push(message); };
   const created = (event: unknown): void => {
-    const worker = (event as { worker: Worker }).worker;
+    const worker = (event as { worker: SessionWorker }).worker;
     workers.push(worker); worker.on('message', record);
     const send = worker.postMessage.bind(worker);
     const spy = vi.spyOn(worker, 'postMessage').mockImplementation((value, transfer) => {
@@ -73,7 +73,7 @@ export async function observedOpen(inputs: SessionInputs): Promise<{
     });
     restores.push(() => { spy.mockRestore(); worker.off('message', record); });
   };
-  const events = channel('worker_threads');
+  const events = channel('ramify:session-worker');
   events.subscribe(created);
   try {
     const opened = await openRetainedSession(inputs);
