@@ -1,0 +1,424 @@
+import { readFile, rm } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { WorkLimit } from '../report.js';
+import { audited, comparable, equalToBatch, fixture, fixtureFiles, instrumentCompiler, instrumentObserver, opened, ownedFiles,
+  parentExposure, paths, put, replace, revised, timeout } from './session-test-fixture.js';
+
+describe('description, metadata and broad session revisions', () => {
+  it('relinks without compiler work and decides only importers or originals in the changed subtree, then restores the exposure', () => fixture(async (root, inputs) => {
+    const { handle, state } = await opened(inputs);
+    try {
+      const compiler = instrumentCompiler(state);
+      const before = state.facts!;
+      expect(Object.keys(before.decisions)).toHaveLength(4);
+      const siblingId = before.files[paths.sibling]!.accesses[0]!.id;
+      const selected = [paths.rootMain, paths.local, paths.leaf].map(path => before.files[path]!.accesses[0]!.id);
+
+      await replace(root, paths.description, parentExposure, '');
+      const denied = await revised(handle, [paths.description]);
+      expect(denied.checked).toEqual({ path: 'description', files: [], accesses: 3, modelRebuilt: true });
+      expect([compiler.update.mock.calls.length, compiler.describe.mock.calls.length, compiler.interpret.mock.calls.length]).toEqual([0, 0, 0]);
+      expect([denied.timings.compiler, denied.timings.descriptions, denied.timings.accesses]).toEqual([0, 0, 0]);
+      expect(denied.delta.added.map(item => [item.code, item.location?.file])).toEqual([['not-visible', paths.rootMain]]);
+      expect(denied.delta.removed).toEqual([]);
+      expect(state.facts!.files).toBe(before.files);
+      expect(state.facts!.decisions[siblingId]).toBe(before.decisions[siblingId]);
+      for (const id of selected) expect(state.facts!.decisions[id]).not.toBe(before.decisions[id]);
+      await audited(handle);
+      await equalToBatch(handle, inputs);
+
+      await put(root, paths.description, fixtureFiles[paths.description]!);
+      const restored = await revised(handle, [paths.description]);
+      expect(restored.checked).toEqual({ path: 'description', files: [], accesses: 3, modelRebuilt: true });
+      expect(restored.delta).toEqual({ added: [], removed: [denied.delta.added[0]!.id], positionOnly: [] });
+      expect(restored.outcome.check).toBe('passed');
+      await audited(handle);
+      await equalToBatch(handle, inputs);
+    } finally { await handle.dispose(); }
+  }), timeout);
+
+  it('refreshes description statement positions without re-extraction or unrelated decisions', () => fixture(async (root, inputs) => {
+    const { handle, state } = await opened(inputs);
+    try {
+      const compiler = instrumentCompiler(state);
+      const before = state.facts!;
+      const siblingId = before.files[paths.sibling]!.accesses[0]!.id;
+      await replace(root, paths.description, parentExposure, `// Move the exposure statement.\n${parentExposure}`);
+      const moved = await revised(handle, [paths.description]);
+      expect(moved.checked.path).toBe('description');
+      expect(moved.checked.files).toEqual([]);
+      expect(moved.checked.modelRebuilt).toBe(true);
+      expect([compiler.update.mock.calls.length, compiler.describe.mock.calls.length, compiler.interpret.mock.calls.length]).toEqual([0, 0, 0]);
+      expect(state.facts!.decisions[siblingId]).toBe(before.decisions[siblingId]);
+      expect(moved.delta).toEqual({ added: [], removed: [], positionOnly: [] });
+      await audited(handle);
+      await equalToBatch(handle, inputs);
+    } finally { await handle.dispose(); }
+  }), timeout);
+
+  it('refreshes README purposes without compiler, link or decision work', () => fixture(async (root, inputs) => {
+    const { handle, state } = await opened(inputs);
+    try {
+      const compiler = instrumentCompiler(state);
+      const before = state.facts!;
+      const purpose = 'The edited purpose explains what this branch provides.';
+      await put(root, paths.readme, `# Branch\n\n${purpose}\n`);
+      const metadata = await revised(handle, [paths.readme]);
+      expect(metadata.checked).toEqual({ path: 'metadata', files: [], accesses: 0, modelRebuilt: false });
+      expect([metadata.timings.compiler, metadata.timings.descriptions, metadata.timings.accesses, metadata.timings.link, metadata.timings.decide]).toEqual([0, 0, 0, 0, 0]);
+      expect([compiler.update.mock.calls.length, compiler.describe.mock.calls.length, compiler.interpret.mock.calls.length]).toEqual([0, 0, 0]);
+      expect(state.facts!.model).toBe(before.model);
+      expect(state.facts!.linked).toBe(before.linked);
+      expect(state.facts!.decisions).toBe(before.decisions);
+      const report = await equalToBatch(handle, inputs);
+      expect(report.snapshot!.inventory.modules.find(module => module.name === 'branch')?.purpose).toEqual({ state: 'present', readme: paths.readme, paragraph: purpose });
+      await audited(handle);
+    } finally { await handle.dispose(); }
+  }), timeout);
+
+  it('combines source and description changes without skipping either decision dependency', () => fixture(async (root, inputs) => {
+    const { handle, state } = await opened(inputs);
+    try {
+      const compiler = instrumentCompiler(state);
+      await replace(root, paths.description, parentExposure, '');
+      await replace(root, paths.sibling, 'import { rootValue }', 'import { privateValue as rootValue }');
+      const revision = await revised(handle, [paths.description, paths.sibling]);
+      expect(revision.checked).toEqual({ path: 'source', files: [paths.sibling], accesses: 4, modelRebuilt: true });
+      expect(compiler.update).toHaveBeenCalledTimes(1);
+      expect(compiler.interpret.mock.calls.map(call => call[0])).toEqual([[paths.sibling]]);
+      expect(revision.delta.added.map(item => [item.code, item.location?.file])).toEqual([
+        ['not-visible', paths.rootMain], ['not-visible', paths.sibling],
+      ]);
+      await audited(handle);
+      await equalToBatch(handle, inputs);
+    } finally { await handle.dispose(); }
+  }), timeout);
+
+  it('checks every owned file on creation and deletion and removes the deleted file finding', () => fixture(async (root, inputs) => {
+    const { handle, state } = await opened(inputs);
+    try {
+      const compiler = instrumentCompiler(state);
+      await put(root, paths.extra, "import { privateValue } from '../../../src/interfaces/api.js';\nvoid privateValue;\n");
+      const created = await revised(handle, [paths.extra], 'created');
+      const all = [...ownedFiles, paths.extra].sort();
+      expect(created.checked).toEqual({ path: 'broad', files: all, accesses: 5, modelRebuilt: true });
+      expect(compiler.describe.mock.calls.map(call => call[0])).toEqual([all]);
+      expect(compiler.interpret.mock.calls.map(call => call[0])).toEqual([all]);
+      expect(created.delta.added.map(item => [item.code, item.location?.file])).toEqual([['not-visible', paths.extra]]);
+      await audited(handle);
+      await equalToBatch(handle, inputs);
+
+      await rm(join(root, paths.extra));
+      const deleted = await revised(handle, [paths.extra], 'deleted');
+      expect(deleted.checked).toEqual({ path: 'broad', files: ownedFiles, accesses: 4, modelRebuilt: true });
+      expect(deleted.delta.removed).toEqual([created.delta.added[0]!.id]);
+      const report = await equalToBatch(handle, inputs);
+      expect(report.snapshot!.inventory.files.map(file => file.path)).not.toContain(paths.extra);
+      expect(report.snapshot!.catalog!.files.map(file => file.file)).not.toContain(paths.extra);
+      expect(report.coverage.some(note => note.location.file === paths.extra)).toBe(false);
+      await audited(handle);
+    } finally { await handle.dispose(); }
+  }), timeout);
+
+  it('re-extracts all files on the same warm compiler for configuration and dependency changes', () => fixture(async (root, inputs) => {
+    const { handle, state, revision: cold } = await opened(inputs);
+    try {
+      const compiler = instrumentCompiler(state);
+      const configuration = JSON.parse(await readFile(join(root, 'tsconfig.json'), 'utf8'));
+      configuration.compilerOptions.paths = { '@fixture/api': ['./src/interfaces/api.ts'] };
+      await put(root, 'tsconfig.json', JSON.stringify(configuration));
+      const changedConfiguration = await revised(handle, ['tsconfig.json']);
+      expect(changedConfiguration.checked).toEqual({ path: 'broad', files: ownedFiles, accesses: 5, modelRebuilt: true });
+      expect(compiler.describe.mock.calls.map(call => call[0])).toEqual([ownedFiles]);
+      expect(compiler.interpret.mock.calls.map(call => call[0])).toEqual([ownedFiles]);
+      expect(compiler.dispose).not.toHaveBeenCalled();
+      expect(state.adapter).toBe(compiler.adapter);
+      await audited(handle);
+      await equalToBatch(handle, inputs);
+
+      const dependency = 'node_modules/fixture-dependency/index.d.ts';
+      const before = cold.inputs.find(input => input.path === dependency && input.role === 'dependency');
+      expect(before).toBeDefined();
+      await replace(root, dependency, 'readonly n: number', 'readonly n: string');
+      const changedDependency = await revised(handle, [dependency]);
+      expect(changedDependency.checked).toEqual({ path: 'broad', files: ownedFiles, accesses: 5, modelRebuilt: true });
+      expect(changedDependency.inputs.find(input => input.path === dependency && input.role === 'dependency')?.sha256).not.toBe(before!.sha256);
+      expect(compiler.dispose).not.toHaveBeenCalled();
+      expect(state.adapter).toBe(compiler.adapter);
+      await audited(handle);
+      await equalToBatch(handle, inputs);
+    } finally { await handle.dispose(); }
+  }, {
+    [paths.rootApi]: `import type { DependencyShape } from 'fixture-dependency';\nexport type DependencyAlias = DependencyShape;\n${fixtureFiles[paths.rootApi]}`,
+    'node_modules/fixture-dependency/package.json': '{"name":"fixture-dependency","version":"1.0.0","types":"index.d.ts"}',
+    'node_modules/fixture-dependency/index.d.ts': 'export interface DependencyShape { readonly n: number }\n',
+  }), timeout);
+
+  it('uses broad re-extraction when a module header changes the source areas', () => fixture(async (root, inputs) => {
+    const { handle } = await opened(inputs);
+    try {
+      await replace(root, paths.description, 'module branch', 'module branch tagged [ui]');
+      const tagged = await revised(handle, [paths.description]);
+      expect(tagged.checked).toEqual({ path: 'broad', files: ownedFiles, accesses: 4, modelRebuilt: true });
+      expect(tagged.diagnostics.some(item => item.location?.file === paths.rootMain)).toBe(true);
+      await audited(handle);
+      await equalToBatch(handle, inputs);
+      await put(root, paths.description, fixtureFiles[paths.description]!);
+      const restored = await revised(handle, [paths.description]);
+      expect(restored.checked.path).toBe('broad');
+      expect(restored.outcome.check).toBe('passed');
+      await audited(handle);
+      await equalToBatch(handle, inputs);
+    } finally { await handle.dispose(); }
+  }), timeout);
+
+  it('re-extracts every owned file when an owned declaration shim changes a resource export', () => fixture(async (root, inputs) => {
+    const { handle, state, revision: cold } = await opened(inputs);
+    try {
+      const shim = 'src/styles.d.ts';
+      const resource = 'src/style.css';
+      expect(cold.outcome).toEqual({ execution: 'completed', check: 'passed', coverage: 'complete' });
+      expect(state.facts!.files[resource]!.description.dependencies.shims).toContain(shim);
+      const compiler = instrumentCompiler(state);
+      await replace(root, shim, 'export default styles;', 'export default styles; export const accent: string;');
+      const revision = await revised(handle, [shim]);
+      const all = [...ownedFiles, shim, resource].sort();
+      expect(revision.checked).toEqual({ path: 'broad', files: all, accesses: cold.summary.accesses, modelRebuilt: true });
+      expect(compiler.describe.mock.calls.map(call => call[0])).toEqual([all]);
+      expect(compiler.interpret.mock.calls.map(call => call[0])).toEqual([all]);
+      expect(compiler.update.mock.calls.some(call => call[0].invalidateAll)).toBe(true);
+      expect(compiler.dispose).not.toHaveBeenCalled();
+      expect(state.facts!.catalog.files.find(file => file.file === resource)?.exports.map(entry => entry.name)).toEqual(['accent', 'default']);
+      await audited(handle);
+      await equalToBatch(handle, inputs);
+    } finally { await handle.dispose(); }
+  }, {
+    'module.ramify': `${fixtureFiles['module.ramify']}expose-src default from "style.css" to descendants\n`,
+    [paths.local]: `${fixtureFiles[paths.local]}import styles from '../../../src/style.css';\nvoid styles;\n`,
+    'src/styles.d.ts': 'declare module "*.css" { const styles: Record<string, string>; export default styles; }\n',
+    'src/style.css': '.root { color: red; }\n',
+  }), timeout);
+
+  it('publishes invalid current inputs without stale results, preserves the last valid projection and recovers', () => fixture(async (root, inputs) => {
+    const { handle, revision: valid } = await opened(inputs);
+    try {
+      const previous = await handle.report();
+      await replace(root, paths.description, parentExposure, 'expose-src value to parent\n');
+      const invalid = await revised(handle, [paths.description]);
+      expect(invalid.outcome.execution).toBe('invalid');
+      expect(invalid.inputId).not.toBe(valid.inputId);
+      expect(invalid.inputs.find(input => input.path === paths.description)?.sha256).not.toBe(valid.inputs.find(input => input.path === paths.description)?.sha256);
+      expect(invalid.diagnostics.some(item => item.category === 'description' && item.location?.file === paths.description)).toBe(true);
+      const report = await equalToBatch(handle, inputs);
+      expect(report.inputId).toBeNull();
+      expect(report.snapshot?.results ?? []).toEqual([]);
+      expect(comparable(await handle.report(undefined, valid.sequence))).toEqual(comparable(previous));
+      expect(handle.current).toBe(invalid);
+      await audited(handle);
+
+      await put(root, paths.description, fixtureFiles[paths.description]!);
+      const recovered = await revised(handle, [paths.description]);
+      expect(recovered.sequence).toBe(invalid.sequence + 1);
+      expect(recovered.outcome.execution).toBe('completed');
+      expect(recovered.outcome.check).toBe('passed');
+      expect(recovered.diagnostics).toEqual(valid.diagnostics);
+      expect(recovered.delta.added).toEqual([]);
+      await audited(handle);
+      await equalToBatch(handle, inputs);
+    } finally { await handle.dispose(); }
+  }), timeout);
+
+  it('stays invalid through source-only and README-only events until the invalid description is repaired', () => fixture(async (root, inputs) => {
+    const { handle, revision: valid } = await opened(inputs);
+    try {
+      const validReport = await handle.report();
+      await replace(root, paths.description, parentExposure, 'expose-src value to parent\n');
+      const invalid = await revised(handle, [paths.description]);
+      expect(invalid.outcome.execution).toBe('invalid');
+      await audited(handle);
+      await equalToBatch(handle, inputs);
+
+      await put(root, paths.provider, `${fixtureFiles[paths.provider]}export const recoveredValue = 9;\n`);
+      const sourceOnly = await revised(handle, [paths.provider]);
+      expect(sourceOnly.outcome.execution).toBe('invalid');
+      expect(sourceOnly.sequence).toBe(invalid.sequence + 1);
+      expect(sourceOnly.diagnostics.some(item => item.category === 'description' && item.location?.file === paths.description)).toBe(true);
+      await audited(handle);
+      await equalToBatch(handle, inputs);
+
+      const purpose = 'A purpose changed while the description remained invalid.';
+      await put(root, paths.readme, `# Branch\n\n${purpose}\n`);
+      const readmeOnly = await revised(handle, [paths.readme]);
+      expect(readmeOnly.outcome.execution).toBe('invalid');
+      expect(readmeOnly.sequence).toBe(sourceOnly.sequence + 1);
+      expect(readmeOnly.diagnostics.some(item => item.category === 'description' && item.location?.file === paths.description)).toBe(true);
+      await audited(handle);
+      await equalToBatch(handle, inputs);
+      expect(comparable(await handle.report(undefined, valid.sequence))).toEqual(comparable(validReport));
+
+      await put(root, paths.description, fixtureFiles[paths.description]!);
+      const recovered = await revised(handle, [paths.description]);
+      expect(recovered.sequence).toBe(readmeOnly.sequence + 1);
+      expect(recovered.outcome.execution).toBe('completed');
+      expect(recovered.outcome.check).toBe('passed');
+      expect(recovered.checked.path).toBe('broad');
+      const report = await equalToBatch(handle, inputs);
+      expect(report.snapshot!.catalog!.files.find(file => file.file === paths.provider)?.exports.map(entry => entry.name)).toContain('recoveredValue');
+      expect(report.snapshot!.inventory.modules.find(module => module.name === 'branch')?.purpose).toEqual({ state: 'present', readme: paths.readme, paragraph: purpose });
+      await audited(handle);
+    } finally { await handle.dispose(); }
+  }), timeout);
+
+  it('keeps current and historical facts unpublished when extraction fails and recovers with a broad update', () => fixture(async (root, inputs) => {
+    const { handle, state, revision: current } = await opened(inputs);
+    try {
+      const compiler = instrumentCompiler(state);
+      const retained = state.facts;
+      const report = await handle.report();
+      compiler.describe.mockRejectedValueOnce(new WorkLimit('maxExports', 1, 2));
+      await replace(root, paths.provider, '  return 2;', '  return 3;');
+      const failed = await handle.update([{ path: paths.provider, kind: 'changed' }]);
+      expect(failed.status).toBe('reported');
+      if (failed.status !== 'reported') throw new Error('Expected the extraction failure');
+      expect(failed.report.outcome.execution).toBe('incomplete');
+      expect(failed.report.outcome.check).toBe('not-run');
+      expect(failed.report.diagnostics.some(item => item.code === 'resource-limit')).toBe(true);
+      expect(handle.current).toBe(current);
+      expect(state.facts).toBe(retained);
+      expect(comparable(await handle.report())).toEqual(comparable(report));
+      expect(await handle.report(undefined, current.sequence + 1)).toBeNull();
+      const recovered = await revised(handle, [paths.provider]);
+      expect(recovered.sequence).toBe(current.sequence + 1);
+      expect(recovered.checked.path).toBe('broad');
+      await audited(handle);
+      await equalToBatch(handle, inputs);
+    } finally { await handle.dispose(); }
+  }), timeout);
+
+  it('uses the broad path for an unknown event that changes an owned input', () => fixture(async (root, inputs) => {
+    const { handle } = await opened(inputs);
+    try {
+      await replace(root, paths.provider, '  return 2;', '  return 9;');
+      const revision = await revised(handle, [paths.provider], 'unknown');
+      expect(revision.checked).toEqual({ path: 'broad', files: ownedFiles, accesses: 4, modelRebuilt: true });
+      await audited(handle);
+      await equalToBatch(handle, inputs);
+    } finally { await handle.dispose(); }
+  }), timeout);
+
+  it('does not commit private facts or history when a revision exceeds the retained fact budget', () => fixture(async (root, inputs) => {
+    const baseline = await opened(inputs);
+    const bytes = baseline.handle.status().factBytes;
+    await baseline.handle.dispose();
+    const { handle, state, revision } = await opened({ ...inputs, session: { ...inputs.session, maxRetainedFactBytes: 2 * bytes - 1 } });
+    try {
+      const before = state.facts;
+      const report = await handle.report();
+      await put(root, paths.readme, `# Branch\n\n${'A longer purpose. '.repeat(100)}\n`);
+      const refused = await handle.update([{ path: paths.readme, kind: 'changed' }]);
+      expect(refused.status).toBe('reported');
+      if (refused.status !== 'reported') throw new Error('Expected a retained fact limit failure');
+      expect(refused.report.outcome.execution).toBe('incomplete');
+      expect(refused.report.diagnostics.some(item => item.code === 'resource-limit' && item.limit?.name === 'maxRetainedFactBytes')).toBe(true);
+      expect(handle.current).toBe(revision);
+      expect(state.facts).toBe(before);
+      expect(handle.status().factBytes).toBe(bytes);
+      expect(await handle.report(undefined, revision.sequence + 1)).toBeNull();
+      expect(comparable(await handle.report())).toEqual(comparable(report));
+    } finally { await handle.dispose(); }
+  }), timeout);
+
+  it('does not publish computed facts if promotion of compiler observations fails', () => fixture(async (root, inputs) => {
+    const { handle, state, revision } = await opened(inputs);
+    try {
+      const { observer, apply } = instrumentObserver(state);
+      const compiler = instrumentCompiler(state);
+      const before = state.facts;
+      const report = await handle.report();
+      apply.mockImplementationOnce(observer.apply.bind(observer)).mockResolvedValueOnce({ kind: 'incomplete',
+        issues: [{ code: 'read-failure', path: paths.provider, message: 'Injected failure while promoting compiler observations' }] });
+      await replace(root, paths.provider, '  return 2;', '  return 8;');
+      const refused = await handle.update([{ path: paths.provider, kind: 'changed' }]);
+      expect(refused.status).toBe('reported');
+      if (refused.status !== 'reported') throw new Error('Expected observation promotion to fail');
+      expect(refused.report.outcome.execution).toBe('incomplete');
+      expect(refused.report.diagnostics.some(item => item.code === 'read-failure')).toBe(true);
+      expect(apply).toHaveBeenCalledTimes(2);
+      expect(apply.mock.calls[1]![0]).toEqual([]);
+      expect(compiler.describe).toHaveBeenCalledTimes(1);
+      expect(handle.current).toBe(revision);
+      expect(state.facts).toBe(before);
+      expect(comparable(await handle.report())).toEqual(comparable(report));
+      expect(await handle.report(undefined, revision.sequence + 1)).toBeNull();
+      const recovered = await revised(handle, [paths.provider]);
+      expect(recovered.sequence).toBe(revision.sequence + 1);
+      expect(recovered.checked.path).toBe('broad');
+      await audited(handle);
+      await equalToBatch(handle, inputs);
+    } finally { await handle.dispose(); }
+  }), timeout);
+
+  it('rejects publication when a compiler observation advances past the extracted source snapshot', () => fixture(async (root, inputs) => {
+    const { handle, state, revision } = await opened(inputs);
+    try {
+      const adapter = state.adapter!;
+      const compiler = instrumentCompiler(state);
+      const before = state.facts;
+      const report = await handle.report();
+      compiler.describe.mockImplementationOnce(async (...args) => {
+        const extracted = await adapter.describe(...args);
+        await replace(root, paths.provider, '  return 8;', '  return 9;');
+        const bytes = await readFile(join(root, paths.provider));
+        state.observer!.sink.file(paths.provider, createHash('sha256').update(bytes).digest('hex'), bytes.length, 'source');
+        return extracted;
+      });
+      await replace(root, paths.provider, '  return 2;', '  return 8;');
+      const refused = await handle.update([{ path: paths.provider, kind: 'changed' }]);
+      expect(refused.status).toBe('reported');
+      if (refused.status !== 'reported') throw new Error('Expected snapshot coherence admission to fail');
+      expect(refused.report.outcome.execution).toBe('incomplete');
+      expect(refused.report.diagnostics.some(item => item.code === 'changed-input')).toBe(true);
+      expect(handle.current).toBe(revision);
+      expect(state.facts).toBe(before);
+      expect(state.stale).toBe(true);
+      expect(comparable(await handle.report())).toEqual(comparable(report));
+      expect(await handle.report(undefined, revision.sequence + 1)).toBeNull();
+      const recovered = await revised(handle, [paths.provider]);
+      expect(recovered.sequence).toBe(revision.sequence + 1);
+      expect(recovered.checked.path).toBe('broad');
+      await audited(handle);
+      await equalToBatch(handle, inputs);
+    } finally { await handle.dispose(); }
+  }), timeout);
+
+  it('keeps published facts when report size admission fails, then recovers after the oversized purpose is removed', () => fixture(async (root, inputs) => {
+    const baseline = await opened(inputs);
+    const bytes = Buffer.byteLength(JSON.stringify(await baseline.handle.report()));
+    await baseline.handle.dispose();
+    const maximum = bytes + 64 * 1024;
+    const bounded = { ...inputs, limits: { ...inputs.limits, maxReportBytes: maximum } };
+    const { handle, state, revision } = await opened(bounded);
+    try {
+      const before = state.facts;
+      const report = await handle.report();
+      await put(root, paths.readme, `# Branch\n\n${'Very long purpose. '.repeat(Math.ceil(maximum / 9))}\n`);
+      const refused = await handle.update([{ path: paths.readme, kind: 'changed' }]);
+      expect(refused.status).toBe('reported');
+      if (refused.status !== 'reported') throw new Error('Expected report size admission to fail');
+      expect(refused.report.outcome.execution).toBe('incomplete');
+      expect(refused.report.diagnostics.some(item => item.code === 'resource-limit')).toBe(true);
+      expect(handle.current).toBe(revision);
+      expect(state.facts).toBe(before);
+      expect(comparable(await handle.report())).toEqual(comparable(report));
+      expect(await handle.report(undefined, revision.sequence + 1)).toBeNull();
+      await put(root, paths.readme, fixtureFiles[paths.readme]!);
+      const recovered = await revised(handle, [paths.readme]);
+      expect(recovered.sequence).toBe(revision.sequence + 1);
+      expect(recovered.outcome.execution).toBe('completed');
+      await audited(handle);
+      await equalToBatch(handle, bounded);
+    } finally { await handle.dispose(); }
+  }), timeout);
+});

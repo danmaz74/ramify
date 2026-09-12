@@ -21,7 +21,8 @@ describe('Plan 5 inventory and gates', () => {
     expect(new Set(plan5Instances.map(item => item.matrixId)).size).toBe(14);
     expect(plan5Instances.every(item => item.evidenceKind && !('status' in item))).toBe(true);
     expect([...plan5Runtime.capabilities].sort()).toEqual(['catalog', 'compiler', 'engine', 'harness-gate', 'observer', 'session']);
-    expect(plan5Runtime.handlers.size).toBe(42);
+    expect(plan5Runtime.handlers.size).toBe(53);
+    expect(plan5Instances.filter(item => item.iteration === 7).every(item => plan5Runtime.handlers.has(item.id))).toBe(true);
     const first = plan5Instances[0];
     expect(validateInstanceRecords(plan5Instances.slice(1), plan)).toEqual([`Missing reviewed instance: ${first.id}`]);
     expect(validateInstanceRecords([{ ...first, evidenceKind: 'unit' }, ...plan5Instances.slice(1)], plan))

@@ -94,8 +94,8 @@ class Session implements RetainedSession {
       // A coherent invalid capture opens a session that retries observation on
       // the next update; it holds the sealed inputs and no compiler.
       this.#sealed = observed.sealedInputs;
-      state.facts = invalidFacts(state, issues, observed.inventory);
-      const revision = this.#publish({ status: 'computed', facts: state.facts, checked: { path: 'cold', files: [], accesses: 0, modelRebuilt: false },
+      const facts = invalidFacts(state, issues, observed.inventory, observed.sealedInputs ?? []);
+      const revision = this.#publish({ status: 'computed', facts, checked: { path: 'cold', files: [], accesses: 0, modelRebuilt: false },
         changed: [], timings, positionRefreshed: [] }, observed.sealedInputs ?? [], sealedIdentity(observed.sealedInputs), started);
       if ('report' in revision) return { status: 'reported', report: revision.report };
       return { status: 'opened', session: this, revision: revision.revision };
@@ -104,8 +104,7 @@ class Session implements RetainedSession {
     try {
       start = performance.now();
       const facts = await recomputeAll(state, observed.observer.inventory, timings, signal);
-      state.facts = facts;
-      await observed.observer.apply([]);
+      await this.#promote(signal);
       const published = this.#publish({ status: 'computed', facts, checked: wholeCheckedSet('cold', facts), changed: [], timings, positionRefreshed: [] },
         observed.observer.inputs, facts.invalid ? null : observed.observer.inputId, started);
       if ('report' in published) { await this.dispose(); return { status: 'reported', report: published.report }; }
@@ -143,12 +142,7 @@ class Session implements RetainedSession {
           changed: [], timings: zeroTimings(), positionRefreshed: [] }, state.observer.inputs, facts.invalid ? null : state.observer.inputId, started);
         return 'report' in published ? { status: 'reported', report: published.report } : { status: 'revised', revision: published.revision, identical: false };
       }
-      state.facts = result.facts;
-      // Promote the compiler's reads of this update so the published inputs
-      // and identity cover them, as a batch capture of the same state would.
-      await state.observer.apply([]);
-      const published = this.#publish(result, state.observer.inputs, result.facts.invalid ? null : state.observer.inputId, started);
-      return 'report' in published ? { status: 'reported', report: published.report } : { status: 'revised', revision: published.revision, identical: false };
+      return this.#complete(result, started, signal);
     });
   }
 
@@ -165,10 +159,7 @@ class Session implements RetainedSession {
       if (result.status === 'cancelled') return { status: 'cancelled' };
       if (result.status === 'reported') return result;
       if (result.status === 'identical') return { status: 'revised', revision: this.#current!, identical: true };
-      this.#state.facts = result.facts;
-      await observer.apply([]);
-      const published = this.#publish(result, observer.inputs, result.facts.invalid ? null : observer.inputId, started);
-      return 'report' in published ? { status: 'reported', report: published.report } : { status: 'revised', revision: published.revision, identical: false };
+      return this.#complete(result, started, control.signal);
     });
   }
 
@@ -177,21 +168,21 @@ class Session implements RetainedSession {
       if (this.#disposed) throw new Error('Retained session is disposed');
       if (control.signal?.aborted) return { status: 'cancelled' };
       const started = performance.now();
-      let audit;
-      try { audit = await auditFacts(this.#state, control.signal); }
-      catch (error) {
+      try {
+        const audit = await auditFacts(this.#state, control.signal);
+        const sequence = this.#sequence;
+        if (audit.status === 'equal') return { status: 'equal', sequence, elapsedMs: audit.elapsedMs };
+        const observer = this.#state.observer;
+        if (!audit.facts.invalid) await this.#promote(control.signal);
+        const published = this.#publish({ status: 'computed', facts: audit.facts, checked: wholeCheckedSet('broad', audit.facts), changed: [],
+          timings: audit.timings, positionRefreshed: [] }, observer?.inputs ?? [], audit.facts.invalid ? null : observer!.inputId, started);
+        if ('report' in published) throw new Error(`The audit could not publish its recomputed facts: ${published.report.diagnostics.map(item => item.message).join('; ')}`);
+        return { status: 'mismatch', sequence, fields: audit.fields, revision: published.revision };
+      } catch (error) {
+        this.#state.stale = true;
         if (isCancellation(error, control.signal)) return { status: 'cancelled' };
         throw error;
       }
-      const sequence = this.#sequence;
-      if (audit.status !== 'mismatch') return { status: 'equal', sequence, elapsedMs: audit.status === 'equal' ? audit.elapsedMs : performance.now() - started };
-      const observer = this.#state.observer!;
-      this.#state.facts = audit.facts;
-      await observer.apply([]);
-      const published = this.#publish({ status: 'computed', facts: audit.facts, checked: wholeCheckedSet('broad', audit.facts), changed: [],
-        timings: audit.timings, positionRefreshed: [] }, observer.inputs, audit.facts.invalid ? null : observer.inputId, started);
-      if ('report' in published) throw new Error(`The audit could not publish its recomputed facts: ${published.report.diagnostics.map(item => item.message).join('; ')}`);
-      return { status: 'mismatch', sequence, fields: audit.fields, revision: published.revision };
     });
   }
 
@@ -245,6 +236,44 @@ class Session implements RetainedSession {
     return result;
   };
 
+  /** Publication only commits facts after all compiler reads were observed. */
+  async #complete(computed: Computed, started: number, signal?: AbortSignal): Promise<SessionUpdate> {
+    const state = this.#state;
+    try {
+      if (!computed.facts.invalid) await this.#promote(signal);
+      const observer = state.observer!;
+      const published = this.#publish(computed, observer.inputs, computed.facts.invalid ? null : observer.inputId, started);
+      return 'report' in published ? { status: 'reported', report: published.report } : { status: 'revised', revision: published.revision, identical: false };
+    } catch (error) {
+      state.stale = true;
+      if (isCancellation(error, signal)) return { status: 'cancelled' };
+      return { status: 'reported', report: failureReport(state, error, 'acquisition', state.facts?.inventory) };
+    }
+  }
+
+  async #promote(signal?: AbortSignal): Promise<void> {
+    const observer = this.#state.observer!;
+    // Reads already carry content hashes, including pending compiler reads.
+    // Probe and directory identities gain acquisition metadata at promotion,
+    // so only actual file bytes can be compared across this boundary.
+    const empty = createHash('sha256').update('').digest('hex');
+    const reads = new Map(observer.inputs.filter(input => input.bytes > 0 || input.sha256 === empty)
+      .map(input => [input.path, input]));
+    const result = await observer.apply([], signal);
+    if (result.kind === 'incomplete' || result.kind === 'invalid') {
+      const first = result.issues[0];
+      throw Object.assign(new Error(result.issues.map(issue => issue.message).join('; ')),
+        { code: first?.code ?? 'read-failure', path: first?.path });
+    }
+    for (const current of observer.inputs) {
+      const before = reads.get(current.path);
+      if (before && (before.sha256 !== current.sha256 || before.bytes !== current.bytes)) {
+        throw Object.assign(new Error(`Input changed while promoting compiler reads: ${current.path}`),
+          { code: 'changed-input', path: current.path });
+      }
+    }
+  }
+
   #serialize<T>(operation: () => Promise<T>): Promise<T> {
     const next = this.#queue.then(operation, operation);
     this.#queue = next.catch(() => undefined);
@@ -292,8 +321,8 @@ class Session implements RetainedSession {
       const identity = sealedIdentity(observed.sealedInputs);
       if (identity === this.#current?.inputId && !changes.length) return { status: 'revised', revision: this.#current, identical: true };
       this.#sealed = observed.sealedInputs;
-      state.facts = invalidFacts(state, issues, observed.inventory);
-      const published = this.#publish({ status: 'computed', facts: state.facts, checked: { path: 'broad', files: [], accesses: 0, modelRebuilt: false },
+      const facts = invalidFacts(state, issues, observed.inventory, observed.sealedInputs ?? []);
+      const published = this.#publish({ status: 'computed', facts, checked: { path: 'broad', files: [], accesses: 0, modelRebuilt: false },
         changed: sortedPaths(changes.map(change => change.path)), timings, positionRefreshed: [] }, observed.sealedInputs ?? [], identity, started);
       return 'report' in published ? { status: 'reported', report: published.report } : { status: 'revised', revision: published.revision, identical: false };
     }
@@ -302,8 +331,8 @@ class Session implements RetainedSession {
     try {
       start = performance.now();
       const facts = await recomputeAll(state, observed.observer.inventory, timings, signal);
-      state.facts = facts; state.stale = false;
-      await observed.observer.apply([]);
+      state.stale = false;
+      await this.#promote(signal);
       const published = this.#publish({ status: 'computed', facts, checked: wholeCheckedSet('broad', facts),
         changed: sortedPaths(changes.map(change => change.path)), timings, positionRefreshed: [] },
         observed.observer.inputs, facts.invalid ? null : observed.observer.inputId, started);
@@ -324,16 +353,20 @@ class Session implements RetainedSession {
   #publish(computed: Computed, inputs: readonly CapturedInput[], inputId: string | null, started: number):
   { readonly revision: SessionRevision } | { readonly report: AnalysisReport } {
     const state = this.#state;
+    if (computed.facts.invalid) { inputs = computed.facts.invalid.inputs; inputId = null; }
     const publishStart = performance.now();
     let report: AnalysisReport;
     try {
       const draft = draftReport(computed.facts, state.request, inputs, inputId);
-      draft.stage('report', 'completed');
-      report = draft.build();
+      report = draft.finish();
     }
     catch (error) {
       state.stale = true;
       return { report: failureReport(state, error, 'report', computed.facts.inventory) };
+    }
+    if (report.outcome.execution !== 'completed' && report.outcome.execution !== 'invalid') {
+      state.stale = true;
+      return { report };
     }
     const bytes = factBytes(computed.facts);
     let retained = bytes;
@@ -347,13 +380,14 @@ class Session implements RetainedSession {
     const publish = performance.now() - publishStart;
     const timings = { ...computed.timings, publish, total: performance.now() - started };
     const revision: SessionRevision = deepFreeze({
-      sequence, inputId: inputId ?? sealedIdentity(this.#sealed), inputs, changed: computed.changed, checked: computed.checked,
+      sequence, inputId: inputId ?? sealedIdentity(inputs), inputs, changed: computed.changed, checked: computed.checked,
       outcome: report.outcome, summary: report.summary, diagnostics: report.diagnostics, warnings: report.warnings, coverage: report.coverage,
       delta, timings,
     });
     this.#versions.set(sequence, { facts: computed.facts, inputs, inputId, request: state.request, bytes });
     this.#sequence = sequence;
     this.#current = revision;
+    state.facts = computed.facts;
     return { revision };
   }
 }

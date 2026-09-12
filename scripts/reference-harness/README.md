@@ -445,12 +445,36 @@ or F copy, applies its edits to that copy, calls `update`, runs the session's
 own `verify()` audit and compares the `report()` projection with
 `analyzeProject` over the same disk state after replacing `runId`, then asserts
 its independent expectation on the revision's checked set and finding delta.
+`plan5-session-revision-cases.ts` adds all eleven I5-07 instances at iteration 7:
+the description and metadata paths, created/deleted file and configuration or
+dependency broad updates, invalid-current recovery, the twelve-step reference
+sequence and injected audit drift. Every edit runs the session's own audit and
+compares every report field with a fresh batch analysis except `runId`.
+Description checks compare actual re-decided access identities against the
+independently computed subtree; metadata checks assert zero compiler, extraction,
+link and decision work. The dependency mutation owns a copy of Zod and verifies
+that the shared reference package remains unchanged.
+
+`plan5-session-inspection.ts` observes private state through a temporary Node
+load hook matching exactly one unique session-module URL. It refuses a changed
+factory anchor and deregisters and removes its capture symbol in `finally`.
+This harness instrumentation supplies identities of retained decision objects
+and compiler PID evidence and permits replacing one frozen access fact to test the real
+audit's repair behavior. It adds no production export or mutable public handle.
+Every I5-07 handler disposes its session and checks compiler exit, released
+observer/adapter handles, empty retained versions and unavailable projection.
+Audit repair is identified by the `verify()` result; the settled session
+revision type carries no `cause` member, and contexts assigns that cause later.
+The last valid projection is asserted through its historical sequence; no
+`lastValid` field is added to the session status contract.
+
 The capabilities `hosting`, `contexts`, `supersession`, `hook-cli`,
 `live-equivalence`, `fast-measure` and `completion` are registered names whose
 instances report `not-executed` until the iteration that implements them adds
 a provider; registration never establishes execution. `--iteration 4` requires
 the 18 instances of iterations 2 and 4; `--iteration 5` requires the 32 of
 iterations 2 to 5; `--iteration 6` requires the 42 of iterations 2 to 6;
+`--iteration 7` requires the 53 of iterations 2 to 7;
 `--iteration 9` requires the 74 of iterations 2 to 9. The unfiltered `--plan 5` gate requires
 all 103 and is expected to fail until iteration 13.
 

@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": true,
+    "functionalRequirementsSatisfied": true,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-12T09:32:15.388Z",
+  "iteration": "7",
+  "notes": "All 53 iteration-7 prerequisite gate instances pass, including all 11 I5-07 cases; 31 focused owner tests and 10 harness registration tests pass. Build, all type-check scopes and both resident project checks pass with complete coverage. Full regression/scenario/seal checks are reserved for workflow automation. Results record the inherited project-observation provider gap to resolve before concurrent live freshness acceptance; worker and context integration remain later iterations."
+}

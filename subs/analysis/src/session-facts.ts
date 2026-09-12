@@ -37,6 +37,7 @@ export interface FactIndexes {
 export interface InvalidAcquisition {
   readonly issues: readonly AnalysisDiagnostic[];
   readonly inventory: ProjectInventory | null;
+  readonly inputs: readonly CapturedInput[];
 }
 export interface SessionFacts {
   readonly registry: ResolvedTagRegistry;
