@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": true,
+    "functionalRequirementsSatisfied": true,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-12T08:30:00Z",
+  "iteration": "5",
+  "notes": "createRetainedSourceAnalysis keeps one warm compiler with exactly one live snapshot, reports every filesystem observation to project's ObservationSink, regenerates the synthetic configuration and witness from the carried inventory, releases and rebuilds on demand, and rejects the next call with read-failure after server loss. T5 active; SourceChangeSet, RetainedSourceInputs and RetainedSourceAnalysis in the T2 wildcard. npm run reference:verify -- --plan 5 --iteration 5 passes (32 required, 32 passed, all seven I5-04 instances on A/R and A/S100; report plan5-iteration5-958bb0c1-bb88-4bcd-9c4f-32dedc5246f8.json). typescript owner suite 145 tests pass including the new retained-source-analysis.test.ts and the extended retention.test.ts; plan5.test.ts 10 pass; build and type-check pass; check:reference (15 owners, 294 accesses, 2 warnings) and check:self (11 owners, 2,995 accesses, no finding) pass under an owned RAMIFY_ENDPOINT_DIR with the daemon stopped afterwards; git diff --check clean. The implementing session ended before its background gate finished; the recovery turn re-ran the gate to completion and fixed three defects in the new harness handlers (zod types entry is index.d.cts, existence probes are not byte reads, S100 functions are single-line). npm test was left to the workflow's automatic regression check per the project's check policy."
+}

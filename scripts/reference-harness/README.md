@@ -432,12 +432,19 @@ seven I5-03 `catalog` instances. Its work root is the toolkit's
 successive disk states of one project through `plan5-catalog-fixture.ts`, which
 opens its own compiler snapshot per state and carries only the plain
 descriptions across, and compares every incremental result with a whole
-recompute of the same state. The capabilities
-`compiler`, `observer`, `session`, `hosting`, `contexts`, `supersession`,
-`hook-cli`, `live-equivalence`, `fast-measure` and `completion` are registered
-names whose instances report `not-executed` until the iteration that
-implements them adds a provider; registration never establishes execution.
-`--iteration 4` requires the 18 instances of iterations 2 and 4; `--iteration 9`
+recompute of the same state. `plan5-observer-cases.ts` provides `observer` at
+iteration 4 and `plan5-compiler-cases.ts` provides `compiler` at iteration 5:
+each I5-04 instance opens the real `observeProject` observer over a fixture
+copy, hands its sink to `createRetainedSourceAnalysis`, drives the adapter
+through updates, and compares its facts with a cold adapter, the finite helper
+or a sealed batch capture of the same disk state; `retainedCompilerEvidence`
+supplies the live-snapshot count, the server process and the synthetic
+configuration outside the port. The capabilities `session`, `hosting`,
+`contexts`, `supersession`, `hook-cli`, `live-equivalence`, `fast-measure` and
+`completion` are registered names whose instances report `not-executed` until
+the iteration that implements them adds a provider; registration never
+establishes execution. `--iteration 4` requires the 18 instances of iterations 2
+and 4; `--iteration 5` requires the 32 of iterations 2 to 5; `--iteration 9`
 requires the 74 of iterations 2 to 9. The unfiltered `--plan 5` gate requires
 all 103 and is expected to fail until iteration 13.
 

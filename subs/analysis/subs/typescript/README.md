@@ -1,6 +1,6 @@
 # TypeScript
 
-The TypeScript adapter owns compiler sessions and resolution state, extracts complete export and original catalogs, and records bounded source-access facts. It separates real resource identity from declaration shims and returns plain data and explicit analysis limits.
+The TypeScript adapter owns compiler sessions and resolution state, describes the exports and originals of each file with the inputs that description depended on, assembles them into complete catalogs, and records bounded source-access facts through an interpreter it sets up once. It keeps one live snapshot in a retained adapter, reports every filesystem observation it makes, separates real resource identity from declaration shims, and returns plain data and explicit analysis limits.
 
 `createSourceAnalysis` provides `catalog()`, `accesses()` and `dispose()`. Analysis
 supplies a captured project view, its inventory, resolved source areas and finite
@@ -33,6 +33,23 @@ original, the namespace module, the runtime flag and its own extraction ambiguit
 A resource description is the union of what every importing specifier reaches, so
 describing one reads those importers again, and a shim's content identity, not its
 own export description, is the edge that reaches the resources it describes.
+
+`createRetainedSourceAnalysis` keeps one warm compiler server with exactly one
+live snapshot in the caller's thread. `update` names the changed, created and
+deleted files of one disk state, regenerates the synthetic configuration and
+resource witness from the inventory it carries when the owned file list or areas
+changed, replaces the snapshot and disposes the previous one before returning,
+or re-reads everything with `invalidateAll`. `describe` reads the named files
+over the retained descriptions and returns the delta, `catalog` assembles the
+current descriptions, and `interpreter` is the maintained access interpreter
+following the current snapshot. Every filesystem callback reads the disk
+directly and reports the read, existence probe, directory listing, realpath or
+absence to project's `ObservationSink`, so an observer merging those reports
+carries the input identity a batch capture of the same state carries.
+`releaseCompiler` closes the server and keeps the retained descriptions; the
+next `update` reopens and the next `describe` reads every owned file again.
+A server that exits on its own rejects the next call with `read-failure`, and
+the compiler is discarded rather than answering from a stale snapshot.
 
 The supervised helper uses the pinned TypeScript 7.0.2 native API. Its in-memory
 configuration extends the project's configuration and includes every owned

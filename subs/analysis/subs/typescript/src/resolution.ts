@@ -22,8 +22,16 @@ export class Resolution {
   // Existence is reported when resolution actually probed it, so a description
   // can record the paths it found absent as dependencies.
   onCandidate: ((path: string, existing?: boolean) => void) | undefined;
-  readonly files: ReadonlyMap<string, InventoryFile>;
-  constructor(readonly project: Project, readonly inventory: ProjectInventory, readonly host: CatalogHost) {
+  files: ReadonlyMap<string, InventoryFile>;
+  project: Project;
+  inventory: ProjectInventory;
+  constructor(project: Project, inventory: ProjectInventory, readonly host: CatalogHost) {
+    this.project = project; this.inventory = inventory;
+    this.files = new Map(inventory.files.map(file => [resolve(inventory.scope.root, file.path), file]));
+  }
+  /** Point at the snapshot and inventory of a later state; the host stays. */
+  retarget(project: Project, inventory: ProjectInventory): void {
+    this.project = project; this.inventory = inventory;
     this.files = new Map(inventory.files.map(file => [resolve(inventory.scope.root, file.path), file]));
   }
   module(node: Node): ResolvedModule {

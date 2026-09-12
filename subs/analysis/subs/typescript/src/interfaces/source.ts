@@ -1,5 +1,5 @@
 import type { OriginalId, SourceOrigin, SourceLocation, SourceArea, BindingRequest } from '../../../model/src/interfaces/model.js';
-import type { ProjectInputView, ProjectInventory } from '../../../project/src/interfaces/project.js';
+import type { ObservationSink, ProjectInputView, ProjectInventory } from '../../../project/src/interfaces/project.js';
 
 export interface CatalogOriginal {
   readonly id: OriginalId;
@@ -126,5 +126,37 @@ export interface AccessInterpreter {
     readonly candidates: readonly { readonly file: string; readonly paths: readonly string[] }[];
   }>;
   replaceDescriptions(descriptions: readonly FileDescription[], removed: readonly string[]): void;
+  dispose(): Promise<void>;
+}
+
+/** The files one update names. `inventory` is the current inventory when the
+ * owned file list or areas changed, so the virtual inputs regenerate. */
+export interface SourceChangeSet {
+  readonly changed: readonly string[];
+  readonly created: readonly string[];
+  readonly deleted: readonly string[];
+  readonly inventory: ProjectInventory | null;
+  readonly invalidateAll: boolean;
+}
+/** Plain inputs of a retained adapter. `sink` is project's port; the adapter
+ * reports every filesystem observation it makes to it. */
+export interface RetainedSourceInputs {
+  readonly root: string;
+  readonly configuration: string;
+  readonly inventory: ProjectInventory;
+  readonly areas: readonly SourceArea[];
+  readonly limits: SourceWorkLimits;
+  readonly sink: ObservationSink;
+  readonly signal?: AbortSignal;
+}
+/** One warm compiler with exactly one live snapshot behind plain data. */
+export interface RetainedSourceAnalysis {
+  readonly hot: boolean;
+  update(changes: SourceChangeSet, signal?: AbortSignal): Promise<{ readonly snapshot: number; readonly elapsedMs: number }>;
+  describe(files: readonly string[], signal?: AbortSignal): Promise<{ readonly descriptions: readonly FileDescription[];
+    readonly delta: CatalogDelta }>;
+  catalog(): SourceCatalog;
+  interpreter(): AccessInterpreter;
+  releaseCompiler(): Promise<void>;
   dispose(): Promise<void>;
 }

@@ -23,9 +23,11 @@ export class AccessInterpretation {
   readonly resolution: Resolution;
   readonly files: Map<string, FileExports>;
   readonly originals: Map<string, CatalogOriginal>;
-  readonly inventory: Map<string, HelperInputs['inventory']['files'][number]>;
-  readonly ordered: readonly string[];
-  readonly areas: Map<string, SourceOrigin['area']>;
+  inventory: Map<string, HelperInputs['inventory']['files'][number]>;
+  ordered: readonly string[];
+  areas: Map<string, SourceOrigin['area']>;
+  project: Project;
+  inputs: HelperInputs;
   readonly coverageByFile = new Map<string, SourceLimit[]>();
   readonly coverageById = new Map<string, SourceLimit>();
   private readonly originalKeysByFile = new Map<string, string[]>();
@@ -33,8 +35,9 @@ export class AccessInterpretation {
   private readonly replacedRuntime = new WeakMap<CatalogExport, boolean>();
   private closed = false;
 
-  constructor(readonly project: Project, readonly inputs: HelperInputs, host: CatalogHost,
+  constructor(project: Project, inputs: HelperInputs, host: CatalogHost,
     catalog: SourceCatalog, readonly runtime: ReadonlyMap<CatalogExport, boolean>) {
+    this.project = project; this.inputs = inputs;
     this.resolution = new Resolution(project, inputs.inventory, host);
     this.files = new Map(catalog.files.map(file => [file.file, file]));
     this.originals = new Map(catalog.originals.map(original => [originalKey(original.id), original]));
@@ -65,7 +68,20 @@ export class AccessInterpretation {
     this.coverageById.set(issue.id, issue);
   }
 
-  replaceDescriptions(descriptions: Parameters<AccessInterpreter['replaceDescriptions']>[0], removed: readonly string[]): void {
+  /** Follow a later snapshot and inventory. Descriptions, originals and
+   * coverage stay until `replaceDescriptions` names what changed. */
+  refresh(project: Project, inputs: HelperInputs): void {
+    this.check();
+    this.project = project; this.inputs = inputs;
+    this.resolution.retarget(project, inputs.inventory);
+    this.inventory = new Map(inputs.inventory.files.map(file => [file.path, file]));
+    this.ordered = [...this.inventory.keys()].sort(order);
+    this.areas = new Map(inputs.areas.map(area => [JSON.stringify([area.owner, area.kind]), area]));
+  }
+
+  /** `live` descriptions share their export objects with the runtime map this
+   * interpretation reads, so no detached export-path flag is restored for them. */
+  replaceDescriptions(descriptions: Parameters<AccessInterpreter['replaceDescriptions']>[0], removed: readonly string[], live = false): void {
     this.check();
     for (const file of new Set([...removed, ...descriptions.map(description => description.file)])) {
       this.files.delete(file);
@@ -86,7 +102,7 @@ export class AccessInterpretation {
           if (entry.namespace) restoreRuntime(entry.namespace, path);
         }
       };
-      restoreRuntime(description.exports.exports, []);
+      if (!live) restoreRuntime(description.exports.exports, []);
       const keys: string[] = [];
       for (const original of description.originals) {
         if (original.origin.file !== description.file) {

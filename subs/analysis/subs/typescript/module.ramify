@@ -8,3 +8,5 @@ expose-src * from "interfaces/source.ts" to parent
 expose-src createAccessInterpreter from "access-interpreter.ts" to parent
 // T4: per-file export descriptions and their assembly.
 expose-src describeFiles, assembleCatalog from "descriptions.ts" to parent
+// T5: the retained compiler adapter with one live snapshot.
+expose-src createRetainedSourceAnalysis from "retained-source-analysis.ts" to parent

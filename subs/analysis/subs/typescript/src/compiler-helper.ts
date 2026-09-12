@@ -1,11 +1,12 @@
 import { readSync, writeSync } from 'node:fs';
-import { dirname, relative, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { API } from 'typescript/unstable/sync';
 import { buildCatalog } from './catalog.js';
 import { createDescriptionSet } from './descriptions.js';
 import { AccessInterpretation } from './accesses.js';
 import type { AccessInterpreter, CatalogExport, SourceCatalog } from './interfaces/source.js';
-import { CHUNK_BYTES, FILE_BYTES, FRAME_BYTES, READ_RESPONSE_BYTES, RESULT_BYTES, SourceFailure, decodeChunk, encode } from './wire.js';
+import { referencesOnly, syntheticCandidate, syntheticInputs } from './synthetic.js';
+import { CHUNK_BYTES, FRAME_BYTES, READ_RESPONSE_BYTES, RESULT_BYTES, SourceFailure, decodeChunk, encode } from './wire.js';
 import type { HelperInputs, Operation } from './wire.js';
 
 // Only this finite helper blocks on synchronous pipe and native compiler calls.
@@ -75,17 +76,6 @@ function result(operation: Operation, value: unknown): void {
   }
 }
 
-// Inspect only solution-style metadata. The compiler owns option/configuration
-// inheritance and file selection; this never interprets compiler settings.
-function referencesOnly(text: string, selectedFiles: readonly string[]): boolean {
-  const clean = text.replace(/^\uFEFF/, '').replace(/("(?:[^"\\]|\\.)*")|\/\/[^\r\n]*|\/\*[\s\S]*?\*\//g,
-    (match, string: string | undefined) => string ?? match.replace(/[^\r\n]/g, ' '));
-  let metadata: Record<string, unknown>;
-  try { metadata = JSON.parse(clean.replace(/("(?:[^"\\]|\\.)*")|,\s*(?=[}\]])/g, (_match, string: string | undefined) => string ?? '')); }
-  catch { throw new SourceFailure('unavailable', 'The selected compiler configuration could not be parsed'); }
-  return !!(Array.isArray(metadata.references) && metadata.references.length && !selectedFiles.length);
-}
-
 let api: API | undefined;
 let snapshot: ReturnType<API['updateSnapshot']> | undefined;
 try {
@@ -110,34 +100,18 @@ try {
   let synthetic: string | undefined;
   let resourceWitness: string | undefined;
   for (let candidate = 0; candidate < 1000; candidate++) {
-    const configPath = resolve(dirname(configuration), `.ramify-source-inputs-${candidate}.json`);
-    const witnessPath = resolve(dirname(configuration), `.ramify-source-inputs-${candidate}.ts`);
+    const { configuration: configPath, witness: witnessPath } = syntheticCandidate(configuration, candidate);
     if (request('absent', configPath) && request('absent', witnessPath)) {
       synthetic = configPath; resourceWitness = witnessPath; break;
     }
   }
   if (!synthetic || !resourceWitness) throw new SourceFailure('resource-limit', 'No unoccupied synthetic compiler input paths were available');
 
-  const roots = new Set(parsed.fileNames);
-  for (const file of inputs.inventory.files) if (file.kind === 'source') roots.add(resolve(root, file.path));
-  roots.add(resourceWitness);
-  const configurationBytes = encode({ extends: configuration, files: [...roots].sort(), include: [], exclude: [] }, FILE_BYTES);
-  const imports: string[] = [];
-  let witnessBytes = 0;
-  for (const file of inputs.inventory.files) {
-    if (file.kind !== 'resource') continue;
-    let specifier = relative(dirname(resourceWitness), resolve(root, file.path));
-    if (!specifier.startsWith('.')) specifier = `./${specifier}`;
-    const statement = `import * as ramifyResource${imports.length} from ${JSON.stringify(specifier)};\n`;
-    if (witnessBytes + Buffer.byteLength(statement) > FILE_BYTES) throw new SourceFailure('resource-limit', 'Resource witness exceeds the source file byte limit');
-    witnessBytes += Buffer.byteLength(statement); imports.push(statement);
-  }
-  // A module marker also keeps an empty witness independent of shared globals.
-  if (witnessBytes + 11 > FILE_BYTES) throw new SourceFailure('resource-limit', 'Resource witness exceeds the source file byte limit');
-  virtual.set(synthetic, configurationBytes.toString('utf8'));
-  virtual.set(resourceWitness, `${imports.join('')}export {};\n`);
-  request('derived', synthetic, configurationBytes.length);
-  request('derived', resourceWitness, witnessBytes + 11);
+  const generated = syntheticInputs(inputs.inventory, configuration, parsed.fileNames, resourceWitness);
+  virtual.set(synthetic, generated.configuration);
+  virtual.set(resourceWitness, generated.witness);
+  request('derived', synthetic, generated.configurationBytes);
+  request('derived', resourceWitness, generated.witnessBytes);
   snapshot = api.updateSnapshot({ openProjects: [synthetic] });
   const project = snapshot.getProject(synthetic);
   if (!project) throw new SourceFailure('unavailable', 'The compiler could not create the selected project');
