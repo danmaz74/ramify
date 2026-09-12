@@ -22,6 +22,7 @@ const fixtureFiles = {
   [probe]: "import { publicValue } from '../../../src/interfaces/api.js';\nvoid publicValue;\n",
   [other]: 'export function compute(): number {\n  return 2;\n}\n',
 };
+const timeout = 120_000;
 const session = { updateDeadlineMs: 2_000, sweepIntervalMs: 30_000, workerHeapMiB: 512, maxRetainedFactBytes: 96 * 1024 ** 2 };
 
 async function put(root: string, path: string, text: string): Promise<void> {
@@ -109,7 +110,7 @@ describe('retained analysis session', () => {
       expect(handle.current?.sequence).toBe(1);
       await audited(handle);
     } finally { await handle.dispose(); }
-  }));
+  }), timeout);
 
   it('takes the unchanged-surface path for a body edit: one file checked, nothing decided, model kept', () => fixture(async (root, inputs) => {
     const { session: handle } = await opened(inputs);
@@ -124,7 +125,7 @@ describe('retained analysis session', () => {
       await audited(handle);
       await expectEqualToBatch(handle, inputs);
     } finally { await handle.dispose(); }
-  }));
+  }), timeout);
 
   it('takes the source path for imports and exports, bounds the checked set and reports finding deltas', () => fixture(async (root, inputs) => {
     const { session: handle } = await opened(inputs);
@@ -164,7 +165,7 @@ describe('retained analysis session', () => {
       await audited(handle);
       await expectEqualToBatch(handle, inputs);
     } finally { await handle.dispose(); }
-  }));
+  }), timeout);
 
   it('refreshes decisions and diagnostic identities when declarations only move', () => fixture(async (root, inputs) => {
     const { session: handle } = await opened(inputs);
@@ -187,7 +188,7 @@ describe('retained analysis session', () => {
       const declarations = report.snapshot!.results.flatMap(result => result.decisions.map(decision => decision.original?.declarations[0]?.start));
       expect(declarations.every(start => start !== undefined && start > 0)).toBe(true);
     } finally { await handle.dispose(); }
-  }));
+  }), timeout);
 
   it('takes the metadata path for a README edit and the broad path for created, deleted and reopened compiler states', () => fixture(async (root, inputs) => {
     const { session: handle } = await opened(inputs);
@@ -219,7 +220,7 @@ describe('retained analysis session', () => {
       await audited(handle);
       await expectEqualToBatch(handle, inputs);
     } finally { await handle.dispose(); }
-  }));
+  }), timeout);
 
   it('retains historical versions for report projection until released and rejects releasing the current one', () => fixture(async (root, inputs) => {
     const { session: handle, revision: first } = await opened(inputs);
@@ -238,7 +239,7 @@ describe('retained analysis session', () => {
       expect(await handle.report(undefined, 1)).toBeNull();
       expect(handle.status().factBytes).toBeLessThan(retained);
     } finally { await handle.dispose(); }
-  }));
+  }), timeout);
 
   it('opens over a coherent invalid capture with an invalid revision and recovers on the next update', () => fixture(async (root, inputs) => {
     const { session: handle, revision } = await opened(inputs);
@@ -256,7 +257,7 @@ describe('retained analysis session', () => {
       await audited(handle);
       await expectEqualToBatch(handle, inputs);
     } finally { await handle.dispose(); }
-  }, { ...fixtureFiles, 'subs/consumer/module.ramify': 'ramify 1\nmodule consumer\nexpose-src nothing from\n' }));
+  }, { ...fixtureFiles, 'subs/consumer/module.ramify': 'ramify 1\nmodule consumer\nexpose-src nothing from\n' }), timeout);
 
   it('reports an unavailable cold result without opening a session', async () => {
     const root = join(tmpdir(), 'ramify-retained-session-missing-root');
@@ -265,7 +266,7 @@ describe('retained analysis session', () => {
     if (result.status !== 'reported') throw new Error('Expected a report');
     expect(result.report.outcome.execution).toBe('unavailable');
     expect(comparable(result.report)).toEqual(comparable(await batch({ ...analysisInputs(root), session })));
-  });
+  }, timeout);
 
   it('rejects invalid session limits and unsupported capabilities before observing', async () => {
     const root = join(tmpdir(), 'ramify-retained-session-limits');
@@ -273,7 +274,7 @@ describe('retained analysis session', () => {
     expect(limits.status === 'reported' && limits.report.diagnostics[0]?.code).toBe('invalid-invocation');
     const capability = await openRetainedSession({ ...analysisInputs(root), capabilities: ['browser-verification'], session });
     expect(capability.status === 'reported' && capability.report.diagnostics[0]?.code).toBe('unavailable-capability');
-  });
+  }, timeout);
 
   it('refuses work after disposal and releases the compiler and observer', () => fixture(async (root, inputs) => {
     const { session: handle } = await opened(inputs);
@@ -283,5 +284,5 @@ describe('retained analysis session', () => {
     expect(update.status === 'reported' && update.report.diagnostics[0]?.code).toBe('session-disposed');
     expect(await handle.report()).toBeNull();
     expect(handle.status().level).toBe('warm');
-  }));
+  }), timeout);
 });

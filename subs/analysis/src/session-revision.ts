@@ -6,7 +6,6 @@ import type { ParsedDescription } from '../subs/descriptions/src/interfaces/synt
 import { buildModel, deriveSourceAreas, originalKey } from '../subs/model/src/index.js';
 import type { Model, ResolvedTagRegistry, SourceArea } from '../subs/model/src/interfaces/model.js';
 import type { CapturedInput, ObservedChange, ProjectInventory, ProjectIssue, ProjectObserver } from '../subs/project/src/interfaces/project.js';
-import { createRetainedSourceAnalysis } from '../subs/typescript/src/retained-source-analysis.js';
 import type { AccessInterpreter, CatalogOriginal, RetainedSourceAnalysis, SourceAccess, SourceCatalog,
   SourceLimit } from '../subs/typescript/src/interfaces/source.js';
 import { evaluateAccessesAsync } from './evaluate-accesses.js';
@@ -171,6 +170,9 @@ export async function recomputeAll(state: SessionState, inventory: ProjectInvent
   }
   if (!state.adapter) {
     check(signal);
+    // The adapter carries the compiler API; loading it here keeps the batch
+    // entry free of the compiler package until a session needs one.
+    const { createRetainedSourceAnalysis } = await import('../subs/typescript/src/retained-source-analysis.js');
     state.adapter = await createRetainedSourceAnalysis({ root: inventory.scope.root, configuration: inventory.scope.configuration,
       inventory, areas: derived.areas, limits: state.request.limits.source, sink: observer.sink });
     state.adapterAreas = areasKey;
