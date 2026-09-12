@@ -1,6 +1,8 @@
 import { reportCapacity } from './report-capacity.js';
-import { analyzeIncrement, resolveProject } from '../subs/analysis/src/index.js';
+import { sessionLimits } from './resident-budgets.js';
+import { openRetainedSession, resolveProject } from '../subs/analysis/src/index.js';
 import type { AnalysisLimits, RunControl } from '../subs/analysis/src/interfaces/analysis.js';
+import type { RetainedSession, SessionLimits } from '../subs/analysis/src/interfaces/session.js';
 import { createDefaultTagRegistry } from '../subs/analysis/subs/model/src/registry.js';
 import type { AnalysisDriver, WatcherPort, ClockPort, ContextBudgets } from '../subs/daemon/src/context-types.js';
 import type { DaemonInstance, LogEntry, DaemonService } from '../subs/daemon/src/interfaces/daemon.js';
@@ -25,10 +27,16 @@ const limits: AnalysisLimits = {
   disposeTimeoutMs: 5000, deadlineMs: 120_000,
 };
 
-/** Session lifetime stays inside analysis; only detached products leave it. */
-export function createAnalysisDriverFromSessions(): AnalysisDriver {
+/** Contexts hold the handles; driver disposal closes any remaining sessions. */
+export function createSessionDriver(): AnalysisDriver {
+  return sessionDriver(sessionLimits);
+}
+
+function sessionDriver(capacity: SessionLimits): AnalysisDriver {
   let disposed = false;
+  let disposal: Promise<void> | undefined;
   const active = new Map<AbortController, Promise<unknown>>();
+  const sessions = new Set<RetainedSession>();
   async function tracked<T>(control: RunControl | undefined, operation: (signal: AbortSignal) => Promise<T>): Promise<T> {
     const controller = new AbortController();
     const abort = () => controller.abort(control?.signal?.reason);
@@ -40,26 +48,60 @@ export function createAnalysisDriverFromSessions(): AnalysisDriver {
     try { return await promise; }
     finally { active.delete(controller); control?.signal?.removeEventListener('abort', abort); }
   }
+  function ownedSession(session: RetainedSession): RetainedSession {
+    let closing: Promise<void> | undefined;
+    const handle: RetainedSession = Object.freeze({
+      get current() { return session.current; },
+      update: session.update.bind(session), sweep: session.sweep.bind(session),
+      verify: session.verify.bind(session), report: session.report.bind(session),
+      releaseRevision: session.releaseRevision.bind(session), status: session.status.bind(session),
+      releaseCompiler: session.releaseCompiler.bind(session),
+      dispose() {
+        closing ??= Promise.resolve().then(() => session.dispose()).then(() => { sessions.delete(handle); });
+        return closing;
+      },
+    });
+    sessions.add(handle);
+    return handle;
+  }
   return {
     async resolve(request, control) {
       if (disposed) throw new Error('Analysis driver is disposed');
       control?.signal?.throwIfAborted();
       return tracked(control, signal => resolveProject(request, { signal }));
     },
-    async check(input, control) {
+    async open(project, setup, control) {
       if (disposed || control?.signal?.aborted) return { status: 'cancelled' };
-      return tracked(control, signal => analyzeIncrement({ inputs: { project: input.project,
-        registry: createDefaultTagRegistry(), capabilities: input.setup.capabilities, limits },
-      previous: input.previous, changes: input.changes }, { signal }));
+      return tracked(control, async signal => {
+        const opened = await openRetainedSession({ project, registry: createDefaultTagRegistry(),
+          capabilities: setup.capabilities, limits, session: capacity }, { signal });
+        if (opened.status !== 'opened') return opened;
+        const session = ownedSession(opened.session);
+        if (disposed || signal.aborted) {
+          await session.dispose();
+          return { status: 'cancelled' as const };
+        }
+        return { ...opened, session };
+      });
     },
-    async dispose() {
+    dispose() {
+      if (disposal) return disposal;
       disposed = true;
       for (const controller of active.keys()) controller.abort();
-      await Promise.allSettled(active.values());
+      disposal = Promise.resolve().then(async () => {
+        await Promise.allSettled(active.values());
+        const closed = await Promise.allSettled([...sessions].map(session => session.dispose()));
+        const failures = closed.filter(result => result.status === 'rejected');
+        if (failures.length) throw new AggregateError(failures.map(result => result.reason), 'Analysis session cleanup failed');
+      });
+      return disposal;
     },
   };
 }
 
 export function assembleResidentService(options: ResidentAssemblyOptions): DaemonService {
-  return createDaemonService({ ...options, driver: createAnalysisDriverFromSessions() });
+  return createDaemonService({ ...options, driver: sessionDriver({ ...sessionLimits,
+    maxRetainedFactBytes: Math.min(sessionLimits.maxRetainedFactBytes, options.budgets.maxRetainedBytesPerContext),
+    updateDeadlineMs: options.budgets.updateDeadlineMs, sweepIntervalMs: options.budgets.sweepIntervalMs,
+  }) });
 }

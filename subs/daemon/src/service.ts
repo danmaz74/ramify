@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { channel } from 'node:diagnostics_channel';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { performance } from 'node:perf_hooks';
+import type { RetainedSession } from '../../analysis/src/interfaces/session.js';
 import type { RunControl } from '../../analysis/src/interfaces/analysis.js';
 import type { CheckOutcome, ContextEvent, ContextStatus, ContextToken, OpenOutcome, SubscriptionHandle, Unavailable } from '../subs/contexts/src/interfaces/contexts.js';
 import { createContextManager } from '../subs/contexts/src/context-manager.js';
@@ -28,7 +29,8 @@ function domainError<T>(value: Unavailable): ServiceResult<T> {
 export function createDaemonService(options: DaemonServiceOptions): DaemonService {
   const startedAt = options.clock.now();
   const counters = { revisions: 0, analyses: 0, cancelledAnalyses: 0, reusedRevisions: 0, coalescedEvents: 0,
-    evictions: 0, rejectedRequests: 0, disconnectedSlowConsumers: 0 } satisfies DaemonCounters;
+    evictions: 0, rejectedRequests: 0, disconnectedSlowConsumers: 0, sweeps: 0, audits: 0, auditMismatches: 0,
+    coveredRequests: 0, coldOutcomes: 0, deadlineOutcomes: 0 } satisfies DaemonCounters;
   let stopping = false;
   let disposed = false;
   let disposePromise: Promise<void> | undefined;
@@ -36,20 +38,39 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
   const manager = createContextManager({ ...options, engine: options.instance.engine, generationId: () => `gen/1:${randomUUID()}`,
     driver: {
       resolve: (request, control) => options.driver.resolve(request, control),
-      async check(inputs, control) {
-        counters.analyses++;
-        let cancelled = false;
-        const abort = () => { if (!cancelled) { cancelled = true; counters.cancelledAnalyses++; } };
-        control?.signal?.addEventListener('abort', abort, { once: true });
-        if (control?.signal?.aborted) abort();
-        try {
-          const run = await options.driver.check(inputs, control);
-          if (run.status === 'cancelled') abort();
-          return run;
-        } finally { control?.signal?.removeEventListener('abort', abort); }
+      async open(project, setup, control) {
+        const opened = await measured(control, () => options.driver.open(project, setup, control));
+        if (opened.status !== 'opened') return opened;
+        const session = opened.session;
+        const counted: RetainedSession = {
+          get current() { return session.current; },
+          update: (changes, control, invocation) => measured(control, () => session.update(changes, control, invocation)),
+          sweep: control => { counters.sweeps++; return measured(control, () => session.sweep(control)); },
+          async verify(control) {
+            counters.audits++;
+            const result = await measured(control, () => session.verify(control));
+            if (result.status === 'mismatch') {
+              counters.auditMismatches++;
+              options.log({ at: options.clock.now(), level: 'error', event: 'audit-mismatch', message: `Retained analysis audit mismatch: ${result.fields.join(', ')}` });
+            }
+            return result;
+          },
+          report: session.report.bind(session), releaseRevision: session.releaseRevision.bind(session),
+          status: session.status.bind(session), releaseCompiler: session.releaseCompiler.bind(session), dispose: session.dispose.bind(session),
+        };
+        return { ...opened, session: counted };
       },
       dispose: () => options.driver.dispose(),
     } });
+  async function measured<T extends { readonly status: string }>(control: RunControl | undefined, run: () => Promise<T>): Promise<T> {
+    counters.analyses++;
+    let cancelled = false;
+    const abort = () => { if (!cancelled) { cancelled = true; counters.cancelledAnalyses++; } };
+    control?.signal?.addEventListener('abort', abort, { once: true });
+    if (control?.signal?.aborted) abort();
+    try { const result = await run(); if (result.status === 'cancelled') abort(); return result; }
+    finally { control?.signal?.removeEventListener('abort', abort); }
+  }
   const clients = new Map<string, { pairs: Map<string, string>; subscriptions: Map<string, { handle: SubscriptionHandle; token: ContextToken }>;
     opening: Set<AbortController>; released: boolean }>();
   const stops = new Set<(disposition: StopDisposition) => void>();
@@ -138,8 +159,13 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
       },
       async check(params, control) {
         const invalid = guard<CheckOutcome>('check', params); if (invalid) return invalid;
-        const result = await manager.check(params, pair(params.token), control);
-        if (result.status === 'reported' && result.freshness.reusedRevision) counters.reusedRevisions++;
+        const result = await manager.check({ ...params, scope: 'report' }, pair(params.token), control);
+        if (result.status === 'reported' && result.freshness.reusedRevision) {
+          counters.reusedRevisions++;
+          if (result.freshness.captureStarted === null && result.freshness.verified) counters.coveredRequests++;
+        }
+        if (result.status === 'cold') counters.coldOutcomes++;
+        if (result.status === 'deadline-exceeded') counters.deadlineOutcomes++;
         observe();
         return success(result);
       },

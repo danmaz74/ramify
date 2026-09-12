@@ -1,37 +1,160 @@
 import { createHash } from 'node:crypto';
-import type { AnalysisDriver, ContextBudgets } from '../interfaces/contexts.js';
-import type { IncrementRun, RetainedAnalysis } from '../../../../../analysis/src/interfaces/analysis.js';
-import type { CapturedInput } from '../../../../../analysis/subs/project/src/interfaces/project.js';
+import type { AnalysisDriver, ContextBudgets, ContextSetup } from '../interfaces/contexts.js';
+import type { AnalysisInputs, AnalysisReport, RunControl } from '../../../../../analysis/src/interfaces/analysis.js';
+import type { RetainedSession, SessionChange, SessionRevision, SessionStatus, SessionUpdate, VerifyOutcome } from '../../../../../analysis/src/interfaces/session.js';
+import type { CapturedInput, ProjectRequest } from '../../../../../analysis/subs/project/src/interfaces/project.js';
 import { historyReport } from './history-fixture.js';
 
-export const testBudgets: ContextBudgets = { maxContexts: 8, maxHistoryRevisions: 8, maxHistoryBytes: 64 * 1024 ** 2,
-  maxRetainedBytesPerContext: 96 * 1024 ** 2, maxRetainedBytesGlobal: 512 * 1024 ** 2, maxQueuedPaths: 10_000,
-  maxConcurrentAnalyses: 1, warmIdleMs: 600_000, coldRetainMs: 1_800_000, debounceMs: 100, verificationIntervalMs: 60_000 };
+export const testBudgets: ContextBudgets = {
+  maxContexts: 8, maxHotContexts: 2, maxHistoryRevisions: 8, maxHistoryBytes: 64 * 1024 ** 2,
+  maxRetainedBytesPerContext: 96 * 1024 ** 2, maxRetainedBytesGlobal: 512 * 1024 ** 2,
+  maxQueuedPaths: 10_000, maxConcurrentAnalyses: 1, warmIdleMs: 600_000,
+  coldRetainMs: 1_800_000, debounceMs: 100, sweepIntervalMs: 30_000, updateDeadlineMs: 2000,
+};
 export function hash(content: string): string { return createHash('sha256').update(content).digest('hex'); }
-export function capture(version = 1, execution: 'completed' | 'invalid' | 'incomplete' = 'completed', inputs?: readonly CapturedInput[]): Extract<IncrementRun, { status: 'reported' }> {
-  const report = historyReport(`run/1:${version}`);
+
+/** Independently supplied facts for a scripted session operation. The fake does
+ * no filesystem discovery or Ramify analysis and cannot establish equivalence. */
+export interface ScriptedCapture {
+  readonly status: 'captured';
+  readonly report: AnalysisReport;
+  readonly revision: SessionRevision;
+  readonly factBytes?: number;
+}
+export function capture(version = 1, execution: 'completed' | 'invalid' | 'incomplete' = 'completed', inputs?: readonly CapturedInput[]): ScriptedCapture {
+  const base = historyReport(`run/1:${version}`);
   const observed = inputs ?? [{ path: 'src/index.ts', role: 'source' as const, sha256: hash(String(version)), bytes: 1 }];
   const inputId = `input/1:${hash(JSON.stringify(observed))}`;
-  const retained: RetainedAnalysis = { schemaVersion: 'ramify.retained/1', inputId, engine: 'test-engine', inputs: observed,
-    bytes: 100, stages: [], products: {} };
-  return { status: 'reported', report: { ...report, inputId, outcome: { execution, check: execution === 'completed' ? 'passed' : 'not-run', coverage: execution === 'completed' ? 'complete' : 'not-run' },
-    summary: { ...report.summary, complete: execution === 'completed', owners: version } },
-    retained: execution === 'incomplete' ? null : retained, reused: [], changed: observed.map(input => input.path) };
+  const report: AnalysisReport = {
+    ...base, inputId,
+    outcome: { execution, check: execution === 'completed' ? 'passed' : 'not-run', coverage: execution === 'completed' ? 'complete' : 'not-run' },
+    summary: { ...base.summary, complete: execution === 'completed', owners: version },
+  };
+  return { status: 'captured', report, revision: {
+    sequence: version, inputId, inputs: observed, changed: observed.map(input => input.path),
+    checked: { path: version === 1 ? 'cold' : 'source', files: observed.filter(input => input.role === 'source').map(input => input.path), accesses: 0, modelRebuilt: version === 1 },
+    outcome: report.outcome, summary: report.summary, diagnostics: report.diagnostics, warnings: report.warnings, coverage: report.coverage,
+    delta: { added: [], removed: [], positionOnly: [] },
+    timings: { classify: 1, inventory: 2, compiler: 3, descriptions: 4, accesses: 5, link: 6, decide: 7, publish: 8, total: 36 },
+  } };
 }
+export interface ScriptedCall {
+  readonly kind: 'open' | 'update' | 'sweep';
+  readonly inputs: { readonly project: ProjectRequest; readonly setup: ContextSetup; readonly changes: readonly SessionChange[] };
+  readonly signal: AbortSignal | undefined;
+}
+type ScriptedResult = ScriptedCapture | SessionUpdate | { readonly status: 'unchanged' };
+export interface ScriptedSession {
+  readonly session: RetainedSession;
+  readonly project: ProjectRequest;
+  readonly reportCalls: number[];
+  readonly releasedRevisions: number[];
+  releaseCompilerCalls: number;
+  disposeCalls: number;
+}
+
 export function createScriptedDriver() {
-  const calls: { inputs: Parameters<AnalysisDriver['check']>[0]; signal: AbortSignal | undefined }[] = [];
-  const pending: ((call: typeof calls[number]) => Promise<IncrementRun> | IncrementRun)[] = [];
-  let version = 1;
+  const calls: ScriptedCall[] = [];
+  const pending: ((call: ScriptedCall) => Promise<ScriptedResult> | ScriptedResult)[] = [];
+  const sessions: ScriptedSession[] = [];
+  const reportCalls: { readonly root: string; readonly sequence: number }[] = [];
+  const verifyCalls: string[] = [];
+  const verifyPending: ((session: RetainedSession) => Promise<VerifyOutcome> | VerifyOutcome)[] = [];
+  const missingReports = new Set<number>();
+  let fallback = capture(1);
+  let factBytes = 100;
   let disposed = false;
+  const invoke = async (call: ScriptedCall): Promise<ScriptedResult> => {
+    calls.push(call);
+    const next = pending.shift();
+    const result = next ? await next(call) : fallback;
+    if (result.status === 'captured') fallback = result;
+    return result;
+  };
   const driver: AnalysisDriver = {
-    async resolve(request) { return { status: 'resolved', root: request.root ?? '/fixture', selection: request.root ? 'given' : 'found', invokedFrom: request.cwd, configuration: 'tsconfig.json' }; },
-    async check(inputs, control) {
-      const call = { inputs, signal: control?.signal }; calls.push(call);
-      const run = pending.shift();
-      return run ? run(call) : capture(version);
+    async resolve(request) {
+      return { status: 'resolved', root: request.root ?? '/fixture', selection: request.root ? 'given' : 'found', invokedFrom: request.cwd, configuration: 'tsconfig.json' };
+    },
+    async open(project, setup, control) {
+      const first = await invoke({ kind: 'open', inputs: { project, setup, changes: [] }, signal: control?.signal });
+      if (control?.signal?.aborted || first.status === 'cancelled') return { status: 'cancelled' };
+      if (first.status === 'reported') return first;
+      if (first.status !== 'captured') throw new Error(`A scripted open needs a capture, received ${first.status}`);
+      if (first.report.outcome.execution === 'incomplete' || first.report.outcome.execution === 'unavailable') return { status: 'reported', report: first.report };
+      let current: SessionRevision | null = null;
+      let currentReport: AnalysisReport | null = null;
+      let level: SessionStatus['level'] = 'hot';
+      let retainedBytes = factBytes;
+      let sessionDisposed = false;
+      let invocation: Pick<AnalysisInputs, 'project' | 'capabilities'> = { project, capabilities: setup.capabilities };
+      const reports = new Map<number, AnalysisReport>();
+      function accept(next: ScriptedCapture): Extract<SessionUpdate, { status: 'revised' }> {
+        const report: AnalysisReport = { ...next.report, request: { ...next.report.request, project: invocation.project, capabilities: invocation.capabilities } };
+        const comparable = (value: AnalysisReport) => JSON.stringify({ ...value, runId: '' });
+        retainedBytes = next.factBytes ?? factBytes;
+        if (current && currentReport && comparable(report) === comparable(currentReport)) return { status: 'revised', revision: current, identical: true };
+        const sequence = (current?.sequence ?? 0) + 1;
+        const previous = new Map((current?.diagnostics ?? []).map(diagnostic => [diagnostic.id, diagnostic]));
+        const nextIds = new Set(report.diagnostics.map(diagnostic => diagnostic.id));
+        current = { ...next.revision, sequence, outcome: report.outcome, summary: report.summary,
+          diagnostics: report.diagnostics, warnings: report.warnings, coverage: report.coverage,
+          delta: { added: report.diagnostics.filter(diagnostic => !previous.has(diagnostic.id)),
+            removed: [...previous.keys()].filter(identity => !nextIds.has(identity)), positionOnly: next.revision.delta.positionOnly } };
+        currentReport = report;
+        reports.set(sequence, report);
+        return { status: 'revised', revision: current, identical: false };
+      }
+      async function run(kind: 'update' | 'sweep', changes: readonly SessionChange[], runControl?: RunControl,
+        nextInvocation?: Pick<AnalysisInputs, 'project' | 'capabilities'>): Promise<SessionUpdate | { readonly status: 'unchanged' }> {
+        if (sessionDisposed) throw new Error('Scripted session is disposed');
+        if (nextInvocation) invocation = nextInvocation;
+        const result = await invoke({ kind, inputs: { project: invocation.project, setup: { ...setup, capabilities: invocation.capabilities }, changes }, signal: runControl?.signal });
+        if (runControl?.signal?.aborted) return { status: 'cancelled' };
+        if (result.status !== 'captured') return result;
+        if (result.report.outcome.execution === 'incomplete' || result.report.outcome.execution === 'unavailable') return { status: 'reported', report: result.report };
+        level = 'hot';
+        return accept(result);
+      }
+      const initial = accept(first);
+      const session: RetainedSession = {
+        get current() { return current; },
+        async update(changes, runControl, nextInvocation) {
+          const result = await run('update', changes, runControl, nextInvocation);
+          return result.status === 'unchanged' ? { status: 'revised', revision: current!, identical: true } : result;
+        },
+        sweep: runControl => run('sweep', [], runControl),
+        async verify(runControl) {
+          verifyCalls.push(project.root ?? project.cwd);
+          if (runControl?.signal?.aborted) return { status: 'cancelled' };
+          const next = verifyPending.shift();
+          const result = next ? await next(session) : { status: 'equal' as const, sequence: current!.sequence, elapsedMs: 1 };
+          if (result.status === 'mismatch') current = result.revision;
+          return result;
+        },
+        async report(_runControl, sequence = current?.sequence ?? 0) {
+          entry.reportCalls.push(sequence);
+          reportCalls.push({ root: project.root ?? project.cwd, sequence });
+          return missingReports.has(sequence) ? null : reports.get(sequence) ?? null;
+        },
+        async releaseRevision(sequence) { entry.releasedRevisions.push(sequence); reports.delete(sequence); },
+        status() { return { level, sequence: current?.sequence ?? 0, observedInputs: current?.inputs.length ?? 0,
+          factBytes: retainedBytes, worker: { heapUsed: 1000, rss: 2000 }, compiler: { pid: level === 'hot' ? 123 : null, rss: level === 'hot' ? 1000 : null }, lastSweepAt: null }; },
+        async releaseCompiler() { entry.releaseCompilerCalls++; level = 'warm'; },
+        async dispose() { if (sessionDisposed) return; entry.disposeCalls++; sessionDisposed = true; current = null; currentReport = null; reports.clear(); retainedBytes = 0; },
+      };
+      const entry: ScriptedSession = { session, project, reportCalls: [], releasedRevisions: [], releaseCompilerCalls: 0, disposeCalls: 0 };
+      sessions.push(entry);
+      return { status: 'opened', session, revision: initial.revision };
     },
     async dispose() { disposed = true; },
   };
-  return { driver, calls, pending, set version(value: number) { version = value; }, get disposed() { return disposed; } };
+  return { driver, calls, pending, sessions, reportCalls, verifyCalls, verifyPending, missingReports,
+    get openCalls() { return calls.filter(call => call.kind === 'open'); },
+    get updateCalls() { return calls.filter(call => call.kind === 'update'); },
+    get sweepCalls() { return calls.filter(call => call.kind === 'sweep'); },
+    set version(value: number) { fallback = capture(value); },
+    set factBytes(value: number) { factBytes = value; },
+    get disposed() { return disposed; },
+  };
 }
-export async function flush(): Promise<void> { for (let index = 0; index < 30; index++) await Promise.resolve(); }
+export async function flush(): Promise<void> { for (let index = 0; index < 80; index++) await Promise.resolve(); }

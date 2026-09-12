@@ -1,5 +1,4 @@
 import { channel } from 'node:diagnostics_channel';
-import type { RetainedWork } from './retained-products.js';
 import type { AnalysisInputs, AnalysisRun, AnalysisSession, RunControl } from './interfaces/analysis.js';
 import { detached, diagnostic } from './report-data.js';
 import { ReportDraft } from './report.js';
@@ -9,11 +8,6 @@ const sessionEvents = channel('ramify.analysis.session');
 
 /** Construction captures only plain request data; the single analyze call owns all I/O. */
 export function createAnalysisSession(inputs: AnalysisInputs): AnalysisSession {
-  return createRetainedSession(inputs);
-}
-
-/** Private session variant; retention does not change the public lifetime. */
-export function createRetainedSession(inputs: AnalysisInputs, retained?: RetainedWork): AnalysisSession {
   const request = detached(inputs);
   if (sessionEvents.hasSubscribers) sessionEvents.publish({ event: 'created' });
   let used = false;
@@ -34,7 +28,7 @@ export function createRetainedSession(inputs: AnalysisInputs, retained?: Retaine
       const cancel = (): void => abort.abort();
       control.signal?.addEventListener('abort', cancel, { once: true });
       if (control.signal?.aborted) cancel();
-      pending = runAnalysis(request, abort.signal, retained).finally(() => {
+      pending = runAnalysis(request, abort.signal).finally(() => {
         control.signal?.removeEventListener('abort', cancel); pending = undefined;
       });
       return pending;

@@ -33,7 +33,7 @@ for (const instance of plan2Instances.filter(item => item.id.startsWith('I2-24:'
       const token = opened.value.token;
       const sync = async () => {
         const value = await backend.check({ token, requestId: randomUUID(), freshness: { mode: 'synchronized', expect: [] } });
-        if (!value.ok || value.value.status !== 'reported') throw new Error(JSON.stringify(value)); return value.value;
+        if (!value.ok || value.value.status !== 'reported' || value.value.report === null) throw new Error(JSON.stringify(value)); return { ...value.value, report: value.value.report };
       };
       const baseline = await sync();
       const out: string[] = [], err: string[] = [];
@@ -65,7 +65,7 @@ for (const instance of plan2Instances.filter(item => item.id.startsWith('I2-24:'
         } else if (instance.subcase === 'codec-in-direct-channel') {
           const local = await quick.service.check({ token, requestId: 'local', freshness: { mode: 'published', wait: false } });
           const transported = await backend.check({ token, requestId: 'wire', freshness: { mode: 'published', wait: false } });
-          if (!local.ok || local.value.status !== 'reported' || !transported.ok || transported.value.status !== 'reported') throw new Error('Expected published reports');
+          if (!local.ok || local.value.status !== 'reported' || local.value.report === null || !transported.ok || transported.value.status !== 'reported' || transported.value.report === null) throw new Error('Expected published reports');
           a.equal('serialized report values are unchanged', transported.value.report, local.value.report);
           a.ok('transport has no report or nested shared identity', transported.value.report !== local.value.report && transported.value.report.summary !== local.value.report.summary);
           const invalid = await quick.request('notAnOperation', {});

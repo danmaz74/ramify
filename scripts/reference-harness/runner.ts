@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { performance } from 'node:perf_hooks';
 
 import { instanceFromSeed } from './instances.js';
+import { plan5Instances } from './plan5-instances.js';
 import type { ReferenceInstance, VerificationCapability } from './instances.js';
 import { runIsolatedProject } from './mutation.js';
 import type { IsolatedProject, ProjectFixture } from './mutation.js';
@@ -111,8 +112,9 @@ export interface InstanceExecution {
   readonly id: string;
   readonly iteration: number;
   readonly required: boolean;
-  readonly status: 'passed' | 'failed' | 'not-executed';
-  readonly reason?: 'future-iteration' | 'missing-record' | 'missing-capability' | 'missing-handler'
+  readonly status: 'passed' | 'failed' | 'not-executed' | 'superseded';
+  readonly supersededBy?: string;
+  readonly reason?: 'superseded' | 'future-iteration' | 'missing-record' | 'missing-capability' | 'missing-handler'
     | 'unrun-assertion' | 'unrun-baseline' | 'assertion-failed' | 'baseline-failed' | 'handler-failed';
   readonly missingCapabilities?: readonly VerificationCapability[];
   readonly baselineAssertions: readonly AssertionEvidence[];
@@ -200,6 +202,7 @@ export async function verifyInstances(options: {
   readonly plan: ReviewedPlan;
   readonly records: readonly ReferenceInstance[];
   readonly runtime: HarnessRuntime;
+  readonly counterpartRecords?: readonly ReferenceInstance[];
   readonly iteration?: number;
   readonly workRoot: string;
   readonly preserveOnFailure?: boolean;
@@ -208,17 +211,35 @@ export async function verifyInstances(options: {
   const inventoryIssues = validateInstanceRecords(options.records, options.plan);
   const records = new Map(options.records.map((record) => [record.id, record]));
   const instances: InstanceExecution[] = [];
-  for (const seed of options.plan.members) {
+  const neededCounterparts = new Set(Object.entries(options.plan.supersessions ?? {})
+    .filter(([id]) => iterations.includes(options.plan.members.find(seed => seed[0] === id)![1])).map(([, value]) => value.by));
+  const counterpartMembers = (options.plan.counterparts ?? []).filter(seed => neededCounterparts.has(seed[0]));
+  const counterpartRecords = new Map((options.counterpartRecords ?? plan5Instances).map(record => [record.id, record]));
+  for (const seed of counterpartMembers) {
+    const counterpart = counterpartRecords.get(seed[0]);
+    if (!counterpart) inventoryIssues.push(`Missing reviewed counterpart: ${seed[0]}`);
+    else if (JSON.stringify(counterpart) !== JSON.stringify(instanceFromSeed(seed))) inventoryIssues.push(`Counterpart differs from reviewed metadata: ${seed[0]}`);
+  }
+  for (const seed of [...options.plan.members, ...counterpartMembers]) {
     // Even a deleted record retains its independently required execution slot.
     const member = instanceFromSeed(seed);
-    const required = iterations.includes(member.iteration);
+    const superseded = options.plan.supersessions?.[member.id];
+    const counterpart = neededCounterparts.has(member.id);
+    const required = !superseded && (counterpart || iterations.includes(member.iteration));
     const empty = { id: seed[0], iteration: member.iteration, required,
       baselineAssertions: [], assertions: [], durationMs: 0 } as const;
-    if (!required) {
+    if (superseded && iterations.includes(member.iteration) && records.has(member.id)) {
+      instances.push({ ...empty, status: 'superseded', reason: 'superseded', supersededBy: superseded.by });
+      continue;
+    }
+    if (!required && !superseded) {
       instances.push({ ...empty, status: 'not-executed', reason: 'future-iteration' });
       continue;
     }
-    const record = records.get(seed[0]);
+    if (superseded && !iterations.includes(member.iteration)) {
+      instances.push({ ...empty, status: 'not-executed', reason: 'future-iteration' }); continue;
+    }
+    const record = counterpart ? counterpartRecords.get(seed[0]) : records.get(seed[0]);
     if (!record) {
       instances.push({ ...empty, status: 'not-executed', reason: 'missing-record' });
       continue;

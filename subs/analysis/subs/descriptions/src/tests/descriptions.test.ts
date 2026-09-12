@@ -34,21 +34,22 @@ const linkingNames = ['LinkInputs', 'ExpandedSelection', 'LinkIssue', 'LinkedDes
 const analysisNames = ['Capability', 'StageId', 'RunControl', 'AnalysisLimits', 'AnalysisInputs',
   'InventoryInputs', 'InventorySnapshot', 'InventoryRun', 'ValidationRun', 'CapabilityExecution',
   'StageExecution', 'AnalysisCode', 'AnalysisDiagnostic', 'AccessResult', 'AnalysisSnapshot',
-  'AnalysisSummary', 'AnalysisReport', 'AnalysisRun', 'AnalysisSession', 'InputChange', 'RetainedStageId', 'RetainedStage',
-  'RetainedAnalysis', 'IncrementInputs', 'IncrementRun'];
+  'AnalysisSummary', 'AnalysisReport', 'AnalysisRun', 'AnalysisSession', 'SessionLimits', 'SessionInputs',
+  'SessionChange', 'RevisionPath', 'CheckedSet', 'FindingDelta', 'RevisionTimings', 'SessionRevision',
+  'SessionUpdate', 'VerifyOutcome', 'SessionStatus', 'RetainedSession', 'SessionOpen'];
 const syntaxNames = ['TextSpan', 'DescriptionToken', 'DescriptionIssue', 'NamedSelection',
   'DescriptionSelection', 'DescriptionStatement', 'DescriptionDocument', 'ParsedDescription', 'DescriptionParser'];
 
 const projectNames = ['ProjectRequest', 'ProjectScope', 'CapturedInput', 'InventoryArea', 'ModulePurpose',
   'InventoryModule', 'InventoryFile', 'ExactReference', 'OutsideSourceWarning', 'ProjectInventory',
   'ProjectIssue', 'AcquisitionLimits', 'ProjectInputView', 'ProjectReadOptions', 'ProjectRead', 'ProjectResolution', 'RetainedConfiguration'];
-// Plan 5 iteration 4 adds these to analysis A7 only; root relays them later.
+// The sink remains inside analysis; iteration 9 relays the other observer types.
 const observerNames = ['ObservationSink', 'InputChangeKind', 'ObservedChange', 'InventoryUpdate', 'ProjectObserver', 'ProjectObserve'];
 
 // Independent literal selections from Plan 2 owners.md R7 and N5.
 const contextNames = ['ContextId', 'GenerationId', 'RevisionId', 'LeaseId', 'ContextToken', 'ContextSetup',
   'ContextSelection', 'InputFingerprints', 'RevisionCause', 'ContextRevision', 'ContextState', 'SynchronizationState',
-  'ContextStatus', 'ExpectedContent', 'Freshness', 'FreshnessRecord', 'CheckRequest', 'UnavailableReason', 'Unavailable',
+  'ContextStatus', 'ExpectedContent', 'Freshness', 'FreshnessRecord', 'CheckRequest', 'CheckDelta', 'UnavailableReason', 'Unavailable',
   'CheckOutcome', 'OpenOutcome', 'ContextEvent', 'SubscriptionHandle', 'WatchEvent', 'WatcherHandle', 'WatcherPort',
   'ClockPort', 'ContextBudgets'];
 const controlledNames = ['createControlledWatcher', 'createControlledClock', 'ControlledWatcher', 'ControlledClock'];
@@ -97,11 +98,11 @@ const toolkit: readonly Fixture[] = [
     src('*', 'interfaces/batch.ts', null, descendants), src('*', 'interfaces/service.ts', null, descendants),
     statement('expose-test', ['createQuickEnvironment', 'QuickEnvironment'], 'quick-environment.ts', descendants),
     sub(modelNames, 'analysis', descendants), sub([...syntaxNames, ...linkingNames], 'analysis', descendants),
-    sub(projectNames, 'analysis', descendants), sub(sourceNames, 'analysis', descendants),
+    sub([...projectNames, ...observerNames.slice(1)], 'analysis', descendants), sub(sourceNames, 'analysis', descendants),
     sub(analysisNames, 'analysis', descendants), sub(presentationNames, 'presentation', descendants),
     sub([...contextNames, ...residentNames, ...controlledNames], 'daemon', descendants),
   ] },
-  { path: 'subs/analysis/', name: 'analysis', tags: [], statements: [sub('*', 'model', both), sub([...syntaxNames, ...linkingNames], 'descriptions', both), sub([...projectNames, ...observerNames], 'project', both), sub(sourceNames, 'typescript', both), src(['validateProject'], 'validation.ts'), src('*', 'interfaces/analysis.ts'), src(['acquireInventory'], 'inventory.ts'), src(['createAnalysisSession'], 'session.ts'), src(['analyzeProject'], 'analyze-project.ts'), src(['analyzeIncrement'], 'increment.ts'), src(['resolveProject'], 'resolve-project.ts'), src('*', 'interfaces/session.ts'), src(['openRetainedSession'], 'retained-session.ts')] },
+  { path: 'subs/analysis/', name: 'analysis', tags: [], statements: [sub('*', 'model', both), sub([...syntaxNames, ...linkingNames], 'descriptions', both), sub([...projectNames, ...observerNames], 'project', both), sub(sourceNames, 'typescript', both), src(['validateProject'], 'validation.ts'), src('*', 'interfaces/analysis.ts'), src(['acquireInventory'], 'inventory.ts'), src(['createAnalysisSession'], 'session.ts'), src(['analyzeProject'], 'analyze-project.ts'), src(['resolveProject'], 'resolve-project.ts'), src('*', 'interfaces/session.ts'), src(['openRetainedSession'], 'retained-session.ts')] },
   { path: 'subs/analysis/subs/descriptions/', name: 'descriptions', tags: browser, statements: [src(['parseDescription'], 'parse.ts', browser), src('*', 'interfaces/syntax.ts'), src(['linkDescriptions'], 'link.ts', browser), src('*', 'interfaces/linking.ts')] },
   { path: 'subs/analysis/subs/model/', name: 'model', tags: browser, statements: [
     src('*', 'interfaces/model.ts'), src(['resolveTagRegistry', 'createDefaultTagRegistry'], 'registry.ts', browser),

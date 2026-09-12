@@ -31,6 +31,12 @@ export interface SubscriptionOpened {
 }
 export interface UnsubscribeParams { readonly subscription: string }
 export interface DaemonCounters {
+  readonly sweeps: number;
+  readonly audits: number;
+  readonly auditMismatches: number;
+  readonly coveredRequests: number;
+  readonly coldOutcomes: number;
+  readonly deadlineOutcomes: number;
   readonly revisions: number;
   readonly analyses: number;
   readonly cancelledAnalyses: number;

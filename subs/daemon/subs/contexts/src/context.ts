@@ -1,4 +1,4 @@
-import type { RetainedAnalysis } from '../../../../analysis/src/interfaces/analysis.js';
+import type { RetainedSession } from '../../../../analysis/src/interfaces/session.js';
 import type { ProjectRequest, ProjectScope } from '../../../../analysis/subs/project/src/interfaces/project.js';
 import type { ContextEvent, ContextRevision, ContextSelection, ContextState, ContextToken, SynchronizationState, WatcherHandle } from './interfaces/contexts.js';
 import type { RevisionHistory } from './history.js';
@@ -12,8 +12,9 @@ export interface LiveContext {
   readonly openedAt: number;
   readonly invocations: Map<string, Invocation>;
   readonly subscriptions: Map<string, { lease: string; listener: (event: ContextEvent) => void }>;
-  readonly history: RevisionHistory<ContextRevision>;
+  history: RevisionHistory<ContextRevision>;
   readonly queue: PendingCheck[];
+  readonly deliveries: Set<PendingCheck>;
   readonly paths: Map<string, 'changed' | 'created' | 'deleted' | 'unknown'>;
   lastActivityAt: number;
   hadLease: boolean;
@@ -21,15 +22,26 @@ export interface LiveContext {
   state: ContextState;
   synchronization: SynchronizationState;
   lastValid: ContextRevision | null;
-  retained: RetainedAnalysis | null;
+  session: RetainedSession | null;
+  publishedSession: RetainedSession | null;
+  readonly versions: Set<number>;
+  observedSequence: number;
+  invocation: Invocation;
+  sweepRequired: boolean;
+  lastSweepAt: number;
+  auditedSequence: number;
+  auditRequired: boolean;
+  demoting: Promise<void> | null;
+  cooling: boolean;
   sequence: number;
   watcher: WatcherHandle | null;
   watcherState: 'active' | 'unavailable' | 'disposed';
   attaching: boolean;
   conservative: boolean;
-  background: 'open' | 'watch' | 'verify' | 'conservative' | null;
+  background: 'open' | 'request' | 'watch' | 'sweep' | 'verify' | 'conservative' | null;
   running: RunningCapture | null;
   debounce: (() => void) | null;
-  verification: (() => void) | null;
+  sweepTimer: (() => void) | null;
+  auditTimer: (() => void) | null;
   idle: (() => void) | null;
 }

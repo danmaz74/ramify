@@ -1,8 +1,9 @@
+import { interceptSessionOperations } from './session-driver-operations.js';
 import { randomUUID } from 'node:crypto';
 import { cp, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createQuickEnvironment } from '../../src/tests/quick-environment.js';
-import { createAnalysisDriverFromSessions } from '../../src/resident-assembly.js';
+import { createSessionDriver } from '../../src/resident-assembly.js';
 import type { AnalysisDriver, CheckOutcome, ContextToken, ContextSetup } from '../../subs/daemon/subs/contexts/src/interfaces/contexts.js';
 import type { Capability, AnalysisReport } from '../../subs/analysis/src/interfaces/analysis.js';
 import type { RamifyService, ServiceResult, OpenContextParams } from '../../src/interfaces/service.js';
@@ -18,8 +19,8 @@ const capabilities: readonly Capability[] = ['registry', 'layout', 'metadata', '
 const setup: ContextSetup = { registry: 'default', capabilities };
 const handlers = new Map<string, InstanceHandler>();
 function value<T>(result: ServiceResult<T>): T { if (!result.ok) throw new Error(`${result.error.code}: ${result.error.message}`); return result.value; }
-function report(result: ServiceResult<CheckOutcome>): Extract<CheckOutcome, { status: 'reported' }> {
-  const outcome = value(result); if (outcome.status !== 'reported') throw new Error(JSON.stringify(outcome)); return outcome;
+function report(result: ServiceResult<CheckOutcome>): Extract<CheckOutcome, { status: 'reported' }> & { report: AnalysisReport } {
+  const outcome = value(result); if (outcome.status !== 'reported' || outcome.report === null) throw new Error(JSON.stringify(outcome)); return { ...outcome, report: outcome.report };
 }
 function normalize(report: AnalysisReport): unknown { return { ...report, runId: '' }; }
 async function settled(service: RamifyService, token: ContextToken): Promise<void> {
@@ -75,11 +76,11 @@ for (const instance of plan2Instances.filter(item => item.iteration === 5)) {
           a.equal('supported browser tag matching remains available', control.report.outcome.check, 'passed'); return;
         }
         if (instance.subcase === 'sync-throw' || instance.subcase === 'async-failure') {
-          const real = createAnalysisDriverFromSessions(); let fail = false;
-          const driver: AnalysisDriver = { ...real, check(inputs, control) {
+          const real = createSessionDriver(); let fail = false;
+          const driver: AnalysisDriver = interceptSessionOperations(real, async run => {
             if (fail) { fail = false; if (instance.subcase === 'sync-throw') throw new Error('Injected synchronous driver fault'); return Promise.reject(new Error('Injected asynchronous driver fault')); }
-            return real.check(inputs, control);
-          } };
+            return run();
+          });
           const faultQuick = await createQuickEnvironment({}, { driver });
           const faultService = faultQuick.service;
           try {

@@ -181,4 +181,21 @@ const seeds: readonly InstanceSeed[] = [
   ["I2-30:plan1-regression", 14, ["DA18"], "completion", "R", "`npm run reference:verify -- --plan 1` under a harness-owned `RAMIFY_ENDPOINT_DIR`.", "All 308 Plan 1 instances pass on the Plan 2 build: 305 records and expectations byte-untouched, and the three backed by the revised owner-list and entry-map expectations passing with their eleven-owner and eight-entry literals; no daemon survives the run.", null, null, {"selection": "R, T", "evidence": "process"}],
 ];
 
-export const plan2Instances: readonly ReferenceInstance[] = seeds.map(instanceFromSeed);
+export const plan2SupersessionAmendment = 'docs/plans/done/iteration-2-resident-verification/supersession-plan5.md';
+/** Exactly the ten accepted retirements; records remain in the inventory. */
+export const plan2Supersessions: Readonly<Record<string, string>> = {
+  'I2-10:null-changes-no-reuse': 'I5-07:configuration-broad',
+  'I2-10:metadata-only-reuse': 'I5-07:readme-metadata-only',
+  'I2-10:exposure-only-reuse': 'I5-07:description-relink-subtree',
+  'I2-10:header-tag-rerun': 'I5-07:description-relink-subtree',
+  'I2-10:source-rerun': 'I5-06:export-added-importers',
+  'I2-10:configuration-rerun': 'I5-07:configuration-broad',
+  'I2-10:absent-appears-rerun': 'I5-07:created-importing-file',
+  'I2-10:dependency-rerun': 'I5-07:dependency-broad',
+  'I2-10:products-plain': 'I5-06:unchanged-surface-no-propagation',
+  'I2-11:reuse-equal': 'I5-07:audit-equal-sequence',
+};
+export const plan2Instances: readonly ReferenceInstance[] = seeds.map(seed => {
+  const instance = instanceFromSeed(seed), by = plan2Supersessions[instance.id];
+  return by ? { ...instance, superseded: { by, amendment: plan2SupersessionAmendment } } : instance;
+});

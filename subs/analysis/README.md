@@ -2,10 +2,10 @@
 
 Analysis composes one captured project view, source facts, descriptions and model decisions into disposable batch work, immutable reports and a retained session whose revisions recompute only the facts a change reaches. It owns stage outcomes, input identity and computational invalidation so every client consumes the same completed analysis.
 
-`analyzeIncrement` runs the same disposable pipeline over a fresh capture and
-reuses frozen stage products only when their recorded dependencies match. Unknown
-changes permit only per-file description and README reuse. `resolveProject`
-selects the canonical root and configuration without reading module descriptions.
+`analyzeProject` runs the disposable batch pipeline over a fresh capture.
+`resolveProject` selects the canonical root and configuration without reading
+module descriptions. Resident contexts keep one `openRetainedSession` handle
+for their successive revisions.
 
 `openRetainedSession(inputs, control?)` observes one project, keeps a warm
 compiler behind the retained adapter with the observer's sink, and publishes

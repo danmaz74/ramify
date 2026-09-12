@@ -1,4 +1,4 @@
-import type { InputChange } from '../../../../analysis/src/interfaces/analysis.js';
+import type { SessionChange } from '../../../../analysis/src/interfaces/session.js';
 import type { ProjectRequest } from '../../../../analysis/subs/project/src/interfaces/project.js';
 import type { CheckOutcome, CheckRequest, ContextSetup } from './interfaces/contexts.js';
 
@@ -9,13 +9,16 @@ export interface PendingCheck {
   readonly acknowledged: number;
   readonly invocation: Invocation;
   readonly resolve: (outcome: CheckOutcome) => void;
+  readonly revisionAtAcknowledgment: import('./interfaces/contexts.js').ContextRevision | null;
+  readonly needsSweep: boolean;
   cleanup: () => void;
   settled: boolean;
+  deadlineExpired: boolean;
 }
 export interface RunningCapture {
   readonly controller: AbortController;
   readonly requests: readonly PendingCheck[];
-  readonly changes: readonly InputChange[] | null;
+  readonly changes: readonly SessionChange[];
   readonly background: boolean;
   readonly started: number;
 }

@@ -32,8 +32,8 @@ interface PackageMetadata {
 // Independent entry expectations: Plan 1's portable entry witnesses plus
 // the analysis and client exports required by Plan 2's activation contract.
 const entryFunctions = {
-  '.': ['createAnalysisSession', 'analyzeProject', 'validateProject', 'acquireInventory', 'analyzeIncrement', 'resolveProject'],
-  './analysis': ['createAnalysisSession', 'analyzeProject', 'validateProject', 'acquireInventory', 'analyzeIncrement', 'resolveProject'],
+  '.': ['createAnalysisSession', 'analyzeProject', 'validateProject', 'acquireInventory', 'openRetainedSession', 'resolveProject'],
+  './analysis': ['createAnalysisSession', 'analyzeProject', 'validateProject', 'acquireInventory', 'openRetainedSession', 'resolveProject'],
   './analysis/inventory': ['acquireInventory'], './model': ['createDefaultTagRegistry'],
   './presentation': ['ModelDiagram'], './layout': ['placeNodes'], './cli': ['runCli'],
   './client': ['connectDaemon', 'selectEndpoint', 'readDaemonRecord', 'encodeMessage', 'decodeMessage'],
@@ -48,7 +48,7 @@ function description(text: string): DescriptionDocument {
 
 /** Plan 2 abbreviates unchanged named lists. Expand only from the archived
  * Plan 1 review, never from the implementation being checked. */
-export function reviewedOwners(baseline: string, resident: string): ReadonlyMap<string, ReviewedOwner> {
+export function reviewedOwners(baseline: string, resident: string, retained?: string, retainedIteration = 9): ReadonlyMap<string, ReviewedOwner> {
   const owners = new Map<string, ReviewedOwner>();
   function add(review: string, abbreviations: boolean): number {
     let count = 0;
@@ -84,6 +84,13 @@ export function reviewedOwners(baseline: string, resident: string): ReadonlyMap<
   }
   assert.equal(add(baseline, false), 9, 'All nine archived Plan 1 owners must be present');
   assert.equal(add(resident, true), 6, 'All six Plan 2 owner declarations must be present');
+  if (retained) {
+    const previousCli = owners.get('cli')!;
+    assert.equal(add(retained, true), 7, 'All seven Plan 5 declaration texts must be present');
+    // CLI's purpose describes --changed and its document, activated in iteration
+    // 10. Do not claim that future behavior while validating iteration 9.
+    if (retainedIteration < 10) owners.set('cli', { ...owners.get('cli')!, purpose: previousCli.purpose });
+  }
   assert.equal(owners.size, 11, 'All eleven final owners must be present');
   return owners;
 }
@@ -147,7 +154,7 @@ for (const [name, entry] of Object.entries(metadata.exports)) {
 
 export async function validateFinalContracts(root: string) {
   const read = (path: string) => readFile(resolve(root, path), 'utf8');
-  const expected = reviewedOwners(await read(`${plan1}/owners.md`), await read(`${plan2}/owners.md`));
+  const expected = reviewedOwners(await read(`${plan1}/owners.md`), await read(`${plan2}/owners.md`), await read('docs/plans/iteration-5-fast-incremental-checks/owners.md'));
   const metadata = reviewedPackage(await read(`${plan1}/contracts.md`), await read(`${plan2}/contracts.md`));
   const errors: Error[] = [];
   for (const owner of expected.values()) {

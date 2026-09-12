@@ -229,8 +229,8 @@ and all fourteen sequence indices, titles and prerequisite assignments. The
 Plan 1 reader and its 308 records remain independent.
 
 `npm run reference:verify -- --plan 2 --iteration 2` executes the four I2-28
-harness controls. The full `--plan 2` gate requires all 176. `plan2-runtime.ts` registers the
-real incremental, context, service, IPC, process and CLI providers. A Plan 1
+harness controls. The full `--plan 2` gate preserves all 176 records and, under the accepted [Plan 5 supersession](../../docs/plans/done/iteration-2-resident-verification/supersession-plan5.md), requires the 166 unsuperseded records plus eight distinct retained-session counterparts. The ten retired records have explicit `superseded` status and no invented executions. `plan2-runtime.ts` registers the
+real retained-session, context, service, IPC, process and CLI providers. A Plan 1
 capability never activates its Plan 2 counterpart; registration never
 establishes execution or a passing gate. `--iteration 5`
 requires 64 instances from iterations 2–5; `--iteration 9` requires 134 from
@@ -512,3 +512,20 @@ commit so the recorded 229-file, 2,744-access baseline stays fixed.
 `plan5-engine-fixture.ts` instruments the owner's synchronous
 `AccessInterpretation` inside a real compiler snapshot for the query-count and
 setup-count instances. No Plan 5 engine instance starts a daemon.
+
+### Context integration and Plan 2 supersession (iteration 9)
+
+`plan5-context-cases.ts` supplies all ten I5-09 witnesses: a real reference
+session through the quick environment and controlled context cases for identity
+coverage, path coalescing, compact history, deadlines and compiler demotion.
+`plan5-supersession-cases.ts` checks the compiled entry and removed names, exact
+amended membership and both full and focused Plan 2 gates. The full-gate witness
+executes the actual Plan 2 command; the Plan 2 runner includes only the eight
+reviewed session counterparts, so composition cannot recurse into I5-10.
+
+The standalone `assertPlan2SupersessionAdmission` operation checks membership and
+negative controls without executing any product or regression handler. Its pass
+alone does not establish I5-10's full Plan 2 gate. The process witnesses preserve
+failed outputs and archive full nested reports separately to keep the enclosing
+report within its byte limit. Measurement reuse expectations remain iteration
+12's responsibility; missing or stale workload evidence still fails acceptance.

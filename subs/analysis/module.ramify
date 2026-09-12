@@ -23,7 +23,6 @@ expose-src acquireInventory from "inventory.ts" to parent
 expose-src createAnalysisSession from "session.ts" to parent
 expose-src analyzeProject from "analyze-project.ts" to parent
 
-expose-src analyzeIncrement from "increment.ts" to parent
 expose-src resolveProject from "resolve-project.ts" to parent
 
 // A11/A12: the retained session and its plain-data vocabulary.

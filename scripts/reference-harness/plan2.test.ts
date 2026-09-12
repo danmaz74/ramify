@@ -63,7 +63,7 @@ describe('Plan 2 inventory and gates', () => {
     // negative tests admission without bootstrapping or measuring the product.
     const full = await verifyInstances({ ...options, runtime: { capabilities: new Set(), handlers: new Map() } });
     expect(full.inventoryIssues).toEqual([]);
-    expect(full.summary).toEqual({ required: 176, passed: 0, failed: 0, notExecuted: 176 });
+    expect(full.summary).toEqual({ required: 174, passed: 0, failed: 0, notExecuted: 174 });
     expect([full.passed, full.planComplete]).toEqual([false, false]);
     expect(full.instances.filter(item => item.required).every(item => item.status === 'not-executed' && item.assertions.length === 0)).toBe(true);
   }, 600_000);
@@ -91,11 +91,11 @@ describe('Plan 2 inventory and gates', () => {
   ])('rejects drift in %s', async (file, from, to) => {
     const root = await mkdtemp(join(tmpdir(), 'ramify-plan2-'));
     try {
-      for (const path of [plan2InventoryDocument, `${plan2Directory}/main-plan.md`]) {
+      for (const path of [plan2InventoryDocument, `${plan2Directory}/main-plan.md`, 'docs/plans/done/iteration-2-resident-verification/supersession-plan5.md', 'docs/plans/iteration-5-fast-incremental-checks/scope.md', 'docs/plans/iteration-5-fast-incremental-checks/main-plan.md', 'docs/plans/iteration-5-fast-incremental-checks/subcases.md']) {
         const original = await readFile(join(repositoryRoot, path), 'utf8');
-        if (path.endsWith('/' + file)) expect(original.split(from)).toHaveLength(2);
+        if (path === `${plan2Directory}/${file}`) expect(original.split(from)).toHaveLength(2);
         await mkdir(dirname(join(root, path)), { recursive: true });
-        await writeFile(join(root, path), path.endsWith('/' + file) ? original.replace(from, to) : original);
+        await writeFile(join(root, path), path === `${plan2Directory}/${file}` ? original.replace(from, to) : original);
       }
       expect(() => readReviewedPlan2(root)).toThrow('Invalid reviewed Plan 2 inventory');
     } finally { await rm(root, { recursive: true, force: true }); }

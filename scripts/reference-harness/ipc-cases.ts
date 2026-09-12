@@ -1,3 +1,4 @@
+import { interceptSessionOperations } from './session-driver-operations.js';
 import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ipcFixture } from '../../subs/daemon/src/tests/ipc-fixture.js';
@@ -15,8 +16,8 @@ async function opened(fixture: Awaited<ReturnType<typeof ipcFixture>>, client: A
 }
 async function checked(client: Awaited<ReturnType<Awaited<ReturnType<typeof ipcFixture>>['connect']>>, token: ContextToken, requestId: string) {
   const result = await client.check({ token, requestId, freshness: { mode: 'synchronized', expect: [] } });
-  if (!result.ok || result.value.status !== 'reported' || !result.value.published) throw new Error(`IPC fixture did not publish: ${JSON.stringify(result)}`);
-  return result.value;
+  if (!result.ok || result.value.status !== 'reported' || !result.value.published || result.value.report === null) throw new Error(`IPC fixture did not publish: ${JSON.stringify(result)}`);
+  return { ...result.value, report: result.value.report };
 }
 function memory(run: (assertions: Assertions) => Promise<void>): InstanceHandler {
   return { kind: 'memory', run: ({ assertions }) => run(assertions) };
@@ -201,15 +202,17 @@ add('I2-16:reconnect-no-replay', async assertions => {
 });
 
 add('I2-14:error-preservation', async assertions => {
-  const { createAnalysisDriverFromSessions } = await import('../../src/resident-assembly.js');
-  const realDriver = createAnalysisDriverFromSessions();
+  const { createSessionDriver } = await import('../../src/resident-assembly.js');
+  const realDriver = createSessionDriver();
   let incomplete = false;
-  const fixture = await ipcFixture({}, false, { ...realDriver, async check(inputs, control) {
-    const run = await realDriver.check(inputs, control);
-    if (!incomplete || run.status !== 'reported') return run;
-    return { ...run, retained: null, report: { ...run.report, outcome: { execution: 'incomplete', check: 'not-run', coverage: 'not-run' },
-      summary: { ...run.report.summary, complete: false } } };
-  } });
+  const fixture = await ipcFixture({}, false, interceptSessionOperations(realDriver, async (run, session) => {
+    const result = await run();
+    if (!incomplete) return result;
+    const report = await session.report();
+    if (!report) throw new Error('Missing controlled incomplete report');
+    return { status: 'reported', report: { ...report, outcome: { execution: 'incomplete', check: 'not-run', coverage: 'not-run' },
+      summary: { ...report.summary, complete: false } } };
+  }));
   try {
     const { createProjectFixture } = await import('./fixtures/plan1/project.js');
     await createProjectFixture(fixture.project);
@@ -253,8 +256,8 @@ async function blockedNotifications(assertions: Assertions, evict: boolean) {
     for (let index = 0; index < 10; index++) {
       await writeFile(join(fixture.project, 'src/index.ts'), `export const value = ${index + 10};\n`);
       const result = await fixture.environment.service.check({ token: context.token, requestId: `queued-${index}`, freshness: { mode: 'synchronized', expect: [] } });
-      if (!result.ok || result.value.status !== 'reported' || !result.value.published) throw new Error('Publication failed while socket blocked');
-      latest = result.value;
+      if (!result.ok || result.value.status !== 'reported' || !result.value.published || result.value.report === null) throw new Error('Publication failed while socket blocked');
+      latest = { ...result.value, report: result.value.report };
     }
     if (evict) {
       // Explicit context closure evicts only an unleased context; release this

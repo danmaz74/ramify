@@ -168,20 +168,34 @@ function summary(value: unknown): boolean {
   return shape(value, ['complete', 'owners', 'sourceFiles', 'resources', 'originals', 'accesses', 'allowed', 'denied', 'errors', 'warnings', 'coverageNotes', 'external'])
     && typeof value.complete === 'boolean' && Object.entries(value).every(([key, count]) => key === 'complete' || integer(count));
 }
+function timings(value: unknown): boolean {
+  return shape(value, ['classify', 'inventory', 'compiler', 'descriptions', 'accesses', 'link', 'decide', 'publish', 'total'])
+    && Object.values(value).every(item => typeof item === 'number' && Number.isFinite(item) && item >= 0);
+}
 function revision(value: unknown): boolean {
-  return shape(value, ['token', 'revision', 'sequence', 'publishedAt', 'cause', 'fingerprints', 'changed', 'reused', 'outcome', 'summary'])
+  return shape(value, ['token', 'revision', 'sequence', 'publishedAt', 'cause', 'fingerprints', 'changed', 'checked', 'delta', 'timings', 'outcome', 'summary'])
     && token(value.token) && string(value.revision) && /^rev\/1:[0-9a-f-]{36}:[1-9][0-9]*$/.test(value.revision) && integer(value.sequence) && value.sequence > 0
-    && integer(value.publishedAt) && ['open', 'watch', 'request', 'verify', 'conservative'].includes(value.cause as string)
+    && integer(value.publishedAt) && ['open', 'watch', 'request', 'sweep', 'verify', 'conservative'].includes(value.cause as string)
     && shape(value.fingerprints, ['inputId', 'declarations', 'source', 'configuration', 'registry', 'engine'])
-    && Object.values(value.fingerprints).every(string)
-    && (value.changed === null || Array.isArray(value.changed) && value.changed.every(string))
-    && Array.isArray(value.reused) && value.reused.every(item => ['configuration', 'parse', 'metadata', 'catalog', 'access', 'link', 'decide'].includes(item))
-    && outcome(value.outcome) && summary(value.summary);
+    && Object.values(value.fingerprints).every(string) && strings(value.changed)
+    && shape(value.checked, ['path', 'files', 'accesses', 'modelRebuilt'])
+    && ['cold', 'unchanged-surface', 'source', 'description', 'metadata', 'broad'].includes(value.checked.path as string)
+    && strings(value.checked.files) && integer(value.checked.accesses) && typeof value.checked.modelRebuilt === 'boolean'
+    && shape(value.delta, ['added', 'removed', 'positionOnly']) && Object.values(value.delta).every(integer)
+    && timings(value.timings) && outcome(value.outcome) && summary(value.summary);
+}
+function sessionStatus(value: unknown): boolean {
+  return value === null || shape(value, ['level', 'sequence', 'observedInputs', 'factBytes', 'worker', 'compiler', 'lastSweepAt'])
+    && ['hot', 'warm'].includes(value.level as string) && integer(value.sequence) && integer(value.observedInputs) && integer(value.factBytes)
+    && shape(value.worker, ['heapUsed', 'rss']) && Object.values(value.worker).every(integer)
+    && shape(value.compiler, ['pid', 'rss']) && (value.compiler.pid === null || integer(value.compiler.pid))
+    && (value.compiler.rss === null || integer(value.compiler.rss)) && (value.lastSweepAt === null || integer(value.lastSweepAt));
 }
 function status(value: unknown): boolean {
   return shape(value, ['token', 'selection', 'scope', 'state', 'synchronization', 'published', 'lastValid', 'pending', 'history',
-    'retainedBytes', 'leases', 'watcher', 'openedAt', 'lastActivityAt']) && token(value.token) && selection(value.selection) && scope(value.scope)
+    'retainedBytes', 'leases', 'watcher', 'openedAt', 'lastActivityAt', 'level', 'session']) && token(value.token) && selection(value.selection) && scope(value.scope)
     && ['opening', 'warm', 'cold', 'evicted'].includes(value.state as string)
+    && ['hot', 'warm', 'cold'].includes(value.level as string) && sessionStatus(value.session)
     && ['initializing', 'synchronized', 'reconciling', 'conservative', 'watcher-unavailable'].includes(value.synchronization as string)
     && (value.published === null || revision(value.published)) && (value.lastValid === null || revision(value.lastValid))
     && integer(value.retainedBytes) && integer(value.openedAt) && integer(value.lastActivityAt)

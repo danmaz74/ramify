@@ -51,7 +51,7 @@ for (const sabotage of ['removed-record', 'failing-assertion'] as const) {
       const result = broken.instances.find(item => item.id === target)!;
       assertions.equal(`${mode}: sabotage fails both completion flags`, [broken.passed, broken.planComplete], [false, false]);
       assertions.equal(`${mode}: deleted or failing slot is still required`, result.required, true);
-      assertions.equal(`${mode}: all 176 slots retained`, broken.instances.length, 176);
+      assertions.equal(`${mode}: all 176 slots retained`, broken.instances.length, iteration === 2 ? 176 : 184);
       assertions.equal(`${mode}: exact failure retained`, [result.status, result.reason], sabotage === 'removed-record'
         ? ['not-executed', 'missing-record'] : ['failed', 'assertion-failed']);
       if (sabotage === 'removed-record') assertions.ok(`${mode}: removed record remains an inventory error`, broken.inventoryIssues.includes(`Missing reviewed instance: ${target}`));
@@ -71,13 +71,13 @@ for (const sabotage of ['removed-record', 'failing-assertion'] as const) {
 }
 
 handlers.set('I2-28:iteration-filter', { kind: 'memory', run: async ({ assertions }) => {
-  for (const [iteration, expected, count] of [[5, [2, 3, 4, 5], 64], [9, [2, 3, 4, 5, 6, 8, 9], 134]] as const) {
+  for (const [iteration, expected, count] of [[5, [2, 3, 4, 5, 6, 7], 62], [9, [2, 3, 4, 5, 6, 7, 8, 9], 132]] as const) {
     const report = await verifyInstances({ plan: readReviewedPlan2(), records: plan2Instances,
       runtime: { capabilities: new Set(), handlers: new Map() }, iteration, workRoot });
     assertions.equal(`${iteration}: exact implementing iterations`, [...new Set(report.instances.filter(item => item.required).map(item => item.iteration))].sort((a, b) => a - b), expected);
     assertions.equal(`${iteration}: exact prerequisite closure includes review and owner tests`, report.requiredIterations, Array.from({ length: iteration }, (_, index) => index + 1));
     assertions.equal(`${iteration}: independent required count`, report.summary.required, count);
-    assertions.equal(`${iteration}: every later instance is explicitly not executed`, report.instances.filter(item => !item.required).map(item => [item.status, item.reason]), Array.from({ length: 176 - count }, () => ['not-executed', 'future-iteration']));
+    assertions.equal(`${iteration}: every later instance is explicitly not executed`, report.instances.filter(item => !item.required && item.status !== 'superseded').map(item => [item.status, item.reason]), Array.from({ length: 174 - count }, () => ['not-executed', 'future-iteration']));
     assertions.equal(`${iteration}: unavailable requirements fail gate`, report.passed, false);
     recordObservation('plan2-iteration-filter', { iteration, summary: report.summary, requiredIterations: report.requiredIterations });
   }

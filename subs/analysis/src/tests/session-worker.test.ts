@@ -298,7 +298,11 @@ workerSuite('retained session worker', import.meta.url, () => {
       for (const message of observation.messages) if (message.kind === 'child' && message.active) {
         expect(alive(message.pid)).toBe(false);
       }
-    } finally { observation.cleanup(); }
+    } finally {
+      try {
+        if (observation.opened.status === 'opened') await observation.opened.session.dispose();
+      } finally { observation.cleanup(); }
+    }
   }), timeout);
 
   it('rejects a heap too small for Node bootstrap without starting a worker', () => fixture(async (_root, inputs) => {

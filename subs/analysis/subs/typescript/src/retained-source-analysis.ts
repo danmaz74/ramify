@@ -49,7 +49,7 @@ export interface RetainedCompilerEvidence {
  * project observer's sink, so the compiler's reads are observed inputs. Facts
  * are plain data; the compiler stays inside this owner.
  */
-class RetainedAnalysis implements RetainedSourceAnalysis {
+class RetainedSourceState implements RetainedSourceAnalysis {
   #root: string;
   #configuration: string;
   #inventory: ProjectInventory;
@@ -466,7 +466,7 @@ export async function createRetainedSourceAnalysis(inputs: RetainedSourceInputs)
   if (Object.values(inputs.limits).some(value => !Number.isSafeInteger(value) || value <= 0)) {
     throw new SourceFailure('resource-limit', 'Source work limits must be positive safe integers');
   }
-  const analysis = new RetainedAnalysis(inputs);
+  const analysis = new RetainedSourceState(inputs);
   try { await analysis.update({ changed: [], created: [], deleted: [], inventory: null, invalidateAll: false }); }
   catch (error) { await analysis.dispose(); throw error; }
   return analysis;
@@ -474,6 +474,6 @@ export async function createRetainedSourceAnalysis(inputs: RetainedSourceInputs)
 
 /** Compiler evidence for tests and the reference harness; not a contract. */
 export function retainedCompilerEvidence(analysis: RetainedSourceAnalysis): RetainedCompilerEvidence {
-  if (!(analysis instanceof RetainedAnalysis)) throw new Error('Compiler evidence needs this owner\'s retained adapter');
+  if (!(analysis instanceof RetainedSourceState)) throw new Error('Compiler evidence needs this owner\'s retained adapter');
   return analysis.evidence;
 }

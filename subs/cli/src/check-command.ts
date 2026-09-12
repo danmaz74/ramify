@@ -50,8 +50,8 @@ export async function checkCommand(args: CheckArguments, environment: CliEnviron
         control.signal?.throwIfAborted();
         if (!response.ok) throw serviceFailure(response.error);
         const value = response.value;
-        if (value.status === 'reported') {
-          const revision = value.published ? `context ${token.context}; revision ${value.revision.sequence}`
+        if (value.status === 'reported' && value.report) {
+          const revision = value.published ? `context ${token.context}; revision ${value.revision.sequence}; ${value.revision.checked.path}`
             : `context ${token.context}; unpublished`;
           return printReport(value.report, `resident (daemon ${connection.daemon.instance.pid}; ${revision}; synchronized${value.freshness.reusedRevision ? '; revision reused' : ''})`, args.format, environment);
         }

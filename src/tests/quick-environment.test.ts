@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createQuickEnvironment } from './quick-environment.js';
-import { createAnalysisDriverFromSessions } from '../resident-assembly.js';
+import { createSessionDriver } from '../resident-assembly.js';
 import { fixture } from './fixture.js';
 import type { ServiceConnection } from '../../subs/daemon/src/interfaces/daemon.js';
 import type { QuickEnvironment } from './quick-environment.js';
@@ -26,7 +26,7 @@ describe('quick transport and cleanup boundaries', () => {
   });
 
   it('cancels only the request named by a cancel frame', async () => {
-    const driver = createAnalysisDriverFromSessions();
+    const driver = createSessionDriver();
     let entered!: () => void;
     const resolving = new Promise<void>(resolve => { entered = resolve; });
     driver.resolve = async (_request, control) => {

@@ -73,8 +73,8 @@ describe('Plan 2 final contract validator', () => {
     // Independent fixtures contain callable bindings, not an empty module
     // that could mask a missing public entry re-export.
     const functions: Record<string, readonly string[]> = {
-      '.': ['createAnalysisSession', 'analyzeProject', 'validateProject', 'acquireInventory', 'analyzeIncrement', 'resolveProject'],
-      './analysis': ['createAnalysisSession', 'analyzeProject', 'validateProject', 'acquireInventory', 'analyzeIncrement', 'resolveProject'],
+      '.': ['createAnalysisSession', 'analyzeProject', 'validateProject', 'acquireInventory', 'openRetainedSession', 'resolveProject'],
+      './analysis': ['createAnalysisSession', 'analyzeProject', 'validateProject', 'acquireInventory', 'openRetainedSession', 'resolveProject'],
       './analysis/inventory': ['acquireInventory'], './model': ['createDefaultTagRegistry'],
       './presentation': ['ModelDiagram'], './layout': ['placeNodes'], './cli': ['runCli'],
       './client': ['connectDaemon', 'selectEndpoint', 'readDaemonRecord', 'encodeMessage', 'decodeMessage'],
@@ -103,7 +103,7 @@ describe('Plan 2 final contract validator', () => {
       await put(client.import, source(functions['./client'].filter(name => name !== 'connectDaemon')) + '\nexport const connectDaemon = "not callable";');
       await expect(validatePackageEntries(root, metadata)).rejects.toThrow('Missing callable export: ramify.ts/client#connectDaemon');
       await put(client.import, source(functions['./client']));
-      for (const missing of ['analyzeIncrement', 'resolveProject']) {
+      for (const missing of ['openRetainedSession', 'resolveProject']) {
         await put(metadata.exports['.'].import, source(functions['.'].filter(name => name !== missing)));
         await expect(validatePackageEntries(root, metadata)).rejects.toThrow(`Missing callable export: ramify.ts#${missing}`);
       }

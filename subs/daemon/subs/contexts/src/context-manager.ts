@@ -1,23 +1,19 @@
 import { randomUUID } from 'node:crypto';
-import type { AnalysisReport, IncrementRun, InputChange, RunControl } from '../../../../analysis/src/interfaces/analysis.js';
+import type { AnalysisReport, RunControl } from '../../../../analysis/src/interfaces/analysis.js';
+import type { SessionChange, SessionRevision, SessionUpdate } from '../../../../analysis/src/interfaces/session.js';
 import type { ProjectRequest } from '../../../../analysis/subs/project/src/interfaces/project.js';
 import type { CheckOutcome, CheckRequest, ContextEvent, ContextManager, ContextManagerOptions, ContextRevision, ContextSetup, ContextStatus, ContextToken, FreshnessRecord, OpenOutcome, RevisionCause, Unavailable, WatchEvent } from './interfaces/contexts.js';
 import type { LiveContext } from './context.js';
 import { createHistory } from './history.js';
+import type { HistoryEntry } from './history.js';
 import { createContextId, createFingerprints, createRevisionId } from './tokens.js';
 import { complete, invocationKey } from './queue.js';
 import type { Invocation, PendingCheck } from './queue.js';
 
 const implemented = new Set(['registry', 'layout', 'metadata', 'descriptions', 'source-catalog', 'exposure-linking', 'static-access', 'tags-origin', 'namespace-access', 'lazy-access', 'symbol-free-access', 'resource-access', 'coverage']);
 function unavailable(reason: Unavailable['reason'], message: string = reason): Unavailable { return { status: 'unavailable', reason, message }; }
-function equalReport(left: AnalysisReport, right: AnalysisReport): boolean {
-  return JSON.stringify({ ...left, runId: '' }) === JSON.stringify({ ...right, runId: '' });
-}
 function freeze<T>(value: T): T {
-  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const child of Object.values(value)) freeze(child);
-  }
+  if (value && typeof value === 'object' && !Object.isFrozen(value)) { Object.freeze(value); for (const child of Object.values(value)) freeze(child); }
   return value;
 }
 
@@ -26,88 +22,96 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
   const contexts = new Map<string, LiveContext>();
   const lifetimes = new Set<Promise<unknown>>();
   const resolving = new Set<AbortController>();
+  const cleanupFailures: unknown[] = [];
   let disposed = false;
   let pumping = false;
   let active = 0;
   let disposing: Promise<void> | undefined;
-
   function track<T>(promise: Promise<T>): Promise<T> {
-    lifetimes.add(promise);
-    void promise.finally(() => lifetimes.delete(promise)).catch(() => {});
-    return promise;
+    lifetimes.add(promise); void promise.finally(() => lifetimes.delete(promise)).catch(() => {}); return promise;
   }
-  function held(context: LiveContext): boolean {
-    return context.subscriptions.size > 0 || context.queue.some(entry => !entry.settled)
-      || !!context.running?.requests.some(entry => !entry.settled);
+  function cleanup(promise: Promise<void>): Promise<void> {
+    return track(promise.catch(error => { cleanupFailures.push(error); throw error; }));
   }
+  function pending(context: LiveContext): PendingCheck[] { return [...context.queue, ...context.running?.requests ?? [], ...context.deliveries]; }
+  function held(context: LiveContext): boolean { return context.subscriptions.size > 0 || pending(context).some(entry => !entry.settled); }
   function snapshot(context: LiveContext): ContextStatus {
-    const requests = [...context.queue, ...context.running?.requests ?? []].filter(entry => !entry.settled).length;
+    const requests = new Set(pending(context).filter(entry => !entry.settled)).size;
+    const session = context.session?.status() ?? null;
     return freeze({ token: context.token, selection: context.selection, scope: context.scope,
-      state: context.state, synchronization: context.synchronization,
+      state: context.state, level: session?.level ?? 'cold', session, synchronization: context.synchronization,
       published: context.history.published?.revision ?? null, lastValid: context.lastValid,
       pending: { requests, changedPaths: context.paths.size, analysisRunning: !!context.running },
       history: { retained: context.history.count, bytes: context.history.bytes, oldest: context.history.oldest?.revision.revision ?? null },
-      retainedBytes: context.retained?.bytes ?? 0,
-      leases: { subscriptions: context.subscriptions.size, requests }, watcher: context.watcherState,
-      openedAt: context.openedAt, lastActivityAt: context.lastActivityAt });
+      retainedBytes: session?.factBytes ?? 0, leases: { subscriptions: context.subscriptions.size, requests },
+      watcher: context.watcherState, openedAt: context.openedAt, lastActivityAt: context.lastActivityAt });
   }
   function emit(context: LiveContext, event: ContextEvent): void {
-    for (const subscription of [...context.subscriptions.values()]) {
-      try { subscription.listener(event); } catch { /* A consumer cannot break publication. */ }
-    }
+    for (const subscription of [...context.subscriptions.values()]) { try { subscription.listener(event); } catch { /* Consumer isolation. */ } }
   }
-  function changed(context: LiveContext): void {
-    emit(context, { type: 'status-changed', token: context.token, current: snapshot(context), coalesced: 0 });
-  }
+  function changed(context: LiveContext): void { emit(context, { type: 'status-changed', token: context.token, current: snapshot(context), coalesced: 0 }); }
   function closeWatcher(context: LiveContext): void {
-    const handle = context.watcher;
-    context.watcher = null;
-    context.watcherState = 'disposed';
-    if (handle) track(handle.close().catch(() => {}));
+    const handle = context.watcher; context.watcher = null; context.watcherState = 'disposed';
+    if (handle) void cleanup(handle.close());
   }
   function stopTimers(context: LiveContext): void {
-    context.debounce?.(); context.verification?.(); context.idle?.();
-    context.debounce = context.verification = context.idle = null;
+    context.debounce?.(); context.sweepTimer?.(); context.auditTimer?.(); context.idle?.();
+    context.debounce = context.sweepTimer = context.auditTimer = context.idle = null;
+  }
+  function releaseSession(context: LiveContext): Promise<void> {
+    const session = context.session; context.session = null; context.publishedSession = null; context.versions.clear(); context.observedSequence = 0;
+    return session ? cleanup(session.dispose()) : Promise.resolve();
   }
   function evict(context: LiveContext, reason: 'idle' | 'pressure' | 'disposed'): void {
-    context.state = 'evicted';
-    context.running?.controller.abort();
-    for (const entry of [...context.queue, ...context.running?.requests ?? []]) {
-      complete(entry, { ...unavailable(reason === 'disposed' ? 'disposed' : 'expired-generation'), requestId: entry.request.requestId });
-    }
-    context.queue.length = 0;
-    stopTimers(context);
-    closeWatcher(context);
-    context.retained = null;
-    context.history.dispose();
-    context.paths.clear();
-    context.invocations.clear();
-    contexts.delete(context.token.context);
-    emit(context, { type: 'context-evicted', token: context.token, reason });
-    context.subscriptions.clear();
+    context.state = 'evicted'; context.running?.controller.abort();
+    for (const entry of pending(context)) complete(entry, { ...unavailable(reason === 'disposed' ? 'disposed' : 'expired-generation'), requestId: entry.request.requestId });
+    context.queue.length = 0; stopTimers(context); closeWatcher(context);
+    // Dispose owns all remaining fact versions; do not send per-version releases after it.
+    void releaseSession(context); context.history.dispose(); context.paths.clear(); context.invocations.clear(); contexts.delete(context.token.context);
+    emit(context, { type: 'context-evicted', token: context.token, reason }); context.subscriptions.clear();
+  }
+  async function demote(context: LiveContext): Promise<void> {
+    if (context.demoting) return context.demoting;
+    const session = context.session;
+    if (!session || session.status().level !== 'hot') return;
+    const work = session.releaseCompiler(); context.demoting = work;
+    try { await work; } finally { context.demoting = null; if (context.state !== 'evicted') changed(context); }
+  }
+  async function hotBudget(preferred?: LiveContext): Promise<void> {
+    const hot = [...contexts.values()].filter(item => item.session?.status().level === 'hot')
+      .sort((a, b) => Number(a === preferred) - Number(b === preferred) || a.lastActivityAt - b.lastActivityAt);
+    while (hot.length > budgets.maxHotContexts) await demote(hot.shift()!);
+  }
+  async function cool(context: LiveContext): Promise<void> {
+    if (context.cooling || context.running || held(context)) return;
+    context.cooling = true;
+    try {
+      const current = context.history.published;
+      const report = current && (current.report ?? await context.session?.report(undefined, current.sequence));
+      if (held(context) || context.running || disposed || context.state === 'evicted') return;
+      if (current && (!report || !context.history.retainPublished(freeze(report)))) { evict(context, 'pressure'); return; }
+      context.state = 'cold'; stopTimers(context); closeWatcher(context);
+      await releaseSession(context); context.paths.clear(); context.sweepRequired = true; context.conservative = true;
+      changed(context);
+    } finally { context.cooling = false;
+      if (!disposed && context.state === 'cold' && held(context)) touch(context);
+      scheduleIdle(context); kick(); }
   }
   function scheduleIdle(context: LiveContext): void {
     context.idle?.(); context.idle = null;
-    if (disposed || context.state === 'evicted') return;
+    if (disposed || context.state === 'evicted' || context.cooling) return;
     if (held(context)) { context.hadLease = true; return; }
     if (context.hadLease) { context.lastActivityAt = clock.now(); context.hadLease = false; }
-    const delay = context.state === 'cold' ? budgets.coldRetainMs : Math.max(0, context.lastActivityAt + budgets.warmIdleMs - clock.now());
+    const level = context.session?.status().level;
+    const elapsed = clock.now() - context.lastActivityAt;
+    const delay = context.state === 'cold' ? budgets.coldRetainMs : level === 'hot'
+      ? Math.max(0, budgets.warmIdleMs - elapsed) : Math.max(0, budgets.warmIdleMs + budgets.coldRetainMs - elapsed);
     context.idle = clock.schedule(delay, () => {
       context.idle = null;
       if (held(context)) return;
       if (context.state === 'cold') { evict(context, 'idle'); return; }
-      context.state = 'cold';
-      context.running?.controller.abort();
-      context.background = null;
-      context.debounce?.(); context.debounce = null;
-      context.verification?.(); context.verification = null;
-      closeWatcher(context);
-      context.retained = null;
-      context.history.retainPublished();
-      context.paths.clear();
-      context.conservative = true;
-      changed(context);
-      scheduleIdle(context);
+      if (context.running) return; // Completion reschedules the idle transition.
+      track((async () => { if (context.session?.status().level === 'hot') await demote(context); else await cool(context); scheduleIdle(context); })());
     });
   }
   function attach(context: LiveContext): void {
@@ -115,21 +119,44 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     context.attaching = true;
     track(Promise.resolve().then(() => watcher.watch(context.selection.root, events => watchEvents(context, events)))
       .then(async handle => {
-        if (context.state === 'cold' || context.state === 'evicted' || disposed) await handle.close();
-        else { context.watcher = handle; context.watcherState = 'active'; }
+        if (context.state === 'cold' || context.state === 'evicted' || disposed) await cleanup(handle.close());
+        else { context.watcher = handle; context.watcherState = 'active';
+          if (context.synchronization === 'watcher-unavailable') context.synchronization = context.sweepRequired || context.running || context.background ? 'reconciling' : 'synchronized'; }
       }).catch(() => {
-        if (context.state !== 'evicted' && !disposed) {
-          context.watcherState = 'unavailable'; context.synchronization = 'watcher-unavailable'; context.conservative = true;
-        }
+        if (context.state !== 'evicted' && !disposed) { context.watcherState = 'unavailable'; context.synchronization = 'watcher-unavailable'; context.sweepRequired = true; }
       }).finally(() => { context.attaching = false; }));
   }
+  function auditLater(context: LiveContext): void {
+    context.auditTimer?.(); context.auditTimer = null;
+    if (!context.session || disposed || context.state === 'cold' || context.auditedSequence === context.session.current?.sequence) return;
+    if (context.auditRequired) { context.background ??= 'verify'; return; }
+    context.auditTimer = clock.schedule(Math.max(1, context.lastActivityAt + budgets.sweepIntervalMs - clock.now()), () => {
+      context.auditTimer = null;
+      if (!context.session || context.state === 'cold' || disposed) return;
+      if (pending(context).some(entry => !entry.settled)) return;
+      context.auditRequired = true;
+      if (context.running) return;
+      context.background ??= 'verify'; kick();
+    });
+  }
+  function sweepLater(context: LiveContext): void {
+    if (context.sweepTimer || !context.session || disposed || context.state === 'cold') return;
+    context.sweepTimer = clock.schedule(Math.max(1, context.lastSweepAt + budgets.sweepIntervalMs - clock.now()), () => {
+      context.sweepTimer = null;
+      if (!context.session || disposed || context.state === 'cold') return;
+      // Warm inactive sessions keep their facts until activity resumes.
+      if (held(context) || clock.now() - context.lastActivityAt < budgets.warmIdleMs) {
+        context.sweepRequired = true; context.background = 'sweep'; context.synchronization = 'reconciling'; changed(context); kick();
+      }
+    });
+  }
   function touch(context: LiveContext): void {
-    context.lastActivityAt = clock.now();
-    if (context.state === 'cold') {
-      context.state = 'warm'; context.synchronization = 'reconciling'; context.conservative = true;
-      context.background = 'conservative'; attach(context); kick();
+    context.lastActivityAt = clock.now(); context.auditRequired = false;
+    if (context.state === 'cold' && !context.cooling) { context.state = 'opening'; context.sweepRequired = true; context.conservative = true; context.background = 'open'; attach(context); kick(); }
+    if (context.session && clock.now() - context.lastSweepAt >= budgets.sweepIntervalMs) {
+      context.sweepRequired = true; context.background ??= 'sweep'; context.synchronization = 'reconciling'; kick();
     }
-    scheduleIdle(context);
+    auditLater(context); sweepLater(context); scheduleIdle(context); track(hotBudget(context));
   }
   function lookup(token: ContextToken): LiveContext | Unavailable {
     if (disposed) return unavailable('disposed');
@@ -138,208 +165,246 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     if (context.token.generation !== token.generation) return unavailable('expired-generation');
     return context;
   }
-  function verifyLater(context: LiveContext): void {
-    context.verification?.(); context.verification = null;
-    if (disposed || context.state !== 'warm') return;
-    context.verification = clock.schedule(budgets.verificationIntervalMs, () => {
-      context.verification = null;
-      context.background ??= 'verify';
-      if (context.synchronization !== 'watcher-unavailable') context.synchronization = context.conservative ? 'conservative' : 'reconciling';
-      changed(context); kick();
-    });
-  }
   function watchEvents(context: LiveContext, events: readonly WatchEvent[]): void {
     if (disposed || context.state === 'cold' || context.state === 'evicted' || !events.length) return;
     for (const event of events) {
-      if (event.kind === 'overflow' || event.kind === 'error') context.conservative = true;
-      else if (!context.conservative) context.paths.set(event.path, event.kind === 'renamed' ? 'unknown' : event.kind);
-      if (event.kind === 'error') {
-        closeWatcher(context); context.watcherState = 'unavailable';
-      }
-      if (context.paths.size > budgets.maxQueuedPaths) { context.paths.clear(); context.conservative = true; }
+      if (event.kind === 'overflow' || event.kind === 'error') { context.conservative = true; context.sweepRequired = true; }
+      else context.paths.set(event.path, event.kind === 'renamed' ? 'unknown' : event.kind);
+      if (/(?:^|\/)(?:tsconfig[^/]*\.json|package\.json|package-lock\.json|yarn\.lock|pnpm-lock\.yaml)$/.test(event.path)) context.sweepRequired = true;
+      if (event.kind === 'error') { closeWatcher(context); context.watcherState = 'unavailable'; }
     }
+    if (context.paths.size > budgets.maxQueuedPaths) { context.paths.clear(); context.conservative = true; context.sweepRequired = true; }
+    // An active request keeps its capture; newer writes queue behind it. Idle
+    // background work may be cancelled, but every consumed path is restored.
     if (context.running?.background) {
-      context.running.controller.abort();
-      if (context.running.changes === null) context.conservative = true;
-      else for (const change of context.running.changes) context.paths.set(change.path, change.kind);
+      context.running.controller.abort(); context.sweepRequired = true;
+      for (const change of context.running.changes) context.paths.set(change.path, change.kind);
     }
-    if (context.paths.size > budgets.maxQueuedPaths) { context.paths.clear(); context.conservative = true; }
+    if (context.paths.size > budgets.maxQueuedPaths) { context.paths.clear(); context.conservative = true; context.sweepRequired = true; }
     context.synchronization = context.watcherState === 'unavailable' ? 'watcher-unavailable' : context.conservative ? 'conservative' : 'reconciling';
     context.background = context.conservative ? 'conservative' : 'watch';
-    context.debounce?.();
-    context.debounce = clock.schedule(budgets.debounceMs, () => { context.debounce = null; kick(); });
-    changed(context);
+    context.debounce?.(); context.debounce = clock.schedule(budgets.debounceMs, () => { context.debounce = null; kick(); }); changed(context);
   }
-  function totalBytes(): number {
-    return [...contexts.values()].reduce((sum, context) => sum + context.history.bytes + (context.retained?.bytes ?? 0), 0);
-  }
-  function reserve(context: LiveContext, report: AnalysisReport, retainedBytes: number): number | null {
-    const bytes = Buffer.byteLength(JSON.stringify(report), 'utf8');
-    if (!budgets.maxHistoryRevisions || bytes > budgets.maxHistoryBytes) return null;
-    // Published replacement can release the previous current report. Account
-    // only history that will remain after the candidate's per-context trimming.
-    let projected = Math.min(budgets.maxHistoryBytes, context.history.bytes + bytes);
-    if (budgets.maxHistoryRevisions === 1) projected = bytes;
-    let delta = projected - context.history.bytes + retainedBytes - (context.retained?.bytes ?? 0);
-    while (totalBytes() + delta > budgets.maxRetainedBytesGlobal) {
-      const eligible = [...contexts.values()].filter(item => item.history.count > 1)
+  function totalBytes(): number { return [...contexts.values()].reduce((sum, item) => sum + item.history.bytes + (item.session?.status().factBytes ?? 0), 0); }
+  async function trim(context: LiveContext, candidateBytes: number): Promise<boolean> {
+    // The session already bounds shared historical facts and candidate overlap.
+    // Here both process locations count toward the context/global admission.
+    while ((context.session?.status().factBytes ?? 0) > budgets.maxRetainedBytesPerContext
+      || totalBytes() + candidateBytes > budgets.maxRetainedBytesGlobal) {
+      const historical = [...contexts.values()].filter(item => item.history.count > 1)
         .sort((a, b) => a.history.oldest!.revision.publishedAt - b.history.oldest!.revision.publishedAt);
-      if (eligible.length) {
-        const item = eligible[0]!;
-        item.history.discardOldest();
-        if (item === context) {
-          projected = Math.min(budgets.maxHistoryBytes, context.history.bytes + bytes);
-          if (budgets.maxHistoryRevisions === 1) projected = bytes;
-          delta = projected - context.history.bytes + retainedBytes - (context.retained?.bytes ?? 0);
-        }
-        continue;
-      }
+      let removed = false;
+      for (const item of historical) { if (item.history.discardOldest()) { removed = true; break; } }
+      if (removed) { await Promise.all([...releaseWork]); continue; }
       const cold = [...contexts.values()].filter(item => item !== context && item.state === 'cold' && !held(item))
         .sort((a, b) => a.lastActivityAt - b.lastActivityAt)[0];
       if (cold) { evict(cold, 'pressure'); continue; }
-      // Dropping the previous publication is allowed as part of replacing it,
-      // but only if the candidate itself fits all global limits.
-      if (totalBytes() - context.history.bytes - (context.retained?.bytes ?? 0) + bytes + retainedBytes <= budgets.maxRetainedBytesGlobal) {
-        return budgets.maxRetainedBytesGlobal - (totalBytes() - context.history.bytes - (context.retained?.bytes ?? 0)) - retainedBytes;
-      }
-      return null;
+      return false;
     }
-    return Math.min(budgets.maxHistoryBytes, budgets.maxRetainedBytesGlobal - (totalBytes() - context.history.bytes - (context.retained?.bytes ?? 0)) - retainedBytes);
+    return true;
+  }
+  const releaseWork = new Set<Promise<void>>();
+  function releaseVersion(context: LiveContext, entry: HistoryEntry<ContextRevision>): void {
+    const session = context.session;
+    if (!session || entry.report !== null || entry.sequence === session.current?.sequence) return;
+    context.versions.delete(entry.sequence);
+    const promise = cleanup(session.releaseRevision(entry.sequence)); releaseWork.add(promise);
+    void promise.finally(() => releaseWork.delete(promise)).catch(() => {});
+  }
+  function observeVersion(context: LiveContext): void {
+    const sequence = context.session?.current?.sequence ?? context.observedSequence;
+    for (let value = context.observedSequence + 1; value <= sequence; value++) context.versions.add(value);
+    context.observedSequence = sequence;
+  }
+  async function releaseUnpublished(context: LiveContext): Promise<void> {
+    const session = context.session;
+    if (!session?.current) return;
+    observeVersion(context);
+    for (const sequence of context.versions) {
+      if (sequence === session.current.sequence || context.history.hasSequence(sequence)) continue;
+      await cleanup(session.releaseRevision(sequence)); context.versions.delete(sequence);
+    }
+  }
+  async function sessionWork(context: LiveContext, run: () => Promise<SessionUpdate | { status: 'unchanged' }>): Promise<SessionUpdate | { status: 'unchanged' }> {
+    let result = await run(); observeVersion(context);
+    if (result.status === 'reported' && result.report.diagnostics.some(item => item.limit?.name === 'maxRetainedFactBytes')) {
+      // Reclaim unpinned historical versions before one bounded retry. The
+      // session rejects a candidate before publication, preserving current facts.
+      let released = false;
+      while (context.history.discardOldest()) released = true;
+      await Promise.all([...releaseWork]); await releaseUnpublished(context);
+      if (released) { result = await run(); observeVersion(context); }
+    }
+    return result;
   }
   function fresh(entry: PendingCheck, started: number | null, verified: boolean, reusedRevision = false): FreshnessRecord {
     return { mode: entry.request.freshness.mode, acknowledged: entry.acknowledged, captureStarted: started, verified, reusedRevision };
   }
-  function reported(entry: PendingCheck, revision: ContextRevision, report: AnalysisReport, started: number | null, reused = false): void {
-    complete(entry, { status: 'reported', requestId: entry.request.requestId, published: true, revision,
-      report, freshness: fresh(entry, started, entry.request.freshness.mode === 'synchronized', reused) });
+  async function deliver(context: LiveContext, entry: PendingCheck, publication: HistoryEntry<ContextRevision>, started: number | null, reused = false): Promise<void> {
+    if (entry.settled) return;
+    const baseline = entry.request.since ? context.history.get(entry.request.since) : context.history.getPrevious(publication.revision.revision);
+    if (entry.request.since && !baseline) { complete(entry, { ...unavailable('evicted-revision'), requestId: entry.request.requestId }); return; }
+    const unpin = context.history.pin(publication.revision.revision);
+    const unpinBase = baseline ? context.history.pin(baseline.revision.revision) : () => {};
+    context.deliveries.add(entry);
+    try {
+      const previous = new Set(baseline?.diagnostics.map(item => item.id));
+      const current = new Set(publication.diagnostics.map(item => item.id));
+      const delta = freeze({ since: baseline?.revision.revision ?? null,
+        findings: publication.diagnostics.map(item => ({ ...item, new: !previous.has(item.id) })),
+        removed: [...previous].filter(id => !current.has(id)), warnings: publication.warnings, coverage: publication.coverage });
+      const report = entry.request.scope === 'report'
+        ? publication.report ?? await context.session?.report(undefined, publication.sequence) ?? null : null;
+      if (entry.request.scope === 'report' && !report) { complete(entry, { ...unavailable('evicted-revision'), requestId: entry.request.requestId }); return; }
+      if (report) context.scope = report.scope;
+      complete(entry, { status: 'reported', requestId: entry.request.requestId, published: true, revision: publication.revision,
+        delta, report: freeze(report), freshness: fresh(entry, started, entry.request.freshness.mode === 'synchronized', reused) });
+    } catch (error) { complete(entry, { ...unavailable('analysis-failed', String(error)), requestId: entry.request.requestId }); }
+    finally { unpinBase(); unpin(); context.deliveries.delete(entry); scheduleIdle(context); }
   }
-  function satisfy(context: LiveContext, entries: readonly PendingCheck[], run: Extract<IncrementRun, { status: 'reported' }>, revision: ContextRevision | null, started: number, reused: boolean): void {
-    for (const entry of entries) {
-      if (entry.settled) continue;
-      if (!run.retained || !revision) {
-        complete(entry, { status: 'reported', requestId: entry.request.requestId, published: false, revision: null,
-          report: run.report, freshness: fresh(entry, started, false) }); continue;
-      }
-      if (entry.request.freshness.mode === 'synchronized') {
-        const mismatches: { path: string; expected: string | null; observed: string | null }[] = [];
-        let missing = false;
-        for (const expected of entry.request.freshness.expect) {
-          const input = run.retained.inputs.find(input => input.path === expected.path && input.role !== 'directory');
-          if (!input) { missing = true; break; }
-          const observed = input.role === 'absent' ? null : input.sha256;
-          if (expected.sha256 !== observed) mismatches.push({ path: expected.path, expected: expected.sha256, observed });
-        }
-        if (missing) { complete(entry, { ...unavailable('unobserved-input'), requestId: entry.request.requestId }); continue; }
-        if (mismatches.length) { complete(entry, { status: 'superseded', requestId: entry.request.requestId, revision, mismatches }); continue; }
-      }
-      reported(entry, revision, reused ? context.history.published!.report : run.report, started, reused);
+  function mismatch(context: LiveContext, entry: PendingCheck, data: SessionRevision): CheckOutcome | null {
+    if (entry.request.freshness.mode !== 'synchronized') return null;
+    const mismatches: { path: string; expected: string | null; observed: string | null }[] = [];
+    for (const expected of entry.request.freshness.expect) {
+      const input = data.inputs.find(item => item.path === expected.path && item.role !== 'directory');
+      if (!input) return { ...unavailable('unobserved-input', `Input was not observed: ${expected.path}`), requestId: entry.request.requestId };
+      const observed = input.role === 'absent' ? null : input.sha256;
+      if (observed !== expected.sha256) mismatches.push({ path: expected.path, expected: expected.sha256, observed });
     }
+    return mismatches.length ? { status: 'superseded', requestId: entry.request.requestId, revision: context.history.published?.revision ?? null, mismatches } : null;
+  }
+  async function publish(context: LiveContext, data: SessionRevision, cause: RevisionCause): Promise<boolean> {
+    if (!['completed', 'invalid'].includes(data.outcome.execution)) throw new Error('Unpublishable session revision');
+    if (context.publishedSession === context.session && context.history.published?.sequence === data.sequence) return trim(context, 0);
+    const revision = freeze({ token: context.token, revision: createRevisionId(context.token.generation, context.sequence + 1),
+      sequence: context.sequence + 1, publishedAt: clock.now(), cause,
+      fingerprints: createFingerprints(data.inputId, data.inputs, context.selection.setup.registry, options.engine),
+      changed: data.changed, checked: data.checked, delta: { added: data.delta.added.length, removed: data.delta.removed.length, positionOnly: data.delta.positionOnly.length },
+      timings: data.timings, outcome: data.outcome, summary: data.summary });
+    const candidateBytes = Buffer.byteLength(JSON.stringify({ revision, sequence: data.sequence, diagnostics: data.diagnostics,
+      warnings: data.warnings, coverage: data.coverage, delta: data.delta, report: null }));
+    if (candidateBytes > budgets.maxHistoryBytes || !budgets.maxHistoryRevisions) return false;
+    // Make room in both locations before admitting a header; pinned reads keep
+    // their exact version and cause explicit pressure rather than substitution.
+    while ((context.history.count >= budgets.maxHistoryRevisions || context.history.bytes + candidateBytes > budgets.maxHistoryBytes)
+      && context.history.discardOldest()) { await Promise.all([...releaseWork]); }
+    if (!await trim(context, candidateBytes)) return false;
+    if (!context.history.append(revision, data)) return false;
+    await Promise.all([...releaseWork]);
+    context.sequence++; context.publishedSession = context.session;
+    if (data.outcome.execution === 'completed') context.lastValid = revision;
+    emit(context, { type: 'revision-published', token: context.token, revision, coalesced: 0 });
+    return true;
+  }
+  async function abandonCandidate(context: LiveContext): Promise<void> {
+    const publication = context.history.published;
+    const report = publication && (publication.report ?? await context.session?.report(undefined, publication.sequence));
+    if (!publication || !report || !context.history.retainPublished(freeze(report))
+      || totalBytes() - (context.session?.status().factBytes ?? 0) > budgets.maxRetainedBytesGlobal) {
+      context.history.dispose(); context.lastValid = null;
+      context.history = createHistory(budgets.maxHistoryRevisions, budgets.maxHistoryBytes, entry => releaseVersion(context, entry));
+    }
+    context.state = 'cold'; context.sweepRequired = true; context.background = null;
+    stopTimers(context); closeWatcher(context); await releaseSession(context);
   }
   async function analyze(context: LiveContext): Promise<void> {
     const first = context.queue.find(entry => !entry.settled && entry.request.freshness.mode === 'synchronized');
-    const invocation: Invocation = first?.invocation ?? { project: context.project, setup: context.selection.setup };
+    const invocation: Invocation = first?.invocation ?? context.invocation;
     const entries: PendingCheck[] = [];
-    if (first) {
-      const key = invocationKey(invocation);
-      for (const entry of context.queue) {
-        if (entry.settled || entry.request.freshness.mode !== 'synchronized') continue;
-        if (invocationKey(entry.invocation) !== key) break;
-        entries.push(entry);
-      }
-      for (const entry of entries) context.queue.splice(context.queue.indexOf(entry), 1);
+    if (first) for (const entry of context.queue) {
+      if (entry.settled || entry.request.freshness.mode !== 'synchronized') continue;
+      if (invocationKey(entry.invocation) !== invocationKey(invocation)) break;
+      entries.push(entry);
     }
-    const cause: RevisionCause = context.conservative ? (context.sequence === 0 ? 'open' : 'conservative') : entries.length ? 'request' : context.background ?? 'verify';
-    const changes: readonly InputChange[] | null = context.conservative ? null : [...context.paths].map(([path, kind]) => ({ path, kind }));
-    context.paths.clear(); context.conservative = false; context.background = null;
+    for (const entry of entries) context.queue.splice(context.queue.indexOf(entry), 1);
+    const cause: RevisionCause = !context.session ? 'open' : context.conservative ? 'conservative' : entries.length ? 'request' : context.background ?? 'sweep';
+    const changes: SessionChange[] = [...context.paths].map(([path, kind]) => ({ path, kind }));
+    const sweep = context.sweepRequired || entries.some(entry => entry.needsSweep) || cause === 'sweep';
+    context.paths.clear(); context.conservative = false; context.sweepRequired = false; context.background = null;
     context.debounce?.(); context.debounce = null;
-    const previous = context.retained;
-    const controller = new AbortController();
-    const started = clock.now();
-    const running = { controller, requests: entries, changes, background: !entries.length, started };
-    context.running = running;
-    active++;
-    if (context.synchronization !== 'watcher-unavailable') context.synchronization = context.sequence === 0 ? 'initializing' : cause === 'conservative' ? 'conservative' : 'reconciling';
-    changed(context);
+    const controller = new AbortController(); const started = clock.now();
+    context.running = { controller, requests: entries, changes, background: !entries.length, started }; active++;
+    context.synchronization = context.watcherState === 'unavailable' ? 'watcher-unavailable' : context.sequence ? 'reconciling' : 'initializing'; changed(context);
+    const control = { signal: controller.signal };
     try {
-      const run = await driver.check({ ...invocation, previous, changes }, { signal: controller.signal });
-      if (disposed || context.state === 'evicted' || context.state === 'cold' || contexts.get(context.token.context) !== context || controller.signal.aborted) return;
-      if (run.status === 'cancelled') {
-        for (const entry of entries) complete(entry, { status: 'cancelled', requestId: entry.request.requestId });
-        return;
-      }
-      if (!run.retained || !['completed', 'invalid'].includes(run.report.outcome.execution)) {
-        context.synchronization = 'reconciling';
-        satisfy(context, entries, { ...run, retained: null }, null, started, false);
-        return;
-      }
-      const fingerprints = createFingerprints(run.retained.inputId, run.retained.inputs,
-        run.report.registry?.id ?? run.report.request.registry.id, options.engine);
-      const current = context.history.published;
-      const reuse = !!current && JSON.stringify(current.revision.fingerprints) === JSON.stringify(fingerprints) && equalReport(current.report, run.report);
-      const keepProducts = run.retained.bytes <= budgets.maxRetainedBytesPerContext ? run.retained : null;
-      let revision: ContextRevision;
-      if (reuse) {
-        const retainedDelta = (keepProducts?.bytes ?? 0) - (context.retained?.bytes ?? 0);
-        while (totalBytes() + retainedDelta > budgets.maxRetainedBytesGlobal) {
-          const historical = [...contexts.values()].filter(item => item.history.count > 1)
-            .sort((a, b) => a.history.oldest!.revision.publishedAt - b.history.oldest!.revision.publishedAt)[0];
-          if (historical) { historical.history.discardOldest(); continue; }
-          const cold = [...contexts.values()].filter(item => item !== context && item.state === 'cold' && !held(item))
-            .sort((a, b) => a.lastActivityAt - b.lastActivityAt)[0];
-          if (cold) { evict(cold, 'pressure'); continue; }
-          context.synchronization = 'reconciling';
-          for (const entry of entries) complete(entry, { ...unavailable('resource-unavailable'), requestId: entry.request.requestId });
-          return;
-        }
-        revision = current.revision;
+      await context.demoting;
+      let run: SessionUpdate | { status: 'unchanged' };
+      if (!context.session) {
+        const opened = await driver.open(invocation.project, invocation.setup, control);
+        if (opened.status === 'opened') {
+          if (controller.signal.aborted || disposed || context.state === 'evicted') { await opened.session.dispose(); return; }
+          context.session = opened.session; context.publishedSession = null; context.invocation = invocation; context.lastSweepAt = started;
+          context.observedSequence = 0; context.versions.clear(); observeVersion(context);
+          run = { status: 'revised', revision: opened.revision, identical: false };
+        } else run = opened;
+      } else if (cause === 'verify' && !changes.length && !sweep) {
+        const verified = await context.session.verify(control);
+        if (verified.status === 'cancelled') run = verified;
+        else { context.auditedSequence = verified.status === 'mismatch' ? verified.revision.sequence : verified.sequence; context.auditRequired = false;
+          run = verified.status === 'mismatch' ? { status: 'revised', revision: verified.revision, identical: false } : { status: 'unchanged' }; }
       } else {
-        const availableBytes = reserve(context, run.report, keepProducts?.bytes ?? 0);
-        if (availableBytes === null) {
-          context.synchronization = 'reconciling';
-          for (const entry of entries) complete(entry, { ...unavailable('resource-unavailable'), requestId: entry.request.requestId });
-          return;
+        const invocationChanged = invocationKey(context.invocation) !== invocationKey(invocation);
+        if (changes.length || invocationChanged || !sweep) {
+          run = await sessionWork(context, () => context.session!.update(changes, control, { project: invocation.project, capabilities: invocation.setup.capabilities }));
+          if (run.status === 'revised') context.invocation = invocation;
+        } else run = { status: 'unchanged' };
+        if (sweep && run.status !== 'reported' && run.status !== 'cancelled') {
+          run = await sessionWork(context, () => context.session!.sweep(control)); context.lastSweepAt = started;
         }
-        revision = freeze({ token: context.token, revision: createRevisionId(context.token.generation, context.sequence + 1),
-          sequence: context.sequence + 1, publishedAt: clock.now(), cause, fingerprints,
-          changed: previous ? run.changed : null, reused: run.reused, outcome: run.report.outcome, summary: run.report.summary });
-        if (!context.history.append(revision, freeze(run.report), availableBytes)) throw new Error('Reserved report did not fit history');
-        context.sequence++;
-        if (run.report.outcome.execution === 'completed') context.lastValid = revision;
       }
-      context.scope = run.report.scope;
-      context.retained = keepProducts;
-      if (!keepProducts) context.conservative = true;
+      if (disposed || context.state === 'evicted' || controller.signal.aborted) return;
+      if (run.status === 'cancelled') { for (const entry of entries) complete(entry, { status: 'cancelled', requestId: entry.request.requestId }); context.sweepRequired = true; return; }
+      if (run.status === 'reported') {
+        context.synchronization = 'reconciling'; context.sweepRequired = true;
+        for (const entry of [...entries, ...context.queue.filter(item => item.request.freshness.mode === 'published')]) {
+          complete(entry, { status: 'reported', requestId: entry.request.requestId, published: false, revision: null, delta: null,
+            report: run.report, freshness: fresh(entry, started, false) });
+        }
+        return;
+      }
+      const data = context.session?.current;
+      if (!data) throw new Error('Session lost its published revision');
+      const reused = context.publishedSession === context.session && context.history.published?.sequence === data.sequence;
+      await hotBudget(context);
+      if (!await publish(context, data, cause)) {
+        context.synchronization = 'reconciling'; context.sweepRequired = true;
+        for (const entry of [...entries, ...context.queue]) complete(entry, { ...unavailable('resource-unavailable'), requestId: entry.request.requestId });
+        await abandonCandidate(context); return;
+      }
       context.state = 'warm';
-      context.synchronization = context.background ? (context.conservative ? 'conservative' : 'reconciling') : 'synchronized';
+      context.synchronization = context.watcherState === 'unavailable' ? 'watcher-unavailable'
+        : context.background || context.sweepRequired || context.paths.size ? 'reconciling' : 'synchronized';
+      const publication = context.history.published!;
+      await Promise.all(entries.map(entry => { const failed = mismatch(context, entry, data);
+        if (failed) { complete(entry, failed); return; } return deliver(context, entry, publication, started, reused); }));
+      const waiting = context.queue.filter(entry => entry.request.freshness.mode === 'published');
+      for (const entry of waiting) context.queue.splice(context.queue.indexOf(entry), 1);
+      await Promise.all(waiting.map(entry => deliver(context, entry, publication, null)));
       if (context.watcherState === 'unavailable') attach(context);
-      satisfy(context, entries, run, revision, started, reuse);
-      for (const waiting of context.queue.filter(entry => entry.request.freshness.mode === 'published')) {
-        reported(waiting, revision, context.history.published!.report, null);
-        context.queue.splice(context.queue.indexOf(waiting), 1);
-      }
-      if (!reuse) emit(context, { type: 'revision-published', token: context.token, revision, coalesced: 0 });
     } catch (error) {
+      context.sweepRequired = true;
       if (!controller.signal.aborted && !disposed && context.state !== 'evicted') {
         context.synchronization = 'reconciling';
         for (const entry of entries) complete(entry, { ...unavailable('analysis-failed', String(error)), requestId: entry.request.requestId });
       }
     } finally {
-      if (controller.signal.aborted) for (const entry of entries) complete(entry,
-        disposed ? { ...unavailable('disposed'), requestId: entry.request.requestId } : { status: 'cancelled', requestId: entry.request.requestId });
-      context.running = null; active--;
-      if (context.state !== 'evicted' && !disposed) { verifyLater(context); scheduleIdle(context); changed(context); }
+      if (controller.signal.aborted) {
+        context.sweepRequired = true;
+        for (const entry of entries) complete(entry, disposed ? { ...unavailable('disposed'), requestId: entry.request.requestId } : { status: 'cancelled', requestId: entry.request.requestId });
+      }
+      try { await releaseUnpublished(context); } catch { context.synchronization = 'reconciling'; context.sweepRequired = true; }
+      context.running = null; active--; context.queue.splice(0, context.queue.length, ...context.queue.filter(entry => !entry.settled));
+      if (context.state !== 'evicted' && !disposed) { auditLater(context); sweepLater(context); scheduleIdle(context); changed(context); }
       kick();
     }
   }
   function kick(): void {
-    if (pumping || disposed) return;
-    pumping = true;
+    if (pumping || disposed) return; pumping = true;
     queueMicrotask(() => {
-      pumping = false;
-      if (disposed) return;
+      pumping = false; if (disposed) return;
       for (const context of contexts.values()) {
         if (active >= budgets.maxConcurrentAnalyses) break;
-        if (context.running || context.state === 'cold' || context.state === 'evicted') continue;
+        if (context.running || context.cooling || context.state === 'cold' || context.state === 'evicted') continue;
         const request = context.queue.some(entry => !entry.settled && entry.request.freshness.mode === 'synchronized');
         if (!request && (!context.background || context.debounce)) continue;
         track(analyze(context));
@@ -347,76 +412,94 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     });
   }
   function check(request: CheckRequest, lease: string, control?: RunControl): Promise<CheckOutcome> {
-    const found = lookup(request.token);
-    if ('status' in found) return Promise.resolve({ ...found, requestId: request.requestId });
+    const found = lookup(request.token); if ('status' in found) return Promise.resolve({ ...found, requestId: request.requestId });
     const context = found;
     if (control?.signal?.aborted) return Promise.resolve({ status: 'cancelled', requestId: request.requestId });
     touch(context);
     return new Promise(resolve => {
       const entry: PendingCheck = { request: freeze(structuredClone(request)), lease, acknowledged: clock.now(),
-        invocation: context.invocations.get(lease) ?? { project: context.project, setup: context.selection.setup }, resolve, cleanup: () => {}, settled: false };
+        invocation: context.invocations.get(lease) ?? { project: context.project, setup: context.selection.setup },
+        revisionAtAcknowledgment: context.history.published?.revision ?? null,
+        needsSweep: request.freshness.mode === 'synchronized' && (request.scope === 'report' || !request.freshness.expect.length),
+        resolve, cleanup: () => {}, settled: false, deadlineExpired: false };
+      let stopDeadline: (() => void) | undefined;
+      const unpinSince = request.since && context.history.get(request.since) ? context.history.pin(request.since) : () => {};
       const cancel = () => {
         complete(entry, { status: 'cancelled', requestId: request.requestId });
-        const position = context.queue.indexOf(entry);
-        if (position !== -1) context.queue.splice(position, 1);
-        if (context.running?.requests.includes(entry) && context.running.requests.every(item => item.settled)) context.running.controller.abort();
+        const position = context.queue.indexOf(entry); if (position !== -1) context.queue.splice(position, 1);
+        if (context.running?.requests.includes(entry) && context.running.requests.every(item => item.settled) && !context.running.requests.some(item => item.deadlineExpired)) context.running.controller.abort();
         scheduleIdle(context);
       };
       control?.signal?.addEventListener('abort', cancel, { once: true });
-      entry.cleanup = () => control?.signal?.removeEventListener('abort', cancel);
+      entry.cleanup = () => { control?.signal?.removeEventListener('abort', cancel); stopDeadline?.(); unpinSince(); };
+      // Plain report clients retain Plan 2's unbounded synchronized wait unless
+      // they explicitly request a deadline. Delta requests use the hook default.
+      const deadline = request.deadlineMs ?? (request.scope === 'delta' ? budgets.updateDeadlineMs : undefined);
+      if (deadline !== undefined) stopDeadline = clock.schedule(deadline, () => {
+        const elapsedMs = clock.now() - entry.acknowledged;
+        entry.deadlineExpired = true;
+        complete(entry, entry.revisionAtAcknowledgment
+          ? { status: 'deadline-exceeded', requestId: request.requestId, elapsedMs, revision: entry.revisionAtAcknowledgment }
+          : { status: 'cold', requestId: request.requestId, elapsedMs, current: snapshot(context) });
+        // A deadline releases only the waiter. Its queued changes and active
+        // session operation still run and may publish after this reply.
+        scheduleIdle(context);
+      });
+      if (request.since && !context.history.get(request.since)) { complete(entry, { ...unavailable('evicted-revision'), requestId: request.requestId }); return; }
       if (request.freshness.mode === 'published') {
-        const published = request.freshness.revision ? context.history.get(request.freshness.revision) : context.history.published;
-        if (published) { reported(entry, published.revision, published.report, null); return; }
+        const publication = request.freshness.revision ? context.history.get(request.freshness.revision) : context.history.published;
+        if (publication) { track(deliver(context, entry, publication, null)); return; }
         if (request.freshness.revision) { complete(entry, { ...unavailable('evicted-revision'), requestId: request.requestId }); return; }
         if (!request.freshness.wait) { complete(entry, { status: 'pending', requestId: request.requestId, current: snapshot(context) }); return; }
+      } else {
+        const data = context.session?.current; const publication = context.history.published;
+        if (data && publication && context.publishedSession === context.session && publication.sequence === data.sequence
+          && !entry.needsSweep && !context.running && !context.background && !context.paths.size && !context.sweepRequired
+          && context.synchronization === 'synchronized' && invocationKey(entry.invocation) === invocationKey(context.invocation)
+          && !mismatch(context, entry, data)) { track(deliver(context, entry, publication, null, true)); return; }
+        for (const expected of request.freshness.expect) context.paths.set(expected.path, 'unknown');
+        if (context.paths.size > budgets.maxQueuedPaths) { context.paths.clear(); context.conservative = true; context.sweepRequired = true; }
+        if (entry.needsSweep) context.sweepRequired = true;
+        context.background ??= 'request'; context.debounce?.(); context.debounce = null;
       }
-      context.queue.push(entry);
-      scheduleIdle(context); kick();
+      context.queue.push(entry); scheduleIdle(context); kick();
     });
   }
   async function open(request: ProjectRequest, setup: ContextSetup, lease: string, control?: RunControl): Promise<OpenOutcome> {
     if (disposed) return unavailable('disposed');
     if (setup.registry !== 'default' || setup.capabilities.some(item => !implemented.has(item))) return unavailable('unsupported-setup');
-    const controller = new AbortController();
-    const abort = () => controller.abort();
-    control?.signal?.addEventListener('abort', abort, { once: true });
-    if (control?.signal?.aborted) controller.abort();
-    resolving.add(controller);
+    const controller = new AbortController(); const abort = () => controller.abort();
+    control?.signal?.addEventListener('abort', abort, { once: true }); if (control?.signal?.aborted) controller.abort(); resolving.add(controller);
     try {
-      const project = freeze(structuredClone(request));
-      const requestedSetup = freeze(structuredClone(setup));
+      const project = freeze(structuredClone(request)); const requestedSetup = freeze(structuredClone(setup));
       const resolution = await driver.resolve(project, { signal: controller.signal });
       if (disposed) return unavailable('disposed');
       if (controller.signal.aborted) return unavailable('analysis-failed', 'Opening request was cancelled');
       if (resolution.status !== 'resolved') {
-        const run = await driver.check({ project, setup: requestedSetup, previous: null, changes: null }, { signal: controller.signal });
-        if (disposed) return unavailable('disposed');
+        const run = await driver.open(project, requestedSetup, { signal: controller.signal });
+        if (run.status === 'opened') { try { const report = await run.session.report();
+          return report ? { status: 'unresolved', resolution, report } : unavailable('analysis-failed'); } finally { await run.session.dispose(); } }
         return run.status === 'cancelled' ? unavailable('analysis-failed', 'Opening request was cancelled') : { status: 'unresolved', resolution, report: run.report };
       }
       const selection = freeze({ root: resolution.root, scope: project.scope, configuration: project.configuration, setup: requestedSetup });
-      const id = createContextId(selection);
-      const existing = contexts.get(id);
-      if (existing) {
-        existing.invocations.set(lease, { project, setup: requestedSetup }); touch(existing);
-        return { status: 'opened', token: existing.token, created: false, current: snapshot(existing) };
-      }
+      const id = createContextId(selection); const existing = contexts.get(id);
+      if (existing) { existing.invocations.set(lease, { project, setup: requestedSetup }); touch(existing);
+        return { status: 'opened', token: existing.token, created: false, current: snapshot(existing) }; }
       if (contexts.size >= budgets.maxContexts) {
         const victim = [...contexts.values()].filter(item => !held(item)).sort((a, b) => a.lastActivityAt - b.lastActivityAt)[0];
-        if (!victim || budgets.maxContexts === 0) return unavailable('resource-unavailable');
-        evict(victim, 'pressure');
+        if (!victim || !budgets.maxContexts) return unavailable('resource-unavailable'); evict(victim, 'pressure');
       }
       const now = clock.now();
       const context: LiveContext = {
-        token: freeze({ context: id, generation: options.generationId() }), selection, project, openedAt: now, lastActivityAt: now, hadLease: false,
-        invocations: new Map([[lease, { project, setup: requestedSetup }]]), subscriptions: new Map(),
-        history: createHistory(budgets.maxHistoryRevisions, budgets.maxHistoryBytes), queue: [], paths: new Map(),
-        scope: null, state: 'opening', synchronization: 'initializing', lastValid: null, retained: null, sequence: 0,
+        token: freeze({ context: id, generation: options.generationId() }), selection, project, invocation: { project, setup: requestedSetup },
+        openedAt: now, lastActivityAt: now, hadLease: false, invocations: new Map([[lease, { project, setup: requestedSetup }]]), subscriptions: new Map(),
+        history: createHistory(budgets.maxHistoryRevisions, budgets.maxHistoryBytes, entry => releaseVersion(context, entry)),
+        queue: [], deliveries: new Set(), paths: new Map(), scope: null, state: 'opening', synchronization: 'initializing', lastValid: null,
+        session: null, publishedSession: null, versions: new Set(), observedSequence: 0, sequence: 0, sweepRequired: true, lastSweepAt: now, auditedSequence: 0, auditRequired: false, demoting: null, cooling: false,
         watcher: null, watcherState: 'disposed', attaching: false, conservative: true, background: 'open', running: null,
-        debounce: null, verification: null, idle: null,
+        debounce: null, sweepTimer: null, auditTimer: null, idle: null,
       };
-      contexts.set(id, context);
-      const current = snapshot(context);
-      attach(context); scheduleIdle(context); kick();
+      contexts.set(id, context); const current = snapshot(context); attach(context); scheduleIdle(context); kick();
       return { status: 'opened', token: context.token, created: true, current };
     } catch (error) { return unavailable(disposed ? 'disposed' : 'analysis-failed', String(error)); }
     finally { resolving.delete(controller); control?.signal?.removeEventListener('abort', abort); }
@@ -426,29 +509,27 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     status(token) { const found = lookup(token); if ('status' in found) return found; touch(found); return snapshot(found); },
     list: () => [...contexts.values()].map(snapshot),
     subscribe(token, lease, listener) {
-      const found = lookup(token); if ('status' in found) return found;
-      touch(found);
-      const id = randomUUID();
-      found.subscriptions.set(id, { lease, listener }); scheduleIdle(found);
+      const found = lookup(token); if ('status' in found) return found; touch(found);
+      const id = randomUUID(); found.subscriptions.set(id, { lease, listener }); scheduleIdle(found);
       return { id, current: snapshot(found), close() { found.subscriptions.delete(id); scheduleIdle(found); } };
     },
     release(lease) {
       for (const context of contexts.values()) {
         context.invocations.delete(lease);
         for (const [id, subscription] of context.subscriptions) if (subscription.lease === lease) context.subscriptions.delete(id);
-        for (const entry of [...context.queue, ...context.running?.requests ?? []]) if (entry.lease === lease) complete(entry, { status: 'cancelled', requestId: entry.request.requestId });
-        for (let index = context.queue.length - 1; index >= 0; index--) if (context.queue[index]!.settled) context.queue.splice(index, 1);
-        if (context.running && !context.running.background && context.running.requests.every(entry => entry.settled)) context.running.controller.abort();
+        for (const entry of pending(context)) if (entry.lease === lease) complete(entry, { status: 'cancelled', requestId: entry.request.requestId });
+        context.queue.splice(0, context.queue.length, ...context.queue.filter(entry => !entry.settled));
+        if (context.running && !context.running.background && context.running.requests.every(entry => entry.settled) && !context.running.requests.some(entry => entry.deadlineExpired)) context.running.controller.abort();
         scheduleIdle(context);
       }
     },
     dispose() {
-      if (disposing) return disposing;
-      disposed = true;
-      for (const controller of resolving) controller.abort();
-      for (const context of [...contexts.values()]) evict(context, 'disposed');
-      disposing = (async () => { while (lifetimes.size) await Promise.allSettled([...lifetimes]); await driver.dispose(); })();
-      return disposing;
+      if (disposing) return disposing; disposed = true;
+      for (const controller of resolving) controller.abort(); for (const context of [...contexts.values()]) evict(context, 'disposed');
+      disposing = (async () => { while (lifetimes.size) await Promise.allSettled([...lifetimes]);
+        try { await driver.dispose(); } catch (error) { cleanupFailures.push(error); }
+        if (cleanupFailures.length) throw new AggregateError(cleanupFailures, 'Context resource cleanup failed');
+      })(); return disposing;
     },
   };
 }

@@ -8,5 +8,8 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     include: ['src/tests/**/*.test.{ts,tsx}', 'subs/**/src/**/*.test.{ts,tsx}'],
+    // Session workers use their configured heap limits. Clear the host runner's
+    // V8 override for children; the override-rejection case supplies its own env.
+    env: { NODE_OPTIONS: '' },
   },
 });

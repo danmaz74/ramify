@@ -31,6 +31,8 @@ export interface ReferenceInstance {
   /** Retain the reviewed stage-specific meaning, especially resource catalog work. */
   readonly capabilityScope: string;
   readonly evidenceKind?: EvidenceKind;
+  /** Historical record retained by the explicit Plan 5 amendment. */
+  readonly superseded?: { readonly by: string; readonly amendment: string };
   readonly fixture: {
     readonly code: FixtureCode;
     readonly root: string | null;

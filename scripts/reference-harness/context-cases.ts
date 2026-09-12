@@ -21,9 +21,9 @@ for (const instance of plan2Instances.filter(item => item.iteration === 4)) {
       if (result.status !== 'opened') throw new Error(`Expected context: ${result.status}`);
       return result;
     };
-    const check = (token: ContextToken, lease = 'a') => manager.check({ token, requestId: `request-${++requestId}`, freshness: { mode: 'synchronized', expect: [] } }, lease);
-    const state = (token: ContextToken) => manager.status(token) as ContextStatus;
-    const read = (token: ContextToken, revision?: string, wait = false) => manager.check({ token, requestId: `read-${++requestId}`, freshness: { mode: 'published', wait, ...(revision ? { revision } : {}) } }, 'a');
+    const check = (token: ContextToken, lease = 'a') => manager.check({ token, scope: 'report', requestId: `request-${++requestId}`, freshness: { mode: 'synchronized', expect: [] } }, lease);
+    const state = (token: ContextToken) => manager.list().find(context => context.token.context === token.context) as ContextStatus;
+    const read = (token: ContextToken, revision?: string, wait = false) => manager.check({ token, scope: 'report', requestId: `read-${++requestId}`, freshness: { mode: 'published', wait, ...(revision ? { revision } : {}) } }, 'a');
     try {
       if (instance.subcase === 'pending-before-publication' || instance.subcase === 'wait-first-publication') {
         let finish!: (value: ReturnType<typeof capture>) => void;
@@ -48,7 +48,7 @@ for (const instance of plan2Instances.filter(item => item.iteration === 4)) {
           a.equal('cwd does not enter canonical context identity', [same.created, same.token], [false, token]); break;
         }
         case 'generation-on-reopen': {
-          clock.advance(testBudgets.warmIdleMs); await flush(); clock.advance(testBudgets.coldRetainMs); await flush();
+          clock.advance(testBudgets.warmIdleMs); await flush(); clock.advance(testBudgets.coldRetainMs); await flush(); clock.advance(testBudgets.coldRetainMs); await flush();
           const next = await open(); a.ok('reopening gets a fresh generation', next.token.generation !== token.generation);
           a.equal('old generation expires', await check(token), { status: 'unavailable', reason: 'expired-generation', message: 'expired-generation', requestId: 'request-1' }); break;
         }
@@ -85,7 +85,7 @@ for (const instance of plan2Instances.filter(item => item.iteration === 4)) {
         }
         case 'cancel-request': {
           script.pending.push(call => new Promise(resolve => call.signal!.addEventListener('abort', () => resolve({ status: 'cancelled' }))));
-          const controller = new AbortController(); const request = manager.check({ token, requestId: 'cancelled-id', freshness: { mode: 'synchronized', expect: [] } }, 'a', { signal: controller.signal });
+          const controller = new AbortController(); const request = manager.check({ token, scope: 'report', requestId: 'cancelled-id', freshness: { mode: 'synchronized', expect: [] } }, 'a', { signal: controller.signal });
           await flush(); controller.abort();
           a.equal('request cancelled under its own identity', await request, { status: 'cancelled', requestId: 'cancelled-id' }); await flush();
           a.equal('driver receives cancellation', script.calls.at(-1)?.signal?.aborted, true);
@@ -97,12 +97,12 @@ for (const instance of plan2Instances.filter(item => item.iteration === 4)) {
           watcher.emit('/fixture', [{ path: 'second.ts', kind: 'changed' }]); await flush();
           a.equal('stale candidate is discarded', state(token).published?.sequence, 1);
           script.version = 3; clock.advance(100); await flush();
-          a.equal('successor receives union of paths', script.calls.at(-1)?.inputs.changes?.map(item => item.path).sort(), ['first.ts', 'second.ts']); break;
+          a.equal('successor receives union of paths', script.updateCalls.at(-1)?.inputs.changes?.map(item => item.path).sort(), ['first.ts', 'second.ts']); break;
         }
         case 'invalid-current': case 'historical-last-valid': case 'recovery-publishes': {
           const valid = state(token).published;
           script.pending.push(() => capture(2, 'invalid')); const result = await check(token);
-          a.equal('invalid current report is delivered', result.status === 'reported' ? result.report.outcome.execution : result.status, 'invalid');
+          a.equal('invalid current report is delivered', result.status === 'reported' ? result.report?.outcome.execution : result.status, 'invalid');
           a.equal('lastValid remains historical', state(token).lastValid, valid);
           a.equal('published read never substitutes lastValid', (await read(token)).status === 'reported' && state(token).published?.outcome.execution, 'invalid');
           if (instance.subcase === 'recovery-publishes') { script.version = 3; await check(token); a.equal('recovery replaces lastValid', state(token).lastValid, state(token).published); }
@@ -115,7 +115,7 @@ for (const instance of plan2Instances.filter(item => item.iteration === 4)) {
         case 'overflow': {
           watcher.emit('/fixture', Array.from({ length: 10_001 }, (_, index) => ({ path: `src/${index}.ts`, kind: 'changed' })));
           a.equal('overflow marks conservative state', state(token).synchronization, 'conservative'); clock.advance(100); await flush();
-          a.equal('overflow discards untrustworthy path subset', script.calls.at(-1)?.inputs.changes, null); break;
+          a.equal('overflow performs a complete observation sweep', [script.calls.at(-1)?.kind, script.calls.at(-1)?.inputs.changes], ['sweep', []]); break;
         }
         case 'watcher-error': {
           watcher.emit('/fixture', [{ path: '', kind: 'error' }]);
@@ -126,12 +126,12 @@ for (const instance of plan2Instances.filter(item => item.iteration === 4)) {
         case 'unwatched-dependency': {
           const run = capture(2, 'completed', [{ path: 'node_modules/pkg/index.d.ts', role: 'dependency', sha256: hash('dependency'), bytes: 1 }]);
           let finish!: (value: typeof run) => void; script.pending.push(() => new Promise(resolve => { finish = resolve; }));
-          clock.advance(testBudgets.verificationIntervalMs); await flush();
+          clock.advance(testBudgets.sweepIntervalMs); await flush();
           a.equal('verification is visible while running', state(token).synchronization, 'reconciling'); finish(run); await flush();
           a.equal('verification reobserves rather than trusting events', script.calls.at(-1)?.inputs.changes, []);
-          a.equal('driver changed paths are published', [state(token).published?.cause, state(token).published?.changed, state(token).synchronization], ['verify', ['node_modules/pkg/index.d.ts'], 'synchronized']);
+          a.equal('driver changed paths are published', [state(token).published?.cause, state(token).published?.changed, state(token).synchronization], ['sweep', ['node_modules/pkg/index.d.ts'], 'synchronized']);
           script.pending.push(() => run); const revision = state(token).published?.revision;
-          clock.advance(testBudgets.verificationIntervalMs); await flush(); a.equal('unchanged verification reuses publication', state(token).published?.revision, revision); break;
+          clock.advance(testBudgets.sweepIntervalMs); await flush(); a.equal('unchanged verification reuses publication', state(token).published?.revision, revision); break;
         }
         case 'debounce': {
           const before = script.calls.length;
@@ -149,12 +149,12 @@ for (const instance of plan2Instances.filter(item => item.iteration === 4)) {
           a.equal('discarded revisions never substitute current', evicted.status === 'unavailable' ? evicted.reason : evicted.status, 'evicted-revision');
           const result = await read(token, retained, true);
           a.equal('retained read returns exact header/report with no freshness claim', result.status === 'reported'
-            ? [result.revision?.revision, result.report.summary.owners, result.freshness.verified, result.freshness.captureStarted] : result.status,
+            ? [result.revision?.revision, result.report?.summary.owners, result.freshness.verified, result.freshness.captureStarted] : result.status,
           [retained, 6, false, null]); break;
         }
         case 'history-bytes': {
           for (let version = 2; version <= 6; version++) {
-            const base = capture(version); script.pending.push(() => ({ ...base, report: { ...base.report, runId: 'x'.repeat(10 * 1024 ** 2) } })); await check(token);
+            const base = capture(version); script.pending.push(() => ({ ...base, report: { ...base.report, diagnostics: [{ id: 'large', category: 'execution', code: 'internal-error', location: null, related: [], importer: null, original: null, accessId: null, message: 'x'.repeat(10 * 1024 ** 2) }] } })); await check(token);
           }
           a.ok('accounted history stays below 32 MiB', state(token).history.bytes <= 32 * 1024 ** 2);
           a.ok('at most three large reports retained', state(token).history.retained <= 3); break;

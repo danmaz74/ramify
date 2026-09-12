@@ -1,8 +1,9 @@
+import { interceptSessionOperations } from './session-driver-operations.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { chmod, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createQuickEnvironment } from '../../src/tests/quick-environment.js';
-import { createAnalysisDriverFromSessions } from '../../src/resident-assembly.js';
+import { createSessionDriver } from '../../src/resident-assembly.js';
 import type { AnalysisReport, Capability } from '../../subs/analysis/src/interfaces/analysis.js';
 import type { AnalysisDriver, CheckOutcome, ContextRevision, ExpectedContent, ContextEvent } from '../../subs/daemon/subs/contexts/src/interfaces/contexts.js';
 import { runIsolatedProject } from './mutation.js';
@@ -34,14 +35,14 @@ for (const instance of plan2Instances.filter(item => item.iteration === 6)) {
       fixture: reference ? referenceEditFixture : { kind: 'create', create: root => createEditFixture(root, variant) } }, async ({ root }) => {
       if (reference) await prepareReferenceEdits(root, instance.subcase === 'shim-change');
       let injectReadFailure = false;
-      const real = createAnalysisDriverFromSessions();
-      const driver: AnalysisDriver = { ...real, async check(inputs, control) {
-        if (!injectReadFailure) return real.check(inputs, control);
+      const real = createSessionDriver();
+      const driver: AnalysisDriver = interceptSessionOperations(real, async run => {
+        if (!injectReadFailure) return run();
         injectReadFailure = false;
         const path = join(root, 'src/assembly.ts'); const mode = (await stat(path)).mode;
         await chmod(path, 0);
-        try { return await real.check(inputs, control); } finally { await chmod(path, mode); }
-      } };
+        try { return await run(); } finally { await chmod(path, mode); }
+      });
       const quick = await createQuickEnvironment({}, { driver });
       const connection = await quick.connect({ start: 'if-needed' });
       if (connection.status !== 'connected') throw new Error(connection.status);
@@ -52,15 +53,15 @@ for (const instance of plan2Instances.filter(item => item.iteration === 6)) {
       const token = opened.value.token;
       let checkNumber = 0;
       async function status() { const result = await service.contextStatus({ token }); if (!result.ok) throw new Error(result.error.message); return result.value; }
-      async function read(revision?: string): Promise<Extract<CheckOutcome, { status: 'reported' }>> {
+      async function read(revision?: string): Promise<Extract<CheckOutcome, { status: 'reported' }> & { report: AnalysisReport }> {
         const result = await service.check({ token, requestId: randomUUID(), freshness: { mode: 'published', wait: true, ...(revision ? { revision } : {}) } });
-        if (!result.ok || result.value.status !== 'reported') throw new Error(JSON.stringify(result)); return result.value;
+        if (!result.ok || result.value.status !== 'reported' || result.value.report === null) throw new Error(JSON.stringify(result)); return { ...result.value, report: result.value.report };
       }
-      async function sync(expect: readonly ExpectedContent[] = [], reused = false): Promise<Extract<CheckOutcome, { status: 'reported' }>> {
+      async function sync(expect: readonly ExpectedContent[] = [], reused = false): Promise<Extract<CheckOutcome, { status: 'reported' }> & { report: AnalysisReport }> {
         const current = ++checkNumber;
         const result = await service.check({ token, requestId: `sync-${current}`, freshness: { mode: 'synchronized', expect } });
-        if (!result.ok || result.value.status !== 'reported') throw new Error(JSON.stringify(result));
-        const value = result.value;
+        if (!result.ok || result.value.status !== 'reported' || result.value.report === null) throw new Error(JSON.stringify(result));
+        const value = { ...result.value, report: result.value.report };
         a.equal(`synchronized ${current} verifies a fresh sealed capture`, value.freshness.verified, true);
         a.ok(`synchronized ${current} capture follows acknowledgement`, value.freshness.captureStarted! >= value.freshness.acknowledged);
         a.equal(`synchronized ${current} revision reuse is explicit`, value.freshness.reusedRevision, reused);
@@ -70,7 +71,7 @@ for (const instance of plan2Instances.filter(item => item.iteration === 6)) {
       }
       const events: ContextEvent[] = [];
       let nextRevision: ((revision: ContextRevision) => void) | undefined;
-      async function watched(paths: readonly string[]): Promise<Extract<CheckOutcome, { status: 'reported' }>> {
+      async function watched(paths: readonly string[]): Promise<Extract<CheckOutcome, { status: 'reported' }> & { report: AnalysisReport }> {
         let cancel!: () => void;
         const waiting = new Promise<ContextRevision>((resolve, reject) => {
           const timeout = setTimeout(() => reject(new Error('Expected edit publication did not arrive')), 30_000);
@@ -94,7 +95,7 @@ for (const instance of plan2Instances.filter(item => item.iteration === 6)) {
           case 'delayed-watcher': case 'expect-match': case 'expect-superseded': case 'provider-influence': {
             await applyTextMutation(root, edits['remove-hop']);
             const afterHash = hashes(await readFile(join(root, workspaceDescription)));
-            let changed: Extract<CheckOutcome, { status: 'reported' }>;
+            let changed: Extract<CheckOutcome, { status: 'reported' }> & { report: AnalysisReport };
             if (instance.subcase === 'expect-superseded') {
               const result = await service.check({ token, requestId: 'stale-expectation', freshness: { mode: 'synchronized', expect: [{ path: workspaceDescription, sha256: beforeDescription }] } });
               if (!result.ok || result.value.status !== 'superseded') throw new Error(JSON.stringify(result));
@@ -139,7 +140,7 @@ for (const instance of plan2Instances.filter(item => item.iteration === 6)) {
             await applyTextMutation(root, edits[instance.subcase]); const changed = await sync();
             oracle(a, instance.subcase, inner => assertReferenceEditReport(instance.subcase as ReferenceEdit, baseline.report, changed.report, inner));
             if (instance.subcase === 'readme-edit') {
-              a.equal('README change reuses every nonmetadata stage', [...changed.revision!.reused].sort(), ['configuration', 'parse', 'catalog', 'access', 'link', 'decide'].sort());
+              a.equal('README change performs no compiler or decision work', [changed.revision!.checked.path, changed.revision!.checked.accesses, changed.revision!.timings.compiler, changed.revision!.timings.decide], ['metadata', 0, 0, 0]);
             }
             if (instance.subcase === 'foreign-wildcard-invalid' || instance.subcase === 'invalid-description') {
               a.equal('invalid publication keeps historical lastValid', (await status()).lastValid, baseline.revision);
@@ -196,7 +197,7 @@ for (const instance of plan2Instances.filter(item => item.iteration === 6)) {
           case 'resolver-failure': {
             injectReadFailure = true;
             const failed = await service.check({ token, requestId: 'read-failure', freshness: { mode: 'synchronized', expect: [] } });
-            if (!failed.ok || failed.value.status !== 'reported') throw new Error(JSON.stringify(failed));
+            if (!failed.ok || failed.value.status !== 'reported' || failed.value.report === null) throw new Error(JSON.stringify(failed));
             a.equal('actual acquisition failure is delivered unpublished', [failed.value.published, failed.value.revision, failed.value.freshness.verified, failed.value.report.outcome.execution], [false, null, false, 'incomplete']);
             a.ok('real acquisition report carries read-failure diagnostic', failed.value.report.diagnostics.some(item => item.code === 'read-failure'));
             const current = await status();

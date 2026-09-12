@@ -18,6 +18,8 @@ export interface ReviewedPlan {
   readonly number?: 1 | 2 | 5;
   readonly members: readonly InstanceSeed[];
   readonly prerequisites: Readonly<Record<number, readonly number[]>>;
+  readonly supersessions?: Readonly<Record<string, { readonly by: string; readonly amendment: string }>>;
+  readonly counterparts?: readonly InstanceSeed[];
 }
 
 function tableRows(text: string): string[][] {
@@ -106,7 +108,10 @@ export function requiredIterations(plan: ReviewedPlan, iteration?: number): numb
 
 export function validateInstanceRecords(records: readonly ReferenceInstance[], plan: ReviewedPlan): string[] {
   const issues: string[] = [];
-  const expected = new Map(plan.members.map((seed) => [seed[0], instanceFromSeed(seed)]));
+  const expected = new Map(plan.members.map((seed) => {
+    const record = instanceFromSeed(seed), superseded = plan.supersessions?.[record.id];
+    return [seed[0], superseded ? { ...record, superseded } : record];
+  }));
   const seen = new Set<string>();
   for (const record of records) {
     if (seen.has(record.id)) issues.push(`Duplicate instance: ${record.id}`);
@@ -219,7 +224,21 @@ export function readReviewedPlan2(root = repositoryRoot): ReviewedPlan {
   }
   for (const group of matrix.keys()) require(members.some(member => member[0].startsWith(group + ':')), `empty matrix group ${group}`);
   require(rows.some(row => row[0] === 'Total' && row[1] === '176'), 'declared total differs');
-  return { number: 2, members, prerequisites: plan2Prerequisites };
+  // The accepted amendment is read independently of executable registrations.
+  // Preserve the original 176 leaves and add only reviewed I5 counterparts.
+  const amendment = 'docs/plans/done/iteration-2-resident-verification/supersession-plan5.md';
+  const amendmentText = read(amendment);
+  require(/\*\*User acceptance date:\*\* 2026-09-12/.test(amendmentText), 'missing recorded supersession acceptance');
+  const pairs = tableRows(amendmentText).filter(row => /^`I2-/.test(row[0]))
+    .map(row => row.map(cell => cell.replace(/`/g, '')));
+  const reviewedPairs = tableRows(read(`${plan5Directory}/scope.md`)).filter(row => /^`I2-/.test(row[0]))
+    .map(row => [row[0].replace(/`/g, ''), /`(I5-[^`]+)`/.exec(row[1])?.[1]]);
+  require(pairs.length === 10 && JSON.stringify(pairs) === JSON.stringify(reviewedPairs), 'supersession differs from the reviewed ten mappings');
+  const supersessions = Object.fromEntries(pairs.map(([id, by]) => [id, { by, amendment }]));
+  const counterpartIds = new Set(pairs.map(([, by]) => by));
+  const counterparts = readReviewedPlan5(root).members.filter(seed => counterpartIds.has(seed[0]));
+  require(counterparts.length === 8, 'expected eight distinct retained-session counterparts');
+  return { number: 2, members, prerequisites: plan2Prerequisites, supersessions, counterparts };
 }
 
 /** Reviewed Plan 5 scheduling, independent of registration and availability. */

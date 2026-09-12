@@ -1,32 +1,31 @@
 # Contexts
 
-Contexts keeps each selected project root isolated as a context with its own generation, orders its updates and requests into one queue, publishes immutable revisions atomically, and bounds history, retained products, leases and idle lifetime. It drives analysis through a neutral port and never reads project files or transport objects itself.
+Contexts keeps each selected project root isolated as a context with its own generation, orders its updates and requests into one queue, publishes immutable revisions atomically, and bounds compact history, sessions, leases and idle lifetime. It drives one retained analysis session through a neutral port, answers a request from the published revision when that revision already covers the identities it names, and never reads project files or transport objects itself.
 
-`createContextManager` implements the reviewed isolation, acknowledgment order,
-publication, watcher reconciliation and retention contracts. Each client's
-opening request is retained per lease, so sharing a canonical context preserves
-its invocation facts and capability order. Synchronized checks run a fresh
-capture after acknowledgment. Published reads can select an exact retained
-revision; incomplete results are delivered without replacing a publication.
+`createContextManager` preserves each opening lease's invocation and capability
+order. Covered delta requests reuse a coherent publication when no influencing
+change or sweep is pending. Other synchronized requests flush the queue; an
+empty expectation requires a sweep started after acknowledgment. Unobserved and
+superseded identities cannot produce a passing check. Request deadlines return
+cold or deadline-exceeded outcomes while the session continues updating.
 
-Warm contexts periodically verify inputs even when watcher events are missing.
-Unleased contexts become cold, release watchers and retained analysis products,
-and eventually expire. Count and byte budgets evict eligible history before
-returning resource unavailability. A request to a cold context reattaches its
-watcher and reconciles conservatively. Disposal cancels requests and releases
-all handles, products and reports.
+History retains revision headers, diagnostics, warnings, coverage and finding
+deltas. Reports are projected from the session's immutable facts by exact
+sequence only when requested. A request pins its retained baseline while it
+waits. History eviction releases the corresponding worker version. Byte budgets
+include the compact history and the session's facts; oversized candidates fail
+explicitly. Intermediate session versions without a published header are released.
+
+Watcher changes drive updates independently of requests. Required and periodic
+sweeps reconcile observed inputs, and an idle audit verifies each revision at
+most once. Compiler budgets and inactivity demote hot sessions to warm. Cold
+disposal retains a detached current report within the history budget, releases
+the session and watcher, and eventually expires the generation. New activity
+reopens the session; disposal releases requests, timers and all owned resources.
 
 The controlled clock's `advance(milliseconds)` runs due callbacks synchronously
 in deadline order, using scheduling order for ties. Tests await asynchronous
-operations separately. `pending` counts scheduled callbacks. The controlled
-watcher delivers supplied batches to matching roots, supports a one-shot
-attachment failure through `failNextWatch`, and reports live handles through
-`active` and `roots`. Handles close idempotently, and disposing either control
-releases all its callbacks. Neither control opens an OS timer or file watcher.
-
-The private history store keeps reports by exact revision identity, accounts
-their serialized UTF-8 bytes, and removes oldest reports to meet count and byte
-bounds. An oversized candidate leaves existing history intact. Explicit pressure
-removal keeps the current publication; cold retention drops every past report.
-The manager owns publication eligibility, revision metadata, historical
-last-valid headers and retained analysis product accounting.
+operations separately. The controlled watcher delivers supplied batches to
+matching roots and supports a one-shot attachment failure. Neither control
+opens an OS timer or file watcher; both expose live resource counts for cleanup
+assertions.

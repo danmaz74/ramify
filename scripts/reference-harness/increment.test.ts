@@ -5,9 +5,9 @@ import { plan2Instances } from './plan2-instances.js';
 import { readReviewedPlan2, repositoryRoot } from './plan.js';
 import { verifyInstances } from './runner.js';
 
-describe('real incremental analysis providers', () => {
-  it('implements exactly the eighteen reviewed iteration-3 instances', () => {
-    expect([...incrementHandlers.keys()].sort()).toEqual(plan2Instances.filter(instance => instance.iteration === 3).map(instance => instance.id).sort());
+describe('retained session and resolution providers', () => {
+  it('implements exactly the eight unsuperseded reviewed iteration-3 instances', () => {
+    expect([...incrementHandlers.keys()].sort()).toEqual(plan2Instances.filter(instance => instance.iteration === 3 && !instance.superseded).map(instance => instance.id).sort());
   });
   it.each([...incrementHandlers])('%s exercises actual providers and its independent expectation', async (id, handler) => {
     const report = await verifyInstances({ plan: readReviewedPlan2(), records: plan2Instances, iteration: 3,

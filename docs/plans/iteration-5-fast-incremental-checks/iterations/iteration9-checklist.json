@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": false,
+    "functionalRequirementsSatisfied": false,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-12T11:02:47Z",
+  "iteration": "9",
+  "notes": "Implementation and selected behavior are verified: all ten I5-09 plus compiled I5-10 removal pass (11 handlers/53 assertions), four amended gate controls pass (68 assertions), 12 admission and 12 retention assertions pass; build, all type-check scopes, final declarations and resident reference/self-check pass. Full acceptance is unconfirmed: Vitest/Cucumber including new suites, full prerequisite and Plan 1/2 regression gates are reserved for automation and not run locally. I5-10 full gate also retains Plan 2 measurement obligations whose obsolete increment telemetry migration is assigned to iteration 12. No assertion or measurement requirement was waived. See iteration9-results.md for exact coverage and pending conditions."
+}

@@ -1,5 +1,7 @@
-import type { AnalysisReport, AnalysisSummary, Capability, RunControl, IncrementRun, InputChange, RetainedAnalysis, RetainedStageId } from '../../../../../analysis/src/interfaces/analysis.js';
-import type { ProjectRequest, ProjectScope, ProjectResolution } from '../../../../../analysis/subs/project/src/interfaces/project.js';
+import type { AnalysisReport, AnalysisSummary, Capability, RunControl, AnalysisDiagnostic } from '../../../../../analysis/src/interfaces/analysis.js';
+import type { CheckedSet, RevisionTimings, SessionStatus, SessionOpen } from '../../../../../analysis/src/interfaces/session.js';
+import type { SourceLimit } from '../../../../../analysis/subs/typescript/src/interfaces/source.js';
+import type { ProjectRequest, ProjectScope, ProjectResolution, OutsideSourceWarning } from '../../../../../analysis/subs/project/src/interfaces/project.js';
 
 export type ContextId = string;
 export type GenerationId = string;
@@ -27,7 +29,7 @@ export interface InputFingerprints {
   readonly registry: string;
   readonly engine: string;
 }
-export type RevisionCause = 'open' | 'watch' | 'request' | 'verify' | 'conservative';
+export type RevisionCause = 'open' | 'watch' | 'request' | 'sweep' | 'verify' | 'conservative';
 export interface ContextRevision {
   readonly token: ContextToken;
   readonly revision: RevisionId;
@@ -35,8 +37,10 @@ export interface ContextRevision {
   readonly publishedAt: number;
   readonly cause: RevisionCause;
   readonly fingerprints: InputFingerprints;
-  readonly changed: readonly string[] | null;
-  readonly reused: readonly RetainedStageId[];
+  readonly changed: readonly string[];
+  readonly checked: CheckedSet;
+  readonly delta: { readonly added: number; readonly removed: number; readonly positionOnly: number };
+  readonly timings: RevisionTimings;
   readonly outcome: AnalysisReport['outcome'];
   readonly summary: AnalysisSummary;
 }
@@ -48,6 +52,8 @@ export interface ContextStatus {
   readonly selection: ContextSelection;
   readonly scope: ProjectScope | null;
   readonly state: ContextState;
+  readonly level: 'hot' | 'warm' | 'cold';
+  readonly session: SessionStatus | null;
   readonly synchronization: SynchronizationState;
   readonly published: ContextRevision | null;
   readonly lastValid: ContextRevision | null;
@@ -79,6 +85,16 @@ export interface CheckRequest {
   readonly token: ContextToken;
   readonly requestId: string;
   readonly freshness: Freshness;
+  readonly scope: 'report' | 'delta';
+  readonly since?: RevisionId;
+  readonly deadlineMs?: number;
+}
+export interface CheckDelta {
+  readonly since: RevisionId | null;
+  readonly findings: readonly (AnalysisDiagnostic & { readonly new: boolean })[];
+  readonly removed: readonly string[];
+  readonly warnings: readonly OutsideSourceWarning[];
+  readonly coverage: readonly SourceLimit[];
 }
 export type UnavailableReason = 'unknown-context' | 'expired-generation' | 'evicted-revision' | 'unobserved-input'
   | 'resource-unavailable' | 'analysis-failed' | 'unsupported-setup' | 'disposed';
@@ -89,14 +105,16 @@ export interface Unavailable {
 }
 export type CheckOutcome =
   | { readonly status: 'reported'; readonly requestId: string; readonly published: true;
-      readonly revision: ContextRevision; readonly freshness: FreshnessRecord; readonly report: AnalysisReport }
+      readonly revision: ContextRevision; readonly freshness: FreshnessRecord; readonly delta: CheckDelta; readonly report: AnalysisReport | null }
   | { readonly status: 'reported'; readonly requestId: string; readonly published: false;
-      readonly revision: null; readonly freshness: FreshnessRecord; readonly report: AnalysisReport }
+      readonly revision: null; readonly freshness: FreshnessRecord; readonly delta: null; readonly report: AnalysisReport }
   | { readonly status: 'pending'; readonly requestId: string; readonly current: ContextStatus }
   | { readonly status: 'superseded'; readonly requestId: string;
       readonly revision: ContextRevision | null;
       readonly mismatches: readonly { readonly path: string; readonly expected: string | null;
         readonly observed: string | null }[] }
+  | { readonly status: 'cold'; readonly requestId: string; readonly elapsedMs: number; readonly current: ContextStatus }
+  | { readonly status: 'deadline-exceeded'; readonly requestId: string; readonly elapsedMs: number; readonly revision: ContextRevision | null }
   | { readonly status: 'cancelled'; readonly requestId: string }
   | (Unavailable & { readonly requestId: string });
 export type OpenOutcome =
@@ -141,13 +159,13 @@ export interface ContextBudgets {
   readonly warmIdleMs: number;
   readonly coldRetainMs: number;
   readonly debounceMs: number;
-  readonly verificationIntervalMs: number;
+  readonly maxHotContexts: number;
+  readonly sweepIntervalMs: number;
+  readonly updateDeadlineMs: number;
 }
 export interface AnalysisDriver {
   resolve(request: ProjectRequest, control?: RunControl): Promise<ProjectResolution>;
-  check(inputs: { readonly project: ProjectRequest; readonly setup: ContextSetup;
-    readonly previous: RetainedAnalysis | null; readonly changes: readonly InputChange[] | null },
-    control?: RunControl): Promise<IncrementRun>;
+  open(project: ProjectRequest, setup: ContextSetup, control?: RunControl): Promise<SessionOpen>;
   dispose(): Promise<void>;
 }
 export interface ContextManagerOptions {

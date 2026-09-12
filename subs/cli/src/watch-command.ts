@@ -50,9 +50,9 @@ export async function watchCommand(args: { readonly root?: string; readonly form
     if (result.value.status === 'unavailable' && result.value.reason === 'evicted-revision') {
       publish({ schemaVersion: 'ramify.watch/1', event: 'revision-evicted', revision, coalesced },
         `Revision ${revision.sequence} (evicted before it could be read)`);
-    } else if (result.value.status === 'reported' && result.value.published && result.value.revision.revision === revision.revision) {
+    } else if (result.value.status === 'reported' && result.value.published && result.value.report && result.value.revision.revision === revision.revision) {
       const report = result.value.report;
-      const human = `Revision ${revision.sequence} (${revision.cause}; changed ${revision.changed?.length ?? 'unknown'} paths; reused ${revision.reused.join(', ') || 'none'})\n`
+      const human = `Revision ${revision.sequence} (${revision.cause}; ${revision.checked.path}; checked ${revision.checked.files.length} files, ${revision.checked.accesses} accesses; ${revision.timings.total.toFixed(1)} ms)\n`
         + formatHuman(report, `resident (daemon ${connection.daemon.instance.pid}; context ${revision.token.context}; revision ${revision.sequence}; published)`)
           .split('\n').slice(3).join('\n').trimEnd();
       publish({ schemaVersion: 'ramify.watch/1', event: 'revision', revision, coalesced, report }, human);
