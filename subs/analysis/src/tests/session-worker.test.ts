@@ -211,9 +211,44 @@ workerSuite('retained session worker', import.meta.url, () => {
       expect(handle.current).toBeNull();
       expect(await handle.report()).toBeNull();
       expect(worker.threadId).toBe(-1);
-      await eventually(() => !alive(pid));
       expect(handle.status().factBytes).toBe(0);
-    } finally { await handle.dispose(); await handle.dispose(); observation.cleanup(); }
+    } finally {
+      const disposed = await Promise.allSettled([handle.dispose(), handle.dispose()]);
+      observation.cleanup();
+      // Keep cleanup assertions visible without masking a prior report failure.
+      expect.soft(disposed.map(result => result.status)).toEqual(['fulfilled', 'fulfilled']);
+      expect.soft(alive(pid)).toBe(false);
+    }
+  }), timeout);
+
+  it('reports heap exhaustion after compiler startup and releases the already observed child', () => fixture(async (_root, inputs) => {
+    const observation = await opened({ ...inputs, session: { ...inputs.session, workerHeapMiB: 64 } });
+    const { handle, worker, messages } = observation;
+    const pid = handle.status().compiler.pid!;
+    try {
+      expect(alive(pid)).toBe(true);
+      const before = messages.length;
+      // Exceed the bounded worker heap during ordinary message deserialization,
+      // after startup has proved that its compiler child exists. No injected
+      // worker error or test-only production command supplies the failure.
+      const prefix = 'x'.repeat(2_048);
+      const changes = Array.from({ length: 40_000 }, (_, index) => ({ path: `${prefix}/${index}.ts`, kind: 'changed' as const }));
+      const result = await handle.update(changes);
+      expect(result.status).toBe('reported');
+      if (result.status !== 'reported') throw new Error(JSON.stringify(result));
+      expect(result.report.outcome.execution).toBe('unavailable');
+      expect(result.report.outcome.check).not.toBe('passed');
+      expect(result.report.diagnostics.map(item => item.code)).toContain('resource-limit');
+      expect(result.report.diagnostics.some(item => item.message.includes('resource-unavailable'))).toBe(true);
+      expect(messages.slice(before).some(message => message.kind === 'reply' && message.result && 'revision' in message.result)).toBe(false);
+      expect(handle.current).toBeNull();
+      expect(worker.threadId).toBe(-1);
+    } finally {
+      const disposed = await Promise.allSettled([handle.dispose()]);
+      observation.cleanup();
+      expect.soft(disposed.map(result => result.status)).toEqual(['fulfilled']);
+      expect.soft(alive(pid)).toBe(false);
+    }
   }), timeout);
 
   it('turns an actual worker heap exhaustion into an unavailable resource-limit report', () => fixture(async (_root, inputs) => {

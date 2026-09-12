@@ -4,6 +4,23 @@
 
 **Date:** 2026-09-12. **Outcome:** incomplete. Normal worker hosting and the I5-08 behavior are implemented, but abrupt worker termination leaves an unreaped compiler child. Abrupt-loss and heap-exhaustion cleanup regressions remain failing. This iteration is not ready for acceptance; no cleanup requirement or test has been waived.
 
+## One focused self-assessment follow-up
+
+The requested follow-up does not complete the iteration. Production hosting, the compiler provider and the reviewed contracts are unchanged. This attempt adds a deterministic reproduction of heap failure after compiler startup and corrects the failing tests' own cleanup handling.
+
+The new case opens a real session with a 64 MiB worker limit, establishes a live observed compiler PID, then submits 40,000 ordinary changed-path records with 2,048-character prefixes through `session.update`. Deserializing the real request exhausts the worker heap after its compiler exists. The case independently asserts an unavailable resource-limit report, no new revision reply, a cleared current revision and a terminated worker. It then fails the independent disposal-success and child-gone assertions. No synthetic worker error, new production command, skipped failure or zombie-as-gone predicate supplies the result.
+
+The abrupt-loss test now settles both disposal calls and always restores its diagnostic listeners and spies. Soft cleanup assertions still fail the test, but they no longer mask an earlier report assertion or prevent the test's own cleanup from running. The deterministic heap test uses the same assertion ordering.
+
+Verification for this test-only follow-up:
+
+- `NODE_OPTIONS='' npx vitest run subs/analysis/src/tests/session-worker.test.ts -t 'abrupt worker loss|heap exhaustion|disposes while work is queued'`: four selected cases executed, **one passed and three failed**, ten unrelated cases not selected. Queued/in-flight normal disposal passes. Forced termination, deterministic heap exhaustion after startup, and the existing 16 MiB cold-heap case fail child cleanup. The report and no-stale-revision assertions passed before those cleanup failures. Receipt: `.reference-work/reports/iteration8-followup-lifecycle.json`.
+- `npm run type-check` and `git diff --check`: pass.
+- The initial isolated execution of the newly added case also failed cleanup; receipt `.reference-work/reports/iteration8-followup-late-heap.json`.
+- No production source changed. The prior build, complete session-suite and 61-instance prerequisite evidence below belongs to the pre-follow-up snapshot. This attempt does not claim to have rerun those broad checks; full regression, scenario and seal checks remain reserved for automation.
+
+`functionalRequirementsSatisfied` and `allNewTestsPass` remain false; `newCodeCoveredByTests` remains true. The remaining capability is surviving ownership of native compiler launch and reaping when the session worker disappears. The existing provider port has no launcher/reaper handoff, while the assigned implementation still requires the worker host. A reviewed hosting or provider change is therefore still needed. The workflow should record this as a reviewable finding; this follow-up requests no waiver and does not publish another draft.
+
 ## Scope and contracts
 
 All edits, commands and Git operations use `/tmp/worktrees/ramify-67e9dd0f/iteration-5-fast-incremental-checks`, on `workflow/iteration-5-fast-incremental-checks`. Changes are confined to analysis source, same-owner tests and the reference harness. The pre-existing managed modification to iteration7-check-results.md is preserved without editing or staging it. No dependency-owner source, settled public session type, declaration, package entry, CLI or daemon source changes.
@@ -43,16 +60,16 @@ There is also an early-failure gap: the Node child creation diagnostic precedes 
 
 The iteration-work skill states that neither Studio nor direct work "permits changing a settled contract" (`.agents/skills/iteration-work/SKILL.md:14–17`), and the user-supplied Plan 5 requires a change to the reviewed contracts to revise iteration 1's package first (`main-plan.md:547–548`). The assigned owner remains analysis. These constraints are the reason a broader hosting/provider change requires a review decision.
 
-The robust architectural requirement is surviving ownership of compiler spawning and reaping, established before fallible analysis work. The current RetainedSourceInputs/RetainedSourceAnalysis public port supplies no launch or transport operation, and the installed synchronous compiler client creates its own child. Changing that provider contract exceeds this iteration's analysis-only write scope. The planned child-process session fallback is a candidate, but it must pass the same abrupt-failure test, including container child reaping, before it can be accepted. A request to choose fallback preparation or an incomplete submission is pending with the user.
+The robust architectural requirement is surviving ownership of compiler spawning and reaping, established before fallible analysis work. The current RetainedSourceInputs/RetainedSourceAnalysis public port supplies no launch or transport operation, and the installed synchronous compiler client creates its own child. Changing that provider contract exceeds this iteration's analysis-only write scope. The planned child-process session fallback is a candidate, but it must pass the same abrupt-failure test, including container child reaping, before it can be accepted. The self-assessment follow-up leaves this supervision choice for a reviewable workflow finding; no fallback implementation was authorized or applied.
 
 An isolated real-session experiment tested the planned direction without changing production hosting. A dedicated Node process opened the actual worker and compiler, terminated the worker, killed the compiler and observed a zombie. After that dedicated Node process exited, the container's docker-init reaper removed the compiler. This establishes Linux feasibility for process isolation in this environment, not a completed fallback implementation or portable acceptance. Receipt: `.reference-work/reports/session-supervisor-probe-20260912.json`; probe source: `.reference-work/session-supervisor-probe.mjs`. The production contract remains unchanged.
 
-## Evidence and verification
+## Implementation evidence before the follow-up
 
 - `npm run worktree:prepare`: nested example and site dependencies provisioned from this checkout.
 - `npm run build && npm run type-check`: passed after correcting source-only loader URLs to respect production dependency validation; all four TypeScript scopes passed.
 - The existing ten retained-session tests pass through the public worker with their original assertions unchanged. Under an inherited V8 override, a test-only wrapper runs the complete file in a sanitized child process and propagates failures.
-- The required four-file session command on final source executes 44 tests: 42 passed and 2 failed. Both failures are in session-worker.test.ts: abrupt worker loss and actual heap exhaustion after a child was started. Receipt: `.reference-work/reports/iteration8-sessions-coherent-20260912.json`. An earlier full worker-only run passed 12 and failed 1; the later heap-exhaustion failure demonstrates that compiler cleanup also depends on when the worker exhausts memory. No failing test is excluded from the final result.
+- The required four-file session command on the pre-follow-up source executed 44 tests: 42 passed and 2 failed. Both failures are in session-worker.test.ts: abrupt worker loss and actual heap exhaustion after a child was started. Receipt: `.reference-work/reports/iteration8-sessions-coherent-20260912.json`. An earlier full worker-only run passed 12 and failed 1; the later heap-exhaustion failure demonstrates that compiler cleanup also depends on when the worker exhausts memory. No failing test is excluded from the final result.
 - `NODE_OPTIONS='' npx vitest run subs/analysis/src/tests/session-revision.test.ts subs/analysis/src/tests/session-audit.test.ts`: 21 passed. Private fault-injection probes keep direct access to the internal engine; all I5-06 and I5-07 acceptance handlers now execute through the worker host.
 - `npx vitest run -c scripts/reference-harness/vitest.config.ts scripts/reference-harness/plan5.test.ts`: 10 passed.
 - Focused worker inspection smokes: description subtree 20 assertions; injected audit drift 19 assertions, including actual worker/compiler disposal.
@@ -76,7 +93,7 @@ The corrected cold S1000 run records a maximum 10 ms timer gap of 23.95 ms, a 3,
 
 A follow-up focused queued-disposal test passes after moving timeout cleanup before forced thread termination. An initial mistyped filter selected zero tests and is not evidence.
 
-The first full prerequisite-gate run was rejected because source changed during verification (the disposal fix landed while it ran); it supplies no passing evidence. A second run was stopped explicitly when final review identified a status/RSS race; its owned descendants were stopped. The race is corrected by rechecking worker failure after the asynchronous RSS read. The final `NODE_OPTIONS='' npm run reference:verify -- --plan 5 --iteration 8` run passes on stable source and compiled output: required 61, passed 61, failed 0, not executed 42. Every I5-08 handler and all prerequisites ran. Receipt: `.reference-work/reports/plan5-iteration8-0b254b2b-b33f-4fb6-b3f4-9fefa1abc3e5.json`. The gate and its owned children exited. This passing matrix gate does not waive the two failing same-owner lifecycle tests.
+The first full prerequisite-gate run was rejected because source changed during verification (the disposal fix landed while it ran); it supplies no passing evidence. A second run was stopped explicitly when final review identified a status/RSS race; its owned descendants were stopped. The race is corrected by rechecking worker failure after the asynchronous RSS read. The pre-follow-up `NODE_OPTIONS='' npm run reference:verify -- --plan 5 --iteration 8` run passed on stable source and compiled output: required 61, passed 61, failed 0, not executed 42. Every I5-08 handler and all prerequisites ran. Receipt: `.reference-work/reports/plan5-iteration8-0b254b2b-b33f-4fb6-b3f4-9fefa1abc3e5.json`. The gate and its owned children exited. This passing matrix gate does not waive the two failing same-owner lifecycle tests.
 
 ## Recommendations for Next Iteration
 

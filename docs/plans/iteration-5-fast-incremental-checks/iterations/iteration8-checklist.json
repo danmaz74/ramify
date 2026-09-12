@@ -9,7 +9,7 @@
     "functionalRequirementsSatisfied": false,
     "newCodeCoveredByTests": true
   },
-  "completedAt": "2026-09-12T10:20:39.118Z",
+  "completedAt": "2026-09-12T10:26:01.491Z",
   "iteration": "8",
-  "notes": "Incomplete: final four-file session run has 42 passed and 2 failed. Abrupt worker loss and genuine heap exhaustion after compiler startup leave unreaped children. The coherent Plan 5 iteration 8 prerequisite gate passes 61/61 with all eight I5-08 handlers executed; build, type-check, reference and self-check pass. Matrix success does not waive the two lifecycle failures. Process-isolation feasibility was probed on Linux, but a reviewed hosting/compiler supervision change is still required; production contract unchanged."
+  "notes": "One focused follow-up completed; iteration remains incomplete. Added a deterministic real-API heap-exhaustion test after compiler startup and fixed test cleanup so disposal rejection cannot mask report assertions or skip listener restoration. Selected lifecycle run: 1 passed, 3 failed, 10 not selected. Forced worker termination, late heap exhaustion, and cold heap exhaustion still leave unreaped children; unavailable reports and no-new-revision assertions pass. Type-check and diff checks pass. Production source and reviewed contracts unchanged. Completing cleanup requires surviving compiler launch/reap ownership via a reviewed hosting/provider change. Record a reviewable finding; no waiver and no publication in this follow-up. Prior 61/61 gate and 42/44 full focused-suite results belong to the pre-follow-up snapshot."
 }
