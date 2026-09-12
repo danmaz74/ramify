@@ -2,7 +2,7 @@
 
 # Iteration 6 results: Retained session, facts and source-edit paths
 
-**Date:** 2026-09-12. **Outcome:** complete. `analysis` now opens a retained session over one project: `openRetainedSession` observes the project through iteration 4's observer, creates iteration 5's retained compiler adapter with the observer's sink, runs the cold path and returns revision 1 as frozen plain data. `update` classifies the named changes through the observer, applies one compiler update, recomputes export descriptions over their dependency closure, re-interprets the changed files and the importers of every description that changed by value, rebuilds the model only when the link input changed, patches declaration positions when they only moved, and decides the accesses the change reaches. Every revision carries its checked set, its finding delta with `positionOnly` and its timings; `report` materializes the `ramify.analysis/1` document of a retained revision on request and `verify` recomputes everything from the warm compiler and compares it field by field. A11 and A12 are active. `npm run reference:verify -- --plan 5 --iteration 6` passes with all 42 required instances of iterations 2 to 6 executed, every I5-06 row equal to a batch analysis of the same disk state at every step with the session's own audit reporting equal; both project checks pass.
+**Date:** 2026-09-12. **Outcome:** complete. `analysis` now opens a retained session over one project: `openRetainedSession` observes the project through iteration 4's observer, creates iteration 5's retained compiler adapter with the observer's sink, runs the cold path and returns revision 1 as frozen plain data. `update` classifies the named changes through the observer, applies one compiler update, recomputes export descriptions over their dependency closure, re-interprets the changed files and the importers of every description that changed by value, rebuilds the model only when the link input changed, patches declaration positions when they only moved, and decides the accesses the change reaches. Every revision carries its checked set, its finding delta with `positionOnly` and its timings; `report` materializes the `ramify.analysis/1` document of a retained revision on request and `verify` recomputes everything from the warm compiler and compares it field by field. A11 and A12 are active. `npm run reference:verify -- --plan 5 --iteration 6` passes with all 42 required instances of iterations 2 to 6 executed, every I5-06 row equal to a batch analysis of the same disk state at every step with the session's own audit reporting equal; both project checks pass. The automatic regression run's two failures were corrected in a follow-up commit, recorded under Remediation below.
 
 ## Scope and execution
 
@@ -64,9 +64,10 @@ Unit evidence beside the gate: `src/tests/retained-session.test.ts` (10 cases ov
 | `npx vitest run -c scripts/reference-harness/vitest.config.ts scripts/reference-harness/plan5.test.ts` | 10 tests pass: six capabilities, 42 handlers. |
 | `npm run reference:verify -- --plan 5 --iteration 6` | **Passes.** Required 42, passed 42, failed 0, not executed 61; required iterations 1 to 6; available capabilities `catalog`, `compiler`, `engine`, `harness-gate`, `observer`, `session`. Report `.reference-work/reports/plan5-iteration6-0388ebd0-50ca-4f39-b89a-01fdbe1dc227.json`. |
 | `npm run check:reference` under an owned `RAMIFY_ENDPOINT_DIR` | 15 owners, 54 source files, 294 accesses, 2 warnings, 0 errors, complete coverage. |
-| `npm run check:self` under the same endpoint | 11 owners, 247 source files, 3,153 accesses, no finding, complete coverage; the counts exceed the pinned baseline because the checkout carries iterations 2 to 6's files. |
+| `npm run check:self` under the same endpoint | 11 owners, 247 source files, 3,153 accesses, no finding, complete coverage; the counts exceed the pinned baseline because the checkout carries iterations 2 to 6's files. Rerun after the remediation with the same result. |
+| `npx vitest run src/tests/entry-boundaries.test.ts subs/analysis/src/tests/retained-session.test.ts` (after the remediation, on a rebuilt `dist/`) | 12 tests pass. |
 | `node dist/src/cli-entry.js daemon stop`, `git diff --check` | Daemon stopped explicitly; diff clean. |
-| `npm test` | Not run by hand, per the check policy; the workflow's automatic regression check covers it. |
+| `npm test` | Not run by hand, per the check policy; the workflow's automatic regression check covers it. Its first run failed on two points corrected below. |
 
 The unfiltered `--plan 5` gate and `--iteration 7` and beyond still fail, as the iteration document expects.
 
@@ -80,6 +81,15 @@ The unfiltered `--plan 5` gate and `--iteration 7` and beyond still fail, as the
 - **Adapter areas.** The adapter fixes its source areas at creation and `SourceChangeSet` carries none, so the whole recomputation disposes and recreates the adapter when the derived areas differ from the ones it was created with. No I5-06 instance exercises it; iteration 7's tag changes will, and the typescript owner may prefer an `areas` member on the change set.
 - **`describe` is called once per whole recomputation.** Naming every owned file returns every description, so the cold, broad and audit paths read the adapter once rather than twice.
 
+## Remediation after the automatic checks
+
+The workflow's regression run reported two failures, both corrected in a follow-up commit and verified locally with the focused tests only:
+
+- **The batch entry loaded the compiler package.** `src/tests/entry-boundaries.test.ts` requires that `ramify check --batch` loads no module of the `typescript` package; with A12 active the analysis index reached the retained adapter, which imports the compiler API statically. `session-revision.ts` now imports `retained-source-analysis.js` lazily when a session creates its adapter, so the batch path stays free of the compiler API and `check:self` still accepts the lazy import (11 owners, no finding). `src/tests/entry-boundaries.test.ts` passes on the rebuilt `dist/`.
+- **Two session tests exceeded vitest's 5 s default under the parallel regression run.** Every case of `retained-session.test.ts` now carries an explicit 120 s timeout, as the compiler-bearing tests of other owners do; all 10 pass.
+
+Two scope-review findings were raised and could not be decided from this session (the workflow requires the authenticated review surface): the throwing stub in `plan5-baseline-loader.mjs`, forced by A12 making the adapter reachable from the pinned baseline replay, and the members implemented ahead of the iteration table (`verify`, `sweep`, `releaseRevision`, historical projection, the metadata path and the broad fallback), which the `RetainedSession` contract and the I5-06 handlers' `verify()` calls require. Both are documented under Issues and Known limitations for the reviewer.
+
 ## Known limitations
 
 - The description path is taken as `broad` (whole re-extraction over the warm compiler, relink, all decisions): exact, but not the subtree-bounded work iteration 7 fixes. The metadata path, the created and deleted file handling and the invalid-update projection are implemented conservatively and not asserted by a matrix row here.
@@ -92,12 +102,12 @@ The unfiltered `--plan 5` gate and `--iteration 7` and beyond still fail, as the
 ## Files
 
 - New: `subs/analysis/src/interfaces/session.ts`, `src/retained-session.ts`, `src/session-facts.ts`, `src/session-revision.ts`, `src/session-audit.ts`, `src/tests/retained-session.test.ts`; `scripts/reference-harness/plan5-session-cases.ts`.
-- Changed: `subs/analysis/{module.ramify,README.md}`, `src/index.ts`, `src/tests/report-copy.test.ts`; `subs/analysis/subs/descriptions/src/tests/descriptions.test.ts`; `scripts/reference-harness/{plan5-runtime.ts,plan5.test.ts,plan5-baseline-loader.mjs,README.md}`.
+- Changed: `subs/analysis/{module.ramify,README.md}`, `src/index.ts`, `src/session-revision.ts` (lazy adapter import in the remediation), `src/tests/report-copy.test.ts`; `subs/analysis/subs/descriptions/src/tests/descriptions.test.ts`; `scripts/reference-harness/{plan5-runtime.ts,plan5.test.ts,plan5-baseline-loader.mjs,README.md}`.
 
 ## Recommendations for Next Iteration
 
 - Iteration 7 should replace the broad fallback for `local.descriptions` with the description path: relink and rebuild the model from the new inventory over the retained catalog, and decide the accesses whose importer or original owner lies in the subtree of a changed module. A header tag change alters the areas embedded in every access fact of that owner, so either the adapter gains an `areas` member on `SourceChangeSet` and the affected files are re-interpreted, or the session keeps recreating the adapter for area changes as it does now.
 - Iteration 7's created and deleted file handling can narrow the broad path using the retained `candidates` per file and the `importers` index; the two-step adapter update (created and deleted first, `invalidateAll` second) must stay.
 - The audit's `nothing-retained` outcome for invalid states should be revisited with `invalid-description-current` and `invalid-recovery`: the observer's local invalid update carries a null inventory while batch acquisition may carry one, so the invalid projection is not yet compared with batch.
-- Iteration 8 should measure the observer's `apply` cost and the `observer.inputs` getter on R and S100 before the hook budgets bind: on the reference they account for most of an unchanged-surface update's 317 ms while the compiler-bearing phases total about 12 ms.
+- Iteration 8 should measure the observer's `apply` cost and the `observer.inputs` getter on R and S100 before the hook budgets bind: on the reference they account for most of an unchanged-surface update's 317 ms while the compiler-bearing phases total about 12 ms. The adapter must stay lazily loaded so the batch entry never carries the compiler package.
 - Iteration 9's contexts can publish `checked`, `delta` and `timings` directly from `SessionRevision`; report projections should be requested with the sequence so historical versions are used, and `releaseRevision` should follow the history budget.

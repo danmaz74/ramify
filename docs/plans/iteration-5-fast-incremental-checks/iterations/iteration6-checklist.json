@@ -1,7 +1,7 @@
 {
   "_cucumberViz": {
     "generatedBy": "cucumber-viz",
-    "mcpTool": "workflow.publish_iteration",
+    "mcpTool": "workflow.write_iteration_checklist",
     "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
   },
   "checks": {
@@ -9,7 +9,7 @@
     "functionalRequirementsSatisfied": true,
     "newCodeCoveredByTests": true
   },
-  "completedAt": "2026-09-12T08:20:00Z",
+  "completedAt": "2026-09-12T08:25:00Z",
   "iteration": "6",
-  "notes": "openRetainedSession behind A11/A12 with frozen plain revisions, checked sets, finding deltas, position refresh, report projection and verify; all ten I5-06 instances pass through `reference:verify --plan 5 --iteration 6` (42/42), each step equal to batch with the audit equal; check:reference and check:self pass. Description path taken conservatively as broad until iteration 7; npm test left to the automatic regression check."
+  "notes": "openRetainedSession behind A11/A12 with frozen plain revisions, checked sets, finding deltas, position refresh, report projection and verify; all ten I5-06 instances pass through `reference:verify --plan 5 --iteration 6` (42/42), each step equal to batch with the audit equal; check:reference and check:self pass. Remediation: the retained adapter is now imported lazily so the batch entry never loads the compiler package (entry-boundaries test passes), and the session tests carry explicit timeouts. Two scope-review findings (baseline-loader stub; members ahead of the iteration table) await the authenticated review surface. Description path taken conservatively as broad until iteration 7; npm test left to the automatic regression check."
 }
