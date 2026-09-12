@@ -8,14 +8,30 @@ import { plan5Instances } from './plan5-instances.js';
 import { plan5LiveHandlers } from './plan5-live-cases.js';
 import { repositoryRoot } from './plan.js';
 import { Assertions } from './runner.js';
+import type { InstanceHandler } from './runner.js';
+
+/** Derive membership from the reviewed inventory, so a missing provider cannot
+ * silently reduce either the default focused run or automatic registration. */
+export function liveInstanceSelection(
+  handlers: ReadonlyMap<string, InstanceHandler> = plan5LiveHandlers,
+  requested?: readonly string[],
+): readonly string[] {
+  const required = plan5Instances.filter(instance => instance.iteration === 11).map(instance => instance.id);
+  const ids = requested ?? required;
+  assert.ok(ids.length > 0, 'Live instance selection must not be empty');
+  assert.equal(new Set(ids).size, ids.length, 'Live instance selection must not contain duplicates');
+  for (const id of ids) assert.ok(required.includes(id), `Unknown live instance: ${id}`);
+  assert.deepEqual([...handlers.keys()].sort(), [...required].sort(), 'Live providers must match the reviewed inventory');
+  return [...ids];
+}
 
 /** Focused process evidence using the exact gate handlers. This never credits
  * prerequisite records or invokes the regression runners reserved for Studio. */
-export async function runLiveInstances(ids: readonly string[] = [...plan5LiveHandlers.keys()]) {
-  for (const id of ids) assert.ok(plan5LiveHandlers.has(id), `Unknown live instance: ${id}`);
+export async function runLiveInstances(ids?: readonly string[]) {
+  const selected = liveInstanceSelection(plan5LiveHandlers, ids);
   const identity = await executionIdentity(), startedAt = new Date().toISOString();
   const results = [];
-  for (const id of ids) {
+  for (const id of selected) {
     const handler = plan5LiveHandlers.get(id)!;
     assert.equal(handler.kind, 'memory');
     const assertions = new Assertions(), started = performance.now();
