@@ -34,9 +34,11 @@ Vitest launches integration children with `NODE_OPTIONS=''` so the environment's
 
 No model rule, package entry or owner was added. Declarations and owner prose were updated with their real exports. The CLI purpose remains at its current stage in the validator rather than asserting iteration 10 behavior.
 
-## Verification
+## Verification before the self-assessment repair
 
-Final coherent focused receipt: `.reference-work/reports/iteration9-final-focused.json`, completed 2026-09-12T11:01:18.109Z. It records source hash `ee708242f7958f45f7e8c0b9a58b669ae800e27304918403119e7df62e44a333`, build hash `7643d6ed656f79b3646d41a65feafe158606248daf668b7946673f5e018d0861`, Node v22.23.2 and TypeScript 7.0.2. The receipt identifies the pre-commit HEAD plus dirty source bytes and checks that source/build hashes remain coherent throughout the run.
+The following evidence was collected for implementation commit `dd6c9c6`, before the focused repair described below. It has not been rerun on the repaired source except for build and type-check.
+
+Coherent focused receipt: `.reference-work/reports/iteration9-final-focused.json`, completed 2026-09-12T11:01:18.109Z. It records source hash `ee708242f7958f45f7e8c0b9a58b669ae800e27304918403119e7df62e44a333`, build hash `7643d6ed656f79b3646d41a65feafe158606248daf668b7946673f5e018d0861`, Node v22.23.2 and TypeScript 7.0.2. The receipt identifies the pre-commit HEAD plus dirty source bytes and checks that source/build hashes remain coherent throughout the run.
 
 | Check | Result |
 | --- | --- |
@@ -54,9 +56,30 @@ New and migrated unit suites cover session opening, covering identities, invocat
 
 **Not run locally under the supplied policy:** Vitest/Cucumber regression (including the new Vitest suites), scenario coverage, sealed-file checks, full Plan 1/Plan 2 gates, the full iteration 9 prerequisite gate and the two I5-10 full regression/gate handlers. Their automatic verdict is separate. Authored tests and passing selected handlers are not a claim that every new Vitest test ran.
 
+## Focused self-assessment repair
+
+The 2026-09-12 retry inspected the current workflow state: iteration 9 is awaiting output revalidation, with no automatic regression verdict yet. The two false checklist flags cannot be replaced by a passing-test claim from that state.
+
+The review found a concrete exception-delivery defect in `context-manager.ts`. A published reader waiting for the first revision stays in the context queue rather than the synchronized request batch. If the background `driver.open` threw or rejected, the catch branch completed only that batch, leaving the reader waiting indefinitely with no publication or explicit failure.
+
+The catch branch now completes queued published readers with `analysis-failed` as well. Cancelled requests keep their original outcome; no failed revision is published. The context remains reconciling and a later synchronized request can reopen successfully. The change is confined to the contexts implementation and its existing session-driver test suite.
+
+Two new parameterized tests retain the independent failure, cancellation, recovery and teardown expectations. Their equivalent focused reproduction uses the real manager with the existing scripted driver and controlled ports. It does not invoke Vitest or the reserved regression checks.
+
+| Repair verification | Result |
+| --- | --- |
+| `NODE_OPTIONS='' node --import tsx .reference-work/iteration9-open-failure-check.mts before` | Both cases fail for the defect: neither waiting reader receives an outcome after the open fails. Receipt: `.reference-work/reports/iteration9-open-failure-before.json`. |
+| `NODE_OPTIONS='' node --import tsx .reference-work/iteration9-open-failure-check.mts after` | **2/2 cases, 18 assertions pass**, plus teardown checks for timers, watchers and owned session disposal. Receipt: `.reference-work/reports/iteration9-open-failure-after.json`, completed 2026-09-12T11:06:53.434Z. |
+| `npm run build && npm run type-check` | Pass on the repaired source; all four TypeScript scopes include the added tests. |
+| `git diff --check` | Pass. |
+
+The reserved Vitest/Cucumber suites, scenario coverage and sealed-file checks were not run. No full acceptance gate or measurement workload was run in this focused repair. The new Vitest cases are authored and type-checked, but their automatic execution remains pending. The focused reproduction is not represented as all new tests passing.
+
+Both managed deliverables are updated for this repair. Code will be committed on the authoritative worktree branch; no publication tool is called, as required by the retry instruction.
+
 ## Outstanding exit condition
 
-The ten I5-09 instances and the compiled removal instance have current passing evidence. I5-10 `plan2-gate-amended` and `plan2-contexts-regression` remain unexecuted locally. A complete `--plan 2` pass cannot be asserted from the admission controls.
+The ten I5-09 instances and the compiled removal instance passed on the preceding implementation commit; those handlers were not rerun during this focused exception-delivery repair. I5-10 `plan2-gate-amended` and `plan2-contexts-regression` remain unexecuted locally. A complete `--plan 2` pass cannot be asserted from the admission controls.
 
 In addition, existing `scripts/measurements/resident-*` providers still consume removed increment stage-reuse telemetry. Their migration is explicitly assigned to iteration 12 by the plan. The 166 retained I2 obligations still include those measurement instances, so strict iteration 9 full-gate acceptance depends on that migration or an explicit plan revision. This implementation neither removes those obligations nor reuses stale measurements as current evidence. The checklist therefore leaves full functional acceptance and all-new-tests-pass unconfirmed.
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AnalysisDiagnostic } from '../../../../../analysis/src/interfaces/analysis.js';
+import type { CheckOutcome } from '../interfaces/contexts.js';
 import { createFingerprints } from '../tokens.js';
 import { sessionEnvironment } from './session-fixture.js';
 import { capture, flush, hash } from './scripted-driver.js';
@@ -8,6 +9,38 @@ const diagnostic = (id: string): AnalysisDiagnostic => ({ id, category: 'executi
   location: null, related: [], importer: null, original: null, accessId: null });
 
 describe('contexts on one retained session', () => {
+  it.each(['throw', 'reject'])('settles publication waiters when the opening session fails by %s and permits recovery', async mode => {
+    const e = sessionEnvironment();
+    let fail!: () => void;
+    const gate = new Promise<void>(resolve => { fail = resolve; });
+    e.script.pending.push(async () => {
+      await gate;
+      if (mode === 'throw') throw new Error('first session failed');
+      return Promise.reject(new Error('first session failed'));
+    });
+    try {
+      const opened = await e.open(); await flush();
+      const replies: CheckOutcome[] = [];
+      const waiting = [1, 2].map(() => e.check(opened.token, { mode: 'published', wait: true }, { scope: 'report' })
+        .then(result => { replies.push(result); }));
+      const controller = new AbortController();
+      const cancelled = e.manager.check({ token: opened.token, requestId: 'cancelled', scope: 'report',
+        freshness: { mode: 'published', wait: true } }, 'lease', { signal: controller.signal });
+      controller.abort(); expect((await cancelled).status).toBe('cancelled');
+      await flush(); expect(replies).toEqual([]);
+      fail(); await flush();
+      // Assert settlement before awaiting so this defect fails without hanging.
+      expect(replies).toHaveLength(2);
+      expect(replies.every(result => result.status === 'unavailable' && result.reason === 'analysis-failed')).toBe(true);
+      await Promise.all(waiting);
+      expect(e.status(opened.token)).toMatchObject({ published: null, synchronization: 'reconciling', pending: { requests: 0 } });
+      expect(e.script.openCalls).toHaveLength(1);
+      const recovered = await e.check(opened.token, { mode: 'synchronized', expect: [{ path: 'src/index.ts', sha256: hash('1') }] });
+      expect(recovered).toMatchObject({ status: 'reported', published: true, revision: { sequence: 1 } });
+      expect(e.script.openCalls).toHaveLength(2);
+    } finally { fail(); await flush(); await e.dispose(); }
+  });
+
   it('opens once per canonical context and obtains subsequent revisions from its session', async () => {
     const e = sessionEnvironment();
     try {

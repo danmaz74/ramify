@@ -385,7 +385,11 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       context.sweepRequired = true;
       if (!controller.signal.aborted && !disposed && context.state !== 'evicted') {
         context.synchronization = 'reconciling';
-        for (const entry of entries) complete(entry, { ...unavailable('analysis-failed', String(error)), requestId: entry.request.requestId });
+        // Published readers can join a background open without entering its
+        // synchronized request batch. They must observe its failure as well.
+        for (const entry of [...entries, ...context.queue.filter(item => item.request.freshness.mode === 'published')]) {
+          complete(entry, { ...unavailable('analysis-failed', String(error)), requestId: entry.request.requestId });
+        }
       }
     } finally {
       if (controller.signal.aborted) {

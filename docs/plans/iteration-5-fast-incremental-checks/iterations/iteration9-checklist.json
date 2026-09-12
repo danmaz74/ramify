@@ -9,7 +9,7 @@
     "functionalRequirementsSatisfied": false,
     "newCodeCoveredByTests": true
   },
-  "completedAt": "2026-09-12T11:02:47Z",
+  "completedAt": "2026-09-12T11:07:54.845Z",
   "iteration": "9",
-  "notes": "Implementation and selected behavior are verified: all ten I5-09 plus compiled I5-10 removal pass (11 handlers/53 assertions), four amended gate controls pass (68 assertions), 12 admission and 12 retention assertions pass; build, all type-check scopes, final declarations and resident reference/self-check pass. Full acceptance is unconfirmed: Vitest/Cucumber including new suites, full prerequisite and Plan 1/2 regression gates are reserved for automation and not run locally. I5-10 full gate also retains Plan 2 measurement obligations whose obsolete increment telemetry migration is assigned to iteration 12. No assertion or measurement requirement was waived. See iteration9-results.md for exact coverage and pending conditions."
+  "notes": "Focused retry fixed published readers hanging when the first session open throws or rejects. The reproduction failed before the fix and passes afterward (2 cases, 18 assertions plus teardown); build and all four type-check scopes pass. Equivalent new Vitest cases are added. Functional completion remains false because I5-10 full Plan 2 acceptance is unestablished and its retained measurement obligations still depend on the iteration 12 telemetry migration. All-new-tests-pass remains false because the new and migrated Vitest suites and full regression gates are reserved for automation and have not run. No requirement, assertion or measurement was waived. Prior selected I5-09/removal evidence is recorded separately from this repair. No publication requested."
 }
