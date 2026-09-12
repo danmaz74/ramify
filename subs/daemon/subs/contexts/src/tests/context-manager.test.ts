@@ -244,13 +244,21 @@ describe('watcher reconciliation and retention', () => {
       e.script.pending.push(() => ({ ...capture(1), factBytes: 6000 }));
       const waiting = e.check(opened.token).then(result => { answered = true; return result; });
       await flush(); expect(projecting).toBe(true); expect(answered).toBe(false);
+      let lateAnswered = false;
+      const late = e.check(opened.token).then(result => { lateAnswered = true; return result; });
+      await flush(); expect(lateAnswered).toBe(false);
       finishReport(); await flush();
-      expect(disposing).toBe(true); expect(owned.disposeCalls).toBe(0); expect(answered).toBe(false);
-      finishDisposal();
+      expect(disposing).toBe(true); expect(owned.disposeCalls).toBe(0); expect(answered).toBe(false); expect(lateAnswered).toBe(false);
+      finishDisposal(); await flush();
+      expect(answered).toBe(true); expect(lateAnswered).toBe(true);
       expect(await waiting).toMatchObject({ reason: 'resource-unavailable' });
+      expect(await late).toMatchObject({ reason: 'resource-unavailable' });
       expect(owned.disposeCalls).toBe(1);
-      expect(e.status(opened.token)).toMatchObject({ level: 'cold', retainedBytes: 0, published: before.published });
+      expect(e.status(opened.token)).toMatchObject({ level: 'cold', retainedBytes: 0, published: before.published,
+        pending: { requests: 0, analysisRunning: false } });
       expect(e.status(opened.token).retainedBytes + e.status(opened.token).history.bytes).toBeLessThanOrEqual(5000);
+      e.script.version = 2;
+      expect(await e.check(opened.token)).toMatchObject({ status: 'reported', published: true });
     } finally { finishReport(); finishDisposal(); await flush(); await e.dispose(); }
   });
   it('rejects session facts above the per-context bound without publishing a pass', async () => {

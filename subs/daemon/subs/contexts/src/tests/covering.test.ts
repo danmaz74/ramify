@@ -33,7 +33,21 @@ describe('covered identity rendezvous', () => {
       ]);
       expect(e.clock.now()).toBe(0); expect(e.script.calls).toHaveLength(before + 1);
       expect(e.script.updateCalls.at(-1)?.inputs.changes.map(change => change.path).sort()).toEqual(['src/a.ts', 'src/b.ts', 'src/provider.ts']);
+      expect(e.script.updateCalls.at(-1)?.inputs.changes.every(change => change.kind === 'changed')).toBe(true);
       expect(results.every(result => result.status === 'reported' && result.published && result.revision.sequence === 2)).toBe(true);
+    } finally { await e.dispose(); }
+  });
+
+  it.each(['created', 'deleted', 'renamed'] as const)('preserves a pending %s watcher hint when a hook names the same path', async kind => {
+    const e = sessionEnvironment();
+    try {
+      const opened = await e.open(); await flush();
+      e.watcher.emit('/fixture', [{ path: 'src/index.ts', kind }]);
+      e.script.version = 2;
+      const result = await e.check(opened.token, { mode: 'synchronized', expect: expected('src/index.ts', '2') });
+      expect(result).toMatchObject({ status: 'reported', published: true });
+      expect(e.script.updateCalls).toHaveLength(1);
+      expect(e.script.updateCalls[0]?.inputs.changes).toEqual([{ path: 'src/index.ts', kind: kind === 'renamed' ? 'unknown' : kind }]);
     } finally { await e.dispose(); }
   });
 

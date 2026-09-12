@@ -82,8 +82,12 @@ export function validateServiceRequest(operation: unknown, params: unknown): Ser
       case 'contextStatus':
       case 'subscribe':
       case 'closeContext': valid = record(params, ['token']) && token(params.token); break;
-      case 'check': valid = record(params, ['token', 'requestId', 'freshness']) && token(params.token)
-        && matches(params.requestId, requestId) && freshness(params.freshness); break;
+      case 'check': valid = record(params, ['token', 'requestId', 'freshness'], ['scope', 'since', 'deadlineMs']) && token(params.token)
+        && matches(params.requestId, requestId) && freshness(params.freshness)
+        && (!Object.hasOwn(params, 'scope') || params.scope === 'report' || params.scope === 'delta')
+        && (!Object.hasOwn(params, 'since') || matches(params.since, revisionId))
+        && (!Object.hasOwn(params, 'deadlineMs') || (typeof params.deadlineMs === 'number'
+          && Number.isSafeInteger(params.deadlineMs) && params.deadlineMs > 0 && params.deadlineMs <= 600_000)); break;
       case 'unsubscribe': valid = record(params, ['subscription']) && nonempty(params.subscription); break;
       case 'daemonStatus': valid = record(params, []); break;
       case 'stopDaemon': valid = record(params, ['instanceId']) && nonempty(params.instanceId); break;

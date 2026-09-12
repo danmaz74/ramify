@@ -20,9 +20,9 @@ describe('Plan 5 inventory and gates', () => {
       .toEqual([0, 10, 7, 8, 7, 10, 11, 8, 13, 9, 5, 9, 6]);
     expect(new Set(plan5Instances.map(item => item.matrixId)).size).toBe(14);
     expect(plan5Instances.every(item => item.evidenceKind && !('status' in item))).toBe(true);
-    expect([...plan5Runtime.capabilities].sort()).toEqual(['catalog', 'compiler', 'contexts', 'engine', 'harness-gate', 'hosting', 'observer', 'session', 'supersession']);
-    expect(plan5Runtime.handlers.size).toBe(74);
-    expect(plan5Instances.filter(item => item.iteration === 9).every(item => plan5Runtime.handlers.has(item.id))).toBe(true);
+    expect([...plan5Runtime.capabilities].sort()).toEqual(['catalog', 'compiler', 'contexts', 'engine', 'harness-gate', 'hook-cli', 'hosting', 'observer', 'session', 'supersession']);
+    expect(plan5Runtime.handlers.size).toBe(83);
+    expect(plan5Instances.filter(item => item.iteration === 10).every(item => plan5Runtime.handlers.has(item.id))).toBe(true);
     const first = plan5Instances[0];
     expect(validateInstanceRecords(plan5Instances.slice(1), plan)).toEqual([`Missing reviewed instance: ${first.id}`]);
     expect(validateInstanceRecords([{ ...first, evidenceKind: 'unit' }, ...plan5Instances.slice(1)], plan))

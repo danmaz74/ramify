@@ -1,6 +1,6 @@
 import type { RunControl } from '../../subs/analysis/src/interfaces/analysis.js';
 import type { ProjectRequest } from '../../subs/analysis/subs/project/src/interfaces/project.js';
-import type { ContextToken, ContextSetup, ContextStatus, ContextBudgets, CheckOutcome, Freshness,
+import type { ContextToken, ContextSetup, ContextStatus, ContextBudgets, CheckOutcome, Freshness, RevisionId,
   OpenOutcome, ContextEvent } from '../../subs/daemon/src/context-types.js';
 
 export type ServiceOperation = 'openContext' | 'contextStatus' | 'check' | 'subscribe'
@@ -23,6 +23,9 @@ export interface CheckParams {
   readonly token: ContextToken;
   readonly requestId: string;
   readonly freshness: Freshness;
+  readonly scope?: 'report' | 'delta';
+  readonly since?: RevisionId;
+  readonly deadlineMs?: number;
 }
 export interface SubscriptionOpened {
   readonly subscription: string;

@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": false,
+    "functionalRequirementsSatisfied": false,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-12T11:27:04.000Z",
+  "iteration": "10",
+  "notes": "Iteration 10 implementation and all nine I5-11 instances pass on one coherent build (125 assertions; eight process cases and one IPC case). Build/type-check, declaration validation and resident reference/toolkit checks pass. Tests are authored and type-checked, but reserved Vitest/Cucumber regression awaits automation. Full functional exit remains unconfirmed because full prerequisite gates are unrun, the inherited Plan 2 measurement-provider dependency remains, and deletion/input-identity plus mixed-invocation dependency gaps are preserved in the results. No requirement or test was waived."
+}

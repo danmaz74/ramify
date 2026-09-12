@@ -159,7 +159,7 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
       },
       async check(params, control) {
         const invalid = guard<CheckOutcome>('check', params); if (invalid) return invalid;
-        const result = await manager.check({ ...params, scope: 'report' }, pair(params.token), control);
+        const result = await manager.check({ ...params, scope: params.scope ?? 'report' }, pair(params.token), control);
         if (result.status === 'reported' && result.freshness.reusedRevision) {
           counters.reusedRevisions++;
           if (result.freshness.captureStarted === null && result.freshness.verified) counters.coveredRequests++;

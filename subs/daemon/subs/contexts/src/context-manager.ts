@@ -368,11 +368,12 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       await hotBudget(context);
       if (!await publish(context, data, cause)) {
         context.synchronization = 'reconciling'; context.sweepRequired = true;
-        const rejected = [...entries, ...context.queue];
         // Restore the retained-byte bound before acknowledging the rejection.
         // Projection and disposal may both yield while the oversized facts live.
         await abandonCandidate(context);
-        for (const entry of rejected) complete(entry, { ...unavailable('resource-unavailable'), requestId: entry.request.requestId });
+        // Include callers that arrived during cleanup: the cold context has no
+        // scheduled analysis left to settle those requests.
+        for (const entry of [...entries, ...context.queue]) complete(entry, { ...unavailable('resource-unavailable'), requestId: entry.request.requestId });
         return;
       }
       context.state = 'warm';
@@ -465,7 +466,11 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
           && !entry.needsSweep && !context.running && !context.background && !context.paths.size && !context.sweepRequired
           && context.synchronization === 'synchronized' && invocationKey(entry.invocation) === invocationKey(context.invocation)
           && !mismatch(context, entry, data)) { track(deliver(context, entry, publication, null, true)); return; }
-        for (const expected of request.freshness.expect) context.paths.set(expected.path, 'unknown');
+        // A hook identifies a path to re-observe. The observer determines its
+        // actual creation/deletion and role; preserve stronger watcher hints.
+        for (const expected of request.freshness.expect) {
+          if (!context.paths.has(expected.path)) context.paths.set(expected.path, 'changed');
+        }
         if (context.paths.size > budgets.maxQueuedPaths) { context.paths.clear(); context.conservative = true; context.sweepRequired = true; }
         if (entry.needsSweep) context.sweepRequired = true;
         context.background ??= 'request'; context.debounce?.(); context.debounce = null;

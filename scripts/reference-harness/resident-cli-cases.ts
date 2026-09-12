@@ -109,7 +109,7 @@ for (const instance of plan2Instances.filter(item => /^I2-(19|20|21|22):/.test(i
           const cwd = subcase === 'root-from-subdirectory' ? join(root, 'subs/workspace/subs/catalog/src') : root;
           if (subcase === 'human') {
             const result = await command(p, cwd, ['check'], a, 'resident human check', expected);
-            a.ok('resident mode includes real identity, revision and freshness', /Mode: resident \(daemon \d+; context ctx\/1:.*; revision \d+; synchronized/.test(result.stdout));
+            a.ok('resident mode includes real identity, revision path and freshness', /Mode: resident \(daemon \d+; context ctx\/1:.*; revision \d+; (?:cold|unchanged-surface|source|description|metadata|broad); synchronized/.test(result.stdout));
             a.ok('Plan 1 human details retained', result.stdout.includes(`Root: ${canonicalRoot} (found from ${canonicalRoot})`) && result.stdout.includes('Execution: completed; check: passed; coverage: complete'));
           } else {
             const result = await command(p, cwd, ['check', '--format', 'json'], a, 'resident JSON check', expected);

@@ -1,13 +1,22 @@
 # CLI
 
-The CLI parses supported arguments, reaches the resident daemon through an injected connector or runs an injected batch operation, formats completed reports, streamed revisions and daemon status, and selects the documented process exit code. It contains no checking algorithm and keeps help, version and status independent of compiler and server startup.
+The CLI parses supported arguments, reaches the resident daemon through an injected connector or runs an injected batch operation, formats completed reports, revision deltas for the files a caller names, streamed revisions and daemon status, and selects the documented process exit code. It contains no checking algorithm and keeps help, version and status independent of compiler and server startup.
 
 `runCli(argv, environment, control?)` accepts output sinks, a working directory,
 the package version, a service connector and a `BatchOperation`. Root supplies
 the real connector and lazy batch binding, and owns SIGINT and stream cleanup.
 The handler validates the complete invocation before dispatch and checks stage
 completion before reporting success. Pre-analysis invocation failures use
-`ramify.cli/1`; check results retain the bare `ramify.analysis/1` document.
+`ramify.cli/1`; plain check results retain the bare `ramify.analysis/1` document.
+
+`check --changed <path>...` hashes each named file relative to the selected root,
+with a missing file represented by an absent identity. It requests a compact
+delta with synchronized freshness, a two-second default deadline and an optional
+`--since` revision. JSON output is one `ramify.check/1` document; human output
+marks new findings and names the revision path, checked set and wait. Findings
+anywhere in the project fail the check. Cold, overdue, unobserved, superseded
+and unavailable checks exit 2 explicitly. This command never calls the batch
+operation, including after exhausted recovery.
 
 An ordinary `check` opens a context and requests synchronized freshness. Its
 human `Mode:` line identifies the daemon, context and revision, or explicitly

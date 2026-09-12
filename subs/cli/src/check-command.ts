@@ -4,10 +4,13 @@ import type { ContextToken } from '../../daemon/src/context-types.js';
 import type { CliEnvironment, CliExitCode } from './interfaces/cli.js';
 import { capabilities, printReport } from './command-support.js';
 import { CliFailure, disconnectFailure, serviceFailure } from './errors.js';
+import { changedCommand } from './changed-command.js';
 
-interface CheckArguments { readonly root?: string; readonly format: 'human' | 'json'; readonly batch: boolean }
+interface CheckArguments { readonly root?: string; readonly format: 'human' | 'json'; readonly batch: boolean;
+  readonly changed?: readonly string[]; readonly since?: string; readonly deadlineMs?: number }
 
 export async function checkCommand(args: CheckArguments, environment: CliEnvironment, control: RunControl): Promise<CliExitCode> {
+  if (args.changed) return changedCommand({ ...args, changed: args.changed }, environment, control);
   async function batch(mode: string): Promise<CliExitCode> {
     const result = await environment.batch({ cwd: environment.cwd,
       ...(args.root === undefined ? {} : { root: args.root }), capabilities }, control);

@@ -48,7 +48,7 @@ function description(text: string): DescriptionDocument {
 
 /** Plan 2 abbreviates unchanged named lists. Expand only from the archived
  * Plan 1 review, never from the implementation being checked. */
-export function reviewedOwners(baseline: string, resident: string, retained?: string, retainedIteration = 9): ReadonlyMap<string, ReviewedOwner> {
+export function reviewedOwners(baseline: string, resident: string, retained?: string, retainedIteration = 10): ReadonlyMap<string, ReviewedOwner> {
   const owners = new Map<string, ReviewedOwner>();
   function add(review: string, abbreviations: boolean): number {
     let count = 0;

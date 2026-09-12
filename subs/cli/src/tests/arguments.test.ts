@@ -94,3 +94,29 @@ describe('resident command grammar', () => {
     expect(() => parseArguments(argv)).toThrow();
   });
 });
+
+describe('changed command grammar', () => {
+  const revision = 'rev/1:00000000-0000-0000-0000-000000000001:7';
+  it('consumes all changed paths up to a flag and retains the selected deadline and baseline', () => {
+    expect(parseArguments(['check', '--since', revision, '--changed', './src/a.ts', 'src/b file.ts',
+      '--deadline', '500', '--root', '../root', '--format', 'json'])).toEqual({ command: 'check',
+      root: '../root', format: 'json', batch: false, changed: ['./src/a.ts', 'src/b file.ts'], since: revision, deadlineMs: 500 });
+    expect(parseArguments(['check', '--changed', 'a.ts'])).toEqual({ command: 'check', format: 'human', batch: false, changed: ['a.ts'] });
+  });
+  it.each([
+    ['check', '--changed'], ['check', '--changed', '--format', 'json'], ['check', '--changed', ''],
+    ['check', '--changed', 'a.ts', '--changed', 'b.ts'], ['check', '--changed', 'a.ts', '--batch'],
+    ['check', '--since', revision], ['check', '--deadline', '500'],
+    ['check', '--changed', 'a.ts', '--since', 'rev/1:'], ['check', '--changed', 'a.ts', '--since', 'rev/1:made-up'],
+    ['check', '--changed', 'a.ts', '--since', `${revision}\n`],
+    ...['0', '-1', '600001', '1.5', 'Infinity', '1e3', '9007199254740993'].map(value => ['check', '--changed', 'a.ts', '--deadline', value]),
+    ['check', '--changed', 'a.ts', '--deadline', '1', '--deadline', '2'],
+    ['watch', '--changed', 'a.ts'], ['daemon', 'status', '--changed', 'a.ts'],
+  ])('rejects %j before any service or batch operation', (...argv) => {
+    expect(() => parseArguments(argv)).toThrow();
+  });
+  it('accepts the positive deadline boundaries', () => {
+    for (const value of [1, 600_000]) expect(parseArguments(['check', '--changed', 'a.ts', '--deadline', String(value)]))
+      .toMatchObject({ deadlineMs: value });
+  });
+});

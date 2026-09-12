@@ -98,6 +98,28 @@ describe('service request structure', () => {
     expect(check(null)?.code).toBe('invalid-request');
   });
 
+  it('accepts optional report/delta scope, retained revision and inclusive deadline bounds', () => {
+    for (const scope of ['report', 'delta']) for (const deadlineMs of [1, 2000, 600_000]) {
+      expect(validateServiceRequest('check', { ...synchronized, scope, since: revision, deadlineMs })).toBeNull();
+    }
+    for (const params of [{ ...synchronized, scope: 'delta' }, { ...synchronized, since: revision },
+      { ...synchronized, deadlineMs: 100 }]) expect(validateServiceRequest('check', params)).toBeNull();
+  });
+
+  it('rejects malformed compact-check parameters instead of silently using defaults', () => {
+    const invalid = [
+      ...[undefined, null, '', 'changed', 1, {}, ['delta']].map(scope => ({ scope })),
+      ...[undefined, null, '', 'rev/1:bad', `rev/1:${uuid}:0`, `rev/1:${uuid}:01`, `${revision}\n`, 1].map(since => ({ since })),
+      ...[undefined, null, 0, -1, 1.5, 600_001, Number.MAX_SAFE_INTEGER + 1, Infinity, NaN, '2000'].map(deadlineMs => ({ deadlineMs })),
+    ];
+    for (const params of invalid) {
+      expect(validateServiceRequest('check', { ...synchronized, ...params })?.code).toBe('invalid-request');
+    }
+    let reads = 0;
+    expect(validateServiceRequest('check', { ...synchronized, get deadlineMs() { reads++; return 2000; } })?.code).toBe('invalid-request');
+    expect(reads).toBe(0);
+  });
+
   it('accepts 10,000 expectations and rejects 10,001 before processing them', () => {
     const expectList = Array.from({ length: 10_000 }, (_, index) => ({ path: `src/${index}.ts`, sha256: null }));
     const request = { ...synchronized, freshness: { mode: 'synchronized', expect: expectList } };
