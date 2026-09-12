@@ -93,3 +93,33 @@ Resident receipt: `.reference-work/reports/iteration10-resident.json`, completed
 5. Keep the inherited macOS worker/process requirement, observer disagreement-propagation limitation and iteration 12 latency/memory obligations explicit. None is waived here.
 
 Iterations 11 and 12 can consume the installed CLI, compact document, validated service parameters, hook example and registered process handlers. No model rule, new owner, package entry, transport frame, persistent cache or inspection command was added.
+
+## Focused self-assessment retry
+
+**2026-09-12:** the workflow was inspected at `validate_output_retry`. Its journal records the draft publication, but no iteration-10 regression execution or verdict exists yet. The required automatic runners were not invoked locally. The two false checks therefore cannot be replaced with a passing-regression or complete-exit claim.
+
+This one bounded attempt added previously missing coverage of **exhausted in-flight recovery**, distinct from the already-tested failed initial connection and successful recovery. The CLI owner's `changed-command.test.ts` now invokes a same-owner `exhausted-recovery.ts` witness for unavailable, explicit stop and incompatible terminal recovery.
+
+Each witness uses the real quick service and retained analysis to complete a clean covering revision. It then injects loss of that response at the connection boundary, changes the file on disk and exhausts recovery. Its independent expectations require one automatic recovery, no further check, exactly one `ramify.check/1` not-checked document with exit 2 and the original hash, no claimed revision or findings, no batch call, and connection cleanup before output. Real service counters establish zero connections, subscriptions and pending request leases; disposal establishes zero watcher handles and timers.
+
+**Result: 3/3 witnesses, 54 assertions passed.** No production defect was reproduced, so production implementation is unchanged. The added parameterized Vitest registrations remain unexecuted by Vitest; the focused receipt establishes only these three directly invoked quick witnesses.
+
+| Verification in this retry | Result |
+| --- | --- |
+| `NODE_OPTIONS='' node --import tsx .reference-work/iteration10-exhausted-recovery.mts` | Pass: unavailable, stopped and incompatible, 18 assertions each. |
+| `npx tsc --noEmit` | Pass, including both changed test files. |
+| `git diff --check` | Pass. |
+| Reserved regression, scenario coverage, sealed-file checks and full prerequisite gates | Not run. No new verdict is claimed. |
+
+Receipt: `.reference-work/reports/iteration10-exhausted-recovery.json`, completed **2026-09-12T11:31:53.059Z**. The same committed test witness supplies the direct checks and Vitest registrations. Source/build identity remained coherent throughout this focused run:
+
+- Base HEAD: `b1706f7c398cf368cd8cc488000670f674987550`.
+- Source SHA-256, including the new tests: `6e8c5fe9d6f55f7992fc0bc7e955884fd49232cfb7d0c1489d75aca097095c16`.
+- Unchanged production-build SHA-256: `022d2c69c6b96b82612ed92fa20fc406141ee00f206e876a19267da4da2ccff4`.
+- Witness SHA-256: `5003607d77b16dbebea53fa74d5b594c643f19e5aa8efeca7ce08ad9006542f5`.
+
+The earlier nine I5-11 process/IPC results and resident checks remain evidence for the unchanged production implementation; they were not repeated for this test-only addition. The new witnesses do not replace those process/IPC instances.
+
+Checklist disposition remains **functionalRequirementsSatisfied: false**, **newCodeCoveredByTests: true**, **allNewTestsPass: false**. The full iteration exit still lacks its required prerequisite-gate evidence; the inherited Plan 2 measurement-provider migration and the recorded deletion/input-identity and mixed-invocation gaps remain open. Their owning implementation and later measurement work were not expanded into this CLI coverage attempt. Complete execution of all newly authored tests also remains unconfirmed until automation runs. No requirement, record or assertion was waived.
+
+Both managed deliverables are updated for this attempt. The primary agent commits these test and report changes on the authoritative worktree branch. No publication tool is called; validation and publication proceed through the supplied workflow retry.

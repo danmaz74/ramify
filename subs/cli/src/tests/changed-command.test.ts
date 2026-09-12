@@ -9,6 +9,7 @@ import type { ServiceConnector, DisconnectReason } from '../../../daemon/src/int
 import type { CheckOutcome } from '../../../daemon/src/context-types.js';
 import type { CheckDocument, CliEnvironment } from '../interfaces/cli.js';
 import { runCli } from '../run-cli.js';
+import { exhaustedRecoveryWitness } from './exhausted-recovery.js';
 
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), 'ramify-changed-command-'));
@@ -120,6 +121,10 @@ describe('changed check command', () => {
     expect([result.code, result.stdout.length, result.stderr, result.batchCalls]).toEqual([2, 1, [], 0]);
     expect(result.document).toMatchObject({ schemaVersion: 'ramify.check/1', outcome: 'not-checked',
       reason: kind === 'failure' ? 'unavailable' : kind === 'explicit-stop' ? 'stopped' : 'incompatible', exitCode: 2 });
+  });
+
+  it.each(['unavailable', 'stopped', 'incompatible'] as const)('keeps exhausted in-flight recovery %s explicit and releases the real quick-service lease', async reason => {
+    await exhaustedRecoveryWitness(reason);
   });
 
   it('defends the completed-result boundary against a reply without covering freshness', async () => {
