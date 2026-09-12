@@ -32,7 +32,9 @@ async function command(root: string, connect: ServiceConnector, extra: readonly 
   return { code, stdout, stderr, batchCalls, document: stdout.length ? JSON.parse(stdout[0]) as CheckDocument : null };
 }
 
-describe('changed check command', () => {
+// Real compiler startup, updates and teardown need room under parallel regression.
+// CLI deadlines and the controlled deadline assertions remain independent.
+describe('changed check command', { timeout: 30_000 }, () => {
   it('hashes bytes once, deduplicates normalized paths and sends the compact synchronized contract through the quick service', async () => {
     const f = await fixture();
     try {
