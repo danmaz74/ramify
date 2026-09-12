@@ -1,10 +1,11 @@
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { expect, it } from 'vitest';
 import { analyzeProject, openRetainedSession } from '../index.js';
 import type { AnalysisInputs, AnalysisReport, RetainedSession, SessionInputs, SessionRevision } from '../index.js';
 import { createDefaultTagRegistry } from '../../subs/model/src/index.js';
+import { workerSuite } from './session-worker-fixture.js';
 
 const api = 'src/interfaces/api.ts';
 const probe = 'subs/consumer/src/probe.ts';
@@ -87,7 +88,7 @@ function frozen(value: unknown, path = '$'): void {
   for (const [key, child] of Object.entries(value)) frozen(child, `${path}.${key}`);
 }
 
-describe('retained analysis session', () => {
+workerSuite('retained analysis session', import.meta.url, () => {
   it('opens cold with frozen plain revisions equal to batch and answers identical updates without a new sequence', () => fixture(async (root, inputs) => {
     const { session: handle, revision } = await opened(inputs);
     try {

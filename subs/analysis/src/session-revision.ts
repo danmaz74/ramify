@@ -355,7 +355,7 @@ export async function revise(state: SessionState, changes: readonly ObservedChan
         checked: { path: 'broad', files: [], accesses: 0, modelRebuilt: false }, changed, timings, positionRefreshed: [] };
     }
     const unknown = changes.some(change => change.kind === 'unknown');
-    if (!state.stale && (update.kind === 'unchanged' || (!changed.length && observer.inputId === beforeId))) return { status: 'identical' };
+    if (!state.stale && state.adapter?.hot && (update.kind === 'unchanged' || (!changed.length && observer.inputId === beforeId))) return { status: 'identical' };
     const inventory = observer.inventory;
     const owned = new Set(inventory.files.map(file => file.path));
     const previous = state.facts;

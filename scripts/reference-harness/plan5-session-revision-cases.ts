@@ -4,14 +4,13 @@ import { join } from 'node:path';
 import { analyzeProject } from '../../subs/analysis/src/analyze-project.js';
 import type { AnalysisReport } from '../../subs/analysis/src/interfaces/analysis.js';
 import type { RetainedSession, SessionRevision } from '../../subs/analysis/src/interfaces/session.js';
-import { deepFreeze } from '../../subs/analysis/src/session-facts.js';
-import type { SessionState } from '../../subs/analysis/src/session-revision.js';
 import { firstDifference } from './equivalence-comparison.js';
 import { coreDirectory, referenceRoot, vocabulary, workspaceDescription } from './fixtures/plan2/reference.js';
 import { replaceExactlyOnce } from './mutation.js';
 import type { IsolatedProject } from './mutation.js';
 import { recordObservation } from './observations.js';
 import { compilerPid, disposeInspectedSession, openInspectedSession } from './plan5-session-inspection.js';
+import type { SessionInspection } from './plan5-session-inspection.js';
 import { applyTextMutation, residentTextMutations } from './resident-mutations.js';
 import { sessionInputs } from './session-expectations.js';
 import type { Assertions, InstanceHandler, ProjectContext } from './runner.js';
@@ -31,7 +30,7 @@ const digest = (text: string): string => createHash('sha256').update(text).diges
 const comparable = (report: AnalysisReport): unknown => ({ ...report, runId: 'compared' });
 
 interface Context {
-  readonly root: string; readonly assertions: Assertions; readonly session: RetainedSession; readonly state: SessionState;
+  readonly root: string; readonly assertions: Assertions; readonly session: RetainedSession; readonly inspection: SessionInspection;
 }
 interface Step {
   readonly revision: SessionRevision; readonly report: AnalysisReport; readonly decided: readonly string[];
@@ -57,12 +56,12 @@ async function equalState(context: Context, name: string): Promise<AnalysisRepor
 
 async function step(context: Context, name: string, edit: () => Promise<readonly string[]>): Promise<Step> {
   const before = context.session.current!.sequence;
-  const decisions = context.state.facts!.decisions;
+  const decisions = await context.inspection.decisions();
   const paths = await edit();
   const result = await context.session.update(paths.map(path => ({ path, kind: 'changed' as const })));
   if (result.status !== 'revised') throw new Error(`${name}: expected revised, got ${JSON.stringify(result).slice(0, 3000)}`);
   context.assertions.equal(`${name}: exactly one new revision is published`, [result.identical, result.revision.sequence], [false, before + 1]);
-  const decided = Object.entries(context.state.facts!.decisions)
+  const decided = Object.entries(await context.inspection.decisions())
     .filter(([id, value]) => decisions[id] !== value).map(([id]) => id).sort(order);
   const report = await equalState(context, name);
   recordObservation('plan5-session-revision', { step: name, sequence: result.revision.sequence,
@@ -72,13 +71,13 @@ async function step(context: Context, name: string, edit: () => Promise<readonly
 
 async function withSession(context: ProjectContext, run: (context: Context, cold: SessionRevision, baseline: AnalysisReport) => Promise<void>): Promise<void> {
   const opened = await openInspectedSession({ ...sessionInputs(context.root), session: sessionLimits });
-  const current = { ...context, session: opened.session, state: opened.state };
+  const current = { ...context, session: opened.session, inspection: opened.inspection };
   try {
     const baseline = await equalState(current, 'cold');
     context.assertions.equal('the reference baseline is completed without findings', [baseline.outcome.execution, baseline.summary.errors], ['completed', 0]);
-    context.assertions.ok('the cold session owns a live compiler', compilerPid(opened.state) !== null);
+    context.assertions.ok('the cold session owns a live compiler', compilerPid(opened.session) !== null);
     await run(current, opened.revision, baseline);
-  } finally { await disposeInspectedSession(opened.session, opened.state, context.assertions); }
+  } finally { await disposeInspectedSession(opened.session, opened.inspection, context.assertions); }
 }
 
 async function replace(root: string, path: string, before: string, after: string): Promise<readonly string[]> {
@@ -192,12 +191,12 @@ add('deleted-file', async context => {
   context.assertions.equal('deletion removes exactly the finding the file carried', deleted.revision.delta.removed, created.revision.delta.added.map(item => item.id));
 });
 add('configuration-broad', async context => {
-  const pid = compilerPid(context.state);
+  const pid = compilerPid(context.session);
   const value = await step(context, 'configuration edit', () => replace(context.root, 'tsconfig.json',
     '"@features/*": ["./subs/workspace/subs/*"]', '"@features/*": ["./subs/workspace/subs/*"],\n      "@session/*": ["./subs/workspace/subs/*"]'));
   assertBroad(context, 'configuration edit', value);
   assertNoFinding(context, 'configuration edit', value);
-  context.assertions.equal('configuration invalidation retains the same warm compiler process', compilerPid(context.state), pid);
+  context.assertions.equal('configuration invalidation retains the same warm compiler process', compilerPid(context.session), pid);
   context.assertions.equal('the revision inputId equals the batch projection identity', value.revision.inputId, value.report.inputId);
 });
 
@@ -306,15 +305,8 @@ add('audit-equal-sequence', async (context, cold, baseline) => {
 });
 
 add('audit-detects-drift', async (context, cold, baseline) => {
-  const facts = context.state.facts!;
-  const entry = Object.entries(facts.files).find(([, file]) => file.accesses.length > 0)!;
-  const [path, file] = entry;
-  context.assertions.ok('the retained access fact is frozen before corruption', Object.isFrozen(file.accesses[0]));
-  // Replace a cloned immutable fact as a faulty revision implementation would;
-  // never mutate an already-published revision or alter the source on disk.
-  const corrupted = { ...facts, files: { ...facts.files, [path]: { ...file,
-    accesses: [{ ...file.accesses[0], specifier: './injected-audit-drift.js' }, ...file.accesses.slice(1)] } } };
-  context.state.facts = deepFreeze(corrupted);
+  const { path, frozen } = await context.inspection.corruptAccess();
+  context.assertions.ok('the retained access fact is frozen before corruption', frozen);
   const audited = await context.session.verify();
   context.assertions.equal('the audit detects retained fact drift', audited.status, 'mismatch');
   if (audited.status !== 'mismatch') throw new Error('The injected drift was not detected');

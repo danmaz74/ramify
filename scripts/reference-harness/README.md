@@ -455,26 +455,45 @@ independently computed subtree; metadata checks assert zero compiler, extraction
 link and decision work. The dependency mutation owns a copy of Zod and verifies
 that the shared reference package remains unchanged.
 
-`plan5-session-inspection.ts` observes private state through a temporary Node
-load hook matching exactly one unique session-module URL. It refuses a changed
-factory anchor and deregisters and removes its capture symbol in `finally`.
-This harness instrumentation supplies identities of retained decision objects
-and compiler PID evidence and permits replacing one frozen access fact to test the real
-audit's repair behavior. It adds no production export or mutable public handle.
-Every I5-07 handler disposes its session and checks compiler exit, released
-observer/adapter handles, empty retained versions and unavailable projection.
+`plan5-session-inspection.ts` opens the production worker host with a
+harness-only worker entry. A load hook inside that worker matches the engine
+factory exactly and removes itself and its capture symbol after construction.
+A separate private MessagePort returns stable decision-object identity stamps
+and injects one frozen access corruption to test audit repair. No private
+facts or testing operations cross the production message protocol. Every I5-07
+handler verifies worker termination, compiler exit, released observations and
+historical versions, and unavailable report projection after disposal.
 Audit repair is identified by the `verify()` result; the settled session
 revision type carries no `cause` member, and contexts assigns that cause later.
 The last valid projection is asserted through its historical sequence; no
 `lastValid` field is added to the session status contract.
 
-The capabilities `hosting`, `contexts`, `supersession`, `hook-cli`,
+`plan5-hosting-cases.ts` registers the eight I5-08 `hosting` instances in
+iteration 8. They use the real worker over reference and materialized S1000
+copies, verify responsive cold startup, explicit heap failure, hot/warm
+transitions, requested sweeps, caller deadline independence, timings and normal
+disposal. Sweep scheduling and deadline replies remain contexts' iteration 9
+responsibility: the harness schedules the public sweep and races its own wait.
+The S1000 deadline case records enlarged test limits (1,024 MiB worker heap,
+256 MiB facts) to retain broad historical versions and an audit candidate;
+this is behavioral evidence, not acceptance of default memory budgets.
+
+Worker heap tests must start with enforced V8 limits. Use `NODE_OPTIONS=''`
+when running this gate if the surrounding environment specifies a heap override;
+the production host explicitly rejects an ineffective bound. Same-owner Vitest
+worker suites relaunch their complete file in an isolated process under that
+condition and propagate every failed assertion. Abrupt worker loss has its own
+same-owner regression in addition to these matrix instances; passing the matrix
+alone does not waive that cleanup requirement.
+
+The capabilities `contexts`, `supersession`, `hook-cli`,
 `live-equivalence`, `fast-measure` and `completion` are registered names whose
 instances report `not-executed` until the iteration that implements them adds
 a provider; registration never establishes execution. `--iteration 4` requires
 the 18 instances of iterations 2 and 4; `--iteration 5` requires the 32 of
 iterations 2 to 5; `--iteration 6` requires the 42 of iterations 2 to 6;
 `--iteration 7` requires the 53 of iterations 2 to 7;
+`--iteration 8` requires the 61 of iterations 2 to 8;
 `--iteration 9` requires the 74 of iterations 2 to 9. The unfiltered `--plan 5` gate requires
 all 103 and is expected to fail until iteration 13.
 

@@ -2,7 +2,7 @@ import type { CapturedInput, ObservedChange, OutsideSourceWarning } from '../../
 import type { SourceLimit } from '../../subs/typescript/src/interfaces/source.js';
 import type { AnalysisDiagnostic, AnalysisInputs, AnalysisReport, AnalysisSummary, RunControl } from './analysis.js';
 
-/** Limits of one retained session; the worker host of a later iteration reads them too. */
+/** Limits of one retained session; contexts owns request deadlines and sweep scheduling. */
 export interface SessionLimits {
   readonly updateDeadlineMs: number;
   readonly sweepIntervalMs: number;

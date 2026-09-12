@@ -2,7 +2,8 @@ import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promi
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { expect, vi } from 'vitest';
-import { analyzeProject, openRetainedSession } from '../index.js';
+import { analyzeProject } from '../index.js';
+import { openSessionEngine as openRetainedSession } from '../session-engine.js';
 import type { AnalysisReport, RetainedSession, SessionInputs, SessionRevision } from '../index.js';
 import type { SessionState } from '../session-revision.js';
 import { createDefaultTagRegistry } from '../../subs/model/src/index.js';

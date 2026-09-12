@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": false,
+    "functionalRequirementsSatisfied": false,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-12T10:20:39.118Z",
+  "iteration": "8",
+  "notes": "Incomplete: final four-file session run has 42 passed and 2 failed. Abrupt worker loss and genuine heap exhaustion after compiler startup leave unreaped children. The coherent Plan 5 iteration 8 prerequisite gate passes 61/61 with all eight I5-08 handlers executed; build, type-check, reference and self-check pass. Matrix success does not waive the two lifecycle failures. Process-isolation feasibility was probed on Linux, but a reviewed hosting/compiler supervision change is still required; production contract unchanged."
+}
