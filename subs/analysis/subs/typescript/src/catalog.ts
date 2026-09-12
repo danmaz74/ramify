@@ -8,7 +8,8 @@ import { SyntaxKind, isExportDeclaration, isExportSpecifier, isImportDeclaration
 import { originalKey } from '../../model/src/identity.js';
 import type { OriginalId, SourceArea, SourceLocation, SourceOrigin } from '../../model/src/interfaces/model.js';
 import type { InventoryFile, ProjectInventory } from '../../project/src/interfaces/project.js';
-import type { CatalogOriginal, CatalogExport, FileExports, SourceCatalog, SourceLimit, SourceWorkLimits } from './interfaces/source.js';
+import type { CatalogDelta, CatalogOriginal, CatalogExport, DescriptionDependencies, FileDescription,
+  FileExports, SourceCatalog, SourceLimit, SourceWorkLimits } from './interfaces/source.js';
 import { Resolution, type CatalogHost } from './resolution.js';
 import { SourceFailure } from './wire.js';
 
@@ -16,12 +17,70 @@ interface Inputs { readonly inventory: ProjectInventory; readonly areas: readonl
 interface MutableFile { file: string; state: FileExports['state']; exports: CatalogExport[]; issueIds: string[]; descriptionFiles: string[] }
 interface Selection { file: string; name: string; node: Node }
 interface Stars { source: SourceFile; explicit: Set<string>; targets: { file: string; node: Node; typeOnly: boolean }[] }
+interface MutableDependencies { files: Set<string>; resources: Set<string>; shims: Set<string>; probed: Map<string, boolean> }
 const order = (a: string, b: string) => Buffer.compare(Buffer.from(a), Buffer.from(b));
+const sorted = (values: Iterable<string>): readonly string[] => [...new Set(values)].sort(order);
 
-/** Called only in the supervised helper. The returned graph contains no native
+/** One file's description together with the extraction facts a later round needs
+ * to treat it as a resolved leaf without re-reading it from the compiler. */
+export interface FileRecord {
+  readonly description: FileDescription;
+  /** The file's state before the selection and propagation fixed point ran. */
+  readonly extractionState: FileExports['state'];
+  readonly runtime: readonly (readonly [string, boolean])[];
+  readonly namespaceModules: readonly (readonly [string, string])[];
+  readonly bindingProblems: readonly SourceLocation[];
+  /** Files whose own content, not their description, shaped this one: the
+   * importers reaching a resource and the source augmenting a module. */
+  readonly contributors: readonly string[];
+  /** The descriptions this file's content shaped in the same way. */
+  readonly contributions: readonly string[];
+}
+export interface DescribedRound {
+  /** The files described afresh: the selection and everything its extraction reached. */
+  readonly records: ReadonlyMap<string, FileRecord>;
+  /** Originals and notes belonging to files this round did not describe. */
+  readonly foreignOriginals: readonly CatalogOriginal[];
+  readonly foreignCoverage: readonly SourceLimit[];
+}
+
+/** Called only in the supervised helper. The returned records contain no native
  * compiler handles; every identity comes from declarations and captured owners. */
+export function describeRound(project: Project, inputs: Inputs, host: CatalogHost, runtime: Map<CatalogExport, boolean>,
+  selected: ReadonlySet<string>, retained: ReadonlyMap<string, FileRecord>): DescribedRound {
+  return new CatalogBuilder(project, inputs, host, runtime, selected, retained).build();
+}
+
+/** The whole-project catalog is the assembly of every owned file's description. */
 export function buildCatalog(project: Project, inputs: Inputs, host: CatalogHost, runtime: Map<CatalogExport, boolean>): SourceCatalog {
-  return new CatalogBuilder(project, inputs, host, runtime).build();
+  const selected = new Set(inputs.inventory.files.map(file => file.path));
+  const round = describeRound(project, inputs, host, runtime, selected, new Map());
+  return assembleCatalog([...round.records.values()].map(record => record.description));
+}
+
+/** Plain-data assembly; it reads descriptions only and holds no compiler state. */
+export function assembleCatalog(descriptions: readonly FileDescription[]): SourceCatalog {
+  const retained = new Set<string>();
+  const retain = (entry: CatalogExport): void => {
+    if (entry.original) retained.add(originalKey(entry.original));
+    entry.namespace?.forEach(retain);
+  };
+  for (const description of descriptions) description.exports.exports.forEach(retain);
+  const originals = new Map<string, CatalogOriginal>();
+  const coverage = new Map<string, SourceLimit>();
+  for (const description of descriptions) {
+    for (const original of description.originals) {
+      const key = originalKey(original.id);
+      if (retained.has(key)) originals.set(key, original);
+    }
+    for (const issue of description.coverage) if (!coverage.has(issue.id)) coverage.set(issue.id, issue);
+  }
+  return {
+    originals: [...originals.values()].sort((a, b) => order(originalKey(a.id), originalKey(b.id))),
+    files: [...descriptions].sort((a, b) => order(a.file, b.file)).map(description => description.exports),
+    coverage: [...coverage.values()].sort((a, b) => order(a.location.file, b.location.file)
+      || a.location.start - b.location.start || order(a.id, b.id)),
+  };
 }
 
 class CatalogBuilder {
@@ -36,12 +95,87 @@ class CatalogBuilder {
   private readonly resolutionDiagnostics = new Map<string, readonly Diagnostic[]>();
   private readonly selections = new Map<CatalogExport, Selection>();
   private readonly starTargets = new Map<string, Stars>();
-  private readonly namespaceTargets: { file: MutableFile; target: MutableFile; name: string; node: Node }[] = [];
+  private readonly namespaceTargets: { file: MutableFile; target: string; name: string; node: Node }[] = [];
   private readonly root: string;
+  private readonly dependencies = new Map<string, MutableDependencies>();
+  private readonly contributors = new Map<string, string[]>();
+  private readonly contributions = new Map<string, string[]>();
+  private readonly namespaceModules = new Map<readonly CatalogExport[], string>();
+  private readonly entryModules = new WeakMap<CatalogExport, string>();
+  private readonly referenced = new Set<string>();
+  private readonly extractionStates = new Map<string, FileExports['state']>();
+  private readonly reporters = new Map<string, string>();
+  private readonly ownedPaths: ReadonlySet<string>;
+  private describing: string | null = null;
+  /** The specifier scan looks for resource descriptions only, so the files and
+   * probes it resolves are not edges of the describing file's own exports. */
+  private scanning = false;
   constructor(private readonly project: Project, private readonly inputs: Inputs, private readonly host: CatalogHost,
-    private readonly runtime: Map<CatalogExport, boolean>) {
+    private readonly runtime: Map<CatalogExport, boolean>,
+    private readonly selected: ReadonlySet<string>, private readonly retained: ReadonlyMap<string, FileRecord>) {
     this.root = inputs.inventory.scope.root;
     this.resolution = new Resolution(project, inputs.inventory, host);
+    this.ownedPaths = new Set(inputs.inventory.files.map(file => file.path));
+    // Retained problems belong to files this round does not read again; their
+    // positions are those of the unchanged source the records were taken from.
+    for (const [path, record] of retained) {
+      if (!selected.has(path)) this.bindingProblems.set(path, record.bindingProblems);
+    }
+    this.resolution.onCandidate = (path, existing) => this.probe(path, existing);
+  }
+  /** Record what resolution looked at while describing the current file. */
+  private probe(path: string, existing?: boolean): void {
+    if (!this.describing || this.scanning) return;
+    const dependencies = this.dependencyRecord(this.describing);
+    const owned = this.resolution.files.get(resolve(path));
+    if (owned) {
+      if (owned.path !== this.describing) (owned.kind === 'resource' ? dependencies.resources : dependencies.files).add(owned.path);
+      dependencies.probed.set(path, true);
+      return;
+    }
+    // An unprobed candidate is recorded as absent: creating a file there can
+    // change the resolution that read it, which is what the edge must catch.
+    if (existing === true) { dependencies.probed.set(path, true); return; }
+    if (!dependencies.probed.get(path)) dependencies.probed.set(path, false);
+  }
+  private dependencyRecord(file: string): MutableDependencies {
+    let record = this.dependencies.get(file);
+    if (!record) {
+      record = { files: new Set(), resources: new Set(), shims: new Set(), probed: new Map() };
+      this.dependencies.set(file, record);
+    }
+    return record;
+  }
+  /** Resolve a specifier and record the owned files, resources and absent paths
+   * the description of the file being read therefore depends on. */
+  private target(node: Node): ReturnType<Resolution['module']> {
+    const resolved = this.resolution.module(node);
+    if (this.describing && resolved.kind === 'application' && resolved.file) {
+      const dependencies = this.dependencyRecord(this.describing);
+      if (resolved.resource) {
+        dependencies.resources.add(resolved.file);
+        this.contribute(this.describing, resolved.file);
+      } else if (!this.scanning && resolved.file !== this.describing) dependencies.files.add(resolved.file);
+    }
+    return resolved;
+  }
+  /** Record that one file's content shapes another file's description. */
+  private contribute(source: string, target: string): void {
+    if (source === target) return;
+    const contributors = this.contributors.get(target) ?? [];
+    if (!contributors.includes(source)) contributors.push(source);
+    this.contributors.set(target, contributors);
+    const contributions = this.contributions.get(source) ?? [];
+    if (!contributions.includes(target)) contributions.push(target);
+    this.contributions.set(source, contributions);
+  }
+  private shim(file: MutableFile, path: string): void {
+    this.dependencyRecord(file.file).shims.add(this.local(path));
+  }
+  /** Dependencies outside the root cannot be named relative to it. */
+  private local(path: string): string {
+    const relativePath = relative(this.root, path);
+    return relativePath.startsWith('..') ? `external:${resolve(path)}` : relativePath;
   }
   private origin(file: string): SourceOrigin | null {
     const inventory = this.resolution.files.get(resolve(this.root, file));
@@ -66,7 +200,7 @@ class CatalogBuilder {
     if (!issue) {
       if (this.coverage.length >= 100_000) throw new SourceFailure('resource-limit', 'Source coverage record limit exceeded');
       issue = { id: key, code, message, location: reported, related, ...(compilerCode === undefined ? {} : { compilerCode }) };
-      this.coverage.push(issue);
+      this.coverage.push(issue); this.reporters.set(key, file.file);
     }
     if (!file.issueIds.includes(key)) file.issueIds.push(key);
     if (code === 'ambiguous-original') file.state = 'ambiguous';
@@ -101,10 +235,38 @@ class CatalogBuilder {
     const members = new Set(this.project.checker.getPropertiesOfType(type).map(symbol => symbol.name));
     for (const entry of entries) this.runtime.set(entry, members.has(entry.name));
   }
-  build(): SourceCatalog {
-    // The compiler resolves resource descriptions both in actual source and in
-    // an unexecuted witness, so unimported resource exports remain catalogued.
-    const sourceFiles = [...this.inputs.inventory.files.filter(file => file.kind === 'source').map(file => resolve(this.root, file.path)), this.host.resourceWitness];
+  build(): DescribedRound {
+    this.scan();
+    for (const file of [...this.inputs.inventory.files].sort((a, b) => order(a.path, b.path))) {
+      if (this.selected.has(file.path)) this.file(file.path, 0);
+    }
+    for (const [path, file] of this.files) this.extractionStates.set(path, file.state);
+    this.resolveExports();
+    return this.records();
+  }
+
+  /** The compiler resolves resource descriptions both in actual source and in an
+   * unexecuted witness, so unimported resource exports remain catalogued. Every
+   * specifier reaching a resource contributes to its effective description, so a
+   * round describing one reads its recorded importers as well as the selection. */
+  private scan(): void {
+    const resources = new Set([...this.selected].filter(path =>
+      this.resolution.files.get(resolve(this.root, path))?.kind === 'resource'));
+    const importers = new Set<string>();
+    if (resources.size) {
+      for (const [path, record] of this.retained) {
+        if (record.description.dependencies.resources.some(resource => resources.has(resource))) importers.add(path);
+      }
+    }
+    const owned = this.inputs.inventory.files.filter(file => file.kind === 'source'
+      && (this.selected.has(file.path) || importers.has(file.path)));
+    // Extraction can also reach a resource through a selected file that
+    // forwards it, and the witness is one of its describing specifiers.
+    const witness = resources.size > 0 || [...this.selected].some(path => {
+      const record = this.retained.get(path);
+      return !record || record.description.dependencies.resources.length > 0;
+    });
+    const sourceFiles = [...owned.map(file => resolve(this.root, file.path)), ...(witness ? [this.host.resourceWitness] : [])];
     for (const path of sourceFiles) {
       const source = this.project.program.getSourceFile(path);
       if (!source) continue;
@@ -117,7 +279,7 @@ class CatalogBuilder {
           : isCallExpression(node) && node.expression.kind === SyntaxKind.ImportKeyword ? node.arguments[0]
           : isImportTypeNode(node) && isLiteralTypeNode(node.argument) ? node.argument.literal : undefined;
         if (specifier && isStringLiteral(specifier)) {
-          const target = this.resolution.module(specifier);
+          const target = this.target(specifier);
           if (target.resource && target.module) {
             const descriptions = this.resourceModules.get(target.resource.path) ?? [];
             if (!descriptions.some(symbol => symbol.id === target.module!.id)) descriptions.push(target.module);
@@ -127,25 +289,111 @@ class CatalogBuilder {
         for (const doc of (node as Node & { jsDoc?: readonly Node[] }).jsDoc ?? []) visit(doc);
         node.forEachChild(child => { visit(child); });
       };
-      visit(source);
+      this.describing = this.resolution.files.get(path)?.path ?? null;
+      this.scanning = true;
+      try { visit(source); } finally { this.describing = null; this.scanning = false; }
     }
-    for (const file of [...this.inputs.inventory.files].sort((a, b) => order(a.path, b.path))) this.file(file.path, 0);
-    this.resolveExports();
-    // Native star enumeration may temporarily supply one conflicting winner.
-    // Only originals retained by the validated export selections are facts.
-    const retained = new Set<string>();
-    const retain = (entry: CatalogExport): void => {
-      if (entry.original) retained.add(originalKey(entry.original));
-      entry.namespace?.forEach(retain);
+  }
+
+  /** Split the round's facts by the file each belongs to. Native star enumeration
+   * may temporarily supply one conflicting winner, so which originals are facts
+   * is settled by the assembly over every description, not per file. */
+  private records(): DescribedRound {
+    const originalsByFile = new Map<string, CatalogOriginal[]>();
+    const coverageByFile = new Map<string, SourceLimit[]>();
+    const foreignOriginals: CatalogOriginal[] = [];
+    const foreignCoverage: SourceLimit[] = [];
+    const into = <T>(index: Map<string, T[]>, file: string, value: T): void => {
+      const values = index.get(file) ?? [];
+      values.push(value); index.set(file, values);
     };
-    for (const file of this.files.values()) file.exports.forEach(retain);
-    return {
-      originals: [...this.originals.values()].filter(original => retained.has(originalKey(original.id)))
-        .sort((a, b) => order(originalKey(a.id), originalKey(b.id))),
-      files: [...this.files.values()].sort((a, b) => order(a.file, b.file)).map(file => ({ ...file,
-        exports: file.exports.sort((a, b) => order(a.name, b.name)), issueIds: file.issueIds.sort(order), descriptionFiles: file.descriptionFiles.sort(order) })),
-      coverage: this.coverage.sort((a, b) => order(a.location.file, b.location.file) || a.location.start - b.location.start || order(a.id, b.id)),
-    };
+    for (const original of this.originals.values()) {
+      if (this.files.has(original.origin.file)) into(originalsByFile, original.origin.file, original);
+      else foreignOriginals.push(original);
+    }
+    for (const issue of this.coverage) {
+      const located = issue.location.file;
+      // A note outside every owned file belongs to the description that found it.
+      if (this.files.has(located)) into(coverageByFile, located, issue);
+      else if (this.ownedPaths.has(located)) foreignCoverage.push(issue);
+      else into(coverageByFile, this.reporters.get(issue.id)!, issue);
+    }
+    const records = new Map<string, FileRecord>();
+    for (const [path, file] of [...this.files].sort((a, b) => order(a[0], b[0]))) {
+      const dependencies = this.dependencyRecord(path);
+      const exports: FileExports = { file: file.file, state: file.state,
+        exports: file.exports.sort((a, b) => order(a.name, b.name)),
+        issueIds: file.issueIds.sort(order), descriptionFiles: file.descriptionFiles.sort(order) };
+      const runtime: (readonly [string, boolean])[] = [];
+      const namespaceModules: (readonly [string, string])[] = [];
+      const walk = (entries: readonly CatalogExport[], prefix: readonly string[]): void => {
+        for (const entry of entries) {
+          const names = [...prefix, entry.name], key = JSON.stringify(names);
+          const value = this.runtime.get(entry);
+          if (value !== undefined) runtime.push([key, value]);
+          if (!entry.namespace) continue;
+          const module = this.moduleOf(entry);
+          if (module) namespaceModules.push([key, module]);
+          walk(entry.namespace, names);
+        }
+      };
+      walk(exports.exports, []);
+      // A description that embeds another module's namespace depends on it,
+      // including when a retained leaf supplied that namespace.
+      for (const [, module] of namespaceModules) if (module !== path) dependencies.files.add(module);
+      records.set(path, {
+        description: {
+          file: path, exports,
+          originals: (originalsByFile.get(path) ?? []).sort((a, b) => order(originalKey(a.id), originalKey(b.id))),
+          coverage: (coverageByFile.get(path) ?? []).sort((a, b) => a.location.start - b.location.start || order(a.id, b.id)),
+          dependencies: {
+            // Every specifier reaching a resource contributes to its effective
+            // description, so those importers are dependencies of that record.
+            files: sorted([...dependencies.files, ...(this.contributors.get(path) ?? [])]),
+            resources: sorted(dependencies.resources),
+            shims: sorted(dependencies.shims),
+            absent: sorted([...dependencies.probed].filter(([, existing]) => !existing).map(([probed]) => this.local(probed))),
+          },
+        },
+        extractionState: this.extractionStates.get(path) ?? file.state,
+        runtime, namespaceModules,
+        bindingProblems: this.bindingProblems.get(path) ?? [],
+        contributors: sorted(this.contributors.get(path) ?? []),
+        contributions: sorted(this.contributions.get(path) ?? []),
+      });
+    }
+    return { records, foreignOriginals, foreignCoverage };
+  }
+
+  /** The owned module a namespace description forwards, when it has one. */
+  private moduleOf(entry: CatalogExport): string | undefined {
+    return (entry.namespace && this.namespaceModules.get(entry.namespace)) || this.entryModules.get(entry);
+  }
+
+  /** Retained files a described file selects from, as resolved leaves. */
+  private leaves(): ReadonlySet<string> {
+    const leaves = new Set<string>();
+    for (const path of this.files.keys()) {
+      for (const dependency of this.dependencies.get(path)?.files ?? []) {
+        if (!this.files.has(dependency) && this.retained.has(dependency)) leaves.add(dependency);
+      }
+    }
+    return leaves;
+  }
+  /** A note always belongs to a description this round actually read. */
+  private reporting(definition: { file: MutableFile | null; entry: CatalogExport }): MutableFile {
+    if (!definition.file) throw new SourceFailure('unavailable', `No described file reports on export ${definition.entry.name}`);
+    return definition.file;
+  }
+  /** Live description of a file this round described, or the retained leaf. */
+  private view(path: string): { readonly exports: readonly CatalogExport[]; readonly state: FileExports['state'] } | undefined {
+    return this.files.get(path) ?? this.retained.get(path)?.description.exports;
+  }
+  /** Completeness of a propagation target this round must know about. */
+  private stateOf(path: string): FileExports['state'] {
+    const view = this.view(path);
+    if (!view) throw new SourceFailure('unavailable', `No described or retained export description for ${path}`);
+    return view.state;
   }
   private file(path: string, depth: number): MutableFile {
     const previous = this.files.get(path);
@@ -155,6 +403,11 @@ class CatalogBuilder {
     this.files.set(path, file); this.active.add(path);
     const inventory = this.resolution.files.get(resolve(this.root, path));
     if (!inventory) throw new Error(`Catalog requested non-owned file ${path}`);
+    // Extraction reaches namespace and resource targets, so every dependency is
+    // recorded for the description being read rather than the one that asked.
+    const outer = this.describing;
+    this.describing = path;
+    try {
     if (inventory.kind === 'resource') this.resource(file, inventory, depth);
     else {
       const source = this.project.program.getSourceFile(resolve(this.root, path));
@@ -182,12 +435,20 @@ class CatalogBuilder {
         else this.sharedGlobals(source, file);
       }
     }
+    } finally { this.describing = outer; }
     this.active.delete(path);
     return file;
   }
   /** The compiler distinguishes global augmentations from ordinary namespaces
    * named global and string-named external module augmentations. */
   private sharedAugmentations(source: SourceFile, file: MutableFile): void {
+    // A string-named augmentation of an owned module adds exports and
+    // declarations to that module's description, not to this file's.
+    for (const name of source.moduleAugmentations) {
+      if (!isStringLiteral(name)) continue;
+      const augmented = this.target(name);
+      if (augmented.kind === 'application' && augmented.file && !augmented.resource) this.contribute(file.file, augmented.file);
+    }
     const declarations = source.moduleAugmentations
       .filter(name => isIdentifier(name) && name.text === 'global' && isModuleDeclaration(name.parent))
       .map(name => name.parent);
@@ -231,6 +492,7 @@ class CatalogBuilder {
         const declaration = handle.resolve(this.project);
         if (!declaration) continue;
         const path = relative(this.root, declaration.getSourceFile().fileName);
+        this.shim(file, declaration.getSourceFile().fileName);
         if (!file.descriptionFiles.includes(path)) file.descriptionFiles.push(path);
       }
     }
@@ -297,7 +559,7 @@ class CatalogBuilder {
         if (own && !forwarding.some(origin => origin.file === own.file)) forwarding.push(own);
         const specifier = this.moduleSpecifier(node);
         if (specifier) {
-          const target = this.resolution.module(specifier);
+          const target = this.target(specifier);
           if (target.resource) {
             const resource = this.file(target.resource.path, depth + 1);
             if (resource.state !== 'complete') this.limit(file, 'incomplete-exports', 'Resource has an incomplete effective export description', node);
@@ -360,7 +622,8 @@ class CatalogBuilder {
           return { name, original: null, namespace: null, forwarding: chain };
         }
         const nested = this.file(path, depth + 1);
-        this.namespaceTargets.push({ file, target: nested, name, node: moduleSource });
+        this.namespaceTargets.push({ file, target: nested.file, name, node: moduleSource });
+        this.dependencyRecord(file.file).files.add(path);
         return { name, original: null, namespace: nested.exports, forwarding: chain };
       }
     }
@@ -410,7 +673,7 @@ class CatalogBuilder {
     const targets: Stars['targets'] = [];
     for (const statement of source.statements) {
       if (!isExportDeclaration(statement) || statement.exportClause || !statement.moduleSpecifier) continue;
-      const target = this.resolution.module(statement.moduleSpecifier);
+      const target = this.target(statement.moduleSpecifier);
       if (target.kind !== 'application' || !target.file) {
         this.limit(file, target.kind === 'outside-module' ? 'outside-module-target' : target.kind === 'resource-target' ? 'resource-target' : 'incomplete-exports',
           'Cannot enumerate every application original of this star export', statement.moduleSpecifier);
@@ -430,7 +693,7 @@ class CatalogBuilder {
       changed = false;
       for (const [path, stars] of this.starTargets) {
         const file = this.files.get(path)!;
-        for (const target of stars.targets) for (const entry of this.files.get(target.file)!.exports) {
+        for (const target of stars.targets) for (const entry of this.view(target.file)!.exports) {
           if (entry.name === 'default' || file.exports.some(item => item.name === entry.name)) continue;
           this.check(0, true);
           file.exports.push({ name: entry.name, original: null, namespace: null, forwarding: [] });
@@ -440,25 +703,44 @@ class CatalogBuilder {
     }
     const key = (file: string, name: string) => JSON.stringify([file, name]);
     interface Definition {
-      file: MutableFile; entry: CatalogExport; edges: string[] | null; node?: Node;
+      // A retained leaf has no live file: nothing may report a note against it.
+      file: MutableFile | null; entry: CatalogExport; edges: string[] | null; node?: Node;
       forwarding: readonly SourceOrigin[]; ambiguous: boolean;
       runtimeEdges: string[] | null; runtime: boolean | undefined;
     }
     const definitions = new Map<string, Definition>();
-    const namespaces = new Map<readonly CatalogExport[], string>();
-    for (const file of this.files.values()) namespaces.set(file.exports, file.file);
+    for (const file of this.files.values()) this.namespaceModules.set(file.exports, file.file);
     for (const file of this.files.values()) for (const entry of file.exports) {
       const stars = this.starTargets.get(file.file), selection = this.selections.get(entry);
       if (stars?.targets.length && !stars.explicit.has(entry.name)) {
         definitions.set(key(file.file, entry.name), { file, entry, node: stars.source,
-          edges: stars.targets.filter(target => entry.name !== 'default' && this.files.get(target.file)!.exports.some(item => item.name === entry.name))
+          edges: stars.targets.filter(target => entry.name !== 'default' && this.view(target.file)!.exports.some(item => item.name === entry.name))
             .map(target => key(target.file, entry.name)), forwarding: [this.origin(file.file)!], ambiguous: file.state === 'ambiguous',
           runtime: undefined, runtimeEdges: stars.targets.filter(target => !target.typeOnly && entry.name !== 'default'
-            && this.files.get(target.file)!.exports.some(item => item.name === entry.name)).map(target => key(target.file, entry.name)) });
+            && this.view(target.file)!.exports.some(item => item.name === entry.name)).map(target => key(target.file, entry.name)) });
       } else definitions.set(key(file.file, entry.name), { file, entry,
         edges: selection ? [key(selection.file, selection.name)] : null, node: selection?.node,
         forwarding: entry.forwarding, ambiguous: file.state === 'ambiguous', runtime: this.runtime.get(entry),
         runtimeEdges: selection ? [key(selection.file, selection.name)] : null });
+    }
+    // A file this round did not describe is a resolved leaf: its retained entry
+    // supplies the original, the namespace module, the runtime flag and the
+    // ambiguity its own extraction established, and nothing edits it here.
+    for (const path of this.leaves()) {
+      const record = this.retained.get(path)!;
+      const flags = new Map(record.runtime), modules = new Map(record.namespaceModules);
+      this.namespaceModules.set(record.description.exports.exports, path);
+      for (const entry of record.description.exports.exports) {
+        const names = JSON.stringify([entry.name]), module = modules.get(names);
+        if (entry.namespace && module) this.entryModules.set(entry, module);
+        const value = flags.get(names);
+        definitions.set(key(path, entry.name), { file: null, entry, edges: null,
+          forwarding: entry.forwarding, ambiguous: record.extractionState === 'ambiguous',
+          runtime: value, runtimeEdges: null });
+        // The caller's export-path facts belong to this compiler state, so a
+        // retained entry's recorded flag replaces whatever the map still holds.
+        if (value === undefined) this.runtime.delete(entry); else this.runtime.set(entry, value);
+      }
     }
     // Runtime presence belongs to an export path, not its canonical original.
     // The compiler handles named/local type aliases; explicit star edges also
@@ -500,18 +782,23 @@ class CatalogBuilder {
           unresolved = true; ambiguous ||= current.ambiguous; return;
         }
         const identity = entry.original ? originalKey(entry.original)
-          : JSON.stringify(['namespace', namespaces.get(entry.namespace!) ?? entry.namespace]);
+          : JSON.stringify(['namespace', this.moduleOf(entry) ?? entry.namespace]);
         candidates.set(identity, entry);
       };
       visit(root, 0);
       ambiguous ||= candidates.size > 1;
       const forwarding = [...origins.values()];
       if (ambiguous || unresolved || candidates.size !== 1) {
-        this.limit(definition.file, ambiguous ? 'ambiguous-original' : 'unresolved-original',
+        this.limit(this.reporting(definition), ambiguous ? 'ambiguous-original' : 'unresolved-original',
           ambiguous ? `Export paths supply distinct or ambiguous originals named ${definition.entry.name}`
             : `Cannot establish selected export ${definition.entry.name}`, definition.node);
         results.set(definition.entry, { name: definition.entry.name, original: null, namespace: null, forwarding });
-      } else results.set(definition.entry, { ...candidates.values().next().value!, name: definition.entry.name, forwarding });
+      } else {
+        const chosen = candidates.values().next().value!;
+        const module = this.moduleOf(chosen);
+        if (chosen.namespace && module) this.entryModules.set(definition.entry, module);
+        results.set(definition.entry, { ...chosen, name: definition.entry.name, forwarding });
+      }
     }
     // Apply together so one lookup cannot observe another lookup's tentative
     // result. Namespace forwarding through stars must also retain the finite
@@ -526,7 +813,7 @@ class CatalogBuilder {
     };
     const recursiveEntries = new Set([...results.keys()].filter(entry => recursive(entry)));
     for (const definition of definitions.values()) if (recursiveEntries.has(definition.entry)) {
-      this.limit(definition.file, 'incomplete-exports', `Recursive namespace ${definition.entry.name} exceeds a finite export description`, definition.node);
+      this.limit(this.reporting(definition), 'incomplete-exports', `Recursive namespace ${definition.entry.name} exceeds a finite export description`, definition.node);
       const result = results.get(definition.entry)!;
       results.set(definition.entry, { ...result, original: null, namespace: null });
     }
@@ -536,8 +823,10 @@ class CatalogBuilder {
     // whole export description, so its completeness follows the module's state.
     for (const definition of definitions.values()) {
       const selection = this.selections.get(definition.entry);
-      const module = definition.entry.namespace && namespaces.get(definition.entry.namespace);
-      if (selection && module) this.namespaceTargets.push({ file: definition.file, target: this.files.get(module)!, name: definition.entry.name, node: selection.node });
+      const module = definition.entry.namespace ? this.moduleOf(definition.entry) : undefined;
+      if (selection && module && definition.file) {
+        this.namespaceTargets.push({ file: definition.file, target: module, name: definition.entry.name, node: selection.node });
+      }
     }
     changed = true;
     while (changed) {
@@ -545,7 +834,7 @@ class CatalogBuilder {
       for (const [path, stars] of this.starTargets) {
         const file = this.files.get(path)!;
         for (const target of stars.targets) {
-          const nested = this.files.get(target.file)!;
+          const nested = this.view(target.file)!;
           if (nested.state === 'complete') continue;
           const before = file.state;
           this.limit(file, nested.state === 'ambiguous' ? 'ambiguous-original' : 'incomplete-exports',
@@ -554,7 +843,7 @@ class CatalogBuilder {
         }
       }
       for (const { file, target, name, node } of this.namespaceTargets) {
-        if (target.state === 'complete') continue;
+        if (this.stateOf(target) === 'complete') continue;
         const before = file.state;
         this.limit(file, 'incomplete-exports', `Namespace ${name} has an incomplete export description`, node);
         changed ||= before !== file.state;

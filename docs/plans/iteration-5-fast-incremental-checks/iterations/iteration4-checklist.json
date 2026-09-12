@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.publish_iteration",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": true,
+    "functionalRequirementsSatisfied": true,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-12T05:45:00Z",
+  "iteration": "4",
+  "notes": "observeProject is active behind P4 with ObservationSink and the five observer types in the P2 wildcard and analysis A7. All eight I5-05 instances ran and asserted their own expectations: npm run reference:verify -- --plan 5 --iteration 4 passes with 18 of 18 required instances. New code is covered by subs/analysis/subs/project/src/tests/observer.test.ts (14 cases) and sweep.test.ts (6 cases); npm test passes 1,282 tests and npm run reference:cases passes 369. check:reference reports 15 owners with its two recorded warnings and check:self reports 11 owners with no finding. Three deviations are recorded in the results: an optional registry field added to ProjectReadOptions so the observer can compute the batch input identity, the inputId recipe transcribed rather than shared with run-analysis.ts because owners.md declares no exposure for it in this iteration, and a missing exposure target recorded as a reference status rather than an invalid update, which is what I5-05 file-deleted-local expects."
+}

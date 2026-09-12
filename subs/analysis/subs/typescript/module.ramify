@@ -6,3 +6,5 @@ expose-src createSourceAnalysis from "source-analysis.ts" to parent
 expose-src * from "interfaces/source.ts" to parent
 // T3: the hoisted access interpreter.
 expose-src createAccessInterpreter from "access-interpreter.ts" to parent
+// T4: per-file export descriptions and their assembly.
+expose-src describeFiles, assembleCatalog from "descriptions.ts" to parent

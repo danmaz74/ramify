@@ -109,7 +109,8 @@ const toolkit: readonly Fixture[] = [
     src(['buildModel'], 'model.ts', browser), src(['explainVisibility', 'explainImport'], 'decisions.ts', browser),
   ] },
   { path: 'subs/analysis/subs/project/', name: 'project', tags: [], statements: [src(['readProject'], 'read-project.ts'), src('*', 'interfaces/project.ts'), src(['resolveProjectRoot'], 'resolve-root.ts'), src(['observeProject'], 'observer.ts')] },
-  { path: 'subs/analysis/subs/typescript/', name: 'typescript', tags: [], statements: [src(['createSourceAnalysis'], 'source-analysis.ts'), src('*', 'interfaces/source.ts'), src(['createAccessInterpreter'], 'access-interpreter.ts')] },
+  { path: 'subs/analysis/subs/typescript/', name: 'typescript', tags: [], statements: [src(['createSourceAnalysis'], 'source-analysis.ts'), src('*', 'interfaces/source.ts'), src(['createAccessInterpreter'], 'access-interpreter.ts'),
+      src(['describeFiles', 'assembleCatalog'], 'descriptions.ts')] },
   { path: 'subs/cli/', name: 'cli', tags: ['dispatch'], statements: [src(['runCli'], 'run-cli.ts'), src('*', 'interfaces/cli.ts')] },
   { path: 'subs/daemon/', name: 'daemon', tags: ['dispatch'], statements: [
     src(['createDaemonService', 'dispatchServiceRequest'], 'service.ts'),

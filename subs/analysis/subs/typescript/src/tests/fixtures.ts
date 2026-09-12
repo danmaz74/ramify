@@ -34,6 +34,15 @@ export async function put(root: string, file: string, content: string): Promise<
   if (definition) definitions.set(root, { ...definition, files: { ...definition.files, [file]: content } });
 }
 
+export async function drop(root: string, file: string): Promise<void> {
+  await rm(join(root, file), { force: true });
+  const definition = definitions.get(root);
+  if (!definition) return;
+  const files = { ...definition.files };
+  delete files[file];
+  definitions.set(root, { ...definition, files });
+}
+
 export async function fixture(files: Readonly<Record<string, string>>, children: readonly FixtureOwner[] = []): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), 'ramify-source-catalog-'));
   try {

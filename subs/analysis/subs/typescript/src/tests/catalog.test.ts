@@ -1,7 +1,8 @@
 import { rm } from 'node:fs/promises';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { SourceCatalog } from '../interfaces/source.js';
-import { analyze, childOwner, code, configuration, exported, file, fixture, original, resource, withCatalog } from './fixtures.js';
+import { assembleCatalog, describeFiles } from '../descriptions.js';
+import { analyze, areasFor, childOwner, code, configuration, exported, file, fixture, original, resource, sourceLimits, withCatalog } from './fixtures.js';
 
 describe('compiler-derived code originals', () => {
   let root: string;
@@ -53,6 +54,12 @@ describe('compiler-derived code originals', () => {
     expect(exported(catalog, 'subs/child/src/original.ts', 'work').original).toEqual(code('original.ts', 'work', 'fixture/child'));
     expect(catalog.coverage).toEqual([]);
   });
+
+  it('assembles every owned file description into the same whole catalog', async () => {
+    const view = result.view;
+    const inputs = { view, inventory: view.inventory, areas: areasFor(view), limits: sourceLimits };
+    expect(assembleCatalog(await describeFiles(inputs, view.inventory.files.map(entry => entry.path)))).toEqual(catalog);
+  }, 90_000);
 
   it('preserves originals through configured aliases, .js substitution, local forwarding and defaults', () => {
     expect(exported(catalog, 'src/forward.ts', 'RenamedShape').original).toEqual(code('original.ts', 'Shape'));

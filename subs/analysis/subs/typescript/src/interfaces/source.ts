@@ -26,6 +26,28 @@ export interface SourceCatalog {
   readonly files: readonly FileExports[];
   readonly coverage: readonly SourceLimit[];
 }
+/** What one file's export description read. A change to any of these can change
+ * that description, so recomputation follows these edges. */
+export interface DescriptionDependencies {
+  readonly files: readonly string[];
+  readonly resources: readonly string[];
+  readonly shims: readonly string[];
+  readonly absent: readonly string[];
+}
+export interface FileDescription {
+  readonly file: string;
+  readonly exports: FileExports;
+  readonly originals: readonly CatalogOriginal[];
+  readonly coverage: readonly SourceLimit[];
+  readonly dependencies: DescriptionDependencies;
+}
+export interface CatalogDelta {
+  readonly recomputed: readonly string[];
+  readonly changed: readonly string[];
+  readonly moved: readonly string[];
+  readonly changedOriginals: readonly OriginalId[];
+  readonly removedOriginals: readonly OriginalId[];
+}
 export type SourceTarget =
   | { readonly kind: 'application'; readonly origin: SourceOrigin }
   | { readonly kind: 'external'; readonly resolution: 'package' | 'builtin' | 'standard-library';
@@ -103,13 +125,6 @@ export interface AccessInterpreter {
     readonly coverage: readonly SourceLimit[];
     readonly candidates: readonly { readonly file: string; readonly paths: readonly string[] }[];
   }>;
-  // The structural description input accepts iteration 3's FileDescription
-  // without activating that iteration's additional public names early.
-  replaceDescriptions(descriptions: readonly {
-    readonly file: string;
-    readonly exports: FileExports;
-    readonly originals: readonly CatalogOriginal[];
-    readonly coverage: readonly SourceLimit[];
-  }[], removed: readonly string[]): void;
+  replaceDescriptions(descriptions: readonly FileDescription[], removed: readonly string[]): void;
   dispose(): Promise<void>;
 }

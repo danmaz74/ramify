@@ -4,7 +4,9 @@ import { createAccessInterpreter } from '../access-interpreter.js';
 import { AccessInterpretation } from '../accesses.js';
 import { createSourceAnalysis } from '../source-analysis.js';
 import { acquire, areasFor, fixture, sourceLimits } from './fixtures.js';
-import type { AccessInterpreter } from '../interfaces/source.js';
+import type { AccessInterpreter, DescriptionDependencies } from '../interfaces/source.js';
+
+const noDependencies: DescriptionDependencies = { files: [], resources: [], shims: [], absent: [] };
 import type { Project } from 'typescript/unstable/sync';
 
 it('matches whole-pass subsets, reports candidates per file, and replaces only changed descriptions', async () => {
@@ -35,7 +37,7 @@ it('matches whole-pass subsets, reports candidates per file, and replaces only c
     expect(await interpreter.interpret([])).toEqual({ accesses: [], coverage: [], candidates: [] });
     const original = catalog.originals.find(item => item.id.binding === 'value')!;
     const description = { file: 'src/api.ts', exports: catalog.files.find(file => file.file === 'src/api.ts')!,
-      originals: [{ ...original, hasValue: false, hasType: true }], coverage: [] };
+      originals: [{ ...original, hasValue: false, hasType: true }], coverage: [], dependencies: noDependencies };
     interpreter.replaceDescriptions([description], []);
     expect((await interpreter.interpret(['src/a.ts'])).accesses[0].selections[0].request).toBe('type-only');
     interpreter.replaceDescriptions([], ['src/api.ts']);
@@ -109,7 +111,8 @@ it('preserves erased namespace members when descriptions cross the detached repl
     const before = await interpreter.interpret(['src/use.ts']);
     interpreter.replaceDescriptions(catalog.files.map(file => ({ file: file.file, exports: file,
       originals: catalog.originals.filter(original => original.origin.file === file.file),
-      coverage: catalog.coverage.filter(issue => issue.location.file === file.file) })), []);
+      coverage: catalog.coverage.filter(issue => issue.location.file === file.file),
+      dependencies: noDependencies })), []);
     expect(await interpreter.interpret(['src/use.ts'])).toEqual(before);
   } finally { await interpreter?.dispose(); await source.dispose(); await view.dispose(); await rm(root, { recursive: true, force: true }); }
 }, 60_000);

@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.publish_iteration",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": true,
+    "functionalRequirementsSatisfied": true,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-12T06:30:00Z",
+  "iteration": "3",
+  "notes": "describeFiles and assembleCatalog are active behind T4; buildCatalog is the assembly of every file's description and the batch helper calls it unchanged. All seven I5-03 instances ran and asserted their own expectations: npm run reference:verify -- --plan 5 --iteration 3 required 17, passed 17, failed 0. Plan 1's gate passes 308/308 on the same build, and check:reference (15 owners) and check:self (11 owners, no finding) are unchanged. Ten owner cases in src/tests/descriptions.test.ts cover dependency recording, the recomputed set, propagation to a fixed point, ambiguity, removed originals, resource shims, namespace-chain deletion, module augmentation and the moved/changed split; catalog.test.ts and resources.test.ts gained assembly equality. An adversarial review found three defects (unrecorded namespace-module edge, unrecorded module-augmentation edge, unreachable moved for files with coverage notes); all three are fixed with regression tests. Known limitations are recorded in the results under that heading."
+}

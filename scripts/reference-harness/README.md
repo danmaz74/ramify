@@ -425,9 +425,14 @@ the per-iteration counts. It accepts the fixture codes `R`, `T`, `F`, `S100`,
 Plan 2 readers and their records remain independent.
 
 `npm run reference:verify -- --plan 5 --iteration 2` executes the six I5-01
-engine instances and the four I5-02 harness controls; its work root is the
-toolkit's `.reference-work/`. `plan5-runtime.ts` makes only `engine` and
-`harness-gate` available at iteration 2. The capabilities `catalog`,
+engine instances and the four I5-02 harness controls; `--iteration 3` adds the
+seven I5-03 `catalog` instances. Its work root is the toolkit's
+`.reference-work/`. `plan5-runtime.ts` makes `engine`, `harness-gate` and
+`catalog` available at iteration 3. `plan5-catalog-cases.ts` describes
+successive disk states of one project through `plan5-catalog-fixture.ts`, which
+opens its own compiler snapshot per state and carries only the plain
+descriptions across, and compares every incremental result with a whole
+recompute of the same state. The capabilities
 `compiler`, `observer`, `session`, `hosting`, `contexts`, `supersession`,
 `hook-cli`, `live-equivalence`, `fast-measure` and `completion` are registered
 names whose instances report `not-executed` until the iteration that

@@ -19,7 +19,9 @@ export interface ResolvedModule {
 /** Compiler declarations establish code targets. Resource descriptions need an
  * additional captured, physical target; an ambient wildcard alone proves none. */
 export class Resolution {
-  onCandidate: ((path: string) => void) | undefined;
+  // Existence is reported when resolution actually probed it, so a description
+  // can record the paths it found absent as dependencies.
+  onCandidate: ((path: string, existing?: boolean) => void) | undefined;
   readonly files: ReadonlyMap<string, InventoryFile>;
   constructor(readonly project: Project, readonly inventory: ProjectInventory, readonly host: CatalogHost) {
     this.files = new Map(inventory.files.map(file => [resolve(inventory.scope.root, file.path), file]));
@@ -60,9 +62,13 @@ export class Resolution {
       if (isAbsolute(selected)) candidates.push(selected);
       else if (base && isAbsolute(base)) candidates.push(resolve(base, selected));
     }
-    paths.forEach(path => this.onCandidate?.(path));
+    paths.forEach(path => this.onCandidate?.(path, true));
     candidates.forEach(path => this.onCandidate?.(path));
-    const exists = (path: string): boolean => { this.onCandidate?.(path); return this.host.fileExists(path); };
+    const exists = (path: string): boolean => {
+      const existing = this.host.fileExists(path);
+      this.onCandidate?.(path, existing);
+      return existing;
+    };
     // JSON and ordinary ESM code resolve to actual source files. Ambient module
     // declarations instead name their describing source file, handled below.
     const sourcePaths = [...new Set(declarationNodes.filter(node => node.kind === SyntaxKind.SourceFile)
