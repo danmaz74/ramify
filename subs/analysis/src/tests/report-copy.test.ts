@@ -107,4 +107,25 @@ describe('detached report data with shared immutable subtrees', () => {
     { value: NaN }, { value: Infinity }, undefined])('rejects non-JSON runtime state %#', value => {
     expect(() => copyReport(value)).toThrow(TypeError);
   });
+
+  it('copies a session revision as frozen plain data sharing its equal subtrees', () => {
+    const location = { file: 'src/a.ts', start: 1, end: 2, line: 1, column: 2 };
+    const finding = { id: 'source-diagnostic/1:abc', category: 'import', code: 'not-visible', message: 'denied', location, related: [location],
+      importer: { owner: 'consumer', kind: 'ordinary', root: 'subs/consumer/src', profile: [] }, original: null, accessId: 'access/1' };
+    const revision = {
+      sequence: 2, inputId: 'input/1:abc', inputs: [{ path: 'src/a.ts', role: 'source', sha256: 'a', bytes: 1 }], changed: ['src/a.ts'],
+      checked: { path: 'source', files: ['src/a.ts'], accesses: 1, modelRebuilt: false },
+      outcome: { execution: 'completed', check: 'failed', coverage: 'complete' },
+      summary: { complete: true, owners: 2, sourceFiles: 1, resources: 0, originals: 1, accesses: 1, allowed: 0, denied: 1, errors: 1, warnings: 0, coverageNotes: 0, external: 0 },
+      diagnostics: [finding], warnings: [], coverage: [], delta: { added: [finding], removed: [], positionOnly: [] },
+      timings: { classify: 0, inventory: 1, compiler: 2, descriptions: 3, accesses: 4, link: 0, decide: 5, publish: 1, total: 16 },
+    };
+    const copy = copyReport(revision);
+    expect(JSON.stringify(copy)).toBe(JSON.stringify(revision));
+    const frozen = (value: unknown): boolean => !value || typeof value !== 'object' || (Object.isFrozen(value) && Object.values(value).every(frozen));
+    expect(frozen(copy)).toBe(true);
+    expect(copy.diagnostics[0]).toBe(copy.delta.added[0]);
+    expect(copy.diagnostics[0]!.location).toBe(copy.diagnostics[0]!.related[0]);
+    expect(Object.getPrototypeOf(copy.checked)).toBe(Object.prototype);
+  });
 });

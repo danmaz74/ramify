@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": true,
+    "functionalRequirementsSatisfied": true,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-12T08:20:00Z",
+  "iteration": "6",
+  "notes": "openRetainedSession behind A11/A12 with frozen plain revisions, checked sets, finding deltas, position refresh, report projection and verify; all ten I5-06 instances pass through `reference:verify --plan 5 --iteration 6` (42/42), each step equal to batch with the audit equal; check:reference and check:self pass. Description path taken conservatively as broad until iteration 7; npm test left to the automatic regression check."
+}

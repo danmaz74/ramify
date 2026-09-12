@@ -1,11 +1,26 @@
 # Analysis
 
-Analysis composes one captured project view, source facts, descriptions and model decisions into disposable batch work, immutable reports and retained stage products that a later run over unchanged inputs may reuse. It owns stage outcomes, input identity and computational invalidation so every client consumes the same completed analysis.
+Analysis composes one captured project view, source facts, descriptions and model decisions into disposable batch work, immutable reports and a retained session whose revisions recompute only the facts a change reaches. It owns stage outcomes, input identity and computational invalidation so every client consumes the same completed analysis.
 
 `analyzeIncrement` runs the same disposable pipeline over a fresh capture and
 reuses frozen stage products only when their recorded dependencies match. Unknown
 changes permit only per-file description and README reuse. `resolveProject`
 selects the canonical root and configuration without reading module descriptions.
+
+`openRetainedSession(inputs, control?)` observes one project, keeps a warm
+compiler behind the retained adapter with the observer's sink, and publishes
+frozen plain-data revisions. Each `update` classifies the named changes through
+the observer, applies one compiler update, recomputes export descriptions over
+their dependency closure, re-interprets the changed files and the importers of
+every description that changed by value, rebuilds the model only when the link
+input changed and decides the accesses the change reaches. A body edit that
+leaves descriptions and access facts equal by value is the `unchanged-surface`
+path; a declaration that only moved refreshes the decisions selecting it so
+their evidence and diagnostic identities match a fresh pass. Every revision
+carries its checked set, finding delta and timings; `report` materializes the
+`ramify.analysis/1` document of a retained revision on request, equal to
+`analyzeProject` over the same inputs except `runId`, and `verify` recomputes
+everything from the warm compiler and compares it with the retained facts.
 
 Iteration 7 provides `validateProject(inputs, control?)` through
 `src/validation-entry.ts`. Supply the reviewed project request, resolved registry

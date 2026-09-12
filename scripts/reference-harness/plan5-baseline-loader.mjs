@@ -22,6 +22,15 @@ export const enginePaths = [
 const read = path => engine === 'worktree' ? readFileSync(resolve(repo, path), 'utf8')
   : execFileSync('git', ['show', `${baselineRevision}:${path}`], { cwd: repo, encoding: 'utf8', maxBuffer: 4 * 1024 ** 2 });
 const sources = new Map(enginePaths.map(path => [resolve(repo, 'dist', path.replace(/\.ts$/, '.js')), read(path)]));
+// The retained session of iteration 6 makes the retained adapter reachable
+// from the analysis entry. The pinned engine predates it and the batch replay
+// never calls it, so the baseline serves an explicit stub instead of a module
+// whose imports the pinned engine sources cannot satisfy.
+if (engine === 'baseline') {
+  sources.set(resolve(repo, 'dist/subs/analysis/subs/typescript/src/retained-source-analysis.js'),
+    "export function createRetainedSourceAnalysis() { throw new Error('The pinned baseline engine has no retained adapter'); }\n"
+    + "export function retainedCompilerEvidence() { throw new Error('The pinned baseline engine has no retained adapter'); }\n");
+}
 registerHooks({ load(url, context, next) {
   if (url.startsWith('file:')) {
     const source = sources.get(fileURLToPath(url));

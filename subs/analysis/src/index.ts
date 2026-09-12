@@ -11,3 +11,5 @@ export type * from '../subs/typescript/src/interfaces/source.js';
 
 export { analyzeIncrement } from './increment.js';
 export { resolveProject } from './resolve-project.js';
+export { openRetainedSession } from './retained-session.js';
+export type * from './interfaces/session.js';

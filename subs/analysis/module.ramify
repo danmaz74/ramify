@@ -25,3 +25,7 @@ expose-src analyzeProject from "analyze-project.ts" to parent
 
 expose-src analyzeIncrement from "increment.ts" to parent
 expose-src resolveProject from "resolve-project.ts" to parent
+
+// A11/A12: the retained session and its plain-data vocabulary.
+expose-src * from "interfaces/session.ts" to parent
+expose-src openRetainedSession from "retained-session.ts" to parent
