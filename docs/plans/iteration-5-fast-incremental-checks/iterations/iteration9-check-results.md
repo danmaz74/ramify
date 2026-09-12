@@ -2,114 +2,72 @@
 
 ## Summary
 - **Static Analysis**: PASSED
-- **Scope Review**: PASSED
 - **Sealed Files**: PASSED
-- **Constraints**: PASSED
-- **Regression Tests**: FAILED
+- **Constraints**: FAILED
 
 ## Failure Details
 
-### Regression Tests
+### Constraints
 ```
-erimental feature and might change at any time
-(Use `node --trace-warnings ...` to show where the warning was created)
-(node:3093868) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
-(Use `node --trace-warnings ...` to show where the warning was created)
-(node:3093868) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
-(Use `node --trace-warnings ...` to show where the warning was created)
-(node:3094126) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
-(Use `node --trace-warnings ...` to show where the warning was created)
-(node:3094126) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
-(Use `node --trace-warnings ...` to show where the warning was created)
-(node:3094359) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
-(Use `node --trace-warnings ...` to show where the warning was created)
-(node:3094359) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
-(Use `node --trace-warnings ...` to show where the warning was created)
-(node:3094612) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
-(Use `node --trace-warnings ...` to show where the warning was created)
-(node:3094612) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
-(Use `node --trace-warnings ...` to show where the warning was created)
-(node:3095309) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
-(Use `node --trace-warnings ...` to show where the warning was created)
-(node:3095309) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
-(Use `node --trace-warnings ...` to show where the warning was created)
-(node:3095628) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
-(Use `node --trace-warnings ...` to show where the warning was created)
-(node:3095628) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
-(Use `node --trace-warnings ...` to show where the warning was created)
-(node:3095953) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
-(Use `node --trace-warnings ...` to show where the warning was created)
-(node:3095953) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
-(Use `node --trace-warnings ...` to show where the warning was created)
-(node:3096078) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
-(Use `node --trace-warnings ...` to show where the warning was created)
-(node:3096078) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
-(Use `node --trace-warnings ...` to show where the warning was created)
-(node:3096181) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
-(Use `node --trace-warnings ...` to show where the warning was created)
-(node:3096181) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
-(Use `node --trace-warnings ...` to show where the warning was created)
-(node:3096548) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
-(Use `node --trace-warnings ...` to show where the warning was created)
-(node:3096548) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
-(Use `node --trace-warnings ...` to show where the warning was created)
-panic: EOF [recovered, repanicked]
-
-goroutine 36 [running]:
-sync.(*WaitGroup).Go.func1.1()
-	sync/waitgroup.go:251 +0x45
-panic({0xd7d680?, 0x1ac2fa0?})
-	runtime/panic.go:860 +0x13a
-github.com/microsoft/typescript-go/internal/api.(*callbackFS).ReadFile(0x328383182b00, {0x328382fd3180, 0x46})
-	github.com/microsoft/typescript-go/internal/api/callbackfs.go:108 +0x15d
-github.com/microsoft/typescript-go/internal/vfs/cachedvfs.(*FS).ReadFile(0x328383318c40?, {0x328382fd3180?, 0x3283832259d0?})
-	github.com/microsoft/typescript-go/internal/vfs/cachedvfs/cachedvfs.go:97 +0x22
-github.com/microsoft/typescript-go/internal/project.(*snapshotFSBuilder).reloadEntryIfNeeded(0x32838307b800, 0x328383318c40)
-	github.com/microsoft/typescript-go/internal/project/snapshotfs.go:416 +0x6d
-github.com/microsoft/typescript-go/internal/project.(*snapshotFSBuilder).getDiskFile(0x32838307b800, {0x328382fd3180, 0x46}, {0x328382fd3180, 0x46}, 0x0)
-	github.com/microsoft/typescript-go/internal/project/snapshotfs.go:353 +0x11d
-github.com/microsoft/typescript-go/internal/project.(*snapshotFSBuilder).GetFileByPath(0x32838307b800, {0x328382fd3180, 0x46}, {0x328382fd3180, 0x46})
-	github.com/microsoft/typescript-go/internal/project/snapshotfs.go:320 +0x75
-github.com/microsoft/typescript-go/internal/project.(*sourceFS).GetFileByPath(0x3283831d5cb0, {0x328382fd3180, 0x46}, {0x328382fd3180, 0x46})
-	github.com/microsoft/typescript-go/internal/project/snapshotfs.go:723 +0x53
-github.com/microsoft/typescript-go/internal/project.(*compilerHost).GetSourceFile(0x328382fc5630, {{0x328382fd3180, 0x46}, {0x328382fd3180, 0x46}, {0x0, 0x0}})
-	github.com/microsoft/typescript-go/internal/project/compilerhost.go:98 +0x87
-github.com/microsoft/typescript-go/internal/compiler.(*fileLoader).parseSourceFile(0x32838331c008, 0x32838312d080)
-	github.com/microsoft/typescript-go/internal/compiler/fileloader.go:370 +0x25b
-github.com/microsoft/typescript-go/internal/compiler.(*parseTask).load(0x32838312d080, 0x32838331c008)
-	github.com/microsoft/typescript-go/internal/compiler/filesparser.go:112 +0x4a6
-github.com/microsoft/typescript-go/internal/compiler.(*filesParser).start.func1()
-	github.com/microsoft/typescript-go/internal/compiler/filesparser.go:290 +0x351
-github.com/microsoft/typescript-go/internal/core.(*parallelWorkGroup).Queue.func1()
-	github.com/microsoft/typescript-go/internal/core/workgroup.go:40 +0x13
-sync.(*WaitGroup).Go.func1()
-	sync/waitgroup.go:258 +0x4a
-created by sync.(*WaitGroup).Go in goroutine 33
-	sync/waitgroup.go:238 +0x73
-(node:3096698) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
-(Use `node --trace-warnings ...` to show where the warning was created)
-(node:3096698) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
-(Use `node --trace-warnings ...` to show where the warning was created)
-(node:3096842) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
-(Use `node --trace-warnings ...` to show where the warning was created)
-(node:3096842) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
-(Use `node --trace-warnings ...` to show where the warning was created)
-(node:3096989) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
-(Use `node --trace-warnings ...` to show where the warning was created)
-(node:3096989) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
-(Use `node --trace-warnings ...` to show where the warning was created)
-
-⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
-
- FAIL  subs/daemon/subs/contexts/src/tests/context-manager.test.ts > watcher reconciliation and retention > applies the global budget to session facts even when the revision is reused
-AssertionError: expected 7422 to be less than or equal to 5000
- ❯ subs/daemon/subs/contexts/src/tests/context-manager.test.ts:228:91
-    226|       expect(await e.check(opened.token)).toMatchObject({ reason: 'res…
-    227|       expect(e.status(opened.token).published).toEqual(before.publishe…
-    228|       expect(e.status(opened.token).retainedBytes + e.status(opened.to…
-       |                                                                                           ^
-    229|     } finally { await e.dispose(); }
-    230|   });
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+{
+  "met": false,
+  "reasoning": "Reviewed all five selected constraints. One request-completion contradiction was reproduced through the real daemon service with a scripted session. No concrete contradictions were established against the other four constraints.",
+  "issues": [
+    {
+      "constraintPath": "docs/architecture/quick-testing.spec.md",
+      "constraintId": "docs/architecture/quick-testing.spec.md#architecture-specs",
+      "ruleId": "architecture-specs",
+      "severity": "important",
+      "issue": "subs/daemon/subs/contexts/src/context-manager.ts:371-375 snapshots rejected requests before awaiting abandonCandidate(). A second synchronized check arriving during report preservation is absent from that snapshot. abandonCandidate() then sets the context cold and clears background work (lines 299-308), while kick() skips cold contexts (line 415). The second request remains pending indefinitely. Reproduction through createDaemonService returned resource-unavailable for the first request but left the second pending with no running analysis or scheduled timers, even after advancing the controlled clock. This contradicts the requirement that direct service flows complete requests.",
+      "guidance": "After retention cleanup, either explicitly settle requests that arrived during cleanup or reopen the context to service them. Add a regression that queues a second plain synchronized check while report preservation is delayed and verifies that both requests settle and resources are released."
+    }
+  ],
+  "selectedConstraints": [
+    {
+      "path": "docs/architecture/cli-invocation.spec.md",
+      "id": "docs/architecture/cli-invocation.spec.md#architecture-specs",
+      "ruleId": "architecture-specs",
+      "score": 0.78,
+      "selectedBy": [
+        "semantic"
+      ]
+    },
+    {
+      "path": "docs/architecture/quick-testing.spec.md",
+      "id": "docs/architecture/quick-testing.spec.md#architecture-specs",
+      "ruleId": "architecture-specs",
+      "score": 0.97,
+      "selectedBy": [
+        "semantic"
+      ]
+    },
+    {
+      "path": "docs/model/cross-module-importability.principles.md",
+      "id": "docs/model/cross-module-importability.principles.md#principles-md",
+      "ruleId": "principles-md",
+      "score": 0.92,
+      "selectedBy": [
+        "semantic"
+      ]
+    },
+    {
+      "path": "docs/model/module-description.principles.md",
+      "id": "docs/model/module-description.principles.md#principles-md",
+      "ruleId": "principles-md",
+      "score": 0.87,
+      "selectedBy": [
+        "semantic"
+      ]
+    },
+    {
+      "path": "docs/model/typescript-source-interpretation.principles.md",
+      "id": "docs/model/typescript-source-interpretation.principles.md#principles-md",
+      "ruleId": "principles-md",
+      "score": 0.69,
+      "selectedBy": [
+        "semantic"
+      ]
+    }
+  ]
+}
 ```
