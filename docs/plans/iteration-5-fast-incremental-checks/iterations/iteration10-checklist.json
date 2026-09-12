@@ -9,7 +9,7 @@
     "functionalRequirementsSatisfied": false,
     "newCodeCoveredByTests": true
   },
-  "completedAt": "2026-09-12T11:33:42Z",
+  "completedAt": "2026-09-12T11:39:29Z",
   "iteration": "10",
-  "notes": "The focused self-assessment retry adds three exhausted in-flight recovery cases (unavailable, stopped and incompatible). Direct execution passed 54 assertions and TypeScript checking passed; production code is unchanged. Reserved Vitest/Cucumber regression has no iteration 10 verdict yet, so allNewTestsPass remains unconfirmed. Full functional acceptance remains unconfirmed because prerequisite gates are unrun, the inherited Plan 2 measurement-provider migration remains assigned to iteration 12, and the documented deletion/input-identity and mixed-invocation dependency gaps remain. No requirement or test was waived. Both managed deliverables record this bounded retry; publication is left to workflow validation as instructed."
+  "notes": "Both reported CLI constraint defects are repaired: received findings and revision evidence survive cleanup rejection in one explicit exit-2 document, and cancellation as connect completes closes the acquired connection before returning 130. Three real quick-service regressions reproduced the defects before the repair and pass afterward (38 assertions, including resource teardown); all four type-check scopes pass. Reserved Vitest/Cucumber execution and automatic constraint revalidation remain pending. The decision-pending self-assessment remains false for full functionality and all new tests: full prerequisite gates, the inherited Plan 2 measurement-provider migration, and documented deletion/input-identity and mixed-invocation gaps remain unconfirmed or unresolved outside this bounded remediation. No requirement, scenario or assertion was waived. Results and checklist are updated; workflow revalidation/publication is not invoked locally."
 }

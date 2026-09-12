@@ -10,6 +10,7 @@ import type { CheckOutcome } from '../../../daemon/src/context-types.js';
 import type { CheckDocument, CliEnvironment } from '../interfaces/cli.js';
 import { runCli } from '../run-cli.js';
 import { exhaustedRecoveryWitness } from './exhausted-recovery.js';
+import { changedCleanupWitness } from './changed-cleanup.js';
 
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), 'ramify-changed-command-'));
@@ -125,6 +126,14 @@ describe('changed check command', () => {
 
   it.each(['unavailable', 'stopped', 'incompatible'] as const)('keeps exhausted in-flight recovery %s explicit and releases the real quick-service lease', async reason => {
     await exhaustedRecoveryWitness(reason);
+  });
+
+  it.each(['close-context', 'close-connection'] as const)('preserves received findings when %s cleanup fails', async fault => {
+    await changedCleanupWitness(fault);
+  });
+
+  it('closes the acquired connection when cancellation arrives as connect completes', async () => {
+    await changedCleanupWitness('cancel-connect');
   });
 
   it('defends the completed-result boundary against a reply without covering freshness', async () => {

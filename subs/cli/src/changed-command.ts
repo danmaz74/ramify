@@ -41,6 +41,7 @@ export async function changedCommand(args: ChangedArguments, environment: CliEnv
   let waitedMs = 0, root = resolve(environment.cwd, args.root ?? '.');
   let identities: readonly ExpectedContent[] = args.changed.map(path => ({ path, sha256: null }));
   let hashed = false;
+  let received: CheckDocument | undefined;
   function document(reason: CheckDocument['reason'], revision: ContextRevision | null = null,
     report: AnalysisReport | null = null): CheckDocument {
     return { schemaVersion: 'ramify.check/1', root,
@@ -68,13 +69,15 @@ export async function changedCommand(args: ChangedArguments, environment: CliEnv
   }
   async function run(): Promise<CheckDocument> {
     const connected = await environment.connect({ start: 'if-needed', signal: control.signal });
-    control.signal?.throwIfAborted();
-    if (connected.status === 'unavailable') throw disconnectFailure(connected.reason);
-    if (connected.status === 'stopped') return document('stopped');
-    if (connected.status === 'not-running') return document('unavailable');
+    if (connected.status !== 'connected') {
+      control.signal?.throwIfAborted();
+      if (connected.status === 'unavailable') throw disconnectFailure(connected.reason);
+      return document(connected.status === 'stopped' ? 'stopped' : 'unavailable');
+    }
     const connection = connected.connection;
     let token: ContextToken | undefined, reopened = false, recovered = false;
     try {
+      control.signal?.throwIfAborted();
       while (true) {
         try {
           const opened = await connection.openContext({ project: { cwd: environment.cwd,
@@ -83,7 +86,7 @@ export async function changedCommand(args: ChangedArguments, environment: CliEnv
           control.signal?.throwIfAborted();
           if (!opened.ok) throw serviceFailure(opened.error);
           if (opened.value.status === 'unavailable') return document(opened.value.reason);
-          if (opened.value.status === 'unresolved') return document('unavailable', null, opened.value.report);
+          if (opened.value.status === 'unresolved') return received = document('unavailable', null, opened.value.report);
           token = opened.value.token;
           const selected = opened.value.current.selection.root;
           // Recovery preserves the caller's original expectation; re-hashing
@@ -115,7 +118,7 @@ export async function changedCommand(args: ChangedArguments, environment: CliEnv
           control.signal?.throwIfAborted();
           if (!response.ok) throw serviceFailure(response.error);
           const value = response.value;
-          if (value.status === 'reported') return reported(value);
+          if (value.status === 'reported') return received = reported(value);
           if (value.status === 'cancelled') throw new CliFailure('cancelled', 'Check was cancelled', value);
           if (value.status === 'unavailable' && ['expired-generation', 'unknown-context'].includes(value.reason) && !reopened) {
             reopened = true;
@@ -152,6 +155,9 @@ export async function changedCommand(args: ChangedArguments, environment: CliEnv
     control.signal?.throwIfAborted();
     result = document(error instanceof CliFailure && reasons.includes(error.code as CheckDocument['reason'])
       ? error.code as CheckDocument['reason'] : 'unavailable');
+    // Cleanup can fail after delivery. Keep the received findings and coverage
+    // evidence while reporting the command failure in the same document.
+    if (received) result = { ...received, outcome: 'not-checked', reason: result.reason, exitCode: 2 };
   }
   // Keep output failures outside recovery: a failing sink must never cause a
   // second JSON document or turn a failed write into a successful check.
