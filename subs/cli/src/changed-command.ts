@@ -161,6 +161,7 @@ export async function changedCommand(args: ChangedArguments, environment: CliEnv
   }
   // Keep output failures outside recovery: a failing sink must never cause a
   // second JSON document or turn a failed write into a successful check.
+  control.signal?.throwIfAborted();
   result = { ...result, timings: { ...result.timings, totalMs: performance.now() - started } };
   environment.stdout(args.format === 'json' ? JSON.stringify(result) + '\n' : formatChangedHuman(result));
   return result.exitCode;

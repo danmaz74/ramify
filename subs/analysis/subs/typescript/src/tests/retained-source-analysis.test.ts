@@ -6,6 +6,7 @@ import { createRetainedSourceAnalysis, retainedCompilerEvidence } from '../retai
 import { createSourceAnalysis } from '../source-analysis.js';
 import type { RetainedSourceAnalysis, RetainedSourceInputs, SourceChangeSet } from '../interfaces/source.js';
 import { acquire, areasFor, drop, fixture, put, sourceLimits } from './fixtures.js';
+import { retainedMembershipWitness } from './retained-membership.js';
 
 const roots: string[] = [];
 const opened: RetainedSourceAnalysis[] = [];
@@ -100,6 +101,7 @@ const project = {
 };
 
 describe('retained source analysis', () => {
+  it('removes a configured source that existed at cold open from the synthetic roots', retainedMembershipWitness, 60_000);
   it('opens one warm compiler whose cold facts equal the finite helper and a fresh adapter', async () => {
     const root = await start(project);
     const inputs = await inputsOf(root);

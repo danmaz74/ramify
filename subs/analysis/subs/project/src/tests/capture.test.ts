@@ -5,6 +5,7 @@ import { performance } from 'node:perf_hooks';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Capture } from '../capture.js';
 import { limits, put } from './fixtures.js';
+import { captureRetirementWitness } from './capture-retirement.js';
 
 let root: string;
 let capture: Capture;
@@ -12,6 +13,7 @@ beforeEach(async () => { root = await mkdtemp(join(tmpdir(), 'ramify-capture-'))
 afterEach(async () => { await capture.dispose(); await rm(root, { recursive: true, force: true }); });
 
 describe('one captured filesystem view', () => {
+  it('retires compiler-only observations while preserving acquisition evidence on shared paths', captureRetirementWitness);
   it('returns captured bytes after an edit and reports changed input at seal', async () => {
     await put(root, 'value.ts', 'before');
     expect(await capture.readFile('value.ts')).toBe('before');

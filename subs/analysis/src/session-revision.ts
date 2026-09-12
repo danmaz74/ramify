@@ -416,7 +416,8 @@ export async function revise(state: SessionState, changes: readonly ObservedChan
         const deleted = [...oldFiles].filter(path => !owned.has(path));
         await state.adapter.update({ changed: state.stale ? [...owned] : ownedChanged, created, deleted,
           inventory, invalidateAll: false }, signal);
-        if (state.stale || unknown || structural || shimChanged || otherChanged.length > 0 || unexplained.length > 0) {
+        if (state.stale || unknown || structural || shimChanged || otherChanged.length > 0 || unexplained.length > 0
+          || created.length > 0 || deleted.length > 0) {
           await state.adapter.update({ changed: [], created: [], deleted: [], inventory: null, invalidateAll: true }, signal);
         }
       }

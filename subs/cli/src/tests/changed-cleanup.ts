@@ -10,8 +10,9 @@ import type { CheckDocument } from '../interfaces/cli.js';
 import { runCli } from '../run-cli.js';
 
 /** Exercise cleanup faults after a real quick-service reply, or cancellation
- * at the instant that the same connector hands ownership to the command. */
-export async function changedCleanupWitness(fault: 'close-context' | 'close-connection' | 'cancel-connect') {
+ * when connecting or completing asynchronous cleanup. */
+export async function changedCleanupWitness(fault: 'close-context' | 'close-connection'
+  | 'cancel-connect' | 'cancel-close-context' | 'cancel-close-connection') {
   const assertions: string[] = [];
   function equal(label: string, actual: unknown, expected: unknown): void {
     assert.deepEqual(actual, expected, label);
@@ -39,9 +40,11 @@ export async function changedCleanupWitness(fault: 'close-context' | 'close-conn
         stdout: text => { baseline.push(text); }, stderr: text => { throw new Error(text); },
         batch: async () => { throw new Error('Unexpected baseline batch'); },
       });
-      equal('the real clean baseline completes before introducing the invalid name',
+      equal('the real clean baseline completes before the cleanup fault',
         [exit, baseline.length, baseline.length === 1 ? JSON.parse(baseline[0]).findings : null], [0, 1, []]);
-      await writeFile(join(root, 'module.ramify'), description);
+      if (fault === 'close-context' || fault === 'close-connection') {
+        await writeFile(join(root, 'module.ramify'), description);
+      }
     }
     const connect: ServiceConnector = async options => {
       const connected = await quick.connect(options);
@@ -66,6 +69,7 @@ export async function changedCleanupWitness(fault: 'close-context' | 'close-conn
           closeContextCalls++;
           const response = await actual.closeContext(params);
           events.push('context-closed');
+          if (fault === 'cancel-close-context') controller.abort();
           if (fault === 'close-context') { lost = true; throw new Error('Lost closeContext reply'); }
           return response;
         },
@@ -73,6 +77,7 @@ export async function changedCleanupWitness(fault: 'close-context' | 'close-conn
           closeCalls++;
           await actual.close();
           events.push('connection-closed');
+          if (fault === 'cancel-close-connection') controller.abort();
           if (fault === 'close-connection') { lost = true; throw new Error('Connection cleanup failed'); }
         },
       } };
@@ -87,6 +92,16 @@ export async function changedCleanupWitness(fault: 'close-context' | 'close-conn
       equal('interruption remains explicit', stderr, ['Interrupted; no result claimed.\n']);
       equal('no context, check or recovery starts after cancellation', [openCalls, checkCalls, recoveries, closeContextCalls], [0, 0, 0, 0]);
       equal('the acquired connection is closed exactly once', [closeCalls, connection?.state], [1, 'closed']);
+    } else if (fault === 'cancel-close-context' || fault === 'cancel-close-connection') {
+      equal('the real service supplied a completed clean covering revision before cleanup', received
+        ? [received.revision.outcome.execution, received.freshness.verified, received.delta.findings] : null,
+      ['completed', true, []]);
+      equal('cancellation during cleanup exits 130 without stdout or a batch', [exitCode, stdout, batchCalls], [130, [], 0]);
+      equal('interruption remains explicit', stderr, ['Interrupted; no result claimed.\n']);
+      equal('cleanup finishes once without another check or recovery',
+        [openCalls, checkCalls, recoveries, closeContextCalls, closeCalls, connection?.state], [1, 1, 0, 1, 1, 'closed']);
+      equal('both cleanup operations finish without delivering the received result', events,
+        ['check-received', 'context-closed', 'connection-closed']);
     } else {
       equal('real service supplied an invalid covering revision', received
         ? [received.revision.outcome.execution, received.freshness.verified, received.delta.findings.map(item => item.code)] : null,

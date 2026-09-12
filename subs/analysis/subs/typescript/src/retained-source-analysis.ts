@@ -134,7 +134,12 @@ class RetainedSourceState implements RetainedSourceAnalysis {
         this.#replaceSnapshot({ invalidateAll: true });
         this.#broad = true;
       } else {
-        if (changes.inventory) for (const path of this.#regenerate()) changed.add(path);
+        if (changes.inventory) {
+          // Configured roots also change with membership. Retaining the old
+          // fileNames list would keep a deleted source in the synthetic roots.
+          this.#guarded(() => { this.#selectedFiles = this.#api!.parseConfigFile(this.#configuration).fileNames; });
+          for (const path of this.#regenerate()) changed.add(path);
+        }
         if (changed.size || created.length || deleted.length) {
           this.#replaceSnapshot({ changed: [...changed].sort(order), created, deleted });
         }

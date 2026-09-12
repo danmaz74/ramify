@@ -19,6 +19,7 @@ interface Observation {
   role: Role;
   exactName?: boolean;
 }
+type ObservationRecipe = { path: string; role: Role; read: boolean; directory: boolean; exact: boolean };
 
 /** Private, invocation-owned capture. No filesystem object escapes to a report. */
 export class Capture {
@@ -34,6 +35,8 @@ export class Capture {
   #enumerations = 0;
   #application = new Set<string>();
   #applicationBytes = 0;
+  #acquisition: Map<string, ObservationRecipe> | undefined;
+  #reporting = false;
   root: string;
   constructor(root: string, readonly limits: AcquisitionLimits, readonly deadline: number, readonly signal?: AbortSignal) {
     this.root = root;
@@ -44,6 +47,31 @@ export class Capture {
     if (!this.#acquired && performance.now() >= this.deadline) throw new AcquisitionError('resource-limit', this.root, 'Acquisition deadline exceeded');
   }
   finishAcquisition(): void { this.#acquired = true; }
+  /** The observer keeps acquisition reads separate from compiler callbacks. */
+  retainAcquisition(): void { this.#acquisition = new Map(this.observations().map(entry => [entry.path, entry])); }
+  async reported<T>(operation: () => Promise<T>): Promise<T> {
+    const previous = this.#reporting;
+    this.#reporting = true;
+    try { return await operation(); } finally { this.#reporting = previous; }
+  }
+  #retain(path: string, fields: Partial<Omit<ObservationRecipe, 'path'>> = {}): void {
+    if (!this.#acquisition || this.#reporting) return;
+    const previous = this.#acquisition.get(path) ?? { path, role: 'dependency', read: false, directory: false, exact: false };
+    this.#acquisition.set(path, { ...previous, ...fields });
+  }
+  /** Retire the preceding compiler input set without rescanning the inventory.
+   * A shared path is restored to its acquisition recipe, including probe-only
+   * paths that the compiler had subsequently read or enumerated. */
+  async retireReported(): Promise<void> {
+    if (!this.#acquisition) return;
+    for (const entry of this.observations()) {
+      const retained = this.#acquisition.get(entry.path);
+      if (retained && JSON.stringify(retained) === JSON.stringify(entry)) continue;
+      await this.#settle(entry.path);
+      this.#forget(entry.path);
+      if (retained) await this.replay([retained]);
+    }
+  }
   path(path: string): string { return resolve(this.root, path); }
   label(path: string): string {
     return within(this.root, path) ? relative(this.root, path) || '.'
@@ -76,6 +104,7 @@ export class Capture {
   async observe(input: string): Promise<Observation> {
     this.check();
     const path = this.path(input);
+    this.#retain(path);
     const old = this.#observations.get(path);
     if (old) return old;
     const pending = this.#pending.get(path);
@@ -103,6 +132,7 @@ export class Capture {
   async hasExactEntry(path: string): Promise<boolean> {
     const entry = await this.observe(path);
     if (entry.kind === 'absent') return false;
+    this.#retain(entry.path, { exact: true });
     if (entry.exactName !== undefined) return entry.exactName;
     if (this.#closed) throw new AcquisitionError('read-failure', path, 'Cannot capture an exact name after sealing');
     entry.exactName = (await readdir(dirname(entry.path))).includes(basename(entry.path));
@@ -120,6 +150,8 @@ export class Capture {
   async bytes(path: string, role: Role = 'dependency'): Promise<Buffer | undefined> {
     const entry = await this.#target(path);
     if (entry.kind !== 'file') return undefined;
+    const acquiredRole = this.#acquisition?.get(entry.path)?.role;
+    this.#retain(entry.path, { read: true, role: role === 'dependency' && acquiredRole ? acquiredRole : role });
     if (role !== 'dependency' || entry.role === 'dependency') entry.role = role;
     if (entry.bytes) return entry.bytes;
     const old = this.#reads.get(entry.path);
@@ -162,6 +194,7 @@ export class Capture {
   async readDirectory(path: string): Promise<readonly string[]> {
     const entry = await this.#target(path);
     if (entry.kind !== 'directory') return [];
+    this.#retain(entry.path, { directory: true, role: 'directory' });
     if (entry.entries) return entry.entries;
     const old = this.#directories.get(entry.path);
     if (old) return old;
@@ -246,6 +279,7 @@ export class Capture {
     const path = this.path(input);
     await this.#settle(path);
     this.#forget(path);
+    if (!this.#reporting) this.#acquisition?.delete(path);
   }
   /** Re-observe one input in place, repeating exactly the reads made of it. */
   async refresh(input: string): Promise<void> {
@@ -310,6 +344,7 @@ export class Capture {
     this.#disposed = true;
     await Promise.allSettled([...this.#pending.values(), ...this.#reads.values(), ...this.#directories.values()]);
     this.#observations.clear(); this.#pending.clear(); this.#reads.clear(); this.#directories.clear(); this.#application.clear();
+    this.#acquisition?.clear();
     this.#bytes = 0;
   }
 }

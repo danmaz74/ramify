@@ -136,6 +136,10 @@ describe('changed check command', () => {
     await changedCleanupWitness('cancel-connect');
   });
 
+  it.each(['cancel-close-context', 'cancel-close-connection'] as const)('honors %s after cleanup without delivering the received result', async fault => {
+    await changedCleanupWitness(fault);
+  });
+
   it('defends the completed-result boundary against a reply without covering freshness', async () => {
     const f = await fixture();
     try {

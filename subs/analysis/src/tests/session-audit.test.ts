@@ -3,10 +3,13 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { compareFacts } from '../session-audit.js';
 import { deepFreeze } from '../session-facts.js';
+import { sessionInputWitness } from './session-input-witness.js';
 import { audited, comparable, equalToBatch, fixture, fixtureFiles, instrumentObserver, opened, ownedFiles, parentExposure, paths, put, replace,
   revised, timeout } from './session-test-fixture.js';
 
 describe('retained session audit', () => {
+  it('retires obsolete compiler observations after deleting the last source and a whole module', sessionInputWitness, timeout);
+
   it('equals batch and keeps the current sequence after each of twelve source, description, metadata and membership steps', () => fixture(async (root, inputs) => {
     const { handle } = await opened(inputs);
     try {
