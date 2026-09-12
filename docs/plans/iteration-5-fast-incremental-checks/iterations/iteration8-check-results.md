@@ -2,7 +2,6 @@
 
 ## Summary
 - **Static Analysis**: PASSED
-- **Scope Review**: PASSED
 - **Sealed Files**: PASSED
 - **Constraints**: FAILED
 
@@ -12,15 +11,15 @@
 ```
 {
   "met": false,
-  "reasoning": "The worker failure path contradicts the selected requirement to release test-owned resources on success and failure. No concrete contradiction was established for the importability principles; no unconfirmed API accessibility violation is reported.",
+  "reasoning": "One concrete teardown contradiction remains in the new heap-exhaustion test. No concrete contradiction with the importability principles was established.",
   "issues": [
     {
       "constraintPath": "docs/architecture/quick-testing.spec.md",
       "constraintId": "docs/architecture/quick-testing.spec.md#architecture-specs",
       "ruleId": "architecture-specs",
       "severity": "important",
-      "issue": "Worker termination and heap exhaustion leave compiler children unreaped. In subs/analysis/src/session-processes.ts:67-76, cleanup sends SIGKILL and polls process existence but cannot complete reaping after the worker exits. SessionHost.dispose() then clears child tracking even when cleanup rejects. The recorded iteration8-followup-lifecycle.json confirms three new failure cases retain compiler PIDs after teardown. This violates the requirement that each test release its owned sessions and resources on both success and failure.",
-      "guidance": "Make compiler-child supervision survive worker failure and await actual child reaping before discarding lifecycle ownership. Keep the crash and heap-exhaustion assertions enabled, and ensure their teardown releases all owned processes even when assertions or disposal fail."
+      "issue": "In subs/analysis/src/tests/session-worker.test.ts:287-301, if the 16 MiB session unexpectedly opens, the expected 'reported' assertion throws, but finally only calls observation.cleanup(). That helper restores spies and listeners; it neither disposes the opened session nor terminates its worker. The enclosing fixture only removes temporary files. This failure path leaves the session, supervisor and compiler running, contradicting the requirement that tests release owned resources on both success and failure.",
+      "guidance": "Make the test's finally block dispose any successfully opened session and await worker termination, with observation.cleanup() in a nested finally so listeners are restored even when disposal rejects. Preserve the existing heap-failure assertions."
     }
   ],
   "selectedConstraints": [
@@ -28,7 +27,7 @@
       "path": "docs/architecture/quick-testing.spec.md",
       "id": "docs/architecture/quick-testing.spec.md#architecture-specs",
       "ruleId": "architecture-specs",
-      "score": 0.87,
+      "score": 0.94,
       "selectedBy": [
         "semantic"
       ]
@@ -37,7 +36,7 @@
       "path": "docs/model/cross-module-importability.principles.md",
       "id": "docs/model/cross-module-importability.principles.md#principles-md",
       "ruleId": "principles-md",
-      "score": 0.55,
+      "score": 0.54,
       "selectedBy": [
         "semantic"
       ]
