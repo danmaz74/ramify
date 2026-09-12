@@ -1,7 +1,8 @@
 import { rm } from 'node:fs/promises';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { SourceCatalog } from '../interfaces/source.js';
-import { analyze, childOwner, configuration, exported, file, fixture, original, resource, withCatalog } from './fixtures.js';
+import { assembleCatalog, describeFiles } from '../descriptions.js';
+import { analyze, areasFor, childOwner, configuration, exported, file, fixture, original, resource, sourceLimits, withCatalog } from './fixtures.js';
 
 describe('resource-specific effective exports', () => {
   let root: string;
@@ -30,6 +31,20 @@ describe('resource-specific effective exports', () => {
     catalog = result.catalog;
   }, 30_000);
   afterAll(async () => { await result?.dispose(); if (root) await rm(root, { recursive: true, force: true }); });
+
+  it('records the shims and importers each resource description read and assembles the same catalog', async () => {
+    const view = result.view;
+    const inputs = { view, inventory: view.inventory, areas: areasFor(view), limits: sourceLimits };
+    const descriptions = await describeFiles(inputs, view.inventory.files.map(entry => entry.path));
+    const described = (path: string) => descriptions.find(entry => entry.file === path)!;
+    expect(described('src/theme.module.css').dependencies.shims).toEqual(['src/resources.d.ts']);
+    expect(described('src/theme.module.css').dependencies.files).toEqual(['src/forward.ts']);
+    // An unimported resource is described through the witness alone.
+    expect(described('src/unimported.module.css').dependencies.files).toEqual([]);
+    expect(described('src/unimported.module.css').dependencies.shims).toEqual(['src/resources.d.ts']);
+    expect(described('src/forward.ts').dependencies.resources).toEqual(['src/theme.module.css']);
+    expect(assembleCatalog(descriptions)).toEqual(catalog);
+  }, 90_000);
 
   it('keeps two existing resources distinct under one shared shim', () => {
     const first = exported(catalog, 'src/theme.module.css', 'default');

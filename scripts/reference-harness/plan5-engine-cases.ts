@@ -22,7 +22,7 @@ const semantic = (report: AnalysisReport): string => { const { runId: _runId, ..
 const hash = (text: string): string => createHash('sha256').update(text).digest('hex');
 
 /** A pinned input fixture preserves the reviewed 229-file toolkit baseline. */
-async function toolkitFixture(root: string): Promise<void> {
+export async function toolkitFixture(root: string): Promise<void> {
   const archive = join(root, 'fixture.tar');
   const tar = execFileSync('git', ['archive', revision, 'src', 'subs', 'module.ramify', 'README.md', 'package.json', 'package-lock.json', 'tsconfig.json'],
     { cwd: repositoryRoot, maxBuffer: 32 * 1024 ** 2 });

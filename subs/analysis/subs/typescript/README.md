@@ -19,6 +19,21 @@ file's identifiers by spelling on first use and resolves one spelling with a
 single batched symbol query, so a file that binds no namespace issues no
 identifier symbol query at all.
 
+`describeFiles` describes owned files one at a time and `assembleCatalog` turns
+descriptions into a catalog, so a whole `buildCatalog` is the assembly of every
+file's description and a later round can read a few of them again. A description
+carries the file's export entry, the originals it defines, the coverage notes
+located in it, and the owned files, resources, shims and absent probed paths it
+read. A round starts from the named files, adds each file whose own description
+depends on one that changed by value, runs the existing star, selection and
+incompleteness propagation over that set, and keeps every other description by
+identity; the delta separates a change by value from a declaration move. A file
+the round did not read acts as a resolved leaf: its retained entry supplies the
+original, the namespace module, the runtime flag and its own extraction ambiguity.
+A resource description is the union of what every importing specifier reaches, so
+describing one reads those importers again, and a shim's content identity, not its
+own export description, is the edge that reaches the resources it describes.
+
 The supervised helper uses the pinned TypeScript 7.0.2 native API. Its in-memory
 configuration extends the project's configuration and includes every owned
 compiler source, including tests omitted by ordinary compiler selection. A

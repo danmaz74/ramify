@@ -2,6 +2,7 @@ import { readSync, writeSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { API } from 'typescript/unstable/sync';
 import { buildCatalog } from './catalog.js';
+import { createDescriptionSet } from './descriptions.js';
 import { AccessInterpretation } from './accesses.js';
 import type { AccessInterpreter, CatalogExport, SourceCatalog } from './interfaces/source.js';
 import { CHUNK_BYTES, FILE_BYTES, FRAME_BYTES, READ_RESPONSE_BYTES, RESULT_BYTES, SourceFailure, decodeChunk, encode } from './wire.js';
@@ -144,10 +145,11 @@ try {
   // Private export-path facts stay with this compiler/catalog lifetime. They
   // neither change original identities nor extend the public catalog contract.
   const runtime = new Map<CatalogExport, boolean>();
-  const currentCatalog = (): SourceCatalog => catalog ??= buildCatalog(project, inputs, { fileExists, readFile, resourceWitness }, runtime);
+  const host = { fileExists, readFile, resourceWitness };
+  const currentCatalog = (): SourceCatalog => catalog ??= buildCatalog(project, inputs, host, runtime);
   let interpreter: AccessInterpretation | undefined;
   const currentInterpreter = (): AccessInterpretation => interpreter ??= new AccessInterpretation(
-    project, inputs, { fileExists, readFile, resourceWitness }, currentCatalog(), runtime);
+    project, inputs, host, currentCatalog(), runtime);
   const collectAccesses = () => {
     const current = currentInterpreter();
     const { accesses, coverage } = current.interpret(current.ordered);
@@ -159,6 +161,10 @@ try {
     if (command.kind !== 'command') throw new SourceFailure('protocol-error', 'Expected source operation command');
     if (command.command === 'catalog') {
       result('catalog', currentCatalog());
+    } else if (command.command === 'describe') {
+      const data = request('describe-inputs', root) as { files: string[] };
+      // Descriptions own their own export-path facts within this lifetime.
+      result('describe', createDescriptionSet().describe(project, inputs, host, new Map<CatalogExport, boolean>(), data.files).descriptions);
     } else if (command.command === 'accesses') {
       result('accesses', collectAccesses());
     } else if (command.command === 'interpreter') {
