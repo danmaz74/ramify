@@ -9,7 +9,7 @@
     "functionalRequirementsSatisfied": false,
     "newCodeCoveredByTests": true
   },
-  "completedAt": "2026-09-12T11:07:54.845Z",
+  "completedAt": "2026-09-12T11:14:47.573Z",
   "iteration": "9",
-  "notes": "Focused retry fixed published readers hanging when the first session open throws or rejects. The reproduction failed before the fix and passes afterward (2 cases, 18 assertions plus teardown); build and all four type-check scopes pass. Equivalent new Vitest cases are added. Functional completion remains false because I5-10 full Plan 2 acceptance is unestablished and its retained measurement obligations still depend on the iteration 12 telemetry migration. All-new-tests-pass remains false because the new and migrated Vitest suites and full regression gates are reserved for automation and have not run. No requirement, assertion or measurement was waived. Prior selected I5-09/removal evidence is recorded separately from this repair. No publication requested."
+  "notes": "Automatic Vitest executed 1389 tests: 1388 passed and one failed because retention rejection replied before oversized session disposal. This repair awaits report preservation and disposal before replying, preserving the original budget assertion. Exact immediate and delayed-cleanup reproductions fail before the fix and pass afterward (2 cases, 17 assertions plus teardown; 2594 retained bytes within 5000). An additional Vitest case covers delayed cleanup. Build and all four type-check scopes pass. AllNewTestsPass remains false pending automatic execution of the repaired regression and added test; the earlier full run is recorded as failed. Functional completion remains false because full I5-10/Plan 2 acceptance, including the iteration-12 measurement telemetry migration, is unestablished. The self-assessment finding remains decision-pending; no gate or assertion was weakened or waived. No full regression or publication was run locally."
 }

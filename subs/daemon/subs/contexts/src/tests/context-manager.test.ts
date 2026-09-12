@@ -228,6 +228,31 @@ describe('watcher reconciliation and retention', () => {
       expect(e.status(opened.token).retainedBytes + e.status(opened.token).history.bytes).toBeLessThanOrEqual(5000);
     } finally { await e.dispose(); }
   });
+  it('waits for report preservation and session disposal before acknowledging a retention rejection', async () => {
+    const e = environment({ maxRetainedBytesGlobal: 5000 });
+    let finishReport!: () => void; let finishDisposal!: () => void;
+    const reportGate = new Promise<void>(resolve => { finishReport = resolve; });
+    const disposalGate = new Promise<void>(resolve => { finishDisposal = resolve; });
+    try {
+      const opened = await e.open(); await flush(); const before = e.status(opened.token);
+      const owned = e.script.sessions[0]!;
+      const originalReport = owned.session.report.bind(owned.session);
+      const originalDispose = owned.session.dispose.bind(owned.session);
+      let projecting = false; let disposing = false; let answered = false;
+      owned.session.report = async (...args) => { projecting = true; await reportGate; return originalReport(...args); };
+      owned.session.dispose = async () => { disposing = true; await disposalGate; await originalDispose(); };
+      e.script.pending.push(() => ({ ...capture(1), factBytes: 6000 }));
+      const waiting = e.check(opened.token).then(result => { answered = true; return result; });
+      await flush(); expect(projecting).toBe(true); expect(answered).toBe(false);
+      finishReport(); await flush();
+      expect(disposing).toBe(true); expect(owned.disposeCalls).toBe(0); expect(answered).toBe(false);
+      finishDisposal();
+      expect(await waiting).toMatchObject({ reason: 'resource-unavailable' });
+      expect(owned.disposeCalls).toBe(1);
+      expect(e.status(opened.token)).toMatchObject({ level: 'cold', retainedBytes: 0, published: before.published });
+      expect(e.status(opened.token).retainedBytes + e.status(opened.token).history.bytes).toBeLessThanOrEqual(5000);
+    } finally { finishReport(); finishDisposal(); await flush(); await e.dispose(); }
+  });
   it('rejects session facts above the per-context bound without publishing a pass', async () => {
     const e = environment({ maxRetainedBytesPerContext: 50 });
     try {

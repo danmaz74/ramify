@@ -368,8 +368,12 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       await hotBudget(context);
       if (!await publish(context, data, cause)) {
         context.synchronization = 'reconciling'; context.sweepRequired = true;
-        for (const entry of [...entries, ...context.queue]) complete(entry, { ...unavailable('resource-unavailable'), requestId: entry.request.requestId });
-        await abandonCandidate(context); return;
+        const rejected = [...entries, ...context.queue];
+        // Restore the retained-byte bound before acknowledging the rejection.
+        // Projection and disposal may both yield while the oversized facts live.
+        await abandonCandidate(context);
+        for (const entry of rejected) complete(entry, { ...unavailable('resource-unavailable'), requestId: entry.request.requestId });
+        return;
       }
       context.state = 'warm';
       context.synchronization = context.watcherState === 'unavailable' ? 'watcher-unavailable'

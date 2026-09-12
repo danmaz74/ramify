@@ -2,7 +2,7 @@
 
 # Iteration 9 results: Contexts on retained sessions
 
-**Date:** 2026-09-12. **Outcome:** session-based contexts, compact history and the increment-engine removal are implemented. Focused behavioral and static verification passes. The complete iteration exit is **not established**: automatic regression remains pending, and the unchanged Plan 2 measurement providers still require their iteration 12 migration before the full amended Plan 2 gate can pass. No required record, assertion or measurement was waived.
+**Date:** 2026-09-12. **Outcome:** session-based contexts, compact history and the increment-engine removal are implemented. Automatic regression executed 1,389 tests with one retention-ordering failure. That defect is now repaired and its focused reproduction passes; automatic revalidation remains pending. The complete iteration exit is **not established**: the unchanged Plan 2 measurement providers still require their iteration 12 migration before the full amended Plan 2 gate can pass. No required record, assertion or measurement was waived.
 
 ## Implemented behavior
 
@@ -76,6 +76,27 @@ Two new parameterized tests retain the independent failure, cancellation, recove
 The reserved Vitest/Cucumber suites, scenario coverage and sealed-file checks were not run. No full acceptance gate or measurement workload was run in this focused repair. The new Vitest cases are authored and type-checked, but their automatic execution remains pending. The focused reproduction is not represented as all new tests passing.
 
 Both managed deliverables are updated for this repair. Code will be committed on the authoritative worktree branch; no publication tool is called, as required by the retry instruction.
+
+## Regression repair: restore the retention bound before replying
+
+The workflow's automatic Vitest run started at 11:10:28 UTC and reported **1,388 passed, one failed**, across 92 files. The sole failing assertion was `context-manager.test.ts`'s global-budget check on an unchanged revision: 7,422 retained bytes exceeded the 5,000-byte limit. The full historical output remains at `/ramify/.cucumber-viz/workflows/lD1vuzYQuKvbHViU1BMjX/check-results/post_commit_regression-9-1789211428278-958329/regression/output.log`. This updates the earlier statement that automation had not yet executed; it does not turn that failed run into a pass.
+
+The manager correctly refused admission but completed the request before awaiting `abandonCandidate`. Report preservation and disposal both yield, so a caller could receive `resource-unavailable` while the oversized facts were still retained.
+
+The failure path now captures the rejected request group, awaits report preservation and session disposal, then completes those requests. It retains the previous publication when its detached report fits. Requests arriving during cleanup remain separate from that rejected group. The original 5,000-byte assertion is unchanged. An additional same-owner test explicitly delays report projection and disposal and requires the request to remain pending through both operations, then checks actual scripted disposal, the original publication and the byte bound. Its finally block releases both gates and disposes all owned resources on failure as well as success.
+
+| Focused verification for this repair | Result |
+| --- | --- |
+| `NODE_OPTIONS='' node --import tsx .reference-work/iteration9-budget-check.mts before-exact` | Both cases fail before the fix. The direct-await case reproduces **7,422 > 5,000 bytes**; the delayed-cleanup case exposes the premature reply. Receipt: `.reference-work/reports/iteration9-budget-before-exact.json`. |
+| `NODE_OPTIONS='' node --import tsx .reference-work/iteration9-budget-check.mts after` | **2/2 cases, 17 assertions pass**, plus resource teardown checks. Both replies arrive with **2,594 retained bytes**, zero retained session facts and the original publication. Receipt: `.reference-work/reports/iteration9-budget-after.json`, completed 2026-09-12T11:13:47.865Z. |
+| `npm run build && npm run type-check` | Pass; production build and all four TypeScript scopes. |
+| `git diff --check` | Pass. |
+
+The focused reproduction calls the real context manager with the existing scripted driver and controlled ports; it does not run Vitest or replace the automatic regression verdict. An initial reproduction with an extra promise continuation masked the immediate byte observation while still exposing delayed cleanup; its receipt is preserved as `iteration9-budget-before.json`. The corrected direct-await reproduction above matches the failing test's observation boundary.
+
+No full regression, scenario coverage, sealed-file check, acceptance gate or measurement workload was rerun locally. The reported retention defect is fixed on focused evidence; the added Vitest case and the repaired regression await automatic execution.
+
+The self-assessment finding remains decision-pending. Functional acceptance still depends on the full I5-10/Plan 2 obligations, including the measurement-provider migration explicitly scheduled for iteration 12. This bounded regression repair neither performs that later work nor changes the gate. The checklist continues to distinguish authored coverage and focused passing evidence from a fully passing automatic test run.
 
 ## Outstanding exit condition
 
