@@ -1,6 +1,6 @@
 # Project
 
-Project selects and acquires one real project, validates its physical ownership layout and exact paths, and supplies coherent captured input reads. It resolves the root and compiler configuration on request, records raw source areas, configuration selection, outside-module warnings and README purpose metadata, and can reuse its configuration product when its captured dependencies are unchanged, without deciding import permissions.
+Project selects and acquires one real project, validates its physical ownership layout and exact paths, and supplies coherent captured input reads. It resolves the root and compiler configuration on request, records raw source areas, configuration selection, outside-module warnings and README purpose metadata, can reuse its configuration product when its captured dependencies are unchanged, and can keep its observations live for a retained session, updating the inventory locally, rebuilding it for structural changes and re-observing its whole observed set, without deciding import permissions.
 
 `resolveProjectRoot` selects canonical root and configuration paths without
 reading module descriptions. Its short-lived configuration helper identifies

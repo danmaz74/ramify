@@ -42,6 +42,8 @@ const syntaxNames = ['TextSpan', 'DescriptionToken', 'DescriptionIssue', 'NamedS
 const projectNames = ['ProjectRequest', 'ProjectScope', 'CapturedInput', 'InventoryArea', 'ModulePurpose',
   'InventoryModule', 'InventoryFile', 'ExactReference', 'OutsideSourceWarning', 'ProjectInventory',
   'ProjectIssue', 'AcquisitionLimits', 'ProjectInputView', 'ProjectReadOptions', 'ProjectRead', 'ProjectResolution', 'RetainedConfiguration'];
+// Plan 5 iteration 4 adds these to analysis A7 only; root relays them later.
+const observerNames = ['ObservationSink', 'InputChangeKind', 'ObservedChange', 'InventoryUpdate', 'ProjectObserver', 'ProjectObserve'];
 
 // Independent literal selections from Plan 2 owners.md R7 and N5.
 const contextNames = ['ContextId', 'GenerationId', 'RevisionId', 'LeaseId', 'ContextToken', 'ContextSetup',
@@ -99,14 +101,14 @@ const toolkit: readonly Fixture[] = [
     sub(analysisNames, 'analysis', descendants), sub(presentationNames, 'presentation', descendants),
     sub([...contextNames, ...residentNames, ...controlledNames], 'daemon', descendants),
   ] },
-  { path: 'subs/analysis/', name: 'analysis', tags: [], statements: [sub('*', 'model', both), sub([...syntaxNames, ...linkingNames], 'descriptions', both), sub(projectNames, 'project', both), sub(sourceNames, 'typescript', both), src(['validateProject'], 'validation.ts'), src('*', 'interfaces/analysis.ts'), src(['acquireInventory'], 'inventory.ts'), src(['createAnalysisSession'], 'session.ts'), src(['analyzeProject'], 'analyze-project.ts'), src(['analyzeIncrement'], 'increment.ts'), src(['resolveProject'], 'resolve-project.ts')] },
+  { path: 'subs/analysis/', name: 'analysis', tags: [], statements: [sub('*', 'model', both), sub([...syntaxNames, ...linkingNames], 'descriptions', both), sub([...projectNames, ...observerNames], 'project', both), sub(sourceNames, 'typescript', both), src(['validateProject'], 'validation.ts'), src('*', 'interfaces/analysis.ts'), src(['acquireInventory'], 'inventory.ts'), src(['createAnalysisSession'], 'session.ts'), src(['analyzeProject'], 'analyze-project.ts'), src(['analyzeIncrement'], 'increment.ts'), src(['resolveProject'], 'resolve-project.ts')] },
   { path: 'subs/analysis/subs/descriptions/', name: 'descriptions', tags: browser, statements: [src(['parseDescription'], 'parse.ts', browser), src('*', 'interfaces/syntax.ts'), src(['linkDescriptions'], 'link.ts', browser), src('*', 'interfaces/linking.ts')] },
   { path: 'subs/analysis/subs/model/', name: 'model', tags: browser, statements: [
     src('*', 'interfaces/model.ts'), src(['resolveTagRegistry', 'createDefaultTagRegistry'], 'registry.ts', browser),
     src(['deriveSourceAreas', 'assignOriginalTags'], 'profiles.ts', browser), src(['originalKey'], 'identity.ts', browser),
     src(['buildModel'], 'model.ts', browser), src(['explainVisibility', 'explainImport'], 'decisions.ts', browser),
   ] },
-  { path: 'subs/analysis/subs/project/', name: 'project', tags: [], statements: [src(['readProject'], 'read-project.ts'), src('*', 'interfaces/project.ts'), src(['resolveProjectRoot'], 'resolve-root.ts')] },
+  { path: 'subs/analysis/subs/project/', name: 'project', tags: [], statements: [src(['readProject'], 'read-project.ts'), src('*', 'interfaces/project.ts'), src(['resolveProjectRoot'], 'resolve-root.ts'), src(['observeProject'], 'observer.ts')] },
   { path: 'subs/analysis/subs/typescript/', name: 'typescript', tags: [], statements: [src(['createSourceAnalysis'], 'source-analysis.ts'), src('*', 'interfaces/source.ts'), src(['createAccessInterpreter'], 'access-interpreter.ts')] },
   { path: 'subs/cli/', name: 'cli', tags: ['dispatch'], statements: [src(['runCli'], 'run-cli.ts'), src('*', 'interfaces/cli.ts')] },
   { path: 'subs/daemon/', name: 'daemon', tags: ['dispatch'], statements: [

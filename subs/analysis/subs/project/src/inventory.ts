@@ -5,16 +5,18 @@ import { readPurpose } from './purpose.js';
 import { exactReferences } from './references.js';
 import type { DescriptionParser } from '../../descriptions/src/interfaces/syntax.js';
 import type { ConfigurationData } from './configuration-data.js';
-import type { ExactReference, InventoryFile, InventoryModule, ProjectInventory, ProjectIssue, ProjectScope } from './interfaces/project.js';
+import type { ExactReference, InventoryFile, InventoryModule, OutsideSourceWarning, ProjectInventory, ProjectIssue, ProjectScope } from './interfaces/project.js';
 
 const compilerSource = /\.(?:[cm]?[jt]sx?)$/;
+/** Compiler-visible source, as distinct from an owned resource. */
+export const inventoryFileKind = (path: string): InventoryFile['kind'] => compilerSource.test(path) ? 'source' : 'resource';
 type Metadata = Record<string, { identity: string; purpose: InventoryModule['purpose'] }>;
 interface Boundary { directory: string; module: InventoryModule | null; depth: number }
 interface Walk { directory: string; boundary: Boundary | null }
 type InventoryRead = { inventory: ProjectInventory; issues: ProjectIssue[]; metadata: Metadata; metadataReused: boolean }
   & ({ status: 'complete' } | { status: 'failed'; error: unknown });
 
-function excludedDirectory(path: string, config: ConfigurationData): boolean {
+export function excludedDirectory(path: string, config: ConfigurationData): boolean {
   if (['.git', 'node_modules', 'bower_components', 'jspm_packages'].includes(basename(path))) return true;
   if ([config.options.outDir, config.options.declarationDir]
     .some(directory => typeof directory === 'string' && within(directory, path))) return true;
@@ -24,6 +26,16 @@ function excludedDirectory(path: string, config: ConfigurationData): boolean {
   return basename(path) === '.reference-work' && config.exclusions.some(exclusion =>
     exclusion.patterns.some(pattern => pattern === '**/.reference-work'
       || join(exclusion.directory, pattern) === path));
+}
+/** One warning per first path entry, in byte order, for outside selected source. */
+export function outsideSourceWarnings(outsideModuleFiles: readonly string[]): readonly OutsideSourceWarning[] {
+  const groups = new Map<string, string[]>();
+  for (const file of outsideModuleFiles) {
+    const entry = file.split('/')[0]!;
+    const group = groups.get(entry) ?? []; group.push(file); groups.set(entry, group);
+  }
+  return [...groups].sort(([a], [b]) => byteOrder(a, b))
+    .map(([entry, files]) => ({ code: 'outside-module-source' as const, entry, count: files.length, files }));
 }
 export async function inventoryProject(capture: Capture, scope: Omit<ProjectScope, 'walkedAreas' | 'independentScopes'>,
   config: ConfigurationData, parse: DescriptionParser, previousMetadata?: Metadata): Promise<InventoryRead> {
@@ -47,17 +59,12 @@ export async function inventoryProject(capture: Capture, scope: Omit<ProjectScop
   const names = new Map<string, InventoryModule>();
   const selected = config.files.filter(path => within(capture.root, path));
   function snapshot(): ProjectInventory {
-    const groups = new Map<string, string[]>();
-    for (const file of outsideModuleFiles) {
-      const entry = file.split('/')[0]!;
-      const group = groups.get(entry) ?? []; group.push(file); groups.set(entry, group);
-    }
     return freeze({
       scope: { ...scope, walkedAreas: modules.flatMap(module => module.areas.map(area => area.root)).sort(byteOrder),
         independentScopes: independentScopes.sort(byteOrder) },
       modules: modules.sort((a, b) => byteOrder(a.directory, b.directory)),
       files: files.sort((a, b) => byteOrder(a.path, b.path)), references, outsideModuleFiles,
-      warnings: [...groups].sort(([a], [b]) => byteOrder(a, b)).map(([entry, files]) => ({ code: 'outside-module-source' as const, entry, count: files.length, files })),
+      warnings: outsideSourceWarnings(outsideModuleFiles),
     });
   }
   try {

@@ -5,13 +5,44 @@ import { AcquisitionError, Cancelled, byteOrder, freeze } from './data.js';
 import { acquireConfiguration, ConfigurationChanged } from './configuration.js';
 import { inventoryProject } from './inventory.js';
 import { resolveCapturedRoot } from './resolve-root.js';
-import type { ProjectInputView, ProjectInventory, ProjectIssue, ProjectRead, ProjectReadOptions } from './interfaces/project.js';
+import type { ConfigurationData } from './configuration-data.js';
+import type { ProjectInputView, ProjectInventory, ProjectIssue, ProjectRead, ProjectReadOptions, RetainedConfiguration } from './interfaces/project.js';
+
+/** One live acquisition, retained by its caller instead of a sealed view. */
+export interface AcquiredProject {
+  readonly capture: Capture;
+  readonly inventory: ProjectInventory;
+  readonly configuration: RetainedConfiguration;
+  readonly configurationPath: string;
+  readonly configurationData: ConfigurationData;
+  readonly reusedConfiguration: boolean;
+}
+export type ProjectAcquire =
+  | { readonly status: 'acquired'; readonly acquired: AcquiredProject }
+  | Exclude<ProjectRead, { readonly status: 'acquired' }>;
 
 const invalidCodes = new Set<ProjectIssue['code']>(['missing-root-description', 'symlink-root', 'symlink-description', 'invalid-description']);
 const unavailableCodes = new Set<ProjectIssue['code']>(['root-not-found', 'configuration-not-found', 'references-only-configuration']);
 const issueOrder = (a: ProjectIssue, b: ProjectIssue): number => byteOrder(a.path, b.path) || byteOrder(a.code, b.code) || byteOrder(a.message, b.message);
 
 export async function readProject(options: ProjectReadOptions): Promise<ProjectRead> {
+  const result = await acquireProject(options);
+  if (result.status !== 'acquired') return result;
+  const { capture, inventory, configuration, reusedConfiguration } = result.acquired;
+  const view: ProjectInputView = Object.freeze({ inventory,
+    get inputs() { return capture.inputs; },
+    readFile: (path: string) => capture.readFile(path),
+    fileExists: (path: string) => capture.fileExists(path),
+    directoryExists: (path: string) => capture.directoryExists(path),
+    readDirectory: (path: string) => capture.readDirectory(path),
+    realPath: (path: string) => capture.realPath(path),
+    seal: () => capture.seal(), dispose: () => capture.dispose(),
+  });
+  return { status: 'acquired', view, configuration, reusedConfiguration };
+}
+
+/** Plan 1's acquisition, retained for the caller. Success transfers the capture. */
+export async function acquireProject(options: ProjectReadOptions): Promise<ProjectAcquire> {
   const { request, limits, signal } = options;
   if (Object.values(limits).some(value => !Number.isSafeInteger(value) || value <= 0)
     || limits.attempts > 3 || request.scope !== 'whole-project' || request.configuration !== 'discover') {
@@ -41,20 +72,12 @@ export async function readProject(options: ProjectReadOptions): Promise<ProjectR
         if (seal.status === 'changed') throw new AcquisitionError('changed-input', selected.root, 'Inputs changed during acquisition');
         return freeze({ status: 'invalid', inventory, issues: issues.sort(issueOrder), sealedInputs: seal.inputs });
       }
-      const view: ProjectInputView = Object.freeze({ inventory,
-        get inputs() { return capture.inputs; },
-        readFile: (path: string) => capture.readFile(path),
-        fileExists: (path: string) => capture.fileExists(path),
-        directoryExists: (path: string) => capture.directoryExists(path),
-        readDirectory: (path: string) => capture.readDirectory(path),
-        realPath: (path: string) => capture.realPath(path),
-        seal: () => capture.seal(), dispose: () => capture.dispose(),
-      });
       capture.finishAcquisition();
       retained = true;
       const product = { ...acquiredConfiguration.retained.product, metadata: acquired.metadata, metadataReused: acquired.metadataReused };
       const configurationProduct = freeze({ ...acquiredConfiguration.retained, product, bytes: Buffer.byteLength(JSON.stringify(product)) });
-      return { status: 'acquired', view, configuration: configurationProduct, reusedConfiguration: acquiredConfiguration.reused };
+      return { status: 'acquired', acquired: { capture, inventory, configuration: configurationProduct,
+        configurationPath: configuration, configurationData: config, reusedConfiguration: acquiredConfiguration.reused } };
     } catch (error) {
       if (error instanceof ConfigurationChanged) { previousConfiguration = null; attempt--; continue; }
       if (error instanceof Cancelled || signal?.aborted) return { status: 'cancelled' };

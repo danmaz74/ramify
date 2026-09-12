@@ -110,6 +110,8 @@ export interface ProjectReadOptions {
   readonly limits: AcquisitionLimits;
   readonly signal?: AbortSignal;
   readonly retained?: RetainedConfiguration | null;
+  /** Resolved tag registry identity; only an input identity depends on it. */
+  readonly registry?: string;
 }
 export type ProjectRead =
   | { readonly status: 'acquired'; readonly view: ProjectInputView;
@@ -118,6 +120,40 @@ export type ProjectRead =
       readonly inventory: ProjectInventory | null; readonly issues: readonly ProjectIssue[];
       readonly sealedInputs: readonly CapturedInput[] | null }
   | { readonly status: 'cancelled' };
+
+export interface ObservationSink {
+  file(path: string, sha256: string | null, bytes: number, role: 'source' | 'resource' | 'configuration' | 'dependency'): void;
+  directory(path: string, entries: readonly string[]): void;
+  absent(path: string): void;
+  probe(path: string, operation: 'fileExists' | 'directoryExists' | 'realPath'): void;
+}
+export type InputChangeKind = 'changed' | 'created' | 'deleted' | 'unknown';
+export interface ObservedChange {
+  readonly path: string;
+  readonly kind: InputChangeKind;
+}
+export type InventoryUpdate =
+  | { readonly kind: 'unchanged' }
+  | { readonly kind: 'local'; readonly inventory: ProjectInventory;
+      readonly descriptions: readonly string[]; readonly readmes: readonly string[];
+      readonly created: readonly string[]; readonly deleted: readonly string[]; readonly changed: readonly string[] }
+  | { readonly kind: 'structural'; readonly inventory: ProjectInventory }
+  | { readonly kind: 'invalid'; readonly inventory: ProjectInventory | null; readonly issues: readonly ProjectIssue[] }
+  | { readonly kind: 'incomplete'; readonly issues: readonly ProjectIssue[] };
+export interface ProjectObserver {
+  readonly inventory: ProjectInventory;
+  readonly inputs: readonly CapturedInput[];
+  readonly inputId: string;
+  readonly sink: ObservationSink;
+  apply(changes: readonly ObservedChange[], signal?: AbortSignal): Promise<InventoryUpdate>;
+  reobserve(signal?: AbortSignal): Promise<readonly ObservedChange[]>;
+  readDescription(path: string): Promise<string | undefined>;
+  readReadme(path: string): Promise<string | undefined>;
+  dispose(): Promise<void>;
+}
+export type ProjectObserve =
+  | { readonly status: 'observing'; readonly observer: ProjectObserver }
+  | Exclude<ProjectRead, { readonly status: 'acquired' }>;
 
 export type ProjectResolution =
   | { readonly status: 'resolved'; readonly root: string; readonly selection: 'given' | 'found';

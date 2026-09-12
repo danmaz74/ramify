@@ -5,4 +5,8 @@ module project
 expose-src readProject from "read-project.ts" to parent
 expose-src * from "interfaces/project.ts" to parent
 
+// P3: root and configuration resolution without source acquisition.
 expose-src resolveProjectRoot from "resolve-root.ts" to parent
+
+// P4: live observation of one project for the retained session.
+expose-src observeProject from "observer.ts" to parent
