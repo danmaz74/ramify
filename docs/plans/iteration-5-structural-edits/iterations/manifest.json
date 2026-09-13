@@ -1,0 +1,12 @@
+{
+  "createdAt": "2026-09-13T00:00:00.000Z",
+  "iterations": [
+    { "file": "iteration1.md", "index": 1, "parallelGroup": null, "title": "Time the promotion and the sweep" },
+    { "file": "iteration2.md", "index": 2, "parallelGroup": null, "title": "Validate resolution reuse by discovery queries only" },
+    { "file": "iteration3.md", "index": 3, "parallelGroup": null, "title": "Membership witness and contribution index" },
+    { "file": "iteration4.md", "index": 4, "parallelGroup": null, "title": "Membership path with targeted retirement" },
+    { "file": "iteration5.md", "index": 5, "parallelGroup": null, "title": "Skip the sweep after reacquisition" },
+    { "file": "iteration6.md", "index": 6, "parallelGroup": null, "title": "Keep the inventory on an options-only configuration edit" },
+    { "file": "iteration7.md", "index": 7, "parallelGroup": null, "title": "Closure and measurement recipe" }
+  ]
+}
