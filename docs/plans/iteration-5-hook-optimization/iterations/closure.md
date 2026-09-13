@@ -209,3 +209,5 @@ budget:
    `status.compiler.rss`.
 6. Replace the analysis's pre-optimization figures with measured ones and
    re-rank the remaining targets, the deferred sweep step and the smaller items.
+
+Reference and S100 results: [measurement results](measurement-results.md).
