@@ -14,10 +14,62 @@ const capabilityStages: Record<Capability, StageId> = {
   'exposure-linking': 'link', 'static-access': 'decide', 'tags-origin': 'decide', 'namespace-access': 'decide',
   'lazy-access': 'decide', 'symbol-free-access': 'decide', 'resource-access': 'decide', coverage: 'access', 'browser-verification': 'decide',
 };
-export const byteOrder = (a: string, b: string): number => Buffer.compare(Buffer.from(a), Buffer.from(b));
+/**
+ * UTF-8 byte order without encoding either string, as `Buffer.compare` over
+ * `Buffer.from` orders. The project owner's comparator is not exposed, so this
+ * owner keeps its own copy: comparing scalar values orders exactly as UTF-8
+ * bytes, and a lone surrogate compares as U+FFFD, which `Buffer.from` encodes.
+ */
+export function byteOrder(a: string, b: string): number {
+  if (a === b) return 0;
+  let i = 0, j = 0;
+  while (i < a.length && j < b.length) {
+    const x = a.charCodeAt(i), y = b.charCodeAt(j);
+    if (x === y && (x < 0xd800 || x > 0xdfff)) { i++; j++; continue; }
+    const p = scalar(a, i), q = scalar(b, j);
+    if (p !== q) return p < q ? -1 : 1;
+    i += p > 0xffff ? 2 : 1; j += q > 0xffff ? 2 : 1;
+  }
+  return i < a.length ? 1 : j < b.length ? -1 : 0;
+}
+/** The scalar value `Buffer.from` encodes at one code unit. */
+function scalar(text: string, index: number): number {
+  const unit = text.charCodeAt(index);
+  if (unit < 0xd800 || unit > 0xdfff) return unit;
+  if (unit <= 0xdbff && index + 1 < text.length) {
+    const low = text.charCodeAt(index + 1);
+    if (low >= 0xdc00 && low <= 0xdfff) return 0x10000 + ((unit - 0xd800) << 10) + (low - 0xdc00);
+  }
+  return 0xfffd;
+}
 const locatedOrder = (a: { location: SourceLocation | null; code: string; id: string }, b: typeof a): number =>
   byteOrder(a.location?.file ?? '', b.location?.file ?? '') || (a.location?.start ?? 0) - (b.location?.start ?? 0)
   || byteOrder(a.code, b.code) || byteOrder(a.id, b.id);
+
+/** Summary counts a snapshot yields. A publication draft records them without building the snapshot. */
+export interface SnapshotCounts {
+  readonly owners: number; readonly sourceFiles: number; readonly resources: number; readonly originals: number;
+  readonly accesses: number; readonly allowed: number; readonly denied: number; readonly external: number;
+}
+/** The parts of a report a published revision keeps. */
+export type PublishedReport = Pick<AnalysisReport, 'outcome' | 'summary' | 'diagnostics' | 'warnings' | 'coverage'>;
+
+function inventoryCounts(inventory: ProjectInventory): SnapshotCounts {
+  return { owners: inventory.modules.length, sourceFiles: inventory.files.filter(file => file.kind === 'source').length,
+    resources: inventory.files.filter(file => file.kind === 'resource').length, originals: 0, accesses: 0, allowed: 0, denied: 0, external: 0 };
+}
+function snapshotCounts(snapshot: AnalysisSnapshot | null): SnapshotCounts {
+  const decisions = snapshot?.results.flatMap(result => result.decisions) ?? [];
+  return { owners: snapshot?.inventory.modules.length ?? 0,
+    sourceFiles: snapshot?.inventory.files.filter(file => file.kind === 'source').length ?? 0,
+    resources: snapshot?.inventory.files.filter(file => file.kind === 'resource').length ?? 0,
+    originals: snapshot?.catalog?.originals.length ?? 0, accesses: snapshot?.accesses.length ?? 0,
+    allowed: decisions.filter(decision => decision.status === 'allowed').length,
+    denied: decisions.filter(decision => decision.status === 'denied').length,
+    external: snapshot?.results.filter(result => result.outcome === 'external').length ?? 0 };
+}
+/** Space kept for the mandatory report envelope when evidence is admitted. */
+const envelopeReserve = 64 * 1024;
 
 export class WorkLimit extends Error {
   readonly code = 'resource-limit';
@@ -63,6 +115,8 @@ export class ReportDraft {
   readonly warnings: OutsideSourceWarning[] = [];
   registry: AnalysisReport['registry'] = null;
   snapshot: AnalysisSnapshot | null = null;
+  /** Counts recorded instead of a snapshot by a publication draft. */
+  counts: SnapshotCounts | null = null;
   execution: AnalysisReport['outcome']['execution'] = 'incomplete';
   readonly diagnostics: AnalysisDiagnostic[] = [];
   readonly coverage: SourceLimit[] = [];
@@ -73,11 +127,13 @@ export class ReportDraft {
   stage(stage: StageId, status: StageExecution['status'], diagnostics: readonly AnalysisDiagnostic[] = []): void {
     this.stages[stageOrder.indexOf(stage)] = { stage, status, blockedBy: [], diagnosticIds: diagnostics.map(item => item.id) };
   }
-  inventory(inventory: ProjectInventory): void {
+  /** Record the inventory: into a new snapshot, or only as counts when `snapshot` is false. */
+  inventory(inventory: ProjectInventory, snapshot = true): void {
     const warnings = [...inventory.warnings];
     this.scope = inventory.scope;
     this.warnings.length = 0;
-    this.snapshot = { inventory: { ...inventory, warnings: this.warnings }, areas: [], inputs: [], catalog: null, linked: null, model: null, accesses: [], results: [] };
+    if (snapshot) this.snapshot = { inventory: { ...inventory, warnings: this.warnings }, areas: [], inputs: [], catalog: null, linked: null, model: null, accesses: [], results: [] };
+    else this.counts = inventoryCounts(inventory);
     for (const warning of warnings) { this.admit(); this.warnings.push(warning); }
   }
   patch(value: Partial<AnalysisSnapshot>): void {
@@ -119,11 +175,24 @@ export class ReportDraft {
       if (stage.status === 'blocked') this.stages[stageOrder.indexOf(stage.stage)] = { ...stage, blockedBy: [...blockers] };
     }
   }
+  private isComplete(): boolean {
+    return this.execution === 'completed' && this.stages.every(stage => stage.status === 'completed');
+  }
+  private outcomeOf(complete: boolean): AnalysisReport['outcome'] {
+    return { execution: this.execution, check: this.execution === 'invalid' ? 'failed'
+      : complete ? this.diagnostics.length ? 'failed' : 'passed' : 'not-run',
+    coverage: this.stages.find(stage => stage.stage === 'access')!.status === 'completed'
+      ? complete && !this.coverage.length ? 'complete' : 'partial' : 'not-run' };
+  }
+  private summaryOf(complete: boolean, counts: SnapshotCounts, warnings: number): AnalysisReport['summary'] {
+    return { complete, owners: counts.owners, sourceFiles: counts.sourceFiles, resources: counts.resources,
+      originals: counts.originals, accesses: counts.accesses, allowed: counts.allowed, denied: counts.denied,
+      errors: this.diagnostics.length, warnings, coverageNotes: this.coverage.length, external: counts.external };
+  }
   build(): AnalysisReport {
     this.blockDependents();
-    const complete = this.execution === 'completed' && this.stages.every(stage => stage.status === 'completed');
+    const complete = this.isComplete();
     const warnings = [...this.warnings].sort((a, b) => byteOrder(a.entry, b.entry));
-    const decisions = this.snapshot?.results.flatMap(result => result.decisions) ?? [];
     const diagnosticIds = new Set(this.diagnostics.map(item => item.id));
     return {
       schemaVersion: 'ramify.analysis/1', runId: this.runId, inputId: this.inputId, request: this.echo,
@@ -134,21 +203,32 @@ export class ReportDraft {
       stages: this.stages.map(stage => ({ ...stage,
         diagnosticIds: stage.diagnosticIds.filter(id => diagnosticIds.has(id)),
       })),
-      outcome: { execution: this.execution, check: this.execution === 'invalid' ? 'failed'
-        : complete ? this.diagnostics.length ? 'failed' : 'passed' : 'not-run',
-      coverage: this.stages.find(stage => stage.stage === 'access')!.status === 'completed'
-        ? complete && !this.coverage.length ? 'complete' : 'partial' : 'not-run' },
+      outcome: this.outcomeOf(complete),
       snapshot: this.snapshot, diagnostics: [...this.diagnostics].sort(locatedOrder), warnings,
       coverage: [...this.coverage].sort(locatedOrder),
-      summary: { complete, owners: this.snapshot?.inventory.modules.length ?? 0,
-        sourceFiles: this.snapshot?.inventory.files.filter(file => file.kind === 'source').length ?? 0,
-        resources: this.snapshot?.inventory.files.filter(file => file.kind === 'resource').length ?? 0,
-        originals: this.snapshot?.catalog?.originals.length ?? 0, accesses: this.snapshot?.accesses.length ?? 0,
-        allowed: decisions.filter(decision => decision.status === 'allowed').length,
-        denied: decisions.filter(decision => decision.status === 'denied').length,
-        errors: this.diagnostics.length, warnings: warnings.length, coverageNotes: this.coverage.length,
-        external: this.snapshot?.results.filter(result => result.outcome === 'external').length ?? 0 },
+      summary: this.summaryOf(complete, snapshotCounts(this.snapshot), warnings.length),
     };
+  }
+  /**
+   * The parts a published revision keeps, built without a snapshot and measured
+   * against `maxReportBytes` the way `bounded()` admits evidence. Null when they
+   * exceed the limit or are not plain data: the full report's bounded failure
+   * then describes the refusal.
+   */
+  publication(): PublishedReport | null {
+    if (this.stages.find(stage => stage.stage === 'report')!.status !== 'failed') this.stage('report', 'completed');
+    this.blockDependents();
+    const complete = this.isComplete();
+    const warnings = [...this.warnings].sort((a, b) => byteOrder(a.entry, b.entry));
+    const diagnostics = [...this.diagnostics].sort(locatedOrder), coverage = [...this.coverage].sort(locatedOrder);
+    const kept: PublishedReport = { outcome: this.outcomeOf(complete),
+      summary: this.summaryOf(complete, this.counts ?? snapshotCounts(this.snapshot), warnings.length), diagnostics, warnings, coverage };
+    const maximum = this.request.limits.maxReportBytes;
+    try {
+      reportBytes({ diagnostics, warnings, coverage }, Math.max(1, maximum - envelopeReserve));
+      reportBytes(kept, maximum);
+    } catch { return null; }
+    return kept;
   }
   /** The detached report every receiver of a full report gets. */
   finish(): AnalysisReport {
@@ -162,7 +242,7 @@ export class ReportDraft {
     if (this.stages.find(stage => stage.stage === 'report')!.status !== 'failed') this.stage('report', 'completed');
     let report = this.build();
     const maximum = this.request.limits.maxReportBytes;
-    const reserve = 64 * 1024;
+    const reserve = envelopeReserve;
     try {
       // Admit evidence separately so the mandatory envelope has its reserved space.
       const evidence = { snapshot: report.snapshot, diagnostics: report.diagnostics, warnings: report.warnings, coverage: report.coverage };

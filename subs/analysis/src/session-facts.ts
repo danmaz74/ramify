@@ -5,6 +5,7 @@ import type { CapturedInput, ProjectInventory } from '../subs/project/src/interf
 import type { FileDescription, SourceAccess, SourceCatalog, SourceLimit } from '../subs/typescript/src/interfaces/source.js';
 import type { AccessResult, AnalysisDiagnostic, AnalysisInputs } from './interfaces/analysis.js';
 import { ReportDraft, byteOrder } from './report.js';
+import type { SnapshotCounts } from './report.js';
 
 /**
  * Retained facts of one session: per-file export descriptions and access
@@ -72,11 +73,12 @@ export function sortedPaths(paths: Iterable<string>): string[] {
   return [...new Set(paths)].sort(byteOrder);
 }
 
+const accessOrder = (a: SourceAccess, b: SourceAccess): number => byteOrder(a.location.file, b.location.file) || a.location.start - b.location.start
+  || (a.selections[0]?.location.start ?? 0) - (b.selections[0]?.location.start ?? 0) || byteOrder(a.id, b.id);
+
 /** Accesses of every file in the order a whole pass lists them. */
 export function assembleAccesses(files: Readonly<Record<string, FileFacts>>): SourceAccess[] {
-  const accesses = Object.values(files).flatMap(file => file.accesses);
-  return accesses.sort((a, b) => byteOrder(a.location.file, b.location.file) || a.location.start - b.location.start
-    || (a.selections[0]?.location.start ?? 0) - (b.selections[0]?.location.start ?? 0) || byteOrder(a.id, b.id));
+  return Object.values(files).flatMap(file => file.accesses).sort(accessOrder);
 }
 
 /** Access coverage of every file, deduplicated by identity in the batch order. */
@@ -170,16 +172,32 @@ export function recordedDiagnostics(facts: SessionFacts, accesses: readonly Sour
 
 /**
  * Drive one report draft from the retained facts exactly as `runAnalysis`
- * drives it from a batch run. `build()` on the result yields the revision's
- * outcome, summary and sorted lists; `finish()` yields the report.
+ * drives it from a batch run. `finish()` on the result yields the report.
  */
 export function draftReport(facts: SessionFacts, request: AnalysisInputs, inputs: readonly CapturedInput[],
   inputId: string | null): ReportDraft {
+  const draft = driveReport(facts, request, true);
+  if (facts.invalid) return draft;
+  draft.patch({ inputs: [...inputs].sort((a, b) => byteOrder(a.path, b.path) || byteOrder(a.role, b.role)) });
+  draft.inputId = inputId;
+  return draft;
+}
+
+/**
+ * Drive the same stages, findings and limits without building a snapshot:
+ * the draft records only the summary counts a snapshot would yield.
+ * `publication()` on the result yields what a published revision keeps.
+ */
+export function draftPublication(facts: SessionFacts, request: AnalysisInputs): ReportDraft {
+  return driveReport(facts, request, false);
+}
+
+function driveReport(facts: SessionFacts, request: AnalysisInputs, snapshot: boolean): ReportDraft {
   const draft = new ReportDraft(request);
   draft.registry = facts.registry; draft.stage('registry', 'completed');
   draft.current = 'acquisition';
   if (facts.invalid) {
-    if (facts.invalid.inventory) draft.inventory(facts.invalid.inventory);
+    if (facts.invalid.inventory) draft.inventory(facts.invalid.inventory, snapshot);
     draft.record(facts.invalid.issues);
     draft.stage('acquisition', 'invalid', draft.diagnostics);
     if (facts.invalid.issues.some(item => item.category === 'description')) {
@@ -190,40 +208,79 @@ export function draftReport(facts: SessionFacts, request: AnalysisInputs, inputs
     return draft;
   }
   if (!facts.inventory) throw new Error('Valid session facts require an inventory');
-  draft.inventory(facts.inventory);
+  draft.inventory(facts.inventory, snapshot);
   draft.stage('acquisition', 'completed'); draft.stage('parse', 'completed'); draft.current = 'parse';
-  draft.patch({ areas: facts.areas });
+  if (snapshot) draft.patch({ areas: facts.areas });
   if (facts.areaIssues.length) {
     draft.record(facts.areaIssues);
     draft.stage('parse', 'invalid', draft.diagnostics); draft.execution = 'invalid';
   } else {
     draft.current = 'catalog';
-    draft.patch({ catalog: facts.catalog });
+    if (snapshot) draft.patch({ catalog: facts.catalog });
+    else draft.counts = { ...draft.counts!, originals: facts.catalog.originals.length };
     draft.cover(facts.catalog.coverage.filter(note => note.code !== 'resource-description'
       || facts.inventory!.references.some(reference => reference.normalized === note.location.file)));
     draft.stage('catalog', 'completed');
     draft.current = 'link';
-    if (facts.linked) draft.patch({ linked: facts.linked });
+    if (facts.linked && snapshot) draft.patch({ linked: facts.linked });
     if (facts.linkIssues.length || !facts.model) {
       draft.record(facts.linkIssues);
       draft.stage('link', 'invalid', draft.diagnostics); draft.execution = 'invalid';
     } else {
-      draft.patch({ model: facts.model }); draft.stage('link', 'completed'); draft.current = 'access';
-      const accesses = assembleAccesses(facts.files);
-      draft.patch({ accesses }); draft.cover(assembleCoverage(facts.files)); draft.stage('access', 'completed');
-      draft.current = 'decide';
-      const results = accesses.map(access => {
-        const decision = facts.decisions[access.id];
-        if (!decision) throw new Error(`Retained facts hold no decision for access ${access.id}`);
-        return decision.result;
-      });
-      draft.patch({ results });
-      draft.record(recordedDiagnostics(facts, accesses));
+      if (snapshot) draft.patch({ model: facts.model });
+      draft.stage('link', 'completed'); draft.current = 'access';
+      if (snapshot) {
+        const accesses = assembleAccesses(facts.files);
+        draft.patch({ accesses }); draft.cover(assembleCoverage(facts.files)); draft.stage('access', 'completed');
+        draft.current = 'decide';
+        const results = accesses.map(access => {
+          const decision = facts.decisions[access.id];
+          if (!decision) throw new Error(`Retained facts hold no decision for access ${access.id}`);
+          return decision.result;
+        });
+        draft.patch({ results });
+        draft.record(recordedDiagnostics(facts, accesses));
+      } else {
+        draft.cover(assembleCoverage(facts.files)); draft.stage('access', 'completed');
+        draft.current = 'decide';
+        draft.counts = { ...draft.counts!, ...decisionCounts(facts) };
+        draft.record(decidedDiagnostics(facts));
+      }
       draft.stage('decide', 'completed', draft.diagnostics); draft.execution = 'completed';
     }
   }
   draft.current = 'report';
-  draft.patch({ inputs: [...inputs].sort((a, b) => byteOrder(a.path, b.path) || byteOrder(a.role, b.role)) });
-  draft.inputId = inputId;
   return draft;
+}
+
+/** The access, decision and external counts a snapshot's accesses and results yield, without listing them. */
+function decisionCounts(facts: SessionFacts): Pick<SnapshotCounts, 'accesses' | 'allowed' | 'denied' | 'external'> {
+  let accesses = 0, allowed = 0, denied = 0, external = 0;
+  for (const file of Object.values(facts.files)) {
+    for (const access of file.accesses) {
+      const decision = facts.decisions[access.id];
+      if (!decision) {
+        // Name the first missing access in the order a whole pass reports it.
+        const missing = assembleAccesses(facts.files).find(item => !facts.decisions[item.id])!;
+        throw new Error(`Retained facts hold no decision for access ${missing.id}`);
+      }
+      accesses++;
+      if (decision.result.outcome === 'external') external++;
+      for (const item of decision.result.decisions) {
+        if (item.status === 'allowed') allowed++;
+        else if (item.status === 'denied') denied++;
+      }
+    }
+  }
+  return { accesses, allowed, denied, external };
+}
+
+/**
+ * Decision diagnostics in the order `recordedDiagnostics` lists them, sorting
+ * only the accesses that have any: a stable sort keeps the relative order a
+ * sort of every access gives them.
+ */
+function decidedDiagnostics(facts: SessionFacts): AnalysisDiagnostic[] {
+  const found = Object.values(facts.files).flatMap(file => file.accesses.filter(access => facts.decisions[access.id]!.diagnostics.length));
+  return found.sort(accessOrder).flatMap(access => facts.decisions[access.id]!.diagnostics);
 }

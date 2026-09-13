@@ -53,6 +53,10 @@ export async function changedCommand(args: ChangedArguments, environment: CliEnv
       timings: { daemon: null, waitedMs, totalMs: performance.now() - started }, exitCode: 2 };
   }
   function reported(value: Extract<CheckOutcome, { status: 'reported' }>): CheckDocument {
+    const result = reportedDocument(value);
+    return value.timings ? { ...result, timings: { ...result.timings, reply: value.timings } } : result;
+  }
+  function reportedDocument(value: Extract<CheckOutcome, { status: 'reported' }>): CheckDocument {
     if (!value.published) return document(value.report.outcome.execution === 'incomplete' ? 'incomplete' : 'unavailable', null, value.report);
     const { revision, delta } = value;
     const coherent = value.freshness.mode === 'synchronized' && value.freshness.verified

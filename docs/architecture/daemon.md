@@ -388,6 +388,15 @@ the outcome. Readers observe a complete published revision; no result combines
 new ownership with old tags or stale access findings. Immutable logical snapshots
 may share unchanged data structures.
 
+A published revision keeps the outcome, summary, diagnostics, warnings and
+coverage notes; publication builds only those and applies the report-size limit
+(`maxReportBytes`) to them. The full report, with its analysis snapshot, is
+built from the revision's retained facts only when it is requested: a
+report-scope check, `--format json`, batch and later `inspect`. Its size limit
+applies where it is built. A hook's check can therefore pass while a full report
+for the same revision would exceed `maxReportBytes`; the limit protects the
+receiver of the full report, which still gets the resource-limit failure.
+
 Lazy enrichment also names its input revision. If a compiler session has advanced,
 it must use retained evidence for the requested revision or report that enrichment
 as unavailable/superseded. It cannot query the current program and label the answer

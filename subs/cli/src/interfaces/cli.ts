@@ -1,7 +1,7 @@
 import type { BatchOperation } from '../../../../src/interfaces/batch.js';
 import type { DaemonStatus } from '../../../../src/interfaces/service.js';
 import type { ServiceConnector, DaemonRecord } from '../../../daemon/src/interfaces/daemon.js';
-import type { ContextStatus, ContextRevision, RevisionId } from '../../../daemon/src/context-types.js';
+import type { ContextStatus, ContextRevision, ReplyTimings, RevisionId } from '../../../daemon/src/context-types.js';
 import type { AnalysisReport, AnalysisDiagnostic } from '../../../analysis/src/interfaces/analysis.js';
 import type { RevisionPath, CheckedSet, RevisionTimings } from '../../../analysis/src/interfaces/session.js';
 import type { OutsideSourceWarning } from '../../../analysis/subs/project/src/interfaces/project.js';
@@ -30,7 +30,9 @@ export interface CheckDocument {
   readonly warnings: readonly OutsideSourceWarning[];
   readonly coverage: readonly SourceLimit[];
   readonly checked: CheckedSet | null;
-  readonly timings: { readonly daemon: RevisionTimings | null; readonly waitedMs: number; readonly totalMs: number };
+  readonly timings: { readonly daemon: RevisionTimings | null; readonly waitedMs: number; readonly totalMs: number;
+    /** The reported check reply's own durations, present only when the reply carries them. */
+    readonly reply?: ReplyTimings };
   readonly exitCode: 0 | 1 | 2;
 }
 export type WatchLine =

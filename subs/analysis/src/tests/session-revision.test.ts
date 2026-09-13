@@ -393,29 +393,46 @@ describe('description, metadata and broad session revisions', () => {
     } finally { await handle.dispose(); }
   }), timeout);
 
-  it('keeps published facts when report size admission fails, then recovers after the oversized purpose is removed', () => fixture(async (root, inputs) => {
+  it('hook-passes-under-limit: publishes when only the full report exceeds maxReportBytes and keeps published facts when what a revision keeps exceeds it', () => fixture(async (root, inputs) => {
     const baseline = await opened(inputs);
     const bytes = Buffer.byteLength(JSON.stringify(await baseline.handle.report()));
     await baseline.handle.dispose();
     const maximum = bytes + 64 * 1024;
     const bounded = { ...inputs, limits: { ...inputs.limits, maxReportBytes: maximum } };
-    const { handle, state, revision } = await opened(bounded);
+    const { handle, state } = await opened(bounded);
     try {
+      // The oversized purpose is only in the snapshot: the revision publishes and a full report still fails.
+      await put(root, paths.readme, `# Branch\n\n${'Very long purpose. '.repeat(Math.ceil(maximum / 9))}\n`);
+      const passed = await revised(handle, [paths.readme]);
+      expect(passed.outcome).toEqual({ execution: 'completed', check: 'passed', coverage: 'complete' });
+      expect(passed.summary.complete).toBe(true);
+      const full = await equalToBatch(handle, bounded);
+      expect(full.outcome.execution).toBe('incomplete');
+      expect(full.snapshot).toBeNull();
+      expect(full.diagnostics).toContainEqual(expect.objectContaining({ code: 'resource-limit',
+        limit: expect.objectContaining({ name: 'maxReportBytes', maximum }) }));
+      await audited(handle);
+
+      // Findings are kept by the revision: exceeding the limit with them refuses publication.
       const before = state.facts;
       const report = await handle.report();
-      await put(root, paths.readme, `# Branch\n\n${'Very long purpose. '.repeat(Math.ceil(maximum / 9))}\n`);
-      const refused = await handle.update([{ path: paths.readme, kind: 'changed' }]);
+      const denied = Array.from({ length: Math.ceil(maximum / 200) }, (_, index) =>
+        `import { privateValue as hidden${index} } from '../../../src/interfaces/api.js';\nvoid hidden${index};\n`).join('');
+      await put(root, paths.sibling, `${fixtureFiles[paths.sibling]!}${denied}`);
+      const refused = await handle.update([{ path: paths.sibling, kind: 'changed' }]);
       expect(refused.status).toBe('reported');
       if (refused.status !== 'reported') throw new Error('Expected report size admission to fail');
       expect(refused.report.outcome.execution).toBe('incomplete');
-      expect(refused.report.diagnostics.some(item => item.code === 'resource-limit')).toBe(true);
-      expect(handle.current).toBe(revision);
+      expect(refused.report.diagnostics).toContainEqual(expect.objectContaining({ code: 'resource-limit',
+        limit: expect.objectContaining({ name: 'maxReportBytes', maximum }) }));
+      expect(handle.current).toBe(passed);
       expect(state.facts).toBe(before);
       expect(comparable(await handle.report())).toEqual(comparable(report));
-      expect(await handle.report(undefined, revision.sequence + 1)).toBeNull();
+      expect(await handle.report(undefined, passed.sequence + 1)).toBeNull();
+      await put(root, paths.sibling, fixtureFiles[paths.sibling]!);
       await put(root, paths.readme, fixtureFiles[paths.readme]!);
-      const recovered = await revised(handle, [paths.readme]);
-      expect(recovered.sequence).toBe(revision.sequence + 1);
+      const recovered = await revised(handle, [paths.sibling, paths.readme]);
+      expect(recovered.sequence).toBe(passed.sequence + 1);
       expect(recovered.outcome.execution).toBe('completed');
       await audited(handle);
       await equalToBatch(handle, bounded);

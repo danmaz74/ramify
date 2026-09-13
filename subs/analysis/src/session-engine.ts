@@ -12,9 +12,10 @@ import type { FindingDelta, RetainedSession, SessionChange, SessionInputs, Sessi
 import { detached, diagnostic } from './report-data.js';
 import { copyReport } from './report-copy.js';
 import { ReportDraft, WorkLimit, availableCapabilities } from './report.js';
+import type { PublishedReport } from './report.js';
 import { auditFacts } from './session-audit.js';
 import type { SessionFacts } from './session-facts.js';
-import { deepFreeze, diagnosticSurface, draftReport, factBytes, sortedPaths } from './session-facts.js';
+import { deepFreeze, diagnosticSurface, draftPublication, draftReport, factBytes, sortedPaths } from './session-facts.js';
 import { acquisitionDiagnostics, failureReport, invalidFacts, isCancellation, recomputeAll, revise, wholeCheckedSet, zeroTimings } from './session-revision.js';
 import type { Computed, SessionState } from './session-revision.js';
 
@@ -386,27 +387,33 @@ class Session implements RetainedSession {
 
   /**
    * Publish computed facts as the next revision: project the outcome, the
-   * summary and the sorted lists through the same draft a batch run uses,
-   * compute the finding delta against the previous revision and retain the
-   * version for later report projections.
+   * summary and the sorted lists through the stages a batch run drives, without
+   * the snapshot, compute the finding delta against the previous revision and
+   * retain the version for later full report projections.
    */
   #publish(computed: Computed, inputs: readonly CapturedInput[], inputId: string | null, started: number):
   { readonly revision: SessionRevision } | { readonly report: AnalysisReport } {
     const state = this.#state;
     if (computed.facts.invalid) { inputs = computed.facts.invalid.inputs; inputId = null; }
     const publishStart = performance.now();
-    let report: AnalysisReport;
+    let report: PublishedReport;
     try {
-      // The revision keeps only frozen parts of this report; it needs no detached copy.
-      report = draftReport(computed.facts, state.request, inputs, inputId).bounded();
+      const projected = draftPublication(computed.facts, state.request).publication();
+      if (projected) report = projected;
+      else {
+        // What the revision keeps exceeds maxReportBytes: the full report's
+        // bounded failure describes the refusal.
+        const full = draftReport(computed.facts, state.request, inputs, inputId).bounded();
+        if (full.outcome.execution !== 'completed' && full.outcome.execution !== 'invalid') {
+          state.stale = true;
+          return { report: copyReport(full) };
+        }
+        report = full;
+      }
     }
     catch (error) {
       state.stale = true;
       return { report: failureReport(state, error, 'report', computed.facts.inventory) };
-    }
-    if (report.outcome.execution !== 'completed' && report.outcome.execution !== 'invalid') {
-      state.stale = true;
-      return { report: copyReport(report) };
     }
     const bytes = factBytes(computed.facts);
     let retained = bytes;

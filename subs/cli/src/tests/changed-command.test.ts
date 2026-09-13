@@ -6,8 +6,10 @@ import { describe, expect, it } from 'vitest';
 import { createQuickEnvironment } from '../../../../src/tests/quick-environment.js';
 import type { CheckParams } from '../../../../src/interfaces/service.js';
 import type { ServiceConnector, DisconnectReason } from '../../../daemon/src/interfaces/daemon.js';
+import type { AnalysisReport } from '../../../analysis/src/interfaces/analysis.js';
 import type { CheckOutcome } from '../../../daemon/src/context-types.js';
 import type { CheckDocument, CliEnvironment } from '../interfaces/cli.js';
+import { formatChangedHuman } from '../format.js';
 import { runCli } from '../run-cli.js';
 import { exhaustedRecoveryWitness } from './exhausted-recovery.js';
 import { changedCleanupWitness } from './changed-cleanup.js';
@@ -200,6 +202,60 @@ describe('changed check command', { timeout: 30_000 }, () => {
       expect([result.code, result.batchCalls, result.stdout.length, result.stderr]).toEqual([2, 0, 1, []]);
       expect(result.document).toMatchObject({ outcome: 'not-checked', reason: execution, execution, revision: null,
         changed: [{ covered: false }], findings: [{ code: 'missing-stage', new: false }], exitCode: 2 });
+    } finally { await f.dispose(); }
+  });
+
+  it('timing-fields: the JSON document carries the reply timings only when the reply has them, and human output is unchanged', async () => {
+    const f = await fixture();
+    try {
+      const replies: CheckOutcome[] = [];
+      let strip = false;
+      const connect: ServiceConnector = async options => {
+        const connected = await f.quick.connect(options);
+        if (connected.status !== 'connected') return connected;
+        return { ...connected, connection: { ...connected.connection,
+          async check(params, control) {
+            const response = await connected.connection.check(params, control);
+            if (!response.ok || response.value.status !== 'reported') return response;
+            replies.push(response.value);
+            if (!strip) return response;
+            const { timings: _timings, ...value } = response.value;
+            return { ok: true, value };
+          },
+        } };
+      };
+      const timed = await command(f.root, connect, ['--deadline', '5000']);
+      const reply = replies[0]?.status === 'reported' ? replies[0].timings : undefined;
+      expect(reply).toMatchObject({ invocationCheck: expect.any(Number), workerStatus: expect.any(Number),
+        workerRoundTrip: expect.any(Number), publication: expect.any(Number), service: expect.any(Number) });
+      expect(timed.document).toMatchObject({ outcome: 'checked', exitCode: 0 });
+      expect(Object.keys(timed.document!.timings)).toEqual(['daemon', 'waitedMs', 'totalMs', 'reply']);
+      expect(timed.document!.timings.reply).toEqual(reply);
+      const { reply: _reply, ...without } = timed.document!.timings;
+      expect(formatChangedHuman(timed.document!)).toBe(formatChangedHuman({ ...timed.document!, timings: without }));
+      strip = true;
+      const untimed = await command(f.root, connect, ['--deadline', '5000']);
+      expect(untimed.document).toMatchObject({ outcome: 'checked', exitCode: 0 });
+      expect(Object.keys(untimed.document!.timings)).toEqual(['daemon', 'waitedMs', 'totalMs']);
+    } finally { await f.dispose(); }
+  });
+
+  it('full-report-on-request: a resident JSON report equals the batch JSON report', async () => {
+    const f = await fixture();
+    try {
+      const run = async (argv: readonly string[]) => {
+        const stdout: string[] = [];
+        const code = await runCli([...argv], { cwd: f.root, version: '0', connect: f.quick.connect, batch: f.quick.batch,
+          stdout: value => { stdout.push(value); }, stderr: () => {} });
+        expect([code, stdout.length]).toEqual([0, 1]);
+        return { ...(JSON.parse(stdout[0]!) as AnalysisReport), runId: null };
+      };
+      const resident = await run(['check', '--format', 'json']);
+      expect(resident.snapshot).not.toBeNull();
+      const batch = await run(['check', '--batch', '--format', 'json']);
+      // The two invocations echo the same request with differently ordered project keys.
+      expect(resident.request).toEqual(batch.request);
+      expect(JSON.stringify({ ...resident, request: null })).toBe(JSON.stringify({ ...batch, request: null }));
     } finally { await f.dispose(); }
   });
 
