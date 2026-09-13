@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { accessSync, constants, readFileSync, realpathSync } from 'node:fs';
+import { machine, type } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -70,6 +71,18 @@ export function plainReport(report) {
   }
   visit(report);
   return { objects: seen.size, bytes: Buffer.byteLength(JSON.stringify(report)) };
+}
+
+/** The installed `ramify` command users run: its bin launcher execs this build's host compiled
+ * client. That client cannot load the Node process probe; these measurements sample it externally. */
+export function installedCommand(prefix) {
+  const executable = join(prefix, 'node_modules/.bin/ramify');
+  assert.equal(realpathSync(executable), join(packageRoot, 'dist/src/ramify'), 'Installed bin must be this measured build\'s launcher');
+  // Without the client the launcher silently falls back to the Node entry; refuse to mislabel that.
+  const client = `dist/src/ramify-client-${type()}-${machine()}`;
+  accessSync(join(packageRoot, client), constants.X_OK);
+  return { executable, client: { bin: 'node_modules/.bin/ramify', launcher: 'dist/src/ramify', executes: client,
+    runtime: 'bun-compiled', children: 'Daemon and batch analysis run as node from PATH.' } };
 }
 
 export const sha256 = value => createHash('sha256').update(value).digest('hex');

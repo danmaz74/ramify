@@ -60,10 +60,11 @@ async function stop(p: SequenceProcess): Promise<void> {
   const result = await p.run(repositoryRoot, ['daemon', 'stop', '--format', 'json']);
   if (result.code !== 0 || result.error) throw new Error(`Could not stop owned daemon: ${JSON.stringify(result)}`);
 }
+// The adapter finds the installed `ramify` on PATH: the launcher and compiled client, which the probe cannot trace.
 async function host(p: SequenceProcess, root: string, environment = p.environment): Promise<CommandResult> {
   return command(root, process.execPath, [join(repositoryRoot, 'scripts/reference-harness/fixtures/plan5/hook-host.mjs'),
     join(repositoryRoot, 'examples/hooks/claude-code-post-write.mjs'), JSON.stringify({ tool_input: { file_path: join(root, assembly) } })],
-  15_000, { ...environment, PATH: `${dirname(p.executable)}:${environment.PATH ?? ''}` });
+  15_000, { ...environment, PATH: `${dirname(p.bin)}:${environment.PATH ?? ''}` });
 }
 
 function add(subcase: string, run: (p: SequenceProcess, root: string, directory: string, a: Assertions) => Promise<void>): void {

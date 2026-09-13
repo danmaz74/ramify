@@ -47,8 +47,9 @@ export async function selectEndpoint(options: { readonly packageRoot: string; re
   try {
     paths = [...await runtimeFiles(root, 'dist/src'), ...await runtimeFiles(root, 'dist/subs')]
       .sort((a, b) => Buffer.compare(Buffer.from(a), Buffer.from(b)));
+    // The bin may be a native launcher beside the Node entry; only JavaScript entries join the build identity.
     const required = ['dist/src/daemon-entry.js', ...runtimeEntries(manifest.exports),
-      ...runtimeEntries(manifest.main), ...runtimeEntries(manifest.bin)];
+      ...runtimeEntries(manifest.main), ...runtimeEntries(manifest.bin)].filter(path => /\.(?:js|mjs)$/.test(path));
     if (required.some(path => !paths.includes(path)) || !paths.some(path => path.startsWith('dist/subs/'))) {
       throw new Error('Missing production entry or owner runtime');
     }

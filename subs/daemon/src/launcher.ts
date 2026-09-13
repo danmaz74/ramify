@@ -12,6 +12,8 @@ interface StartLock { readonly pid: number; readonly at: number }
 interface LaunchOptions {
   readonly endpoint: EndpointSelection;
   readonly daemonEntry: string;
+  /** Node executable for the daemon entry; defaults to this process's own runtime. */
+  readonly daemonRuntime?: string;
   readonly version: string;
   readonly engine: string;
   readonly startupMs: number;
@@ -90,7 +92,8 @@ async function acquireLock(endpoint: EndpointSelection, deadline: number, signal
 async function terminateUnreadyChild(child: ReturnType<typeof spawn>, endpoint: EndpointSelection): Promise<void> {
   const record = await readRecord(endpoint);
   if (record?.state === 'running' && record.pid === child.pid) return;
-  if (child.exitCode !== null || child.signalCode !== null) return;
+  // A child that failed to spawn has no pid and emits no exit; runtimes differ on its exit code.
+  if (child.pid === undefined || child.exitCode !== null || child.signalCode !== null) return;
   child.kill('SIGTERM');
   await new Promise<void>(resolve => {
     const timer = setTimeout(() => { child.kill('SIGKILL'); }, 1000);
@@ -179,12 +182,14 @@ export async function launchDaemon(options: LaunchOptions): Promise<{ readonly r
       if (!info.isFile() || info.uid !== process.getuid!() || (info.mode & 0o077) !== 0) throw new Error('Unsafe daemon log file');
       await log.truncate(0);
       checkDeadline(deadline, options.signal);
-      child = spawn(process.execPath, [options.daemonEntry, '--endpoint-dir', endpoint.directory,
+      child = spawn(options.daemonRuntime ?? process.execPath, [options.daemonEntry, '--endpoint-dir', endpoint.directory,
         '--build-key', endpoint.buildKey, '--version', options.version, '--engine', options.engine],
       { detached: true, stdio: ['ignore', log.fd, log.fd] });
       await new Promise<void>((accept, reject) => {
         child!.once('spawn', accept);
-        child!.once('error', reject);
+        // Runtimes word spawn failures differently; report the code with a stable message.
+        child!.once('error', (error: NodeJS.ErrnoException) => reject(Object.assign(
+          new Error(`Cannot start daemon runtime ${options.daemonRuntime ?? process.execPath} (${error.code ?? error.message})`), { code: error.code })));
       });
       child.unref();
       keepLock = true;
@@ -208,7 +213,7 @@ export async function launchDaemon(options: LaunchOptions): Promise<{ readonly r
   } catch (error) {
     if (child && !options.signal?.aborted) {
       await terminateUnreadyChild(child, endpoint);
-      keepLock = child.exitCode === null && child.signalCode === null;
+      keepLock = child.pid !== undefined && child.exitCode === null && child.signalCode === null;
     }
     throw error;
   } finally {

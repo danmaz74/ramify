@@ -103,6 +103,10 @@ export interface ConnectOptions {
   readonly engine: string;
   readonly start: 'if-needed' | 'never';
   readonly daemonEntry: string | null;
+  /** Node executable that runs daemonEntry; defaults to the connecting process's runtime. */
+  readonly daemonRuntime?: string;
+  /** Installed package root whose build selects the endpoint; defaults to this module's package. */
+  readonly packageRoot?: string;
   readonly endpointDirectory?: string;
   readonly timeouts?: Partial<ConnectTimeouts>;
   readonly onState?: (state: ConnectionState, reason: DisconnectReason | null) => void;

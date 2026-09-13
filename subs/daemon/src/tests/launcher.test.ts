@@ -1,4 +1,5 @@
 import { readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { launchDaemon } from '../launcher.js';
 import { processAlive, writeDaemonRecord } from '../records.js';
@@ -84,6 +85,23 @@ describe('private coordinated launcher with a fake entry', () => {
   it('reports an entry exit and releases its start lock', async () => {
     const value = await fixture(fakeEntry.slice(0, fakeEntry.indexOf('const server')) + 'process.exit(23);');
     await expect(launchDaemon(value.launch)).rejects.toThrow('exited before readiness (23)');
+    await expect(readFile(value.endpoint.lock)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('runs the entry with the supplied daemon runtime', async () => {
+    const value = await fixture();
+    const runtime = join(value.root, 'runtime.sh'), marker = join(value.root, 'runtime-args');
+    await writeFile(runtime, `#!/bin/sh\nprintf '%s\\n' "$1" > '${marker}'\nexec '${process.execPath}' "$@"\n`, { mode: 0o755 });
+    const result = await launchDaemon({ ...value.launch, daemonRuntime: runtime });
+    expect(result.started).toBe(true);
+    expect(await readFile(marker, 'utf8')).toBe(`${value.launch.daemonEntry}\n`);
+  });
+
+  it('reports a daemon runtime that cannot spawn and releases its start lock', async () => {
+    const value = await fixture();
+    const started = performance.now();
+    await expect(launchDaemon({ ...value.launch, daemonRuntime: join(value.root, 'missing-node') })).rejects.toMatchObject({ code: 'ENOENT' });
+    expect(performance.now() - started).toBeLessThan(2000);
     await expect(readFile(value.endpoint.lock)).rejects.toMatchObject({ code: 'ENOENT' });
   });
 

@@ -79,7 +79,7 @@ describe('watch stdout reader controls without a daemon', () => {
     const owned = await mkdtemp(join(work, 'watch-reader-')), pidFile = join(owned, 'pid');
     const unused = async (): Promise<never> => { throw new Error('Reader controls cannot call daemon operations'); };
     const fixture: SequenceProcess = {
-      executable: join(repositoryRoot, 'scripts/reference-harness/fixtures/plan2/watch-stream.mjs'),
+      executable: join(repositoryRoot, 'scripts/reference-harness/fixtures/plan2/watch-stream.mjs'), bin: '',
       environment: { ...process.env, NODE_OPTIONS: '', RAMIFY_WATCH_CONTROL: mode, RAMIFY_WATCH_CONTROL_PID: pidFile },
       traceFile: '', endpoint: '', run: unused, check: unused, status: unused,
     };

@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto';
-import { realpathSync } from 'node:fs';
-import { lstat, mkdir, readFile, readdir, realpath, writeFile } from 'node:fs/promises';
+import { constants, realpathSync } from 'node:fs';
+import { access, lstat, mkdir, readFile, readdir, realpath, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { delimiter, dirname, isAbsolute, join, relative, sep } from 'node:path';
 import type { AnalysisReport } from '../../subs/analysis/src/index.js';
+import { compiledClientName } from '../compiled-client.js';
 import { portableValue } from './artifact.js';
 import { replaceExactlyOnce } from './mutation.js';
 import { analysisEvidence, archiveObservation, recordObservation } from './observations.js';
@@ -62,6 +63,17 @@ async function exists(path: string): Promise<boolean> {
   catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false; throw error; }
 }
 
+async function executable(path: string): Promise<boolean> {
+  try { await access(path, constants.X_OK); return true; }
+  catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false; throw error; }
+}
+
+/** The bin launcher, the host compiled client it execs, and the Node entry it falls back to. */
+const commandFiles = ['dist/src/ramify', `dist/src/${compiledClientName}`, 'dist/src/cli-entry.js'];
+async function assertCommandFiles(context: ProjectContext, root: string, label: string): Promise<void> {
+  for (const file of commandFiles) context.assertions.equal(`${label}: ${file} is executable`, await executable(join(root, file)), true);
+}
+
 async function assertLocalLinks(context: ProjectContext, root: string, label: string): Promise<void> {
   const canonical = await realpath(root);
   const outside: string[] = [];
@@ -95,6 +107,8 @@ function assertClean(context: ProjectContext, report: AnalysisReport, label: str
 }
 
 const installedRoot = (context: ProjectContext) => join(context.runDirectory, 'consumer');
+// The installed command as users run it. The relocation PATH keeps this Node first, which the
+// launcher's fallback and the compiled client's daemon and batch children find as `node`.
 const installedBin = (context: ProjectContext) => join(installedRoot(context), 'node_modules/.bin/ramify');
 
 /** Independently callable smoke setup; it does not register or pass a matrix instance. */
@@ -128,7 +142,7 @@ export async function prepareRelocatedPackage(context: ProjectContext,
     environment: 'Isolated home, temporary directory and PATH; no inherited Node loaders or module paths' });
   await run(context, 'clean source bootstrap build', root, 'npm', ['run', 'build']);
   await run(context, 'relocated whole type-check', root, 'npm', ['run', 'type-check']);
-  assertions.equal('build creates the actual executable', await exists(join(root, 'dist/src/cli-entry.js')), true);
+  await assertCommandFiles(context, root, 'build creates the installed command');
   const compiled = await run(context, 'relocated compiled reference', root, process.execPath,
     ['dist/src/cli-entry.js', 'check', '--batch', '--root', referencePath, '--format', 'json']);
   assertions.equal('compiled JSON has clean stderr', compiled.stderr, '');
@@ -152,7 +166,8 @@ export async function prepareRelocatedPackage(context: ProjectContext,
     ['install', '--omit=dev', '--ignore-scripts', '--prefer-offline', '--no-audit', '--no-fund', `./${tarballs[0].filename}`]);
   const installed = join(consumer, 'node_modules/ramify.ts');
   assertions.equal('installed package is an unpacked copy', (await lstat(installed)).isSymbolicLink(), false);
-  assertions.ok('installed shebang resolves to the unpacked executable', within(await realpath(installed), await realpath(installedBin(context))));
+  assertions.equal('installed bin resolves to the unpacked launcher', await realpath(installedBin(context)), join(await realpath(installed), 'dist/src/ramify'));
+  await assertCommandFiles(context, installed, 'installed package keeps the command');
   for (const name of ['vitest', 'tsx', 'jsdom']) assertions.equal(`${name}: dev dependency absent from consumer`, await exists(join(consumer, 'node_modules', name)), false);
   await assertLocalLinks(context, join(consumer, 'node_modules'), 'consumer');
   const consumerLock = await readFile(join(consumer, 'package-lock.json'));

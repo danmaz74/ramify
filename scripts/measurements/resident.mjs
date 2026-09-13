@@ -6,7 +6,7 @@ import { arch, cpus, platform, release, totalmem, tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { persistMeasurement } from './archive.mjs';
 import { readJsonSync, writeJsonSync } from './json-stream.mjs';
-import { packageRoot, sha256 } from './common.mjs';
+import { installedCommand, packageRoot, sha256 } from './common.mjs';
 import { filesUnder, treeIdentity } from './identities.mjs';
 import { measureProcess, processRows } from './process-observer.mjs';
 import { pendingResidentWorkloads, residentBudgets, residentWorkloads } from './resident-plan.mjs';
@@ -38,7 +38,8 @@ const scope = 'docs/plans/iteration-2-resident-verification/scope.md';
 const report = {
   schemaVersion: 'ramify.resident-measurements/1', measuredAt: new Date().toISOString(),
   command: ['node', 'scripts/measurements/resident.mjs', ...args], passed: false, status: 'incomplete', evidenceKind: 'measurement',
-  implementation: 'Installed compiled CLI and real resident service; separate bounded diagnostic daemon entry; actual POSIX process sampling.',
+  implementation: 'Installed ramify command (launcher and host compiled client) and real resident service; separate bounded diagnostic daemon entry; actual POSIX process sampling.',
+  client: null,
   environment: { node: process.version, versions: process.versions, platform: platform(), release: release(), arch: arch(),
     logicalCpus: cpus().length, cpuModel: cpus()[0]?.model, totalMemoryBytes: totalmem(),
     concurrentActivity: process.env.RAMIFY_MEASUREMENT_ACTIVITY ?? 'No operator annotation; review recorded process census before latency acceptance.',
@@ -80,8 +81,8 @@ try {
   const install = spawnSync('npm', ['install', '--prefix', prefix, '--offline', '--ignore-scripts', '--no-audit', '--no-fund', packageRoot],
     { cwd: packageRoot, env: { ...process.env, NODE_OPTIONS: '' }, encoding: 'utf8', timeout: 30_000, maxBuffer: 1024 * 1024 });
   assert.equal(install.status, 0, install.error?.message ?? install.stderr);
-  const executable = join(prefix, 'node_modules/.bin/ramify');
-  assert.equal(realpathSync(executable), join(packageRoot, 'dist/src/cli-entry.js'), 'Installed entry must identify this measured build');
+  const { executable, client } = installedCommand(prefix);
+  report.client = client;
   persist();
   for (let index = 0; index < report.workloads.length; index++) {
     const id = report.workloads[index].id, suffix = id.replace('I2-29:', '');

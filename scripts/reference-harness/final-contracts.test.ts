@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -67,8 +67,11 @@ describe('Plan 2 final contract validator', () => {
   it('resolves all eight runtime and type targets from the supplied package and rejects missing or broken entries', async () => {
     const metadata = reviewedPackage(...await reviews('contracts.md'));
     expect(Object.keys(metadata.exports).sort()).toEqual(['.', './analysis', './analysis/inventory', './cli', './client', './layout', './model', './presentation']);
+    // The reviewed bin target remains the Node entry beside the installed launcher.
+    expect([metadata.bin, metadata.nodeEntry]).toEqual([{ ramify: 'dist/src/ramify' }, 'dist/src/cli-entry.js']);
     const root = await mkdtemp(join(tmpdir(), 'ramify-final-entries-'));
-    const manifest = { name: 'ramify.ts', ...metadata };
+    const { nodeEntry, ...reviewed } = metadata;
+    const manifest = { name: 'ramify.ts', ...reviewed };
     const put = async (path: string, text: string) => { await mkdir(dirname(join(root, path)), { recursive: true }); await writeFile(join(root, path), text); };
     // Independent fixtures contain callable bindings, not an empty module
     // that could mask a missing public entry re-export.
@@ -86,7 +89,8 @@ describe('Plan 2 final contract validator', () => {
         await put(entry.types, functions[name].map(name => `export declare function ${name}(): void;`).join('\n'));
         await put(entry.import, source(functions[name]));
       }
-      await put(metadata.bin.ramify, '#!/usr/bin/env node\n');
+      await put(metadata.bin.ramify, '#!/bin/sh\n'); await put(nodeEntry, '#!/usr/bin/env node\n');
+      for (const file of [metadata.bin.ramify, nodeEntry]) await chmod(join(root, file), 0o755);
       expect(await validatePackageEntries(root, metadata)).toBe(8);
       const client = metadata.exports['./client'];
       await rm(join(root, client.types));
@@ -117,8 +121,17 @@ describe('Plan 2 final contract validator', () => {
       await expect(validatePackageEntries(root, metadata)).rejects.toThrow('ramify.ts/client types target');
       await put('package.json', JSON.stringify(manifest));
       expect(await validatePackageEntries(root, metadata)).toBe(8);
-      await put(metadata.bin.ramify, '// missing shebang\n');
-      await expect(validatePackageEntries(root, metadata)).rejects.toThrow();
+      await put(metadata.bin.ramify, '#!/usr/bin/env node\n');
+      await expect(validatePackageEntries(root, metadata)).rejects.toThrow('dist/src/ramify must start with #!/bin/sh');
+      await put(metadata.bin.ramify, '#!/bin/sh\n');
+      await put(nodeEntry, '// missing shebang\n');
+      await expect(validatePackageEntries(root, metadata)).rejects.toThrow('dist/src/cli-entry.js must start with #!/usr/bin/env node');
+      await put(nodeEntry, '#!/usr/bin/env node\n');
+      await chmod(join(root, nodeEntry), 0o644);
+      await expect(validatePackageEntries(root, metadata)).rejects.toThrow('dist/src/cli-entry.js must be executable');
+      await chmod(join(root, nodeEntry), 0o755);
+      await put('package.json', JSON.stringify({ ...manifest, bin: { ramify: nodeEntry } }));
+      await expect(validatePackageEntries(root, metadata)).rejects.toThrow('Final package bin');
     } finally { await rm(root, { recursive: true, force: true }); }
   }, 30_000);
 });

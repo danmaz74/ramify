@@ -16,14 +16,18 @@ npm run check:reference
 npm run check:self
 ```
 
-The build bootstraps from source. `npm run production:files -- --root .` prints
-its deterministic source selection. Production omits every testing-classified
+The build bootstraps from source. It also compiles the host's client executable
+with Bun, pinned as a devDependency, into `dist/src/`.
+`npm run production:files -- --root .` prints its deterministic source selection. Production omits every testing-classified
 area, including a testing module's ordinary `src/`; architectural checking and
 test discovery still cover those files. Toolkit `allowJs` includes its owned
 ESM process probe in source analysis. The example, scripts and site have separate
 compiler configurations and contribute no source findings to toolkit self-check.
 
 To install the built package into a consumer, run `npm install /path/to/ramify`.
+Its `ramify` command is the `dist/src/ramify` launcher, which runs the compiled
+client or, where none was built, `node dist/src/cli-entry.js`. The compiled client
+runs `--batch` analysis in a Node child.
 Use `npx ramify check` inside a project or
 `npx ramify check --root /path/to/project --format json`. An invocation from a
 child directory still checks the whole discovered project. `--batch` is accepted.

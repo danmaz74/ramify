@@ -103,6 +103,9 @@ async function packed(context: ProjectContext, resident: boolean): Promise<void>
     await readFile(join(context.root, 'docs/plans/iteration-2-resident-verification/contracts.md'), 'utf8'));
   context.assertions.equal('all packed import and type conditions expose their required bindings', await validatePackageEntries(installed, expected), 8);
   const preload = await realpath(join(context.root, 'src/tests/process-probe.mjs'));
+  // Probe-traced commands run the unpacked Node entry; the bin launcher would exec the untraceable compiled client.
+  context.assertions.equal('installed bin resolves to the unpacked launcher',
+    await realpath(join(consumer, 'node_modules/.bin/ramify')), join(installed, 'dist/src/ramify'));
   await withSequenceProcess(async processes => {
     const imports = await command(consumer, process.execPath, ['--input-type=module', '--eval',
       "const client = await import('ramify.ts/client'); console.log(JSON.stringify(Object.keys(client)));"], 30_000, processes.environment);
@@ -128,7 +131,7 @@ async function packed(context: ProjectContext, resident: boolean): Promise<void>
       context.assertions.ok('relocated daemon listens on its isolated socket', trace.some(event => event.pid === daemon.pid
         && event.event === 'listen' && event.path?.startsWith(processes.endpoint + '/')));
     }
-  }, { executable: join(consumer, 'node_modules/.bin/ramify'), cwd: consumer, preload,
+  }, { executable: join(installed, 'dist/src/cli-entry.js'), bin: join(consumer, 'node_modules/.bin/ramify'), cwd: consumer, preload,
     environment: relocationEnvironment(context.runDirectory) });
 }
 

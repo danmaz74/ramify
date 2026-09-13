@@ -151,9 +151,13 @@ every required stage completed.
 
 `ramify check` connects to a compatible resident daemon, starts it when needed,
 and requests a synchronized check after opening the project context. `--batch`
-selects a fresh session in the CLI process and disposes it on exit. Both modes
-preserve the analysis report and exit-code contract above; human output names
-the selected mode. Help and version load neither the engine nor a daemon host.
+selects a fresh session and disposes it on exit: in the CLI process for the Node
+entry, or in a Node child of the compiled client. Both modes preserve the
+analysis report and exit-code contract above; human output names the selected
+mode. Help and version load neither the engine nor a daemon host. The installed
+`ramify` command runs the host's compiled client when present, otherwise the
+Node entry, with the same contract; see the
+[native client](optimization.md#native-client).
 
 `ramify watch` streams versioned revision and status events, fetches each
 report by its exact revision id, and releases its subscription on SIGINT.

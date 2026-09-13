@@ -47,7 +47,7 @@ flowchart LR
 
 | Process | Owns at runtime | Lifetime |
 | --- | --- | --- |
-| CLI | Argument parsing, local connection, command formatting and launch/control requests. Batch mode additionally owns its fresh engine session; MCP mode dispatches to the adapter below. | One command, except explicit watch or MCP serving modes. |
+| CLI | Argument parsing, local connection, command formatting and launch/control requests. Batch mode additionally owns its fresh engine session: in process for the Node entry, in a Node child for the [compiled client](optimization.md#native-client). MCP mode dispatches to the adapter below. | One command, except explicit watch or MCP serving modes. |
 | External Node service client | An integrating program uses the lightweight `connectDaemon` client for analysis requests and subscriptions. | Its host owns process lifetime; each connection and operation follows the shared bounded lease and cleanup rules. |
 | Daemon | Project/worktree contexts, coherent inputs, watchers, compiler sessions, checking, semantic queries, bounded history and local service delivery. | Retained for interactive use, with inactive-context eviction and idle shutdown. |
 | MCP adapter | MCP definitions, input schemas, protocol sessions and translation to the daemon service. | The host-launched `ramify mcp` process serves its stdio connection, then releases resources and exits. |
@@ -142,7 +142,7 @@ configuration discovery, warnings and exits, is [CLI invocation](cli-invocation.
 | `ramify check` | Connect to a compatible daemon, starting one if necessary; synchronize the requested inputs, obtain the check result, print it and exit. Agent post-write hooks are its main use case and require the [fast incremental check](daemon.md#fast-incremental-checks) path. |
 | `ramify inspect ...`, `ramify explain ...` | Query the selected project's analysis with explicit freshness/revision semantics, print the result and exit. |
 | `ramify watch` | Keep a bounded subscription open and render published updates. The daemon owns watching and analysis. |
-| `ramify check --batch` | Load the engine only for this mode, create a fresh session, run the check and dispose it on exit. CI uses this independent mode. |
+| `ramify check --batch` | Load the engine only for this mode, in the CLI process or its Node child, create a fresh session, run the check and dispose it on exit. CI uses this independent mode. |
 | `ramify explore` | Ensure a compatible daemon, start or reuse a compatible web process, open the browser at the selected project and exit. Visualization is a later capability. |
 | `ramify mcp` | Lazily load the MCP adapter and serve the host's stdio connection in this process. Resolve a compatible daemon for analysis requests; no web server or per-call CLI subprocess is required. |
 | `ramify daemon status` | Inspect an existing daemon without starting one or loading an analysis engine merely to report absence. |
@@ -175,11 +175,12 @@ over reproducible disk inputs may use the batch fallback specified in
 Report fallback use; do not silently substitute current state for an
 unavailable historical revision. Whether a hook-facing check may use this
 fallback is a [review item](daemon.md#decisions-still-requiring-review).
-Only terminating CLI commands may load the engine for in-process fallback;
-they dispose the session and exit. Watch, MCP, web and external service clients
+Only terminating CLI commands may run the fallback engine: the Node entry loads
+it in process, and the compiled client runs it in a Node child. Either disposes
+the session and exits. Watch, MCP, web and external service clients
 never load a fallback engine: they recover the daemon within the lifecycle
-policy or report unavailable execution. No subprocess batch fallback is part
-of these long-lived client modes.
+policy or report unavailable execution. No batch fallback, in process or in a
+child, is part of these long-lived client modes.
 
 ## MCP server
 
@@ -307,12 +308,16 @@ Process placement is separate from the [Ramify ownership tree](daemon.md#ramifys
 Eleven owners are declared: the batch owners plus daemon and contexts with
 staged vocabulary, ports and private helpers. Root owns assembly through
 distinct source entry files; it is not one eagerly imported application barrel.
-`src/cli-entry.ts`, installed as `dist/src/cli-entry.js`, imports CLI handling and
-lazily imports `src/batch.ts` for a check. Help/version load no compiler or UI
-assembly. Package exports select separate analysis, inventory, model,
-presentation, layout and CLI entries; the package root selects analysis. These
-are still seven package exports. `src/client.ts`, `src/resident-assembly.ts`,
-`src/daemon-entry.ts` and the `./client` package export remain absent.
+The installed `bin.ramify` is `dist/src/ramify`, a launcher that runs the
+compiled client for the host when present and otherwise the Node entry.
+`src/cli-entry.ts`, built as `dist/src/cli-entry.js`, is the Node entry; it
+imports CLI handling and lazily imports `src/batch.ts` for batch analysis.
+`src/compiled-entry.ts` is compiled with Bun into the host executable, which runs
+batch checks through `dist/src/batch-entry.js` in a Node child. Both share
+`src/cli-process.ts`; the [native client](optimization.md#native-client)
+describes the build and its dependency boundary. Help/version load no compiler
+or UI assembly. Package exports select separate analysis, inventory, model,
+presentation, layout, CLI and client entries; the package root selects analysis.
 
 The resident entry-point requirements remain:
 

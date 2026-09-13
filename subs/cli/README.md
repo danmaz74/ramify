@@ -4,7 +4,8 @@ The CLI parses supported arguments, reaches the resident daemon through an injec
 
 `runCli(argv, environment, control?)` accepts output sinks, a working directory,
 the package version, a service connector and a `BatchOperation`. Root supplies
-the real connector and lazy batch binding, and owns SIGINT and stream cleanup.
+the real connector and batch binding, lazy in the Node entry and a Node child in
+the compiled client, and owns SIGINT and stream cleanup.
 The handler validates the complete invocation before dispatch and checks stage
 completion before reporting success. Pre-analysis invocation failures use
 `ramify.cli/1`; plain check results retain the bare `ramify.analysis/1` document.
