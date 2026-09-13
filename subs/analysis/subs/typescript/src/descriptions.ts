@@ -77,6 +77,14 @@ function surface(description: FileDescription): string {
   });
 }
 
+/** Whether creating `created` can satisfy a resolution that recorded `absent`:
+ * the path itself, or a specifier base the compiler completes with an extension
+ * or suffix (`src/soon` for `src/soon.ts`) or as a directory (`src/soon/index.ts`).
+ * An extensionless or aliased specifier records only its base. */
+export function completes(absent: string, created: string): boolean {
+  return created === absent || created.startsWith(`${absent}.`) || created.startsWith(`${absent}/`);
+}
+
 function sameOriginal(left: CatalogOriginal | undefined, right: CatalogOriginal): boolean {
   return !!left && JSON.stringify(left) === JSON.stringify(right);
 }
@@ -111,7 +119,7 @@ function recompute(previous: ReadonlyMap<string, FileRecord>, project: Project, 
     if (!owned.has(path) || selected.has(path)) continue;
     const dependencies = record.description.dependencies;
     if (deleted.some(gone => dependencies.files.includes(gone) || dependencies.resources.includes(gone)
-      || dependencies.shims.includes(gone)) || created.some(added => dependencies.absent.includes(added))) selected.add(path);
+      || dependencies.shims.includes(gone)) || created.some(added => dependencies.absent.some(absent => completes(absent, added)))) selected.add(path);
     // A shim's or an augmenting file's own export description does not carry
     // what it says here, so its content identity is the edge that reaches it.
     if (dependencies.shims.some(shim => requested.has(shim))
