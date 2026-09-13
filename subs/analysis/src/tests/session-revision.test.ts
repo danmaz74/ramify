@@ -1,3 +1,4 @@
+import { createHook } from 'node:async_hooks';
 import { readFile, rm } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { join, relative } from 'node:path';
@@ -782,7 +783,8 @@ describe('membership path', () => {
       const configuration = JSON.parse(await readFile(join(root, 'tsconfig.json'), 'utf8'));
       configuration.compilerOptions.strict = true;
       await put(root, 'tsconfig.json', JSON.stringify(configuration));
-      await expectBroad(handle, state, retire, inputs, ['tsconfig.json'], 'changed', []);
+      // The inventory and capture are kept, so the previous compiler reads are retired.
+      await expectBroad(handle, state, retire, inputs, ['tsconfig.json'], 'changed', ['all']);
       await replace(root, 'node_modules/fixture-dependency/index.d.ts', 'readonly n: number', 'readonly n: string');
       await expectBroad(handle, state, retire, inputs, ['node_modules/fixture-dependency/index.d.ts'], 'changed', []);
       await put(root, `${branch}/unknown.ts`, 'export const unknown = 1;\n');
@@ -1010,9 +1012,9 @@ describe('reacquisition report', () => {
   it('sweep-skipped-after-reacquire: a structural update reports reacquisition, and a sweep of the same capture finds nothing', () => fixture(async (root, inputs) => {
     const { handle } = await opened(inputs);
     try {
-      // An options-only configuration edit rebuilds the inventory on a fresh capture.
+      // A configuration edit that changes the selection rebuilds the inventory on a fresh capture.
       const configuration = JSON.parse(await readFile(join(root, 'tsconfig.json'), 'utf8'));
-      configuration.compilerOptions.target = 'ES2023';
+      configuration.exclude = ['subs/unused'];
       await put(root, 'tsconfig.json', JSON.stringify(configuration));
       const reacquired = await updated(handle, ['tsconfig.json']);
       expect([reacquired.identical, reacquired.reacquired, reacquired.revision.checked.path]).toEqual([false, true, 'broad']);
@@ -1044,12 +1046,109 @@ describe('reacquisition report', () => {
       await audited(handle);
       await equalToBatch(handle, inputs);
 
-      // A sweep that finds a configuration edit reports the reacquisition on its own revision.
-      configuration.compilerOptions.target = 'ES2022';
+      // An options-only edit keeps the capture and reports none.
+      configuration.compilerOptions.target = 'ES2023';
+      await put(root, 'tsconfig.json', JSON.stringify(configuration));
+      expect(await updated(handle, ['tsconfig.json'])).toMatchObject({ identical: false, reacquired: false, revision: { checked: { path: 'broad' } } });
+      await audited(handle);
+      await equalToBatch(handle, inputs);
+
+      // A sweep that finds a selection edit reports the reacquisition on its own revision.
+      delete configuration.exclude;
       await put(root, 'tsconfig.json', JSON.stringify(configuration));
       expect(await handle.sweep()).toMatchObject({ status: 'revised', identical: false, reacquired: true, revision: { checked: { path: 'broad' } } });
       await audited(handle);
       await equalToBatch(handle, inputs);
     } finally { await handle.dispose(); }
   }), timeout);
+});
+
+describe('configuration projection', () => {
+  /** Configuration helpers and other child processes started while `operation` runs. */
+  const spawned = async <T>(operation: () => Promise<T>): Promise<{ value: T; helpers: number }> => {
+    let helpers = 0;
+    const hook = createHook({ init(_id, type) { if (type === 'PROCESSWRAP') helpers++; } }).enable();
+    try { return { value: await operation(), helpers }; } finally { hook.disable(); }
+  };
+  const reads = (revision: SessionRevision, name: string): boolean => revision.inputs.some(input => input.path.endsWith(`/${name}`));
+  /** One configuration update, its observer update, adapter invalidations and retirements, then batch equality of inputs and identity. */
+  const configured = async (handle: RetainedSession, state: Parameters<typeof instrumentCompiler>[0], inputs: Parameters<typeof equalToBatch>[1],
+    path: string) => {
+    const { apply, retire } = instrumentObserver(state);
+    const compiler = instrumentCompiler(state);
+    const inventory = state.observer!.inventory;
+    const { value: result, helpers } = await spawned(() => handle.update([{ path, kind: 'changed' }]));
+    if (result.status !== 'revised') throw new Error(`Expected a revision: ${JSON.stringify(result)}`);
+    const update = await apply.mock.results[0]!.value;
+    const report = await equalToBatch(handle, inputs);
+    expect(result.revision.inputs).toEqual(report.snapshot!.inputs);
+    expect(result.revision.inputId).toBe(report.inputId);
+    await audited(handle);
+    return { result, update, helpers, keptInventory: state.observer!.inventory === inventory,
+      invalidations: compiler.update.mock.calls.map(call => call[0].invalidateAll), retirements: retire.mock.calls.map(call => call[0].kind) };
+  };
+
+  it('configuration-projection-unchanged: an options-only edit keeps the inventory and capture, spawns one helper, invalidates the compiler and publishes the batch inputs', () => fixture(async (root, inputs) => {
+    const { handle, state, revision: cold } = await opened(inputs);
+    try {
+      // The fixture names no `lib`, so the target selects the default libraries the compiler reads.
+      expect([reads(cold, 'lib.es2022.full.d.ts'), reads(cold, 'lib.es2023.full.d.ts')]).toEqual([true, false]);
+      const configuration = JSON.parse(await readFile(join(root, 'tsconfig.json'), 'utf8'));
+      configuration.compilerOptions.target = 'ES2023';
+      await put(root, 'tsconfig.json', JSON.stringify(configuration));
+      const target = await configured(handle, state, inputs, 'tsconfig.json');
+      expect(target.update).toMatchObject({ kind: 'local', configuration: ['tsconfig.json'], descriptions: [], readmes: [], created: [], deleted: [], changed: [] });
+      expect([target.keptInventory, target.helpers, target.invalidations, target.retirements]).toEqual([true, 1, [false, true], ['all']]);
+      expect([target.result.identical, target.result.reacquired, target.result.revision.checked.path, target.result.revision.checked.files])
+        .toEqual([false, false, 'broad', ownedFiles]);
+      expect(target.result.revision.changed).toEqual(expect.arrayContaining(['tsconfig.json']));
+      expect([reads(target.result.revision, 'lib.es2022.full.d.ts'), reads(target.result.revision, 'lib.es2023.full.d.ts')]).toEqual([false, true]);
+      // The capture still sweeps, and the sweep finds it coherent.
+      expect(await handle.sweep()).toEqual({ status: 'unchanged' });
+
+      // Moving the options into an extended file changes the helper's requests and acquires again.
+      await put(root, 'base.json', JSON.stringify({ compilerOptions: { target: 'ES2023' } }));
+      delete configuration.compilerOptions.target;
+      await put(root, 'tsconfig.json', JSON.stringify({ extends: './base.json', ...configuration }));
+      const moved = await configured(handle, state, inputs, 'tsconfig.json');
+      expect([moved.update.kind, moved.keptInventory, moved.result.reacquired, moved.retirements]).toEqual(['structural', false, true, []]);
+      // An options edit of the extended file is kept.
+      await put(root, 'base.json', JSON.stringify({ compilerOptions: { target: 'ES2022' } }));
+      const base = await configured(handle, state, inputs, 'base.json');
+      expect([base.update.kind, base.update.configuration, base.keptInventory, base.helpers, base.invalidations, base.retirements, base.result.reacquired])
+        .toEqual(['local', ['base.json'], true, 1, [false, true], ['all'], false]);
+      expect([reads(base.result.revision, 'lib.es2022.full.d.ts'), reads(base.result.revision, 'lib.es2023.full.d.ts')]).toEqual([true, false]);
+      expect(await handle.sweep()).toEqual({ status: 'unchanged' });
+
+      // Created and deleted owned files since the acquisition leave the next options edit kept.
+      await put(root, paths.extra, 'export const extra = 1;\n');
+      expect((await revised(handle, [paths.extra], 'created')).checked.path).toBe('membership');
+      await put(root, 'base.json', JSON.stringify({ compilerOptions: { target: 'ES2023', strict: true } }));
+      const afterMembership = await configured(handle, state, inputs, 'base.json');
+      expect([afterMembership.update.kind, afterMembership.keptInventory, afterMembership.result.reacquired]).toEqual(['local', true, false]);
+    } finally { await handle.dispose(); }
+  }), timeout);
+
+  it('configuration-projection-changed: include, files, exclude, outDir and extended-file edits acquire the project again and equal batch', () => fixture(async (root, inputs) => {
+    const { handle, state } = await opened(inputs);
+    try {
+      const configuration = JSON.parse(await readFile(join(root, 'tsconfig.json'), 'utf8'));
+      const rebuilt = async (path: string, text: unknown): Promise<SessionRevision> => {
+        await put(root, path, JSON.stringify(text));
+        const step = await configured(handle, state, inputs, path);
+        // The re-read that compares the projection, then the acquisition's own read.
+        expect([step.update.kind, step.keptInventory, step.helpers, step.invalidations.at(-1), step.retirements, step.result.reacquired],
+          `${path}: ${JSON.stringify(text)}`).toEqual(['structural', false, 2, true, [], true]);
+        expect(step.result.revision.checked.path).toBe('broad');
+        return step.result.revision;
+      };
+      const included = await rebuilt('tsconfig.json', { ...configuration, include: ['src', 'subs', 'extra'] });
+      expect(included.inputs.some(input => input.path === 'extra/loose.ts')).toBe(true);
+      await rebuilt('tsconfig.json', { ...configuration, files: ['extra/loose.ts'] });
+      await rebuilt('tsconfig.json', { ...configuration, include: ['src', 'subs', 'extra'], exclude: ['extra'] });
+      await rebuilt('tsconfig.json', { ...configuration, compilerOptions: { ...configuration.compilerOptions, outDir: 'dist' } });
+      await rebuilt('tsconfig.json', { ...configuration, extends: './base.json' });
+      await rebuilt('base.json', { compilerOptions: { strict: true }, exclude: ['subs/unused'] });
+    } finally { await handle.dispose(); }
+  }, { 'extra/loose.ts': 'export const loose = 1;\n', 'base.json': JSON.stringify({ compilerOptions: { strict: true } }) }), timeout);
 });

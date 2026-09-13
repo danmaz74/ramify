@@ -2,7 +2,7 @@ import { resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { Capture } from './capture.js';
 import { AcquisitionError, Cancelled, byteOrder, freeze } from './data.js';
-import { acquireConfiguration, ConfigurationChanged } from './configuration.js';
+import { acquireConfiguration, ConfigurationChanged, selectionProjection, solutionStyle } from './configuration.js';
 import { inventoryProject } from './inventory.js';
 import { recordResolution, resolveCapturedRoot } from './resolve-root.js';
 import type { ConfigurationData } from './configuration-data.js';
@@ -61,8 +61,8 @@ export async function acquireProject(options: ProjectReadOptions): Promise<Proje
       const { resolution: { configuration, status: _status, ...selected }, discovery } = await resolveCapturedRoot(capture, request);
       const acquiredConfiguration = await acquireConfiguration(capture, configuration, previousConfiguration);
       const config = acquiredConfiguration.data;
-      if (config.references.length && !config.files.length) throw new AcquisitionError('references-only-configuration', configuration,
-        `Solution-style configurations are unavailable; referenced configurations: ${config.references.join(', ')}`);
+      const refusal = solutionStyle(configuration, config);
+      if (refusal) throw refusal;
       // The capture holds only selection and configuration queries here, as a
       // standalone resolution's capture does when it succeeds.
       const resolution = recordResolution(capture, request, { status: 'resolved', ...selected, configuration }, discovery, config.references.length > 0);
@@ -79,7 +79,8 @@ export async function acquireProject(options: ProjectReadOptions): Promise<Proje
       }
       capture.finishAcquisition();
       retained = true;
-      const product = { ...acquiredConfiguration.retained.product, metadata: acquired.metadata, metadataReused: acquired.metadataReused };
+      const product = { ...acquiredConfiguration.retained.product, metadata: acquired.metadata, metadataReused: acquired.metadataReused,
+        selection: selectionProjection(capture.root, config, new Set(inventory.files.map(file => file.path))) };
       const configurationProduct = freeze({ ...acquiredConfiguration.retained, product, bytes: Buffer.byteLength(JSON.stringify(product)) });
       return { status: 'acquired', acquired: { capture, inventory, configuration: configurationProduct,
         configurationPath: configuration, configurationData: config, reusedConfiguration: acquiredConfiguration.reused, resolution } };

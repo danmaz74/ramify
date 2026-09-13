@@ -1,9 +1,14 @@
+import { createHook } from 'node:async_hooks';
+import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { mkdtemp, realpath, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { readProject } from '../read-project.js';
+import { rereadConfiguration, selectionProjection } from '../configuration.js';
+import type { ConfigurationReread } from '../configuration.js';
+import { acquireProject, readProject } from '../read-project.js';
+import type { AcquiredProject } from '../read-project.js';
 import type { ProjectRead, ProjectReadOptions, ProjectInputView } from '../interfaces/project.js';
 import { fixture, limits, put, syntax } from './fixtures.js';
 
@@ -166,6 +171,94 @@ describe('real project configuration and scope', () => {
     const acquired = view(await read());
     expect(acquired.inventory.scope.independentScopes).toEqual(['examples/demo']);
     expect(acquired.inventory.modules).toHaveLength(1);
+  });
+});
+
+describe('configuration re-read on a retained acquisition', () => {
+  const selection = { compilerOptions: { types: [], module: 'ESNext', moduleResolution: 'bundler' }, include: ['src'] };
+  const captures: AcquiredProject['capture'][] = [];
+  afterEach(async () => { for (const capture of captures.splice(0)) await capture.dispose(); });
+  async function acquired(): Promise<AcquiredProject> {
+    const result = await acquireProject({ request: { cwd: root, root, configuration: 'discover', scope: 'whole-project' }, parse: syntax, limits });
+    if (result.status !== 'acquired') throw new Error(JSON.stringify(result));
+    captures.push(result.acquired.capture);
+    return result.acquired;
+  }
+  const owned = (project: AcquiredProject): Set<string> => new Set(project.inventory.files.map(file => file.path));
+  /** Rewrite the configuration, re-observe it as the observer does, and read it again through the helper. */
+  async function reread(project: AcquiredProject, configuration: unknown): Promise<{ result: ConfigurationReread; helpers: number }> {
+    const text = JSON.stringify(configuration);
+    await put(root, 'tsconfig.json', text);
+    await project.capture.refresh(join(root, 'tsconfig.json'));
+    let helpers = 0;
+    const hook = createHook({ init(_id, type) { if (type === 'PROCESSWRAP') helpers++; } }).enable();
+    try { return { result: await rereadConfiguration(project.capture, project.configuration, owned(project), ['tsconfig.json']), helpers }; } finally { hook.disable(); }
+  }
+
+  it('configuration-projection-unchanged: an options-only edit keeps the acquisition with one helper and a retained configuration a later acquisition reuses', async () => {
+    const project = await acquired();
+    const { result, helpers } = await reread(project, { ...selection, compilerOptions: { ...selection.compilerOptions, target: 'ES2023', strict: true } });
+    expect(helpers).toBe(1);
+    expect(result.status).toBe('kept');
+    if (result.status !== 'kept') throw new Error('Expected a kept configuration');
+    expect(result.data.options).toMatchObject({ target: 10, strict: true });
+    expect(selectionProjection(root, result.data, owned(project))).toBe(selectionProjection(root, project.configurationData, owned(project)));
+    expect(result.retained.key).not.toBe(project.configuration.key);
+    const text = JSON.stringify({ ...selection, compilerOptions: { ...selection.compilerOptions, target: 'ES2023', strict: true } });
+    expect(result.retained.dependencies.find(input => input.path === 'tsconfig.json'))
+      .toEqual({ path: 'tsconfig.json', role: 'configuration', sha256: createHash('sha256').update(text).digest('hex'), bytes: text.length });
+    expect(result.retained.dependencies.map(input => input.path)).toEqual(project.configuration.dependencies.map(input => input.path));
+    // The replaced product is reused by the next acquisition without a helper; the one it replaced no longer is.
+    let spawned = 0;
+    const hook = createHook({ init(_id, type) { if (type === 'PROCESSWRAP') spawned++; } }).enable();
+    let reused: ProjectRead;
+    try { reused = await read({ retained: result.retained }); } finally { hook.disable(); }
+    expect([reused.status === 'acquired' && reused.reusedConfiguration, spawned]).toEqual([true, 0]);
+    const stale = await read({ retained: project.configuration });
+    expect(stale.status === 'acquired' && stale.reusedConfiguration).toBe(false);
+  });
+
+  it('configuration-projection-unchanged: the projection holds selected files beneath the root the inventory does not own, and no other option', () => {
+    const data = { options: { target: 10, outDir: join(root, 'dist') }, references: [], exclusions: [{ directory: root, patterns: ['dist'] }],
+      files: [join(root, 'src/value.ts'), join(root, 'extra/loose.ts'), join(work, 'outside.ts'), join(root, 'extra/loose.ts')] };
+    const owned = new Set(['src/value.ts']);
+    expect(JSON.parse(selectionProjection(root, data, owned))).toEqual([['extra/loose.ts'], [], [{ directory: root, patterns: ['dist'] }], join(root, 'dist'), null]);
+    expect(selectionProjection(root, { ...data, options: { target: 9, outDir: join(root, 'dist') }, files: [join(root, 'extra/loose.ts')] }, owned))
+      .toBe(selectionProjection(root, data, owned));
+    expect(selectionProjection(root, data, new Set())).not.toBe(selectionProjection(root, data, owned));
+    expect(selectionProjection(root, { ...data, options: { declarationDir: join(root, 'types') } }, owned)).not.toBe(selectionProjection(root, data, owned));
+  });
+
+  it.each([
+    ['include', { ...selection, include: ['src', 'extra'] }, 'projection'],
+    ['exclude', { ...selection, exclude: ['src/generated'] }, 'projection'],
+    ['files', { ...selection, files: ['extra/loose.ts'] }, 'projection'],
+    ['outDir', { ...selection, compilerOptions: { ...selection.compilerOptions, outDir: 'dist' } }, 'projection'],
+    ['declarationDir', { ...selection, compilerOptions: { ...selection.compilerOptions, declaration: true, declarationDir: 'types' } }, 'projection'],
+    ['references', { ...selection, references: [{ path: './ref' }] }, 'projection'],
+    ['extends', { ...selection, extends: './base.json' }, 'requests'],
+  ] as const)('configuration-projection-changed: an edit of %s is not kept', async (_name, configuration, reason) => {
+    await put(root, 'extra/loose.ts', 'export const loose = 1;\n');
+    await put(root, 'ref/tsconfig.json', '{"files":[]}\n');
+    await put(root, 'base.json', '{"compilerOptions":{"strict":true}}\n');
+    const project = await acquired();
+    const { result, helpers } = await reread(project, configuration);
+    expect([result, helpers]).toEqual([{ status: 'changed', reason }, 1]);
+  });
+
+  it('configuration-projection-changed: an edited extended file that changes an exclusion is not kept, and a solution-style rewrite is refused', async () => {
+    await put(root, 'base.json', '{"compilerOptions":{"strict":true}}\n');
+    await put(root, 'ref/tsconfig.json', '{"files":[]}\n');
+    await put(root, 'tsconfig.json', JSON.stringify({ ...selection, extends: './base.json' }));
+    const project = await acquired();
+    await put(root, 'base.json', '{"compilerOptions":{"strict":false}}\n');
+    await project.capture.refresh(join(root, 'base.json'));
+    expect((await rereadConfiguration(project.capture, project.configuration, owned(project), ['base.json'])).status).toBe('kept');
+    await put(root, 'base.json', '{"compilerOptions":{"strict":false},"exclude":["src/generated"]}\n');
+    await project.capture.refresh(join(root, 'base.json'));
+    expect(await rereadConfiguration(project.capture, project.configuration, owned(project), ['base.json'])).toEqual({ status: 'changed', reason: 'projection' });
+    await expect(reread(project, { files: [], references: [{ path: './ref' }] }))
+      .rejects.toMatchObject({ code: 'references-only-configuration', message: 'Solution-style configurations are unavailable; referenced configurations: ./ref' });
   });
 });
 

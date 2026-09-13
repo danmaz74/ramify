@@ -1,11 +1,20 @@
+import { createHook } from 'node:async_hooks';
 import { createHash } from 'node:crypto';
 import { mkdtemp, realpath, rm, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { observeProject } from '../observer.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { observeProject, observedEnumerations } from '../observer.js';
+import { resolveProjectRoot } from '../resolve-root.js';
 import type { InventoryUpdate, ProjectObserver, ProjectReadOptions } from '../interfaces/project.js';
 import { declaration, fixture, limits, put } from './fixtures.js';
+
+/** Files the capture opens to read bytes; pass-through otherwise. */
+const opened = vi.hoisted(() => ({ paths: [] as string[] }));
+vi.mock('node:fs/promises', async importOriginal => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  return { ...actual, open: (...args: Parameters<typeof actual.open>) => { opened.paths.push(String(args[0])); return actual.open(...args); } };
+});
 
 let work: string, root: string;
 const observers: ProjectObserver[] = [];
@@ -29,6 +38,26 @@ async function observe(changes: Partial<ProjectReadOptions> = {}): Promise<Proje
   if (result.status !== 'observing') throw new Error('Expected an observing project');
   observers.push(result.observer);
   return result.observer;
+}
+/** Helper processes, directory enumerations and opened files while `operation` runs. */
+async function counted<T>(observer: ProjectObserver, operation: () => Promise<T>): Promise<{ value: T; helpers: number; enumerations: number; opened: string[] }> {
+  let helpers = 0;
+  const enumerations = observedEnumerations(observer);
+  opened.paths.length = 0;
+  const hook = createHook({ init(_id, type) { if (type === 'PROCESSWRAP') helpers++; } }).enable();
+  try {
+    const value = await operation();
+    return { value, helpers, enumerations: observedEnumerations(observer) - enumerations, opened: [...opened.paths] };
+  } finally { hook.disable(); }
+}
+/** The observer's inventory, inputs and identity equal a fresh acquisition of the same disk. */
+async function expectFresh(observer: ProjectObserver): Promise<void> {
+  const fresh = await observe();
+  expect(observer.inventory).toEqual(fresh.inventory);
+  expect(JSON.stringify(observer.inputs)).toBe(JSON.stringify(fresh.inputs));
+  expect(observer.inputId).toBe(fresh.inputId);
+  observers.splice(observers.indexOf(fresh), 1);
+  await fresh.dispose();
 }
 function local(update: InventoryUpdate): Extract<InventoryUpdate, { kind: 'local' }> {
   expect(update.kind, JSON.stringify(update)).toBe('local');
@@ -246,6 +275,106 @@ describe('project observer updates', () => {
     expect(await observer.readReadme('subs/child/README.md')).toBe('# Child\n\nChild purpose.\n');
     expect(await observer.readDescription('subs/child/absent.ramify')).toBeUndefined();
   });
+
+  it('configuration-projection-unchanged: an options-only edit keeps the inventory and capture, spawns one helper, walks no directory and reads only the edited file', async () => {
+    const observer = await observe();
+    // Selected owned files created and deleted since the acquisition leave the projection equal.
+    await put(root, 'src/added.ts', 'export const added = 1;\n');
+    expect(local(await observer.apply([{ path: 'src/added.ts', kind: 'created' }])).created).toEqual(['src/added.ts']);
+    await unlink(join(root, 'src/value.ts'));
+    expect(local(await observer.apply([{ path: 'src/value.ts', kind: 'deleted' }])).deleted).toEqual(['src/value.ts']);
+    const before = observer.inventory;
+    const identities = new Map(observer.inputs.map(input => [input.path, input.sha256]));
+    await put(root, 'tsconfig.json', '{"compilerOptions":{"types":[],"module":"ESNext","moduleResolution":"bundler","target":"ES2023"},"include":["src"]}\n');
+    const edited = await counted(observer, () => observer.apply([{ path: 'tsconfig.json', kind: 'changed' }]));
+    const update = local(edited.value);
+    expect([update.configuration, update.descriptions, update.readmes, update.created, update.deleted, update.changed])
+      .toEqual([['tsconfig.json'], [], [], [], [], []]);
+    expect([update.inventory, observer.inventory]).toEqual([before, before]);
+    expect(observer.inventory).toBe(before);
+    expect([edited.helpers, edited.enumerations, edited.opened]).toEqual([1, 0, [join(root, 'tsconfig.json')]]);
+    expect(observer.inputs.filter(input => identities.get(input.path) !== input.sha256).map(input => input.path)).toEqual(['tsconfig.json']);
+    await expectFresh(observer);
+
+    // An extended file: adding it changes the helper's requests; an options edit of it is kept.
+    await put(root, 'base.json', '{"compilerOptions":{"strict":true}}\n');
+    await put(root, 'tsconfig.json', '{"extends":"./base.json","compilerOptions":{"types":[],"module":"ESNext","moduleResolution":"bundler"},"include":["src"]}\n');
+    expect((await observer.apply([{ path: 'tsconfig.json', kind: 'changed' }])).kind).toBe('structural');
+    const extended = observer.inventory;
+    await put(root, 'base.json', '{"compilerOptions":{"strict":false,"noImplicitAny":false}}\n');
+    const base = await counted(observer, () => observer.apply([{ path: 'base.json', kind: 'changed' }]));
+    expect(local(base.value).configuration).toEqual(['base.json']);
+    expect(observer.inventory).toBe(extended);
+    expect([base.helpers, base.enumerations, base.opened]).toEqual([1, 0, [join(root, 'base.json')]]);
+    await expectFresh(observer);
+
+    // The replaced configuration product serves the next rebuild without a helper.
+    await put(root, 'subs/child/module.ramify', 'ramify 1\nmodule renamed\n');
+    const renamed = await counted(observer, () => observer.apply([{ path: 'subs/child/module.ramify', kind: 'changed' }]));
+    expect([renamed.value.kind, renamed.helpers]).toEqual(['structural', 0]);
+    await expectFresh(observer);
+  }, 60_000);
+
+  it('configuration-projection-unchanged: a kept edit of a configuration with references replaces the resolution the invocation check reuses', async () => {
+    await put(root, 'ref/tsconfig.json', '{"files":[]}\n');
+    await put(root, 'tsconfig.json', '{"compilerOptions":{"types":[],"module":"ESNext","moduleResolution":"bundler"},"include":["src"],"references":[{"path":"./ref"}]}\n');
+    const observer = await observe();
+    const request = { cwd: root, root, configuration: 'discover', scope: 'whole-project' } as const;
+    const seeded = observer.resolution;
+    expect((await counted(observer, () => resolveProjectRoot(request, undefined, [seeded]))).helpers).toBe(0);
+    await put(root, 'tsconfig.json', '{"compilerOptions":{"types":[],"module":"ESNext","moduleResolution":"bundler","strict":true},"include":["src"],"references":[{"path":"./ref"}]}\n');
+    expect(local(await observer.apply([{ path: 'tsconfig.json', kind: 'changed' }])).configuration).toEqual(['tsconfig.json']);
+    const replaced = observer.resolution;
+    expect(replaced).not.toBe(seeded);
+    expect(replaced).toEqual(seeded);
+    const reused = await counted(observer, () => resolveProjectRoot(request, undefined, [replaced]));
+    expect([reused.value, reused.helpers]).toEqual([replaced, 0]);
+    expect(reused.value).toBe(replaced);
+    expect((await counted(observer, () => resolveProjectRoot(request, undefined, [seeded]))).helpers).toBe(1);
+    await expectFresh(observer);
+  }, 60_000);
+
+  it('configuration-projection-changed: include, files, exclude, outDir, references, extended-file and manifest edits rebuild as a fresh acquisition', async () => {
+    await put(root, 'extra/loose.ts', 'export const loose = 1;\n');
+    await put(root, 'src/out/generated.ts', 'export const generated = 1;\n');
+    await put(root, 'ref/tsconfig.json', '{"files":[]}\n');
+    await put(root, 'base.json', '{"compilerOptions":{"strict":true}}\n');
+    const observer = await observe();
+    const options = '"compilerOptions":{"types":[],"module":"ESNext","moduleResolution":"bundler"}';
+    const rebuilt = async (path: string, text: string): Promise<void> => {
+      await put(root, path, text);
+      const update = await counted(observer, () => observer.apply([{ path, kind: 'changed' }]));
+      expect(update.value.kind, `${path}: ${text}`).toBe('structural');
+      await expectFresh(observer);
+    };
+    await rebuilt('tsconfig.json', `{${options},"include":["src","subs"]}`);
+    await rebuilt('tsconfig.json', `{${options},"include":["src"],"files":["extra/loose.ts"]}`);
+    expect(observer.inventory.outsideModuleFiles).toEqual(['extra/loose.ts']);
+    await rebuilt('tsconfig.json', `{${options},"include":["src"],"exclude":["src/generated"]}`);
+    expect(observer.inventory.files.map(file => file.path)).toContain('src/out/generated.ts');
+    await rebuilt('tsconfig.json', `{"compilerOptions":{"types":[],"module":"ESNext","moduleResolution":"bundler","outDir":"src/out"},"include":["src"]}`);
+    expect(observer.inventory.files.map(file => file.path)).not.toContain('src/out/generated.ts');
+    await rebuilt('tsconfig.json', `{${options},"include":["src"],"references":[{"path":"./ref"}]}`);
+    await rebuilt('tsconfig.json', `{"extends":"./base.json",${options},"include":["src"]}`);
+    await rebuilt('base.json', '{"compilerOptions":{"strict":true},"exclude":["src/generated"]}');
+    await rebuilt('package.json', '{"type":"module","private":true}\n');
+
+    // An unknown change, or a configuration edit beside another change, reconciles through a rebuild.
+    const strict = `{"extends":"./base.json","compilerOptions":{"types":[],"module":"ESNext","moduleResolution":"bundler","strict":false},"include":["src"]}`;
+    await put(root, 'tsconfig.json', strict);
+    expect((await observer.apply([{ path: 'tsconfig.json', kind: 'unknown' }])).kind).toBe('structural');
+    await put(root, 'tsconfig.json', strict.replace('"strict":false', '"strict":true'));
+    await put(root, 'src/value.ts', 'export const value = 3;\n');
+    expect((await observer.apply([{ path: 'tsconfig.json', kind: 'changed' }, { path: 'src/value.ts', kind: 'changed' }])).kind).toBe('structural');
+    await expectFresh(observer);
+
+    // A configuration the helper cannot read is reported by the rebuild, which keeps the last inventory.
+    const before = observer.inventory;
+    await put(root, 'tsconfig.json', `{"extends":"./missing.json",${options},"include":["src"]}`);
+    const failed = await observer.apply([{ path: 'tsconfig.json', kind: 'changed' }]);
+    expect(failed).toMatchObject({ kind: 'incomplete', issues: [{ code: 'read-failure' }] });
+    expect(observer.inventory).toBe(before);
+   }, 60_000);
 
   it('refuses further work once disposed', async () => {
     const observer = await observe();

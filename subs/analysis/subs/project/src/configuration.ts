@@ -1,18 +1,31 @@
 import { createHash } from 'node:crypto';
-import type { RetainedConfiguration } from './interfaces/project.js';
+import type { CapturedInput, RetainedConfiguration } from './interfaces/project.js';
 import { freeze } from './data.js';
 import { spawn } from 'node:child_process';
-import { basename } from 'node:path';
+import { basename, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { performance } from 'node:perf_hooks';
 import { Capture } from './capture.js';
-import { AcquisitionError, Cancelled } from './data.js';
+import { AcquisitionError, Cancelled, byteOrder, within } from './data.js';
 import { FRAME_BYTES, CHUNK_BYTES } from './configuration-data.js';
 import type { ConfigurationData } from './configuration-data.js';
 
-/** Configuration-only supervised process. One callback operation is in flight. */
-export async function readConfiguration(capture: Capture, config: string): Promise<ConfigurationData> {
+/** A helper run's product and the filesystem requests it made, each `[method, path]` as JSON, sorted and unique. */
+export interface ConfigurationRead {
+  readonly data: ConfigurationData;
+  readonly requests: readonly string[];
+}
+/**
+ * Configuration-only supervised process. One callback operation is in flight.
+ * A capture that finished its acquisition answers from its recorded
+ * observations, so `control` supplies the deadline and signal of the operation
+ * that reads the configuration again.
+ */
+export async function readConfiguration(capture: Capture, config: string,
+  control: { readonly deadline?: number; readonly signal?: AbortSignal } = {}): Promise<ConfigurationRead> {
   capture.check();
+  if (control.signal?.aborted) throw new Cancelled();
+  const requests = new Set<string>();
   const source = import.meta.url.endsWith('.ts');
   const helper = fileURLToPath(new URL(`./configuration-helper.${source ? 'ts' : 'js'}`, import.meta.url));
   const budget = Math.floor(capture.limits.maxInputBytes / 4);
@@ -42,9 +55,11 @@ export async function readConfiguration(capture: Capture, config: string): Promi
   };
   const abort = () => stop(new Cancelled());
   const timer = setTimeout(() => stop(new AcquisitionError('resource-limit', config, 'Configuration helper deadline exceeded')),
-    Math.max(1, capture.deadline - performance.now()));
-  capture.signal?.addEventListener('abort', abort, { once: true });
-  if (capture.signal?.aborted) abort();
+    Math.max(1, (control.deadline ?? capture.deadline) - performance.now()));
+  for (const signal of [capture.signal, control.signal]) {
+    signal?.addEventListener('abort', abort, { once: true });
+    if (signal?.aborted) abort();
+  }
   const write = (value: unknown) => {
     const bytes = Buffer.from(`${JSON.stringify(value)}\n`);
     if (bytes.length > FRAME_BYTES) throw new AcquisitionError('resource-limit', config, 'Configuration frame byte limit exceeded');
@@ -76,6 +91,7 @@ export async function readConfiguration(capture: Capture, config: string): Promi
       resultChunks.push(bytes); resultComplete = !frame.more; write({ id: frame.id }); return;
     }
     if (frame.kind !== 'request' || typeof frame.path !== 'string' || resultChunks.length) throw new Error('Invalid configuration request');
+    requests.add(JSON.stringify([frame.method, frame.path]));
     let value: unknown;
     switch (frame.method) {
       case 'readFile': value = await capture.readFile(frame.path, basename(frame.path) === 'package.json' ? 'dependency' : 'configuration') ?? null; break;
@@ -120,10 +136,12 @@ export async function readConfiguration(capture: Capture, config: string): Promi
     if (failure) throw failure;
     if (code !== 0 || !resultComplete || buffer.length) throw new AcquisitionError('read-failure', config, `Configuration helper failed: ${stderr || `exit ${code}`}`);
     capture.check();
-    return JSON.parse(Buffer.concat(resultChunks, resultSize).toString('utf8')) as ConfigurationData;
+    return { data: JSON.parse(Buffer.concat(resultChunks, resultSize).toString('utf8')) as ConfigurationData,
+      requests: [...requests].sort(byteOrder) };
   } finally {
     terminal = true; clearTimeout(timer); clearTimeout(escalation);
     capture.signal?.removeEventListener('abort', abort);
+    control.signal?.removeEventListener('abort', abort);
     kill('SIGKILL');
     child.stdin.destroy(); child.stdout.destroy(); child.stderr.destroy();
     pending = undefined; resultChunks.length = 0;
@@ -133,11 +151,29 @@ export async function readConfiguration(capture: Capture, config: string): Promi
 /** A rejected recipe must be retried with an empty capture: obsolete dependencies
  * must never leak into the next batch-compatible input identity. */
 export class ConfigurationChanged extends Error {}
+
+/** What a retained configuration records; `RetainedConfiguration.product` is opaque outside this owner. */
+interface ConfigurationProduct {
+  readonly root: string;
+  readonly config: string;
+  readonly data: ConfigurationData;
+  readonly observations: ReturnType<Capture['observations']>;
+  readonly requests: readonly string[];
+  /** The selection projection over the inventory the product was last acquired or read again with. */
+  readonly selection?: string;
+}
+const configurationKey = (root: string, config: string, dependencies: RetainedConfiguration['dependencies']): string => createHash('sha256')
+  .update(JSON.stringify([root, config, dependencies.map(({ path, role, sha256 }) => [path, role, sha256])])).digest('hex');
+/** The refusal of a configuration that selects no file and only references others. */
+export const solutionStyle = (config: string, data: ConfigurationData): AcquisitionError | null => data.references.length && !data.files.length
+  ? new AcquisitionError('references-only-configuration', config,
+    `Solution-style configurations are unavailable; referenced configurations: ${data.references.join(', ')}`)
+  : null;
+
 export async function acquireConfiguration(capture: Capture, config: string, previous?: RetainedConfiguration | null): Promise<{
   data: ConfigurationData; retained: RetainedConfiguration; reused: boolean;
 }> {
-  const key = (dependencies: RetainedConfiguration['dependencies']): string => createHash('sha256')
-    .update(JSON.stringify([capture.root, config, dependencies.map(({ path, role, sha256 }) => [path, role, sha256])])).digest('hex');
+  const key = (dependencies: RetainedConfiguration['dependencies']): string => configurationKey(capture.root, config, dependencies);
   if (previous?.key && previous.product.root === capture.root && previous.product.config === config) {
     await capture.replay(previous.product.observations as ReturnType<Capture['observations']>);
     const fresh = new Map(capture.inputs.map(input => [input.path, input]));
@@ -148,10 +184,65 @@ export async function acquireConfiguration(capture: Capture, config: string, pre
     }
     throw new ConfigurationChanged();
   }
-  const data = await readConfiguration(capture, config);
+  const { data, requests } = await readConfiguration(capture, config);
   const dependencies = capture.inputs.filter(input => input.role === 'configuration' || input.role === 'directory'
     || input.role === 'absent' || input.role === 'dependency' && input.bytes > 0);
-  const product = { root: capture.root, config, data, observations: capture.observations() };
+  const product: ConfigurationProduct = { root: capture.root, config, data, observations: capture.observations(), requests };
   return { data, reused: false, retained: freeze({ key: key(dependencies), dependencies,
-    bytes: Buffer.byteLength(JSON.stringify(product)), product }) };
+    bytes: Buffer.byteLength(JSON.stringify(product)), product: product as unknown as RetainedConfiguration['product'] }) };
+}
+
+/**
+ * The selection projection: every configuration field acquisition reads, as
+ * the inventory reads it. The inventory reads the selected files beneath the
+ * root that it does not own, each `exclude` list with its directory, and the
+ * `outDir` and `declarationDir` options; acquisition and resolution read the
+ * references. No other field reaches the inventory. Owned files are left out
+ * because selecting one changes neither the outside-module files nor an
+ * independent scope, so a created or deleted owned file leaves it equal.
+ * `owned` holds root-relative inventory paths.
+ */
+export function selectionProjection(root: string, data: ConfigurationData, owned: ReadonlySet<string>): string {
+  const selected = [...new Set(data.files.filter(path => within(root, path)).map(path => relative(root, path)))]
+    .filter(path => !owned.has(path)).sort(byteOrder);
+  const { outDir, declarationDir } = data.options;
+  return JSON.stringify([selected, data.references, data.exclusions, outDir ?? null, declarationDir ?? null]);
+}
+
+export type ConfigurationReread =
+  | { readonly status: 'kept'; readonly data: ConfigurationData; readonly retained: RetainedConfiguration }
+  | { readonly status: 'changed'; readonly reason: 'product' | 'projection' | 'requests' | 'dependencies' };
+
+/**
+ * Read the configuration of a retained acquisition again through the helper,
+ * on the capture that holds it, after the edited configuration files named by
+ * `refreshed` (input labels) were re-observed. A solution-style configuration is
+ * refused. The acquisition is kept only when the selection projection over the
+ * currently `owned` files equals the recorded one and the helper made exactly
+ * the requests it made before, so the capture holds the queries a fresh
+ * acquisition makes. The retained configuration then carries the new data,
+ * projection and refreshed files' identities, so a later acquisition can reuse
+ * it. Anything else is `changed`: the caller acquires again.
+ */
+export async function rereadConfiguration(capture: Capture, previous: RetainedConfiguration, owned: ReadonlySet<string>, refreshed: readonly string[],
+  control: { readonly deadline?: number; readonly signal?: AbortSignal } = {}): Promise<ConfigurationReread> {
+  const product = previous.product as unknown as ConfigurationProduct;
+  const { data, requests } = await readConfiguration(capture, product.config, control);
+  const refusal = solutionStyle(product.config, data);
+  if (refusal) throw refusal;
+  if (product.root !== capture.root || !Array.isArray(product.requests) || product.selection === undefined) return { status: 'changed', reason: 'product' };
+  const selection = selectionProjection(product.root, data, owned);
+  if (selection !== product.selection) return { status: 'changed', reason: 'projection' };
+  if (JSON.stringify(requests) !== JSON.stringify(product.requests)) return { status: 'changed', reason: 'requests' };
+  const current = new Map(capture.inputs.map(input => [input.path, input]));
+  const names = new Set(refreshed);
+  const dependencies = previous.dependencies.map(input => {
+    if (!names.delete(input.path)) return input;
+    const now = current.get(input.path);
+    return now?.role === input.role ? now : undefined;
+  });
+  if (names.size || dependencies.some(input => !input)) return { status: 'changed', reason: 'dependencies' };
+  const next = { ...previous.product, data, selection } as RetainedConfiguration['product'];
+  return { status: 'kept', data, retained: freeze({ key: configurationKey(product.root, product.config, dependencies as CapturedInput[]),
+    dependencies: dependencies as CapturedInput[], bytes: Buffer.byteLength(JSON.stringify(next)), product: next }) };
 }

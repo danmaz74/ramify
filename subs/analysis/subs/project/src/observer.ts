@@ -1,6 +1,9 @@
 import { basename, dirname, join, relative, resolve } from 'node:path';
+import { performance } from 'node:perf_hooks';
 import type { Capture } from './capture.js';
+import { rereadConfiguration } from './configuration.js';
 import { acquireProject } from './read-project.js';
+import { refreshResolution } from './resolve-root.js';
 import type { AcquiredProject } from './read-project.js';
 import { AcquisitionError, Cancelled, byteOrder, freeze, within } from './data.js';
 import { excludedDirectory, inventoryFileKind, outsideSourceWarnings } from './inventory.js';
@@ -19,14 +22,15 @@ type Classified =
   | { readonly kind: 'readme'; readonly path: string; readonly directory: string }
   | { readonly kind: 'owned'; readonly path: string; readonly module: InventoryModule }
   | { readonly kind: 'input'; readonly path: string }
+  | { readonly kind: 'configuration'; readonly path: string }
   | { readonly kind: 'structural'; readonly path: string }
   | { readonly kind: 'ignored'; readonly path: string };
 
 const issueOrder = (a: ProjectIssue, b: ProjectIssue): number =>
   byteOrder(a.path, b.path) || byteOrder(a.code, b.code) || byteOrder(a.message, b.message);
-/** A configuration or manifest read is never a locally repairable input. */
-const broadRoles = new Set<CapturedInput['role']>(['configuration']);
+/** A manifest, or a configuration name the helper did not read, is never a locally repairable input. */
 const broadNames = new Set(['tsconfig.json', 'package.json', 'package-lock.json']);
+const manifestNames = new Set(['package.json', 'package-lock.json']);
 
 /**
  * One acquired project kept observed instead of sealed. Every input keeps its
@@ -212,7 +216,9 @@ class Observer implements ProjectObserver {
   #classify(path: string): Classified {
     const name = basename(path);
     if (!within(this.#capture.root, path)) {
-      return this.#capture.recorded(path) ? { kind: 'input', path } : { kind: 'ignored', path };
+      const recorded = this.#capture.recorded(path);
+      if (recorded?.role === 'configuration') return { kind: 'configuration', path };
+      return recorded ? { kind: 'input', path } : { kind: 'ignored', path };
     }
     if (name === 'module.ramify') {
       const directory = dirname(path);
@@ -227,7 +233,9 @@ class Observer implements ProjectObserver {
     }
     const recorded = this.#capture.recorded(path);
     if (!recorded) return { kind: 'ignored', path };
-    if (broadRoles.has(recorded.role) || broadNames.has(name)) return { kind: 'structural', path };
+    // A file the configuration helper read is re-read through it; the selection decides.
+    if (recorded.role === 'configuration' && !manifestNames.has(name)) return { kind: 'configuration', path };
+    if (broadNames.has(name)) return { kind: 'structural', path };
     return { kind: 'input', path };
   }
 
@@ -236,6 +244,15 @@ class Observer implements ProjectObserver {
     const classified = paths.map(path => this.#classify(path));
     if (classified.every(item => item.kind === 'ignored')) return freeze({ kind: 'unchanged' });
     if (classified.some(item => item.kind === 'structural')) return this.#rebuild(signal);
+    const configuration = classified.filter(item => item.kind === 'configuration').map(item => item.path);
+    if (configuration.length) {
+      // Only configuration edits alone keep the acquisition; an unknown change reconciles through a rebuild.
+      if (classified.some(item => item.kind !== 'configuration' && item.kind !== 'ignored')
+        || changes.some(change => change.kind === 'unknown' && configuration.includes(resolve(this.#capture.root, change.path)))) {
+        return this.#rebuild(signal);
+      }
+      return this.#reconfigure(configuration, signal);
+    }
 
     const modules = new Map(this.#inventory.modules.map(module => [module.directory, module]));
     const files = new Map(this.#inventory.files.map(file => [file.path, file]));
@@ -310,7 +327,35 @@ class Observer implements ProjectObserver {
     });
     this.#inventory = inventory;
     return freeze({ kind: 'local', inventory, descriptions: descriptions.sort(byteOrder), readmes: readmes.sort(byteOrder),
-      created: created.sort(byteOrder), deleted: deleted.sort(byteOrder), changed: changed.sort(byteOrder) });
+      created: created.sort(byteOrder), deleted: deleted.sort(byteOrder), changed: changed.sort(byteOrder), configuration: [] });
+  }
+
+  /**
+   * Edited configuration files: re-observe them, read the configuration again
+   * through the helper on this capture, and keep the inventory and the capture
+   * when the selection projection and the helper's requests are unchanged. A
+   * solution-style configuration is refused here; a changed selection, or a
+   * configuration the helper cannot read, acquires the project again, which
+   * reports that failure as batch does.
+   */
+  async #reconfigure(paths: readonly string[], signal?: AbortSignal): Promise<InventoryUpdate> {
+    for (const path of paths) await this.#capture.refresh(path);
+    const labels = paths.map(path => this.#capture.label(path)).sort(byteOrder);
+    let reread: Awaited<ReturnType<typeof rereadConfiguration>>;
+    try {
+      reread = await rereadConfiguration(this.#capture, this.#configuration, new Set(this.#inventory.files.map(file => file.path)), labels,
+        { deadline: performance.now() + this.options.limits.deadlineMs, ...(signal ? { signal } : {}) });
+    } catch (error) {
+      if (error instanceof Cancelled || signal?.aborted) throw error;
+      if (error instanceof AcquisitionError && error.code === 'references-only-configuration') throw error;
+      return this.#rebuild(signal);
+    }
+    if (reread.status === 'changed') return this.#rebuild(signal);
+    this.#configuration = reread.retained;
+    this.#configurationData = reread.data;
+    this.#resolution = await refreshResolution(this.options.request, this.#resolution, signal);
+    return freeze({ kind: 'local', inventory: this.#inventory, descriptions: [], readmes: [], created: [], deleted: [], changed: [],
+      configuration: labels });
   }
 
   /** One owned path inside an existing source area, created, deleted or edited. */

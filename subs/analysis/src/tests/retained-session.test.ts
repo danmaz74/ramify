@@ -224,7 +224,7 @@ workerSuite('retained analysis session', import.meta.url, () => {
     } finally { await handle.dispose(); }
   }), timeout);
 
-  it('sweep-skipped-after-reacquire: a worker update reports reacquisition for a configuration edit and for no path that keeps the capture', () => fixture(async (root, inputs) => {
+  it('sweep-skipped-after-reacquire, configuration-projection-unchanged, configuration-projection-changed: a worker update reports reacquisition for a selection edit and for no path that keeps the capture', () => fixture(async (root, inputs) => {
     const { session: handle } = await opened(inputs);
     try {
       const update = async (paths: readonly string[], kind: 'changed' | 'created' = 'changed') => {
@@ -232,9 +232,17 @@ workerSuite('retained analysis session', import.meta.url, () => {
         if (result.status !== 'revised') throw new Error('Expected a revised update');
         return { path: result.revision.checked.path, identical: result.identical, reacquired: result.reacquired };
       };
-      await replace(root, 'tsconfig.json', '"target":"ES2022"', '"target":"ES2021"');
+      // An options-only edit keeps the inventory and capture: the whole program is invalidated, and the capture still sweeps.
+      await replace(root, 'tsconfig.json', '"target":"ES2022"', '"target":"ES2023"');
+      expect(await update(['tsconfig.json'])).toEqual({ path: 'broad', identical: false, reacquired: false });
+      expect((await handle.sweep()).status).toBe('unchanged');
+      await audited(handle);
+      const kept = await expectEqualToBatch(handle, inputs);
+      expect(kept.snapshot!.inputs.some(input => input.path.endsWith('/lib.es2023.full.d.ts'))).toBe(true);
+      expect(kept.snapshot!.inputs.some(input => input.path.endsWith('/lib.es2022.full.d.ts'))).toBe(false);
+      // A selection edit acquires again; the sweep the context skips finds nothing in the reacquired capture.
+      await replace(root, 'tsconfig.json', '"include":["src","subs"]', '"include":["src","subs"],"exclude":["subs/unused"]');
       expect(await update(['tsconfig.json'])).toEqual({ path: 'broad', identical: false, reacquired: true });
-      // The sweep the context skips finds nothing in the reacquired capture.
       expect((await handle.sweep()).status).toBe('unchanged');
       await audited(handle);
       await expectEqualToBatch(handle, inputs);

@@ -547,7 +547,8 @@ export async function revise(state: SessionState, changes: readonly ObservedChan
     const local = update.kind === 'local' ? update : null;
     const ownedChanged = local ? local.changed.filter(path => owned.has(path)) : [];
     const otherChanged = local ? local.changed.filter(path => !owned.has(path)) : [];
-    const explained = new Set(local ? [...local.changed, ...local.readmes, ...local.descriptions, ...local.created, ...local.deleted] : []);
+    const explained = new Set(local ? [...local.changed, ...local.readmes, ...local.descriptions, ...local.created, ...local.deleted,
+      ...local.configuration] : []);
     // A created or deleted file changes the membership of every directory
     // between it and the root; those observations are explained by it.
     for (const path of [...(local?.created ?? []), ...(local?.deleted ?? [])]) {
@@ -561,8 +562,10 @@ export async function revise(state: SessionState, changes: readonly ObservedChan
     const areasChanged = descriptions.length > 0 && previous
       && JSON.stringify(deriveAreas(state.registry, inventory).areas) !== JSON.stringify(previous.areas);
     const membershipChange = local !== null && (local.created.length > 0 || local.deleted.length > 0);
+    // The observer kept the inventory; any option can change resolution, libraries or type classification.
+    const configurationChange = local !== null && local.configuration.length > 0;
     const otherwiseBroad = state.stale || !state.adapter || !state.adapter.hot || !previous || previous.invalid !== null || previous.areaIssues.length > 0
-      || unknown || structural || areasChanged || shimChanged || otherChanged.length > 0 || unexplained.length > 0;
+      || unknown || structural || configurationChange || areasChanged || shimChanged || otherChanged.length > 0 || unexplained.length > 0;
     const refusal = membershipChange && !otherwiseBroad ? membershipRefusal(previous!, inventory, local!) : null;
     const membership = membershipChange && !otherwiseBroad && refusal === null;
     const broad = otherwiseBroad || (membershipChange && !membership);
@@ -656,7 +659,9 @@ export async function revise(state: SessionState, changes: readonly ObservedChan
     }
 
     if (broad) {
-      if (membershipChange) {
+      // The kept capture still holds the reads of the previous program and
+      // configuration, such as libraries an edited target no longer selects.
+      if (membershipChange || configurationChange) {
         start = performance.now();
         await observer.retire({ kind: 'all' });
         timings.inventory += performance.now() - start;
@@ -671,7 +676,7 @@ export async function revise(state: SessionState, changes: readonly ObservedChan
         const deleted = [...oldFiles].filter(path => !owned.has(path));
         await state.adapter.update({ changed: state.stale ? [...owned] : ownedChanged, created, deleted,
           inventory, invalidateAll: false }, signal);
-        if (state.stale || unknown || structural || shimChanged || otherChanged.length > 0 || unexplained.length > 0
+        if (state.stale || unknown || structural || configurationChange || shimChanged || otherChanged.length > 0 || unexplained.length > 0
           || created.length > 0 || deleted.length > 0) {
           await state.adapter.update({ changed: [], created: [], deleted: [], inventory: null, invalidateAll: true }, signal);
         }
