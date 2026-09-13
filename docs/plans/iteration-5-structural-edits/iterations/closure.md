@@ -1,6 +1,6 @@
 # Plan 5 structural edit latency: closure
 
-**Date:** 2026-09-13. **Status:** implementation complete; iterations 1 to 6
+**Date:** 2026-09-13. **Status:** implementation complete; iterations 1 to 7
 passed the cucumber-viz commit audit, see [Commit audits](#commit-audits). The
 [plan](../main-plan.md) delivered a repair for each of the brief's five
 hypotheses. Every matrix row has unit evidence or a results section below.
@@ -136,7 +136,7 @@ measured.
 | 4 remediation | `6c460c3`; `159634a` docs only | PASS, 2 min 48 s, 101 files and 1,536 tests | `refs/audited/runs/2026-09-13T21-12-09Z-6c460c3` |
 | 5 | `387ddc0` (with `76728ac`); `0da429f` docs only | PASS, 2 min 10 s | `refs/audited/runs/2026-09-13T21-40-33Z-387ddc0` |
 | 6 | `0cc2077`; `72c2b9b` docs only | PASS, 2 min 26 s | `refs/audited/runs/2026-09-13T22-17-59Z-0cc2077` |
-| 7 | this closure and the document updates | pending | |
+| 7 | `c28f24a`, this closure and the document updates; the audit record is a docs-only follow-up | PASS, 2 min 41 s | `refs/audited/runs/2026-09-13T22-32-48Z-c28f24a` |
 
 ## Iteration 7 deviations
 
