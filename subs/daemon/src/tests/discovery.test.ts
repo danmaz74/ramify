@@ -39,6 +39,17 @@ describe('endpoint selection', () => {
     expect(await selectEndpoint(value.options)).toEqual(value.endpoint);
   });
 
+  it('requires JavaScript bin entries but leaves a native launcher bin out of the build identity', async () => {
+    const value = await fixture();
+    const manifest = JSON.parse(await readFile(join(value.packageRoot, 'package.json'), 'utf8'));
+    await writeFile(join(value.packageRoot, 'package.json'), JSON.stringify({ ...manifest, bin: { ramify: 'dist/src/ramify' } }));
+    const launcher = await selectEndpoint(value.options);
+    await writeFile(join(value.packageRoot, 'dist/src/ramify'), '#!/bin/sh\n');
+    expect(await selectEndpoint(value.options)).toEqual(launcher);
+    await writeFile(join(value.packageRoot, 'package.json'), JSON.stringify({ ...manifest, bin: { ramify: 'dist/src/cli-entry.js' } }));
+    await expect(selectEndpoint(value.options)).rejects.toThrow('Missing or incomplete daemon build');
+  });
+
   it('prefers the option, RAMIFY_ENDPOINT_DIR, XDG_RUNTIME_DIR/ramify, then the user temporary directory', async () => {
     // macOS's per-user TMPDIR can leave insufficient space for this nested
     // precedence fixture under the independently enforced 100-byte socket bound.

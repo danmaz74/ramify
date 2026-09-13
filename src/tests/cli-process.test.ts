@@ -8,13 +8,14 @@ import { fixture, put } from './fixture.js';
 import { cliProcess, repositoryRoot } from './process.js';
 
 describe('compiled CLI process lifetime', () => {
-  it('installs a local package and runs its ramify bin through the Node shebang', async () => fixture(async root => {
+  // The installed bin runs the compiled client (compiled-client.test.ts); the probe observes the Node entry.
+  it('installs a local package and runs its Node entry through the shebang', async () => fixture(async root => {
     const installation = await mkdtemp(join(tmpdir(), 'ramify-bin-install-'));
     try {
       await writeFile(join(installation, 'package.json'), '{"private":true}');
       await promisify(execFile)('npm', ['install', '--offline', '--ignore-scripts', '--no-audit', '--no-fund', '--no-package-lock', repositoryRoot],
         { cwd: installation, timeout: 20_000 });
-      const result = await cliProcess(root, ['check', '--batch', '--format', 'json'], { executable: join(installation, 'node_modules/.bin/ramify') });
+      const result = await cliProcess(root, ['check', '--batch', '--format', 'json'], { executable: join(installation, 'node_modules/ramify.ts/dist/src/cli-entry.js') });
       expect([result.code, result.signal, result.stderr]).toEqual([0, null, '']);
       expect(JSON.parse(result.stdout)).toMatchObject({ schemaVersion: 'ramify.analysis/1', summary: { complete: true, owners: 2 } });
       expect(result.survivingChildren).toEqual([]);

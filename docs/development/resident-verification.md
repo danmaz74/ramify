@@ -27,8 +27,12 @@ group for a harness run. For a disposable shell verification:
 export RAMIFY_ENDPOINT_DIR="$(mktemp -d)"
 npm run check:reference
 npm run check:self
-node dist/src/cli-entry.js daemon stop
+dist/src/ramify daemon stop
 ```
+
+These scripts run the installed launcher, `dist/src/ramify`, which selects the
+host's compiled client when one was built. `node dist/src/cli-entry.js` runs
+the same commands through the Node entry and reaches the same daemon.
 
 Automated harnesses put stop and cleanup in `finally`, including after failed
 assertions. They wait for the daemon and observed descendants to exit, fail on

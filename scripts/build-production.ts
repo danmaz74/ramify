@@ -1,9 +1,10 @@
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { acquireProductionSelection } from './production-selection.js';
+import { compileClient } from './compiled-client.js';
 import { compilerSource, promoteProductionArtifacts } from './production-artifacts.js';
 
 async function emit(root: string, config: string): Promise<void> {
@@ -35,6 +36,9 @@ export async function buildProduction(root: string): Promise<void> {
       files: sourceFiles.map(file => join(root, file)), include: [], exclude: [] }, null, 2)}\n`);
     if (sourceFiles.length) await emit(root, config);
     await promoteProductionArtifacts(root, staging, promoted, document.files, manifest);
+    // The launcher is the bin; the Node entry beside it stays directly executable through its shebang.
+    await chmod(join(promoted, 'src/cli-entry.js'), 0o755);
+    await compileClient(promoted, workspace);
     // Do not publish artifacts after selected source changed under the build.
     const hashes = new Map(snapshot.inventory.files.map(file => [file.path, file.sha256]));
     for (const file of document.files) {

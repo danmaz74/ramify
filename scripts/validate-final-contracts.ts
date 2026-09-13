@@ -28,6 +28,13 @@ interface PackageMetadata {
   readonly bin: { readonly ramify: string };
   readonly exports: Readonly<Record<string, { readonly types: string; readonly import: string }>>;
 }
+/** Reviewed metadata after the compiled-client packaging: `nodeEntry` is the reviewed bin target. */
+interface ExpectedPackage extends PackageMetadata { readonly nodeEntry: string }
+
+// The reviewed bin target stays the Node entry. The installed `ramify` became a POSIX sh
+// launcher beside it, which execs the host compiled client when present, else that entry.
+const reviewedNodeEntry = 'dist/src/cli-entry.js';
+const launcher = 'dist/src/ramify';
 
 // Independent entry expectations: Plan 1's portable entry witnesses plus
 // the analysis and client exports required by Plan 2's activation contract.
@@ -95,7 +102,7 @@ export function reviewedOwners(baseline: string, resident: string, retained?: st
   return owners;
 }
 
-export function reviewedPackage(baseline: string, resident: string): PackageMetadata {
+export function reviewedPackage(baseline: string, resident: string): ExpectedPackage {
   const metadata = (text: string): PackageMetadata => {
     const block = [...text.matchAll(/```json\n([\s\S]*?)\n```/g)].map(match => match[1]).find(value => value.includes('"bin"'));
     assert.ok(block, 'Reviewed package metadata must be present');
@@ -104,7 +111,9 @@ export function reviewedPackage(baseline: string, resident: string): PackageMeta
   const original = metadata(baseline), addition = metadata(resident);
   assert.deepEqual(addition.bin, original.bin, 'Plan 2 keeps the bin target');
   assert.deepEqual(Object.keys(addition.exports), ['./client'], 'Plan 2 adds only the client entry');
-  const expected = { ...original, exports: { ...original.exports, ...addition.exports } };
+  assert.deepEqual(original.bin, { ramify: reviewedNodeEntry }, 'Reviewed bin targets the Node entry');
+  const expected = { ...original, bin: { ramify: launcher }, nodeEntry: reviewedNodeEntry,
+    exports: { ...original.exports, ...addition.exports } };
   assert.equal(Object.keys(expected.exports).length, 8);
   return expected;
 }
@@ -118,7 +127,7 @@ export function assertOwner(actual: string, readme: string, expected: ReviewedOw
   if (purpose.state === 'present') assert.equal(purpose.paragraph, expected.purpose, `Final README purpose differs: ${expected.directory}`);
 }
 
-export async function validatePackageEntries(root: string, expected: PackageMetadata): Promise<number> {
+export async function validatePackageEntries(root: string, expected: ExpectedPackage): Promise<number> {
   const actual = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'));
   for (const key of ['type', 'main', 'types', 'bin', 'exports'] as const) assert.deepEqual(actual[key], expected[key], `Final package ${key}`);
   for (const entry of Object.values(expected.exports)) {
@@ -148,7 +157,10 @@ for (const [name, entry] of Object.entries(metadata.exports)) {
       '--input-type=module', '--eval', probe, JSON.stringify(actual), condition, JSON.stringify(entryFunctions)],
     { cwd: root, timeout: 30_000, maxBuffer: 1024 * 1024 });
   }
-  assert.ok((await readFile(resolve(root, actual.bin.ramify), 'utf8')).startsWith('#!/usr/bin/env node\n'));
+  for (const [file, shebang] of [[actual.bin.ramify, '#!/bin/sh\n'], [expected.nodeEntry, '#!/usr/bin/env node\n']]) {
+    assert.ok((await readFile(resolve(root, file), 'utf8')).startsWith(shebang), `${file} must start with ${shebang.trim()}`);
+    assert.ok(((await stat(resolve(root, file))).mode & 0o111) !== 0, `${file} must be executable`);
+  }
   return Object.keys(expected.exports).length;
 }
 

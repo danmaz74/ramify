@@ -38,7 +38,8 @@ export async function connectDaemon(options: ConnectOptions): Promise<ConnectOut
       if (key === 'reconnectBackoffMs') { if (!Array.isArray(value) || value.some(item => !Number.isSafeInteger(item) || item < 0)) throw new Error('Invalid reconnect backoff'); }
       else if (!Number.isSafeInteger(value) || Number(value) < (key.endsWith('Attempts') ? 0 : 1)) throw new Error(`Invalid timeout: ${key}`);
     }
-    const endpoint = await selectEndpoint({ packageRoot: await packageRoot(), version: options.client.version, endpointDirectory: options.endpointDirectory });
+    const runtime = options.daemonRuntime === undefined ? {} : { daemonRuntime: options.daemonRuntime };
+    const endpoint = await selectEndpoint({ packageRoot: options.packageRoot ?? await packageRoot(), version: options.client.version, endpointDirectory: options.endpointDirectory });
     let current: SocketConnection | undefined;
     let state: ConnectionState = 'unavailable';
     let reason: DisconnectReason | null = null;
@@ -76,7 +77,7 @@ export async function connectDaemon(options: ConnectOptions): Promise<ConnectOut
       for (let attempt = 0; attempt < timeouts.startAttempts && !current; attempt++) {
         attempts++;
         try {
-          const launched = await launchDaemon({ endpoint, daemonEntry: options.daemonEntry, version: options.client.version,
+          const launched = await launchDaemon({ endpoint, daemonEntry: options.daemonEntry, ...runtime, version: options.client.version,
             engine: options.engine, startupMs: timeouts.startupMs, signal });
           started ||= launched.started; await connect();
         } catch (error) { last = error; if (terminal(failure(error)) || options.signal?.aborted) throw error; }
@@ -120,7 +121,7 @@ export async function connectDaemon(options: ConnectOptions): Promise<ConnectOut
           }
           attempts++;
           try {
-            const launched = await launchDaemon({ endpoint, daemonEntry: options.daemonEntry, version: options.client.version,
+            const launched = await launchDaemon({ endpoint, daemonEntry: options.daemonEntry, ...runtime, version: options.client.version,
               engine: options.engine, startupMs: Math.max(1, Math.floor(Math.min(timeouts.startupMs, deadline - performance.now()))), signal });
             await connect(Math.min(timeouts.handshakeMs, Math.max(1, deadline - performance.now())));
             return { status: 'recovered', instance: current!.daemon.instance, restarted: launched.started };

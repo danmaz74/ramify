@@ -1,0 +1,15 @@
+#!/bin/sh
+# Installed ramify command: the compiled client built for this host, else the Node entry.
+# Both run the same CLI; the Node entry is slower to start and never different in result.
+self=$0
+case $self in */*) ;; *) self=$(command -v -- "$self") ;; esac
+# Package managers install bins as symlinks; the client and entry sit beside the real file.
+while [ -L "$self" ]; do
+  link=$(readlink -- "$self")
+  case $link in /*) self=$link ;; *) self=${self%/*}/$link ;; esac
+done
+dir=${self%/*}
+host=$(uname -sm)
+client="$dir/ramify-client-${host% *}-${host#* }"
+if [ -x "$client" ]; then exec "$client" "$@"; fi
+exec node "$dir/cli-entry.js" "$@"

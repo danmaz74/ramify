@@ -317,8 +317,11 @@ oracle; equal reports alone do not pass a step.
 
 `equivalence-cases.ts` registers all nine I2-25/I2-26 process handlers under
 `equivalence`. Each handler owns its project, npm installation prefix, short
-Unix-socket endpoint directory and process trace. The installed bin must connect
-to that endpoint without loading the batch engine in the CLI. The reported daemon
+Unix-socket endpoint directory and process trace. The installed bin resolves to the
+`dist/src/ramify` launcher, which runs the compiled client that the Node process
+probe cannot observe, so traced commands run the installed Node entry
+`dist/src/cli-entry.js`. It must connect to that endpoint without loading the batch
+engine in the CLI. The reported daemon
 must load the compiled daemon entry and listen there. Cleanup invokes `daemon
 stop`, checks every observed child, kills leaks while failing the instance, and
 removes the endpoint and install. No shared user endpoint is used.

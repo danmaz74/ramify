@@ -75,8 +75,11 @@ work; browser tag matching is implemented.
 ## Check a project
 
 Build this package with `npm run build`, then install it locally with
-`npm install /path/to/ramify` in a consuming package. Its `ramify` executable
-is available through npm's local bin directory:
+`npm install /path/to/ramify` in a consuming package. The build also compiles a
+client executable for the host with Bun, a pinned devDependency. The `ramify`
+command, the `dist/src/ramify` launcher, runs that executable, or the Node entry
+`node dist/src/cli-entry.js` where none was built. It is available through npm's
+local bin directory:
 
 ```sh
 npx ramify check
@@ -130,7 +133,8 @@ usage, production selection, gate evidence and measurement commands.
   [Collection Review reference-project plan](docs/plans/reference-project/README.md)
   and its planned compatibility and regression cases, plus the
   [implementation roadmap and plan briefs](docs/roadmap.md).
-- `src/` - CLI and daemon executable entries, resident assembly and lazy batch assembly.
+- `src/` - the installed launcher, Node and compiled CLI entries, the daemon
+  entry, resident assembly and lazy batch assembly.
 - `subs/analysis/` - batch validation and its declared model, descriptions,
   project and TypeScript children.
 - `subs/presentation/` - teaching diagrams, React components and the neutral

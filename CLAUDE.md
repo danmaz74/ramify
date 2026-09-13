@@ -104,7 +104,10 @@ records acceptance evidence and remaining limitations.
 The [architecture overview](docs/architecture/README.md) indexes the implementation
 design. CLI checks use a lightweight client talking directly to the resident analysis
 daemon. `--batch` selects an independent disposable session. Watch, status and
-stop use the same client. The planned on-demand tRPC web process for
+stop use the same client. The installed `ramify` launcher runs a Bun-compiled
+client for the host, else the Node entry; the compiled client runs batch analysis
+and the daemon in Node, as [optimization](docs/architecture/optimization.md) records.
+The planned on-demand tRPC web process for
 visualization remains separate.
 The later root child `mcp [dispatch]` serves stdio through a lazily loaded
 `ramify mcp` mode, using the same daemon client; it is independent of visualization.

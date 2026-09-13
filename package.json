@@ -5,7 +5,7 @@
   "description": "Multi-file hierarchical modules for TypeScript: a toolkit to define, enforce, visualize, and help agents adhere to them.",
   "type": "module",
   "bin": {
-    "ramify": "dist/src/cli-entry.js"
+    "ramify": "dist/src/ramify"
   },
   "exports": {
     ".": {
@@ -62,8 +62,8 @@
     "example:test:cucumber": "npm --prefix examples/collection-review run test:cucumber",
     "reference:cases": "vitest run -c scripts/reference-harness/vitest.config.ts",
     "reference:report": "tsx scripts/reference-harness/report.ts",
-    "check:reference": "node dist/src/cli-entry.js check --root examples/collection-review",
-    "check:self": "node dist/src/cli-entry.js check --root .",
+    "check:reference": "dist/src/ramify check --root examples/collection-review",
+    "check:self": "dist/src/ramify check --root .",
     "measure:batch": "node scripts/measurements/run.mjs",
     "measure:resident": "node scripts/measurements/resident.mjs",
     "measure:fast": "node scripts/measurements/fast.mjs",
@@ -76,6 +76,7 @@
     "@types/node": "^26.4.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
+    "bun": "1.4.2",
     "jsdom": "^30.0.1",
     "tsx": "^4.23.13",
     "vitest": "^4.1.11"

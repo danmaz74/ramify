@@ -22,7 +22,7 @@ adapter process and an on-demand web server. The MCP host starts the adapter
 through a CLI serving mode, `ramify mcp`; that process lives for the stdio
 connection. Ordinary CLI commands, MCP and web adapters consume the same daemon
 service. Batch execution runs the same engine independently inside the CLI
-process.
+process, or in a Node child of the compiled client.
 
 The daemon retains analysis state within explicit resource limits so that a
 check after a small edit is fast; agent post-write hooks are the main use case.
@@ -38,6 +38,7 @@ exit and reclaim its memory without discarding warm analysis.
 | [Memory lifecycle](memory-lifecycle.md) | Resident dependency boundaries, retention and work limits, memory reclamation and measurement requirements. |
 | [Quick testing](quick-testing.spec.md) | In-process execution of real client/service flows, the boundaries replaced in quick mode, and complementary transport/process tests. |
 | [CLI invocation](cli-invocation.spec.md) | How `ramify check` selects the project, finds the compiler configuration, treats files outside modules, reports and exits. |
+| [Optimization](optimization.md) | Process-level optimization decisions, starting with the Bun-compiled per-invocation client that avoids Node startup on every hook. |
 
 The [tooling roadmap](../roadmap.md) owns migration and
 delivery order. Its first detailed plan is

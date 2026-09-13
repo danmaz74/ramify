@@ -271,7 +271,9 @@ Node analysis, presentation and CLI. They confer no internal Ramify visibility.
 The combined `src/index.ts` entry has been removed. Both `ramify.ts` and
 `ramify.ts/analysis` select the analysis entry; `ramify.ts/analysis/inventory`,
 `ramify.ts/model`, `ramify.ts/presentation`, `ramify.ts/layout` and `ramify.ts/cli`
-select their respective owner entries. The executable is `dist/src/cli-entry.js`.
+select their respective owner entries. The installed executable is the
+`dist/src/ramify` launcher, which runs the compiled client or the Node entry
+`dist/src/cli-entry.js`.
 The [entry-point dependency requirements](processes-and-clients.md#modules-and-executable-entry-points)
 also keep `connectDaemon` usable without importing daemon startup or compiler
 assembly. A legal exposure path alone does not establish low startup memory.

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, realpath, rm } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { command } from './processes.js';
 import type { CommandResult } from './processes.js';
 import { repositoryRoot } from './plan.js';
@@ -23,7 +23,10 @@ export async function readTrace(path: string): Promise<TraceEvent[]> {
   return content.split('\n').filter(Boolean).map(line => JSON.parse(line) as TraceEvent);
 }
 export interface SequenceProcess {
+  /** The installed Node entry. The process probe observes Node only, never the compiled client. */
   readonly executable: string;
+  /** The installed `ramify` command: a launcher that runs the compiled client when present. */
+  readonly bin: string;
   readonly environment: NodeJS.ProcessEnv;
   readonly traceFile: string;
   readonly endpoint: string;
@@ -44,9 +47,11 @@ export function assertResidentTrace(events: readonly TraceEvent[], cliPid: numbe
 }
 
 /** Installs the real local package into a private npm prefix, then invokes its
- * bin link. Every command and spawned daemon inherits the tracing preload. */
+ * Node entry directly. Every command and spawned daemon inherits the tracing preload. */
 export async function withSequenceProcess<T>(operation: (processes: SequenceProcess) => Promise<T>, installation?: {
   readonly executable: string;
+  /** Defaults to the launcher beside the executable, as installed in dist/src. */
+  readonly bin?: string;
   readonly cwd: string;
   readonly preload: string;
   readonly environment: NodeJS.ProcessEnv;
@@ -55,7 +60,10 @@ export async function withSequenceProcess<T>(operation: (processes: SequenceProc
   // macOS's per-user TMPDIR is too long once endpoint/install nesting is added.
   const owned = await realpath(await mkdtemp('/tmp/ri11-'));
   const endpoint = join(owned, 'endpoint'), traceFile = join(owned, 'trace.jsonl');
-  const prefix = join(owned, 'install'), executable = installation?.executable ?? join(prefix, 'node_modules/.bin/ramify');
+  const prefix = join(owned, 'install');
+  // The bin launcher would exec the compiled client, which ignores the preload.
+  const executable = installation?.executable ?? join(prefix, 'node_modules/ramify.ts/dist/src/cli-entry.js');
+  const bin = installation?.bin ?? (installation ? join(dirname(installation.executable), 'ramify') : join(prefix, 'node_modules/.bin/ramify'));
   const cwd = installation?.cwd ?? repositoryRoot;
   const environment: NodeJS.ProcessEnv = { ...(installation?.environment ?? process.env), RAMIFY_ENDPOINT_DIR: endpoint,
     RAMIFY_CLI_TRACE: traceFile, RAMIFY_PROCESS_SOCKETS: 'allow', RAMIFY_CLI_PROBE: '',
@@ -69,11 +77,12 @@ export async function withSequenceProcess<T>(operation: (processes: SequenceProc
         '--no-audit', '--no-fund', repositoryRoot], 30_000, { ...process.env, NODE_OPTIONS: '' });
       assert.equal(install.error, null, install.stderr);
       assert.equal(install.code, 0, install.stderr);
+      assert.equal(await realpath(bin), join(repositoryRoot, 'dist/src/ramify'), 'Installed bin must be the launcher');
       assert.equal(await realpath(executable), join(repositoryRoot, 'dist/src/cli-entry.js'));
     }
     installed = true;
     const processes: SequenceProcess = {
-      executable, environment, traceFile, endpoint, run,
+      executable, bin, environment, traceFile, endpoint, run,
       status: async () => {
         const outcome = await run(cwd, ['daemon', 'status', '--format', 'json']);
         assert.equal(outcome.error, null);
@@ -94,7 +103,7 @@ export async function withSequenceProcess<T>(operation: (processes: SequenceProc
           : report.outcome.execution === 'invalid' || report.outcome.check === 'failed' || report.summary.denied || report.diagnostics.length ? 1 : 0);
         const events = (await readTrace(traceFile)).slice(before);
         const start = events.find(e => e.event === 'start' && e.argv?.[1] === executable);
-        assert.ok(start, 'Installed executable must be traced');
+        assert.ok(start, 'Installed Node entry must be traced');
         if (batch) assert.ok(!events.some(e => e.pid === start.pid && ['connect', 'listen', 'bind'].includes(e.event)),
           'Batch check must not contact a daemon');
         else assertResidentTrace(events, start.pid, endpoint);

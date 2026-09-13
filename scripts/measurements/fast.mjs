@@ -6,7 +6,7 @@ import { arch, cpus, platform, release, totalmem, tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { persistMeasurement } from './archive.mjs';
 import { readJsonSync, writeJsonSync } from './json-stream.mjs';
-import { packageRoot } from './common.mjs';
+import { installedCommand, packageRoot } from './common.mjs';
 import { treeIdentity } from './identities.mjs';
 import { measureProcess, processRows } from './process-observer.mjs';
 import { fastInputs, fastDependencies } from './fast-inputs.mjs';
@@ -41,7 +41,7 @@ const report = {
     logicalCpus: cpus().length, cpuModel: cpus()[0]?.model, totalMemoryBytes: totalmem(),
     concurrentActivity: process.env.RAMIFY_MEASUREMENT_ACTIVITY ?? 'Unspecified; inspect process census before performance acceptance.',
     processCensus: processRows() },
-  dependencies: {}, inputs: { build: null }, fixtures: [], budgets: fastBudgets,
+  client: null, dependencies: {}, inputs: { build: null }, fixtures: [], budgets: fastBudgets,
   performancePolicy: 'Every timing and memory target is an ideal optimization budget, recorded and never enforced; correctness, runtime limits and completeness enforced.',
   sampling: { intervalMs: 50,
     source: 'External POSIX process tree sampler plus daemonStatus over the real socket every 50 ms.',
@@ -75,8 +75,8 @@ try {
   const install = spawnSync('npm', ['install', '--prefix', prefix, '--offline', '--ignore-scripts', '--no-audit', '--no-fund', packageRoot],
     { cwd: packageRoot, env: { ...process.env, NODE_OPTIONS: '' }, encoding: 'utf8', timeout: 30_000, maxBuffer: 1024 * 1024 });
   assert.equal(install.status, 0, install.error?.message ?? install.stderr);
-  const executable = join(prefix, 'node_modules/.bin/ramify');
-  assert.equal(realpathSync(executable), join(packageRoot, 'dist/src/cli-entry.js'));
+  const { executable, client } = installedCommand(prefix);
+  report.client = client;
   persist();
   const derivedSelected = ['checked-set-bounded', 'cold-open'].includes(selected);
   for (let index = 0; index < report.workloads.length; index++) {
