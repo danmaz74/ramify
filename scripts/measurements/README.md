@@ -245,7 +245,12 @@ import, and created/deleted edits reject a missing witness before changing files
 Only the deleted phase has an absent target and its precise `unresolved-target`
 coverage note, with no finding. The first body sequence launches the installed
 hook command immediately after each save. Every command is recorded, including
-unsuccessful or uncovered replies.
+unsuccessful or uncovered replies. A racing hook must be answered from the
+revision its save produced. The revision's publication may answer it as one
+covered request with zero reply session work, or an update that included it may
+answer it with no covered request, as when it reached the daemon before the
+watcher's batch. Either way at least one analysis other than a sweep or audit
+runs; a covered answer from another revision fails.
 Twenty bare Node executions and twenty covered zero-analysis CLI checks record
 the process floor and client cost. Requests use a finite 600,000 ms measurement
 deadline so work exceeding the normal hook deadline remains measurable and its

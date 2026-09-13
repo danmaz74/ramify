@@ -95,6 +95,29 @@ export function publishedHookAttributed(cycle) {
     && s.analyses - a.analyses === maintenance(s) - maintenance(a);
 }
 
+const replySessionWork = ['invocationCheck', 'workerStatus', 'workerRoundTrip', 'publication'];
+
+/**
+ * Judges a hook launched while the watcher's update for its write ran. `b` and
+ * `s` are daemon counters sampled before the save and once settled. The hook
+ * must be answered from the racing revision with every changed entry covered.
+ * Either the revision that published answered it as a covered request with no
+ * session work of its own, or it added no covered request and was answered by
+ * an update that included it, as when it arrived before the watcher's batch.
+ * Sweeps and audits count in `analyses` and are discounted; at least one other
+ * analysis must have run. A covered answer from another revision, more than one
+ * covered request, or a covered reply that reports session work fails.
+ */
+export function racingHookAttributed(cycle) {
+  const b = cycle?.countersBeforeSave, s = cycle?.settled?.counters, reply = cycle?.hook?.document?.timings?.reply;
+  if (![b, s].every(counters => counterFields.every(field => Number.isSafeInteger(counters?.[field]) && counters[field] >= 0))) return false;
+  if (!coveringEdit(cycle) || cycle.hook.code !== 0) return false;
+  if (s.analyses - b.analyses - (maintenance(s) - maintenance(b)) < 1) return false;
+  const covered = s.coveredRequests - b.coveredRequests;
+  if (covered === 1) return reply === undefined || replySessionWork.every(field => reply[field] === 0);
+  return covered === 0 && (reply === undefined || reply.workerRoundTrip > 0);
+}
+
 /** Recompute from raw responses and observations, never trust a saved verdict. */
 export function assertFastWorkload(id, measurements) {
   if (id === 'I5-13:entry-footprints') return assertResidentWorkload('I2-29:entry-footprints', measurements);
@@ -238,11 +261,10 @@ export function assertFastWorkload(id, measurements) {
     const racing = data.cycles?.body;
     check('racing hooks launched before publication', racing?.length > 0 && racing.every(cycle => cycle.hookStartedAt <= cycle.revision?.publishedAt),
       racing?.map(cycle => ({ started: cycle.hookStartedAt, published: cycle.revision?.publishedAt })) ?? null);
-    check('racing hooks wait for an uncovered identity', racing?.length > 0 && racing.every(cycle =>
-      natural(cycle.countersBeforeSave?.coveredRequests)
-      && cycle.settled?.counters?.coveredRequests === cycle.countersBeforeSave.coveredRequests),
-    racing?.map(cycle => ({ before: cycle.countersBeforeSave?.coveredRequests ?? null,
-      after: cycle.settled?.counters?.coveredRequests ?? null })) ?? null);
+    check('racing hooks are answered from the racing revision', racing?.length > 0 && racing.every(racingHookAttributed),
+      { cycles: racing?.length ?? 0,
+        covered: racing?.filter(cycle => cycle.settled?.counters?.coveredRequests === cycle.countersBeforeSave?.coveredRequests + 1).length ?? 0,
+        unattributed: racing?.flatMap((cycle, index) => racingHookAttributed(cycle) ? [] : [index + 1]) ?? [] });
     target('racing: median hook end to end (ms)', med(racing?.map(cycle => cycle.hook.durationMs)), limit.racing);
     count('watcher already published: twenty hooks', data.published, 20);
     for (const [index, cycle] of (data.published ?? []).entries()) completed(`published ${index + 1}`, cycle);

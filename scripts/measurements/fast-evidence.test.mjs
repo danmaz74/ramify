@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import { gzipSync } from 'node:zlib';
 import { archiveMeasurement } from './archive.mjs';
 import { sha256 } from './common.mjs';
-import { assertFastWorkload, deriveFastMeasurements, fastDeferrals, publishedHookAttributed } from './fast-assertions.mjs';
+import { assertFastWorkload, deriveFastMeasurements, fastDeferrals, publishedHookAttributed, racingHookAttributed } from './fast-assertions.mjs';
 import { fastBudgets, fastFixtures, fastWorkloads } from './fast-plan.mjs';
 import { findFastEvidence, readFastEvidence, verifyFastEvidence } from './verify-fast-evidence.mjs';
 
@@ -151,13 +151,53 @@ test('checked-set evidence requires covering advancing revisions for every recor
   }
 });
 
-test('racing evidence rejects a request that found the revision already covered', () => {
-  const bodies = Array.from({ length: 20 }, (_, index) => ({ ...cycle(index), settled: { counters: { coveredRequests: 0 } } }));
+test('racing evidence accepts a hook covered on publication or answered by its own update, and rejects a wrong answer', () => {
+  const zero = { invocationCheck: 0, workerStatus: 0, workerRoundTrip: 0, publication: 0, service: 3, clientTransport: 1 };
+  const worked = { invocationCheck: 1, workerStatus: 1, workerRoundTrip: 40, publication: 2, service: 45, clientTransport: 1 };
+  const counters = (analyses, coveredRequests, sweeps = 0, audits = 0) => ({ analyses, revisions: analyses, coveredRequests, sweeps, audits });
+  /** One watcher update published the racing revision; the hook was a covered request on that publication. */
+  const coveredCycle = index => {
+    const row = cycle(index);
+    row.countersBeforeSave = counters(10, 4);
+    row.settled = { counters: counters(11, 5) };
+    row.hook.document.timings.reply = { ...zero };
+    return row;
+  };
+  const bodies = () => Array.from({ length: 20 }, (_, index) => coveredCycle(index));
   const predicate = data => assertFastWorkload('I5-13:hook-latency-reference', data)
-    .find(value => value.name === 'racing hooks wait for an uncovered identity');
-  assert.equal(predicate({ cycles: { body: bodies } }).passed, true);
-  bodies[3].settled.counters.coveredRequests++;
-  assert.equal(predicate({ cycles: { body: bodies } }).passed, false);
+    .find(value => value.name === 'racing hooks are answered from the racing revision');
+  assert.equal(predicate({ cycles: { body: bodies() } }).passed, true);
+  const accepted = [
+    ['a hook that reached check before the watcher batch runs two updates', row => {
+      row.settled.counters = counters(12, 4); row.hook.document.timings.reply = { ...worked }; }],
+    ['a hook answered by its own identical update', row => {
+      row.settled.counters = counters(11, 4); row.hook.document.timings.reply = { ...worked }; }],
+    ['a sweep in the settle window is discounted', row => { row.settled.counters = counters(12, 5, 1); }],
+    ['a document without reply timings', row => { delete row.hook.document.timings.reply; }],
+  ];
+  for (const [label, mutate] of accepted) {
+    const rows = bodies(); mutate(rows[3]);
+    assert.equal(racingHookAttributed(rows[3]), true, label);
+    assert.equal(predicate({ cycles: { body: rows } }).passed, true, label);
+  }
+  const rejected = [
+    ['a covered answer from the revision before the save', row => {
+      row.revision.sequence = row.beforeSequence; row.hook.document.revision.sequence = row.beforeSequence; }],
+    ['a covered answer naming another revision', row => { row.hook.document.revision.id = 'rev/stale'; }],
+    ['a covered entry with the wrong content', row => { row.hook.document.changed[0].sha256 = 'wrong-content'; }],
+    ['an uncovered changed entry', row => { row.hook.document.changed[0].covered = false; }],
+    ['a not-checked reply', row => { row.hook.code = 2; row.hook.document.outcome = 'not-checked'; row.hook.document.exitCode = 2; }],
+    ['two covered requests', row => { row.settled.counters.coveredRequests++; }],
+    ['a covered reply reporting session work', row => { row.hook.document.timings.reply = { ...worked }; }],
+    ['an uncovered reply reporting no session work', row => { row.settled.counters.coveredRequests--; }],
+    ['no analysis beyond maintenance', row => { row.settled.counters = counters(11, 5, 1); }],
+    ['missing counters', row => { delete row.countersBeforeSave.analyses; }],
+  ];
+  for (const [label, mutate] of rejected) {
+    const rows = bodies(); mutate(rows[3]);
+    assert.equal(racingHookAttributed(rows[3]), false, label);
+    assert.equal(predicate({ cycles: { body: rows } }).passed, false, label);
+  }
 });
 
 test('filtered extraction requires twenty covering one-file revisions and cannot use broad timings', () => {
