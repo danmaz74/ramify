@@ -38,6 +38,8 @@ HO-19 `rss-sampling`, HO-20 `docs-updated`.
 ```sh
 npx vitest run subs/analysis/src/tests
 npm run type-check
+npm run build
+npm run check:self
 git diff --check
 ```
 
