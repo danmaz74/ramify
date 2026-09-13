@@ -2,24 +2,35 @@ import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import type { SessionUpdate } from '../interfaces/session.js';
+import type { resolveProjectRoot } from '../../subs/project/src/resolve-root.js';
 import { audited, equalToBatch, fixture, fixtureFiles, opened, paths, put, replace, timeout } from './session-test-fixture.js';
 
 // Every root resolution that is not reused reads the configuration through the
-// helper; acquisition's own configuration reads use the module's internal binding.
-const resolutions = vi.hoisted(() => ({ count: 0 }));
-vi.mock('../../subs/project/src/configuration.js', async original => {
-  const actual = await original<typeof import('../../subs/project/src/configuration.js')>();
-  return { ...actual, readConfiguration: (...args: Parameters<typeof actual.readConfiguration>) => {
-    resolutions.count++;
-    return actual.readConfiguration(...args);
+// helper process. The resolver is wrapped through its exposed binding: each call
+// counts the helper processes spawned while it runs and whether it returned a
+// resolution it was not given. Acquisition's own configuration reads do not pass
+// through it.
+const resolutions = vi.hoisted(() => ({ helpers: 0, fresh: 0 }));
+vi.mock('../../subs/project/src/resolve-root.js', async original => {
+  const actual = await original<{ resolveProjectRoot: typeof resolveProjectRoot }>();
+  const { createHook } = await import('node:async_hooks');
+  return { ...actual, resolveProjectRoot: async (...args: Parameters<typeof resolveProjectRoot>) => {
+    const hook = createHook({ init(_id, type) { if (type === 'PROCESSWRAP') resolutions.helpers++; } }).enable();
+    try {
+      const resolution = await actual.resolveProjectRoot(...args);
+      if (!(args[2] ?? []).includes(resolution)) resolutions.fresh++;
+      return resolution;
+    } finally { hook.disable(); }
   } };
 });
 
 /** Root resolutions performed by one operation, beside its result. */
 async function counted(operation: () => Promise<SessionUpdate>): Promise<{ result: SessionUpdate; resolutions: number }> {
-  const before = resolutions.count;
+  const helpers = resolutions.helpers, fresh = resolutions.fresh;
   const result = await operation();
-  return { result, resolutions: resolutions.count - before };
+  // A resolution the session did not already hold is exactly one that spawned its helper.
+  expect(resolutions.fresh - fresh).toBe(resolutions.helpers - helpers);
+  return { result, resolutions: resolutions.helpers - helpers };
 }
 
 describe('invocation checks reuse the session resolution', () => {
