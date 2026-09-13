@@ -45,21 +45,77 @@ export function processAlive(pid: number): boolean {
   catch (error) { if ((error as NodeJS.ErrnoException).code === 'ESRCH') return false; throw error; }
 }
 
-/** Compiler RSS is separate from the worker's process-wide RSS. */
-export async function processRss(pid: number): Promise<number | null> {
-  if (process.platform === 'linux') {
+/** Compiler RSS is separate from the worker's process-wide RSS. Linux reads
+ * `/proc`; macOS spawns `/bin/ps` for each read. */
+export async function processRss(pid: number, platform: NodeJS.Platform = process.platform): Promise<number | null> {
+  if (platform === 'linux') {
     try {
       const match = (await readFile(`/proc/${pid}/status`, 'utf8')).match(/^VmRSS:\s+(\d+)/m);
       return match ? Number(match[1]) * 1024 : null;
     } catch { return null; }
   }
-  if (process.platform === 'darwin') return new Promise(resolve => {
+  if (platform === 'darwin') return new Promise(resolve => {
     execFile('/bin/ps', ['-o', 'rss=', '-p', String(pid)], { timeout: 1_000 }, (error, stdout) => {
       const bytes = Number(stdout.trim()) * 1024;
       resolve(!error && Number.isFinite(bytes) && bytes > 0 ? bytes : null);
     });
   });
   return null;
+}
+
+/** The longest a reported compiler RSS sample is reused where a read spawns a process. */
+export const rssSampleIntervalMs = 5_000;
+
+export interface RssSampling {
+  readonly platform?: NodeJS.Platform;
+  readonly read?: (pid: number) => Promise<number | null>;
+  readonly now?: () => number;
+  readonly intervalMs?: number;
+}
+export interface RssSampler {
+  /** The compiler RSS to report with a worker status message. */
+  sample(pid: number): Promise<number | null>;
+  dispose(): void;
+}
+
+/**
+ * Samples compiler RSS for the session status. On Linux every worker status
+ * message reads `/proc`, which starts no process. Elsewhere a read may spawn a
+ * process, so a compiler is read when its pid is first reported and the sample
+ * is then reused. A status message that finds the sample at least `intervalMs`
+ * old starts one background read and still reports the reused sample; the
+ * read's result reaches `refreshed`. No read runs without a status message.
+ */
+export function createRssSampler(refreshed: (pid: number, rss: number | null) => void, options: RssSampling = {}): RssSampler {
+  const platform = options.platform ?? process.platform;
+  const read = options.read ?? ((pid: number) => processRss(pid, platform));
+  if (platform === 'linux') return { sample: read, dispose: () => undefined };
+  const now = options.now ?? (() => performance.now());
+  const intervalMs = options.intervalMs ?? rssSampleIntervalMs;
+  let latest: { readonly pid: number; readonly rss: number | null; readonly at: number } | null = null;
+  let reading = false, disposed = false;
+  return {
+    async sample(pid) {
+      if (latest?.pid !== pid) {
+        const at = now(), rss = await read(pid);
+        if (!disposed) latest = { pid, rss, at };
+        return rss;
+      }
+      const current = latest;
+      if (!reading && now() - current.at >= intervalMs) {
+        reading = true;
+        const at = now();
+        void read(pid).then(rss => {
+          reading = false;
+          if (disposed || latest !== current) return;
+          latest = { pid, rss, at };
+          refreshed(pid, rss);
+        }, () => { reading = false; });
+      }
+      return current.rss;
+    },
+    dispose: () => { disposed = true; latest = null; },
+  };
 }
 
 /** Verify the host's observations after the supervisor has reaped its children.

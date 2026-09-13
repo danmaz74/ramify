@@ -5,7 +5,8 @@ import type { SessionCommand, WorkerMessage, WorkerOpen, WorkerResult } from './
 import { diagnostic } from './report-data.js';
 import { ReportDraft } from './report.js';
 import { deepFreeze } from './session-facts.js';
-import { processRss, releaseSessionChildren } from './session-processes.js';
+import { createRssSampler, releaseSessionChildren } from './session-processes.js';
+import type { RssSampler, RssSampling } from './session-processes.js';
 
 interface Pending {
   readonly operation: SessionCommand['operation'];
@@ -37,6 +38,7 @@ class SessionHost implements RetainedSession {
   readonly #pending = new Map<number, Pending>();
   readonly #children = new Set<number>();
   readonly #exit: Promise<void>;
+  readonly #rss: RssSampler;
   #messages: Promise<void> = Promise.resolve();
   #nextId = 0;
   #current: SessionRevision | null = null;
@@ -46,8 +48,13 @@ class SessionHost implements RetainedSession {
   #disposal: Promise<void> | null = null;
   #ready: Promise<void>;
 
-  constructor(inputs: SessionInputs, entry: URL) {
+  constructor(inputs: SessionInputs, entry: URL, sampling?: RssSampling) {
     this.#inputs = inputs;
+    // A background compiler sample replaces only the status of the compiler it read.
+    this.#rss = createRssSampler((pid, rss) => {
+      if (this.#failed || this.#closing || this.#status.compiler.pid !== pid) return;
+      this.#status = deepFreeze({ ...this.#status, compiler: { pid, rss } });
+    }, sampling);
     const source = entry.pathname.endsWith('.ts');
     const loader = new URL('./session-source-loader.js', import.meta.url);
     if (source) loader.pathname = loader.pathname.replace(/\.js$/, '.ts');
@@ -79,7 +86,7 @@ class SessionHost implements RetainedSession {
         if (this.#failed) return;
         if (message.status) {
           const pid = message.status.compiler.pid;
-          const rss = pid === null ? null : await processRss(pid);
+          const rss = pid === null ? null : await this.#rss.sample(pid);
           if (this.#failed) return;
           this.#status = deepFreeze({ ...message.status, compiler: { pid, rss } });
         }
@@ -173,6 +180,7 @@ class SessionHost implements RetainedSession {
         } finally {
           await this.#exit;
           await this.#messages;
+          this.#rss.dispose();
           if (released) this.#children.clear();
           this.#worker.removeAllListeners();
           this.#rejectPending(failure('session-disposed', 'Retained session is disposed'));
@@ -224,7 +232,8 @@ class SessionHost implements RetainedSession {
   }
 }
 
-export async function openWorkerSession(inputs: SessionInputs, control: RunControl = {}, entry?: URL): Promise<SessionOpen> {
+export async function openWorkerSession(inputs: SessionInputs, control: RunControl = {}, entry?: URL,
+  sampling?: RssSampling): Promise<SessionOpen> {
   if (control.signal?.aborted) return { status: 'cancelled' };
   const detached = deepFreeze(structuredClone(inputs));
   if (!detached.session || Object.values(detached.session).some(value => !Number.isSafeInteger(value) || value <= 0)) {
@@ -238,6 +247,6 @@ export async function openWorkerSession(inputs: SessionInputs, control: RunContr
   }
   const workerEntry = entry ?? new URL('./session-worker.js', import.meta.url);
   if (!entry && import.meta.url.endsWith('.ts')) workerEntry.pathname = workerEntry.pathname.replace(/\.js$/, '.ts');
-  try { return await new SessionHost(detached, workerEntry).open(control); }
+  try { return await new SessionHost(detached, workerEntry, sampling).open(control); }
   catch (error) { return { status: 'reported', report: failureReport(detached, error as Error) }; }
 }
