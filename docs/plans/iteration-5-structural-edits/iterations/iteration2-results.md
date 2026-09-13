@@ -262,3 +262,10 @@ Resolved decision 3 supersedes these HO-11 and HO-12 expectations from
   observer's rebuild.
 - **Review decision 4.** Record the session's `internal-error` projection
   above beside the accepted move of attribution.
+
+## Audit
+
+The cucumber-viz commit audit of `c8474d9` (source `f97895a` plus these
+results), run with `use_existing_head` on the worktree, passed in 2 min 1 s:
+worktree dependencies, type-check and the Vitest regression suite. Evidence:
+`refs/audited/runs/2026-09-13T19-51-33Z-c8474d9`.
