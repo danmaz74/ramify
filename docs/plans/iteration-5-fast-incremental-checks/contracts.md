@@ -178,6 +178,7 @@ export type InventoryUpdate =
   | { readonly kind: 'incomplete'; readonly issues: readonly ProjectIssue[] };
 export interface ProjectObserver {
   readonly inventory: ProjectInventory;
+  readonly resolution: Extract<ProjectResolution, { readonly status: 'resolved' }>;
   readonly inputs: readonly CapturedInput[];
   readonly inputId: string;
   readonly sink: ObservationSink;
@@ -216,7 +217,14 @@ whose signature changed and returns their changes. `inputId` is computed by
 the same recipe as `run-analysis.ts` over the current observations, so a
 session revision and a batch report over the same inputs carry the same
 identity. After an invalid update, `inventory` remains the last valid inventory;
-that stale inventory is never used to publish valid facts. `readProject` and `resolveProjectRoot` are unchanged.
+that stale inventory is never used to publish valid facts. `readProject` is unchanged.
+`resolution` is the resolution the acquisition behind `inventory` made; a structural
+rebuild replaces it. `resolveProjectRoot(request, signal?, known?)` gains the optional
+`known` resolutions, most recent first: the first recorded for an equal request is
+returned unchanged, with no configuration helper, while every discovery query it made
+answers the same on disk, and it resolves again otherwise. `resolveProject(request,
+control?, known?)` passes `known` through. These additive members follow resolved
+decision 5 of the [hook optimization plan](../iteration-5-hook-optimization/main-plan.md#resolved-decisions).
 
 ## Analysis: the retained session
 
@@ -358,7 +366,8 @@ deadlines only bound the contexts wait and do not cancel an active update.
 `increment.ts`, `retained-products.ts`, the retained input of
 `run-analysis.ts` and `session.ts` and the increment types are removed in
 iteration 9; `analyzeProject`, `createAnalysisSession`, `validateProject`,
-`acquireInventory` and `resolveProject` are unchanged.
+`acquireInventory` are unchanged; `resolveProject` gains only the optional `known`
+argument described with the observer.
 
 ## Contexts: the session driver, revisions and requests
 
@@ -366,7 +375,7 @@ iteration 9; `analyzeProject`, `createAnalysisSession`, `validateProject`,
 
 ```ts
 export interface AnalysisDriver {
-  resolve(request: ProjectRequest, control?: RunControl): Promise<ProjectResolution>;
+  resolve(request: ProjectRequest, control?: RunControl, known?: readonly ProjectResolution[]): Promise<ProjectResolution>;
   open(project: ProjectRequest, setup: ContextSetup, control?: RunControl): Promise<SessionOpen>;
   dispose(): Promise<void>;
 }
@@ -425,7 +434,11 @@ export interface ContextStatus { /* Plan 2 members unchanged */ readonly level: 
 `RevisionCause` gains `sweep`; `reused` is removed from `ContextRevision`;
 `UnavailableReason` is unchanged and `unobserved-input` keeps its meaning.
 `ContextEvent` is unchanged in shape; a `revision-published` event now
-carries the extended header.
+carries the extended header. `AnalysisDriver.resolve` accepts optional `known`
+resolutions of an equal request, most recent first, and returns one unchanged, as
+the same object, only while every discovery query it made answers the same. The
+manager passes the resolutions held by contexts with a live session and records
+the result per context (hook optimization resolved decision 5).
 
 Manager rules (iteration 9):
 
