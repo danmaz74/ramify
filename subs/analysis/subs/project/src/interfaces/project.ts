@@ -143,7 +143,7 @@ export type InventoryUpdate =
 export interface ProjectObserver {
   readonly inventory: ProjectInventory;
   /** The resolution of the acquisition behind `inventory`, replaced by a structural rebuild.
-   * Passed to `resolveProjectRoot` as known, it is reused while its queries answer the same. */
+   * Passed to `resolveProjectRoot` as known, it is reused while its discovery queries answer the same. */
   readonly resolution: Extract<ProjectResolution, { readonly status: 'resolved' }>;
   readonly inputs: readonly CapturedInput[];
   readonly inputId: string;

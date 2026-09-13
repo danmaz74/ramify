@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import type { SessionUpdate } from '../interfaces/session.js';
 import type { resolveProjectRoot } from '../../subs/project/src/resolve-root.js';
+import { analyzeProject } from '../index.js';
 import { audited, equalToBatch, fixture, fixtureFiles, opened, paths, put, replace, timeout } from './session-test-fixture.js';
 
 // Every root resolution that is not reused reads the configuration through the
@@ -64,20 +65,83 @@ describe('invocation checks reuse the session resolution', () => {
     } finally { await handle.dispose(); }
   }), timeout);
 
-  it('root-resolution-invalidated: a configuration edit resolves again and a moved root is refused', () => fixture(async (root, inputs) => {
+  it('resolution-survives-membership: a created or deleted source file reuses the resolution in the invocation check', () => fixture(async (root, inputs) => {
+    const { handle } = await opened(inputs);
+    try {
+      const invocation = { project: inputs.project, capabilities: inputs.capabilities };
+      const nested = { ...invocation, project: { cwd: join(root, 'subs/branch/src'), scope: 'whole-project' as const, configuration: 'discover' as const } };
+      expect((await counted(() => handle.update([], {}, nested))).resolutions).toBe(1);
+      // The configuration helper enumerated `subs/branch/src`; its membership is not a discovery answer.
+      await put(root, paths.extra, 'export const extra = 1;\n');
+      const created = await counted(() => handle.update([{ path: paths.extra, kind: 'created' }], {}, invocation));
+      expect(created.resolutions).toBe(0);
+      expect(created.result).toMatchObject({ status: 'revised', identical: false });
+      expect(created.result.status === 'revised' && created.result.revision.inputs.some(input => input.path === paths.extra)).toBe(true);
+      expect((await counted(() => handle.update([], {}, nested))).resolutions).toBe(0);
+      expect((await counted(() => handle.update([], {}, invocation))).resolutions).toBe(0);
+      await audited(handle);
+      await equalToBatch(handle, inputs);
+      await rm(join(root, paths.extra));
+      const deleted = await counted(() => handle.update([{ path: paths.extra, kind: 'deleted' }], {}, invocation));
+      expect(deleted.resolutions).toBe(0);
+      expect(deleted.result).toMatchObject({ status: 'revised', identical: false });
+      expect(deleted.result.status === 'revised' && deleted.result.revision.inputs.some(input => input.path === paths.extra)).toBe(false);
+      expect((await counted(() => handle.update([], {}, nested))).resolutions).toBe(0);
+      expect((await counted(() => handle.update([], {}, invocation))).resolutions).toBe(0);
+      await audited(handle);
+      await equalToBatch(handle, inputs);
+    } finally { await handle.dispose(); }
+  }), timeout);
+
+  it('resolution-survives-configuration-bytes: a configuration edit reuses the resolution and a solution-style rewrite is refused by acquisition', () => fixture(async (root, inputs) => {
+    const { handle } = await opened(inputs);
+    try {
+      const invocation = { project: inputs.project, capabilities: inputs.capabilities };
+      const config = JSON.parse(fixtureFiles['tsconfig.json']!) as { compilerOptions: Record<string, unknown> };
+      await put(root, 'tsconfig.json', JSON.stringify({ ...config, compilerOptions: { ...config.compilerOptions, strict: true } }));
+      const edited = await counted(() => handle.update([{ path: 'tsconfig.json', kind: 'changed' }], {}, invocation));
+      expect(edited.resolutions).toBe(0);
+      expect(edited.result).toMatchObject({ status: 'revised', identical: false });
+      await audited(handle);
+      await equalToBatch(handle, inputs);
+      // A solution-style rewrite passes the invocation check; the observer's reacquisition refuses it.
+      await put(root, 'ref/tsconfig.json', '{"files":[]}');
+      await put(root, 'tsconfig.json', '{"files":[],"references":[{"path":"./ref"}]}');
+      const refused = await counted(() => handle.update([{ path: 'tsconfig.json', kind: 'changed' }], {}, invocation));
+      expect(refused.resolutions).toBe(0);
+      const { session: _session, ...request } = inputs;
+      const batch = await analyzeProject(request);
+      if (batch.status !== 'reported') throw new Error('Batch comparison was cancelled');
+      expect(batch.report.diagnostics).toMatchObject([{ code: 'references-only-configuration' }]);
+      // The engine projects a failed reacquisition as a failure diagnostic carrying the acquisition's message.
+      expect(refused.result).toMatchObject({ status: 'reported', report: { diagnostics: [{ code: 'internal-error', message: batch.report.diagnostics[0]!.message }] } });
+      // Restoring the configuration revises without a resolution.
+      await put(root, 'tsconfig.json', fixtureFiles['tsconfig.json']!);
+      const restored = await counted(() => handle.update([{ path: 'tsconfig.json', kind: 'changed' }], {}, invocation));
+      expect(restored.resolutions).toBe(0);
+      expect(restored.result).toMatchObject({ status: 'revised' });
+      await equalToBatch(handle, inputs);
+    } finally { await handle.dispose(); }
+  }), timeout);
+
+  it('root-resolution-invalidated, resolution-invalidated-by-discovery: a created or deleted description or configuration on the discovery path resolves again and a moved root is refused', () => fixture(async (root, inputs) => {
     const { handle } = await opened(inputs);
     try {
       const invocation = { project: { cwd: join(root, 'subs/branch/src'), scope: 'whole-project' as const, configuration: 'discover' as const },
         capabilities: inputs.capabilities };
       expect((await counted(() => handle.update([], {}, invocation))).resolutions).toBe(1);
       expect((await counted(() => handle.update([], {}, invocation))).resolutions).toBe(0);
-      // A configuration edit changes a read the resolution made.
-      const config = JSON.parse(fixtureFiles['tsconfig.json']!) as { compilerOptions: Record<string, unknown> };
-      await put(root, 'tsconfig.json', JSON.stringify({ ...config, compilerOptions: { ...config.compilerOptions, strict: true } }));
-      const edited = await counted(() => handle.update([{ path: 'tsconfig.json', kind: 'changed' }], {}, invocation));
-      expect(edited.resolutions).toBe(1);
-      expect(edited.result).toMatchObject({ status: 'revised', identical: false });
-      expect((await counted(() => handle.update([], {}, invocation))).resolutions).toBe(0);
+      // The configuration found on the discovery path is deleted: the invocation no longer
+      // resolves, and discovery fails before any helper could be spawned.
+      await rm(join(root, 'tsconfig.json'));
+      const deleted = await handle.update([], {}, invocation);
+      expect(deleted.status === 'reported' && deleted.report.diagnostics[0]!.message)
+        .toBe('The invocation does not resolve to a project: No tsconfig.json at the root or its ancestors');
+      // Created again, every discovery query answers as recorded: the earlier resolution is valid again.
+      await put(root, 'tsconfig.json', fixtureFiles['tsconfig.json']!);
+      const created = await counted(() => handle.update([], {}, invocation));
+      expect(created.resolutions).toBe(0);
+      expect(created.result).toMatchObject({ status: 'revised' });
       // A description in `src/` is the nearest boundary of this working directory:
       // the invocation now resolves to an independent root, not the session's.
       await put(root, 'subs/branch/src/module.ramify', 'ramify 1\nmodule moved\n');

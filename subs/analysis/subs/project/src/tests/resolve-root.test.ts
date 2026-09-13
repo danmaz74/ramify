@@ -1,5 +1,5 @@
 import { createHook } from 'node:async_hooks';
-import { mkdtemp, realpath, rm, unlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, realpath, rm, symlink, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -92,7 +92,8 @@ describe('reused project-root resolution', () => {
       const both = await spawned(() => resolveProjectRoot(request, undefined, [elsewhere.value, first.value]));
       expect(both.value).toBe(first.value); expect(both.helpers).toBe(0);
       // An observer's acquisition records the same resolution evidence, and a
-      // structural rebuild replaces it with its own.
+      // structural rebuild replaces it with its own. A configuration content
+      // edit is not a discovery answer, so both remain valid.
       const observed = await observeProject({ request, limits, parse: syntax });
       if (observed.status !== 'observing') throw new Error(JSON.stringify(observed));
       try {
@@ -104,15 +105,55 @@ describe('reused project-root resolution', () => {
         expect((await observed.observer.apply([{ path: 'tsconfig.json', kind: 'changed' }])).kind).toBe('structural');
         const rebuilt = observed.observer.resolution;
         expect(rebuilt).not.toBe(seeded);
-        const stale = await spawned(() => resolveProjectRoot(request, undefined, [seeded]));
-        expect(stale.value).not.toBe(seeded); expect(stale.helpers).toBe(1);
+        const seed = await spawned(() => resolveProjectRoot(request, undefined, [seeded]));
+        expect(seed.value).toBe(seeded); expect(seed.helpers).toBe(0);
         const current = await spawned(() => resolveProjectRoot(request, undefined, [rebuilt]));
         expect(current.value).toBe(rebuilt); expect(current.helpers).toBe(0);
       } finally { await observed.observer.dispose(); }
     } finally { await rm(work, { recursive: true, force: true }); }
   }, 60_000);
 
-  it('root-resolution-invalidated: a configuration edit, a created or deleted candidate, membership or a moved root resolves again', async () => {
+  it('resolution-survives-membership: a created or deleted source file in an enumerated directory reuses the resolution', async () => {
+    const work = await realpath(await mkdtemp(join(tmpdir(), 'ramify-resolution-membership-')));
+    const root = join(work, 'project');
+    try {
+      await fixture(root);
+      const request = found(join(root, 'src'));
+      const first = await spawned(() => resolveProjectRoot(request));
+      expect(first.helpers).toBe(1);
+      const reused = async (): Promise<void> => {
+        const next = await spawned(() => resolveProjectRoot(request, undefined, [first.value]));
+        expect(next.value).toBe(first.value); expect(next.helpers).toBe(0);
+      };
+      // The configuration helper enumerated `src`; its membership is not a discovery answer.
+      await put(root, 'src/added.ts', 'export const added = 1;\n');
+      await reused();
+      await put(root, 'src/nested/deeper.ts', 'export const deeper = 1;\n');
+      await reused();
+      await unlink(join(root, 'src/value.ts'));
+      await reused();
+      // Acquisition still enumerates the current membership.
+      const read = await acquired(root);
+      expect(read.view.inventory.files.map(file => file.path)).toEqual(['src/added.ts', 'src/nested/deeper.ts']);
+      await read.view.dispose();
+      // An observer's seed survives a membership change the same way, and its
+      // local update keeps the seed.
+      const observed = await observeProject({ request, limits, parse: syntax });
+      if (observed.status !== 'observing') throw new Error(JSON.stringify(observed));
+      try {
+        const seeded = observed.observer.resolution;
+        await put(root, 'src/later.ts', 'export const later = 1;\n');
+        expect((await observed.observer.apply([{ path: 'src/later.ts', kind: 'created' }])).kind).toBe('local');
+        expect(observed.observer.resolution).toBe(seeded);
+        await unlink(join(root, 'src/added.ts'));
+        expect((await observed.observer.apply([{ path: 'src/added.ts', kind: 'deleted' }])).kind).toBe('local');
+        const again = await spawned(() => resolveProjectRoot(request, undefined, [seeded]));
+        expect(again.value).toBe(seeded); expect(again.helpers).toBe(0);
+      } finally { await observed.observer.dispose(); }
+    } finally { await rm(work, { recursive: true, force: true }); }
+  }, 60_000);
+
+  it('root-resolution-invalidated, resolution-invalidated-by-discovery: a created or deleted configuration or description on the discovery path, a moved root or a changed canonical path resolves again', async () => {
     const work = await realpath(await mkdtemp(join(tmpdir(), 'ramify-resolution-invalidated-')));
     // `child` is an independent root: a grouping directory, not `subs/`, holds it.
     const parent = join(work, 'parent'), root = join(parent, 'subs/group/child');
@@ -134,23 +175,127 @@ describe('reused project-root resolution', () => {
       // A created configuration candidate on the discovery path.
       await put(root, 'tsconfig.json', '{"compilerOptions":{"types":[]},"include":["src"]}\n');
       expect(await resolvedAgain()).toMatchObject({ status: 'resolved', root, configuration: join(root, 'tsconfig.json') });
-      // A configuration edit.
-      await writeFile(join(root, 'tsconfig.json'), '{"compilerOptions":{"types":[],"strict":true},"include":["src"]}\n');
-      expect(await resolvedAgain()).toMatchObject({ status: 'resolved', root, configuration: join(root, 'tsconfig.json') });
-      // Membership of an enumerated directory: the compiler's file selection answered differently.
-      await put(root, 'src/added.ts', 'export const added = 1;\n');
-      expect(await resolvedAgain()).toMatchObject({ status: 'resolved', root });
       // A deleted candidate: discovery continues to the ancestor configuration.
       await unlink(join(root, 'tsconfig.json'));
       expect(await resolvedAgain()).toMatchObject({ status: 'resolved', root, configuration: join(parent, 'tsconfig.json') });
-      // A description above makes `child` a descendant: the root moves.
+      // A created description above makes `child` a descendant: the root moves.
       await put(parent, 'module.ramify', 'ramify 1\nmodule parent\n');
       expect(await resolvedAgain()).toMatchObject({ status: 'resolved', root: parent, configuration: join(parent, 'tsconfig.json') });
-      // A configuration that becomes references-only is unavailable, never a reused resolution.
-      await writeFile(join(parent, 'tsconfig.json'), '{"files":[],"references":[{"path":"./subs"}]}\n');
-      const refused = await spawned(() => resolveProjectRoot(request, undefined, [known]));
-      expect(refused.helpers).toBe(1);
-      expect(refused.value).toMatchObject({ status: 'unavailable', issues: [{ code: 'references-only-configuration' }] });
+      // A deleted description on the climb: the root moves back.
+      await unlink(join(parent, 'module.ramify'));
+      expect(await resolvedAgain()).toMatchObject({ status: 'resolved', root, configuration: join(parent, 'tsconfig.json') });
+      // A description in the working directory is its nearest boundary: the root moves to it.
+      await put(root, 'src/module.ramify', 'ramify 1\nmodule moved\n');
+      expect(await resolvedAgain()).toMatchObject({ status: 'resolved', root: join(root, 'src') });
+      await unlink(join(root, 'src/module.ramify'));
+      expect(await resolvedAgain()).toMatchObject({ status: 'resolved', root });
+      // The root description is deleted: no project is found, and none is reused.
+      await unlink(join(root, 'module.ramify'));
+      const deleted = await spawned(() => resolveProjectRoot(request, undefined, [known]));
+      expect(deleted.value).toMatchObject({ status: 'unavailable', issues: [{ code: 'root-not-found' }] });
+      await put(root, 'module.ramify', 'ramify 1\nmodule fixture\n');
+      known = await resolveProjectRoot(request);
+      // The root description becomes a symlink: its kind answers differently and a fresh resolution refuses it.
+      await rm(join(root, 'module.ramify'));
+      await put(work, 'elsewhere.ramify', 'ramify 1\nmodule fixture\n');
+      await symlink(join(work, 'elsewhere.ramify'), join(root, 'module.ramify'));
+      const linked = await spawned(() => resolveProjectRoot(request, undefined, [known]));
+      expect(linked.helpers).toBe(0);
+      expect(linked.value).toMatchObject({ status: 'invalid', issues: [{ code: 'symlink-description' }] });
+    } finally { await rm(work, { recursive: true, force: true }); }
+  }, 60_000);
+
+  it('resolution-invalidated-by-discovery: a changed canonical path of the working directory resolves again', async () => {
+    const work = await realpath(await mkdtemp(join(tmpdir(), 'ramify-resolution-canonical-')));
+    try {
+      await fixture(join(work, 'a/project'));
+      await fixture(join(work, 'b/project'));
+      await symlink(join(work, 'a'), join(work, 'link'));
+      const request = found(join(work, 'link/project/src'));
+      const first = await resolveProjectRoot(request);
+      expect(first).toMatchObject({ status: 'resolved', root: join(work, 'a/project'), invokedFrom: join(work, 'a/project/src') });
+      expect((await spawned(() => resolveProjectRoot(request, undefined, [first]))).value).toBe(first);
+      // The same raw request now reaches another directory.
+      await unlink(join(work, 'link'));
+      await symlink(join(work, 'b'), join(work, 'link'));
+      const moved = await spawned(() => resolveProjectRoot(request, undefined, [first]));
+      expect(moved.helpers).toBe(1);
+      expect(moved.value).toEqual({ status: 'resolved', root: join(work, 'b/project'), invokedFrom: join(work, 'b/project/src'),
+        selection: 'found', configuration: join(work, 'b/project/tsconfig.json') });
+      // A canonical configuration path that moves beneath an unchanged root: the configuration becomes a symlink.
+      const root = join(work, 'b/project');
+      const again = moved.value;
+      await put(work, 'shared/tsconfig.json', '{"compilerOptions":{"types":[],"module":"ESNext","moduleResolution":"bundler"},"include":["../b/project/src"]}\n');
+      await unlink(join(root, 'tsconfig.json'));
+      await symlink(join(work, 'shared/tsconfig.json'), join(root, 'tsconfig.json'));
+      const relinked = await spawned(() => resolveProjectRoot(request, undefined, [again]));
+      expect(relinked.helpers).toBe(1);
+      expect(relinked.value).toMatchObject({ status: 'resolved', root, configuration: join(work, 'shared/tsconfig.json') });
+    } finally { await rm(work, { recursive: true, force: true }); }
+  }, 60_000);
+
+  it('resolution-survives-configuration-bytes: a configuration content edit reuses the resolution and acquisition refuses what resolution no longer re-reads, with the same codes', async () => {
+    const work = await realpath(await mkdtemp(join(tmpdir(), 'ramify-resolution-bytes-')));
+    const root = join(work, 'project');
+    try {
+      await fixture(root);
+      await put(root, 'ref/tsconfig.json', '{"files":[]}\n');
+      const request = found(join(root, 'src'));
+      const first = await spawned(() => resolveProjectRoot(request));
+      expect(first.helpers).toBe(1);
+      const reused = async (): Promise<void> => {
+        const next = await spawned(() => resolveProjectRoot(request, undefined, [first.value]));
+        expect(next.value).toBe(first.value); expect(next.helpers).toBe(0);
+      };
+      await writeFile(join(root, 'tsconfig.json'), '{"compilerOptions":{"types":[],"module":"ESNext","moduleResolution":"bundler","target":"ES2022"},"include":["src"]}\n');
+      await reused();
+      // An extended configuration created and then edited: bytes the helper would read.
+      await put(root, 'base.json', '{"compilerOptions":{"strict":true}}\n');
+      await writeFile(join(root, 'tsconfig.json'), '{"extends":"./base.json","compilerOptions":{"types":[],"module":"ESNext","moduleResolution":"bundler"},"include":["src"]}\n');
+      await reused();
+      await writeFile(join(root, 'base.json'), '{"compilerOptions":{"strict":false}}\n');
+      await reused();
+      const observed = await observeProject({ request, limits, parse: syntax });
+      if (observed.status !== 'observing') throw new Error(JSON.stringify(observed));
+      try {
+        // A solution-style rewrite: the resolution is reused, and acquisition refuses it.
+        await writeFile(join(root, 'tsconfig.json'), '{"files":[],"references":[{"path":"./ref"}]}\n');
+        await reused();
+        const fresh = await resolveProjectRoot(request);
+        expect(fresh).toMatchObject({ status: 'unavailable', issues: [{ code: 'references-only-configuration' }] });
+        expect(await readProject({ request, limits, parse: syntax })).toMatchObject({ status: 'unavailable', sealedInputs: null,
+          issues: [{ code: 'references-only-configuration', path: 'tsconfig.json' }] });
+        expect(await observed.observer.apply([{ path: 'tsconfig.json', kind: 'changed' }]))
+          .toMatchObject({ kind: 'incomplete', issues: [{ code: 'references-only-configuration' }] });
+      } finally { await observed.observer.dispose(); }
+      await writeFile(join(root, 'tsconfig.json'), '{"compilerOptions":{"types":[],"module":"ESNext","moduleResolution":"bundler"},"include":["src"]}\n');
+      await reused();
+      // An enumerated directory made unreadable: the resolution is reused, and acquisition fails to read it.
+      if (process.getuid?.() !== 0) {
+        await put(root, 'src/nested/deeper.ts', 'export const deeper = 1;\n');
+        await chmod(join(root, 'src/nested'), 0o000);
+        try {
+          await reused();
+          const fresh = await resolveProjectRoot(request);
+          expect(fresh).toMatchObject({ status: 'unavailable', issues: [{ code: 'read-failure' }] });
+          const read = await readProject({ request, limits, parse: syntax });
+          expect(read).toMatchObject({ status: 'incomplete', sealedInputs: null, issues: [{ code: 'read-failure' }] });
+        } finally { await chmod(join(root, 'src/nested'), 0o755); }
+      }
+      await reused();
+      // A configuration with references keeps every query: a content edit resolves again.
+      await writeFile(join(root, 'tsconfig.json'), '{"compilerOptions":{"types":[],"module":"ESNext","moduleResolution":"bundler"},"include":["src"],"references":[{"path":"./ref"}]}\n');
+      const referenced = await spawned(() => resolveProjectRoot(request, undefined, [first.value]));
+      expect(referenced.value).toBe(first.value); expect(referenced.helpers).toBe(0);
+      const withReferences = (await resolveProjectRoot(request)) as ProjectResolution;
+      expect(withReferences).toMatchObject({ status: 'resolved', root });
+      expect((await spawned(() => resolveProjectRoot(request, undefined, [withReferences]))).helpers).toBe(0);
+      await writeFile(join(root, 'tsconfig.json'), '{"compilerOptions":{"types":[],"module":"ESNext","moduleResolution":"bundler","strict":true},"include":["src"],"references":[{"path":"./ref"}]}\n');
+      const edited = await spawned(() => resolveProjectRoot(request, undefined, [withReferences]));
+      expect(edited.value).not.toBe(withReferences); expect(edited.helpers).toBe(1);
+      await put(root, 'src/added.ts', 'export const added = 1;\n');
+      const member = await spawned(() => resolveProjectRoot(request, undefined, [edited.value]));
+      expect(member.value).not.toBe(edited.value); expect(member.helpers).toBe(1);
     } finally { await rm(work, { recursive: true, force: true }); }
   }, 60_000);
 });

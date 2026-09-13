@@ -8,15 +8,24 @@ import type { AcquisitionLimits, ProjectRequest, ProjectResolution } from './int
 
 type Resolved = Extract<ProjectResolution, { status: 'resolved' }>;
 
+/** Queries to replay and the digest of what they answered. */
+export interface AnsweredQueries {
+  readonly observations: ReturnType<Capture['observations']>;
+  readonly answers: string;
+}
 /**
- * What one resolution queried and what the filesystem answered. Replaying
- * the queries and obtaining the same answers makes the same selection, finds
- * the same configuration and reaches the same configuration outcome.
+ * What one resolution queried and what the filesystem answered. `replay` is
+ * normally the discovery snapshot: the selection and configuration-discovery
+ * probes and the root description's symlink probe. Their kinds, canonical
+ * paths and exact-name memberships answering the same make the same selection
+ * and find the same configuration. Directory listings and file bytes are not
+ * part of it: acquisition reads the configuration again and verifies its
+ * content and the readability of what it enumerates. A configuration with
+ * references keeps every query, including the configuration's own.
  */
 interface ResolutionEvidence {
   readonly request: string;
-  readonly observations: ReturnType<Capture['observations']>;
-  readonly answers: string;
+  readonly replay: AnsweredQueries;
 }
 /** Keyed by the frozen resolution object: evidence leaves with the resolution it describes. */
 const evidence = new WeakMap<Resolved, ResolutionEvidence>();
@@ -27,21 +36,31 @@ const limits: AcquisitionLimits = { attempts: 3, maxFiles: 50_000, maxApplicatio
 const requestKey = (request: ProjectRequest): string =>
   JSON.stringify([request.cwd, request.root ?? null, request.scope, request.configuration]);
 
-/** Shared selection within the caller's capture; no description contents read. */
-export async function resolveCapturedRoot(capture: Capture, request: ProjectRequest): Promise<Resolved> {
+/**
+ * Shared selection within the caller's capture; no description contents read.
+ * `discovery` is taken after the root description's symlink probe and before
+ * any configuration query, so both call sites record the same query set.
+ */
+export async function resolveCapturedRoot(capture: Capture, request: ProjectRequest): Promise<{ resolution: Resolved; discovery: AnsweredQueries }> {
   const selected = await selectRoot(capture, request);
   capture.root = selected.root;
   const configuration = await findConfiguration(capture);
-  return { status: 'resolved', ...selected, configuration };
+  // Selection has already observed the root marker; the probe adds no path.
+  await capture.kind('module.ramify');
+  return { resolution: { status: 'resolved', ...selected, configuration }, discovery: { observations: capture.observations(), answers: capture.answers } };
 }
 
 /**
- * Record a successful resolution made within `capture`, whose observations are
- * exactly the selection and configuration queries. Returns the frozen resolution.
+ * Record a successful resolution made within `capture`, after its configuration
+ * was read. `discovery` is the snapshot `resolveCapturedRoot` took; when the
+ * configuration has references, the capture's current queries are kept instead.
+ * Returns the frozen resolution.
  */
-export function recordResolution(capture: Capture, request: ProjectRequest, resolution: Resolved): Resolved {
+export function recordResolution(capture: Capture, request: ProjectRequest, resolution: Resolved,
+  discovery: AnsweredQueries, references: boolean): Resolved {
   const frozen = freeze(resolution);
-  evidence.set(frozen, { request: requestKey(request), observations: capture.observations(), answers: capture.answers });
+  evidence.set(frozen, { request: requestKey(request),
+    replay: references ? { observations: capture.observations(), answers: capture.answers } : discovery });
   return frozen;
 }
 
@@ -51,12 +70,12 @@ const replayWidth = 16;
 /** Replay the recorded queries on a fresh capture; any failure counts as a change. */
 async function unchanged(recorded: ResolutionEvidence, request: ProjectRequest, signal?: AbortSignal): Promise<boolean> {
   const capture = new Capture(resolve(request.cwd), limits, performance.now() + limits.deadlineMs, signal);
-  const { observations } = recorded;
+  const { observations, answers } = recorded.replay;
   let next = 0;
   const replay = async (): Promise<void> => { while (next < observations.length) await capture.replay([observations[next++]!]); };
   try {
     await Promise.all(Array.from({ length: Math.min(replayWidth, observations.length) }, replay));
-    return capture.answers === recorded.answers;
+    return capture.answers === answers;
   } catch (error) {
     if (signal?.aborted) throw signal.reason ?? error;
     return false;
@@ -66,8 +85,11 @@ async function unchanged(recorded: ResolutionEvidence, request: ProjectRequest, 
 /**
  * Resolve the project root and its compiler configuration. `known` holds
  * earlier resolutions, most recent first: the first recorded for an equal
- * request is returned unchanged, with no configuration helper, when every
- * query it made still answers the same on disk. Otherwise it resolves again.
+ * request is returned unchanged, with no configuration helper, when its
+ * discovery queries still answer the same on disk, or every query when its
+ * configuration has references. Otherwise it resolves again. A reused
+ * resolution does not re-read the configuration: a solution-style rewrite or
+ * an unreadable enumerated directory is refused by acquisition, with the same code.
  */
 export async function resolveProjectRoot(request: ProjectRequest, signal?: AbortSignal,
   known: readonly ProjectResolution[] = []): Promise<ProjectResolution> {
@@ -81,12 +103,12 @@ export async function resolveProjectRoot(request: ProjectRequest, signal?: Abort
   }
   const capture = new Capture(resolve(request.cwd), limits, performance.now() + limits.deadlineMs, signal);
   try {
-    const selected = await resolveCapturedRoot(capture, request);
+    const { resolution: selected, discovery } = await resolveCapturedRoot(capture, request);
     if (await capture.kind('module.ramify') === 'symlink') throw new AcquisitionError('symlink-description', 'module.ramify', 'Invalid module boundary: symlink-description');
     const config = await readConfiguration(capture, selected.configuration);
     if (config.references.length && !config.files.length) throw new AcquisitionError('references-only-configuration', selected.configuration,
       `Solution-style configurations are unavailable; referenced configurations: ${config.references.join(', ')}`);
-    return recordResolution(capture, request, selected);
+    return recordResolution(capture, request, selected, discovery, config.references.length > 0);
   } catch (error) {
     if (signal?.aborted) throw signal.reason ?? error;
     const issue = error instanceof AcquisitionError ? error : new AcquisitionError('read-failure', capture.root, String(error));

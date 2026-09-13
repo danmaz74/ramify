@@ -58,14 +58,14 @@ export async function acquireProject(options: ProjectReadOptions): Promise<Proje
     let inventory: ProjectInventory | null = null;
     let issues: ProjectIssue[] = [];
     try {
-      const { configuration, status: _status, ...selected } = await resolveCapturedRoot(capture, request);
+      const { resolution: { configuration, status: _status, ...selected }, discovery } = await resolveCapturedRoot(capture, request);
       const acquiredConfiguration = await acquireConfiguration(capture, configuration, previousConfiguration);
       const config = acquiredConfiguration.data;
       if (config.references.length && !config.files.length) throw new AcquisitionError('references-only-configuration', configuration,
         `Solution-style configurations are unavailable; referenced configurations: ${config.references.join(', ')}`);
       // The capture holds only selection and configuration queries here, as a
       // standalone resolution's capture does when it succeeds.
-      const resolution = recordResolution(capture, request, { status: 'resolved', ...selected, configuration });
+      const resolution = recordResolution(capture, request, { status: 'resolved', ...selected, configuration }, discovery, config.references.length > 0);
       const acquired = await inventoryProject(capture, { ...selected, configuration }, config, options.parse, options.retained?.product.metadata as Parameters<typeof inventoryProject>[4]);
       inventory = acquired.inventory;
       issues = acquired.issues;

@@ -63,12 +63,44 @@ describe('project-root resolution on open', () => {
     } finally { release(); await flush(); await e.dispose(); }
   });
 
+  it('resolution-survives-membership, resolution-survives-configuration-bytes: hooks for a created or deleted file or a configuration edit reopen with the known resolution', async () => {
+    const e = sessionEnvironment();
+    try {
+      const opened = await e.open(); await flush();
+      const created = { path: 'src/created.ts', role: 'source' as const, sha256: hash('created'), bytes: 7 };
+      const index = { path: 'src/index.ts', role: 'source' as const, sha256: hash('1'), bytes: 1 };
+      // The driver's discovery answers are unchanged throughout: only files and bytes the
+      // resolution does not validate change, so every reopen is offered and reuses it.
+      const hookFor = async (lease: string, contents: readonly { path: string; sha256: string | null }[]) => {
+        const reopened = await e.open('/fixture', lease);
+        expect(reopened).toMatchObject({ token: opened.token, created: false });
+        expect(e.script.resolveCalls.at(-1)).toMatchObject({ reused: true, known: [expect.anything()] });
+        return e.check(reopened.token, { mode: 'synchronized', expect: contents }, {}, lease);
+      };
+      e.script.pending.push(() => capture(2, 'completed', [created, index]));
+      expect(await hookFor('created', [{ path: created.path, sha256: created.sha256 }]))
+        .toMatchObject({ status: 'reported', published: true, revision: { sequence: 2 } });
+      expect(e.script.updateCalls.at(-1)?.inputs.changes).toEqual([{ path: created.path, kind: 'changed' }]);
+      e.script.pending.push(() => capture(3, 'completed', [{ path: created.path, role: 'absent', sha256: hash(''), bytes: 0 }, index]));
+      expect(await hookFor('deleted', [{ path: created.path, sha256: null }]))
+        .toMatchObject({ status: 'reported', published: true, revision: { sequence: 3 } });
+      // A configuration edit arrives through the watcher and requires a sweep; the next hook still reuses.
+      e.script.pending.push(() => capture(4, 'completed', [index]));
+      e.watcher.emit('/fixture', [{ path: 'tsconfig.json', kind: 'changed' }]);
+      expect(await hookFor('configuration', [{ path: index.path, sha256: index.sha256 }]))
+        .toMatchObject({ status: 'reported', published: true });
+      expect(e.script.updateCalls.some(call => call.inputs.changes.some(change => change.path === 'tsconfig.json'))).toBe(true);
+      expect(e.script.resolutions).toBe(1);
+      expect(e.script.openCalls).toHaveLength(1);
+    } finally { await e.dispose(); }
+  });
+
   it('root-resolution-invalidated: changed discovery answers resolve again and a moved root opens its own context', async () => {
     const e = sessionEnvironment();
     try {
       const opened = await e.open(); await flush();
       const original = e.script.resolveCalls[0]!;
-      // A configuration edit: the known resolution is not returned, the root is unchanged.
+      // A changed discovery answer, such as a created configuration candidate: the known resolution is not returned, the root is unchanged.
       e.script.changeDiscovery();
       const edited = await e.open('/fixture', 'edited');
       expect(edited).toMatchObject({ token: opened.token, created: false });
