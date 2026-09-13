@@ -1,11 +1,11 @@
 import { readFile, rm } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { ObservationSink } from '../../../project/src/interfaces/project.js';
 import { createRetainedSourceAnalysis, retainedCompilerEvidence } from '../retained-source-analysis.js';
 import { createSourceAnalysis } from '../source-analysis.js';
 import type { RetainedSourceAnalysis, RetainedSourceInputs, SourceChangeSet } from '../interfaces/source.js';
-import { acquire, areasFor, drop, fixture, put, sourceLimits } from './fixtures.js';
+import { acquire, areasFor, configuration, drop, fixture, put, sourceLimits } from './fixtures.js';
 import { retainedMembershipWitness } from './retained-membership.js';
 
 const roots: string[] = [];
@@ -199,6 +199,43 @@ describe('retained source analysis', () => {
     expect(invalidated.catalog).not.toBe(cold.catalog);
     expect(invalidated.catalog).toBe((await batch(root)).catalog);
   }, 60_000);
+
+  it('reaches edited options of the configuration and its extended file through a whole invalidation, reading the libraries a fresh adapter reads', async () => {
+    const { compilerOptions: { target: _target, ...options }, ...rest } = configuration;
+    const root = await start({ ...project, 'tsconfig.base.json': JSON.stringify({ compilerOptions: { target: 'ES2022' } }),
+      'tsconfig.json': JSON.stringify({ ...rest, extends: './tsconfig.base.json', compilerOptions: options }) });
+    const { sink, events } = recording();
+    const analysis = await open(root, sink);
+    await analysis.describe([]);
+    /** Library basenames read since an event index, and by a fresh adapter over the same disk. */
+    const libraries = (reads: readonly Recorded[]): string[] => [...new Set(reads.filter(event => event.shape === 'file' && /^lib\..*\.d\.ts$/.test(basename(event.path)))
+      .map(event => basename(event.path)))].sort();
+    const freshLibraries = async (): Promise<string[]> => {
+      const observed = recording();
+      const compared = await createRetainedSourceAnalysis(await inputsOf(root, observed.sink));
+      try { await compared.describe([]); return libraries(observed.events); } finally { await compared.dispose(); }
+    };
+    const program = (name: string): boolean => {
+      const read = events.find(event => event.shape === 'file' && basename(event.path) === name);
+      return !!read && retainedCompilerEvidence(analysis).programHas(read.path);
+    };
+    expect(libraries(events)).toContain('lib.es2022.full.d.ts');
+    // The extended file changes the target; only a whole invalidation follows.
+    let before = events.length;
+    await put(root, 'tsconfig.base.json', JSON.stringify({ compilerOptions: { target: 'ES2023' } }));
+    await analysis.update({ ...none, invalidateAll: true });
+    await analysis.describe([]);
+    expect(libraries(events.slice(before))).toEqual(await freshLibraries());
+    expect([program('lib.es2023.full.d.ts'), program('lib.es2022.full.d.ts')]).toEqual([true, false]);
+    // The selected configuration overrides it.
+    before = events.length;
+    await put(root, 'tsconfig.json', JSON.stringify({ ...rest, extends: './tsconfig.base.json', compilerOptions: { ...options, target: 'ES2021' } }));
+    await analysis.update({ ...none, invalidateAll: true });
+    await analysis.describe([]);
+    expect(libraries(events.slice(before))).toEqual(await freshLibraries());
+    expect([program('lib.es2021.full.d.ts'), program('lib.es2023.full.d.ts')]).toEqual([true, false]);
+    await equalsFresh(analysis, root);
+  }, 90_000);
 
   it('reports every read, probe, listing and absence to the sink with the capture roles', async () => {
     const root = await start({ ...project, 'src/probe.ts': 'export type { Absent } from "./absent.js";\nexport const own = 1;\n' });

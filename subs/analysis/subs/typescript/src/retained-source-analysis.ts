@@ -69,6 +69,10 @@ class RetainedSourceState implements RetainedSourceAnalysis {
   #synthetic: string | undefined;
   #witness: string | undefined;
   #selectedFiles: readonly string[] = [];
+  /** Text of each file the last configuration parse read, null when absent. */
+  #configurationTexts = new Map<string, string | null>();
+  /** The reads of a configuration parse in progress. */
+  #parseReads: Map<string, string | null> | undefined;
   #owned = new Map<string, 'source' | 'resource'>();
   #set: DescriptionSet = createDescriptionSet();
   #runtime = new Map<CatalogExport, boolean>();
@@ -133,22 +137,32 @@ class RetainedSourceState implements RetainedSourceAnalysis {
       if (changes.invalidateAll) {
         // A configuration change can select other files, so the explicit
         // roots follow a fresh parse; everything else is re-read anyway.
-        this.#guarded(() => { this.#selectedFiles = this.#api!.parseConfigFile(this.#configuration).fileNames; });
+        const configuration = this.#guarded(() => this.#parseConfiguration());
         for (const path of this.#regenerate()) changed.add(path);
+        // A whole invalidation re-reads every file but keeps the project's parsed
+        // options. Configuration files whose text changed are named first, so
+        // an options-only edit reaches the program, its libraries included.
+        if (configuration.changed.length || configuration.deleted.length) {
+          this.#replaceSnapshot({ changed: [...configuration.changed], deleted: [...configuration.deleted] });
+        }
         this.#replaceSnapshot({ invalidateAll: true });
         this.#broad = true;
       } else {
+        let removedConfiguration: readonly string[] = [];
         if (changes.inventory) {
           // Configured roots also change with membership. Retaining the old
           // fileNames list would keep a deleted source in the synthetic roots.
-          this.#guarded(() => { this.#selectedFiles = this.#api!.parseConfigFile(this.#configuration).fileNames; });
-          for (const path of this.#regenerate()) changed.add(path);
+          // A configuration text this update did not announce still reaches the
+          // compiler's options, so the recorded texts never absorb a change.
+          const configuration = this.#guarded(() => this.#parseConfiguration());
+          for (const path of [...this.#regenerate(), ...configuration.changed]) changed.add(path);
+          removedConfiguration = configuration.deleted;
         }
         const membership = created.length > 0 || deleted.length > 0;
         const before = membership ? this.#programFiles() : [];
         const global = membership ? deleted.filter(path => this.#reachesGlobally(path)) : [];
-        if (changed.size || created.length || deleted.length) {
-          this.#replaceSnapshot({ changed: [...changed].sort(order), created, deleted });
+        if (changed.size || created.length || deleted.length || removedConfiguration.length) {
+          this.#replaceSnapshot({ changed: [...changed].sort(order), created, deleted: [...deleted, ...removedConfiguration].sort(order) });
         }
         if (membership) {
           const owned = (path: string): boolean => ownedBefore.has(path) || this.#owned.has(path);
@@ -344,11 +358,11 @@ class RetainedSourceState implements RetainedSourceAnalysis {
     }
     try {
       this.#guarded(() => {
-        const parsed = api.parseConfigFile(this.#configuration);
+        this.#configurationTexts.clear();
+        this.#parseConfiguration();
         const text = this.#readFile(this.#configuration);
         if (text === null) throw new SourceFailure('unavailable', 'The selected compiler configuration is missing');
-        if (referencesOnly(text, parsed.fileNames)) throw new SourceFailure('unavailable', 'Solution-style compiler configurations are unavailable');
-        this.#selectedFiles = parsed.fileNames;
+        if (referencesOnly(text, this.#selectedFiles)) throw new SourceFailure('unavailable', 'Solution-style compiler configurations are unavailable');
         // Occupancy of the synthetic names is an observation of their directory,
         // exactly as the finite helper's absence probe enumerates it.
         const directory = resolve(this.#configuration, '..');
@@ -365,6 +379,25 @@ class RetainedSourceState implements RetainedSourceAnalysis {
         this.#replaceSnapshot(undefined);
       });
     } catch (error) { this.#discard(); throw error; }
+  }
+
+  /**
+   * Parse the selected configuration for its explicit roots, recording the text
+   * of every file the parse read. Returns the files whose text differs from the
+   * previous parse: present ones as changed, now absent ones as deleted.
+   */
+  #parseConfiguration(): { readonly changed: readonly string[]; readonly deleted: readonly string[] } {
+    const reads = new Map<string, string | null>();
+    this.#parseReads = reads;
+    try { this.#selectedFiles = this.#api!.parseConfigFile(this.#configuration).fileNames; }
+    finally { this.#parseReads = undefined; }
+    const previous = this.#configurationTexts;
+    this.#configurationTexts = reads;
+    const differing = [...reads].filter(([path, text]) => previous.has(path) ? previous.get(path) !== text : text !== null);
+    return {
+      changed: differing.filter(([, text]) => text !== null).map(([path]) => path).sort(order),
+      deleted: differing.filter(([, text]) => text === null).map(([path]) => path).sort(order),
+    };
   }
 
   /** Regenerate the virtual inputs; the virtual paths whose text changed. */
@@ -438,6 +471,12 @@ class RetainedSourceState implements RetainedSourceAnalysis {
   }
 
   #readFile(requested: string): string | null {
+    const text = this.#readObserved(requested);
+    this.#parseReads?.set(resolve(requested), text);
+    return text;
+  }
+
+  #readObserved(requested: string): string | null {
     const path = resolve(requested);
     const virtual = this.#virtual.get(path);
     if (virtual !== undefined) return virtual;
