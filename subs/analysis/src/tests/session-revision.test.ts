@@ -626,10 +626,10 @@ describe('timing fields outside the revision total', () => {
       expect(Object.keys(revision.timings).sort()).toEqual(stages);
       const invocation = { project: inputs.project, capabilities: inputs.capabilities };
       // Without an invocation nothing is checked.
-      expect(await handle.update([])).toEqual({ status: 'revised', revision, identical: true, timings: { invocationCheck: 0, promotion: 0 } });
+      expect(await handle.update([])).toEqual({ status: 'revised', revision, identical: true, reacquired: false, timings: { invocationCheck: 0, promotion: 0 } });
       // The identical update keeps the published revision and its timings; its own check sits beside them.
       const same = await handle.update([], {}, invocation);
-      expect(same).toEqual({ status: 'revised', revision, identical: true, timings: { invocationCheck: expect.any(Number), promotion: 0 } });
+      expect(same).toEqual({ status: 'revised', revision, identical: true, reacquired: false, timings: { invocationCheck: expect.any(Number), promotion: 0 } });
       expect(same.status === 'revised' && same.timings!.invocationCheck).toBeGreaterThan(0);
       // A refused invocation reports its check with the refusal.
       const refused = await handle.update([], {}, { ...invocation, capabilities: ['coverage'] });
@@ -677,7 +677,7 @@ describe('timing fields outside the revision total', () => {
       expect([edited.revision.checked.path, promotions]).toEqual(['unchanged-surface', 2]);
       expect(edited.timings!.promotion).toBeGreaterThanOrEqual(delayMs - 1);
       expect(edited.timings!.promotion).toBeLessThanOrEqual(outside(edited.revision) + 0.001);
-      expect(await handle.update([{ path: paths.provider, kind: 'changed' }])).toEqual({ status: 'revised', revision: edited.revision, identical: true,
+      expect(await handle.update([{ path: paths.provider, kind: 'changed' }])).toEqual({ status: 'revised', revision: edited.revision, identical: true, reacquired: false,
         timings: { invocationCheck: 0, promotion: 0 } });
       // An in-process sweep that finds nothing reports no timings; its hosting layers add them.
       expect(await handle.sweep()).toEqual({ status: 'unchanged' });
@@ -997,4 +997,59 @@ describe('contribution index', () => {
       await equalToBatch(handle, inputs);
     } finally { await handle.dispose(); }
   }, { 'subs/branch/src/pending.ts': "import { later } from './later.js';\nexport const pending = later;\n" }), timeout);
+});
+
+describe('reacquisition report', () => {
+  type Revised = Extract<Awaited<ReturnType<RetainedSession['update']>>, { status: 'revised' }>;
+  const updated = async (handle: RetainedSession, names: readonly string[], kind: 'changed' | 'created' | 'deleted' | 'unknown' = 'changed'): Promise<Revised> => {
+    const result = await handle.update(names.map(path => ({ path, kind })));
+    if (result.status !== 'revised') throw new Error(`Expected a revision: ${JSON.stringify(result)}`);
+    return result;
+  };
+
+  it('sweep-skipped-after-reacquire: a structural update reports reacquisition, and a sweep of the same capture finds nothing', () => fixture(async (root, inputs) => {
+    const { handle } = await opened(inputs);
+    try {
+      // An options-only configuration edit rebuilds the inventory on a fresh capture.
+      const configuration = JSON.parse(await readFile(join(root, 'tsconfig.json'), 'utf8'));
+      configuration.compilerOptions.target = 'ES2023';
+      await put(root, 'tsconfig.json', JSON.stringify(configuration));
+      const reacquired = await updated(handle, ['tsconfig.json']);
+      expect([reacquired.identical, reacquired.reacquired, reacquired.revision.checked.path]).toEqual([false, true, 'broad']);
+      // The sweep the context now skips re-observes every recorded input and finds no change.
+      expect(await handle.sweep()).toEqual({ status: 'unchanged' });
+      expect(handle.current).toBe(reacquired.revision);
+      await audited(handle);
+      await equalToBatch(handle, inputs);
+
+      // Updates that keep the capture report none.
+      await replace(root, paths.provider, '  return 2;', '  void 0;\n  return 2;');
+      expect(await updated(handle, [paths.provider])).toMatchObject({ identical: false, reacquired: false, revision: { checked: { path: 'unchanged-surface' } } });
+      expect(await updated(handle, [paths.provider])).toMatchObject({ identical: true, reacquired: false });
+      await put(root, paths.extra, 'export const extra = 1;\n');
+      expect(await updated(handle, [paths.extra], 'created')).toMatchObject({ identical: false, reacquired: false, revision: { checked: { path: 'membership' } } });
+      await replace(root, paths.local, 'void rootValue;', 'void rootValue;\nvoid 0;');
+      expect(await updated(handle, [paths.local], 'unknown')).toMatchObject({ identical: false, reacquired: false, revision: { checked: { path: 'broad' } } });
+      await audited(handle);
+
+      // A structural update whose acquisition is invalid promotes nothing and reports none.
+      const twig = 'subs/sibling/subs/twig/module.ramify';
+      await put(root, twig, 'ramify 1\nmodule twig\nexpose-src nothing from\n');
+      const invalid = await updated(handle, [twig], 'created');
+      expect([invalid.revision.outcome.execution, invalid.identical, invalid.reacquired]).toEqual(['invalid', false, false]);
+      // Its repair reconciles through a structural rebuild and reports it.
+      await rm(join(root, 'subs/sibling/subs'), { recursive: true });
+      const repaired = await updated(handle, [twig], 'deleted');
+      expect([repaired.revision.outcome.execution, repaired.identical, repaired.reacquired]).toEqual(['completed', false, true]);
+      await audited(handle);
+      await equalToBatch(handle, inputs);
+
+      // A sweep that finds a configuration edit reports the reacquisition on its own revision.
+      configuration.compilerOptions.target = 'ES2022';
+      await put(root, 'tsconfig.json', JSON.stringify(configuration));
+      expect(await handle.sweep()).toMatchObject({ status: 'revised', identical: false, reacquired: true, revision: { checked: { path: 'broad' } } });
+      await audited(handle);
+      await equalToBatch(handle, inputs);
+    } finally { await handle.dispose(); }
+  }), timeout);
 });

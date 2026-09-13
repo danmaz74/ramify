@@ -537,6 +537,9 @@ a fresh batch check.
   A queued request whose expectations the new revision covers, with no other
   known change or required sweep pending, is answered from that revision
   without another update.
+- A configuration or manifest path event requires a sweep in the next capture.
+  An update in that capture that acquired the project again on a fresh
+  capture satisfies that sweep; every other required sweep still runs.
 - A hook-facing check has a bounded response time. When it cannot be met, for
   example in a cold context or during daemon recovery, the outcome is explicit
   and never a pass.

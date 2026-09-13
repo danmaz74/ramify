@@ -66,7 +66,11 @@ export interface OperationTimings {
   readonly workerRoundTrip?: number;
 }
 export type SessionUpdate =
-  | { readonly status: 'revised'; readonly revision: SessionRevision; readonly identical: boolean; readonly timings?: OperationTimings }
+  | { readonly status: 'revised'; readonly revision: SessionRevision; readonly identical: boolean;
+      /** A structural observer update acquired the project again on a fresh, validated capture and
+       * this revision promoted every compiler read into it. False for an identical or invalid result
+       * and for the observation retry of a session opened over an invalid capture. */
+      readonly reacquired: boolean; readonly timings?: OperationTimings }
   | { readonly status: 'reported'; readonly report: AnalysisReport; readonly timings?: OperationTimings }
   | { readonly status: 'cancelled' };
 export type VerifyOutcome =

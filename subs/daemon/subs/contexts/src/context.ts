@@ -34,7 +34,10 @@ export interface LiveContext {
   readonly versions: Set<number>;
   observedSequence: number;
   invocation: Invocation;
-  sweepRequired: boolean;
+  /** A sweep must run in the next capture. `'configuration'` while every requirement since the last
+   * capture came from a configuration or manifest path event: an update in that capture that
+   * reacquired the project satisfies it. Any other requirement writes `true`. */
+  sweepRequired: boolean | 'configuration';
   /** An elapsed `sweepIntervalMs` is due; it never blocks coverage or marks reconciling. */
   periodicSweepDue: boolean;
   /** Start of the most recent sweep of either kind. */

@@ -150,11 +150,12 @@ class Session implements RetainedSession {
       if (result.status === 'cancelled') return { status: 'cancelled' };
       if (result.status === 'reported') return timed(result);
       if (result.status === 'identical') {
-        if (!republish || !state.facts) return timed({ status: 'revised', revision: this.#current!, identical: true });
+        if (!republish || !state.facts) return timed({ status: 'revised', revision: this.#current!, identical: true, reacquired: false });
         const facts = state.facts;
         const published = this.#publish({ status: 'computed', facts, checked: { ...this.#current!.checked, files: [], accesses: 0, modelRebuilt: false },
           changed: [], timings: zeroTimings(), positionRefreshed: [] }, state.observer.inputs, facts.invalid ? null : state.observer.inputId, started);
-        return timed('report' in published ? { status: 'reported', report: published.report } : { status: 'revised', revision: published.revision, identical: false });
+        return timed('report' in published ? { status: 'reported', report: published.report }
+          : { status: 'revised', revision: published.revision, identical: false, reacquired: false });
       }
       return timed(await this.#complete(result, started, signal));
     });
@@ -182,7 +183,7 @@ class Session implements RetainedSession {
       const result = await revise(this.#state, changes, control.signal);
       if (result.status === 'cancelled') return { status: 'cancelled' };
       if (result.status === 'reported') return result;
-      if (result.status === 'identical') return { status: 'revised', revision: this.#current!, identical: true };
+      if (result.status === 'identical') return { status: 'revised', revision: this.#current!, identical: true, reacquired: false };
       return this.#complete(result, started, control.signal);
     });
   }
@@ -271,6 +272,9 @@ class Session implements RetainedSession {
     const state = this.#state;
     let promotion = 0;
     const timings = (): OperationTimings => ({ invocationCheck: 0, promotion });
+    // A structural update acquired a fresh capture; promotion then observes every compiler read
+    // into it. Invalid facts skip promotion, so they never report a reacquisition.
+    const reacquired = computed.reacquired === true && !computed.facts.invalid;
     try {
       if (!computed.facts.invalid) {
         const promoting = performance.now();
@@ -279,7 +283,7 @@ class Session implements RetainedSession {
       const observer = state.observer!;
       const published = this.#publish(computed, observer.inputs, computed.facts.invalid ? null : observer.inputId, started);
       return 'report' in published ? { status: 'reported', report: published.report, timings: timings() }
-        : { status: 'revised', revision: published.revision, identical: false, timings: timings() };
+        : { status: 'revised', revision: published.revision, identical: false, reacquired, timings: timings() };
     } catch (error) {
       // The revision step applied its changes to the observer before
       // returning them, so even a cancellation before promotion leaves the
@@ -367,7 +371,8 @@ class Session implements RetainedSession {
     this.#resolutions = [resolution, ...this.#resolutions.filter(item => item !== resolution)].slice(0, knownResolutions);
   }
 
-  /** Retry observation for a session opened over a coherent invalid capture. */
+  /** Retry observation for a session opened over a coherent invalid capture. Its acquisition is a
+   * cold open, not a structural update, so it reports no reacquisition and a required sweep still runs. */
   async #reopen(changes: readonly SessionChange[], started: number, signal?: AbortSignal): Promise<SessionUpdate> {
     const state = this.#state;
     const timings = zeroTimings();
@@ -384,12 +389,13 @@ class Session implements RetainedSession {
           { code: first?.code ?? 'read-failure', path: first?.path }), 'acquisition', observed.inventory) };
       }
       const identity = sealedIdentity(observed.sealedInputs);
-      if (identity === this.#current?.inputId && !changes.length) return { status: 'revised', revision: this.#current, identical: true };
+      if (identity === this.#current?.inputId && !changes.length) return { status: 'revised', revision: this.#current, identical: true, reacquired: false };
       this.#sealed = observed.sealedInputs;
       const facts = invalidFacts(state, issues, observed.inventory, observed.sealedInputs ?? []);
       const published = this.#publish({ status: 'computed', facts, checked: { path: 'broad', files: [], accesses: 0, modelRebuilt: false },
         changed: sortedPaths(changes.map(change => change.path)), timings, positionRefreshed: [] }, observed.sealedInputs ?? [], identity, started);
-      return 'report' in published ? { status: 'reported', report: published.report } : { status: 'revised', revision: published.revision, identical: false };
+      return 'report' in published ? { status: 'reported', report: published.report }
+        : { status: 'revised', revision: published.revision, identical: false, reacquired: false };
     }
     state.observer = observed.observer;
     this.#sealed = null;
@@ -405,7 +411,7 @@ class Session implements RetainedSession {
         observed.observer.inputs, facts.invalid ? null : observed.observer.inputId, started);
       const operation: OperationTimings = { invocationCheck: 0, promotion };
       return 'report' in published ? { status: 'reported', report: published.report, timings: operation }
-        : { status: 'revised', revision: published.revision, identical: false, timings: operation };
+        : { status: 'revised', revision: published.revision, identical: false, reacquired: false, timings: operation };
     } catch (error) {
       if (isCancellation(error, signal)) return { status: 'cancelled' };
       state.stale = true;

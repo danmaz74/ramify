@@ -107,8 +107,8 @@ workerSuite('retained analysis session', import.meta.url, () => {
       expect([status.level, status.sequence, status.factBytes > 0, status.observedInputs > 3]).toEqual(['hot', 1, true, true]);
       const same = await handle.update([{ path: probe, kind: 'changed' }]);
       const workerTimings = { invocationCheck: 0, promotion: 0, workerStatus: expect.any(Number), workerRoundTrip: expect.any(Number) };
-      expect(same).toEqual({ status: 'revised', revision, identical: true, timings: workerTimings });
-      expect(await handle.update([])).toEqual({ status: 'revised', revision, identical: true, timings: workerTimings });
+      expect(same).toEqual({ status: 'revised', revision, identical: true, reacquired: false, timings: workerTimings });
+      expect(await handle.update([])).toEqual({ status: 'revised', revision, identical: true, reacquired: false, timings: workerTimings });
       expect(handle.current?.sequence).toBe(1);
       await audited(handle);
     } finally { await handle.dispose(); }
@@ -224,6 +224,29 @@ workerSuite('retained analysis session', import.meta.url, () => {
     } finally { await handle.dispose(); }
   }), timeout);
 
+  it('sweep-skipped-after-reacquire: a worker update reports reacquisition for a configuration edit and for no path that keeps the capture', () => fixture(async (root, inputs) => {
+    const { session: handle } = await opened(inputs);
+    try {
+      const update = async (paths: readonly string[], kind: 'changed' | 'created' = 'changed') => {
+        const result = await handle.update(paths.map(path => ({ path, kind })));
+        if (result.status !== 'revised') throw new Error('Expected a revised update');
+        return { path: result.revision.checked.path, identical: result.identical, reacquired: result.reacquired };
+      };
+      await replace(root, 'tsconfig.json', '"target":"ES2022"', '"target":"ES2021"');
+      expect(await update(['tsconfig.json'])).toEqual({ path: 'broad', identical: false, reacquired: true });
+      // The sweep the context skips finds nothing in the reacquired capture.
+      expect((await handle.sweep()).status).toBe('unchanged');
+      await audited(handle);
+      await expectEqualToBatch(handle, inputs);
+      await replace(root, other, '  return 2;', '  void 0;\n  return 2;');
+      expect(await update([other])).toEqual({ path: 'unchanged-surface', identical: false, reacquired: false });
+      await put(root, extra, 'export const extra = 1;\n');
+      expect(await update([extra], 'created')).toEqual({ path: 'membership', identical: false, reacquired: false });
+      expect(await update([extra], 'created')).toEqual({ path: 'membership', identical: true, reacquired: false });
+      await expectEqualToBatch(handle, inputs);
+    } finally { await handle.dispose(); }
+  }), timeout);
+
   it('retains historical versions for report projection until released and rejects releasing the current one', () => fixture(async (root, inputs) => {
     const { session: handle, revision: first } = await opened(inputs);
     try {
@@ -252,7 +275,11 @@ workerSuite('retained analysis session', import.meta.url, () => {
       expect(handle.status().level).toBe('warm');
       await expectEqualToBatch(handle, inputs);
       await put(root, 'subs/consumer/module.ramify', 'ramify 1\nmodule consumer\n');
-      const recovered = await revised(handle, ['subs/consumer/module.ramify']);
+      // Observation acquired from cold inside the update is not a structural update: the context still sweeps.
+      const retried = await handle.update([{ path: 'subs/consumer/module.ramify', kind: 'changed' }]);
+      expect(retried).toMatchObject({ status: 'revised', identical: false, reacquired: false });
+      if (retried.status !== 'revised') throw new Error('Expected a revised update');
+      const recovered = retried.revision;
       expect(recovered.outcome.execution).toBe('completed');
       expect(recovered.checked.path).toBe('broad');
       expect(handle.status().level).toBe('hot');

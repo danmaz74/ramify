@@ -22,6 +22,8 @@ export interface ScriptedCapture {
   readonly factBytes?: number;
   /** Operation durations the session reports beside the revision, when the script supplies them. */
   readonly timings?: OperationTimings;
+  /** The update acquired the project again on a fresh capture; false unless the script says so. */
+  readonly reacquired?: boolean;
 }
 export function capture(version = 1, execution: 'completed' | 'invalid' | 'incomplete' = 'completed', inputs?: readonly CapturedInput[]): ScriptedCapture {
   const base = historyReport(`run/1:${version}`);
@@ -110,7 +112,7 @@ export function createScriptedDriver() {
         const report: AnalysisReport = { ...next.report, request: { ...next.report.request, project: invocation.project, capabilities: invocation.capabilities } };
         const comparable = (value: AnalysisReport) => JSON.stringify({ ...value, runId: '' });
         retainedBytes = next.factBytes ?? factBytes;
-        if (current && currentReport && comparable(report) === comparable(currentReport)) return { status: 'revised', revision: current, identical: true };
+        if (current && currentReport && comparable(report) === comparable(currentReport)) return { status: 'revised', revision: current, identical: true, reacquired: false };
         const sequence = (current?.sequence ?? 0) + 1;
         const previous = new Map((current?.diagnostics ?? []).map(diagnostic => [diagnostic.id, diagnostic]));
         const nextIds = new Set(report.diagnostics.map(diagnostic => diagnostic.id));
@@ -120,7 +122,7 @@ export function createScriptedDriver() {
             removed: [...previous.keys()].filter(identity => !nextIds.has(identity)), positionOnly: next.revision.delta.positionOnly } };
         currentReport = report;
         reports.set(sequence, report);
-        return { status: 'revised', revision: current, identical: false };
+        return { status: 'revised', revision: current, identical: false, reacquired: next.reacquired ?? false };
       }
       async function run(kind: 'update' | 'sweep', changes: readonly SessionChange[], runControl?: RunControl,
         nextInvocation?: Pick<AnalysisInputs, 'project' | 'capabilities'>): Promise<SessionUpdate | { readonly status: 'unchanged'; readonly timings?: OperationTimings }> {
@@ -139,7 +141,7 @@ export function createScriptedDriver() {
         get current() { return current; },
         async update(changes, runControl, nextInvocation) {
           const result = await run('update', changes, runControl, nextInvocation);
-          return result.status === 'unchanged' ? { status: 'revised', revision: current!, identical: true } : result;
+          return result.status === 'unchanged' ? { status: 'revised', revision: current!, identical: true, reacquired: false } : result;
         },
         sweep: runControl => run('sweep', [], runControl),
         async verify(runControl) {

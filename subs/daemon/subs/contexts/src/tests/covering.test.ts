@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { sessionEnvironment } from './session-fixture.js';
-import { capture, flush, hash } from './scripted-driver.js';
+import { capture, flush, hash, testBudgets } from './scripted-driver.js';
 
 const expected = (path = 'src/index.ts', content = '1') => [{ path, sha256: hash(content) }];
 
@@ -454,5 +454,140 @@ describe('timing fields outside the revision total', () => {
       expect([e.script.updateCalls.length, e.script.sweepCalls.length]).toEqual([2, 2]);
       expect(e.status(opened.token).published!.capture).toMatchObject({ invocationCheck: 1, promotion: 0, workerStatus: 1, workerRoundTrip: 10, sweep: 0 });
     } finally { e.script.pending.length = 0; await flush(); await e.dispose(); }
+  });
+});
+
+describe('sweep after reacquisition', () => {
+  const work = { invocationCheck: 3, promotion: 7, workerStatus: 2, workerRoundTrip: 40 };
+  const reacquiring = () => ({ ...capture(2), reacquired: true, timings: work });
+  const unchangedSweep = () => ({ status: 'unchanged' as const, timings: { invocationCheck: 0, promotion: 0, workerStatus: 1, workerRoundTrip: 25 } });
+
+  it('sweep-skipped-after-reacquire: a configuration event and a hook run one update that reacquired, no sweep, and publish synchronized', async () => {
+    const e = sessionEnvironment();
+    try {
+      const opened = await e.open(); await flush();
+      e.script.pending.push(reacquiring);
+      e.watcher.emit('/fixture', [{ path: 'tsconfig.json', kind: 'changed' }]);
+      expect(e.status(opened.token).synchronization).toBe('reconciling');
+      const answered = await e.check(opened.token, { mode: 'synchronized', expect: expected('src/index.ts', '2') });
+      expect([e.script.updateCalls.length, e.script.sweepCalls.length]).toEqual([1, 0]);
+      expect(e.script.updateCalls[0]?.inputs.changes.map(change => change.path).sort()).toEqual(['src/index.ts', 'tsconfig.json']);
+      expect(answered).toMatchObject({ status: 'reported', published: true, freshness: { captureStarted: 0, verified: true, reusedRevision: false },
+        revision: { sequence: 2, cause: 'request', capture: { ...work, sweep: 0 } }, timings: { ...work, sweep: 0 } });
+      await flush();
+      // The capture counts as swept: nothing is left to reconcile, and a covered hook runs no capture.
+      expect(e.status(opened.token)).toMatchObject({ synchronization: 'synchronized', pending: { changedPaths: 0, analysisRunning: false } });
+      const covered = await e.check(opened.token, { mode: 'synchronized', expect: expected('src/index.ts', '2') });
+      expect(covered).toMatchObject({ status: 'reported', freshness: { captureStarted: null, reusedRevision: true } });
+      // The next periodic sweep keeps its interval from the capture's start.
+      e.clock.advance(testBudgets.sweepIntervalMs - 1); await flush();
+      expect([e.script.updateCalls.length, e.script.sweepCalls.length]).toEqual([1, 0]);
+      // A watcher-driven configuration capture skips it the same way.
+      e.script.pending.push(() => ({ ...capture(3), reacquired: true }));
+      e.watcher.emit('/fixture', [{ path: 'package.json', kind: 'changed' }]);
+      e.clock.advance(100); await flush();
+      expect([e.script.updateCalls.length, e.script.sweepCalls.length]).toEqual([2, 0]);
+      expect(e.status(opened.token)).toMatchObject({ synchronization: 'synchronized', published: { sequence: 3, cause: 'watch', capture: { sweep: 0 } } });
+    } finally { e.script.pending.length = 0; await flush(); await e.dispose(); }
+  });
+
+  describe('sweep-kept', () => {
+    it('sweep-kept: a matched configuration path the update did not reacquire for still sweeps before the capture is synchronized', async () => {
+      const e = sessionEnvironment();
+      let finish: ((value: ReturnType<typeof unchangedSweep>) => void) | undefined;
+      try {
+        const opened = await e.open(); await flush();
+        // The observer records no `subs/tool/package.json`, so its update keeps the capture.
+        e.script.pending.push(() => ({ ...capture(2), timings: work }), () => new Promise(resolve => { finish = resolve; }));
+        e.watcher.emit('/fixture', [{ path: 'subs/tool/package.json', kind: 'changed' }]);
+        e.clock.advance(100); await flush();
+        expect([e.script.updateCalls.length, e.script.sweepCalls.length]).toEqual([1, 1]);
+        // The session advanced, but the context publishes nothing as synchronized while its sweep runs.
+        expect(e.status(opened.token)).toMatchObject({ synchronization: 'reconciling', published: { sequence: 1 }, pending: { analysisRunning: true } });
+        finish!(unchangedSweep()); await flush();
+        expect(e.status(opened.token)).toMatchObject({ synchronization: 'synchronized', published: { sequence: 2, capture: { ...work, workerStatus: 3, workerRoundTrip: 65, sweep: 25 } } });
+      } finally { finish?.(unchangedSweep()); e.script.pending.length = 0; await flush(); await e.dispose(); }
+    });
+
+    it.each([
+      ['a watcher overflow before the configuration event', [{ path: '', kind: 'overflow' }, { path: 'tsconfig.json', kind: 'changed' }]],
+      ['a watcher overflow after the configuration event', [{ path: 'tsconfig.json', kind: 'changed' }, { path: '', kind: 'overflow' }]],
+    ] as const)('sweep-kept: %s still sweeps after a reacquiring update', async (_name, events) => {
+      const e = sessionEnvironment();
+      try {
+        const opened = await e.open(); await flush();
+        e.script.pending.push(reacquiring, unchangedSweep);
+        e.watcher.emit('/fixture', events);
+        expect(e.status(opened.token).synchronization).toBe('conservative');
+        e.clock.advance(100); await flush();
+        expect([e.script.updateCalls.length, e.script.sweepCalls.length]).toEqual([1, 1]);
+        expect(e.status(opened.token)).toMatchObject({ synchronization: 'synchronized', published: { sequence: 2, cause: 'conservative', capture: { sweep: 25 } } });
+      } finally { e.script.pending.length = 0; await flush(); await e.dispose(); }
+    });
+
+    it('sweep-kept: a queue overflow before a configuration event still sweeps after a reacquiring update', async () => {
+      const e = sessionEnvironment({ maxQueuedPaths: 2 });
+      try {
+        const opened = await e.open(); await flush();
+        e.script.pending.push(reacquiring, unchangedSweep);
+        e.watcher.emit('/fixture', ['a.ts', 'b.ts', 'c.ts'].map(path => ({ path, kind: 'changed' as const })));
+        e.watcher.emit('/fixture', [{ path: 'tsconfig.json', kind: 'changed' }]);
+        e.clock.advance(100); await flush();
+        expect(e.script.updateCalls[0]?.inputs.changes).toEqual([{ path: 'tsconfig.json', kind: 'changed' }]);
+        expect([e.script.updateCalls.length, e.script.sweepCalls.length]).toEqual([1, 1]);
+        expect(e.status(opened.token).published).toMatchObject({ sequence: 2, capture: { sweep: 25 } });
+      } finally { e.script.pending.length = 0; await flush(); await e.dispose(); }
+    });
+
+    it('sweep-kept: a cancelled configuration update leaves a sweep that the next reacquiring update does not satisfy', async () => {
+      const e = sessionEnvironment();
+      try {
+        const opened = await e.open(); await flush();
+        e.script.pending.push(call => new Promise(resolve => call.signal!.addEventListener('abort', () => resolve(reacquiring()))), reacquiring, unchangedSweep);
+        e.watcher.emit('/fixture', [{ path: 'tsconfig.json', kind: 'changed' }]);
+        e.clock.advance(100); await flush();
+        expect(e.status(opened.token).pending.analysisRunning).toBe(true);
+        // A newer write cancels the background capture and restores its configuration path.
+        e.watcher.emit('/fixture', [{ path: 'src/index.ts', kind: 'changed' }]); await flush();
+        expect(e.status(opened.token).published?.sequence).toBe(1);
+        e.clock.advance(100); await flush();
+        expect(e.script.updateCalls.map(call => call.inputs.changes.map(change => change.path).sort())).toEqual([['tsconfig.json'], ['src/index.ts', 'tsconfig.json']]);
+        expect(e.script.sweepCalls).toHaveLength(1);
+        expect(e.status(opened.token)).toMatchObject({ synchronization: 'synchronized', published: { sequence: 2, capture: { sweep: 25 } } });
+      } finally { e.script.pending.length = 0; await flush(); await e.dispose(); }
+    });
+
+    it('sweep-kept: a request that needs a sweep still has one after a reacquiring configuration update', async () => {
+      const e = sessionEnvironment();
+      try {
+        const opened = await e.open(); await flush();
+        e.script.pending.push(reacquiring, unchangedSweep);
+        e.watcher.emit('/fixture', [{ path: 'tsconfig.json', kind: 'changed' }]);
+        const answered = await e.check(opened.token, { mode: 'synchronized', expect: [] }, { scope: 'report' });
+        expect([e.script.updateCalls.length, e.script.sweepCalls.length]).toEqual([1, 1]);
+        expect(answered).toMatchObject({ status: 'reported', published: true, timings: { sweep: 25 } });
+      } finally { e.script.pending.length = 0; await flush(); await e.dispose(); }
+    });
+
+    it('sweep-kept: a cold open acquires in full and leaves no configuration requirement a later update could satisfy', async () => {
+      const e = sessionEnvironment({ warmIdleMs: 100, coldRetainMs: 200, sweepIntervalMs: 1_000 });
+      try {
+        const opened = await e.open(); await flush();
+        e.clock.advance(100); await flush(); e.clock.advance(200); await flush();
+        expect(e.status(opened.token)).toMatchObject({ state: 'cold', session: null });
+        // A hook at the cold context reopens it: the open is the capture's acquisition and sweep.
+        e.script.pending.push(() => capture(2));
+        const reopened = await e.check(opened.token, { mode: 'synchronized', expect: expected('src/index.ts', '2') });
+        expect(reopened).toMatchObject({ status: 'reported', published: true, revision: { cause: 'open' } });
+        expect([e.script.openCalls.length, e.script.updateCalls.length, e.script.sweepCalls.length]).toEqual([2, 0, 0]);
+        await flush();
+        expect(e.status(opened.token).synchronization).toBe('synchronized');
+        // A configuration update that does not reacquire on the reopened session still sweeps.
+        e.script.pending.push(() => capture(3), unchangedSweep);
+        e.watcher.emit('/fixture', [{ path: 'tsconfig.json', kind: 'changed' }]);
+        e.clock.advance(100); await flush();
+        expect([e.script.updateCalls.length, e.script.sweepCalls.length]).toEqual([1, 1]);
+      } finally { e.script.pending.length = 0; await flush(); await e.dispose(); }
+    });
   });
 });

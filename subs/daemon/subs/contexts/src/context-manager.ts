@@ -179,7 +179,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     for (const event of events) {
       if (event.kind === 'overflow' || event.kind === 'error') { context.conservative = true; context.sweepRequired = true; }
       else { context.paths.set(event.path, event.kind === 'renamed' ? 'unknown' : event.kind); context.requested.delete(event.path); }
-      if (/(?:^|\/)(?:tsconfig[^/]*\.json|package\.json|package-lock\.json|yarn\.lock|pnpm-lock\.yaml)$/.test(event.path)) context.sweepRequired = true;
+      if (/(?:^|\/)(?:tsconfig[^/]*\.json|package\.json|package-lock\.json|yarn\.lock|pnpm-lock\.yaml)$/.test(event.path) && !context.sweepRequired) context.sweepRequired = 'configuration';
       if (event.kind === 'error') { closeWatcher(context); context.watcherState = 'unavailable'; }
     }
     if (context.paths.size > budgets.maxQueuedPaths) { context.paths.clear(); context.requested.clear(); context.conservative = true; context.sweepRequired = true; }
@@ -343,6 +343,8 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     // changes rather than lengthening their capture.
     const sweepKind = context.sweepRequired || entries.some(entry => entry.needsSweep) ? 'required' : cause === 'sweep' ? 'periodic' : null;
     const sweep = sweepKind !== null;
+    // Only a requirement from configuration path events may be satisfied by the update's reacquisition.
+    const reacquirable = context.sweepRequired === 'configuration' && !entries.some(entry => entry.needsSweep);
     const watch = context.watched, work = noWork();
     context.paths.clear(); context.requested.clear(); context.watched = null; context.conservative = false; context.sweepRequired = false; context.background = null;
     context.debounce?.(); context.debounce = null;
@@ -362,20 +364,23 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
           if (controller.signal.aborted || disposed || context.state === 'evicted') { await opened.session.dispose(); return; }
           context.session = opened.session; context.publishedSession = null; context.invocation = invocation; context.lastSweepAt = started;
           context.observedSequence = 0; context.versions.clear(); observeVersion(context);
-          run = { status: 'revised', revision: opened.revision, identical: false };
+          run = { status: 'revised', revision: opened.revision, identical: false, reacquired: false };
         } else run = opened;
       } else if (cause === 'verify' && !changes.length && !sweep) {
         const verified = await context.session.verify(control);
         if (verified.status === 'cancelled') run = verified;
         else { context.auditedSequence = verified.status === 'mismatch' ? verified.revision.sequence : verified.sequence; context.auditRequired = false;
-          run = verified.status === 'mismatch' ? { status: 'revised', revision: verified.revision, identical: false } : { status: 'unchanged' }; }
+          run = verified.status === 'mismatch' ? { status: 'revised', revision: verified.revision, identical: false, reacquired: false } : { status: 'unchanged' }; }
       } else {
         const invocationChanged = invocationKey(context.invocation) !== invocationKey(invocation);
         if (changes.length || invocationChanged || !sweep) {
           run = await sessionWork(context, work, () => context.session!.update(changes, control, { project: invocation.project, capabilities: invocation.setup.capabilities }));
           if (run.status === 'revised') context.invocation = invocation;
         } else run = { status: 'unchanged' };
-        if (sweep && run.status !== 'reported' && run.status !== 'cancelled') {
+        // An update that acquired the project again on a fresh capture has verified everything a sweep
+        // would; the capture counts as swept, as if the sweep had returned unchanged.
+        const swept = reacquirable && run.status === 'revised' && run.reacquired;
+        if (sweep && !swept && run.status !== 'reported' && run.status !== 'cancelled') {
           run = await sessionWork(context, work, () => context.session!.sweep(control), true);
         }
       }

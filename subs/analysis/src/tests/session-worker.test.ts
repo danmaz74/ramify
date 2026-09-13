@@ -41,7 +41,7 @@ workerSuite('retained session worker', import.meta.url, () => {
       expect(requests).toContainEqual({ operation: 'report', id: 2 });
       const before = messages.length;
       const same = await handle.update([]);
-      expect(same).toEqual({ status: 'revised', revision, identical: true,
+      expect(same).toEqual({ status: 'revised', revision, identical: true, reacquired: false,
         timings: { invocationCheck: 0, promotion: 0, workerStatus: expect.any(Number), workerRoundTrip: expect.any(Number) } });
       expect(handle.current).toBe(revision);
       expect(messages.slice(before).some(message => message.kind === 'reply' && message.result && 'snapshot' in message.result)).toBe(false);

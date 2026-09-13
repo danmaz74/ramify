@@ -45,6 +45,8 @@ export interface Computed {
   readonly timings: PhaseTimings;
   /** Accesses decided again only because their original's declarations moved. */
   readonly positionRefreshed: readonly string[];
+  /** The observer update was structural: the project was acquired again on a fresh, validated capture. */
+  readonly reacquired?: boolean;
 }
 export type StepResult =
   | Computed
@@ -677,7 +679,7 @@ export async function revise(state: SessionState, changes: readonly ObservedChan
       timings.compiler = performance.now() - start;
       const facts = await recomputeAll(state, inventory, timings, signal);
       state.stale = false;
-      return { status: 'computed', facts, checked: wholeCheckedSet('broad', facts), changed, timings, positionRefreshed: [] };
+      return { status: 'computed', facts, checked: wholeCheckedSet('broad', facts), changed, timings, positionRefreshed: [], reacquired: structural };
     }
 
     // The source side: one compiler update, the description closure, the

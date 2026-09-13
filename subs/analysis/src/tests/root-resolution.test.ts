@@ -42,7 +42,7 @@ describe('invocation checks reuse the session resolution', () => {
       // The observer's acquisition already resolved this request.
       const same = await counted(() => handle.update([], {}, invocation));
       expect(same.resolutions).toBe(0);
-      expect(same.result).toEqual({ status: 'revised', revision, identical: true, timings: { invocationCheck: expect.any(Number), promotion: 0 } });
+      expect(same.result).toEqual({ status: 'revised', revision, identical: true, reacquired: false, timings: { invocationCheck: expect.any(Number), promotion: 0 } });
       // The reused check still validates its discovery answers on disk, and reports that work.
       expect(same.result.status === 'revised' && same.result.timings!.invocationCheck).toBeGreaterThan(0);
       // A source edit is not a discovery answer.

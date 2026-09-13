@@ -40,7 +40,7 @@ describe('resident analysis driver resolution lifetime', () => {
       expect({ ...report, runId: 'compared' }).toEqual({ ...batch.report, runId: 'compared' });
       expect(report.inputId).toBe(revision.inputId);
       expect(report.snapshot?.inputs).toEqual(revision.inputs);
-      expect(await session.update([])).toEqual({ status: 'revised', revision, identical: true,
+      expect(await session.update([])).toEqual({ status: 'revised', revision, identical: true, reacquired: false,
         timings: { invocationCheck: 0, promotion: 0, workerStatus: expect.any(Number), workerRoundTrip: expect.any(Number) } });
       const pid = session.status().compiler.pid;
       expect(pid).toBeGreaterThan(0);
