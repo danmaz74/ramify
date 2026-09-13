@@ -150,7 +150,15 @@ export class ReportDraft {
         external: this.snapshot?.results.filter(result => result.outcome === 'external').length ?? 0 },
     };
   }
+  /** The detached report every receiver of a full report gets. */
   finish(): AnalysisReport {
+    return copyReport(this.bounded());
+  }
+  /**
+   * The report measured against `maxReportBytes`, bounded on failure, without
+   * the detached copy. It shares this draft's evidence objects.
+   */
+  bounded(): AnalysisReport {
     if (this.stages.find(stage => stage.stage === 'report')!.status !== 'failed') this.stage('report', 'completed');
     let report = this.build();
     const maximum = this.request.limits.maxReportBytes;
@@ -213,6 +221,6 @@ export class ReportDraft {
       // Never return arbitrary large caller metadata after dropping only the snapshot.
       reportBytes(report, Math.max(maximum, reserve));
     }
-    return copyReport(report);
+    return report;
   }
 }

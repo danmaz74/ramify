@@ -10,6 +10,7 @@ import type { AnalysisDiagnostic, AnalysisInputs, AnalysisReport, RunControl } f
 import type { FindingDelta, RetainedSession, SessionChange, SessionInputs, SessionOpen, SessionRevision, SessionStatus,
   SessionUpdate, VerifyOutcome } from './interfaces/session.js';
 import { detached, diagnostic } from './report-data.js';
+import { copyReport } from './report-copy.js';
 import { ReportDraft, WorkLimit, availableCapabilities } from './report.js';
 import { auditFacts } from './session-audit.js';
 import type { SessionFacts } from './session-facts.js';
@@ -396,8 +397,8 @@ class Session implements RetainedSession {
     const publishStart = performance.now();
     let report: AnalysisReport;
     try {
-      const draft = draftReport(computed.facts, state.request, inputs, inputId);
-      report = draft.finish();
+      // The revision keeps only frozen parts of this report; it needs no detached copy.
+      report = draftReport(computed.facts, state.request, inputs, inputId).bounded();
     }
     catch (error) {
       state.stale = true;
@@ -405,7 +406,7 @@ class Session implements RetainedSession {
     }
     if (report.outcome.execution !== 'completed' && report.outcome.execution !== 'invalid') {
       state.stale = true;
-      return { report };
+      return { report: copyReport(report) };
     }
     const bytes = factBytes(computed.facts);
     let retained = bytes;
