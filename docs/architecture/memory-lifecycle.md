@@ -176,10 +176,12 @@ on the reference, and the near-equal misses against per-class ideal targets
 identified a fixed per-revision overhead that a single tolerant gate would have
 accepted without comment. Report ideal misses; do not gate on them.
 
-No budget of either kind may be set below a measured floor. State the floor
-beside the budget. Plan 5's 120 ms end-to-end target for a hook whose revision
-the watcher had already published sat below the 206 ms cost of its own client
-performing no analysis, so no implementation could have met it.
+No budget of either kind may be set below an irreducible floor, such as bare
+process startup on the measurement host. State the floor beside the budget, and
+decompose any larger figure before treating it as a floor: Plan 5's client
+measured 206 ms for a request that needed no analysis, which looked like a floor
+but was mostly project-root resolution the daemon repeated on every context
+open.
 
 A first delivery is accepted against acceptable-time budgets only. An ideal
 budget becomes an acceptable-time budget by a reviewed revision once an

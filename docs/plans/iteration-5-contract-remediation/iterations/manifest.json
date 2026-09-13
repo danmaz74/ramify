@@ -1,0 +1,8 @@
+{
+  "createdAt": "2026-09-13T00:00:00.000Z",
+  "iterations": [
+    { "file": "iteration1.md", "index": 1, "parallelGroup": null, "title": "Periodic sweeps as maintenance" },
+    { "file": "iteration2.md", "index": 2, "parallelGroup": null, "title": "Cancellation without advanced state" },
+    { "file": "iteration3.md", "index": 3, "parallelGroup": null, "title": "Harness attribution, ideal budgets and live correctness" }
+  ]
+}

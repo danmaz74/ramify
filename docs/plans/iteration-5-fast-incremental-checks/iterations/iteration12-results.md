@@ -67,9 +67,13 @@ The same run measured the floor beneath it, as the budget section requires:
 | Bare Node process | 34.2 ms |
 | CLI client covering a revision with zero daemon work | 206.4 ms |
 
-So of the ~520 ms floor, roughly 206 ms is client round trip and roughly 320 ms
-is fixed cost on the daemon side, before any analysis runs. Narrowing the
-checked set cannot reach either component.
+Session work is `revision.timings.total`, measured inside the session, so the
+whole floor is daemon-side and client time is additional. The zero-work client
+figure is not an irreducible floor either: most of it is project-root
+resolution performed by the daemon on every context open. The
+[optimization analysis](../../../analysis/fast-incremental-checks-optimization.md)
+decomposes both; this paragraph originally attributed part of the session floor
+to the client, which was wrong.
 
 ## Correctness predicates that failed
 
@@ -100,6 +104,11 @@ increases by exactly one. Enumerating the twenty reference cycles:
 The sequence clause held in every cycle: the watcher had published exactly the
 revision the hook then requested, and the daemon performed analysis anyway.
 S100 fails the same predicate; its cycles were not enumerated.
+
+Later analysis for the [contract remediation](../../iteration-5-contract-remediation/main-plan.md)
+found that only cycle 1 is a daemon violation. Cycle 13, and S100 cycle 18,
+were answered by coverage; a periodic sweep then started inside the harness's
+settle window and was attributed to the hook.
 
 The sibling predicates `racing hooks launched before publication` and
 `racing hooks wait for an uncovered identity` passed.
@@ -170,9 +179,10 @@ iteration 11's 88 and the nine `I5-13` handlers, not an observed count.
 Iteration 13 did not run and this plan does not close as delivered. A follow-up
 inherits three separate findings:
 
-1. A fixed per-revision overhead of roughly 320 ms on the daemon and 206 ms in
-   the client, independent of edit class, which no narrowing of the checked set
-   addresses.
+1. A fixed per-revision cost in the daemon, independent of edit class, which no
+   narrowing of the checked set addresses; the
+   [optimization analysis](../../../analysis/fast-incremental-checks-optimization.md)
+   locates it.
 2. The description revision path falling back to the broad path.
 3. The covering rule permitting analysis on a published hook.
 

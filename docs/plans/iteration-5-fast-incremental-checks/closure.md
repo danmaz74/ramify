@@ -68,25 +68,29 @@ the hook races the watcher, against the alternative of a full batch check. The
 figure that would settle it is a batch baseline on the same build, which was
 never taken.
 
-One target was infeasible rather than aspirational. The 120 ms end-to-end budget
-for an already-published hook sat below the 206 ms cost of the client performing
-no analysis; the observed 207 ms means the daemon contributed under a
-millisecond and the entire cost is client startup and IPC. That row could not
-have been met by any engine, and it is the most actionable item in the set.
+The 120 ms end-to-end budget for an already-published hook sat below the
+206 ms measured for a client whose request needed no analysis, and the observed
+207 ms matched it. That figure is the current implementation's cost, not an
+irreducible floor: the
+[optimization analysis](../../analysis/fast-incremental-checks-optimization.md)
+attributes most of it to project-root resolution in the daemon on every context
+open, and to build-key hashing in the client.
 
 Three findings pass to a follow-up, and they are separate problems. None is a
 budget dispute:
 
-1. **A fixed per-revision overhead.** Session work is flat across edit classes,
+1. **A fixed per-revision cost.** Session work is flat across edit classes,
    523 to 574 ms on the reference and 861 to 1008 ms on S100, whether the edit
-   was a README touch or an export change. Of the reference floor, roughly
-   206 ms is CLI client round trip and roughly 320 ms is fixed daemon cost
-   before any analysis runs. Narrowing the checked set reaches neither. This
-   is the finding that decides whether the design can meet its budgets at all.
+   was a README touch or an export change. It is entirely daemon-side; the
+   [optimization analysis](../../analysis/fast-incremental-checks-optimization.md)
+   locates it in work that runs on every revision whatever its path.
 2. **The description revision path falls back to broad**, in 1 of 20 cycles on
    each binding fixture.
-3. **The covering rule leaks**, in 2 of 20 reference cycles, one of which also
-   failed to count the request as covered.
+3. **The covering rule leaks**, in reference cycle 1. Reference cycle 13 and
+   S100 cycle 18 were later found to be harness attribution errors.
+
+The [contract remediation plan](../iteration-5-contract-remediation/main-plan.md)
+addresses findings 2 and 3.
 
 The deferral triggers Plan 5 defined are mostly unanswered: resolution-bounded
 narrowing triggered, and the other four depend on workloads that never ran.
