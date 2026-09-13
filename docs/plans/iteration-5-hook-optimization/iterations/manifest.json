@@ -1,0 +1,12 @@
+{
+  "createdAt": "2026-09-13T00:00:00.000Z",
+  "iterations": [
+    { "file": "iteration1.md", "index": 1, "parallelGroup": null, "title": "Timing fields and watcher timestamps" },
+    { "file": "iteration2.md", "index": 2, "parallelGroup": null, "title": "Maintain the observed-input list" },
+    { "file": "iteration3.md", "index": 3, "parallelGroup": null, "title": "Build only what a hook publishes" },
+    { "file": "iteration4.md", "index": 4, "parallelGroup": null, "title": "Reuse project-root resolution" },
+    { "file": "iteration5.md", "index": 5, "parallelGroup": null, "title": "Answer queued racing hooks on publication" },
+    { "file": "iteration6.md", "index": 6, "parallelGroup": null, "title": "Build-time runtime identity" },
+    { "file": "iteration7.md", "index": 7, "parallelGroup": null, "title": "macOS RSS sampling and plan closure" }
+  ]
+}
