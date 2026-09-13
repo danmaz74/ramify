@@ -52,9 +52,19 @@ export interface SessionRevision {
   readonly delta: FindingDelta;
   readonly timings: RevisionTimings;
 }
+/** Durations of one update or sweep outside `RevisionTimings.total`, in milliseconds.
+ * Each layer adds what it measures; a field is absent where its layer did not run. */
+export interface OperationTimings {
+  /** The engine's invocation check before the update's timer starts; zero for a sweep. */
+  readonly invocationCheck: number;
+  /** The worker's status checkpoint sent with the reply. */
+  readonly workerStatus?: number;
+  /** Request posted to reply received, measured by the daemon-side host. */
+  readonly workerRoundTrip?: number;
+}
 export type SessionUpdate =
-  | { readonly status: 'revised'; readonly revision: SessionRevision; readonly identical: boolean }
-  | { readonly status: 'reported'; readonly report: AnalysisReport }
+  | { readonly status: 'revised'; readonly revision: SessionRevision; readonly identical: boolean; readonly timings?: OperationTimings }
+  | { readonly status: 'reported'; readonly report: AnalysisReport; readonly timings?: OperationTimings }
   | { readonly status: 'cancelled' };
 export type VerifyOutcome =
   | { readonly status: 'equal'; readonly sequence: number; readonly elapsedMs: number }

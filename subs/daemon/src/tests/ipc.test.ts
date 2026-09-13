@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { createHash } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ipcFixture } from './ipc-fixture.js';
 import { eventually } from './socket-fixture.js';
 import { encodeJsonFrame } from '../codec.js';
+import type { ContextEvent } from '../context-types.js';
 
  describe('IPC framing and shared service dispatch', () => {
   it('preserves validation errors and tokens while releasing subscription leases on close', async () => {
@@ -95,6 +97,35 @@ import { encodeJsonFrame } from '../codec.js';
       expect(report).toMatchObject({ ok: true, value: { status: 'reported', published: true, report: { outcome: { execution: 'completed', coverage: 'partial' } } } });
       await eventually(() => events.some(event => (event as { type: string }).type === 'revision-published'));
       expect(events).toContainEqual(expect.objectContaining({ type: 'revision-published', revision: expect.objectContaining({ outcome: expect.objectContaining({ coverage: 'partial' }) }) }));
+    } finally { await fixture.dispose(); }
+  });
+  it('timing-fields: a socket check reply carries session work, publication, service handling and client transport', async () => {
+    const fixture = await ipcFixture();
+    try {
+      const client = await fixture.connect();
+      const opened = await client.openContext(fixture.params);
+      if (!opened.ok || opened.value.status !== 'opened') throw new Error('Open failed');
+      const token = opened.value.token;
+      const events: ContextEvent[] = [];
+      await client.subscribe({ token }, event => events.push(event));
+      expect(await client.check({ token, requestId: 'opened', scope: 'delta', freshness: { mode: 'published', wait: true } })).toMatchObject({ ok: true, value: { status: 'reported' } });
+      const text = 'export const value = 2;\n';
+      await writeFile(join(fixture.project, 'src/index.ts'), text);
+      const result = await client.check({ token, requestId: 'timings', scope: 'delta',
+        freshness: { mode: 'synchronized', expect: [{ path: 'src/index.ts', sha256: createHash('sha256').update(text).digest('hex') }] } });
+      if (!result.ok || result.value.status !== 'reported' || !result.value.published) throw new Error(JSON.stringify(result));
+      const { revision } = result.value, timings = result.value.timings!;
+      expect(Object.keys(revision.timings)).toHaveLength(9);
+      expect(Object.keys(timings).sort()).toEqual(['clientTransport', 'invocationCheck', 'publication', 'service', 'workerRoundTrip', 'workerStatus']);
+      expect(Object.values(timings).every(value => Number.isFinite(value) && value >= 0)).toBe(true);
+      expect([timings.invocationCheck > 0, timings.workerStatus > 0, timings.workerRoundTrip > 0]).toEqual([true, true, true]);
+      // Service handling brackets the capture's round trip and publication.
+      expect(timings.service).toBeGreaterThanOrEqual(timings.workerRoundTrip + timings.publication);
+      // One update answered the request, so the revision's capture reports the same session work.
+      expect(revision.capture).toEqual({ invocationCheck: timings.invocationCheck, workerStatus: timings.workerStatus, workerRoundTrip: timings.workerRoundTrip, watch: null });
+      await eventually(() => events.some(event => event.type === 'revision-published' && event.revision.sequence === revision.sequence));
+      const published = events.find(event => event.type === 'revision-published' && event.revision.sequence === revision.sequence);
+      expect(published?.type === 'revision-published' && published.revision.capture).toEqual(revision.capture);
     } finally { await fixture.dispose(); }
   });
 

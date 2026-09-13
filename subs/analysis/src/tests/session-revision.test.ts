@@ -565,3 +565,33 @@ describe('cancelled sweeps and revisions', () => {
     } finally { await handle.dispose(); }
   }), timeout);
 });
+
+describe('timing fields outside the revision total', () => {
+  it('timing-fields: an update reports its invocation check beside unchanged revision timings', () => fixture(async (root, inputs) => {
+    const { handle, revision } = await opened(inputs);
+    try {
+      const stages = ['accesses', 'classify', 'compiler', 'decide', 'descriptions', 'inventory', 'link', 'publish', 'total'];
+      expect(Object.keys(revision.timings).sort()).toEqual(stages);
+      const invocation = { project: inputs.project, capabilities: inputs.capabilities };
+      // Without an invocation nothing is checked.
+      expect(await handle.update([])).toEqual({ status: 'revised', revision, identical: true, timings: { invocationCheck: 0 } });
+      // The identical update keeps the published revision and its timings; its own check sits beside them.
+      const same = await handle.update([], {}, invocation);
+      expect(same).toEqual({ status: 'revised', revision, identical: true, timings: { invocationCheck: expect.any(Number) } });
+      expect(same.status === 'revised' && same.timings!.invocationCheck).toBeGreaterThan(0);
+      // A refused invocation reports its check with the refusal.
+      const refused = await handle.update([], {}, { ...invocation, capabilities: ['coverage'] });
+      expect(refused).toMatchObject({ status: 'reported', timings: { invocationCheck: expect.any(Number) } });
+      expect(refused.status === 'reported' && refused.report.diagnostics[0]?.message).toContain('different capability set');
+      await replace(root, paths.provider, '  return 2;', '  void 0;\n  return 2;');
+      const edited = await handle.update([{ path: paths.provider, kind: 'changed' }], {}, invocation);
+      if (edited.status !== 'revised') throw new Error(JSON.stringify(edited));
+      expect([edited.identical, edited.revision.checked.path]).toEqual([false, 'unchanged-surface']);
+      expect(Object.keys(edited.revision.timings).sort()).toEqual(stages);
+      expect(Object.keys(edited.timings!)).toEqual(['invocationCheck']);
+      expect(edited.timings!.invocationCheck).toBeGreaterThan(0);
+      await audited(handle);
+      await equalToBatch(handle, inputs);
+    } finally { await handle.dispose(); }
+  }), timeout);
+});

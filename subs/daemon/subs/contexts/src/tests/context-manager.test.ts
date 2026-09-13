@@ -138,6 +138,27 @@ describe('watcher reconciliation and retention', () => {
       expect(e.status(opened.token).published?.summary.owners).toBe(3);
     } finally { await e.dispose(); }
   });
+  it('watcher-timestamps: the update a batch triggers carries its receipt and flush, spanning coalesced and restored batches', async () => {
+    const e = environment();
+    try {
+      const opened = await e.open(); await flush();
+      e.clock.advance(10); e.watcher.emit('/fixture', [{ path: 'a', kind: 'changed' }], { receivedAt: 2, flushedAt: 10 });
+      e.clock.advance(50); e.watcher.emit('/fixture', [{ path: 'b', kind: 'changed' }], { receivedAt: 45, flushedAt: 60 });
+      e.script.version = 2; e.clock.advance(100); await flush();
+      expect(e.status(opened.token).published).toMatchObject({ sequence: 2, cause: 'watch', capture: { watch: { receivedAt: 2, flushedAt: 60 } } });
+      // A superseded background capture restores its batches with its changes; a port without times uses the context clock.
+      e.script.pending.push(call => new Promise(resolve => call.signal!.addEventListener('abort', () => resolve(capture(3)))));
+      e.watcher.emit('/fixture', [{ path: 'c', kind: 'changed' }], { receivedAt: 150, flushedAt: 160 }); e.clock.advance(100); await flush();
+      expect(e.script.updateCalls).toHaveLength(2);
+      e.watcher.emit('/fixture', [{ path: 'd', kind: 'changed' }]); await flush();
+      e.script.version = 4; e.clock.advance(100); await flush();
+      expect(e.script.updateCalls.at(-1)?.inputs.changes.map(item => item.path).sort()).toEqual(['c', 'd']);
+      expect(e.status(opened.token).published).toMatchObject({ sequence: 3, cause: 'watch', capture: { watch: { receivedAt: 150, flushedAt: 260 } } });
+      // An update without watcher input records none.
+      e.script.version = 5; await e.check(opened.token);
+      expect(e.status(opened.token).published).toMatchObject({ sequence: 4, cause: 'request', capture: { watch: null } });
+    } finally { await e.dispose(); }
+  });
   it('overflow and lost watcher reconcile conservatively, then reattach', async () => {
     const e = environment({ maxQueuedPaths: 2 });
     try {

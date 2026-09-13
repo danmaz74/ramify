@@ -41,7 +41,8 @@ workerSuite('retained session worker', import.meta.url, () => {
       expect(requests).toContainEqual({ operation: 'report', id: 2 });
       const before = messages.length;
       const same = await handle.update([]);
-      expect(same).toEqual({ status: 'revised', revision, identical: true });
+      expect(same).toEqual({ status: 'revised', revision, identical: true,
+        timings: { invocationCheck: 0, workerStatus: expect.any(Number), workerRoundTrip: expect.any(Number) } });
       expect(handle.current).toBe(revision);
       expect(messages.slice(before).some(message => message.kind === 'reply' && message.result && 'snapshot' in message.result)).toBe(false);
       expect(await handle.verify()).toMatchObject({ status: 'equal', sequence: 1 });
@@ -386,6 +387,28 @@ workerSuite('retained session worker', import.meta.url, () => {
       const refused = await handle.update([]);
       expect(refused.status === 'reported' && refused.report.diagnostics[0]?.code).toBe('session-disposed');
       expect(await handle.report()).toBeNull();
+    } finally { await handle.dispose(); observation.cleanup(); }
+  }), timeout);
+
+  it('timing-fields: worker replies add the status checkpoint and daemon-side round trip beside the invocation check', () => fixture(async (_root, inputs) => {
+    const observation = await opened(inputs);
+    const { handle, revision } = observation;
+    try {
+      const same = await handle.update([], {}, { project: inputs.project, capabilities: inputs.capabilities });
+      if (same.status !== 'revised') throw new Error(JSON.stringify(same));
+      // The identical update keeps the published revision; its own durations sit beside it.
+      expect(same.revision).toBe(revision);
+      expect(Object.keys(revision.timings).sort()).toEqual(['accesses', 'classify', 'compiler', 'decide', 'descriptions', 'inventory', 'link', 'publish', 'total']);
+      const timings = same.timings!;
+      frozenPlain(timings);
+      expect(Object.keys(timings).sort()).toEqual(['invocationCheck', 'workerRoundTrip', 'workerStatus']);
+      expect(timings.invocationCheck).toBeGreaterThan(0);
+      expect(timings.workerStatus).toBeGreaterThan(0);
+      // The host's round trip brackets both durations measured inside the worker.
+      expect(timings.workerRoundTrip).toBeGreaterThanOrEqual(timings.invocationCheck + timings.workerStatus!);
+      // Operations other than update and sweep results report no operation timings.
+      expect(await handle.verify()).not.toHaveProperty('timings');
+      expect(await handle.sweep()).toEqual({ status: 'unchanged' });
     } finally { await handle.dispose(); observation.cleanup(); }
   }), timeout);
 

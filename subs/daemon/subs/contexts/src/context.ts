@@ -1,6 +1,6 @@
 import type { RetainedSession } from '../../../../analysis/src/interfaces/session.js';
 import type { ProjectRequest, ProjectScope } from '../../../../analysis/subs/project/src/interfaces/project.js';
-import type { ContextEvent, ContextRevision, ContextSelection, ContextState, ContextToken, SynchronizationState, WatcherHandle } from './interfaces/contexts.js';
+import type { ContextEvent, ContextRevision, ContextSelection, ContextState, ContextToken, SynchronizationState, WatchBatch, WatcherHandle } from './interfaces/contexts.js';
 import type { RevisionHistory } from './history.js';
 import type { Invocation, PendingCheck, RunningCapture } from './queue.js';
 
@@ -16,6 +16,8 @@ export interface LiveContext {
   readonly queue: PendingCheck[];
   readonly deliveries: Set<PendingCheck>;
   readonly paths: Map<string, 'changed' | 'created' | 'deleted' | 'unknown'>;
+  /** Watcher batches behind `paths`: the earliest receipt and latest flush, until a capture consumes them. */
+  watched: WatchBatch | null;
   lastActivityAt: number;
   hadLease: boolean;
   scope: ProjectScope | null;

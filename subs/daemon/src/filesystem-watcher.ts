@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { lstat, readdir, realpath } from 'node:fs/promises';
 import { isAbsolute, join, relative, sep } from 'node:path';
-import type { WatchEvent, WatcherHandle, WatcherPort } from '../subs/contexts/src/interfaces/contexts.js';
+import type { ClockPort, WatchBatch, WatchEvent, WatcherHandle, WatcherPort } from '../subs/contexts/src/interfaces/contexts.js';
 
 const excluded = new Set(['node_modules', '.git', 'dist', '.reference-work']);
 const maximumPaths = 10_000;
@@ -16,11 +16,12 @@ interface DirectoryWatch {
 /** Recursive coverage through pruned directory handles, without following symlinks.
  * Events are hints: rename never guesses creation/deletion, and unknown paths,
  * overflow or watcher failure require the consumer to reconcile conservatively. */
-export function createFilesystemWatcher(): WatcherPort {
-  return { watch: watchTree };
+export function createFilesystemWatcher(clock: Pick<ClockPort, 'now'> = { now: Date.now }): WatcherPort {
+  return { watch: (root, listener) => watchTree(root, listener, clock) };
 }
 
-async function watchTree(root: string, listener: (events: readonly WatchEvent[]) => void): Promise<WatcherHandle> {
+async function watchTree(root: string, listener: (events: readonly WatchEvent[], batch: WatchBatch) => void,
+  clock: Pick<ClockPort, 'now'>): Promise<WatcherHandle> {
   const canonicalRoot = await realpath(root);
   let deliver: typeof listener | undefined = listener;
   const directories = new Map<string, DirectoryWatch>();
@@ -32,11 +33,14 @@ async function watchTree(root: string, listener: (events: readonly WatchEvent[])
   let rescanAll = true;
   const changedDirectories = new Set<string>();
   let timer: ReturnType<typeof setTimeout> | undefined;
+  /** Receipt of the first event since the last flush. */
+  let receivedAt: number | undefined;
   let scanning: Promise<void> | undefined;
   let closing: Promise<void> | undefined;
 
   function enqueue(path: string, kind: WatchEvent['kind']): void {
     if (closed) return;
+    receivedAt ??= clock.now();
     if (kind === 'error' || kind === 'overflow') signals.add(kind);
     else if (!signals.has('overflow')) {
       if (!pending.has(path) && pending.size === maximumPaths) {
@@ -68,7 +72,10 @@ async function watchTree(root: string, listener: (events: readonly WatchEvent[])
       ...[...pending].sort(([a], [b]) => a.localeCompare(b)).map(([path, kind]) => ({ path, kind })),
     ];
     pending.clear(); signals.clear();
-    if (events.length) deliver?.(Object.freeze(events.map(event => Object.freeze(event))));
+    const received = receivedAt; receivedAt = undefined;
+    if (!events.length) return;
+    const flushedAt = clock.now();
+    deliver?.(Object.freeze(events.map(event => Object.freeze(event))), Object.freeze({ receivedAt: received ?? flushedAt, flushedAt }));
   }
 
   function attach(directory: string, identity: string): DirectoryWatch {

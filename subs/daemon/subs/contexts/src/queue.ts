@@ -1,6 +1,6 @@
 import type { SessionChange } from '../../../../analysis/src/interfaces/session.js';
 import type { ProjectRequest } from '../../../../analysis/subs/project/src/interfaces/project.js';
-import type { CheckOutcome, CheckRequest, ContextSetup } from './interfaces/contexts.js';
+import type { CheckOutcome, CheckRequest, ContextSetup, WatchBatch } from './interfaces/contexts.js';
 
 export interface Invocation { readonly project: ProjectRequest; readonly setup: ContextSetup }
 export interface PendingCheck {
@@ -23,6 +23,13 @@ export interface RunningCapture {
   /** A required sweep makes requests wait; a periodic sweep is maintenance. */
   readonly sweep: 'required' | 'periodic' | null;
   readonly started: number;
+  /** Watcher batches the capture consumed; restored with its changes when cancelled. */
+  readonly watch: WatchBatch | null;
+}
+/** The earliest receipt and latest flush of two batch spans. */
+export function spanBatches(first: WatchBatch | null, second: WatchBatch | null): WatchBatch | null {
+  if (!first || !second) return first ?? second;
+  return { receivedAt: Math.min(first.receivedAt, second.receivedAt), flushedAt: Math.max(first.flushedAt, second.flushedAt) };
 }
 
 export function invocationKey(value: Invocation): string {

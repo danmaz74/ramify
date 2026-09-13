@@ -1,7 +1,7 @@
 import { setImmediate } from 'node:timers/promises';
 import { getHeapStatistics } from 'node:v8';
 import { parentPort, resourceLimits, workerData } from 'node:worker_threads';
-import type { RetainedSession, SessionInputs, SessionStatus } from './interfaces/session.js';
+import type { RetainedSession, SessionInputs, SessionStatus, SessionUpdate } from './interfaces/session.js';
 import type { WorkerMessage, WorkerRequest, WorkerResult } from './session-messages.js';
 import { deepFreeze } from './session-facts.js';
 import { trackSessionChildren } from './session-processes.js';
@@ -49,7 +49,14 @@ async function execute(request: Exclude<WorkerRequest, { operation: 'cancel' }>,
       }
     }
     await setImmediate(); // Deliver native child exits before the status checkpoint.
-    post({ kind: 'reply', id, result, status: status() });
+    const checking = performance.now();
+    const checkpoint = status();
+    const workerStatus = performance.now() - checking;
+    if ((operation === 'update' || operation === 'sweep') && result && 'status' in result && (result.status === 'revised' || result.status === 'reported')) {
+      const update = result as Extract<SessionUpdate, { status: 'revised' | 'reported' }>;
+      result = { ...update, timings: { invocationCheck: 0, ...update.timings, workerStatus } };
+    }
+    post({ kind: 'reply', id, result, status: checkpoint });
   } catch (error) {
     post({ kind: 'error', id, message: error instanceof Error ? error.message : String(error), status: status() });
   } finally {

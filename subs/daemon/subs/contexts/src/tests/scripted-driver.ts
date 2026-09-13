@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { AnalysisDriver, ContextBudgets, ContextSetup } from '../interfaces/contexts.js';
 import type { AnalysisInputs, AnalysisReport, RunControl } from '../../../../../analysis/src/interfaces/analysis.js';
-import type { RetainedSession, SessionChange, SessionRevision, SessionStatus, SessionUpdate, VerifyOutcome } from '../../../../../analysis/src/interfaces/session.js';
+import type { OperationTimings, RetainedSession, SessionChange, SessionRevision, SessionStatus, SessionUpdate, VerifyOutcome } from '../../../../../analysis/src/interfaces/session.js';
 import type { CapturedInput, ProjectRequest } from '../../../../../analysis/subs/project/src/interfaces/project.js';
 import { historyReport } from './history-fixture.js';
 
@@ -20,6 +20,8 @@ export interface ScriptedCapture {
   readonly report: AnalysisReport;
   readonly revision: SessionRevision;
   readonly factBytes?: number;
+  /** Operation durations the session reports beside the revision, when the script supplies them. */
+  readonly timings?: OperationTimings;
 }
 export function capture(version = 1, execution: 'completed' | 'invalid' | 'incomplete' = 'completed', inputs?: readonly CapturedInput[]): ScriptedCapture {
   const base = historyReport(`run/1:${version}`);
@@ -113,7 +115,8 @@ export function createScriptedDriver() {
         if (result.status !== 'captured') return result;
         if (result.report.outcome.execution === 'incomplete' || result.report.outcome.execution === 'unavailable') return { status: 'reported', report: result.report };
         level = 'hot';
-        return accept(result);
+        const accepted = accept(result);
+        return result.timings ? { ...accepted, timings: result.timings } : accepted;
       }
       const initial = accept(first);
       const session: RetainedSession = {

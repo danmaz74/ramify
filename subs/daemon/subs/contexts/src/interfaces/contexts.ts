@@ -30,6 +30,33 @@ export interface InputFingerprints {
   readonly engine: string;
 }
 export type RevisionCause = 'open' | 'watch' | 'request' | 'sweep' | 'verify' | 'conservative';
+/** One watcher batch: its first event's receipt and its flush, on the watcher's clock. */
+export interface WatchBatch {
+  readonly receivedAt: number;
+  readonly flushedAt: number;
+}
+/** Session work of one capture outside `RevisionTimings.total`: sums over its
+ * update and sweep operations in milliseconds, zero for operations that report none. */
+export interface CaptureWork {
+  readonly invocationCheck: number;
+  readonly workerStatus: number;
+  readonly workerRoundTrip: number;
+}
+/** The capture that published a revision. `watch` spans the watcher batches it
+ * consumed: the earliest receipt and the latest flush, or null without any. */
+export interface CaptureTimings extends CaptureWork {
+  readonly watch: WatchBatch | null;
+}
+/** Work outside `RevisionTimings.total` paid by the capture that answered a
+ * request, in milliseconds; zero for an answer from an existing publication. */
+export interface ReplyTimings extends CaptureWork {
+  /** The capture's daemon publication: fingerprints, history admission and events. */
+  readonly publication: number;
+  /** The service's handling of the check request, added by the daemon service. */
+  readonly service?: number;
+  /** Request sent to response received, less `service`, added by a socket client connection. */
+  readonly clientTransport?: number;
+}
 export interface ContextRevision {
   readonly token: ContextToken;
   readonly revision: RevisionId;
@@ -41,6 +68,7 @@ export interface ContextRevision {
   readonly checked: CheckedSet;
   readonly delta: { readonly added: number; readonly removed: number; readonly positionOnly: number };
   readonly timings: RevisionTimings;
+  readonly capture: CaptureTimings;
   readonly outcome: AnalysisReport['outcome'];
   readonly summary: AnalysisSummary;
 }
@@ -105,9 +133,11 @@ export interface Unavailable {
 }
 export type CheckOutcome =
   | { readonly status: 'reported'; readonly requestId: string; readonly published: true;
-      readonly revision: ContextRevision; readonly freshness: FreshnessRecord; readonly delta: CheckDelta; readonly report: AnalysisReport | null }
+      readonly revision: ContextRevision; readonly freshness: FreshnessRecord; readonly delta: CheckDelta; readonly report: AnalysisReport | null;
+      readonly timings?: ReplyTimings }
   | { readonly status: 'reported'; readonly requestId: string; readonly published: false;
-      readonly revision: null; readonly freshness: FreshnessRecord; readonly delta: null; readonly report: AnalysisReport }
+      readonly revision: null; readonly freshness: FreshnessRecord; readonly delta: null; readonly report: AnalysisReport;
+      readonly timings?: ReplyTimings }
   | { readonly status: 'pending'; readonly requestId: string; readonly current: ContextStatus }
   | { readonly status: 'superseded'; readonly requestId: string;
       readonly revision: ContextRevision | null;
@@ -142,7 +172,8 @@ export interface WatchEvent {
 }
 export interface WatcherHandle { close(): Promise<void> }
 export interface WatcherPort {
-  watch(root: string, listener: (events: readonly WatchEvent[]) => void): Promise<WatcherHandle>;
+  /** A listener without `batch` receives its times from the context clock on delivery. */
+  watch(root: string, listener: (events: readonly WatchEvent[], batch?: WatchBatch) => void): Promise<WatcherHandle>;
 }
 export interface ClockPort {
   now(): number;

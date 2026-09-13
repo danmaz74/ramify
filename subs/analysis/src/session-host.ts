@@ -8,6 +8,9 @@ import { deepFreeze } from './session-facts.js';
 import { processRss, releaseSessionChildren } from './session-processes.js';
 
 interface Pending {
+  readonly operation: SessionCommand['operation'];
+  /** When the request was posted, for the update's worker round trip. */
+  readonly sent: number;
   readonly resolve: (value: WorkerResult) => void;
   readonly reject: (error: Error) => void;
   readonly cleanup: () => void;
@@ -71,6 +74,7 @@ class SessionHost implements RetainedSession {
         return;
       }
       if (message.kind !== 'reply' && message.kind !== 'error') return;
+      const received = performance.now();
       this.#messages = this.#messages.then(async () => {
         if (this.#failed) return;
         if (message.status) {
@@ -87,6 +91,11 @@ class SessionHost implements RetainedSession {
         if (result && 'revision' in result) {
           if (this.#current?.sequence === result.revision.sequence) result = { ...result, revision: this.#current };
           else this.#current = result.revision;
+        }
+        if ((pending.operation === 'update' || pending.operation === 'sweep') && result && 'status' in result
+          && (result.status === 'revised' || result.status === 'reported')) {
+          const update = result as Extract<SessionUpdate, { status: 'revised' | 'reported' }>;
+          result = { ...update, timings: { invocationCheck: 0, ...update.timings, workerRoundTrip: received - pending.sent } };
         }
         pending.resolve(deepFreeze(result));
       }).catch(error => this.#fail(failure('analysis-failed', String(error))));
@@ -181,7 +190,7 @@ class SessionHost implements RetainedSession {
     const id = ++this.#nextId;
     return new Promise((resolve, reject) => {
       const abort = (): void => { this.#worker.postMessage(Object.freeze({ operation: 'cancel', id })); };
-      this.#pending.set(id, { resolve, reject, cleanup: () => control.signal?.removeEventListener('abort', abort) });
+      this.#pending.set(id, { operation: command.operation, sent: performance.now(), resolve, reject, cleanup: () => control.signal?.removeEventListener('abort', abort) });
       try {
         this.#worker.postMessage(deepFreeze(structuredClone({ ...command, id })));
         control.signal?.addEventListener('abort', abort, { once: true });

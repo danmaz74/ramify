@@ -5,7 +5,7 @@ import { join, relative, sep } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { describe, expect, it, vi } from 'vitest';
 import { createFilesystemWatcher } from '../filesystem-watcher.js';
-import type { WatchEvent, WatcherHandle } from '../../subs/contexts/src/interfaces/contexts.js';
+import type { ClockPort, WatchBatch, WatchEvent, WatcherHandle } from '../../subs/contexts/src/interfaces/contexts.js';
 
 async function until(predicate: () => boolean): Promise<void> {
   const deadline = performance.now() + 4000;
@@ -17,15 +17,17 @@ async function until(predicate: () => boolean): Promise<void> {
 
 async function fixture(run: (root: string, state: {
   readonly batches: (readonly WatchEvent[])[];
+  readonly times: WatchBatch[];
   readonly native: fs.FSWatcher[];
   readonly paths: string[];
-  open(): Promise<WatcherHandle>;
+  open(clock?: Pick<ClockPort, 'now'>): Promise<WatcherHandle>;
 }) => Promise<void>): Promise<void> {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'ramify-watcher-')));
   const handles: WatcherHandle[] = [];
   const native: fs.FSWatcher[] = [];
   const paths: string[] = [];
   const batches: (readonly WatchEvent[])[] = [];
+  const times: WatchBatch[] = [];
   const originalWatch = fs.watch;
   const spy = vi.spyOn(fs, 'watch').mockImplementation((...args: Parameters<typeof fs.watch>) => {
     paths.push(String(args[0]));
@@ -36,8 +38,8 @@ async function fixture(run: (root: string, state: {
   try {
     await mkdir(join(root, 'src', 'nested'), { recursive: true });
     await writeFile(join(root, 'src', 'nested', 'value.ts'), 'before');
-    await run(root, { batches, native, paths, async open() {
-      const handle = await createFilesystemWatcher().watch(root, events => batches.push(events));
+    await run(root, { batches, times, native, paths, async open(clock) {
+      const handle = await createFilesystemWatcher(clock).watch(root, (events, batch) => { batches.push(events); if (batch) times.push(batch); });
       handles.push(handle);
       return handle;
     } });
@@ -64,6 +66,8 @@ describe('filesystem watcher', () => {
         expect(Object.isFrozen(batch)).toBe(true);
         for (const event of batch) { expect(Object.isFrozen(event)).toBe(true); expect(event.path.startsWith(root)).toBe(false); }
       }
+      expect(state.times).toHaveLength(state.batches.length);
+      for (const batch of state.times) expect(batch.receivedAt).toBeLessThanOrEqual(batch.flushedAt);
     });
   });
 
@@ -136,6 +140,21 @@ describe('filesystem watcher', () => {
       expect(state.batches).toHaveLength(1);
       expect(state.batches[0]).toHaveLength(100);
       expect(new Set(state.batches[0].map(event => event.path)).size).toBe(100);
+    });
+  });
+
+  it('watcher-timestamps: each batch records its first event receipt and its flush on the injected clock', async () => {
+    await fixture(async (_root, state) => {
+      let now = 1_000;
+      await state.open({ now: () => now }); vi.useFakeTimers();
+      now = 1_010; state.native[0].emit('change', 'change', 'first.ts');
+      now = 1_050; state.native[0].emit('change', 'change', 'second.ts');
+      now = 1_110; vi.advanceTimersByTime(100);
+      now = 2_000; state.native[0].emit('change', 'change', 'third.ts');
+      now = 2_100; vi.advanceTimersByTime(100);
+      expect(state.batches.map(batch => batch.map(event => event.path))).toEqual([['first.ts', 'second.ts'], ['third.ts']]);
+      expect(state.times).toEqual([{ receivedAt: 1_010, flushedAt: 1_110 }, { receivedAt: 2_000, flushedAt: 2_100 }]);
+      expect(state.times.every(batch => Object.isFrozen(batch))).toBe(true);
     });
   });
 

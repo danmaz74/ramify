@@ -149,3 +149,30 @@ describe('large bounded service messages', () => {
     expect(() => decodeJsonFrame(header, 96 * 1024 ** 2 + 64 * 1024)).toThrow('exceeds');
   });
 });
+
+describe('revision capture timings', () => {
+  const token = { context: `ctx/1:${'a'.repeat(64)}`, generation: 'gen/1:00000000-0000-4000-8000-000000000000' };
+  const revision = { token, revision: 'rev/1:00000000-0000-4000-8000-000000000000:2', sequence: 2, publishedAt: 260, cause: 'watch',
+    fingerprints: { inputId: 'input', declarations: 'd', source: 's', configuration: 'c', registry: 'r', engine: 'e' }, changed: ['src/a.ts'],
+    checked: { path: 'source', files: ['src/a.ts'], accesses: 1, modelRebuilt: false }, delta: { added: 0, removed: 0, positionOnly: 0 },
+    timings: { classify: 1, inventory: 1, compiler: 1, descriptions: 1, accesses: 1, link: 1, decide: 1, publish: 1, total: 9 },
+    capture: { invocationCheck: 0.5, workerStatus: 0.25, workerRoundTrip: 12.5, watch: { receivedAt: 150, flushedAt: 250 } },
+    outcome: { execution: 'completed', check: 'passed', coverage: 'complete' },
+    summary: { complete: true, owners: 1, sourceFiles: 1, resources: 0, originals: 0, accesses: 1, allowed: 1, denied: 0, errors: 0, warnings: 0, coverageNotes: 0, external: 0 } };
+  const event = (value: unknown) => ({ type: 'event', seq: 1, subscription: 'subscription-1', event: { type: 'revision-published', token, revision: value, coalesced: 0 } });
+
+  it('timing-fields: accepts a published revision whose capture carries session work and watcher times beside unchanged stage timings', () => {
+    const message = event(revision);
+    expect(decodeMessage(encodeMessage(message as never))).toEqual(message);
+    expect(decodeMessage(encodeMessage(event({ ...revision, capture: { ...revision.capture, watch: null } }) as never))).toMatchObject({ type: 'event' });
+  });
+
+  it('rejects a revision without its capture or with malformed capture timings', () => {
+    const { capture, ...missing } = revision;
+    for (const value of [missing, { ...revision, timings: { ...revision.timings, invocationCheck: 0 } },
+      { ...revision, capture: { ...capture, workerRoundTrip: -1 } }, { ...revision, capture: { ...capture, extra: 0 } },
+      { ...revision, capture: { ...capture, watch: { receivedAt: 150 } } }, { ...revision, capture: { ...capture, watch: { receivedAt: 1.5, flushedAt: 2 } } }]) {
+      expect(() => encodeMessage(event(value) as never)).toThrow('Invalid IPC message schema');
+    }
+  });
+});

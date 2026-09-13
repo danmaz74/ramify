@@ -1,4 +1,4 @@
-import type { ClockPort, WatchEvent, WatcherPort } from '../interfaces/contexts.js';
+import type { ClockPort, WatchBatch, WatchEvent, WatcherPort } from '../interfaces/contexts.js';
 
 export interface ControlledClock extends ClockPort {
   readonly pending: number;
@@ -11,7 +11,8 @@ export interface ControlledClock extends ClockPort {
 export interface ControlledWatcher extends WatcherPort {
   readonly active: number;
   readonly roots: readonly string[];
-  emit(root: string, events: readonly WatchEvent[]): void;
+  /** Without `batch` the listener receives no watcher times, as a port that records none. */
+  emit(root: string, events: readonly WatchEvent[], batch?: WatchBatch): void;
   /** Reject the next attachment once, allowing a later reattachment to succeed. */
   failNextWatch(error: Error): void;
   dispose(): Promise<void>;
@@ -77,7 +78,7 @@ export function createControlledWatcher(): ControlledWatcher {
   let disposed = false;
   let nextId = 0;
   let failure: Error | undefined;
-  const listeners = new Map<number, { readonly root: string; readonly listener: (events: readonly WatchEvent[]) => void }>();
+  const listeners = new Map<number, { readonly root: string; readonly listener: (events: readonly WatchEvent[], batch?: WatchBatch) => void }>();
 
   return {
     get active() { return listeners.size; },
@@ -93,12 +94,13 @@ export function createControlledWatcher(): ControlledWatcher {
       listeners.set(id, { root, listener });
       return { async close() { listeners.delete(id); } };
     },
-    emit(root, events) {
+    emit(root, events, times) {
       if (disposed) return;
       const batch = Object.freeze(events.map(event => Object.freeze({ ...event })));
+      const frozen = times && Object.freeze({ ...times });
       for (const id of [...listeners.keys()]) {
         const entry = listeners.get(id);
-        if (entry?.root === root) entry.listener(batch);
+        if (entry?.root === root) { if (frozen) entry.listener(batch, frozen); else entry.listener(batch); }
       }
     },
     failNextWatch(error) {

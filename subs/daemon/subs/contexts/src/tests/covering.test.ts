@@ -195,3 +195,38 @@ describe('covered identity rendezvous', () => {
     });
   });
 });
+
+describe('timing fields outside the revision total', () => {
+  it('timing-fields: a revision carries its capture\'s session work and a reply adds publication, zero when covered', async () => {
+    const e = sessionEnvironment();
+    try {
+      const opened = await e.open(); await flush();
+      const stages = capture(2).revision.timings;
+      // Opening reports no operation timings.
+      expect(e.status(opened.token).published!.capture).toEqual({ invocationCheck: 0, workerStatus: 0, workerRoundTrip: 0, watch: null });
+      e.script.pending.push(() => ({ ...capture(2), timings: { invocationCheck: 3, workerStatus: 2, workerRoundTrip: 40 } }));
+      const fresh = await e.check(opened.token, { mode: 'synchronized', expect: expected('src/index.ts', '2') });
+      if (fresh.status !== 'reported' || !fresh.published) throw new Error(fresh.status);
+      expect(fresh.revision).toMatchObject({ sequence: 2, timings: stages, capture: { invocationCheck: 3, workerStatus: 2, workerRoundTrip: 40, watch: null } });
+      expect(Object.keys(fresh.revision.timings).sort()).toEqual(Object.keys(stages).sort());
+      expect(Object.keys(fresh.timings!).sort()).toEqual(['invocationCheck', 'publication', 'workerRoundTrip', 'workerStatus']);
+      expect(fresh.timings).toMatchObject({ invocationCheck: 3, workerStatus: 2, workerRoundTrip: 40 });
+      expect(Number.isFinite(fresh.timings!.publication) && fresh.timings!.publication >= 0).toBe(true);
+      expect(Object.isFrozen(fresh.timings) && Object.isFrozen(fresh.revision.capture)).toBe(true);
+      expect(e.status(opened.token).published).toEqual(fresh.revision);
+      // A racing hook runs an identical update: its reply reports that update while the revision keeps its own capture.
+      e.watcher.emit('/fixture', [{ path: 'src/index.ts', kind: 'changed' }]);
+      e.script.pending.push(() => ({ ...capture(2), timings: { invocationCheck: 5, workerStatus: 1, workerRoundTrip: 30 } }));
+      const racing = await e.check(opened.token, { mode: 'synchronized', expect: expected('src/index.ts', '2') });
+      expect(racing).toMatchObject({ status: 'reported', published: true, freshness: { reusedRevision: true },
+        revision: { sequence: 2, capture: { invocationCheck: 3, workerStatus: 2, workerRoundTrip: 40 } },
+        timings: { invocationCheck: 5, workerStatus: 1, workerRoundTrip: 30 } });
+      expect(e.script.updateCalls).toHaveLength(2); await flush();
+      // A covered answer runs no capture and pays nothing.
+      const covered = await e.check(opened.token, { mode: 'synchronized', expect: expected('src/index.ts', '2') });
+      expect(covered).toMatchObject({ status: 'reported', freshness: { captureStarted: null, reusedRevision: true },
+        timings: { invocationCheck: 0, workerStatus: 0, workerRoundTrip: 0, publication: 0 } });
+      expect(e.script.updateCalls).toHaveLength(2);
+    } finally { await e.dispose(); }
+  });
+});

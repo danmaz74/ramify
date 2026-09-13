@@ -2,16 +2,17 @@ import { randomUUID } from 'node:crypto';
 import type { AnalysisReport, RunControl } from '../../../../analysis/src/interfaces/analysis.js';
 import type { SessionChange, SessionRevision, SessionUpdate } from '../../../../analysis/src/interfaces/session.js';
 import type { ProjectRequest } from '../../../../analysis/subs/project/src/interfaces/project.js';
-import type { CheckOutcome, CheckRequest, ContextEvent, ContextManager, ContextManagerOptions, ContextRevision, ContextSetup, ContextStatus, ContextToken, FreshnessRecord, OpenOutcome, RevisionCause, Unavailable, WatchEvent } from './interfaces/contexts.js';
+import type { CaptureTimings, CaptureWork, CheckOutcome, CheckRequest, ContextEvent, ContextManager, ContextManagerOptions, ContextRevision, ContextSetup, ContextStatus, ContextToken, FreshnessRecord, OpenOutcome, ReplyTimings, RevisionCause, Unavailable, WatchBatch, WatchEvent } from './interfaces/contexts.js';
 import type { LiveContext } from './context.js';
 import { createHistory } from './history.js';
 import type { HistoryEntry } from './history.js';
 import { createContextId, createFingerprints, createRevisionId } from './tokens.js';
-import { complete, invocationKey } from './queue.js';
+import { complete, invocationKey, spanBatches } from './queue.js';
 import type { Invocation, PendingCheck } from './queue.js';
 
 const implemented = new Set(['registry', 'layout', 'metadata', 'descriptions', 'source-catalog', 'exposure-linking', 'static-access', 'tags-origin', 'namespace-access', 'lazy-access', 'symbol-free-access', 'resource-access', 'coverage']);
 function unavailable(reason: Unavailable['reason'], message: string = reason): Unavailable { return { status: 'unavailable', reason, message }; }
+const noWork = (): { -readonly [K in keyof CaptureWork]: number } => ({ invocationCheck: 0, workerStatus: 0, workerRoundTrip: 0 });
 function freeze<T>(value: T): T {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) { Object.freeze(value); for (const child of Object.values(value)) freeze(child); }
   return value;
@@ -67,7 +68,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     for (const entry of pending(context)) complete(entry, { ...unavailable(reason === 'disposed' ? 'disposed' : 'expired-generation'), requestId: entry.request.requestId });
     context.queue.length = 0; stopTimers(context); closeWatcher(context);
     // Dispose owns all remaining fact versions; do not send per-version releases after it.
-    void releaseSession(context); context.history.dispose(); context.paths.clear(); context.invocations.clear(); contexts.delete(context.token.context);
+    void releaseSession(context); context.history.dispose(); context.paths.clear(); context.watched = null; context.invocations.clear(); contexts.delete(context.token.context);
     emit(context, { type: 'context-evicted', token: context.token, reason }); context.subscriptions.clear();
   }
   async function demote(context: LiveContext): Promise<void> {
@@ -91,7 +92,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       if (held(context) || context.running || disposed || context.state === 'evicted') return;
       if (current && (!report || !context.history.retainPublished(freeze(report)))) { evict(context, 'pressure'); return; }
       context.state = 'cold'; stopTimers(context); closeWatcher(context);
-      await releaseSession(context); context.paths.clear(); context.sweepRequired = true; context.conservative = true;
+      await releaseSession(context); context.paths.clear(); context.watched = null; context.sweepRequired = true; context.conservative = true;
       changed(context);
     } finally { context.cooling = false;
       if (!disposed && context.state === 'cold' && held(context)) touch(context);
@@ -117,7 +118,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
   function attach(context: LiveContext): void {
     if (context.attaching || context.watcher || context.state === 'cold' || context.state === 'evicted' || disposed) return;
     context.attaching = true;
-    track(Promise.resolve().then(() => watcher.watch(context.selection.root, events => watchEvents(context, events)))
+    track(Promise.resolve().then(() => watcher.watch(context.selection.root, (events, batch) => watchEvents(context, events, batch)))
       .then(async handle => {
         if (context.state === 'cold' || context.state === 'evicted' || disposed) await cleanup(handle.close());
         else { context.watcher = handle; context.watcherState = 'active';
@@ -165,8 +166,10 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     if (context.token.generation !== token.generation) return unavailable('expired-generation');
     return context;
   }
-  function watchEvents(context: LiveContext, events: readonly WatchEvent[]): void {
+  function watchEvents(context: LiveContext, events: readonly WatchEvent[], batch?: WatchBatch): void {
     if (disposed || context.state === 'cold' || context.state === 'evicted' || !events.length) return;
+    const now = clock.now();
+    context.watched = spanBatches(context.watched, batch ? { receivedAt: batch.receivedAt, flushedAt: batch.flushedAt } : { receivedAt: now, flushedAt: now });
     for (const event of events) {
       if (event.kind === 'overflow' || event.kind === 'error') { context.conservative = true; context.sweepRequired = true; }
       else context.paths.set(event.path, event.kind === 'renamed' ? 'unknown' : event.kind);
@@ -180,6 +183,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     if (context.running?.background) {
       context.running.controller.abort(); if (context.running.sweep !== 'periodic') context.sweepRequired = true;
       for (const change of context.running.changes) context.paths.set(change.path, change.kind);
+      context.watched = spanBatches(context.watched, context.running.watch);
     }
     if (context.paths.size > budgets.maxQueuedPaths) { context.paths.clear(); context.conservative = true; context.sweepRequired = true; }
     context.synchronization = context.watcherState === 'unavailable' ? 'watcher-unavailable' : context.conservative ? 'conservative' : 'reconciling';
@@ -226,22 +230,28 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       await cleanup(session.releaseRevision(sequence)); context.versions.delete(sequence);
     }
   }
-  async function sessionWork(context: LiveContext, run: () => Promise<SessionUpdate | { status: 'unchanged' }>): Promise<SessionUpdate | { status: 'unchanged' }> {
-    let result = await run(); observeVersion(context);
+  function account(work: ReturnType<typeof noWork>, result: SessionUpdate | { status: 'unchanged' }): void {
+    const timings = 'timings' in result ? result.timings : undefined;
+    if (!timings) return;
+    work.invocationCheck += timings.invocationCheck; work.workerStatus += timings.workerStatus ?? 0; work.workerRoundTrip += timings.workerRoundTrip ?? 0;
+  }
+  async function sessionWork(context: LiveContext, work: ReturnType<typeof noWork>, run: () => Promise<SessionUpdate | { status: 'unchanged' }>): Promise<SessionUpdate | { status: 'unchanged' }> {
+    let result = await run(); observeVersion(context); account(work, result);
     if (result.status === 'reported' && result.report.diagnostics.some(item => item.limit?.name === 'maxRetainedFactBytes')) {
       // Reclaim unpinned historical versions before one bounded retry. The
       // session rejects a candidate before publication, preserving current facts.
       let released = false;
       while (context.history.discardOldest()) released = true;
       await Promise.all([...releaseWork]); await releaseUnpublished(context);
-      if (released) { result = await run(); observeVersion(context); }
+      if (released) { result = await run(); observeVersion(context); account(work, result); }
     }
     return result;
   }
   function fresh(entry: PendingCheck, started: number | null, verified: boolean, reusedRevision = false): FreshnessRecord {
     return { mode: entry.request.freshness.mode, acknowledged: entry.acknowledged, captureStarted: started, verified, reusedRevision };
   }
-  async function deliver(context: LiveContext, entry: PendingCheck, publication: HistoryEntry<ContextRevision>, started: number | null, reused = false): Promise<void> {
+  async function deliver(context: LiveContext, entry: PendingCheck, publication: HistoryEntry<ContextRevision>, started: number | null, reused = false,
+    timings: ReplyTimings = { ...noWork(), publication: 0 }): Promise<void> {
     if (entry.settled) return;
     const baseline = entry.request.since ? context.history.get(entry.request.since) : context.history.getPrevious(publication.revision.revision);
     if (entry.request.since && !baseline) { complete(entry, { ...unavailable('evicted-revision'), requestId: entry.request.requestId }); return; }
@@ -259,7 +269,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       if (entry.request.scope === 'report' && !report) { complete(entry, { ...unavailable('evicted-revision'), requestId: entry.request.requestId }); return; }
       if (report) context.scope = report.scope;
       complete(entry, { status: 'reported', requestId: entry.request.requestId, published: true, revision: publication.revision,
-        delta, report: freeze(report), freshness: fresh(entry, started, entry.request.freshness.mode === 'synchronized', reused) });
+        delta, report: freeze(report), freshness: fresh(entry, started, entry.request.freshness.mode === 'synchronized', reused), timings: freeze({ ...timings }) });
     } catch (error) { complete(entry, { ...unavailable('analysis-failed', String(error)), requestId: entry.request.requestId }); }
     finally { unpinBase(); unpin(); context.deliveries.delete(entry); scheduleIdle(context); }
   }
@@ -274,14 +284,14 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     }
     return mismatches.length ? { status: 'superseded', requestId: entry.request.requestId, revision: context.history.published?.revision ?? null, mismatches } : null;
   }
-  async function publish(context: LiveContext, data: SessionRevision, cause: RevisionCause): Promise<boolean> {
+  async function publish(context: LiveContext, data: SessionRevision, cause: RevisionCause, capture: CaptureTimings): Promise<boolean> {
     if (!['completed', 'invalid'].includes(data.outcome.execution)) throw new Error('Unpublishable session revision');
     if (context.publishedSession === context.session && context.history.published?.sequence === data.sequence) return trim(context, 0);
     const revision = freeze({ token: context.token, revision: createRevisionId(context.token.generation, context.sequence + 1),
       sequence: context.sequence + 1, publishedAt: clock.now(), cause,
       fingerprints: createFingerprints(data.inputId, data.inputs, context.selection.setup.registry, options.engine),
       changed: data.changed, checked: data.checked, delta: { added: data.delta.added.length, removed: data.delta.removed.length, positionOnly: data.delta.positionOnly.length },
-      timings: data.timings, outcome: data.outcome, summary: data.summary });
+      timings: data.timings, capture, outcome: data.outcome, summary: data.summary });
     const candidateBytes = Buffer.byteLength(JSON.stringify({ revision, sequence: data.sequence, diagnostics: data.diagnostics,
       warnings: data.warnings, coverage: data.coverage, delta: data.delta, report: null }));
     if (candidateBytes > budgets.maxHistoryBytes || !budgets.maxHistoryRevisions) return false;
@@ -324,11 +334,12 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     // changes rather than lengthening their capture.
     const sweepKind = context.sweepRequired || entries.some(entry => entry.needsSweep) ? 'required' : cause === 'sweep' ? 'periodic' : null;
     const sweep = sweepKind !== null;
-    context.paths.clear(); context.conservative = false; context.sweepRequired = false; context.background = null;
+    const watch = context.watched, work = noWork();
+    context.paths.clear(); context.watched = null; context.conservative = false; context.sweepRequired = false; context.background = null;
     context.debounce?.(); context.debounce = null;
     const controller = new AbortController(); const started = clock.now();
     if (sweep) { context.periodicSweepDue = false; context.lastSweepAt = started; context.sweepTimer?.(); context.sweepTimer = null; }
-    context.running = { controller, requests: entries, changes, background: !entries.length, sweep: sweepKind, started }; active++;
+    context.running = { controller, requests: entries, changes, background: !entries.length, sweep: sweepKind, started, watch }; active++;
     if (sweepKind !== 'periodic') context.synchronization = context.watcherState === 'unavailable' ? 'watcher-unavailable' : context.sequence ? 'reconciling' : 'initializing';
     changed(context);
     const control = { signal: controller.signal };
@@ -351,11 +362,11 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       } else {
         const invocationChanged = invocationKey(context.invocation) !== invocationKey(invocation);
         if (changes.length || invocationChanged || !sweep) {
-          run = await sessionWork(context, () => context.session!.update(changes, control, { project: invocation.project, capabilities: invocation.setup.capabilities }));
+          run = await sessionWork(context, work, () => context.session!.update(changes, control, { project: invocation.project, capabilities: invocation.setup.capabilities }));
           if (run.status === 'revised') context.invocation = invocation;
         } else run = { status: 'unchanged' };
         if (sweep && run.status !== 'reported' && run.status !== 'cancelled') {
-          run = await sessionWork(context, () => context.session!.sweep(control));
+          run = await sessionWork(context, work, () => context.session!.sweep(control));
         }
       }
       if (disposed || context.state === 'evicted' || controller.signal.aborted) return;
@@ -364,7 +375,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         context.synchronization = 'reconciling'; context.sweepRequired = true;
         for (const entry of [...entries, ...context.queue.filter(item => item.request.freshness.mode === 'published')]) {
           complete(entry, { status: 'reported', requestId: entry.request.requestId, published: false, revision: null, delta: null,
-            report: run.report, freshness: fresh(entry, started, false) });
+            report: run.report, freshness: fresh(entry, started, false), timings: freeze({ ...work, publication: 0 }) });
         }
         return;
       }
@@ -372,7 +383,10 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       if (!data) throw new Error('Session lost its published revision');
       const reused = context.publishedSession === context.session && context.history.published?.sequence === data.sequence;
       await hotBudget(context);
-      if (!await publish(context, data, cause)) {
+      const publishing = performance.now();
+      const admitted = await publish(context, data, cause, freeze({ ...work, watch }));
+      const timings: ReplyTimings = { ...work, publication: performance.now() - publishing };
+      if (!admitted) {
         context.synchronization = 'reconciling'; context.sweepRequired = true;
         // Restore the retained-byte bound before acknowledging the rejection.
         // Projection and disposal may both yield while the oversized facts live.
@@ -387,10 +401,10 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         : context.background || context.sweepRequired || context.paths.size ? 'reconciling' : 'synchronized';
       const publication = context.history.published!;
       await Promise.all(entries.map(entry => { const failed = mismatch(context, entry, data);
-        if (failed) { complete(entry, failed); return; } return deliver(context, entry, publication, started, reused); }));
+        if (failed) { complete(entry, failed); return; } return deliver(context, entry, publication, started, reused, timings); }));
       const waiting = context.queue.filter(entry => entry.request.freshness.mode === 'published');
       for (const entry of waiting) context.queue.splice(context.queue.indexOf(entry), 1);
-      await Promise.all(waiting.map(entry => deliver(context, entry, publication, null)));
+      await Promise.all(waiting.map(entry => deliver(context, entry, publication, null, false, timings)));
       if (context.watcherState === 'unavailable') attach(context);
     } catch (error) {
       context.sweepRequired = true;
@@ -522,7 +536,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         token: freeze({ context: id, generation: options.generationId() }), selection, project, invocation: { project, setup: requestedSetup },
         openedAt: now, lastActivityAt: now, hadLease: false, invocations: new Map([[lease, { project, setup: requestedSetup }]]), subscriptions: new Map(),
         history: createHistory(budgets.maxHistoryRevisions, budgets.maxHistoryBytes, entry => releaseVersion(context, entry)),
-        queue: [], deliveries: new Set(), paths: new Map(), scope: null, state: 'opening', synchronization: 'initializing', lastValid: null,
+        queue: [], deliveries: new Set(), paths: new Map(), watched: null, scope: null, state: 'opening', synchronization: 'initializing', lastValid: null,
         session: null, publishedSession: null, versions: new Set(), observedSequence: 0, sequence: 0, sweepRequired: true, periodicSweepDue: false, lastSweepAt: now, auditedSequence: 0, auditRequired: false, demoting: null, cooling: false,
         watcher: null, watcherState: 'disposed', attaching: false, conservative: true, background: 'open', running: null,
         debounce: null, sweepTimer: null, auditTimer: null, idle: null,

@@ -159,6 +159,7 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
       },
       async check(params, control) {
         const invalid = guard<CheckOutcome>('check', params); if (invalid) return invalid;
+        const handling = performance.now();
         const result = await manager.check({ ...params, scope: params.scope ?? 'report' }, pair(params.token), control);
         if (result.status === 'reported' && result.freshness.reusedRevision) {
           counters.reusedRevisions++;
@@ -167,7 +168,9 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
         if (result.status === 'cold') counters.coldOutcomes++;
         if (result.status === 'deadline-exceeded') counters.deadlineOutcomes++;
         observe();
-        return success(result);
+        // A client subtracts the service's own handling from its round trip to find transport.
+        return success(result.status === 'reported' && result.timings
+          ? { ...result, timings: Object.freeze({ ...result.timings, service: performance.now() - handling }) } : result);
       },
       async subscribe(params, listener) {
         const invalid = guard<Awaited<ReturnType<RamifyService['subscribe']>> extends ServiceResult<infer T> ? T : never>('subscribe', params);

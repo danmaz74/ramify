@@ -172,8 +172,13 @@ function timings(value: unknown): boolean {
   return shape(value, ['classify', 'inventory', 'compiler', 'descriptions', 'accesses', 'link', 'decide', 'publish', 'total'])
     && Object.values(value).every(item => typeof item === 'number' && Number.isFinite(item) && item >= 0);
 }
+function capture(value: unknown): boolean {
+  return shape(value, ['invocationCheck', 'workerStatus', 'workerRoundTrip', 'watch'])
+    && [value.invocationCheck, value.workerStatus, value.workerRoundTrip].every(item => typeof item === 'number' && Number.isFinite(item) && item >= 0)
+    && (value.watch === null || shape(value.watch, ['receivedAt', 'flushedAt']) && integer(value.watch.receivedAt) && integer(value.watch.flushedAt));
+}
 function revision(value: unknown): boolean {
-  return shape(value, ['token', 'revision', 'sequence', 'publishedAt', 'cause', 'fingerprints', 'changed', 'checked', 'delta', 'timings', 'outcome', 'summary'])
+  return shape(value, ['token', 'revision', 'sequence', 'publishedAt', 'cause', 'fingerprints', 'changed', 'checked', 'delta', 'timings', 'capture', 'outcome', 'summary'])
     && token(value.token) && string(value.revision) && /^rev\/1:[0-9a-f-]{36}:[1-9][0-9]*$/.test(value.revision) && integer(value.sequence) && value.sequence > 0
     && integer(value.publishedAt) && ['open', 'watch', 'request', 'sweep', 'verify', 'conservative'].includes(value.cause as string)
     && shape(value.fingerprints, ['inputId', 'declarations', 'source', 'configuration', 'registry', 'engine'])
@@ -182,7 +187,7 @@ function revision(value: unknown): boolean {
     && ['cold', 'unchanged-surface', 'source', 'description', 'metadata', 'broad'].includes(value.checked.path as string)
     && strings(value.checked.files) && integer(value.checked.accesses) && typeof value.checked.modelRebuilt === 'boolean'
     && shape(value.delta, ['added', 'removed', 'positionOnly']) && Object.values(value.delta).every(integer)
-    && timings(value.timings) && outcome(value.outcome) && summary(value.summary);
+    && timings(value.timings) && capture(value.capture) && outcome(value.outcome) && summary(value.summary);
 }
 function sessionStatus(value: unknown): boolean {
   return value === null || shape(value, ['level', 'sequence', 'observedInputs', 'factBytes', 'worker', 'compiler', 'lastSweepAt'])

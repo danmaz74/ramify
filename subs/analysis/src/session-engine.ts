@@ -123,26 +123,31 @@ class Session implements RetainedSession {
       const signal = control.signal;
       if (signal?.aborted) return { status: 'cancelled' };
       const state = this.#state;
-      let republish = false;
+      let republish = false, invocationCheck = 0;
+      // The invocation check runs before `total` starts; the update reports it beside the revision.
+      const timed = (update: SessionUpdate): SessionUpdate => update.status === 'cancelled' ? update : { ...update, timings: { invocationCheck } };
       if (invocation) {
+        const checking = performance.now();
         const problem = await this.#invocationProblem(invocation, signal);
-        if (problem) return { status: 'reported', report: failureReport(state, problem, 'acquisition', state.facts?.inventory) };
+        invocationCheck = performance.now() - checking;
+        if (problem) return timed({ status: 'reported', report: failureReport(state, problem, 'acquisition', state.facts?.inventory) });
         const next = detached({ ...state.request, project: invocation.project, capabilities: invocation.capabilities });
         if (JSON.stringify(next) !== JSON.stringify(state.request)) { state.request = next; republish = true; }
+        invocationCheck = performance.now() - checking;
       }
       const started = performance.now();
-      if (!state.observer) return this.#reopen(changes, started, signal);
+      if (!state.observer) return timed(await this.#reopen(changes, started, signal));
       const result = await revise(state, changes, signal);
       if (result.status === 'cancelled') return { status: 'cancelled' };
-      if (result.status === 'reported') return result;
+      if (result.status === 'reported') return timed(result);
       if (result.status === 'identical') {
-        if (!republish || !state.facts) return { status: 'revised', revision: this.#current!, identical: true };
+        if (!republish || !state.facts) return timed({ status: 'revised', revision: this.#current!, identical: true });
         const facts = state.facts;
         const published = this.#publish({ status: 'computed', facts, checked: { ...this.#current!.checked, files: [], accesses: 0, modelRebuilt: false },
           changed: [], timings: zeroTimings(), positionRefreshed: [] }, state.observer.inputs, facts.invalid ? null : state.observer.inputId, started);
-        return 'report' in published ? { status: 'reported', report: published.report } : { status: 'revised', revision: published.revision, identical: false };
+        return timed('report' in published ? { status: 'reported', report: published.report } : { status: 'revised', revision: published.revision, identical: false });
       }
-      return this.#complete(result, started, signal);
+      return timed(await this.#complete(result, started, signal));
     });
   }
 
