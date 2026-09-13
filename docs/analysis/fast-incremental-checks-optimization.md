@@ -9,6 +9,12 @@ ranks the work that would reduce it. It establishes no implemented capability.
 Measured figures are labelled as measured; savings and end-to-end projections
 are estimates derived from them.
 
+**Delivery.** The [hook optimization plan](../plans/iteration-5-hook-optimization/main-plan.md)
+delivered targets 0 to 5 and 7; its [closure](../plans/iteration-5-hook-optimization/iterations/closure.md)
+records the evidence. Every measured figure in this analysis is
+pre-optimization, taken before that plan, and none has been measured again.
+Real-process measurement of the delivered targets follows that plan.
+
 ## Priorities
 
 The agent's post-write hook, `ramify check --changed <path>`, is the primary use
@@ -28,7 +34,8 @@ The measurement harness passes `--deadline 600000`, so the figures below show
 the full time instead.
 
 A hook usually races the watcher's update for the same write. Its measured
-medians against the 2 s budget, from the archive described below:
+pre-optimization medians against the 2 s budget, from the archive described
+below:
 
 | Edit | Reference | S100 |
 | --- | ---: | ---: |
@@ -304,16 +311,18 @@ the reference, root resolution is about 63% and build-key hashing about 17%.
 Savings are estimates from the measured components. Timing fields come first,
 because targets 3, 4 and 6 cannot be verified without them.
 
-| Rank | Target | Owner | Estimated saving, reference and S100 | Kind | Depends on |
-| ---: | --- | --- | --- | --- | --- |
-| 0 | Timing fields for work outside `total` and watcher timestamps | `analysis`, `daemon/contexts`, `daemon` | none; replaces inference | cheap | none |
-| 1 | Maintain the observed-input list instead of rebuilding it | `analysis/project`; callers in `analysis` | 290 to 340 and 160 to 185 ms per revision; 50 and 27 ms per worker reply | cheap steps, then a small design change | none |
-| 2 | Build only what a hook publishes | `analysis` | 60 and 345 ms from skipping the copy; 95 and 555 ms fully | cheap step, then a contract clarification | none |
-| 3 | Reuse project-root resolution for a known context | `analysis/project`, `analysis`, `daemon/contexts` | 110 and 330 ms per invocation; 120 and 330 ms per update | design change | 0 |
-| 4 | Answer a queued racing hook from the revision that just published | `daemon/contexts` | 413 and 489 ms per racing hook today; 60 to 100 ms after 1 to 3 | contract clarification | 0; best after 1 to 3 |
-| 5 | Cache the client build key | `daemon` discovery, build scripts | 25 to 30 ms per invocation | cheap | none |
-| 6 | Shorten the watcher's path to a hook's analysis | `daemon` | up to 130 ms per racing hook | design change | 0, 3 and 5 |
-| 7 | Sample worker RSS without a process per message on macOS | `analysis` | unmeasured; one process spawn per worker message | cheap | none |
+Estimated savings are relative to the pre-optimization build.
+
+| Rank | Target | Owner | Estimated saving, reference and S100 | Kind | Depends on | Status |
+| ---: | --- | --- | --- | --- | --- | --- |
+| 0 | Timing fields for work outside `total` and watcher timestamps | `analysis`, `daemon/contexts`, `daemon` | none; replaces inference | cheap | none | [delivered](../plans/iteration-5-hook-optimization/iterations/iteration1-results.md) |
+| 1 | Maintain the observed-input list instead of rebuilding it | `analysis/project`; callers in `analysis` | 290 to 340 and 160 to 185 ms per revision; 50 and 27 ms per worker reply | cheap steps, then a small design change | none | [delivered](../plans/iteration-5-hook-optimization/iterations/iteration2-results.md); sweep step deferred |
+| 2 | Build only what a hook publishes | `analysis` | 60 and 345 ms from skipping the copy; 95 and 555 ms fully | cheap step, then a contract clarification | none | [delivered](../plans/iteration-5-hook-optimization/iterations/iteration3-results.md) |
+| 3 | Reuse project-root resolution for a known context | `analysis/project`, `analysis`, `daemon/contexts` | 110 and 330 ms per invocation; 120 and 330 ms per update | design change | 0 | [delivered](../plans/iteration-5-hook-optimization/iterations/iteration4-results.md) |
+| 4 | Answer a queued racing hook from the revision that just published | `daemon/contexts` | 413 and 489 ms per racing hook today; 60 to 100 ms after 1 to 3 | contract clarification | 0; best after 1 to 3 | [delivered](../plans/iteration-5-hook-optimization/iterations/iteration5-results.md) |
+| 5 | Cache the client build key | `daemon` discovery, build scripts | 25 to 30 ms per invocation | cheap | none | [delivered](../plans/iteration-5-hook-optimization/iterations/iteration6-results.md) |
+| 6 | Shorten the watcher's path to a hook's analysis | `daemon` | up to 130 ms per racing hook | design change | 0, 3 and 5 | open |
+| 7 | Sample worker RSS without a process per message on macOS | `analysis` | unmeasured; one process spawn per worker message | cheap | none | [delivered](../plans/iteration-5-hook-optimization/iterations/iteration7-results.md) |
 
 ### 0. Timing fields
 
@@ -322,6 +331,10 @@ check, worker `status`, worker and client transport and daemon publication,
 carried through the revision and reply timings. Add two watcher timestamps:
 event receipt and batch flush. Every later measurement then shows the split
 directly instead of by subtraction.
+
+**Delivered** by [hook optimization iteration 1](../plans/iteration-5-hook-optimization/iterations/iteration1-results.md).
+Revision `capture` timings, reply `timings` and watcher batch times carry the
+split; `ramify.check/1` includes the reply timings since iteration 3.
 
 ### 1. The observed-input list
 
@@ -341,6 +354,11 @@ A later step may let a sweep re-hash only observations whose size or
 modification time moved, reusing the recorded hashes; a sweep currently
 re-hashes every file, about 260 to 280 ms on the reference.
 
+**Delivered** by [hook optimization iteration 2](../plans/iteration-5-hook-optimization/iterations/iteration2-results.md),
+except the sweep step, which remains deferred. Repeated reads return the cached
+list and identity; a mutation re-hashes only changed observations and sorts
+with the non-allocating comparator.
+
 ### 2. Build only what a hook publishes
 
 Decided. Publication builds only what the revision keeps: `outcome`, `summary`
@@ -357,6 +375,9 @@ failure.
 
 The first step, omitting the deep copy, changes no behavior.
 
+**Delivered** by [hook optimization iteration 3](../plans/iteration-5-hook-optimization/iterations/iteration3-results.md).
+The clarification is recorded in [daemon and analysis](../architecture/daemon.md).
+
 ### 3. Root resolution
 
 Skip the invocation check when the invocation equals the session's, and reuse a
@@ -364,6 +385,11 @@ known context's resolution, validated against the configuration dependencies
 the observer already holds; configuration acquisition already has a
 replay-and-reuse path. The risk is a stale root when discovery inputs change;
 configuration edits already take the structural path.
+
+**Delivered** by [hook optimization iteration 4](../plans/iteration-5-hook-optimization/iterations/iteration4-results.md).
+The reuse is validated by replaying the recorded resolution's discovery queries
+on disk rather than against the observer's configuration dependencies, which
+omit found markers and reflect only the last apply.
 
 ### 4. Racing hooks
 
@@ -378,6 +404,10 @@ writes that sentence into the covering rule of
 Attaching a request to the running update on arrival was rejected: it is harder
 to keep exact when the request's expectations differ from what that update
 analyses.
+
+**Delivered** by [hook optimization iteration 5](../plans/iteration-5-hook-optimization/iterations/iteration5-results.md).
+A hook that reaches `check` before the watcher's batch still runs a second
+update; that remains target 6.
 
 ### 5. Build key
 
@@ -405,6 +435,13 @@ Sample the worker's RSS on an interval, or only when a limit check needs it,
 instead of spawning `/bin/ps` for every worker message. A process per message
 is a cost on every revision and reply without a measurement to justify it.
 
+**Delivered** by [hook optimization iteration 7](../plans/iteration-5-hook-optimization/iterations/iteration7-results.md).
+The sampled process is the compiler, not the worker. Where a read spawns
+`/bin/ps`, a compiler is read when its pid is first reported and at most once
+per five seconds afterwards, in the background; Linux still reads `/proc` on
+every status message. No supervision limit consumes the sample; it is status
+evidence.
+
 ### Smaller items
 
 The fingerprint comparator (16 and 9 ms), `factBytes` (5 and 23 ms), and a
@@ -418,7 +455,7 @@ by the contract remediation in `85be06c`; see
 
 ## Projection
 
-Estimates, assuming targets 1 to 5:
+Pre-optimization estimates, assuming targets 1 to 5:
 
 | Workload | Measured reference | Estimated reference | Measured S100 | Estimated S100 |
 | --- | ---: | ---: | ---: | ---: |
