@@ -228,7 +228,7 @@ export async function recomputeAll(state: SessionState, inventory: ProjectInvent
   const decisions = linked.model ? await decide(state, linked.model, assembleAccesses(files), signal) : {};
   timings.decide += performance.now() - start;
   return deepFreeze({ registry: state.registry, invalid: null, inventory, areas: derived.areas, areaIssues: [], files, catalog,
-    linked: linked.linked, linkIssues: linked.issues, model: linked.model, decisions, indexes: buildIndexes(files) });
+    linked: linked.linked, linkIssues: linked.issues, model: linked.model, decisions, indexes: buildIndexes(files, inventory.scope.root) });
 }
 
 export function wholeCheckedSet(path: RevisionPath, facts: SessionFacts): CheckedSet {
@@ -495,7 +495,7 @@ export async function revise(state: SessionState, changes: readonly ObservedChan
 
     stage = 'decide';
     start = performance.now();
-    const indexes = buildIndexes(files);
+    const indexes = buildIndexes(files, inventory.scope.root);
     const decisions: Record<string, AccessDecision> = {};
     const positionRefreshed: string[] = [];
     let decided = 0;

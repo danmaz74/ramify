@@ -1,9 +1,10 @@
 import { readFile, rm } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { WorkLimit } from '../report.js';
 import type { SessionRevision } from '../interfaces/session.js';
+import { buildIndexes, emptyIndexes, type FileFacts, type SessionFacts } from '../session-facts.js';
 import { audited, comparable, equalToBatch, fixture, fixtureFiles, instrumentCompiler, instrumentObserver, opened, ownedFiles,
   parentExposure, paths, put, replace, revised, revisionsEntered, timeout } from './session-test-fixture.js';
 
@@ -652,4 +653,119 @@ describe('timing fields outside the revision total', () => {
       await equalToBatch(handle, inputs);
     } finally { await handle.dispose(); }
   }), timeout);
+});
+
+/** Each observation path to the files naming it, derived here without the index's own helper. */
+function expectedContributors(root: string, facts: SessionFacts): Record<string, string[]> {
+  const map = new Map<string, Set<string>>();
+  for (const [file, entry] of Object.entries(facts.files)) {
+    const { files, resources, shims, absent } = entry.description.dependencies;
+    for (const path of [file, ...entry.candidates, ...files, ...resources, ...shims, ...absent]) {
+      const key = path.startsWith('external:') ? relative(root, path.slice(9)) : path;
+      map.set(key, (map.get(key) ?? new Set()).add(file));
+    }
+  }
+  const order = (a: string, b: string): number => Buffer.compare(Buffer.from(a), Buffer.from(b));
+  return Object.fromEntries([...map].sort(([a], [b]) => order(a, b)).map(([key, set]) => [key, [...set].sort(order)]));
+}
+
+describe('contribution index', () => {
+  it('contribution-index: maps each file, candidate and description dependency to its sorted contributors, relative to the root', () => {
+    const root = '/project';
+    const file = (candidates: string[], dependencies: Partial<Record<'files' | 'resources' | 'shims' | 'absent', string[]>>): FileFacts =>
+      ({ accesses: [], coverage: [], candidates, description: { dependencies: { files: [], resources: [], shims: [], absent: [], ...dependencies } } }) as unknown as FileFacts;
+    const indexes = buildIndexes({
+      'src/b.ts': file(['src/a.js', 'src/a.ts', 'src/gone.ts', '../outside/x.d.ts'], { files: ['src/a.ts'], absent: ['src/soon'] }),
+      'src/a.ts': file([], { resources: ['src/style.css'], shims: ['src/style.d.ts'], absent: ['external:/outside/x.d.ts', 'src/gone.ts'] }),
+      'src/style.css': file([], {}),
+    }, root);
+    expect(indexes.contributors).toEqual({
+      '../outside/x.d.ts': ['src/a.ts', 'src/b.ts'],
+      'src/a.js': ['src/b.ts'],
+      'src/a.ts': ['src/a.ts', 'src/b.ts'],
+      'src/b.ts': ['src/b.ts'],
+      'src/gone.ts': ['src/a.ts', 'src/b.ts'],
+      'src/soon': ['src/b.ts'],
+      'src/style.css': ['src/a.ts', 'src/style.css'],
+      'src/style.d.ts': ['src/a.ts'],
+    });
+    expect(Object.keys(indexes.contributors)).toEqual(Object.keys(indexes.contributors).sort());
+    expect([Object.isFrozen(indexes.contributors), Object.isFrozen(indexes.contributors['src/a.ts'])]).toEqual([true, true]);
+    expect(emptyIndexes.contributors).toEqual({});
+    expect(buildIndexes({}, root)).toEqual(emptyIndexes);
+  });
+
+  it('contribution-index: equals a rebuild after every revision kind and holds no path of a removed file', () => fixture(async (root, inputs) => {
+    const { handle, state } = await opened(inputs);
+    const pending = 'subs/branch/src/pending.ts', later = 'subs/branch/src/later.ts';
+    const verify = async (path: string | null): Promise<SessionFacts> => {
+      const facts = state.facts!;
+      if (path) expect(handle.current!.checked.path).toBe(path);
+      expect(JSON.stringify(facts.indexes)).toBe(JSON.stringify(buildIndexes(facts.files, root)));
+      expect(facts.indexes.contributors).toEqual(expectedContributors(root, facts));
+      for (const file of Object.keys(facts.files)) expect(facts.indexes.contributors[file]).toContain(file);
+      expect(Object.isFrozen(facts.indexes.contributors)).toBe(true);
+      await audited(handle);
+      return facts;
+    };
+    try {
+      let facts = await verify('cold');
+      // The pending importer probed the later file as absent before it exists.
+      expect(facts.indexes.contributors[later]).toEqual([pending]);
+
+      await replace(root, paths.provider, 'return 2;', 'return 3;');
+      await revised(handle, [paths.provider]);
+      await verify('unchanged-surface');
+      await replace(root, paths.sibling, 'import { rootValue }', 'import { privateValue as rootValue }');
+      await revised(handle, [paths.sibling]);
+      facts = await verify('source');
+      expect(facts.indexes.contributors[paths.rootApi]).toEqual([paths.rootApi, paths.local, paths.sibling]);
+      // A source edit that changes an importer's candidates replaces its contributions.
+      await replace(root, pending, "import { later } from './later.js';", "import { value as later } from './provider.js';");
+      await revised(handle, [pending]);
+      facts = await verify('source');
+      expect(facts.indexes.contributors[later]).toBeUndefined();
+      expect(facts.indexes.contributors[paths.provider]).toContain(pending);
+      await put(root, pending, "import { later } from './later.js';\nexport const pending = later;\n");
+      await revised(handle, [pending]);
+      facts = await verify('source');
+      expect(facts.indexes.contributors[later]).toEqual([pending]);
+      await replace(root, paths.description, parentExposure, '');
+      await revised(handle, [paths.description]);
+      await verify('description');
+      await put(root, paths.readme, '# Branch\n\nAn edited purpose.\n');
+      await revised(handle, [paths.readme]);
+      await verify('metadata');
+      await replace(root, paths.description, 'module branch\n', 'module branch\nexpose-src value to parent\n');
+      const invalid = await revised(handle, [paths.description]);
+      expect(invalid.outcome.execution).toBe('invalid');
+      facts = await verify(null);
+      expect(facts.indexes).toEqual(emptyIndexes);
+      await put(root, paths.description, fixtureFiles[paths.description]!);
+      await revised(handle, [paths.description]);
+      await verify('broad');
+
+      await put(root, later, 'export const later = 1;\n');
+      await revised(handle, [later], 'created');
+      facts = await verify('broad');
+      expect(facts.indexes.contributors[later]).toEqual([later, pending]);
+      await rm(join(root, later));
+      await revised(handle, [later], 'deleted');
+      facts = await verify('broad');
+      expect(Object.values(facts.indexes.contributors).some(files => files.includes(later))).toBe(false);
+      expect(facts.indexes.contributors[later]).toEqual([pending]);
+      await rm(join(root, pending));
+      await revised(handle, [pending], 'deleted');
+      facts = await verify('broad');
+      expect(Object.values(facts.indexes.contributors).some(files => files.includes(pending))).toBe(false);
+      expect(Object.keys(facts.indexes.contributors).some(path => path.startsWith('subs/branch/src/later'))).toBe(false);
+
+      const configuration = JSON.parse(await readFile(join(root, 'tsconfig.json'), 'utf8'));
+      configuration.compilerOptions.strict = true;
+      await put(root, 'tsconfig.json', JSON.stringify(configuration));
+      await revised(handle, ['tsconfig.json']);
+      await verify('broad');
+      await equalToBatch(handle, inputs);
+    } finally { await handle.dispose(); }
+  }, { 'subs/branch/src/pending.ts': "import { later } from './later.js';\nexport const pending = later;\n" }), timeout);
 });

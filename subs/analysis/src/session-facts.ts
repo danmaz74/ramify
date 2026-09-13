@@ -1,3 +1,4 @@
+import { relative } from 'node:path';
 import type { LinkedDescriptions } from '../subs/descriptions/src/interfaces/linking.js';
 import { originalKey } from '../subs/model/src/index.js';
 import type { Model, ResolvedTagRegistry, SourceArea, SourceLocation } from '../subs/model/src/interfaces/model.js';
@@ -33,6 +34,12 @@ export interface FactIndexes {
   readonly selectors: Readonly<Record<string, readonly string[]>>;
   /** Access id to the file holding it. */
   readonly owners: Readonly<Record<string, string>>;
+  /**
+   * Observation path, relative to the root, to the owned files contributing it:
+   * each file's own path, its candidates and its description dependencies. Keys
+   * and files are in byte order; a path outside the root keeps its relative spelling.
+   */
+  readonly contributors: Readonly<Record<string, readonly string[]>>;
 }
 /** An invalid acquisition: the batch run records its issues and, when it has one, the inventory. */
 export interface InvalidAcquisition {
@@ -58,7 +65,8 @@ export interface SessionFacts {
   readonly indexes: FactIndexes;
 }
 
-export const emptyIndexes: FactIndexes = Object.freeze({ importers: Object.freeze({}), selectors: Object.freeze({}), owners: Object.freeze({}) });
+export const emptyIndexes: FactIndexes = Object.freeze({ importers: Object.freeze({}), selectors: Object.freeze({}), owners: Object.freeze({}),
+  contributors: Object.freeze({}) });
 export const emptyCatalog: SourceCatalog = Object.freeze({ originals: Object.freeze([]), files: Object.freeze([]), coverage: Object.freeze([]) });
 
 export function deepFreeze<T>(value: T): T {
@@ -96,11 +104,25 @@ export function accessTargets(access: SourceAccess): string[] {
   return [...targets];
 }
 
-export function buildIndexes(files: Readonly<Record<string, FileFacts>>): FactIndexes {
+/** The observation paths one file contributes, relative to the root. A description
+ * names a dependency outside the root as `external:<absolute path>`. */
+function contributions(root: string, path: string, file: FileFacts): string[] {
+  const local = (dependency: string): string => dependency.startsWith('external:') ? relative(root, dependency.slice('external:'.length)) : dependency;
+  const { files, resources, shims, absent } = file.description.dependencies;
+  return [path, ...file.candidates, ...[...files, ...resources, ...shims, ...absent].map(local)];
+}
+
+export function buildIndexes(files: Readonly<Record<string, FileFacts>>, root: string): FactIndexes {
   const importers = new Map<string, Set<string>>();
   const selectors = new Map<string, Set<string>>();
+  const contributors = new Map<string, Set<string>>();
   const owners: Record<string, string> = {};
   for (const [path, file] of Object.entries(files)) {
+    for (const observation of contributions(root, path, file)) {
+      let set = contributors.get(observation);
+      if (!set) { set = new Set(); contributors.set(observation, set); }
+      set.add(path);
+    }
     for (const access of file.accesses) {
       owners[access.id] = path;
       for (const target of accessTargets(access)) {
@@ -119,7 +141,8 @@ export function buildIndexes(files: Readonly<Record<string, FileFacts>>): FactIn
   }
   const record = (map: Map<string, Set<string>>): Record<string, readonly string[]> =>
     Object.fromEntries([...map].map(([key, set]) => [key, sortedPaths(set)]));
-  return deepFreeze({ importers: record(importers), selectors: record(selectors), owners });
+  return deepFreeze({ importers: record(importers), selectors: record(selectors), owners,
+    contributors: Object.fromEntries([...contributors].sort(([a], [b]) => byteOrder(a, b)).map(([key, set]) => [key, sortedPaths(set)])) });
 }
 
 /** Serialized size of the retained facts; measured at publication. */
