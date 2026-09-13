@@ -286,8 +286,12 @@ workerSuite('retained session worker', import.meta.url, () => {
   }), timeout);
 
   it('turns an actual worker heap exhaustion into an unavailable resource-limit report', () => fixture(async (_root, inputs) => {
-    const observation = await observedOpen({ ...inputs, session: { ...inputs.session, workerHeapMiB: 16 } });
+    // 16 MiB sat on this fixture's open threshold: repeated opens both exhausted
+    // and completed at 16 to 22 MiB. 12 MiB exhausted every sampled open, always
+    // after the worker proved its heap limit and started its compiler child.
+    const observation = await observedOpen({ ...inputs, session: { ...inputs.session, workerHeapMiB: 12 } });
     try {
+      expect(observation.messages.some(message => message.kind === 'ready' && message.oldGenerationMiB === 12)).toBe(true);
       expect(observation.opened.status).toBe('reported');
       if (observation.opened.status !== 'reported') throw new Error(JSON.stringify(observation.opened));
       expect(observation.opened.report.outcome.execution).toBe('unavailable');

@@ -17,6 +17,8 @@ vi.mock('node:crypto', async original => {
 });
 
 const registry = 'registry/1:test';
+/** Observer cases acquire a project per step; a loaded parallel run exceeds the 5 s default. */
+const timeout = 60_000;
 let work: string, root: string;
 const disposals: (() => Promise<void>)[] = [];
 beforeEach(async () => {
@@ -101,7 +103,7 @@ describe('the observed-input list', () => {
     hashing.calls = 0;
     for (let index = 0; index < 5; index++) { expect(observer.inputs).toBe(merged); expect(observer.inputId).toBe(mergedId); }
     expect(hashing.calls).toBe(0);
-  });
+  }, timeout);
 
   it('HO-4 input-list-invalidated: every capture mutation advances the version and equals a fresh rebuild', async () => {
     const view = capture();
@@ -140,7 +142,7 @@ describe('the observed-input list', () => {
     await view.dispose();
     expect(view.version).toBeGreaterThan(version);
     expect(view.inputs).toEqual([]);
-  });
+  }, timeout);
 
   it('HO-4 input-list-invalidated: reports, promotion, local and structural updates equal a fresh acquisition', async () => {
     const observer = await observe();
@@ -183,7 +185,7 @@ describe('the observed-input list', () => {
       await put(root, 'subs/child/subs/grandchild/src/deep.ts', 'export const deep = 4;\n');
       expect((await observer.apply([{ path: 'subs/child/subs/grandchild/module.ramify', kind: 'created' }])).kind).toBe('structural');
     });
-  });
+  }, timeout);
 
   it('HO-5 input-cache-no-leak: forgotten observations leave no cached entry', async () => {
     const view = capture();
@@ -212,7 +214,7 @@ describe('the observed-input list', () => {
     expect((await observer.apply([{ path: 'subs/child/src/child.ts', kind: 'deleted' }])).kind).toBe('local');
     expect(observer.inputs.some(input => input.path === label || input.path === 'subs/child/src/child.ts')).toBe(false);
     expect(observer.inputId).toBe((await reobserved([], false)).inputId);
-  });
+  }, timeout);
 
   it('HO-6 byte-order-equivalent: the comparator orders every tested pair as Buffer.compare does', async () => {
     const buffers = (a: string, b: string): number => Buffer.compare(Buffer.from(a), Buffer.from(b));
@@ -242,5 +244,5 @@ describe('the observed-input list', () => {
     const paths = view.inputs.map(input => input.path);
     expect(paths).toEqual(['names', 'names/z.ts', 'names/\u00e9.ts', 'names/\ue000.ts', 'names/\u{1f600}.ts']);
     expect(paths).toEqual([...paths].sort(buffers));
-  });
+  }, timeout);
 });

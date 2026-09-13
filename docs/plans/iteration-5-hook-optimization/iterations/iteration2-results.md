@@ -183,13 +183,57 @@ sorts. The reference fixture and live recipes were not run (decision 7).
 | Command | Result |
 | --- | --- |
 | `npx vitest run subs/analysis/subs/project/src/tests` | 8 files, 135 tests passed (130 existing plus 5 new) |
-| `npx vitest run subs/analysis/src/tests` | 11 files, 207 tests passed, including session-equals-batch tests and the worker heap-exhaustion test (no flake observed) |
+| `npx vitest run subs/analysis/src/tests` | 11 files, 207 tests passed, including session-equals-batch tests (first run; see the audit remediation below) |
 | `npm run type-check` | Passed |
 | `git diff --check` | Clean |
 
 No existing expectation changed. `inputId` values in existing tests are
 unchanged: `sweep.test.ts` compares observer identities with an independently
 transcribed batch recipe, and those tests pass unmodified.
+
+## Audit remediation
+
+The cucumber-viz commit audit of `e2f6e8e` (full suite, parallel, under load) failed two tests. The audit of `fbde665` had passed. Both are fixed in a follow-up commit.
+
+### HO-4 observer case timeout
+
+`input-list.test.ts` "HO-4 input-list-invalidated: reports, promotion, local and structural updates equal a fresh acquisition" took 5,040 ms against Vitest's 5 s default. It acquires a new observer after each of its ten steps as the fresh rebuild, which takes about 0.7 s alone and longer under a loaded parallel run.
+
+**Fix.** Every test in the file now carries an explicit `timeout` of 60,000 ms, declared once at the top. The owner's other slow acquisition tests do the same (`resolve-root.test.ts:33`, `:59`). No assertion changed. The fresh acquisition per step is the independent oracle HO-4 asks for, so the test was not made cheaper by dropping steps.
+
+### Worker heap exhaustion at 16 MiB
+
+`session-worker.test.ts` "turns an actual worker heap exhaustion into an unavailable resource-limit report" opened a session instead of reporting heap exhaustion.
+
+**Cause: a pre-existing threshold flake, not a change in allocation.** The test opens this fixture with `workerHeapMiB: 16` and expects V8 to terminate the worker. A temporary probe test (not committed) opened the same fixture repeatedly through `observedOpen` at several heap limits:
+
+| Build and conditions | Heap (MiB) | Exhausted | Opened |
+| --- | ---: | ---: | ---: |
+| `fbde665` sources, alone | 16 | 3 | 1 |
+| `fbde665` sources, alone | 18 | 1 | 3 |
+| `fbde665` sources, alone | 22 | 2 | 2 |
+| This iteration, alone | 16 | 3 | 0 |
+| This iteration, alone | 18 | 1 | 2 |
+| This iteration, alone | 12 / 14 | 15 / 15 | 0 / 0 |
+| This iteration, beside both owner test directories | 16 | 10 | 2 |
+| This iteration, beside both owner test directories | 12 | 12 | 0 |
+| This iteration, alone | 10 | 8 (4 before `ready`) | 0 |
+| This iteration, alone | 8 | 8 (all before `ready`) | 0 |
+
+The base build also opened at 16 MiB. The outcome between 16 and 22 MiB depends on garbage-collection timing, so the iteration 1 audit passing was luck, not margin. The worker's peak open-time heap is dominated by startup and compiler work, not by the observed-input list. Iteration 2 does not move the threshold measurably.
+
+**Fix.** The test uses `workerHeapMiB: 12`. That limit exhausted all 39 sampled opens, alone and under load. Every one exhausted after the worker posted `ready` and started its compiler child. At 10 MiB and below, some opens exhaust during bootstrap, which the separate 1 MiB case already covers. The test now also asserts that a `ready` message with `oldGenerationMiB === 12` arrived. That keeps it distinct from bootstrap failure and slightly strengthens it. All previous assertions are unchanged.
+
+### Remediation verification
+
+| Command | Result |
+| --- | --- |
+| `npx vitest run subs/analysis/src/tests/session-worker.test.ts -t "turns an actual worker heap exhaustion"`, five times | 5 of 5 passed |
+| `npx vitest run subs/analysis/src/tests/session-worker.test.ts`, twice | 16 of 16 passed, both runs |
+| `npx vitest run subs/analysis/src/tests` concurrently with `npx vitest run subs/analysis/subs/project/src/tests` and the heap probe (load average 6.7) | 208 passed (207 plus the probe) and 135 passed |
+| `npx vitest run subs/analysis/src/tests` alone, after removing the probe | 11 files, 207 passed |
+| `npm run type-check` | Passed |
+| `git diff --check` | Clean |
 
 ## Deviations and limits
 
