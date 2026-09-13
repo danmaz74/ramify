@@ -21,7 +21,8 @@ After this plan:
   from retained facts when requested;
 - a known context and an unchanged invocation reuse project-root resolution;
 - a queued hook covered by the revision that just published is answered from it;
-- the client derives its endpoint without hashing every runtime file;
+- the client derives its endpoint without hashing every runtime file, and the
+  compiled client refuses a build it was not compiled from;
 - macOS worker supervision does not spawn a process per worker message;
 - timing fields show the work outside `revision.timings.total`.
 
@@ -42,7 +43,7 @@ in nine of fourteen rows. The fixed costs every row pays:
 | Publication `finish()` size walks and deep copy | 96 to 110 ms | 552 to 588 ms | 2 |
 | Project-root resolution per open and per update | 110 to 120 ms | 323 to 339 ms | 3 |
 | Racing hook's second update | 413 ms | 489 ms | 4 |
-| Client build-key hashing | 26 to 34 ms | 23 to 30 ms | 5 |
+| Client build-key hashing, Node entry; about 9 ms in the compiled client | 26 to 34 ms | 23 to 30 ms | 5 |
 
 ## Resolved decisions
 
@@ -71,11 +72,16 @@ in nine of fourteen rows. The fixed costs every row pays:
    the invocation equals the session's. The daemon reuses a known context's
    resolution while the configuration dependencies its observer holds are
    unchanged. A configuration or discovery-input change resolves again.
-6. **Build key (target 5).** The build writes the runtime identity; the client
-   reads it instead of hashing every runtime file. A mixed or incomplete build
-   still fails endpoint selection. The planned
-   [native client](../../architecture/optimization.md#native-client) is not
-   implemented here; the build-time identity must be readable by any client.
+6. **Build key (target 5).** The build writes the runtime identity; both
+   clients read it instead of hashing every runtime file. A mixed or incomplete
+   build still fails endpoint selection, including after `npm pack` and
+   installation. The [compiled client](../../architecture/optimization.md#native-client)
+   landed separately in `b6275fc`, and iteration 6 starts by merging it. The
+   build embeds the identity into the executable it compiles. The compiled
+   client refuses an identity that differs from its embedded one as
+   `incompatible`, exit 2, before it reads a daemon record or starts a daemon.
+   The Node entry has no embedded identity and is unaffected. The identity file
+   is plain JSON readable by any client.
 7. **No live runs in iterations.** Iterations run owner tests, type-check and
    the commit audit, never `npm run measure:*` or the full suite.
 
@@ -90,7 +96,7 @@ No owner, exposure line or package entry is added.
 | 3 | `analysis`, `cli` if a consumer needs it | `report.ts`, `session-engine.ts`, `docs/architecture/daemon.md` |
 | 4 | `analysis/project`, `analysis`, `daemon/contexts` | `resolve-root.ts`, `session-engine.ts`, `context-manager.ts` |
 | 5 | `daemon/contexts` | `context-manager.ts`, `tokens.ts`, `docs/architecture/daemon.md` |
-| 6 | `daemon`, root build scripts | `discovery.ts`, `scripts/build-production.ts` |
+| 6 | `daemon`, root, root build scripts | `discovery.ts`, `compiled-entry.ts`, `scripts/build-production.ts`, `scripts/compiled-client.ts` |
 | 7 | `analysis` | `session-processes.ts` |
 
 ## Acceptance matrix
@@ -115,6 +121,8 @@ No owner, exposure line or package entry is added.
 | HO-16 | `fingerprint-order`: `createFingerprints` output is unchanged with a non-serializing comparator | unit | 5 |
 | HO-17 | `build-identity-read`: endpoint selection reads the build-time identity and yields the same build key as hashing | unit | 6 |
 | HO-18 | `mixed-build-detected`: a changed, missing or added runtime file after the build fails endpoint selection | unit | 6 |
+| HO-21 | `compiled-identity-bound`: a compiled client beside a `dist` with a different runtime identity exits 2 as `incompatible`, leaving the endpoint directory empty and starting no daemon; a matching one checks normally | process | 6 |
+| HO-22 | `installed-identity`: a packed and installed build derives the same key as hashing, and a changed runtime file there still fails selection | unit | 6 |
 | HO-19 | `rss-sampling`: macOS sampling spawns no process per worker message and still enforces the RSS limit | unit | 7 |
 | HO-20 | `docs-updated`: the analysis marks each delivered target and links the results | review | 7 |
 
@@ -129,7 +137,7 @@ Iterations run in sequence in one worktree; each is one subagent.
 | [3](iterations/iteration3.md) | Build only what a hook publishes | 2 |
 | [4](iterations/iteration4.md) | Reuse project-root resolution | 1 |
 | [5](iterations/iteration5.md) | Answer queued racing hooks on publication | 1, 4 |
-| [6](iterations/iteration6.md) | Build-time runtime identity | none |
+| [6](iterations/iteration6.md) | Build-time runtime identity | `b6275fc` merged |
 | [7](iterations/iteration7.md) | macOS RSS sampling and plan closure | 1 to 6 |
 
 ## Verification policy
@@ -147,7 +155,7 @@ failures are fixed before the next iteration starts.
 | Target 6, watcher latency | Batching and debounce values change only after target 0's timestamps show the split. |
 | Real-process measurement | Reference and S100 focused runs, then S500, S1000 and macOS, follow this plan against the 2 s budget. |
 | Sweep re-hashing only moved files | The later step of target 1; after the cached list lands. |
-| Native client, Node compile cache, `factBytes` | See [optimization](../../architecture/optimization.md#native-client) and the analysis's smaller items. |
+| Node compile cache, `factBytes` | See the analysis's smaller items. The native client landed separately as the [compiled client](../../architecture/optimization.md#native-client). |
 | Repeated deletion revision | Its own [plan](../iteration-5-repeated-deletions/main-plan.md). |
 | Resolution-bounded narrowing | Indicated for created and deleted files; a separate plan. |
 
