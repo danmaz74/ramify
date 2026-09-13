@@ -1,25 +1,27 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { measuredReuse } from './resident-reuse.mjs';
+import { measuredPath } from './resident-reuse.mjs';
 
-const all = ['parse', 'configuration', 'metadata', 'catalog', 'link', 'access', 'decide'];
-const source = ['parse', 'configuration', 'metadata'];
-function observation(traces, published = source) {
-  return { contexts: [{ published: { fingerprints: { inputId: 'edited' }, reused: published } }],
-    instrumentation: { increments: traces.map(([sequence, reused, inputId = 'edited']) =>
-      ({ sequence, reused, inputId, execution: 'completed' })) } };
+function observation(traces, path = 'source') {
+  const checked = { path, files: ['src/entry.ts'], accesses: 1, modelRebuilt: false }, timings = { total: 10 };
+  return { contexts: [{ published: { revision: 'rev/2', fingerprints: { inputId: 'edited' }, checked, timings } }],
+    instrumentation: { workerMessages: traces.map(([sequence, tracePath, inputId = 'edited']) =>
+      ({ sequence, operation: tracePath ? 'update' : 'report', kind: 'reply', inputId, execution: 'completed',
+        revision: tracePath ? { checked: { path: tracePath, fileCount: checked.files.length,
+          accesses: checked.accesses, modelRebuilt: checked.modelRebuilt }, timings } : null })) } };
 }
-test('edit retains its publication reuse when same-input revalidation follows it', () => {
-  const settled = observation([[10, source], [11, source], [12, all]]);
-  assert.deepEqual(measuredReuse('source', 'edited', settled, 10), source);
+test('edit keeps its publication path when same-input report projection follows it', () => {
+  assert.equal(measuredPath('source', 'edited', observation([[10, 'source'], [11, 'source'], [12, null]]), 10), 'source');
 });
-test('unchanged command uses its new revalidation, not retained publication reuse', () => {
-  assert.deepEqual(measuredReuse('unchanged', 'edited', observation([[10, source], [11, all]]), 10), all);
+test('unchanged command proves report projection and preserves the prior revision', () => {
+  assert.equal(measuredPath('unchanged', 'edited', observation([[11, null]], 'cold'), 10, 'rev/2'), 'cold');
+  assert.throws(() => measuredPath('unchanged', 'edited', observation([[11, null]]), 10, 'rev/1'), /preserve the context revision/);
 });
-test('publication reuse alone cannot replace a missing matching completed trace', () => {
-  assert.throws(() => measuredReuse('source', 'edited', observation([[10, source], [11, all]]), 10), /Real completed increment/);
+test('publication path alone cannot replace a matching completed worker reply', () => {
+  assert.throws(() => measuredPath('source', 'edited', observation([[10, 'source'], [11, null]]), 10), /Real completed worker revision/);
+  assert.throws(() => measuredPath('source', 'edited', observation([[11, 'metadata']]), 10), /Real completed worker revision/);
 });
-test('earlier same-input cycles and other captures cannot supply current proof', () => {
-  assert.throws(() => measuredReuse('source', 'edited', observation([[9, source], [11, source, 'other']]), 10), /Real completed increment/);
-  assert.throws(() => measuredReuse('unchanged', 'edited', observation([[9, all]]), 10), /Real completed increment/);
+test('earlier same-input cycles and unrelated captures cannot supply current proof', () => {
+  assert.throws(() => measuredPath('source', 'edited', observation([[9, 'source'], [11, 'source', 'other']]), 10), /Real completed worker revision/);
+  assert.throws(() => measuredPath('unchanged', 'edited', observation([[9, null]]), 10, 'rev/2'), /Real completed report reply/);
 });

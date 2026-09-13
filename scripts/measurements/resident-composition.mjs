@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { closeSync, openSync, readFileSync, readSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { dirname, join, relative, resolve } from 'node:path';
-import { gunzipSync } from 'node:zlib';
+import { readArchiveJsonSync } from './archive.mjs';
 import { packageRoot, sha256 } from './common.mjs';
 import { filesUnder } from './identities.mjs';
 import { residentInputs, residentDependencies } from './resident-inputs.mjs';
@@ -60,13 +61,21 @@ export function verifyCompatibleInputs(before, current, proof, entries = sourceE
   }
 }
 export function readResidentArtifact(path, expected) {
-  const bytes = readFileSync(path), raw = path.endsWith('.gz') ? gunzipSync(bytes) : bytes;
-  const identity = { fileSha256: sha256(bytes), rawSha256: sha256(raw) };
+  const fd = openSync(path, 'r'), hash = createHash('sha256'), buffer = Buffer.allocUnsafe(64 * 1024);
+  try {
+    for (;;) {
+      const count = readSync(fd, buffer, 0, buffer.length, null);
+      if (!count) break; hash.update(buffer.subarray(0, count));
+    }
+  } finally { closeSync(fd); }
+  const fileSha256 = hash.digest('hex');
+  if (expected) assert.equal(fileSha256, expected.fileSha256, 'Measurement artifact bytes changed');
+  const parsed = readArchiveJsonSync(path);
+  const identity = { fileSha256, rawSha256: parsed.rawSha256 };
   if (expected) {
-    assert.equal(identity.fileSha256, expected.fileSha256, 'Measurement artifact bytes changed');
     assert.equal(identity.rawSha256, expected.rawSha256, 'Measurement raw bytes changed');
   }
-  return { report: JSON.parse(raw), ...identity };
+  return { report: parsed.report, ...identity };
 }
 export function verifyCompositionArtifact(artifact, manifestPath, id, current = residentInputs(), dependencies = residentDependencies()) {
   assert.ok(artifact.workloadIds.includes(id));

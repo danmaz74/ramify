@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { arch, platform } from 'node:os';
-import { gunzipSync } from 'node:zlib';
-import { packageRoot, sha256 } from './common.mjs';
+import { packageRoot } from './common.mjs';
+import { readArchiveJsonSync } from './archive.mjs';
+import { readJsonSync } from './json-stream.mjs';
 import { residentInputs, residentDependencies } from './resident-inputs.mjs';
 import { residentBudgets, residentWorkloads } from './resident-plan.mjs';
 import { assertResidentWorkload } from './resident-assertions.mjs';
@@ -57,12 +57,7 @@ export function verifyResidentEvidence(report, id, expectedInputs = residentInpu
 }
 
 function readEvidence(path, record) {
-  const bytes = readFileSync(path), raw = path.endsWith('.gz') ? gunzipSync(bytes) : bytes;
-  if (record) {
-    assert.equal(sha256(bytes), record.gzipSha256, 'Archive gzip hash mismatch');
-    assert.equal(sha256(raw), record.rawSha256, 'Archive raw hash mismatch');
-  }
-  return { report: JSON.parse(raw), artifact: path, rawSha256: sha256(raw), rawBytes: raw.length };
+  return { ...readArchiveJsonSync(path, record), artifact: path };
 }
 async function run() {
   const [id, provided] = process.argv.slice(2);
@@ -72,7 +67,7 @@ async function run() {
   if (provided) evidence = readEvidence(resolve(provided));
   else {
     const directory = join(packageRoot, 'scripts/measurements/results');
-    const index = JSON.parse(readFileSync(join(directory, 'index.json'), 'utf8'));
+    const index = readJsonSync(join(directory, 'index.json'));
     const candidates = index.records.filter(record => record.phase === 'resident').reverse();
     for (const record of candidates) {
       assert.equal(basename(record.file), record.file, 'Archive file must remain in its owned directory');

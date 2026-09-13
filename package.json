@@ -66,9 +66,11 @@
     "check:self": "node dist/src/cli-entry.js check --root .",
     "measure:batch": "node scripts/measurements/run.mjs",
     "measure:resident": "node scripts/measurements/resident.mjs",
+    "measure:fast": "node scripts/measurements/fast.mjs",
     "reference:verify": "tsx scripts/reference-harness/verify.ts"
   },
   "devDependencies": {
+    "@streamparser/json": "0.0.26",
     "@types/d3-hierarchy": "^3.1.7",
     "@types/d3-shape": "^3.2.0",
     "@types/node": "^26.4.0",

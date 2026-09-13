@@ -17,6 +17,6 @@ export function residentInputs() {
   };
 }
 export function residentDependencies() {
-  return Object.fromEntries(['typescript', 'tsx'].map(name =>
+  return Object.fromEntries(['typescript', 'tsx', '@streamparser/json'].map(name =>
     [name, JSON.parse(readFileSync(join(packageRoot, 'node_modules', name, 'package.json'), 'utf8')).version]));
 }

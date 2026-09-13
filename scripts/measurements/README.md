@@ -167,7 +167,7 @@ The driver measures five independent cold starts and twenty unchanged, README,
 exposure, source and configuration cycles on both the reference and S100; 200
 alternating source edits on each; eight warm S100 contexts; a non-reading peer
 over ten S100 publications; cold/source checks on S500 and S1000; and publication
-and serialization peaks. Stage reuse comes from the actual analysis increment.
+and serialization peaks. Revision paths come from the actual retained session replies.
 Every check must complete with its independently expected owner, denial and
 coverage outcomes. The slow peer also requests real published reports without
 reading them, since ten publication headers alone do not fill the 128 MiB queue.
@@ -215,3 +215,110 @@ stale evidence fails and identifies the required measurement command.
 cleanup, timeout, interruption, archive-integrity and missing/stale/target-miss
 controls. These controls provide no resident matrix credit. Run acceptance
 measurements on an otherwise idle host after source, build and scope are frozen.
+
+## Fast hook and retained-session measurements
+
+```sh
+npm run worktree:prepare
+npm run build
+RAMIFY_MEASUREMENT_ACTIVITY='Idle host; no other builds or measurements' npm run measure:fast
+```
+
+The Plan 5 recipe materializes fresh reference, S100, S500 and S1000 copies,
+installs this checkout's compiled CLI into an owned prefix, and runs the real
+socket service and watcher. It preserves the generators and records each edit
+setup identity. Each workload has a separate daemon and endpoint under an owned
+temporary directory. Normal completion, failures and interruption clean up the
+observed process tree. `NODE_OPTIONS` is cleared for measured child processes;
+the existing worker supervisor still performs its effective heap preflight.
+
+Each fixture receives twenty alternating body, export, exposure, README and
+configuration edits, twenty deleted/created file pairs, and twenty additional
+body edits whose watcher revision has published before the hook starts. The
+created-file setup adds the owned target and a stable same-owner side-effect
+import to the body-edit source before recording its setup identity. Each pair
+deletes the target and recreates it, preserving complete coverage for the other
+workloads. The import preserves the compiler's observation of the absent target
+after deletion; an unreferenced deleted file
+would correctly receive `unobserved-input`. Every edit and revert preserves the
+import, and created/deleted edits reject a missing witness before changing files.
+Only the deleted phase has an absent target and its precise `unresolved-target`
+coverage note, with no finding. The first body sequence launches the installed
+hook command immediately after each save. Every command is recorded, including
+unsuccessful or uncovered replies.
+Twenty bare Node executions and twenty covered zero-analysis CLI checks record
+the process floor and client cost. Requests use a finite 600,000 ms measurement
+deadline so work exceeding the normal hook deadline remains measurable; the
+unchanged timing budgets still fail when missed. Startup, setup, explicit
+settling and status polling outside the command are excluded from its duration.
+Session timings come from the exact published revision, not elapsed CLI time.
+
+Additional workloads retain 200 alternating body edits on the reference and
+S100, two hot and six warm S100 contexts with active subscriptions, four cold
+opens, and Plan 2's unchanged entry-footprint workloads. The checked-set and cold
+instances reuse those process observations with independent predicates; they do
+not claim an additional execution. Created/deleted files must report the broad
+path, as the reviewed Plan 5 scope permits.
+
+The external POSIX sampler observes process RSS at a 50 ms target interval.
+A separate socket poll records daemon counters, contexts, retained facts and
+history bytes at the same target interval, with actual timestamps and delays.
+Worker heap is the latest real worker-reply checkpoint, rather than an invented
+50 ms heap sample. Passive worker diagnostics record effective heap preflight,
+thread/child lifetimes and bounded message traces. Operation traces include analysis, copying, transport and scheduling. A separate,
+explicit probe outside hook timing sends the real latest revision input and
+diagnostic arrays through an auxiliary worker, twenty round trips per array.
+It records both clone directions and scheduling, array bytes, integrity hashes
+and thread cleanup; analysis, JSON sizing and hash checks are outside its timings.
+The existing supervisor process is included alongside the daemon and compiler. Each PID's RSS is counted
+once; shared pages can still occur in several processes' RSS. Polling can miss
+short peaks and adds measurement overhead.
+
+Plan 5's reference and S100 session/hook timing rows are binding for this
+iteration. S500/S1000 timings and every memory target are advisory. This extends
+the policy at the top of this document only for Plan 5; Plan 2 remains advisory.
+No command option reduces sample counts, changes targets or converts failed
+execution into a pass. `--workload <I5-13 suffix>` records a partial diagnostic
+and exits 1 while any required workload remains unrun. `--output FILE` names the
+raw report; every completed invocation also appends a lossless gzip record to
+`results/index.json`, preserving failures and exact dependency, recipe, source,
+build, scope and fixture identities.
+
+Both resident and fast reports use bounded JSON serialization and incremental
+parsing, so a complete raw report can exceed Node's maximum string size. Archives
+use concatenated gzip members with indexed byte ranges and member hashes, while
+retaining the whole compressed and raw payload hashes. Standard `gzip -dc`
+reconstructs the original JSON bytes. The readers validate every indexed member
+and the whole payload before accepting evidence; older single-member archives
+remain readable. No samples are dropped to reduce the report size. The pinned
+`@streamparser/json` development dependency and its version are recorded with
+the measurement inputs.
+
+The report evaluates proportional relinking, created-file resolution narrowing,
+filtered extraction, persistent checkpoints and host-isolation deferral triggers.
+A missing component remains `not-evaluated` and prevents full-recipe acceptance.
+RSS growth includes the separate worker supervisor and compiler as well as the
+daemon. Runtime retention ceilings apply to every recorded poll; lifecycle
+counters must balance at settled checkpoints and after cleanup. A binding miss needs an owner fix or
+a reviewed budget revision; the recipe never relaxes its assertion.
+
+The nine `fast-measure` handlers verify existing current evidence rather than
+starting measurements concurrently with the prerequisite matrix:
+
+```sh
+RAMIFY_FAST_MEASUREMENT_REPORT=/absolute/path/fast.json npm run reference:verify -- --plan 5 --iteration 12
+node scripts/measurements/verify-fast-evidence.mjs I5-13:entry-footprints /absolute/path/fast.json
+node --test scripts/measurements/fast-evidence.test.mjs scripts/measurements/resident-reuse.test.mjs
+```
+
+Without a report path, the verifier selects the newest archive for the exact
+current inputs. It verifies archive hashes and recomputes each predicate from
+raw data. A completed individual workload in a partial invocation may supply
+that instance; it grants no credit for missing workloads or full-recipe
+completion. Controls reject removed rows, missing samples, stale inputs, altered
+assertions, process leaks and archive corruption.
+
+The resident recipe now asserts actual retained revision paths and correlates
+each edit with its worker reply. Covered synchronized requests may reuse a
+revision captured before acknowledgment. Settled retained workers and compiler
+servers are expected live resources; cleanup is checked when their daemon stops.

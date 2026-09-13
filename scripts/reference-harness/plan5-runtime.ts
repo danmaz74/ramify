@@ -10,10 +10,11 @@ import { plan5SessionRevisionHandlers } from './plan5-session-revision-cases.js'
 import { plan5HostingHandlers } from './plan5-hosting-cases.js';
 import { plan5HookHandlers } from './plan5-hook-cases.js';
 import { plan5LiveHandlers } from './plan5-live-cases.js';
+import { plan5FastMeasureHandlers } from './plan5-fast-measure-cases.js';
 import type { HarnessRuntime } from './runner.js';
 
 /** Registration is not execution; later providers remain unavailable. */
 export const plan5Runtime: HarnessRuntime = {
-  capabilities: new Set(['engine', 'harness-gate', 'catalog', 'observer', 'compiler', 'session', 'hosting', 'contexts', 'supersession', 'hook-cli', 'live-equivalence']),
-  handlers: new Map([...plan5LiveHandlers, ...plan5HookHandlers, ...plan5ContextHandlers, ...plan5SupersessionHandlers, ...plan5EngineHandlers, ...plan5CatalogHandlers, ...plan5ObserverHandlers, ...plan5CompilerHandlers, ...plan5SessionHandlers, ...plan5SessionRevisionHandlers, ...plan5HostingHandlers, ...plan5GateHandlers]),
+  capabilities: new Set(['engine', 'harness-gate', 'catalog', 'observer', 'compiler', 'session', 'hosting', 'contexts', 'supersession', 'hook-cli', 'live-equivalence', 'fast-measure']),
+  handlers: new Map([...plan5FastMeasureHandlers, ...plan5LiveHandlers, ...plan5HookHandlers, ...plan5ContextHandlers, ...plan5SupersessionHandlers, ...plan5EngineHandlers, ...plan5CatalogHandlers, ...plan5ObserverHandlers, ...plan5CompilerHandlers, ...plan5SessionHandlers, ...plan5SessionRevisionHandlers, ...plan5HostingHandlers, ...plan5GateHandlers]),
 };

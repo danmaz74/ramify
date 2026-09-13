@@ -122,10 +122,12 @@ export class Resident {
     const started = performance.now();
     const outcome = unwrap(await this.connection.check({ token, requestId: randomUUID(), freshness: { mode: 'synchronized', expect } }));
     const durationMs = performance.now() - started;
-    assert.equal(outcome.status, 'reported', JSON.stringify(outcome)); assert.equal(outcome.published, true);
+    assert.equal(outcome.status, 'reported', JSON.stringify(outcome)); assert.equal(outcome.published, true, JSON.stringify(outcome));
     assert.equal(outcome.report.outcome.execution, 'completed'); assert.equal(outcome.report.summary.owners, project.owners);
     assert.equal(outcome.freshness.mode, 'synchronized'); assert.equal(outcome.freshness.verified, true);
-    assert.ok(outcome.freshness.captureStarted >= outcome.freshness.acknowledged);
+    // With explicit identities the covering revision may predate this request.
+    // Empty-expect plain checks retain the post-acknowledgment sweep contract.
+    if (!expect.length) assert.ok(outcome.freshness.captureStarted >= outcome.freshness.acknowledged);
     assert.equal(outcome.revision.fingerprints.inputId, outcome.report.inputId);
     if (expect.length && this.lastInput) assert.notEqual(outcome.report.inputId, this.lastInput, 'Edited input must produce a fresh captured revision');
     this.lastInput = outcome.report.inputId;
@@ -214,5 +216,5 @@ export class Resident {
 }
 export function sampleMetrics(value) {
   const { instrumentation, ...status } = value;
-  return { ...status, instrumentation: { ...instrumentation, services: undefined, outbound: undefined, increments: instrumentation.increments } };
+  return { ...status, instrumentation: { ...instrumentation, services: undefined, outbound: undefined } };
 }

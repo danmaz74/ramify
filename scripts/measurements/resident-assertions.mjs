@@ -1,6 +1,6 @@
 import { residentBudgets as budgets } from './resident-plan.mjs';
 import { median } from './common.mjs';
-import { measuredReuse } from './resident-reuse.mjs';
+import { measuredPath } from './resident-reuse.mjs';
 
 /** Correctness remains binding; empirical performance targets are advisory by user decision. */
 export function assertResidentWorkload(id, measurements) {
@@ -33,7 +33,8 @@ export function assertResidentWorkload(id, measurements) {
   const advances = cycles => cycles?.every((cycle, index) => cycle?.revision?.sequence > 0
     && cycle.revision?.fingerprints?.inputId === cycle.report?.inputId && captured(cycle)
     && cycle.freshness?.verified === true && cycle.freshness?.mode === 'synchronized'
-    && cycle.freshness?.captureStarted >= cycle.freshness?.acknowledged
+    // Covered identities can be published before a synchronized request arrives.
+    && Number.isFinite(cycle.freshness?.acknowledged)
     && (index === 0 || cycle.revision.sequence > cycles[index - 1].revision.sequence
       && cycle.report.inputId !== cycles[index - 1].report.inputId));
   const retained = (name, sample) => {
@@ -42,7 +43,7 @@ export function assertResidentWorkload(id, measurements) {
     for (const context of sample?.contexts ?? []) {
       within(`${name}: retained revision count ${context.token.context}`, context.history.retained, budgets.retention.revisionsPerContext);
       within(`${name}: history bytes ${context.token.context}`, context.history.bytes, budgets.retention.historyBytesPerContext);
-      within(`${name}: product bytes ${context.token.context}`, context.retainedBytes, budgets.retention.productsBytesPerContext);
+      within(`${name}: retained fact bytes ${context.token.context}`, context.retainedBytes, budgets.retention.productsBytesPerContext);
       total += context.history.bytes + context.retainedBytes;
     }
     within(`${name}: global retained bytes`, total, budgets.retention.globalBytes);
@@ -69,20 +70,16 @@ export function assertResidentWorkload(id, measurements) {
       measurements.cold?.map(value => value.instanceId));
     check('cold timings are actual positive durations', measurements.cold?.every(value => Number.isFinite(value.durationMs) && value.durationMs > 0), measurements.cold?.map(value => value.durationMs));
     target('cold median', measurements.cold?.length ? median(measurements.cold.map(value => value.durationMs)) : null, limit.coldMs);
-    const expectedReuse = {
-      unchanged: ['access', 'catalog', 'configuration', 'decide', 'link', 'metadata', 'parse'],
-      readme: ['access', 'catalog', 'configuration', 'decide', 'link', 'parse'],
-      exposure: ['access', 'catalog', 'configuration', 'metadata'],
-      source: ['configuration', 'metadata', 'parse'], configuration: ['metadata', 'parse'],
-    };
-    for (const [kind, expected] of Object.entries(expectedReuse)) {
+    const expectedPaths = { unchanged: null, readme: 'metadata', exposure: 'description',
+      source: name === 'reference' ? 'source' : 'unchanged-surface', configuration: 'broad' };
+    for (const [kind, expected] of Object.entries(expectedPaths)) {
       const cycles = measurements.cycles?.[kind];
       count(`${kind}: twenty actual cycles`, cycles, budgets.editCycles);
       check(`${kind}: positive command durations`, cycles?.every(value => Number.isFinite(value.durationMs) && value.durationMs > 0), cycles?.map(value => value.durationMs));
       target(`${kind}: median`, cycles?.length ? median(cycles.map(value => value.durationMs)) : null, limit[`${kind}Ms`]);
-      check(`${kind}: recorded completed stage reuse`, cycles?.every(value => JSON.stringify([...value.reused].sort()) === JSON.stringify(expected)), cycles?.map(value => value.reused));
-      check(`${kind}: stage reuse is backed by the publication and raw increment`, cycles?.every(value => {
-        try { return JSON.stringify(measuredReuse(kind, value.report?.inputId, value.settled, value.afterSequence)) === JSON.stringify(value.reused); }
+      if (expected !== null) check(`${kind}: expected published revision path`, cycles?.every(value => value.path === expected), cycles?.map(value => value.path));
+      check(`${kind}: revision path is backed by the publication and real worker reply`, cycles?.every(value => {
+        try { return measuredPath(kind, value.report?.inputId, value.settled, value.afterSequence, value.beforeRevision) === value.path; }
         catch { return false; }
       }), cycles?.length);
       if (kind !== 'unchanged') {
@@ -115,15 +112,23 @@ export function assertResidentWorkload(id, measurements) {
       target(`${name}: settled RSS growth`, last && first ? last.memory.rss - first.memory.rss : null, budgets.plateau.rssGrowthBytes);
       target(`${name}: heap growth beyond history bytes`, last && first ? last.memory.heapUsed - first.memory.heapUsed - (history(last) - history(first)) : null,
         budgets.plateau.heapGrowthBeyondHistoryBytes);
-      check(`${name}: all real session and helper lifetimes balanced`, cycles?.every(({ settled: sample }) => {
+      check(`${name}: retained worker and compiler lifetimes match live sessions`, cycles?.every(({ settled: sample }) => {
         const m = sample.instrumentation;
-        return m.activeSessions === 0 && m.helpers === 0 && m.files === 0 && m.totals.sessionsCreated > 0
-          && m.totals.sessionsCreated === m.totals.sessionsDisposed && m.totals.helpersStarted === m.totals.helpersClosed
+        const sessions = sample.contexts.filter(context => context.session), hot = sessions.filter(context => context.level === 'hot');
+        return sessions.length > 0 && m.activeSessions === sessions.length && m.workerCount === sessions.length
+          && m.compilerCount === hot.length && m.helpers === 0 && m.files === 0
+          && m.workers?.every(worker => worker.threadId > 0 && worker.status?.worker?.heapUsed > 0 && worker.statusAt > 0)
+          && m.totals.sessionsCreated - m.totals.sessionsDisposed === sessions.length
+          && m.totals.workersCreated - m.totals.workersExited === sessions.length
+          && m.totals.compilersStarted - m.totals.compilersExited === hot.length
+          && m.totals.helpersStarted === m.totals.helpersClosed
           && m.totals.filesOpened === m.totals.filesClosed;
-      }), cycles?.map(({ settled: sample }) => [sample.instrumentation.activeSessions, sample.instrumentation.helpers, sample.instrumentation.files]));
-      check(`${name}: no native helper survives settled observations`, cycles?.every(cycle => {
+      }), cycles?.map(({ settled: sample }) => [sample.instrumentation.activeSessions, sample.instrumentation.workerCount, sample.instrumentation.compilerCount]));
+      check(`${name}: settled OS processes match daemon, worker supervisors and retained compilers`, cycles?.every(cycle => {
         const processes = cycle.samples?.at(-1)?.processes;
-        return processes?.length === 1 && processes[0].pid === cycle.settled.pid;
+        const m = cycle.settled.instrumentation;
+        const expected = [cycle.settled.pid, ...(m.workers ?? []).map(worker => worker.pid), ...(m.compilerPids ?? [])].sort((a, b) => a - b);
+        return Array.isArray(processes) && JSON.stringify(processes.map(row => row.pid).sort((a, b) => a - b)) === JSON.stringify(expected);
       }), cycles?.map(cycle => cycle.samples?.at(-1)?.processes?.map(item => item.pid)));
       check(`${name}: settled watcher and timer counts stay bounded`, settled.length > 0 && settled.every(({ settled: sample }) =>
         sample.instrumentation.watchers === first.instrumentation.watchers && sample.instrumentation.timers <= first.instrumentation.timers + 1),
@@ -135,7 +140,9 @@ export function assertResidentWorkload(id, measurements) {
     }
   } else if (suffix === 'many-contexts') {
     count('eight warm contexts', measurements.settled?.contexts, budgets.manyContexts.contexts);
-    check('every context is warm and published', measurements.settled?.contexts?.every(context => context.state === 'warm' && context.published), measurements.settled?.contexts?.map(context => context.state));
+    check('every context has a published retained session', measurements.settled?.contexts?.every(context => context.state === 'warm' && context.published && context.session), measurements.settled?.contexts?.map(context => context.state));
+    count('two retained hot compiler contexts', measurements.settled?.contexts?.filter(context => context.level === 'hot'), 2);
+    count('six warm contexts with released compilers', measurements.settled?.contexts?.filter(context => context.level === 'warm' && context.session?.compiler?.pid === null), 6);
     settledMemory('eight contexts', measurements.settled);
     targetBytes('eight-context settled RSS', measurements.settled?.memory?.rss, budgets.manyContexts.rssBytes);
     retained('eight warm contexts', measurements.settled);

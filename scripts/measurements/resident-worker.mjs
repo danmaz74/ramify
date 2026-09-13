@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { writeFileSync } from 'node:fs';
+import { writeJsonSync } from './json-stream.mjs';
 import { executeResidentWorkload } from './resident-workloads.mjs';
 import { assertResidentWorkload } from './resident-assertions.mjs';
 import { controls } from './resident-driver.mjs';
@@ -11,7 +11,7 @@ const definition = residentWorkloads.find(workload => workload.id === `I2-29:${s
 assert.ok(definition && scratch && templates && executable && output, 'Invalid workload worker arguments');
 const report = { ...definition, status: 'running', passed: false, startedAt: new Date().toISOString(),
   measurements: {}, assertions: [], failures: [], interrupted: false };
-const persist = () => writeFileSync(output, JSON.stringify(report) + '\n');
+const persist = () => writeJsonSync(output, report, { indent: 0 });
 const checkpoint = (phase, cycle, count) => {
   if (report.interrupted) throw new Error('Resident measurement interrupted');
   if (!cycle || cycle % 5 === 0 || cycle === count) {

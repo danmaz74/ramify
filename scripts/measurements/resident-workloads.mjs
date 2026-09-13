@@ -8,7 +8,7 @@ import { Resident, command, controls, fixture, reportCommand, sampleMetrics, unw
 import { residentBudgets as budgets } from './resident-plan.mjs';
 import { packageRoot, median } from './common.mjs';
 import { treeIdentity } from './identities.mjs';
-import { measuredReuse } from './resident-reuse.mjs';
+import { measuredPath } from './resident-reuse.mjs';
 import { coldCommand, withResident } from './resident-failure.mjs';
 
 const peak = samples => Math.max(0, ...samples.map(sample => sample.combinedRssBytes));
@@ -40,7 +40,8 @@ export async function executeResidentWorkload(suffix, options, measurements, che
   }
   async function cliCycle(project, host, kind, index) {
     const before = await host.settled();
-    const afterSequence = before.instrumentation.incrementSequence;
+    const afterSequence = before.instrumentation.workerSequence;
+    const beforeRevision = before.contexts.find(context => context.selection.root === project.root)?.published?.revision;
     const expected = await project.edit(kind, index);
     const sample = await host.cli(project);
     const report = reportCommand(sample, project.owners, kind === 'exposure' && index % 2 === 0 ? 1 : 0, expected);
@@ -50,8 +51,8 @@ export async function executeResidentWorkload(suffix, options, measurements, che
     }
     host.lastInput = report.inputId;
     const settled = await host.settled();
-    const reused = measuredReuse(kind, report.inputId, settled, afterSequence);
-    return { ...compactCli(sample, report), expected, reused, afterSequence, settled: sampleMetrics(settled) };
+    const path = measuredPath(kind, report.inputId, settled, afterSequence, beforeRevision);
+    return { ...compactCli(sample, report), expected, path, afterSequence, beforeRevision, settled: sampleMetrics(settled) };
   }
   if (suffix === 'entry-footprints') {
     const short = resident();

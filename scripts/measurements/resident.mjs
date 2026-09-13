@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { arch, cpus, platform, release, totalmem, tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { persistMeasurement } from './archive.mjs';
+import { readJsonSync, writeJsonSync } from './json-stream.mjs';
 import { packageRoot, sha256 } from './common.mjs';
 import { filesUnder, treeIdentity } from './identities.mjs';
 import { measureProcess, processRows } from './process-observer.mjs';
@@ -46,18 +47,18 @@ const report = {
   budgets: residentBudgets, performancePolicy: 'advisory-by-user-request-2026-09-11',
   sampling: { intervalMs: 50, source: 'External POSIX ps observer follows actual daemon/helper/native and CLI processes',
     settling: 'Two diagnostic GC passes across event-loop turns in the instrumented daemon; no budget or product operation overrides.',
-    limits: 'Sampled peaks can miss sub-interval peaks; summed RSS counts shared mappings repeatedly. Worker memory is excluded from workload acceptance peaks.' },
+    limits: 'Sampled peaks can miss sub-interval peaks; summed RSS counts shared mappings repeatedly. Combined process peaks include worker supervisors and compiler servers; daemon-only rows identify their PID. Worker heap values are production reply checkpoints, not fresh 50 ms heap measurements.' },
   workloads: pendingResidentWorkloads('Workload has not completed in this invocation.'),
   compilerStateTrigger: { status: 'not-evaluated', reason: 'Source-edit workloads have not both completed.' }, failures: [],
 };
 const replacements = [[scratch, '<measurement-work>'], [packageRoot, '<package>'], [realpathSync(join(packageRoot, 'node_modules')), '<dependencies>']].sort(([a], [b]) => b.length - a.length);
-function portable(value) {
-  if (typeof value === 'string') return replacements.reduce((text, [from, to]) => text.replaceAll(from, to), value);
-  if (Array.isArray(value)) return value.map(portable);
-  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, portable(item)]));
-  return value;
+function portableString(value) {
+  return replacements.reduce((text, [from, to]) => text.replaceAll(from, to), value);
 }
-function persist() { mkdirSync(dirname(output), { recursive: true }); writeFileSync(output, JSON.stringify(portable(report), null, 2) + '\n'); }
+function persist() {
+  mkdirSync(dirname(output), { recursive: true });
+  writeJsonSync(output, report, { indent: 0, transformString: portableString });
+}
 try {
   report.inputs = residentInputs();
   report.dependencies = residentDependencies();
@@ -91,7 +92,7 @@ try {
     const child = await measureProcess(process.execPath, ['scripts/measurements/resident-worker.mjs', suffix, scratch, templates, executable, workerOutput],
       { signal: controller.signal, timeoutMs: 2 * 60 * 60 * 1000, onStderr: bytes => process.stderr.write(bytes) });
     let measured;
-    try { measured = JSON.parse(readFileSync(workerOutput, 'utf8')); }
+    try { measured = readJsonSync(workerOutput); }
     catch (error) { measured = { ...report.workloads[index], status: 'failed', passed: false, failures: [String(error), child.stderr] }; }
     measured.controllerObservation = { durationMs: child.durationMs, processes: child.processes, samples: child.samples,
       failure: child.failure, code: child.code, signal: child.signal, postExitObservedProcesses: child.postExitObservedProcesses,
@@ -108,7 +109,7 @@ try {
     const observed = timed.map(row => ({ id: row.id, medianSourceMs: row.measurements.medians.source,
       targetMs: row.id.endsWith('reference') ? residentBudgets.reference.sourceMs : residentBudgets.S100.sourceMs }));
     report.compilerStateTrigger = { status: observed.some(value => value.medianSourceMs > value.targetMs) ? 'triggered' : 'not-triggered', observed,
-      reason: 'Measured source-edit latency with retained stage products; missed reference targets are advisory under the user decision of 2026-09-11.' };
+      reason: 'Measured source-edit latency with retained sessions and recorded revision paths; missed reference targets remain advisory under the Plan 2 user decision of 2026-09-11.' };
   }
   report.passed = report.workloads.every(row => row.passed);
   report.status = report.passed ? 'passed' : report.workloads.some(row => row.status === 'not-executed') ? 'incomplete' : 'failed';
@@ -118,8 +119,9 @@ finally {
   if (report.failures.length || report.interrupted) { report.passed = false; report.status = 'incomplete'; }
   rmSync(scratch, { recursive: true, force: true });
   process.removeListener('SIGINT', onInterrupt); process.removeListener('SIGTERM', onInterrupt);
-  const saved = persistMeasurement(portable(report), output, join(packageRoot, 'scripts/measurements/results'),
-    'Real resident workload observations; advisory performance targets, binding runtime limits, missing and failing evidence retained.');
+  const saved = persistMeasurement(report, output, join(packageRoot, 'scripts/measurements/results'),
+    'Real resident workload observations; advisory performance targets, binding runtime limits, missing and failing evidence retained.',
+    { transformString: portableString });
   process.stdout.write(JSON.stringify({ output: saved.rawWritten ? output : null,
     archive: saved.archive ? `scripts/measurements/results/${saved.archive.file}` : null, status: saved.report.status,
     passed: saved.report.passed, failures: saved.report.failures,

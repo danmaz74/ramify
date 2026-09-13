@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { syntheticOwnerFiles } from '../probes/fixtures/synthetic-owners.js';
@@ -26,6 +26,16 @@ export async function materializeSynthetic(destination: string, fixture: 'S100' 
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  if (process.argv.length === 2) {
+    const parent = resolve('.reference-work');
+    await mkdir(parent, { recursive: true });
+    const directory = await mkdtemp(join(parent, 'fast-fixtures-'));
+    for (const name of ['S100', 'S500', 'S1000'] as const) {
+      const destination = join(directory, name);
+      process.stdout.write(JSON.stringify({ destination, ...await materializeSynthetic(destination, name) }) + '\n');
+    }
+    process.exit(0);
+  }
   const destination = process.argv[2], fixture = process.argv[3] ?? 'S100';
   assert.ok(process.argv.length <= 4 && ['S100', 'S500', 'S1000'].includes(fixture), 'Usage: materialize.ts <new-directory> [S100|S500|S1000]');
   assert.ok(destination, 'Supply a new, owned synthetic-fixture directory');
