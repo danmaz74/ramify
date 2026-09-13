@@ -151,6 +151,41 @@ numeric ceilings and acceptable settled growth before accepting the correspondin
 runtime milestone. Set limits for timeouts, retained bytes, concurrent work and
 active contexts; this document does not invent configuration syntax for them.
 
+### Two kinds of budget
+
+Every numeric budget, for time or for memory, is one of two kinds, and its kind
+is declared beside its value.
+
+An **acceptable-time budget** is the largest value the use case tolerates. It is
+enforced: a miss fails the check. It is derived from what the caller does with
+the result, and the derivation is recorded with the number.
+
+An **ideal optimization budget** is the value the design predicts when it
+behaves as intended. It is never enforced and a miss never fails a check. A
+miss is recorded with its measured value and a stated reason, in the way a
+deferral trigger records its outcome.
+
+The kind decides enforcement, not the fixture. Splitting enforcement by fixture
+holds an implementation to an aspiration on a small project and to nothing on a
+large one.
+
+An ideal budget that fails nothing still earns its place. A systematic pattern
+across ideal misses locates defects that an acceptable-time gate alone passes in
+silence: Plan 5 measured session work of 523 to 574 ms across every edit class
+on the reference, and the near-equal misses against per-class ideal targets
+identified a fixed per-revision overhead that a single tolerant gate would have
+accepted without comment. Report ideal misses; do not gate on them.
+
+No budget of either kind may be set below a measured floor. State the floor
+beside the budget. Plan 5's 120 ms end-to-end target for a hook whose revision
+the watcher had already published sat below the 206 ms cost of its own client
+performing no analysis, so no implementation could have met it.
+
+A first delivery is accepted against acceptable-time budgets only. An ideal
+budget becomes an acceptable-time budget by a reviewed revision once an
+implementation meets it, never by default; without that ratchet the ideal
+values stay decorative and performance drifts unobserved.
+
 ### Initial setup probe
 
 A local probe on 2026-09-07 used Node v22.23.2 and the installed enclosing

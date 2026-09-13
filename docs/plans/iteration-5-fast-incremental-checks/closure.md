@@ -41,16 +41,41 @@ batch and report comparisons and 30 equal session audits on one build.
 
 ## Why the plan cannot be closed as delivered
 
-Functional equivalence held. The performance objective did not, and two
-behavioral contracts did not.
+Functional equivalence held. Two behavioral contracts did not. The performance
+result is reclassified below and is not by itself a reason to reject the
+implementation.
 
-Every binding budget row that was measured was missed, on both fixtures RP-6
-made binding, by 1.7 to 21 times its target. Two correctness predicates failed:
-description edits fall back to the broad revision path, and the covering rule
-permits analysis on a hook whose revision the watcher has already published.
-Neither is answered by a revised budget.
+Two correctness predicates failed: description edits fall back to the broad
+revision path, and the covering rule permits analysis on a hook whose revision
+the watcher has already published. Neither is answered by any budget revision,
+and together they are the reason this plan does not close as delivered.
 
-Three findings pass to a follow-up, and they are separate problems:
+### The budget result, reclassified
+
+Plan 5 declared its reference and S100 rows binding under RP-6 and enforced
+them, and all eighteen were missed by 1.7 to 21 times their targets. Under
+[Two kinds of budget](../../architecture/memory-lifecycle.md#two-kinds-of-budget),
+adopted 2026-09-13, those rows are ideal optimization budgets: they state what
+the design predicts when it behaves as intended, not what the use case
+tolerates. **A first delivery is not failed by them, and Plan 5's is not.** The
+misses are recorded, with their reasons, as findings for a follow-up.
+
+Plan 5 declared no acceptable-time budget at any point, so the delivered hook
+was never measured against a tolerance derived from its use case. Judged
+informally against that use case, the measured cost is defensible: 207 ms end to
+end when the watcher has already published, and 1392 ms on the reference when
+the hook races the watcher, against the alternative of a full batch check. The
+figure that would settle it is a batch baseline on the same build, which was
+never taken.
+
+One target was infeasible rather than aspirational. The 120 ms end-to-end budget
+for an already-published hook sat below the 206 ms cost of the client performing
+no analysis; the observed 207 ms means the daemon contributed under a
+millisecond and the entire cost is client startup and IPC. That row could not
+have been met by any engine, and it is the most actionable item in the set.
+
+Three findings pass to a follow-up, and they are separate problems. None is a
+budget dispute:
 
 1. **A fixed per-revision overhead.** Session work is flat across edit classes,
    523 to 574 ms on the reference and 861 to 1008 ms on S100, whether the edit
@@ -104,6 +129,11 @@ trusting the merged tree.
 
 The [roadmap](../../roadmap.md) still describes Plan 5 as "a draft awaiting its
 iteration 1 contract review". Its Plan 5 row and section should be advanced to
-"stopped, implementation merged, performance objective unmet" and point at this
-file. That edit was left undone because the roadmap has unrelated revisions in
-flight on this branch.
+"stopped, implementation merged, two behavioral contracts unmet" and point at
+this file. That edit was left undone because the roadmap has unrelated revisions
+in flight on this branch.
+
+[scope.md](scope.md#budgets) still presents its table as binding under RP-6 and
+splits enforcement by fixture. A follow-up that inherits this recipe should
+restate the table by kind and derive acceptable-time budgets from the use case;
+the table is left as the record of what Plan 5 actually enforced.

@@ -30,8 +30,14 @@ it was stopped.
 
 ## Measured budget rows
 
-Medians of twenty cycles, from the 13:27 run. Every row below is binding under
-RP-6 and every row was missed.
+Medians of twenty cycles, from the 13:27 run. Every row below was enforced as
+binding under RP-6 when the run executed, and every row was missed.
+
+Those rows were reclassified after the stop. Under
+[Two kinds of budget](../../../architecture/memory-lifecycle.md#two-kinds-of-budget)
+they are ideal optimization budgets, which are recorded and never enforced, so
+these misses do not fail the delivered implementation. See
+[closure.md](../closure.md). The table records what the run asserted at the time.
 
 | Workload | Reference observed | Reference target | S100 observed | S100 target |
 | --- | ---: | ---: | ---: | ---: |
