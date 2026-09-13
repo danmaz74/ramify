@@ -4,6 +4,8 @@ import { ReportDraft } from '../report.js';
 import { diagnostic } from '../report-data.js';
 
 const MiB = 1024 ** 2;
+/** Serializing about 100 MiB of evidence is CPU-bound; the parallel suite can slow it well past the default. */
+const timeout = 60_000;
 function report(maximum: number, message: string) {
   const draft = new ReportDraft({ project: { cwd: '/capacity', root: '/capacity', scope: 'whole-project', configuration: 'discover' },
     registry: createDefaultTagRegistry(), capabilities: [], limits: {
@@ -27,12 +29,12 @@ describe('bounded large report evidence', () => {
     expect(current.diagnostics[0].message).toBe(message);
     expect(current.stages.find(stage => stage.stage === 'report')?.status).toBe('completed');
     expect(Buffer.byteLength(JSON.stringify(current))).toBeLessThan(96 * MiB);
-  });
+  }, timeout);
 
   it('still returns a bounded incomplete result when evidence exceeds 96 MiB', () => {
     const current = report(96 * MiB, 'x'.repeat(96 * MiB));
     expect(current.outcome.execution).toBe('incomplete');
     expect(current.diagnostics.some(item => item.limit?.name === 'maxReportBytes' && item.limit.maximum === 96 * MiB)).toBe(true);
     expect(Buffer.byteLength(JSON.stringify(current))).toBeLessThanOrEqual(96 * MiB);
-  });
+  }, timeout);
 });
