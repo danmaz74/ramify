@@ -18,7 +18,8 @@ workflow.
 | `1bfe0d6` | C: Plan 5 contract text |
 | `4715194` | D: compiler RSS sampling (HO-19) |
 | `ad0043b` | D: analysis update (HO-20) |
-| closing commit | D: this document, the closure and the iteration's verification block |
+| `2570788` | D: this document, the closure and the iteration's verification block |
+| the commit after `2570788` | A: the reviewed description statements and the Plan 5 owner manifest gain the added relay names; see [Audit remediation](#audit-remediation) |
 
 ## A. Self-check remediation
 
@@ -118,10 +119,9 @@ than only recorded here:
   a sentence on the manager's use after the contexts block.
 
 `docs/architecture` describes none of these signatures, so it needed no change.
-The historical owner manifests that list the relays
-(`docs/plans/iteration-2-resident-verification/owners.md`,
-`docs/plans/iteration-5-fast-incremental-checks/owners.md`) were not updated
-for item A.
+The Plan 5 owner manifest, which lists the relay declarations, gained the item A
+names in the audit remediation. The superseded Plan 2 manifest,
+`docs/plans/iteration-2-resident-verification/owners.md`, is unchanged.
 
 ## D. Compiler RSS sampling (HO-19)
 
@@ -214,8 +214,44 @@ pre-optimization estimates. No figure changed.
 | `git diff --check` | clean |
 
 The cucumber-viz commit audit was not run by this agent, and no full suite ran.
-The audit remains for the controlling session. The daemons started by
-`check:self` were stopped by PID.
+The daemons started by `check:self` were stopped by PID.
+
+## Audit remediation
+
+The controlling session's commit audit of `2570788` failed two tests in
+`subs/analysis/subs/descriptions/src/tests/descriptions.test.ts`:
+`all current project descriptions as exact-text parser fixtures` >
+`parses module.ramify to the reviewed statements` and
+`parses subs/daemon/module.ramify to the reviewed statements`. Both were
+deep-equal mismatches. The test pins every authored declaration's names, and
+item A added `OperationTimings` to root's R3 relay and `ReplyTimings` to root's
+R7 and daemon's N5 relays. The owner test runs in the full suite, and item A's
+focused runs did not include it.
+
+**Fix.** The reviewed name lists gain exactly those names at their declared
+positions:
+
+- `OperationTimings` after `RevisionTimings` in `analysisNames`
+  (`subs/analysis/subs/descriptions/src/tests/descriptions.test.ts:38`), used
+  only by root's R3 statement;
+- `ReplyTimings` after `CheckOutcome` in `contextNames` (`:53`), used only by
+  root's R7 and daemon's N5 statements.
+
+A search for other enumerations of those relays found no other test, snapshot or
+architecture text. `docs/architecture/daemon.md`'s exposure paths name no
+relay lists. The Plan 5 owner manifest
+(`docs/plans/iteration-5-fast-incremental-checks/owners.md:87`, `:93`, `:328`)
+held the three declarations verbatim as they stood at `f2f24d8`. It gained the
+same names, and each line now equals the authored declaration. The superseded
+Plan 2 manifest is unchanged.
+
+| Command | Result |
+| --- | --- |
+| `npx vitest run subs/analysis/subs/descriptions/src/tests` | 4 files, 189 tests passed |
+| `npm run type-check` | passed |
+| `git diff --check` | clean |
+
+The audit of the remediation commit is pending for the controlling session.
 
 ## Deviations and limits
 

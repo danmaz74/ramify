@@ -35,7 +35,7 @@ const analysisNames = ['Capability', 'StageId', 'RunControl', 'AnalysisLimits', 
   'InventoryInputs', 'InventorySnapshot', 'InventoryRun', 'ValidationRun', 'CapabilityExecution',
   'StageExecution', 'AnalysisCode', 'AnalysisDiagnostic', 'AccessResult', 'AnalysisSnapshot',
   'AnalysisSummary', 'AnalysisReport', 'AnalysisRun', 'AnalysisSession', 'SessionLimits', 'SessionInputs',
-  'SessionChange', 'RevisionPath', 'CheckedSet', 'FindingDelta', 'RevisionTimings', 'SessionRevision',
+  'SessionChange', 'RevisionPath', 'CheckedSet', 'FindingDelta', 'RevisionTimings', 'OperationTimings', 'SessionRevision',
   'SessionUpdate', 'VerifyOutcome', 'SessionStatus', 'RetainedSession', 'SessionOpen'];
 const syntaxNames = ['TextSpan', 'DescriptionToken', 'DescriptionIssue', 'NamedSelection',
   'DescriptionSelection', 'DescriptionStatement', 'DescriptionDocument', 'ParsedDescription', 'DescriptionParser'];
@@ -50,7 +50,7 @@ const observerNames = ['ObservationSink', 'InputChangeKind', 'ObservedChange', '
 const contextNames = ['ContextId', 'GenerationId', 'RevisionId', 'LeaseId', 'ContextToken', 'ContextSetup',
   'ContextSelection', 'InputFingerprints', 'RevisionCause', 'ContextRevision', 'ContextState', 'SynchronizationState',
   'ContextStatus', 'ExpectedContent', 'Freshness', 'FreshnessRecord', 'CheckRequest', 'CheckDelta', 'UnavailableReason', 'Unavailable',
-  'CheckOutcome', 'OpenOutcome', 'ContextEvent', 'SubscriptionHandle', 'WatchEvent', 'WatcherHandle', 'WatcherPort',
+  'CheckOutcome', 'ReplyTimings', 'OpenOutcome', 'ContextEvent', 'SubscriptionHandle', 'WatchEvent', 'WatcherHandle', 'WatcherPort',
   'ClockPort', 'ContextBudgets'];
 const controlledNames = ['createControlledWatcher', 'createControlledClock', 'ControlledWatcher', 'ControlledClock'];
 const residentNames = ['DaemonInstance', 'LogEntry', 'DaemonBudgets', 'EndpointSelection', 'DaemonRecord',

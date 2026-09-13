@@ -1,7 +1,7 @@
 # Plan 5 hook optimization: closure
 
-**Date:** 2026-09-13. **Status:** implementation complete; the iteration 7
-commit audit is pending. The [plan](../main-plan.md) delivered targets 0 to 5
+**Date:** 2026-09-13. **Status:** implementation complete; the audit of the
+iteration 7 remediation is pending. The [plan](../main-plan.md) delivered targets 0 to 5
 and 7 of the
 [optimization analysis](../../../analysis/fast-incremental-checks-optimization.md#ranked-targets).
 Every matrix row has unit or process evidence below. Iterations 1 to 6 passed
@@ -80,7 +80,8 @@ decision 2 in every iteration.
 | 4 | `8b04e27` | PASS |
 | 5 | `fa6ee87` | PASS |
 | 6 | `f2f24d8`, including the merged compiled client `b2bf082` | PASS |
-| 7 | `630da32` to the closing commit | pending; owner tests, type-check, build and `check:self` pass |
+| 7 | `2570788` (from `630da32`) | FAIL: two `descriptions.test.ts` reviewed-statement fixtures did not include the names item A added to root's R3 and R7 and daemon's N5 relays |
+| 7 remediation | the commit after `2570788` | pending; the fixtures and the Plan 5 owner manifest gain exactly those names, and the descriptions owner tests and type-check pass |
 
 **Defect found after iteration 6.** The commit audit does not run
 `npm run check:self`. On `f2f24d8`, the build and self-check failed with five
@@ -88,7 +89,9 @@ decision 2 in every iteration.
 them but did not fix them. Iteration 7 fixed them in `630da32`, and the
 self-check now passes with 0 errors. The plan's acceptance requires it, so
 iteration 7's verification block now lists `npm run build` and
-`npm run check:self`.
+`npm run check:self`. The extended relay lists then failed the iteration 7
+audit through the reviewed description fixtures, which the
+[remediation](iteration7-results.md#audit-remediation) updated.
 
 ## Remaining gaps
 

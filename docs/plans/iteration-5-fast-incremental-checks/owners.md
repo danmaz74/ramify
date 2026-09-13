@@ -84,13 +84,13 @@ expose-sub ProjectRequest, ProjectScope, CapturedInput, InventoryArea, ModulePur
 expose-sub CatalogOriginal, … , SourceAnalysis from analysis to descendants
 
 // R3: complete analysis report, session and operation vocabulary.
-expose-sub Capability, StageId, RunControl, AnalysisLimits, AnalysisInputs, InventoryInputs, InventorySnapshot, InventoryRun, ValidationRun, CapabilityExecution, StageExecution, AnalysisCode, AnalysisDiagnostic, AccessResult, AnalysisSnapshot, AnalysisSummary, AnalysisReport, AnalysisRun, AnalysisSession, SessionLimits, SessionInputs, SessionChange, RevisionPath, CheckedSet, FindingDelta, RevisionTimings, SessionRevision, SessionUpdate, VerifyOutcome, SessionStatus, RetainedSession, SessionOpen from analysis to descendants
+expose-sub Capability, StageId, RunControl, AnalysisLimits, AnalysisInputs, InventoryInputs, InventorySnapshot, InventoryRun, ValidationRun, CapabilityExecution, StageExecution, AnalysisCode, AnalysisDiagnostic, AccessResult, AnalysisSnapshot, AnalysisSummary, AnalysisReport, AnalysisRun, AnalysisSession, SessionLimits, SessionInputs, SessionChange, RevisionPath, CheckedSet, FindingDelta, RevisionTimings, OperationTimings, SessionRevision, SessionUpdate, VerifyOutcome, SessionStatus, RetainedSession, SessionOpen from analysis to descendants
 
 // R5: declaration-only UI relay; root source imports none of these.
 expose-sub DiagramDefinition, … , shopFocusDiagram from presentation to descendants
 
 // R7: resident vocabulary and controlled test ports relayed unchanged from daemon.
-expose-sub ContextId, GenerationId, RevisionId, LeaseId, ContextToken, ContextSetup, ContextSelection, InputFingerprints, RevisionCause, ContextRevision, ContextState, SynchronizationState, ContextStatus, ExpectedContent, Freshness, FreshnessRecord, CheckRequest, CheckDelta, UnavailableReason, Unavailable, CheckOutcome, OpenOutcome, ContextEvent, SubscriptionHandle, WatchEvent, WatcherHandle, WatcherPort, ClockPort, ContextBudgets, DaemonInstance, LogEntry, DaemonBudgets, EndpointSelection, DaemonRecord, StopDisposition, Handshake, Welcome, ConnectTimeouts, ConnectOptions, ConnectionState, DisconnectReason, RecoveryOutcome, ServiceConnection, ConnectOutcome, ServiceConnector, WireMessage, createControlledWatcher, createControlledClock, ControlledWatcher, ControlledClock from daemon to descendants
+expose-sub ContextId, GenerationId, RevisionId, LeaseId, ContextToken, ContextSetup, ContextSelection, InputFingerprints, RevisionCause, ContextRevision, ContextState, SynchronizationState, ContextStatus, ExpectedContent, Freshness, FreshnessRecord, CheckRequest, CheckDelta, UnavailableReason, Unavailable, CheckOutcome, ReplyTimings, OpenOutcome, ContextEvent, SubscriptionHandle, WatchEvent, WatcherHandle, WatcherPort, ClockPort, ContextBudgets, DaemonInstance, LogEntry, DaemonBudgets, EndpointSelection, DaemonRecord, StopDisposition, Handshake, Welcome, ConnectTimeouts, ConnectOptions, ConnectionState, DisconnectReason, RecoveryOutcome, ServiceConnection, ConnectOutcome, ServiceConnector, WireMessage, createControlledWatcher, createControlledClock, ControlledWatcher, ControlledClock from daemon to descendants
 ```
 
 Lines this plan changes, all in iteration 9:
@@ -325,7 +325,7 @@ expose-src startDaemon from "start-daemon.ts" to parent
 // N4: owned transport, lifecycle and service-binding vocabulary.
 expose-src * from "interfaces/daemon.ts" to parent
 // N5: neutral context vocabulary, ports and controlled test ports relayed unchanged.
-expose-sub AnalysisDriver, ContextId, GenerationId, RevisionId, LeaseId, ContextToken, ContextSetup, ContextSelection, InputFingerprints, RevisionCause, ContextRevision, ContextState, SynchronizationState, ContextStatus, ExpectedContent, Freshness, FreshnessRecord, CheckRequest, CheckDelta, UnavailableReason, Unavailable, CheckOutcome, OpenOutcome, ContextEvent, SubscriptionHandle, WatchEvent, WatcherHandle, WatcherPort, ClockPort, ContextBudgets, ContextManagerOptions, ContextManager, createControlledWatcher, createControlledClock, ControlledWatcher, ControlledClock from contexts to parent
+expose-sub AnalysisDriver, ContextId, GenerationId, RevisionId, LeaseId, ContextToken, ContextSetup, ContextSelection, InputFingerprints, RevisionCause, ContextRevision, ContextState, SynchronizationState, ContextStatus, ExpectedContent, Freshness, FreshnessRecord, CheckRequest, CheckDelta, UnavailableReason, Unavailable, CheckOutcome, ReplyTimings, OpenOutcome, ContextEvent, SubscriptionHandle, WatchEvent, WatcherHandle, WatcherPort, ClockPort, ContextBudgets, ContextManagerOptions, ContextManager, createControlledWatcher, createControlledClock, ControlledWatcher, ControlledClock from contexts to parent
 ```
 
 N5 gains `CheckDelta` in iteration 9; N1 to N4 are unchanged. Source:
