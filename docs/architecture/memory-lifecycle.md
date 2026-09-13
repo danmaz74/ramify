@@ -188,6 +188,16 @@ budget becomes an acceptable-time budget by a reviewed revision once an
 implementation meets it, never by default; without that ratchet the ideal
 values stay decorative and performance drifts unobserved.
 
+The declared acceptable-time budget:
+
+| Workload | Value | Judged on | Derivation | Floor |
+| --- | --- | --- | --- | --- |
+| Agent post-write hook, `ramify check --changed`, end to end, every edit class and fixture size | 2 s | median of the measured cycles | An agent waits for the hook after every write. The value equals the hook's default request deadline, beyond which it replies `deadline-exceeded` instead of a result. | bare Node startup, 25.8 to 34.2 ms on the measurement host |
+
+Every other timing figure Plan 5 records is an ideal optimization budget. The
+[optimization analysis](../analysis/fast-incremental-checks-optimization.md#priorities)
+records the measured position against this budget.
+
 ### Initial setup probe
 
 A local probe on 2026-09-07 used Node v22.23.2 and the installed enclosing

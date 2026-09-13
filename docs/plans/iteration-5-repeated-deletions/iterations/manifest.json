@@ -1,0 +1,7 @@
+{
+  "createdAt": "2026-09-13T00:00:00.000Z",
+  "iterations": [
+    { "file": "iteration1.md", "index": 1, "parallelGroup": null, "title": "Reproduce and locate the repeated deletion revision" },
+    { "file": "iteration2.md", "index": 2, "parallelGroup": null, "title": "Reuse the published revision for a repeated deletion" }
+  ]
+}

@@ -1,11 +1,48 @@
 # Fast incremental checks: optimization targets
 
-**Date:** 2026-09-13. **Status:** analysis for planning. It locates where warm
-revision and hook time goes in the retained session that
+**Date:** 2026-09-13. **Status:** analysis for planning, revised after the
+[contract remediation](../plans/iteration-5-contract-remediation/main-plan.md)
+landed in `85be06c` and after review decisions on this analysis. It locates
+where warm revision and hook time goes in the retained session that
 [Plan 5](../plans/iteration-5-fast-incremental-checks/closure.md) delivered and
 ranks the work that would reduce it. It establishes no implemented capability.
 Measured figures are labelled as measured; savings and end-to-end projections
 are estimates derived from them.
+
+## Priorities
+
+The agent's post-write hook, `ramify check --changed <path>`, is the primary use
+case. It is optimized for two things: latency, and the space its reply takes in
+the agent's context.
+
+| Budget | Kind | Value | Judged on |
+| --- | --- | --- | --- |
+| Hook end to end, every edit class and fixture size | acceptable time | 2 s | median of the measured cycles |
+| Per-class session work and hook targets from Plan 5 | ideal optimization | as Plan 5 records them | median |
+
+Both kinds follow [Two kinds of budget](../architecture/memory-lifecycle.md#two-kinds-of-budget).
+The 2 s budget equals the hook's default request deadline
+([changed-command.ts:116](../../subs/cli/src/changed-command.ts#L116)): a hook
+that exceeds it in normal use replies `deadline-exceeded` instead of a result.
+The measurement harness passes `--deadline 600000`, so the figures below show
+the full time instead.
+
+A hook usually races the watcher's update for the same write. Its measured
+medians against the 2 s budget, from the archive described below:
+
+| Edit | Reference | S100 |
+| --- | ---: | ---: |
+| Body | 1,381 ms | 2,003 ms |
+| Source | 1,409 ms | 2,110 ms |
+| Description | 1,404 ms | 2,065 ms |
+| README | 1,362 ms | 1,962 ms |
+| Created | 2,194 ms | 3,614 ms |
+| Deleted | 2,697 ms | 5,334 ms |
+| Configuration | 3,262 ms | 5,503 ms |
+
+Nine of fourteen rows exceed the acceptable-time budget. Targets 1 to 4 below
+address the fixed costs every row pays; the deleted rows also carry a separate
+defect, see [Deleted files](#deleted-files).
 
 ## Summary
 
@@ -35,9 +72,10 @@ hook at about 300 ms.
 
 ## Evidence and method
 
-- **Archive.** Per-stage `revision.timings` from the 13:27 run of Plan 5
-  iteration 12 on 2026-09-12, medians of twenty cycles, Linux x64, Node
-  v22.23.2, build `ed91c6d`. The run and its identity are recorded in
+- **Archive.** Per-stage `revision.timings`, worker message records and hook
+  durations from the 13:27 run of Plan 5 iteration 12 on 2026-09-12, medians of
+  twenty cycles, Linux x64, Node v22.23.2, build `ed91c6d`. The run and its
+  identity are recorded in
   [iteration 12 results](../plans/iteration-5-fast-incremental-checks/iterations/iteration12-results.md).
 - **In-process reproduction.** A private export of `1d1d7b5`, built outside the
   checkout, ran the session engine with instrumentation, stack capture and a
@@ -51,6 +89,9 @@ hook at about 300 ms.
   load hook.
 - No test suite, measurement recipe or reference gate ran. The scratch scripts
   were not retained in the repository.
+- **Later source.** Every measurement predates `85be06c`, which changed sweep
+  scheduling, covering during periodic sweeps and cancellation. Source links
+  below point at `85be06c`.
 
 `revision.timings.total` is measured inside the session. It contains no
 client, transport, invocation-check or daemon publication time; those appear
@@ -109,14 +150,14 @@ two buffers per comparison
 ([data.ts:5](../../subs/analysis/subs/project/src/data.ts#L5)). `inputId`
 repeats the work. Stack capture found seven evaluations in one body revision:
 
-| Caller | Timed as |
+| Caller at `85be06c` | Timed as |
 | --- | --- |
-| `session-revision.ts:328` and `:329` | inventory |
-| `session-revision.ts:345` | classify |
-| `session-engine.ts:273` and `:281`, in promotion | unattributed |
-| `session-engine.ts:258`, the `inputs` and `inputId` arguments to publication | unattributed |
+| `session-revision.ts:331` and `:332` | inventory |
+| `session-revision.ts:349` | classify |
+| `session-engine.ts:290` and `:298`, in promotion | unattributed |
+| `session-engine.ts:261`, the `inputs` and `inputId` arguments to publication | unattributed |
 
-The worker's `status()` at `session-engine.ts:218` performs an eighth on every
+The worker's `status()` at `session-engine.ts:221` performs an eighth on every
 worker reply, about 50 ms on the reference. A revision that finds nothing
 changed still performs four, about 190 ms. The call sites are the same for
 metadata and description revisions. In a CPU profile of the reference loop the
@@ -126,10 +167,11 @@ quarter and relabelling most of the rest.
 ### Report materialization on publication
 
 Publication at
-[session-engine.ts:370-399](../../subs/analysis/src/session-engine.ts#L370-L399)
+[session-engine.ts:383-422](../../subs/analysis/src/session-engine.ts#L383-L422)
 calls `draftReport(...).finish()`. `finish()` walks the whole report twice to
-measure it and hash-conses a deep copy, yet the revision keeps only `outcome`,
-`summary`, `diagnostics`, `warnings` and `coverage`.
+measure it against `maxReportBytes` and hash-conses a deep copy, yet the
+revision keeps only `outcome`, `summary`, `diagnostics`, `warnings` and
+`coverage`.
 
 | Fixture | `finish()` | `build()` alone | `factBytes` |
 | --- | ---: | ---: | ---: |
@@ -138,25 +180,51 @@ measure it and hash-conses a deep copy, yet the revision keeps only `outcome`,
 
 On S100 the deep copy is about 60% of `finish()` and the size walks about 40%.
 
+Almost all of that size is the report's `snapshot`, not its findings. The
+problem lists (`diagnostics`, `warnings`, `coverage`) are small and usually
+empty. The snapshot carries the inventory, source areas, every captured input,
+the catalog of originals, the linked descriptions, the model, every access and
+one result per access, including every allowed decision. Its consumers are:
+
+- `--format json`, which writes the whole `ramify.analysis/1` document and
+  applies its own size limit
+  ([format.ts:21-50](../../subs/cli/src/format.ts#L21-L50));
+- the summary counts, which are cheap and need no size walk or copy;
+- Plan 3's planned `inspect` and `available` queries, and later visualization.
+
+The hook reply, the human report and the daemon never read it. The session does
+not retain the published report either: each version keeps the facts a report
+is built from
+([session-engine.ts:417](../../subs/analysis/src/session-engine.ts#L417)),
+bounded by `maxRetainedFactBytes`, so a full report can be built from them on
+request.
+
 ### Smaller fixed costs
 
 - The daemon's `createFingerprints` sorts with `JSON.stringify` inside the
-  comparator: 16 ms on the reference, 9 ms on S100.
+  comparator
+  ([tokens.ts:28](../../subs/daemon/subs/contexts/src/tokens.ts#L28), called at
+  [context-manager.ts:282](../../subs/daemon/subs/contexts/src/context-manager.ts#L282)):
+  16 ms on the reference, 9 ms on S100.
 - Structured clone of a revision across the worker boundary: about 3 ms. The
   reference revision's JSON is 563 KB, mostly the inputs list.
-- On macOS, every worker message spawns `ps` to sample RSS. Linux is unaffected.
+- On macOS, every worker message spawns `/bin/ps` to sample RSS
+  ([session-processes.ts:57](../../subs/analysis/src/session-processes.ts#L57)).
+  Linux is unaffected and no macOS figure exists; see target 7.
 
 ## Hook latency beyond session work
 
 ### Project-root resolution
 
 The daemon resolves the project on every `openContext`
-([context-manager.ts:488](../../subs/daemon/subs/contexts/src/context-manager.ts#L488)),
+([context-manager.ts:503](../../subs/daemon/subs/contexts/src/context-manager.ts#L503)),
 which reads the compiler configuration through a spawned helper process. The
 worker resolves again on every update that carries an invocation
 ([session-engine.ts:127-131](../../subs/analysis/src/session-engine.ts#L127-L131)),
-and the context manager always passes one. That check runs before the session's
-timer starts, so it never appears in `total`.
+and the context manager always passes one
+([context-manager.ts:354](../../subs/daemon/subs/contexts/src/context-manager.ts#L354)).
+That check runs before the session's timer starts, so it never appears in
+`total`.
 
 Measured configuration reading takes 110 to 120 ms on the reference and 323 to
 339 ms on S100. A bare helper, Node plus the TypeScript synchronous API, takes
@@ -174,24 +242,43 @@ A reference body hook that races the watcher, 1,381 ms:
 | Revision release round trip | 53 |
 | The hook's own update, which finds the same revision | 413 |
 
-The hook reaches `check` while the watcher's update runs. The covering test at
-[context-manager.ts:464-468](../../subs/daemon/subs/contexts/src/context-manager.ts#L464-L468)
-requires nothing to be running, so the request queues its paths and a second
-update follows. On S100 that update costs 489 ms, in every edit class.
+The hook reaches `check` while the watcher's update runs. The covering test
+([context-manager.ts:432-438](../../subs/daemon/subs/contexts/src/context-manager.ts#L432-L438))
+is evaluated when the request arrives. Since `85be06c` it tolerates a running
+periodic sweep, but not a running update, so the request queues its paths and a
+second update follows. On S100 that update costs 489 ms, in every edit class.
+In the archive every racing cycle of every edit class ran exactly two updates,
+except one reference description cycle.
+
+The watcher's 200 ms is a 100 ms batching window
+([filesystem-watcher.ts:8](../../subs/daemon/src/filesystem-watcher.ts#L8))
+and a 100 ms debounce
+([resident-budgets.ts:11](../../src/resident-budgets.ts#L11)), plus event
+delivery; the split among them is not measured.
 
 ### Due sweeps before delivery
 
-A sweep that has come due runs before the waiting request is answered, adding
-320 to 390 ms to the affected hooks: all twenty configuration cycles and one to
-four of twenty in the other classes. This is also the trigger of the covering
-violation the [contract remediation](../plans/iteration-5-contract-remediation/main-plan.md)
-repairs.
+In the measured build a sweep that had come due ran before the waiting request
+was answered, adding 320 to 390 ms: all twenty configuration cycles and one to
+four of twenty in the other classes. Since `85be06c` a periodic sweep runs only
+when no request is waiting and never makes a covered request wait. A request
+that needs a sweep, a report request or a check with no expected files, still
+waits for one, as does every required-sweep trigger. The remaining limits are
+recorded in the remediation's
+[iteration 1 results](../plans/iteration-5-contract-remediation/iterations/iteration1-results.md#deviations-and-limits).
+The configuration cycles' sweep is required and remains.
 
 ### Deleted files
 
-A deleted-file hook runs two broad revisions: the watcher's, about 1,470 ms,
-then the hook's, about 690 ms, which is not identical to the first. The measured
-deleted row is the second. Why it is not identical is unexplained.
+A deleted-file hook runs two broad revisions: the watcher's, 1,461 to 1,698 ms
+worker round trip on the reference and 2,725 to 3,009 ms on S100, then the
+hook's, 848 to 1,113 ms and 2,150 to 2,464 ms. In all forty delete cycles the second update
+publishes a new revision sequence with the same input identity as the first;
+in every other edit class the hook's second update reuses the published
+revision. A repeated deletion is not recognized as identical. The measured
+deleted session-work row is the second revision. The
+[repeated deletion plan](../plans/iteration-5-repeated-deletions/main-plan.md)
+investigates and repairs it.
 
 ## Client cost
 
@@ -203,7 +290,7 @@ compiler module.
 | --- | ---: | ---: |
 | Node bootstrap to script start | about 21 | about 21 |
 | Import the CLI closure | about 16 | about 16 |
-| Endpoint selection: read and SHA-256 every runtime file to derive the build key ([discovery.ts:46-53](../../subs/daemon/src/discovery.ts#L46-L53)) | 26 to 34 | 23 to 30 |
+| Endpoint selection: read and SHA-256 every runtime file to derive the build key ([discovery.ts:46-59](../../subs/daemon/src/discovery.ts#L46-L59)) | 26 to 34 | 23 to 30 |
 | Read the record, connect, handshake | about 4 | about 4 |
 | `openContext`, dominated by daemon-side root resolution | 106 to 114 | 324 to 375 |
 | Hash the changed file, `check` on the covering path, close | about 3 | about 3 |
@@ -214,17 +301,27 @@ the reference, root resolution is about 63% and build-key hashing about 17%.
 
 ## Ranked targets
 
-Savings are estimates from the measured components.
+Savings are estimates from the measured components. Timing fields come first,
+because targets 3, 4 and 6 cannot be verified without them.
 
 | Rank | Target | Owner | Estimated saving, reference and S100 | Kind | Depends on |
 | ---: | --- | --- | --- | --- | --- |
+| 0 | Timing fields for work outside `total` and watcher timestamps | `analysis`, `daemon/contexts`, `daemon` | none; replaces inference | cheap | none |
 | 1 | Maintain the observed-input list instead of rebuilding it | `analysis/project`; callers in `analysis` | 290 to 340 and 160 to 185 ms per revision; 50 and 27 ms per worker reply | cheap steps, then a small design change | none |
-| 2 | Stop materializing the full report on publication | `analysis` | 60 and 345 ms from skipping the copy; 95 and 555 ms fully | cheap step, then contract review | none |
-| 3 | Reuse project-root resolution for a known context | `analysis/project`, `analysis`, `daemon/contexts` | 110 and 330 ms per invocation; 120 and 330 ms per update | design change | none |
-| 4 | Answer a queued racing hook from the revision that just published | `daemon/contexts` | 413 and 489 ms per racing hook today; 60 to 100 ms after 1 to 3 | contract clarification | best after 1 to 3 |
+| 2 | Build only what a hook publishes | `analysis` | 60 and 345 ms from skipping the copy; 95 and 555 ms fully | cheap step, then a contract clarification | none |
+| 3 | Reuse project-root resolution for a known context | `analysis/project`, `analysis`, `daemon/contexts` | 110 and 330 ms per invocation; 120 and 330 ms per update | design change | 0 |
+| 4 | Answer a queued racing hook from the revision that just published | `daemon/contexts` | 413 and 489 ms per racing hook today; 60 to 100 ms after 1 to 3 | contract clarification | 0; best after 1 to 3 |
 | 5 | Cache the client build key | `daemon` discovery, build scripts | 25 to 30 ms per invocation | cheap | none |
-| 6 | Shorten the watcher's path to a hook's analysis | `daemon` | up to 130 ms per racing hook | design change | 3 and 5 |
-| 7 | Run a due periodic sweep after delivery | `daemon/contexts` | 320 to 390 ms on affected hooks | contract decision | the remediation's sweep classification |
+| 6 | Shorten the watcher's path to a hook's analysis | `daemon` | up to 130 ms per racing hook | design change | 0, 3 and 5 |
+| 7 | Sample worker RSS without a process per message on macOS | `analysis` | unmeasured; one process spawn per worker message | cheap | none |
+
+### 0. Timing fields
+
+Add timing fields beside the existing stage timings for the worker's invocation
+check, worker `status`, worker and client transport and daemon publication,
+carried through the revision and reply timings. Add two watcher timestamps:
+event receipt and batch flush. Every later measurement then shows the split
+directly instead of by subtraction.
 
 ### 1. The observed-input list
 
@@ -236,13 +333,29 @@ including in-place role and byte changes, exact-name probes, forgetting,
 refreshing and reported observations, and the order feeds `inputId`, so it must
 remain byte-identical. The comparator and hash-once steps are safe first steps.
 
-### 2. Report materialization
+The cache's only memory requirement is that it does not leak: an entry leaves
+with its observation, and a forgotten observation leaves no cached state. No
+separate memory measurement is required.
 
-First step, with no behavioral change: omit the deep copy in the publication
-projection. Full step: build the report without `finish()` and replace the
-exact size walk with a sound upper bound that proves a report is far below
-`maxReportBytes`. The full step moves where the report-size limit is enforced
-and needs contract review.
+A later step may let a sweep re-hash only observations whose size or
+modification time moved, reusing the recorded hashes; a sweep currently
+re-hashes every file, about 260 to 280 ms on the reference.
+
+### 2. Build only what a hook publishes
+
+Decided. Publication builds only what the revision keeps: `outcome`, `summary`
+and the three problem lists, and applies the report-size limit to those. The
+full report, with its snapshot, is built from the retained facts only when it
+is requested: `--format json`, batch, and later `inspect`. Its size limit
+applies where it is produced, so every output that includes the snapshot is
+unchanged.
+
+The contract clarification: a hook's check can pass while a full report for the
+same revision would exceed `maxReportBytes`. The limit protects whoever
+receives the full report, and that receiver still gets the resource-limit
+failure.
+
+The first step, omitting the deep copy, changes no behavior.
 
 ### 3. Root resolution
 
@@ -254,10 +367,17 @@ configuration edits already take the structural path.
 
 ### 4. Racing hooks
 
-When a publication's inputs match a queued request's expectations and no other
-change is pending, deliver that publication instead of running another update.
-Plan 5's covering rule is evaluated at acknowledgment, so this needs its
-contract clarified.
+Decided. The covering rule is evaluated when a request arrives and again when
+each revision publishes. A queued request whose expectations the new revision
+covers, with no other known change or required sweep pending, is answered from
+that revision without another update. The plan that implements this target
+writes that sentence into the covering rule of
+[daemon and analysis](../architecture/daemon.md). The harness attribution from
+`85be06c` distinguishes a covered answer from an analysed one.
+
+Attaching a request to the running update on arrival was rejected: it is harder
+to keep exact when the request's expectations differ from what that update
+analyses.
 
 ### 5. Build key
 
@@ -269,19 +389,25 @@ must still detect a mixed build.
 After targets 3 and 5, the client reaches `check` in about 60 to 70 ms, before
 the watcher's batch flushes, so a request-triggered update could start sooner.
 The watcher's later duplicate event must stay cheap, which targets 1 and 3
-provide.
+provide. Batching and debounce values change only after target 0's timestamps
+show the split.
 
-### 7. Due sweeps
+### 7. macOS process sampling
 
-With periodic sweeps classified as maintenance, as the contract remediation
-proposes, a due periodic sweep could run after delivery rather than before.
-Required sweeps would still run first.
+Sample the worker's RSS on an interval, or only when a limit check needs it,
+instead of spawning `/bin/ps` for every worker message. A process per message
+is a cost on every revision and reply without a measurement to justify it.
 
 ### Smaller items
 
-The fingerprint comparator (16 and 9 ms), `factBytes` (5 and 23 ms), sweep
-re-hashing of every file (about 260 to 280 ms per sweep on the reference), and a
+The fingerprint comparator (16 and 9 ms), `factBytes` (5 and 23 ms), and a
 Node compile cache or bundling (speculative, 5 to 10 ms).
+
+### Resolved elsewhere
+
+Running a due periodic sweep after delivery, previously target 7, was delivered
+by the contract remediation in `85be06c`; see
+[Due sweeps before delivery](#due-sweeps-before-delivery).
 
 ## Projection
 
@@ -298,48 +424,28 @@ Estimates, assuming targets 1 to 5:
 | Deferral | Verdict | Reason |
 | --- | --- | --- |
 | Proportional relink | not indicated on the reference | Link is 0.7 to 21 ms there. On S100 narrow paths it is about 100 ms, which becomes 10 to 25% of session work once targets 1 to 3 land; revisit with S500 and S1000. |
-| Resolution-bounded narrowing | indicated for created and deleted files | About 1.4 s of broad analysis on S100 created files, on top of the floor. |
+| Resolution-bounded narrowing | indicated for created and deleted files | About 1.4 s of broad analysis on S100 created files, on top of the floor; created and deleted racing hooks exceed the 2 s budget on both fixtures. |
 | Syntactic pre-filter | not indicated | Access extraction is 1 to 3 ms for body edits. |
 | Persistent checkpoints | unrelated to warm latency | Concerns cold opens only. |
 | Child-process host | not a latency lever | A supervisor process already hosts the worker thread ([session-supervisor.ts:52](../../subs/analysis/src/session-supervisor.ts#L52)); clone cost is about 3 ms. |
 
-## Interaction with the contract remediation
+## Measurement sequencing
 
-- The description fallback is a cancellation defect, not a description defect;
-  faster sweeps narrow its window but do not remove it.
-- In the enumerated covering violation, a due sweep was the trigger. Targets 1
-  and 3 make the resulting redundant update cheap; target 7 decides whether it
-  runs at all.
-- The remediation's attribution fix to the harness is a prerequisite for
-  measuring any of these targets reliably.
+- Target 0 lands before any target it verifies.
+- Each target is measured on the reference and S100 with focused runs of the
+  workloads it affects.
+- S500, S1000 and macOS are measured once, after the optimization plan
+  completes, against the 2 s acceptable-time budget.
+- No batch-check baseline is required: the acceptable-time budget is set by the
+  use case.
 
-## Toward acceptable-time budgets
+## Open questions
 
-[Two kinds of budget](../architecture/memory-lifecycle.md#two-kinds-of-budget)
-requires acceptable-time budgets derived from the use case, beside an
-irreducible floor. The inputs this analysis provides:
-
-- **Irreducible floor.** Bare Node startup measured 25.8 to 34.2 ms on the
-  measurement host. Everything above it in the client is implementation cost.
-- **Design aim.** The [original proposal](fast-incremental-checks.md) aimed at
-  roughly 300 ms end to end for a one-file edit in a warm context.
-- **Missing comparison.** No batch check was measured on the same build, so the
-  saving a warm hook offers over the alternative is unknown.
-
-A reasonable derivation sets acceptable-time budgets for the racing hook, the
-position an agent actually occupies, from that aim and a batch baseline, and
-records targets 1 to 7's estimates as ideal budgets.
-
-## Open questions and missing measurements
-
-- A `check --batch` baseline on the same build for the reference and S100.
-- S500 and S1000. The report walk and copy, the inputs list and link all scale
-  with project size.
-- Timing fields for work outside `total`: the invocation check, worker
-  `status`, transport and daemon publication. Adding them would replace
-  inference.
-- The watcher's 200 ms, split into event delivery, batching and debounce.
-- Why a deleted file's second broad revision is not identical to the first.
-- macOS figures, including FSEvents delivery and `ps` per worker message.
-- The memory cost of maintaining the inputs list, and tail percentiles; every
-  figure here is a median.
+- How much of the agent's context a hook reply occupies: the length of a
+  passing reply and the wording and size of a failing one. This is to be
+  examined against the priority above, not measured for latency.
+- The cause of the repeated deletion revision, owned by its
+  [plan](../plans/iteration-5-repeated-deletions/main-plan.md).
+- The remaining covering limits after `85be06c`: a running idle audit still
+  refuses coverage, and a covered request can be refused between the session
+  advancing and the context publishing. Target 4 must account for the second.
