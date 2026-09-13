@@ -291,16 +291,20 @@ class Session implements RetainedSession {
     // Reads already carry content hashes, including pending compiler reads.
     // Probe and directory identities gain acquisition metadata at promotion,
     // so only actual file bytes can be compared across this boundary.
-    const empty = createHash('sha256').update('').digest('hex');
-    const reads = new Map(observer.inputs.filter(input => input.bytes > 0 || input.sha256 === empty)
-      .map(input => [input.path, input]));
+    const listed = observer.inputs;
     const result = await observer.apply([], signal);
     if (result.kind === 'incomplete' || result.kind === 'invalid') {
       const first = result.issues[0];
       throw Object.assign(new Error(result.issues.map(issue => issue.message).join('; ')),
         { code: first?.code ?? 'read-failure', path: first?.path });
     }
-    for (const current of observer.inputs) {
+    // The observer returns the same list object until an observation changes.
+    const after = observer.inputs;
+    if (after === listed) return;
+    const empty = createHash('sha256').update('').digest('hex');
+    const reads = new Map(listed.filter(input => input.bytes > 0 || input.sha256 === empty)
+      .map(input => [input.path, input]));
+    for (const current of after) {
       const before = reads.get(current.path);
       if (before && (before.sha256 !== current.sha256 || before.bytes !== current.bytes)) {
         throw Object.assign(new Error(`Input changed while promoting compiler reads: ${current.path}`),

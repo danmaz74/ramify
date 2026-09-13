@@ -39,6 +39,9 @@ class Observer implements ProjectObserver {
   #configuration: RetainedConfiguration;
   #configurationData: ConfigurationData;
   #reported = new ReportedObservations();
+  /** The last merged list and identity with the state they describe; the next read replaces them. */
+  #merged: { readonly capture: Capture; readonly captured: number; readonly reported: number; readonly inputs: readonly CapturedInput[] } | undefined;
+  #recordedId: { readonly inputs: readonly CapturedInput[]; readonly inventory: ProjectInventory; readonly id: string } | undefined;
   #work: Promise<unknown> = Promise.resolve();
   #disposed = false;
 
@@ -54,18 +57,36 @@ class Observer implements ProjectObserver {
   /** Filesystem work performed so far, for locality evidence outside the port. */
   get enumerations(): number { return this.#capture.enumerations; }
   get sink(): ObservationSink { return this.#reported.sink; }
+  /**
+   * Captured inputs merged with pending reports. Both sides carry versions, so
+   * an unchanged observer returns the list it last built; without pending
+   * reports the capture's own list is already the merged order.
+   */
   get inputs(): readonly CapturedInput[] {
-    const captured = this.#capture.inputs;
+    const capture = this.#capture;
+    const captured = capture.inputs;
+    const reported = this.#reported.pending;
+    if (!reported.length) { this.#merged = undefined; return captured; }
+    const cached = this.#merged;
+    if (cached?.capture === capture && cached.captured === capture.version && cached.reported === this.#reported.version) return cached.inputs;
     const known = new Set(captured.map(input => input.path));
     const merged = [...captured];
-    for (const observation of this.#reported.pending) {
-      const label = this.#capture.label(this.#capture.path(observation.path));
+    for (const observation of reported) {
+      const label = capture.label(capture.path(observation.path));
       if (!known.has(label)) merged.push(reportedInput(observation, label));
     }
-    return freeze(merged.sort((a, b) => byteOrder(a.path, b.path)));
+    const inputs = freeze(merged.sort((a, b) => byteOrder(a.path, b.path)));
+    this.#merged = { capture, captured: capture.version, reported: this.#reported.version, inputs };
+    return inputs;
   }
+  /** Recomputed only when the merged list or the inventory is a different object. */
   get inputId(): string {
-    return inputIdentity(this.#inventory, this.options.registry ?? '', this.inputs);
+    const inputs = this.inputs, inventory = this.#inventory;
+    const cached = this.#recordedId;
+    if (cached?.inputs === inputs && cached.inventory === inventory) return cached.id;
+    const id = inputIdentity(inventory, this.options.registry ?? '', inputs);
+    this.#recordedId = { inputs, inventory, id };
+    return id;
   }
 
   async readDescription(path: string): Promise<string | undefined> {
@@ -108,6 +129,7 @@ class Observer implements ProjectObserver {
   async dispose(): Promise<void> {
     this.#disposed = true;
     this.#reported.clear();
+    this.#merged = undefined; this.#recordedId = undefined;
     await this.#work.catch(() => undefined);
     await this.#capture.dispose();
   }
@@ -361,6 +383,7 @@ class Observer implements ProjectObserver {
     this.#configuration = result.acquired.configuration;
     this.#configurationData = result.acquired.configurationData;
     this.#capture.retainAcquisition();
+    this.#merged = undefined; this.#recordedId = undefined;
     await previous.dispose();
     // The broad compiler update supplies the current dependency observations;
     // callbacks from a removed module must not enter this new acquisition.

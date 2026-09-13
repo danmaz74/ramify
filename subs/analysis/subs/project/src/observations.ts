@@ -24,6 +24,7 @@ export interface ReportedObservation {
 export class ReportedObservations {
   #pending = new Map<string, ReportedObservation>();
   #promoted = new Map<string, ReportedObservation>();
+  #version = 0;
 
   readonly sink: ObservationSink = {
     file: (path, sha256, bytes, role) => this.#record({ path, shape: 'file', role, sha256, bytes, entries: undefined, operation: undefined }),
@@ -37,18 +38,22 @@ export class ReportedObservations {
     const previous = this.#pending.get(observation.path);
     if (previous && previous.shape !== 'probe' && observation.shape === 'probe') return;
     this.#pending.set(observation.path, observation);
+    this.#version++;
   }
+  /** Advances with every change to the pending reports, which merged input lists include. */
+  get version(): number { return this.#version; }
   /** Take the reports awaiting promotion; promoted reports stay recorded. */
   take(): readonly ReportedObservation[] {
     const taken = [...this.#pending.values()];
     for (const observation of taken) this.#promoted.set(observation.path, observation);
+    if (this.#pending.size) this.#version++;
     this.#pending.clear();
     return taken;
   }
   get pending(): readonly ReportedObservation[] { return [...this.#pending.values()]; }
   get promoted(): readonly ReportedObservation[] { return [...this.#promoted.values()]; }
-  forget(path: string): void { this.#pending.delete(path); this.#promoted.delete(path); }
-  clear(): void { this.#pending.clear(); this.#promoted.clear(); }
+  forget(path: string): void { if (this.#pending.delete(path)) this.#version++; this.#promoted.delete(path); }
+  clear(): void { if (this.#pending.size) this.#version++; this.#pending.clear(); this.#promoted.clear(); }
 }
 
 /** A report's identity in the captured-input spelling, for merged input sets. */

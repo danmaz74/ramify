@@ -18,7 +18,11 @@ interface Observation {
   entries?: readonly string[];
   role: Role;
   exactName?: boolean;
+  /** Content identity and reported input, recorded once per mutation of this observation. */
+  sha256?: string;
+  input?: CapturedInput;
 }
+type Mutable = 'role' | 'bytes' | 'entries' | 'exactName';
 type ObservationRecipe = { path: string; role: Role; read: boolean; directory: boolean; exact: boolean };
 
 /** Private, invocation-owned capture. No filesystem object escapes to a report. */
@@ -37,9 +41,40 @@ export class Capture {
   #applicationBytes = 0;
   #acquisition: Map<string, ObservationRecipe> | undefined;
   #reporting = false;
-  root: string;
+  #root: string;
+  #version = 0;
+  #inputs: readonly CapturedInput[] | undefined;
   constructor(root: string, readonly limits: AcquisitionLimits, readonly deadline: number, readonly signal?: AbortSignal) {
-    this.root = root;
+    this.#root = root;
+  }
+  get root(): string { return this.#root; }
+  /** Labels are relative to the root, so every recorded input is relabelled. */
+  set root(root: string) {
+    if (root === this.#root) return;
+    this.#root = root;
+    for (const entry of this.#observations.values()) entry.input = undefined;
+    this.#changed();
+  }
+  /** Advances with every change to what `inputs` reports; evidence and a cache key, not an identity. */
+  get version(): number { return this.#version; }
+  /**
+   * The one place a change to the observation table becomes visible. Adding,
+   * forgetting or clearing observations, relabelling, and every field
+   * `inputs` reads pass here: the list is dropped and the version advances.
+   */
+  #changed(): void {
+    this.#version++;
+    this.#inputs = undefined;
+  }
+  #assign<K extends Mutable>(entry: Observation, field: K, value: Observation[K]): void {
+    if (entry[field] === value) return;
+    entry[field] = value;
+    entry.sha256 = undefined; entry.input = undefined;
+    this.#changed();
+  }
+  /** The hash `inputs` reports for one observation, computed once per mutation. */
+  #hash(entry: Observation): string {
+    return entry.sha256 ??= hash(entry.bytes ?? JSON.stringify([entry.signature, entry.link, entry.entries, entry.exactName]));
   }
   check(): void {
     if (this.signal?.aborted) throw new Cancelled();
@@ -122,6 +157,7 @@ export class Capture {
         }
         this.#admit(Buffer.byteLength(path) + Buffer.byteLength(observation.signature), path);
         this.#observations.set(path, observation);
+        this.#changed();
         return observation;
       } finally { this.#pending.delete(path); }
     })();
@@ -135,8 +171,8 @@ export class Capture {
     this.#retain(entry.path, { exact: true });
     if (entry.exactName !== undefined) return entry.exactName;
     if (this.#closed) throw new AcquisitionError('read-failure', path, 'Cannot capture an exact name after sealing');
-    entry.exactName = (await readdir(dirname(entry.path))).includes(basename(entry.path));
-    return entry.exactName;
+    this.#assign(entry, 'exactName', (await readdir(dirname(entry.path))).includes(basename(entry.path)));
+    return entry.exactName!;
   }
   async kind(path: string): Promise<Kind> { return (await this.observe(path)).kind; }
   async #target(path: string): Promise<Observation> {
@@ -152,7 +188,7 @@ export class Capture {
     if (entry.kind !== 'file') return undefined;
     const acquiredRole = this.#acquisition?.get(entry.path)?.role;
     this.#retain(entry.path, { read: true, role: role === 'dependency' && acquiredRole ? acquiredRole : role });
-    if (role !== 'dependency' || entry.role === 'dependency') entry.role = role;
+    if (role !== 'dependency' || entry.role === 'dependency') this.#assign(entry, 'role', role);
     if (entry.bytes) return entry.bytes;
     const old = this.#reads.get(entry.path);
     if (old) return old;
@@ -178,7 +214,7 @@ export class Capture {
           throw new AcquisitionError('changed-input', path, 'File changed while capturing bytes');
         }
         this.check();
-        entry.bytes = buffer;
+        this.#assign(entry, 'bytes', buffer);
         return buffer;
       } finally { await handle.close(); this.#reads.delete(entry.path); }
     })();
@@ -211,8 +247,8 @@ export class Capture {
           entries.push(childPath);
         }
         entries.sort(byteOrder);
-        entry.entries = Object.freeze(entries);
-        return entry.entries;
+        this.#assign(entry, 'entries', Object.freeze(entries));
+        return entry.entries!;
       } finally { this.#directories.delete(entry.path); }
     })();
     this.#directories.set(entry.path, operation);
@@ -228,7 +264,9 @@ export class Capture {
       this.#application.add(path);
       this.#applicationBytes += bytes.length;
     }
-    return { sha256: hash(bytes), bytes: bytes.length };
+    const entry = this.#observations.get(this.path(path));
+    const target = entry?.kind === 'symlink' && entry.canonical ? this.#observations.get(entry.canonical) : entry;
+    return { sha256: target?.bytes === bytes ? this.#hash(target) : hash(bytes), bytes: bytes.length };
   }
   /** Private replay recipe retains absolute addresses, never filesystem handles. */
   observations(): readonly { path: string; role: Role; read: boolean; directory: boolean; exact: boolean }[] {
@@ -243,10 +281,17 @@ export class Capture {
       if (entry.directory) await this.readDirectory(entry.path);
     }
   }
+  /**
+   * The sorted observed inputs. The list is kept until the next mutation and
+   * each entry until its observation changes, so an unchanged table costs no
+   * hashing, labelling or sorting.
+   */
   get inputs(): readonly CapturedInput[] {
-    return freeze([...this.#observations.values()].map(entry => ({ path: this.label(entry.path), role: entry.role,
-      sha256: hash(entry.bytes ?? JSON.stringify([entry.signature, entry.link, entry.entries, entry.exactName])), bytes: entry.bytes?.length ?? 0,
-    })).sort((a, b) => byteOrder(a.path, b.path)));
+    if (this.#inputs) return this.#inputs;
+    const inputs = [...this.#observations.values()].map(entry => entry.input ??= freeze({ path: this.label(entry.path), role: entry.role,
+      sha256: this.#hash(entry), bytes: entry.bytes?.length ?? 0 }));
+    this.#inputs = freeze(inputs.sort((a, b) => byteOrder(a.path, b.path)));
+    return this.#inputs;
   }
   /** Enumerations actually performed; a cached listing costs none. */
   get enumerations(): number { return this.#enumerations; }
@@ -259,7 +304,7 @@ export class Capture {
   }
   digest(input: string): string | undefined {
     const entry = this.#observations.get(this.path(input));
-    return entry?.bytes === undefined ? undefined : hash(entry.bytes);
+    return entry?.bytes === undefined ? undefined : this.#hash(entry);
   }
   async #settle(path: string): Promise<void> {
     await Promise.allSettled([this.#pending.get(path), this.#reads.get(path), this.#directories.get(path)]);
@@ -269,6 +314,7 @@ export class Capture {
     const old = this.#observations.get(path);
     if (!old) return undefined;
     this.#observations.delete(path);
+    this.#changed();
     if (old.kind === 'file') this.#files--;
     this.#bytes -= Buffer.byteLength(path) + Buffer.byteLength(old.signature) + (old.bytes?.length ?? 0)
       + (old.entries?.reduce((total, entry) => total + Buffer.byteLength(entry) * 2 + 4, 0) ?? 0);
@@ -347,7 +393,7 @@ export class Capture {
     if (this.#disposed) return;
     this.#disposed = true;
     await Promise.allSettled([...this.#pending.values(), ...this.#reads.values(), ...this.#directories.values()]);
-    this.#observations.clear(); this.#pending.clear(); this.#reads.clear(); this.#directories.clear(); this.#application.clear();
+    this.#observations.clear(); this.#changed(); this.#pending.clear(); this.#reads.clear(); this.#directories.clear(); this.#application.clear();
     this.#acquisition?.clear();
     this.#bytes = 0;
   }

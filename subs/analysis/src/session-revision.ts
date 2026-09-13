@@ -239,6 +239,8 @@ const inputIdentity = (input: CapturedInput): string => `${input.role}/${input.s
 
 /** Observed paths whose identity differs between two input lists. */
 export function changedInputs(before: readonly CapturedInput[], after: readonly CapturedInput[]): string[] {
+  // An observer returns the same frozen list until one of its observations changes.
+  if (before === after) return [];
   const left = new Map(before.map(input => [input.path, inputIdentity(input)]));
   const right = new Map(after.map(input => [input.path, inputIdentity(input)]));
   const changed = new Set<string>();
