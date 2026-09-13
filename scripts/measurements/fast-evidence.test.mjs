@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import { gzipSync } from 'node:zlib';
 import { archiveMeasurement } from './archive.mjs';
 import { sha256 } from './common.mjs';
-import { assertFastWorkload, deriveFastMeasurements, fastDeferrals } from './fast-assertions.mjs';
+import { assertFastWorkload, deriveFastMeasurements, fastDeferrals, publishedHookAttributed } from './fast-assertions.mjs';
 import { fastBudgets, fastFixtures, fastWorkloads } from './fast-plan.mjs';
 import { findFastEvidence, readFastEvidence, verifyFastEvidence } from './verify-fast-evidence.mjs';
 
@@ -295,7 +295,8 @@ test('plateaus account separately for daemon, worker, compiler and combined phys
   last.processes.find(row => row.pid === 41).rssBytes += fastBudgets.memory.rssGrowth + 1;
   last.combinedRssBytes += fastBudgets.memory.rssGrowth + 1;
   const assertions = assertFastWorkload('I5-13:repeated-edit-plateau', measurements);
-  passing(assertions); // Numeric memory targets remain advisory.
+  passing(assertions); // Numeric memory targets are ideal budgets.
+  assert.ok(assertions.filter(value => 'enforcement' in value).every(value => value.enforcement === 'ideal'));
   assert.equal(assertions.find(value => value.name === 'reference: daemon RSS growth').targetMet, true);
   for (const name of ['reference: worker supervisor RSS growth', 'reference: combined process RSS growth']) {
     assert.equal(assertions.find(value => value.name === name).targetMet, false);
@@ -373,23 +374,112 @@ test('missing observations cannot pass any of the reviewed workloads', () => {
   }
 });
 
-test('reference and S100 timing misses fail while advisory misses remain recorded', () => {
-  for (const name of ['reference', 'S100', 'S500', 'S1000']) {
-    const binding = ['reference', 'S100'].includes(name);
-    const duration = fastBudgets[name].body + 1;
-    const assertions = assertFastWorkload(`I5-13:hook-latency-${name.toLowerCase()}`, {
-      cycles: { body: Array.from({ length: 20 }, () => ({
-        revision: { timings: { total: duration } }, hook: { durationMs: 1 },
-      })) },
+test('timing misses on every fixture are ideal budgets recorded without failing, while correctness still fails', () => {
+  for (const name of fastFixtures) {
+    const id = `I5-13:hook-latency-${name.toLowerCase()}`, duration = fastBudgets[name].body + 1;
+    const body = Array.from({ length: 20 }, (_, index) => {
+      const row = cycle(index);
+      // The revision and the hook document share one timings object.
+      row.revision.timings.total = duration; row.hook.durationMs = fastBudgets[name].racing + 1;
+      return row;
+    });
+    const data = {
+      cycles: { body },
       // A claimed median cannot conceal the twenty recorded durations.
       medianBodyMs: 0,
-    });
-    const measured = assertions.find(value => value.name === 'body: median session work (ms)');
-    assert.equal(measured.observed, duration);
-    assert.equal(measured.targetMet, false);
-    assert.equal(measured.enforcement, binding ? 'binding' : 'advisory');
-    assert.equal(measured.passed, !binding);
+    };
+    const assertions = assertFastWorkload(id, data);
+    for (const [label, maximum, observed] of [['body: median session work (ms)', fastBudgets[name].body, duration],
+      ['racing: median hook end to end (ms)', fastBudgets[name].racing, fastBudgets[name].racing + 1]]) {
+      assert.deepEqual(assertions.find(value => value.name === label),
+        { name: label, passed: true, observed, maximum, enforcement: 'ideal', targetMet: false }, `${name}: ${label}`);
+    }
+    assert.ok(assertions.filter(value => 'enforcement' in value).every(value => value.enforcement === 'ideal'));
+    for (const suffix of ['real covering CLI result', 'independent outcome', 'timings match the covering revision', 'revision path']) {
+      assert.equal(assertions.find(value => value.name === `body 5: ${suffix}`).passed, true, `${name}: ${suffix}`);
+    }
+    // Correctness remains enforced beside an ideal miss.
+    const broad = structuredClone(data); broad.cycles.body[4].revision.checked.path = 'broad';
+    const failed = assertFastWorkload(id, broad);
+    assert.equal(failed.find(value => value.name === 'body 5: revision path').passed, false);
+    assert.equal(failed.find(value => value.name === 'body: median session work (ms)').passed, true);
+    const late = structuredClone(data); late.cycles.body.forEach(row => { row.revision.timings.total = 1; });
+    assert.equal(assertFastWorkload(id, late).find(value => value.name === 'body: median session work (ms)').targetMet, true);
+    const missing = structuredClone(data); missing.cycles.body[0].revision.timings.total = null;
+    assert.equal(assertFastWorkload(id, missing).find(value => value.name === 'body: median session work (ms)').passed, false);
   }
+  const cold = Object.fromEntries(fastFixtures.map(name => [name, { cold: { reply: { status: 'reported', published: true,
+    revision: { checked: { path: 'cold' }, outcome: { execution: 'completed', coverage: 'complete' },
+      summary: { owners: name === 'reference' ? 15 : Number(name.slice(1)) }, timings: { total: fastBudgets[name].cold + 1 } } } } }]));
+  const coldAssertions = assertFastWorkload('I5-13:cold-open', cold);
+  passing(coldAssertions);
+  assert.ok(fastFixtures.every(name => coldAssertions.some(value => value.name === `${name}: cold session work (ms)`
+    && value.enforcement === 'ideal' && value.targetMet === false)));
+});
+
+const counters = (analyses, coveredRequests, sweeps = 4, audits = 1, revisions = 160) =>
+  ({ analyses, revisions, coveredRequests, sweeps, audits, auditMismatches: 0 });
+
+/** A synthetic published-hook cycle with before, after-hook and settled counters. */
+function publishedCycle(index, before, after, settled) {
+  const row = cycle(index), sequence = row.revision.sequence;
+  row.beforeHook = { counters: before, contexts: [{ published: { sequence } }] };
+  row.afterHook = { counters: after, contexts: [{ published: { sequence } }] };
+  row.settled = { counters: settled, contexts: [{ published: { sequence } }] };
+  return row;
+}
+
+// Plan 5 iteration 12, reference cycle 1: a periodic sweep began after the
+// before sample but 200 ms before the hook's request, the request queued behind
+// it and forced a second update. Two analyses, one sweep, no covered request.
+const referenceCycle1 = () => publishedCycle(0, counters(323, 21), counters(325, 21, 5), counters(325, 21, 5));
+// Reference cycle 13: covered within 1 ms; a sweep began in the settle window.
+const referenceCycle13 = () => publishedCycle(12, counters(337, 32), counters(337, 33), counters(338, 33, 5));
+// S100 cycle 18 had the same shape as reference cycle 13.
+const s100Cycle18 = () => publishedCycle(17, counters(412, 57, 9, 2, 230), counters(412, 58, 9, 2, 230), counters(413, 58, 10, 2, 230));
+
+test('published hooks are judged by the counters sampled when the hook returns', () => {
+  assert.equal(publishedHookAttributed(referenceCycle13()), true);
+  assert.equal(publishedHookAttributed(s100Cycle18()), true);
+  for (const [label, row] of [
+    ['no maintenance', publishedCycle(0, counters(10, 1), counters(10, 2), counters(10, 2))],
+    ['sweep between reply and after sample', publishedCycle(0, counters(10, 1), counters(11, 2, 5), counters(11, 2, 5))],
+    ['sweep running at the before sample', publishedCycle(0, counters(10, 1, 5), counters(10, 2, 5), counters(10, 2, 5))],
+    ['audit and sweep while settling', publishedCycle(0, counters(10, 1), counters(10, 2), counters(12, 2, 5, 2))],
+  ]) assert.equal(publishedHookAttributed(row), true, label);
+
+  assert.equal(publishedHookAttributed(referenceCycle1()), false, 'reference cycle 1');
+  // The same violation fails when its sweep was already counted before the hook.
+  assert.equal(publishedHookAttributed(publishedCycle(0, counters(324, 21, 5), counters(325, 21, 5), counters(325, 21, 5))), false);
+  for (const [label, mutate] of [
+    ['update during the hook', row => { row.afterHook.counters.analyses++; row.settled.counters.analyses++; }],
+    ['covered count below one', row => { row.afterHook.counters.coveredRequests--; row.settled.counters.coveredRequests--; }],
+    ['two covered requests', row => { row.afterHook.counters.coveredRequests++; row.settled.counters.coveredRequests++; }],
+    ['update while settling', row => { row.settled.counters.analyses++; }],
+    ['sweep publishes while settling', row => { row.settled.counters.revisions++; }],
+    ['covered request while settling', row => { row.settled.counters.coveredRequests++; }],
+    ['before revision differs from the hook', row => { row.beforeHook.contexts[0].published.sequence--; }],
+    ['nonzero exit', row => { row.hook.code = 1; row.hook.document.exitCode = 1; }],
+    ['uncovered changed entry', row => { row.hook.document.changed[0].covered = false; }],
+    ['no changed entries', row => { row.hook.document.changed = []; }],
+    ['missing after sample', row => { row.afterHook = null; }],
+    ['missing sweep counter', row => { delete row.afterHook.counters.sweeps; }],
+  ]) {
+    const row = referenceCycle13(); mutate(row);
+    assert.equal(publishedHookAttributed(row), false, label);
+  }
+
+  const predicate = published => assertFastWorkload('I5-13:hook-latency-reference', { published })
+    .find(value => value.name === 'published hooks perform zero analysis');
+  const twenty = () => Array.from({ length: 20 }, (_, index) => index === 12 ? referenceCycle13()
+    : publishedCycle(index, counters(300 + index, index), counters(300 + index, index + 1), counters(300 + index, index + 1)));
+  assert.deepEqual(predicate(twenty()), { name: 'published hooks perform zero analysis', passed: true, observed: { cycles: 20, unattributed: [] } });
+  const violated = twenty(); violated[0] = referenceCycle1();
+  assert.deepEqual(predicate(violated).observed, { cycles: 20, unattributed: [1] });
+  assert.equal(predicate(violated).passed, false);
+  const s100 = twenty(); s100[17] = s100Cycle18();
+  assert.equal(predicate(s100).passed, true);
+  assert.equal(predicate([]).passed, false);
 });
 
 test('current source, dependencies, runtime and targets are required', () => {

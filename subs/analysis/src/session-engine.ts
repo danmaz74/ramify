@@ -3,7 +3,7 @@ import { performance } from 'node:perf_hooks';
 import { parseDescription } from '../subs/descriptions/src/parse.js';
 import type { ParsedDescription } from '../subs/descriptions/src/interfaces/syntax.js';
 import { resolveTagRegistry } from '../subs/model/src/index.js';
-import type { CapturedInput } from '../subs/project/src/interfaces/project.js';
+import type { CapturedInput, ProjectObserver } from '../subs/project/src/interfaces/project.js';
 import { observeProject } from '../subs/project/src/observer.js';
 import { resolveProjectRoot } from '../subs/project/src/resolve-root.js';
 import type { AnalysisDiagnostic, AnalysisInputs, AnalysisReport, RunControl } from './interfaces/analysis.js';
@@ -156,10 +156,13 @@ class Session implements RetainedSession {
       let changes: readonly SessionChange[];
       try { changes = await observer.reobserve(control.signal); }
       catch (error) {
-        if (isCancellation(error, control.signal)) return { status: 'cancelled' };
+        if (isCancellation(error, control.signal)) return this.#cancelledSweep(observer);
         this.#state.stale = true;
         return { status: 'reported', report: failureReport(this.#state, error, 'acquisition', this.#state.facts?.inventory) };
       }
+      // A cancellation reobservation completed without noticing stops here,
+      // before the revision step applies anything.
+      if (control.signal?.aborted) return this.#cancelledSweep(observer);
       if (!changes.length) return { status: 'unchanged' };
       const started = performance.now();
       const result = await revise(this.#state, changes, control.signal);
@@ -258,10 +261,24 @@ class Session implements RetainedSession {
       const published = this.#publish(computed, observer.inputs, computed.facts.invalid ? null : observer.inputId, started);
       return 'report' in published ? { status: 'reported', report: published.report } : { status: 'revised', revision: published.revision, identical: false };
     } catch (error) {
+      // The revision step applied its changes to the observer before
+      // returning them, so even a cancellation before promotion leaves the
+      // session past its published revision: the same event would otherwise
+      // compare identical and its edit would never be published.
       state.stale = true;
       if (isCancellation(error, signal)) return { status: 'cancelled' };
       return { status: 'reported', report: failureReport(state, error, 'acquisition', state.facts?.inventory) };
     }
+  }
+
+  /**
+   * A cancelled sweep leaves the session as published unless reobservation
+   * already promoted reported compiler reads that moved the observer's inputs;
+   * those changes would not be observed again.
+   */
+  #cancelledSweep(observer: ProjectObserver): { readonly status: 'cancelled' } {
+    if (observer.inputId !== this.#current?.inputId) this.#state.stale = true;
+    return { status: 'cancelled' };
   }
 
   async #promote(signal?: AbortSignal): Promise<void> {

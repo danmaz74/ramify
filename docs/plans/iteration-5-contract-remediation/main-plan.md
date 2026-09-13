@@ -1,7 +1,7 @@
 # Plan 5 contract remediation
 
-**Date:** 2026-09-13. **Status:** draft for review. This plan repairs the two
-behavioral contract violations that kept
+**Date:** 2026-09-13. **Status:** draft; review decisions resolved. This plan
+repairs the two behavioral contract violations that kept
 [Plan 5](../iteration-5-fast-incremental-checks/main-plan.md) from closing as
 delivered, as its [closure](../iteration-5-fast-incremental-checks/closure.md)
 records. It adds no capability, owner, package entry or wire field. Plan 5's
@@ -19,10 +19,10 @@ resident context:
 - after a `module.ramify` edit, receives a revision on the `description` path
   whether or not background work was cancelled while the edit arrived.
 
-The plan is complete when both behaviors hold under deterministic owner tests,
-the measurement harness attributes daemon work to the hook correctly, and one
-bounded real-process run of the reference and S100 hook workloads passes every
-correctness predicate. Performance targets are reported, not enforced.
+The plan is complete when both behaviors hold under deterministic owner tests
+and the harness self-test shows the measurement harness attributing daemon work
+to the hook correctly. No real-process run is part of completion. Performance
+targets are reported, not enforced.
 
 ## Evidence
 
@@ -114,19 +114,15 @@ reference failure is index 6 and the S100 failure index 17.
    acceptable-time budget; deriving them is left to the
    [optimization analysis](../../analysis/fast-incremental-checks-optimization.md).
    Correctness predicates remain enforced.
-
-## Review decisions
-
-- **RD-1 periodic-sweep coverage.** Answering a covered hook while a periodic
-  sweep runs means an out-of-band change the sweep would have found can land
-  after the reply. Plan 5 requires waiting only for *known* changes, and the
-  sweep still publishes. Accept, or require waiting for a running periodic
-  sweep but never for a merely due one.
-- **RD-2 the live run.** Iteration 3 runs two bounded real-process workloads,
-  about 16 minutes together. At the observed rate of one or two collisions per
-  twenty cycles, a clean run is supporting evidence only; the deterministic
-  tests are the regression evidence. Accept, or drop the run and close on the
-  deterministic tests and the harness self-test.
+6. **Coverage during a periodic sweep.** A covered request is answered from
+   the revision published before a running periodic sweep, without waiting for
+   that sweep. An out-of-band change the sweep finds can therefore publish
+   after the reply. Plan 5 requires waiting only for *known* changes, and the
+   sweep still publishes what it finds.
+7. **No live run.** The plan closes on the deterministic owner tests and the
+   harness self-test. At the observed rate of one or two collisions per twenty
+   cycles, a clean real-process run would be supporting evidence only, not
+   regression evidence.
 
 ## Owners
 
@@ -152,7 +148,6 @@ source or owned tests.
 | RC-7 | `cancel-check-before-revise`: a signal aborted during `reobserve()` returns `cancelled` without entering `revise()` | unit | 2 |
 | RC-8 | `hook-attribution`: synthetic cycles with a sweep between hook and settle pass; an update during the hook, or a covered count below one, fails | unit, harness | 3 |
 | RC-9 | `ideal-budgets-report`: a timing miss is recorded with its target and `enforcement: 'ideal'` and does not fail the workload | unit, harness | 3 |
-| RC-10 | `live-correctness`: `hook-latency-reference` and `hook-latency-s100` pass every correctness predicate, including zero analysis for published hooks and the `description` path in all twenty cycles | measurement, real processes | 3 |
 
 ## Iterations
 
@@ -160,17 +155,17 @@ source or owned tests.
 | --- | --- | --- |
 | [1](iterations/iteration1.md) | Periodic sweeps as maintenance | none |
 | [2](iterations/iteration2.md) | Cancellation without advanced state | none |
-| [3](iterations/iteration3.md) | Harness attribution, ideal budgets and live correctness | 1 and 2 |
+| [3](iterations/iteration3.md) | Harness attribution and ideal budgets | 1 and 2 |
 
 Iterations 1 and 2 write different owners and could run in parallel; they are
-sequenced so that iteration 3 measures one integrated build.
+sequenced so that iteration 3 writes the completion report against one
+integrated build.
 
 ## Verification policy
 
 Each iteration runs its owners' test files and `npm run type-check`, never the
 full suite by hand; full verification is the cucumber-viz commit audit on the
-iteration's worktree. Only iteration 3 runs real processes, and only the two
-named workloads.
+iteration's worktree. No iteration runs real-process measurement workloads.
 
 ## Deferrals
 
@@ -179,12 +174,14 @@ named workloads.
 | `contextStatus` resetting activity | Every status poll calls `touch()`, which postpones the idle audit and schedules sweeps; the harness's 20 ms polling kept audits from ever running. It breaks no contract once cadence is fixed. |
 | Not cancelling background work on watcher events | Removes the collision entirely but makes an edit wait up to a sweep's duration, which grows with project size. |
 | `captureStarted` and per-request analysis attribution in `ramify.check/1` | Would remove counter inference from the harness but changes a published document. |
+| Real-process runs of `hook-latency-reference` and `hook-latency-s100` | Resolved decision 7. Live confirmation of the repaired contracts is left to Plan 5's outstanding measurement, which uses the corrected harness. |
 | Remaining Plan 5 iteration 12 workloads and iteration 13 | S1000, checked sets, plateau, memory, cold opens, footprints, declarations, self-check and document revisions stay outstanding under Plan 5. |
 | Performance work | See the [optimization analysis](../../analysis/fast-incremental-checks-optimization.md). |
 
 ## Handoff
 
 The completion report states the sweep classification and cadence, the
-cancellation rule, the corrected harness assertion and the live results with
-their platform. Plan 5's outstanding iteration 13 must carry the sweep
-definition into its revision of [daemon and analysis](../../architecture/daemon.md).
+cancellation rule, the coverage rule during periodic sweeps, the corrected
+harness assertion and the owner and harness test results. Plan 5's outstanding
+iteration 13 must carry the sweep definition and the coverage rule into its
+revision of [daemon and analysis](../../architecture/daemon.md).

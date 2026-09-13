@@ -8,14 +8,20 @@ import type { AnalysisReport, RetainedSession, SessionInputs, SessionRevision } 
 import type { SessionState } from '../session-revision.js';
 import { createDefaultTagRegistry } from '../../subs/model/src/index.js';
 
-const activeCapture = vi.hoisted(() => ({ capture: undefined as ((state: SessionState) => void) | undefined }));
+const activeCapture = vi.hoisted(() => ({ capture: undefined as ((state: SessionState) => void) | undefined, revisions: 0 }));
 vi.mock('../session-revision.js', async importOriginal => {
   const actual = await importOriginal<typeof import('../session-revision.js')>();
   return { ...actual, recomputeAll: (...args: Parameters<typeof actual.recomputeAll>) => {
     activeCapture.capture?.(args[0]);
     return actual.recomputeAll(...args);
+  }, revise: (...args: Parameters<typeof actual.revise>) => {
+    activeCapture.revisions++;
+    return actual.revise(...args);
   } };
 });
+
+/** Revision steps the session engine has entered in this test file. */
+export const revisionsEntered = (): number => activeCapture.revisions;
 
 export const paths = {
   rootApi: 'src/interfaces/api.ts', rootMain: 'src/main.ts',
@@ -110,13 +116,14 @@ export function instrumentCompiler(state: SessionState) {
 export function instrumentObserver(state: SessionState) {
   const observer = state.observer!;
   const apply = vi.fn(observer.apply.bind(observer));
+  const reobserve = vi.fn(observer.reobserve.bind(observer));
   state.observer = {
     get inventory() { return observer.inventory; }, get inputs() { return observer.inputs; },
-    get inputId() { return observer.inputId; }, sink: observer.sink, apply,
-    reobserve: observer.reobserve.bind(observer), readDescription: observer.readDescription.bind(observer),
+    get inputId() { return observer.inputId; }, sink: observer.sink, apply, reobserve,
+    readDescription: observer.readDescription.bind(observer),
     readReadme: observer.readReadme.bind(observer), dispose: observer.dispose.bind(observer),
   };
-  return { observer, apply };
+  return { observer, apply, reobserve };
 }
 
 export const comparable = (report: AnalysisReport | null): unknown => JSON.parse(JSON.stringify({ ...report, runId: 'compared' }));

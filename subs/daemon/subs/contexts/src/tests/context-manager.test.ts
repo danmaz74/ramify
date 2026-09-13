@@ -159,6 +159,39 @@ describe('watcher reconciliation and retention', () => {
       const before = e.script.calls.length; e.clock.advance(60_000); await flush(); expect(e.script.calls.length).toBe(before + 1);
     } finally { await e.dispose(); }
   });
+  it('sweep-cadence: spaces periodic sweeps from the start of any sweep and checks during a sweep never bring the next closer', async () => {
+    const e = environment();
+    let finish: ((value: ReturnType<typeof capture>) => void) | undefined;
+    const hold = (call: { kind: string }) => call.kind === 'sweep' ? new Promise<ReturnType<typeof capture>>(resolve => { finish = resolve; }) : capture();
+    let hooks = 0;
+    const hook = (token: ContextToken) => e.manager.check({ token, requestId: `hook-${++hooks}`, scope: 'delta', deadlineMs: 60_000,
+      freshness: { mode: 'synchronized', expect: [{ path: 'src/index.ts', sha256: hash('1') }] } }, 'lease');
+    try {
+      const opened = await e.open(); await flush();
+      // A configuration change at 19,900 ms starts its required sweep at 20,000 ms, after the debounce.
+      e.clock.advance(19_900); e.script.pending.push(hold, hold);
+      e.watcher.emit('/fixture', [{ path: 'tsconfig.json', kind: 'changed' }]);
+      e.clock.advance(100); await flush();
+      expect(e.script.updateCalls).toHaveLength(1); expect(e.script.sweepCalls).toHaveLength(1);
+      // Activity during the held-open sweep schedules nothing earlier.
+      e.clock.advance(5_000); const waiting = hook(opened.token); e.manager.status(opened.token); await flush();
+      e.clock.advance(6_000); await flush();
+      expect(e.script.sweepCalls).toHaveLength(1);
+      finish!(capture()); expect((await waiting).status).toBe('reported'); await flush();
+      expect(e.script.updateCalls).toHaveLength(2); expect(e.script.sweepCalls).toHaveLength(1);
+      e.clock.advance(49_999 - e.clock.now()); await flush(); expect(e.script.sweepCalls).toHaveLength(1);
+      // The periodic sweep starts at 50,000 ms and is held open while a covered hook arrives.
+      e.script.pending.push(hold); e.clock.advance(1); await flush();
+      expect(e.script.sweepCalls).toHaveLength(2); expect(e.script.updateCalls).toHaveLength(2);
+      e.clock.advance(10_000);
+      expect(await hook(opened.token)).toMatchObject({ status: 'reported', freshness: { captureStarted: null, reusedRevision: true } });
+      e.manager.status(opened.token); e.clock.advance(10_000); await flush();
+      finish!(capture()); await flush();
+      e.clock.advance(79_999 - e.clock.now()); await flush(); expect(e.script.sweepCalls).toHaveLength(2);
+      e.clock.advance(1); await flush(); expect(e.script.sweepCalls).toHaveLength(3);
+      expect(e.script.updateCalls).toHaveLength(2);
+    } finally { finish?.(capture()); e.script.pending.length = 0; await flush(); await e.dispose(); }
+  });
   it('keeps eight of twelve reports and answers exact retained revisions', async () => {
     const e = environment();
     try {

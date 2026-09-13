@@ -304,12 +304,16 @@ export class Capture {
   async validate(): Promise<readonly string[]> {
     return (await this.changes()).map(change => this.label(change.path)).sort(byteOrder);
   }
-  /** Stat every observed path and report the ones whose recorded state moved. */
-  async changes(): Promise<readonly { path: string; kind: 'changed' | 'created' | 'deleted' }[]> {
+  /**
+   * Stat every observed path and report the ones whose recorded state moved.
+   * A caller's signal stops the comparison between paths and between hashed chunks.
+   */
+  async changes(signal?: AbortSignal): Promise<readonly { path: string; kind: 'changed' | 'created' | 'deleted' }[]> {
     await Promise.all([...this.#pending.values(), ...this.#reads.values(), ...this.#directories.values()]);
+    const check = (): void => { this.check(); if (signal?.aborted) throw new Cancelled(); };
     const changed: { path: string; kind: 'changed' | 'created' | 'deleted' }[] = [];
     for (const entry of this.#observations.values()) {
-      this.check();
+      check();
       const current = await this.#disk(entry.path);
       let different = current.signature !== entry.signature || current.link !== entry.link;
       if (!different && entry.exactName !== undefined) {
@@ -322,7 +326,7 @@ export class Capture {
       if (!different && entry.bytes) {
         const handle = await open(entry.path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
         try {
-          const digest = await hashFile(handle, entry.bytes.length, () => this.check());
+          const digest = await hashFile(handle, entry.bytes.length, check);
           different = digest !== hash(entry.bytes);
         } finally { await handle.close(); }
       }

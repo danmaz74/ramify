@@ -54,13 +54,15 @@ export async function executeFastWorkload(id, options, measurements, checkpoint)
     const beforeHook = position === 'published' ? await host.status() : null;
     const hookStartedAt = Date.now();
     const hook = await host.hook(project, expected);
+    // Sampled as soon as the hook returns, so later sweeps and audits are not attributed to it.
+    const afterHook = position === 'published' ? await host.status() : null;
     const settled = settledSample(await host.quiet());
     const current = await host.context(token);
     const revision = current.published;
     const mark = host.observer.mark();
     return { kind, index, position, expected, writtenAt, hookStartedAt,
       beforeSequence: before.published.sequence, countersBeforeSave,
-      beforeHook: beforeHook && compactStatus(beforeHook), hook, revision, settled,
+      beforeHook: beforeHook && compactStatus(beforeHook), afterHook: afterHook && compactStatus(afterHook), hook, revision, settled,
       settledProcessSample: host.observer.samples[mark] };
   }
   async function captureHost(host, destination) {

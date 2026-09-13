@@ -1,5 +1,5 @@
-// Reviewed Plan 5 scope.md budgets. R/S100 timing rows bind under the active
-// iteration instruction; memory and S500/S1000 timing rows remain advisory.
+// Reviewed Plan 5 scope.md budgets. Every timing and memory row is an ideal
+// optimization budget, recorded and never enforced; runtime limits are enforced.
 const MiB = 1024 ** 2;
 export const fastBudgets = {
   sampleIntervalMs: 50, editCycles: 20, repeatedCycles: 200, settledCycles: 100,

@@ -12,7 +12,7 @@ maintenance is running or due, and make periodic sweeps keep their interval.
 ## Read first
 
 - Main plan: [Violation 1](../main-plan.md#violation-1-the-covering-rule-leaks),
-  resolved decisions 1 and 2, RD-1, rows RC-1 to RC-4.
+  resolved decisions 1, 2 and 6, rows RC-1 to RC-4.
 - Plan 5 scope: [Live updates and the covering rule](../../iteration-5-fast-incremental-checks/scope.md#live-updates-and-the-covering-rule)
   and [The sweep](../../iteration-5-fast-incremental-checks/scope.md#the-sweep).
 - `subs/daemon/subs/contexts/src/context-manager.ts`: `sweepLater` (142-152),
@@ -31,7 +31,8 @@ maintenance is running or due, and make periodic sweeps keep their interval.
    required sweep.
 2. **Covering test.** A synchronized request whose expectations are covered is
    answered from the published revision when the only running or due work is
-   a periodic sweep carrying no changes. The covering test runs before
+   a periodic sweep carrying no changes, including while that sweep runs
+   (resolved decision 6). The covering test runs before
    `touch()` can schedule anything for that request.
 3. **Cadence.** Starting any sweep cancels the periodic timer and records the
    start as `lastSweepAt`. No timer is scheduled while a sweep runs; the

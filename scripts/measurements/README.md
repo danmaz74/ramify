@@ -248,10 +248,21 @@ hook command immediately after each save. Every command is recorded, including
 unsuccessful or uncovered replies.
 Twenty bare Node executions and twenty covered zero-analysis CLI checks record
 the process floor and client cost. Requests use a finite 600,000 ms measurement
-deadline so work exceeding the normal hook deadline remains measurable; the
-unchanged timing budgets still fail when missed. Startup, setup, explicit
+deadline so work exceeding the normal hook deadline remains measurable and its
+duration is recorded against the unchanged timing budgets. Startup, setup, explicit
 settling and status polling outside the command are excluded from its duration.
 Session timings come from the exact published revision, not elapsed CLI time.
+
+A hook whose watcher revision has already published is judged by the work it
+caused. Daemon counters are sampled before the hook, immediately after it
+returns and once settled. The hook must be answered from that published
+revision with exit code 0 and every changed entry covered, and must add exactly
+one covered request before it returns. In both intervals every added analysis
+must be a sweep or an audit, which the daemon counts in `sweeps` and `audits` as
+well as `analyses`. No revision may publish and no covered request may be added
+while settling. A sweep that begins inside the settle window is maintenance, not
+the hook's work; an update the hook forced, or a request that was not covered,
+fails.
 
 Additional workloads retain 200 alternating body edits on the reference and
 S100, two hot and six warm S100 contexts with active subscriptions, four cold
@@ -274,9 +285,14 @@ The existing supervisor process is included alongside the daemon and compiler. E
 once; shared pages can still occur in several processes' RSS. Polling can miss
 short peaks and adds measurement overhead.
 
-Plan 5's reference and S100 session/hook timing rows are binding for this
-iteration. S500/S1000 timings and every memory target are advisory. This extends
-the policy at the top of this document only for Plan 5; Plan 2 remains advisory.
+Every Plan 5 timing and memory target, on every fixture, is an ideal
+optimization budget under [Two kinds of budget](../../docs/architecture/memory-lifecycle.md#two-kinds-of-budget).
+Each is recorded with its observed value, its target (`maximum`),
+`enforcement: 'ideal'` and `targetMet`; a miss never fails a workload, and the
+summary lists misses as `idealMisses`. A missing or non-finite observation is
+missing evidence and still fails. Correctness predicates, runtime retention and
+queue limits and completeness remain enforced. No acceptable-time budget is
+declared. Plan 2 remains advisory under the policy at the top of this document.
 No command option reduces sample counts, changes targets or converts failed
 execution into a pass. `--workload <I5-13 suffix>` records a partial diagnostic
 and exits 1 while any required workload remains unrun. `--output FILE` names the
@@ -299,8 +315,8 @@ filtered extraction, persistent checkpoints and host-isolation deferral triggers
 A missing component remains `not-evaluated` and prevents full-recipe acceptance.
 RSS growth includes the separate worker supervisor and compiler as well as the
 daemon. Runtime retention ceilings apply to every recorded poll; lifecycle
-counters must balance at settled checkpoints and after cleanup. A binding miss needs an owner fix or
-a reviewed budget revision; the recipe never relaxes its assertion.
+counters must balance at settled checkpoints and after cleanup. A failed
+correctness predicate needs an owner fix; the recipe never relaxes its assertion.
 
 The nine `fast-measure` handlers verify existing current evidence rather than
 starting measurements concurrently with the prerequisite matrix:

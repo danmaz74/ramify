@@ -322,6 +322,9 @@ export async function revise(state: SessionState, changes: readonly ObservedChan
   if (!observer) throw internal('The session has no observer');
   const timings = zeroTimings();
   let stage: StageId = 'acquisition';
+  // Set immediately before the observer applies the changes; every compiler
+  // update follows it. Until then the session is still exactly as published.
+  let advanced = false;
   try {
     check(signal);
     let start = performance.now();
@@ -331,6 +334,7 @@ export async function revise(state: SessionState, changes: readonly ObservedChan
     // place. Reconcile through its configuration boundary before trusting it
     // again, even if this request names only a source file or README.
     const reconcile = state.stale || state.facts?.invalid;
+    advanced = true;
     const update = await observer.apply(reconcile
       ? [...changes, { path: observer.inventory.scope.configuration, kind: 'unknown' }]
       : changes, signal);
@@ -526,10 +530,12 @@ export async function revise(state: SessionState, changes: readonly ObservedChan
     return { status: 'computed', facts: next, checked: { path, files: interpretedFiles, accesses: decided, modelRebuilt: rebuild },
       changed, timings, positionRefreshed: sortedPaths(positionRefreshed) };
   } catch (error) {
-    // The compiler or the facts may have advanced past the published
-    // revision; the next update recomputes everything from the disk.
-    state.stale = true;
-    if (isCancellation(error, signal)) return { status: 'cancelled' };
+    // Once the observer or the compiler may have advanced past the published
+    // revision, the next update recomputes everything from the disk. A
+    // cancellation before that point leaves the session as published.
+    const cancellation = isCancellation(error, signal);
+    if (advanced || !cancellation) state.stale = true;
+    if (cancellation) return { status: 'cancelled' };
     return { status: 'reported', report: failureReport(state, error, stage, state.facts?.inventory) };
   }
 }

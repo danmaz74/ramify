@@ -121,7 +121,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       .then(async handle => {
         if (context.state === 'cold' || context.state === 'evicted' || disposed) await cleanup(handle.close());
         else { context.watcher = handle; context.watcherState = 'active';
-          if (context.synchronization === 'watcher-unavailable') context.synchronization = context.sweepRequired || context.running || context.background ? 'reconciling' : 'synchronized'; }
+          if (context.synchronization === 'watcher-unavailable') context.synchronization = context.sweepRequired || (context.running && context.running.sweep !== 'periodic') || context.background ? 'reconciling' : 'synchronized'; }
       }).catch(() => {
         if (context.state !== 'evicted' && !disposed) { context.watcherState = 'unavailable'; context.synchronization = 'watcher-unavailable'; context.sweepRequired = true; }
       }).finally(() => { context.attaching = false; }));
@@ -140,22 +140,22 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     });
   }
   function sweepLater(context: LiveContext): void {
-    if (context.sweepTimer || !context.session || disposed || context.state === 'cold') return;
+    // Starting a sweep cancels this timer and its completion reschedules it.
+    if (context.sweepTimer || context.running?.sweep || !context.session || disposed || context.state === 'cold') return;
     context.sweepTimer = clock.schedule(Math.max(1, context.lastSweepAt + budgets.sweepIntervalMs - clock.now()), () => {
       context.sweepTimer = null;
-      if (!context.session || disposed || context.state === 'cold') return;
-      // Warm inactive sessions keep their facts until activity resumes.
-      if (held(context) || clock.now() - context.lastActivityAt < budgets.warmIdleMs) {
-        context.sweepRequired = true; context.background = 'sweep'; context.synchronization = 'reconciling'; changed(context); kick();
-      }
+      if (!context.session || disposed || context.state === 'cold' || context.running?.sweep) return;
+      if (clock.now() - context.lastSweepAt < budgets.sweepIntervalMs) { sweepLater(context); return; }
+      // Warm inactive sessions keep their facts until activity resumes. A
+      // periodic sweep is maintenance: it neither marks the context reconciling
+      // nor makes a covered request wait.
+      if (held(context) || clock.now() - context.lastActivityAt < budgets.warmIdleMs) { context.periodicSweepDue = true; kick(); }
     });
   }
   function touch(context: LiveContext): void {
     context.lastActivityAt = clock.now(); context.auditRequired = false;
     if (context.state === 'cold' && !context.cooling) { context.state = 'opening'; context.sweepRequired = true; context.conservative = true; context.background = 'open'; attach(context); kick(); }
-    if (context.session && clock.now() - context.lastSweepAt >= budgets.sweepIntervalMs) {
-      context.sweepRequired = true; context.background ??= 'sweep'; context.synchronization = 'reconciling'; kick();
-    }
+    if (context.session && !context.running?.sweep && clock.now() - context.lastSweepAt >= budgets.sweepIntervalMs) { context.periodicSweepDue = true; kick(); }
     auditLater(context); sweepLater(context); scheduleIdle(context); track(hotBudget(context));
   }
   function lookup(token: ContextToken): LiveContext | Unavailable {
@@ -176,8 +176,9 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     if (context.paths.size > budgets.maxQueuedPaths) { context.paths.clear(); context.conservative = true; context.sweepRequired = true; }
     // An active request keeps its capture; newer writes queue behind it. Idle
     // background work may be cancelled, but every consumed path is restored.
+    // A cancelled periodic sweep stays maintenance; its start keeps the cadence.
     if (context.running?.background) {
-      context.running.controller.abort(); context.sweepRequired = true;
+      context.running.controller.abort(); if (context.running.sweep !== 'periodic') context.sweepRequired = true;
       for (const change of context.running.changes) context.paths.set(change.path, change.kind);
     }
     if (context.paths.size > budgets.maxQueuedPaths) { context.paths.clear(); context.conservative = true; context.sweepRequired = true; }
@@ -319,12 +320,17 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     for (const entry of entries) context.queue.splice(context.queue.indexOf(entry), 1);
     const cause: RevisionCause = !context.session ? 'open' : context.conservative ? 'conservative' : entries.length ? 'request' : context.background ?? 'sweep';
     const changes: SessionChange[] = [...context.paths].map(([path, kind]) => ({ path, kind }));
-    const sweep = context.sweepRequired || entries.some(entry => entry.needsSweep) || cause === 'sweep';
+    // A periodic sweep runs alone. A due one waits behind requests and known
+    // changes rather than lengthening their capture.
+    const sweepKind = context.sweepRequired || entries.some(entry => entry.needsSweep) ? 'required' : cause === 'sweep' ? 'periodic' : null;
+    const sweep = sweepKind !== null;
     context.paths.clear(); context.conservative = false; context.sweepRequired = false; context.background = null;
     context.debounce?.(); context.debounce = null;
     const controller = new AbortController(); const started = clock.now();
-    context.running = { controller, requests: entries, changes, background: !entries.length, started }; active++;
-    context.synchronization = context.watcherState === 'unavailable' ? 'watcher-unavailable' : context.sequence ? 'reconciling' : 'initializing'; changed(context);
+    if (sweep) { context.periodicSweepDue = false; context.lastSweepAt = started; context.sweepTimer?.(); context.sweepTimer = null; }
+    context.running = { controller, requests: entries, changes, background: !entries.length, sweep: sweepKind, started }; active++;
+    if (sweepKind !== 'periodic') context.synchronization = context.watcherState === 'unavailable' ? 'watcher-unavailable' : context.sequence ? 'reconciling' : 'initializing';
+    changed(context);
     const control = { signal: controller.signal };
     try {
       await context.demoting;
@@ -349,7 +355,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
           if (run.status === 'revised') context.invocation = invocation;
         } else run = { status: 'unchanged' };
         if (sweep && run.status !== 'reported' && run.status !== 'cancelled') {
-          run = await sessionWork(context, () => context.session!.sweep(control)); context.lastSweepAt = started;
+          run = await sessionWork(context, () => context.session!.sweep(control));
         }
       }
       if (disposed || context.state === 'evicted' || controller.signal.aborted) return;
@@ -398,7 +404,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       }
     } finally {
       if (controller.signal.aborted) {
-        context.sweepRequired = true;
+        if (sweepKind !== 'periodic') context.sweepRequired = true;
         for (const entry of entries) complete(entry, disposed ? { ...unavailable('disposed'), requestId: entry.request.requestId } : { status: 'cancelled', requestId: entry.request.requestId });
       }
       try { await releaseUnpublished(context); } catch { context.synchronization = 'reconciling'; context.sweepRequired = true; }
@@ -415,22 +421,35 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         if (active >= budgets.maxConcurrentAnalyses) break;
         if (context.running || context.cooling || context.state === 'cold' || context.state === 'evicted') continue;
         const request = context.queue.some(entry => !entry.settled && entry.request.freshness.mode === 'synchronized');
-        if (!request && (!context.background || context.debounce)) continue;
+        if (!request && (!(context.background || context.periodicSweepDue) || context.debounce)) continue;
         track(analyze(context));
       }
     });
+  }
+  /** A covered request is answered from the published revision. Only a running
+   * periodic sweep carrying no changes may coexist with coverage: the answer
+   * uses the revision published before that sweep began. */
+  function covers(context: LiveContext, entry: PendingCheck): boolean {
+    const data = context.session?.current; const publication = context.history.published; const running = context.running;
+    const maintenance = !running || (running.sweep === 'periodic' && !running.requests.length && !running.changes.length);
+    return !!data && !!publication && context.publishedSession === context.session && publication.sequence === data.sequence
+      && !entry.needsSweep && maintenance && !context.background && !context.paths.size && !context.sweepRequired
+      && context.synchronization === 'synchronized' && invocationKey(entry.invocation) === invocationKey(context.invocation)
+      && !mismatch(context, entry, data);
   }
   function check(request: CheckRequest, lease: string, control?: RunControl): Promise<CheckOutcome> {
     const found = lookup(request.token); if ('status' in found) return Promise.resolve({ ...found, requestId: request.requestId });
     const context = found;
     if (control?.signal?.aborted) return Promise.resolve({ status: 'cancelled', requestId: request.requestId });
-    touch(context);
     return new Promise(resolve => {
       const entry: PendingCheck = { request: freeze(structuredClone(request)), lease, acknowledged: clock.now(),
         invocation: context.invocations.get(lease) ?? { project: context.project, setup: context.selection.setup },
         revisionAtAcknowledgment: context.history.published?.revision ?? null,
         needsSweep: request.freshness.mode === 'synchronized' && (request.scope === 'report' || !request.freshness.expect.length),
         resolve, cleanup: () => {}, settled: false, deadlineExpired: false };
+      // Test coverage before touch() can mark a periodic sweep due for this activity.
+      const covered = request.freshness.mode === 'synchronized' && covers(context, entry);
+      touch(context);
       let stopDeadline: (() => void) | undefined;
       const unpinSince = request.since && context.history.get(request.since) ? context.history.pin(request.since) : () => {};
       const cancel = () => {
@@ -461,11 +480,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         if (request.freshness.revision) { complete(entry, { ...unavailable('evicted-revision'), requestId: request.requestId }); return; }
         if (!request.freshness.wait) { complete(entry, { status: 'pending', requestId: request.requestId, current: snapshot(context) }); return; }
       } else {
-        const data = context.session?.current; const publication = context.history.published;
-        if (data && publication && context.publishedSession === context.session && publication.sequence === data.sequence
-          && !entry.needsSweep && !context.running && !context.background && !context.paths.size && !context.sweepRequired
-          && context.synchronization === 'synchronized' && invocationKey(entry.invocation) === invocationKey(context.invocation)
-          && !mismatch(context, entry, data)) { track(deliver(context, entry, publication, null, true)); return; }
+        if (covered) { track(deliver(context, entry, context.history.published!, null, true)); return; }
         // A hook identifies a path to re-observe. The observer determines its
         // actual creation/deletion and role; preserve stronger watcher hints.
         for (const expected of request.freshness.expect) {
@@ -508,7 +523,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         openedAt: now, lastActivityAt: now, hadLease: false, invocations: new Map([[lease, { project, setup: requestedSetup }]]), subscriptions: new Map(),
         history: createHistory(budgets.maxHistoryRevisions, budgets.maxHistoryBytes, entry => releaseVersion(context, entry)),
         queue: [], deliveries: new Set(), paths: new Map(), scope: null, state: 'opening', synchronization: 'initializing', lastValid: null,
-        session: null, publishedSession: null, versions: new Set(), observedSequence: 0, sequence: 0, sweepRequired: true, lastSweepAt: now, auditedSequence: 0, auditRequired: false, demoting: null, cooling: false,
+        session: null, publishedSession: null, versions: new Set(), observedSequence: 0, sequence: 0, sweepRequired: true, periodicSweepDue: false, lastSweepAt: now, auditedSequence: 0, auditRequired: false, demoting: null, cooling: false,
         watcher: null, watcherState: 'disposed', attaching: false, conservative: true, background: 'open', running: null,
         debounce: null, sweepTimer: null, auditTimer: null, idle: null,
       };

@@ -16,7 +16,9 @@ import { assertFastWorkload, deriveFastMeasurements, fastDeferrals } from './fas
 const args = process.argv.slice(2);
 if (args.length === 1 && args[0] === '--help') {
   process.stdout.write('Usage: npm run measure:fast -- [--output FILE] [--workload all|I5-13-suffix]\n'
-    + 'Twenty edits per class on four fixtures, 200-cycle plateaus, contexts and footprints. R/S100 timing misses fail. Partial runs retain missing rows and exit 1.\n');
+    + 'Twenty edits per class on four fixtures, 200-cycle plateaus, contexts and footprints.\n'
+    + 'Every timing and memory target is an ideal optimization budget: a miss is recorded with its target, enforcement \'ideal\' and targetMet false, and never fails a workload.\n'
+    + 'Correctness predicates, runtime limits and missing evidence fail. Partial runs retain missing rows and exit 1.\n');
   process.exit(0);
 }
 const options = new Map();
@@ -40,7 +42,7 @@ const report = {
     concurrentActivity: process.env.RAMIFY_MEASUREMENT_ACTIVITY ?? 'Unspecified; inspect process census before performance acceptance.',
     processCensus: processRows() },
   dependencies: {}, inputs: { build: null }, fixtures: [], budgets: fastBudgets,
-  performancePolicy: 'R/S100 session and hook time binding; S500/S1000 and memory advisory; runtime limits and completeness binding.',
+  performancePolicy: 'Every timing and memory target is an ideal optimization budget, recorded and never enforced; correctness, runtime limits and completeness enforced.',
   sampling: { intervalMs: 50,
     source: 'External POSIX process tree sampler plus daemonStatus over the real socket every 50 ms.',
     settling: 'Two GC passes in daemon outside timed operation; worker heaps are latest actual reply checkpoints, not forced-GC samples.',
@@ -131,12 +133,12 @@ finally {
   rmSync(scratch, { recursive: true, force: true });
   process.removeListener('SIGINT', interrupt); process.removeListener('SIGTERM', interrupt);
   const saved = persistMeasurement(report, output, join(packageRoot, 'scripts/measurements/results'),
-    'Plan 5 actual process measurements; R/S100 timing binding, memory and larger fixture timing advisory. Missing and failed evidence retained.',
+    'Plan 5 actual process measurements; timing and memory targets are ideal budgets, never enforced. Missing and failed evidence retained.',
     { transformString: portableString });
   process.stdout.write(JSON.stringify({ output: saved.rawWritten ? output : null, archive: saved.archive?.file ?? null,
     status: saved.report.status, passed: saved.report.passed, failures: saved.report.failures,
     workloads: saved.report.workloads.map(row => ({ id: row.id, status: row.status, passed: row.passed,
       failures: row.failures, failedAssertions: row.assertions?.filter(assertion => !assertion.passed).map(assertion => assertion.name),
-      advisoryMisses: row.assertions?.filter(assertion => assertion.enforcement === 'advisory' && !assertion.targetMet).map(assertion => assertion.name) })) }, null, 2) + '\n');
+      idealMisses: row.assertions?.filter(assertion => assertion.enforcement === 'ideal' && !assertion.targetMet).map(assertion => assertion.name) })) }, null, 2) + '\n');
   process.exitCode = saved.report.passed ? 0 : 1;
 }

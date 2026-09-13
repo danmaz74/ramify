@@ -106,7 +106,7 @@ export function verifyFastEvidence(report, id, expectedInputs = fastInputs(), de
   assert.equal(report.passed, reportComplete, 'Recipe pass must require all nine completed workloads');
   assert.equal(report.status === 'passed', reportComplete, 'Recipe status must preserve incomplete or failed workloads');
   return { id, passed, reportComplete, assertions, deferrals,
-    advisoryMisses: assertions.filter(value => value.enforcement === 'advisory' && !value.targetMet),
+    idealMisses: assertions.filter(value => value.enforcement === 'ideal' && !value.targetMet),
     measuredAt: report.measuredAt, completedAt: row.completedAt, inputs: report.inputs,
     samples: { processes: row.controllerObservation.processes.length,
       controller: row.controllerObservation.samples.length } };

@@ -98,7 +98,7 @@ class Observer implements ProjectObserver {
       signal?.throwIfAborted();
       const changes = new Map<string, ObservedChange>();
       for (const change of await this.#promote()) changes.set(change.path, change);
-      for (const change of await this.#capture.changes()) {
+      for (const change of await this.#capture.changes(signal)) {
         if (!changes.has(change.path)) changes.set(change.path, { path: change.path, kind: change.kind });
       }
       return freeze([...changes.values()].sort((a, b) => byteOrder(a.path, b.path)));

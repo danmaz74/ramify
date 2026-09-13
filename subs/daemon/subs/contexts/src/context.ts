@@ -28,6 +28,9 @@ export interface LiveContext {
   observedSequence: number;
   invocation: Invocation;
   sweepRequired: boolean;
+  /** An elapsed `sweepIntervalMs` is due; it never blocks coverage or marks reconciling. */
+  periodicSweepDue: boolean;
+  /** Start of the most recent sweep of either kind. */
   lastSweepAt: number;
   auditedSequence: number;
   auditRequired: boolean;
@@ -38,7 +41,8 @@ export interface LiveContext {
   watcherState: 'active' | 'unavailable' | 'disposed';
   attaching: boolean;
   conservative: boolean;
-  background: 'open' | 'request' | 'watch' | 'sweep' | 'verify' | 'conservative' | null;
+  /** Pending non-periodic work; a due periodic sweep is `periodicSweepDue`. */
+  background: 'open' | 'request' | 'watch' | 'verify' | 'conservative' | null;
   running: RunningCapture | null;
   debounce: (() => void) | null;
   sweepTimer: (() => void) | null;

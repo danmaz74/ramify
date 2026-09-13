@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { WorkLimit } from '../report.js';
 import { audited, comparable, equalToBatch, fixture, fixtureFiles, instrumentCompiler, instrumentObserver, opened, ownedFiles,
-  parentExposure, paths, put, replace, revised, timeout } from './session-test-fixture.js';
+  parentExposure, paths, put, replace, revised, revisionsEntered, timeout } from './session-test-fixture.js';
 
 describe('description, metadata and broad session revisions', () => {
   it('relinks without compiler work and decides only importers or originals in the changed subtree, then restores the exposure', () => fixture(async (root, inputs) => {
@@ -419,6 +419,149 @@ describe('description, metadata and broad session revisions', () => {
       expect(recovered.outcome.execution).toBe('completed');
       await audited(handle);
       await equalToBatch(handle, bounded);
+    } finally { await handle.dispose(); }
+  }), timeout);
+});
+
+describe('cancelled sweeps and revisions', () => {
+  const findings = (revision: { readonly delta: { readonly added: readonly { code: string; location?: { file: string } | null }[] } }) =>
+    revision.delta.added.map(item => [item.code, item.location?.file]);
+
+  it('cancel-before-apply-keeps-description: a sweep cancelled after reobservation leaves the next description edit on the description path', () => fixture(async (root, inputs) => {
+    const { handle, state, revision } = await opened(inputs);
+    try {
+      const { observer, apply, reobserve } = instrumentObserver(state);
+      const cancellation = new AbortController();
+      reobserve.mockImplementationOnce(async signal => {
+        const changes = await observer.reobserve(signal);
+        cancellation.abort();
+        return changes;
+      });
+      await replace(root, paths.description, parentExposure, '');
+      expect(await handle.sweep({ signal: cancellation.signal })).toEqual({ status: 'cancelled' });
+      expect(reobserve).toHaveBeenCalledTimes(1);
+      expect(apply).not.toHaveBeenCalled();
+      expect(handle.current).toBe(revision);
+      const denied = await revised(handle, [paths.description]);
+      expect(denied.checked.path).toBe('description');
+      expect(findings(denied)).toEqual([['not-visible', paths.rootMain]]);
+      await audited(handle);
+      await equalToBatch(handle, inputs);
+    } finally { await handle.dispose(); }
+  }), timeout);
+
+  it('cancel-after-apply-stays-exact: a sweep cancelled after the observer applied its edit recomputes that edit from the disk', () => fixture(async (root, inputs) => {
+    const { handle, state, revision } = await opened(inputs);
+    try {
+      const { observer, apply } = instrumentObserver(state);
+      const cancellation = new AbortController();
+      apply.mockImplementationOnce(async (changes, signal) => {
+        const update = await observer.apply(changes, signal);
+        cancellation.abort();
+        return update;
+      });
+      await replace(root, paths.description, parentExposure, '');
+      expect(await handle.sweep({ signal: cancellation.signal })).toEqual({ status: 'cancelled' });
+      // The revision step itself observed the cancellation; promotion never ran.
+      expect(apply).toHaveBeenCalledTimes(1);
+      expect(state.stale).toBe(true);
+      expect(handle.current).toBe(revision);
+      expect(await handle.report(undefined, revision.sequence + 1)).toBeNull();
+      // The observer already holds the edit, so the same event would otherwise compare identical.
+      const recomputed = await revised(handle, [paths.description]);
+      expect(recomputed.checked.path).toBe('broad');
+      expect(findings(recomputed)).toEqual([['not-visible', paths.rootMain]]);
+      await audited(handle);
+      await equalToBatch(handle, inputs);
+    } finally { await handle.dispose(); }
+  }), timeout);
+
+  it('cancel-check-before-revise: a signal aborted while reobservation compares inputs with the disk never enters the revision step', () => fixture(async (root, inputs) => {
+    const { handle, state, revision } = await opened(inputs);
+    try {
+      const { observer, reobserve } = instrumentObserver(state);
+      const cancellation = new AbortController();
+      let armed = false;
+      // Abort at the first read of the signal after reobservation starts. The
+      // observer's start-up check uses a bound method, so that read is the
+      // comparison loop's own cancellation check.
+      const signal = new Proxy(cancellation.signal, { get(target, property) {
+        if (property === 'aborted' && armed) cancellation.abort();
+        const value: unknown = Reflect.get(target, property, target);
+        return typeof value === 'function' ? value.bind(target) : value;
+      } });
+      let reobservation: Promise<unknown> | undefined;
+      reobserve.mockImplementationOnce(given => {
+        armed = true;
+        const pending = observer.reobserve(given);
+        reobservation = pending;
+        return pending;
+      });
+      await replace(root, paths.description, parentExposure, '');
+      const entered = revisionsEntered();
+      expect(await handle.sweep({ signal })).toEqual({ status: 'cancelled' });
+      expect(cancellation.signal.aborted).toBe(true);
+      await expect(reobservation).rejects.toThrow();
+      expect(revisionsEntered()).toBe(entered);
+      expect(state.stale).toBe(false);
+      expect(handle.current).toBe(revision);
+      const denied = await revised(handle, [paths.description]);
+      expect(denied.checked.path).toBe('description');
+      await equalToBatch(handle, inputs);
+    } finally { await handle.dispose(); }
+  }), timeout);
+
+  it('recomputes from the disk when reobservation promoted a changed compiler read before the sweep was cancelled', () => fixture(async (root, inputs) => {
+    const { handle, state, revision } = await opened(inputs);
+    try {
+      const { observer, reobserve } = instrumentObserver(state);
+      const cancellation = new AbortController();
+      reobserve.mockImplementationOnce(async signal => {
+        const changes = await observer.reobserve(signal);
+        cancellation.abort();
+        return changes;
+      });
+      const deniedImport = "import { privateValue } from '../../../src/interfaces/api.js';\nvoid privateValue;\n";
+      await replace(root, paths.local, 'void rootValue;', `void rootValue;\n${deniedImport}`);
+      const bytes = await readFile(join(root, paths.local));
+      state.observer!.sink.file(paths.local, createHash('sha256').update(bytes).digest('hex'), bytes.length, 'source');
+      expect(await handle.sweep({ signal: cancellation.signal })).toEqual({ status: 'cancelled' });
+      // Promotion refreshed the recorded read, so the observer moved past the published revision.
+      expect(state.stale).toBe(true);
+      expect(handle.current).toBe(revision);
+      const recomputed = await revised(handle, [paths.local]);
+      expect(recomputed.checked.path).toBe('broad');
+      expect(findings(recomputed)).toEqual([['not-visible', paths.local]]);
+      await audited(handle);
+      await equalToBatch(handle, inputs);
+    } finally { await handle.dispose(); }
+  }), timeout);
+
+  it('recomputes from the disk when a completed revision is cancelled before promoting compiler reads', () => fixture(async (root, inputs) => {
+    const { handle, state, revision } = await opened(inputs);
+    try {
+      const { observer, apply } = instrumentObserver(state);
+      const cancellation = new AbortController();
+      // The first call is the revision step's own application; the second is promotion.
+      apply.mockImplementationOnce(observer.apply.bind(observer)).mockImplementationOnce(async (changes, signal) => {
+        expect(changes).toEqual([]);
+        expect(signal).toBe(cancellation.signal);
+        cancellation.abort();
+        throw Object.assign(new Error('Cancelled before promoting compiler observations'), { name: 'AbortError' });
+      });
+      await replace(root, paths.description, parentExposure, '');
+      expect(await handle.sweep({ signal: cancellation.signal })).toEqual({ status: 'cancelled' });
+      expect(apply).toHaveBeenCalledTimes(2);
+      // The revision step already applied the edit to the observer, so the
+      // session cannot stay as published even though promotion never began.
+      expect(state.stale).toBe(true);
+      expect(handle.current).toBe(revision);
+      expect(await handle.report(undefined, revision.sequence + 1)).toBeNull();
+      const recomputed = await revised(handle, [paths.description]);
+      expect(recomputed.checked.path).toBe('broad');
+      expect(findings(recomputed)).toEqual([['not-visible', paths.rootMain]]);
+      await audited(handle);
+      await equalToBatch(handle, inputs);
     } finally { await handle.dispose(); }
   }), timeout);
 });

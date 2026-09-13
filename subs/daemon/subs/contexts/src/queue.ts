@@ -20,6 +20,8 @@ export interface RunningCapture {
   readonly requests: readonly PendingCheck[];
   readonly changes: readonly SessionChange[];
   readonly background: boolean;
+  /** A required sweep makes requests wait; a periodic sweep is maintenance. */
+  readonly sweep: 'required' | 'periodic' | null;
   readonly started: number;
 }
 

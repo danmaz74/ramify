@@ -1,4 +1,4 @@
-# Iteration 3: Harness attribution, ideal budgets and live correctness
+# Iteration 3: Harness attribution and ideal budgets
 
 **Plan:** [Plan 5 contract remediation](../main-plan.md).
 **Prerequisites:** iterations 1 and 2 on one build.
@@ -6,13 +6,12 @@
 
 ## Goal
 
-Judge each hook by the work it caused, report Plan 5's timing targets as ideal
-budgets, and confirm the repaired contracts on the reference and S100 with real
-processes.
+Judge each hook by the work it caused and report Plan 5's timing targets as
+ideal budgets. No real-process workload runs (resolved decision 7).
 
 ## Read first
 
-- Main plan: resolved decisions 4 and 5, RD-2, rows RC-8 to RC-10.
+- Main plan: resolved decisions 4, 5 and 7, rows RC-8 and RC-9.
 - [Two kinds of budget](../../../architecture/memory-lifecycle.md#two-kinds-of-budget).
 - `scripts/measurements/fast-assertions.mjs` (the `target` helper at 79-82,
   `binding` at 189, the published-hook predicate at 224-229),
@@ -37,40 +36,31 @@ processes.
    workload. The fixture split at `binding` is removed. Correctness predicates
    stay enforced. `fast.mjs --help` and `README.md` state the rule.
 3. **Harness tests** for RC-8 and RC-9 in `fast-evidence.test.mjs`, including
-   synthetic cycles reproducing reference cycles 1 and 13.
-4. **Live run** (RD-2) with one fresh daemon per workload in its own
-   `RAMIFY_ENDPOINT_DIR`, no other builds, tests or measurements on the host:
-   `hook-latency-reference`, then `hook-latency-s100`. The results record each
-   predicate, every ideal miss with its value, cancelled-analysis and sweep
-   counts, and the platform. Raw archives are not committed; their hashes are.
+   synthetic cycles reproducing reference cycles 1 and 13 and S100 cycle 18.
 
 ## Matrix rows executed here
 
-RC-8 `hook-attribution`, RC-9 `ideal-budgets-report`, RC-10 `live-correctness`.
+RC-8 `hook-attribution`, RC-9 `ideal-budgets-report`.
 
 ## Verification
 
 ```sh
 npm run build && npm run type-check
 node --test scripts/measurements/fast-evidence.test.mjs
-npm run measure:fast -- --workload hook-latency-reference --output .reference-work/reports/remediation-reference.json
-npm run measure:fast -- --workload hook-latency-s100 --output .reference-work/reports/remediation-s100.json
 git diff --check
 ```
 
-Evidence kind for RC-10 is `measurement` from real processes.
-Expected intermediate failures: none after iterations 1 and 2; a correctness
-failure here reopens the owning iteration rather than being recorded.
+Then the cucumber-viz commit audit on the iteration worktree. Expected
+intermediate failures: none.
 
 ## Exit criteria
 
 - RC-8 and RC-9 pass.
-- Both live workloads pass every correctness predicate; ideal misses are
-  recorded, not failed.
 - The completion report required by the main plan's handoff exists as
   `iteration3-results.md`.
 
 ## Handoff
 
-The plan's completion report, and the corrected harness for any later run of
-Plan 5's remaining workloads.
+The plan's completion report, and the corrected harness for Plan 5's
+outstanding measurement, including any later run of the hook-latency
+workloads.
