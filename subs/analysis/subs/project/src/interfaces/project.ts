@@ -142,6 +142,9 @@ export type InventoryUpdate =
   | { readonly kind: 'incomplete'; readonly issues: readonly ProjectIssue[] };
 export interface ProjectObserver {
   readonly inventory: ProjectInventory;
+  /** The resolution of the acquisition behind `inventory`, replaced by a structural rebuild.
+   * Passed to `resolveProjectRoot` as known, it is reused while its queries answer the same. */
+  readonly resolution: Extract<ProjectResolution, { readonly status: 'resolved' }>;
   readonly inputs: readonly CapturedInput[];
   readonly inputId: string;
   readonly sink: ObservationSink;

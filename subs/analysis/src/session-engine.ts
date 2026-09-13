@@ -3,7 +3,7 @@ import { performance } from 'node:perf_hooks';
 import { parseDescription } from '../subs/descriptions/src/parse.js';
 import type { ParsedDescription } from '../subs/descriptions/src/interfaces/syntax.js';
 import { resolveTagRegistry } from '../subs/model/src/index.js';
-import type { CapturedInput, ProjectObserver } from '../subs/project/src/interfaces/project.js';
+import type { CapturedInput, ProjectObserver, ProjectResolution } from '../subs/project/src/interfaces/project.js';
 import { observeProject } from '../subs/project/src/observer.js';
 import { resolveProjectRoot } from '../subs/project/src/resolve-root.js';
 import type { AnalysisDiagnostic, AnalysisInputs, AnalysisReport, RunControl } from './interfaces/analysis.js';
@@ -28,6 +28,8 @@ interface Version {
   readonly bytes: number;
 }
 
+/** Distinct invocation requests whose resolutions a session keeps for reuse. */
+const knownResolutions = 4;
 const positiveIntegers = (values: readonly unknown[]): boolean => values.every(value => Number.isSafeInteger(value) && (value as number) > 0);
 
 /** Findings that appeared, disappeared or only moved between two complete lists. */
@@ -64,6 +66,9 @@ class Session implements RetainedSession {
   /** Sealed inputs of an invalid acquisition retained before an observer exists. */
   #sealed: readonly CapturedInput[] | null = null;
   readonly #acquisition: AnalysisInputs['limits']['acquisition'];
+  /** Resolutions an invocation check may reuse, most recent first: the observer's and earlier checks'. */
+  #resolutions: ProjectResolution[] = [];
+  #observedResolution: ProjectResolution | null = null;
 
   constructor(state: SessionState, acquisition: AnalysisInputs['limits']['acquisition']) {
     this.#state = state;
@@ -246,7 +251,7 @@ class Session implements RetainedSession {
         try { await observer?.dispose(); }
         finally {
           this.#versions.clear();
-          this.#current = null; this.#sealed = null;
+          this.#current = null; this.#sealed = null; this.#resolutions = []; this.#observedResolution = null;
           this.#state.facts = null; this.#state.parsed.clear();
         }
       }
@@ -335,12 +340,23 @@ class Session implements RetainedSession {
     if (JSON.stringify(wanted) !== JSON.stringify(have)) return problem('The invocation requests a different capability set than the session');
     const scope = state.facts?.inventory?.scope ?? state.facts?.invalid?.inventory?.scope;
     if (!scope) return null;
-    const resolved = await resolveProjectRoot(invocation.project, signal);
+    // An equal invocation reuses a known resolution while every discovery query
+    // it made answers the same on disk; the scope comparison below still runs.
+    const observed = state.observer?.resolution ?? null;
+    if (observed && observed !== this.#observedResolution) { this.#observedResolution = observed; this.#remember(observed); }
+    const resolved = await resolveProjectRoot(invocation.project, signal, this.#resolutions);
     if (resolved.status !== 'resolved') return problem(`The invocation does not resolve to a project: ${resolved.issues.map(issue => issue.message).join('; ')}`);
+    this.#remember(resolved);
     if (resolved.root !== scope.root || resolved.configuration !== scope.configuration) {
       return problem(`The invocation resolves to ${resolved.root}, not this session's ${scope.root}`);
     }
     return null;
+  }
+
+  /** Keep a resolution first among a few; requests from other directories keep their own. */
+  #remember(resolution: ProjectResolution): void {
+    if (this.#resolutions[0] === resolution) return;
+    this.#resolutions = [resolution, ...this.#resolutions.filter(item => item !== resolution)].slice(0, knownResolutions);
   }
 
   /** Retry observation for a session opened over a coherent invalid capture. */

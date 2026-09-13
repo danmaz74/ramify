@@ -4,9 +4,9 @@ import { Capture } from './capture.js';
 import { AcquisitionError, Cancelled, byteOrder, freeze } from './data.js';
 import { acquireConfiguration, ConfigurationChanged } from './configuration.js';
 import { inventoryProject } from './inventory.js';
-import { resolveCapturedRoot } from './resolve-root.js';
+import { recordResolution, resolveCapturedRoot } from './resolve-root.js';
 import type { ConfigurationData } from './configuration-data.js';
-import type { ProjectInputView, ProjectInventory, ProjectIssue, ProjectRead, ProjectReadOptions, RetainedConfiguration } from './interfaces/project.js';
+import type { ProjectInputView, ProjectInventory, ProjectIssue, ProjectRead, ProjectReadOptions, ProjectResolution, RetainedConfiguration } from './interfaces/project.js';
 
 /** One live acquisition, retained by its caller instead of a sealed view. */
 export interface AcquiredProject {
@@ -16,6 +16,8 @@ export interface AcquiredProject {
   readonly configurationPath: string;
   readonly configurationData: ConfigurationData;
   readonly reusedConfiguration: boolean;
+  /** The resolution this acquisition made, recorded before any inventory query. */
+  readonly resolution: Extract<ProjectResolution, { status: 'resolved' }>;
 }
 export type ProjectAcquire =
   | { readonly status: 'acquired'; readonly acquired: AcquiredProject }
@@ -61,6 +63,9 @@ export async function acquireProject(options: ProjectReadOptions): Promise<Proje
       const config = acquiredConfiguration.data;
       if (config.references.length && !config.files.length) throw new AcquisitionError('references-only-configuration', configuration,
         `Solution-style configurations are unavailable; referenced configurations: ${config.references.join(', ')}`);
+      // The capture holds only selection and configuration queries here, as a
+      // standalone resolution's capture does when it succeeds.
+      const resolution = recordResolution(capture, request, { status: 'resolved', ...selected, configuration });
       const acquired = await inventoryProject(capture, { ...selected, configuration }, config, options.parse, options.retained?.product.metadata as Parameters<typeof inventoryProject>[4]);
       inventory = acquired.inventory;
       issues = acquired.issues;
@@ -77,7 +82,7 @@ export async function acquireProject(options: ProjectReadOptions): Promise<Proje
       const product = { ...acquiredConfiguration.retained.product, metadata: acquired.metadata, metadataReused: acquired.metadataReused };
       const configurationProduct = freeze({ ...acquiredConfiguration.retained, product, bytes: Buffer.byteLength(JSON.stringify(product)) });
       return { status: 'acquired', acquired: { capture, inventory, configuration: configurationProduct,
-        configurationPath: configuration, configurationData: config, reusedConfiguration: acquiredConfiguration.reused } };
+        configurationPath: configuration, configurationData: config, reusedConfiguration: acquiredConfiguration.reused, resolution } };
     } catch (error) {
       if (error instanceof ConfigurationChanged) { previousConfiguration = null; attempt--; continue; }
       if (error instanceof Cancelled || signal?.aborted) return { status: 'cancelled' };

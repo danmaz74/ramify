@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import type { AnalysisDriver, ContextBudgets, ContextSetup } from '../interfaces/contexts.js';
 import type { AnalysisInputs, AnalysisReport, RunControl } from '../../../../../analysis/src/interfaces/analysis.js';
 import type { OperationTimings, RetainedSession, SessionChange, SessionRevision, SessionStatus, SessionUpdate, VerifyOutcome } from '../../../../../analysis/src/interfaces/session.js';
-import type { CapturedInput, ProjectRequest } from '../../../../../analysis/subs/project/src/interfaces/project.js';
+import type { CapturedInput, ProjectRequest, ProjectResolution } from '../../../../../analysis/subs/project/src/interfaces/project.js';
 import { historyReport } from './history-fixture.js';
 
 export const testBudgets: ContextBudgets = {
@@ -46,6 +46,12 @@ export interface ScriptedCall {
   readonly signal: AbortSignal | undefined;
 }
 type ScriptedResult = ScriptedCapture | SessionUpdate | { readonly status: 'unchanged' };
+/** One `resolve` call: the known resolutions it received and whether one was returned. */
+export interface ScriptedResolve {
+  readonly request: ProjectRequest;
+  readonly known: readonly ProjectResolution[];
+  readonly reused: boolean;
+}
 export interface ScriptedSession {
   readonly session: RetainedSession;
   readonly project: ProjectRequest;
@@ -66,6 +72,11 @@ export function createScriptedDriver() {
   let fallback = capture(1);
   let factBytes = 100;
   let disposed = false;
+  const resolveCalls: ScriptedResolve[] = [];
+  // A stand-in for discovery answers: a resolution stays valid until they change.
+  let discovery = 0;
+  let movedRoot: string | undefined;
+  const answered = new WeakMap<ProjectResolution, number>();
   const invoke = async (call: ScriptedCall): Promise<ScriptedResult> => {
     calls.push(call);
     const next = pending.shift();
@@ -74,8 +85,13 @@ export function createScriptedDriver() {
     return result;
   };
   const driver: AnalysisDriver = {
-    async resolve(request) {
-      return { status: 'resolved', root: request.root ?? '/fixture', selection: request.root ? 'given' : 'found', invokedFrom: request.cwd, configuration: 'tsconfig.json' };
+    async resolve(request, _control, known = []) {
+      const candidate = known[0];
+      if (candidate && answered.get(candidate) === discovery) { resolveCalls.push({ request, known, reused: true }); return candidate; }
+      const resolution: ProjectResolution = { status: 'resolved', root: movedRoot ?? request.root ?? '/fixture', selection: request.root ? 'given' : 'found', invokedFrom: request.cwd, configuration: 'tsconfig.json' };
+      answered.set(resolution, discovery);
+      resolveCalls.push({ request, known, reused: false });
+      return resolution;
     },
     async open(project, setup, control) {
       const first = await invoke({ kind: 'open', inputs: { project, setup, changes: [] }, signal: control?.signal });
@@ -151,7 +167,11 @@ export function createScriptedDriver() {
     },
     async dispose() { disposed = true; },
   };
-  return { driver, calls, pending, sessions, reportCalls, verifyCalls, verifyPending, missingReports,
+  return { driver, calls, pending, sessions, reportCalls, verifyCalls, verifyPending, missingReports, resolveCalls,
+    /** Resolutions actually performed: calls that returned no known resolution. */
+    get resolutions() { return resolveCalls.filter(call => !call.reused).length; },
+    /** Change the discovery answers: every earlier resolution is invalid, optionally with a moved root. */
+    changeDiscovery(root?: string) { discovery++; movedRoot = root; },
     get openCalls() { return calls.filter(call => call.kind === 'open'); },
     get updateCalls() { return calls.filter(call => call.kind === 'update'); },
     get sweepCalls() { return calls.filter(call => call.kind === 'sweep'); },

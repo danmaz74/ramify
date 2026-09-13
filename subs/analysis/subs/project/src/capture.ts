@@ -293,6 +293,16 @@ export class Capture {
     this.#inputs = freeze(inputs.sort((a, b) => byteOrder(a.path, b.path)));
     return this.#inputs;
   }
+  /**
+   * What every recorded query answered: kind, canonical path, exact name,
+   * enumerated members and read bytes. Stat metadata such as size and times is
+   * left out, so an edited file that was only probed answers the same.
+   */
+  get answers(): string {
+    const entries = [...this.#observations.values()].sort((a, b) => byteOrder(a.path, b.path));
+    return hash(JSON.stringify(entries.map(entry => [entry.path, entry.kind, entry.canonical ?? null, entry.exactName ?? null,
+      entry.entries ?? null, entry.bytes === undefined ? null : this.#hash(entry)])));
+  }
   /** Enumerations actually performed; a cached listing costs none. */
   get enumerations(): number { return this.#enumerations; }
   /** What was recorded about one path, without re-reading it. */

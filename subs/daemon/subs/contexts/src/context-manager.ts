@@ -1,17 +1,19 @@
 import { randomUUID } from 'node:crypto';
 import type { AnalysisReport, RunControl } from '../../../../analysis/src/interfaces/analysis.js';
 import type { SessionChange, SessionRevision, SessionUpdate } from '../../../../analysis/src/interfaces/session.js';
-import type { ProjectRequest } from '../../../../analysis/subs/project/src/interfaces/project.js';
+import type { ProjectRequest, ProjectResolution } from '../../../../analysis/subs/project/src/interfaces/project.js';
 import type { CaptureTimings, CaptureWork, CheckOutcome, CheckRequest, ContextEvent, ContextManager, ContextManagerOptions, ContextRevision, ContextSetup, ContextStatus, ContextToken, FreshnessRecord, OpenOutcome, ReplyTimings, RevisionCause, Unavailable, WatchBatch, WatchEvent } from './interfaces/contexts.js';
 import type { LiveContext } from './context.js';
 import { createHistory } from './history.js';
 import type { HistoryEntry } from './history.js';
 import { createContextId, createFingerprints, createRevisionId } from './tokens.js';
-import { complete, invocationKey, spanBatches } from './queue.js';
+import { complete, invocationKey, projectKey, spanBatches } from './queue.js';
 import type { Invocation, PendingCheck } from './queue.js';
 
 const implemented = new Set(['registry', 'layout', 'metadata', 'descriptions', 'source-catalog', 'exposure-linking', 'static-access', 'tags-origin', 'namespace-access', 'lazy-access', 'symbol-free-access', 'resource-access', 'coverage']);
 function unavailable(reason: Unavailable['reason'], message: string = reason): Unavailable { return { status: 'unavailable', reason, message }; }
+/** Distinct project requests whose resolutions one context keeps for reuse. */
+const knownResolutions = 4;
 const noWork = (): { -readonly [K in keyof CaptureWork]: number } => ({ invocationCheck: 0, workerStatus: 0, workerRoundTrip: 0 });
 function freeze<T>(value: T): T {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) { Object.freeze(value); for (const child of Object.values(value)) freeze(child); }
@@ -61,6 +63,8 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
   }
   function releaseSession(context: LiveContext): Promise<void> {
     const session = context.session; context.session = null; context.publishedSession = null; context.versions.clear(); context.observedSequence = 0;
+    // An unavailable session resolves again: known resolutions leave with it.
+    context.resolutions.clear();
     return session ? cleanup(session.dispose()) : Promise.resolve();
   }
   function evict(context: LiveContext, reason: 'idle' | 'pressure' | 'disposed'): void {
@@ -507,6 +511,19 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       context.queue.push(entry); scheduleIdle(context); kick();
     });
   }
+  /** Resolutions of an equal request held by contexts with a live session. */
+  function knownFor(key: string): { readonly context: LiveContext; readonly resolution: ProjectResolution }[] {
+    const known: { context: LiveContext; resolution: ProjectResolution }[] = [];
+    for (const context of contexts.values()) {
+      const resolution = context.resolutions.get(key);
+      if (resolution && context.session && !context.cooling && context.state !== 'cold' && context.state !== 'evicted') known.push({ context, resolution });
+    }
+    return known;
+  }
+  function rememberResolution(context: LiveContext, key: string, resolution: ProjectResolution): void {
+    context.resolutions.delete(key); context.resolutions.set(key, resolution);
+    for (const oldest of context.resolutions.keys()) { if (context.resolutions.size <= knownResolutions) break; context.resolutions.delete(oldest); }
+  }
   async function open(request: ProjectRequest, setup: ContextSetup, lease: string, control?: RunControl): Promise<OpenOutcome> {
     if (disposed) return unavailable('disposed');
     if (setup.registry !== 'default' || setup.capabilities.some(item => !implemented.has(item))) return unavailable('unsupported-setup');
@@ -514,7 +531,11 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     control?.signal?.addEventListener('abort', abort, { once: true }); if (control?.signal?.aborted) controller.abort(); resolving.add(controller);
     try {
       const project = freeze(structuredClone(request)); const requestedSetup = freeze(structuredClone(setup));
-      const resolution = await driver.resolve(project, { signal: controller.signal });
+      // A known context's resolution of an equal request is reused while its discovery
+      // queries answer the same; the driver validates it against the filesystem.
+      const key = projectKey(project); const known = knownFor(key);
+      const resolution = await driver.resolve(project, { signal: controller.signal }, known.map(item => item.resolution));
+      for (const item of known) if (item.resolution !== resolution && item.context.resolutions.get(key) === item.resolution) item.context.resolutions.delete(key);
       if (disposed) return unavailable('disposed');
       if (controller.signal.aborted) return unavailable('analysis-failed', 'Opening request was cancelled');
       if (resolution.status !== 'resolved') {
@@ -525,7 +546,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       }
       const selection = freeze({ root: resolution.root, scope: project.scope, configuration: project.configuration, setup: requestedSetup });
       const id = createContextId(selection); const existing = contexts.get(id);
-      if (existing) { existing.invocations.set(lease, { project, setup: requestedSetup }); touch(existing);
+      if (existing) { existing.invocations.set(lease, { project, setup: requestedSetup }); rememberResolution(existing, key, resolution); touch(existing);
         return { status: 'opened', token: existing.token, created: false, current: snapshot(existing) }; }
       if (contexts.size >= budgets.maxContexts) {
         const victim = [...contexts.values()].filter(item => !held(item)).sort((a, b) => a.lastActivityAt - b.lastActivityAt)[0];
@@ -534,7 +555,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       const now = clock.now();
       const context: LiveContext = {
         token: freeze({ context: id, generation: options.generationId() }), selection, project, invocation: { project, setup: requestedSetup },
-        openedAt: now, lastActivityAt: now, hadLease: false, invocations: new Map([[lease, { project, setup: requestedSetup }]]), subscriptions: new Map(),
+        openedAt: now, lastActivityAt: now, hadLease: false, invocations: new Map([[lease, { project, setup: requestedSetup }]]), resolutions: new Map([[key, resolution]]), subscriptions: new Map(),
         history: createHistory(budgets.maxHistoryRevisions, budgets.maxHistoryBytes, entry => releaseVersion(context, entry)),
         queue: [], deliveries: new Set(), paths: new Map(), watched: null, scope: null, state: 'opening', synchronization: 'initializing', lastValid: null,
         session: null, publishedSession: null, versions: new Set(), observedSequence: 0, sequence: 0, sweepRequired: true, periodicSweepDue: false, lastSweepAt: now, auditedSequence: 0, auditRequired: false, demoting: null, cooling: false,

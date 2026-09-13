@@ -32,6 +32,10 @@ export function spanBatches(first: WatchBatch | null, second: WatchBatch | null)
   return { receivedAt: Math.min(first.receivedAt, second.receivedAt), flushedAt: Math.max(first.flushedAt, second.flushedAt) };
 }
 
+/** Project requests that resolve alike: their raw fields, as the resolver compares them. */
+export function projectKey(project: ProjectRequest): string {
+  return JSON.stringify([project.cwd, project.root ?? null, project.scope, project.configuration]);
+}
 export function invocationKey(value: Invocation): string {
   const { cwd, root, scope, configuration } = value.project;
   return JSON.stringify([cwd, root ?? null, scope, configuration, value.setup.registry, value.setup.capabilities]);

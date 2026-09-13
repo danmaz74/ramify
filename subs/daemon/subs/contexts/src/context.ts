@@ -1,5 +1,5 @@
 import type { RetainedSession } from '../../../../analysis/src/interfaces/session.js';
-import type { ProjectRequest, ProjectScope } from '../../../../analysis/subs/project/src/interfaces/project.js';
+import type { ProjectRequest, ProjectResolution, ProjectScope } from '../../../../analysis/subs/project/src/interfaces/project.js';
 import type { ContextEvent, ContextRevision, ContextSelection, ContextState, ContextToken, SynchronizationState, WatchBatch, WatcherHandle } from './interfaces/contexts.js';
 import type { RevisionHistory } from './history.js';
 import type { Invocation, PendingCheck, RunningCapture } from './queue.js';
@@ -11,6 +11,8 @@ export interface LiveContext {
   readonly project: ProjectRequest;
   readonly openedAt: number;
   readonly invocations: Map<string, Invocation>;
+  /** Resolved project requests by `projectKey`, oldest first; reused on open only while a session is live. */
+  readonly resolutions: Map<string, ProjectResolution>;
   readonly subscriptions: Map<string, { lease: string; listener: (event: ContextEvent) => void }>;
   history: RevisionHistory<ContextRevision>;
   readonly queue: PendingCheck[];

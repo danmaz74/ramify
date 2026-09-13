@@ -65,10 +65,10 @@ function sessionDriver(capacity: SessionLimits): AnalysisDriver {
     return handle;
   }
   return {
-    async resolve(request, control) {
+    async resolve(request, control, known) {
       if (disposed) throw new Error('Analysis driver is disposed');
       control?.signal?.throwIfAborted();
-      return tracked(control, signal => resolveProject(request, { signal }));
+      return tracked(control, signal => resolveProject(request, { signal }, known));
     },
     async open(project, setup, control) {
       if (disposed || control?.signal?.aborted) return { status: 'cancelled' };

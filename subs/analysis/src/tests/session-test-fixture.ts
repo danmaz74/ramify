@@ -118,7 +118,7 @@ export function instrumentObserver(state: SessionState) {
   const apply = vi.fn(observer.apply.bind(observer));
   const reobserve = vi.fn(observer.reobserve.bind(observer));
   state.observer = {
-    get inventory() { return observer.inventory; }, get inputs() { return observer.inputs; },
+    get inventory() { return observer.inventory; }, get resolution() { return observer.resolution; }, get inputs() { return observer.inputs; },
     get inputId() { return observer.inputId; }, sink: observer.sink, apply, reobserve,
     readDescription: observer.readDescription.bind(observer),
     readReadme: observer.readReadme.bind(observer), dispose: observer.dispose.bind(observer),

@@ -11,7 +11,7 @@ import type { ConfigurationData } from './configuration-data.js';
 import type {
   CapturedInput, ExactReference, InventoryFile, InventoryModule, InventoryUpdate, ObservationSink,
   ObservedChange, ProjectInventory, ProjectIssue, ProjectObserve, ProjectObserver, ProjectReadOptions,
-  RetainedConfiguration,
+  ProjectResolution, RetainedConfiguration,
 } from './interfaces/project.js';
 
 type Classified =
@@ -38,6 +38,7 @@ class Observer implements ProjectObserver {
   #inventory: ProjectInventory;
   #configuration: RetainedConfiguration;
   #configurationData: ConfigurationData;
+  #resolution: Extract<ProjectResolution, { status: 'resolved' }>;
   #reported = new ReportedObservations();
   /** The last merged list and identity with the state they describe; the next read replaces them. */
   #merged: { readonly capture: Capture; readonly captured: number; readonly reported: number; readonly inputs: readonly CapturedInput[] } | undefined;
@@ -50,10 +51,12 @@ class Observer implements ProjectObserver {
     this.#inventory = acquired.inventory;
     this.#configuration = acquired.configuration;
     this.#configurationData = acquired.configurationData;
+    this.#resolution = acquired.resolution;
     this.#capture.retainAcquisition();
   }
 
   get inventory(): ProjectInventory { return this.#inventory; }
+  get resolution(): Extract<ProjectResolution, { status: 'resolved' }> { return this.#resolution; }
   /** Filesystem work performed so far, for locality evidence outside the port. */
   get enumerations(): number { return this.#capture.enumerations; }
   get sink(): ObservationSink { return this.#reported.sink; }
@@ -382,6 +385,7 @@ class Observer implements ProjectObserver {
     this.#inventory = result.acquired.inventory;
     this.#configuration = result.acquired.configuration;
     this.#configurationData = result.acquired.configurationData;
+    this.#resolution = result.acquired.resolution;
     this.#capture.retainAcquisition();
     this.#merged = undefined; this.#recordedId = undefined;
     await previous.dispose();

@@ -195,7 +195,10 @@ export interface ContextBudgets {
   readonly updateDeadlineMs: number;
 }
 export interface AnalysisDriver {
-  resolve(request: ProjectRequest, control?: RunControl): Promise<ProjectResolution>;
+  /** `known` holds earlier resolutions of an equal request, most recent first. A driver
+   * returns one of them unchanged, as the same object, only while every discovery query
+   * it made still answers the same; otherwise it resolves again. */
+  resolve(request: ProjectRequest, control?: RunControl, known?: readonly ProjectResolution[]): Promise<ProjectResolution>;
   open(project: ProjectRequest, setup: ContextSetup, control?: RunControl): Promise<SessionOpen>;
   dispose(): Promise<void>;
 }
