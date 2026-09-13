@@ -357,3 +357,5 @@ Also report the reference configuration row against 2 s (before 1,872 ms, p90
 decision 3 and iteration 6's small-project option from the measured
 configuration rows. Update the optimization analysis's figures and remaining
 targets.
+
+Reference and S100 results: [measurement results](measurement-results.md).
