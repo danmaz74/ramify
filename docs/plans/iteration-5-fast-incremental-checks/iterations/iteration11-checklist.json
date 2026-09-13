@@ -1,0 +1,15 @@
+{
+  "_cucumberViz": {
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "workflow.write_iteration_checklist",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "checks": {
+    "allNewTestsPass": false,
+    "functionalRequirementsSatisfied": false,
+    "newCodeCoveredByTests": true
+  },
+  "completedAt": "2026-09-12T12:17:37.955Z",
+  "iteration": "11",
+  "notes": "Automatic Vitest reported 1437 passing and 10 failing tests. This bounded remediation addresses all three causes in the three failing test files: defer the new audit witness import until the fixture installs its state-capture mock (five setup failures); keep a real compiler import probe so the observed-deletion fixture satisfies its stated precondition without changing the expected exit/hash/coverage result (one failure); give the real-compiler CLI suite a 30-second test-runner allowance while preserving every CLI deadline and behavior assertion (four runner timeouts). All four type-check scopes and diff checks pass. A focused direct quick-service probe passes 34 assertions, including complete resident/batch equality for observed deletion, negative paths, cleanup and zero leaked resources. No reserved regression runner was rerun locally. Mock ordering and the parallel-runner correction await automatic confirmation; allNewTestsPass remains false. Full prerequisite completion and inherited measurement obligations remain unconfirmed, so functionalRequirementsSatisfied remains false. Existing coverage and all assertions are preserved; no obligation or decision-pending self-assessment finding is waived. See iteration11-results.md for exact evidence and source/build identities."
+}
