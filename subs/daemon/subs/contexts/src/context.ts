@@ -18,6 +18,9 @@ export interface LiveContext {
   readonly queue: PendingCheck[];
   readonly deliveries: Set<PendingCheck>;
   readonly paths: Map<string, 'changed' | 'created' | 'deleted' | 'unknown'>;
+  /** Queued paths only synchronized requests named, with those requests. A watcher event,
+   * a restored capture or a bound reset makes a path a known change and removes it. */
+  readonly requested: Map<string, Set<PendingCheck>>;
   /** Watcher batches behind `paths`: the earliest receipt and latest flush, until a capture consumes them. */
   watched: WatchBatch | null;
   lastActivityAt: number;

@@ -73,3 +73,52 @@ describe('daemon session audit accounting', () => {
     }
   });
 });
+
+describe('daemon racing-hook attribution', () => {
+  it('counts a hook covered on publication as a covered request with only the watcher update analysed', async () => {
+    const clock = createControlledClock(); const watcher = createControlledWatcher();
+    const observed = (content: string): SessionRevision => ({ ...revision(1), inputs: [{ path: 'src/index.ts', role: 'source', sha256: content, bytes: 1 }] });
+    let current = observed('a'.repeat(64)); let finish: (() => void) | undefined;
+    const session: RetainedSession = {
+      get current() { return current; },
+      async update() {
+        await new Promise<void>(resolve => { finish = resolve; });
+        current = { ...observed('b'.repeat(64)), sequence: current.sequence + 1, checked: { ...current.checked, path: 'source' } };
+        return { status: 'revised', revision: current, identical: false };
+      },
+      async sweep() { return { status: 'unchanged' }; }, async verify() { return { status: 'equal', sequence: current.sequence, elapsedMs: 1 }; },
+      async report() { return null; }, async releaseRevision() {},
+      status() { return { level: 'hot', sequence: current.sequence, observedInputs: 1, factBytes: 100,
+        worker: { heapUsed: 100, rss: 100 }, compiler: { pid: null, rss: null }, lastSweepAt: null }; },
+      async releaseCompiler() {}, async dispose() {},
+    };
+    const driver: AnalysisDriver = {
+      async resolve(request) { return { status: 'resolved', root: '/fixture', selection: 'given', invokedFrom: request.cwd, configuration: 'tsconfig.json' }; },
+      async open() { return { status: 'opened', session, revision: current }; },
+      async dispose() {},
+    };
+    const service = createDaemonService({ driver, watcher, clock, budgets: { ...budgets, sweepIntervalMs: 60_000, warmIdleMs: 60_000, coldRetainMs: 120_000 },
+      instance: { instanceId: 'racing-attribution-test', pid: process.pid, version: '0.0.0', engine: 'test-engine', buildKey: '0000000000000000' },
+      log: () => {} });
+    try {
+      const opened = await service.openContext({ project: { cwd: '/fixture', root: '/fixture', scope: 'whole-project', configuration: 'discover' },
+        setup: { registry: 'default', capabilities: [] } });
+      if (!opened.ok || opened.value.status !== 'opened') throw new Error('Expected an opened context');
+      await flush();
+      const before = await service.daemonStatus();
+      watcher.emit('/fixture', [{ path: 'src/index.ts', kind: 'changed' }]); clock.advance(10); await flush();
+      expect(finish).toBeDefined();
+      const hook = service.check({ token: opened.value.token, requestId: 'racing', scope: 'delta',
+        freshness: { mode: 'synchronized', expect: [{ path: 'src/index.ts', sha256: 'b'.repeat(64) }] } });
+      await flush(); finish!();
+      expect(await hook).toMatchObject({ ok: true, value: { status: 'reported', revision: { sequence: 2, cause: 'watch' },
+        freshness: { captureStarted: null, verified: true, reusedRevision: true } } });
+      await flush();
+      const after = await service.daemonStatus();
+      if (!before.ok || !after.ok) throw new Error('Expected daemon counters');
+      expect(after.value.counters.analyses - before.value.counters.analyses).toBe(1);
+      expect(after.value.counters.revisions - before.value.counters.revisions).toBe(1);
+      expect(after.value.counters.coveredRequests - before.value.counters.coveredRequests).toBe(1);
+    } finally { finish?.(); await service.dispose(); await watcher.dispose(); clock.dispose(); }
+  });
+});

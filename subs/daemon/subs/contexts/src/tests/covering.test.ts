@@ -141,10 +141,12 @@ describe('covered identity rendezvous', () => {
         let controlAnswered = false;
         const control = e.check(opened.token, { mode: 'synchronized', expect: expected('src/index.ts', '2') }).then(result => { controlAnswered = true; return result; });
         await flush(); expect(controlAnswered).toBe(false); expect(e.script.updateCalls).toHaveLength(0);
-        // The sweep finds an out-of-band change and publishes it after the covered reply.
+        // The sweep finds an out-of-band change and publishes it after the covered reply;
+        // that publication covers the queued control, which runs no update of its own.
         finish!(capture(2));
-        expect(await control).toMatchObject({ status: 'reported', published: true, revision: { sequence: 2, cause: 'sweep' } });
-        expect(e.script.updateCalls).toHaveLength(1); expect(e.script.sweepCalls).toHaveLength(1);
+        expect(await control).toMatchObject({ status: 'reported', published: true, revision: { sequence: 2, cause: 'sweep' },
+          freshness: { captureStarted: null, reusedRevision: true } });
+        expect(e.script.updateCalls).toHaveLength(0); expect(e.script.sweepCalls).toHaveLength(1);
       } finally { finish?.(capture()); await flush(); await e.dispose(); }
     });
 
@@ -193,6 +195,205 @@ describe('covered identity rendezvous', () => {
         expect(await hook).toMatchObject({ status: 'reported', published: true, freshness: { acknowledged: 5, captureStarted: 5, verified: true } });
       } finally { finish?.(capture()); e.script.pending.length = 0; await flush(); await e.dispose(); }
     });
+  });
+});
+
+describe('covering on publication', () => {
+  type Held = ReturnType<typeof capture> | { readonly status: 'cancelled' };
+  const pause = () => { let finish: (value: Held) => void = () => {}; const promise = new Promise<Held>(resolve => { finish = resolve; }); return { promise, finish }; };
+  const observed = (version: string) => [
+    { path: 'src/index.ts', role: 'source' as const, sha256: hash(version), bytes: 1 },
+    { path: 'src/other.ts', role: 'source' as const, sha256: hash('other'), bytes: 5 },
+  ];
+  const zero = { invocationCheck: 0, workerStatus: 0, workerRoundTrip: 0, publication: 0 };
+  /** Resolves the promise's outcome when it settles and records whether it has. */
+  function watch<T>(promise: Promise<T>) { const state = { answered: false, result: promise.then(value => { state.answered = true; return value; }) }; return state; }
+
+  it('covered-on-publication: hooks queued during the watcher update are answered from its revision with no second update', async () => {
+    const e = sessionEnvironment();
+    const held = pause();
+    try {
+      const opened = await e.open(); await flush();
+      e.script.pending.push(() => held.promise);
+      e.clock.advance(10); e.watcher.emit('/fixture', [{ path: 'src/index.ts', kind: 'changed' }], { receivedAt: 5, flushedAt: 10 });
+      e.clock.advance(100); await flush();
+      expect(e.script.updateCalls).toHaveLength(1); expect(e.status(opened.token).pending.analysisRunning).toBe(true);
+      // Two hooks race the running update: one for the watched write, one for a path it did not name.
+      const hooks = [watch(e.check(opened.token, { mode: 'synchronized', expect: expected('src/index.ts', '2') })),
+        watch(e.check(opened.token, { mode: 'synchronized', expect: [{ path: 'src/other.ts', sha256: hash('other') }] }))];
+      await flush();
+      expect(hooks.map(hook => hook.answered)).toEqual([false, false]);
+      expect(e.status(opened.token).pending).toMatchObject({ requests: 2, changedPaths: 2, analysisRunning: true });
+      held.finish(capture(2, 'completed', observed('2')));
+      for (const hook of hooks) {
+        expect(await hook.result).toMatchObject({ status: 'reported', published: true,
+          revision: { sequence: 2, cause: 'watch', capture: { watch: { receivedAt: 5, flushedAt: 10 } } },
+          freshness: { acknowledged: 110, captureStarted: null, verified: true, reusedRevision: true }, timings: zero });
+      }
+      e.clock.advance(1_000); await flush();
+      expect(e.script.updateCalls).toHaveLength(1); expect(e.script.sweepCalls).toHaveLength(0);
+      expect(e.status(opened.token)).toMatchObject({ synchronization: 'synchronized', published: { sequence: 2 },
+        pending: { requests: 0, changedPaths: 0, analysisRunning: false } });
+      // Control: an arriving hook with the same identity is covered on arrival as before.
+      expect(await e.check(opened.token, { mode: 'synchronized', expect: expected('src/index.ts', '2') }))
+        .toMatchObject({ revision: { sequence: 2 }, freshness: { captureStarted: null, reusedRevision: true } });
+      expect(e.script.updateCalls).toHaveLength(1);
+    } finally { held.finish(capture(2, 'completed', observed('2'))); await flush(); await e.dispose(); }
+  });
+
+  describe('uncovered-after-publication', () => {
+    it('uncovered-after-publication: a queued differing expectation runs an update, and a covered companion waits with it', async () => {
+      const e = sessionEnvironment();
+      const first = pause(), second = pause();
+      try {
+        const opened = await e.open(); await flush();
+        e.script.pending.push(() => first.promise, () => second.promise);
+        e.watcher.emit('/fixture', [{ path: 'src/index.ts', kind: 'changed' }]); e.clock.advance(100); await flush();
+        const companion = watch(e.check(opened.token, { mode: 'synchronized', expect: [{ path: 'src/other.ts', sha256: hash('other') }] }));
+        const differing = watch(e.check(opened.token, { mode: 'synchronized', expect: expected('src/index.ts', '3') }));
+        first.finish(capture(2, 'completed', observed('2'))); await flush();
+        expect(e.status(opened.token).published?.sequence).toBe(2);
+        expect([companion.answered, differing.answered]).toEqual([false, false]);
+        expect(e.script.updateCalls).toHaveLength(2);
+        expect(e.script.updateCalls[1]?.inputs.changes.map(change => change.path).sort()).toEqual(['src/index.ts', 'src/other.ts']);
+        second.finish(capture(3, 'completed', observed('3')));
+        for (const hook of [companion, differing]) {
+          expect(await hook.result).toMatchObject({ status: 'reported', published: true, revision: { sequence: 3, cause: 'request' },
+            freshness: { acknowledged: 100, captureStarted: 100, verified: true, reusedRevision: false } });
+        }
+        expect(e.script.updateCalls).toHaveLength(2);
+      } finally { first.finish({ status: 'cancelled' }); second.finish({ status: 'cancelled' }); await flush(); await e.dispose(); }
+    });
+
+    it.each([
+      ['a watcher change to another path', [{ path: 'src/provider.ts', kind: 'changed' }], 'src/provider.ts', 0],
+      ['the watcher event for the hook\'s own path', [{ path: 'src/index.ts', kind: 'changed' }], 'src/index.ts', 0],
+      ['a configuration change that requires a sweep', [{ path: 'tsconfig.json', kind: 'changed' }], 'tsconfig.json', 1],
+    ] as const)('uncovered-after-publication: %s pending at publication runs an update', async (_case, events, path, sweeps) => {
+      const e = sessionEnvironment();
+      const first = pause(), second = pause();
+      try {
+        const opened = await e.open(); await flush();
+        const hold = (call: { kind: string }) => call.kind === 'update' && e.script.updateCalls.length === 1 ? first.promise
+          : call.kind === 'update' ? second.promise : capture(2);
+        e.script.pending.push(hold, hold, hold);
+        // A request's update is not background work, so the watcher event queues behind it rather than cancelling it.
+        const running = e.check(opened.token, { mode: 'synchronized', expect: expected('src/index.ts', '2') });
+        await flush(); expect(e.script.updateCalls).toHaveLength(1);
+        e.watcher.emit('/fixture', events);
+        const hook = watch(e.check(opened.token, { mode: 'synchronized', expect: expected('src/index.ts', '2') }));
+        first.finish(capture(2)); await flush();
+        expect(await running).toMatchObject({ status: 'reported', revision: { sequence: 2 }, freshness: { captureStarted: 0 } });
+        expect(hook.answered).toBe(false);
+        expect(e.script.updateCalls).toHaveLength(2);
+        expect(e.script.updateCalls[1]?.inputs.changes.map(change => change.path)).toContain(path);
+        second.finish(capture(2)); await flush();
+        expect(await hook.result).toMatchObject({ status: 'reported', published: true, revision: { sequence: 2 },
+          freshness: { captureStarted: 0, verified: true } });
+        expect(e.script.updateCalls).toHaveLength(2); expect(e.script.sweepCalls).toHaveLength(sweeps);
+      } finally { first.finish({ status: 'cancelled' }); second.finish({ status: 'cancelled' }); e.script.pending.length = 0; await flush(); await e.dispose(); }
+    });
+
+    it('uncovered-after-publication: a queued request from another invocation runs an update despite an equal identity', async () => {
+      const e = sessionEnvironment();
+      const held = [pause(), pause()];
+      try {
+        const opened = await e.open('/fixture', 'lease'); await e.open('/fixture', 'other', '/other'); await flush();
+        e.script.pending.push(() => held[0]!.promise, () => held[1]!.promise);
+        e.watcher.emit('/fixture', [{ path: 'src/index.ts', kind: 'changed' }]); e.clock.advance(100); await flush();
+        const other = watch(e.check(opened.token, { mode: 'synchronized', expect: expected('src/index.ts', '2') }, {}, 'other'));
+        held[0]!.finish(capture(2)); await flush();
+        expect(other.answered).toBe(false); expect(e.script.updateCalls).toHaveLength(2);
+        expect(e.script.updateCalls[1]?.inputs.project.cwd).toBe('/other');
+        held[1]!.finish(capture(2));
+        expect(await other.result).toMatchObject({ status: 'reported', published: true, freshness: { captureStarted: 100, verified: true } });
+        expect(e.script.updateCalls).toHaveLength(2);
+      } finally { for (const item of held) item.finish({ status: 'cancelled' }); await flush(); await e.dispose(); }
+    });
+
+    it.each(['expired', 'cancelled'] as const)('uncovered-after-publication: a queued path of a request that %s still runs, and a covered hook sharing it waits', async ending => {
+      const e = sessionEnvironment();
+      const held = [pause(), pause()];
+      try {
+        const opened = await e.open(); await flush();
+        e.script.pending.push(() => held[0]!.promise, () => held[1]!.promise);
+        e.watcher.emit('/fixture', [{ path: 'src/index.ts', kind: 'changed' }]); e.clock.advance(100); await flush();
+        const controller = new AbortController();
+        const ended = e.manager.check({ token: opened.token, requestId: 'ended', scope: 'delta', deadlineMs: 10,
+          freshness: { mode: 'synchronized', expect: expected('src/index.ts', '2') } }, 'lease', { signal: controller.signal });
+        if (ending === 'expired') e.clock.advance(10); else controller.abort();
+        expect(await ended).toMatchObject({ status: ending === 'expired' ? 'deadline-exceeded' : 'cancelled' });
+        const hook = watch(e.check(opened.token, { mode: 'synchronized', expect: expected('src/index.ts', '2') }));
+        held[0]!.finish(capture(2)); await flush();
+        expect(hook.answered).toBe(false); expect(e.script.updateCalls).toHaveLength(2);
+        expect(e.script.updateCalls[1]?.inputs.changes).toEqual([{ path: 'src/index.ts', kind: 'changed' }]);
+        held[1]!.finish(capture(2));
+        expect(await hook.result).toMatchObject({ status: 'reported', published: true, revision: { sequence: 2 }, freshness: { verified: true } });
+        expect((await hook.result as { freshness: { captureStarted: number | null } }).freshness.captureStarted).not.toBeNull();
+        expect(e.script.updateCalls).toHaveLength(2);
+      } finally { for (const item of held) item.finish({ status: 'cancelled' }); await flush(); await e.dispose(); }
+    });
+  });
+
+  it('advance-before-publish: a hook arriving after the session advanced and before publication waits and is answered from that revision', async () => {
+    // Every hot session is demoted before publication; a held demotion keeps the window open.
+    const e = sessionEnvironment({ maxHotContexts: 0 });
+    let release: () => void = () => {};
+    try {
+      const opened = await e.open(); await flush();
+      const session = e.script.sessions[0]!.session;
+      const demote = session.releaseCompiler.bind(session);
+      Object.assign(session, { releaseCompiler: () => new Promise<void>(resolve => { release = resolve; }).then(demote) });
+      e.script.pending.push(() => capture(2));
+      const running = watch(e.check(opened.token, { mode: 'synchronized', expect: expected('src/index.ts', '2') }));
+      await flush();
+      expect(session.current?.sequence).toBe(2);
+      expect(e.status(opened.token)).toMatchObject({ published: { sequence: 1 }, pending: { analysisRunning: true } });
+      const hook = watch(e.check(opened.token, { mode: 'synchronized', expect: expected('src/index.ts', '2') }));
+      await flush();
+      expect([running.answered, hook.answered]).toEqual([false, false]);
+      release(); await flush();
+      expect(await running.result).toMatchObject({ status: 'reported', revision: { sequence: 2 }, freshness: { captureStarted: 0, reusedRevision: false } });
+      expect(await hook.result).toMatchObject({ status: 'reported', published: true, revision: { sequence: 2 },
+        freshness: { captureStarted: null, verified: true, reusedRevision: true }, timings: zero });
+      await flush(); expect(e.script.updateCalls).toHaveLength(1);
+      // Control: in the same window, a hook expecting the still-published identity is not answered from it.
+      e.script.pending.push(() => capture(3));
+      const advancing = e.check(opened.token, { mode: 'synchronized', expect: expected('src/index.ts', '3') });
+      await flush();
+      expect(session.current?.sequence).toBe(3); expect(e.status(opened.token).published?.sequence).toBe(2);
+      const stale = watch(e.check(opened.token, { mode: 'synchronized', expect: expected('src/index.ts', '2') }));
+      await flush(); expect(stale.answered).toBe(false);
+      release(); await flush(); release(); await flush();
+      expect(await advancing).toMatchObject({ status: 'reported', revision: { sequence: 3 } });
+      expect(await stale.result).toMatchObject({ status: 'superseded', revision: { sequence: 3 },
+        mismatches: [{ path: 'src/index.ts', expected: hash('2'), observed: hash('3') }] });
+      expect(e.script.updateCalls).toHaveLength(3);
+    } finally { release(); await flush(); release(); await flush(); await e.dispose(); }
+  });
+
+  it('advance-before-publish: a hook arriving from the publication event before its capture ends is answered from it', async () => {
+    const e = sessionEnvironment();
+    const held = pause();
+    try {
+      const opened = await e.open(); await flush();
+      let late: ReturnType<typeof watch<Awaited<ReturnType<typeof e.check>>>> | undefined;
+      const subscription = e.manager.subscribe(opened.token, 'lease', event => {
+        if (event.type === 'revision-published' && event.revision.sequence === 2 && !late) {
+          expect(e.status(opened.token).pending.analysisRunning).toBe(true);
+          late = watch(e.check(opened.token, { mode: 'synchronized', expect: expected('src/index.ts', '2') }));
+        }
+      });
+      if ('status' in subscription) throw new Error(subscription.status);
+      e.script.pending.push(() => held.promise);
+      e.watcher.emit('/fixture', [{ path: 'src/index.ts', kind: 'changed' }]); e.clock.advance(100); await flush();
+      held.finish(capture(2)); await flush();
+      expect(late).toBeDefined();
+      expect(await late!.result).toMatchObject({ status: 'reported', revision: { sequence: 2, cause: 'watch' },
+        freshness: { captureStarted: null, reusedRevision: true } });
+      await flush(); expect(e.script.updateCalls).toHaveLength(1);
+      subscription.close();
+    } finally { held.finish(capture(2)); await flush(); await e.dispose(); }
   });
 });
 

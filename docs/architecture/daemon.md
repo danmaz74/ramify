@@ -528,6 +528,13 @@ a fresh batch check.
   inputs, including findings, coverage and the checked set. An edit whose
   effects cannot be bounded takes the broader path, and its report identifies
   the wider checked set.
+- A synchronized check whose expected file identities the published revision
+  covers, with no other known change or required sweep pending, is answered
+  from that revision without an update. The covering rule
+  is evaluated when a request arrives and again when each revision publishes.
+  A queued request whose expectations the new revision covers, with no other
+  known change or required sweep pending, is answered from that revision
+  without another update.
 - A hook-facing check has a bounded response time. When it cannot be met, for
   example in a cold context or during daemon recovery, the outcome is explicit
   and never a pass.

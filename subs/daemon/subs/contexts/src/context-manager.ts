@@ -72,7 +72,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     for (const entry of pending(context)) complete(entry, { ...unavailable(reason === 'disposed' ? 'disposed' : 'expired-generation'), requestId: entry.request.requestId });
     context.queue.length = 0; stopTimers(context); closeWatcher(context);
     // Dispose owns all remaining fact versions; do not send per-version releases after it.
-    void releaseSession(context); context.history.dispose(); context.paths.clear(); context.watched = null; context.invocations.clear(); contexts.delete(context.token.context);
+    void releaseSession(context); context.history.dispose(); context.paths.clear(); context.requested.clear(); context.watched = null; context.invocations.clear(); contexts.delete(context.token.context);
     emit(context, { type: 'context-evicted', token: context.token, reason }); context.subscriptions.clear();
   }
   async function demote(context: LiveContext): Promise<void> {
@@ -96,7 +96,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       if (held(context) || context.running || disposed || context.state === 'evicted') return;
       if (current && (!report || !context.history.retainPublished(freeze(report)))) { evict(context, 'pressure'); return; }
       context.state = 'cold'; stopTimers(context); closeWatcher(context);
-      await releaseSession(context); context.paths.clear(); context.watched = null; context.sweepRequired = true; context.conservative = true;
+      await releaseSession(context); context.paths.clear(); context.requested.clear(); context.watched = null; context.sweepRequired = true; context.conservative = true;
       changed(context);
     } finally { context.cooling = false;
       if (!disposed && context.state === 'cold' && held(context)) touch(context);
@@ -176,20 +176,20 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     context.watched = spanBatches(context.watched, batch ? { receivedAt: batch.receivedAt, flushedAt: batch.flushedAt } : { receivedAt: now, flushedAt: now });
     for (const event of events) {
       if (event.kind === 'overflow' || event.kind === 'error') { context.conservative = true; context.sweepRequired = true; }
-      else context.paths.set(event.path, event.kind === 'renamed' ? 'unknown' : event.kind);
+      else { context.paths.set(event.path, event.kind === 'renamed' ? 'unknown' : event.kind); context.requested.delete(event.path); }
       if (/(?:^|\/)(?:tsconfig[^/]*\.json|package\.json|package-lock\.json|yarn\.lock|pnpm-lock\.yaml)$/.test(event.path)) context.sweepRequired = true;
       if (event.kind === 'error') { closeWatcher(context); context.watcherState = 'unavailable'; }
     }
-    if (context.paths.size > budgets.maxQueuedPaths) { context.paths.clear(); context.conservative = true; context.sweepRequired = true; }
+    if (context.paths.size > budgets.maxQueuedPaths) { context.paths.clear(); context.requested.clear(); context.conservative = true; context.sweepRequired = true; }
     // An active request keeps its capture; newer writes queue behind it. Idle
     // background work may be cancelled, but every consumed path is restored.
     // A cancelled periodic sweep stays maintenance; its start keeps the cadence.
     if (context.running?.background) {
       context.running.controller.abort(); if (context.running.sweep !== 'periodic') context.sweepRequired = true;
-      for (const change of context.running.changes) context.paths.set(change.path, change.kind);
+      for (const change of context.running.changes) { context.paths.set(change.path, change.kind); context.requested.delete(change.path); }
       context.watched = spanBatches(context.watched, context.running.watch);
     }
-    if (context.paths.size > budgets.maxQueuedPaths) { context.paths.clear(); context.conservative = true; context.sweepRequired = true; }
+    if (context.paths.size > budgets.maxQueuedPaths) { context.paths.clear(); context.requested.clear(); context.conservative = true; context.sweepRequired = true; }
     context.synchronization = context.watcherState === 'unavailable' ? 'watcher-unavailable' : context.conservative ? 'conservative' : 'reconciling';
     context.background = context.conservative ? 'conservative' : 'watch';
     context.debounce?.(); context.debounce = clock.schedule(budgets.debounceMs, () => { context.debounce = null; kick(); }); changed(context);
@@ -339,7 +339,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     const sweepKind = context.sweepRequired || entries.some(entry => entry.needsSweep) ? 'required' : cause === 'sweep' ? 'periodic' : null;
     const sweep = sweepKind !== null;
     const watch = context.watched, work = noWork();
-    context.paths.clear(); context.watched = null; context.conservative = false; context.sweepRequired = false; context.background = null;
+    context.paths.clear(); context.requested.clear(); context.watched = null; context.conservative = false; context.sweepRequired = false; context.background = null;
     context.debounce?.(); context.debounce = null;
     const controller = new AbortController(); const started = clock.now();
     if (sweep) { context.periodicSweepDue = false; context.lastSweepAt = started; context.sweepTimer?.(); context.sweepTimer = null; }
@@ -347,6 +347,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     if (sweepKind !== 'periodic') context.synchronization = context.watcherState === 'unavailable' ? 'watcher-unavailable' : context.sequence ? 'reconciling' : 'initializing';
     changed(context);
     const control = { signal: controller.signal };
+    let published = false;
     try {
       await context.demoting;
       let run: SessionUpdate | { status: 'unchanged' };
@@ -400,6 +401,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         for (const entry of [...entries, ...context.queue]) complete(entry, { ...unavailable('resource-unavailable'), requestId: entry.request.requestId });
         return;
       }
+      published = true;
       context.state = 'warm';
       context.synchronization = context.watcherState === 'unavailable' ? 'watcher-unavailable'
         : context.background || context.sweepRequired || context.paths.size ? 'reconciling' : 'synchronized';
@@ -427,7 +429,11 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       }
       try { await releaseUnpublished(context); } catch { context.synchronization = 'reconciling'; context.sweepRequired = true; }
       context.running = null; active--; context.queue.splice(0, context.queue.length, ...context.queue.filter(entry => !entry.settled));
-      if (context.state !== 'evicted' && !disposed) { auditLater(context); sweepLater(context); scheduleIdle(context); changed(context); }
+      if (context.state !== 'evicted' && !disposed) {
+        // Requests queued while this capture ran, including after the session advanced, meet the covering rule here.
+        if (published && !controller.signal.aborted) coverQueued(context);
+        auditLater(context); sweepLater(context); scheduleIdle(context); changed(context);
+      }
       kick();
     }
   }
@@ -444,16 +450,40 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       }
     });
   }
+  /** The published revision is the session's current one, and it observed every expected
+   * identity under the request's invocation; no sweep is needed. */
+  function identityCovered(context: LiveContext, entry: PendingCheck): boolean {
+    const data = context.session?.current; const publication = context.history.published;
+    return !!data && !!publication && context.publishedSession === context.session && publication.sequence === data.sequence
+      && !entry.needsSweep && invocationKey(entry.invocation) === invocationKey(context.invocation) && !mismatch(context, entry, data);
+  }
   /** A covered request is answered from the published revision. Only a running
    * periodic sweep carrying no changes may coexist with coverage: the answer
    * uses the revision published before that sweep began. */
   function covers(context: LiveContext, entry: PendingCheck): boolean {
-    const data = context.session?.current; const publication = context.history.published; const running = context.running;
+    const running = context.running;
     const maintenance = !running || (running.sweep === 'periodic' && !running.requests.length && !running.changes.length);
-    return !!data && !!publication && context.publishedSession === context.session && publication.sequence === data.sequence
-      && !entry.needsSweep && maintenance && !context.background && !context.paths.size && !context.sweepRequired
-      && context.synchronization === 'synchronized' && invocationKey(entry.invocation) === invocationKey(context.invocation)
-      && !mismatch(context, entry, data);
+    return maintenance && !context.background && !context.paths.size && !context.sweepRequired
+      && context.synchronization === 'synchronized' && identityCovered(context, entry);
+  }
+  /** The covering rule again when a revision publishes. The queued synchronized requests
+   * are answered from it, and the paths they queued withdrawn, only when it covers every
+   * one of them and nothing else is pending: no path a watcher event, another request or a
+   * restored capture queued, no background work other than theirs, no conservative
+   * reconciliation and no required sweep. Otherwise all of them wait for the next update. */
+  function coverQueued(context: LiveContext): void {
+    const requests = context.queue.filter(entry => !entry.settled && entry.request.freshness.mode === 'synchronized');
+    if (!requests.length || context.state !== 'warm' || context.running || context.conservative || context.sweepRequired
+      || context.watcherState === 'unavailable' || (context.background !== null && context.background !== 'request')) return;
+    const answered = new Set(requests);
+    for (const path of context.paths.keys()) {
+      const owners = context.requested.get(path);
+      if (!owners || [...owners].some(owner => !answered.has(owner))) return;
+    }
+    if (!requests.every(entry => identityCovered(context, entry))) return;
+    context.paths.clear(); context.requested.clear(); context.background = null; context.synchronization = 'synchronized';
+    context.queue.splice(0, context.queue.length, ...context.queue.filter(entry => !answered.has(entry)));
+    for (const entry of requests) track(deliver(context, entry, context.history.published!, null, true));
   }
   function check(request: CheckRequest, lease: string, control?: RunControl): Promise<CheckOutcome> {
     const found = lookup(request.token); if ('status' in found) return Promise.resolve({ ...found, requestId: request.requestId });
@@ -501,10 +531,12 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         if (covered) { track(deliver(context, entry, context.history.published!, null, true)); return; }
         // A hook identifies a path to re-observe. The observer determines its
         // actual creation/deletion and role; preserve stronger watcher hints.
+        // A path only requests named stays theirs, for withdrawal on a covering publication.
         for (const expected of request.freshness.expect) {
-          if (!context.paths.has(expected.path)) context.paths.set(expected.path, 'changed');
+          if (!context.paths.has(expected.path)) { context.paths.set(expected.path, 'changed'); context.requested.set(expected.path, new Set([entry])); }
+          else context.requested.get(expected.path)?.add(entry);
         }
-        if (context.paths.size > budgets.maxQueuedPaths) { context.paths.clear(); context.conservative = true; context.sweepRequired = true; }
+        if (context.paths.size > budgets.maxQueuedPaths) { context.paths.clear(); context.requested.clear(); context.conservative = true; context.sweepRequired = true; }
         if (entry.needsSweep) context.sweepRequired = true;
         context.background ??= 'request'; context.debounce?.(); context.debounce = null;
       }
@@ -557,7 +589,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         token: freeze({ context: id, generation: options.generationId() }), selection, project, invocation: { project, setup: requestedSetup },
         openedAt: now, lastActivityAt: now, hadLease: false, invocations: new Map([[lease, { project, setup: requestedSetup }]]), resolutions: new Map([[key, resolution]]), subscriptions: new Map(),
         history: createHistory(budgets.maxHistoryRevisions, budgets.maxHistoryBytes, entry => releaseVersion(context, entry)),
-        queue: [], deliveries: new Set(), paths: new Map(), watched: null, scope: null, state: 'opening', synchronization: 'initializing', lastValid: null,
+        queue: [], deliveries: new Set(), paths: new Map(), requested: new Map(), watched: null, scope: null, state: 'opening', synchronization: 'initializing', lastValid: null,
         session: null, publishedSession: null, versions: new Set(), observedSequence: 0, sequence: 0, sweepRequired: true, periodicSweepDue: false, lastSweepAt: now, auditedSequence: 0, auditRequired: false, demoting: null, cooling: false,
         watcher: null, watcherState: 'disposed', attaching: false, conservative: true, background: 'open', running: null,
         debounce: null, sweepTimer: null, auditTimer: null, idle: null,

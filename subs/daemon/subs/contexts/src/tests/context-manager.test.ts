@@ -198,19 +198,20 @@ describe('watcher reconciliation and retention', () => {
       e.clock.advance(5_000); const waiting = hook(opened.token); e.manager.status(opened.token); await flush();
       e.clock.advance(6_000); await flush();
       expect(e.script.sweepCalls).toHaveLength(1);
-      finish!(capture()); expect((await waiting).status).toBe('reported'); await flush();
-      expect(e.script.updateCalls).toHaveLength(2); expect(e.script.sweepCalls).toHaveLength(1);
+      // The sweep's publication covers the hook queued during it, so no second update runs.
+      finish!(capture()); expect(await waiting).toMatchObject({ status: 'reported', freshness: { captureStarted: null, reusedRevision: true } }); await flush();
+      expect(e.script.updateCalls).toHaveLength(1); expect(e.script.sweepCalls).toHaveLength(1);
       e.clock.advance(49_999 - e.clock.now()); await flush(); expect(e.script.sweepCalls).toHaveLength(1);
       // The periodic sweep starts at 50,000 ms and is held open while a covered hook arrives.
       e.script.pending.push(hold); e.clock.advance(1); await flush();
-      expect(e.script.sweepCalls).toHaveLength(2); expect(e.script.updateCalls).toHaveLength(2);
+      expect(e.script.sweepCalls).toHaveLength(2); expect(e.script.updateCalls).toHaveLength(1);
       e.clock.advance(10_000);
       expect(await hook(opened.token)).toMatchObject({ status: 'reported', freshness: { captureStarted: null, reusedRevision: true } });
       e.manager.status(opened.token); e.clock.advance(10_000); await flush();
       finish!(capture()); await flush();
       e.clock.advance(79_999 - e.clock.now()); await flush(); expect(e.script.sweepCalls).toHaveLength(2);
       e.clock.advance(1); await flush(); expect(e.script.sweepCalls).toHaveLength(3);
-      expect(e.script.updateCalls).toHaveLength(2);
+      expect(e.script.updateCalls).toHaveLength(1);
     } finally { finish?.(capture()); e.script.pending.length = 0; await flush(); await e.dispose(); }
   });
   it('keeps eight of twelve reports and answers exact retained revisions', async () => {

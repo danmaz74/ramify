@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import type { CapturedInput } from '../../../../../analysis/subs/project/src/interfaces/project.js';
 import type { ContextSelection } from '../interfaces/contexts.js';
@@ -95,5 +96,50 @@ describe('detached input fingerprints (no retained resources)', () => {
     expect(after.registry).not.toBe(before.registry);
     expect(after.engine).not.toBe(before.engine);
     expect({ ...after, registry: before.registry, engine: before.engine }).toEqual(before);
+  });
+});
+
+describe('fingerprint order without serializing comparisons (no retained resources)', () => {
+  /** The comparator `createFingerprints` used before: serialized tuples compared as strings. */
+  function serializedFingerprints(inputId: string, inputs: readonly CapturedInput[], registryIdentity: string, engineIdentity: string) {
+    const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+    const observations = inputs.map(input => [input.path, input.role, input.sha256, input.bytes] as const).sort((left, right) => {
+      const a = JSON.stringify(left); const b = JSON.stringify(right);
+      return a < b ? -1 : a > b ? 1 : 0;
+    });
+    return { inputId, declarations: digest(observations.filter(input => input[1] === 'description')),
+      source: digest(observations.filter(input => ['source', 'resource', 'dependency', 'directory', 'absent'].includes(input[1]))),
+      configuration: digest(observations.filter(input => input[1] === 'configuration')),
+      registry: digest(registryIdentity), engine: digest(engineIdentity) };
+  }
+  // Pieces whose encodings reorder: the closing quote against space and `!`, short and
+  // unicode escapes, non-ASCII units, and paired or lone surrogates.
+  const units = [0x00, 0x01, 0x08, 0x09, 0x0a, 0x0c, 0x0d, 0x1f, 0x20, 0x21, 0x22, 0x23, 0x2f, 0x41, 0x5c, 0x61, 0x62, 0x7e, 0x7f,
+    0x85, 0xa0, 0xe9, 0x2028, 0xd800, 0xdbff, 0xdc00, 0xdfff, 0xe000, 0xffff];
+  const pieces = ['', 'src/', 'ab', 'a b', String.fromCodePoint(0x1f600), ...units.map(unit => String.fromCharCode(unit))];
+  const roles = ['description', 'readme', 'source', 'resource', 'configuration', 'dependency', 'directory', 'absent'] as const;
+  function random(seed: number) { return () => { seed = (seed * 1_103_515_245 + 12_345) % 2 ** 31; return seed / 2 ** 31; }; }
+
+  it('fingerprint-order: createFingerprints output is unchanged with a non-serializing comparator', () => {
+    const next = random(7);
+    const pick = <T>(values: readonly T[]) => values[Math.floor(next() * values.length)]!;
+    const text = () => Array.from({ length: Math.floor(next() * 4) }, () => pick(pieces)).join('');
+    const bytes = [0, 1, 2, 12, 123, 9, 10, 100, 1.5, -0, Number.NaN];
+    for (let round = 0; round < 400; round++) {
+      // Few distinct values per round force ties on earlier fields, so later fields decide.
+      const paths = Array.from({ length: 3 }, text), hashes = Array.from({ length: 3 }, text);
+      const inputs: CapturedInput[] = Array.from({ length: 1 + Math.floor(next() * 12) },
+        () => ({ path: pick(paths), role: pick(roles), sha256: pick(hashes), bytes: pick(bytes) }));
+      expect(createFingerprints(`input/1:${round}`, inputs, 'default', engine)).toEqual(serializedFingerprints(`input/1:${round}`, inputs, 'default', engine));
+    }
+    // Every ordered pair of pieces, as a path suffix, a hash suffix and a longer path with differing sizes.
+    for (const left of pieces) for (const right of pieces) {
+      const inputs: CapturedInput[] = [{ path: `p${left}`, role: 'source', sha256: 'h', bytes: 1 }, { path: `p${right}`, role: 'source', sha256: 'h', bytes: 2 },
+        { path: 'q', role: 'source', sha256: `h${left}`, bytes: 1 }, { path: 'q', role: 'source', sha256: `h${right}`, bytes: 1 },
+        { path: `p${left}x`, role: 'source', sha256: 'h', bytes: 12 }, { path: `p${left}x`, role: 'source', sha256: 'h', bytes: 123 }];
+      const expected = serializedFingerprints('input/1:pair', inputs, 'default', engine).source;
+      expect(createFingerprints('input/1:pair', inputs, 'default', engine).source).toBe(expected);
+      expect(createFingerprints('input/1:pair', [...inputs].reverse(), 'default', engine).source).toBe(expected);
+    }
   });
 });
