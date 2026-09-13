@@ -523,6 +523,10 @@ portions of DA17 and the architecture's
 [open review item](architecture/daemon.md#decisions-still-requiring-review)
 for the hook path.
 
+The [structural edit latency plan](plans/iteration-5-structural-edits/main-plan.md)
+is a draft successor of the [hook optimization](plans/iteration-5-hook-optimization/main-plan.md),
+implemented and awaiting review of its decisions.
+
 ## Plan 6: Project explorer
 
 **Detailed plan:** not yet written. **Prerequisites:** Plan 2's revisioned

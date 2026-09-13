@@ -13,7 +13,10 @@ are estimates derived from them.
 delivered targets 0 to 5 and 7; its [closure](../plans/iteration-5-hook-optimization/iterations/closure.md)
 records the evidence. Every measured figure in this analysis is
 pre-optimization, taken before that plan, and none has been measured again.
-Real-process measurement of the delivered targets follows that plan.
+Real-process measurement of the delivered targets follows that plan. The
+[structural edit latency plan](../plans/iteration-5-structural-edits/main-plan.md)
+then repaired the created, deleted and configuration rows; see
+[Structural edit repairs](#structural-edit-repairs).
 
 ## Priorities
 
@@ -453,6 +456,39 @@ Running a due periodic sweep after delivery, previously target 7, was delivered
 by the contract remediation in `85be06c`; see
 [Due sweeps before delivery](#due-sweeps-before-delivery).
 
+## Structural edit repairs
+
+The hook optimization's
+[measurement results](../plans/iteration-5-hook-optimization/iterations/measurement-results.md#recommended-next-targets)
+left the S100 created, deleted and configuration rows over 2 s and recommended
+next targets. The [structural edit latency plan](../plans/iteration-5-structural-edits/main-plan.md)
+addressed four of them; its [closure](../plans/iteration-5-structural-edits/iterations/closure.md)
+records the evidence. All of its figures are in process, so none of the
+measured figures in this analysis or in those results has changed.
+
+| Recommended target | Delivered repair | Status |
+| --- | --- | --- |
+| Root-resolution replay per hook | Reuse validated by discovery queries only, so created and deleted files and configuration edits no longer resolve again | delivered, except for configurations with `references`; the narrow-edit replay is unmeasured |
+| Resolution-bounded narrowing | `membership` path for created and deleted sources | delivered |
+| Configuration edits on S100 | Inventory kept when the selection is unchanged; sweep skipped after a reacquisition | partly delivered; an options-only edit's capture still sweeps |
+| The reference broad path's unattributed time | `promotion` timing field | delivered |
+
+Remaining targets, in order:
+
+1. **Measure the repairs** on the reference and S100 with the closure's
+   [recipe](../plans/iteration-5-structural-edits/iterations/closure.md#measurement-recipe),
+   against the 2 s budget. That also shows whether the narrow-edit
+   resolution replay fell with the discovery-only validation.
+2. **The configuration row's remainder.** The kept path spawns the helper,
+   about 207 ms on the reference and 308 ms on S100 in process. Its capture
+   sweeps again, about 325 and 334 ms, which the deferred sweep step of target 1
+   would shrink. On the reference the kept path is about 225 ms slower than
+   before.
+3. **Proportional relink**, now also the membership path's largest analysis
+   stage on S100, about 80 to 93 ms in process; measure at S500 and S1000 first.
+4. **Target 6**, at most about 70 ms on S100 narrow hooks.
+5. **S500, S1000, macOS and memory.**
+
 ## Projection
 
 Pre-optimization estimates, assuming targets 1 to 5:
@@ -468,7 +504,7 @@ Pre-optimization estimates, assuming targets 1 to 5:
 | Deferral | Verdict | Reason |
 | --- | --- | --- |
 | Proportional relink | not indicated on the reference | Link is 0.7 to 21 ms there. On S100 narrow paths it is about 100 ms, which becomes 10 to 25% of session work once targets 1 to 3 land; revisit with S500 and S1000. |
-| Resolution-bounded narrowing | indicated for created and deleted files | About 1.4 s of broad analysis on S100 created files, on top of the floor; created and deleted racing hooks exceed the 2 s budget on both fixtures. |
+| Resolution-bounded narrowing | [delivered](../plans/iteration-5-structural-edits/iterations/closure.md) for created and deleted files | Indicated by about 1.4 s of broad analysis on S100 created files. The structural edit latency plan's `membership` path narrows it; unbounded cases keep the broad path. |
 | Syntactic pre-filter | not indicated | Access extraction is 1 to 3 ms for body edits. |
 | Persistent checkpoints | unrelated to warm latency | Concerns cold opens only. |
 | Child-process host | not a latency lever | A supervisor process already hosts the worker thread ([session-supervisor.ts:52](../../subs/analysis/src/session-supervisor.ts#L52)); clone cost is about 3 ms. |

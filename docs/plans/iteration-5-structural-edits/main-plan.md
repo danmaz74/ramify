@@ -1,6 +1,10 @@
 # Plan 5 structural edit latency
 
-**Date:** 2026-09-13. **Status:** draft. This plan answers the
+**Date:** 2026-09-13. **Status:** implemented; iterations 1 to 7 are complete,
+and the [closure](iterations/closure.md) records the evidence, the
+clarifications of the resolved decisions below, the estimates the evidence does
+not support and the decisions still awaiting review. The S100 budget is not yet
+verified in the real process. This plan answers the
 [structural edit latency brief](../../analysis/structural-edit-latency.md) and
 implements what its evidence indicates. It adds no capability, owner or package
 entry. [Plan 5](../iteration-5-fast-incremental-checks/main-plan.md) contracts,
