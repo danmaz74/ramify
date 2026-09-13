@@ -192,7 +192,7 @@ workerSuite('retained analysis session', import.meta.url, () => {
     } finally { await handle.dispose(); }
   }), timeout);
 
-  it('takes the metadata path for a README edit and the broad path for created, deleted and reopened compiler states', () => fixture(async (root, inputs) => {
+  it('takes the metadata path for a README edit, the membership path for created and deleted files and the broad path for a reopened compiler', () => fixture(async (root, inputs) => {
     const { session: handle } = await opened(inputs);
     try {
       await replace(root, 'subs/consumer/README.md', 'The consumer imports', 'The consumer reads');
@@ -203,13 +203,13 @@ workerSuite('retained analysis session', import.meta.url, () => {
 
       await put(root, extra, "import { PublicType } from '../../../src/interfaces/api.js';\nexport type Seen = PublicType;\n");
       const created = await revised(handle, [extra], 'created');
-      expect(created.checked).toEqual({ path: 'broad', files: [api, extra, other, probe], accesses: 2, modelRebuilt: true });
+      expect(created.checked).toEqual({ path: 'membership', files: [extra], accesses: 1, modelRebuilt: true });
       await audited(handle);
       await expectEqualToBatch(handle, inputs);
 
       await rm(join(root, extra));
       const deleted = await revised(handle, [extra], 'deleted');
-      expect(deleted.checked).toEqual({ path: 'broad', files: [api, other, probe], accesses: 1, modelRebuilt: true });
+      expect(deleted.checked).toEqual({ path: 'membership', files: [], accesses: 0, modelRebuilt: true });
       await audited(handle);
       await expectEqualToBatch(handle, inputs);
 

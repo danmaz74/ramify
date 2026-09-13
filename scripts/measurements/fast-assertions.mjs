@@ -247,7 +247,7 @@ export function assertFastWorkload(id, measurements) {
       && row.after.counters.coveredRequests > row.before.counters.coveredRequests),
     data.zeroWork?.map(row => row.hook?.durationMs) ?? null);
     const paths = { body: 'unchanged-surface', source: 'source', description: 'description', readme: 'metadata',
-      created: 'broad', deleted: 'broad', configuration: 'broad' };
+      created: 'membership', deleted: 'membership', configuration: 'broad' };
     for (const kind of editKinds) {
       const cycles = data.cycles?.[kind]; count(`${kind}: twenty cycles`, cycles, 20);
       for (const [index, cycle] of (cycles ?? []).entries()) {
@@ -407,7 +407,7 @@ export function fastDeferrals(workloads) {
   const cloneFailed = clone?.status === 'failed' && clone.failures?.length > 0;
   return {
     proportionalRelink: evaluated(descriptions, (value, index) => value > budgets[['S500', 'S1000'][index]].description, 'Description session medians on S500/S1000.'),
-    resolutionNarrowing: evaluated([editMedian('S100', 'created', 'broad')], value => value > budgets.S100.created, 'S100 created-file session median from twenty covering broad revisions.'),
+    resolutionNarrowing: evaluated([editMedian('S100', 'created', 'membership')], value => value > budgets.S100.created, 'S100 created-file session median from twenty covering membership revisions.'),
     syntacticPrefilter: evaluated([extraction], value => value > 10, 'S1000 filtered access extraction median from twenty covering unchanged-surface revisions checking only the fixture body file, with zero decided accesses and no model rebuild.'),
     persistentCheckpoints: evaluated([completedCold(data('S1000'), 'S1000') ? data('S1000').cold.reply.revision.timings.total : null], value => value > budgets.S1000.cold, 'S1000 completed cold session work.'),
     childProcessHost: { status: heapFailed || cloneFailed ? 'triggered'

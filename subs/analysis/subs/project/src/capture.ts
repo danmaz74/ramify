@@ -40,6 +40,8 @@ export class Capture {
   #application = new Set<string>();
   #applicationBytes = 0;
   #acquisition: Map<string, ObservationRecipe> | undefined;
+  /** Compiler-reported observations awaiting confirmation by the next promotion. */
+  #marked: Set<string> | undefined;
   #reporting = false;
   #root: string;
   #version = 0;
@@ -98,14 +100,44 @@ export class Capture {
    * A shared path is restored to its acquisition recipe, including probe-only
    * paths that the compiler had subsequently read or enumerated. */
   async retireReported(): Promise<void> {
+    this.#marked = undefined;
     if (!this.#acquisition) return;
     for (const entry of this.observations()) {
-      const retained = this.#acquisition.get(entry.path);
-      if (retained && JSON.stringify(retained) === JSON.stringify(entry)) continue;
-      await this.#settle(entry.path);
-      this.#forget(entry.path);
-      if (retained) await this.replay([retained]);
+      if (!this.#reportedOnly(entry)) continue;
+      await this.#retire(entry.path);
     }
+  }
+  /**
+   * Mark every compiler-reported observation that holds no read bytes: an
+   * existence probe, an absence or a listing. Read bytes stay as they are. The
+   * next `retireUnconfirmed` releases each mark that `confirm` did not clear.
+   */
+  markReported(): void {
+    if (!this.#acquisition) return;
+    this.#marked = new Set(this.observations().filter(entry => !entry.read && this.#reportedOnly(entry)).map(entry => entry.path));
+  }
+  /** A compiler report of a marked path keeps it, unless the path holds a listing the report no longer makes. */
+  async confirm(path: string, shape: 'file' | 'directory' | 'absent' | 'probe'): Promise<void> {
+    if (!this.#marked?.delete(path)) return;
+    const entry = this.#observations.get(path);
+    if (entry?.entries !== undefined && !this.#acquisition?.get(path)?.directory && shape !== 'directory') await this.#retire(path);
+  }
+  /** Release every marked observation no compiler report confirmed. */
+  async retireUnconfirmed(): Promise<void> {
+    const marked = this.#marked;
+    this.#marked = undefined;
+    for (const path of marked ?? []) if (this.#observations.has(path)) await this.#retire(path);
+  }
+  /** Whether an observation differs from its acquisition recipe, so a compiler report added it. */
+  #reportedOnly(entry: ObservationRecipe): boolean {
+    const retained = this.#acquisition?.get(entry.path);
+    return !retained || JSON.stringify(retained) !== JSON.stringify(entry);
+  }
+  async #retire(path: string): Promise<void> {
+    const retained = this.#acquisition?.get(path);
+    await this.#settle(path);
+    this.#forget(path);
+    if (retained) await this.replay([retained]);
   }
   path(path: string): string { return resolve(this.root, path); }
   label(path: string): string {
@@ -404,7 +436,7 @@ export class Capture {
     this.#disposed = true;
     await Promise.allSettled([...this.#pending.values(), ...this.#reads.values(), ...this.#directories.values()]);
     this.#observations.clear(); this.#changed(); this.#pending.clear(); this.#reads.clear(); this.#directories.clear(); this.#application.clear();
-    this.#acquisition?.clear();
+    this.#acquisition?.clear(); this.#marked = undefined;
     this.#bytes = 0;
   }
 }

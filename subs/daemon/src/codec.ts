@@ -184,7 +184,7 @@ function revision(value: unknown): boolean {
     && shape(value.fingerprints, ['inputId', 'declarations', 'source', 'configuration', 'registry', 'engine'])
     && Object.values(value.fingerprints).every(string) && strings(value.changed)
     && shape(value.checked, ['path', 'files', 'accesses', 'modelRebuilt'])
-    && ['cold', 'unchanged-surface', 'source', 'description', 'metadata', 'broad'].includes(value.checked.path as string)
+    && ['cold', 'unchanged-surface', 'source', 'description', 'metadata', 'membership', 'broad'].includes(value.checked.path as string)
     && strings(value.checked.files) && integer(value.checked.accesses) && typeof value.checked.modelRebuilt === 'boolean'
     && shape(value.delta, ['added', 'removed', 'positionOnly']) && Object.values(value.delta).every(integer)
     && timings(value.timings) && capture(value.capture) && outcome(value.outcome) && summary(value.summary);

@@ -170,9 +170,10 @@ describe('the observed-input list', () => {
       await put(root, 'subs/child/src/child.ts', 'export const child = 2;\n');
       expect((await observer.apply([{ path: 'subs/child/src/child.ts', kind: 'changed' }])).kind).toBe('local');
     });
-    await step('create an owned file, retiring reported reads', async () => {
+    await step('create an owned file, then retire every reported observation', async () => {
       await put(root, 'subs/child/src/extra.ts', 'export const extra = 3;\n');
       expect((await observer.apply([{ path: 'subs/child/src/extra.ts', kind: 'created' }])).kind).toBe('local');
+      await observer.retire({ kind: 'all' });
       reports.length = 0; promoted = false;
     });
     await step('change a description, replacing the inventory', async () => {
@@ -212,7 +213,9 @@ describe('the observed-input list', () => {
     await observer.apply([]);
     await unlink(join(root, 'subs/child/src/child.ts'));
     expect((await observer.apply([{ path: 'subs/child/src/child.ts', kind: 'deleted' }])).kind).toBe('local');
-    expect(observer.inputs.some(input => input.path === label || input.path === 'subs/child/src/child.ts')).toBe(false);
+    expect(observer.inputs.some(input => input.path === 'subs/child/src/child.ts')).toBe(false);
+    await observer.retire({ kind: 'all' });
+    expect(observer.inputs.some(input => input.path === label)).toBe(false);
     expect(observer.inputId).toBe((await reobserved([], false)).inputId);
   }, timeout);
 

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdtemp, realpath, rm, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -81,6 +82,56 @@ describe('project observer updates', () => {
     expect([deleted.created, deleted.deleted]).toEqual([[], ['subs/child/src/extra.ts']]);
     expect(deleted.inventory.files.map(file => file.path)).toEqual(['src/value.ts', 'subs/child/src/child.ts']);
     expect(observer.inputs.some(input => input.path === 'subs/child/src/extra.ts')).toBe(false);
+  });
+
+  it('membership-identity-equals-batch: apply leaves compiler observations to retire; probes retirement keeps reads and re-reported probes, all retirement restores the acquisition', async () => {
+    await put(root, 'node_modules/pkg/index.d.ts', 'export declare const pkg: number;\n');
+    const dependency = join(root, 'node_modules/pkg/index.d.ts'), directory = join(root, 'node_modules/pkg');
+    const kept = join(root, 'node_modules/kept.d.ts'), gone = join(root, 'node_modules/gone.d.ts');
+    const digest = createHash('sha256').update('export declare const pkg: number;\n').digest('hex');
+    const observer = await observe();
+    const acquired = JSON.stringify(observer.inputs);
+    observer.sink.file(dependency, digest, 34, 'dependency');
+    observer.sink.directory(directory, [dependency]);
+    observer.sink.absent(gone);
+    observer.sink.probe(kept, 'fileExists');
+    expect((await observer.apply([])).kind).toBe('unchanged');
+    const reported = observer.inputs;
+    const labels = (): string[] => observer.inputs.map(input => input.path);
+    expect(labels()).toEqual(expect.arrayContaining(['node_modules/gone.d.ts', 'node_modules/kept.d.ts', 'node_modules/pkg', 'node_modules/pkg/index.d.ts']));
+
+    await put(root, 'subs/child/src/extra.ts', 'export const extra = 2;\n');
+    local(await observer.apply([{ path: 'subs/child/src/extra.ts', kind: 'created' }]));
+    // The update itself retires nothing: the session chooses the retirement.
+    for (const input of reported.filter(input => input.path.startsWith('node_modules/'))) expect(observer.inputs).toContainEqual(input);
+    await observer.retire({ kind: 'probes' });
+    for (const input of reported.filter(input => input.path.startsWith('node_modules/'))) expect(observer.inputs).toContainEqual(input);
+    // The compiler reports the kept probe again and now only probes the listed directory.
+    observer.sink.probe(kept, 'fileExists');
+    observer.sink.probe(directory, 'directoryExists');
+    expect((await observer.apply([])).kind).toBe('unchanged');
+    expect(labels()).not.toContain('node_modules/gone.d.ts');
+    expect(observer.inputs.find(input => input.path === 'node_modules/pkg/index.d.ts')).toMatchObject({ role: 'dependency', bytes: 34, sha256: digest });
+
+    // The same reports on a fresh acquisition give the same list and identity.
+    const fresh = await observe();
+    fresh.sink.file(dependency, digest, 34, 'dependency');
+    fresh.sink.probe(kept, 'fileExists');
+    fresh.sink.probe(directory, 'directoryExists');
+    expect((await fresh.apply([])).kind).toBe('unchanged');
+    expect(JSON.stringify(observer.inputs)).toBe(JSON.stringify(fresh.inputs));
+    expect(observer.inputId).toBe(fresh.inputId);
+
+    // A marked probe the next promotion does not confirm is released; all retirement releases reads too.
+    await observer.retire({ kind: 'probes' });
+    expect((await observer.apply([])).kind).toBe('unchanged');
+    expect(labels()).not.toContain('node_modules/kept.d.ts');
+    expect(labels()).toContain('node_modules/pkg/index.d.ts');
+    await observer.retire({ kind: 'all' });
+    expect(labels().some(path => path.startsWith('node_modules/'))).toBe(false);
+    const current = await observe();
+    expect(JSON.stringify(observer.inputs)).toBe(JSON.stringify(current.inputs));
+    expect(JSON.stringify(observer.inputs)).not.toBe(acquired);
   });
 
   it('records a created owned test file and its area presence', async () => {

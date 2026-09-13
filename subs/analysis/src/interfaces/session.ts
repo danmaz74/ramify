@@ -11,7 +11,7 @@ export interface SessionLimits {
 }
 export interface SessionInputs extends AnalysisInputs { readonly session: SessionLimits }
 export type SessionChange = ObservedChange;
-export type RevisionPath = 'cold' | 'unchanged-surface' | 'source' | 'description' | 'metadata' | 'broad';
+export type RevisionPath = 'cold' | 'unchanged-surface' | 'source' | 'description' | 'metadata' | 'membership' | 'broad';
 /** What one revision recomputed. `files` were re-interpreted or described afresh;
  * `accesses` were decided afresh, position refreshes excluded. */
 export interface CheckedSet {

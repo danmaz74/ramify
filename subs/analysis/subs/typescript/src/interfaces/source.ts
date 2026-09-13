@@ -138,6 +138,23 @@ export interface SourceChangeSet {
   readonly inventory: ProjectInventory | null;
   readonly invalidateAll: boolean;
 }
+/**
+ * What an update that creates or deletes owned files, without a whole
+ * invalidation, changed beyond the files it names. Paths are relative to the
+ * root, a path outside it in its `../` spelling, in byte order.
+ */
+export interface MembershipReach {
+  /** Program files outside the owned inventory that entered or left the program. */
+  readonly added: readonly string[];
+  readonly removed: readonly string[];
+  /** Created or deleted owned files that can reach other files without an import the
+   * access facts record: a script, a declaration file, a module augmentation, an
+   * ambient module, a triple-slash reference or an import the compiler did not resolve. */
+  readonly global: readonly string[];
+  /** False when `baseUrl`, `rootDirs` or a `paths` mapping without an absolute base can resolve
+   * a specifier to a path no candidate spells. */
+  readonly spelled: boolean;
+}
 /** Plain inputs of a retained adapter. `sink` is project's port; the adapter
  * reports every filesystem observation it makes to it. */
 export interface RetainedSourceInputs {
@@ -152,7 +169,10 @@ export interface RetainedSourceInputs {
 /** One warm compiler with exactly one live snapshot behind plain data. */
 export interface RetainedSourceAnalysis {
   readonly hot: boolean;
-  update(changes: SourceChangeSet, signal?: AbortSignal): Promise<{ readonly snapshot: number; readonly elapsedMs: number }>;
+  /** `reach` is present when the update created or deleted files on a warm
+   * compiler without a whole invalidation. */
+  update(changes: SourceChangeSet, signal?: AbortSignal): Promise<{ readonly snapshot: number; readonly elapsedMs: number;
+    readonly reach?: MembershipReach }>;
   describe(files: readonly string[], signal?: AbortSignal): Promise<{ readonly descriptions: readonly FileDescription[];
     readonly delta: CatalogDelta }>;
   catalog(): SourceCatalog;

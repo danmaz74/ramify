@@ -7,7 +7,7 @@ export function measuredPath(kind, inputId, settled, afterSequence, beforeRevisi
     .filter(publication => publication?.fingerprints?.inputId === inputId) ?? [];
   assert.equal(publications.length, 1, 'One published context must identify the measured captured result');
   const publication = publications[0];
-  assert.ok(['cold', 'unchanged-surface', 'source', 'description', 'metadata', 'broad'].includes(publication.checked?.path),
+  assert.ok(['cold', 'unchanged-surface', 'source', 'description', 'metadata', 'membership', 'broad'].includes(publication.checked?.path),
     'Actual revision checked path required');
   const completed = (settled?.instrumentation?.workerMessages ?? []).filter(trace =>
     Number.isSafeInteger(trace.sequence) && trace.sequence > afterSequence && trace.kind === 'reply'

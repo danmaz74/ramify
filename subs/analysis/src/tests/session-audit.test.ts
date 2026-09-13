@@ -7,13 +7,13 @@ import { audited, comparable, equalToBatch, fixture, fixtureFiles, instrumentObs
   revised, timeout } from './session-test-fixture.js';
 
 describe('retained session audit', () => {
-  it('retires obsolete compiler observations after deleting the last source and a whole module', async () => {
+  it('membership-sequences-equal-batch: retires obsolete compiler observations after deleting the last source, restoring it and removing a whole module', async () => {
     // Load the engine only after session-test-fixture installs its state capture.
     const { sessionInputWitness } = await import('./session-input-witness.js');
     await sessionInputWitness();
   }, timeout);
 
-  it('equals batch and keeps the current sequence after each of twelve source, description, metadata and membership steps', () => fixture(async (root, inputs) => {
+  it('membership-sequences-equal-batch: equals batch and keeps the current sequence after each of fourteen source, description, metadata, membership and structural steps', () => fixture(async (root, inputs) => {
     const { handle } = await opened(inputs);
     try {
       let steps = 0;
@@ -71,14 +71,26 @@ describe('retained session audit', () => {
 
       await put(root, paths.extra, "import { rootValue } from '../../../src/interfaces/api.js';\nvoid rootValue;\n");
       const created = await revised(handle, [paths.extra], 'created');
-      expect(created.checked.files).toEqual([...ownedFiles, paths.extra].sort());
+      expect(created.checked).toEqual({ path: 'membership', files: [paths.extra], accesses: 1, modelRebuilt: true });
       expect(created.outcome.check).toBe('passed');
       await check();
 
       await rm(join(root, paths.extra));
-      expect((await revised(handle, [paths.extra], 'deleted')).checked.files).toEqual(ownedFiles);
+      expect((await revised(handle, [paths.extra], 'deleted')).checked).toEqual({ path: 'membership', files: [], accesses: 0, modelRebuilt: true });
       await check();
-      expect(steps).toBe(12);
+
+      // Restoring the deleted file takes the membership path again.
+      await put(root, paths.extra, "import { rootValue } from '../../../src/interfaces/api.js';\nvoid rootValue;\n");
+      expect((await revised(handle, [paths.extra], 'created')).checked).toEqual({ path: 'membership', files: [paths.extra], accesses: 1, modelRebuilt: true });
+      await check();
+
+      // Removing a whole module rebuilds the inventory on the broad path.
+      await rm(join(root, 'subs/sibling'), { recursive: true });
+      const removed = await revised(handle, ['subs/sibling'], 'deleted');
+      expect(removed.checked.path).toBe('broad');
+      expect(removed.inputs.some(input => input.path.startsWith('subs/sibling'))).toBe(false);
+      await check();
+      expect(steps).toBe(14);
     } finally { await handle.dispose(); }
   }), timeout);
 

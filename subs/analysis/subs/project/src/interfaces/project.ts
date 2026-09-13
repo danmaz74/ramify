@@ -140,6 +140,16 @@ export type InventoryUpdate =
   | { readonly kind: 'structural'; readonly inventory: ProjectInventory }
   | { readonly kind: 'invalid'; readonly inventory: ProjectInventory | null; readonly issues: readonly ProjectIssue[] }
   | { readonly kind: 'incomplete'; readonly issues: readonly ProjectIssue[] };
+/**
+ * Which compiler-reported observations `ProjectObserver.retire` releases; a
+ * released path keeps its acquisition recipe. `all` releases every one now.
+ * `probes` keeps every observation holding read bytes and marks existence
+ * probes, absences and listings: the next promotion keeps each one the compiler
+ * reported again and releases the rest.
+ */
+export type ObservationRetirement =
+  | { readonly kind: 'all' }
+  | { readonly kind: 'probes' };
 export interface ProjectObserver {
   readonly inventory: ProjectInventory;
   /** The resolution of the acquisition behind `inventory`, replaced by a structural rebuild.
@@ -149,6 +159,8 @@ export interface ProjectObserver {
   readonly inputId: string;
   readonly sink: ObservationSink;
   apply(changes: readonly ObservedChange[], signal?: AbortSignal): Promise<InventoryUpdate>;
+  /** Release compiler-reported observations before a compiler update that reports them again. */
+  retire(retirement: ObservationRetirement): Promise<void>;
   reobserve(signal?: AbortSignal): Promise<readonly ObservedChange[]>;
   readDescription(path: string): Promise<string | undefined>;
   readReadme(path: string): Promise<string | undefined>;

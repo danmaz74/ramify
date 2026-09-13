@@ -62,12 +62,12 @@ export async function sessionInputWitness(): Promise<{ assertions: number; steps
     equal(handle!.current!.sequence, sequence, `${name}: audit does not repair a faulty publication`);
     steps.push(name);
   };
-  const update = async (path: string, kind: 'deleted' | 'created'): Promise<void> => {
+  const update = async (path: string, kind: 'deleted' | 'created', expected: 'membership' | 'broad'): Promise<void> => {
     const result = await handle!.update([{ path, kind }]);
     equal(result.status, 'revised', `${kind} ${path}: published`);
     if (result.status !== 'revised') throw new Error(JSON.stringify(result));
     equal(result.identical, false, `${kind} ${path}: new revision`);
-    equal(result.revision.checked.path, 'broad', `${kind} ${path}: membership path`);
+    equal(result.revision.checked.path, expected, `${kind} ${path}: revision path`);
   };
   try {
     for (const [path, contents] of Object.entries(files)) await put(path, contents);
@@ -79,7 +79,8 @@ export async function sessionInputWitness(): Promise<{ assertions: number; steps
     await check('baseline denial', 1, 2);
     const finding = handle.current!.diagnostics.find(item => item.code === 'not-visible')!.id;
     await rm(join(root, provider));
-    await update(provider, 'deleted');
+    // The last owned source in its directory takes the broad path.
+    await update(provider, 'deleted', 'broad');
     equal(handle.current!.delta.removed, [finding], 'deleting the importer removes its finding');
     equal(handle.current!.inputs.some(input => input.path === provider), false, 'unreferenced deleted source is no longer observed');
     await check('last source removed', 0, 2);
@@ -91,11 +92,11 @@ export async function sessionInputWitness(): Promise<{ assertions: number; steps
     equal(repeated.revision, deleted, 'a repeated missing-path request keeps the covering revision');
     await check('missing source requested again', 0, 2);
     await put(provider, source);
-    await update(provider, 'created');
+    await update(provider, 'created', 'membership');
     await check('source restored', 1, 2);
     equal(handle.current!.delta.added.map(item => item.code), ['not-visible'], 'restoration detects the denial again');
     await rm(join(root, 'subs/provider'), { recursive: true });
-    await update('subs/provider', 'deleted');
+    await update('subs/provider', 'deleted', 'broad');
     equal(handle.current!.delta.removed, [finding], 'whole module removal removes its finding');
     await check('whole module removed', 0, 1);
   } finally {

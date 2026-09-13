@@ -50,7 +50,7 @@ for (const [subcase, fixture] of [['reference-sequence-live', 'R'], ['hundred-ow
             if (index === 9) a.equal(`${label}: metadata performs no compiler or decision work`,
               [current.revision.checked, current.revision.timings.compiler, current.revision.timings.link, current.revision.timings.decide],
               [{ path: 'metadata', files: [], accesses: 0, modelRebuilt: false }, 0, 0, 0]);
-            if (index >= 10) a.equal(`${label}: membership explicitly uses broad work`, current.revision.checked.path, 'broad');
+            if (index >= 10) a.equal(`${label}: membership takes the membership path`, current.revision.checked.path, 'membership');
             // A removed unreferenced file is no longer observed by batch. The
             // exact contract rejects its absent hash, then a retained source
             // identity rendezvous confirms the removal revision for the project.

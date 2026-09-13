@@ -3,8 +3,9 @@ import { createHash } from 'node:crypto';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { WorkLimit } from '../report.js';
-import type { SessionRevision } from '../interfaces/session.js';
+import type { RetainedSession, SessionRevision } from '../interfaces/session.js';
 import { buildIndexes, emptyIndexes, type FileFacts, type SessionFacts } from '../session-facts.js';
+import { membershipMatches, reachRefusal } from '../session-revision.js';
 import { audited, comparable, equalToBatch, fixture, fixtureFiles, instrumentCompiler, instrumentObserver, opened, ownedFiles,
   parentExposure, paths, put, replace, revised, revisionsEntered, timeout } from './session-test-fixture.js';
 
@@ -98,23 +99,55 @@ describe('description, metadata and broad session revisions', () => {
     } finally { await handle.dispose(); }
   }), timeout);
 
-  it('checks every owned file on creation and deletion and removes the deleted file finding', () => fixture(async (root, inputs) => {
+  it('membership-path-narrow: a created and a deleted file update the compiler once without a whole invalidation and check only the affected files', () => fixture(async (root, inputs) => {
     const { handle, state } = await opened(inputs);
     try {
       const compiler = instrumentCompiler(state);
+      const { retire } = instrumentObserver(state);
+      const pending = 'subs/branch/src/pending.ts', later = 'subs/branch/src/later.ts';
+      const calls = () => ({ updates: compiler.update.mock.calls.map(call => ({ ...call[0], inventory: call[0].inventory ? 'current' : null })),
+        described: compiler.describe.mock.calls.map(call => call[0]), interpreted: compiler.interpret.mock.calls.map(call => call[0]),
+        retired: retire.mock.calls.map(call => call[0]) });
+      const reset = (): void => { for (const spy of [compiler.update, compiler.describe, compiler.interpret, retire]) spy.mockClear(); };
+
+      // A created unreferenced file: only the file itself is described and interpreted.
       await put(root, paths.extra, "import { privateValue } from '../../../src/interfaces/api.js';\nvoid privateValue;\n");
       const created = await revised(handle, [paths.extra], 'created');
-      const all = [...ownedFiles, paths.extra].sort();
-      expect(created.checked).toEqual({ path: 'broad', files: all, accesses: 5, modelRebuilt: true });
-      expect(compiler.describe.mock.calls.map(call => call[0])).toEqual([all]);
-      expect(compiler.interpret.mock.calls.map(call => call[0])).toEqual([all]);
+      expect(created.checked).toEqual({ path: 'membership', files: [paths.extra], accesses: 1, modelRebuilt: true });
+      expect(calls()).toEqual({ updates: [{ changed: [], created: [paths.extra], deleted: [], inventory: 'current', invalidateAll: false }],
+        described: [[paths.extra]], interpreted: [[paths.extra]], retired: [{ kind: 'probes' }] });
       expect(created.delta.added.map(item => [item.code, item.location?.file])).toEqual([['not-visible', paths.extra]]);
-      await audited(handle);
       await equalToBatch(handle, inputs);
+      await audited(handle);
+      reset();
+
+      // A created file that satisfies an importer's absent probe: the importer is described and interpreted too.
+      await put(root, later, 'export const later = 1;\n');
+      const satisfied = await revised(handle, [later], 'created');
+      expect(satisfied.checked).toEqual({ path: 'membership', files: [later, pending], accesses: 1, modelRebuilt: true });
+      expect(calls()).toEqual({ updates: [{ changed: [], created: [later], deleted: [], inventory: 'current', invalidateAll: false }],
+        described: [[later, pending]], interpreted: [[later, pending]], retired: [{ kind: 'probes' }] });
+      expect(satisfied.coverage.some(note => note.location.file === pending)).toBe(false);
+      await equalToBatch(handle, inputs);
+      await audited(handle);
+      reset();
+
+      // A referenced deletion re-interprets its importer; an unreferenced one checks nothing.
+      await rm(join(root, later));
+      const referenced = await revised(handle, [later], 'deleted');
+      expect(referenced.checked).toEqual({ path: 'membership', files: [pending], accesses: 1, modelRebuilt: true });
+      expect(calls()).toEqual({ updates: [{ changed: [], created: [], deleted: [later], inventory: 'current', invalidateAll: false }],
+        described: [[later, pending]], interpreted: [[pending]], retired: [{ kind: 'probes' }] });
+      expect(referenced.coverage.map(note => [note.code, note.location.file])).toContainEqual(['unresolved-target', pending]);
+      await equalToBatch(handle, inputs);
+      await audited(handle);
+      reset();
 
       await rm(join(root, paths.extra));
       const deleted = await revised(handle, [paths.extra], 'deleted');
-      expect(deleted.checked).toEqual({ path: 'broad', files: ownedFiles, accesses: 4, modelRebuilt: true });
+      expect(deleted.checked).toEqual({ path: 'membership', files: [], accesses: 0, modelRebuilt: true });
+      expect(calls()).toEqual({ updates: [{ changed: [], created: [], deleted: [paths.extra], inventory: 'current', invalidateAll: false }],
+        described: [[paths.extra]], interpreted: [[]], retired: [{ kind: 'probes' }] });
       expect(deleted.delta.removed).toEqual([created.delta.added[0]!.id]);
       const report = await equalToBatch(handle, inputs);
       expect(report.snapshot!.inventory.files.map(file => file.path)).not.toContain(paths.extra);
@@ -122,7 +155,7 @@ describe('description, metadata and broad session revisions', () => {
       expect(report.coverage.some(note => note.location.file === paths.extra)).toBe(false);
       await audited(handle);
     } finally { await handle.dispose(); }
-  }), timeout);
+  }, { 'subs/branch/src/pending.ts': "import { later } from './later.js';\nexport const pending = later;\n" }), timeout);
 
   it('re-extracts all files on the same warm compiler for configuration and dependency changes', () => fixture(async (root, inputs) => {
     const { handle, state, revision: cold } = await opened(inputs);
@@ -630,7 +663,7 @@ describe('timing fields outside the revision total', () => {
       await put(root, paths.extra, 'export const extra = 1;\n');
       const created = await handle.update([{ path: paths.extra, kind: 'created' }]);
       if (created.status !== 'revised') throw new Error(JSON.stringify(created));
-      expect([created.identical, created.revision.checked.path, promotions]).toEqual([false, 'broad', 1]);
+      expect([created.identical, created.revision.checked.path, promotions]).toEqual([false, 'membership', 1]);
       expect(Object.keys(created.timings!)).toEqual(['invocationCheck', 'promotion']);
       expect(Object.keys(created.revision.timings).sort()).toEqual([...stages, 'total'].sort());
       const { promotion } = created.timings!;
@@ -653,6 +686,202 @@ describe('timing fields outside the revision total', () => {
       await equalToBatch(handle, inputs);
     } finally { await handle.dispose(); }
   }), timeout);
+});
+
+describe('membership path', () => {
+  const branch = 'subs/branch/src';
+  const membershipFiles: Record<string, string> = {
+    [`${branch}/consumer.ts`]: "import { later } from './later.js';\nexport const sum = later;\n",
+    [`${branch}/bare.ts`]: "export * from './soon';\n",
+    [`${branch}/remove.ts`]: "import { value } from './provider.js';\nimport { ghost } from './ghost.js';\nexport const remove = value + ghost;\n",
+    [`${branch}/user.ts`]: "import { remove } from './remove.js';\nexport const used = remove;\n",
+    [`${branch}/lonely.ts`]: 'export const lonely = 1;\n',
+  };
+  /** The published revision's inputs and identity against a fresh batch run over the same disk. */
+  const expectBatchInputs = async (revision: SessionRevision, inputs: Parameters<typeof equalToBatch>[1], handle: Parameters<typeof equalToBatch>[0]) => {
+    const report = await equalToBatch(handle, inputs);
+    expect(revision.inputs).toEqual(report.snapshot!.inputs);
+    expect(revision.inputId).toBe(report.inputId);
+    await audited(handle);
+  };
+  const labels = (revision: SessionRevision, prefix: string): string[] => revision.inputs.map(input => input.path).filter(path => path.startsWith(prefix));
+
+  it('membership-identity-equals-batch: unreferenced and referenced deletions and created files that satisfy an absent or extensionless probe publish the batch inputs', () => fixture(async (root, inputs) => {
+    const { handle, revision: cold } = await opened(inputs);
+    try {
+      const step = async (path: string, kind: 'created' | 'deleted', text?: string): Promise<SessionRevision> => {
+        if (text === undefined) await rm(join(root, path)); else await put(root, path, text);
+        const revision = await revised(handle, [path], kind);
+        expect(revision.checked.path).toBe('membership');
+        await expectBatchInputs(revision, inputs, handle);
+        return revision;
+      };
+      // The compiler's extension probes of each failed import are recorded, attributed to no file.
+      expect(labels(cold, `${branch}/ghost.js.`).length).toBeGreaterThan(0);
+      expect(labels(cold, `${branch}/later.js.`).length).toBeGreaterThan(0);
+      expect(labels(cold, `${branch}/soon.`).length).toBeGreaterThan(0);
+
+      const unreferenced = await step(`${branch}/lonely.ts`, 'deleted');
+      expect(labels(unreferenced, `${branch}/lonely`)).toEqual([]);
+      const referenced = await step(`${branch}/remove.ts`, 'deleted');
+      expect(referenced.checked.files).toEqual([`${branch}/user.ts`]);
+      expect(labels(referenced, `${branch}/ghost`)).toEqual([]);
+      const probed = await step(`${branch}/later.ts`, 'created', 'export const later = 2;\n');
+      expect(probed.checked.files).toEqual([`${branch}/consumer.ts`, `${branch}/later.ts`]);
+      expect(labels(probed, `${branch}/later.js.`)).toEqual([]);
+      const extensionless = await step(`${branch}/soon.ts`, 'created', 'export const soon = 3;\n');
+      expect(extensionless.checked.files).toEqual([`${branch}/bare.ts`, `${branch}/soon.ts`]);
+      expect(labels(extensionless, `${branch}/soon.`)).toEqual([`${branch}/soon.ts`]);
+      const fresh = await step(`${branch}/fresh.ts`, 'created', "import { value } from './provider.js';\nexport const fresh = value;\n");
+      expect(fresh.checked).toEqual({ path: 'membership', files: [`${branch}/fresh.ts`], accesses: 1, modelRebuilt: true });
+      // Restoring the referenced file resolves its importer again.
+      const restored = await step(`${branch}/remove.ts`, 'created', membershipFiles[`${branch}/remove.ts`]!);
+      expect(restored.checked.files).toEqual([`${branch}/remove.ts`, `${branch}/user.ts`]);
+    } finally { await handle.dispose(); }
+  }, membershipFiles), timeout);
+
+  it('membership-path-narrow, broad-kept: matching completes recorded bases and stems, and the reach rule names each unbounded update', () => {
+    const facts = { indexes: { ...emptyIndexes, contributors: {
+      'src/later.js': ['src/consumer.ts'], 'src/soon': ['src/bare.ts'], 'src/dir': ['src/index-user.ts'], 'src/gone.ts': ['src/gone.ts', 'src/user.ts'],
+      'src/other.ts': ['src/other.ts'], 'src/lateral': ['src/unrelated.ts'], '../outside/src/later.ts': ['src/outside.ts'],
+    } } } as unknown as SessionFacts;
+    expect(membershipMatches(facts, ['src/later.ts'], [])).toEqual(['src/consumer.ts']);
+    expect(membershipMatches(facts, ['src/later.ios.ts'], [])).toEqual(['src/consumer.ts']);
+    expect(membershipMatches(facts, ['src/soon/index.ts', 'src/dir.ts'], [])).toEqual(['src/bare.ts', 'src/index-user.ts']);
+    expect(membershipMatches(facts, [], ['src/gone.ts'])).toEqual(['src/user.ts']);
+    expect(membershipMatches(facts, ['src/unrelated.ts'], ['src/missing.ts'])).toEqual([]);
+    const bounded = { added: [], removed: [], global: [], spelled: true };
+    expect(reachRefusal(bounded, true)).toBeNull();
+    expect(reachRefusal(undefined, false)).toBe('reach-unknown');
+    expect(reachRefusal({ ...bounded, added: ['node_modules/pkg/index.d.ts'] }, true)).toBe('program');
+    expect(reachRefusal({ ...bounded, removed: ['node_modules/pkg/index.d.ts'] }, false)).toBe('program');
+    expect(reachRefusal({ ...bounded, global: ['src/script.ts'] }, false)).toBe('global');
+    expect(reachRefusal({ ...bounded, spelled: false }, true)).toBe('unspelled');
+    expect(reachRefusal({ ...bounded, spelled: false }, false)).toBeNull();
+  });
+
+  /** Every broad revision below invalidates the whole program after the named files enter it. */
+  const expectBroad = async (handle: RetainedSession, state: Parameters<typeof instrumentCompiler>[0], retire: ReturnType<typeof instrumentObserver>['retire'],
+    inputs: Parameters<typeof equalToBatch>[1], names: readonly string[], kind: 'changed' | 'created' | 'deleted' | 'unknown',
+    retirements: readonly string[]): Promise<SessionRevision> => {
+    // A changed area derivation replaces the adapter, so each step instruments the current one.
+    const compiler = instrumentCompiler(state);
+    retire.mockClear();
+    const revision = await revised(handle, names, kind);
+    expect(revision.checked.path).toBe('broad');
+    expect(compiler.update.mock.calls.map(call => call[0].invalidateAll).at(-1)).toBe(true);
+    expect(retire.mock.calls.map(call => call[0].kind)).toEqual(retirements);
+    await expectBatchInputs(revision, inputs, handle);
+    return revision;
+  };
+
+  it('broad-kept: structural, configuration, non-owned, unknown, unexplained and area changes keep the whole invalidation', () => fixture(async (root, inputs) => {
+    const { handle, state } = await opened(inputs);
+    try {
+      const { retire, observer } = instrumentObserver(state);
+      const configuration = JSON.parse(await readFile(join(root, 'tsconfig.json'), 'utf8'));
+      configuration.compilerOptions.strict = true;
+      await put(root, 'tsconfig.json', JSON.stringify(configuration));
+      await expectBroad(handle, state, retire, inputs, ['tsconfig.json'], 'changed', []);
+      await replace(root, 'node_modules/fixture-dependency/index.d.ts', 'readonly n: number', 'readonly n: string');
+      await expectBroad(handle, state, retire, inputs, ['node_modules/fixture-dependency/index.d.ts'], 'changed', []);
+      await put(root, `${branch}/unknown.ts`, 'export const unknown = 1;\n');
+      await expectBroad(handle, state, retire, inputs, [`${branch}/unknown.ts`], 'unknown', ['all']);
+      // A compiler report still pending at the update is promoted by it: a change no created file explains.
+      await put(root, `${branch}/explained.ts`, 'export const explained = 1;\n');
+      observer.sink.absent(join(root, 'node_modules/unexplained.d.ts'));
+      await expectBroad(handle, state, retire, inputs, [`${branch}/explained.ts`], 'created', ['all']);
+      // The first owned test file makes `src/tests/` appear.
+      await put(root, `${branch}/tests/branch.test.ts`, 'export const spec = 1;\n');
+      await expectBroad(handle, state, retire, inputs, [`${branch}/tests/branch.test.ts`], 'created', ['all']);
+      await put(root, 'subs/branch/subs/twig/module.ramify', 'ramify 1\nmodule twig\n');
+      await put(root, 'subs/branch/subs/twig/README.md', '# Twig\n\nA new child.\n');
+      await put(root, 'subs/branch/subs/twig/src/twig.ts', 'export const twig = 1;\n');
+      await expectBroad(handle, state, retire, inputs, ['subs/branch/subs/twig/module.ramify'], 'created', []);
+    } finally { await handle.dispose(); }
+  }, {
+    ...membershipFiles,
+    [paths.rootApi]: `import type { DependencyShape } from 'fixture-dependency';\nexport type DependencyAlias = DependencyShape;\n${fixtureFiles[paths.rootApi]}`,
+    'node_modules/fixture-dependency/package.json': '{"name":"fixture-dependency","version":"1.0.0","types":"index.d.ts"}',
+    'node_modules/fixture-dependency/index.d.ts': 'export interface DependencyShape { readonly n: number }\n',
+  }), timeout);
+
+  it('broad-kept: a membership change the facts or the compiler cannot bound falls back to the whole invalidation', () => fixture(async (root, inputs) => {
+    const { handle, state } = await opened(inputs);
+    try {
+      const { retire } = instrumentObserver(state);
+      const refused = (names: readonly string[], kind: 'created' | 'deleted', retirements: readonly string[]) =>
+        expectBroad(handle, state, retire, inputs, names, kind, retirements);
+      // Refused from the facts before any compiler work.
+      await put(root, `${branch}/ambient.d.ts`, 'declare module "ambient-name" { export const ambient: number; }\n');
+      await refused([`${branch}/ambient.d.ts`], 'created', ['all']);
+      await put(root, `${branch}/view.tsx`, 'export const view = 1;\n');
+      expect((await revised(handle, [`${branch}/view.tsx`], 'created')).checked.path).toBe('membership');
+      await rm(join(root, `${branch}/view.tsx`));
+      await refused([`${branch}/view.tsx`], 'deleted', ['all']);
+      await put(root, `${branch}/solo/solo.ts`, 'export const solo = 1;\n');
+      expect((await revised(handle, [`${branch}/solo/solo.ts`], 'created')).checked.path).toBe('membership');
+      await rm(join(root, `${branch}/solo/solo.ts`));
+      await refused([`${branch}/solo/solo.ts`], 'deleted', ['all']);
+      // Refused from the compiler's reach after its incremental update.
+      await put(root, `${branch}/script.ts`, 'declare module "script-name" { export const script: number; }\n');
+      await refused([`${branch}/script.ts`], 'created', ['probes', 'all']);
+      await put(root, `${branch}/package-user.ts`, "import type { DependencyShape } from 'fixture-dependency';\nexport type Used = DependencyShape;\n");
+      await refused([`${branch}/package-user.ts`], 'created', ['probes', 'all']);
+      await rm(join(root, `${branch}/package-user.ts`));
+      await refused([`${branch}/package-user.ts`], 'deleted', ['probes', 'all']);
+      await put(root, `${branch}/referencing.ts`, '/// <reference path="../../../node_modules/fixture-dependency/index.d.ts" />\nexport const referencing = 1;\n');
+      await refused([`${branch}/referencing.ts`], 'created', ['probes', 'all']);
+      // An unresolved package access names no candidate a created file could complete.
+      await put(root, `${branch}/missing.ts`, "import { gone } from 'missing-package';\nexport const missing = gone;\n");
+      await refused([`${branch}/missing.ts`], 'created', ['probes', 'all']);
+      await put(root, `${branch}/after-missing.ts`, 'export const afterMissing = 1;\n');
+      await refused([`${branch}/after-missing.ts`], 'created', ['all']);
+      await rm(join(root, `${branch}/missing.ts`));
+      await refused([`${branch}/missing.ts`], 'deleted', ['all']);
+      // With `baseUrl`, a created file can satisfy a specifier no candidate spells.
+      const configuration = JSON.parse(await readFile(join(root, 'tsconfig.json'), 'utf8'));
+      configuration.compilerOptions.baseUrl = '.';
+      await put(root, 'tsconfig.json', JSON.stringify(configuration));
+      await expectBroad(handle, state, retire, inputs, ['tsconfig.json'], 'changed', []);
+      await put(root, `${branch}/based.ts`, 'export const based = 1;\n');
+      await refused([`${branch}/based.ts`], 'created', ['probes', 'all']);
+    } finally { await handle.dispose(); }
+  }, {
+    ...membershipFiles,
+    'node_modules/fixture-dependency/package.json': '{"name":"fixture-dependency","version":"1.0.0","types":"index.d.ts"}',
+    'node_modules/fixture-dependency/index.d.ts': 'export interface DependencyShape { readonly n: number }\n',
+  }), timeout);
+
+  it('membership-identity-equals-batch: promotes a membership revision far below a broad one on the same fixture', () => fixture(async (root, inputs) => {
+    const { handle } = await opened(inputs);
+    try {
+      const promotion = async (path: string, kind: 'created' | 'deleted', text?: string): Promise<{ path: string; promotion: number }> => {
+        if (text === undefined) await rm(join(root, path)); else await put(root, path, text);
+        const result = await handle.update([{ path, kind }]);
+        if (result.status !== 'revised') throw new Error(JSON.stringify(result));
+        return { path: result.revision.checked.path, promotion: result.timings!.promotion };
+      };
+      const membership: number[] = [], broad: number[] = [];
+      for (let cycle = 0; cycle < 5; cycle++) {
+        const deleted = await promotion(`${branch}/lonely.ts`, 'deleted');
+        const created = await promotion(`${branch}/lonely.ts`, 'created', `export const lonely = ${cycle};\n`);
+        expect([deleted.path, created.path]).toEqual(['membership', 'membership']);
+        membership.push(deleted.promotion, created.promotion);
+        // Deleting the last source of a directory takes the broad path: every
+        // compiler observation retires and the whole invalidation reports it again.
+        const solo = `${branch}/solo/solo.ts`;
+        expect((await promotion(solo, 'created', `export const solo = ${cycle};\n`)).path).toBe('membership');
+        const last = await promotion(solo, 'deleted');
+        expect(last.path).toBe('broad');
+        broad.push(last.promotion);
+      }
+      const median = (values: number[]): number => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)]!;
+      expect(median(membership) * 4).toBeLessThan(median(broad));
+      await audited(handle);
+      await equalToBatch(handle, inputs);
+    } finally { await handle.dispose(); }
+  }, membershipFiles), timeout);
 });
 
 /** Each observation path to the files naming it, derived here without the index's own helper. */
@@ -747,16 +976,16 @@ describe('contribution index', () => {
 
       await put(root, later, 'export const later = 1;\n');
       await revised(handle, [later], 'created');
-      facts = await verify('broad');
+      facts = await verify('membership');
       expect(facts.indexes.contributors[later]).toEqual([later, pending]);
       await rm(join(root, later));
       await revised(handle, [later], 'deleted');
-      facts = await verify('broad');
+      facts = await verify('membership');
       expect(Object.values(facts.indexes.contributors).some(files => files.includes(later))).toBe(false);
       expect(facts.indexes.contributors[later]).toEqual([pending]);
       await rm(join(root, pending));
       await revised(handle, [pending], 'deleted');
-      facts = await verify('broad');
+      facts = await verify('membership');
       expect(Object.values(facts.indexes.contributors).some(files => files.includes(pending))).toBe(false);
       expect(Object.keys(facts.indexes.contributors).some(path => path.startsWith('subs/branch/src/later'))).toBe(false);
 

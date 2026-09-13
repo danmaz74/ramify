@@ -17,6 +17,9 @@ function expectReported(evidence: MembershipEvidence): void {
   expect(evidence.unreported).toEqual([]);
 }
 
+/** An update whose program outside the owned files is unchanged and whose file reaches nothing globally. */
+const bounded = { added: [], removed: [], global: [], spelled: true };
+
 const pkgReads = { 'node_modules/pkg/other.d.ts': ['file', 'probe'], 'node_modules/pkg/package.json': ['file', 'probe'] };
 const probes = (paths: readonly string[]): Record<string, string[]> => Object.fromEntries(paths.map(path => [path, ['probe']]));
 
@@ -27,9 +30,10 @@ async function witness(change: MembershipCase): Promise<MembershipEvidence> {
   return evidence;
 }
 
-describe('membership-incremental-equal, membership-reads-reported: a created or deleted file without a whole invalidation', () => {
+describe('membership-incremental-equal, membership-reads-reported, membership-identity-equals-batch: a created or deleted file without a whole invalidation', () => {
   it('a created unreferenced file is read, described alone and reported with its own contributions', async () => {
     const evidence = await witness(membershipCases['created unreferenced']);
+    expect(evidence.reach).toEqual(bounded);
     expect(evidence.recomputed).toEqual(['src/fresh.ts']);
     expect(evidence.reread).toEqual(['src/fresh.ts', 'tsconfig.json']);
     expect(evidence.affected).toEqual(['src/fresh.ts']);
@@ -43,6 +47,7 @@ describe('membership-incremental-equal, membership-reads-reported: a created or 
 
   it('a created file satisfying an importer\'s absence probe is reported as read, and the importer\'s contributions are reported', async () => {
     const evidence = await witness(membershipCases['created satisfying a probed specifier']);
+    expect(evidence.reach).toEqual(bounded);
     expect(evidence.recomputed).toEqual(['src/hub.ts', 'src/later.ts']);
     expect(evidence.reread).toEqual(['src/later.ts', 'tsconfig.json']);
     expect(evidence.affected).toEqual(['src/consumer.ts', 'src/hub.ts', 'src/later.ts']);
@@ -55,6 +60,7 @@ describe('membership-incremental-equal, membership-reads-reported: a created or 
 
   it('a created file satisfying an extensionless specifier recomputes the re-exporter whose absent base it completes', async () => {
     const evidence = await witness(membershipCases['created satisfying an extensionless specifier']);
+    expect(evidence.reach).toEqual(bounded);
     expect(evidence.recomputed).toEqual(['src/barehub.ts', 'src/soon.ts']);
     expect(evidence.reread).toEqual(['src/soon.ts', 'tsconfig.json']);
     expect(evidence.affected).toEqual(['src/bare.ts', 'src/barehub.ts', 'src/soon.ts']);
@@ -67,6 +73,7 @@ describe('membership-incremental-equal, membership-reads-reported: a created or 
   it('a deleted referenced file leaves the program and its importers\' new absence probes are reported', async () => {
     const evidence = await witness(membershipCases['deleted referenced']);
     expect(evidence.incremental.program['src/remove.ts']).toBe(false);
+    expect(evidence.reach).toEqual(bounded);
     expect(evidence.recomputed).toEqual(['src/hub.ts']);
     expect(evidence.reread).toEqual(['tsconfig.json']);
     expect(evidence.affected).toEqual(['src/hub.ts', 'src/remove.ts', 'src/user.ts']);
@@ -80,6 +87,8 @@ describe('membership-incremental-equal, membership-reads-reported: a created or 
   it('a deleted unreferenced file leaves the program with the dependency package only it reached', async () => {
     const evidence = await witness(membershipCases['deleted unreferenced']);
     expect([evidence.incremental.program['src/lonely.ts'], evidence.incremental.program['node_modules/pkg/other.d.ts']]).toEqual([false, false]);
+    // The package leaves the program with its sole importer: the session cannot keep its reads.
+    expect(evidence.reach).toEqual({ ...bounded, removed: ['node_modules/pkg/index.d.ts', 'node_modules/pkg/other.d.ts'] });
     expect(evidence.recomputed).toEqual([]);
     expect(evidence.reread).toEqual(['tsconfig.json']);
     expect(evidence.affected).toEqual(['src/lonely.ts']);

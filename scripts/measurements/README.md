@@ -273,8 +273,9 @@ Additional workloads retain 200 alternating body edits on the reference and
 S100, two hot and six warm S100 contexts with active subscriptions, four cold
 opens, and Plan 2's unchanged entry-footprint workloads. The checked-set and cold
 instances reuse those process observations with independent predicates; they do
-not claim an additional execution. Created/deleted files must report the broad
-path, as the reviewed Plan 5 scope permits.
+not claim an additional execution. Created/deleted files must report the
+membership path; a fixture change whose reach cannot be bounded would report the
+broad path and fail this workload.
 
 The external POSIX sampler observes process RSS at a 50 ms target interval.
 A separate socket poll records daemon counters, contexts, retained facts and

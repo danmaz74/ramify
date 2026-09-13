@@ -10,7 +10,7 @@ import { ReportedObservations, inputIdentity, reportedInput } from './observatio
 import type { ConfigurationData } from './configuration-data.js';
 import type {
   CapturedInput, ExactReference, InventoryFile, InventoryModule, InventoryUpdate, ObservationSink,
-  ObservedChange, ProjectInventory, ProjectIssue, ProjectObserve, ProjectObserver, ProjectReadOptions,
+  ObservationRetirement, ObservedChange, ProjectInventory, ProjectIssue, ProjectObserve, ProjectObserver, ProjectReadOptions,
   ProjectResolution, RetainedConfiguration,
 } from './interfaces/project.js';
 
@@ -104,16 +104,20 @@ class Observer implements ProjectObserver {
       signal?.throwIfAborted();
       try {
         await this.#promote();
-        const update = await this.#update(changes, signal);
-        if (update.kind === 'local' && (update.created.length || update.deleted.length)) {
-          await this.#capture.retireReported();
-          this.#reported.clear();
-        }
-        return update;
+        return await this.#update(changes, signal);
       } catch (error) {
         if (error instanceof Cancelled || signal?.aborted) throw signal?.reason ?? error;
         return this.#incomplete(error);
       }
+    });
+  }
+
+  async retire(retirement: ObservationRetirement): Promise<void> {
+    return this.#serialize(async () => {
+      if (retirement.kind === 'probes') { this.#capture.markReported(); return; }
+      await this.#capture.retireReported();
+      // Reports not yet promoted belong to the retired compiler state.
+      this.#reported.clear();
     });
   }
 
@@ -155,6 +159,7 @@ class Observer implements ProjectObserver {
     const changes: ObservedChange[] = [];
     for (const observation of this.#reported.take()) {
       const path = this.#capture.path(observation.path);
+      await this.#capture.confirm(path, observation.shape);
       const known = this.#capture.recorded(path);
       const previous = known ? this.#identity(known.path, known.entries) : undefined;
       // A report that disagrees with the recorded state re-observes the path:
@@ -170,6 +175,7 @@ class Observer implements ProjectObserver {
         changes.push({ path, kind: 'changed' });
       }
     }
+    await this.#capture.retireUnconfirmed();
     return changes;
   }
 

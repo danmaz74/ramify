@@ -6,16 +6,16 @@ import type { ParsedDescription } from '../subs/descriptions/src/interfaces/synt
 import { parseDescription } from '../subs/descriptions/src/parse.js';
 import { buildModel, deriveSourceAreas, originalKey } from '../subs/model/src/index.js';
 import type { Model, ResolvedTagRegistry, SourceArea } from '../subs/model/src/interfaces/model.js';
-import type { CapturedInput, ObservedChange, ProjectInventory, ProjectIssue, ProjectObserver } from '../subs/project/src/interfaces/project.js';
+import type { CapturedInput, InventoryUpdate, ObservedChange, ProjectInventory, ProjectIssue, ProjectObserver } from '../subs/project/src/interfaces/project.js';
 import { readProject } from '../subs/project/src/read-project.js';
-import type { AccessInterpreter, CatalogOriginal, RetainedSourceAnalysis, SourceAccess, SourceCatalog,
+import type { AccessInterpreter, CatalogDelta, CatalogOriginal, MembershipReach, RetainedSourceAnalysis, SourceAccess, SourceCatalog,
   SourceLimit } from '../subs/typescript/src/interfaces/source.js';
 import { evaluateAccessesAsync } from './evaluate-accesses.js';
 import type { AccessResult, AnalysisDiagnostic, AnalysisInputs, AnalysisReport, StageId } from './interfaces/analysis.js';
 import type { CheckedSet, RevisionPath, RevisionTimings, SessionLimits } from './interfaces/session.js';
 import { diagnostic, projectDiagnostics } from './report-data.js';
 import { ReportDraft, WorkLimit, byteOrder } from './report.js';
-import type { AccessDecision, FileFacts, SessionFacts } from './session-facts.js';
+import type { AccessDecision, FactIndexes, FileFacts, SessionFacts } from './session-facts.js';
 import { accessSurface, assembleAccesses, buildIndexes, canonicalLocations, deepFreeze, emptyCatalog, emptyIndexes,
   sortedPaths } from './session-facts.js';
 
@@ -315,6 +315,183 @@ function descriptionAccesses(inventory: ProjectInventory, descriptions: readonly
     || access.selections.some(selection => selection.original && inside(selection.original.owner))).map(access => access.id));
 }
 
+/** Whether a path names a file relative to its importer rather than a package or mapped name. */
+const relativeSpecifier = (specifier: string): boolean => specifier === '.' || specifier === '..' || specifier.startsWith('./')
+  || specifier.startsWith('../') || specifier.startsWith('/');
+/** A declaration file can declare ambient modules and globals other files read without an import. */
+const declarationFile = (path: string): boolean => /\.d(\.[^./]+)?\.[cm]?ts$/.test(path);
+/** Extensions whose files the compiler can give an implicit JSX runtime import. */
+const jsxFile = (path: string): boolean => /\.[jt]sx$/.test(path);
+/** A package-style access the compiler could not resolve to a file; its lookup can read manifests no fact names. */
+const unresolvedPackage = (access: SourceAccess): boolean => access.specifier !== null && !relativeSpecifier(access.specifier)
+  && (access.target.kind === 'unresolved' || (access.target.kind === 'external' && access.target.resolvedFile === null));
+
+/**
+ * Why a local update that creates or deletes owned files cannot take the
+ * membership path, judged before any compiler work from the retained facts and
+ * the inventories; null when it can. The broad path is always equal to batch,
+ * so every case this rule cannot bound exactly is refused.
+ */
+export function membershipRefusal(previous: SessionFacts, inventory: ProjectInventory,
+  local: Extract<InventoryUpdate, { kind: 'local' }>): string | null {
+  if (local.changed.length || local.descriptions.length) return 'other-changes';
+  const before = previous.inventory;
+  if (!before) return 'no-inventory';
+  const areas = (value: ProjectInventory): string => JSON.stringify(value.modules.map(module => [module.directory, module.areas]));
+  if (areas(before) !== areas(inventory)) return 'areas';
+  const current = new Map(inventory.files.map(file => [file.path, file]));
+  const earlier = new Map(before.files.map(file => [file.path, file]));
+  for (const path of local.created) if (current.get(path)?.kind !== 'source' || declarationFile(path)) return 'created-kind';
+  const shims = new Set(Object.values(previous.files).flatMap(file => file.description.dependencies.shims));
+  for (const path of local.deleted) {
+    const facts = previous.files[path];
+    if (earlier.get(path)?.kind !== 'source' || !facts || declarationFile(path) || jsxFile(path) || shims.has(path)) return 'deleted-kind';
+    // A shared global or an unresolved package access can reach files no access fact names.
+    if (facts.description.coverage.some(note => note.code === 'shared-global')) return 'deleted-global';
+    if (facts.accesses.some(unresolvedPackage)) return 'deleted-unresolved';
+    // The compiler reads the nearest package manifest per directory that holds a program file.
+    const directory = dirname(path);
+    if (!inventory.files.some(file => file.kind === 'source' && dirname(file.path) === directory)) return 'deleted-last-in-directory';
+  }
+  // Package imports, self-references and failed package lookups name no candidate a created file could complete.
+  if (local.created.length && Object.values(previous.files).some(file => file.accesses.some(unresolvedPackage))) return 'unresolved-package';
+  return null;
+}
+
+/** Why the compiler's membership update reached beyond the named files; null when it did not. */
+export function reachRefusal(reach: MembershipReach | undefined, created: boolean): string | null {
+  if (!reach) return 'reach-unknown';
+  if (reach.added.length || reach.removed.length) return 'program';
+  if (reach.global.length) return 'global';
+  if (created && !reach.spelled) return 'unspelled';
+  return null;
+}
+
+/** The first `.` of a path's base name onward removed: the name a specifier completes. */
+function stem(path: string): string {
+  const slash = path.lastIndexOf('/');
+  const dot = path.indexOf('.', slash + 1);
+  return dot > slash + 1 ? path.slice(0, dot) : path;
+}
+/** Whether a created path completes a recorded one: equal, or extending it or its stem after `.` or `/`. */
+function completesRecorded(recorded: string, created: string): boolean {
+  for (const base of new Set([recorded, stem(recorded)])) {
+    if (created === base || created.startsWith(`${base}.`) || created.startsWith(`${base}/`)) return true;
+  }
+  return false;
+}
+
+/**
+ * Retained files whose resolution a created or deleted path can change: every
+ * contributor of a recorded path a created file completes, and every contributor
+ * naming a deleted file exactly. Deleted files themselves are excluded.
+ */
+export function membershipMatches(facts: SessionFacts, created: readonly string[], deleted: readonly string[]): string[] {
+  const matched = new Set<string>();
+  for (const path of deleted) for (const file of facts.indexes.contributors[path] ?? []) matched.add(file);
+  if (created.length) {
+    for (const [recorded, files] of Object.entries(facts.indexes.contributors)) {
+      if (created.some(path => completesRecorded(recorded, path))) for (const file of files) matched.add(file);
+    }
+  }
+  for (const path of deleted) matched.delete(path);
+  return sortedPaths(matched);
+}
+
+/**
+ * A membership update whose compiler reach the facts cannot bound: retire every
+ * compiler observation, invalidate the program the incremental update already
+ * holds, and recompute every owned file, exactly as the broad path does.
+ */
+async function broadAfterMembership(state: SessionState, inventory: ProjectInventory, timings: PhaseTimings,
+  signal?: AbortSignal): Promise<Omit<Computed, 'changed'>> {
+  let start = performance.now();
+  await state.observer!.retire({ kind: 'all' });
+  timings.inventory += performance.now() - start;
+  start = performance.now();
+  await state.adapter!.update({ changed: [], created: [], deleted: [], inventory: null, invalidateAll: true }, signal);
+  timings.compiler += performance.now() - start;
+  const facts = await recomputeAll(state, inventory, timings, signal);
+  return { status: 'computed', facts, checked: wholeCheckedSet('broad', facts), timings, positionRefreshed: [] };
+}
+
+interface Relinked {
+  readonly linked: LinkedDescriptions | null;
+  readonly model: Model | null;
+  readonly linkIssues: readonly AnalysisDiagnostic[];
+  readonly rebuild: boolean;
+  readonly decisions: Record<string, AccessDecision>;
+  readonly indexes: FactIndexes;
+  /** Accesses decided because their own facts, their original or its exposures changed. */
+  readonly decided: number;
+  readonly positionRefreshed: readonly string[];
+}
+
+/**
+ * The narrow paths' link and decisions over updated file facts: relink when the
+ * catalog's link input changed or `relink` asks for it, otherwise patch moved
+ * declarations, then decide the accesses whose facts, originals or exposures
+ * changed and keep every other retained decision.
+ */
+async function relinkAndDecide(state: SessionState, facts: SessionFacts, inventory: ProjectInventory, files: Readonly<Record<string, FileFacts>>,
+  catalog: SourceCatalog, delta: CatalogDelta, interpretedFiles: readonly string[], descriptions: readonly string[], relink: boolean,
+  timings: PhaseTimings, stage: (stage: StageId) => void, signal?: AbortSignal): Promise<Relinked> {
+  stage('link');
+  let start = performance.now();
+  const previousOriginals = new Map(facts.catalog.originals.map(original => [originalKey(original.id), original]));
+  const currentOriginals = new Map(catalog.originals.map(original => [originalKey(original.id), original]));
+  const changedKeys = delta.changedOriginals.map(originalKey);
+  const movedOriginals = new Set(changedKeys.filter(key => {
+    const earlier = previousOriginals.get(key), current = currentOriginals.get(key);
+    return !!earlier && !!current && originalSurface(earlier) === originalSurface(current);
+  }));
+  const rebuild = relink || descriptions.length > 0 || facts.model === null || delta.changed.length > 0 || delta.removedOriginals.length > 0
+    || changedKeys.some(key => !movedOriginals.has(key));
+  let { linked, model, linkIssues } = facts;
+  if (rebuild) {
+    const outcome = link(state, inventory, catalog);
+    linked = outcome.linked; model = outcome.model; linkIssues = outcome.issues;
+  } else if (movedOriginals.size && linked && model) {
+    ({ linked, model } = patchPositions(linked, model, catalog, movedOriginals));
+  }
+  timings.link = performance.now() - start;
+
+  stage('decide');
+  start = performance.now();
+  const indexes = buildIndexes(files, inventory.scope.root);
+  const decisions: Record<string, AccessDecision> = {};
+  const positionRefreshed: string[] = [];
+  let decided = 0;
+  if (model) {
+    const decideIds = new Set<string>();
+    const previousAccess = new Map<string, string>();
+    for (const path of interpretedFiles) for (const access of facts.files[path]?.accesses ?? []) previousAccess.set(access.id, JSON.stringify(access));
+    const ordered = assembleAccesses(files);
+    for (const id of descriptionAccesses(inventory, descriptions, ordered)) decideIds.add(id);
+    const byId = new Map(ordered.map(access => [access.id, access]));
+    for (const path of interpretedFiles) {
+      for (const access of files[path]!.accesses) if (previousAccess.get(access.id) !== JSON.stringify(access)) decideIds.add(access.id);
+    }
+    let all = facts.model === null;
+    if (rebuild && facts.model) {
+      if (JSON.stringify(facts.model.modules) !== JSON.stringify(model.modules)) all = true;
+      else for (const key of affectedOriginals(facts.model, model)) for (const id of facts.indexes.selectors[key] ?? []) decideIds.add(id);
+    }
+    const selected = all ? new Set(byId.keys()) : new Set([...decideIds].filter(id => byId.has(id)));
+    for (const key of movedOriginals) for (const id of indexes.selectors[key] ?? []) if (!selected.has(id)) { selected.add(id); positionRefreshed.push(id); }
+    for (const access of ordered) {
+      const retained = facts.decisions[access.id];
+      if (!selected.has(access.id) && retained) decisions[access.id] = retained;
+    }
+    const refreshed = new Set(positionRefreshed);
+    const targets = ordered.filter(access => selected.has(access.id) || !decisions[access.id]);
+    decided = targets.filter(access => !refreshed.has(access.id)).length;
+    if (targets.length) Object.assign(decisions, await decide(state, model, targets, signal));
+  }
+  timings.decide = performance.now() - start;
+  return { linked, model, linkIssues, rebuild, decisions, indexes, decided, positionRefreshed: sortedPaths(positionRefreshed) };
+}
+
 /**
  * The revision step. Classify the changes through the observer, then take the
  * metadata, description, unchanged-surface, source or broad path over the retained facts.
@@ -381,10 +558,75 @@ export async function revise(state: SessionState, changes: readonly ObservedChan
     const shimChanged = ownedChanged.some(path => shims.has(path));
     const areasChanged = descriptions.length > 0 && previous
       && JSON.stringify(deriveAreas(state.registry, inventory).areas) !== JSON.stringify(previous.areas);
-    const broad = state.stale || !state.adapter || !state.adapter.hot || !previous || previous.invalid !== null || previous.areaIssues.length > 0
-      || unknown || structural || areasChanged || shimChanged || otherChanged.length > 0 || unexplained.length > 0
-      || (local !== null && (local.created.length > 0 || local.deleted.length > 0));
+    const membershipChange = local !== null && (local.created.length > 0 || local.deleted.length > 0);
+    const otherwiseBroad = state.stale || !state.adapter || !state.adapter.hot || !previous || previous.invalid !== null || previous.areaIssues.length > 0
+      || unknown || structural || areasChanged || shimChanged || otherChanged.length > 0 || unexplained.length > 0;
+    const refusal = membershipChange && !otherwiseBroad ? membershipRefusal(previous!, inventory, local!) : null;
+    const membership = membershipChange && !otherwiseBroad && refusal === null;
+    const broad = otherwiseBroad || (membershipChange && !membership);
     timings.classify = performance.now() - start;
+
+    if (membership) {
+      const adapter = state.adapter!;
+      const facts = previous!;
+      const { created, deleted } = local!;
+      start = performance.now();
+      // The incremental update reports again every probe and listing the
+      // compiler still needs, so the next promotion releases the rest. Read
+      // bytes stay: the compiler does not read a cached file again.
+      await observer.retire({ kind: 'probes' });
+      timings.inventory += performance.now() - start;
+      stage = 'catalog';
+      start = performance.now();
+      const { reach } = await adapter.update({ changed: [], created, deleted, inventory, invalidateAll: false }, signal);
+      timings.compiler = performance.now() - start;
+      if (reachRefusal(reach, created.length > 0) !== null) {
+        return { ...await broadAfterMembership(state, inventory, timings, signal), changed };
+      }
+      start = performance.now();
+      // A created file can satisfy or shadow a resolution whose importer's
+      // description the set would not select on its own, so the matched files
+      // are described beside the created and deleted ones.
+      const matched = membershipMatches(facts, created, deleted);
+      const described = await adapter.describe(sortedPaths([...created, ...deleted, ...matched]), signal);
+      const delta = described.delta;
+      const catalog = adapter.catalog();
+      timings.descriptions = performance.now() - start;
+      const files: Record<string, FileFacts> = { ...facts.files };
+      for (const path of deleted) delete files[path];
+      for (const description of described.descriptions) {
+        const current = files[description.file];
+        files[description.file] = deepFreeze(current ? { ...current, description } : { accesses: [], coverage: [], candidates: [], description });
+      }
+
+      stage = 'access';
+      start = performance.now();
+      const reinterpret = new Set<string>([...created, ...matched, ...delta.recomputed]);
+      for (const target of [...delta.changed, ...deleted]) for (const importer of facts.indexes.importers[target] ?? []) reinterpret.add(importer);
+      for (const target of delta.moved) {
+        for (const importer of facts.indexes.importers[target] ?? []) {
+          if (facts.files[importer]?.coverage.some(note => note.related.some(at => at.file === target))) reinterpret.add(importer);
+        }
+      }
+      for (const path of deleted) reinterpret.delete(path);
+      const interpretedFiles = sortedPaths([...reinterpret].filter(path => owned.has(path)));
+      const interpreted = await adapter.interpreter().interpret(interpretedFiles, signal);
+      const perFile = fileAccessFacts(interpretedFiles, interpreted);
+      for (const path of interpretedFiles) files[path] = deepFreeze({ ...files[path]!, ...perFile.get(path)! });
+      timings.accesses = performance.now() - start;
+      const missing = [...owned].filter(path => !files[path]?.description);
+      if (missing.length || Object.keys(files).length !== owned.size) throw internal(`The membership update left files without facts: ${missing.join(', ')}`);
+      // A whole recomputation lists files in byte order, and the indexes follow that order.
+      const ordered: Record<string, FileFacts> = Object.fromEntries(sortedPaths(owned).map(path => [path, files[path]!]));
+
+      const decided = await relinkAndDecide(state, facts, inventory, ordered, catalog, delta, interpretedFiles, [], true, timings,
+        next => { stage = next; }, signal);
+      const next: SessionFacts = deepFreeze({ registry: state.registry, invalid: null, inventory, areas: facts.areas, areaIssues: [], files: ordered, catalog,
+        linked: decided.linked, linkIssues: decided.linkIssues, model: decided.model, decisions: decided.decisions, indexes: decided.indexes });
+      return { status: 'computed', facts: next,
+        checked: { path: 'membership', files: interpretedFiles, accesses: decided.decided, modelRebuilt: decided.rebuild },
+        changed, timings, positionRefreshed: decided.positionRefreshed };
+    }
 
     if (!broad && local && !ownedChanged.length && !descriptions.length) {
       // Metadata only: purposes changed, nothing the compiler, the link or a
@@ -412,6 +654,11 @@ export async function revise(state: SessionState, changes: readonly ObservedChan
     }
 
     if (broad) {
+      if (membershipChange) {
+        start = performance.now();
+        await observer.retire({ kind: 'all' });
+        timings.inventory += performance.now() - start;
+      }
       stage = 'catalog';
       start = performance.now();
       if (state.adapter) {
@@ -473,64 +720,14 @@ export async function revise(state: SessionState, changes: readonly ObservedChan
     const unchangedSurface = interpretedFiles.every(path => ownedChanged.includes(path))
       && ownedChanged.every(path => !delta.changed.includes(path) && accessSurface(facts.files[path]!) === accessSurface(files[path]!));
 
-    stage = 'link';
-    start = performance.now();
-    const previousOriginals = new Map(facts.catalog.originals.map(original => [originalKey(original.id), original]));
-    const currentOriginals = new Map(catalog.originals.map(original => [originalKey(original.id), original]));
-    const changedKeys = delta.changedOriginals.map(originalKey);
-    const movedOriginals = new Set(changedKeys.filter(key => {
-      const earlier = previousOriginals.get(key), current = currentOriginals.get(key);
-      return !!earlier && !!current && originalSurface(earlier) === originalSurface(current);
-    }));
-    const rebuild = descriptions.length > 0 || facts.model === null || delta.changed.length > 0 || delta.removedOriginals.length > 0
-      || changedKeys.some(key => !movedOriginals.has(key));
-    let { linked, model, linkIssues } = facts;
-    if (rebuild) {
-      const outcome = link(state, inventory, catalog);
-      linked = outcome.linked; model = outcome.model; linkIssues = outcome.issues;
-    } else if (movedOriginals.size && linked && model) {
-      ({ linked, model } = patchPositions(linked, model, catalog, movedOriginals));
-    }
-    timings.link = performance.now() - start;
-
-    stage = 'decide';
-    start = performance.now();
-    const indexes = buildIndexes(files, inventory.scope.root);
-    const decisions: Record<string, AccessDecision> = {};
-    const positionRefreshed: string[] = [];
-    let decided = 0;
-    if (model) {
-      const decideIds = new Set<string>();
-      const previousAccess = new Map<string, string>();
-      for (const path of interpretedFiles) for (const access of facts.files[path]?.accesses ?? []) previousAccess.set(access.id, JSON.stringify(access));
-      const ordered = assembleAccesses(files);
-      for (const id of descriptionAccesses(inventory, descriptions, ordered)) decideIds.add(id);
-      const byId = new Map(ordered.map(access => [access.id, access]));
-      for (const path of interpretedFiles) {
-        for (const access of files[path]!.accesses) if (previousAccess.get(access.id) !== JSON.stringify(access)) decideIds.add(access.id);
-      }
-      let all = facts.model === null;
-      if (rebuild && facts.model) {
-        if (JSON.stringify(facts.model.modules) !== JSON.stringify(model.modules)) all = true;
-        else for (const key of affectedOriginals(facts.model, model)) for (const id of facts.indexes.selectors[key] ?? []) decideIds.add(id);
-      }
-      const selected = all ? new Set(byId.keys()) : new Set([...decideIds].filter(id => byId.has(id)));
-      for (const key of movedOriginals) for (const id of indexes.selectors[key] ?? []) if (!selected.has(id)) { selected.add(id); positionRefreshed.push(id); }
-      for (const access of ordered) {
-        const retained = facts.decisions[access.id];
-        if (!selected.has(access.id) && retained) decisions[access.id] = retained;
-      }
-      const refreshed = new Set(positionRefreshed);
-      const targets = ordered.filter(access => selected.has(access.id) || !decisions[access.id]);
-      decided = targets.filter(access => !refreshed.has(access.id)).length;
-      if (targets.length) Object.assign(decisions, await decide(state, model, targets, signal));
-    }
-    timings.decide = performance.now() - start;
+    const decided = await relinkAndDecide(state, facts, inventory, files, catalog, delta, interpretedFiles, descriptions, false, timings,
+      next => { stage = next; }, signal);
+    const { linked, model, linkIssues, rebuild, decisions, indexes } = decided;
     const path: RevisionPath = model && unchangedSurface && !descriptions.length ? 'unchanged-surface' : 'source';
     const next: SessionFacts = deepFreeze({ registry: state.registry, invalid: null, inventory, areas: facts.areas, areaIssues: [], files, catalog,
       linked, linkIssues, model, decisions, indexes });
-    return { status: 'computed', facts: next, checked: { path, files: interpretedFiles, accesses: decided, modelRebuilt: rebuild },
-      changed, timings, positionRefreshed: sortedPaths(positionRefreshed) };
+    return { status: 'computed', facts: next, checked: { path, files: interpretedFiles, accesses: decided.decided, modelRebuilt: rebuild },
+      changed, timings, positionRefreshed: decided.positionRefreshed };
   } catch (error) {
     // Once the observer or the compiler may have advanced past the published
     // revision, the next update recomputes everything from the disk. A

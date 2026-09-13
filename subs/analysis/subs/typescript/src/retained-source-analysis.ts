@@ -1,14 +1,15 @@
 import type { ChildProcess } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { lstatSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
-import { basename, resolve } from 'node:path';
+import { basename, isAbsolute, relative, resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { API, type Project } from 'typescript/unstable/sync';
+import { isStringLiteral } from 'typescript/unstable/ast';
 import type { ObservationSink, ProjectInventory } from '../../project/src/interfaces/project.js';
 import type { SourceArea } from '../../model/src/interfaces/model.js';
 import { AccessInterpretation } from './accesses.js';
 import { createDescriptionSet, type DescriptionSet } from './descriptions.js';
-import type { AccessInterpreter, CatalogDelta, CatalogExport, FileDescription, RetainedSourceAnalysis,
+import type { AccessInterpreter, CatalogDelta, CatalogExport, FileDescription, MembershipReach, RetainedSourceAnalysis,
   RetainedSourceInputs, SourceCatalog, SourceChangeSet, SourceWorkLimits } from './interfaces/source.js';
 import type { CatalogHost } from './resolution.js';
 import { referencesOnly, syntheticCandidate, syntheticInputs } from './synthetic.js';
@@ -113,9 +114,12 @@ class RetainedSourceState implements RetainedSourceAnalysis {
     };
   }
 
-  async update(changes: SourceChangeSet, signal?: AbortSignal): Promise<{ readonly snapshot: number; readonly elapsedMs: number }> {
+  async update(changes: SourceChangeSet, signal?: AbortSignal): Promise<{ readonly snapshot: number; readonly elapsedMs: number;
+    readonly reach?: MembershipReach }> {
     this.#check(signal);
     const start = performance.now();
+    const ownedBefore = new Set(this.#owned.keys());
+    let reach: MembershipReach | undefined;
     if (changes.inventory) this.#adoptInventory(changes.inventory);
     if (!this.#api) {
       // A released or discarded compiler reopens from the disk as it is now;
@@ -140,15 +144,59 @@ class RetainedSourceState implements RetainedSourceAnalysis {
           this.#guarded(() => { this.#selectedFiles = this.#api!.parseConfigFile(this.#configuration).fileNames; });
           for (const path of this.#regenerate()) changed.add(path);
         }
+        const membership = created.length > 0 || deleted.length > 0;
+        const before = membership ? this.#programFiles() : [];
+        const global = membership ? deleted.filter(path => this.#reachesGlobally(path)) : [];
         if (changed.size || created.length || deleted.length) {
           this.#replaceSnapshot({ changed: [...changed].sort(order), created, deleted });
+        }
+        if (membership) {
+          const owned = (path: string): boolean => ownedBefore.has(path) || this.#owned.has(path);
+          const previous = new Set(before.filter(path => !owned(path)));
+          const current = new Set(this.#programFiles().filter(path => !owned(path)));
+          const label = (paths: Iterable<string>): string[] => [...paths].map(path => relative(this.#root, path)).sort(order);
+          const options = this.#project!.program.getCompilerOptions() as { readonly baseUrl?: string; readonly rootDirs?: readonly string[];
+            readonly paths?: Readonly<Record<string, readonly string[]>>; readonly pathsBasePath?: string };
+          reach = {
+            added: label([...current].filter(path => !previous.has(path))),
+            removed: label([...previous].filter(path => !current.has(path))),
+            global: label([...global, ...created.filter(path => this.#reachesGlobally(path))]),
+            // Resolution records a paths substitution only against an absolute base.
+            spelled: !options.baseUrl && !options.rootDirs?.length && (!options.paths || isAbsolute(options.pathsBasePath ?? '')),
+          };
         }
       }
     }
     this.#interpretation?.refresh(this.#project!, this.#helperInputs());
     this.#described = false;
     this.#sequence++;
-    return freezeData({ snapshot: this.#sequence, elapsedMs: performance.now() - start });
+    return freezeData({ snapshot: this.#sequence, elapsedMs: performance.now() - start, ...(reach ? { reach } : {}) });
+  }
+
+  /** Every file of the current program, as absolute paths. */
+  #programFiles(): readonly string[] {
+    const project = this.#requireProject();
+    return this.#guarded(() => project.program.getSourceFileNames().map(path => resolve(path)));
+  }
+
+  /** Whether an owned source in the current program can reach other files through
+   * anything but a resolved import: see `MembershipReach.global`. A file the
+   * program does not hold reaches nothing. */
+  #reachesGlobally(path: string): boolean {
+    const project = this.#requireProject();
+    return this.#guarded(() => {
+      const source = project.program.getSourceFile(path);
+      if (!source) return false;
+      if (!source.externalModuleIndicator || source.isDeclarationFile || source.moduleAugmentations.length > 0
+        || source.ambientModuleNames.length > 0 || source.referencedFiles.length > 0 || source.typeReferenceDirectives.length > 0
+        || source.libReferenceDirectives.length > 0) return true;
+      // An import the compiler did not resolve can still have read a package manifest.
+      return source.imports.some(node => {
+        const text = isStringLiteral(node) ? node.text : undefined;
+        const relativeSpecifier = text !== undefined && (text.startsWith('./') || text.startsWith('../') || text === '.' || text === '..' || text.startsWith('/'));
+        return !relativeSpecifier && !project.checker.getSymbolAtLocation(node);
+      });
+    });
   }
 
   async describe(files: readonly string[], signal?: AbortSignal): Promise<{ readonly descriptions: readonly FileDescription[]; readonly delta: CatalogDelta }> {

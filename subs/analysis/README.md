@@ -16,7 +16,11 @@ every description that changed by value, rebuilds the model only when the link
 input changed and decides the accesses the change reaches. A body edit that
 leaves descriptions and access facts equal by value is the `unchanged-surface`
 path; a declaration that only moved refreshes the decisions selecting it so
-their evidence and diagnostic identities match a fresh pass. Every revision
+their evidence and diagnostic identities match a fresh pass. An update that only
+creates or deletes owned sources takes the `membership` path: one incremental
+compiler update, then only the files whose resolution those paths can change are
+described and interpreted. A membership change whose reach the retained facts or
+the compiler cannot bound takes the broad path instead. Every revision
 carries its checked set, finding delta and timings; `report` materializes the
 `ramify.analysis/1` document of a retained revision on request, equal to
 `analyzeProject` over the same inputs except `runId`, and `verify` recomputes

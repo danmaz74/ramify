@@ -3,7 +3,7 @@ import { rm } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { completes } from '../descriptions.js';
 import { createRetainedSourceAnalysis, retainedCompilerEvidence } from '../retained-source-analysis.js';
-import type { FileDescription, RetainedSourceAnalysis, SourceAccess } from '../interfaces/source.js';
+import type { FileDescription, MembershipReach, RetainedSourceAnalysis, SourceAccess } from '../interfaces/source.js';
 import type { ObservationSink, ProjectInputView } from '../../../project/src/interfaces/project.js';
 import { acquire, areasFor, drop, fixture, put, sourceLimits } from './fixtures.js';
 
@@ -133,6 +133,8 @@ export interface MembershipEvidence {
   /** Paths inside the root the incremental adapter reported before the change, that a fresh adapter
    * does not observe, and that no pre-change contribution of an affected file names, with their shapes. */
   readonly obsoleteUnattributed: Readonly<Record<string, readonly Reported['shape'][]>>;
+  /** What the update reports it changed beyond the named file. */
+  readonly reach: MembershipReach | undefined;
 }
 
 /**
@@ -176,7 +178,7 @@ export async function membershipWitness(change: MembershipCase): Promise<Members
     views.push(current);
     const after = current.inventory.files.map(file => file.path);
     recorded.events.length = 0;
-    await adapter.update({ changed: [], created: change.change === 'created' ? [change.file] : [],
+    const { reach } = await adapter.update({ changed: [], created: change.change === 'created' ? [change.file] : [],
       deleted: change.change === 'deleted' ? [change.file] : [], inventory: current.inventory, invalidateAll: false });
     const updateEvents = recorded.events.splice(0);
     const reported = local(updateEvents);
@@ -225,6 +227,7 @@ export async function membershipWitness(change: MembershipCase): Promise<Members
       changedFile: [...new Set(updateEvents.filter(event => relative(root, event.path) === change.file).map(event => event.shape))].sort(),
       freshNotReported: shapes(freshRecorded.events, [...observed].filter(path => inside(path) && !reported.has(path))),
       obsoleteUnattributed: shapes(priorEvents, [...reportedBefore].filter(path => inside(path) && !observed.has(path) && !priorIndex.has(path))),
+      reach,
     };
   } finally {
     for (const adapter of adapters) await adapter.dispose();
