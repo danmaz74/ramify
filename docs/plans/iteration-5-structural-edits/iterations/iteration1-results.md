@@ -229,4 +229,7 @@ ends deliberately; every test passed.
 
 ## Audit
 
-Pending.
+The cucumber-viz commit audit of `507ca36` (source `c5b47e4` plus these
+results), run with `use_existing_head` on the worktree, passed in 2 min 33 s:
+worktree dependencies, type-check and the Vitest regression suite. Evidence:
+`refs/audited/runs/2026-09-13T19-34-09Z-507ca36`.
