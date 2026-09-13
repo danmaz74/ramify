@@ -15,6 +15,9 @@ export interface CliEnvironment {
   readonly stderr: (text: string) => void;
   readonly batch: BatchOperation;
   readonly connect: ServiceConnector;
+  /** Resolves a refusal when this client cannot run the installed build, otherwise null.
+   * A command awaits it before it connects or runs batch; help and version do not. */
+  readonly buildRefusal?: () => Promise<string | null>;
 }
 export interface CheckDocument {
   readonly schemaVersion: 'ramify.check/1';

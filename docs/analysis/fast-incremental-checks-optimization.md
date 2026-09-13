@@ -384,6 +384,13 @@ analyses.
 Precompute the runtime identity at build time or cache it by file signature. It
 must still detect a mixed build.
 
+**Delivered** by [hook optimization iteration 6](../plans/iteration-5-hook-optimization/iterations/iteration6-results.md).
+The build writes the runtime identity, and selection reads it, checking file
+paths, sizes and modification times. The compiled client refuses a build
+whose identity differs from its embedded one. See
+[build binding](../architecture/optimization.md#build-binding) for the identity
+file and the mixed builds the check misses.
+
 ### 6. Watcher latency
 
 After targets 3 and 5, the client reaches `check` in about 60 to 70 ms, before

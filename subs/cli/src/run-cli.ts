@@ -23,6 +23,8 @@ export async function runCli(argv: readonly string[], environment: CliEnvironmen
       output.stdout(args.command === 'help' ? help : `${environment.version}\n`); return 0;
     }
     phase = 'execution';
+    const refusal = await environment.buildRefusal?.();
+    if (refusal) throw new CliFailure('incompatible', refusal, null);
     if (args.command === 'check') return await checkCommand(args, output, control);
     if (args.command === 'watch') return await watchCommand(args, output, control);
     if (args.command === 'daemon') return await daemonCommand(args, output, control);

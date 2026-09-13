@@ -51,6 +51,8 @@ export interface DaemonBudgets {
 }
 export interface EndpointSelection {
   readonly directory: string;
+  /** SHA-256 over the manifest and runtime files; with the real package root and version it derives buildKey. */
+  readonly buildIdentity: string;
   readonly buildKey: string;
   readonly socket: string;
   readonly record: string;

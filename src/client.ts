@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { connectDaemon } from '../subs/daemon/src/connect-daemon.js';
+import { selectEndpoint } from '../subs/daemon/src/discovery.js';
 import type { ServiceConnector } from '../subs/daemon/src/interfaces/daemon.js';
 
 /** Where the installed build lives. The Node entry derives it from its own module path;
@@ -18,4 +19,15 @@ export function createServiceConnector(version: string, location?: ClientLocatio
     ...(location ? { packageRoot: location.packageRoot, daemonRuntime: location.daemonRuntime } : {}),
     ...(process.env.RAMIFY_ENDPOINT_DIR ? { endpointDirectory: process.env.RAMIFY_ENDPOINT_DIR } : {}),
   });
+}
+
+/** The compiled client's binding to the build it was compiled from. Endpoint selection establishes the
+ * installed identity, so a mixed or incomplete build fails here as it would on connection. */
+export function createBuildRefusal(version: string, packageRoot: string, buildIdentity: string): () => Promise<string | null> {
+  return async () => {
+    const selected = await selectEndpoint({ packageRoot, version,
+      ...(process.env.RAMIFY_ENDPOINT_DIR ? { endpointDirectory: process.env.RAMIFY_ENDPOINT_DIR } : {}) });
+    return selected.buildIdentity === buildIdentity ? null
+      : `this compiled client was built from runtime identity ${buildIdentity.slice(0, 12)}, but ${packageRoot} holds ${selected.buildIdentity.slice(0, 12)}; rebuild the package with npm run build`;
+  };
 }

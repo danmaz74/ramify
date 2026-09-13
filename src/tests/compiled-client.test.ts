@@ -1,5 +1,6 @@
 import { execFile, spawn } from 'node:child_process';
-import { access, mkdir, mkdtemp, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { access, copyFile, cp, link, mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { machine, tmpdir, type } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -70,12 +71,56 @@ describe('compiled client process contracts', () => {
     expect(await processesMentioning(`${status.status.pid} node ${join(repositoryRoot, 'dist/src/daemon-entry.js')}`)).toHaveLength(1);
     for (const args of [['check'], ['check', '--format', 'json'], ['check', '--changed', 'src/interfaces/api.ts', '--format', 'json']]) {
       const [compiled, node] = [await run(launcher, args, { cwd: root, env }), await run(process.execPath, [nodeEntry, ...args], { cwd: root, env })];
-      const normalize = (text: string) => withoutRunId(text).replace(/"(?:requestId|[a-zA-Z]*Ms)":("[^"]*"|[\d.]+)/g, '"<varies>"');
+      const normalize = (text: string) => withoutRunId(text).replace(/"(?:requestId|[a-zA-Z]*Ms)":("[^"]*"|[\d.]+)/g, '"<varies>"')
+        .replace(/"reply":\{[^}]*\}/g, '"reply":"<varies>"');
       expect([compiled.code, normalize(compiled.stdout), compiled.stderr], args.join(' ')).toEqual([node.code, normalize(node.stdout), node.stderr]);
     }
     const nodeStatus = JSON.parse((await run(process.execPath, [nodeEntry, 'daemon', 'status', '--format', 'json'], { cwd: root, env })).stdout);
     expect(nodeStatus.status.instanceId).toBe(status.status.instanceId);
   }), 120_000);
+
+  it('compiled-identity-bound: refuses a package whose runtime identity differs from the embedded one', async () => fixture(async root => {
+    const isolated = await realpath(await mkdtemp('/tmp/rci-')), copy = join(isolated, 'pkg'), endpoints = join(isolated, 'e');
+    try {
+      await mkdir(endpoints, { mode: 0o700 });
+      const copied = { ...env, RAMIFY_ENDPOINT_DIR: endpoints };
+      await cp(join(repositoryRoot, 'dist'), join(copy, 'dist'), { recursive: true, filter: path => path !== client });
+      // The executable locates its package from its own path; a hard link avoids copying the embedded runtime.
+      const copiedClient = join(copy, 'dist/src', `ramify-client-${type()}-${machine()}`);
+      await link(client, copiedClient).catch(() => copyFile(client, copiedClient));
+      await copyFile(join(repositoryRoot, 'package.json'), join(copy, 'package.json'));
+      await symlink(join(repositoryRoot, 'node_modules'), join(copy, 'node_modules'));
+      const matching = await run(copiedClient, ['check', '--batch', '--format', 'json'], { cwd: root, env: copied });
+      expect([matching.code, matching.stderr]).toEqual([0, '']);
+      // Change one runtime file and rewrite the identity consistently: a complete build, but not the compiled one.
+      const identityPath = join(copy, 'dist/runtime-identity.json');
+      const identity = JSON.parse(await readFile(identityPath, 'utf8')) as { buildIdentity: string; packageJson: string;
+        files: { path: string; sha256: string; bytes: number }[] };
+      const changed = identity.files.find(file => file.path === 'dist/src/batch-entry.js')!;
+      const bytes = Buffer.concat([await readFile(join(copy, changed.path)), Buffer.from('// another build\n')]);
+      await writeFile(join(copy, changed.path), bytes);
+      Object.assign(changed, { sha256: createHash('sha256').update(bytes).digest('hex'), bytes: bytes.length });
+      identity.buildIdentity = createHash('sha256').update(JSON.stringify({ packageJson: identity.packageJson,
+        files: identity.files.map(file => [file.path, file.sha256]) })).digest('hex');
+      await writeFile(identityPath, JSON.stringify(identity));
+      const prefix = `Error [incompatible]: this compiled client was built from runtime identity `;
+      for (const args of [['check'], ['check', '--batch'], ['check', '--changed', 'src/interfaces/api.ts'], ['watch'], ['daemon', 'status']]) {
+        const refused = await run(copiedClient, args, { cwd: root, env: copied });
+        expect([refused.code, refused.stdout], args.join(' ')).toEqual([2, '']);
+        expect(refused.stderr.startsWith(prefix), refused.stderr).toBe(true);
+        expect(refused.stderr).toContain(`but ${copy} holds ${identity.buildIdentity.slice(0, 12)}; rebuild the package with npm run build\n`);
+      }
+      const json = await run(copiedClient, ['check', '--format', 'json'], { cwd: root, env: copied });
+      expect([json.code, json.stderr]).toEqual([2, '']);
+      expect(JSON.parse(json.stdout)).toMatchObject({ schemaVersion: 'ramify.cli/1', status: 'unavailable', exitCode: 2,
+        diagnostics: [{ category: 'execution', code: 'incompatible' }] });
+      const version = await run(copiedClient, ['--version'], { cwd: root, env: copied });
+      const manifest = JSON.parse(await readFile(join(repositoryRoot, 'package.json'), 'utf8')) as { version: string };
+      expect([version.code, version.stdout, version.stderr]).toEqual([0, `${manifest.version}\n`, '']);
+      expect(await readdir(endpoints)).toEqual([]);
+      expect(await processesMentioning(copy)).toEqual([]);
+    } finally { await rm(isolated, { recursive: true, force: true }); }
+  }), 60_000);
 
   it('fails promptly and releases the start lock when Node is not on PATH', async () => fixture(async root => {
     const isolated = await realpath(await mkdtemp('/tmp/rcn-')), tools = join(isolated, 'bin');

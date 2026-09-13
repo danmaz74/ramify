@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto';
-import { chmod, mkdir, readFile, readdir, rename, rm, stat, symlink, writeFile } from 'node:fs/promises';
+import { chmod, cp, mkdir, readFile, readdir, rename, rm, stat, symlink, utimes, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { readDaemonRecord, selectEndpoint } from '../discovery.js';
+import { readDaemonRecord, runtimeIdentityPath, selectEndpoint } from '../discovery.js';
 import { processAlive, writeDaemonRecord } from '../records.js';
-import { daemonRecord, deadPid, discoveryFixture } from './discovery-fixture.js';
+import { daemonRecord, deadPid, discoveryFixture, writeRuntimeIdentity } from './discovery-fixture.js';
 
 const fixtures: Awaited<ReturnType<typeof discoveryFixture>>[] = [];
 async function fixture() { const value = await discoveryFixture(); fixtures.push(value); return value; }
@@ -103,6 +103,100 @@ describe('endpoint selection', () => {
     await rm(join(value.packageRoot, 'dist/subs'), { recursive: true });
     await mkdir(join(value.packageRoot, 'dist/subs'));
     await expect(selectEndpoint(value.options)).rejects.toThrow('incomplete');
+  });
+});
+
+describe('build-time runtime identity', () => {
+  const sha = (content: string | Uint8Array) => createHash('sha256').update(content).digest('hex');
+  const index = 'dist/subs/analysis/src/index.js';
+  // npm pack stores every entry with this one modification time.
+  const packed = new Date('1985-10-26T08:15:00Z');
+
+  it('build-identity-read: selection reads the written identity and yields the key hashing yields', async () => {
+    const value = await fixture();
+    const identity = await writeRuntimeIdentity(value.packageRoot);
+    expect(identity).toEqual({ schemaVersion: 'ramify.runtime-identity/1', buildIdentity: value.endpoint.buildIdentity,
+      packageJson: sha(await readFile(join(value.packageRoot, 'package.json'))), client: null, files: [
+        { path: 'dist/src/daemon-entry.js', sha256: sha(await readFile(join(value.packageRoot, 'dist/src/daemon-entry.js'))),
+          bytes: (await stat(join(value.packageRoot, 'dist/src/daemon-entry.js'))).size },
+        { path: index, sha256: sha(await readFile(join(value.packageRoot, index))), bytes: (await stat(join(value.packageRoot, index))).size }] });
+    expect(await selectEndpoint(value.options)).toEqual(value.endpoint);
+    // A same-size replacement no newer than the identity is not read: the recorded hash still derives the key.
+    const original = await readFile(join(value.packageRoot, index), 'utf8');
+    await writeFile(join(value.packageRoot, index), original.replace('engine', 'ENGINE'));
+    await utimes(join(value.packageRoot, index), packed, packed);
+    expect(await selectEndpoint(value.options)).toEqual(value.endpoint);
+    await rm(join(value.packageRoot, runtimeIdentityPath));
+    const hashed = await selectEndpoint(value.options);
+    expect(hashed.buildKey).not.toBe(value.endpoint.buildKey);
+    // A missing, malformed, inconsistent or linked identity falls back to hashing, never to the recorded hashes.
+    const text = `${JSON.stringify(identity)}\n`;
+    for (const bad of ['{', text.replace('ramify.runtime-identity/1', 'ramify.runtime-identity/2'),
+      JSON.stringify({ ...identity, buildIdentity: sha('other') }), JSON.stringify({ ...identity, files: [...identity.files].reverse() }),
+      JSON.stringify({ ...identity, extra: true }), JSON.stringify({ ...identity, files: [{ ...identity.files[0], bytes: -1 }, identity.files[1]] })]) {
+      await writeFile(join(value.packageRoot, runtimeIdentityPath), bad);
+      expect(await selectEndpoint(value.options), bad.slice(0, 40)).toEqual(hashed);
+    }
+    await writeFile(join(value.root, 'identity.json'), text);
+    await rm(join(value.packageRoot, runtimeIdentityPath));
+    await symlink(join(value.root, 'identity.json'), join(value.packageRoot, runtimeIdentityPath));
+    expect(await selectEndpoint(value.options)).toEqual(hashed);
+  });
+
+  it('mixed-build-detected: a changed, missing or added runtime file after the build fails selection', async () => {
+    const value = await fixture();
+    const helper = join(value.packageRoot, 'dist/subs/analysis/src/helper.js');
+    await writeFile(helper, 'export const helper = 1;');
+    await writeRuntimeIdentity(value.packageRoot);
+    const built = await selectEndpoint(value.options);
+    const path = join(value.packageRoot, index), original = await readFile(path, 'utf8');
+    await writeFile(path, `${original}\n`);
+    await expect(selectEndpoint(value.options)).rejects.toThrow(`Mixed daemon build in ${value.packageRoot}: ${index} differs`);
+    // The same size, modified after the identity was written: undecided by size, so hashed.
+    await writeFile(path, original.replace('engine', 'ENGINE'));
+    await expect(selectEndpoint(value.options)).rejects.toThrow(`${index} differs`);
+    await writeFile(path, original);
+    expect(await selectEndpoint(value.options)).toEqual(built);
+    await rm(helper);
+    await expect(selectEndpoint(value.options)).rejects.toThrow('dist/subs/analysis/src/helper.js is listed in dist/runtime-identity.json but absent');
+    await writeFile(helper, 'export const helper = 1;');
+    await writeFile(join(value.packageRoot, 'dist/src/extra.mjs'), 'export {};');
+    await expect(selectEndpoint(value.options)).rejects.toThrow('dist/src/extra.mjs is not listed in dist/runtime-identity.json');
+    await rm(join(value.packageRoot, 'dist/src/extra.mjs'));
+    expect(await selectEndpoint(value.options)).toEqual(built);
+    // Declarations, maps and the identity itself are not runtime files.
+    await writeFile(join(value.packageRoot, 'dist/src/types.d.ts'), 'export interface T {}');
+    expect(await selectEndpoint(value.options)).toEqual(built);
+    // Required entries are still enforced before the identity is consulted.
+    await rename(join(value.packageRoot, 'dist/src/daemon-entry.js'), join(value.root, 'entry.js'));
+    await expect(selectEndpoint(value.options)).rejects.toThrow('Missing or incomplete daemon build');
+  });
+
+  it('installed-identity: a copy without build modification times derives the hashing key and still detects changes', async () => {
+    const value = await fixture();
+    const identity = await writeRuntimeIdentity(value.packageRoot);
+    const installed = join(value.root, 'installed');
+    await cp(value.packageRoot, installed, { recursive: true });
+    const files = ['package.json', runtimeIdentityPath, ...identity.files.map(file => file.path)];
+    const options = { ...value.options, packageRoot: installed };
+    const key = sha(JSON.stringify([installed, '1', value.endpoint.buildIdentity])).slice(0, 16);
+    // Packed: every entry has one fixed time.
+    for (const path of files) await utimes(join(installed, path), packed, packed);
+    const selected = await selectEndpoint(options);
+    expect([selected.buildIdentity, selected.buildKey]).toEqual([value.endpoint.buildIdentity, key]);
+    // Copied in an order that leaves the identity older than runtime files: those files are hashed and still agree.
+    await utimes(join(installed, runtimeIdentityPath), new Date(0), new Date(0));
+    expect(await selectEndpoint(options)).toEqual(selected);
+    await rm(join(installed, runtimeIdentityPath));
+    expect(await selectEndpoint(options)).toEqual(selected);
+    await cp(join(value.packageRoot, runtimeIdentityPath), join(installed, runtimeIdentityPath));
+    for (const path of files) await utimes(join(installed, path), packed, packed);
+    const original = await readFile(join(installed, index), 'utf8');
+    await writeFile(join(installed, index), original.replace('engine', 'ENGINE'));
+    await expect(selectEndpoint(options)).rejects.toThrow(`Mixed daemon build in ${installed}: ${index} differs`);
+    await writeFile(join(installed, index), `${original};`);
+    await utimes(join(installed, index), packed, packed);
+    await expect(selectEndpoint(options)).rejects.toThrow(`${index} differs`);
   });
 });
 

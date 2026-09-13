@@ -55,7 +55,7 @@ try {
     process.stderr.write(line);
   };
   const clock = createSystemClock();
-  service = assembleResidentService({ watcher: createFilesystemWatcher(), clock,
+  service = assembleResidentService({ watcher: createFilesystemWatcher(clock), clock,
     budgets: contexts, log, instance: { instanceId: randomUUID(), pid: process.pid,
       version: fields.get('--version')!, engine: fields.get('--engine')!, buildKey } });
   const started = await startDaemon({ service, endpoint, budgets: daemon, clock, log });

@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { setImmediate as yieldTurn, setTimeout as delay } from 'node:timers/promises';
 import { runCli } from '../subs/cli/src/run-cli.js';
 import type { BatchOperation } from './interfaces/batch.js';
-import { createServiceConnector, type ClientLocation } from './client.js';
+import { createBuildRefusal, createServiceConnector, type ClientLocation } from './client.js';
 import { reportCapacity } from './report-capacity.js';
 import { createPublicationQueue } from './publication-queue.js';
 
@@ -13,6 +13,8 @@ export interface CliProcessOptions {
   readonly packageRoot: string;
   readonly batch: BatchOperation;
   readonly location?: ClientLocation;
+  /** The runtime identity a compiled client embeds; commands refuse an installed build with another. */
+  readonly buildIdentity?: string;
 }
 
 /** One CLI invocation bound to this process's argv, signals and standard streams.
@@ -72,6 +74,7 @@ export async function runCliProcess(options: CliProcessOptions): Promise<void> {
       }, stderr: text => write(process.stderr, text),
       connect: createServiceConnector(manifest.version, options.location),
       batch: options.batch,
+      ...(options.buildIdentity === undefined ? {} : { buildRefusal: createBuildRefusal(manifest.version, options.packageRoot, options.buildIdentity) }),
     }, { signal: controller.signal });
   } catch (error) {
     process.exitCode = controller.signal.aborted ? 130 : 2;

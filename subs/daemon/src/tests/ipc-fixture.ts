@@ -24,7 +24,7 @@ export async function ipcFixture(overrides: Partial<DaemonBudgets> = {}, publicC
   const environment = await createQuickEnvironment({}, { instance, driver });
   const buildKey = environment.service.instance.buildKey;
   const prefix = join(directory, `daemon-${buildKey}`);
-  const endpoint: EndpointSelection = { directory, buildKey, socket: `${prefix}.sock`, record: `${prefix}.json`, lock: `${prefix}.lock`, log: `${prefix}.log` };
+  const endpoint: EndpointSelection = { directory, buildIdentity: '0'.repeat(64), buildKey, socket: `${prefix}.sock`, record: `${prefix}.json`, lock: `${prefix}.lock`, log: `${prefix}.log` };
   const budgets: DaemonBudgets = { maxConnections: 64, maxRequestBytes: 1024 ** 2, maxResponseBytes: 32 * 1024 ** 2 + 64 * 1024,
     maxOutboundBytes: 64 * 1024 ** 2, maxOutboundFrames: 256, maxRequestsInFlight: 16,
     leaseMs: 45_000, pingMs: 15_000, idleExitMs: 1_800_000, shutdownGraceMs: 100, ...overrides };

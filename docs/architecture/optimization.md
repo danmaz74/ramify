@@ -111,9 +111,9 @@ already does.
   never started and releases the start lock. Under Bun such a child emits no
   `exit` and keeps a null exit code, which would otherwise leave the launcher
   waiting indefinitely while holding the lock.
-- **Compatibility identity.** Endpoint selection hashes the dist JavaScript
-  files, and requires only JavaScript `bin` entries among them. The launcher and
-  executable are not hashed. See [identity limitation](#identity-limitation).
+- **Compatibility identity.** The build key derives from the dist JavaScript
+  files, and only JavaScript `bin` entries are required among them. The launcher
+  and executable are not part of it. See [build binding](#build-binding).
 - **Dependency boundaries.** The build fails if the bundle's inputs include the
   engine (`dist/subs/analysis`, `batch.js`, `batch-entry.js`), presentation, MCP
   or web modules, the daemon host modules (`daemon-entry`, `resident-assembly`,
@@ -121,14 +121,44 @@ already does.
   `contexts`) or any `node_modules` package. This is the boundary the Node
   entry's process tests enforce. The bundle has 22 modules, about 100 KB.
 
-### Identity limitation
+### Build binding
 
-The build key still hashes the dist JavaScript files on each invocation, about
-9 ms in the compiled client. The executable's own bytes are not part of the key.
-The build replaces `dist` atomically, including the launcher and executable, so
-an installed build keeps them together. Binding the executable to the
-precomputed runtime identity belongs with target 5, item 6 of the
-[hook optimization plan](../plans/iteration-5-hook-optimization/main-plan.md).
+- **Identity file.** After promotion, the build writes
+  `dist/runtime-identity.json`. It is plain JSON with schema
+  `ramify.runtime-identity/1` and records:
+  - the manifest's SHA-256;
+  - each runtime file's path, SHA-256 and size, in byte order;
+  - the build identity, derived from those as selection derives it by hashing;
+  - after compilation, the executable's path and SHA-256, for tooling only.
+
+  The file is not a runtime file, so the identity does not cover it.
+- **Selection.** Endpoint selection reads the identity file instead of hashing
+  every runtime file. It still lists the runtime files and hashes the manifest,
+  so the key is the one hashing derives. A missing, linked, oversized or
+  malformed file, or one whose identity does not derive from its entries, falls
+  back to hashing every runtime file.
+- **Mixed builds.** Selection fails when a runtime file is added or removed, or
+  its size differs from the record. A runtime file modified after the identity
+  file is hashed, and selection fails if the hash differs. Packing and installing
+  may give every file one modification time, which leaves none newer than the
+  identity file. A copy that makes runtime files newer is hashed instead.
+  A same-size change whose modification time is not after the identity file's
+  goes undetected. Examples are a preserved time from `cp -p` or `tar`, an
+  explicit `touch`, or an edit within a coarse timestamp's granularity.
+- **Compiled client.** The build embeds the build identity with Bun's `--define`
+  and fails if the executable lacks it. After argument parsing, and before a
+  command reads a daemon record, starts a daemon or runs batch, the client
+  selects the endpoint and compares identities. A difference exits 2 with
+  `Error [incompatible]: this compiled client was built from runtime identity
+  <12 hex>, but <package root> holds <12 hex>; rebuild the package with npm run
+  build`, or the same code in a JSON document. `--help`, `--version` and
+  invalid invocations need no identity. A mixed or incomplete build fails
+  selection there, as it would on connection.
+- **Cost.** Selection lists the runtime directories concurrently and reads one
+  size and modification time per runtime file; it reads no runtime file unless
+  that file is newer than the identity file. The compiled client selects twice
+  on a daemon command: once to compare identities and once in `connectDaemon`.
+- The Node entry has no embedded identity and runs no comparison.
 
 ### Verification
 
@@ -143,7 +173,13 @@ precomputed runtime identity belongs with target 5, item 6 of the
   - without `node` on `PATH`, exit 2 promptly with no start lock left;
   - SIGINT during a batch run exits 130 and leaves no child;
   - a closed stdout exits 2;
-  - an npm-installed package's bin runs the compiled client.
+  - an npm-installed package's bin runs the compiled client;
+  - a copied package whose runtime identity differs exits 2 as `incompatible`
+    for every command, leaving the endpoint directory empty and starting no
+    daemon, while the matching copy checks normally.
+- `subs/daemon/src/tests/discovery.test.ts` verifies that selection reads the
+  identity file, detects mixed builds and derives the same key from a copy
+  whose modification times were reset.
 - `src/tests/launcher-script.test.ts` verifies the launcher through a symlinked
   bin, argument preservation and fallback to the Node entry.
 - The existing Node-probe process suites keep verifying the Node entry. Quick

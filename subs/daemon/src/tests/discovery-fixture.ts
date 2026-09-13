@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { selectEndpoint } from '../discovery.js';
+import { describeRuntime, runtimeIdentityPath, selectEndpoint } from '../discovery.js';
 import type { DaemonRecord, EndpointSelection } from '../interfaces/daemon.js';
 import { processAlive } from '../records.js';
 
@@ -53,6 +53,13 @@ export async function discoveryFixture(entry = fakeEntry, temporaryDirectory = '
       } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
       await rm(root, { recursive: true, force: true });
     } };
+}
+
+/** Write the build-time runtime identity as the production build does after promotion. */
+export async function writeRuntimeIdentity(packageRoot: string) {
+  const identity = await describeRuntime(join(packageRoot, 'dist'), await readFile(join(packageRoot, 'package.json')));
+  await writeFile(join(packageRoot, runtimeIdentityPath), `${JSON.stringify(identity, null, 2)}\n`);
+  return identity;
 }
 
 export function daemonRecord(endpoint: EndpointSelection, overrides: Partial<DaemonRecord> = {}): DaemonRecord {
