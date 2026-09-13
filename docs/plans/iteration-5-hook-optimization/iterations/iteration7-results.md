@@ -251,7 +251,7 @@ Plan 2 manifest is unchanged.
 | `npm run type-check` | passed |
 | `git diff --check` | clean |
 
-The audit of the remediation commit is pending for the controlling session.
+The commit audit passed on the remediation commit `7ebc4d1`.
 
 ## Deviations and limits
 
