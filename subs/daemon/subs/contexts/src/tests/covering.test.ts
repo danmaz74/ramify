@@ -205,7 +205,7 @@ describe('covering on publication', () => {
     { path: 'src/index.ts', role: 'source' as const, sha256: hash(version), bytes: 1 },
     { path: 'src/other.ts', role: 'source' as const, sha256: hash('other'), bytes: 5 },
   ];
-  const zero = { invocationCheck: 0, workerStatus: 0, workerRoundTrip: 0, publication: 0 };
+  const zero = { invocationCheck: 0, promotion: 0, workerStatus: 0, workerRoundTrip: 0, sweep: 0, publication: 0 };
   /** Resolves the promise's outcome when it settles and records whether it has. */
   function watch<T>(promise: Promise<T>) { const state = { answered: false, result: promise.then(value => { state.answered = true; return value; }) }; return state; }
 
@@ -404,30 +404,55 @@ describe('timing fields outside the revision total', () => {
       const opened = await e.open(); await flush();
       const stages = capture(2).revision.timings;
       // Opening reports no operation timings.
-      expect(e.status(opened.token).published!.capture).toEqual({ invocationCheck: 0, workerStatus: 0, workerRoundTrip: 0, watch: null });
-      e.script.pending.push(() => ({ ...capture(2), timings: { invocationCheck: 3, workerStatus: 2, workerRoundTrip: 40 } }));
+      expect(e.status(opened.token).published!.capture).toEqual({ invocationCheck: 0, promotion: 0, workerStatus: 0, workerRoundTrip: 0, sweep: 0, watch: null });
+      e.script.pending.push(() => ({ ...capture(2), timings: { invocationCheck: 3, promotion: 4, workerStatus: 2, workerRoundTrip: 40 } }));
       const fresh = await e.check(opened.token, { mode: 'synchronized', expect: expected('src/index.ts', '2') });
       if (fresh.status !== 'reported' || !fresh.published) throw new Error(fresh.status);
-      expect(fresh.revision).toMatchObject({ sequence: 2, timings: stages, capture: { invocationCheck: 3, workerStatus: 2, workerRoundTrip: 40, watch: null } });
+      expect(fresh.revision).toMatchObject({ sequence: 2, timings: stages, capture: { invocationCheck: 3, promotion: 4, workerStatus: 2, workerRoundTrip: 40, sweep: 0, watch: null } });
       expect(Object.keys(fresh.revision.timings).sort()).toEqual(Object.keys(stages).sort());
-      expect(Object.keys(fresh.timings!).sort()).toEqual(['invocationCheck', 'publication', 'workerRoundTrip', 'workerStatus']);
-      expect(fresh.timings).toMatchObject({ invocationCheck: 3, workerStatus: 2, workerRoundTrip: 40 });
+      expect(Object.keys(fresh.timings!).sort()).toEqual(['invocationCheck', 'promotion', 'publication', 'sweep', 'workerRoundTrip', 'workerStatus']);
+      expect(fresh.timings).toMatchObject({ invocationCheck: 3, promotion: 4, workerStatus: 2, workerRoundTrip: 40, sweep: 0 });
       expect(Number.isFinite(fresh.timings!.publication) && fresh.timings!.publication >= 0).toBe(true);
       expect(Object.isFrozen(fresh.timings) && Object.isFrozen(fresh.revision.capture)).toBe(true);
       expect(e.status(opened.token).published).toEqual(fresh.revision);
       // A racing hook runs an identical update: its reply reports that update while the revision keeps its own capture.
       e.watcher.emit('/fixture', [{ path: 'src/index.ts', kind: 'changed' }]);
-      e.script.pending.push(() => ({ ...capture(2), timings: { invocationCheck: 5, workerStatus: 1, workerRoundTrip: 30 } }));
+      e.script.pending.push(() => ({ ...capture(2), timings: { invocationCheck: 5, promotion: 0, workerStatus: 1, workerRoundTrip: 30 } }));
       const racing = await e.check(opened.token, { mode: 'synchronized', expect: expected('src/index.ts', '2') });
       expect(racing).toMatchObject({ status: 'reported', published: true, freshness: { reusedRevision: true },
-        revision: { sequence: 2, capture: { invocationCheck: 3, workerStatus: 2, workerRoundTrip: 40 } },
-        timings: { invocationCheck: 5, workerStatus: 1, workerRoundTrip: 30 } });
+        revision: { sequence: 2, capture: { invocationCheck: 3, promotion: 4, workerStatus: 2, workerRoundTrip: 40 } },
+        timings: { invocationCheck: 5, promotion: 0, workerStatus: 1, workerRoundTrip: 30, sweep: 0 } });
       expect(e.script.updateCalls).toHaveLength(2); await flush();
       // A covered answer runs no capture and pays nothing.
       const covered = await e.check(opened.token, { mode: 'synchronized', expect: expected('src/index.ts', '2') });
       expect(covered).toMatchObject({ status: 'reported', freshness: { captureStarted: null, reusedRevision: true },
-        timings: { invocationCheck: 0, workerStatus: 0, workerRoundTrip: 0, publication: 0 } });
+        timings: { invocationCheck: 0, promotion: 0, workerStatus: 0, workerRoundTrip: 0, sweep: 0, publication: 0 } });
       expect(e.script.updateCalls).toHaveLength(2);
     } finally { await e.dispose(); }
+  });
+
+  it('promotion-timed: a capture adds its update\'s promotion and its sweep\'s round trip, including an unchanged sweep', async () => {
+    const e = sessionEnvironment();
+    try {
+      const opened = await e.open(); await flush();
+      // A configuration path requires a sweep after the update in the same capture.
+      e.script.pending.push(() => ({ ...capture(2), timings: { invocationCheck: 3, promotion: 7, workerStatus: 2, workerRoundTrip: 40 } }),
+        () => ({ status: 'unchanged', timings: { invocationCheck: 0, promotion: 0, workerStatus: 1, workerRoundTrip: 25 } }));
+      e.watcher.emit('/fixture', [{ path: 'tsconfig.json', kind: 'changed' }]);
+      const answered = await e.check(opened.token, { mode: 'synchronized', expect: expected('src/index.ts', '2') });
+      expect([e.script.updateCalls.length, e.script.sweepCalls.length]).toEqual([1, 1]);
+      if (answered.status !== 'reported' || !answered.published) throw new Error(answered.status);
+      const work = { invocationCheck: 3, promotion: 7, workerStatus: 3, workerRoundTrip: 65, sweep: 25 };
+      expect(answered.revision.capture).toMatchObject(work);
+      expect(answered.timings).toMatchObject(work);
+      expect(e.status(opened.token).published!.capture).toMatchObject(work);
+      // A sweep that reports a revision adds its round trip the same way; one without timings adds nothing.
+      e.script.pending.push(() => ({ ...capture(3), timings: { invocationCheck: 1, promotion: 0, workerStatus: 1, workerRoundTrip: 10 } }),
+        () => ({ status: 'unchanged' }));
+      e.watcher.emit('/fixture', [{ path: 'package.json', kind: 'changed' }]);
+      e.clock.advance(100); await flush();
+      expect([e.script.updateCalls.length, e.script.sweepCalls.length]).toEqual([2, 2]);
+      expect(e.status(opened.token).published!.capture).toMatchObject({ invocationCheck: 1, promotion: 0, workerStatus: 1, workerRoundTrip: 10, sweep: 0 });
+    } finally { e.script.pending.length = 0; await flush(); await e.dispose(); }
   });
 });

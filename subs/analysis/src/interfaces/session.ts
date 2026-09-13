@@ -57,6 +57,9 @@ export interface SessionRevision {
 export interface OperationTimings {
   /** The engine's invocation check before the update's timer starts; zero for a sweep. */
   readonly invocationCheck: number;
+  /** Promotion of the compiler's reads into the capture after computation, inside
+   * `RevisionTimings.total` but outside its stages; zero when it did not run. */
+  readonly promotion: number;
   /** The worker's status checkpoint sent with the reply. */
   readonly workerStatus?: number;
   /** Request posted to reply received, measured by the daemon-side host. */
@@ -83,7 +86,8 @@ export interface RetainedSession {
   readonly current: SessionRevision | null;
   update(changes: readonly SessionChange[], control?: RunControl,
     invocation?: Pick<AnalysisInputs, 'project' | 'capabilities'>): Promise<SessionUpdate>;
-  sweep(control?: RunControl): Promise<SessionUpdate | { readonly status: 'unchanged' }>;
+  /** An unchanged sweep may carry the timings its hosting layers measured. */
+  sweep(control?: RunControl): Promise<SessionUpdate | { readonly status: 'unchanged'; readonly timings?: OperationTimings }>;
   verify(control?: RunControl): Promise<VerifyOutcome>;
   report(control?: RunControl, sequence?: number): Promise<AnalysisReport | null>;
   releaseRevision(sequence: number): Promise<void>;

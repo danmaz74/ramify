@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { WorkLimit } from '../report.js';
+import type { SessionRevision } from '../interfaces/session.js';
 import { audited, comparable, equalToBatch, fixture, fixtureFiles, instrumentCompiler, instrumentObserver, opened, ownedFiles,
   parentExposure, paths, put, replace, revised, revisionsEntered, timeout } from './session-test-fixture.js';
 
@@ -591,22 +592,62 @@ describe('timing fields outside the revision total', () => {
       expect(Object.keys(revision.timings).sort()).toEqual(stages);
       const invocation = { project: inputs.project, capabilities: inputs.capabilities };
       // Without an invocation nothing is checked.
-      expect(await handle.update([])).toEqual({ status: 'revised', revision, identical: true, timings: { invocationCheck: 0 } });
+      expect(await handle.update([])).toEqual({ status: 'revised', revision, identical: true, timings: { invocationCheck: 0, promotion: 0 } });
       // The identical update keeps the published revision and its timings; its own check sits beside them.
       const same = await handle.update([], {}, invocation);
-      expect(same).toEqual({ status: 'revised', revision, identical: true, timings: { invocationCheck: expect.any(Number) } });
+      expect(same).toEqual({ status: 'revised', revision, identical: true, timings: { invocationCheck: expect.any(Number), promotion: 0 } });
       expect(same.status === 'revised' && same.timings!.invocationCheck).toBeGreaterThan(0);
       // A refused invocation reports its check with the refusal.
       const refused = await handle.update([], {}, { ...invocation, capabilities: ['coverage'] });
-      expect(refused).toMatchObject({ status: 'reported', timings: { invocationCheck: expect.any(Number) } });
+      expect(refused).toMatchObject({ status: 'reported', timings: { invocationCheck: expect.any(Number), promotion: 0 } });
       expect(refused.status === 'reported' && refused.report.diagnostics[0]?.message).toContain('different capability set');
       await replace(root, paths.provider, '  return 2;', '  void 0;\n  return 2;');
       const edited = await handle.update([{ path: paths.provider, kind: 'changed' }], {}, invocation);
       if (edited.status !== 'revised') throw new Error(JSON.stringify(edited));
       expect([edited.identical, edited.revision.checked.path]).toEqual([false, 'unchanged-surface']);
       expect(Object.keys(edited.revision.timings).sort()).toEqual(stages);
-      expect(Object.keys(edited.timings!)).toEqual(['invocationCheck']);
+      expect(Object.keys(edited.timings!)).toEqual(['invocationCheck', 'promotion']);
       expect(edited.timings!.invocationCheck).toBeGreaterThan(0);
+      await audited(handle);
+      await equalToBatch(handle, inputs);
+    } finally { await handle.dispose(); }
+  }), timeout);
+
+  it('promotion-timed: a revised update reports its promotion, which lies inside the total and outside the eight stages', () => fixture(async (root, inputs) => {
+    const { handle, state } = await opened(inputs);
+    try {
+      const stages = ['classify', 'inventory', 'compiler', 'descriptions', 'accesses', 'link', 'decide', 'publish'] as const;
+      const outside = (revision: SessionRevision): number => revision.timings.total - stages.reduce((sum, stage) => sum + revision.timings[stage], 0);
+      // Promotion is the observer's empty apply after computation; the revision step's own apply names the changes.
+      const { observer, apply } = instrumentObserver(state);
+      const delayMs = 40;
+      let promotions = 0;
+      apply.mockImplementation(async (changes, signal) => {
+        if (!changes.length) { promotions++; await new Promise(resolve => setTimeout(resolve, delayMs)); }
+        return observer.apply(changes, signal);
+      });
+      await put(root, paths.extra, 'export const extra = 1;\n');
+      const created = await handle.update([{ path: paths.extra, kind: 'created' }]);
+      if (created.status !== 'revised') throw new Error(JSON.stringify(created));
+      expect([created.identical, created.revision.checked.path, promotions]).toEqual([false, 'broad', 1]);
+      expect(Object.keys(created.timings!)).toEqual(['invocationCheck', 'promotion']);
+      expect(Object.keys(created.revision.timings).sort()).toEqual([...stages, 'total'].sort());
+      const { promotion } = created.timings!;
+      expect(promotion).toBeGreaterThanOrEqual(delayMs - 1);
+      // The stages are disjoint, so the promotion fits in the time outside them.
+      expect(promotion).toBeLessThanOrEqual(outside(created.revision) + 0.001);
+      // A narrow edit promotes too; an identical update does not.
+      await replace(root, paths.provider, '  return 2;', '  void 0;\n  return 2;');
+      const edited = await handle.update([{ path: paths.provider, kind: 'changed' }]);
+      if (edited.status !== 'revised') throw new Error(JSON.stringify(edited));
+      expect([edited.revision.checked.path, promotions]).toEqual(['unchanged-surface', 2]);
+      expect(edited.timings!.promotion).toBeGreaterThanOrEqual(delayMs - 1);
+      expect(edited.timings!.promotion).toBeLessThanOrEqual(outside(edited.revision) + 0.001);
+      expect(await handle.update([{ path: paths.provider, kind: 'changed' }])).toEqual({ status: 'revised', revision: edited.revision, identical: true,
+        timings: { invocationCheck: 0, promotion: 0 } });
+      // An in-process sweep that finds nothing reports no timings; its hosting layers add them.
+      expect(await handle.sweep()).toEqual({ status: 'unchanged' });
+      apply.mockImplementation((changes, signal) => observer.apply(changes, signal));
       await audited(handle);
       await equalToBatch(handle, inputs);
     } finally { await handle.dispose(); }

@@ -116,13 +116,14 @@ import type { ContextEvent } from '../context-types.js';
       if (!result.ok || result.value.status !== 'reported' || !result.value.published) throw new Error(JSON.stringify(result));
       const { revision } = result.value, timings = result.value.timings!;
       expect(Object.keys(revision.timings)).toHaveLength(9);
-      expect(Object.keys(timings).sort()).toEqual(['clientTransport', 'invocationCheck', 'publication', 'service', 'workerRoundTrip', 'workerStatus']);
+      expect(Object.keys(timings).sort()).toEqual(['clientTransport', 'invocationCheck', 'promotion', 'publication', 'service', 'sweep', 'workerRoundTrip', 'workerStatus']);
       expect(Object.values(timings).every(value => Number.isFinite(value) && value >= 0)).toBe(true);
-      expect([timings.invocationCheck > 0, timings.workerStatus > 0, timings.workerRoundTrip > 0]).toEqual([true, true, true]);
+      expect([timings.invocationCheck > 0, timings.promotion > 0, timings.workerStatus > 0, timings.workerRoundTrip > 0]).toEqual([true, true, true, true]);
       // Service handling brackets the capture's round trip and publication.
       expect(timings.service).toBeGreaterThanOrEqual(timings.workerRoundTrip + timings.publication);
       // One update answered the request, so the revision's capture reports the same session work.
-      expect(revision.capture).toEqual({ invocationCheck: timings.invocationCheck, workerStatus: timings.workerStatus, workerRoundTrip: timings.workerRoundTrip, watch: null });
+      expect(revision.capture).toEqual({ invocationCheck: timings.invocationCheck, promotion: timings.promotion, workerStatus: timings.workerStatus,
+        workerRoundTrip: timings.workerRoundTrip, sweep: timings.sweep, watch: null });
       await eventually(() => events.some(event => event.type === 'revision-published' && event.revision.sequence === revision.sequence));
       const published = events.find(event => event.type === 'revision-published' && event.revision.sequence === revision.sequence);
       expect(published?.type === 'revision-published' && published.revision.capture).toEqual(revision.capture);

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { AnalysisReport, RunControl } from '../../../../analysis/src/interfaces/analysis.js';
-import type { SessionChange, SessionRevision, SessionUpdate } from '../../../../analysis/src/interfaces/session.js';
+import type { RetainedSession, SessionChange, SessionRevision } from '../../../../analysis/src/interfaces/session.js';
 import type { ProjectRequest, ProjectResolution } from '../../../../analysis/subs/project/src/interfaces/project.js';
 import type { CaptureTimings, CaptureWork, CheckOutcome, CheckRequest, ContextEvent, ContextManager, ContextManagerOptions, ContextRevision, ContextSetup, ContextStatus, ContextToken, FreshnessRecord, OpenOutcome, ReplyTimings, RevisionCause, Unavailable, WatchBatch, WatchEvent } from './interfaces/contexts.js';
 import type { LiveContext } from './context.js';
@@ -14,7 +14,9 @@ const implemented = new Set(['registry', 'layout', 'metadata', 'descriptions', '
 function unavailable(reason: Unavailable['reason'], message: string = reason): Unavailable { return { status: 'unavailable', reason, message }; }
 /** Distinct project requests whose resolutions one context keeps for reuse. */
 const knownResolutions = 4;
-const noWork = (): { -readonly [K in keyof CaptureWork]: number } => ({ invocationCheck: 0, workerStatus: 0, workerRoundTrip: 0 });
+/** What an update or sweep returns; an update never returns unchanged. */
+type SweepResult = Awaited<ReturnType<RetainedSession['sweep']>>;
+const noWork = (): { -readonly [K in keyof CaptureWork]: number } => ({ invocationCheck: 0, promotion: 0, workerStatus: 0, workerRoundTrip: 0, sweep: 0 });
 function freeze<T>(value: T): T {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) { Object.freeze(value); for (const child of Object.values(value)) freeze(child); }
   return value;
@@ -234,20 +236,23 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       await cleanup(session.releaseRevision(sequence)); context.versions.delete(sequence);
     }
   }
-  function account(work: ReturnType<typeof noWork>, result: SessionUpdate | { status: 'unchanged' }): void {
+  /** Add an operation's timings to its capture's work; a sweep's round trip also counts as `sweep`. */
+  function account(work: ReturnType<typeof noWork>, result: SweepResult, sweep: boolean): void {
     const timings = 'timings' in result ? result.timings : undefined;
     if (!timings) return;
-    work.invocationCheck += timings.invocationCheck; work.workerStatus += timings.workerStatus ?? 0; work.workerRoundTrip += timings.workerRoundTrip ?? 0;
+    work.invocationCheck += timings.invocationCheck; work.promotion += timings.promotion;
+    work.workerStatus += timings.workerStatus ?? 0; work.workerRoundTrip += timings.workerRoundTrip ?? 0;
+    if (sweep) work.sweep += timings.workerRoundTrip ?? 0;
   }
-  async function sessionWork(context: LiveContext, work: ReturnType<typeof noWork>, run: () => Promise<SessionUpdate | { status: 'unchanged' }>): Promise<SessionUpdate | { status: 'unchanged' }> {
-    let result = await run(); observeVersion(context); account(work, result);
+  async function sessionWork(context: LiveContext, work: ReturnType<typeof noWork>, run: () => Promise<SweepResult>, sweep = false): Promise<SweepResult> {
+    let result = await run(); observeVersion(context); account(work, result, sweep);
     if (result.status === 'reported' && result.report.diagnostics.some(item => item.limit?.name === 'maxRetainedFactBytes')) {
       // Reclaim unpinned historical versions before one bounded retry. The
       // session rejects a candidate before publication, preserving current facts.
       let released = false;
       while (context.history.discardOldest()) released = true;
       await Promise.all([...releaseWork]); await releaseUnpublished(context);
-      if (released) { result = await run(); observeVersion(context); account(work, result); }
+      if (released) { result = await run(); observeVersion(context); account(work, result, sweep); }
     }
     return result;
   }
@@ -350,7 +355,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     let published = false;
     try {
       await context.demoting;
-      let run: SessionUpdate | { status: 'unchanged' };
+      let run: SweepResult;
       if (!context.session) {
         const opened = await driver.open(invocation.project, invocation.setup, control);
         if (opened.status === 'opened') {
@@ -371,7 +376,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
           if (run.status === 'revised') context.invocation = invocation;
         } else run = { status: 'unchanged' };
         if (sweep && run.status !== 'reported' && run.status !== 'cancelled') {
-          run = await sessionWork(context, work, () => context.session!.sweep(control));
+          run = await sessionWork(context, work, () => context.session!.sweep(control), true);
         }
       }
       if (disposed || context.state === 'evicted' || controller.signal.aborted) return;

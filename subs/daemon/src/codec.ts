@@ -173,8 +173,8 @@ function timings(value: unknown): boolean {
     && Object.values(value).every(item => typeof item === 'number' && Number.isFinite(item) && item >= 0);
 }
 function capture(value: unknown): boolean {
-  return shape(value, ['invocationCheck', 'workerStatus', 'workerRoundTrip', 'watch'])
-    && [value.invocationCheck, value.workerStatus, value.workerRoundTrip].every(item => typeof item === 'number' && Number.isFinite(item) && item >= 0)
+  return shape(value, ['invocationCheck', 'promotion', 'workerStatus', 'workerRoundTrip', 'sweep', 'watch'])
+    && [value.invocationCheck, value.promotion, value.workerStatus, value.workerRoundTrip, value.sweep].every(item => typeof item === 'number' && Number.isFinite(item) && item >= 0)
     && (value.watch === null || shape(value.watch, ['receivedAt', 'flushedAt']) && integer(value.watch.receivedAt) && integer(value.watch.flushedAt));
 }
 function revision(value: unknown): boolean {

@@ -106,7 +106,7 @@ workerSuite('retained analysis session', import.meta.url, () => {
       const status = handle.status();
       expect([status.level, status.sequence, status.factBytes > 0, status.observedInputs > 3]).toEqual(['hot', 1, true, true]);
       const same = await handle.update([{ path: probe, kind: 'changed' }]);
-      const workerTimings = { invocationCheck: 0, workerStatus: expect.any(Number), workerRoundTrip: expect.any(Number) };
+      const workerTimings = { invocationCheck: 0, promotion: 0, workerStatus: expect.any(Number), workerRoundTrip: expect.any(Number) };
       expect(same).toEqual({ status: 'revised', revision, identical: true, timings: workerTimings });
       expect(await handle.update([])).toEqual({ status: 'revised', revision, identical: true, timings: workerTimings });
       expect(handle.current?.sequence).toBe(1);

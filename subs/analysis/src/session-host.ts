@@ -1,7 +1,8 @@
 import { SessionWorker as Worker } from './session-supervisor.js';
 import type { AnalysisInputs, AnalysisReport, RunControl } from './interfaces/analysis.js';
-import type { RetainedSession, SessionChange, SessionInputs, SessionOpen, SessionRevision, SessionStatus, SessionUpdate, VerifyOutcome } from './interfaces/session.js';
+import type { OperationTimings, RetainedSession, SessionChange, SessionInputs, SessionOpen, SessionRevision, SessionStatus, SessionUpdate, VerifyOutcome } from './interfaces/session.js';
 import type { SessionCommand, WorkerMessage, WorkerOpen, WorkerResult } from './session-messages.js';
+import { timedResult } from './session-messages.js';
 import { diagnostic } from './report-data.js';
 import { ReportDraft } from './report.js';
 import { deepFreeze } from './session-facts.js';
@@ -99,10 +100,8 @@ class SessionHost implements RetainedSession {
           if (this.#current?.sequence === result.revision.sequence) result = { ...result, revision: this.#current };
           else this.#current = result.revision;
         }
-        if ((pending.operation === 'update' || pending.operation === 'sweep') && result && 'status' in result
-          && (result.status === 'revised' || result.status === 'reported')) {
-          const update = result as Extract<SessionUpdate, { status: 'revised' | 'reported' }>;
-          result = { ...update, timings: { invocationCheck: 0, ...update.timings, workerRoundTrip: received - pending.sent } };
+        if (timedResult(pending.operation, result)) {
+          result = { ...result, timings: { invocationCheck: 0, promotion: 0, ...result.timings, workerRoundTrip: received - pending.sent } };
         }
         pending.resolve(deepFreeze(result));
       }).catch(error => this.#fail(failure('analysis-failed', String(error))));
@@ -141,9 +140,9 @@ class SessionHost implements RetainedSession {
     try { return await this.#request({ operation: 'update', changes, ...(invocation ? { invocation } : {}) }, control) as SessionUpdate; }
     catch (error) { return this.#reportedFailure(error as Error); }
   }
-  async sweep(control: RunControl = {}): Promise<SessionUpdate | { readonly status: 'unchanged' }> {
+  async sweep(control: RunControl = {}): Promise<SessionUpdate | { readonly status: 'unchanged'; readonly timings?: OperationTimings }> {
     if (control.signal?.aborted) return { status: 'cancelled' };
-    try { return await this.#request({ operation: 'sweep' }, control) as SessionUpdate | { status: 'unchanged' }; }
+    try { return await this.#request({ operation: 'sweep' }, control) as SessionUpdate | { status: 'unchanged'; timings?: OperationTimings }; }
     catch (error) { return this.#reportedFailure(error as Error); }
   }
   async verify(control: RunControl = {}): Promise<VerifyOutcome> {

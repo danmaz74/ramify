@@ -45,7 +45,7 @@ export interface ScriptedCall {
   readonly inputs: { readonly project: ProjectRequest; readonly setup: ContextSetup; readonly changes: readonly SessionChange[] };
   readonly signal: AbortSignal | undefined;
 }
-type ScriptedResult = ScriptedCapture | SessionUpdate | { readonly status: 'unchanged' };
+type ScriptedResult = ScriptedCapture | SessionUpdate | { readonly status: 'unchanged'; readonly timings?: OperationTimings };
 /** One `resolve` call: the known resolutions it received and whether one was returned. */
 export interface ScriptedResolve {
   readonly request: ProjectRequest;
@@ -123,7 +123,7 @@ export function createScriptedDriver() {
         return { status: 'revised', revision: current, identical: false };
       }
       async function run(kind: 'update' | 'sweep', changes: readonly SessionChange[], runControl?: RunControl,
-        nextInvocation?: Pick<AnalysisInputs, 'project' | 'capabilities'>): Promise<SessionUpdate | { readonly status: 'unchanged' }> {
+        nextInvocation?: Pick<AnalysisInputs, 'project' | 'capabilities'>): Promise<SessionUpdate | { readonly status: 'unchanged'; readonly timings?: OperationTimings }> {
         if (sessionDisposed) throw new Error('Scripted session is disposed');
         if (nextInvocation) invocation = nextInvocation;
         const result = await invoke({ kind, inputs: { project: invocation.project, setup: { ...setup, capabilities: invocation.capabilities }, changes }, signal: runControl?.signal });

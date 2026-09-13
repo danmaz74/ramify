@@ -238,7 +238,7 @@ handlers.set('I5-08:sweep-scheduled', {
   ...referenceHandler,
   run: (context: ProjectContext) => withSession(context, async (current, cold) => {
     const { session, root, assertions } = current;
-    assertions.equal('a settled sweep reports unchanged', await session.sweep(), { status: 'unchanged' });
+    assertions.equal('a settled sweep reports unchanged', (await session.sweep()).status, 'unchanged');
     assertions.equal('an unchanged sweep publishes no revision', session.current?.sequence, cold.sequence);
     assertions.ok('a completed sweep records its time', session.status().lastSweepAt !== null);
     const before = session.status().lastSweepAt!;
@@ -249,7 +249,7 @@ handlers.set('I5-08:sweep-scheduled', {
     assertions.equal('dependency re-observation runs broad analysis once', [revision.checked.path, revision.sequence], ['broad', cold.sequence + 1]);
     assertions.ok('the new sweep advances its completion timestamp', session.status().lastSweepAt! >= before);
     await equalBatch(current, 'dependency sweep');
-    assertions.equal('the next settled sweep has no change', await session.sweep(), { status: 'unchanged' });
+    assertions.equal('the next settled sweep has no change', (await session.sweep()).status, 'unchanged');
     recordObservation('plan5-worker-sweep', { trigger: 'dependency', changed: revision.changed, lastSweepAt: session.status().lastSweepAt });
   }),
 });
@@ -264,7 +264,7 @@ handlers.set('I5-08:sweep-after-configuration', {
     current.assertions.ok('the configuration receives a new input identity', revision.inputId !== cold.inputId);
     const report = await equalBatch(current, 'configuration sweep');
     current.assertions.equal('the revision identity equals the batch capture identity', revision.inputId, report.inputId);
-    current.assertions.equal('a settled configuration sweep is unchanged', await current.session.sweep(), { status: 'unchanged' });
+    current.assertions.equal('a settled configuration sweep is unchanged', (await current.session.sweep()).status, 'unchanged');
     recordObservation('plan5-worker-sweep', { trigger: 'configuration', inputId: revision.inputId, changed: revision.changed });
   }),
 });

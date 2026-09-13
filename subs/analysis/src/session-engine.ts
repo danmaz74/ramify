@@ -7,7 +7,7 @@ import type { CapturedInput, ProjectObserver, ProjectResolution } from '../subs/
 import { observeProject } from '../subs/project/src/observer.js';
 import { resolveProjectRoot } from '../subs/project/src/resolve-root.js';
 import type { AnalysisDiagnostic, AnalysisInputs, AnalysisReport, RunControl } from './interfaces/analysis.js';
-import type { FindingDelta, RetainedSession, SessionChange, SessionInputs, SessionOpen, SessionRevision, SessionStatus,
+import type { FindingDelta, OperationTimings, RetainedSession, SessionChange, SessionInputs, SessionOpen, SessionRevision, SessionStatus,
   SessionUpdate, VerifyOutcome } from './interfaces/session.js';
 import { detached, diagnostic } from './report-data.js';
 import { copyReport } from './report-copy.js';
@@ -131,8 +131,10 @@ class Session implements RetainedSession {
       if (signal?.aborted) return { status: 'cancelled' };
       const state = this.#state;
       let republish = false, invocationCheck = 0;
-      // The invocation check runs before `total` starts; the update reports it beside the revision.
-      const timed = (update: SessionUpdate): SessionUpdate => update.status === 'cancelled' ? update : { ...update, timings: { invocationCheck } };
+      // The invocation check runs before `total` starts; the update reports it beside the revision
+      // and beside the promotion its computation reported.
+      const timed = (update: SessionUpdate): SessionUpdate => update.status === 'cancelled' ? update
+        : { ...update, timings: { invocationCheck, promotion: update.timings?.promotion ?? 0 } };
       if (invocation) {
         const checking = performance.now();
         const problem = await this.#invocationProblem(invocation, signal);
@@ -158,7 +160,7 @@ class Session implements RetainedSession {
     });
   }
 
-  sweep(control: RunControl = {}): Promise<SessionUpdate | { readonly status: 'unchanged' }> {
+  sweep(control: RunControl = {}): Promise<SessionUpdate | { readonly status: 'unchanged'; readonly timings?: OperationTimings }> {
     return this.#serialize(async () => {
       if (this.#disposed) return { status: 'reported', report: this.#disposedReport() };
       const observer = this.#state.observer;
@@ -267,11 +269,17 @@ class Session implements RetainedSession {
   /** Publication only commits facts after all compiler reads were observed. */
   async #complete(computed: Computed, started: number, signal?: AbortSignal): Promise<SessionUpdate> {
     const state = this.#state;
+    let promotion = 0;
+    const timings = (): OperationTimings => ({ invocationCheck: 0, promotion });
     try {
-      if (!computed.facts.invalid) await this.#promote(signal);
+      if (!computed.facts.invalid) {
+        const promoting = performance.now();
+        try { await this.#promote(signal); } finally { promotion = performance.now() - promoting; }
+      }
       const observer = state.observer!;
       const published = this.#publish(computed, observer.inputs, computed.facts.invalid ? null : observer.inputId, started);
-      return 'report' in published ? { status: 'reported', report: published.report } : { status: 'revised', revision: published.revision, identical: false };
+      return 'report' in published ? { status: 'reported', report: published.report, timings: timings() }
+        : { status: 'revised', revision: published.revision, identical: false, timings: timings() };
     } catch (error) {
       // The revision step applied its changes to the observer before
       // returning them, so even a cancellation before promotion leaves the
@@ -279,7 +287,7 @@ class Session implements RetainedSession {
       // compare identical and its edit would never be published.
       state.stale = true;
       if (isCancellation(error, signal)) return { status: 'cancelled' };
-      return { status: 'reported', report: failureReport(state, error, 'acquisition', state.facts?.inventory) };
+      return { status: 'reported', report: failureReport(state, error, 'acquisition', state.facts?.inventory), timings: timings() };
     }
   }
 
@@ -389,11 +397,15 @@ class Session implements RetainedSession {
       start = performance.now();
       const facts = await recomputeAll(state, observed.observer.inventory, timings, signal);
       state.stale = false;
+      const promoting = performance.now();
       await this.#promote(signal);
+      const promotion = performance.now() - promoting;
       const published = this.#publish({ status: 'computed', facts, checked: wholeCheckedSet('broad', facts),
         changed: sortedPaths(changes.map(change => change.path)), timings, positionRefreshed: [] },
         observed.observer.inputs, facts.invalid ? null : observed.observer.inputId, started);
-      return 'report' in published ? { status: 'reported', report: published.report } : { status: 'revised', revision: published.revision, identical: false };
+      const operation: OperationTimings = { invocationCheck: 0, promotion };
+      return 'report' in published ? { status: 'reported', report: published.report, timings: operation }
+        : { status: 'revised', revision: published.revision, identical: false, timings: operation };
     } catch (error) {
       if (isCancellation(error, signal)) return { status: 'cancelled' };
       state.stale = true;

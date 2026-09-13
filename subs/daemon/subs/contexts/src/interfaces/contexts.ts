@@ -35,12 +35,17 @@ export interface WatchBatch {
   readonly receivedAt: number;
   readonly flushedAt: number;
 }
-/** Session work of one capture outside `RevisionTimings.total`: sums over its
- * update and sweep operations in milliseconds, zero for operations that report none. */
+/** Session work of one capture: sums over its update and sweep operations in
+ * milliseconds, zero for operations that report none. Only `promotion` lies
+ * inside `RevisionTimings.total`. */
 export interface CaptureWork {
   readonly invocationCheck: number;
+  /** Promotion of compiler reads after computation, inside `total` but outside its stages. */
+  readonly promotion: number;
   readonly workerStatus: number;
   readonly workerRoundTrip: number;
+  /** The round trips of the capture's sweep operations, also counted in `workerRoundTrip`. */
+  readonly sweep: number;
 }
 /** The capture that published a revision. `watch` spans the watcher batches it
  * consumed: the earliest receipt and the latest flush, or null without any. */

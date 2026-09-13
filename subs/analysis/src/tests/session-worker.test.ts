@@ -42,7 +42,7 @@ workerSuite('retained session worker', import.meta.url, () => {
       const before = messages.length;
       const same = await handle.update([]);
       expect(same).toEqual({ status: 'revised', revision, identical: true,
-        timings: { invocationCheck: 0, workerStatus: expect.any(Number), workerRoundTrip: expect.any(Number) } });
+        timings: { invocationCheck: 0, promotion: 0, workerStatus: expect.any(Number), workerRoundTrip: expect.any(Number) } });
       expect(handle.current).toBe(revision);
       expect(messages.slice(before).some(message => message.kind === 'reply' && message.result && 'snapshot' in message.result)).toBe(false);
       expect(await handle.verify()).toMatchObject({ status: 'equal', sequence: 1 });
@@ -120,7 +120,7 @@ workerSuite('retained session worker', import.meta.url, () => {
     try {
       expect(handle.status().lastSweepAt).toBeNull();
       const before = Date.now();
-      expect(await handle.sweep()).toEqual({ status: 'unchanged' });
+      expect(await handle.sweep()).toEqual({ status: 'unchanged', timings: { invocationCheck: 0, promotion: 0, workerStatus: expect.any(Number), workerRoundTrip: expect.any(Number) } });
       expect(handle.status().lastSweepAt).toBeGreaterThanOrEqual(before);
       expect(handle.current).toBe(revision);
       await replace(root, paths.provider, '  return 2;', '  return 3;');
@@ -147,7 +147,7 @@ workerSuite('retained session worker', import.meta.url, () => {
       expect(discovered.revision.changed).toContain(paths.extra);
       await equalToBatch(handle, inputs);
       expect(await handle.verify()).toMatchObject({ status: 'equal' });
-      expect(await handle.sweep()).toEqual({ status: 'unchanged' });
+      expect(await handle.sweep()).toEqual({ status: 'unchanged', timings: { invocationCheck: 0, promotion: 0, workerStatus: expect.any(Number), workerRoundTrip: expect.any(Number) } });
     } finally { await handle.dispose(); observation.cleanup(); }
   }), timeout);
 
@@ -394,7 +394,7 @@ workerSuite('retained session worker', import.meta.url, () => {
     } finally { await handle.dispose(); observation.cleanup(); }
   }), timeout);
 
-  it('timing-fields: worker replies add the status checkpoint and daemon-side round trip beside the invocation check', () => fixture(async (_root, inputs) => {
+  it('timing-fields: worker replies add the status checkpoint and daemon-side round trip beside the invocation check', () => fixture(async (root, inputs) => {
     const observation = await opened(inputs);
     const { handle, revision } = observation;
     try {
@@ -405,14 +405,30 @@ workerSuite('retained session worker', import.meta.url, () => {
       expect(Object.keys(revision.timings).sort()).toEqual(['accesses', 'classify', 'compiler', 'decide', 'descriptions', 'inventory', 'link', 'publish', 'total']);
       const timings = same.timings!;
       frozenPlain(timings);
-      expect(Object.keys(timings).sort()).toEqual(['invocationCheck', 'workerRoundTrip', 'workerStatus']);
+      expect(Object.keys(timings).sort()).toEqual(['invocationCheck', 'promotion', 'workerRoundTrip', 'workerStatus']);
+      expect(timings.promotion).toBe(0);
       expect(timings.invocationCheck).toBeGreaterThan(0);
       expect(timings.workerStatus).toBeGreaterThan(0);
       // The host's round trip brackets both durations measured inside the worker.
       expect(timings.workerRoundTrip).toBeGreaterThanOrEqual(timings.invocationCheck + timings.workerStatus!);
       // Operations other than update and sweep results report no operation timings.
       expect(await handle.verify()).not.toHaveProperty('timings');
-      expect(await handle.sweep()).toEqual({ status: 'unchanged' });
+      // A revised update reports its promotion inside the stage total.
+      await replace(root, paths.provider, '  return 2;', '  void 0;\n  return 2;');
+      const edited = await handle.update([{ path: paths.provider, kind: 'changed' }]);
+      if (edited.status !== 'revised') throw new Error(JSON.stringify(edited));
+      frozenPlain(edited.timings);
+      expect(Object.keys(edited.timings!).sort()).toEqual(['invocationCheck', 'promotion', 'workerRoundTrip', 'workerStatus']);
+      expect(edited.timings!.promotion).toBeGreaterThan(0);
+      expect(edited.timings!.promotion).toBeLessThanOrEqual(edited.revision.timings.total);
+      expect(edited.timings!.workerRoundTrip).toBeGreaterThanOrEqual(edited.revision.timings.total + edited.timings!.workerStatus!);
+      // promotion-timed: an unchanged sweep carries the worker's status checkpoint and the host's round trip.
+      const swept = await handle.sweep();
+      expect(swept).toEqual({ status: 'unchanged', timings: { invocationCheck: 0, promotion: 0, workerStatus: expect.any(Number), workerRoundTrip: expect.any(Number) } });
+      frozenPlain(swept);
+      if (swept.status !== 'unchanged' || !swept.timings) throw new Error(JSON.stringify(swept));
+      expect(swept.timings.workerRoundTrip).toBeGreaterThan(0);
+      expect(swept.timings.workerRoundTrip).toBeGreaterThanOrEqual(swept.timings.workerStatus!);
     } finally { await handle.dispose(); observation.cleanup(); }
   }), timeout);
 
