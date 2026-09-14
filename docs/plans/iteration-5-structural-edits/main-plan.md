@@ -215,6 +215,14 @@ against the budget, so iteration 6 records the measured helper cost and the
    changed areas and an invalid previous state, keeps the whole invalidation.
    A created file that makes `src/tests/` appear changes the areas and stays
    broad.
+
+   **Amendment, 2026-09-14.** The `unknown` label no longer keeps the broad
+   path. The observer ignores the label and re-observes the path, determining
+   creation, deletion or change from the disk, and every reason above is
+   decided from that finding rather than from the label. A watcher reports
+   each created, deleted or atomically replaced file as a rename, which the
+   context manager labels `unknown`, so the label would otherwise have kept
+   watched membership changes off the membership path.
 5. **Contribution index.** The session derives, from the retained facts, a map
    from each observation path to the owned files that contribute it: a file
    contributes itself, its candidates and its description dependencies. On a

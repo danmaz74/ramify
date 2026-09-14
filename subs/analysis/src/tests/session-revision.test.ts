@@ -377,12 +377,14 @@ describe('description, metadata and broad session revisions', () => {
     } finally { await handle.dispose(); }
   }), timeout);
 
-  it('uses the broad path for an unknown event that changes an owned input', () => fixture(async (root, inputs) => {
+  it('takes the observer-determined path for an unknown event that changes an owned input', () => fixture(async (root, inputs) => {
     const { handle } = await opened(inputs);
     try {
+      // The unknown label claims nothing about the event. The observer re-observes
+      // the path, finds a content edit, and the revision takes the path that edit earns.
       await replace(root, paths.provider, '  return 2;', '  return 9;');
       const revision = await revised(handle, [paths.provider], 'unknown');
-      expect(revision.checked).toEqual({ path: 'broad', files: ownedFiles, accesses: 4, modelRebuilt: true });
+      expect(revision.checked.path).toBe('unchanged-surface');
       await audited(handle);
       await equalToBatch(handle, inputs);
     } finally { await handle.dispose(); }
@@ -805,6 +807,28 @@ describe('membership path', () => {
     expect(reachRefusal({ ...bounded, spelled: false }, false)).toBeNull();
   });
 
+  it('membership-identity-equals-batch: a created owned file labelled unknown takes the membership path', () => fixture(async (root, inputs) => {
+    const { handle } = await opened(inputs);
+    try {
+      // The label makes no claim about the event; the observer re-observes the
+      // path, finds the creation, and the membership path takes it.
+      await put(root, `${branch}/fresh.ts`, "import { value } from './provider.js';\nexport const fresh = value;\n");
+      const created = await revised(handle, [`${branch}/fresh.ts`], 'unknown');
+      expect(created.checked).toEqual({ path: 'membership', files: [`${branch}/fresh.ts`], accesses: 1, modelRebuilt: true });
+      await expectBatchInputs(created, inputs, handle);
+    } finally { await handle.dispose(); }
+  }, membershipFiles), timeout);
+
+  it('membership-identity-equals-batch: a deleted owned file labelled unknown takes the membership path', () => fixture(async (root, inputs) => {
+    const { handle } = await opened(inputs);
+    try {
+      await rm(join(root, `${branch}/remove.ts`));
+      const deleted = await revised(handle, [`${branch}/remove.ts`], 'unknown');
+      expect(deleted.checked).toEqual({ path: 'membership', files: [`${branch}/user.ts`], accesses: 1, modelRebuilt: true });
+      await expectBatchInputs(deleted, inputs, handle);
+    } finally { await handle.dispose(); }
+  }, membershipFiles), timeout);
+
   /** Every broad revision below invalidates the whole program after the named files enter it. */
   const expectBroad = async (handle: RetainedSession, state: Parameters<typeof instrumentCompiler>[0], retire: ReturnType<typeof instrumentObserver>['retire'],
     inputs: Parameters<typeof equalToBatch>[1], names: readonly string[], kind: 'changed' | 'created' | 'deleted' | 'unknown',
@@ -820,7 +844,7 @@ describe('membership path', () => {
     return revision;
   };
 
-  it('broad-kept: structural, configuration, non-owned, unknown, unexplained and area changes keep the whole invalidation', () => fixture(async (root, inputs) => {
+  it('broad-kept: structural, configuration, non-owned, unexplained and area changes keep the whole invalidation', () => fixture(async (root, inputs) => {
     const { handle, state } = await opened(inputs);
     try {
       const { retire, observer } = instrumentObserver(state);
@@ -830,8 +854,6 @@ describe('membership path', () => {
       await expectBroad(handle, state, retire, inputs, ['tsconfig.json'], 'changed', []);
       await replace(root, 'node_modules/fixture-dependency/index.d.ts', 'readonly n: number', 'readonly n: string');
       await expectBroad(handle, state, retire, inputs, ['node_modules/fixture-dependency/index.d.ts'], 'changed', []);
-      await put(root, `${branch}/unknown.ts`, 'export const unknown = 1;\n');
-      await expectBroad(handle, state, retire, inputs, [`${branch}/unknown.ts`], 'unknown', ['all']);
       // A compiler report still pending at the update is promoted by it: a change no created file explains.
       await put(root, `${branch}/explained.ts`, 'export const explained = 1;\n');
       observer.sink.absent(join(root, 'node_modules/unexplained.d.ts'));
@@ -1074,7 +1096,8 @@ describe('reacquisition report', () => {
       await put(root, paths.extra, 'export const extra = 1;\n');
       expect(await updated(handle, [paths.extra], 'created')).toMatchObject({ identical: false, reacquired: false, revision: { checked: { path: 'membership' } } });
       await replace(root, paths.local, 'void rootValue;', 'void rootValue;\nvoid 0;');
-      expect(await updated(handle, [paths.local], 'unknown')).toMatchObject({ identical: false, reacquired: false, revision: { checked: { path: 'broad' } } });
+      // An unknown label leaves the event to the observer, which finds a content edit.
+      expect(await updated(handle, [paths.local], 'unknown')).toMatchObject({ identical: false, reacquired: false, revision: { checked: { path: 'unchanged-surface' } } });
       await audited(handle);
 
       // A structural update whose acquisition is invalid promotes nothing and reports none.

@@ -13,6 +13,8 @@ import { audited, equalToBatch, fixture, fixtureFiles, instrumentCompiler, instr
  * create, delete, restore and edit sequences. The hand-written cases fix the
  * shapes they name; these sequences ask whether the retirement rule and its
  * fallbacks keep an arbitrary sequence byte-identical to a fresh batch run.
+ * Part of the steps are labelled `unknown`, the label a watched rename carries,
+ * so the sequences also cover an event the caller makes no claim about.
  *
  * Every choice comes from a seeded generator, so a reported seed reproduces its
  * whole sequence. `RAMIFY_DIFF_SEEDS`, `RAMIFY_DIFF_SEED_START` and
@@ -185,7 +187,11 @@ async function sequence(root: string, inputs: SessionInputs, files: Record<strin
         tree.live.set(step.path, step.text!);
         await put(root, step.path, step.text!);
       }
-      const kind = step.kind === 'edit' ? 'changed' : step.kind === 'delete' ? 'deleted' : 'created';
+      // A watcher reports every created, deleted and atomically replaced file as a
+      // rename, which the context manager labels `unknown`, so part of the sequence
+      // makes no claim about its event and leaves it to the observer.
+      const told = step.kind === 'edit' ? 'changed' : step.kind === 'delete' ? 'deleted' : 'created';
+      const kind = chance(rng, 0.4) ? 'unknown' : told;
       const revision = await revised(handle, [step.path], kind);
       const retirements = watched.retire.mock.calls.map(call => call[0].kind);
       const first = compiler.update.mock.results[0];
@@ -195,7 +201,7 @@ async function sequence(root: string, inputs: SessionInputs, files: Record<strin
       const taken = classify(revision, before, state, retirements, reach,
         step.kind === 'edit' ? [] : created, step.kind === 'edit' ? [] : deleted);
       tally.set(taken, (tally.get(taken) ?? 0) + 1);
-      history.push(`  ${index}. ${step.kind} ${step.path} (${step.note}) -> ${taken}`);
+      history.push(`  ${index}. ${step.kind} ${step.path} [${kind}] (${step.note}) -> ${taken}`);
       try {
         const report = await equalToBatch(handle, inputs);
         // An invalid projection publishes no input list of its own: batch leaves

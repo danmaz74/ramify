@@ -215,7 +215,10 @@ export type ProjectObserve =
 
 `retire` releases compiler-reported observations before a compiler update that
 reports them again; a released path keeps its acquisition recipe. `apply` never
-retires. The session calls `{ kind: 'probes' }` on a membership change: reads
+retires. Every `InputChangeKind` asks `apply` to re-observe its path, and the
+observer determines creation, deletion or change from the disk; `unknown` simply
+makes no claim about the event, and since 2026-09-14 it no longer selects the
+broad path on its own. The session calls `{ kind: 'probes' }` on a membership change: reads
 are kept, every probe, absence and listing is marked, the next promotion keeps
 each one the compiler reported again and releases the rest. `{ kind: 'all' }`
 restores the acquisition's own observations.

@@ -517,7 +517,9 @@ export async function revise(state: SessionState, changes: readonly ObservedChan
     const beforeId = observer.inputId;
     // A failed acquisition leaves the observer's last valid inventory in
     // place. Reconcile through its configuration boundary before trusting it
-    // again, even if this request names only a source file or README.
+    // again, even if this request names only a source file or README. The
+    // `unknown` label asks for that re-observation and claims nothing about the
+    // event; the stale state below is what keeps the broad path.
     const reconcile = state.stale || state.facts?.invalid;
     advanced = true;
     const update = await observer.apply(reconcile
@@ -543,7 +545,6 @@ export async function revise(state: SessionState, changes: readonly ObservedChan
       return { status: 'computed', facts,
         checked: { path: 'broad', files: [], accesses: 0, modelRebuilt: false }, changed, timings, positionRefreshed: [] };
     }
-    const unknown = changes.some(change => change.kind === 'unknown');
     if (!state.stale && state.adapter?.hot && (update.kind === 'unchanged' || (!changed.length && observer.inputId === beforeId))) return { status: 'identical' };
     const inventory = observer.inventory;
     const owned = new Set(inventory.files.map(file => file.path));
@@ -565,8 +566,11 @@ export async function revise(state: SessionState, changes: readonly ObservedChan
     const areasChanged = descriptions.length > 0 && previous
       && JSON.stringify(deriveAreas(state.registry, inventory).areas) !== JSON.stringify(previous.areas);
     const membershipChange = local !== null && (local.created.length > 0 || local.deleted.length > 0);
+    // No change kind is consulted: the observer re-observes every named path and
+    // reports the creations, deletions and content changes it finds, and each
+    // reason below is decided from those findings and the retained state.
     const otherwiseBroad = state.stale || !state.adapter || !state.adapter.hot || !previous || previous.invalid !== null || previous.areaIssues.length > 0
-      || unknown || structural || areasChanged || shimChanged || otherChanged.length > 0 || unexplained.length > 0;
+      || structural || areasChanged || shimChanged || otherChanged.length > 0 || unexplained.length > 0;
     const refusal = membershipChange && !otherwiseBroad ? membershipRefusal(previous!, inventory, local!) : null;
     const membership = membershipChange && !otherwiseBroad && refusal === null;
     const broad = otherwiseBroad || (membershipChange && !membership);
@@ -675,7 +679,7 @@ export async function revise(state: SessionState, changes: readonly ObservedChan
         const deleted = [...oldFiles].filter(path => !owned.has(path));
         await state.adapter.update({ changed: state.stale ? [...owned] : ownedChanged, created, deleted,
           inventory, invalidateAll: false }, signal);
-        if (state.stale || unknown || structural || shimChanged || otherChanged.length > 0 || unexplained.length > 0
+        if (state.stale || structural || shimChanged || otherChanged.length > 0 || unexplained.length > 0
           || created.length > 0 || deleted.length > 0) {
           await state.adapter.update({ changed: [], created: [], deleted: [], inventory: null, invalidateAll: true }, signal);
         }
