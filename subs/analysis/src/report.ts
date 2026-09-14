@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { SourceLocation } from '../subs/model/src/interfaces/model.js';
-import type { ProjectInventory, ProjectScope, OutsideSourceWarning } from '../subs/project/src/interfaces/project.js';
+import type { ProjectInventory, ProjectIssue, ProjectScope, OutsideSourceWarning } from '../subs/project/src/interfaces/project.js';
 import type { SourceLimit } from '../subs/typescript/src/interfaces/source.js';
-import type { AnalysisInputs, AnalysisDiagnostic, AnalysisReport, AnalysisSnapshot, Capability, StageExecution, StageId } from './interfaces/analysis.js';
+import type { AnalysisCode, AnalysisInputs, AnalysisDiagnostic, AnalysisReport, AnalysisSnapshot, Capability, StageExecution, StageId } from './interfaces/analysis.js';
 import { diagnostic } from './report-data.js';
 import { copyReport } from './report-copy.js';
 
@@ -108,6 +108,25 @@ function reportBytes(value: unknown, budget: number): number {
   return size;
 }
 
+/**
+ * The acquisition codes a failure carries, with the category the batch run
+ * records for the same issue, so a session's failure report names what batch
+ * names. `resource-limit` keeps the limit category of a work limit, and
+ * `invalid-description` is absent: the batch run reports the parser's own
+ * issues for it, and an invalid acquisition reaches the session as invalid
+ * facts, which reproduce that expansion, never as a failure.
+ */
+type CarriedCode = Exclude<ProjectIssue['code'], 'invalid-description' | 'resource-limit'>;
+const acquisitionFailure: Readonly<Record<CarriedCode, AnalysisDiagnostic['category']>> = {
+  'root-not-found': 'acquisition', 'configuration-not-found': 'acquisition',
+  'references-only-configuration': 'acquisition', 'symlink-reference': 'acquisition',
+  'case-mismatch': 'acquisition', 'missing-file': 'acquisition', 'invalid-path': 'acquisition',
+  'read-failure': 'acquisition', 'changed-input': 'acquisition',
+  'missing-root-description': 'layout', 'invalid-layout': 'layout', 'duplicate-name': 'layout',
+  'description-in-src': 'layout', 'stray-description': 'layout', 'reserved-container': 'layout',
+  'symlink-root': 'layout', 'symlink-description': 'layout',
+};
+
 /** Invocation-local plain evidence. This object never stores a provider or a callback. */
 export class ReportDraft {
   inputId: string | null = null;
@@ -156,11 +175,12 @@ export class ReportDraft {
   }
   failure(error: unknown, stage = this.current): void {
     const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
-    const recognized = ['resource-limit', 'changed-input', 'read-failure'].includes(code) ? code as 'resource-limit' | 'changed-input' | 'read-failure'
-      : code === 'deadline' ? 'resource-limit' : 'internal-error';
+    const limit = code === 'resource-limit' || code === 'deadline';
+    const carried = !limit && Object.hasOwn(acquisitionFailure, code) ? code as keyof typeof acquisitionFailure : null;
+    const recognized: AnalysisCode = limit ? 'resource-limit' : carried ?? 'internal-error';
     const path = error && typeof error === 'object' && 'path' in error && typeof error.path === 'string' ? error.path : null;
     const item = { ...diagnostic(recognized, error instanceof Error ? error.message : String(error),
-      recognized === 'resource-limit' ? 'limit' : recognized === 'read-failure' || recognized === 'changed-input' ? 'acquisition' : 'execution',
+      limit ? 'limit' : carried ? acquisitionFailure[carried] : 'execution',
       path ? [{ file: path, start: 0, end: 0, line: 1, column: 1 }] : []),
       ...(error instanceof WorkLimit ? { limit: { name: error.limit, maximum: error.maximum, observed: error.observed, collectedPrefix: true as const } } : {}) };
     // The reserved control envelope admits a limit/failure even when the evidence budget is full.

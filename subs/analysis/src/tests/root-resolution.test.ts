@@ -113,8 +113,13 @@ describe('invocation checks reuse the session resolution', () => {
       const batch = await analyzeProject(request);
       if (batch.status !== 'reported') throw new Error('Batch comparison was cancelled');
       expect(batch.report.diagnostics).toMatchObject([{ code: 'references-only-configuration' }]);
-      // The engine projects a failed reacquisition as a failure diagnostic carrying the acquisition's message.
-      expect(refused.result).toMatchObject({ status: 'reported', report: { diagnostics: [{ code: 'internal-error', message: batch.report.diagnostics[0]!.message }] } });
+      // The engine projects a failed reacquisition as the diagnostics batch records for the same
+      // refusal, identities included. The reports still differ where a warm session has more to
+      // say: its execution is `incomplete` beside batch's `unavailable`, and it keeps the
+      // inventory of the last valid acquisition, which batch never reached.
+      expect(refused.result).toMatchObject({ status: 'reported', report: { diagnostics: batch.report.diagnostics } });
+      if (refused.result.status !== 'reported') throw new Error('Expected a reported refusal');
+      expect(refused.result.report.diagnostics.map(item => item.code)).toEqual(['references-only-configuration']);
       // Restoring the configuration revises without a resolution.
       await put(root, 'tsconfig.json', fixtureFiles['tsconfig.json']!);
       const restored = await counted(() => handle.update([{ path: 'tsconfig.json', kind: 'changed' }], {}, invocation));
