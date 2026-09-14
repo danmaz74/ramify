@@ -621,8 +621,10 @@ of loading or spawning another analyzer. Preserve root, input setup, registry,
 requested capabilities and exact content when falling back. If
 a historical request cannot be reproduced, return unavailable instead of
 substituting current state. Report when fallback was used. An unavailable
-checker never produces successful enforcement. Whether a hook-facing check may
-use batch fallback within its bounded response time is a review item.
+checker never produces successful enforcement. The bounded hook check,
+`ramify check --changed`, never uses batch fallback: after exhausted recovery it
+answers not checked, as the [CLI invocation contract](cli-invocation.spec.md#hook-and-complete-checks)
+states.
 
 CI and an explicit batch option use a fresh engine session without starting a
 daemon. Batch and daemon results over identical inputs must agree after normalizing
@@ -718,8 +720,8 @@ needs the following without reopening those decisions or the model rules:
    to be specified; optional HTTP hosting is a later extension.
 4. The [fast incremental check](#fast-incremental-checks) path for agent
    post-write hooks: hook invocation and output, deadline, behavior in a cold
-   context or during recovery (including whether batch fallback is allowed)
-   and the measured latency budget.
+   context or during recovery, and the measured latency budget. The hook check
+   never uses batch fallback; that part is settled.
 5. Resident resource/retention limits, lease/idle durations and measured latency
    budgets implementing the memory policy. Batch work limits and measurement
    outcomes are recorded in the Plan 1 handoff; they do not establish resident

@@ -173,8 +173,9 @@ neither server. After bounded daemon recovery fails, a terminating CLI command
 over reproducible disk inputs may use the batch fallback specified in
 [daemon recovery](daemon.md#transport-process-lifecycle-and-recovery).
 Report fallback use; do not silently substitute current state for an
-unavailable historical revision. Whether a hook-facing check may use this
-fallback is a [review item](daemon.md#decisions-still-requiring-review).
+unavailable historical revision. The bounded hook check, `ramify check --changed`,
+never uses this fallback: after exhausted recovery it answers not checked, as the
+[CLI invocation contract](cli-invocation.spec.md#hook-and-complete-checks) states.
 Only terminating CLI commands may run the fallback engine: the Node entry loads
 it in process, and the compiled client runs it in a Node child. Either disposes
 the session and exits. Watch, MCP, web and external service clients
