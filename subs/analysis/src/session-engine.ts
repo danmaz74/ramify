@@ -193,6 +193,13 @@ class Session implements RetainedSession {
     return this.#serialize(async () => {
       if (this.#disposed) throw new Error('Retained session is disposed');
       if (control.signal?.aborted) return { status: 'cancelled' };
+      // The audit recomputes every fact from the compiler. A released one has
+      // nothing to recompute with, which is a reported outcome rather than a
+      // failure; only invalid facts are recomputed without a compiler.
+      if (!this.#state.facts?.invalid && !this.#state.adapter?.hot) {
+        return { status: 'unavailable', reason: 'compiler-released',
+          message: 'The compiler is released; the audit needs a hot session' };
+      }
       const started = performance.now();
       try {
         const audit = await auditFacts(this.#state, control.signal);

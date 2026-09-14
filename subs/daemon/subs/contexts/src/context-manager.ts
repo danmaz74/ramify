@@ -85,6 +85,9 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     if (context.demoting) return context.demoting;
     const session = context.session;
     if (!session || session.status().level !== 'hot') return;
+    // The released compiler leaves nothing to audit: a demotion cancels the
+    // armed audit rather than letting it run against a warm session.
+    cancelAudit(context);
     const work = session.releaseCompiler(); context.demoting = work;
     try { await work; } finally { context.demoting = null; if (context.state !== 'evicted') changed(context); }
   }
@@ -137,13 +140,24 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         if (context.state !== 'evicted' && !disposed) { context.watcherState = 'unavailable'; context.synchronization = 'watcher-unavailable'; context.sweepRequired = true; }
       }).finally(() => { context.attaching = false; }));
   }
+  /** A demotion, a disposal or a finished attempt leaves no audit armed. */
+  function cancelAudit(context: LiveContext): void {
+    context.auditTimer?.(); context.auditTimer = null; context.auditRequired = false;
+    if (context.background === 'verify') context.background = null;
+  }
+  /** At most one audit per revision, and only while the session is hot: the
+   * audit recomputes from the compiler, so a demoted session has nothing to
+   * audit until an update makes it hot again. */
   function auditLater(context: LiveContext): void {
     context.auditTimer?.(); context.auditTimer = null;
-    if (!context.session || disposed || context.state === 'cold' || context.auditedSequence === context.session.current?.sequence) return;
+    if (!context.session || disposed || context.state === 'cold') return;
+    if (context.session.status().level !== 'hot') { cancelAudit(context); return; }
+    if (context.auditedSequence === context.session.current?.sequence) return;
     if (context.auditRequired) { context.background ??= 'verify'; return; }
     context.auditTimer = clock.schedule(Math.max(1, context.lastActivityAt + budgets.sweepIntervalMs - clock.now()), () => {
       context.auditTimer = null;
       if (!context.session || context.state === 'cold' || disposed) return;
+      if (context.session.status().level !== 'hot') { cancelAudit(context); return; }
       if (pending(context).some(entry => !entry.settled)) return;
       context.auditRequired = true;
       if (context.running) return;
@@ -368,6 +382,8 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     const sweep = sweepKind !== null;
     // Only a requirement from configuration path events may be satisfied by the update's reacquisition.
     const reacquirable = context.sweepRequired === 'configuration' && !entries.some(entry => entry.needsSweep);
+    /** This capture is the revision's idle audit; it recomputes and compares, and changes nothing. */
+    const auditing = !!context.session && cause === 'verify' && !changes.length && !sweep;
     const watch = context.watched, work = noWork();
     context.paths.clear(); context.requested.clear(); context.watched = null; context.conservative = false; context.sweepRequired = false; context.background = null;
     context.debounce?.(); context.debounce = null;
@@ -389,11 +405,19 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
           context.observedSequence = 0; context.versions.clear(); observeVersion(context);
           run = { status: 'revised', revision: opened.revision, identical: false, reacquired: false };
         } else run = opened;
-      } else if (cause === 'verify' && !changes.length && !sweep) {
+      } else if (auditing) {
         const verified = await context.session.verify(control);
         if (verified.status === 'cancelled') run = verified;
-        else { context.auditedSequence = verified.status === 'mismatch' ? verified.revision.sequence : verified.sequence; context.auditRequired = false;
-          run = verified.status === 'mismatch' ? { status: 'revised', revision: verified.revision, identical: false, reacquired: false } : { status: 'unchanged' }; }
+        else {
+          // The attempt counts for this revision, whether it compared the facts
+          // or reported that it could not: a failed audit waits for the next
+          // revision rather than running again at once.
+          context.auditedSequence = verified.status === 'unavailable'
+            ? context.session.current?.sequence ?? context.auditedSequence
+            : verified.status === 'mismatch' ? verified.revision.sequence : verified.sequence;
+          context.auditRequired = false;
+          run = verified.status === 'mismatch' ? { status: 'revised', revision: verified.revision, identical: false, reacquired: false } : { status: 'unchanged' };
+        }
       } else {
         const invocationChanged = invocationKey(context.invocation) !== invocationKey(invocation);
         if (changes.length || invocationChanged || !sweep) {
@@ -446,9 +470,14 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       await Promise.all(waiting.map(entry => deliver(context, entry, publication, null, false, timings)));
       if (context.watcherState === 'unavailable') attach(context);
     } catch (error) {
-      context.sweepRequired = true;
+      // A failed audit observed nothing and requires no re-observation; it is
+      // recorded against this revision so it is not attempted again.
+      if (auditing) { context.auditRequired = false; context.auditedSequence = context.session?.current?.sequence ?? context.auditedSequence; }
+      else context.sweepRequired = true;
       if (!controller.signal.aborted && !disposed && context.state !== 'evicted') {
-        context.synchronization = 'reconciling';
+        // An audit that failed compared nothing; the context's agreement with
+        // the filesystem is what it was before the attempt.
+        if (!auditing) context.synchronization = 'reconciling';
         // Published readers can join a background open without entering its
         // synchronized request batch. They must observe its failure as well.
         for (const entry of [...entries, ...context.queue.filter(item => item.request.freshness.mode === 'published')]) {

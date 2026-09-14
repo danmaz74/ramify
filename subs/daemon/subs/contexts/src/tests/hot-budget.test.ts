@@ -100,6 +100,56 @@ describe('hot and warm session budgets', () => {
       expect(e.script.verifyCalls).toEqual(['/fixture']);
     } finally { await e.dispose(); }
   });
+  it('cancels the armed audit on demotion and leaves the demoted context idle', async () => {
+    const e = sessionEnvironment({ maxHotContexts: 2, sweepIntervalMs: 100, warmIdleMs: 100_000 });
+    try {
+      const first = await e.open('/first'); await flush(); e.clock.advance(1);
+      await e.open('/second'); await flush(); e.clock.advance(1);
+      await e.open('/third'); await flush();
+      expect(e.status(first.token).level).toBe('warm');
+      const demoted = () => e.script.calls.filter(call => call.inputs.project.root === '/first').length;
+      const before = demoted();
+      for (let interval = 0; interval < 5; interval++) { e.clock.advance(100); await flush(); }
+      expect(e.script.verifyCalls).not.toContain('/first');
+      // One periodic sweep per interval at most: no work the audit provokes again.
+      expect(demoted() - before).toBeLessThanOrEqual(5);
+      expect(e.status(first.token)).toMatchObject({ level: 'warm', pending: { analysisRunning: false } });
+    } finally { await e.dispose(); }
+  });
+
+  it('counts a rejected audit as the attempt for its revision and waits for the next one', async () => {
+    const e = sessionEnvironment({ sweepIntervalMs: 100, warmIdleMs: 100_000 });
+    try {
+      const opened = await e.open(); await flush();
+      e.script.verifyPending.push(() => Promise.reject(new Error('The compiler is released')));
+      e.clock.advance(100); await flush(); e.clock.advance(1); await flush();
+      expect(e.script.verifyCalls).toEqual(['/fixture']);
+      const attempted = e.script.calls.length;
+      for (let interval = 0; interval < 5; interval++) { e.clock.advance(100); await flush(); }
+      expect(e.script.verifyCalls).toHaveLength(1);
+      // The audit compared nothing: it neither requires a sweep nor unsettles the context.
+      expect(e.status(opened.token).synchronization).toBe('synchronized');
+      expect(e.script.calls.length - attempted).toBeLessThanOrEqual(5);
+      e.script.version = 2;
+      await e.check(opened.token, { mode: 'synchronized', expect: [{ path: 'src/index.ts', sha256: hash('2') }] });
+      e.clock.advance(100); await flush(); e.clock.advance(1); await flush();
+      expect(e.script.verifyCalls).toHaveLength(2);
+    } finally { await e.dispose(); }
+  });
+
+  it('accepts a reported unavailable audit as an attempt without retrying it', async () => {
+    const e = sessionEnvironment({ sweepIntervalMs: 100, warmIdleMs: 100_000 });
+    try {
+      const opened = await e.open(); await flush();
+      e.script.verifyPending.push(() => ({ status: 'unavailable', reason: 'compiler-released',
+        message: 'The compiler is released; the audit needs a hot session' }));
+      e.clock.advance(100); await flush(); e.clock.advance(1); await flush();
+      for (let interval = 0; interval < 5; interval++) { e.clock.advance(100); await flush(); }
+      expect(e.script.verifyCalls).toHaveLength(1);
+      expect(e.status(opened.token)).toMatchObject({ synchronization: 'synchronized', published: { sequence: 1 } });
+    } finally { await e.dispose(); }
+  });
+
   it('does not release a new session version when an older detached cold report has the same sequence', async () => {
     const e = sessionEnvironment({ maxHistoryRevisions: 2, warmIdleMs: 100, coldRetainMs: 200, sweepIntervalMs: 1000 });
     try {

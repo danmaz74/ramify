@@ -76,6 +76,10 @@ export type SessionUpdate =
 export type VerifyOutcome =
   | { readonly status: 'equal'; readonly sequence: number; readonly elapsedMs: number }
   | { readonly status: 'mismatch'; readonly sequence: number; readonly fields: readonly string[]; readonly revision: SessionRevision }
+  /** The audit did not run: the compiler it recomputes from is released, or the
+   * session failed. A reported outcome, never a rejection, so the caller can
+   * record it without retrying. */
+  | { readonly status: 'unavailable'; readonly reason: 'compiler-released' | 'failed'; readonly message: string }
   | { readonly status: 'cancelled' };
 export interface SessionStatus {
   readonly level: 'hot' | 'warm';

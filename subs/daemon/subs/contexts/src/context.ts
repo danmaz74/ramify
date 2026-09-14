@@ -42,6 +42,8 @@ export interface LiveContext {
   periodicSweepDue: boolean;
   /** Start of the most recent sweep of either kind. */
   lastSweepAt: number;
+  /** The revision sequence whose audit has been attempted, comparison or reported
+   * unavailability alike: the daemon audits a revision at most once. */
   auditedSequence: number;
   auditRequired: boolean;
   demoting: Promise<void> | null;

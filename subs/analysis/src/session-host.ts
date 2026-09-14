@@ -147,7 +147,14 @@ class SessionHost implements RetainedSession {
   }
   async verify(control: RunControl = {}): Promise<VerifyOutcome> {
     if (control.signal?.aborted) return { status: 'cancelled' };
-    return await this.#request({ operation: 'verify' }, control) as VerifyOutcome;
+    // A failed audit is reported like an update or a sweep: the caller records
+    // the outcome for this revision instead of receiving a rejection.
+    try { return await this.#request({ operation: 'verify' }, control) as VerifyOutcome; }
+    catch (error) {
+      const reported = await this.#reportedFailure(error as Error);
+      return { status: 'unavailable', reason: 'failed',
+        message: reported.report.diagnostics[0]?.message ?? String(error) };
+    }
   }
   async report(control: RunControl = {}, sequence?: number): Promise<AnalysisReport | null> {
     if (this.#closing || control.signal?.aborted) return null;
