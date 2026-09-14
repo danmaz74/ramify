@@ -1986,6 +1986,947 @@
           "passed": false
         }
       ]
+    },
+    {
+      "file": "resident-2026-09-14T14-13-56.663Z-f988f0d7-c7aa-4b24-96f5-49c6ca4fd9e2.json.gz",
+      "rawSha256": "34026ff80205d542efe2b92a819c04dd3196fb621da6acf7b2e2d3df7b03abca",
+      "gzipSha256": "2e96bae35d799ee5f88eb32a2a8398960d9e4540992718016fe26602e160ace6",
+      "rawBytes": 367846,
+      "gzipBytes": 25649,
+      "gzipMembers": [
+        {
+          "offset": 0,
+          "length": 25649,
+          "rawBytes": 367846,
+          "rawSha256": "34026ff80205d542efe2b92a819c04dd3196fb621da6acf7b2e2d3df7b03abca",
+          "gzipSha256": "2e96bae35d799ee5f88eb32a2a8398960d9e4540992718016fe26602e160ace6"
+        }
+      ],
+      "note": "Real resident workload observations; advisory performance targets, binding runtime limits, missing and failing evidence retained.",
+      "measuredAt": "2026-09-14T14:13:56.663Z",
+      "completedAt": "2026-09-14T14:14:11.508Z",
+      "phase": "resident",
+      "passed": false,
+      "payloadSchema": "ramify.resident-measurements/1",
+      "build": {
+        "files": 315,
+        "sha256": "3df6d4a3a7c507ed1fd98f596bf349299a58cd1fcea2bb05b27752218a208810"
+      },
+      "workloads": [
+        {
+          "name": "I2-29:entry-footprints",
+          "status": "measured",
+          "passed": false
+        },
+        {
+          "name": "I2-29:cold-warm-broad-reference",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:cold-warm-broad-hundred",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:repeated-edit-plateau",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:many-contexts",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:slow-consumer",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:synthetic-500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:synthetic-1000",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:publication-peak",
+          "status": "not-executed",
+          "passed": false
+        }
+      ]
+    },
+    {
+      "file": "resident-2026-09-14T14-24-47.359Z-35f8cdfe-3c95-4675-b7a0-b5a3da4f2f16.json.gz",
+      "rawSha256": "54a4706725dc3470bde4b2f12960f871ee88d0ebcf3a1d47e9653511e6701a1d",
+      "gzipSha256": "8aa6ca806e62556b6927cce9b82896fb84c4f19feabdace659b6b7ab71a9e6aa",
+      "rawBytes": 28419924,
+      "gzipBytes": 1640845,
+      "gzipMembers": [
+        {
+          "offset": 0,
+          "length": 260205,
+          "rawBytes": 4194304,
+          "rawSha256": "16c95542d648ad391dc59034bb3c17b2a02496c54e8a109c42ab8ed03ba63316",
+          "gzipSha256": "5a539b8853bd767488f55901c56f0a78b5f7f9a8e4afe5bafbb46da22adc3b2d"
+        },
+        {
+          "offset": 260205,
+          "length": 200848,
+          "rawBytes": 4194304,
+          "rawSha256": "d2a672896639ec827a2303c4899fd8ab01a56f5ab7343d0ab914390d0caa93d6",
+          "gzipSha256": "ab803324177844f05d2c60844127bd2f11c02c3d6ddd488af1b68fa1c28f5051"
+        },
+        {
+          "offset": 461053,
+          "length": 226102,
+          "rawBytes": 4194304,
+          "rawSha256": "a8fb285d70552349e88835ab1299f265f5ce434ecbc11ca6824a010b95ecd618",
+          "gzipSha256": "ae85c5b75e68458e754a0963492ccaff37910190906d6154829fe043bca84ee5"
+        },
+        {
+          "offset": 687155,
+          "length": 284000,
+          "rawBytes": 4194304,
+          "rawSha256": "7e2cfc0b3a75e37b6a47e1ea87772c4c5a6139b6afdfa4e4dda5fec94ce949a6",
+          "gzipSha256": "63a7311447f9bbbf6a61991c6319484da7cff48884180a63602e46b18ffb43fb"
+        },
+        {
+          "offset": 971155,
+          "length": 290393,
+          "rawBytes": 4194304,
+          "rawSha256": "4cb28763f70affa9248d2b824ed4552f466fedef1cb085ec17cc023a39faa406",
+          "gzipSha256": "39af1bbc80218c9242d4bc9a0cd076c6857f56986c221ea7975ec00b8b0c45a3"
+        },
+        {
+          "offset": 1261548,
+          "length": 289583,
+          "rawBytes": 4194304,
+          "rawSha256": "0112a8a6e53982f9837b33ab17659614b7cec5de1bbf782c42a47bfe435f959f",
+          "gzipSha256": "df293ae0741907e2deed345dd4b1fab65ed26821995911c18e7f00a234de6ac4"
+        },
+        {
+          "offset": 1551131,
+          "length": 89714,
+          "rawBytes": 3254100,
+          "rawSha256": "05b4d73a4149e6ae69e6428ecebafc56a2734df9165374b5a754b66645ea75f9",
+          "gzipSha256": "168e6430fe58f4be8acdc2a29676355c85819c8ff18415c6ff18e7bf974cbf68"
+        }
+      ],
+      "note": "Real resident workload observations; advisory performance targets, binding runtime limits, missing and failing evidence retained.",
+      "measuredAt": "2026-09-14T14:24:47.359Z",
+      "completedAt": "2026-09-14T14:27:30.189Z",
+      "phase": "resident",
+      "passed": false,
+      "payloadSchema": "ramify.resident-measurements/1",
+      "build": {
+        "files": 315,
+        "sha256": "3df6d4a3a7c507ed1fd98f596bf349299a58cd1fcea2bb05b27752218a208810"
+      },
+      "workloads": [
+        {
+          "name": "I2-29:entry-footprints",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:cold-warm-broad-reference",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2-29:cold-warm-broad-hundred",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:repeated-edit-plateau",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:many-contexts",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:slow-consumer",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:synthetic-500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:synthetic-1000",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:publication-peak",
+          "status": "not-executed",
+          "passed": false
+        }
+      ]
+    },
+    {
+      "file": "resident-2026-09-14T14-27-36.672Z-c2ba8606-5247-45c0-9b43-65953578692b.json.gz",
+      "rawSha256": "07d7f4aa66a4416ddd7f927884bfe52e0e594fe48c1c6a66a0da4095581e089b",
+      "gzipSha256": "30a02639c418af1e0d243e8361a5da39e58d03b935bb55788f9da7413bba9671",
+      "rawBytes": 31932743,
+      "gzipBytes": 1576883,
+      "gzipMembers": [
+        {
+          "offset": 0,
+          "length": 276507,
+          "rawBytes": 4194304,
+          "rawSha256": "77cf4ad9322841c009972d2d69f489e9555a985ccc8aae97fbefa0ac2b503fc5",
+          "gzipSha256": "c7720464e0bea831b616845de4193cb699fad83ef135ef307809f30e40d9e643"
+        },
+        {
+          "offset": 276507,
+          "length": 240661,
+          "rawBytes": 4194304,
+          "rawSha256": "245c48b26ca781ec4f6f92d44d46462ed7888c37135de6299ffcc266fc68c1ef",
+          "gzipSha256": "426b3947a3be069e721279e9184743374ab636ad90b4f939346dac6b578664cf"
+        },
+        {
+          "offset": 517168,
+          "length": 202264,
+          "rawBytes": 4194304,
+          "rawSha256": "4d863c1d93ee92111a3272d04c07bee6d98b620c4d18c3b64263534c3c97f206",
+          "gzipSha256": "753ea1de7124cb152b5d93abb9ef9e432063c8a573eb03f80aadf175c97254e7"
+        },
+        {
+          "offset": 719432,
+          "length": 214818,
+          "rawBytes": 4194304,
+          "rawSha256": "90839e0b89a5ab0ad0861d843387a81e3ce301ab4d6ee6c1b8c6c274978d620d",
+          "gzipSha256": "808a40cf7a2c5831db99832bb47181e1f82ac4bc6dc012796dfa3cea73e9ea6c"
+        },
+        {
+          "offset": 934250,
+          "length": 229070,
+          "rawBytes": 4194304,
+          "rawSha256": "c89e49d2609b7c74dce9c118a90114b52fc81e3ee880fee59da1863071017a8f",
+          "gzipSha256": "2b4967790a56f6960f20feeede515112333d06144874b0f184af0e7832122164"
+        },
+        {
+          "offset": 1163320,
+          "length": 240011,
+          "rawBytes": 4194304,
+          "rawSha256": "d95b55d7d230c52c3402b686ee23e73d48842338504d41feb5014cae04c0af00",
+          "gzipSha256": "dcaf0855a7dbee3edb32f135274f5a38b084d2098c9826b170fe6c6d7bbcac2c"
+        },
+        {
+          "offset": 1403331,
+          "length": 117828,
+          "rawBytes": 4194304,
+          "rawSha256": "327cb686edc644a88654929ee93ddf50b5b1f94c74666b8b36c9ba9cd89063b6",
+          "gzipSha256": "654ced7a98c4e9e0b8c65f0822558244973c3e2c871c8f536f9ee9f2b70adaed"
+        },
+        {
+          "offset": 1521159,
+          "length": 55724,
+          "rawBytes": 2572615,
+          "rawSha256": "f203ad9870bf859b708590ddcbb345488187498e1f36cf39b36d84821130df20",
+          "gzipSha256": "ff5117d9c4fe16761cd18c8a13c65a2fc13fc0d1de2fd1bc0e6cc5c2e8c8d17f"
+        }
+      ],
+      "note": "Real resident workload observations; advisory performance targets, binding runtime limits, missing and failing evidence retained.",
+      "measuredAt": "2026-09-14T14:27:36.672Z",
+      "completedAt": "2026-09-14T14:32:37.466Z",
+      "phase": "resident",
+      "passed": false,
+      "payloadSchema": "ramify.resident-measurements/1",
+      "build": {
+        "files": 315,
+        "sha256": "3df6d4a3a7c507ed1fd98f596bf349299a58cd1fcea2bb05b27752218a208810"
+      },
+      "workloads": [
+        {
+          "name": "I2-29:entry-footprints",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:cold-warm-broad-reference",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:cold-warm-broad-hundred",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2-29:repeated-edit-plateau",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:many-contexts",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:slow-consumer",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:synthetic-500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:synthetic-1000",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:publication-peak",
+          "status": "not-executed",
+          "passed": false
+        }
+      ]
+    },
+    {
+      "file": "resident-2026-09-14T14-32-45.260Z-26c11cd0-86cd-4e51-b09c-a8cacfbbee23.json.gz",
+      "rawSha256": "eae76631443e2002d1e3a3864b9aa6e0cb9b7f5664cc46178b646ebdb9388501",
+      "gzipSha256": "a322c7a24aac97ce9890b6bfd23a5f504d9feb50d21276936491eae543419b7c",
+      "rawBytes": 77376082,
+      "gzipBytes": 3755275,
+      "gzipMembers": [
+        {
+          "offset": 0,
+          "length": 239987,
+          "rawBytes": 4194304,
+          "rawSha256": "9c34fc75461b70fe153b5e53c7c78050dc1466e7232c0d974ef8daa8fd50a742",
+          "gzipSha256": "2578fbf88a101fd58f7e147d8567045f89f60dd0a00a83d7a7da130c091ea464"
+        },
+        {
+          "offset": 239987,
+          "length": 218417,
+          "rawBytes": 4194304,
+          "rawSha256": "b4695891082bcb05486c864054709c21c6ead32eb15cd6e732b99ae60c29a80d",
+          "gzipSha256": "201486248970862951a763d8b2e6351588f939df665a46353603691699c57b92"
+        },
+        {
+          "offset": 458404,
+          "length": 219074,
+          "rawBytes": 4194304,
+          "rawSha256": "018feb1ed43922fcfde10e8ead6e209d908e0f3f33767b56f7862b597916bce4",
+          "gzipSha256": "4f9c954fc9600f992136b4dab5753d6e4d7e39ea3f3931e001d41c078c74c195"
+        },
+        {
+          "offset": 677478,
+          "length": 220467,
+          "rawBytes": 4194304,
+          "rawSha256": "6e4aa0a2b51d1b26d623e761b2dc703f158b89cca2f4e0d2f0d9c495b58f4468",
+          "gzipSha256": "f793f2627ea046bbfbb20454d6b825806eb990def3a0e14eb0d5505a6eb24c0d"
+        },
+        {
+          "offset": 897945,
+          "length": 221572,
+          "rawBytes": 4194304,
+          "rawSha256": "a88496f985dc884d80762ecfefa81021399bfe30c6c141bc1364f777a4f2604d",
+          "gzipSha256": "4b7768f2b6647ec481833ba8bcd352fd281c13604b86a820c7246f421259ab00"
+        },
+        {
+          "offset": 1119517,
+          "length": 219164,
+          "rawBytes": 4194304,
+          "rawSha256": "2903ea11b5341b5ec8f3395e3986e6b8f71e2c31e168d6a557d5b7b92c02b8a8",
+          "gzipSha256": "c422ce8ba5fdf38fab6b2bce1fdbefdf9c1b43571d22a86e65728d715823c6b7"
+        },
+        {
+          "offset": 1338681,
+          "length": 220436,
+          "rawBytes": 4194304,
+          "rawSha256": "c1ba068cb660f4b82417d066032122f04fd975d5e83be846c0e93e67726fe265",
+          "gzipSha256": "4e395c9413837b9f06159274b23f20e401b60ae15b00844b2dbc50d55d7241b6"
+        },
+        {
+          "offset": 1559117,
+          "length": 233319,
+          "rawBytes": 4194304,
+          "rawSha256": "c12959422bfcf2df014df36a5398ffaa7bed2c477d874dc57ab7e86d680205ec",
+          "gzipSha256": "9e7f8ad631f383d5440c2fc3bfa5fc0b3fdcf8dfffc1f1fdd1e6b1c91bda4a0c"
+        },
+        {
+          "offset": 1792436,
+          "length": 219384,
+          "rawBytes": 4194304,
+          "rawSha256": "0a215d0e8863059c0782ef8739e041f7b2624d77c7a236da29b6067d39c3dfb2",
+          "gzipSha256": "088af3d9ff2029bae70a3aca42f02acbcdcf0395670596e2369b1db2318f2308"
+        },
+        {
+          "offset": 2011820,
+          "length": 218982,
+          "rawBytes": 4194304,
+          "rawSha256": "a6338405d625df4bd325c1414c2f4a06b5e81d0c777f094b7cbc7284ab5bb45e",
+          "gzipSha256": "ecaaec647a7e82e0b1abd297d7455fe822f462674afe6042398f921aa845223a"
+        },
+        {
+          "offset": 2230802,
+          "length": 222213,
+          "rawBytes": 4194304,
+          "rawSha256": "a81578008f4ea809e3adb60623ca2539ed82b7b86fd3c1ed7fc6d91c7469f450",
+          "gzipSha256": "195283cb2e53bd4e98a081aa71b9009042eba01320e15eb3e20afa36b64fed62"
+        },
+        {
+          "offset": 2453015,
+          "length": 220039,
+          "rawBytes": 4194304,
+          "rawSha256": "65d8f5840578d90d5abe9219cfdc1e907622e0e9349fe76f9ba80e5ffc07049e",
+          "gzipSha256": "ce15ff3da9050f7ab01ec45894f5a5172a99f277aa7f3b80ee00ead611aed953"
+        },
+        {
+          "offset": 2673054,
+          "length": 222646,
+          "rawBytes": 4194304,
+          "rawSha256": "fdd242bdf37214b91f2a39721144bd61f0c7197cc4db30994d130aa57377dd2a",
+          "gzipSha256": "1aae8bb769925e25e8ffa33541eafb65f6ea341186e222fc567a329ec687468b"
+        },
+        {
+          "offset": 2895700,
+          "length": 220104,
+          "rawBytes": 4194304,
+          "rawSha256": "a4dc5b8f0c3b1ac86d3a0b431916d36dd0537f0dd0c180df8c9a7235d3f4c8ce",
+          "gzipSha256": "d16e76787bf7dfd074f19466c90e27f03852ff6432d7f505b225aa4a85e73cae"
+        },
+        {
+          "offset": 3115804,
+          "length": 222750,
+          "rawBytes": 4194304,
+          "rawSha256": "12a678bee37c3aa945ecbb0937b45938a4b8a2ed185c880c887fa3830a016767",
+          "gzipSha256": "5711e5903cdadb293c9f03793d05efbf8c2298bcbecadba1fc2c8511a1323b41"
+        },
+        {
+          "offset": 3338554,
+          "length": 194090,
+          "rawBytes": 4194304,
+          "rawSha256": "349c4fee4616ea2cfbe1d2e92e1625468054f3ae80d10b60304d6846f189cd25",
+          "gzipSha256": "0e7ccbaba826a6a0b880b66fec0f39d41b6ba776ca7e0b9ccdb88fee4cd7975d"
+        },
+        {
+          "offset": 3532644,
+          "length": 95837,
+          "rawBytes": 4194304,
+          "rawSha256": "8077043ec9f326f95690f55505ad45ca10a988f0561e9659123545c547870a53",
+          "gzipSha256": "511972fb61568a9f37c048347ff8ef4a22a31eb47dac30511540b58309f974a9"
+        },
+        {
+          "offset": 3628481,
+          "length": 87924,
+          "rawBytes": 4194304,
+          "rawSha256": "011bd50da3fcd6c1d61ebdd2c209de066d0509b8ca875febe4b7a9ee112822c0",
+          "gzipSha256": "7eef9fa9e1657bc3282a1c4a9d72a3d02368cdee995c08c2a23b4528ee29ba73"
+        },
+        {
+          "offset": 3716405,
+          "length": 38870,
+          "rawBytes": 1878610,
+          "rawSha256": "25bd504983f0ce91a450fd8da0fced8ec3f02d4d75ceb3edc4f007d816576ed6",
+          "gzipSha256": "50879a0b56153b323ae1fbeb6eb7b61b5e1819b50b3faa1a34453fa2351e9b56"
+        }
+      ],
+      "note": "Real resident workload observations; advisory performance targets, binding runtime limits, missing and failing evidence retained.",
+      "measuredAt": "2026-09-14T14:32:45.260Z",
+      "completedAt": "2026-09-14T14:43:09.221Z",
+      "phase": "resident",
+      "passed": false,
+      "payloadSchema": "ramify.resident-measurements/1",
+      "build": {
+        "files": 315,
+        "sha256": "3df6d4a3a7c507ed1fd98f596bf349299a58cd1fcea2bb05b27752218a208810"
+      },
+      "workloads": [
+        {
+          "name": "I2-29:entry-footprints",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:cold-warm-broad-reference",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:cold-warm-broad-hundred",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:repeated-edit-plateau",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2-29:many-contexts",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:slow-consumer",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:synthetic-500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:synthetic-1000",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:publication-peak",
+          "status": "not-executed",
+          "passed": false
+        }
+      ]
+    },
+    {
+      "file": "resident-2026-09-14T14-43-27.767Z-cccce697-628b-48a3-a3f5-19ecd24ee7d9.json.gz",
+      "rawSha256": "9a0b8718399ce382d6b7326ecd7128b849be7ff784898f129a9adfba8b93a348",
+      "gzipSha256": "b59136c53f6e4b9018e22d26cbec2ddcdc0aadfc2a1c387a56f24a46cb2354b9",
+      "rawBytes": 84970143,
+      "gzipBytes": 1129523,
+      "gzipMembers": [
+        {
+          "offset": 0,
+          "length": 93090,
+          "rawBytes": 4194304,
+          "rawSha256": "4b8e67e86e8edf9828ce3b3ef95da3016062ef2f956666c41af5b4ea27d498a4",
+          "gzipSha256": "3ad4118b8450bd5dddf21375f242bd35f1d9448ff33d889099d2040367d7f636"
+        },
+        {
+          "offset": 93090,
+          "length": 65996,
+          "rawBytes": 4194304,
+          "rawSha256": "e9fae24791791cd771b1630a7c41441ed04b5935742d724afa90ea192bd038fb",
+          "gzipSha256": "3619adfe2052d4e92e27e052ac122b77d4f4bb4a6ca44abb3ea012e6854ada25"
+        },
+        {
+          "offset": 159086,
+          "length": 44363,
+          "rawBytes": 4194304,
+          "rawSha256": "aa287063904f2d130fbd07635aa100414e1a7d60808f70fa9ef5d0c62792079c",
+          "gzipSha256": "f9e296f8f4968ca8e35539573261f637fb1c508e466b4f1f35e578d1488f8156"
+        },
+        {
+          "offset": 203449,
+          "length": 44097,
+          "rawBytes": 4194304,
+          "rawSha256": "836cea0efb09a752e85508887508610bfe198a32bfdf4a5bb603fc84715fd9ae",
+          "gzipSha256": "b55a83b65f671c203c2f821df43365f49f9d43f70bbd5878a466b345c60f9486"
+        },
+        {
+          "offset": 247546,
+          "length": 41379,
+          "rawBytes": 4194304,
+          "rawSha256": "884c044970db08e7bb0f961e26ddc81ed63583287c77efd15a48d389680f5cbb",
+          "gzipSha256": "2840465605b693a61edba3c2f9ec139590660722ffef5b61fd419d1413552772"
+        },
+        {
+          "offset": 288925,
+          "length": 43904,
+          "rawBytes": 4194304,
+          "rawSha256": "3948b845bd07047901833da222245b8be0334af9ec8529a394c673b65968e75c",
+          "gzipSha256": "899aa2a8349a777f6b917fe34ed9322258bbba8ab632e2c0e2bae98f37601189"
+        },
+        {
+          "offset": 332829,
+          "length": 48115,
+          "rawBytes": 4194304,
+          "rawSha256": "15bc674585c3bce5d18b426854638bfb44d1a5571a3002eced1bba05240e4620",
+          "gzipSha256": "82210b6d5129dcfca416687db4c16eae3af2756973c7cc3f17091b53372d2289"
+        },
+        {
+          "offset": 380944,
+          "length": 51403,
+          "rawBytes": 4194304,
+          "rawSha256": "c5ef33b13024cbd984867a91167369625f517698e67dedb0ca308dcfc968acc9",
+          "gzipSha256": "e33820ff01019c2d03653aaf2e5854b5f8f688c93a764eba929a042f740c2882"
+        },
+        {
+          "offset": 432347,
+          "length": 52624,
+          "rawBytes": 4194304,
+          "rawSha256": "71733d7b6f3fa67c0db259b2bab1e7563a9eef7d455fb6020161c32e50cced18",
+          "gzipSha256": "6e09d8ee50c247e148b5a3433f19c5eb5179164e2739b44cdf05b543835ea15e"
+        },
+        {
+          "offset": 484971,
+          "length": 55222,
+          "rawBytes": 4194304,
+          "rawSha256": "a2667abe81343d7796b535a247385809edf7ca86a03597402b057cac688b1b5a",
+          "gzipSha256": "b57904b03e3ebbfe16df57f2181d51e6f635f81b51c778a1a3528abd9684f5e4"
+        },
+        {
+          "offset": 540193,
+          "length": 56715,
+          "rawBytes": 4194304,
+          "rawSha256": "a1ca2370d01b704f730d522e7d8f2cc156b302e9495ebbd1c7d1526798e68a07",
+          "gzipSha256": "2a04f65ca93a124b9880f08ce8b7e06f0233d7a591cf821417323109c168dd4f"
+        },
+        {
+          "offset": 596908,
+          "length": 59070,
+          "rawBytes": 4194304,
+          "rawSha256": "35ef447404cbb23add13843833ed41f3bf9c8cd7fa7697bfb592489c949d1db5",
+          "gzipSha256": "78a366f8c7b3d404f955d9f6bfded424740d9033cb421fe39dc4756df5017728"
+        },
+        {
+          "offset": 655978,
+          "length": 58706,
+          "rawBytes": 4194304,
+          "rawSha256": "6bd2173c069d94168b65eb8d7348a27549d17d1e07f6df02a4a024d46cb329af",
+          "gzipSha256": "d8f5ab68a11a7f53fa9e032090b2e200db651d3a30ee6506955e04021130d7a9"
+        },
+        {
+          "offset": 714684,
+          "length": 59735,
+          "rawBytes": 4194304,
+          "rawSha256": "413a15567737c94bbb470f2774f03faaef897f176db0d979eaae41d799b8bc98",
+          "gzipSha256": "fe87a0662083886afdbf517e6e3791c050df3e43ee6d43a55a7a0a2246a0baf7"
+        },
+        {
+          "offset": 774419,
+          "length": 56095,
+          "rawBytes": 4194304,
+          "rawSha256": "de23d6cea33268d08e9e6612ac6f131704cc4700a39ebdfe5d2a1aa8880c767d",
+          "gzipSha256": "ee3fe5c72564b585fb563eac6b92fa910c4b0d19ff874454908d7b158f678cc9"
+        },
+        {
+          "offset": 830514,
+          "length": 54588,
+          "rawBytes": 4194304,
+          "rawSha256": "4a593ee45f0e01d5a265d31d795c3f371525bbd12819ec797f02c687cef3f482",
+          "gzipSha256": "45e9e50d9d2b6d20a2cb54c1022d36596b0480565bae867ac4207fc29d51a8ac"
+        },
+        {
+          "offset": 885102,
+          "length": 58698,
+          "rawBytes": 4194304,
+          "rawSha256": "43c135ce90965674e0be35af091bb90bc038e526c7a68131945c4160eca1c793",
+          "gzipSha256": "b3680526643ed6961646cf2759369bc15be5f7306632b4525adba455b02a082b"
+        },
+        {
+          "offset": 943800,
+          "length": 57719,
+          "rawBytes": 4194304,
+          "rawSha256": "b847fd0a28932e99a4049995b0e32ee9f047a77c490b3dd6ec4b10081d466666",
+          "gzipSha256": "2c019afaeaa71369ffd457adaef767e49f287282cb1cfcb7e470716c61250c2e"
+        },
+        {
+          "offset": 1001519,
+          "length": 54865,
+          "rawBytes": 4194304,
+          "rawSha256": "0d52d6f4911e51ae0f0cc53ee747bb0d148b3a246c2663b2260f0e85ea90fb13",
+          "gzipSha256": "1233356ef739421c07f0bad8f964875052d29aeca75e18bbc05454dcc7b83726"
+        },
+        {
+          "offset": 1056384,
+          "length": 56051,
+          "rawBytes": 4194304,
+          "rawSha256": "3a075c34199c203de7d071c99864d28510570b3648c8609f903d7e7ae8580866",
+          "gzipSha256": "e199f153a9e704e4b7c0ac5a9668c03f6ceb0064c591be0c35cf579cc10a5eb3"
+        },
+        {
+          "offset": 1112435,
+          "length": 17088,
+          "rawBytes": 1084063,
+          "rawSha256": "198fe949b49ac5d8a16897810d6648f38e3391b7973612ade99939daf2190972",
+          "gzipSha256": "a0d94e78605ad3eb942173fd6ac1a5bd0e4b7faf338bd072833b497ac297cdd1"
+        }
+      ],
+      "note": "Real resident workload observations; advisory performance targets, binding runtime limits, missing and failing evidence retained.",
+      "measuredAt": "2026-09-14T14:43:27.767Z",
+      "completedAt": "2026-09-14T15:30:14.892Z",
+      "phase": "resident",
+      "passed": false,
+      "payloadSchema": "ramify.resident-measurements/1",
+      "build": {
+        "files": 315,
+        "sha256": "3df6d4a3a7c507ed1fd98f596bf349299a58cd1fcea2bb05b27752218a208810"
+      },
+      "workloads": [
+        {
+          "name": "I2-29:entry-footprints",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:cold-warm-broad-reference",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:cold-warm-broad-hundred",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:repeated-edit-plateau",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:many-contexts",
+          "status": "failed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:slow-consumer",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:synthetic-500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:synthetic-1000",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:publication-peak",
+          "status": "not-executed",
+          "passed": false
+        }
+      ]
+    },
+    {
+      "file": "resident-2026-09-14T15-30-33.291Z-397835fb-5dfa-4b74-b598-0beedc15b22a.json.gz",
+      "rawSha256": "63809293182ca05fc265a737ec986e07c140a7592db8654e26aaa0e59909021c",
+      "gzipSha256": "3f28a0b2984d68701759e63da6f36cda3a9ff4df9684caed0075c6679f962b9f",
+      "rawBytes": 1079545,
+      "gzipBytes": 53757,
+      "gzipMembers": [
+        {
+          "offset": 0,
+          "length": 53757,
+          "rawBytes": 1079545,
+          "rawSha256": "63809293182ca05fc265a737ec986e07c140a7592db8654e26aaa0e59909021c",
+          "gzipSha256": "3f28a0b2984d68701759e63da6f36cda3a9ff4df9684caed0075c6679f962b9f"
+        }
+      ],
+      "note": "Real resident workload observations; advisory performance targets, binding runtime limits, missing and failing evidence retained.",
+      "measuredAt": "2026-09-14T15:30:33.291Z",
+      "completedAt": "2026-09-14T15:31:18.786Z",
+      "phase": "resident",
+      "passed": false,
+      "payloadSchema": "ramify.resident-measurements/1",
+      "build": {
+        "files": 315,
+        "sha256": "3df6d4a3a7c507ed1fd98f596bf349299a58cd1fcea2bb05b27752218a208810"
+      },
+      "workloads": [
+        {
+          "name": "I2-29:entry-footprints",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:cold-warm-broad-reference",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:cold-warm-broad-hundred",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:repeated-edit-plateau",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:many-contexts",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:slow-consumer",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2-29:synthetic-500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:synthetic-1000",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:publication-peak",
+          "status": "not-executed",
+          "passed": false
+        }
+      ]
+    },
+    {
+      "file": "resident-2026-09-14T15-31-20.132Z-9a79485a-39b4-4732-827f-4f735c525636.json.gz",
+      "rawSha256": "af2bdaca5d6bacedfa6adf8fe312e89c5386555fc7762f8436edb0b739c9f975",
+      "gzipSha256": "fc90a8a3bf60efb1624391c36d9dbc225ae3ddb9992c9f0628abbb30cc542d69",
+      "rawBytes": 360822,
+      "gzipBytes": 29125,
+      "gzipMembers": [
+        {
+          "offset": 0,
+          "length": 29125,
+          "rawBytes": 360822,
+          "rawSha256": "af2bdaca5d6bacedfa6adf8fe312e89c5386555fc7762f8436edb0b739c9f975",
+          "gzipSha256": "fc90a8a3bf60efb1624391c36d9dbc225ae3ddb9992c9f0628abbb30cc542d69"
+        }
+      ],
+      "note": "Real resident workload observations; advisory performance targets, binding runtime limits, missing and failing evidence retained.",
+      "measuredAt": "2026-09-14T15:31:20.132Z",
+      "completedAt": "2026-09-14T15:31:34.273Z",
+      "phase": "resident",
+      "passed": false,
+      "payloadSchema": "ramify.resident-measurements/1",
+      "build": {
+        "files": 315,
+        "sha256": "3df6d4a3a7c507ed1fd98f596bf349299a58cd1fcea2bb05b27752218a208810"
+      },
+      "workloads": [
+        {
+          "name": "I2-29:entry-footprints",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:cold-warm-broad-reference",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:cold-warm-broad-hundred",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:repeated-edit-plateau",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:many-contexts",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:slow-consumer",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:synthetic-500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:synthetic-1000",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:publication-peak",
+          "status": "measured",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "file": "resident-2026-09-14T15-31-35.394Z-599a278a-330c-4357-bc2e-e5ecfb7e678c.json.gz",
+      "rawSha256": "c68bd7ca3c9a5a79d260e824ac18ae8928251f2c3eded95e7c5b9c97f7ba38da",
+      "gzipSha256": "4f88a59a30193b4ce8582ff0583a8c3d3cec106f1cdfb40bf3e03b61d18f2770",
+      "rawBytes": 1910133,
+      "gzipBytes": 61361,
+      "gzipMembers": [
+        {
+          "offset": 0,
+          "length": 61361,
+          "rawBytes": 1910133,
+          "rawSha256": "c68bd7ca3c9a5a79d260e824ac18ae8928251f2c3eded95e7c5b9c97f7ba38da",
+          "gzipSha256": "4f88a59a30193b4ce8582ff0583a8c3d3cec106f1cdfb40bf3e03b61d18f2770"
+        }
+      ],
+      "note": "Real resident workload observations; advisory performance targets, binding runtime limits, missing and failing evidence retained.",
+      "measuredAt": "2026-09-14T15:31:35.394Z",
+      "completedAt": "2026-09-14T15:32:30.658Z",
+      "phase": "resident",
+      "passed": false,
+      "payloadSchema": "ramify.resident-measurements/1",
+      "build": {
+        "files": 315,
+        "sha256": "3df6d4a3a7c507ed1fd98f596bf349299a58cd1fcea2bb05b27752218a208810"
+      },
+      "workloads": [
+        {
+          "name": "I2-29:entry-footprints",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:cold-warm-broad-reference",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:cold-warm-broad-hundred",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:repeated-edit-plateau",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:many-contexts",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:slow-consumer",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:synthetic-500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:synthetic-1000",
+          "status": "failed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:publication-peak",
+          "status": "not-executed",
+          "passed": false
+        }
+      ]
     }
   ],
   "finalRecord": "merged-main.json.gz"

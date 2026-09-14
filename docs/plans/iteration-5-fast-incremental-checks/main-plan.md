@@ -607,11 +607,12 @@ Decisions by Dan, 2026-09-14, recorded verbatim:
 > - Iteration 11's unconfirmed automation gate: re-run what iteration 13's gate list requires; if the unfiltered `--plan 5` gate still needs the waived measurement instances, record each such instance by ID as waived by that decision rather than faking a pass, and state that the unfiltered gate is therefore not fully green.
 
 Under these decisions the hook latency condition below is established on the
-reference and S100 by the successor measurement results, the S500, S1000 and
-memory conditions remain unrecorded gaps, and `npm run measure:fast` and
-`npm run measure:resident` were not run for the closure. The
-[completion report](iterations/iteration13-results.md) records each condition's
-evidence.
+reference and S100 by the successor measurement results, the S500 and S1000
+conditions remain gaps, and `npm run measure:fast` was not run for the closure.
+A later decision of the same date ran the resident workloads instead: seven of
+them on the final build, `synthetic-1000` once as a smoke test and S500 waived.
+The [completion report](iterations/iteration13-results.md) records each
+condition's evidence, the three gates and the open defects.
 
 - [ ] `ramify check --changed <file>` inside the reference answers from the
   covering revision, marks new findings, exits 0, 1 or 2 as the tables fix,
