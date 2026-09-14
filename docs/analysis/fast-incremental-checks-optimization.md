@@ -499,6 +499,13 @@ Remaining targets, in order:
    stage on S100, about 80 to 93 ms in process; measure at S500 and S1000 first.
 4. **Target 6**, at most about 70 ms on S100 narrow hooks.
 5. **S500, S1000, macOS and memory.**
+6. **A batch comparison gate outside the fixtures.** The session audit
+   recomputes through the same compiler, so it cannot detect a retained-compiler
+   option mismatch of the class the
+   [options fix](../plans/iteration-5-structural-edits/iterations/iteration5-results.md#compiler-options-defect-found-by-se-13)
+   repaired. A CI or `check:self` step comparing a live session's `inputId` and
+   report with a batch run would extend the exactness gate beyond the fixtures.
+   Not latency work; it protects the repairs above.
 
 ## Projection
 

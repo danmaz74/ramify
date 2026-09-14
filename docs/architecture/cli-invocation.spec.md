@@ -168,7 +168,10 @@ a file it extends, or a package manifest or lockfile, is answered as not checked
 immediately, with the reason that the configuration changed: the hook verifies a
 module's exports and their use, which a configuration edit is not, and the
 daemon verifies the change behind the reply so the next hook is exact. `--batch`
-is unaffected and checks the whole project as above.
+is unaffected and checks the whole project as above. One known limit: where the
+root `tsconfig.json` carries `references` beside its own files, a created or
+deleted file makes the daemon find the project again rather than reuse what it
+knows, so those hooks are slower than the same hooks elsewhere.
 
 `ramify watch` streams versioned revision and status events, fetches each
 report by its exact revision id, and releases its subscription on SIGINT.

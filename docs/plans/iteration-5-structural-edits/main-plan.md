@@ -1,9 +1,9 @@
 # Plan 5 structural edit latency
 
-**Date:** 2026-09-13. **Status:** implemented; iterations 1 to 7 are complete,
-and the [closure](iterations/closure.md) records the evidence, the
+**Date:** 2026-09-13. **Status:** implemented and reviewed; iterations 1 to 7
+are complete, and the [closure](iterations/closure.md) records the evidence, the
 clarifications of the resolved decisions below, the estimates the evidence does
-not support and the decisions still awaiting review. The S100 budget is not yet
+not support and the decisions taken on 2026-09-14. The S100 budget is not yet
 verified in the real process. This plan answers the
 [structural edit latency brief](../../analysis/structural-edit-latency.md) and
 implements what its evidence indicates. It adds no capability, owner or package
@@ -335,20 +335,27 @@ iteration's commit; failures are fixed before the next iteration starts.
 
 ## Decisions for review
 
+All four were taken on 2026-09-14; the
+[closure](iterations/closure.md#plan-decisions-for-review) records each outcome
+and what it changed.
+
 1. **Observer retirement contract.** Whether the session names retired
    observations through an option on `ProjectObserver.apply` or through a
    separate `retire` method; iteration 4 proposes one and records the
-   alternative.
+   alternative. **Taken:** `ProjectObserver.retire`, as implemented.
 2. **Repeated deletion plan.** The measurement results did not reproduce the
    repeated deletion revision at `8236a00`. Iteration 4 changes deletion
    handling; confirm or withdraw the
    [repeated deletion plan](../iteration-5-repeated-deletions/main-plan.md)
    before it starts, so the two do not edit the same branch of `revise`.
+   **Taken:** that plan is withdrawn, so nothing else edits `revise`.
 3. **Helper spawn on configuration edits.** Closed as moot by the revision
    above.
 4. **Error attribution.** Accept that an unreadable directory or a
    solution-style rewrite is reported by acquisition rather than resolution,
-   with the same codes, as resolved decision 3 states.
+   with the same codes, as resolved decision 3 states. **Taken:** accepted, and
+   the session's failure projection now carries the acquisition's code, so its
+   report names what batch names.
 
 ## Handoff
 

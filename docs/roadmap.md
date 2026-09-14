@@ -525,7 +525,9 @@ for the hook path.
 
 The [structural edit latency plan](plans/iteration-5-structural-edits/main-plan.md)
 is a draft successor of the [hook optimization](plans/iteration-5-hook-optimization/main-plan.md),
-implemented and awaiting review of its decisions.
+implemented, and its decisions were taken on 2026-09-14. Its companion
+[repeated deletion plan](plans/iteration-5-repeated-deletions/main-plan.md) is
+withdrawn without starting.
 
 ## Plan 6: Project explorer
 

@@ -9,6 +9,9 @@ from the hook. Resolved decision 8 excluded live runs, so **whether the three S1
 rows meet the 2 s budget is not verified**. The
 [measurement successor](#measurement-recipe) establishes it.
 
+The decisions this plan left open were taken on 2026-09-14; see
+[Review, 2026-09-14](#review-2026-09-14).
+
 Several resolved decisions were implemented differently from how they are
 written, and two plan estimates are not supported by the evidence. The
 [clarifications](#contract-clarifications), [estimates](#estimates-against-the-evidence)
@@ -64,8 +67,37 @@ not needed at once.
   `refs/audited/runs/2026-09-14T06-50-03Z-4e442e6`. This paragraph is a
   docs-only follow-up.
 - **Left to a successor.** A real-process re-measurement of the configuration
-  rows, and a reference-harness run of the revised not-checked instance, which
-  this revision did not execute.
+  rows. The revised not-checked instance was run on 2026-09-14, see
+  [Reference harness](#reference-harness).
+
+## Review, 2026-09-14
+
+Dan reviewed the plan, this closure and the revision above and took every
+decision they left open; the outcomes are in
+[Decisions taken, 2026-09-14](#decisions-taken-2026-09-14). Two of them changed
+source or documents.
+
+- **The failed reacquisition's code.** `ReportDraft.failure` in `analysis` now
+  carries every acquisition code the project layer reports, with the category
+  the batch run records for the same issue. The SE-5 session case of
+  `subs/analysis/src/tests/root-resolution.test.ts` asserts the session's
+  diagnostics for a solution-style rewrite equal batch's, identities included,
+  instead of expecting `internal-error`. The daemon codec validates envelopes
+  and revision headers, not report diagnostic codes, so it accepts the widened
+  report unchanged; its timing-field cases still pass.
+- **The Plan 5 contracts** now carry the implemented shapes; see
+  [Contract clarifications](#contract-clarifications).
+
+### Reference harness
+
+The revised not-checked instance, `I5-11:changed-exit-2-not-checked` of
+`scripts/reference-harness/plan5-hook-cases.ts`, was run alone against the built
+`dist/` on 2026-09-14: 29 assertions passed, including
+`a named configuration file is not checked at once`, which expects reason
+`configuration-changed` and no revision. The case needed no repair. It was
+driven by a throwaway script over `plan5Runtime.handlers`, outside the
+`reference:verify` iteration sets, which would also have run the rest of
+iteration 10; the script is not committed.
 
 ## Delivered repairs
 
@@ -88,7 +120,7 @@ Line numbers are at `72c2b9b`, the last commit before this closure.
 | SE-2 `unattributed-located` | Results: [iteration 1 attribution](iteration1-results.md#attribution-se-2). Promotion is 398.5 of 403.2 ms (created) and 388.7 of 393.3 ms (deleted) outside the stages, in process. The measured 456 ms is 50 to 60 ms higher; the difference is not attributed |
 | SE-3 `resolution-survives-membership` | `subs/analysis/subs/project/src/tests/resolve-root.test.ts:120` `resolution-survives-membership: a created or deleted source file in an enumerated directory reuses the resolution`; `subs/analysis/src/tests/root-resolution.test.ts:68` `resolution-survives-membership: a created or deleted source file reuses the resolution in the invocation check`; `subs/daemon/subs/contexts/src/tests/root-resolution.test.ts:66` `resolution-survives-membership, resolution-survives-configuration-bytes: hooks for a created or deleted file or a configuration edit reopen with the known resolution`, with a scripted driver |
 | SE-4 `resolution-invalidated-by-discovery` | `resolve-root.test.ts:160` `root-resolution-invalidated, resolution-invalidated-by-discovery: a created or deleted configuration or description on the discovery path, a moved root or a changed canonical path resolves again`; `:212` `resolution-invalidated-by-discovery: a changed canonical path of the working directory resolves again`; `subs/analysis/src/tests/root-resolution.test.ts:127` `root-resolution-invalidated, resolution-invalidated-by-discovery: a created or deleted description or configuration on the discovery path resolves again and a moved root is refused` |
-| SE-5 `resolution-survives-configuration-bytes` | `resolve-root.test.ts:241` `resolution-survives-configuration-bytes: a configuration content edit reuses the resolution and acquisition refuses what resolution no longer re-reads, with the same codes`; `subs/analysis/src/tests/root-resolution.test.ts:96` `resolution-survives-configuration-bytes: a configuration edit reuses the resolution and a solution-style rewrite is refused by acquisition`; the contexts case of SE-3. The session reports the rewrite as `internal-error`, see review decision 4 |
+| SE-5 `resolution-survives-configuration-bytes` | `resolve-root.test.ts:241` `resolution-survives-configuration-bytes: a configuration content edit reuses the resolution and acquisition refuses what resolution no longer re-reads, with the same codes`; `subs/analysis/src/tests/root-resolution.test.ts:96` `resolution-survives-configuration-bytes: a configuration edit reuses the resolution and a solution-style rewrite is refused by acquisition`; the contexts case of SE-3. The session now reports the rewrite with batch's own code, `references-only-configuration`, see [review decision 4](#plan-decisions-for-review) |
 | SE-6 `membership-incremental-equal` | `subs/analysis/subs/typescript/src/tests/retained-membership.test.ts:33` `membership-incremental-equal, membership-reads-reported, membership-identity-equals-batch: a created or deleted file without a whole invalidation`, five cases: `:34` created unreferenced, `:48` created satisfying an absence probe, `:61` created satisfying an extensionless specifier, `:73` deleted referenced, `:87` deleted unreferenced |
 | SE-7 `membership-reads-reported` | The same five cases, `expectReported` with `unreported` empty, and `obsoleteUnattributed` pinned as recorded in [iteration 3 F2](iteration3-results.md#findings-for-iteration-4) |
 | SE-8 `contribution-index` | `session-revision.test.ts:904` `contribution-index: maps each file, candidate and description dependency to its sorted contributors, relative to the root`; `:929` `contribution-index: equals a rebuild after every revision kind and holds no path of a removed file` |
@@ -129,14 +161,15 @@ The table also lists what the plan did not name.
 | Every iteration 6 clarification of resolved decision 7, of iteration 4's handoff, of `reacquired: false` on a kept update, of the double helper spawn and of the replaced references seed is **withdrawn** with the iteration by the [revision](#revision-2026-09-14). A configuration edit reacquires, reports `reacquired: true` and skips its configuration-only sweep, as iteration 5 left it | [revision](#revision-2026-09-14), [iteration 6](iteration6-results.md) | 6 |
 | A synchronized check that names a configuration path is answered at once as unavailable with reason `configuration-changed`; `UnavailableReason` and the `ramify.check/1` reason union add it, and no reply shape or codec rule changed | [revision](#revision-2026-09-14) | revision |
 
-**Contract text not updated.** The
-[Plan 5 contracts](../../iteration-5-fast-incremental-checks/contracts.md) still
-show `RevisionPath` without `membership`, `InventoryUpdate` without
-`configuration` and `ProjectObserver` without `retire`. They also still describe
-resolution reuse as "while every discovery query it made answers the same".
-`SessionUpdate.reacquired` and the new timing fields do not appear there either.
-The exact shapes are in the results files. Updating that text was outside this
-iteration's scope.
+**Contract text updated on 2026-09-14.** The
+[Plan 5 contracts](../../iteration-5-fast-incremental-checks/contracts.md) now
+carry the shapes that exist: `RevisionPath.membership`, `ProjectObserver.retire`
+with `ObservationRetirement`, `SessionUpdate.reacquired`, `OperationTimings` and
+`CaptureWork` with `promotion` and `sweep`, `RetainedSourceAnalysis.update`
+returning `reach: MembershipReach`, the `configuration-changed` unavailable
+reason, and resolution reuse validated by the discovery snapshot alone. The
+withdrawn `InventoryUpdate.configuration` is not described there. The exact
+shapes remain in the results files and in the source.
 
 **Owners and files outside the plan's table.** `typescript` in iterations 4
 (`MembershipReach`) and 5 (`76728ac`). The daemon codec in iterations 1 and 4.
@@ -214,24 +247,67 @@ measured.
 | Proportional relink | Open. Link runs on the membership path: about 17 ms on the reference and 80 to 93 ms on S100, in process |
 | Target 6, watcher window | Open, unchanged |
 | Sweep re-hashing only moved files | Open. The configuration-only sweep is satisfied by the reacquisition again, so the remaining cost is the watcher's own post-hook sweep the measurement recorded, 282 and 285 ms |
+| A batch comparison gate outside the fixtures | Opened on 2026-09-14. A CI or `check:self` step that compares a live session's `inputId` and report with a batch run of the same project, because the session audit cannot detect a retained-compiler option mismatch. Not implemented |
+
+### Decisions taken, 2026-09-14
+
+Every decision this plan left open was taken on 2026-09-14, after the
+[revision](#revision-2026-09-14). Nothing below reopens a resolved decision; the
+two marked as clarifications stand as the resolved decisions read from now on.
+
+| Decision | Raised as | Outcome |
+| --- | --- | --- |
+| `ProjectObserver.retire(retirement)` rather than an option on `apply` | plan review decision 1 | accepted as implemented |
+| Retirement by marking every compiler probe, absence and listing, keeping reads, confirming what the incremental update re-reports and releasing the rest at promotion | clarification of resolved decision 5 | accepted as the clarification of that decision |
+| The affected set matched by completion of recorded bases and stems | clarification of resolved decision 4 | accepted as the clarification of that decision |
+| The list of fallbacks to the broad path | iteration 4 review item | accepted as it is. The reasons the differential generator never reached, `global`, `reach-unknown`, `unresolved-package`, `deleted-unresolved`, `unspelled` and `areas`, are targets for the generator, not candidates for narrowing |
+| `RetainedSourceAnalysis.update` returning `reach: MembershipReach` in the `typescript` owner | iteration 4 contract outside the plan's table | accepted |
+| The compiler options fix `76728ac` | iteration 5 | accepted; see [the audit's blind spot](#the-session-audit-and-resolved-decision-2) |
+| The session's code for a failed reacquisition | plan review decision 4 | resolved by carrying the acquisition's code; see below |
+| A configuration with `references` keeping the full resolution replay | iteration 2 review item | accepted as a known limit; narrowing the replay is a later target |
+| The [repeated deletion plan](../../iteration-5-repeated-deletions/main-plan.md) | plan review decision 2 | withdrawn on 2026-09-14 without starting |
 
 ### Plan decisions for review
 
+The plan numbers four. All four are taken; the numbering below is the plan's.
+
 1. **Observer retirement contract.** Iteration 4 chose `ProjectObserver.retire`
-   over an `apply` option. It awaits sign-off.
+   over an `apply` option. **Accepted on 2026-09-14.**
 2. **Repeated deletion plan.** Iteration 4 found the
    [repeated deletion plan](../../iteration-5-repeated-deletions/main-plan.md)
    unimplemented on every branch and proceeded. The membership path now handles
-   deletions. Whether to confirm, re-scope or withdraw that plan is still to be
-   decided.
-3. **Error attribution.** The project layer refuses with the same codes, as
-   resolved decision 3 states. On a warm context, a hook after a solution-style
-   rewrite now receives a `reported`, unpublished reply with code `internal-error`.
-   Batch reports `references-only-configuration`. `ReportDraft.failure` keeps
-   only `read-failure`, `changed-input` and `resource-limit`. Before the plan,
-   the daemon's resolution refused and returned the batch report as
-   `unresolved`. Still open; the [revision](#revision-2026-09-14) removed
-   iteration 6's re-read path, which had the same projection.
+   deletions. **Withdrawn on 2026-09-14**: it never started, the measurement on
+   build `4981ed5` did not reproduce the revision it was written for, and a hook
+   update followed by the watcher's update is now the normal shape of a deleted
+   file cycle, whose remaining cost is the watcher-window deferral.
+3. **Helper spawn on configuration edits.** Closed as moot by the
+   [revision](#revision-2026-09-14).
+4. **Error attribution.** The project layer refuses with the same codes, as
+   resolved decision 3 states. **Accepted on 2026-09-14**, and the projection
+   that weakened it is repaired: `ReportDraft.failure` carried only
+   `read-failure`, `changed-input` and `resource-limit`, so a hook after a
+   solution-style rewrite received `internal-error` where batch reports
+   `references-only-configuration`. It now carries every acquisition code the
+   project layer reports, with the category the batch run records for it, so the
+   session's diagnostics for a failed reacquisition equal batch's, identities
+   included. Two report fields still differ, and are left as they are: the
+   session's execution is `incomplete` beside batch's `unavailable`, and the
+   session keeps the inventory of its last valid acquisition, which batch never
+   reached. Before the plan, the daemon's resolution refused and returned the
+   batch report as `unresolved`.
+
+### The session audit and resolved decision 2
+
+The runtime session audit cannot detect a retained-compiler option mismatch of
+the class `76728ac` repaired. It recomputes descriptions, accesses, model and
+decisions through the same compiler and compares facts, so a compiler holding
+stale options agrees with itself; it compares no `inputId`. Only a comparison
+with a batch run over the same inputs is an exactness gate for that class, which
+is what the session-equals-batch tests do. Resolved decision 2 should be read
+that way: the audit is a fact-level gate, and batch comparison is the identity
+gate. A CI or `check:self` step that compares a live session's `inputId` and
+report with a batch run of the same project would extend that gate beyond the
+fixtures; it is a deferral below, not implemented here.
 
 ### Review items raised by the iterations
 
@@ -265,7 +341,7 @@ measured.
   update, and the reply leaves the debounce standing so the watcher's batch
   coalesces into that one capture. The reference harness's not-checked instance
   demonstrates the deadline with a source edit and adds the new reason; it was
-  not run in this revision.
+  run on 2026-09-14, see [Reference harness](#reference-harness).
 
 ## Remaining gaps
 
@@ -283,9 +359,14 @@ Gathered from each results file. None blocks a matrix row.
 
 **Resolution**
 
-- Configurations with `references` validate by full replay (iteration 2).
-- A solution-style rewrite is reported as `internal-error` by the session
-  (iteration 2).
+- Configurations with `references` validate by full replay, so a created or
+  deleted file under such a project still resolves again and spawns the
+  configuration helper in the worker and in the daemon (iteration 2). Accepted
+  on 2026-09-14 as a known limit; narrowing that replay is a later target.
+- A failed reacquisition reports the acquisition's code, but its report is not
+  batch's in every field: execution is `incomplete` beside batch's
+  `unavailable`, and the session keeps the inventory of its last valid
+  acquisition (2026-09-14).
 
 **Membership path**
 
