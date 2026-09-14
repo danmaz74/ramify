@@ -53,7 +53,7 @@ for (const instance of plan2Instances.filter(item => item.id.startsWith('I2-24:'
           const current = await sync();
           a.equal('second check equals its backend report', semantic(JSON.parse(second.stdout)), semantic(current.report));
           const human = await invoke(['check']);
-          a.ok('human identifies actual context and revision', human.stdout.includes(`context ${token.context}; revision ${current.revision!.sequence}; synchronized`));
+          a.ok('human identifies actual context and revision', human.stdout.includes(`context ${token.context}; revision ${current.revision!.sequence}; ${current.revision!.checked.path}; synchronized`));
         } else if (instance.subcase === 'quick-status-stop') {
           const status = await invoke(['daemon', 'status', '--format', 'json']);
           a.equal('status uses real service', [status.code, JSON.parse(status.stdout).status.contexts.length], [0, 1]);
@@ -66,7 +66,8 @@ for (const instance of plan2Instances.filter(item => item.id.startsWith('I2-24:'
           const local = await quick.service.check({ token, requestId: 'local', freshness: { mode: 'published', wait: false } });
           const transported = await backend.check({ token, requestId: 'wire', freshness: { mode: 'published', wait: false } });
           if (!local.ok || local.value.status !== 'reported' || local.value.report === null || !transported.ok || transported.value.status !== 'reported' || transported.value.report === null) throw new Error('Expected published reports');
-          a.equal('serialized report values are unchanged', transported.value.report, local.value.report);
+          // Each request projects the revision's report afresh, so only its runId identifies the call.
+          a.equal('serialized report values are unchanged', semantic(transported.value.report), semantic(local.value.report));
           a.ok('transport has no report or nested shared identity', transported.value.report !== local.value.report && transported.value.report.summary !== local.value.report.summary);
           const invalid = await quick.request('notAnOperation', {});
           a.equal('unknown decoded operation reaches shared dispatcher', invalid.ok ? null : invalid.error.code, 'unsupported-operation');

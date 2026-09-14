@@ -48,7 +48,13 @@ for (const instance of plan2Instances.filter(item => item.iteration === 4)) {
           a.equal('cwd does not enter canonical context identity', [same.created, same.token], [false, token]); break;
         }
         case 'generation-on-reopen': {
-          clock.advance(testBudgets.warmIdleMs); await flush(); clock.advance(testBudgets.coldRetainMs); await flush(); clock.advance(testBudgets.coldRetainMs); await flush();
+          // Idle work in flight (a periodic sweep or the idle audit) defers each level transition until it
+          // completes, so step the idle schedule a bounded number of times rather than exactly three.
+          const live = () => manager.list().some(context => context.token.generation === token.generation);
+          clock.advance(testBudgets.warmIdleMs); await flush();
+          let steps = 1;
+          for (; steps < 6 && live(); steps++) { clock.advance(testBudgets.coldRetainMs); await flush(); }
+          a.ok('the idle context expires its generation within the bounded idle schedule', !live());
           const next = await open(); a.ok('reopening gets a fresh generation', next.token.generation !== token.generation);
           a.equal('old generation expires', await check(token), { status: 'unavailable', reason: 'expired-generation', message: 'expired-generation', requestId: 'request-1' }); break;
         }
@@ -125,9 +131,13 @@ for (const instance of plan2Instances.filter(item => item.iteration === 4)) {
         }
         case 'unwatched-dependency': {
           const run = capture(2, 'completed', [{ path: 'node_modules/pkg/index.d.ts', role: 'dependency', sha256: hash('dependency'), bytes: 1 }]);
-          let finish!: (value: typeof run) => void; script.pending.push(() => new Promise(resolve => { finish = resolve; }));
+          let finish: ((value: typeof run) => void) | undefined; script.pending.push(() => new Promise(resolve => { finish = resolve; }));
           clock.advance(testBudgets.sweepIntervalMs); await flush();
-          a.equal('verification is visible while running', state(token).synchronization, 'reconciling'); finish(run); await flush();
+          try {
+            a.ok('the periodic sweep started its capture', finish);
+            // The contract remediation made a periodic sweep maintenance: it never marks the context reconciling.
+            a.equal('a periodic sweep keeps the published revision synchronized while running', state(token).synchronization, 'synchronized');
+          } finally { finish?.(run); await flush(); }
           a.equal('verification reobserves rather than trusting events', script.calls.at(-1)?.inputs.changes, []);
           a.equal('driver changed paths are published', [state(token).published?.cause, state(token).published?.changed, state(token).synchronization], ['sweep', ['node_modules/pkg/index.d.ts'], 'synchronized']);
           script.pending.push(() => run); const revision = state(token).published?.revision;

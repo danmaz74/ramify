@@ -134,7 +134,11 @@ function assertMetadata(context: Context, name: string, value: Step): void {
   assertNoFinding(context, name, value);
 }
 function assertCreated(context: Context, name: string, value: Step): void {
-  assertBroad(context, name, value);
+  // The structural edits plan narrowed a created owned file to the membership path.
+  context.assertions.equal(`${name}: a created file takes the membership path`, value.revision.checked.path, 'membership');
+  context.assertions.ok(`${name}: the membership checked set names the new file and not every owned file`,
+    value.revision.checked.files.includes(extraFile) && value.revision.checked.files.length < owned(value.report).length
+    && value.revision.checked.accesses < value.report.summary.accesses);
   context.assertions.ok(`${name}: the catalog contains the new file`, value.report.snapshot!.catalog!.files.some(file => file.file === extraFile));
   context.assertions.equal(`${name}: its vocabulary import is interpreted and decided`,
     value.report.snapshot!.accesses.filter(access => access.importer.file === extraFile).map(access =>
@@ -142,8 +146,11 @@ function assertCreated(context: Context, name: string, value: Step): void {
     [['recordIdSchema', 'allowed']]);
   assertNoFinding(context, name, value);
 }
-function assertDeleted(context: Context, name: string, value: Step): void {
-  assertBroad(context, name, value);
+function assertDeleted(context: Context, name: string, value: Step, path: 'broad' | 'membership' = 'broad'): void {
+  if (path === 'broad') assertBroad(context, name, value);
+  // The structural edits plan narrowed deleting an unreferenced owned file to the membership path.
+  else context.assertions.equal(`${name}: deleting the unreferenced file takes the membership path and checks no other file`,
+    value.revision.checked, { path: 'membership', files: [], accesses: 0, modelRebuilt: value.revision.checked.modelRebuilt });
   context.assertions.equal(`${name}: the deleted file is absent from inventory, catalog, accesses and coverage`,
     [owned(value.report).includes(extraFile), value.report.snapshot!.catalog!.files.some(file => file.file === extraFile),
       value.report.snapshot!.accesses.some(access => access.importer.file === extraFile), value.report.coverage.some(note => note.location.file === extraFile)],
@@ -297,7 +304,7 @@ add('audit-equal-sequence', async (context, cold, baseline) => {
   values.push(await step(context, '11 file created', () => createExtra(root)));
   assertCreated(context, '11 file created', values[10]);
   values.push(await step(context, '12 file deleted', () => deleteExtra(root)));
-  assertDeleted(context, '12 file deleted', values[11]);
+  assertDeleted(context, '12 file deleted', values[11], 'membership');
   assertions.equal('all twelve edits publish exactly one revision each', values.map(value => value.revision.sequence), Array.from({ length: 12 }, (_, index) => cold.sequence + index + 1));
   assertions.equal('the final findings equal the baseline findings', values[11].revision.diagnostics, baseline.diagnostics);
   recordObservation('plan5-twelve-step-sequence', { steps: values.map((value, index) => ({ step: index + 1, sequence: value.revision.sequence,

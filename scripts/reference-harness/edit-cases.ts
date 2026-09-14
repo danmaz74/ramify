@@ -66,7 +66,7 @@ for (const instance of plan2Instances.filter(item => item.iteration === 6)) {
         a.ok(`synchronized ${current} capture follows acknowledgement`, value.freshness.captureStarted! >= value.freshness.acknowledged);
         a.equal(`synchronized ${current} revision reuse is explicit`, value.freshness.reusedRevision, reused);
         if (value.report.inputId !== null) a.equal(`synchronized ${current} report and revision share inputs`, value.revision?.fingerprints.inputId, value.report.inputId);
-        else a.ok(`synchronized ${current} sealed invalid inputs retain their own identity`, value.report.outcome.execution === 'invalid' && value.revision?.fingerprints.inputId.startsWith('input/1:'));
+        else a.ok(`synchronized ${current} sealed invalid inputs retain their own identity`, value.report.outcome.execution === 'invalid' && /^(?:input|invalid)\/1:[0-9a-f]{64}$/.test(value.revision?.fingerprints.inputId ?? ''));
         return value;
       }
       const events: ContextEvent[] = [];

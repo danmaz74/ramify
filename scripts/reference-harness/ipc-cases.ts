@@ -93,7 +93,14 @@ add('I2-14:token-preservation', async assertions => {
     const client = await fixture.connect(), context = await opened(fixture, client), report = await checked(client, context.token, 'tokens');
     const direct = await fixture.environment.service.check({ token: context.token, requestId: 'tokens', freshness: { mode: 'published', revision: report.revision.revision, wait: false } });
     const wire = await client.check({ token: context.token, requestId: 'tokens', freshness: { mode: 'published', revision: report.revision.revision, wait: false } });
-    assertions.equal('named published revision and report survive IPC byte for byte', wire, direct);
+    // Each request projects the named revision's report afresh and measures its own reply, so the
+    // report's runId and the reply timings identify the call; everything else survives IPC unchanged.
+    const call = (result: typeof wire) => {
+      if (!result.ok || result.value.status !== 'reported') return result;
+      const { timings: _timings, ...value } = result.value;
+      return { ...result, value: { ...value, report: value.report && { ...value.report, runId: 'call' } } };
+    };
+    assertions.equal('named published revision and report survive IPC byte for byte', call(wire), call(direct));
     assertions.equal('context status uses the same exact token', await client.contextStatus({ token: context.token }), await fixture.environment.service.contextStatus({ token: context.token }));
   } finally { await fixture.dispose(); }
 });

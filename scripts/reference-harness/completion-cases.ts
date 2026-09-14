@@ -104,7 +104,7 @@ async function packed(context: ProjectContext, resident: boolean): Promise<void>
   context.assertions.equal('all packed import and type conditions expose their required bindings', await validatePackageEntries(installed, expected), 8);
   const preload = await realpath(join(context.root, 'src/tests/process-probe.mjs'));
   // Probe-traced commands run the unpacked Node entry; the bin launcher would exec the untraceable compiled client.
-  context.assertions.equal('installed bin resolves to the unpacked launcher',
+  context.assertions.equal('the packed consumer bin resolves to the unpacked launcher',
     await realpath(join(consumer, 'node_modules/.bin/ramify')), join(installed, 'dist/src/ramify'));
   await withSequenceProcess(async processes => {
     const imports = await command(consumer, process.execPath, ['--input-type=module', '--eval',
