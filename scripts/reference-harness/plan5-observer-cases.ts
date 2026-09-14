@@ -30,6 +30,7 @@ const order = (a: string, b: string): number => Buffer.compare(Buffer.from(a), B
 const sha256 = (value: string | Uint8Array): string => createHash('sha256').update(value).digest('hex');
 const catalogDirectory = 'subs/workspace/subs/catalog';
 const validationSource = 'subs/workspace/subs/reviews/subs/validation/src/validate.ts';
+const unexposedSource = 'subs/workspace/subs/catalog/subs/core/src/history.ts';
 const zodDeclaration = 'node_modules/zod/index.d.ts';
 
 /**
@@ -210,26 +211,30 @@ handlers.set('I5-05:file-created-local', {
 
 handlers.set('I5-05:file-deleted-local', {
   kind: 'project', fixture: { kind: 'copy', sourceRoot: referenceRoot }, ...baseline({ owners: 15, files: 59 }),
-  mutate: ({ root }) => rm(join(root, validationSource)),
+  mutate: ({ root }) => rm(join(root, unexposedSource)),
   run: async (context: ProjectContext) => {
     const { observer, inventory } = await session(context);
     const { assertions } = context;
     try {
       const update = localUpdate(assertions, 'a deleted owned file is a local update',
-        await observer.apply([{ path: validationSource, kind: 'deleted' }]));
+        await observer.apply([{ path: unexposedSource, kind: 'deleted' }]));
       assertions.equal('only the deleted file is named',
-        [update.deleted, update.created, update.descriptions, update.readmes, update.changed], [[validationSource], [], [], [], []]);
+        [update.deleted, update.created, update.descriptions, update.readmes, update.changed], [[unexposedSource], [], [], [], []]);
       assertions.equal('the inventory no longer lists it',
         update.inventory.files.map(file => file.path),
-        inventory.files.map(file => file.path).filter(path => path !== validationSource));
+        inventory.files.map(file => file.path).filter(path => path !== unexposedSource));
       assertions.equal('no other owner loses a file',
         update.inventory.modules.map(module => module.id), inventory.modules.map(module => module.id));
       assertions.equal('the deleted path is no longer an observed input',
-        observer.inputs.some(input => input.path === validationSource), false);
-      assertions.equal('the owner\'s exposure now records a missing source reference',
-        update.inventory.references.filter(reference => reference.normalized === validationSource)
-          .map(reference => [reference.description, reference.status]),
-        [['subs/workspace/subs/reviews/subs/validation/module.ramify', 'missing']]);
+        observer.inputs.some(input => input.path === unexposedSource), false);
+      // The structural edits differential test (ff22508) made a local update reject an exposure target
+      // that lost its exact file, as the acquisition does.
+      await rm(join(context.root, validationSource));
+      const invalid = await observer.apply([{ path: validationSource, kind: 'deleted' }]);
+      assertions.equal('deleting an exposure target is an invalid update naming the missing source reference',
+        invalid.kind === 'invalid' ? invalid.issues.map(issue => [issue.code, issue.path]) : invalid.kind,
+        [['missing-file', 'subs/workspace/subs/reviews/subs/validation/module.ramify']]);
+      assertions.equal('the previous inventory stays current', observer.inventory, update.inventory);
     } finally { await release(context.runDirectory); }
   },
 });

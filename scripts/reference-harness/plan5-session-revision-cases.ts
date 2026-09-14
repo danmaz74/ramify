@@ -133,12 +133,15 @@ function assertMetadata(context: Context, name: string, value: Step): void {
     { state: 'present', readme: workspaceReadme, paragraph: purpose });
   assertNoFinding(context, name, value);
 }
-function assertCreated(context: Context, name: string, value: Step): void {
+function assertCreatedMembership(context: Context, name: string, value: Step): void {
   // The structural edits plan narrowed a created owned file to the membership path.
   context.assertions.equal(`${name}: a created file takes the membership path`, value.revision.checked.path, 'membership');
   context.assertions.ok(`${name}: the membership checked set names the new file and not every owned file`,
     value.revision.checked.files.includes(extraFile) && value.revision.checked.files.length < owned(value.report).length
     && value.revision.checked.accesses < value.report.summary.accesses);
+}
+function assertCreated(context: Context, name: string, value: Step): void {
+  assertCreatedMembership(context, name, value);
   context.assertions.ok(`${name}: the catalog contains the new file`, value.report.snapshot!.catalog!.files.some(file => file.file === extraFile));
   context.assertions.equal(`${name}: its vocabulary import is interpreted and decided`,
     value.report.snapshot!.accesses.filter(access => access.importer.file === extraFile).map(access =>
@@ -190,11 +193,11 @@ add('readme-metadata-only', async context => assertMetadata(context, 'README edi
 add('created-importing-file', async context => assertCreated(context, 'file created', await step(context, 'file created', () => createExtra(context.root))));
 add('deleted-file', async context => {
   const created = await step(context, 'file with denial created', () => createExtra(context.root, true));
-  assertBroad(context, 'file with denial created', created);
+  assertCreatedMembership(context, 'file with denial created', created);
   context.assertions.equal('the file carries exactly one independent denial before deletion',
     created.revision.delta.added.map(item => [item.code, item.location?.file, item.original?.binding]), [['not-visible', extraFile, 'InspectionPort']]);
   const deleted = await step(context, 'file deleted', () => deleteExtra(context.root));
-  assertDeleted(context, 'file deleted', deleted);
+  assertDeleted(context, 'file deleted', deleted, 'membership');
   context.assertions.equal('deletion removes exactly the finding the file carried', deleted.revision.delta.removed, created.revision.delta.added.map(item => item.id));
 });
 add('configuration-broad', async context => {
