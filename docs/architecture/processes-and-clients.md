@@ -139,7 +139,7 @@ configuration discovery, warnings and exits, is [CLI invocation](cli-invocation.
 
 | Command | Required behavior |
 | --- | --- |
-| `ramify check` | Connect to a compatible daemon, starting one if necessary; synchronize the requested inputs, obtain the check result, print it and exit. Agent post-write hooks are its main use case and require the [fast incremental check](daemon.md#fast-incremental-checks) path. |
+| `ramify check` | Connect to a compatible daemon, starting one if necessary; synchronize the requested inputs, obtain the check result, print it and exit. Without `--changed` it is the complete check. With `--changed` it is the bounded check agent post-write hooks run, which requires the [fast incremental check](daemon.md#fast-incremental-checks) path; see [hook and complete checks](cli-invocation.spec.md#hook-and-complete-checks). |
 | `ramify inspect ...`, `ramify explain ...` | Query the selected project's analysis with explicit freshness/revision semantics, print the result and exit. |
 | `ramify watch` | Keep a bounded subscription open and render published updates. The daemon owns watching and analysis. |
 | `ramify check --batch` | Load the engine only for this mode, in the CLI process or its Node child, create a fresh session, run the check and dispose it on exit. CI uses this independent mode. |

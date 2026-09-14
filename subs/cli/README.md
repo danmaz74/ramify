@@ -19,6 +19,13 @@ anywhere in the project fail the check. Cold, overdue, unobserved, superseded,
 configuration-named and unavailable checks exit 2 explicitly. This command never calls the batch
 operation, including after exhausted recovery.
 
+The three `check` forms have distinct roles: `--changed` is the bounded hook
+check, plain `check` the complete check and `--batch` the independent complete
+check. A post-write hook treats exit 2 from `--changed` as not verified; a later
+complete check gives configuration edits their verdict. The `--deadline` wait
+never delays a configuration reply. See
+[hook and complete checks](../../docs/architecture/cli-invocation.spec.md#hook-and-complete-checks).
+
 An ordinary `check` opens a context and requests synchronized freshness. Its
 human `Mode:` line identifies the daemon, context and revision, or explicitly
 says no context when resolution fails. `--batch` uses an independent disposable

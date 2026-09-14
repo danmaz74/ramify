@@ -7,14 +7,21 @@ export const help = `Usage: ramify check [--root <dir>] [--format json] [--batch
 
 Check every owned source area in one project. The root and tsconfig.json
 are discovered from the working directory; --root gives an explicit root.
-Checks reuse a resident daemon. --batch uses an independent analysis session.
---changed hashes paths relative to the selected root and waits for a covering
-revision; it never falls back to batch. Naming a configuration file, such as
-tsconfig.json, a file it extends or a package manifest, answers at once as not
-checked while the daemon verifies in the background. --since marks findings added
-since that revision. --deadline bounds the wait (default 2000 ms; maximum
-600000 ms). --since and --deadline require --changed; --changed cannot accompany
---batch.
+
+  check            Complete check through the resident daemon. Waits, with no
+                   deadline, for a revision covering every current input,
+                   configuration changes included.
+  check --batch    Independent complete check in a fresh session that trusts no
+                   daemon state.
+  check --changed  Bounded hook check. Hashes the named paths relative to the
+                   root and waits for a daemon revision covering them; it never
+                   falls back to batch. A named configuration file, such as
+                   tsconfig.json, a file it extends or a package manifest, is
+                   answered at once as not checked while the daemon verifies it.
+                   --deadline bounds the wait (default 2000 ms; maximum
+                   600000 ms) but does not delay that reply. --since marks
+                   findings added since that revision.
+--since and --deadline require --changed; --changed cannot accompany --batch.
 Watch streams revisions until interrupted. Status and stop never start a daemon.
 
 Exit codes: 0 completed, 1 violations or invalid input, 2 unable to complete,
