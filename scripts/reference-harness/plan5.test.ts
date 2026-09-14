@@ -20,8 +20,9 @@ describe('Plan 5 inventory and gates', () => {
       .toEqual([0, 10, 7, 8, 7, 10, 11, 8, 13, 9, 5, 9, 6]);
     expect(new Set(plan5Instances.map(item => item.matrixId)).size).toBe(14);
     expect(plan5Instances.every(item => item.evidenceKind && !('status' in item))).toBe(true);
-    expect([...plan5Runtime.capabilities].sort()).toEqual(['catalog', 'compiler', 'contexts', 'engine', 'fast-measure', 'harness-gate', 'hook-cli', 'hosting', 'live-equivalence', 'observer', 'session', 'supersession']);
-    expect(plan5Runtime.handlers.size).toBe(97);
+    expect([...plan5Runtime.capabilities].sort()).toEqual(['catalog', 'compiler', 'completion', 'contexts', 'engine', 'fast-measure', 'harness-gate', 'hook-cli', 'hosting', 'live-equivalence', 'observer', 'session', 'supersession']);
+    expect(plan5Runtime.handlers.size).toBe(103);
+    expect(plan5Instances.every(item => plan5Runtime.handlers.has(item.id))).toBe(true);
     expect(plan5Instances.filter(item => item.iteration === 10).every(item => plan5Runtime.handlers.has(item.id))).toBe(true);
     expect(plan5Instances.filter(item => item.iteration === 12).every(item => item.evidenceKind === 'measurement' && plan5Runtime.handlers.has(item.id))).toBe(true);
     const first = plan5Instances[0];

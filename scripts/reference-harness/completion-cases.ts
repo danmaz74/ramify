@@ -64,7 +64,7 @@ export function assertContextsDenial(report: AnalysisReport, assertions: Asserti
   recordObservation('contexts-negative', analysisEvidence(report));
 }
 
-async function toolkit(root: string, assertions: Assertions, negative: boolean): Promise<void> {
+export async function toolkit(root: string, assertions: Assertions, negative: boolean): Promise<void> {
   await withSequenceProcess(async processes => {
     if (!negative) {
       const report = await processes.check(root, false);
