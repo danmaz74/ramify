@@ -49,7 +49,23 @@ not needed at once.
   spawn on a configuration edit, is moot: the kept path that paid for it is gone.
   The configuration row leaves resolved decision 1's 2 s acceptable-time budget.
 - **Commits.** `1d8de4d` the revert, `e81d3fa` the immediate reply, `59c42f4`
-  the measurement assertions, and the document updates.
+  the measurement assertions, and `4e442e6` these document updates.
+- **Verification.** Focused runs of `subs/analysis/src/tests` (15 files, 230
+  tests), `subs/analysis/subs/project/src/tests` (8, 141),
+  `subs/analysis/subs/typescript/src/tests` (152 tests),
+  `subs/daemon/subs/contexts/src/tests` (9, 130), `subs/daemon/src/tests`
+  (14, 129), `subs/cli/src/tests` (3, 124), `src/tests` (13, 71) and
+  `node --test scripts/measurements/*.test.mjs` (55). `npm run type-check`,
+  `git diff --check` and `npm run build` passed. `npm run check:self` reported
+  0 errors, 0 warnings and 0 analysis limits over 11 owners, 284 source files
+  and 3,790 accesses; the daemon it started was stopped with
+  `dist/src/ramify daemon stop`. The cucumber-viz commit audit of `4e442e6`,
+  run with `use_existing_head` on the worktree, passed in 2 min 15 s; evidence
+  `refs/audited/runs/2026-09-14T06-50-03Z-4e442e6`. This paragraph is a
+  docs-only follow-up.
+- **Left to a successor.** A real-process re-measurement of the configuration
+  rows, and a reference-harness run of the revised not-checked instance, which
+  this revision did not execute.
 
 ## Delivered repairs
 
