@@ -81,6 +81,24 @@ describe('description, metadata and broad session revisions', () => {
     } finally { await handle.dispose(); }
   }), timeout);
 
+  it.each([
+    ['a source edit', async (root: string) => { await replace(root, paths.provider, 'return 2;', 'return 3;'); return [paths.provider]; }],
+    ['a description edit', async (root: string) => { await replace(root, paths.description, parentExposure, ''); return [paths.description]; }],
+    ['a created file', async (root: string) => { await put(root, paths.extra, 'export const extra = 1;\n'); return [paths.extra]; }],
+  ] as const)('keeps a README revert that arrives together with %s', (_label, other) => fixture(async (root, inputs) => {
+    const { handle } = await opened(inputs);
+    try {
+      await replace(root, paths.readme, 'provides a value', 'supplies a value');
+      await revised(handle, [paths.readme]);
+      await replace(root, paths.readme, 'supplies a value', 'provides a value');
+      const others = await other(root);
+      await revised(handle, [paths.readme, ...others]);
+      const report = await equalToBatch(handle, inputs);
+      expect(report.snapshot!.inventory.modules.find(module => module.id === 'fixture/branch')!.purpose).toMatchObject({ paragraph: 'The branch provides a value to its parent and descendants.' });
+      await audited(handle);
+    } finally { await handle.dispose(); }
+  }), timeout);
+
   it('combines source and description changes without skipping either decision dependency', () => fixture(async (root, inputs) => {
     const { handle, state } = await opened(inputs);
     try {

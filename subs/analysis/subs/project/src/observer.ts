@@ -269,7 +269,8 @@ class Observer implements ProjectObserver {
         }
         // A renamed owner changes identity, ancestry and sibling uniqueness.
         if (parsed.document.module.name !== module.name) return this.#rebuild(signal);
-        modules.set(module.directory, { ...module, description: parsed, headerTags: parsed.document.module.tags });
+        // Build on this update's record, so a README of the same module applied earlier keeps its purpose.
+        modules.set(module.directory, { ...modules.get(module.directory)!, description: parsed, headerTags: parsed.document.module.tags });
         descriptions.push(label); relink = true;
         continue;
       }

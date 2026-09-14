@@ -65,6 +65,16 @@ describe('project observer updates', () => {
     expect(update.inventory.modules[1]!.description).toBe(description);
   });
 
+  it('keeps both a README purpose and a description of the same module changed in one update', async () => {
+    const observer = await observe();
+    await put(root, 'subs/child/README.md', '# Child\n\nChild purpose, restated.\n');
+    await put(root, 'subs/child/module.ramify', 'ramify 1\nmodule child tagged [ui]\n');
+    const update = local(await observer.apply([{ path: 'subs/child/README.md', kind: 'changed' }, { path: 'subs/child/module.ramify', kind: 'changed' }]));
+    expect([update.readmes, update.descriptions]).toEqual([['subs/child/README.md'], ['subs/child/module.ramify']]);
+    expect([update.inventory.modules[1]!.purpose, update.inventory.modules[1]!.headerTags])
+      .toEqual([{ state: 'present', readme: 'subs/child/README.md', paragraph: 'Child purpose, restated.' }, ['ui']]);
+  });
+
   it('adds a created owned file to its area and drops a deleted one', async () => {
     const observer = await observe();
     await put(root, 'subs/child/src/extra.ts', 'export const extra = 2;\n');
