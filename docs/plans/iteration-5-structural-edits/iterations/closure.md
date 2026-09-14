@@ -245,6 +245,10 @@ Gathered from each results file. None blocks a matrix row.
   deletion refusal (iteration 4).
 - Resource shims and `paths` aliases with a created target were exercised only
   in scratch runs (iteration 3).
+- Seeded create, delete, restore and edit sequences now compare the path with
+  batch after every step; the [differential results](differential-results.md)
+  record their coverage, the two divergences they found and what they still
+  cannot produce.
 
 **Sweep and configuration**
 
