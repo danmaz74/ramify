@@ -236,6 +236,14 @@ establishes execution or a passing gate. `--iteration 5`
 requires 64 instances from iterations 2–5; `--iteration 9` requires 134 from
 2–9 (iteration 7 has owner tests only). All other records stay `not-executed`.
 
+`I2-03:same-root-reuse` compares each lease's synchronized report with a batch run of
+that lease's own invocation on the declaration, registry, engine, source and
+configuration input classes, over the path labels both runs observed, and excludes
+`runId` and `inputId`. Per the decision of 2026-09-14 (Plan 5 iteration 13), a shared
+context states each invocation's own `scope.selection` and `scope.invokedFrom`, while
+`inputId` keeps the context's captured inputs and excludes the invocation's discovery
+climb.
+
 `npm run reference:cases` includes Plan 2 inventory, sabotage, command, generator
 and prerequisite tests. `npx tsx scripts/reference-harness/validate.ts` validates
 both inventories without running conformance assertions. The report command

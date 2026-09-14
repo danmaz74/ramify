@@ -263,6 +263,18 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
   function fresh(entry: PendingCheck, started: number | null, verified: boolean, reusedRevision = false): FreshnessRecord {
     return { mode: entry.request.freshness.mode, acknowledged: entry.acknowledged, captureStarted: started, verified, reusedRevision };
   }
+  /** One context serves invocations that named the root and invocations that found it from a
+   * subdirectory. A report states the root selection of the invocation it answers, taken from
+   * that request's own resolution; the captured inventory, and the `inputId` over it, stay the
+   * context's. An invocation whose resolution the context no longer holds keeps the context's. */
+  function stated(context: LiveContext, entry: PendingCheck, report: AnalysisReport): AnalysisReport {
+    const scope = report.scope;
+    if (!scope) return report;
+    const resolution = context.resolutions.get(projectKey(entry.invocation.project));
+    if (resolution?.status !== 'resolved' || resolution.root !== scope.root) return report;
+    if (resolution.selection === scope.selection && resolution.invokedFrom === scope.invokedFrom) return report;
+    return { ...report, scope: { ...scope, selection: resolution.selection, invokedFrom: resolution.invokedFrom } };
+  }
   async function deliver(context: LiveContext, entry: PendingCheck, publication: HistoryEntry<ContextRevision>, started: number | null, reused = false,
     timings: ReplyTimings = { ...noWork(), publication: 0 }): Promise<void> {
     if (entry.settled) return;
@@ -282,7 +294,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       if (entry.request.scope === 'report' && !report) { complete(entry, { ...unavailable('evicted-revision'), requestId: entry.request.requestId }); return; }
       if (report) context.scope = report.scope;
       complete(entry, { status: 'reported', requestId: entry.request.requestId, published: true, revision: publication.revision,
-        delta, report: freeze(report), freshness: fresh(entry, started, entry.request.freshness.mode === 'synchronized', reused), timings: freeze({ ...timings }) });
+        delta, report: freeze(report && stated(context, entry, report)), freshness: fresh(entry, started, entry.request.freshness.mode === 'synchronized', reused), timings: freeze({ ...timings }) });
     } catch (error) { complete(entry, { ...unavailable('analysis-failed', String(error)), requestId: entry.request.requestId }); }
     finally { unpinBase(); unpin(); context.deliveries.delete(entry); scheduleIdle(context); }
   }
@@ -401,7 +413,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         context.synchronization = 'reconciling'; context.sweepRequired = true;
         for (const entry of [...entries, ...context.queue.filter(item => item.request.freshness.mode === 'published')]) {
           complete(entry, { status: 'reported', requestId: entry.request.requestId, published: false, revision: null, delta: null,
-            report: run.report, freshness: fresh(entry, started, false), timings: freeze({ ...work, publication: 0 }) });
+            report: stated(context, entry, run.report), freshness: fresh(entry, started, false), timings: freeze({ ...work, publication: 0 }) });
         }
         return;
       }

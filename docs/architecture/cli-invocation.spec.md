@@ -46,7 +46,11 @@ discovery rule is that an implicitly selected root may not itself sit directly
 under a directory named `subs`.
 
 The report states the root and how it was selected: given, or found from the
-working directory. Working from inside a nested module, an excluded-looking
+working directory. A resident check states the selection of its own invocation
+even when it shares a context another invocation opened, while the report's
+`inputId` identifies the project's captured inputs and excludes that invocation's
+discovery climb, so it can differ from a batch run that found the root by climbing
+from a subdirectory. Working from inside a nested module, an excluded-looking
 directory such as the toolkit's `site/`, or an independent project nested in
 the tree such as the toolkit's example, all resolve by the same rule, and the
 example resolves to its own root because `examples/` is not `subs/`.

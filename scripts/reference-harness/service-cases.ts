@@ -7,6 +7,7 @@ import { createSessionDriver } from '../../src/resident-assembly.js';
 import type { AnalysisDriver, CheckOutcome, ContextToken, ContextSetup } from '../../subs/daemon/subs/contexts/src/interfaces/contexts.js';
 import type { Capability, AnalysisReport } from '../../subs/analysis/src/interfaces/analysis.js';
 import type { RamifyService, ServiceResult, OpenContextParams } from '../../src/interfaces/service.js';
+import { createFingerprints } from '../../subs/daemon/subs/contexts/src/tokens.js';
 import { runIsolatedProject } from './mutation.js';
 import { createProjectFixture } from './fixtures/plan1/project.js';
 import { referenceEditFixture, prepareReferenceEdits } from './fixtures/plan2/reference.js';
@@ -23,6 +24,14 @@ function report(result: ServiceResult<CheckOutcome>): Extract<CheckOutcome, { st
   const outcome = value(result); if (outcome.status !== 'reported' || outcome.report === null) throw new Error(JSON.stringify(outcome)); return { ...outcome, report: outcome.report };
 }
 function normalize(report: AnalysisReport): unknown { return { ...report, runId: '' }; }
+/** The Plan 2 input classes over one report's observations, computed with the registry
+ * identity and engine the run declares. `shared` restricts the observations to the path
+ * labels both runs carry: a root found by climbing from a subdirectory probes directories
+ * the other invocation never named. */
+function classes(report: AnalysisReport, registry: string, engine: string, shared?: ReadonlySet<string>): ReturnType<typeof createFingerprints> {
+  const inputs = report.snapshot?.inputs ?? [];
+  return createFingerprints('', shared ? inputs.filter(input => shared.has(input.path)) : inputs, registry, engine);
+}
 async function settled(service: RamifyService, token: ContextToken): Promise<void> {
   for (let count = 0; count < 1000; count++) {
     const current = value(await service.contextStatus({ token }));
@@ -112,10 +121,25 @@ for (const instance of plan2Instances.filter(item => item.iteration === 5)) {
             const other = await open(second.connection, ownParams);
             a.equal('same canonical root and setup share identity', [other.created, other.token], [false, token]);
             const own = report(await check(token, service)); const theirs = report(await check(token, second.connection));
+            const engine = second.connection.daemon.instance.engine;
             for (const [label, selection, actual] of [['first', params, own], ['second', ownParams, theirs]] as const) {
               const batch = await quick.batch({ cwd: selection.project.cwd, root: selection.project.root, capabilities: selection.setup.capabilities });
               if (batch.status !== 'reported') throw new Error('Batch cancelled');
-              a.equal(`${label} invocation facts agree with batch`, normalize(actual.report), normalize(batch.report));
+              // Decision of 2026-09-14 (Plan 5 iteration 13): the shared context reports each
+              // invocation's own root selection, while `inputId` keeps the context's captured
+              // inputs and excludes this invocation's discovery climb.
+              a.equal(`${label} report states its own invocation`, [actual.report.scope?.selection, actual.report.scope?.invokedFrom],
+                [batch.report.scope?.selection, batch.report.scope?.invokedFrom]);
+              const observed = classes(batch.report, selection.setup.registry, engine);
+              a.equal(`${label} invocation agrees with batch on declarations, registry and engine`,
+                [actual.revision?.fingerprints.declarations, actual.revision?.fingerprints.registry, actual.revision?.fingerprints.engine],
+                [observed.declarations, observed.registry, observed.engine]);
+              const labels = new Set((actual.report.snapshot?.inputs ?? []).map(input => input.path));
+              const shared = new Set((batch.report.snapshot?.inputs ?? []).map(input => input.path).filter(path => labels.has(path)));
+              const resident = classes(actual.report, selection.setup.registry, engine, shared);
+              const compared = classes(batch.report, selection.setup.registry, engine, shared);
+              a.equal(`${label} invocation agrees with batch on the shared source and configuration observations`,
+                [resident.source, resident.configuration], [compared.source, compared.configuration]);
             }
             await service.closeContext({ token });
             a.equal('closing one pair leaves the other usable', report(await check(token, second.connection)).report.outcome.check, 'passed');

@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest';
+import type { AnalysisReport } from '../../../../../analysis/src/interfaces/analysis.js';
+import type { CheckOutcome } from '../interfaces/contexts.js';
 import { sessionEnvironment } from './session-fixture.js';
 import { capture, flush, hash } from './scripted-driver.js';
 
 const hook = { mode: 'synchronized' as const, expect: [{ path: 'src/index.ts', sha256: hash('1') }] };
+function reported(outcome: CheckOutcome): AnalysisReport {
+  if (outcome.status !== 'reported' || !outcome.report) throw new Error(`Expected a report, received ${outcome.status}`);
+  return outcome.report;
+}
 
 describe('project-root resolution on open', () => {
   it('root-resolution-reused: reopening a known context with a live session performs no root resolution', async () => {
@@ -27,6 +33,32 @@ describe('project-root resolution on open', () => {
       await e.open('/fixture', 'nested-again', '/fixture/src');
       expect(e.script.resolveCalls.at(-1)).toMatchObject({ reused: true, known: [{ invokedFrom: '/fixture/src' }] });
       expect(e.script.resolutions).toBe(2);
+      expect(e.script.openCalls).toHaveLength(1);
+    } finally { await e.dispose(); }
+  });
+
+  it('lease-scope-invocation: leases with different working directories each receive their own selection and invokedFrom', async () => {
+    const e = sessionEnvironment();
+    try {
+      const first = capture(1);
+      const scope = { root: '/fixture', selection: 'given' as const, invokedFrom: '/fixture',
+        configuration: 'tsconfig.json', walkedAreas: ['src'], independentScopes: [] };
+      e.script.pending.push(() => ({ ...first, report: { ...first.report, scope } }));
+      const given = await e.open('/fixture', 'given'); await flush();
+      // The second lease finds the same root by climbing from a subdirectory: one context, two invocations.
+      const found = await e.manager.open({ cwd: '/fixture/subs/workspace', scope: 'whole-project', configuration: 'discover' },
+        { registry: 'default', capabilities: [] }, 'found');
+      expect(found).toMatchObject({ status: 'opened', token: given.token, created: false });
+      const own = reported(await e.check(given.token, hook, { scope: 'report' }, 'given'));
+      const theirs = reported(await e.check(given.token, hook, { scope: 'report' }, 'found'));
+      expect(own.scope).toEqual(scope);
+      expect(theirs.scope).toEqual({ ...scope, selection: 'found', invokedFrom: '/fixture/subs/workspace' });
+      // Everything the context published is shared: the stated root selection and the echoed
+      // request are the caller's own, and the captured inputs and their identity are the context's.
+      expect({ ...theirs, scope: null, request: null }).toEqual({ ...own, scope: null, request: null });
+      expect([own.request.project, theirs.request.project]).toEqual([
+        { cwd: '/fixture', root: '/fixture', scope: 'whole-project', configuration: 'discover' },
+        { cwd: '/fixture/subs/workspace', scope: 'whole-project', configuration: 'discover' }]);
       expect(e.script.openCalls).toHaveLength(1);
     } finally { await e.dispose(); }
   });

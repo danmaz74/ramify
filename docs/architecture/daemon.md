@@ -578,7 +578,12 @@ The whole-project catalog is the assembly of the per-file descriptions, so batch
 and session produce it with the same code. The project observer records every
 input the analysis used, including the compiler's reads, existence probes and
 directory listings, so a revision's `inputId` equals a batch capture's over the
-same disk state.
+same disk state. A report the context delivers states the root selection of the
+invocation it answers: `scope.selection` and `scope.invokedFrom` come from that
+request's own resolution, while `scope.root`, `scope.configuration` and `inputId`
+stay the context's. Because `inputId` identifies the project's captured inputs and
+excludes the invocation's discovery climb, it can differ from a batch run that
+found the root by climbing from a subdirectory.
 
 **Revision paths.** An update classifies the named changes and takes one of the
 paths `unchanged-surface`, `source`, `description`, `metadata`, `membership` and `broad`:
