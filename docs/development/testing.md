@@ -49,6 +49,7 @@ example/site packages with `npm --prefix <directory> ci` as needed.
 | Command | Purpose |
 | --- | --- |
 | `npm run build` | Compile the toolkit. |
+| `dist/src/ramify check --changed <path>... [--deadline <ms>] [--format json]` | Run the bounded hook check against the resident daemon: exit 0 without findings, 1 with findings or an invalid revision, 2 when not checked; never a batch fallback. Scripted runs own their `RAMIFY_ENDPOINT_DIR`. `examples/hooks/claude-code-post-write.mjs` maps a Claude Code post-write hook to it. |
 | `npm run check:self`, `npm run check:reference` | Check all eleven toolkit owners or fifteen reference owners, including owned tests. Both commands use the resident default; isolate their endpoint and stop the owned daemon after verification. |
 | `npm run type-check` | Type-check toolkit source and scripts. |
 | `npm test` | Run toolkit Vitest tests; append `-- <test-file>` for a focused run. |
@@ -56,10 +57,11 @@ example/site packages with `npm --prefix <directory> ci` as needed.
 | `npm run reference:report -- --dry-run` | Inventory reference cases without executing the example tiers. |
 | `npm run reference:report` | Run current example tiers and report capability/coverage status. |
 | `npm run reference:verify -- --plan 1` | Require all reviewed Plan 1 instances; fails while required capabilities or assertions are absent. Add `--iteration <n>` for the named iteration and its transitive prerequisites. |
-| `npm run reference:verify -- --plan 2` | Require all 176 resident instances, including current measurement evidence and a passing same-input Plan 1 gate. Add `--iteration <n>` to include that iteration and its prerequisites. |
-| `npm run reference:verify -- --plan 5` | Require all 103 fast-incremental-check instances; expected to fail until Plan 5's iteration 13. Add `--iteration <n>` (1 to 13) to require that iteration and its transitive prerequisites only. |
+| `npm run reference:verify -- --plan 2` | Require the 166 retained resident instances and the named Plan 5 counterparts of the ten superseded records, including current measurement evidence and a passing same-input Plan 1 gate. Add `--iteration <n>` to include that iteration and its prerequisites. |
+| `npm run reference:verify -- --plan 5` | Require all 103 fast-incremental-check instances, including current `measure:fast` evidence and same-input Plan 1 and Plan 2 gates, so run it after them on the same build. Add `--iteration <n>` (1 to 13) to require that iteration and its transitive prerequisites only. |
 | `npx tsx scripts/validate-final-contracts.ts` | Require the eleven final declarations, their real exports and all eight package entries. |
 | `npm run measure:resident` | Run all nine real resident workloads and archive observations. Performance targets are advisory; missing evidence, runtime-limit violations and cleanup failures remain blocking. |
+| `npm run measure:fast` | Run Plan 5's nine hook and session workloads and archive raw results; `node scripts/measurements/fast.mjs --workload <id>` runs one. Timing targets are ideal budgets recorded without failing; correctness predicates, missing evidence and runtime limits fail. Run one measurement at a time on a quiet host. |
 | `npm run example:type-check`, `npm run example:test`, `npm run example:build`, `npm run example:test:cucumber` | Check the reference application's types, runtime, build and Cucumber workflows. |
 | `npm run diagrams`, `npm run site:build` | Check diagrams and the documentation site when affected. |
 
@@ -79,10 +81,12 @@ remain unchanged; a composed receipt identifies their original inputs separately
 from the current checkout. Other plans retain their own acceptance contracts.
 
 See [resident verification readiness](resident-verification.md) for current
-command availability and the endpoint isolation convention. `check:self` and `check:reference` retain their existing script
-text and use the resident default. Scripts and harnesses must then set an owned
-`RAMIFY_ENDPOINT_DIR`, stop their daemon in `finally` and fail if it survives.
-An implicit batch result cannot satisfy a resident instance.
+command availability and the endpoint isolation convention. `check:self`,
+`check:reference` and every `ramify check`, including `--changed`, use the
+resident daemon. Every scripted resident run, harness or measurement sets an
+owned `RAMIFY_ENDPOINT_DIR`, stops its daemon with that build's
+`dist/src/ramify daemon stop` in `finally` and fails if it survives. An implicit
+batch result cannot satisfy a resident instance.
 
 For Studio iterations, the supplied check policy takes precedence over the
 command list. If regression runners are reserved for automation, leave

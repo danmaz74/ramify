@@ -62,6 +62,16 @@ definitions must match the frozen archive, and the toolkit/package observations
 must show eleven owners and eight entries. It never starts another regression
 run. A newer failure for the same inputs blocks an older pass.
 
+Plan 5's `scripts/reference-harness/plan5-completion-cases.ts` supplies the six
+I5-14 handlers. The self-check and packed-entry handlers reuse the handlers above
+and additionally require `./analysis` to export `openRetainedSession` without
+`analyzeIncrement`, and the `./cli` and `./client` import closures to load no
+session, worker or compiler module. The declarations handler also requires the
+six added exposure lines and the removed increment line. The Plan 1 and Plan 2
+regression handlers read the newest unfiltered report for the same inputs, so run
+`--plan 1`, then `--plan 2`, then `--plan 5` on one build. The documents handler
+reads the architecture documents for the implemented session.
+
 The old 308-instance archive describes the Plan 1 build and cannot establish
 the current build's regression result. Run the unfiltered Plan 1 gate first,
 then Plan 2 without changing source or build inputs. Preserve the raw resource

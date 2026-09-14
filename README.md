@@ -67,8 +67,11 @@ reference gate instances are implemented, including the independent toolkit
 negative and relocated installation. The [completion report](docs/plans/done/iteration-1-project-verifier/iterations/iteration15-results.md)
 records actual execution, resource measurements and remaining acceptance work.
 Resident checks, streamed watch revisions, daemon status/stop and the lightweight
-`ramify.ts/client` entry are implemented. Plan 2 acceptance requires the current
-reference gates, resource measurements and both supported process platforms.
+`ramify.ts/client` entry are implemented. The daemon keeps a retained analysis
+session per project and answers `ramify check --changed`, the bounded check an
+agent's post-write hook runs, from the revision that covers the written file.
+The [Plan 5 completion report](docs/plans/iteration-5-fast-incremental-checks/iterations/iteration13-results.md)
+records its evidence and remaining gaps.
 The Ramify MCP server, interactive explorer and browser verifier remain future
 work; browser tag matching is implemented.
 
@@ -84,6 +87,8 @@ local bin directory:
 ```sh
 npx ramify check
 npx ramify check --root /path/to/project --format json
+npx ramify check --changed src/foo.ts
+npx ramify check --changed src/a.ts src/b.ts --deadline 500 --format json
 npx ramify check --batch
 npx ramify watch --format json
 npx ramify daemon status
@@ -104,6 +109,15 @@ resources. `--batch` uses and disposes a fresh
 session. Human output is the default; JSON output is one versioned report on
 stdout. See the [CLI contract](docs/architecture/cli-invocation.spec.md) for
 scope and exit codes. `--help` and `--version` load no compiler or server.
+
+`check --changed <path>...` is the bounded hook check. It hashes the named files,
+waits up to `--deadline` milliseconds (default 2000) for a daemon revision that
+covers them and prints every project finding, marking the new ones; JSON output
+is one `ramify.check/1` document. It exits 0 without findings, 1 with findings or
+an invalid revision and 2 when the files were not checked, and it never falls back to batch. The
+example adapter [`examples/hooks/claude-code-post-write.mjs`](examples/hooks/README.md)
+runs it from a Claude Code post-write hook. Use the plain `check` or `--batch` at
+the end of a task, before a commit or in CI.
 
 The reusable session is exported from `ramify.ts/analysis`; command handling
 with an injected service connector and batch operation is exported from `ramify.ts/cli`.
