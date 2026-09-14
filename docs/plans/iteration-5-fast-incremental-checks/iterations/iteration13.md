@@ -2,9 +2,21 @@
 
 **Plan:** [Plan 5: Fast incremental checks](../main-plan.md).
 **Prerequisites:** iterations 11 and 12 (`live-equivalence` and
-`fast-measure`; every earlier capability). **Owners:** any owner whose real
+`fast-measure`; every earlier capability). Iteration 12 did not complete; the
+decisions below settle what this iteration requires of it and of the gates. **Owners:** any owner whose real
 violation the self-check finds; the independent scripts scope; the
 architecture documents, the roadmap and the development guides.
+
+## Decisions, 2026-09-14
+
+Decisions by Dan, 2026-09-14, recorded verbatim:
+
+> - Iteration 12's remaining measurement workloads are waived: S500 and S1000 are not measured. The other unexecuted I5-13 workloads (checked-set-bounded, repeated-edit-plateau, hot-warm-memory, cold-open, entry-footprints) are also not run for this closure; record them as not executed, never as passed, and list them as remaining gaps. The reference and S100 hook latency rows are established by the hook optimization and structural edits measurement results; cite those.
+> - Plan 5 is closed on this branch; merging to `main` is not part of the closure. Do not describe the plan as merged to main.
+> - Iteration 11's unconfirmed automation gate: re-run what iteration 13's gate list requires; if the unfiltered `--plan 5` gate still needs the waived measurement instances, record each such instance by ID as waived by that decision rather than faking a pass, and state that the unfiltered gate is therefore not fully green.
+
+This iteration ran as direct work on branch `close/plan5-completion`. Its
+[results](iteration13-results.md) apply these decisions to every gate below.
 
 ## Goal
 

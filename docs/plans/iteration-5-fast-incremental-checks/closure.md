@@ -1,5 +1,13 @@
 # Plan 5 closure: stopped before completion
 
+> **Superseded on 2026-09-14.** Iteration 13 ran as direct work and closed Plan 5
+> as complete on branch `close/plan5-completion`, not merged to `main`, under
+> Dan's decisions of that date. The
+> [iteration 13 completion report](iterations/iteration13-results.md) records the
+> delivered scope, the gates and the remaining gaps. This record is kept as the
+> account of the stop on 2026-09-12; its statements about iteration 13 and the
+> gates describe that date.
+
 **Date:** 2026-09-13. **Status:** stopped. Plan 5 is **not complete** and its
 completion gate did not run.
 

@@ -1,7 +1,12 @@
 # Plan 5: Fast incremental checks
 
-**Date:** 2026-09-11. **Status:** Detailed implementation plan for review,
-authored from the roadmap's [Plan 5 brief](../../roadmap.md#plan-5-fast-incremental-checks),
+**Date:** 2026-09-11. **Status:** Complete on 2026-09-14, on branch
+`close/plan5-completion`; not merged to `main`. The
+[completion report](iterations/iteration13-results.md) records the delivered
+scope, the gates, the waived and unexecuted measurement workloads and the
+remaining gaps; the hook optimization, contract remediation and structural edit
+plans changed the delivered scope. The text below is the plan as authored,
+from the roadmap's [Plan 5 brief](../../roadmap.md#plan-5-fast-incremental-checks),
 Plan 2's [completion evidence](../done/iteration-2-resident-verification/iterations/iteration14-results.md),
 the [retained-session proposal](../../analysis/fast-incremental-checks-retained-session.md),
 the parallel [hook analysis](../../analysis/fast-incremental-checks.md) and
@@ -594,6 +599,19 @@ git diff --check
 ```
 
 The plan is complete only when all of these hold:
+
+Decisions by Dan, 2026-09-14, recorded verbatim:
+
+> - Iteration 12's remaining measurement workloads are waived: S500 and S1000 are not measured. The other unexecuted I5-13 workloads (checked-set-bounded, repeated-edit-plateau, hot-warm-memory, cold-open, entry-footprints) are also not run for this closure; record them as not executed, never as passed, and list them as remaining gaps. The reference and S100 hook latency rows are established by the hook optimization and structural edits measurement results; cite those.
+> - Plan 5 is closed on this branch; merging to `main` is not part of the closure. Do not describe the plan as merged to main.
+> - Iteration 11's unconfirmed automation gate: re-run what iteration 13's gate list requires; if the unfiltered `--plan 5` gate still needs the waived measurement instances, record each such instance by ID as waived by that decision rather than faking a pass, and state that the unfiltered gate is therefore not fully green.
+
+Under these decisions the hook latency condition below is established on the
+reference and S100 by the successor measurement results, the S500, S1000 and
+memory conditions remain unrecorded gaps, and `npm run measure:fast` and
+`npm run measure:resident` were not run for the closure. The
+[completion report](iterations/iteration13-results.md) records each condition's
+evidence.
 
 - [ ] `ramify check --changed <file>` inside the reference answers from the
   covering revision, marks new findings, exits 0, 1 or 2 as the tables fix,
