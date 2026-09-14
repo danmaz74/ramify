@@ -182,6 +182,32 @@ export function assertFastWorkload(id, measurements) {
       && Object.values(cycle?.revision?.timings ?? {}).length === 9
       && Object.values(cycle?.revision?.timings ?? {}).every(finite) && finite(hook?.durationMs), timing(cycle) ?? null);
   }
+  /**
+   * The configuration row's hook is answered at once as not checked: a configuration
+   * edit is not the kind of change a post-write hook verifies. The cycle's revision is
+   * the one the daemon published behind that reply, read after the cycle settled.
+   */
+  function notChecked(label, cycle) {
+    const hook = cycle?.hook, doc = hook?.document;
+    check(`${label}: real immediate not-checked CLI result`, hook?.failure === null && hook.signal === null && hook.stderr === ''
+      && hook.code === 2 && doc?.schemaVersion === 'ramify.check/1' && doc.outcome === 'not-checked'
+      && doc.reason === 'configuration-changed' && doc.exitCode === 2 && doc.revision === null
+      && doc.checked === null && doc.execution === null && doc.timings?.daemon === null
+      && Array.isArray(cycle.expected) && cycle.expected.length > 0
+      && doc.changed?.length === cycle.expected.length && doc.changed.every((item, index) =>
+        item.covered === false && item.path === cycle.expected[index].path && item.sha256 === cycle.expected[index].sha256),
+    { code: hook?.code ?? null, reason: doc?.reason ?? null, revision: doc?.revision ?? null });
+    check(`${label}: independent outcome`, cycle?.revision?.outcome?.execution === 'completed'
+      && cycle.revision.summary?.denied === 0 && doc?.findings?.length === 0
+      && Array.isArray(doc.coverage) && isDeepStrictEqual(doc.coverage, [])
+      && cycle.revision.outcome.coverage === 'complete',
+    { denied: cycle?.revision?.summary?.denied ?? null, findings: doc?.findings?.length ?? null });
+    check(`${label}: background revision published behind the reply`, natural(cycle?.beforeSequence)
+      && cycle.revision?.sequence > cycle.beforeSequence
+      && Object.values(cycle.revision.timings ?? {}).length === 9
+      && Object.values(cycle.revision.timings ?? {}).every(finite) && finite(hook?.durationMs),
+    { before: cycle?.beforeSequence ?? null, sequence: cycle?.revision?.sequence ?? null, durationMs: hook?.durationMs ?? null });
+  }
   function retained(label, settled) {
     check(`${label}: runtime retention`, settled?.contexts?.length > 0 && withinRetention(settled),
       settled?.contexts?.map(context => ({ facts: context.session?.factBytes, history: context.history?.bytes })) ?? null);
@@ -251,7 +277,8 @@ export function assertFastWorkload(id, measurements) {
     for (const kind of editKinds) {
       const cycles = data.cycles?.[kind]; count(`${kind}: twenty cycles`, cycles, 20);
       for (const [index, cycle] of (cycles ?? []).entries()) {
-        completed(`${kind} ${index + 1}`, cycle, kind === 'description' && index % 2 === 0 ? 1 : 0,
+        if (kind === 'configuration') notChecked(`${kind} ${index + 1}`, cycle);
+        else completed(`${kind} ${index + 1}`, cycle, kind === 'description' && index % 2 === 0 ? 1 : 0,
           kind === 'deleted' ? deletedCoverage(data, name, cycle) : []);
         check(`${kind} ${index + 1}: revision path`, cycle.revision?.checked?.path === paths[kind], cycle.revision?.checked?.path ?? null);
         retained(`${kind} ${index + 1}`, cycle.settled);

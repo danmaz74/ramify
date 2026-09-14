@@ -328,6 +328,48 @@ test('only deletion accepts the exact unresolved-target note for its stable impo
   }
 });
 
+/** A configuration cycle: an immediate not-checked reply and the revision published behind it. */
+function configurationCycle(index) {
+  const row = cycle(index, 'configuration');
+  row.expected = [{ path: 'tsconfig.json', sha256: (index % 2 ? 'a' : 'b').repeat(64) }];
+  row.revision.checked = { path: 'broad', accesses: 1, files: ['src/body.ts'], modelRebuilt: true };
+  row.hook.code = 2;
+  row.hook.document = { schemaVersion: 'ramify.check/1', outcome: 'not-checked', reason: 'configuration-changed',
+    execution: null, exitCode: 2, revision: null, checked: null, findings: [], coverage: [],
+    changed: row.expected.map(item => ({ ...item, covered: false })), timings: { daemon: null } };
+  return row;
+}
+
+test('the configuration row requires an immediate not-checked reply and the revision published behind it', () => {
+  for (const name of fastFixtures) {
+    const id = `I5-13:hook-latency-${name.toLowerCase()}`;
+    const data = { cycles: { configuration: Array.from({ length: 20 }, (_, index) => configurationCycle(index)) } };
+    const named = suffix => assertFastWorkload(id, data).find(value => value.name === `configuration 5: ${suffix}`);
+    const suffixes = ['real immediate not-checked CLI result', 'independent outcome',
+      'background revision published behind the reply', 'revision path'];
+    for (const suffix of suffixes) assert.equal(named(suffix).passed, true, `${name}: ${suffix}`);
+    // A covering reply cannot be recorded for this row, and the background revision is still required.
+    for (const [mutate, suffix] of [
+      [row => { row.hook.code = 0; }, 'real immediate not-checked CLI result'],
+      [row => { row.hook.document.outcome = 'checked'; }, 'real immediate not-checked CLI result'],
+      [row => { row.hook.document.reason = 'deadline-exceeded'; }, 'real immediate not-checked CLI result'],
+      [row => { row.hook.document.exitCode = 0; }, 'real immediate not-checked CLI result'],
+      [row => { row.hook.document.changed[0].covered = true; }, 'real immediate not-checked CLI result'],
+      [row => { row.hook.document.revision = { id: 'rev/6', sequence: 6 }; }, 'real immediate not-checked CLI result'],
+      [row => { row.hook.document.findings.push({ id: 'test-control-only' }); }, 'independent outcome'],
+      [row => { row.hook.document.coverage.push({ id: 'test-control-only' }); }, 'independent outcome'],
+      [row => { row.revision.outcome.execution = 'incomplete'; }, 'independent outcome'],
+      [row => { row.revision.checked.path = 'membership'; }, 'revision path'],
+      [row => { row.revision.sequence = row.beforeSequence; }, 'background revision published behind the reply'],
+      [row => { row.revision.timings.total = null; }, 'background revision published behind the reply'],
+    ]) {
+      const altered = structuredClone(data); mutate(altered.cycles.configuration[4]);
+      assert.equal(assertFastWorkload(id, altered).find(value => value.name === `configuration 5: ${suffix}`).passed,
+        false, `${name}: ${suffix}`);
+    }
+  }
+});
+
 test('plateaus account separately for daemon, worker, compiler and combined physical RSS', () => {
   const measurements = plateaus();
   passing(assertFastWorkload('I5-13:repeated-edit-plateau', measurements));
