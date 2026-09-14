@@ -99,6 +99,16 @@ spike did; the resolution-bounded narrowing named in the proposal is a
 deferral with its trigger below. The path is recorded in every revision's
 checked set, and a hook's answer names it.
 
+**Amendment, 2026-09-14.** The table and the paragraph above record the plan as
+authored; two entries of the `broad` row are superseded and stay as history. A
+created or deleted owned file takes the `membership` path of the
+[structural edits plan](../iteration-5-structural-edits/main-plan.md), with
+`broad` as its fallback, so the resolution-bounded narrowing was delivered rather
+than deferred. An input change labelled `unknown` no longer decides the path:
+the observer determines creation, deletion or change from the disk and every
+broad reason is decided from the path and that finding (iteration 13 decision 1,
+`74d9b87`).
+
 ## Observation and freshness
 
 ### Observed inputs
