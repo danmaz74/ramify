@@ -541,7 +541,7 @@ a fresh batch check.
   An update in that capture that acquired the project again on a fresh
   capture satisfies that sweep; every other required sweep still runs.
 - A hook verifies a module's exports and their use. A synchronized check that
-  names a configuration path is not that kind of change and its verdict is not
+  names a configuration path names no such change, and its verdict is not
   needed at once: the context answers it immediately as not checked, naming the
   configuration change, and queues the named paths as it would any other. The
   configuration paths are the ones the path pattern matches and the ones the

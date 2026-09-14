@@ -13,6 +13,22 @@ and the [hook optimization](../iteration-5-hook-optimization/main-plan.md)
 resolved decisions remain authoritative except where a resolved decision below
 clarifies them.
 
+**Revision, 2026-09-14.** A decision after the measurement adopted option 2: a
+post-write hook exists to verify module exports and their use, and a
+`tsconfig.json` edit is not that kind of change, so a hook that names a
+configuration file is answered at once as not checked, exit code 2 with the
+reason that the configuration changed, while the daemon verifies the change
+behind the reply. Iteration 6 is therefore withdrawn and its configuration
+projection reverted: a configuration edit acquires the project again, and
+iteration 5's sweep skip applies to it once more. Iteration 5's compiler options
+fix stays. The configuration row leaves resolved decision 1's 2 s
+acceptable-time budget, which now covers the S100 created and deleted rows; the
+background revision behind the reply has no hook-facing budget. Resolved
+decision 7 is superseded, and review decision 3, the helper spawn on a
+configuration edit, is moot. The [closure](iterations/closure.md) records the
+revision, and the [CLI invocation contract](../../architecture/cli-invocation.spec.md)
+and the [daemon architecture](../../architecture/daemon.md) state the reply.
+
 ## Workflow and completion boundary
 
 An agent creates or deletes a source file, or edits `tsconfig.json`, and its
@@ -158,7 +174,7 @@ exactly. The saving assumes the replay cost of a narrow edit remains.
 | Narrow root-resolution validation | 2 | about 890 ms | about 880 ms | one file | low; detection of an unreadable directory moves to acquisition |
 | Membership path replacing the whole invalidation | 3, 4 | about 1,200 to 1,400 ms | none | design change in three owners | moderate; input identity must stay equal to batch |
 | Skip the sweep after reacquisition | 5 | none | about 260 ms | small | low |
-| Keep the inventory on an options-only edit | 6 | none | about 700 ms | design change in two owners | moderate; must prove the projection is complete |
+| Keep the inventory on an options-only edit | 6 | none | about 700 ms | design change in two owners | withdrawn by the revision above |
 
 Estimated medians after the plan: created and deleted about 400 to 700 ms with
 iterations 2 to 4, about 1,600 ms with iteration 2 alone; configuration about
@@ -258,7 +274,7 @@ what needs sign-off.
 | `ProjectObserver` | a way for the session to retire named observations after `apply`, either an option on `apply` or a `retire` method | 4 |
 | `CheckedSet.path` | adds `membership` | 4 |
 | `SessionUpdate` revised result | adds `reacquired: boolean` | 5 |
-| `InventoryUpdate` local kind | adds `configuration: readonly string[]` beside `descriptions` | 6 |
+| `InventoryUpdate` local kind | adds `configuration: readonly string[]` beside `descriptions`; withdrawn by the revision above | 6 |
 
 ## Acceptance matrix
 
@@ -278,8 +294,8 @@ what needs sign-off.
 | SE-12 | `broad-kept`: structural, configuration, shim, non-owned, unexplained and area changes still take the broad path with the whole invalidation | unit | 4 |
 | SE-13 | `sweep-skipped-after-reacquire`: a configuration edit runs one update that reports reacquisition and no sweep, and the counters show it | unit | 5 |
 | SE-14 | `sweep-kept`: a matched path the observer did not record, a watcher overflow, a cold open and a cancelled update still sweep | unit | 5 |
-| SE-15 | `configuration-projection-unchanged`: an options-only edit keeps the inventory and capture, spawns the helper once, invalidates the compiler, and the revision equals batch | unit | 6 |
-| SE-16 | `configuration-projection-changed`: an `include`, `exclude`, `files`, `outDir` or extended-file edit that changes the projection rebuilds as today | unit | 6 |
+| SE-15 | Withdrawn with iteration 6 by the revision above | — | 6 |
+| SE-16 | Withdrawn with iteration 6 by the revision above | — | 6 |
 | SE-17 | `docs-updated`: the brief records its verdicts, the analysis ranks the delivered repairs, and the closure lists evidence per row | review | 7 |
 
 ## Iterations
@@ -293,7 +309,7 @@ Iterations run in sequence in one worktree; each is one subagent.
 | [3](iterations/iteration3.md) | Membership witness and contribution index | 1 |
 | [4](iterations/iteration4.md) | Membership path with targeted retirement | 3 |
 | [5](iterations/iteration5.md) | Skip the sweep after reacquisition | 1 |
-| [6](iterations/iteration6.md) | Keep the inventory on an options-only configuration edit | 4, 5 |
+| [6](iterations/iteration6.md) | Keep the inventory on an options-only configuration edit (withdrawn) | 4, 5 |
 | [7](iterations/iteration7.md) | Closure and measurement recipe | 1 to 6 |
 
 ## Verification policy
@@ -311,7 +327,7 @@ iteration's commit; failures are fixed before the next iteration starts.
 | Deferred | Reason |
 | --- | --- |
 | Real-process measurement | Focused `measure:fast` runs of `hook-latency-s100` and `hook-latency-reference` follow the plan, using iteration 7's recipe, against the 2 s budget. S500, S1000 and macOS follow them. |
-| Avoiding the helper spawn on a configuration edit | Whether the retained compiler server's own configuration parse can serve the projection is a [review decision](#decisions-for-review); the configuration estimate is marginal without it. |
+| Avoiding the helper spawn on a configuration edit | Moot after the revision above: the projection it served is withdrawn, and no hook waits for a configuration acquisition. |
 | Cheaper replay primitives | Deriving entry kinds from a typed `readdir` would shrink the 135 and 70 ms replay on S100 narrow edits; unchanged by this plan. |
 | Proportional relink | Link stays whole-project on the membership path; it is about 100 ms on S100. Revisit with S500 and S1000. |
 | Target 6, watcher window | At most about 70 ms on S100; out of scope by the brief. |
@@ -328,10 +344,8 @@ iteration's commit; failures are fixed before the next iteration starts.
    handling; confirm or withdraw the
    [repeated deletion plan](../iteration-5-repeated-deletions/main-plan.md)
    before it starts, so the two do not edit the same branch of `revise`.
-3. **Helper spawn on configuration edits.** Whether the retained compiler
-   server's configuration parse may supply the selection projection instead of
-   a second helper process. It would remove about 330 ms from the
-   configuration row but couples `analysis/project` to the adapter.
+3. **Helper spawn on configuration edits.** Closed as moot by the revision
+   above.
 4. **Error attribution.** Accept that an unreadable directory or a
    solution-style rewrite is reported by acquisition rather than resolution,
    with the same codes, as resolved decision 3 states.

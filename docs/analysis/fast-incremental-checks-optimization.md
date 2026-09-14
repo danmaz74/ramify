@@ -463,14 +463,19 @@ The hook optimization's
 left the S100 created, deleted and configuration rows over 2 s and recommended
 next targets. The [structural edit latency plan](../plans/iteration-5-structural-edits/main-plan.md)
 addressed four of them; its [closure](../plans/iteration-5-structural-edits/iterations/closure.md)
-records the evidence. All of its figures are in process, so none of the
-measured figures in this analysis or in those results has changed.
+records the evidence, and its
+[measurement results](../plans/iteration-5-structural-edits/iterations/measurement-results.md)
+the real-process medians on the closing build: 14 of 14 rows within 2 s. The
+measured figures in this analysis remain pre-optimization. A later
+[revision](../plans/iteration-5-structural-edits/iterations/closure.md#revision-2026-09-14)
+withdrew the configuration projection and answers a configuration hook at once,
+so the configuration rows measured there no longer describe a hook that waits.
 
 | Recommended target | Delivered repair | Status |
 | --- | --- | --- |
 | Root-resolution replay per hook | Reuse validated by discovery queries only, so created and deleted files and configuration edits no longer resolve again | delivered, except for configurations with `references`; the narrow-edit replay is unmeasured |
 | Resolution-bounded narrowing | `membership` path for created and deleted sources | delivered |
-| Configuration edits on S100 | Inventory kept when the selection is unchanged; sweep skipped after a reacquisition | partly delivered; an options-only edit's capture still sweeps |
+| Configuration edits on S100 | Sweep skipped after a reacquisition. The kept-inventory projection was delivered and then [withdrawn](../plans/iteration-5-structural-edits/iterations/closure.md#revision-2026-09-14): a hook that names a configuration file is now answered at once as not checked, so no hook waits for a configuration verdict | delivered as the sweep skip and the immediate reply |
 | The reference broad path's unattributed time | `promotion` timing field | delivered |
 
 Remaining targets, in order:
@@ -479,11 +484,11 @@ Remaining targets, in order:
    [recipe](../plans/iteration-5-structural-edits/iterations/closure.md#measurement-recipe),
    against the 2 s budget. That also shows whether the narrow-edit
    resolution replay fell with the discovery-only validation.
-2. **The configuration row's remainder.** The kept path spawns the helper,
-   about 207 ms on the reference and 308 ms on S100 in process. Its capture
-   sweeps again, about 325 and 334 ms, which the deferred sweep step of target 1
-   would shrink. On the reference the kept path is about 225 ms slower than
-   before.
+2. **Daemon work behind a configuration hook.** The hook returns at once, so
+   this is background cost rather than hook latency: the watcher's second broad
+   update, 116 and 172 ms measured, and the post-hook sweep, 282 and 285 ms,
+   which the deferred sweep step of target 1 would shrink. Re-measure the
+   configuration rows' reply latency and their background revision.
 3. **Proportional relink**, now also the membership path's largest analysis
    stage on S100, about 80 to 93 ms in process; measure at S500 and S1000 first.
 4. **Target 6**, at most about 70 ms on S100 narrow hooks.

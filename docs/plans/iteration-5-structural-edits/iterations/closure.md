@@ -15,6 +15,42 @@ written, and two plan estimates are not supported by the evidence. The
 and [open review items](#decisions-and-review-items) record both. The plan's
 resolved decisions are not rewritten.
 
+## Revision, 2026-09-14
+
+A decision after the [measurement](measurement-results.md) adopted option 2 for
+the configuration row. A post-write hook exists to verify module exports and
+their use; a `tsconfig.json` edit is not that kind of change, and its verdict is
+not needed at once.
+
+- **The hook answers immediately.** A synchronized check whose expectations name
+  a configuration path, one the contexts' configuration path pattern matches or
+  one the acquisition observed with the configuration role, is answered at once
+  as unavailable with the reason `configuration-changed`, which the CLI reports
+  as a not-checked outcome with exit code 2. The named paths still queue their
+  update, so a later request waits for that revision and is answered under the
+  new configuration. A whole-project report request still waits for its capture.
+  The [CLI invocation contract](../../../architecture/cli-invocation.spec.md)
+  and the [daemon architecture](../../../architecture/daemon.md#fast-incremental-checks)
+  state the rule.
+- **Iteration 6 is withdrawn.** `0cc2077` is reverted. A configuration edit is
+  structural again: the observer acquires the project on a fresh capture and
+  reports the reacquisition, so iteration 5's sweep skip applies to it once
+  more and the saving the estimates below recorded as **not met** applies again.
+  `InventoryUpdate.configuration`, the re-read, projection and resolution-refresh
+  functions and the retained product's `requests` and `selection` left with it.
+  SE-15 and SE-16 and their tests are withdrawn with the iteration, and the
+  iteration 5 SE-13 tests are back to a `target` edit reporting `reacquired: true`.
+  The solution-style refusal on the rebuild path keeps its own evidence, the
+  SE-5 acquisition case of `resolve-root.test.ts`.
+- **Kept from iteration 5:** the compiler options fix `76728ac` and the sweep
+  skip `387ddc0`. Kept from the differential test: `ff22508`, the invalid local
+  update and `InvalidAcquisition.parseInvalid`.
+- **Decisions.** Resolved decision 7 is superseded. Review decision 3, the helper
+  spawn on a configuration edit, is moot: the kept path that paid for it is gone.
+  The configuration row leaves resolved decision 1's 2 s acceptable-time budget.
+- **Commits.** `1d8de4d` the revert, `e81d3fa` the immediate reply, `59c42f4`
+  the measurement assertions, and the document updates.
+
 ## Delivered repairs
 
 | Hypothesis | Verdict in the plan | Repair | Iteration | Source commits | Results |
@@ -24,7 +60,7 @@ resolved decisions are not rewritten.
 | 3 Broad analysis re-extracts every owner | confirmed | membership witness, `FactIndexes.contributors`, and the description set's completion rule for extensionless specifiers | 3 | `9ae894e`, `39d8d20` | [iteration 3](iteration3-results.md) |
 | 2 and 3 The whole invalidation | rejected as stated; confirmed | `membership` path: one incremental compiler update, retirement by marking, narrowed description, interpretation and decisions; reference session about 1,140 to 260 ms in process | 4 | `8143956`, `6c460c3` | [iteration 4](iteration4-results.md) |
 | 5 Configuration edits, sweep | confirmed | a capture skips its configuration-only sweep after an update that reacquired the project; also the compiler options defect fix | 5 | `76728ac`, `387ddc0` | [iteration 5](iteration5-results.md) |
-| 5 Configuration edits, inventory | confirmed | an edit that keeps the selection projection and the helper's requests keeps the inventory and capture; S100 update about 3,300 to 2,270 ms in process | 6 | `0cc2077` | [iteration 6](iteration6-results.md) |
+| 5 Configuration edits, inventory | confirmed | an edit that keeps the selection projection and the helper's requests keeps the inventory and capture; S100 update about 3,300 to 2,270 ms in process. **Withdrawn and reverted by the [revision](#revision-2026-09-14)** | 6 | `0cc2077`, reverted by `1d8de4d` | [iteration 6](iteration6-results.md) |
 
 ## Matrix evidence
 
@@ -44,10 +80,10 @@ Line numbers are at `72c2b9b`, the last commit before this closure.
 | SE-10 `membership-path-narrow` | `session-revision.test.ts:103` `membership-path-narrow: a created and a deleted file update the compiler once without a whole invalidation and check only the affected files`; `:744` `membership-path-narrow, broad-kept: matching completes recorded bases and stems, and the reach rule names each unbounded update`; `subs/analysis/src/tests/retained-session.test.ts:195` `takes the metadata path for a README edit, the membership path for created and deleted files and the broad path for a reopened compiler` |
 | SE-11 `membership-sequences-equal-batch` | `subs/analysis/src/tests/session-audit.test.ts:10` `membership-sequences-equal-batch: retires obsolete compiler observations after deleting the last source, restoring it and removing a whole module`; `:16` `membership-sequences-equal-batch: equals batch and keeps the current sequence after each of fourteen source, description, metadata, membership and structural steps` |
 | SE-12 `broad-kept` | `session-revision.test.ts:779` `broad-kept: structural, configuration, non-owned, unknown, unexplained and area changes keep the whole invalidation`; `:811` `broad-kept: a membership change the facts or the compiler cannot bound falls back to the whole invalidation`; `:744` above |
-| SE-13 `sweep-skipped-after-reacquire` | `covering.test.ts:465` `sweep-skipped-after-reacquire: a configuration event and a hook run one update that reacquired, no sweep, and publish synchronized`; `subs/daemon/src/tests/session-counters.test.ts:127` `sweep-skipped-after-reacquire, sweep-kept: ...`, scripted session; `session-revision.test.ts:1012` `sweep-skipped-after-reacquire: a structural update reports reacquisition, and a sweep of the same capture finds nothing`; `retained-session.test.ts:227` `sweep-skipped-after-reacquire, configuration-projection-unchanged, configuration-projection-changed: ...`. Since iteration 6 the reacquiring edit in the session tests is a selection edit (an added `exclude`), and an options-only `target` edit reports `reacquired: false` |
+| SE-13 `sweep-skipped-after-reacquire` | `covering.test.ts:465` `sweep-skipped-after-reacquire: a configuration event and a hook run one update that reacquired, no sweep, and publish synchronized`; `subs/daemon/src/tests/session-counters.test.ts:127` `sweep-skipped-after-reacquire, sweep-kept: ...`, scripted session; `session-revision.test.ts:1012` `sweep-skipped-after-reacquire: a structural update reports reacquisition, and a sweep of the same capture finds nothing`; `retained-session.test.ts:227`. Iteration 6 made the reacquiring edit in the session tests a selection edit; the [revision](#revision-2026-09-14) restored the `target` edit reporting `reacquired: true` |
 | SE-14 `sweep-kept` | `covering.test.ts:495` `sweep-kept: a matched configuration path the update did not reacquire for still sweeps before the capture is synchronized`; `:515` `sweep-kept: %s still sweeps after a reacquiring update` (watcher overflow before and after); `:528` queue overflow; `:542` cancelled configuration update; `:560` a request that needs a sweep; `:572` `sweep-kept: a cold open acquires in full and leaves no configuration requirement a later update could satisfy`; `retained-session.test.ts:277` `opens over a coherent invalid capture with an invalid revision and recovers on the next update`, whose retry reports `reacquired: false`; `session-counters.test.ts:127` |
-| SE-15 `configuration-projection-unchanged` | `observer.test.ts:279` `configuration-projection-unchanged: an options-only edit keeps the inventory and capture, spawns one helper, walks no directory and reads only the edited file`; `observer.test.ts:318` `... a kept edit of a configuration with references replaces the resolution the invocation check reuses`; `subs/analysis/subs/project/src/tests/project.test.ts:198` and `:221`; `session-revision.test.ts:1091` `configuration-projection-unchanged: an options-only edit keeps the inventory and capture, spawns one helper, invalidates the compiler and publishes the batch inputs`; `retained-session.test.ts:227` |
-| SE-16 `configuration-projection-changed` | `project.test.ts:240` `configuration-projection-changed: an edit of %s is not kept` (seven cases); `project.test.ts:249` `... an edited extended file that changes an exclusion is not kept, and a solution-style rewrite is refused`; `observer.test.ts:337` `configuration-projection-changed: include, files, exclude, outDir, references, extended-file and manifest edits rebuild as a fresh acquisition`; `session-revision.test.ts:1132` `configuration-projection-changed: include, files, exclude, outDir and extended-file edits acquire the project again and equal batch`; `retained-session.test.ts:227`. "Rebuilds as today" holds for the result; the rebuild now spawns the helper twice |
+| SE-15 `configuration-projection-unchanged` | Withdrawn with iteration 6 by the [revision](#revision-2026-09-14); its tests are reverted |
+| SE-16 `configuration-projection-changed` | Withdrawn with iteration 6 by the [revision](#revision-2026-09-14); its tests are reverted |
 | SE-17 `docs-updated` | Review: this closure; the [brief](../../../analysis/structural-edit-latency.md)'s status line; the [optimization analysis](../../../analysis/fast-incremental-checks-optimization.md#structural-edit-repairs) delivery section and deferrals table |
 
 The compiler options defect has its own case:
@@ -74,11 +110,8 @@ The table also lists what the plan did not name.
 | `RevisionPath` adds `membership`; the daemon codec accepts it; the measurement assertions, their evidence test, `resident-reuse.mjs` and the reference harness live case expect it for created and deleted files | [iteration 4](iteration4-results.md#implemented-behavior) | 4 |
 | Hypothesis 5's "the adapter re-parses the configuration on `invalidateAll`" was incomplete. The server kept the previous options, so an options edit never reached the retained compiler, and the session's inputs differed from batch while the audit compared equal. `76728ac` names edited configuration files to the compiler before the whole invalidation, at the cost of one extra snapshot update. S100 was exposed: its configuration sets no `lib` | [compiler options defect](iteration5-results.md#compiler-options-defect-found-by-se-13), [iteration 6](iteration6-results.md#measured-cost) | 5, 6 |
 | Resolved decision 6, conservative reading: only a sweep requirement written solely by configuration or manifest path events is satisfiable (`sweepRequired: 'configuration'`). A batch with any other requirement, a cancellation of such a capture, or a request that needs a sweep keeps the sweep. `#reopen` reports `reacquired: false`; an identical structural update reports `false` | [deviations](iteration5-results.md#deviations), [architecture](../../../architecture/daemon.md#fast-incremental-checks) | 5 |
-| Resolved decision 7: the projection's `files` is the non-owned selection beneath the root; the helper's requests must also be equal; only lone, known configuration changes keep the acquisition; external configuration files take the same path; the re-read refuses solution-style configurations. `InventoryUpdate` local adds `configuration`; the retained product gains `requests` and `selection` | [iteration 6 review items](iteration6-results.md#review-items), [shapes that acquire again](iteration6-results.md#configuration-shapes-that-acquire-the-project-again) | 6 |
-| Iteration 4's handoff said an options-only configuration update must not call `retire`. It calls `retire({ kind: 'all' })`, because the kept capture otherwise holds the previous program's library reads. Resolved decision 2 outranks the handoff | [iteration 6 deviations](iteration6-results.md#deviations) | 6 |
-| A kept configuration update reports `reacquired: false`, because the acquisition table is not verified against the disk. Its capture therefore sweeps again, and iteration 5's saving no longer applies to an options-only edit, the measured configuration row | [sweep decision](iteration6-results.md#sweep-decision-deliverable-3), [architecture](../../../architecture/daemon.md#fast-incremental-checks) | 6 |
-| A changed projection spawns the helper twice, once for the re-read and once for the acquisition; before iteration 6 it spawned once | [iteration 6 deviations](iteration6-results.md#deviations) | 6 |
-| A kept edit of a configuration with references replaces the worker observer's resolution. The daemon's own recorded resolution still resolves again once after such an edit | [iteration 6 review item 6](iteration6-results.md#review-items) | 6 |
+| Every iteration 6 clarification of resolved decision 7, of iteration 4's handoff, of `reacquired: false` on a kept update, of the double helper spawn and of the replaced references seed is **withdrawn** with the iteration by the [revision](#revision-2026-09-14). A configuration edit reacquires, reports `reacquired: true` and skips its configuration-only sweep, as iteration 5 left it | [revision](#revision-2026-09-14), [iteration 6](iteration6-results.md) | 6 |
+| A synchronized check that names a configuration path is answered at once as unavailable with reason `configuration-changed`; `UnavailableReason` and the `ramify.check/1` reason union add it, and no reply shape or codec rule changed | [revision](#revision-2026-09-14) | revision |
 
 **Contract text not updated.** The
 [Plan 5 contracts](../../iteration-5-fast-incremental-checks/contracts.md) still
@@ -108,10 +141,10 @@ or the daemon, except where a worker-hosted session is named.
 | --- | --- | --- |
 | Iteration 2: about 890 ms per S100 created or deleted hook, about 880 ms on the configuration row | Reference replay of a reused resolution about 10 ms to 0.3 ms; no S100 or hook figure | unverified |
 | Iterations 3 and 4: about 1,200 to 1,400 ms on S100 created and deleted | Reference session `total` 1,157 to 271 ms (created) and 1,129 to 259 ms (deleted), promotion about 420 to 40 ms; S100 membership totals 377 to 417 ms, against a measured broad session of 1,780 and 1,852 ms | consistent in process; unverified end to end |
-| Iteration 5: about 260 ms on the S100 configuration row | Reference sweep round trip 264 to 321 ms, worker-hosted in process. Since iteration 6 the options-only edit keeps the capture and sweeps (about 334 ms on S100), so the saving applies only to a selection edit, which now spawns the helper twice | **not met** for the measured row |
-| Iteration 6: about 700 ms on the S100 configuration row | S100 capture 3,300 to 2,601 ms in process, net of the sweep that runs again. The reference capture is about 225 ms slower, 1,643 to 1,870 ms | met in process on S100; **regression** on the reference |
+| Iteration 5: about 260 ms on the S100 configuration row | Reference sweep round trip 264 to 321 ms, worker-hosted in process. Iteration 6 made the options-only edit keep the capture and sweep again; the [revision](#revision-2026-09-14) reverted that, so every configuration edit reacquires and skips its configuration-only sweep once more | applies again after the revision; the measurement found the hook carried no sweep either way |
+| Iteration 6: about 700 ms on the S100 configuration row | S100 capture 3,300 to 2,601 ms in process, net of the sweep that runs again. The reference capture is about 225 ms slower, 1,643 to 1,870 ms | **withdrawn** with the iteration by the [revision](#revision-2026-09-14) |
 | After the plan: created and deleted about 400 to 700 ms | Not measured | unverified |
-| After the plan: configuration about 1,800 ms with iterations 2, 5 and 6 | The estimate counted iteration 5's sweep saving, which no longer applies to this row. The options fix adds one snapshot update. The in-process S100 capture alone, 2,601 ms, exceeds 2 s. The in-process loop at `0da429f`, which includes the options fix, gave 3,300 ms where the measured session work before the plan was 2,644 ms plus the sweep, so this does not settle the hook median | **not supported**; unverified |
+| After the plan: configuration about 1,800 ms with iterations 2, 5 and 6 | The measurement found 1,843 ms on S100 with iteration 6 in place. After the [revision](#revision-2026-09-14) the hook no longer waits for that revision at all, so the figure describes the background revision rather than a hook median | superseded by the revision |
 | Hypothesis 4: promotion names at least four fifths of the reference's time outside the stages | 98.8 % in process; about 50 ms of the measured 456 ms is not attributed | met in process |
 
 The reference configuration row measured 1,872 ms (p90 2,119 ms) before the
@@ -160,11 +193,11 @@ measured.
 | Deferred | Current status |
 | --- | --- |
 | Real-process measurement | Open. The [recipe](#measurement-recipe) below; S500, S1000 and macOS follow the reference and S100 |
-| Avoiding the helper spawn on a configuration edit | Open, review decision 3. The helper is 207 ms on the reference and 308 ms on S100 of the kept update, and an extra spawn on a changed projection |
+| Avoiding the helper spawn on a configuration edit | **Moot** after the [revision](#revision-2026-09-14): the kept path that spawned the extra helper is reverted, and no hook waits for the acquisition |
 | Cheaper replay primitives | Probably superseded by iteration 2 for configurations without references; unmeasured, see [estimates](#estimates-against-the-evidence) |
 | Proportional relink | Open. Link runs on the membership path: about 17 ms on the reference and 80 to 93 ms on S100, in process |
 | Target 6, watcher window | Open, unchanged |
-| Sweep re-hashing only moved files | Open, and more relevant: an options-only configuration capture sweeps again, about 325 ms on the reference and 334 ms on S100 in process |
+| Sweep re-hashing only moved files | Open. The configuration-only sweep is satisfied by the reacquisition again, so the remaining cost is the watcher's own post-hook sweep the measurement recorded, 282 and 285 ms |
 
 ### Plan decisions for review
 
@@ -175,16 +208,14 @@ measured.
    unimplemented on every branch and proceeded. The membership path now handles
    deletions. Whether to confirm, re-scope or withdraw that plan is still to be
    decided.
-3. **Helper spawn on configuration edits.** Open, with the figures above. It is
-   now the main remaining cost of the kept observer update, and the changed
-   projection pays it twice.
-4. **Error attribution.** The project layer refuses with the same codes, as
+3. **Error attribution.** The project layer refuses with the same codes, as
    resolved decision 3 states. On a warm context, a hook after a solution-style
    rewrite now receives a `reported`, unpublished reply with code `internal-error`.
    Batch reports `references-only-configuration`. `ReportDraft.failure` keeps
    only `read-failure`, `changed-input` and `resource-limit`. Before the plan,
    the daemon's resolution refused and returned the batch report as
-   `unresolved`. Iteration 6's re-read path has the same projection. Still open.
+   `unresolved`. Still open; the [revision](#revision-2026-09-14) removed
+   iteration 6's re-read path, which had the same projection.
 
 ### Review items raised by the iterations
 
@@ -207,14 +238,18 @@ measured.
   recomputes through the same compiler; only batch comparison can, which bears
   on resolved decision 2. The pre-plan S100 configuration medians were measured
   on a build with this defect.
-- **Iteration 6.** The `InventoryUpdate` `configuration` field and the product
-  fields. The clarification of resolved decision 7 and of iteration 4's handoff.
-  The net cost on small projects: the reference capture is about 225 ms slower
-  than reacquiring without a sweep, while S100 is about 700 ms faster. Options
-  are to accept it, to reacquire when the inventory is small, or to satisfy the
-  sweep for the inputs the helper answered from the capture; the last needs
-  evidence. The double helper spawn on a changed projection. The references seed
-  replaced in the worker only.
+- **Iteration 6.** Withdrawn with the iteration by the
+  [revision](#revision-2026-09-14), including the `InventoryUpdate`
+  `configuration` field, the product fields, the net cost on small projects, the
+  double helper spawn and the replaced references seed.
+- **Revision, 2026-09-14.** The configuration classification lives in
+  `daemon/contexts`, beside the sweep requirement: the configuration path
+  pattern, or an input the acquisition observed with the configuration role. A
+  hook that names a configuration path before its watcher event still queues an
+  update, and the reply leaves the debounce standing so the watcher's batch
+  coalesces into that one capture. The reference harness's not-checked instance
+  demonstrates the deadline with a source edit and adds the new reason; it was
+  not run in this revision.
 
 ## Remaining gaps
 
@@ -232,9 +267,9 @@ Gathered from each results file. None blocks a matrix row.
 
 **Resolution**
 
-- Configurations with `references` validate by full replay (iterations 2 and 6).
+- Configurations with `references` validate by full replay (iteration 2).
 - A solution-style rewrite is reported as `internal-error` by the session
-  (iterations 2 and 6).
+  (iteration 2).
 
 **Membership path**
 
@@ -258,10 +293,10 @@ Gathered from each results file. None blocks a matrix row.
 - A configuration input read only by the server's project parse, and not by
   the adapter's parse, would not be named to the compiler; none is known
   (iteration 5).
-- A directory created or removed in a helper-walked area since the last
-  acquisition makes the next configuration edit rebuild (iteration 6).
-- A cancelled or failed re-read leaves the edited file refreshed; the session
-  marks itself stale and the next update rebuilds (iteration 6).
+- A hook that names a configuration path is answered before the daemon has
+  established anything about the edit, so an edit that makes the project
+  unreadable or solution-style is reported only to the next request
+  ([revision](#revision-2026-09-14)).
 
 **Measurement tooling** (successor inputs, no change in this iteration)
 
@@ -270,8 +305,11 @@ Gathered from each results file. None blocks a matrix row.
   covered answer's `promotion` and `sweep` are also 0, so the list could include
   them (iteration 1).
 - The assertions expect `membership` for created and deleted rows and `broad`
-  for configuration. No assertion reads `capture.sweep`. One must not assert
-  0 for the configuration row, which sweeps again since iteration 6.
+  for configuration. Since the [revision](#revision-2026-09-14) the
+  configuration row expects an immediate not-checked reply and the revision
+  published behind it. No assertion reads `capture.sweep`; a periodic sweep can
+  coincide with the background capture, so asserting 0 there needs its own
+  evidence.
 
 ## Measurement recipe
 
@@ -347,6 +385,11 @@ configuration on both fixtures:
 | Covered on publication | daemon `coveredRequests` per cycle | as before |
 
 ### Acceptance figures
+
+This recipe was executed on `7080722`; the
+[measurement results](measurement-results.md) record its figures. The
+[revision](#revision-2026-09-14) takes the configuration rows out of the
+budget: a successor re-measures their reply latency and background revision.
 
 Compare these three medians with the 2 s acceptable-time budget, all cycles
 and quiet cycles:

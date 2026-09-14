@@ -4,7 +4,13 @@
 [structural edit latency plan's evidence](../plans/iteration-5-structural-edits/main-plan.md#evidence),
 and the delivered repairs, their in-process figures and the remaining gaps are in
 its [closure](../plans/iteration-5-structural-edits/iterations/closure.md).
-Whether the three S100 rows meet 2 s awaits real-process measurement. This
+The [measurement results](../plans/iteration-5-structural-edits/iterations/measurement-results.md)
+answer the question in real processes: 14 of 14 rows within 2 s, the three S100
+rows at 496, 472 and 1,843 ms. A later
+[revision](../plans/iteration-5-structural-edits/iterations/closure.md#revision-2026-09-14)
+withdrew hypothesis 5's inventory repair and answers a hook that names a
+configuration file at once as not checked, so the configuration row is no
+longer a hook that waits and leaves the budget. This
 brief establishes no capability. It follows the [hook optimization](../plans/iteration-5-hook-optimization/iterations/closure.md)
 and its [measurement results](../plans/iteration-5-hook-optimization/iterations/measurement-results.md).
 

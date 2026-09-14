@@ -12,6 +12,20 @@ regression of iteration 6 does not appear in the hook. Every correctness
 predicate passed. No cycle was contended. S500, S1000, macOS and memory were not
 measured.
 
+**Revision, 2026-09-14.** Every configuration figure below was measured on a
+build with iteration 6 in place, and with a hook that waited for the
+configuration verdict. The
+[closure's revision](closure.md#revision-2026-09-14) changed both: iteration 6
+is reverted, so a configuration edit acquires the project again, and a hook that
+names a configuration file is answered at once as not checked, exit code 2, with
+the daemon's revision published behind the reply. The configuration rows
+therefore no longer measure a hook that waits, and the reference configuration
+regression and review decision 3 they weighed are moot. A successor re-measures,
+in real processes, the configuration hook's reply latency, which should fall to
+about the zero-work client check, and the background revision the daemon
+publishes behind it, including whether its capture still carries no sweep. Every
+other row below stands.
+
 Figures are labelled:
 
 - **measured**: medians from this session's archives, build `7080722`;

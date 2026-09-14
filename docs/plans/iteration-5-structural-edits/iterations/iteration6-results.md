@@ -1,5 +1,14 @@
 # Iteration 6 results: Keep the inventory on an options-only configuration edit
 
+**Withdrawn and reverted, 2026-09-14.** The design decision recorded in the
+[closure's revision](closure.md#revision-2026-09-14) withdrew this iteration:
+a post-write hook now answers a configuration edit at once as not checked, so
+the saving this configuration projection bought is not needed. `0cc2077` was
+reverted by `1d8de4d`, a configuration edit acquires the project again, and
+iteration 5's sweep skip applies to it once more. SE-15 and SE-16 and their
+tests left with it. Iteration 5's compiler options fix `76728ac` stays. What
+follows is the record as written; it no longer describes the implementation.
+
 **Date:** 2026-09-13. **Outcome:** SE-15 and SE-16 pass; every session-equals-batch
 and audit case still passes. An edited configuration file is now read again
 through the helper on the retained capture. The observer keeps the inventory
