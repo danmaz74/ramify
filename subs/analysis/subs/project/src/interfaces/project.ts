@@ -136,10 +136,7 @@ export type InventoryUpdate =
   | { readonly kind: 'unchanged' }
   | { readonly kind: 'local'; readonly inventory: ProjectInventory;
       readonly descriptions: readonly string[]; readonly readmes: readonly string[];
-      readonly created: readonly string[]; readonly deleted: readonly string[]; readonly changed: readonly string[];
-      /** Input labels of edited configuration files read again with an unchanged file selection. The inventory
-       * and the capture were kept; the compiler must read the configuration again. Never beside another change. */
-      readonly configuration: readonly string[] }
+      readonly created: readonly string[]; readonly deleted: readonly string[]; readonly changed: readonly string[] }
   | { readonly kind: 'structural'; readonly inventory: ProjectInventory }
   | { readonly kind: 'invalid'; readonly inventory: ProjectInventory | null; readonly issues: readonly ProjectIssue[] }
   | { readonly kind: 'incomplete'; readonly issues: readonly ProjectIssue[] };

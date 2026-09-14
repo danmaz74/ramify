@@ -20,10 +20,7 @@ their evidence and diagnostic identities match a fresh pass. An update that only
 creates or deletes owned sources takes the `membership` path: one incremental
 compiler update, then only the files whose resolution those paths can change are
 described and interpreted. A membership change whose reach the retained facts or
-the compiler cannot bound takes the broad path instead. A configuration edit that
-leaves the file selection unchanged keeps the inventory and the capture; the
-broad path then retires the previous compiler reads and invalidates the whole
-program. Every revision
+the compiler cannot bound takes the broad path instead. Every revision
 carries its checked set, finding delta and timings; `report` materializes the
 `ramify.analysis/1` document of a retained revision on request, equal to
 `analyzeProject` over the same inputs except `runId`, and `verify` recomputes

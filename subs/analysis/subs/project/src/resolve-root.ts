@@ -3,7 +3,7 @@ import { performance } from 'node:perf_hooks';
 import { Capture } from './capture.js';
 import { AcquisitionError, freeze } from './data.js';
 import { selectRoot, findConfiguration } from './selection.js';
-import { readConfiguration, solutionStyle } from './configuration.js';
+import { readConfiguration } from './configuration.js';
 import type { AcquisitionLimits, ProjectRequest, ProjectResolution } from './interfaces/project.js';
 
 type Resolved = Extract<ProjectResolution, { status: 'resolved' }>;
@@ -26,8 +26,6 @@ export interface AnsweredQueries {
 interface ResolutionEvidence {
   readonly request: string;
   readonly replay: AnsweredQueries;
-  /** The replay holds every query, including the configuration's content. */
-  readonly full: boolean;
 }
 /** Keyed by the frozen resolution object: evidence leaves with the resolution it describes. */
 const evidence = new WeakMap<Resolved, ResolutionEvidence>();
@@ -61,32 +59,9 @@ export async function resolveCapturedRoot(capture: Capture, request: ProjectRequ
 export function recordResolution(capture: Capture, request: ProjectRequest, resolution: Resolved,
   discovery: AnsweredQueries, references: boolean): Resolved {
   const frozen = freeze(resolution);
-  evidence.set(frozen, { request: requestKey(request), full: references,
+  evidence.set(frozen, { request: requestKey(request),
     replay: references ? { observations: capture.observations(), answers: capture.answers } : discovery });
   return frozen;
-}
-
-/**
- * A resolution to keep after its configuration was read again with the same
- * requests and an equal selection projection. Discovery evidence holds no
- * configuration content and is returned unchanged. Evidence that holds every
- * query is replayed on a fresh capture, and an equal resolution is recorded with
- * what the queries answer now; a failed replay keeps the resolution, which then
- * no longer validates and resolves again.
- */
-export async function refreshResolution(request: ProjectRequest, resolution: Resolved, signal?: AbortSignal): Promise<Resolved> {
-  const recorded = evidence.get(resolution);
-  if (!recorded?.full || recorded.request !== requestKey(request)) return resolution;
-  const capture = new Capture(resolution.root, limits, performance.now() + limits.deadlineMs, signal);
-  try {
-    await capture.replay(recorded.replay.observations);
-    const frozen = freeze({ ...resolution });
-    evidence.set(frozen, { ...recorded, replay: { observations: recorded.replay.observations, answers: capture.answers } });
-    return frozen;
-  } catch (error) {
-    if (signal?.aborted) throw signal.reason ?? error;
-    return resolution;
-  } finally { await capture.dispose(); }
 }
 
 /** Concurrent replays of one validation. Answers are compared by path, so order is immaterial. */
@@ -130,9 +105,9 @@ export async function resolveProjectRoot(request: ProjectRequest, signal?: Abort
   try {
     const { resolution: selected, discovery } = await resolveCapturedRoot(capture, request);
     if (await capture.kind('module.ramify') === 'symlink') throw new AcquisitionError('symlink-description', 'module.ramify', 'Invalid module boundary: symlink-description');
-    const { data: config } = await readConfiguration(capture, selected.configuration);
-    const refusal = solutionStyle(selected.configuration, config);
-    if (refusal) throw refusal;
+    const config = await readConfiguration(capture, selected.configuration);
+    if (config.references.length && !config.files.length) throw new AcquisitionError('references-only-configuration', selected.configuration,
+      `Solution-style configurations are unavailable; referenced configurations: ${config.references.join(', ')}`);
     return recordResolution(capture, request, selected, discovery, config.references.length > 0);
   } catch (error) {
     if (signal?.aborted) throw signal.reason ?? error;

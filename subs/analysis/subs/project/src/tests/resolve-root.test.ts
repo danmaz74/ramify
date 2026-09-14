@@ -93,8 +93,7 @@ describe('reused project-root resolution', () => {
       expect(both.value).toBe(first.value); expect(both.helpers).toBe(0);
       // An observer's acquisition records the same resolution evidence, and a
       // structural rebuild replaces it with its own. A configuration content
-      // edit is not a discovery answer, so both remain valid. An options-only
-      // edit keeps the acquisition and its resolution; a changed exclusion rebuilds.
+      // edit is not a discovery answer, so both remain valid.
       const observed = await observeProject({ request, limits, parse: syntax });
       if (observed.status !== 'observing') throw new Error(JSON.stringify(observed));
       try {
@@ -103,9 +102,6 @@ describe('reused project-root resolution', () => {
         const reused = await spawned(() => resolveProjectRoot(request, undefined, [seeded]));
         expect(reused.value).toBe(seeded); expect(reused.helpers).toBe(0);
         await writeFile(join(root, 'tsconfig.json'), '{"compilerOptions":{"types":[],"module":"ESNext","moduleResolution":"bundler","strict":true},"include":["src"]}\n');
-        expect(await observed.observer.apply([{ path: 'tsconfig.json', kind: 'changed' }])).toMatchObject({ kind: 'local', configuration: ['tsconfig.json'] });
-        expect(observed.observer.resolution).toBe(seeded);
-        await writeFile(join(root, 'tsconfig.json'), '{"compilerOptions":{"types":[],"module":"ESNext","moduleResolution":"bundler","strict":true},"include":["src"],"exclude":["src/generated"]}\n');
         expect((await observed.observer.apply([{ path: 'tsconfig.json', kind: 'changed' }])).kind).toBe('structural');
         const rebuilt = observed.observer.resolution;
         expect(rebuilt).not.toBe(seeded);
