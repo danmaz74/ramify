@@ -211,4 +211,7 @@ here.
 
 ## Audit
 
-PLACEHOLDER
+The cucumber-viz commit audit of `81a7d18`, with `use_existing_head`, passed in
+3 min 15 s: worktree dependencies, type-check and the Vitest regression suite.
+Evidence: `refs/audited/runs/2026-09-14T05-59-54Z-81a7d18`. This section is a
+docs-only follow-up.
