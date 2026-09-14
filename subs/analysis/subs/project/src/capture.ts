@@ -226,29 +226,32 @@ export class Capture {
     if (old) return old;
     if (this.#closed) throw new AcquisitionError('read-failure', path, 'Cannot capture new bytes after sealing');
     const operation = (async () => {
-      const handle = await open(entry.path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK).catch(error => { throw new AcquisitionError('read-failure', entry.path, `Cannot read input: ${String(error)}`); });
+      // Forget the pending read however it ends, a failed open included, so a later read retries the disk.
       try {
-        const stat = await handle.stat();
-        if (!stat.isFile()) throw new AcquisitionError('changed-input', path, 'File kind changed before capture');
-        if (stat.size > this.limits.maxFileBytes) throw new AcquisitionError('resource-limit', path, 'Individual file byte limit exceeded');
-        this.#admit(stat.size, path);
-        // Read only the admitted size; detect growth without unbounded readFile allocation.
-        const buffer = Buffer.alloc(stat.size);
-        let offset = 0;
-        while (offset < buffer.length) {
+        const handle = await open(entry.path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK).catch(error => { throw new AcquisitionError('read-failure', entry.path, `Cannot read input: ${String(error)}`); });
+        try {
+          const stat = await handle.stat();
+          if (!stat.isFile()) throw new AcquisitionError('changed-input', path, 'File kind changed before capture');
+          if (stat.size > this.limits.maxFileBytes) throw new AcquisitionError('resource-limit', path, 'Individual file byte limit exceeded');
+          this.#admit(stat.size, path);
+          // Read only the admitted size; detect growth without unbounded readFile allocation.
+          const buffer = Buffer.alloc(stat.size);
+          let offset = 0;
+          while (offset < buffer.length) {
+            this.check();
+            const read = await handle.read(buffer, offset, buffer.length - offset, offset);
+            if (!read.bytesRead) break;
+            offset += read.bytesRead;
+          }
+          const extra = await handle.read(Buffer.alloc(1), 0, 1, offset);
+          if (offset !== buffer.length || extra.bytesRead || (await this.#disk(entry.path)).signature !== entry.signature) {
+            throw new AcquisitionError('changed-input', path, 'File changed while capturing bytes');
+          }
           this.check();
-          const read = await handle.read(buffer, offset, buffer.length - offset, offset);
-          if (!read.bytesRead) break;
-          offset += read.bytesRead;
-        }
-        const extra = await handle.read(Buffer.alloc(1), 0, 1, offset);
-        if (offset !== buffer.length || extra.bytesRead || (await this.#disk(entry.path)).signature !== entry.signature) {
-          throw new AcquisitionError('changed-input', path, 'File changed while capturing bytes');
-        }
-        this.check();
-        this.#assign(entry, 'bytes', buffer);
-        return buffer;
-      } finally { await handle.close(); this.#reads.delete(entry.path); }
+          this.#assign(entry, 'bytes', buffer);
+          return buffer;
+        } finally { await handle.close(); }
+      } finally { this.#reads.delete(entry.path); }
     })();
     this.#reads.set(entry.path, operation);
     return operation;

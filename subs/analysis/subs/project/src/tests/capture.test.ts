@@ -1,4 +1,4 @@
-import { mkdtemp, rm, symlink, unlink } from 'node:fs/promises';
+import { chmod, mkdtemp, rm, symlink, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { performance } from 'node:perf_hooks';
@@ -14,6 +14,14 @@ afterEach(async () => { await capture.dispose(); await rm(root, { recursive: tru
 
 describe('one captured filesystem view', () => {
   it('retires compiler-only observations while preserving acquisition evidence on shared paths', captureRetirementWitness);
+  it.skipIf(process.getuid?.() === 0)('reads a file again after a failed open instead of keeping the failure', async () => {
+    await put(root, 'value.ts', 'readable');
+    await chmod(join(root, 'value.ts'), 0);
+    try { await expect(capture.readFile('value.ts')).rejects.toMatchObject({ code: 'read-failure' }); }
+    finally { await chmod(join(root, 'value.ts'), 0o644); }
+    // The retry reaches the disk: the restored mode is a change to the captured observation, not the old failure.
+    await expect(capture.readFile('value.ts')).rejects.toMatchObject({ code: 'changed-input' });
+  });
   it('returns captured bytes after an edit and reports changed input at seal', async () => {
     await put(root, 'value.ts', 'before');
     expect(await capture.readFile('value.ts')).toBe('before');
