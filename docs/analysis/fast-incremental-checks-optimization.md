@@ -286,9 +286,15 @@ hook's, 848 to 1,113 ms and 2,150 to 2,464 ms. In all forty delete cycles the se
 publishes a new revision sequence with the same input identity as the first;
 in every other edit class the hook's second update reuses the published
 revision. A repeated deletion is not recognized as identical. The measured
-deleted session-work row is the second revision. The
+deleted session-work row is the second revision. These figures are from the
+2026-09-12 archive. The
+[measurement](../plans/iteration-5-hook-optimization/iterations/measurement-results.md#anomalies)
+on build `4981ed5` did not reproduce the repeated revision, and the
+[structural edit latency plan](../plans/iteration-5-structural-edits/main-plan.md)
+has since replaced deletion handling with its `membership` path, so the
 [repeated deletion plan](../plans/iteration-5-repeated-deletions/main-plan.md)
-investigates and repairs it.
+was withdrawn on 2026-09-14 without starting. What remains of a deleted-file
+cycle is the watcher window of [target 6](#6-watcher-latency).
 
 ## Client cost
 
@@ -529,8 +535,9 @@ Pre-optimization estimates, assuming targets 1 to 5:
 - How much of the agent's context a hook reply occupies: the length of a
   passing reply and the wording and size of a failing one. This is to be
   examined against the priority above, not measured for latency.
-- The cause of the repeated deletion revision, owned by its
-  [plan](../plans/iteration-5-repeated-deletions/main-plan.md).
+- Closed: the repeated deletion revision. It did not recur on build `4981ed5`,
+  the membership path replaced deletion handling, and its
+  [plan](../plans/iteration-5-repeated-deletions/main-plan.md) is withdrawn.
 - The remaining covering limits after `85be06c`: a running idle audit still
   refuses coverage, and a covered request can be refused between the session
   advancing and the context publishing. Target 4 must account for the second.

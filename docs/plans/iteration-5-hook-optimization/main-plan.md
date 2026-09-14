@@ -156,7 +156,7 @@ failures are fixed before the next iteration starts.
 | Real-process measurement | Reference and S100 focused runs, then S500, S1000 and macOS, follow this plan against the 2 s budget. |
 | Sweep re-hashing only moved files | The later step of target 1; after the cached list lands. |
 | Node compile cache, `factBytes` | See the analysis's smaller items. The native client landed separately as the [compiled client](../../architecture/optimization.md#native-client). |
-| Repeated deletion revision | Its own [plan](../iteration-5-repeated-deletions/main-plan.md). |
+| Repeated deletion revision | Closed. It did not recur in the measurement, the membership path replaced deletion handling, and its [plan](../iteration-5-repeated-deletions/main-plan.md) is withdrawn. |
 | Resolution-bounded narrowing | Indicated for created and deleted files; a separate plan. |
 
 ## Handoff

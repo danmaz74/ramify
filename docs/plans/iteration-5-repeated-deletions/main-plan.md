@@ -1,11 +1,24 @@
 # Plan 5 repeated deletion revisions
 
-**Date:** 2026-09-13. **Status:** draft. This plan finds and repairs why a
-deleted-file hook publishes a second broad revision whose inputs equal the
-revision the watcher just published. It adds no capability, owner, package
-entry or wire field. [Plan 5](../iteration-5-fast-incremental-checks/main-plan.md)
-contracts and the [contract remediation](../iteration-5-contract-remediation/main-plan.md)
-remain authoritative.
+**Date:** 2026-09-13. **Status:** withdrawn on 2026-09-14; no iteration ever
+started. The behavior it was written to repair did not occur in the hook
+optimization
+[measurement](../iteration-5-hook-optimization/iterations/measurement-results.md#anomalies)
+on build `4981ed5`, and the
+[structural edit latency plan](../iteration-5-structural-edits/main-plan.md)
+has since replaced deletion handling with its `membership` path. A hook update
+followed by the watcher's update is now the normal shape of a deleted-file
+cycle, and its remaining cost is the
+[watcher-window deferral](../../analysis/fast-incremental-checks-optimization.md#6-watcher-latency),
+target 6 of the optimization analysis. Nothing below was implemented; the text
+stands as the record of what was proposed.
+
+This plan was to find and repair why a deleted-file hook publishes a second
+broad revision whose inputs equal the revision the watcher just published. It
+adds no capability, owner, package entry or wire field.
+[Plan 5](../iteration-5-fast-incremental-checks/main-plan.md) contracts and the
+[contract remediation](../iteration-5-contract-remediation/main-plan.md) remain
+authoritative.
 
 ## Workflow and completion boundary
 

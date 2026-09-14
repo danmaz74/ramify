@@ -315,7 +315,7 @@ within 15% except deleted and configuration, below.
    deleted cycle, on both fixtures, added one revision; the hook's second update
    reused it. The archive's cheap second revision predates `85be06c`. The
    [repeated deletion plan](../../iteration-5-repeated-deletions/main-plan.md)
-   should confirm it against this evidence before starting.
+   was withdrawn on 2026-09-14 against this evidence, without starting.
 2. **Baseline configuration hooks exceed the archive while their session work
    matches it.** Reference: hook 4,699 ms against 3,262 ms, session work
    1,715 ms against 1,662 ms. S100 quiet cycles: hook 8,167 ms against

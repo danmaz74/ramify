@@ -354,8 +354,8 @@ last-in-directory rule handles.
 - **Review decision 2.** The
   [repeated deletion plan](../../iteration-5-repeated-deletions/main-plan.md)
   was never implemented on any branch, so no other edit touches `revise`.
-  Iteration 4 proceeded; the plan can be withdrawn or re-scoped against this
-  path.
+  Iteration 4 proceeded; the plan was withdrawn against this path on
+  2026-09-14.
 
 ## Review items
 
