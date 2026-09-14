@@ -1,8 +1,12 @@
 # Memory lifecycle
 
-**Date:** 2026-09-11. **Status:** Decided resource-management requirements.
-Numeric budgets, idle periods and detailed representations require measurement
-and review before implementation milestones claim these guarantees.
+**Date:** 2026-09-11; revised 2026-09-14. **Status:** Decided resource-management
+requirements, implemented for the resident daemon and its retained analysis
+sessions with the defaults below. Hook latency on the reference and 100-owner
+projects is measured against its acceptable-time budget; memory plateaus, the
+many-context workload and entry footprints of the retained session are not yet
+measured, as the [Plan 5 completion report](../plans/iteration-5-fast-incremental-checks/iterations/iteration13-results.md)
+records. The MCP adapter, unsaved-content overlays and the explorer are not implemented.
 
 The resident daemon should keep only the dependencies and state needed for
 active analysis. Its [client adapters](processes-and-clients.md) have independent
@@ -56,7 +60,7 @@ alone are insufficient when entries contain arbitrarily large source or results.
 
 | State | Owner and required policy |
 | --- | --- |
-| Compiler sessions and source inputs | Analysis/source adapter retains the current state required by each active context, including the state that [fast incremental checks](daemon.md#fast-incremental-checks) depend on. Losing that state makes the next check slower and more conservative, never stale. Dispose inactive sessions; bound the number and total retained size of contexts. Do not create another session per MCP client, browser or query. |
+| Compiler sessions and source inputs | Analysis/source adapter retains the current state required by each active context, including the state that [fast incremental checks](daemon.md#fast-incremental-checks) depend on. Each hot session's TypeScript compiler server is a bounded cost: one server process per hot session, at most `maxHotContexts` of them, each holding one live snapshot. Losing that state makes the next check slower and more conservative, never stale. Dispose inactive sessions; bound the number and total retained size of contexts. Do not create another session per MCP client, browser or query. |
 | Published and candidate analysis | Analysis/context publication retains the current revision and bounded in-flight work. Share unchanged immutable facts where practical; account for temporary overlap during publication. |
 | Historical revisions | Context retention has explicit byte/count/age limits and bounded request leases. Retain identifiers, evidence and supported historical content; do not keep a full compiler program per revision. |
 | Optional enrichment and search | Use lazy, byte-bounded caches keyed by context/generation/revision and query. Cache eviction cannot alter completed enforcement results. |
@@ -111,12 +115,39 @@ contexts with new generations. This automatic idle exit is distinct from both a
 crash and an explicit user stop; clients follow the
 [shutdown and recovery contract](processes-and-clients.md#launch-compatibility-and-shutdown).
 
-Workers and subprocesses are optional analysis execution strategies that require
-evidence. They can improve responsiveness or isolation, but can also duplicate
-compiler state. Bound their count and lifetime; spawning a worker per request is
-not the default architecture. If measurements justify process recycling, preserve
-generation changes and explicit unavailable/reconnect outcomes rather than
-presenting a rebuilt session as the old one.
+Workers and subprocesses can improve responsiveness or isolation, but can also
+duplicate compiler state. Bound their count and lifetime; spawning a worker per
+request is not the architecture. If measurements justify process recycling,
+preserve generation changes and explicit unavailable/reconnect outcomes rather
+than presenting a rebuilt session as the old one.
+
+### Retained sessions and their levels
+
+Each context's retained session runs one worker thread inside a disposable
+supervisor process, and a hot session adds one TypeScript compiler server as a
+child of that process. The compiler server is the largest bounded cost of a warm
+project, so the daemon keeps it only for the most recently used contexts:
+
+| Level | Retains | Transition |
+| --- | --- | --- |
+| Hot | Worker, compiler server, facts, indexes and observer | Demoted to warm when more than `maxHotContexts` contexts are hot, least recently used first, or after `warmIdleMs` without activity. |
+| Warm | Worker, facts, indexes and observer; the compiler server is released | The next update rebuilds the compiler and takes the broad path. Becomes cold after a further `coldRetainMs` without activity. |
+| Cold | A detached current report within the history budget; the session and watcher are released | The generation expires after `coldRetainMs`; new activity reopens the context with a new session. |
+
+| Limit | Default | Enforcement |
+| --- | ---: | --- |
+| `maxHotContexts` | 2 | Contexts holding a compiler server. |
+| `warmIdleMs`, `coldRetainMs` | 600,000 ms, 1,800,000 ms | Idle demotion and expiry. |
+| `workerHeapMiB` | 512 | The worker's effective V8 old-generation limit. Exhaustion is an explicit resource failure, never a pass. |
+| `maxRetainedFactBytes` | 96 MiB | Current and historical facts of one session, accounted at publication; an oversized candidate fails explicitly. |
+| `maxRetainedBytesGlobal` | 512 MiB | Retained bytes across contexts. |
+
+The compiler server's native memory lies outside the worker's heap limit. The
+session status samples its RSS as evidence and enforces no RSS limit. Worker
+failure releases the supervisor's process group, including the compiler server.
+Losing the compiler server fails the next update explicitly, and a later update
+rebuilds it with broad semantics; losing the worker discards the session and the
+context reopens with a new generation. Neither loss can publish stale facts.
 
 ## Measurement and acceptance
 
@@ -276,10 +307,10 @@ table, compiler handle or cross-run cache survives with that report; each later
 batch starts a fresh session. These implementation choices do not establish any
 resident context, history, queue or lease budget.
 
-Plan 2 adds private byte/count-bounded report history and outbound socket helpers,
-but neither is wired into a context manager or daemon host. The
-[resident measurement tooling](../../scripts/measurements/README.md#resident-measurement-checkpoint)
-now archives prerequisite checks, fixture identities and compiled CLI help probes.
-`npm run measure:resident` exits 1 with incomplete evidence: the resident workload
-driver and all nine complete I2-29 measurements remain unimplemented. Its archived
-targets and helper tests do not establish resident budget acceptance.
+Plan 2 wires byte- and count-bounded history and outbound socket limits into the
+context manager and daemon host. `npm run measure:resident` runs its nine
+resident workloads, and `npm run measure:fast` runs Plan 5's nine hook and session
+workloads; both archive raw results as the
+[measurement recipes](../../scripts/measurements/README.md) describe. Only the
+reference and 100-owner hook latency workloads have been measured for the retained
+session; the Plan 5 completion report lists the unexecuted workloads.

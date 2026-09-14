@@ -1,13 +1,15 @@
 # Daemon and analysis architecture
 
-**Date:** 2026-09-11. **Status:** The batch engine is implemented and eleven owners
-are declared. The daemon and contexts owners contain supporting helpers, but
-incremental analysis, context management and the resident service remain
-unimplemented. The process/client split and memory/testing requirements
-are decided in the [architecture overview](README.md). The
+**Date:** 2026-09-11; revised 2026-09-14. **Status:** Implemented across eleven
+owners: the batch engine, the resident daemon with its context manager, service
+and lightweight client, and the retained analysis session that answers the
+bounded hook check. [Implemented retained session](#implemented-retained-session)
+states what Plan 5 delivered. The process/client split and memory/testing
+requirements are decided in the [architecture overview](README.md). The
 [Plan 1 handoff](../plans/done/iteration-1-project-verifier/iterations/iteration15-results.md)
-records batch evidence; the [Plan 2 checkpoint](../plans/iteration-2-resident-verification/iterations/iteration14-results.md)
-records the missing resident providers and outstanding acceptance work.
+records batch evidence, the [Plan 2 remediation](../plans/iteration-2-resident-verification/remediation-2026-09-11.md)
+records resident evidence, and the [Plan 5 completion report](../plans/iteration-5-fast-incremental-checks/iterations/iteration13-results.md)
+records the retained session's evidence and limits. The MCP adapter, unsaved-content overlays and the explorer are not implemented.
 
 The resident design calls for a long-lived local backend that maintains the
 analyzed state of each active project, updates that state as files change, and
@@ -104,19 +106,19 @@ updates before clients ask questions. Frequent queries should usually read an
 already analyzed revision. Required freshness is explicit; being long-lived does
 not make every answer automatically current.
 
-Current batch execution creates a fresh session, analyzes the selected inputs and
+Batch execution creates a fresh session, analyzes the selected inputs and
 disposes it. `createAnalysisSession` admits one `analyze()` call and provides
 idempotent `dispose()`; `analyzeProject` creates and disposes that session for a
-single invocation. Incremental execution will reuse its discovery, linking,
-interpretation, evaluation and reporting implementation. Starting with batch
-implementation is a delivery step toward this architecture, not a decision to
-postpone the daemon indefinitely.
+single invocation. The daemon instead opens one retained analysis session per
+context with `openRetainedSession`, which reuses the same discovery, linking,
+interpretation, evaluation and reporting code over retained per-file facts. The
+[implemented retained session](#implemented-retained-session) describes its
+structure.
 
 ## Ramify's ownership tree
 
 These eleven owners are declared within one toolkit package. The nine batch
-owners are joined by `daemon` and its `contexts` child, whose declarations expose
-only the implemented subset of resident contracts. Every declared owner
+owners are joined by `daemon` and its `contexts` child. Every declared owner
 has `module.ramify`, a purpose `README.md` and its own `src/`, with optional
 `src/interfaces/` and `src/tests/`. Each edge below corresponds to placement under
 the parent's `subs/`. Brackets show module-header tags, not additional syntax.
@@ -124,14 +126,14 @@ The root's declared name is `ramify`, a reserved word, so its header must quote
 the name as `module "ramify" tagged [dispatch]`.
 
 ```text
-ramify [dispatch]                       executable assembly and batch invocation contract
-├── analysis []                         disposable batch sessions and reports
+ramify [dispatch]                       CLI, daemon and batch entries; service vocabulary; assembly
+├── analysis []                         batch sessions, the retained session, reports and its worker host
 │   ├── model [browser]                 identities, registry, exposure and decisions
 │   ├── descriptions [browser]          parsing and description linking
-│   ├── project []                      filesystem inventory, source reads and metadata
-│   └── typescript []                   compiler integration and source-derived facts
-├── daemon [dispatch]                   watcher, clock, discovery and private transport helpers
-│   └── contexts []                     identity, fingerprints, history and controlled test ports
+│   ├── project []                      inventory, source reads, metadata and the project observer
+│   └── typescript []                   compiler integration, per-file descriptions and the retained adapter
+├── daemon [dispatch]                   service, IPC host, client, watcher, clock and discovery
+│   └── contexts []                     contexts, revisions, history, covering and hot and warm levels
 ├── presentation [ui, browser]          reusable diagrams and interaction
 │   └── layout [browser]                framework-independent geometry
 └── cli [dispatch]                      commands, output and client behavior
@@ -152,24 +154,23 @@ web process. Its SDK and protocol state stay outside the resident daemon.
 
 ### Responsibilities and public contracts
 
-Batch signatures and staged resident exposure manifests are implemented in the
-owners' source interfaces and `module.ramify` files. The table distinguishes the
-available resident helpers from the service, context management, incremental
-updates and semantic queries that remain unimplemented.
+Batch, resident and retained-session signatures are implemented in the owners'
+source interfaces and `module.ramify` files. Semantic queries and enrichment
+remain later work.
 
 | Owner | Responsibility | Principal to-parent contract |
 | --- | --- | --- |
-| `ramify` | Assemble the CLI and lazily load batch delivery; own `BatchInvocation`, `BatchResult` and independent service operation/capability/error/result vocabulary. The complete service interface and daemon assembly remain unimplemented; MCP/web entries are later work. | No effective parent exposure; package entry points target the appropriate owners. |
-| `analysis` | Execute the batch pipeline and produce inventory, validation results, snapshots and reports. Affected-work selection and semantic queries remain resident/query work. | `createAnalysisSession`, `analyzeProject`, `validateProject`, `acquireInventory`, and owned analysis vocabulary; later `inspectModule` and `explainAccess`. |
+| `ramify` | Assemble the CLI, daemon and lazily loaded batch entries; own `BatchInvocation`, `BatchResult` and the dispatch-facing `RamifyService` vocabulary; supply the session driver to contexts. MCP/web entries are later work. | No effective parent exposure; package entry points target the appropriate owners. |
+| `analysis` | Execute the batch pipeline; host one retained session per context in a worker, with its revision paths, finding deltas and audit. Semantic queries remain later work. | `createAnalysisSession`, `analyzeProject`, `validateProject`, `acquireInventory`, `resolveProject`, `openRetainedSession`, and owned analysis and session vocabulary; later `inspectModule` and `explainAccess`. |
 | `model` | Canonical model identities, registry and profile rules, mandatory symbol tags, exposure reach, availability and testing-origin decisions. | `buildModel`, `explainImport`, `explainVisibility`, model vocabulary and validation operations. |
 | `descriptions` | Parse version 1 with source locations and comments; resolve exact selections, exposed names and wildcard contracts; produce grounded declarations and diagnostics. | `parseDescription`, `linkDescriptions`, and their input/result vocabulary. |
-| `project` | Select the root and compiler configuration, inventory ownership, validate containment/symlinks and scope, read coherent inputs and extract README purposes. | `readProject`, project input/inventory and metadata contracts. |
-| `typescript` | Own the source compiler helper; resolve exports, originals and resources and interpret source accesses. Retention across updates and optional symbol details remain later work. | `createSourceAnalysis` with `catalog()`, `accesses()` and `dispose()`, plus plain-data source contracts; enrichment remains later. |
-| `daemon` | Implement filesystem watcher and clock ports, discovery, records and private validation, framing, launch, outbound and log helpers. The shared service, in-process binding, host and client remain unimplemented; IPC will delegate to the service and context work to its child. | `createFilesystemWatcher`, `createSystemClock`, `selectEndpoint`, `readDaemonRecord`, independent lifecycle vocabulary and relayed context types/test ports; `startDaemon`, `connectDaemon` and the service factory remain unavailable. |
-| `contexts` | Implement identity/fingerprint primitives, bounded report history and controlled test ports. Context selection, queues, synchronization, publication, leases and eviction remain unimplemented. | Independent identity, selection, fingerprint and port vocabulary, plus controlled test ports; `createContextManager`, complete revision/status contracts and `AnalysisDriver` remain unavailable. |
+| `project` | Select the root and compiler configuration, inventory ownership, validate containment/symlinks and scope, read coherent inputs and extract README purposes; observe one project's inputs for the retained session, including the compiler's reads, and re-observe them in the sweep. | `readProject`, `resolveProjectRoot`, `observeProject`, project input/inventory, observation and metadata contracts. |
+| `typescript` | Own the finite source compiler helper for batch and the retained compiler adapter with one live snapshot; describe exports per file with their dependencies, resolve originals and resources and interpret source accesses. Optional symbol details remain later work. | `createSourceAnalysis`, `createAccessInterpreter`, `describeFiles`, `assembleCatalog`, `createRetainedSourceAnalysis`, plus plain-data source contracts; enrichment remains later. |
+| `daemon` | Implement the shared service and its in-process binding, the IPC host and process entry, the lightweight client, filesystem watcher and clock ports, discovery, records, framing and launch. IPC delegates to the service and context work to its child. | `createDaemonService`, `dispatchServiceRequest`, `startDaemon`, `connectDaemon`, `createFilesystemWatcher`, `createSystemClock`, `selectEndpoint`, `readDaemonRecord`, codec operations, lifecycle vocabulary and relayed context types/test ports. |
+| `contexts` | Select and isolate contexts; order watcher changes and requests per context; publish revisions atomically; keep compact history; apply the covering rule, the sweep schedule, deadlines, leases, the hot and warm levels and eviction. | `createContextManager`, revision/status/outcome vocabulary, the `AnalysisDriver` port and controlled test ports. |
 | `presentation` | Render model data, interactions and teaching examples; report views remain later work. | Selected components explicitly tagged `[ui, browser]` and owned props. |
 | `layout` | Calculate diagram geometry from supplied neutral data. | Selected functions explicitly tagged `[browser]` and owned layout vocabulary. |
-| `cli` | Parse arguments, invoke an injected batch operation, render results and map execution status to exits. Daemon requests, MCP serving and explorer launch remain later work. | `runCli` and its dispatch-classified vocabulary. |
+| `cli` | Parse arguments, send resident checks, hook checks, watch and daemon requests through the injected connector, invoke an injected batch operation, render results and map execution status to exits. MCP serving and explorer launch remain later work. | `runCli` and its dispatch-classified vocabulary, including the `ramify.check/1` document. |
 
 `analysis` owns computational invalidation; `contexts` owns scheduling and
 publication; `daemon` owns process and transport mechanics. There is one authority
@@ -199,15 +200,13 @@ input contracts.
 Root receives the analysis contracts and relays selected analysis types and
 portable model operations to descendants. It also relays the implemented daemon
 and context vocabulary and controlled test ports through daemon's to-parent
-contract. Resident assembly remains unimplemented.
-In the resident design, the `AnalysisDriver` port travels from contexts to daemon
-and then to root; assembly does not import a private grandchild binding. Transport
+contract. The `AnalysisDriver` port travels from contexts to daemon and then to
+root; assembly does not import a private grandchild binding. Transport
 contracts owned by root carry `dispatch`, so untagged analysis and contexts source cannot import
 them even when they are visible from above.
-Root currently exposes independent service operation, capability, error and result
-types to descendants. The complete `RamifyService` interface and daemon bindings
-remain unimplemented; in the resident design, `daemon [dispatch]` imports and
-implements that interface for both IPC delivery and the in-process binding.
+Root exposes the `RamifyService` interface and its operation, capability, error
+and result types to descendants; `daemon [dispatch]` imports and implements that
+interface for both IPC delivery and the in-process binding.
 Root assembly supplies dependencies; the shared validation and routing stay
 inside daemon, as specified by the [service boundary](processes-and-clients.md#shared-service-boundary).
 
@@ -217,9 +216,8 @@ not import a UI symbol. An exposure to descendants reaches all of them, includin
 other compatible UI owners. Named relays make the chosen audience explicit;
 there is no selected-branch permission.
 
-For example, these fragments describe the planned analysis-driver path. Paths
-are relative to the toolkit root; the shown driver/service declarations are not
-implemented in the current source or staged manifests.
+For example, these fragments illustrate the analysis-driver path. Paths are
+relative to the toolkit root; the implemented declarations carry more names.
 
 At `subs/daemon/subs/contexts/module.ramify`:
 
@@ -332,10 +330,11 @@ when established. They retain stage and capability execution, inventory, linked
 contracts, accesses, decisions, diagnostics, warnings and coverage as frozen
 plain data. These batch identities are not context generations or revisions.
 
-[Fast incremental checks](#fast-incremental-checks) are expected to need
-TypeScript program/resolution state retained between revisions; its adapter
-contract and performance still require review. Optional signature rendering may use that
-session or another adapter; a separate `tsserver` process is not a requirement.
+The retained session keeps a warm TypeScript 7.0.2 compiler server between
+revisions behind `createRetainedSourceAnalysis`; the
+[implemented retained session](#implemented-retained-session) describes it.
+Optional signature rendering may use that session or another adapter; a separate
+`tsserver` process is not a requirement.
 Loss of optional descriptions can degrade enrichment alone. Loss of required
 resolution capability cannot masquerade as a completed check.
 
@@ -558,6 +557,96 @@ a fresh batch check.
 A hook check verifies saved files. It does not check unsaved content, block a
 write before it happens or revert the agent's edit.
 
+### Implemented retained session
+
+Plan 5 and its successor plans implement the requirement above. The
+[Plan 5 completion report](../plans/iteration-5-fast-incremental-checks/iterations/iteration13-results.md)
+records the evidence, the measured hook latency and the remaining limits.
+
+**Structure.** Each context owns one retained analysis session, which runs in a worker thread with an enforced V8 heap limit.
+`analysis` starts that thread inside a disposable supervisor process with its
+own process group, so a failed worker cannot leave its children running. The
+worker keeps one warm TypeScript 7.0.2 compiler server as a child process with
+exactly one live snapshot; compiler objects never leave the `typescript`
+adapter, and the daemon's event loop never waits on the compiler. Messages
+between the context and the worker are frozen plain data: changes in, revisions
+and outcomes out. A full report crosses only when a caller requests one. Batch
+checks keep their finite compiler helpers and share the pipeline code.
+
+**Retained facts.** The session retains the observed inputs, per-file export descriptions with the files, resources, shims and absences each one depended on, per-file access facts, the linked model, per-access decisions and reverse indexes.
+The whole-project catalog is the assembly of the per-file descriptions, so batch
+and session produce it with the same code. The project observer records every
+input the analysis used, including the compiler's reads, existence probes and
+directory listings, so a revision's `inputId` equals a batch capture's over the
+same disk state.
+
+**Revision paths.** An update classifies the named changes and takes one of the
+paths `unchanged-surface`, `source`, `description`, `metadata`, `membership` and `broad`:
+
+| Path | Cause | Work |
+| --- | --- | --- |
+| `unchanged-surface` | A source edit that leaves the file's export description and access facts equal by value | Re-extracts that file and refreshes the decisions citing declarations that moved; decides nothing else. |
+| `source` | A source edit that changes exports or accesses | Recomputes descriptions over their dependency closure, re-interprets the changed files and the importers of every description that changed by value, relinks when the link input changed and decides the accesses the change reaches. |
+| `description` | A `module.ramify` edit | Relinks and decides the accesses whose importer or original owner lies in the affected subtree, with no compiler work. |
+| `metadata` | A README edit | Updates purposes, with no compiler, link or decision work. |
+| `membership` | Created or deleted owned sources whose reach the retained facts and the compiler can bound | One incremental compiler update; describes and interprets only the files whose resolution those paths can change. |
+| `broad` | Configuration, dependency or structural changes, a membership change that cannot be bounded, and a rebuilt compiler | Invalidates the program on the warm compiler and re-extracts every owned file; the checked set names every file. |
+
+Every revision carries its checked set, its finding delta against the previous
+revision and its stage timings. Link and model remain whole-project work on every
+path that relinks.
+
+**Audit.** `verify` recomputes every fact from the warm compiler and compares it
+with the retained facts. The daemon runs it on idle, at most once per revision,
+and publishes the recomputed facts with cause `verify` on a mismatch. Because it
+recomputes through the same compiler, the audit cannot detect a compiler holding
+stale options; only a comparison with a batch run over the same inputs verifies
+input identity.
+
+**Covering rule.** A synchronized request names expected content identities. The
+context answers it from the published revision, with no analysis, when that
+revision observed every named path with the expected identity, the list is
+nonempty, the revision carries the requesting lease's invocation, and no known
+influencing change or required sweep is pending. The rule is evaluated when the
+request arrives and again at each publication. Otherwise the request flushes the
+debounce window, adds its paths to the change set and is answered by the revision
+that covers it. A named path the covering revision did not observe is
+`unobserved-input`; a different identity after the update is `superseded`. A
+request naming a configuration path is answered at once, as the requirement above
+states.
+
+**Sweep.** `reobserve` stats every observed path, hashes those whose signature
+changed and reports them as ordinary input changes; it replaces Plan 2's periodic
+verification capture. A periodic sweep starts once `sweepIntervalMs` (30 s) has
+passed since the start of the previous sweep while the context has activity. It
+never makes a covered request wait and never marks the context reconciling. A
+required sweep follows a configuration, manifest or lockfile change, a watcher
+overflow or error, an opening or conservative context, more queued paths than
+`maxQueuedPaths`, and an empty-expectation plain check; a request waits for it.
+An update that acquired the project again satisfies a sweep that only
+configuration or manifest events required.
+
+**Deadlines and levels.** A hook request's deadline defaults to
+`updateDeadlineMs`, 2 s. A cold context that cannot publish in time answers
+`cold`, and a warm context whose update outlasts the deadline answers
+`deadline-exceeded`; in both cases the update continues and publishes. Sessions
+move between hot, warm and cold levels as the
+[memory lifecycle](memory-lifecycle.md#retained-sessions-and-their-levels) states.
+
+**Hook request and reply.** `ramify check --changed <path>...` hashes each named
+file in the CLI, a missing file as absent, and sends one synchronized request with
+`scope: 'delta'`, the expected identities, an optional `since` revision and
+`deadlineMs`. The compact reply names the covering revision's identifier, sequence
+and path, its checked set, every project finding with a `new` mark against `since`
+or the previous revision, removed finding identities, warnings, coverage and
+timings. With `--format json` the CLI writes it as one `ramify.check/1` document.
+The command exits 0 with no finding, 1 with findings or an invalid revision and 2
+when the files were not checked, and it never falls back to batch. The whole
+report is built only for `scope: 'report'`, which the plain `ramify check` requests
+for its unchanged `ramify.analysis/1` document. The
+[CLI invocation contract](cli-invocation.spec.md#hook-and-complete-checks) pairs the
+two forms.
+
 ## Service operations and client behavior
 
 The initial client contract covers these operation families. Exact method names,
@@ -634,9 +723,9 @@ checking and requested optional verifiers retain their separate status in both.
 ## Declaring and verifying the toolkit
 
 Each iteration reviews the declarations and purpose READMEs of the owners it
-implements before their code is moved or written. `npm run check:self` now checks
-the descriptions and owned source of all nine toolkit owners through the compiled
-batch CLI. Self-checking supplements independent fixtures and the reference
+implements before their code is moved or written. `npm run check:self` checks
+the descriptions and owned source of all eleven toolkit owners through the
+resident CLI. Self-checking supplements independent fixtures and the reference
 project's reviewed mutation expectations; the explicit Plan 1 gate remains
 `npm run reference:verify -- --plan 1`.
 
@@ -708,25 +797,24 @@ in the [architecture overview](README.md). Detailed implementation review still
 needs the following without reopening those decisions or the model rules:
 
 1. TypeScript contracts, `module.ramify` manifests and package entries for the
-   resident and later owners. Eleven owners and staged exposures now exist;
-   the complete resident contracts and client package entry remain unavailable.
-2. Incremental adapter contracts and invalidation dependencies, demonstrated on
-   original resolution, resources, wildcard growth and unmarked interfaces.
-   Batch extraction uses the pinned TypeScript 7.0.2 helper integration above.
+   later owners. The eleven resident owners, their final declarations and the
+   eight package entries are implemented and validated.
+2. Narrower invalidation where Plan 5 kept whole-project work: a proportional
+   relink of the model, and a syntactic pre-filter before re-extraction. The
+   retained adapter contract and per-file dependencies are implemented.
 3. Context-to-daemon grouping, endpoint discovery, wire schemas, compatibility
    handling, notification delivery and reconnect behavior. The separate web
    process and its tRPC API, and the separate stdio MCP adapter, are already
    selected. MCP tool/resource schemas and negotiated protocol details remain
    to be specified; optional HTTP hosting is a later extension.
-4. The [fast incremental check](#fast-incremental-checks) path for agent
-   post-write hooks: hook invocation and output, deadline, behavior in a cold
-   context or during recovery, and the measured latency budget. The hook check
-   never uses batch fallback; that part is settled.
-5. Resident resource/retention limits, lease/idle durations and measured latency
-   budgets implementing the memory policy. Batch work limits and measurement
-   outcomes are recorded in the Plan 1 handoff; they do not establish resident
-   budgets. Optional persistent caches and workers require evidence before
-   adding their complexity.
+4. The remaining [fast incremental check](#fast-incremental-checks) evidence:
+   hook latency on 500- and 1,000-owner projects and on macOS. The hook
+   invocation, output, deadline, cold and recovery behavior are implemented, and
+   the reference and 100-owner rows are measured within the 2 s acceptable-time
+   budget.
+5. Measured memory plateaus for the retained session, hot and warm contexts and
+   entry footprints, and any persistent checkpoint of retained facts. Resident
+   retention limits and idle durations are implemented with their defaults.
 6. Registry configuration serialization and ordinary-default replacement. Until
    specified, use defaults or the resolved registry API; invent no accepted syntax.
 7. Scope and algorithm of separate browser-promise verification and richer

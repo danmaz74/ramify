@@ -1,10 +1,10 @@
 # Processes and clients
 
-**Date:** 2026-09-11. **Status:** Batch checking, help and version are implemented.
-Daemon discovery, record and transport helpers exist, but the service, host,
-client and executable daemon entry remain unimplemented.
-The resident/MCP/web topology is decided architecture for later delivery; its
-command spellings, complete contracts and wire details still require review.
+**Date:** 2026-09-11; revised 2026-09-14. **Status:** Batch checking, help and
+version, the resident daemon with its service, IPC host and lightweight client,
+`ramify check` in its complete and hook forms, `watch` and `daemon status`/`stop`
+are implemented. The MCP adapter, unsaved-content overlays and the explorer are not implemented;
+their command spellings, contracts and wire details still require review.
 
 In the resident design, the analysis daemon is the backend. A separate, on-demand
 web process serves visualization. The CLI connects directly to the daemon for
@@ -15,11 +15,11 @@ resident lifetime.
 
 ## Process topology
 
-The current executable creates a fresh batch session for every check. Project
-configuration and source analysis run finite supervised compiler helpers; they
-return plain data and exit during the invocation. No daemon or listener is
-started. The diagram below retains the resident design; its daemon, external
-service client, MCP and web paths are not implemented yet.
+`ramify check` connects to the resident daemon, starting one when needed, and
+the daemon answers from each context's retained analysis session. That session
+runs in a worker thread inside a supervisor process with one compiler server.
+`--batch` creates a fresh batch session whose finite compiler helpers exit during
+the invocation. The diagram's MCP and web paths are not implemented yet.
 
 ```mermaid
 flowchart LR
@@ -39,6 +39,10 @@ flowchart LR
     API[Local service endpoint] --> Contexts[Project contexts]
     Contexts --> Engine[Retained analysis sessions]
   end
+  subgraph SessionProcess[Session supervisor process per context]
+    Worker[Session worker thread] --> Server[Compiler server]
+  end
+  Engine -->|plain-data messages| Worker
   subgraph BatchProcess[CLI process in batch mode]
     Batch[Batch command] --> Fresh[Fresh session of the same engine]
   end
@@ -73,13 +77,12 @@ the [memory lifecycle](memory-lifecycle.md) explains the tradeoff.
 
 ## Shared service boundary
 
-Batch delivery currently injects root's `runBatch` operation into `runCli`.
-It calls `analyzeProject`, which creates and disposes a real analysis session.
-The daemon-owned service and the two bindings described below remain resident
-work; the batch implementation has no context manager or `connectDaemon` entry.
-Root's `src/interfaces/service.ts` currently exports only independent operation,
-capability, error and result types. Daemon's private validator checks request
-shapes, but no service dispatch or complete `RamifyService` interface exists.
+Batch delivery injects root's `runBatch` operation into `runCli`. It calls
+`analyzeProject`, which creates and disposes a real analysis session. Resident
+delivery injects a service connector: root's `src/interfaces/service.ts` defines
+`RamifyService`, and daemon implements it with the two bindings described below.
+Its validator rejects malformed requests, including a hook check's `scope`,
+`since` and `deadlineMs`, as `invalid-request`.
 
 Define one versioned logical analysis service for context lifecycle, input
 synchronization, checks, inspection, explanations and change notifications.
@@ -105,10 +108,9 @@ binding, so importing the client does not load context or compiler assembly.
 The implemented discovery and launcher helpers use Unix domain sockets in a
 private endpoint directory, grouped by package path, version and production
 runtime bytes. Discovery requires a compiled daemon entry, so it rejects the
-current incomplete build. The private codec frames UTF-8 JSON with a four-byte
-big-endian length; decoded values remain `unknown` until message-schema
-validation is implemented. These helpers do not establish a working client or
-service protocol. Their source and limits are described in the
+incomplete build. The codec frames UTF-8 JSON with a four-byte big-endian
+length, and the daemon validates each decoded request before dispatch.
+Their source and limits are described in the
 [daemon owner](../../subs/daemon/README.md). The web/daemon split is fixed
 independently of those details. Selecting tRPC for the browser does not require
 loading the web router or Express into the daemon or ordinary CLI. The MCP SDK
@@ -127,19 +129,16 @@ project state and unavailable execution.
 
 ## CLI commands
 
-`check`, `--help` and `--version` are implemented. Every current check uses a
-fresh batch session, with or without `--batch`, and human output includes
-`Mode: batch`. The parser recognizes `watch` and `daemon status`/`stop`, but
-dispatch reports that the resident service is not implemented, with exit 2.
-Other commands remain unavailable invocations. The table retains the resident
-command design: its daemon-backed `check` behavior and other command names remain
-later work.
+`check` in its three forms, `watch`, `daemon status`, `daemon stop`, `--help` and
+`--version` are implemented. `inspect`, `explain`, `explore` and `mcp` remain
+unavailable invocations; their rows below record the design.
 The implemented invocation contract of `check`, covering root selection,
 configuration discovery, warnings and exits, is [CLI invocation](cli-invocation.spec.md).
 
 | Command | Required behavior |
 | --- | --- |
-| `ramify check` | Connect to a compatible daemon, starting one if necessary; synchronize the requested inputs, obtain the check result, print it and exit. Without `--changed` it is the complete check. With `--changed` it is the bounded check agent post-write hooks run, which requires the [fast incremental check](daemon.md#fast-incremental-checks) path; see [hook and complete checks](cli-invocation.spec.md#hook-and-complete-checks). |
+| `ramify check` | Connect to a compatible daemon, starting one if necessary; synchronize every current input, obtain the whole report, print it and exit. This is the complete check; human output names the revision's path on its `Mode:` line and `--format json` writes the unchanged `ramify.analysis/1` report. |
+| `ramify check --changed <path>... [--since <revision>] [--deadline <ms>] [--format json]` | The bounded hook check agent post-write hooks run, on the [fast incremental check](daemon.md#fast-incremental-checks) path. The CLI hashes each named file relative to the selected root and asks for the first revision covering those identities, waiting at most the deadline (default 2,000 ms). It prints every project finding, marking those new since `--since` or the previous revision; `--format json` writes one `ramify.check/1` document. It never runs a batch analysis. See [hook and complete checks](cli-invocation.spec.md#hook-and-complete-checks). |
 | `ramify inspect ...`, `ramify explain ...` | Query the selected project's analysis with explicit freshness/revision semantics, print the result and exit. |
 | `ramify watch` | Keep a bounded subscription open and render published updates. The daemon owns watching and analysis. |
 | `ramify check --batch` | Load the engine only for this mode, in the CLI process or its Node child, create a fresh session, run the check and dispose it on exit. CI uses this independent mode. |
@@ -148,6 +147,26 @@ configuration discovery, warnings and exits, is [CLI invocation](cli-invocation.
 | `ramify daemon status` | Inspect an existing daemon without starting one or loading an analysis engine merely to report absence. |
 | `ramify daemon stop` | Request shutdown of the selected daemon instance and report completion or failure. Selection must not silently target another compatible instance. |
 | `ramify --help`, `ramify --version` | Run locally without connecting to or starting any server. |
+
+The hook check exits as follows. Findings anywhere in the project fail it, not
+only findings in the named files, so an edit to a provider reports the importer
+it broke.
+
+| Exit | `ramify check --changed` |
+| --- | --- |
+| 0 | A covering revision completed with no finding in the project. |
+| 1 | A covering revision has findings, or it is invalid; the output marks which findings are new. |
+| 2 | Not checked: `cold`, `deadline-exceeded`, `unobserved-input`, `superseded`, `configuration-changed`, `evicted-revision`, an incomplete or unavailable engine outcome, or an unavailable, stopped or incompatible daemon. |
+| 130 | Interrupted. |
+
+`examples/hooks/claude-code-post-write.mjs` is an example host adapter outside
+every owner. It reads a Claude Code `PostToolUse` event on standard input, runs
+`ramify check --changed <file> --format json` from the written file's directory,
+prints new findings on standard error and exits 2 to return them to the agent. A
+checked revision without new findings exits 0 silently, and a check that could
+not finish prints a one-line notice naming the reason and exits 0 so editing
+continues. It imports no toolkit source; its
+[README](../../examples/hooks/README.md) shows the hook configuration.
 
 A command releases its request, subscription and bounded revision references on
 completion, interruption or connection loss. Its completion does not immediately
@@ -306,8 +325,8 @@ into the resident daemon.
 ## Modules and executable entry points
 
 Process placement is separate from the [Ramify ownership tree](daemon.md#ramifys-ownership-tree).
-Eleven owners are declared: the batch owners plus daemon and contexts with
-staged vocabulary, ports and private helpers. Root owns assembly through
+Eleven owners are declared: the batch owners plus daemon and its contexts
+child. Root owns assembly through
 distinct source entry files; it is not one eagerly imported application barrel.
 The installed `bin.ramify` is `dist/src/ramify`, a launcher that runs the
 compiled client for the host when present and otherwise the Node entry.
