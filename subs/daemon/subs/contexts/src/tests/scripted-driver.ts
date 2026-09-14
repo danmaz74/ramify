@@ -10,6 +10,7 @@ export const testBudgets: ContextBudgets = {
   maxRetainedBytesPerContext: 96 * 1024 ** 2, maxRetainedBytesGlobal: 512 * 1024 ** 2,
   maxQueuedPaths: 10_000, maxConcurrentAnalyses: 1, warmIdleMs: 600_000,
   coldRetainMs: 1_800_000, debounceMs: 100, sweepIntervalMs: 30_000, updateDeadlineMs: 2000,
+  demoteDeadlineMs: 5000,
 };
 export function hash(content: string): string { return createHash('sha256').update(content).digest('hex'); }
 
@@ -70,6 +71,8 @@ export function createScriptedDriver() {
   const reportCalls: { readonly root: string; readonly sequence: number }[] = [];
   const verifyCalls: string[] = [];
   const verifyPending: ((session: RetainedSession) => Promise<VerifyOutcome> | VerifyOutcome)[] = [];
+  /** Scripted `releaseCompiler` answers; one that never resolves models an unresponsive session. */
+  const releasePending: ((session: RetainedSession) => Promise<void> | void)[] = [];
   const missingReports = new Set<number>();
   let fallback = capture(1);
   let factBytes = 100;
@@ -160,7 +163,12 @@ export function createScriptedDriver() {
         async releaseRevision(sequence) { entry.releasedRevisions.push(sequence); reports.delete(sequence); },
         status() { return { level, sequence: current?.sequence ?? 0, observedInputs: current?.inputs.length ?? 0,
           factBytes: retainedBytes, worker: { heapUsed: 1000, rss: 2000 }, compiler: { pid: level === 'hot' ? 123 : null, rss: level === 'hot' ? 1000 : null }, lastSweepAt: null }; },
-        async releaseCompiler() { entry.releaseCompilerCalls++; level = 'warm'; },
+        async releaseCompiler() {
+          entry.releaseCompilerCalls++;
+          const next = releasePending.shift();
+          if (next) await next(session);
+          level = 'warm';
+        },
         async dispose() { if (sessionDisposed) return; entry.disposeCalls++; sessionDisposed = true; current = null; currentReport = null; reports.clear(); retainedBytes = 0; },
       };
       const entry: ScriptedSession = { session, project, reportCalls: [], releasedRevisions: [], releaseCompilerCalls: 0, disposeCalls: 0 };
@@ -169,7 +177,7 @@ export function createScriptedDriver() {
     },
     async dispose() { disposed = true; },
   };
-  return { driver, calls, pending, sessions, reportCalls, verifyCalls, verifyPending, missingReports, resolveCalls,
+  return { driver, calls, pending, sessions, reportCalls, verifyCalls, verifyPending, releasePending, missingReports, resolveCalls,
     /** Resolutions actually performed: calls that returned no known resolution. */
     get resolutions() { return resolveCalls.filter(call => !call.reused).length; },
     /** Change the discovery answers: every earlier resolution is invalid, optionally with a moved root. */

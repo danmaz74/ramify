@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { ContextStatus } from '../interfaces/contexts.js';
 import { sessionEnvironment } from './session-fixture.js';
 import { capture, flush, hash } from './scripted-driver.js';
 
@@ -147,6 +148,56 @@ describe('hot and warm session budgets', () => {
       for (let interval = 0; interval < 5; interval++) { e.clock.advance(100); await flush(); }
       expect(e.script.verifyCalls).toHaveLength(1);
       expect(e.status(opened.token)).toMatchObject({ synchronization: 'synchronized', published: { sequence: 1 } });
+    } finally { await e.dispose(); }
+  });
+
+  it('captures a waiting request before another context resumes its background work', async () => {
+    const e = sessionEnvironment({ maxConcurrentAnalyses: 1, sweepIntervalMs: 100, warmIdleMs: 100_000 });
+    try {
+      const first = await e.open('/first'); await flush();
+      const second = await e.open('/second'); await flush();
+      let release!: () => void;
+      const gate = new Promise<void>(resolve => { release = resolve; });
+      e.script.version = 2;
+      e.script.pending.push(async () => { await gate; return capture(2); });
+      const held = e.check(first.token, { mode: 'synchronized', expect: [{ path: 'src/index.ts', sha256: hash('2') }] });
+      await flush();
+      // The first context holds the single analysis slot and its periodic sweep falls due behind it.
+      e.clock.advance(100); await flush();
+      const waiting = e.check(second.token, { mode: 'synchronized', expect: [{ path: 'src/index.ts', sha256: hash('2') }] });
+      await flush();
+      const queued = e.script.calls.length;
+      release(); await flush();
+      expect(e.script.calls[queued]?.inputs.project.root).toBe('/second');
+      expect(await waiting).toMatchObject({ status: 'reported', published: true });
+      expect(await held).toMatchObject({ status: 'reported', published: true });
+    } finally { await e.dispose(); }
+  });
+
+  it('evicts a context whose demotion passes its deadline and reports the unresponsive session', async () => {
+    const e = sessionEnvironment({ maxHotContexts: 2, demoteDeadlineMs: 500, warmIdleMs: 100_000, sweepIntervalMs: 100_000 });
+    try {
+      const first = await e.open('/first'); await flush(); e.clock.advance(1);
+      const states: ContextStatus[] = [];
+      const reasons: string[] = [];
+      const subscription = e.manager.subscribe(first.token, 'observer', event => {
+        if (event.type === 'status-changed') states.push(event.current);
+        if (event.type === 'context-evicted') reasons.push(event.reason);
+      });
+      if ('status' in subscription) throw new Error('Expected a subscription handle');
+      await e.open('/second'); await flush(); e.clock.advance(1);
+      e.script.releasePending.push(() => new Promise<void>(() => { /* An unresponsive session never answers. */ }));
+      const third = await e.open('/third'); await flush();
+      expect(e.status(first.token)).toMatchObject({ demoting: true, unresponsiveSince: null });
+      expect(e.status(third.token).published).toBeNull();
+      e.clock.advance(500); await flush();
+      expect(states.at(-1)).toMatchObject({ demoting: true, unresponsiveSince: 502 });
+      expect(reasons).toEqual(['pressure']);
+      expect(e.manager.status(first.token)).toMatchObject({ status: 'unavailable', reason: 'unknown-context' });
+      // The freed budget lets the waiting context publish and stay hot.
+      expect(e.status(third.token)).toMatchObject({ level: 'hot', published: { sequence: 1 } });
+      const answer = await e.check(third.token, { mode: 'synchronized', expect: [{ path: 'src/index.ts', sha256: hash('1') }] });
+      expect(answer).toMatchObject({ status: 'reported' });
     } finally { await e.dispose(); }
   });
 

@@ -9,7 +9,7 @@ export const contextBudgets: ContextBudgets = Object.freeze({
   maxRetainedBytesPerContext: 96 * 1024 ** 2, maxRetainedBytesGlobal: 512 * 1024 ** 2,
   maxQueuedPaths: 10_000, maxConcurrentAnalyses: 1, warmIdleMs: 600_000,
   coldRetainMs: 1_800_000, debounceMs: 100, maxHotContexts: 2,
-  sweepIntervalMs: 30_000, updateDeadlineMs: 2_000,
+  sweepIntervalMs: 30_000, updateDeadlineMs: 2_000, demoteDeadlineMs: 5_000,
 });
 
 /** Session capacities extend the existing resident dispatch limits. */

@@ -53,7 +53,8 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       pending: { requests, changedPaths: context.paths.size, analysisRunning: !!context.running },
       history: { retained: context.history.count, bytes: context.history.bytes, oldest: context.history.oldest?.revision.revision ?? null },
       retainedBytes: session?.factBytes ?? 0, leases: { subscriptions: context.subscriptions.size, requests },
-      watcher: context.watcherState, openedAt: context.openedAt, lastActivityAt: context.lastActivityAt });
+      watcher: context.watcherState, openedAt: context.openedAt, lastActivityAt: context.lastActivityAt,
+      demoting: !!context.demoting, unresponsiveSince: context.unresponsiveSince });
   }
   function emit(context: LiveContext, event: ContextEvent): void {
     for (const subscription of [...context.subscriptions.values()]) { try { subscription.listener(event); } catch { /* Consumer isolation. */ } }
@@ -88,8 +89,26 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     // The released compiler leaves nothing to audit: a demotion cancels the
     // armed audit rather than letting it run against a warm session.
     cancelAudit(context);
-    const work = session.releaseCompiler(); context.demoting = work;
-    try { await work; } finally { context.demoting = null; if (context.state !== 'evicted') changed(context); }
+    const work = session.releaseCompiler();
+    // A session that does not answer must not hold the hot budget: the deadline
+    // records the unresponsive demotion and evicts the context, whose disposal
+    // ends the worker and its compiler server.
+    const bounded = new Promise<void>(resolve => {
+      let settled = false;
+      const cancelDeadline = clock.schedule(budgets.demoteDeadlineMs, () => {
+        if (settled) return;
+        // A session that no longer holds the compiler answered; only its
+        // acknowledgement is outstanding, which the deadline does not punish.
+        if (context.session?.status().level !== 'hot') { settled = true; resolve(); return; }
+        settled = true; context.unresponsiveSince = clock.now();
+        if (context.state !== 'evicted') { changed(context); evict(context, 'pressure'); }
+        resolve();
+      });
+      const finish = (): void => { if (settled) return; settled = true; cancelDeadline(); resolve(); };
+      void work.then(finish, finish);
+    });
+    context.demoting = bounded;
+    try { await bounded; } finally { context.demoting = null; if (context.state !== 'evicted') changed(context); }
   }
   async function hotBudget(preferred?: LiveContext): Promise<void> {
     const hot = [...contexts.values()].filter(item => item.session?.status().level === 'hot')
@@ -503,12 +522,17 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     if (pumping || disposed) return; pumping = true;
     queueMicrotask(() => {
       pumping = false; if (disposed) return;
-      for (const context of contexts.values()) {
-        if (active >= budgets.maxConcurrentAnalyses) break;
-        if (context.running || context.cooling || context.state === 'cold' || context.state === 'evicted') continue;
-        const request = context.queue.some(entry => !entry.settled && entry.request.freshness.mode === 'synchronized');
-        if (!request && (!(context.background || context.periodicSweepDue) || context.debounce)) continue;
-        track(analyze(context));
+      // Waiting clients come first: one context's background maintenance can
+      // never take the analysis slot from another context's pending request.
+      for (const requests of [true, false]) {
+        for (const context of contexts.values()) {
+          if (active >= budgets.maxConcurrentAnalyses) return;
+          if (context.running || context.cooling || context.state === 'cold' || context.state === 'evicted') continue;
+          const request = context.queue.some(entry => !entry.settled && entry.request.freshness.mode === 'synchronized');
+          if (request !== requests) continue;
+          if (!request && (!(context.background || context.periodicSweepDue) || context.debounce)) continue;
+          track(analyze(context));
+        }
       }
     });
   }
@@ -667,7 +691,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         openedAt: now, lastActivityAt: now, hadLease: false, invocations: new Map([[lease, { project, setup: requestedSetup }]]), resolutions: new Map([[key, resolution]]), subscriptions: new Map(),
         history: createHistory(budgets.maxHistoryRevisions, budgets.maxHistoryBytes, entry => releaseVersion(context, entry)),
         queue: [], deliveries: new Set(), paths: new Map(), requested: new Map(), watched: null, scope: null, state: 'opening', synchronization: 'initializing', lastValid: null,
-        session: null, publishedSession: null, versions: new Set(), observedSequence: 0, sequence: 0, sweepRequired: true, periodicSweepDue: false, lastSweepAt: now, auditedSequence: 0, auditRequired: false, demoting: null, cooling: false,
+        session: null, publishedSession: null, versions: new Set(), observedSequence: 0, sequence: 0, sweepRequired: true, periodicSweepDue: false, lastSweepAt: now, auditedSequence: 0, auditRequired: false, demoting: null, unresponsiveSince: null, cooling: false,
         watcher: null, watcherState: 'disposed', attaching: false, conservative: true, background: 'open', running: null,
         debounce: null, sweepTimer: null, auditTimer: null, idle: null,
       };

@@ -9,7 +9,7 @@ const budgets: ContextBudgets = {
   maxContexts: 8, maxHotContexts: 2, maxHistoryRevisions: 8, maxHistoryBytes: 1024 ** 2,
   maxRetainedBytesPerContext: 1024 ** 2, maxRetainedBytesGlobal: 8 * 1024 ** 2,
   maxQueuedPaths: 100, maxConcurrentAnalyses: 1, warmIdleMs: 1000, coldRetainMs: 2000,
-  debounceMs: 10, sweepIntervalMs: 100, updateDeadlineMs: 2000,
+  debounceMs: 10, sweepIntervalMs: 100, updateDeadlineMs: 2000, demoteDeadlineMs: 5000,
 };
 async function flush(): Promise<void> { for (let index = 0; index < 100; index++) await Promise.resolve(); }
 function revision(sequence: number): SessionRevision {

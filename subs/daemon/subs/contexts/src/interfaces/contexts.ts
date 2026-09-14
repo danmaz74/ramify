@@ -99,6 +99,11 @@ export interface ContextStatus {
   readonly watcher: 'active' | 'unavailable' | 'disposed';
   readonly openedAt: number;
   readonly lastActivityAt: number;
+  /** A demotion is in flight: the session was asked to release its compiler. */
+  readonly demoting: boolean;
+  /** When a demotion passed `demoteDeadlineMs` without the session answering;
+   * the context is evicted under pressure at that moment. */
+  readonly unresponsiveSince: number | null;
 }
 export interface ExpectedContent {
   readonly path: string;
@@ -200,6 +205,9 @@ export interface ContextBudgets {
   readonly maxHotContexts: number;
   readonly sweepIntervalMs: number;
   readonly updateDeadlineMs: number;
+  /** How long a demotion waits for the session to release its compiler before
+   * the context is evicted under pressure; the session disposal timeout. */
+  readonly demoteDeadlineMs: number;
 }
 export interface AnalysisDriver {
   /** `known` holds earlier resolutions of an equal request, most recent first. A driver

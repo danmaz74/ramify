@@ -198,7 +198,7 @@ function sessionStatus(value: unknown): boolean {
 }
 function status(value: unknown): boolean {
   return shape(value, ['token', 'selection', 'scope', 'state', 'synchronization', 'published', 'lastValid', 'pending', 'history',
-    'retainedBytes', 'leases', 'watcher', 'openedAt', 'lastActivityAt', 'level', 'session']) && token(value.token) && selection(value.selection) && scope(value.scope)
+    'retainedBytes', 'leases', 'watcher', 'openedAt', 'lastActivityAt', 'level', 'session', 'demoting', 'unresponsiveSince']) && token(value.token) && selection(value.selection) && scope(value.scope)
     && ['opening', 'warm', 'cold', 'evicted'].includes(value.state as string)
     && ['hot', 'warm', 'cold'].includes(value.level as string) && sessionStatus(value.session)
     && ['initializing', 'synchronized', 'reconciling', 'conservative', 'watcher-unavailable'].includes(value.synchronization as string)
@@ -209,7 +209,8 @@ function status(value: unknown): boolean {
     && shape(value.leases, ['subscriptions', 'requests']) && Object.values(value.leases).every(integer)
     && shape(value.history, ['retained', 'bytes', 'oldest']) && integer(value.history.retained) && integer(value.history.bytes)
     && (value.history.oldest === null || string(value.history.oldest))
-    && ['active', 'unavailable', 'disposed'].includes(value.watcher as string);
+    && ['active', 'unavailable', 'disposed'].includes(value.watcher as string)
+    && typeof value.demoting === 'boolean' && (value.unresponsiveSince === null || integer(value.unresponsiveSince));
 }
 function event(input: unknown): boolean {
   const value = input as Record<string, unknown>;

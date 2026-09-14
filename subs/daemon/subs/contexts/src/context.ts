@@ -46,7 +46,10 @@ export interface LiveContext {
    * unavailability alike: the daemon audits a revision at most once. */
   auditedSequence: number;
   auditRequired: boolean;
+  /** The demotion in flight, bounded by `demoteDeadlineMs`. */
   demoting: Promise<void> | null;
+  /** When a demotion passed its deadline without the session answering. */
+  unresponsiveSince: number | null;
   cooling: boolean;
   sequence: number;
   watcher: WatcherHandle | null;
