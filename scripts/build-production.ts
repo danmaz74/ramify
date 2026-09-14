@@ -18,6 +18,9 @@ async function emit(root: string, config: string): Promise<void> {
   if (code !== 0) throw new Error(`Production compiler failed with exit ${code}`);
 }
 
+/** The toolkit's Node CLI entry; selecting it makes the build produce the executable client. */
+export const executableEntry = 'src/cli-entry.ts';
+
 /** Source-entry bootstrap: no operation reads an existing dist file. */
 export async function buildProduction(root: string): Promise<void> {
   root = resolve(root);
@@ -38,16 +41,20 @@ export async function buildProduction(root: string): Promise<void> {
       files: sourceFiles.map(file => join(root, file)), include: [], exclude: [] }, null, 2)}\n`);
     if (sourceFiles.length) await emit(root, config);
     await promoteProductionArtifacts(root, staging, promoted, document.files, manifest);
-    // The launcher is the bin; the Node entry beside it stays directly executable through its shebang.
-    await chmod(join(promoted, 'src/cli-entry.js'), 0o755);
-    // The identity is written after promotion, so no runtime file is newer than it, and is not itself a runtime file.
-    const identity = await describeRuntime(promoted, manifestBytes);
-    const identityFile = join(promoted, runtimeIdentityPath.slice('dist/'.length));
-    const writeIdentity = (value: RuntimeIdentity) => writeFile(identityFile, `${JSON.stringify(value, null, 2)}\n`);
-    await writeIdentity(identity);
-    const client = await compileClient(promoted, workspace, identity.buildIdentity);
-    await writeIdentity({ ...identity, client: { path: `dist/${client}`,
-      sha256: createHash('sha256').update(await readFile(join(promoted, client))).digest('hex') } });
+    // Only a package that selects the CLI entry builds the executable: any other root,
+    // such as a project whose production selection is verified, emits its selected files alone.
+    if (document.files.includes(executableEntry)) {
+      // The launcher is the bin; the Node entry beside it stays directly executable through its shebang.
+      await chmod(join(promoted, 'src/cli-entry.js'), 0o755);
+      // The identity is written after promotion, so no runtime file is newer than it, and is not itself a runtime file.
+      const identity = await describeRuntime(promoted, manifestBytes);
+      const identityFile = join(promoted, runtimeIdentityPath.slice('dist/'.length));
+      const writeIdentity = (value: RuntimeIdentity) => writeFile(identityFile, `${JSON.stringify(value, null, 2)}\n`);
+      await writeIdentity(identity);
+      const client = await compileClient(promoted, workspace, identity.buildIdentity);
+      await writeIdentity({ ...identity, client: { path: `dist/${client}`,
+        sha256: createHash('sha256').update(await readFile(join(promoted, client))).digest('hex') } });
+    }
     // Do not publish artifacts after selected source changed under the build.
     const hashes = new Map(snapshot.inventory.files.map(file => [file.path, file.sha256]));
     for (const file of document.files) {

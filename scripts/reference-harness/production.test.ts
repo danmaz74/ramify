@@ -75,7 +75,8 @@ describe('inventory-driven production build', () => {
     expect(await readFile(join(root, 'dist/src/interfaces/api.js'), 'utf8')).toContain('answer = 42');
     expect(await readFile(join(root, 'dist/src/style.css'), 'utf8')).toBe('.root {}');
     expect(await readFile(join(root, 'dist/src/manual.d.ts'), 'utf8')).toContain('interface Manual');
-    for (const file of ['src/unused.d.ts', 'src/tests/private.js', 'subs/specs/src/check.js', 'subs/specs/src/style.css', 'outside.js']) {
+    // A root that selects no CLI entry gets no executable, launcher mode, runtime identity or compiled client.
+    for (const file of ['src/unused.d.ts', 'src/tests/private.js', 'subs/specs/src/check.js', 'subs/specs/src/style.css', 'outside.js', 'runtime-identity.json', 'src/cli-entry.js']) {
       await expect(stat(join(root, 'dist', file))).rejects.toMatchObject({ code: 'ENOENT' });
     }
     expect(await readdir(join(root, '.reference-work'))).toEqual([]);

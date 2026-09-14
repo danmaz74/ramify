@@ -15,6 +15,7 @@ import type { Assertions, InstanceHandler, ProjectContext } from './runner.js';
 import { clean, sessionReport } from './session-expectations.js';
 import { compilerValid } from './static-expectations.js';
 import { regressionVariants, runTier } from './tiers.js';
+import { compiledClientName } from '../compiled-client.js';
 
 const referenceRoot = join(repositoryRoot, 'examples/collection-review');
 const handlers = new Map<string, InstanceHandler>();
@@ -146,8 +147,9 @@ handlers.set('I1-30:production-selection/toolkit', { ...toolkitFixture, run: asy
   recordObservation('toolkit-production-build', build);
   assertions.equal('actual clean toolkit production build succeeds', [build.code, build.error], [0, null]);
   const emitted = await filesBelow(join(root, 'dist'));
-  const expected = selection.files.flatMap(file => /\.d\.ts$/.test(file) || !/\.tsx?$/.test(file) ? [file]
-    : [file.replace(/\.tsx?$/, '.js'), file.replace(/\.tsx?$/, '.d.ts')]).sort();
+  // Beside the selected files, the toolkit build adds its runtime identity and the host's compiled client.
+  const expected = [...selection.files.flatMap(file => /\.d\.ts$/.test(file) || !/\.tsx?$/.test(file) ? [file]
+    : [file.replace(/\.tsx?$/, '.js'), file.replace(/\.tsx?$/, '.d.ts')]), 'runtime-identity.json', `src/${compiledClientName}`].sort();
   assertions.equal('toolkit build emits precisely the actual selector file set', emitted, expected);
   assertions.equal('production build leaves test discovery complete', await listedTests(root), before);
   const types = await command(root, 'npm', ['run', 'type-check']);
