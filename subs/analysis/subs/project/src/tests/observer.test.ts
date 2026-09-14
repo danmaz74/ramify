@@ -242,7 +242,7 @@ describe('project observer updates', () => {
     expect(observer.inventory).toBe(before);
   });
 
-  it('records a missing exposure target as a reference status, not an invalid update', async () => {
+  it('rejects a local update whose exposure target lost its exact file, as the acquisition does', async () => {
     await put(root, 'subs/child/module.ramify', 'ramify 1\nmodule child\n');
     const observer = await observe({ parse: (file, text) => {
       const parsed = declaration(file, text);
@@ -255,11 +255,12 @@ describe('project observer updates', () => {
     } });
     expect(observer.inventory.references.map(reference => [reference.normalized, reference.status]))
       .toEqual([['subs/child/src/child.ts', 'file']]);
+    const before = observer.inventory;
     await unlink(join(root, 'subs/child/src/child.ts'));
-    const update = local(await observer.apply([{ path: 'subs/child/src/child.ts', kind: 'deleted' }]));
-    expect(update.deleted).toEqual(['subs/child/src/child.ts']);
-    expect(update.inventory.references.map(reference => [reference.normalized, reference.status]))
-      .toEqual([['subs/child/src/child.ts', 'missing']]);
+    const update = await observer.apply([{ path: 'subs/child/src/child.ts', kind: 'deleted' }]);
+    expect(update).toEqual({ kind: 'invalid', inventory: null, issues: [{ code: 'missing-file', path: 'subs/child/module.ramify',
+      message: '3:1: missing source reference "child.ts" (subs/child/src/child.ts)' }] });
+    expect(observer.inventory).toBe(before);
   });
 
   it('leaves an unobserved path unchanged', async () => {

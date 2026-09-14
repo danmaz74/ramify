@@ -312,10 +312,12 @@ class Observer implements ProjectObserver {
     let references: readonly ExactReference[] = this.#inventory.references;
     if (relink) {
       const recomputed: ExactReference[] = [];
-      // A reference issue is a function of its recorded status, which the
-      // inventory carries. Only a layout or description error is an invalid
-      // update; a missing exposure target stays a local inventory change.
-      await exactReferences(this.#capture, nextModules, new Set(nextFiles.map(file => file.path)), [], recomputed);
+      const referenceIssues: ProjectIssue[] = [];
+      // A created, deleted or redeclared file can leave an exposure statement
+      // without its exact file. The acquisition rejects that project, so the
+      // update reports it invalid as well; the session then recomputes it.
+      await exactReferences(this.#capture, nextModules, new Set(nextFiles.map(file => file.path)), referenceIssues, recomputed);
+      if (referenceIssues.length) return freeze({ kind: 'invalid', inventory: null, issues: referenceIssues.sort(issueOrder) });
       references = recomputed;
     }
     const inventory: ProjectInventory = freeze({

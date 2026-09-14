@@ -46,6 +46,8 @@ export interface InvalidAcquisition {
   readonly issues: readonly AnalysisDiagnostic[];
   readonly inventory: ProjectInventory | null;
   readonly inputs: readonly CapturedInput[];
+  /** A description failed to parse. Any other invalid acquisition leaves the parse stage blocked. */
+  readonly parseInvalid: boolean;
 }
 export interface SessionFacts {
   readonly registry: ResolvedTagRegistry;
@@ -223,7 +225,10 @@ function driveReport(facts: SessionFacts, request: AnalysisInputs, snapshot: boo
     if (facts.invalid.inventory) draft.inventory(facts.invalid.inventory, snapshot);
     draft.record(facts.invalid.issues);
     draft.stage('acquisition', 'invalid', draft.diagnostics);
-    if (facts.invalid.issues.some(item => item.category === 'description')) {
+    // The batch run marks the parse invalid only where a description failed to
+    // parse. A description diagnostic of a validated layout, such as an
+    // exposure statement whose source file is missing, leaves parse blocked.
+    if (facts.invalid.parseInvalid) {
       draft.stage('parse', 'invalid', draft.diagnostics.filter(item => item.category === 'description'));
     }
     draft.execution = 'invalid';

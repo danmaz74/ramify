@@ -89,10 +89,13 @@ export async function acquisitionDiagnostics(parsed: ReadonlyMap<string, ParsedD
   return projectDiagnostics(inventory, issues, parsed);
 }
 
+/** Whether an acquisition's issues report a description the parser refused, as the batch run's parse results do. */
+export const parseRefused = (issues: readonly ProjectIssue[]): boolean => issues.some(issue => issue.code === 'invalid-description');
+
 /** Facts of an invalid acquisition: no model, results or decisions. */
 export function invalidFacts(state: SessionState, issues: readonly AnalysisDiagnostic[], inventory: ProjectInventory | null,
-  inputs: readonly CapturedInput[] = []): SessionFacts {
-  return deepFreeze({ registry: state.registry, invalid: { issues, inventory, inputs }, inventory: state.facts?.inventory ?? null,
+  parseInvalid: boolean, inputs: readonly CapturedInput[] = []): SessionFacts {
+  return deepFreeze({ registry: state.registry, invalid: { issues, inventory, inputs, parseInvalid }, inventory: state.facts?.inventory ?? null,
     areas: [], areaIssues: [], files: {}, catalog: emptyCatalog, linked: null, linkIssues: [], model: null, decisions: {}, indexes: emptyIndexes });
 }
 
@@ -113,7 +116,8 @@ export async function captureInvalidFacts(state: SessionState, signal?: AbortSig
     throw Object.assign(new Error(acquired.issues.map(issue => issue.message).join('; ')),
       { code: acquired.issues[0]?.code ?? 'read-failure' });
   }
-  return invalidFacts(state, await acquisitionDiagnostics(parsed, acquired.inventory, acquired.issues), acquired.inventory, acquired.sealedInputs);
+  return invalidFacts(state, await acquisitionDiagnostics(parsed, acquired.inventory, acquired.issues), acquired.inventory,
+    parseRefused(acquired.issues), acquired.sealedInputs);
 }
 
 interface LinkOutcome {

@@ -266,6 +266,33 @@ describe('description, metadata and broad session revisions', () => {
     } finally { await handle.dispose(); }
   }), timeout);
 
+  it('invalid-exposure-target-equals-batch: deleting a source an exposure statement names publishes the batch validation report, and restoring it recovers', () => fixture(async (root, inputs) => {
+    const { handle, revision: cold } = await opened(inputs);
+    try {
+      // The generated sequences of `membership-differential.test.ts` found this
+      // divergence: the acquisition rejects a statement without its exact file,
+      // so no session path may keep the project valid.
+      await rm(join(root, paths.provider));
+      const invalid = await revised(handle, [paths.provider], 'deleted');
+      expect(invalid.checked.path).toBe('broad');
+      expect(invalid.outcome).toEqual({ execution: 'invalid', check: 'failed', coverage: 'not-run' });
+      expect(invalid.diagnostics.map(item => [item.category, item.code, item.location?.file]))
+        .toEqual([['description', 'missing-file', paths.description], ['description', 'missing-file', paths.description]]);
+      const report = await equalToBatch(handle, inputs);
+      expect(report.inputId).toBeNull();
+      // A validated layout that lost an exposure target fails the acquisition; the parse never runs.
+      expect(report.stages.find(stage => stage.stage === 'parse')).toMatchObject({ status: 'blocked', blockedBy: ['acquisition'] });
+      await audited(handle);
+
+      await put(root, paths.provider, fixtureFiles[paths.provider]!);
+      const recovered = await revised(handle, [paths.provider], 'created');
+      expect(recovered.outcome).toEqual(cold.outcome);
+      expect(recovered.diagnostics).toEqual(cold.diagnostics);
+      await equalToBatch(handle, inputs);
+      await audited(handle);
+    } finally { await handle.dispose(); }
+  }), timeout);
+
   it('stays invalid through source-only and README-only events until the invalid description is repaired', () => fixture(async (root, inputs) => {
     const { handle, revision: valid } = await opened(inputs);
     try {

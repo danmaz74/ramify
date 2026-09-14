@@ -16,7 +16,8 @@ import type { PublishedReport } from './report.js';
 import { auditFacts } from './session-audit.js';
 import type { SessionFacts } from './session-facts.js';
 import { deepFreeze, diagnosticSurface, draftPublication, draftReport, factBytes, sortedPaths } from './session-facts.js';
-import { acquisitionDiagnostics, failureReport, invalidFacts, isCancellation, recomputeAll, revise, wholeCheckedSet, zeroTimings } from './session-revision.js';
+import { acquisitionDiagnostics, failureReport, invalidFacts, isCancellation, parseRefused, recomputeAll, revise, wholeCheckedSet,
+  zeroTimings } from './session-revision.js';
 import type { Computed, SessionState } from './session-revision.js';
 
 /** One published version: the facts a report projection needs, and its measured size. */
@@ -101,7 +102,7 @@ class Session implements RetainedSession {
       // A coherent invalid capture opens a session that retries observation on
       // the next update; it holds the sealed inputs and no compiler.
       this.#sealed = observed.sealedInputs;
-      const facts = invalidFacts(state, issues, observed.inventory, observed.sealedInputs ?? []);
+      const facts = invalidFacts(state, issues, observed.inventory, parseRefused(observed.issues), observed.sealedInputs ?? []);
       const revision = this.#publish({ status: 'computed', facts, checked: { path: 'cold', files: [], accesses: 0, modelRebuilt: false },
         changed: [], timings, positionRefreshed: [] }, observed.sealedInputs ?? [], sealedIdentity(observed.sealedInputs), started);
       if ('report' in revision) return { status: 'reported', report: revision.report };
@@ -391,7 +392,7 @@ class Session implements RetainedSession {
       const identity = sealedIdentity(observed.sealedInputs);
       if (identity === this.#current?.inputId && !changes.length) return { status: 'revised', revision: this.#current, identical: true, reacquired: false };
       this.#sealed = observed.sealedInputs;
-      const facts = invalidFacts(state, issues, observed.inventory, observed.sealedInputs ?? []);
+      const facts = invalidFacts(state, issues, observed.inventory, parseRefused(observed.issues), observed.sealedInputs ?? []);
       const published = this.#publish({ status: 'computed', facts, checked: { path: 'broad', files: [], accesses: 0, modelRebuilt: false },
         changed: sortedPaths(changes.map(change => change.path)), timings, positionRefreshed: [] }, observed.sealedInputs ?? [], identity, started);
       return 'report' in published ? { status: 'reported', report: published.report }
