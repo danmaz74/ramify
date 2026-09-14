@@ -1,6 +1,14 @@
 # Plan 5 contract review package
 
-**Prepared:** 2026-09-11. **Reviewed and revised:** 2026-09-11. **State:**
+**Prepared:** 2026-09-11. **Reviewed and revised:** 2026-09-11.
+**Updated:** 2026-09-14 to the shapes the successor plans left in the source:
+`RevisionPath.membership`, `ProjectObserver.retire` with `ObservationRetirement`,
+`SessionUpdate.reacquired`, `OperationTimings`, `CaptureWork` and its two
+extensions, `RetainedSourceAnalysis.update` returning `reach: MembershipReach`,
+the `configuration-changed` unavailable reason, and resolution reuse validated by
+the discovery snapshot alone. The
+[structural edit latency closure](../iteration-5-structural-edits/iterations/closure.md)
+records why each landed. **State:**
 revised contract package; RP-4 and RP-6 await the user's acceptance before
 implementation of [Plan 5](main-plan.md). The [owner manifest](owners.md),
 [scope and lifecycle decisions](scope.md) and
@@ -87,9 +95,17 @@ export interface RetainedSourceInputs {
   readonly sink: ObservationSink;
   readonly signal?: AbortSignal;
 }
+export interface MembershipReach {
+  readonly added: readonly string[];      // program files outside the owned inventory that entered
+  readonly removed: readonly string[];    // and that left
+  readonly global: readonly string[];     // created or deleted owned files reaching others without a recorded import
+  readonly spelled: boolean;              // false when baseUrl, rootDirs or an unanchored paths mapping can resolve a specifier no candidate spells
+}
 export interface RetainedSourceAnalysis {
   readonly hot: boolean;
-  update(changes: SourceChangeSet, signal?: AbortSignal): Promise<{ readonly snapshot: number; readonly elapsedMs: number }>;
+  // `reach` is present when the update created or deleted files on a warm compiler without a whole invalidation.
+  update(changes: SourceChangeSet, signal?: AbortSignal): Promise<{ readonly snapshot: number; readonly elapsedMs: number;
+    readonly reach?: MembershipReach }>;
   describe(files: readonly string[], signal?: AbortSignal): Promise<{ readonly descriptions: readonly FileDescription[];
     readonly delta: CatalogDelta }>;
   catalog(): SourceCatalog;
@@ -176,6 +192,9 @@ export type InventoryUpdate =
   | { readonly kind: 'structural'; readonly inventory: ProjectInventory }
   | { readonly kind: 'invalid'; readonly inventory: ProjectInventory | null; readonly issues: readonly ProjectIssue[] }
   | { readonly kind: 'incomplete'; readonly issues: readonly ProjectIssue[] };
+export type ObservationRetirement =
+  | { readonly kind: 'all' }        // release every compiler-reported observation now
+  | { readonly kind: 'probes' };    // keep read bytes; mark probes, absences and listings for the next promotion
 export interface ProjectObserver {
   readonly inventory: ProjectInventory;
   readonly resolution: Extract<ProjectResolution, { readonly status: 'resolved' }>;
@@ -183,6 +202,7 @@ export interface ProjectObserver {
   readonly inputId: string;
   readonly sink: ObservationSink;
   apply(changes: readonly ObservedChange[], signal?: AbortSignal): Promise<InventoryUpdate>;
+  retire(retirement: ObservationRetirement): Promise<void>;
   reobserve(signal?: AbortSignal): Promise<readonly ObservedChange[]>;
   readDescription(path: string): Promise<string | undefined>;
   readReadme(path: string): Promise<string | undefined>;
@@ -192,6 +212,13 @@ export type ProjectObserve =
   | { readonly status: 'observing'; readonly observer: ProjectObserver }
   | Exclude<ProjectRead, { readonly status: 'acquired' }>;
 ```
+
+`retire` releases compiler-reported observations before a compiler update that
+reports them again; a released path keeps its acquisition recipe. `apply` never
+retires. The session calls `{ kind: 'probes' }` on a membership change: reads
+are kept, every probe, absence and listing is marked, the next promotion keeps
+each one the compiler reported again and releases the rest. `{ kind: 'all' }`
+restores the acquisition's own observations.
 
 `ObservationSink` is a synchronous port within the worker. `file` records
 actual read bytes; a null hash means no bytes were read, not an absent path.
@@ -221,9 +248,15 @@ that stale inventory is never used to publish valid facts. `readProject` is unch
 `resolution` is the resolution the acquisition behind `inventory` made; a structural
 rebuild replaces it. `resolveProjectRoot(request, signal?, known?)` gains the optional
 `known` resolutions, most recent first: the first recorded for an equal request is
-returned unchanged, with no configuration helper, while every discovery query it made
-answers the same on disk, and it resolves again otherwise. `resolveProject(request,
-control?, known?)` passes `known` through. These additive members follow resolved
+returned unchanged, with no configuration helper, while its recorded discovery
+queries answer the same on disk, and it resolves again otherwise. The recorded
+evidence is the discovery snapshot, the queries `selectRoot` and
+`findConfiguration` made plus the root description's symlink probe: kinds,
+canonical paths and exact-name membership, with no directory listing and no
+configuration bytes. A resolution recorded from a configuration that has
+`references` keeps the full replay instead. Configuration content and directory
+readability are verified by acquisition, which refuses with the same codes.
+`resolveProject(request, control?, known?)` passes `known` through. These additive members follow resolved
 decision 5 of the [hook optimization plan](../iteration-5-hook-optimization/main-plan.md#resolved-decisions).
 
 ## Analysis: the retained session
@@ -239,7 +272,7 @@ export interface SessionLimits {
 }
 export interface SessionInputs extends AnalysisInputs { readonly session: SessionLimits }
 export type SessionChange = ObservedChange;
-export type RevisionPath = 'cold' | 'unchanged-surface' | 'source' | 'description' | 'metadata' | 'broad';
+export type RevisionPath = 'cold' | 'unchanged-surface' | 'source' | 'description' | 'metadata' | 'membership' | 'broad';
 export interface CheckedSet {
   readonly path: RevisionPath;
   readonly files: readonly string[];      // files re-interpreted or described afresh
@@ -269,9 +302,21 @@ export interface SessionRevision {
   readonly delta: FindingDelta;
   readonly timings: RevisionTimings;
 }
+/** Durations of one update or sweep outside `RevisionTimings.total`, in milliseconds.
+ * Each layer adds what it measures; a field is absent where its layer did not run. */
+export interface OperationTimings {
+  readonly invocationCheck: number;       // the engine's invocation check before the update's timer; zero for a sweep
+  readonly promotion: number;             // compiler reads folded into the capture after computation: inside `total`, outside its stages
+  readonly workerStatus?: number;
+  readonly workerRoundTrip?: number;      // request posted to reply received, measured by the daemon-side host
+}
 export type SessionUpdate =
-  | { readonly status: 'revised'; readonly revision: SessionRevision; readonly identical: boolean }
-  | { readonly status: 'reported'; readonly report: AnalysisReport }      // incomplete or unavailable engine outcome, unpublished
+  // `reacquired`: a structural observer update acquired the project again on a fresh, validated
+  // capture and this revision promoted every compiler read into it. False for an identical or
+  // invalid result and for the observation retry of a session opened over an invalid capture.
+  | { readonly status: 'revised'; readonly revision: SessionRevision; readonly identical: boolean;
+      readonly reacquired: boolean; readonly timings?: OperationTimings }
+  | { readonly status: 'reported'; readonly report: AnalysisReport; readonly timings?: OperationTimings }      // incomplete or unavailable engine outcome, unpublished
   | { readonly status: 'cancelled' };
 export type VerifyOutcome =
   | { readonly status: 'equal'; readonly sequence: number; readonly elapsedMs: number }
@@ -290,7 +335,8 @@ export interface RetainedSession {
   readonly current: SessionRevision | null;
   update(changes: readonly SessionChange[], control?: RunControl,
     invocation?: Pick<AnalysisInputs, 'project' | 'capabilities'>): Promise<SessionUpdate>;
-  sweep(control?: RunControl): Promise<SessionUpdate | { readonly status: 'unchanged' }>;
+  /** An unchanged sweep may carry the timings its hosting layers measured. */
+  sweep(control?: RunControl): Promise<SessionUpdate | { readonly status: 'unchanged'; readonly timings?: OperationTimings }>;
   verify(control?: RunControl): Promise<VerifyOutcome>;
   report(control?: RunControl, sequence?: number): Promise<AnalysisReport | null>;
   releaseRevision(sequence: number): Promise<void>;
@@ -331,6 +377,17 @@ Rules:
   publishes a new sequence even with no file changes. It replaces acquisition
   observations, rather than unioning observations from different callers, and
   reuses compiler facts only where their dependencies are unchanged.
+- A local update that only creates or deletes owned source files takes the
+  `membership` path: the compiler receives the created and deleted files and the
+  regenerated roots in one incremental update, with no whole invalidation, and
+  answers with its `reach`. The affected set is those files, every file whose
+  recorded candidates or description dependencies name one of them by completion
+  of a base or a stem, and the importers of the files whose descriptions were
+  recomputed. Observations are retired by `{ kind: 'probes' }`. Every other
+  broad trigger, and a `reach` the facts cannot bound, keeps the whole
+  invalidation.
+- `reacquired` reports that a structural update acquired the project again on a
+  fresh capture, so a required sweep of that capture is already satisfied.
 - `report` materializes the `ramify.analysis/1` report of the current
   revision from retained facts, or the named sequence; null means that
   sequence's facts have been released. It equals `analyzeProject` over the
@@ -379,6 +436,26 @@ export interface AnalysisDriver {
   open(project: ProjectRequest, setup: ContextSetup, control?: RunControl): Promise<SessionOpen>;
   dispose(): Promise<void>;
 }
+/** Session work of one capture: sums over its update and sweep operations in
+ * milliseconds, zero for operations that report none. Only `promotion` lies
+ * inside `RevisionTimings.total`. */
+export interface CaptureWork {
+  readonly invocationCheck: number;
+  readonly promotion: number;
+  readonly workerStatus: number;
+  readonly workerRoundTrip: number;
+  readonly sweep: number;                   // the round trips of the capture's sweep operations, also counted in workerRoundTrip
+}
+export interface WatchBatch { readonly receivedAt: number; readonly flushedAt: number }
+/** `watch` spans the watcher batches the capture consumed, or null without any. */
+export interface CaptureTimings extends CaptureWork { readonly watch: WatchBatch | null }
+/** Work outside `RevisionTimings.total` paid by the capture that answered a request;
+ * zero for an answer from an existing publication. */
+export interface ReplyTimings extends CaptureWork {
+  readonly publication: number;             // fingerprints, history admission and events
+  readonly service?: number;                // added by the daemon service
+  readonly clientTransport?: number;        // added by a socket client connection
+}
 export interface ContextRevision {
   readonly token: ContextToken;
   readonly revision: RevisionId;
@@ -390,6 +467,7 @@ export interface ContextRevision {
   readonly checked: CheckedSet;
   readonly delta: { readonly added: number; readonly removed: number; readonly positionOnly: number };
   readonly timings: RevisionTimings;
+  readonly capture: CaptureTimings;
   readonly outcome: AnalysisReport['outcome'];
   readonly summary: AnalysisSummary;
 }
@@ -411,9 +489,11 @@ export interface CheckDelta {
 export type CheckOutcome =
   | { readonly status: 'reported'; readonly requestId: string; readonly published: true;
       readonly revision: ContextRevision; readonly freshness: FreshnessRecord;
-      readonly delta: CheckDelta; readonly report: AnalysisReport | null }     // report non-null only for scope 'report'
+      readonly delta: CheckDelta; readonly report: AnalysisReport | null;      // report non-null only for scope 'report'
+      readonly timings?: ReplyTimings }
   | { readonly status: 'reported'; readonly requestId: string; readonly published: false;
-      readonly revision: null; readonly freshness: FreshnessRecord; readonly delta: null; readonly report: AnalysisReport }
+      readonly revision: null; readonly freshness: FreshnessRecord; readonly delta: null; readonly report: AnalysisReport;
+      readonly timings?: ReplyTimings }
   | { readonly status: 'pending'; readonly requestId: string; readonly current: ContextStatus }
   | { readonly status: 'superseded'; readonly requestId: string; readonly revision: ContextRevision | null;
       readonly mismatches: readonly { readonly path: string; readonly expected: string | null; readonly observed: string | null }[] }
@@ -432,7 +512,10 @@ export interface ContextStatus { /* Plan 2 members unchanged */ readonly level: 
 ```
 
 `RevisionCause` gains `sweep`; `reused` is removed from `ContextRevision`;
-`UnavailableReason` is unchanged and `unobserved-input` keeps its meaning.
+`unobserved-input` keeps its meaning. `UnavailableReason` gains
+`configuration-changed`: a synchronized request naming a configuration path is
+answered at once and the context updates behind the reply. No reply shape or
+codec rule changed with it.
 `ContextEvent` is unchanged in shape; a `revision-published` event now
 carries the extended header. `AnalysisDriver.resolve` accepts optional `known`
 resolutions of an equal request, most recent first, and returns one unchanged, as
@@ -451,7 +534,14 @@ Manager rules (iteration 9):
   preserving Plan 2's request/report rules.
 - Watcher batches and sweep results become `session.update` calls; the
   manager keeps Plan 2's queue, debounce, cancellation and supersession
-  rules. A synchronized request whose `expect` identities are all covered by
+  rules. A synchronized request whose expectations name a configuration path,
+  one the configuration path pattern matches or one the acquisition observed
+  with the configuration role, is answered at once as unavailable with reason
+  `configuration-changed`; the named paths still queue their update, and the
+  debounce stands so the watcher's batch coalesces into that capture. A
+  required sweep written solely by configuration or manifest path events is
+  satisfied by an update of the same capture that reported `reacquired`; every
+  other required sweep still runs. A synchronized request whose `expect` identities are all covered by
   the published revision is answered from it without an update only when no
   known influencing change or required sweep is pending, with
   `reusedRevision: true`; otherwise its paths join the next update. An empty
@@ -529,17 +619,21 @@ export interface CheckDocument {
   readonly since: RevisionId | null;
   readonly changed: readonly { readonly path: string; readonly sha256: string | null; readonly covered: boolean }[];
   readonly outcome: 'checked' | 'not-checked';
-  readonly reason: 'cold' | 'deadline-exceeded' | 'unobserved-input' | 'superseded' | 'incomplete' | 'unavailable' | 'stopped' | 'incompatible' | 'evicted-revision' | 'resource-unavailable' | 'analysis-failed' | 'unknown-context' | 'expired-generation' | 'unsupported-setup' | 'disposed' | null;
+  readonly reason: 'cold' | 'deadline-exceeded' | 'unobserved-input' | 'superseded' | 'incomplete' | 'unavailable' | 'stopped' | 'incompatible' | 'evicted-revision' | 'resource-unavailable' | 'analysis-failed' | 'unknown-context' | 'expired-generation' | 'unsupported-setup' | 'disposed' | 'configuration-changed' | null;
   readonly execution: AnalysisReport['outcome']['execution'] | null;
   readonly findings: readonly (AnalysisDiagnostic & { readonly new: boolean })[];
   readonly removed: readonly string[];
   readonly warnings: readonly OutsideSourceWarning[];
   readonly coverage: readonly SourceLimit[];
   readonly checked: CheckedSet | null;
-  readonly timings: { readonly daemon: RevisionTimings | null; readonly waitedMs: number; readonly totalMs: number };
+  readonly timings: { readonly daemon: RevisionTimings | null; readonly waitedMs: number; readonly totalMs: number;
+    readonly reply?: ReplyTimings };      // present only when the reported reply carried them
   readonly exitCode: 0 | 1 | 2;
 }
 ```
+
+A `--changed` invocation naming a configuration path is answered as
+`not-checked` with reason `configuration-changed` and exit 2, without waiting.
 
 Human output prints one line per finding with `new` marked, a summary line
 naming the path, the checked set and the wait, and the `Mode:` line. JSON
