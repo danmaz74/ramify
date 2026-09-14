@@ -99,6 +99,20 @@ driven by a throwaway script over `plan5Runtime.handlers`, outside the
 `reference:verify` iteration sets, which would also have run the rest of
 iteration 10; the script is not committed.
 
+### Verification and audit
+
+Focused runs of `subs/analysis/src/tests` (15 files, 230 tests) and of
+`subs/daemon/src/tests`, `subs/daemon/subs/contexts/src/tests`,
+`subs/cli/src/tests` and `src/tests`, whose last filter matched every owner's
+tests (102 files, 1,557 tests). `npm run type-check`, `git diff --check` and
+`npm run build` passed. `npm run check:self` reported 0 errors, 0 warnings and
+0 analysis limits over 11 owners, 284 source files and 3,792 accesses; the
+daemon it started was stopped with `dist/src/ramify daemon stop`. The
+cucumber-viz commit audit of `8a4a776`, run with `use_existing_head` on the
+worktree, passed in 2 min 15 s; evidence
+`refs/audited/runs/2026-09-14T07-57-00Z-8a4a776`. This paragraph and the audit
+row below are a docs-only follow-up.
+
 ## Delivered repairs
 
 | Hypothesis | Verdict in the plan | Repair | Iteration | Source commits | Results |
@@ -219,6 +233,8 @@ measured.
 | 5 | `387ddc0` (with `76728ac`); `0da429f` docs only | PASS, 2 min 10 s | `refs/audited/runs/2026-09-13T21-40-33Z-387ddc0` |
 | 6 | `0cc2077`; `72c2b9b` docs only | PASS, 2 min 26 s | `refs/audited/runs/2026-09-13T22-17-59Z-0cc2077` |
 | 7 | `c28f24a`, this closure and the document updates; the audit record is a docs-only follow-up | PASS, 2 min 41 s | `refs/audited/runs/2026-09-13T22-32-48Z-c28f24a` |
+| revision | `4e442e6`, the revision's document updates | PASS, 2 min 15 s | `refs/audited/runs/2026-09-14T06-50-03Z-4e442e6` |
+| review | `8a4a776`, the failure-code fix, the contract update, the withdrawal and these decisions | PASS, 2 min 15 s | `refs/audited/runs/2026-09-14T07-57-00Z-8a4a776` |
 
 ## Iteration 7 deviations
 
