@@ -108,8 +108,19 @@ childProcesses.spawn = function (...args) {
   }
   return child;
 };
-// Guard alternate launch mechanisms too; the reviewed compiler integration uses spawn.
-for (const method of ['exec', 'execFile', 'fork', 'spawnSync', 'execSync', 'execFileSync']) {
+// The retained session's supervisor is forked and its process-group cleanup lists processes with
+// execFile. Both return a child with a pid, so record them as tracked launches like spawn.
+for (const method of ['fork', 'execFile']) {
+  const original = childProcesses[method];
+  childProcesses[method] = function (...args) {
+    const child = Reflect.apply(original, this, args);
+    record('spawn', { child: child.pid, command: String(args[0]), args: Array.isArray(args[1]) ? args[1] : [], method });
+    child.once('close', (code, signal) => record('child-close', { child: child.pid, code, signal }));
+    return child;
+  };
+}
+// Guard the remaining launch mechanisms; they return no child whose lifetime cleanup could track.
+for (const method of ['exec', 'spawnSync', 'execSync', 'execFileSync']) {
   const original = childProcesses[method];
   childProcesses[method] = function (...args) { record('other-launch', { method }); return Reflect.apply(original, this, args); };
 }

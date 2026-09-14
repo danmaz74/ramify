@@ -136,7 +136,13 @@ for (const instance of plan2Instances.filter(item => /^I2-(19|20|21|22):/.test(i
             const loaded = events.filter(event => event.pid === daemonPid && event.event === 'load').map(event => event.url ?? '');
             a.ok('trace contains actual daemon assembly', loaded.some(url => url.endsWith('/dist/src/resident-assembly.js')));
             a.equal('daemon closure excludes CLI presentation UI and compiler packages', loaded.filter(url => /\/dist\/subs\/(?:cli|presentation|layout|mcp|web)\/|\/node_modules\/(?:react|react-dom|d3-[^/]+|@modelcontextprotocol|typescript|@typescript)\//.test(url)), []);
-            a.ok('compiler work occurs in separate helpers', events.some(event => event.pid === daemonPid && event.event === 'spawn' && event.args?.some(arg => arg.includes('compiler-helper'))));
+            // Compiler work runs outside the daemon: in the session supervisor process it launches, whose
+            // worker starts the compiler server, and in finite configuration helpers.
+            const supervisor = events.find(event => event.pid === daemonPid && event.event === 'spawn' && event.command?.includes('session-supervisor-entry'));
+            a.ok('the daemon launches the session supervisor process', supervisor?.child);
+            const descendants = new Set([supervisor?.child]);
+            for (const event of events) if (event.event === 'spawn' && descendants.has(event.pid) && event.child) descendants.add(event.child);
+            a.ok('compiler work occurs in separate processes', events.some(event => event.event === 'spawn' && descendants.has(event.pid) && event.args?.includes('--api')));
           } else {
             const cli = starts.filter(event => event.argv?.includes('check') && !event.argv?.includes('--batch')).at(-1)!;
             a.ok('resident CLI start was observed', cli);
