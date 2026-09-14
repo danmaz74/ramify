@@ -138,7 +138,7 @@ fully green. Its twelve failures are:
 | --- | --- |
 | `I5-13:hook-latency-s500`, `I5-13:hook-latency-s1000`, `I5-13:checked-set-bounded`, `I5-13:repeated-edit-plateau`, `I5-13:hot-warm-memory`, `I5-13:cold-open`, `I5-13:entry-footprints` | `npm run measure:fast` was not run for these rows, by Dan's decision of 2026-09-14; each is waived by ID, never counted as passed |
 | `I5-13:hook-latency-reference`, `I5-13:hook-latency-s100` | failed in the unfiltered run for lack of evidence; measured afterwards on the same build and passed when re-run alone, see the [addendum](#addendum-2026-09-14-hook-latency-on-the-final-build) |
-| `I5-12:burst-coalesced` | the [open defect](#open-defects) above |
+| `I5-12:burst-coalesced` | failed the reviewed condition that one revision covers the burst; that expectation was [amended](#changed-harness-expectations) by the decision of 2026-09-14 and the instance passes when re-run alone on the amended harness, with hook sequences `[2, 3, 3, 3, 3]` over the two published revisions 2 and 3 |
 | `I5-10:plan2-gate-amended`, `I5-14:plan2-regression` | both run the whole `--plan 2` gate themselves, and that run had no resident measurement report in its environment, so its nine `I2-29` instances failed. `I5-14:plan2-regression` names exactly those nine and nothing else, so every other required Plan 2 instance passed inside this gate |
 
 **`npm run reference:verify -- --plan 2`, with `RAMIFY_RESIDENT_MEASUREMENT_REPORT`
@@ -216,32 +216,11 @@ that justifies it. No assertion was loosened without one.
 | `I5-07:deleted-file` (reviewed row changed) | path `broad`, every owned file and access checked | path `membership`, a checked set naming no file and no access; the file leaves inventory, catalog and coverage and its finding is in `delta.removed` | structural edits SE-9 and SE-10: a referenced and an unreferenced deletion take the `membership` path, and its [amendment of 2026-09-14](../../iteration-5-structural-edits/main-plan.md) keeps a watched removal off the broad path |
 | `I5-05:file-deleted-local` (reviewed row changed) | delete the source an `expose-src` names and expect a `local` update whose references record a missing target | delete a source no exposure names for the `local` update, then delete the exposure target for an `invalid` update carrying the missing source reference, with the previous inventory still current | structural edits `ff22508`: a local update whose exposure target lost its exact file is rejected, as the acquisition rejects it |
 | `I2-03:same-root-reuse` | the second lease's report and its own batch run agree on every field but `runId` | each report states its own invocation, and the declaration, registry, engine, source and configuration input classes agree with that invocation's batch run over shared path labels, excluding `runId` and `inputId` | iteration 13 decision 2 of 2026-09-14: a report carries its own invocation's root selection and `inputId` stays the context's identity, so an invocation's discovery climb is excluded ([daemon](../../../architecture/daemon.md), [CLI invocation contract](../../../architecture/cli-invocation.spec.md)) |
+| `I5-12:burst-coalesced` | one revision covers all five writes and the sequence advances by one | every hook is answered from a revision covering its own identity, none receives `superseded`, and the burst publishes at most two revisions, so the sequence advances by one or two | Dan's decision of 2026-09-14: the daemon's behaviour is kept. A hook arriving while the context holds a pending debounce cancels it and captures at once, which is what keeps every ordinary hook off the watcher's 100 ms window, so the first racing hook publishes its own revision and the hooks that queue behind that capture are answered together from the next one. The expectation now states the bound the design guarantees |
 
 
 
 ## Open defects
-
-**`I5-12:burst-coalesced` fails: a hook racing a write burst splits the burst
-across two revisions.** The instance writes five files inside one 100 ms window
-and runs one `ramify check --changed` hook for each. The context manager clears a
-pending debounce when a request names a path that is not queued yet, so the first
-hook forces a revision at once, carrying the single watcher event that had
-arrived: revision 2 with `changed` naming only `subs/workspace/src/app.tsx`,
-answered in 64 ms. The four other hooks queue their own paths and are answered
-together from revision 3, 329 ms later. Two runs on the final build observed the
-same split. Every hook is answered from a revision covering its own identity,
-every `covered` flag is true, no hook receives `superseded` and the burst carries
-no finding; only the reviewed condition that the sequence advances by one fails
-(`[3, 2, 3, 3, 3]` against `[2, 2, 2, 2, 2]`).
-
-Clearing the debounce is what keeps a hook off the watcher's 100 ms window, so
-coalescing the burst would delay every racing hook by up to that window on the
-plan's central command. The decision needed: either a racing hook waits for a
-pending debounce covering paths it does not name, or the reviewed expectation
-drops the single-revision condition and requires instead that every hook is
-answered from a revision covering its own identity, none is superseded, and the
-burst produces no more revisions than the hooks racing it. Either answer is a
-design change, so it was not made here.
 
 **`I2-29:many-contexts` stalls at the seventh context.** The workload opens eight
 S100 contexts in one daemon, whose budgets allow two hot contexts. The first six
@@ -547,7 +526,12 @@ requires the remaining 166 plus eight distinct counterparts, 174 in all.
 - The deferred resolution-bounded narrowing beyond the membership path's fallbacks,
   the deferred syntactic pre-filter and the deferred persistent checkpoints.
 - The unchanged `unsupported-commonjs` limit.
-- `I5-12:burst-coalesced`, `I2-29:many-contexts` and `I2-29:entry-footprints`, above.
+- `I2-29:many-contexts` and `I2-29:entry-footprints`, above.
+- A burst of writes racing their hooks publishes two revisions rather than one.
+  The refinement to consider if bursts prove common: a racing hook waits only
+  when the pending debounce holds paths its request does not name. It coalesces
+  such a burst into one revision and costs those hooks up to the 100 ms window
+  (decision of 2026-09-14).
 - The session audit cannot detect a retained compiler holding stale options; a
   CI gate comparing a live session with batch remains open (structural edits
   closure).
@@ -640,9 +624,9 @@ withdrawn without starting. Follow-ups the closure hands on: a CI gate comparing
 a live session's `inputId` with a batch run, so a retained compiler holding stale
 options is detected; re-measuring the configuration hook reply, whose recorded
 figures predate the not-checked answer of 2026-09-14; narrowing the full
-resolution replay a configuration with `references` still keeps; and the open
-defect `I5-12:burst-coalesced`, where a hook racing a write burst cancels the
-watcher's debounce and splits the burst across two revisions.
+resolution replay a configuration with `references` still keeps; and the
+refinement `I5-12:burst-coalesced` records, where a hook racing a write burst
+cancels the watcher's debounce and the burst publishes two revisions.
 ```
 
 ### 4. `docs/analysis/fast-incremental-checks.md`

@@ -154,14 +154,30 @@ reference('burst-coalesced', async (root, directory, a) => withLiveProcess(root,
     const failure = outcomes.find(result => result.status === 'rejected');
     if (failure?.status === 'rejected') throw failure.reason;
     const documents = outcomes.map(result => { assert.equal(result.status, 'fulfilled'); return result.value; });
-    const current = await next();
-    a.equal('one publication covers the burst', current.revision.sequence, initial.revision.sequence + 1);
-    a.equal('every hook sees that same revision', documents.map(document => document.revision?.sequence), paths.map(() => current.revision.sequence));
-    a.equal('watch publication names all five changed files', current.revision.changed, [...paths].sort());
-    a.equal('burst has no findings or superseded hook', documents.map(document => [document.reason, document.findings]), paths.map(() => [null, []]));
+    // Decision of 2026-09-14 (Plan 5 iteration 13): a hook arriving while the
+    // context holds a pending debounce cancels it and captures at once, which
+    // keeps every ordinary hook off the watcher's window. A burst therefore
+    // publishes the first racing hook's capture and at most one revision
+    // coalescing the hooks that queued behind it.
     const after = await status(p);
-    a.equal('daemon published only one revision for the burst', after.contexts[0].published?.sequence, current.revision.sequence);
-    recordObservation('live-burst', { paths, writeWindowMs: elapsed, documents,
+    const published = after.contexts[0].published!.sequence;
+    const advance = published - initial.revision.sequence;
+    a.ok('the burst advances the sequence by one or two', advance >= 1 && advance <= 2);
+    const revisions: LiveRevision[] = [];
+    do { revisions.push(await next()); } while (revisions[revisions.length - 1].revision.sequence < published);
+    const current = revisions[revisions.length - 1];
+    const sequences = revisions.map(revision => revision.revision.sequence);
+    a.equal('the watch publishes exactly the burst revisions the daemon counted', sequences,
+      revisions.map((_, index) => initial.revision.sequence + 1 + index));
+    a.equal('every hook is answered from one of the burst revisions',
+      documents.map(document => sequences.includes(document.revision?.sequence ?? -1)), paths.map(() => true));
+    a.equal('every hook is covered by the revision that answered it',
+      documents.map(document => document.changed.every(identity => identity.covered)), paths.map(() => true));
+    a.equal('the burst revisions together name all five changed files',
+      [...new Set(revisions.flatMap(revision => revision.revision.changed))].sort(), [...paths].sort());
+    a.equal('burst has no findings or superseded hook', documents.map(document => [document.reason, document.findings]), paths.map(() => [null, []]));
+    recordObservation('live-burst', { paths, writeWindowMs: elapsed, documents, sequences,
+      hookSequences: documents.map(document => document.revision?.sequence),
       raw: await archiveObservation('live-burst', (await liveTrace(p)).slice(offset)) });
     // Equality is independent of coalescing and uses the same saved bytes.
     await compareAndAudit(p, root, 'burst', current, a);
