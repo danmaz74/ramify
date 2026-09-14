@@ -2927,6 +2927,327 @@
           "passed": false
         }
       ]
+    },
+    {
+      "file": "fast-2026-09-14T17-22-06.117Z-2854649b-cacd-4714-9502-4e5be8b334fd.json.gz",
+      "rawSha256": "bc5766e266833703b32ae464ea46c315fb24142b6159f25b546389ee8f382f85",
+      "gzipSha256": "1ef28b57e0de78dac478b40e07d10bfdad0f2f6a598b4ecdf1d426e7fac16249",
+      "rawBytes": 56508773,
+      "gzipBytes": 2159328,
+      "gzipMembers": [
+        {
+          "offset": 0,
+          "length": 277411,
+          "rawBytes": 4194304,
+          "rawSha256": "d23e5eb07e07bb87736b2d6b5b59ad5bec40ade1e3622efa43a4de7ab7eae362",
+          "gzipSha256": "c70b80614f12f51a23b696fbee4b553e878ae1df6915e3f71d8f6b3f90829e90"
+        },
+        {
+          "offset": 277411,
+          "length": 214175,
+          "rawBytes": 4194304,
+          "rawSha256": "c15a8adff9fbe00e23d8c4b586ddea33dfade17f2bf95a09ad5aa597e4312381",
+          "gzipSha256": "17098365e3c59f67b4aa871be2f56ee271b0403b3de5c937fbfdfd5a597a6f3d"
+        },
+        {
+          "offset": 491586,
+          "length": 200760,
+          "rawBytes": 4194304,
+          "rawSha256": "91a88927196e5a137f78c05ce6c15da4c4168e19501247b4df8e6dc6990c565b",
+          "gzipSha256": "00196254418a9bad84b0368efa78c4731ee33f3b68a9c615aec427aec75770b4"
+        },
+        {
+          "offset": 692346,
+          "length": 227835,
+          "rawBytes": 4194304,
+          "rawSha256": "5b61872aa68af59c1c69e5b2c8b05e79c534bbb8688d043324aa32c906832544",
+          "gzipSha256": "0c7f1a6e4c9ee8c515c14a5afad3ffdf7e8bcea974ec8e75be7a34db3a261dd9"
+        },
+        {
+          "offset": 920181,
+          "length": 263890,
+          "rawBytes": 4194304,
+          "rawSha256": "4058c7026de8fe535f701b8941de3b455fa636a509de69334c7995f2f0e5b782",
+          "gzipSha256": "e1081191b771cc4f68536d79084defa8b8767c0180fe314f9cd71a3cba9a1079"
+        },
+        {
+          "offset": 1184071,
+          "length": 231651,
+          "rawBytes": 4194304,
+          "rawSha256": "3d91e056431be45830750febf844c09bd38e5a66520f34cbc0af09fb39e14d4d",
+          "gzipSha256": "976d9025230c109ab8ed20d0e2df6dd421088ecda8ad0561d2f574f15c4c18a8"
+        },
+        {
+          "offset": 1415722,
+          "length": 244350,
+          "rawBytes": 4194304,
+          "rawSha256": "65064a509059ef92a7d57093b4a2dc82e579dc45c025f996d7fbd16915488145",
+          "gzipSha256": "bb67aa9bd21f1d510cf9e7bd6142d4feb39f25a7b9a47b1ebff7c0e18d23fa67"
+        },
+        {
+          "offset": 1660072,
+          "length": 65825,
+          "rawBytes": 4194304,
+          "rawSha256": "96b6553a9924298f1cba27ec6f7a7521718208fd5cb30ccb2317b328d217e26e",
+          "gzipSha256": "fcb0fc7690a73895206ca550869592c671f93772f6b1a30281fa50fc8b707592"
+        },
+        {
+          "offset": 1725897,
+          "length": 58158,
+          "rawBytes": 4194304,
+          "rawSha256": "69f030cfaf5a872b1314f89b06048b72b515bcbac17776897160d53942f98ea7",
+          "gzipSha256": "54880991e26aaa373bc44ef6905c1c6f70ca95c32f679e324b0fa45186ed2795"
+        },
+        {
+          "offset": 1784055,
+          "length": 56754,
+          "rawBytes": 4194304,
+          "rawSha256": "69d6724fb9d36b4362e49559fc8650f8210a0357e8f9f6bb546d604281f03fb0",
+          "gzipSha256": "4b479e1650957bbcc8b1da95c028ea1de7076e8eb6b22860c6bb76c9ecb4bce5"
+        },
+        {
+          "offset": 1840809,
+          "length": 60522,
+          "rawBytes": 4194304,
+          "rawSha256": "45211f5a32a57b3a877a6ff108a6013c2582861c64060c2085cc00e77f4aebe7",
+          "gzipSha256": "3927c00f807d3aa25e22ae50d8cc8185179ff05a2a1e257e65de4d8c17ab4208"
+        },
+        {
+          "offset": 1901331,
+          "length": 82716,
+          "rawBytes": 4194304,
+          "rawSha256": "c6cc3fd9baf3b4a24b9c45241a75f81a126a3781f613d4f7a83af1bd3acee3fc",
+          "gzipSha256": "0a9f48303f5db6ca3f12e6265783c727eb1529d35b8944aef3cb34034241bcf7"
+        },
+        {
+          "offset": 1984047,
+          "length": 125197,
+          "rawBytes": 4194304,
+          "rawSha256": "41e47bbdcc9ce65c63409156d6de1efbb0d9bdc8cd14248db81aa75700370721",
+          "gzipSha256": "a545d8cbd04e170c7b85fa4f24fc932dbca6a424b4169e0362f404bf165df567"
+        },
+        {
+          "offset": 2109244,
+          "length": 50084,
+          "rawBytes": 1982821,
+          "rawSha256": "e20f9e2720baa82a81077492c67621db5b9a3e10a96117b34b975b0e875c8015",
+          "gzipSha256": "db554022d514ff97cdec1e826a65987fa0d2c7288b1445363f66649b793a9cd2"
+        }
+      ],
+      "note": "Plan 5 actual process measurements; timing and memory targets are ideal budgets, never enforced. Missing and failed evidence retained.",
+      "measuredAt": "2026-09-14T17:22:06.117Z",
+      "completedAt": "2026-09-14T17:25:37.124Z",
+      "phase": "fast",
+      "passed": false,
+      "payloadSchema": "ramify.fast-measurements/1",
+      "build": {
+        "files": 315,
+        "sha256": "3df6d4a3a7c507ed1fd98f596bf349299a58cd1fcea2bb05b27752218a208810"
+      },
+      "workloads": [
+        {
+          "name": "I5-13:hook-latency-reference",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s100",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I5-13:hook-latency-s500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s1000",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:checked-set-bounded",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:repeated-edit-plateau",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hot-warm-memory",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:cold-open",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:entry-footprints",
+          "status": "not-executed",
+          "passed": false
+        }
+      ]
+    },
+    {
+      "file": "fast-2026-09-14T17-25-50.216Z-2d31ee3c-0693-4cc4-91d2-bbc2ae1c42c6.json.gz",
+      "rawSha256": "2c7944185942e1121b53f32fea5fa71ebd6febd896ca2d177c22784399e5647c",
+      "gzipSha256": "2cfdb4472a6aa9d78c065f635b31d6659f5f44f6c2d38e27c8842be673a3a67b",
+      "rawBytes": 50483012,
+      "gzipBytes": 2159773,
+      "gzipMembers": [
+        {
+          "offset": 0,
+          "length": 229238,
+          "rawBytes": 4194304,
+          "rawSha256": "7c900d4d9a25499e687d832618a13bf30a11766917e6a3374517c0ef4cf9555c",
+          "gzipSha256": "74a38fdbd6e8286a77969ad82014fbd555477ce8768166756a76a5c4ffa6f61f"
+        },
+        {
+          "offset": 229238,
+          "length": 216566,
+          "rawBytes": 4194304,
+          "rawSha256": "5c2ff0970396786a425b399563824e4b41336015181bc58ed096a01353c8a870",
+          "gzipSha256": "60e862963ed1d0e872fb892029ddea0caedfcba67e099547010451acbbafcb4d"
+        },
+        {
+          "offset": 445804,
+          "length": 196483,
+          "rawBytes": 4194304,
+          "rawSha256": "63a2d0ba09e7225621963ac9a863f1f72b969c28339ccc37919aa49a33475b7c",
+          "gzipSha256": "af659c6e69ea30d8cbf993783f99acf30cf0c21c42483a20977e0b8689a38cd6"
+        },
+        {
+          "offset": 642287,
+          "length": 278682,
+          "rawBytes": 4194304,
+          "rawSha256": "75ebd5bbe61b2dfb2796ee1ac0980b4d9e85341ed9339c29f7a3a3cda837ca0f",
+          "gzipSha256": "40166bfc060add80c82c9850e3f0bff6791523c22b4779fe5ef7c76f21d8d3a0"
+        },
+        {
+          "offset": 920969,
+          "length": 305536,
+          "rawBytes": 4194304,
+          "rawSha256": "c256e0d8ecf6f6941e8da55cf6c1fd21a1ff7634f60f6815a233b1eb61bb1aca",
+          "gzipSha256": "9e8c9b8ca1964243f0232991dc6dcf26b3dde29bf7cbc375bac4191556d37c24"
+        },
+        {
+          "offset": 1226505,
+          "length": 235687,
+          "rawBytes": 4194304,
+          "rawSha256": "2a241972f9a08d3a8ef6cd98b561fa74a81b32d2a27617f1557a0f16ab797d3c",
+          "gzipSha256": "39c9d390a26b83b964789164ad8e88a96954436770ac13097bc611b30535d002"
+        },
+        {
+          "offset": 1462192,
+          "length": 234065,
+          "rawBytes": 4194304,
+          "rawSha256": "11a26c9388429a0f19131c9df73cf0646a3cef7c5c1a05b120f8b57ce96893ed",
+          "gzipSha256": "2e9915cc03cd28f2b6e12b73a538fb1847a2822543a6e6747570beabc0028f79"
+        },
+        {
+          "offset": 1696257,
+          "length": 127576,
+          "rawBytes": 4194304,
+          "rawSha256": "8ca39d23ecda1a632fcb8bad671149d5f0e718473639f92e8230424d19dcc549",
+          "gzipSha256": "1008228f5b13d1c9854a391dd0a426ad702b07702eb7e91cc1d31cf81a0b024b"
+        },
+        {
+          "offset": 1823833,
+          "length": 62090,
+          "rawBytes": 4194304,
+          "rawSha256": "a9e1b8297e951552cae33537261f2190a4a5394b25760292b1052e94a8355531",
+          "gzipSha256": "3f588029f3c5fcbcc4d980f5b93d29ce2882a21287068992219b4956dc258bd9"
+        },
+        {
+          "offset": 1885923,
+          "length": 63264,
+          "rawBytes": 4194304,
+          "rawSha256": "20e8e9258b985678919e5516b647b5c7b6b13bb454e9d8c42155f989aa6eaf98",
+          "gzipSha256": "27f14959ced050d1b7c8684c59214bef158173e83bc090c6ae0a307606e7e0ee"
+        },
+        {
+          "offset": 1949187,
+          "length": 89436,
+          "rawBytes": 4194304,
+          "rawSha256": "c1c4b2a09ebdda82c87599a5893ba2feaed40ec0f7338f7535d285ae603310bd",
+          "gzipSha256": "814dc8ef6c4c309919320a7b21386a92650932c1907973d994a06a5c021c6c0e"
+        },
+        {
+          "offset": 2038623,
+          "length": 116727,
+          "rawBytes": 4194304,
+          "rawSha256": "f70efd5c2828bd190c31578529483870613bd6b43e9a23a0c05fbc7b4820517a",
+          "gzipSha256": "c0c5f1b76f6418739abf4bf47ad0629f0546c75cf830c1cf337a822c3e907953"
+        },
+        {
+          "offset": 2155350,
+          "length": 4423,
+          "rawBytes": 151364,
+          "rawSha256": "4c72b6317bbd46e2bb016501ef0652b4ef16e0a26781cebc3ae5ea9b86b15d11",
+          "gzipSha256": "677d8b92db3a0f4441a73f0c96e0da8d842414299525912755765f8c0c352037"
+        }
+      ],
+      "note": "Plan 5 actual process measurements; timing and memory targets are ideal budgets, never enforced. Missing and failed evidence retained.",
+      "measuredAt": "2026-09-14T17:25:50.216Z",
+      "completedAt": "2026-09-14T17:28:37.894Z",
+      "phase": "fast",
+      "passed": false,
+      "payloadSchema": "ramify.fast-measurements/1",
+      "build": {
+        "files": 315,
+        "sha256": "3df6d4a3a7c507ed1fd98f596bf349299a58cd1fcea2bb05b27752218a208810"
+      },
+      "workloads": [
+        {
+          "name": "I5-13:hook-latency-reference",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I5-13:hook-latency-s100",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s1000",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:checked-set-bounded",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:repeated-edit-plateau",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hot-warm-memory",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:cold-open",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:entry-footprints",
+          "status": "not-executed",
+          "passed": false
+        }
+      ]
     }
   ],
   "finalRecord": "merged-main.json.gz"

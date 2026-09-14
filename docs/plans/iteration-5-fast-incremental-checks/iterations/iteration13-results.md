@@ -136,7 +136,8 @@ fully green. Its twelve failures are:
 
 | Instance | Why |
 | --- | --- |
-| `I5-13:hook-latency-reference`, `I5-13:hook-latency-s100`, `I5-13:hook-latency-s500`, `I5-13:hook-latency-s1000`, `I5-13:checked-set-bounded`, `I5-13:repeated-edit-plateau`, `I5-13:hot-warm-memory`, `I5-13:cold-open`, `I5-13:entry-footprints` | `npm run measure:fast` was not run for this closure, by Dan's decision of 2026-09-14; each is waived by ID, never counted as passed |
+| `I5-13:hook-latency-s500`, `I5-13:hook-latency-s1000`, `I5-13:checked-set-bounded`, `I5-13:repeated-edit-plateau`, `I5-13:hot-warm-memory`, `I5-13:cold-open`, `I5-13:entry-footprints` | `npm run measure:fast` was not run for these rows, by Dan's decision of 2026-09-14; each is waived by ID, never counted as passed |
+| `I5-13:hook-latency-reference`, `I5-13:hook-latency-s100` | failed in the unfiltered run for lack of evidence; measured afterwards on the same build and passed when re-run alone, see the [addendum](#addendum-2026-09-14-hook-latency-on-the-final-build) |
 | `I5-12:burst-coalesced` | the [open defect](#open-defects) above |
 | `I5-10:plan2-gate-amended`, `I5-14:plan2-regression` | both run the whole `--plan 2` gate themselves, and that run had no resident measurement report in its environment, so its nine `I2-29` instances failed. `I5-14:plan2-regression` names exactly those nine and nothing else, so every other required Plan 2 instance passed inside this gate |
 
@@ -323,6 +324,52 @@ from the raw samples inside each copied row. The merged report is a derived
 artifact of about 95 MB and is not checked in; rebuild it from the eight archives
 above.
 
+## Addendum, 2026-09-14: hook latency on the final build
+
+Run after the closure commit, at Dan's request, because the created and deleted
+rows are the ones the `unknown`-label decision changes and the closure had only
+re-cited the structural edits figures for them. Same build (`cefe732` code, docs
+commits since), idle host, one `npm run measure:fast -- --workload <suffix>`
+invocation per fixture, S100 first, then the reference; the run itself exits 1
+because the other seven `I5-13` rows stay unmeasured in it.
+
+| Fixture | Cycle | Session work, median | Ideal budget | Hook end to end, median (p95) |
+| --- | --- | ---: | ---: | ---: |
+| S100 | created | 440 ms | 1,500 ms | 503 ms (563) |
+| S100 | deleted | 466 ms | 1,500 ms | 503 ms (557) |
+| S100 | body | 84 ms | 60 ms | 122 ms (151) |
+| S100 | source | 182 ms | 400 ms | 221 ms (258) |
+| S100 | description | 127 ms | 500 ms | |
+| S100 | README | 37 ms | 60 ms | |
+| S100 | configuration | 2,792 ms | 2,500 ms | |
+| reference | created | 271 ms | 600 ms | 318 ms (351) |
+| reference | deleted | 275 ms | 600 ms | 320 ms (351) |
+| reference | body | 37 ms | 25 ms | 100 ms (102) |
+| reference | source | 64 ms | 250 ms | 107 ms (116) |
+| reference | description | 47 ms | 120 ms | |
+| reference | README | 18 ms | 30 ms | |
+| reference | configuration | 1,334 ms | 1,000 ms | |
+
+Every created and deleted cycle, forty per fixture, took the membership path.
+The figures match the structural edits measurement of 2026-09-13 (S100 created
+496 ms, deleted 472 ms): the `unknown`-label decision changes which deliveries
+reach the membership path, not its cost. This recipe's hook names the file, so
+it exercises the route the earlier measurement also exercised; a create or
+delete the watcher delivers first now takes the same path (the I5-12 live
+sequences verify it) but has no latency figure of its own. Body and
+configuration exceed their ideal budgets, which is the state the hook
+optimization closure recorded; ideal budgets never fail a workload. The two
+misses of the configuration row predate the not-checked answer, which this
+recipe does not exercise.
+
+Both reports pass `verify-fast-evidence.mjs`, and `I5-13:hook-latency-s100` and
+`I5-13:hook-latency-reference` pass when run alone with
+`RAMIFY_FAST_MEASUREMENT_REPORT` naming the matching report; the unfiltered gate
+result above is not re-run. Archives under `scripts/measurements/results/`:
+`fast-2026-09-14T17-22-06.117Z-2854649b-cacd-4714-9502-4e5be8b334fd.json.gz`
+(S100) and `fast-2026-09-14T17-25-50.216Z-2d31ee3c-0693-4cc4-91d2-bbc2ae1c42c6.json.gz`
+(reference).
+
 ## Waived and unexecuted work
 
 **Waived by Dan's decisions of 2026-09-14** (not executed, never counted as
@@ -333,11 +380,11 @@ passed):
 - `I5-13:checked-set-bounded`, `I5-13:repeated-edit-plateau`,
   `I5-13:hot-warm-memory`, `I5-13:cold-open`, `I5-13:entry-footprints`: not run
   for this closure.
-- `I5-13:hook-latency-reference` and `I5-13:hook-latency-s100` have no current
-  evidence on the final build, so the gate fails them; their rows are established
-  by the [hook optimization](../../iteration-5-hook-optimization/iterations/measurement-results.md)
-  and [structural edits](../../iteration-5-structural-edits/iterations/measurement-results.md)
-  measurement results, as the decision directs.
+- `I5-13:hook-latency-reference` and `I5-13:hook-latency-s100` had no evidence
+  on the final build when the unfiltered gate ran, so it failed them. Dan then
+  asked for the created and deleted rows, which today's `unknown`-label fix
+  targets; both workloads were measured on the same build and both instances
+  pass, see the [addendum](#addendum-2026-09-14-hook-latency-on-the-final-build).
 
 `npm run measure:fast`, the recipe behind every `I5-13` row, was therefore not
 run. The nine `I5-13` instances fail the unfiltered Plan 5 gate and are recorded
