@@ -159,6 +159,17 @@ mode. Help and version load neither the engine nor a daemon host. The installed
 Node entry, with the same contract; see the
 [native client](optimization.md#native-client).
 
+`ramify check --changed <path>...` is the post-write hook form. It hashes the
+named paths relative to the selected root, waits for a revision that covers
+those exact identities, and never falls back to batch. It exits 0 when that
+revision has no findings, 1 for findings or an invalid revision, and 2 when it
+was not checked, naming the reason. A named configuration file, `tsconfig.json`,
+a file it extends, or a package manifest or lockfile, is answered as not checked
+immediately, with the reason that the configuration changed: the hook verifies a
+module's exports and their use, which a configuration edit is not, and the
+daemon verifies the change behind the reply so the next hook is exact. `--batch`
+is unaffected and checks the whole project as above.
+
 `ramify watch` streams versioned revision and status events, fetches each
 report by its exact revision id, and releases its subscription on SIGINT.
 `ramify daemon status` and `ramify daemon stop` never start a daemon. The

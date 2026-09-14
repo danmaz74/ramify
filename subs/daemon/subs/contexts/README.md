@@ -5,9 +5,12 @@ Contexts keeps each selected project root isolated as a context with its own gen
 `createContextManager` preserves each opening lease's invocation and capability
 order. Covered delta requests reuse a coherent publication when no influencing
 change or sweep is pending. Other synchronized requests flush the queue; an
-empty expectation requires a sweep started after acknowledgment. Unobserved and
-superseded identities cannot produce a passing check. Request deadlines return
-cold or deadline-exceeded outcomes while the session continues updating.
+empty expectation requires a sweep started after acknowledgment. A synchronized
+request that names a configuration path is answered at once as unavailable for
+that reason, and the update its paths queued still runs, so the next request
+waits for that revision. Unobserved and superseded identities cannot produce a
+passing check. Request deadlines return cold or deadline-exceeded outcomes while
+the session continues updating.
 
 History retains revision headers, diagnostics, warnings, coverage and finding
 deltas. Reports are projected from the session's immutable facts by exact

@@ -45,8 +45,10 @@ export async function checkCommand(args: CheckArguments, environment: CliEnviron
         if (!opened.ok) throw serviceFailure(opened.error);
         if (opened.value.status === 'unresolved') return printReport(opened.value.report,
           `resident (daemon ${connection.daemon.instance.pid}; no context)`, args.format, environment);
+        // An open never answers with a reason reserved for a synchronized check; any
+        // reason the failure codes do not name is a plain unavailable outcome.
         if (opened.value.status === 'unavailable') throw new CliFailure(
-          opened.value.reason === 'disposed' ? 'unavailable' : opened.value.reason,
+          opened.value.reason === 'disposed' || opened.value.reason === 'configuration-changed' ? 'unavailable' : opened.value.reason,
           opened.value.message, opened.value);
         token = opened.value.token;
         const response = await connection.check({ token, requestId: randomUUID(), freshness: { mode: 'synchronized', expect: [] } }, control);

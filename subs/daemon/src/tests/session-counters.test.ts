@@ -166,15 +166,17 @@ describe('daemon sweep accounting after reacquisition', () => {
       const token = opened.value.token;
       const hook = (path: string) => service.check({ token, requestId: `hook-${path}`, scope: 'delta',
         freshness: { mode: 'synchronized', expect: [{ path, sha256: content }] } });
+      // A hook that names a configuration path is answered at once; its capture runs behind the reply.
       let before = await counted();
       watcher.emit('/fixture', [{ path: 'tsconfig.json', kind: 'changed' }]);
-      expect(await hook('tsconfig.json')).toMatchObject({ ok: true, value: { status: 'reported', published: true, timings: { sweep: 0 } } });
-      await flush();
+      expect(await hook('tsconfig.json')).toMatchObject({ ok: true, value: { status: 'unavailable', reason: 'configuration-changed' } });
+      expect(delta(await counted(), before)).toEqual({ analyses: 0, sweeps: 0 });
+      clock.advance(budgets.debounceMs); await flush();
       expect(delta(await counted(), before)).toEqual({ analyses: 1, sweeps: 0 });
       before = await counted();
       watcher.emit('/fixture', [{ path: 'subs/tool/package.json', kind: 'changed' }]);
-      expect(await hook('subs/tool/package.json')).toMatchObject({ ok: true, value: { status: 'reported', published: true } });
-      await flush();
+      expect(await hook('subs/tool/package.json')).toMatchObject({ ok: true, value: { status: 'unavailable', reason: 'configuration-changed' } });
+      clock.advance(budgets.debounceMs); await flush();
       expect(delta(await counted(), before)).toEqual({ analyses: 2, sweeps: 1 });
     } finally { await service.dispose(); await watcher.dispose(); clock.dispose(); }
   });

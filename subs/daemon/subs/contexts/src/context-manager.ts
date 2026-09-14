@@ -14,6 +14,10 @@ const implemented = new Set(['registry', 'layout', 'metadata', 'descriptions', '
 function unavailable(reason: Unavailable['reason'], message: string = reason): Unavailable { return { status: 'unavailable', reason, message }; }
 /** Distinct project requests whose resolutions one context keeps for reuse. */
 const knownResolutions = 4;
+/** Paths whose change is a configuration change: the compiler configuration, the package
+ * manifests and the lockfiles. Files the configuration helper read, such as an `extends`
+ * target, are recognized instead by the configuration role their observation carries. */
+const configurationPath = /(?:^|\/)(?:tsconfig[^/]*\.json|package\.json|package-lock\.json|yarn\.lock|pnpm-lock\.yaml)$/;
 /** What an update or sweep returns; an update never returns unchanged. */
 type SweepResult = Awaited<ReturnType<RetainedSession['sweep']>>;
 const noWork = (): { -readonly [K in keyof CaptureWork]: number } => ({ invocationCheck: 0, promotion: 0, workerStatus: 0, workerRoundTrip: 0, sweep: 0 });
@@ -179,7 +183,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     for (const event of events) {
       if (event.kind === 'overflow' || event.kind === 'error') { context.conservative = true; context.sweepRequired = true; }
       else { context.paths.set(event.path, event.kind === 'renamed' ? 'unknown' : event.kind); context.requested.delete(event.path); }
-      if (/(?:^|\/)(?:tsconfig[^/]*\.json|package\.json|package-lock\.json|yarn\.lock|pnpm-lock\.yaml)$/.test(event.path) && !context.sweepRequired) context.sweepRequired = 'configuration';
+      if (configurationPath.test(event.path) && !context.sweepRequired) context.sweepRequired = 'configuration';
       if (event.kind === 'error') { closeWatcher(context); context.watcherState = 'unavailable'; }
     }
     if (context.paths.size > budgets.maxQueuedPaths) { context.paths.clear(); context.requested.clear(); context.conservative = true; context.sweepRequired = true; }
@@ -281,6 +285,13 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         delta, report: freeze(report), freshness: fresh(entry, started, entry.request.freshness.mode === 'synchronized', reused), timings: freeze({ ...timings }) });
     } catch (error) { complete(entry, { ...unavailable('analysis-failed', String(error)), requestId: entry.request.requestId }); }
     finally { unpinBase(); unpin(); context.deliveries.delete(entry); scheduleIdle(context); }
+  }
+  /** A named path the daemon already knows as configuration: one the configuration path
+   * pattern matches, or one the acquisition observed with the configuration role, such as
+   * an `extends` target the configuration helper read. */
+  function namesConfiguration(context: LiveContext, path: string): boolean {
+    return configurationPath.test(path)
+      || !!context.session?.current?.inputs.some(input => input.path === path && input.role === 'configuration');
   }
   function mismatch(context: LiveContext, entry: PendingCheck, data: SessionRevision): CheckOutcome | null {
     if (entry.request.freshness.mode !== 'synchronized') return null;
@@ -539,16 +550,31 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         if (!request.freshness.wait) { complete(entry, { status: 'pending', requestId: request.requestId, current: snapshot(context) }); return; }
       } else {
         if (covered) { track(deliver(context, entry, context.history.published!, null, true)); return; }
+        // A hook verifies a module's exports and their use. A configuration change is not
+        // that kind of change and its verdict is not needed at once, so the request is
+        // answered immediately as not checked. Its paths still queue an update, which the
+        // next request waits for, so the answer after it is exact.
+        const configuration = request.freshness.expect.filter(expectation => namesConfiguration(context, expectation.path));
         // A hook identifies a path to re-observe. The observer determines its
         // actual creation/deletion and role; preserve stronger watcher hints.
         // A path only requests named stays theirs, for withdrawal on a covering publication.
+        // An immediately answered request withdraws nothing and claims none.
         for (const expected of request.freshness.expect) {
-          if (!context.paths.has(expected.path)) { context.paths.set(expected.path, 'changed'); context.requested.set(expected.path, new Set([entry])); }
-          else context.requested.get(expected.path)?.add(entry);
+          if (!context.paths.has(expected.path)) { context.paths.set(expected.path, 'changed'); if (!configuration.length) context.requested.set(expected.path, new Set([entry])); }
+          else if (!configuration.length) context.requested.get(expected.path)?.add(entry);
         }
         if (context.paths.size > budgets.maxQueuedPaths) { context.paths.clear(); context.requested.clear(); context.conservative = true; context.sweepRequired = true; }
         if (entry.needsSweep) context.sweepRequired = true;
-        context.background ??= 'request'; context.debounce?.(); context.debounce = null;
+        context.background ??= 'request';
+        if (configuration.length) {
+          // No caller waits for this capture, so a pending debounce keeps coalescing the
+          // watcher's own batch for the same edit.
+          complete(entry, { ...unavailable('configuration-changed',
+            `Configuration changed: ${configuration.map(item => item.path).join(', ')}. Verification continues in the background.`),
+          requestId: request.requestId });
+          scheduleIdle(context); kick(); return;
+        }
+        context.debounce?.(); context.debounce = null;
       }
       context.queue.push(entry); scheduleIdle(context); kick();
     });

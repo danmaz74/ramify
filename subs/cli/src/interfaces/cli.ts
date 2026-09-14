@@ -26,7 +26,7 @@ export interface CheckDocument {
   readonly since: RevisionId | null;
   readonly changed: readonly { readonly path: string; readonly sha256: string | null; readonly covered: boolean }[];
   readonly outcome: 'checked' | 'not-checked';
-  readonly reason: 'cold' | 'deadline-exceeded' | 'unobserved-input' | 'superseded' | 'incomplete' | 'unavailable' | 'stopped' | 'incompatible' | 'evicted-revision' | 'resource-unavailable' | 'analysis-failed' | 'unknown-context' | 'expired-generation' | 'unsupported-setup' | 'disposed' | null;
+  readonly reason: 'cold' | 'deadline-exceeded' | 'unobserved-input' | 'superseded' | 'incomplete' | 'unavailable' | 'stopped' | 'incompatible' | 'evicted-revision' | 'resource-unavailable' | 'analysis-failed' | 'unknown-context' | 'expired-generation' | 'unsupported-setup' | 'disposed' | 'configuration-changed' | null;
   readonly execution: AnalysisReport['outcome']['execution'] | null;
   readonly findings: readonly (AnalysisDiagnostic & { readonly new: boolean })[];
   readonly removed: readonly string[];

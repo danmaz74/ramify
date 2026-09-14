@@ -591,3 +591,104 @@ describe('sweep after reacquisition', () => {
     });
   });
 });
+
+describe('configuration hooks', () => {
+  const work = { invocationCheck: 3, promotion: 7, workerStatus: 2, workerRoundTrip: 40 };
+  const reacquiring = (version: number) => ({ ...capture(version), reacquired: true, timings: work });
+  const configured = () => capture(1, 'completed', [
+    { path: 'src/index.ts', role: 'source' as const, sha256: hash('1'), bytes: 1 },
+    { path: 'base.json', role: 'configuration' as const, sha256: hash('base'), bytes: 4 },
+  ]);
+
+  it('configuration-answered-at-once: a hook naming a configuration file is not checked immediately and its update runs behind the reply', async () => {
+    const e = sessionEnvironment();
+    let finish: ((value: ReturnType<typeof reacquiring>) => void) | undefined;
+    try {
+      const opened = await e.open(); await flush();
+      // The update the reply does not wait for.
+      e.script.pending.push(() => new Promise(resolve => { finish = resolve; }));
+      const answered = await e.check(opened.token, { mode: 'synchronized', expect: [{ path: 'tsconfig.json', sha256: hash('edited') }] });
+      expect(answered).toMatchObject({ status: 'unavailable', reason: 'configuration-changed',
+        message: 'Configuration changed: tsconfig.json. Verification continues in the background.' });
+      // The reply arrived while the update it queued is still running.
+      await flush();
+      expect(e.script.updateCalls).toHaveLength(1);
+      expect(e.script.updateCalls[0]?.inputs.changes).toEqual([{ path: 'tsconfig.json', kind: 'changed' }]);
+      expect(e.status(opened.token)).toMatchObject({ published: { sequence: 1 }, pending: { requests: 0, analysisRunning: true } });
+      finish!(reacquiring(2)); await flush();
+      expect(e.status(opened.token)).toMatchObject({ synchronization: 'synchronized', published: { sequence: 2, cause: 'request' } });
+      // The reacquiring update satisfied the configuration path's own sweep requirement.
+      expect(e.script.sweepCalls).toHaveLength(0);
+    } finally { finish?.(reacquiring(2)); e.script.pending.length = 0; await flush(); await e.dispose(); }
+  });
+
+  it('configuration-answered-at-once: a recorded configuration input the path pattern does not match is answered the same way', async () => {
+    const e = sessionEnvironment();
+    try {
+      e.script.pending.push(configured);
+      const opened = await e.open(); await flush();
+      const answered = await e.check(opened.token, { mode: 'synchronized', expect: [{ path: 'base.json', sha256: hash('extended') }] });
+      expect(answered).toMatchObject({ status: 'unavailable', reason: 'configuration-changed',
+        message: 'Configuration changed: base.json. Verification continues in the background.' });
+      await flush();
+      expect(e.script.updateCalls[0]?.inputs.changes).toEqual([{ path: 'base.json', kind: 'changed' }]);
+      // A source path the acquisition recorded without that role still waits for its revision.
+      e.script.version = 3;
+      const checked = await e.check(opened.token, { mode: 'synchronized', expect: expected('src/index.ts', '3') });
+      expect(checked).toMatchObject({ status: 'reported', published: true });
+    } finally { e.script.pending.length = 0; await flush(); await e.dispose(); }
+  });
+
+  it('configuration-answered-at-once: a source hook after it waits for the pending revision and is answered from it', async () => {
+    const e = sessionEnvironment();
+    let finish: ((value: ReturnType<typeof reacquiring>) => void) | undefined;
+    try {
+      const opened = await e.open(); await flush();
+      e.script.pending.push(() => new Promise(resolve => { finish = resolve; }));
+      const immediate = await e.check(opened.token, { mode: 'synchronized', expect: [{ path: 'tsconfig.json', sha256: hash('edited') }] });
+      expect(immediate).toMatchObject({ status: 'unavailable', reason: 'configuration-changed' });
+      await flush();
+      let answered = false;
+      const request = e.check(opened.token, { mode: 'synchronized', expect: expected('src/index.ts', '2') })
+        .then(result => { answered = true; return result; });
+      await flush();
+      expect(answered).toBe(false);
+      expect(e.script.updateCalls).toHaveLength(1);
+      finish!(reacquiring(2)); await flush();
+      // The revision the configuration edit published answers it; no second update runs.
+      expect(await request).toMatchObject({ status: 'reported', published: true,
+        revision: { sequence: 2, cause: 'request' }, freshness: { verified: true, reusedRevision: true } });
+      expect([e.script.updateCalls.length, e.script.sweepCalls.length]).toEqual([1, 0]);
+    } finally { finish?.(reacquiring(2)); e.script.pending.length = 0; await flush(); await e.dispose(); }
+  });
+
+  it('configuration-answered-at-once: the reply leaves the watcher debounce standing so one capture carries both', async () => {
+    const e = sessionEnvironment();
+    try {
+      const opened = await e.open(); await flush();
+      e.script.pending.push(() => reacquiring(2));
+      e.watcher.emit('/fixture', [{ path: 'tsconfig.json', kind: 'changed' }]);
+      const answered = await e.check(opened.token, { mode: 'synchronized', expect: [{ path: 'tsconfig.json', sha256: hash('edited') }] });
+      expect(answered).toMatchObject({ status: 'unavailable', reason: 'configuration-changed' });
+      // No caller waits, so the capture starts with the watcher's own batch.
+      await flush();
+      expect(e.script.updateCalls).toHaveLength(0);
+      e.clock.advance(testBudgets.debounceMs); await flush();
+      expect(e.script.updateCalls).toHaveLength(1);
+      expect(e.script.updateCalls[0]?.inputs.changes).toEqual([{ path: 'tsconfig.json', kind: 'changed' }]);
+      expect(e.status(opened.token)).toMatchObject({ synchronization: 'synchronized', published: { sequence: 2 } });
+    } finally { e.script.pending.length = 0; await flush(); await e.dispose(); }
+  });
+
+  it('configuration-answered-at-once: a whole-project report request still waits for its capture', async () => {
+    const e = sessionEnvironment();
+    try {
+      const opened = await e.open(); await flush();
+      e.script.pending.push(() => reacquiring(2), () => ({ status: 'unchanged' as const }));
+      e.watcher.emit('/fixture', [{ path: 'tsconfig.json', kind: 'changed' }]);
+      const answered = await e.check(opened.token, { mode: 'synchronized', expect: [] }, { scope: 'report' });
+      expect(answered).toMatchObject({ status: 'reported', published: true });
+      expect([e.script.updateCalls.length, e.script.sweepCalls.length]).toEqual([1, 1]);
+    } finally { e.script.pending.length = 0; await flush(); await e.dispose(); }
+  });
+});

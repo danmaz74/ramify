@@ -130,7 +130,9 @@ export interface CheckDelta {
   readonly coverage: readonly SourceLimit[];
 }
 export type UnavailableReason = 'unknown-context' | 'expired-generation' | 'evicted-revision' | 'unobserved-input'
-  | 'resource-unavailable' | 'analysis-failed' | 'unsupported-setup' | 'disposed';
+  | 'resource-unavailable' | 'analysis-failed' | 'unsupported-setup' | 'disposed'
+  /** A synchronized request named a configuration path; the context answers at once and updates behind it. */
+  | 'configuration-changed';
 export interface Unavailable {
   readonly status: 'unavailable';
   readonly reason: UnavailableReason;

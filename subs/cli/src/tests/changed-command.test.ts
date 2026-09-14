@@ -259,6 +259,35 @@ describe('changed check command', { timeout: 30_000 }, () => {
     } finally { await f.dispose(); }
   });
 
+  it('configuration-answered-at-once: a named configuration file exits 2 at once, a following source hook is checked, and --batch still runs the whole check', async () => {
+    const f = await fixture();
+    try {
+      const warm = await command(f.root, f.quick.connect);
+      expect([warm.code, warm.document?.outcome]).toEqual([0, 'checked']);
+      await writeFile(join(f.root, 'tsconfig.json'), JSON.stringify({ compilerOptions: { target: 'ES2021', module: 'NodeNext', moduleResolution: 'NodeNext' } }));
+      const configuration = await command(f.root, f.quick.connect, [], {}, 'tsconfig.json');
+      expect([configuration.code, configuration.batchCalls, configuration.stderr]).toEqual([2, 0, []]);
+      expect(configuration.document).toMatchObject({ outcome: 'not-checked', reason: 'configuration-changed', exitCode: 2,
+        revision: null, execution: null, findings: [], checked: null, changed: [{ path: 'tsconfig.json', covered: false }] });
+      expect(formatChangedHuman(configuration.document!)).toContain('Not checked (configuration-changed): tsconfig.json');
+      // The next hook waits for the revision the configuration edit queued.
+      await writeFile(join(f.root, 'src/main.ts'), 'export const value = 2;\n');
+      const source = await command(f.root, f.quick.connect);
+      expect([source.code, source.batchCalls, source.stderr]).toEqual([0, 0, []]);
+      expect(source.document).toMatchObject({ outcome: 'checked', reason: null, execution: 'completed',
+        changed: [{ path: 'src/main.ts', covered: true }] });
+      // A batch check of the same edit is unchanged: it runs its own session and reports in full.
+      const stdout: string[] = [];
+      const code = await runCli(['check', '--batch', '--format', 'json'], { cwd: f.root, version: '0',
+        connect: async () => { throw new Error('A batch check must not connect'); }, batch: f.quick.batch,
+        stdout: value => { stdout.push(value); }, stderr: () => {} });
+      expect([code, stdout.length]).toEqual([0, 1]);
+      const report = JSON.parse(stdout[0]!) as AnalysisReport;
+      expect(report.outcome).toMatchObject({ execution: 'completed', check: 'passed', coverage: 'complete' });
+      expect(report.snapshot).not.toBeNull();
+    } finally { await f.dispose(); }
+  });
+
   it('returns 130 on interruption before connection without a result document', async () => {
     const result = await command('/project', async () => { throw new Error('Must not connect'); }, [], { signal: AbortSignal.abort() });
     expect([result.code, result.stdout, result.batchCalls]).toEqual([130, [], 0]);

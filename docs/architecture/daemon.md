@@ -540,6 +540,15 @@ a fresh batch check.
 - A configuration or manifest path event requires a sweep in the next capture.
   An update in that capture that acquired the project again on a fresh
   capture satisfies that sweep; every other required sweep still runs.
+- A hook verifies a module's exports and their use. A synchronized check that
+  names a configuration path is not that kind of change and its verdict is not
+  needed at once: the context answers it immediately as not checked, naming the
+  configuration change, and queues the named paths as it would any other. The
+  configuration paths are the ones the path pattern matches and the ones the
+  acquisition observed with the configuration role, such as an `extends` target
+  the configuration helper read. The update behind the reply still runs, so a
+  later request waits for that revision and is answered under the new
+  configuration. A whole-project report request still waits for its capture.
 - A hook-facing check has a bounded response time. When it cannot be met, for
   example in a cold context or during daemon recovery, the outcome is explicit
   and never a pass.

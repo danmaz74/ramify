@@ -148,9 +148,12 @@ add('changed-exit-2-not-checked', async (p, root, directory, a) => {
     warm.environment.NODE_OPTIONS += ` --import=${join(repositoryRoot, 'scripts/reference-harness/fixtures/plan5/hook-probe.mjs')}`;
     warm.environment.RAMIFY_HOOK_PROJECT = root;
     const clean = await changed(warm, root, a, 'warm baseline', 0, [assembly, '--deadline', '30000']);
-    await writeFile(join(root, 'tsconfig.json'), await readFile(join(root, 'tsconfig.json'), 'utf8') + '\n');
-    const deadline = await changed(warm, root, a, 'warm broad deadline', 2, ['tsconfig.json', '--deadline', '1']);
+    await writeFile(join(root, assembly), await readFile(join(root, assembly), 'utf8') + '\n');
+    const deadline = await changed(warm, root, a, 'warm source deadline', 2, [assembly, '--deadline', '1']);
     a.equal('warm timeout keeps current sequence', [deadline.reason, deadline.revision?.sequence], ['deadline-exceeded', clean.revision!.sequence]);
+    await writeFile(join(root, 'tsconfig.json'), await readFile(join(root, 'tsconfig.json'), 'utf8') + '\n');
+    const configured = await changed(warm, root, a, 'configuration hook', 2, ['tsconfig.json', '--deadline', '30000']);
+    a.equal('a named configuration file is not checked at once', [configured.reason, configured.revision], ['configuration-changed', null]);
     const unobserved = await changed(warm, root, a, 'outside selected root', 2, ['../outside.ts', '--deadline', '30000']);
     a.equal('outside path is explicit', unobserved.reason, 'unobserved-input');
     const superseded = await changed(warm, root, a, 'rewritten after hash', 2, [assembly, '--deadline', '30000'],
