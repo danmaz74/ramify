@@ -22,6 +22,15 @@ describe('reference verification invocation', () => {
     expect(() => parseVerifyArguments(args)).toThrow();
   });
 
+  it('fails a verification process that exits before its gate settles', () => {
+    const source = `const { failUnsettledExit } = await import(${JSON.stringify(resolve(repositoryRoot, 'scripts/reference-harness/verify.ts'))});
+      failUnsettledExit(new Promise(() => {}));`;
+    const unsettled = spawnSync(process.execPath, ['--import', 'tsx', '--input-type=module', '--eval', source], { cwd: repositoryRoot, encoding: 'utf8', timeout: 60_000 });
+    expect([unsettled.status, unsettled.stderr]).toEqual([1, expect.stringContaining('exited before it settled')]);
+    const settled = spawnSync(process.execPath, ['--import', 'tsx', '--input-type=module', '--eval', source.replace('new Promise(() => {})', 'Promise.resolve()')], { cwd: repositoryRoot, encoding: 'utf8', timeout: 60_000 });
+    expect(settled.status).toBe(0);
+  }, 120_000);
+
   // Full CLI execution is required by reference:verify, outside the inventory suite.
   it.each([3, 4, 5, 6])('reports actual provider execution and pending later checking work for iteration %s', (iteration) => {
     const args = ['--import', 'tsx', resolve(repositoryRoot, 'scripts/reference-harness/verify.ts'), '--plan', '1', '--format', 'json'];

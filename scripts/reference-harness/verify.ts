@@ -100,9 +100,23 @@ async function main(): Promise<number> {
   return report.passed ? 0 : 1;
 }
 
+/** A handler awaiting a promise that can never settle lets Node drain its event loop and exit 0
+ * without a report. Treat an exit before the gate settles as a failure. */
+export function failUnsettledExit(gate: Promise<unknown>): void {
+  let settled = false;
+  const settle = () => { settled = true; };
+  gate.then(settle, settle);
+  process.once('exit', () => {
+    if (settled) return;
+    process.stderr.write('Verification exited before it settled: a handler awaited work that can never finish; no report was produced\n');
+    process.exitCode = 1;
+  });
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  main().then((code) => { process.exitCode = code; }, (error: unknown) => {
+  const gate = main().then((code) => { process.exitCode = code; }, (error: unknown) => {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
   });
+  failUnsettledExit(gate);
 }
