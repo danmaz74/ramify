@@ -222,18 +222,9 @@ that justifies it. No assertion was loosened without one.
 
 ## Open defects
 
-**`I2-29:many-contexts` stalls at the seventh context.** The workload opens eight
-S100 contexts in one daemon, whose budgets allow two hot contexts. The first six
-opened and completed their checks within a minute. The seventh never completed:
-after 45 minutes its own compiler server was idle while the earliest session
-supervisor process burned about 196 % of a CPU continuously (981 jiffies in a
-5 s sample of `/proc`), holding twelve threads and no compiler child of its own.
-The host was idle with twelve CPUs and 47 GiB available and was not swapping. The
-workload was terminated after 47 minutes and recorded a failed row; no process
-leaked. The decision needed is where to investigate: the runaway is in a retained
-session that is no longer the one being checked, so the demotion and eviction path
-under context pressure is the first suspect. Plans 3, 4, 6 and 7 all assume many
-contexts in one daemon, so this should be settled before they start.
+The `I2-29:many-contexts` stall this section recorded is fixed; its diagnosis,
+fix and measured workload moved to
+[the addendum below](#addendum-2026-09-14-the-many-contexts-stall).
 
 **`I2-29:entry-footprints` cannot sample the compiled client's help entry.** The
 binding predicate `help contains real externally sampled RSS` observes 0: the
@@ -348,6 +339,81 @@ result above is not re-run. Archives under `scripts/measurements/results/`:
 `fast-2026-09-14T17-22-06.117Z-2854649b-cacd-4714-9502-4e5be8b334fd.json.gz`
 (S100) and `fast-2026-09-14T17-25-50.216Z-2d31ee3c-0693-4cc4-91d2-bbc2ae1c42c6.json.gz`
 (reference).
+
+## Addendum, 2026-09-14: the many-contexts stall
+
+`I2-29:many-contexts` failed at closure: the seventh of eight S100 contexts never
+completed its check and the workload was terminated after 47 minutes. It was
+diagnosed and fixed after closure on branch `investigate/many-contexts`, from
+`b642c3f`.
+
+**Smallest reproduction.** Not the context count: the idle time after the third
+context. Three S100 contexts back to back, a 90 s idle dwell, then a fourth. Three
+contexts are the fewest that demote one (`maxHotContexts` is two), and the runaway
+began one `sweepIntervalMs`, 30 s, after the demoted context's last activity. In
+the failing build the demoted session's supervisor reached 185 % of a CPU (927
+jiffies in a 5 s `/proc` sample) with no client request outstanding, and the
+fourth context's check never completed; the instrumented daemon's own worker trace
+showed 5.8 replies/s, about 2.9 sweep and verify pairs per second, indefinitely.
+The eight-context run merely took longer than 30 s to open, so it first noticed
+the stall at the seventh.
+
+**Cause.** The idle audit stayed armed through a demotion, and its failure re-armed
+it at once. `auditLater` (`context-manager.ts:144-151`) armed `auditRequired` and a
+background `verify`; `demote` (`:84-90`) released the compiler and cancelled
+nothing. `verify` on a compiler-released session then always threw:
+`session-engine.ts:192` to `session-audit.ts:55` to `recomputeAll`
+(`session-revision.ts:200-214`), which kept the retained adapter and called
+`describe`, whose `#requireProject` (`retained-source-analysis.ts:218`) failed
+because `releaseCompiler` had discarded the project (`:260`, `:332`); `verify` was
+the one operation `session-host.ts:135-138` left without a failure conversion. The
+catch at `context-manager.ts:448-450` set `sweepRequired`, the `finally` at `:468`
+re-armed the audit with no timer and kicked at once, and the next capture paid a
+full 320 ms re-observation before failing again. With `maxConcurrentAnalyses` at
+one, the pump (`:473-484`) scanned contexts in insertion order and the looping
+context was always ready, so the next context's pending synchronized request was
+never scheduled. The audit cadence `daemon.md` states, at most once per revision,
+was broken.
+
+**Fix.** Two commits, both audited PASS:
+
+| Commit | Change |
+| --- | --- |
+| `8f091f4` | The audit is armed only while the session is hot, a demotion cancels an armed audit and its background `verify`, a compiler-released `verify` returns a reported `unavailable` outcome instead of throwing (`session-engine.ts`, converted in `session-host.ts` as `update` and `sweep` already were), and an attempt is recorded against its revision, so a failed audit sets no `sweepRequired`, re-arms nothing and waits for the next revision. |
+| `46d45b2` | The pump takes contexts with a waiting synchronized request in a first pass and background work only in a second, so background maintenance cannot hold the single analysis slot against a waiting client. A demotion races `releaseCompiler` against the new `demoteDeadlineMs` budget, 5 s, and evicts an unresponsive session under pressure; `ContextStatus` adds `demoting` and `unresponsiveSince`, which the codec and the JSON `ramify daemon status` document carry. |
+
+**Tests.** Five in the contexts owner's `src/tests/hot-budget.test.ts`, on the
+scripted clock and driver: a demotion cancels the armed audit and the demoted
+context runs no work over five sweep intervals; a rejected audit counts as the
+attempt for its revision and the next audit waits for the next revision; a
+reported `unavailable` audit is accepted as that attempt; a waiting synchronized
+request is captured before another context resumes its background work; and a
+`releaseCompiler` that never answers evicts the context at its deadline with
+reason `pressure`, with the unresponsive demotion in the status and the waiting
+context published. Each fails on the code before its fix. `context-manager.test.ts`,
+`root-resolution.test.ts`, `covering.test.ts`, `deadlines.test.ts`,
+`session-driver.test.ts`, the daemon codec, service, session-counter and
+validation tests and `subs/analysis/src/tests/retained-session.test.ts` pass
+unchanged.
+
+**Gates.** The reproduction was re-run on the rebuilt tree: the demoted
+supervisor held 0 jiffies in both 5 s `/proc` samples taken during the 90 s dwell,
+where the failing build held 927, and the fourth context checked in 4,496 ms. The
+workload then ran on the same build: `I2-29:many-contexts` is measured and passed
+in 44 s, with all eight of its predicates and no advisory miss. Settled RSS is
+134.2 MiB of the 1,024 MiB target and global retained bytes 64.1 MiB of 512 MiB,
+over eight warm contexts, two of them hot and six with released compilers, each
+retaining 7.98 MiB of facts. The invocation exits 1 because the other eight
+workloads are unmeasured in it. `RAMIFY_MEASUREMENT_ACTIVITY` recorded a host
+shared with one idle agent session and idle editor servers, no concurrent builds,
+audits or other measurements, load average 1.19 at start. Archive:
+`scripts/measurements/results/resident-2026-09-14T18-33-21.430Z-1b256c8a-372f-4060-be51-1e493331dc5a.json.gz`.
+`npm run type-check`, `git diff --check` and `npm run check:self`, which checks all
+eleven owners, pass on the final tree.
+
+**Left open.** `I2-29:entry-footprints` is unaffected and stays open. The
+demotion deadline is a budget of the context manager only; a session that stops
+answering other operations is still bounded by the existing request deadlines.
 
 ## Waived and unexecuted work
 
@@ -627,6 +693,16 @@ figures predate the not-checked answer of 2026-09-14; narrowing the full
 resolution replay a configuration with `references` still keeps; and the
 refinement `I5-12:burst-coalesced` records, where a hook racing a write burst
 cancels the watcher's debounce and the burst publishes two revisions.
+
+**After closure, 2026-09-14.** `I2-29:many-contexts`, which the completion report
+recorded as an open defect, is diagnosed and fixed on branch
+`investigate/many-contexts`: an idle audit stayed armed after a demotion, failed
+against the released compiler and re-armed itself, which spun the demoted context
+and starved the next context's check. The workload now passes, and the
+[addendum](plans/iteration-5-fast-incremental-checks/iterations/iteration13-results.md#addendum-2026-09-14-the-many-contexts-stall)
+records the diagnosis, the fix, its tests and the measured run.
+`I2-29:entry-footprints` stays open: the 50 ms sampler cannot observe the
+Bun-compiled client's 25.5 ms help entry.
 ```
 
 ### 4. `docs/analysis/fast-incremental-checks.md`

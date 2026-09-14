@@ -603,7 +603,12 @@ path that relinks.
 
 **Audit.** `verify` recomputes every fact from the warm compiler and compares it
 with the retained facts. The daemon runs it on idle, at most once per revision,
-and publishes the recomputed facts with cause `verify` on a mismatch. Because it
+and publishes the recomputed facts with cause `verify` on a mismatch. Only a hot
+session is audited: a demotion cancels an armed audit, and a session whose
+compiler is released reports that outcome rather than failing (2026-09-14). An
+attempt counts for its revision whether it compared the facts or reported that it
+could not, so an audit that fails waits for the next revision and requires no
+sweep (2026-09-14). Because it
 recomputes through the same compiler, the audit cannot detect a compiler holding
 stale options; only a comparison with a batch run over the same inputs verifies
 input identity.
@@ -637,6 +642,13 @@ configuration or manifest events required.
 `deadline-exceeded`; in both cases the update continues and publishes. Sessions
 move between hot, warm and cold levels as the
 [memory lifecycle](memory-lifecycle.md#retained-sessions-and-their-levels) states.
+A demotion is bounded by `demoteDeadlineMs`, 5 s: a session that has not released
+its compiler by then is unresponsive, and the context is evicted under pressure
+so the hot budget and the analysis slot are free again (2026-09-14). `ContextStatus`
+reports the demotion in flight and the moment a demotion passed its deadline
+(2026-09-14). A context with a waiting synchronized request is scheduled before
+any context's background maintenance, which cannot take the analysis slot from a
+waiting client (2026-09-14).
 
 **Hook request and reply.** `ramify check --changed <path>...` hashes each named
 file in the CLI, a missing file as absent, and sends one synchronized request with

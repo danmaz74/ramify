@@ -3248,6 +3248,79 @@
           "passed": false
         }
       ]
+    },
+    {
+      "file": "resident-2026-09-14T18-33-21.430Z-1b256c8a-372f-4060-be51-1e493331dc5a.json.gz",
+      "rawSha256": "f1cc55aa5b26025625cececd948e90dbd77ef865c6e4e080f6176581fed3a4d3",
+      "gzipSha256": "2f3376ba14c5ba7bc18caf07cfecdc1725680097dfd373b69932bbcd498f8a67",
+      "rawBytes": 3117863,
+      "gzipBytes": 165347,
+      "gzipMembers": [
+        {
+          "offset": 0,
+          "length": 165347,
+          "rawBytes": 3117863,
+          "rawSha256": "f1cc55aa5b26025625cececd948e90dbd77ef865c6e4e080f6176581fed3a4d3",
+          "gzipSha256": "2f3376ba14c5ba7bc18caf07cfecdc1725680097dfd373b69932bbcd498f8a67"
+        }
+      ],
+      "note": "Real resident workload observations; advisory performance targets, binding runtime limits, missing and failing evidence retained.",
+      "measuredAt": "2026-09-14T18:33:21.430Z",
+      "completedAt": "2026-09-14T18:34:10.111Z",
+      "phase": "resident",
+      "passed": false,
+      "payloadSchema": "ramify.resident-measurements/1",
+      "build": {
+        "files": 315,
+        "sha256": "110dc3d078f28fc54fcc205e1cd6f81a6f3da92c0473b07130039fc29fca5084"
+      },
+      "workloads": [
+        {
+          "name": "I2-29:entry-footprints",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:cold-warm-broad-reference",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:cold-warm-broad-hundred",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:repeated-edit-plateau",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:many-contexts",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2-29:slow-consumer",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:synthetic-500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:synthetic-1000",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:publication-peak",
+          "status": "not-executed",
+          "passed": false
+        }
+      ]
     }
   ],
   "finalRecord": "merged-main.json.gz"
