@@ -7,7 +7,7 @@ services:
       dockerfile: .devcontainer/Dockerfile
       args:
         CLAUDE_CODE_VERSION: latest
-        CUCUMBER_VIZ_VERSION: 0.6.3
+        CUCUMBER_VIZ_VERSION: 0.7.0
     dns:
       - 8.8.8.8
       - 8.8.4.4

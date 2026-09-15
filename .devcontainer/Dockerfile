@@ -123,7 +123,7 @@ RUN sudo npm install -g pm2
 # Bump CUCUMBER_VIZ_VERSION to pick up a newly published version; the paths in
 # .mcp.json, ecosystem.config.cjs and .devcontainer/codex-config.toml point at
 # this global install.
-ARG CUCUMBER_VIZ_VERSION=0.6.3
+ARG CUCUMBER_VIZ_VERSION=0.7.0
 RUN sudo npm install -g --registry https://npm.braimax.com cucumber-viz@${CUCUMBER_VIZ_VERSION}
 
 # Seed the container-local Codex config (auth.json is bind-mounted at runtime).
