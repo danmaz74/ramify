@@ -7,7 +7,7 @@ bounded hook check. [Implemented retained session](#implemented-retained-session
 states what Plan 5 delivered. The process/client split and memory/testing
 requirements are decided in the [architecture overview](README.md). The
 [Plan 1 handoff](../plans/done/iteration-1-project-verifier/iterations/iteration15-results.md)
-records batch evidence, the [Plan 2 remediation](../plans/iteration-2-resident-verification/remediation-2026-09-11.md)
+records batch evidence, the [Plan 2 remediation](../plans/done/iteration-2-resident-verification/remediation-2026-09-11.md)
 records resident evidence, and the [Plan 5 completion report](../plans/iteration-5-fast-incremental-checks/iterations/iteration13-results.md)
 records the retained session's evidence and limits. The MCP adapter, unsaved-content overlays and the explorer are not implemented.
 

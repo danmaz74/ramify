@@ -25,13 +25,13 @@ watcher against the same edits.
   IDs, `remove-hop`, `restore-hop`); rows I2-25 and I2-26.
 - Main plan: Coherent inputs, retained products and equivalence; harness
   points 5 and 8; the first risk row.
-- [Reference contract map](../../reference-project/contract-map.md): Exposing
-  statements; [reference cases](../../reference-project/cases.md): Exposure
+- [Reference contract map](../../../reference-project/contract-map.md): Exposing
+  statements; [reference cases](../../../reference-project/cases.md): Exposure
   and original identity, Tags and source areas, Testing and composition.
 - The iteration 3 I2-11 handlers, the iteration 6 scenario mutations and
   `scripts/reference-harness/mutation.ts` (`replaceExactlyOnce`), which
   these sequences reuse at process level.
-- [Daemon and analysis](../../../architecture/daemon.md): Incremental updates
+- [Daemon and analysis](../../../../architecture/daemon.md): Incremental updates
   and analysis depth, DA06 to DA08, DA10.
 
 ## Deliverables

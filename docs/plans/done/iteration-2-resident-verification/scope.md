@@ -6,7 +6,7 @@ document fixes the deployment arrangement, endpoint discovery, lifecycle
 outcomes, the invalidation dependency model, budgets and deferrals in
 reviewable form. [contracts.md](contracts.md) owns the exact signatures and
 wire schemas; [owners.md](owners.md) owns declarations and placement. Plan 1's
-[scope decisions](../done/iteration-1-project-verifier/scope.md) remain in
+[scope decisions](../iteration-1-project-verifier/scope.md) remain in
 force for everything they cover: configurations, compiler integration, the
 captured input view, report schema and production selection. Batch and resident
 analysis use the same limits, including the large-report capacity amendment below.
@@ -126,7 +126,7 @@ recompute more than the minimum; it may never recompute less.
 | `decide` | `link` set plus `access` set | All unchanged. |
 | `report` | Everything | Never reused; assembled fresh, sharing unchanged frozen subtrees. |
 
-The rows of the architecture's [required reconsideration table](../../architecture/daemon.md#incremental-updates-and-analysis-depth)
+The rows of the architecture's [required reconsideration table](../../../architecture/daemon.md#incremental-updates-and-analysis-depth)
 map onto this model as follows:
 
 | Input change | Changed captured inputs | Minimum rerun |
@@ -167,7 +167,7 @@ revisions is deferred with a trigger recorded under [deferrals](#explicit-deferr
 
 ## Budgets
 
-Starting values come from Plan 1's [agreed batch budgets](../done/iteration-1-project-verifier/iterations/iteration15-results.md#batch-measurements-and-agreed-budgets):
+Starting values come from Plan 1's [agreed batch budgets](../iteration-1-project-verifier/iterations/iteration15-results.md#batch-measurements-and-agreed-budgets):
 5 s and 15 s cold checks, 512 MiB and 768 MiB combined peaks, and 16 MiB heap
 and 64 MiB RSS settled growth over the last twenty cycles. Resident values
 below replace them where the resident workload differs.
@@ -257,7 +257,7 @@ temporary advisory policy above when deciding acceptance.
 
 Iteration 1 revision, 2026-09-11: the measured full-recompute medians are
 **3.442 s reference / 5.723 s S100**, from twenty serial compiled in-process
-runs each ([raw evidence](../../../scripts/probes/results/warm-recompute.json),
+runs each ([raw evidence](../../../../scripts/probes/results/warm-recompute.json),
 [recipe and stage split](probes.md#warm-recompute)). Source targets allow at
 least 1.25 times that floor and broad targets at least 1.5 times it, rounded
 up to the next 0.5 s where an existing target was lower. Thus reference source

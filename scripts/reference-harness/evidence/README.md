@@ -25,7 +25,7 @@ the compiled build is unchanged. Read the report with:
 gzip -dc scripts/reference-harness/evidence/plan2-iteration14-incomplete.json.gz
 ```
 
-The [iteration-14 report](../../../docs/plans/iteration-2-resident-verification/iterations/iteration14-results.md)
+The [iteration-14 report](../../../docs/plans/done/iteration-2-resident-verification/iterations/iteration14-results.md)
 separates these failures, the passing batch self-check, measurement checkpoint,
 automation-owned regression runs and the missing macOS evidence.
 

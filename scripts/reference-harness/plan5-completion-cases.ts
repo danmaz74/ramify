@@ -132,7 +132,7 @@ async function packedEntries(context: ProjectContext): Promise<void> {
   const installed = await realpath(join(consumer, 'node_modules/ramify.ts'));
   const expected = reviewedPackage(
     await readFile(join(context.root, 'docs/plans/done/iteration-1-project-verifier/contracts.md'), 'utf8'),
-    await readFile(join(context.root, 'docs/plans/iteration-2-resident-verification/contracts.md'), 'utf8'));
+    await readFile(join(context.root, 'docs/plans/done/iteration-2-resident-verification/contracts.md'), 'utf8'));
   assertions.equal('all eight packed entries resolve with their import and type conditions', await validatePackageEntries(installed, expected), 8);
   const manifest = JSON.parse(await readFile(join(installed, 'package.json'), 'utf8')) as { bin: unknown; exports: Record<string, unknown> };
   assertions.equal('the entry map is Plan 2\'s eight entries', Object.keys(manifest.exports),

@@ -20,14 +20,14 @@ completion report Plans 3 to 6 start from.
   I2-30; the self-checking risk row; harness item 8.
 - [owners.md](../owners.md): Unchanged owners; Package entries and their
   runtime closures; Manual description review.
-- [Tooling roadmap](../../../roadmap.md): Plan 2: Resident
+- [Tooling roadmap](../../../../roadmap.md): Plan 2: Resident
   verification (Required evidence and next-plan inputs); Information to
   preserve between plans; authoring rule 9.
-- Plan 1's [iteration 15](../../done/iteration-1-project-verifier/iterations/iteration15.md)
-  and its [completion report](../../done/iteration-1-project-verifier/iterations/iteration15-results.md)
+- Plan 1's [iteration 15](../../iteration-1-project-verifier/iterations/iteration15.md)
+  and its [completion report](../../iteration-1-project-verifier/iterations/iteration15-results.md)
   as the report's pattern; `scripts/reference-harness/relocation.ts` and
   `self-cases.ts`.
-- [Development testing guide](../../../development/testing.md): Commands
+- [Development testing guide](../../../../development/testing.md): Commands
   currently available, Report what ran.
 
 ## Deliverables

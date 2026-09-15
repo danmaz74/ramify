@@ -6,12 +6,12 @@ evidence is recorded by the gates, not inferred from this inventory.
 This document freezes fixture causes and independent expectations; it does not
 establish implementation availability or architectural acceptance. The
 [main-plan matrix](main-plan.md#acceptance-matrix), the architecture's
-[DA](../../architecture/daemon.md#acceptance-evidence),
-[PC](../../architecture/processes-and-clients.md#acceptance-evidence),
-[ML](../../architecture/memory-lifecycle.md#measurement-and-acceptance) and
-[QT](../../architecture/quick-testing.spec.md#complementary-verification) cases,
-the [reference contract map](../reference-project/contract-map.md) and Plan 1's
-[instance inventory](../done/iteration-1-project-verifier/subcases.md) govern
+[DA](../../../architecture/daemon.md#acceptance-evidence),
+[PC](../../../architecture/processes-and-clients.md#acceptance-evidence),
+[ML](../../../architecture/memory-lifecycle.md#measurement-and-acceptance) and
+[QT](../../../architecture/quick-testing.spec.md#complementary-verification) cases,
+the [reference contract map](../../reference-project/contract-map.md) and Plan 1's
+[instance inventory](../iteration-1-project-verifier/subcases.md) govern
 these records. Passing one instance never passes an entire family.
 
 ## Membership and intermediate gates

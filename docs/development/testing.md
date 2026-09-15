@@ -74,7 +74,7 @@ records evidence and its limits. For reproducible batch resource measurements,
 use the [measurement recipes](../../scripts/measurements/README.md).
 
 For the resident-plan remediation, the approved
-[acceptance evidence reuse amendment](../plans/iteration-2-resident-verification/acceptance-evidence-policy.md)
+[acceptance evidence reuse amendment](../plans/done/iteration-2-resident-verification/acceptance-evidence-policy.md)
 permits provenance-backed composition of unchanged executions and focused
 reruns. It retains all required cases and workload counts. Historical artifacts
 remain unchanged; a composed receipt identifies their original inputs separately

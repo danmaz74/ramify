@@ -129,7 +129,7 @@ and record the change in the contract map below.
 - The [contract map](../../docs/plans/reference-project/contract-map.md) records
   every exposed symbol: its owner, defining file, kind, tags, the statements
   that carry it, and the modules that import it.
-- The [reference harness](../../scripts/reference-harness/) holds one record per
+- The [reference harness](../../scripts/reference-harness) holds one record per
   case family and prints what has actually been established. From the repository
   root above this package:
 

@@ -22,12 +22,12 @@ publication peaks.
 - [scope.md](../scope.md): Budgets in full, especially the binding-moment
   paragraph, Latency and memory targets and Resident measurement recipe;
   Explicit deferrals (the compiler-state trigger).
-- [Memory lifecycle](../../../architecture/memory-lifecycle.md): Measurement
+- [Memory lifecycle](../../../../architecture/memory-lifecycle.md): Measurement
   and acceptance; Repeatable setup measurements; ML01 to ML04, ML06, ML07.
 - Main plan: Resolved decision 6; RP-2 and RP-7; matrix row I2-29; harness
   point 6.
-- Plan 1's [batch measurements and agreed budgets](../../done/iteration-1-project-verifier/iterations/iteration15-results.md#batch-measurements-and-agreed-budgets)
-  and the [batch recipe](../../../../scripts/measurements/README.md);
+- Plan 1's [batch measurements and agreed budgets](../../iteration-1-project-verifier/iterations/iteration15-results.md#batch-measurements-and-agreed-budgets)
+  and the [batch recipe](../../../../../scripts/measurements/README.md);
   `scripts/measurements/{run,common,repeated,session-setup}.mjs`,
   `materialize.ts` and `results/index.json`.
 - Iteration 1's `probes.md`: the warm-recompute floor.

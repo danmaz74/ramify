@@ -450,7 +450,7 @@ Cucumber tiers.
 
 No macOS run exists for any Plan 5 build, and none can run on this Linux host.
 The latest recorded macOS evidence is Plan 2's: the
-[remediation](../../iteration-2-resident-verification/remediation-2026-09-11.md#macos-portability-verification)
+[remediation](../../done/iteration-2-resident-verification/remediation-2026-09-11.md#macos-portability-verification)
 records 308 of 308 Plan 1 cases, 78 of 78 resident process and IPC cases and
 1,243 toolkit tests on Darwin arm64 in validation run 34599155866, and the
 composed focused run 34615302017, on 2026-09-11. HO-19 drives the macOS RSS

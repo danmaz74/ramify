@@ -100,7 +100,7 @@ async function packed(context: ProjectContext, resident: boolean): Promise<void>
   const installed = await realpath(join(consumer, 'node_modules/ramify.ts'));
   const expected = reviewedPackage(
     await readFile(join(context.root, 'docs/plans/done/iteration-1-project-verifier/contracts.md'), 'utf8'),
-    await readFile(join(context.root, 'docs/plans/iteration-2-resident-verification/contracts.md'), 'utf8'));
+    await readFile(join(context.root, 'docs/plans/done/iteration-2-resident-verification/contracts.md'), 'utf8'));
   context.assertions.equal('all packed import and type conditions expose their required bindings', await validatePackageEntries(installed, expected), 8);
   const preload = await realpath(join(context.root, 'src/tests/process-probe.mjs'));
   // Probe-traced commands run the unpacked Node entry; the bin launcher would exec the untraceable compiled client.

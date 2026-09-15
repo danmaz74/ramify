@@ -2,7 +2,7 @@
 
 The user's 2026-09-11 decision makes empirical latency, RSS, heap and
 memory-growth targets advisory for current batch and resident measurement
-commands and acceptance gates, including inherited Plan 1 comparisons. See the [active scope decision](../../docs/plans/iteration-2-resident-verification/scope.md#budgets).
+commands and acceptance gates, including inherited Plan 1 comparisons. See the [active scope decision](../../docs/plans/done/iteration-2-resident-verification/scope.md#budgets).
 The numbers below remain comparison baselines. Record actual values and target
 misses without claiming performance acceptance. Runtime protocol, queue and
 retention limits, correctness, resource cleanup and finite harness hang guards

@@ -30,8 +30,8 @@ channel; iteration 6 runs the edit scenarios over the same environment.
 - Main plan: Exposure rules for the resident owners; Required data flow;
   Engine results and their delivery; matrix rows I2-01, I2-03, I2-04 and
   I2-13.
-- [Quick testing](../../../architecture/quick-testing.spec.md) in full.
-  [Processes and clients](../../../architecture/processes-and-clients.md):
+- [Quick testing](../../../../architecture/quick-testing.spec.md) in full.
+  [Processes and clients](../../../../architecture/processes-and-clients.md):
   Shared service boundary.
 - Source: `src/batch.ts` (the limits and registry the driver reuses),
   `subs/analysis/src/increment.ts`, the contexts interface.

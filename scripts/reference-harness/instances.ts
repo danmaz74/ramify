@@ -14,7 +14,7 @@ export type FixtureCode = 'A' | 'W' | 'R' | 'F' | 'J' | 'T' | 'M' | 'H' | 'Q' | 
 export type EvidenceKind = 'api' | 'unit' | 'session' | 'quick' | 'ipc' | 'process' | 'measurement';
 export const plan5Directory = 'docs/plans/iteration-5-fast-incremental-checks';
 export const plan5InventoryDocument = `${plan5Directory}/subcases.md`;
-export const plan2Directory = 'docs/plans/iteration-2-resident-verification';
+export const plan2Directory = 'docs/plans/done/iteration-2-resident-verification';
 export const plan2InventoryDocument = `${plan2Directory}/subcases.md`;
 
 export const planDirectory = 'docs/plans/done/iteration-1-project-verifier';

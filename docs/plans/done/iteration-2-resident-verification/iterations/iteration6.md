@@ -30,9 +30,9 @@ through the direct channel.
   Resolved decision 3.
 - [contracts.md](../contracts.md): the ordering and watcher rules under
   Contexts; the `CheckOutcome` and `OpenOutcome` shapes.
-- [Daemon and analysis](../../../architecture/daemon.md): DA02, DA05 to
-  DA09, DA13, DA14. [Reference contract map](../../reference-project/contract-map.md)
-  for W2, C1, K1 and the `remove-hop` anchor; [reference cases](../../reference-project/cases.md):
+- [Daemon and analysis](../../../../architecture/daemon.md): DA02, DA05 to
+  DA09, DA13, DA14. [Reference contract map](../../../reference-project/contract-map.md)
+  for W2, C1, K1 and the `remove-hop` anchor; [reference cases](../../../reference-project/cases.md):
   Exposure and original identity, Tags and source areas, Testing and
   composition.
 - Iteration 3's I2-11 handlers and `scripts/reference-harness/mutation.ts`

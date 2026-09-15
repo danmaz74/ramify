@@ -8,7 +8,7 @@ approach below remain the decided architecture for later delivery. Their contrac
 resident resource budgets still require review. The
 [Plan 1 handoff](../plans/done/iteration-1-project-verifier/iterations/iteration15-results.md)
 records implemented behavior and outstanding acceptance evidence.
-The [Plan 2 checkpoint](../plans/iteration-2-resident-verification/iterations/iteration14-results.md)
+The [Plan 2 checkpoint](../plans/done/iteration-2-resident-verification/iterations/iteration14-results.md)
 records the partial resident implementation and its missing providers.
 
 The current CLI runs `ramify check` through a fresh disposable analysis session;

@@ -26,9 +26,9 @@ state, with timings inside the fixed limits.
   `DisconnectReason`, `RecoveryOutcome`, `StopDisposition`.
 - Main plan: Resolved decision 7; the error table; matrix rows I2-18 and
   I2-27; the risk row on missed stop notifications.
-- [Processes and clients](../../../architecture/processes-and-clients.md):
-  Launch, compatibility and shutdown, PC06. [Memory lifecycle](../../../architecture/memory-lifecycle.md):
-  Pressure, eviction and recovery, ML03, ML07. [Quick testing](../../../architecture/quick-testing.spec.md):
+- [Processes and clients](../../../../architecture/processes-and-clients.md):
+  Launch, compatibility and shutdown, PC06. [Memory lifecycle](../../../../architecture/memory-lifecycle.md):
+  Pressure, eviction and recovery, ML03, ML07. [Quick testing](../../../../architecture/quick-testing.spec.md):
   Complementary verification, QT05.
 - Iteration 8's `daemon-process.test.ts` and the traced-process helper;
   iteration 9's `watch-command.ts` and `errors.ts`.

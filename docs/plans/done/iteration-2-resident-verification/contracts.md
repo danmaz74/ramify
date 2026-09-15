@@ -9,9 +9,9 @@ document. Changing a signature, a wire schema or an activation stage revises
 this package before its consumers change.
 
 Every name implemented by Plan 1 is reused exactly as recorded in its
-[contracts](../done/iteration-1-project-verifier/contracts.md); nothing there
+[contracts](../iteration-1-project-verifier/contracts.md); nothing there
 is renamed. The `AnalysisDriver` draft reviewed there as
-[type only](../done/iteration-1-project-verifier/contracts.md#future-contexts-boundary-type-review-only)
+[type only](../iteration-1-project-verifier/contracts.md#future-contexts-boundary-type-review-only)
 is extended here, as that review anticipated.
 
 The [iteration 1 review record](probes.md#contract-review) identifies the
@@ -116,7 +116,7 @@ export declare function resolveProjectRoot(request: ProjectRequest, signal?: Abo
 ```
 
 `resolveProjectRoot` performs exactly the root climb and configuration
-discovery of the [CLI invocation contract](../../architecture/cli-invocation.spec.md#selecting-the-project)
+discovery of the [CLI invocation contract](../../../architecture/cli-invocation.spec.md#selecting-the-project)
 and returns canonical real absolute paths. It reads no description contents
 and builds no source catalog. Root/path discovery alone cannot identify a
 references-only configuration: resolution uses a short-lived configuration

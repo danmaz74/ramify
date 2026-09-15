@@ -166,7 +166,7 @@ Node entry, with the same contract; see the
 `ramify watch` streams versioned revision and status events, fetches each
 report by its exact revision id, and releases its subscription on SIGINT.
 `ramify daemon status` and `ramify daemon stop` never start a daemon. The
-[resident contracts](../plans/iteration-2-resident-verification/contracts.md)
+[resident contracts](../plans/done/iteration-2-resident-verification/contracts.md)
 define those documents, bounded recovery and visible batch fallback after
 exhausted unexpected-failure recovery. Explicit stop never causes fallback.
 

@@ -36,7 +36,7 @@ export async function executionIdentity() {
     'docs/plans/done/iteration-1-project-verifier/iterations/manifest.json',
     'docs/plans/done/iteration-2-resident-verification/supersession-plan5.md',
     'docs/plans/iteration-5-fast-incremental-checks/scope.md', 'docs/plans/iteration-5-fast-incremental-checks/main-plan.md', 'docs/plans/iteration-5-fast-incremental-checks/subcases.md',
-    'docs/plans/iteration-2-resident-verification/main-plan.md', 'docs/plans/iteration-2-resident-verification/subcases.md'])
+    'docs/plans/done/iteration-2-resident-verification/main-plan.md', 'docs/plans/done/iteration-2-resident-verification/subcases.md'])
     .split('\0').filter(Boolean);
   const deleted = new Set(git(['ls-files', '--deleted', '-z']).split('\0').filter(Boolean));
   // Generated measurement archives are evidence outputs. Hashing them here

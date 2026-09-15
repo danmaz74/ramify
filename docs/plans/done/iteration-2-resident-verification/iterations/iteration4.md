@@ -33,11 +33,11 @@ engine or socket.
   the iteration 4 row of the Activation manifest.
 - Main plan: Resolved decisions 2, 3, 4, 6 and 7; Engine results and their
   delivery; matrix rows I2-05 to I2-08 and I2-12.
-- [Daemon and analysis](../../../architecture/daemon.md): Context identity and
+- [Daemon and analysis](../../../../architecture/daemon.md): Context identity and
   retained state; Revisions and atomic publication; Freshness, saves and
-  overlays. [Memory lifecycle](../../../architecture/memory-lifecycle.md):
+  overlays. [Memory lifecycle](../../../../architecture/memory-lifecycle.md):
   State ownership and bounds; Pressure, eviction and recovery.
-- Plan 1 [contracts](../../done/iteration-1-project-verifier/contracts.md#future-contexts-boundary-type-review-only):
+- Plan 1 [contracts](../../iteration-1-project-verifier/contracts.md#future-contexts-boundary-type-review-only):
   the type-only `AnalysisDriver` review this iteration extends.
 
 ## Deliverables

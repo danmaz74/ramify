@@ -23,17 +23,17 @@ scaled. No owner source, harness code or daemon code is written here.
 - [contracts.md](../contracts.md), [owners.md](../owners.md),
   [scope.md](../scope.md) and [subcases.md](../subcases.md) in full; they are
   the objects of this review.
-- [Daemon and analysis](../../../architecture/daemon.md): Context identity and
+- [Daemon and analysis](../../../../architecture/daemon.md): Context identity and
   retained state, Freshness, saves and overlays, Service operations and client
   behavior, Decisions still requiring review.
-- [Processes and clients](../../../architecture/processes-and-clients.md):
-  Launch, compatibility and shutdown. [Memory lifecycle](../../../architecture/memory-lifecycle.md):
-  State ownership and bounds, Initial setup probe. [Quick testing](../../../architecture/quick-testing.spec.md):
+- [Processes and clients](../../../../architecture/processes-and-clients.md):
+  Launch, compatibility and shutdown. [Memory lifecycle](../../../../architecture/memory-lifecycle.md):
+  State ownership and bounds, Initial setup probe. [Quick testing](../../../../architecture/quick-testing.spec.md):
   Real flows with direct adapters.
-- Plan 1's [implemented contracts and Plan 2 starting requirements](../../done/iteration-1-project-verifier/iterations/iteration15-results.md#implemented-contracts-and-plan-2-starting-requirements)
-  and its [probe record](../../done/iteration-1-project-verifier/probes.md) as
+- Plan 1's [implemented contracts and Plan 2 starting requirements](../../iteration-1-project-verifier/iterations/iteration15-results.md#implemented-contracts-and-plan-2-starting-requirements)
+  and its [probe record](../../iteration-1-project-verifier/probes.md) as
   the pattern for probe scripts and archived results.
-- [Module-description principles](../../../model/module-description.principles.md)
+- [Module-description principles](../../../../model/module-description.principles.md)
   for the manual review of the two new declarations in owners.md.
 
 ## Deliverables

@@ -34,7 +34,7 @@ const output = resolve(options.get('--output') ?? join(parent, 'reports', `resid
 const controller = new AbortController();
 const onInterrupt = () => controller.abort();
 process.once('SIGINT', onInterrupt); process.once('SIGTERM', onInterrupt);
-const scope = 'docs/plans/iteration-2-resident-verification/scope.md';
+const scope = 'docs/plans/done/iteration-2-resident-verification/scope.md';
 const report = {
   schemaVersion: 'ramify.resident-measurements/1', measuredAt: new Date().toISOString(),
   command: ['node', 'scripts/measurements/resident.mjs', ...args], passed: false, status: 'incomplete', evidenceKind: 'measurement',

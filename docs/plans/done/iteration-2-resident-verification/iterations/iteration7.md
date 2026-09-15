@@ -31,9 +31,9 @@ peer.
   closures, the iteration 7 row of the Activation manifest.
 - Main plan: Resolved decisions 1, 5 and 7; Distinct entries and the
   separately importable client.
-- [Processes and clients](../../../architecture/processes-and-clients.md):
+- [Processes and clients](../../../../architecture/processes-and-clients.md):
   Launch, compatibility and shutdown; Modules and executable entry points.
-  [Memory lifecycle](../../../architecture/memory-lifecycle.md): Runtime
+  [Memory lifecycle](../../../../architecture/memory-lifecycle.md): Runtime
   dependency boundaries; Slow consumers and backpressure.
 - Iteration 1's `probes.md`: the socket-framing, atomic-record and
   detached-spawn results.

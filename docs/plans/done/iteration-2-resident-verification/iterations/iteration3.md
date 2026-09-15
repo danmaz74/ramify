@@ -30,15 +30,15 @@ byte-for-byte unchanged.
 - Main plan: Starting point; Coherent inputs, retained products and
   equivalence; Engine results and their delivery; Resolved decision 4; the
   inherited findings paragraph.
-- [Daemon and analysis](../../../architecture/daemon.md): Engine inputs and
+- [Daemon and analysis](../../../../architecture/daemon.md): Engine inputs and
   analysis pipeline; Incremental updates and analysis depth.
-- [CLI invocation](../../../architecture/cli-invocation.spec.md): Selecting
+- [CLI invocation](../../../../architecture/cli-invocation.spec.md): Selecting
   the project; Compiler configuration.
 - Source: `subs/analysis/src/{run-analysis,session,analyze-project,index}.ts`
   and `interfaces/analysis.ts`; `subs/analysis/subs/project/src/{read-project,configuration}.ts`
   and `interfaces/project.ts`; the `require` and `declare global` coverage
   paths in `subs/analysis/subs/typescript/src/{accesses,catalog}.ts`.
-- Plan 1 [contracts](../../done/iteration-1-project-verifier/contracts.md):
+- Plan 1 [contracts](../../iteration-1-project-verifier/contracts.md):
   Analysis: staged composition and completed results; Project: acquisition,
   inventory and metadata.
 

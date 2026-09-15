@@ -160,7 +160,7 @@ This is linear verbose public evidence, not a timing-target failure or a
 quadratic exposure error. It required coordinated report, response-frame,
 outbound-queue and retained-history limits, as implemented below. No
 large-project acceptance requirement was waived.
-Raw evidence and independent checks are retained under [evidence](evidence/).
+Raw evidence and independent checks are retained under [evidence](evidence).
 
 The measurement harness previously connected only after validating a cold
 report, so cleanup could hide that original failure. Its correction connects

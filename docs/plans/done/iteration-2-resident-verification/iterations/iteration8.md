@@ -35,7 +35,7 @@ entry with eight simultaneous starts.
   closures, the iteration 8 row of the Activation manifest.
 - Main plan: Resolved decisions 1, 5 and 7; matrix rows I2-14 to I2-17;
   harness points 3 and 4.
-- [Processes and clients](../../../architecture/processes-and-clients.md):
+- [Processes and clients](../../../../architecture/processes-and-clients.md):
   Process topology; Launch, compatibility and shutdown.
 - Iteration 7's `codec.ts`, `records.ts`, `launcher.ts` and
   `connection.ts`; `src/cli-entry.ts` for the entry conventions (shebang,

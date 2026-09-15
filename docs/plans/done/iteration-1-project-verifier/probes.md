@@ -30,7 +30,7 @@ assertion makes the probe command fail. No Vitest or Cucumber regression suite
 was run by these probes.
 
 Portable stdout captures are retained in
-[`scripts/probes/results/`](../../../../scripts/probes/results/):
+[`scripts/probes/results/`](../../../../scripts/probes/results):
 
 | Command | Raw result | Assertion/result |
 | --- | --- | --- |
@@ -187,7 +187,7 @@ compiler operation or final session cleanup path works.
 ## Source, alias and export findings
 
 The small independent fixture is
-[`scripts/probes/fixtures/compiler-api/`](../../../../scripts/probes/fixtures/compiler-api/).
+[`scripts/probes/fixtures/compiler-api/`](../../../../scripts/probes/fixtures/compiler-api).
 Its configuration uses bundler resolution, a `@probe/*` path alias and
 `verbatimModuleSyntax: false`, so the unmarked purely type imports are legal.
 The repository scripts scope checks the probe and fixture source; the one

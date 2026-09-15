@@ -5,10 +5,10 @@ manual declaration review passed; direct implementation of the revised package
 was authorized on 2026-09-11. These are the required final declaration texts.
 Implementation and acceptance evidence are verified separately. See [contracts.md](contracts.md) and the
 [review record](probes.md#contract-review). The
-definitive [description principles](../../model/module-description.principles.md)
-and [importability principles](../../model/cross-module-importability.principles.md)
+definitive [description principles](../../../model/module-description.principles.md)
+and [importability principles](../../../model/cross-module-importability.principles.md)
 remain authoritative. Plan 1's nine declarations are the
-[implemented starting point](../done/iteration-1-project-verifier/owners.md);
+[implemented starting point](../iteration-1-project-verifier/owners.md);
 the texts below repeat them where they change and mark unchanged owners.
 
 Every edge is a physical `subs/` edge. Iteration 2 creates the two new owner
@@ -40,7 +40,7 @@ ramify [dispatch]                       CLI, daemon and batch entries; service v
 
 Complete final `module.ramify` (R2, R4 syntax, R4 source and R5 lines are
 byte-identical to Plan 1 and abbreviated here with `…`; the full name lists
-are in the [implemented file](../../../module.ramify)):
+are in the [implemented file](../../../../module.ramify)):
 
 ```ramify
 ramify 1

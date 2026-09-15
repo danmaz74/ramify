@@ -41,7 +41,7 @@ const documents = new Set(['docs/plans/done/iteration-1-project-verifier/main-pl
   'docs/plans/done/iteration-1-project-verifier/subcases.md', 'docs/plans/done/iteration-1-project-verifier/iterations/manifest.json',
   'docs/plans/iteration-5-fast-incremental-checks/main-plan.md', 'docs/plans/iteration-5-fast-incremental-checks/subcases.md',
   'docs/plans/iteration-5-fast-incremental-checks/scope.md', 'docs/plans/done/iteration-2-resident-verification/supersession-plan5.md',
-  'docs/plans/iteration-2-resident-verification/main-plan.md', 'docs/plans/iteration-2-resident-verification/subcases.md']);
+  'docs/plans/done/iteration-2-resident-verification/main-plan.md', 'docs/plans/done/iteration-2-resident-verification/subcases.md']);
 function sourceInput(path: string): boolean {
   if (path.includes('/node_modules/') || path.includes('/.reference-work/') || path.startsWith('scripts/measurements/results/')) return false;
   return /^(?:src|subs|scripts)\//.test(path) || path.startsWith('examples/collection-review/') || documents.has(path)

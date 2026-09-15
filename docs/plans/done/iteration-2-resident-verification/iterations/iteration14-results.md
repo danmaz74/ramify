@@ -56,7 +56,7 @@ The roadmap has not been advanced to delivered: that would contradict the gate a
 
 ## Executed instance outcomes before the single remediation
 
-All required metadata and observations are retained in [the complete gate archive](../../../../scripts/reference-harness/evidence/plan2-iteration14-incomplete.json.gz).
+All required metadata and observations are retained in [the complete gate archive](../../../../../scripts/reference-harness/evidence/plan2-iteration14-incomplete.json.gz).
 
 | Evidence kind | Required | Passed | Failed | Not executed |
 | --- | ---: | ---: | ---: | ---: |
@@ -162,7 +162,7 @@ Executed local evidence is Linux only. Existing process-control fixtures use por
 
 ## Budgets and measurements
 
-No resident budget has a passing measured value. Scope.md's iteration-1 targets were not relaxed or rewritten. [The new raw archive](../../../../scripts/measurements/results/resident-2026-09-11T09-26-49.390Z-a323bf02-0031-45b6-bbbf-9129f33bac5d.json.gz) records absent prerequisites, identities and three real CLI help probes, with zero observed survivors. Help sampled peak RSS was 28.5 MiB; help has no numeric target and cannot pass the full entry-footprints instance.
+No resident budget has a passing measured value. Scope.md's iteration-1 targets were not relaxed or rewritten. [The new raw archive](../../../../../scripts/measurements/results/resident-2026-09-11T09-26-49.390Z-a323bf02-0031-45b6-bbbf-9129f33bac5d.json.gz) records absent prerequisites, identities and three real CLI help probes, with zero observed survivors. Help sampled peak RSS was 28.5 MiB; help has no numeric target and cannot pass the full entry-footprints instance.
 
 | Required workload | Binding target | Current resident measurement |
 | --- | --- | --- |

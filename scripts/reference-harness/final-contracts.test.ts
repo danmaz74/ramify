@@ -6,7 +6,7 @@ import { assertOwner, reviewedOwners, reviewedPackage, validatePackageEntries } 
 import { repositoryRoot } from './plan.js';
 
 const archive = 'docs/plans/done/iteration-1-project-verifier';
-const resident = 'docs/plans/iteration-2-resident-verification';
+const resident = 'docs/plans/done/iteration-2-resident-verification';
 async function reviews(file: string): Promise<[string, string]> {
   return [await readFile(join(repositoryRoot, archive, file), 'utf8'), await readFile(join(repositoryRoot, resident, file), 'utf8')];
 }

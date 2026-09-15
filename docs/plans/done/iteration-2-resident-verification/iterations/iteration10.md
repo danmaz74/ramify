@@ -24,8 +24,8 @@ and `--batch` connect to and spawn nothing they must not.
 - [contracts.md](../contracts.md): Package entries and activation.
 - Main plan: Distinct entries and the separately importable client;
   Declaration stages; matrix row I2-19.
-- [Processes and clients](../../../architecture/processes-and-clients.md):
-  Modules and executable entry points; PC01. [Memory lifecycle](../../../architecture/memory-lifecycle.md):
+- [Processes and clients](../../../../architecture/processes-and-clients.md):
+  Modules and executable entry points; PC01. [Memory lifecycle](../../../../architecture/memory-lifecycle.md):
   Runtime dependency boundaries; ML01.
 - `scripts/validate-final-contracts.ts`, `src/tests/process.ts` and
   `src/tests/process-probe.mjs` as extended in iteration 2.

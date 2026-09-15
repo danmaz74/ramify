@@ -1,8 +1,8 @@
 # Plan 2: Keep verification current
 
 **Date:** 2026-09-10. **Status:** Detailed implementation plan for review,
-authored from the roadmap's [Plan 2 brief](../../roadmap.md#plan-2-resident-verification)
-and Plan 1's [completion evidence](../done/iteration-1-project-verifier/iterations/iteration15-results.md).
+authored from the roadmap's [Plan 2 brief](../../../roadmap.md#plan-2-resident-verification)
+and Plan 1's [completion evidence](../iteration-1-project-verifier/iterations/iteration15-results.md).
 No daemon implementation or passing resident evidence is established by this
 document. The plan runs as fourteen iterations, listed under
 [Iteration sequence](#iteration-sequence); each is sized to be implemented
@@ -57,22 +57,22 @@ Inspection commands remain Plan 3, MCP Plan 4, overlays Plan 5 and the
 explorer Plan 6. This plan hands them the context, generation, revision and
 freshness contracts, the client, the codec, the direct-service harness and
 the measured limits the roadmap's
-[handoff table](../../roadmap.md#information-to-preserve-between-plans)
+[handoff table](../../../roadmap.md#information-to-preserve-between-plans)
 requires.
 
 ## Authority and supporting documents
 
 | Document | Role |
 | --- | --- |
-| [Importability principles](../../model/cross-module-importability.principles.md), [glossary](../../model/glossary.md), [module descriptions](../../model/module-description.principles.md), [TypeScript interpretation](../../model/typescript-source-interpretation.principles.md) | Definitive rules the daemon enforces unchanged; this plan adds no importability rule. |
-| [Daemon and analysis](../../architecture/daemon.md) | Ownership tree, exposure paths, context identity, revisions, freshness, invalidation, service operations and DA01–DA18. |
-| [Processes and clients](../../architecture/processes-and-clients.md) | Process split, shared service boundary, command roles, launch/shutdown/recovery contract, entry points and PC01–PC10. |
-| [Memory lifecycle](../../architecture/memory-lifecycle.md) | Dependency boundaries, retention and backpressure policy, measurement recipe and ML01–ML08. |
-| [Quick testing](../../architecture/quick-testing.spec.md) | Direct-adapter flows, harness boundaries and QT01–QT08. |
-| [CLI invocation](../../architecture/cli-invocation.spec.md) | Root and configuration discovery, warnings, output order and exits of `ramify check`, unchanged. |
-| [Tooling roadmap](../../roadmap.md) | The brief, the nine authoring rules and the scheduling map for DA/PC/ML/QT. |
-| [Plan 1 contracts](../done/iteration-1-project-verifier/contracts.md), [owners](../done/iteration-1-project-verifier/owners.md), [scope](../done/iteration-1-project-verifier/scope.md) and [handoff](../done/iteration-1-project-verifier/iterations/iteration15-results.md#implemented-contracts-and-plan-2-starting-requirements) | Implemented names, entries, limits and measured budgets this plan preserves. |
-| [Reference cases](../reference-project/cases.md), [contract map](../reference-project/contract-map.md) and [harness](../reference-project/harness.md) | Independent expectations and statement IDs for the edit sequences. |
+| [Importability principles](../../../model/cross-module-importability.principles.md), [glossary](../../../model/glossary.md), [module descriptions](../../../model/module-description.principles.md), [TypeScript interpretation](../../../model/typescript-source-interpretation.principles.md) | Definitive rules the daemon enforces unchanged; this plan adds no importability rule. |
+| [Daemon and analysis](../../../architecture/daemon.md) | Ownership tree, exposure paths, context identity, revisions, freshness, invalidation, service operations and DA01–DA18. |
+| [Processes and clients](../../../architecture/processes-and-clients.md) | Process split, shared service boundary, command roles, launch/shutdown/recovery contract, entry points and PC01–PC10. |
+| [Memory lifecycle](../../../architecture/memory-lifecycle.md) | Dependency boundaries, retention and backpressure policy, measurement recipe and ML01–ML08. |
+| [Quick testing](../../../architecture/quick-testing.spec.md) | Direct-adapter flows, harness boundaries and QT01–QT08. |
+| [CLI invocation](../../../architecture/cli-invocation.spec.md) | Root and configuration discovery, warnings, output order and exits of `ramify check`, unchanged. |
+| [Tooling roadmap](../../../roadmap.md) | The brief, the nine authoring rules and the scheduling map for DA/PC/ML/QT. |
+| [Plan 1 contracts](../iteration-1-project-verifier/contracts.md), [owners](../iteration-1-project-verifier/owners.md), [scope](../iteration-1-project-verifier/scope.md) and [handoff](../iteration-1-project-verifier/iterations/iteration15-results.md#implemented-contracts-and-plan-2-starting-requirements) | Implemented names, entries, limits and measured budgets this plan preserves. |
+| [Reference cases](../../reference-project/cases.md), [contract map](../../reference-project/contract-map.md) and [harness](../../reference-project/harness.md) | Independent expectations and statement IDs for the edit sequences. |
 
 This plan selects implementation scope and evidence; it revises no model
 document. Where the architecture lists a decision still requiring review, the
@@ -86,19 +86,19 @@ current `main`. Recheck at implementation start.
 
 - Plan 1 is complete and merged: `5b943e1` merged the workflow branch and
   `f5b0939` moved the plan to `docs/plans/done/`. The
-  [status note](../done/iteration-1-project-verifier/status-2026-09-10.md)
+  [status note](../iteration-1-project-verifier/status-2026-09-10.md)
   records `npm run reference:verify -- --plan 1` passing with 308 required, 308
   passed on a clean tree, and a batch measurement on that build: reference
   cold median 3.648 s and peak 480.863 MiB; 100 owners 6.130 s and
   367.785 MiB; settled RSS growth 21.594 MiB and 62.270 MiB. The agreed
   budgets are unchanged: 5 s and 15 s, 512 MiB and 768 MiB, 16 MiB heap and
   64 MiB RSS growth.
-- Nine owners are declared: [`module.ramify`](../../../module.ramify) at the
+- Nine owners are declared: [`module.ramify`](../../../../module.ramify) at the
   root and under `subs/analysis`, its four children, `subs/presentation`,
   `subs/presentation/subs/layout` and `subs/cli`. No `subs/daemon` directory
   exists. `npm run check:self` reports nine owners and 144 source files with
   no findings and no analysis limits.
-- [`package.json`](../../../package.json) has `bin.ramify` at
+- [`package.json`](../../../../package.json) has `bin.ramify` at
   `dist/src/cli-entry.js` and seven `exports`: `.`, `./analysis`,
   `./analysis/inventory`, `./model`, `./presentation`, `./layout`, `./cli`.
   There is no client entry.
@@ -131,15 +131,15 @@ current `main`. Recheck at implementation start.
   `ProjectInputView` with asynchronous reads and `seal()`, and `CapturedInput`
   roles `description | readme | source | resource | configuration | dependency | directory | absent`.
   Root discovery lives inside `read-project.ts`.
-- The reference harness under [`scripts/reference-harness/`](../../../scripts/reference-harness/README.md)
+- The reference harness under [`scripts/reference-harness/`](../../../../scripts/reference-harness/README.md)
   registers 308 Plan 1 instances in `plan1-instances.ts` and `cases.ts`,
   gates them through `verify.ts --plan 1 [--iteration n]`, and validates
   membership in `plan.ts`. Root process tests use `src/tests/process.ts` with
   the `process-probe.mjs` preload, which records `spawn`, `listen`, `bind`,
   `other-launch` and `exit` events plus loaded modules.
-- Batch measurements live under [`scripts/measurements/`](../../../scripts/measurements/README.md)
+- Batch measurements live under [`scripts/measurements/`](../../../../scripts/measurements/README.md)
   with the hundred-owner generator at
-  [`scripts/probes/fixtures/hundred-owners.ts`](../../../scripts/probes/fixtures/hundred-owners.ts)
+  [`scripts/probes/fixtures/hundred-owners.ts`](../../../../scripts/probes/fixtures/hundred-owners.ts)
   and archived raw results indexed in `results/index.json`. No 500 or
   1,000-owner fixture exists.
 - `vitest.config.ts` discovers `src/tests/**/*.test.{ts,tsx}` and
@@ -216,7 +216,7 @@ current `main`. Recheck at implementation start.
 ### Source scope and project selection
 
 Root selection, configuration discovery, whole-project scope, outside-module
-warnings and exits are the [CLI invocation contract](../../architecture/cli-invocation.spec.md)
+warnings and exits are the [CLI invocation contract](../../../architecture/cli-invocation.spec.md)
 and are unchanged. The daemon performs the same selection through
 `resolveProjectRoot`, and a context is exactly one whole project from its
 canonical root. The reference, site and scripts remain independent scopes;
@@ -712,7 +712,7 @@ is its owner tests over the in-process connector and a fake entry.
 Iteration 1 runs five probe scripts under `scripts/probes/`, in the scripts
 scope selected by `tsconfig.scripts.json`, each with `npx tsx scripts/probes/<name>.ts`
 and each archiving `scripts/probes/results/<name>.json`, as Plan 1's
-[probe record](../done/iteration-1-project-verifier/probes.md) did. The record
+[probe record](../iteration-1-project-verifier/probes.md) did. The record
 `probes.md` beside this plan cites every result.
 
 | Script | Result file | Must establish before iteration 3 |
@@ -812,7 +812,7 @@ Review points for iteration 1, each with the recommended choice:
 
 | ID | Question | Alternatives | Recommendation or decision |
 | --- | --- | --- | --- |
-| RP-1 | JSON output of `ramify check` | (a) bare `ramify.analysis/1` in both modes, resident facts only in the human `Mode:` line, the `watch` lines and `daemon status`; (b) a wrapping envelope document in both modes; (c) an additive `resident` member inside `ramify.analysis/1` | Decided in this revision: (a). Plan 1's `scripts/reference-harness/cli-cases.ts` (I1-26) and `self-cases.ts` compare the compiled `ramify check --format json` document with the API report by deep equality after removing only `runId`, and every compiled run asserts empty stderr; an envelope or an additional member would fail I2-30 `plan1-regression`, whose records harness item 1 leaves untouched apart from the two tree-shape expectations. The sealed [invocation contract](../../architecture/cli-invocation.spec.md#output-and-exit) and every other consumer (`src/tests/batch-cli.test.ts`, `relocation.ts`, `gate-cases.ts`) read named members and are unaffected either way. Plan 3 defines revision-qualified JSON for its own commands. |
+| RP-1 | JSON output of `ramify check` | (a) bare `ramify.analysis/1` in both modes, resident facts only in the human `Mode:` line, the `watch` lines and `daemon status`; (b) a wrapping envelope document in both modes; (c) an additive `resident` member inside `ramify.analysis/1` | Decided in this revision: (a). Plan 1's `scripts/reference-harness/cli-cases.ts` (I1-26) and `self-cases.ts` compare the compiled `ramify check --format json` document with the API report by deep equality after removing only `runId`, and every compiled run asserts empty stderr; an envelope or an additional member would fail I2-30 `plan1-regression`, whose records harness item 1 leaves untouched apart from the two tree-shape expectations. The sealed [invocation contract](../../../architecture/cli-invocation.spec.md#output-and-exit) and every other consumer (`src/tests/batch-cli.test.ts`, `relocation.ts`, `gate-cases.ts`) read named members and are unaffected either way. Plan 3 defines revision-qualified JSON for its own commands. |
 | RP-2 | Compiler state across revisions | (a) defer, reuse stage products keyed on inputs; (b) keep one long-lived helper snapshot per context | (a): the helper contract is one-shot and its close guarantees are weak; revisit when iteration 13 misses the source-edit target. |
 | RP-3 | Terminating `check` when the daemon is explicitly stopped mid-flight | (a) exit 2 `stopped`; (b) visible batch fallback | Decided in this revision: (a). The architecture ties in-process fallback to exhausted automatic recovery and makes an explicit stop a user decision that existing clients report as stopped; the `check` prints `Error [stopped]: …` and exits 2 with no fallback. |
 | RP-4 | Daemon grouping | (a) one daemon per user; (b) one per user and installation | (b): concurrent checkouts and rebuilt `dist/` never fight; the old group idles out. |

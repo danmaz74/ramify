@@ -32,8 +32,8 @@ so the Plan 1 gate keeps passing on this build.
   and recovery limits (the cancel-after-interrupt row).
 - [owners.md](../owners.md): CLI, Root, Foreign signature types, the
   iteration 9 row.
-- [CLI invocation](../../../architecture/cli-invocation.spec.md) in full;
-  [Processes and clients](../../../architecture/processes-and-clients.md):
+- [CLI invocation](../../../../architecture/cli-invocation.spec.md) in full;
+  [Processes and clients](../../../../architecture/processes-and-clients.md):
   CLI commands; PC01, PC03, PC04, PC10.
 - Source: `subs/cli/src/{arguments,run-cli,format}.ts`,
   `subs/cli/src/interfaces/cli.ts`, `src/cli-entry.ts`, `src/batch.ts`,

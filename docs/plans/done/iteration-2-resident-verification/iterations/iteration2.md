@@ -25,13 +25,13 @@ this iteration nothing in Plan 2 is green by omission.
   iteration 2 row of the Activation manifest.
 - [subcases.md](../subcases.md): Membership and intermediate gates, Fixture
   and evidence conventions, Instance counts by iteration.
-- [Reference harness README](../../../../scripts/reference-harness/README.md)
+- [Reference harness README](../../../../../scripts/reference-harness/README.md)
   and `scripts/reference-harness/{instances,plan,plan1-instances,verify,runtime,gate-cases}.ts`;
   the I1-30 harness-discipline handlers are the pattern for I2-28.
 - `src/tests/process.ts`, `src/tests/process-probe.mjs`,
   `scripts/probes/fixtures/hundred-owners.ts` and
   `scripts/measurements/materialize.ts` as they are today.
-- [Harness plan](../../reference-project/harness.md): Separate execution from
+- [Harness plan](../../../reference-project/harness.md): Separate execution from
   semantic readiness.
 
 ## Deliverables

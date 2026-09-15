@@ -9,7 +9,7 @@ export function residentInputs() {
   return {
     build: treeIdentity(join(packageRoot, 'dist')),
     source: { root: treeIdentity(join(packageRoot, 'src')), owners: treeIdentity(join(packageRoot, 'subs')) },
-    manifests: ['package.json', 'package-lock.json', 'module.ramify', 'docs/plans/iteration-2-resident-verification/scope.md'].map(hash),
+    manifests: ['package.json', 'package-lock.json', 'module.ramify', 'docs/plans/done/iteration-2-resident-verification/scope.md'].map(hash),
     recipes: filesUnder(join(packageRoot, 'scripts/measurements')).filter(path => /\.(mjs|ts)$/.test(path))
       .map(path => hash(relative(packageRoot, path))),
     fixtureGenerator: hash('scripts/probes/fixtures/synthetic-owners.ts'),

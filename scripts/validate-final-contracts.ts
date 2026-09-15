@@ -21,7 +21,7 @@ function manifest(document: DescriptionDocument): unknown {
 }
 
 const plan1 = 'docs/plans/done/iteration-1-project-verifier';
-const plan2 = 'docs/plans/iteration-2-resident-verification';
+const plan2 = 'docs/plans/done/iteration-2-resident-verification';
 interface ReviewedOwner { readonly directory: string; readonly purpose: string; readonly document: DescriptionDocument }
 interface PackageMetadata {
   readonly type: string; readonly main: string; readonly types: string;
