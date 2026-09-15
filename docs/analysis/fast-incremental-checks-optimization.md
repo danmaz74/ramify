@@ -12,10 +12,11 @@ are estimates derived from them.
 **Delivery.** The [hook optimization plan](../plans/iteration-5-hook-optimization/main-plan.md)
 delivered targets 0 to 5 and 7; its [closure](../plans/iteration-5-hook-optimization/iterations/closure.md)
 records the evidence. Every measured figure in this analysis is
-pre-optimization, taken before that plan, and none has been measured again.
-Real-process measurement of the delivered targets follows that plan. The
-[structural edit latency plan](../plans/iteration-5-structural-edits/main-plan.md)
-then repaired the created, deleted and configuration rows; see
+pre-optimization, taken before that plan. The delivered targets are measured on
+the reference and S100 in the plan's
+[measurement results](../plans/iteration-5-hook-optimization/iterations/measurement-results.md).
+The [structural edit latency plan](../plans/iteration-5-structural-edits/main-plan.md)
+then repaired the created and deleted rows; see
 [Structural edit repairs](#structural-edit-repairs).
 
 ## Priorities
@@ -329,7 +330,7 @@ Estimated savings are relative to the pre-optimization build.
 | 2 | Build only what a hook publishes | `analysis` | 60 and 345 ms from skipping the copy; 95 and 555 ms fully | cheap step, then a contract clarification | none | [delivered](../plans/iteration-5-hook-optimization/iterations/iteration3-results.md) |
 | 3 | Reuse project-root resolution for a known context | `analysis/project`, `analysis`, `daemon/contexts` | 110 and 330 ms per invocation; 120 and 330 ms per update | design change | 0 | [delivered](../plans/iteration-5-hook-optimization/iterations/iteration4-results.md) |
 | 4 | Answer a queued racing hook from the revision that just published | `daemon/contexts` | 413 and 489 ms per racing hook today; 60 to 100 ms after 1 to 3 | contract clarification | 0; best after 1 to 3 | [delivered](../plans/iteration-5-hook-optimization/iterations/iteration5-results.md) |
-| 5 | Cache the client build key | `daemon` discovery, build scripts | 25 to 30 ms per invocation | cheap | none | [delivered](../plans/iteration-5-hook-optimization/iterations/iteration6-results.md) |
+| 5 | Cache the client build key and bind the compiled client to it | `daemon` discovery, root, build scripts | 25 to 30 ms per Node entry invocation; about 9 ms per compiled client invocation | cheap step, then a small design change | the compiled client (`b6275fc`) | [delivered](../plans/iteration-5-hook-optimization/iterations/iteration6-results.md) |
 | 6 | Shorten the watcher's path to a hook's analysis | `daemon` | up to 130 ms per racing hook | design change | 0, 3 and 5 | open |
 | 7 | Sample worker RSS without a process per message on macOS | `analysis` | unmeasured; one process spawn per worker message | cheap | none | [delivered](../plans/iteration-5-hook-optimization/iterations/iteration7-results.md) |
 
@@ -423,6 +424,17 @@ update; that remains target 6.
 Precompute the runtime identity at build time or cache it by file signature. It
 must still detect a mixed build.
 
+The installed command became a Bun-compiled client in `b6275fc`. It still hashes
+every runtime file on each invocation, about 9 ms of its 25 ms `daemon status`.
+The executable's own bytes are outside the build key, so a stale executable
+beside a rebuilt `dist` would connect as the new build. Hashing the 84 MB
+executable per invocation is not an option. The build therefore embeds the
+runtime identity into the executable when it compiles it. The client compares
+that identity with the build-time identity file, a string comparison, and
+refuses a build it was not compiled from. A signature check that avoids reading
+files must hold after `npm pack` and installation, which need not preserve
+build-time modification times.
+
 **Delivered** by [hook optimization iteration 6](../plans/iteration-5-hook-optimization/iterations/iteration6-results.md).
 The build writes the runtime identity, and selection reads it, checking file
 paths, sizes and modification times. The compiled client refuses a build
@@ -454,7 +466,9 @@ evidence.
 ### Smaller items
 
 The fingerprint comparator (16 and 9 ms), `factBytes` (5 and 23 ms), and a
-Node compile cache or bundling (speculative, 5 to 10 ms).
+Node compile cache or bundling (speculative, 5 to 10 ms). Node startup itself,
+about 21 to 24 ms per invocation, is addressed by the native client in
+[optimization](../architecture/optimization.md#native-client).
 
 ### Resolved elsewhere
 
