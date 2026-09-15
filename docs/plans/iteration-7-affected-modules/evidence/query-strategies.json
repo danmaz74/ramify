@@ -1,0 +1,151 @@
+{
+  "kind": "query-strategy-prototype",
+  "node": "v22.23.2",
+  "platform": "linux",
+  "architecture": "x64",
+  "warmups": 20,
+  "samples": 200,
+  "method": "Source-shaped retained accesses and description shim lists; in-memory scan, Map/Set construction and traversal. No source parse, report projection or compiler call. Scope/error handling, actual worker/IPC, queueing, synchronization, peak allocation and incremental maintenance are not measured.",
+  "results": [
+    {
+      "name": "reference",
+      "modules": 15,
+      "accesses": 294,
+      "moduleEdges": 32,
+      "seed": "collection-review/workspace/contracts",
+      "affected": 14,
+      "retainedTraversal": {
+        "p50Ms": 0.0049,
+        "p95Ms": 0.0077,
+        "maxMs": 0.0258
+      },
+      "buildAndTraverse": {
+        "p50Ms": 0.0265,
+        "p95Ms": 0.0903,
+        "maxMs": 0.1371
+      },
+      "temporaryMap": {
+        "liveMapMedianBytes": 2826,
+        "samplesBytes": [
+          2837,
+          2826,
+          2826,
+          2826,
+          2834
+        ]
+      }
+    },
+    {
+      "name": "toolkit",
+      "modules": 11,
+      "accesses": 2744,
+      "moduleEdges": 28,
+      "seed": "ramify/analysis/model",
+      "affected": 9,
+      "retainedTraversal": {
+        "p50Ms": 0.0017,
+        "p95Ms": 0.0021,
+        "maxMs": 0.0038
+      },
+      "buildAndTraverse": {
+        "p50Ms": 0.136,
+        "p95Ms": 0.1568,
+        "maxMs": 0.3002
+      },
+      "temporaryMap": {
+        "liveMapMedianBytes": 2211,
+        "samplesBytes": [
+          2232,
+          2210,
+          2211,
+          2213,
+          2210
+        ]
+      }
+    },
+    {
+      "name": "sparse-100",
+      "modules": 100,
+      "accesses": 2500,
+      "moduleEdges": 1000,
+      "seed": "project/module-0",
+      "affected": 99,
+      "retainedTraversal": {
+        "p50Ms": 0.0392,
+        "p95Ms": 0.0641,
+        "maxMs": 0.3786
+      },
+      "buildAndTraverse": {
+        "p50Ms": 0.3198,
+        "p95Ms": 0.4258,
+        "maxMs": 0.8001
+      },
+      "temporaryMap": {
+        "liveMapMedianBytes": 42866,
+        "samplesBytes": [
+          42838,
+          42866,
+          42866,
+          42866,
+          42866
+        ]
+      }
+    },
+    {
+      "name": "sparse-1000",
+      "modules": 1000,
+      "accesses": 25000,
+      "moduleEdges": 10000,
+      "seed": "project/module-0",
+      "affected": 999,
+      "retainedTraversal": {
+        "p50Ms": 0.4163,
+        "p95Ms": 0.5377,
+        "maxMs": 0.7575
+      },
+      "buildAndTraverse": {
+        "p50Ms": 3.2897,
+        "p95Ms": 3.8591,
+        "maxMs": 4.5197
+      },
+      "temporaryMap": {
+        "liveMapMedianBytes": 420754,
+        "samplesBytes": [
+          420724,
+          420754,
+          420754,
+          420754,
+          420754
+        ]
+      }
+    },
+    {
+      "name": "dense-1000",
+      "modules": 1000,
+      "accesses": 220000,
+      "moduleEdges": 100000,
+      "seed": "project/module-0",
+      "affected": 999,
+      "retainedTraversal": {
+        "p50Ms": 2.1115,
+        "p95Ms": 2.3495,
+        "maxMs": 3.6877
+      },
+      "buildAndTraverse": {
+        "p50Ms": 32.2603,
+        "p95Ms": 33.9552,
+        "maxMs": 37.7845
+      },
+      "temporaryMap": {
+        "liveMapMedianBytes": 2660760,
+        "samplesBytes": [
+          2660771,
+          2660760,
+          2660760,
+          2660760,
+          2660760
+        ]
+      }
+    }
+  ]
+}

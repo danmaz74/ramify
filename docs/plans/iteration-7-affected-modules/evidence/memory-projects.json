@@ -1,0 +1,71 @@
+{
+  "kind": "isolated-prototype-heap-measurement",
+  "node": "v22.23.2",
+  "platform": "linux",
+  "architecture": "x64",
+  "method": "GC-settled heap delta; five samples; multiple retained copies; input facts and their existing strings excluded; Map adjacency with per-edge counts and per-file provider arrays; not process RSS or integrated Plan 5 measurement",
+  "results": [
+    {
+      "name": "reference",
+      "modules": 15,
+      "contributingFiles": 36,
+      "edges": 32,
+      "fileContributions": 61,
+      "reverseOnly": {
+        "medianBytes": 3411,
+        "samplesBytes": [
+          3369,
+          3430,
+          3409,
+          3411,
+          3416
+        ],
+        "medianBuildMs": 0.011,
+        "copies": 64
+      },
+      "maintainedIndex": {
+        "medianBytes": 8929,
+        "samplesBytes": [
+          8802,
+          8929,
+          8921,
+          8933,
+          8929
+        ],
+        "medianBuildMs": 0.01,
+        "copies": 64
+      }
+    },
+    {
+      "name": "toolkit",
+      "modules": 11,
+      "contributingFiles": 98,
+      "edges": 28,
+      "fileContributions": 172,
+      "reverseOnly": {
+        "medianBytes": 2633,
+        "samplesBytes": [
+          2597,
+          2633,
+          2633,
+          2633,
+          2633
+        ],
+        "medianBuildMs": 0.022,
+        "copies": 64
+      },
+      "maintainedIndex": {
+        "medianBytes": 16289,
+        "samplesBytes": [
+          16038,
+          16289,
+          16289,
+          16289,
+          16289
+        ],
+        "medianBuildMs": 0.023,
+        "copies": 64
+      }
+    }
+  ]
+}

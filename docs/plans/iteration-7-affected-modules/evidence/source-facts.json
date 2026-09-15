@@ -1,0 +1,21 @@
+{
+  "status": "passed",
+  "date": "2026-09-12",
+  "sourceCommit": "628892add024b899fadd033726a00e202b8d9630",
+  "method": "real batch source extraction from Plan 5 iteration 2 code; no retained-session claim",
+  "modules": 9,
+  "edges": [
+    "probe/a->probe/b",
+    "probe/a->probe/c",
+    "probe/b->probe/c",
+    "probe/integration->probe/a",
+    "probe/side->probe/c",
+    "probe/tested->probe/c",
+    "probe/types->probe/c"
+  ],
+  "symbolFreeTargetRetained": true,
+  "bothTestFormsRetained": true,
+  "deniedDependenciesRetained": true,
+  "valueOnlyEditKeepsEdges": true,
+  "nonliteralTargetIsPartial": true
+}

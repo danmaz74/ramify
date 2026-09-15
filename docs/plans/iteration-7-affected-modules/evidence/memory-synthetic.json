@@ -1,0 +1,102 @@
+{
+  "kind": "isolated-prototype-heap-measurement",
+  "node": "v22.23.2",
+  "platform": "linux",
+  "architecture": "x64",
+  "method": "GC-settled heap delta; five samples; multiple retained copies; input facts and their existing strings excluded; Map adjacency with per-edge counts and per-file provider arrays; not process RSS or integrated Plan 5 measurement",
+  "results": [
+    {
+      "name": "sparse-100",
+      "modules": 100,
+      "contributingFiles": 500,
+      "edges": 1000,
+      "fileContributions": 2000,
+      "reverseOnly": {
+        "medianBytes": 55705,
+        "samplesBytes": [
+          54846,
+          55705,
+          55705,
+          55708,
+          55712
+        ],
+        "medianBuildMs": 0.321,
+        "copies": 64
+      },
+      "maintainedIndex": {
+        "medianBytes": 130113,
+        "samplesBytes": [
+          128236,
+          130113,
+          130111,
+          130114,
+          130113
+        ],
+        "medianBuildMs": 0.317,
+        "copies": 64
+      }
+    },
+    {
+      "name": "sparse-1000",
+      "modules": 1000,
+      "contributingFiles": 5000,
+      "edges": 10000,
+      "fileContributions": 20000,
+      "reverseOnly": {
+        "medianBytes": 548796,
+        "samplesBytes": [
+          514519,
+          548796,
+          548796,
+          548796,
+          548796
+        ],
+        "medianBuildMs": 2.759,
+        "copies": 16
+      },
+      "maintainedIndex": {
+        "medianBytes": 1378244,
+        "samplesBytes": [
+          1292116,
+          1378244,
+          1378244,
+          1378244,
+          1378244
+        ],
+        "medianBuildMs": 4.417,
+        "copies": 16
+      }
+    },
+    {
+      "name": "dense-1000",
+      "modules": 1000,
+      "contributingFiles": 20000,
+      "edges": 100000,
+      "fileContributions": 200000,
+      "reverseOnly": {
+        "medianBytes": 3684808,
+        "samplesBytes": [
+          2763658,
+          3684808,
+          3684808,
+          3684808,
+          3684808
+        ],
+        "medianBuildMs": 36.21,
+        "copies": 4
+      },
+      "maintainedIndex": {
+        "medianBytes": 7962384,
+        "samplesBytes": [
+          5971840,
+          7962384,
+          7962384,
+          7962384,
+          7962384
+        ],
+        "medianBuildMs": 39.85,
+        "copies": 4
+      }
+    }
+  ]
+}

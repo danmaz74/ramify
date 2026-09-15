@@ -1,0 +1,49 @@
+{
+  "_cucumberViz": {
+    "editMode": "mcp-only",
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "planning.write_iteration_manifest",
+    "message": "Do not edit directly. Use the planning MCP tool.",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "createdAt": "2026-09-12T00:00:00.000Z",
+  "iterations": [
+    {
+      "file": "iteration1.md",
+      "index": 1,
+      "parallelGroup": null,
+      "title": "Contract review and Plan 5 handoff"
+    },
+    {
+      "file": "iteration2.md",
+      "index": 2,
+      "parallelGroup": null,
+      "title": "On-demand graph and retained-session query"
+    },
+    {
+      "file": "iteration3.md",
+      "index": 3,
+      "parallelGroup": null,
+      "title": "Context scheduling and daemon access"
+    },
+    {
+      "file": "iteration4.md",
+      "index": 4,
+      "parallelGroup": null,
+      "title": "CLI affected command"
+    },
+    {
+      "file": "iteration5.md",
+      "index": 5,
+      "parallelGroup": null,
+      "title": "MCP affected-module tool"
+    },
+    {
+      "file": "iteration6.md",
+      "index": 6,
+      "parallelGroup": null,
+      "title": "Cross-client acceptance and resource gate"
+    }
+  ],
+  "planPath": "main-plan.md"
+}

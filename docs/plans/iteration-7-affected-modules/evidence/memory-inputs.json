@@ -1,0 +1,1053 @@
+[
+  {
+    "name": "reference",
+    "modules": 15,
+    "inputId": "input/1:ab66c0b14c419a828c8f413a7c7afd0888f088163a5798d3c9b7c615c197c8a1",
+    "files": [
+      {
+        "file": "src/assembly.ts",
+        "consumer": "collection-review",
+        "providers": [
+          "collection-review/workspace/catalog/core",
+          "collection-review/workspace/catalog",
+          "collection-review/workspace/reviews",
+          "collection-review/workspace/reviews/core"
+        ]
+      },
+      {
+        "file": "subs/integration-tests/src/support/world.ts",
+        "consumer": "collection-review/integration-tests",
+        "providers": [
+          "collection-review"
+        ]
+      },
+      {
+        "file": "subs/workspace/src/app.tsx",
+        "consumer": "collection-review/workspace",
+        "providers": [
+          "collection-review/workspace/catalog/ui",
+          "collection-review",
+          "collection-review/workspace/reviews/ui"
+        ]
+      },
+      {
+        "file": "subs/workspace/src/client.ts",
+        "consumer": "collection-review/workspace",
+        "providers": [
+          "collection-review"
+        ]
+      },
+      {
+        "file": "subs/workspace/src/tests/shell.test.tsx",
+        "consumer": "collection-review/workspace",
+        "providers": [
+          "collection-review",
+          "collection-review/workspace/reviews/ui"
+        ]
+      },
+      {
+        "file": "subs/workspace/subs/catalog/src/mcp.ts",
+        "consumer": "collection-review/workspace/catalog",
+        "providers": [
+          "collection-review/workspace/contracts",
+          "collection-review/workspace/catalog/core",
+          "collection-review"
+        ]
+      },
+      {
+        "file": "subs/workspace/subs/catalog/src/router.ts",
+        "consumer": "collection-review/workspace/catalog",
+        "providers": [
+          "collection-review/workspace/contracts",
+          "collection-review/workspace/catalog/core",
+          "collection-review"
+        ]
+      },
+      {
+        "file": "subs/workspace/subs/catalog/src/tests/adapters.test.ts",
+        "consumer": "collection-review/workspace/catalog",
+        "providers": [
+          "collection-review",
+          "collection-review/workspace/catalog/core"
+        ]
+      },
+      {
+        "file": "subs/workspace/subs/catalog/subs/core/src/catalog.ts",
+        "consumer": "collection-review/workspace/catalog/core",
+        "providers": [
+          "collection-review/workspace/contracts"
+        ]
+      },
+      {
+        "file": "subs/workspace/subs/catalog/subs/core/src/history.ts",
+        "consumer": "collection-review/workspace/catalog/core",
+        "providers": [
+          "collection-review/workspace/contracts"
+        ]
+      },
+      {
+        "file": "subs/workspace/subs/catalog/subs/core/src/records.ts",
+        "consumer": "collection-review/workspace/catalog/core",
+        "providers": [
+          "collection-review/workspace/contracts"
+        ]
+      },
+      {
+        "file": "subs/workspace/subs/catalog/subs/core/src/tests/catalog.test.ts",
+        "consumer": "collection-review/workspace/catalog/core",
+        "providers": [
+          "collection-review/workspace/contracts"
+        ]
+      },
+      {
+        "file": "subs/workspace/subs/catalog/subs/core/src/tests/fixture.ts",
+        "consumer": "collection-review/workspace/catalog/core",
+        "providers": [
+          "collection-review/workspace/contracts"
+        ]
+      },
+      {
+        "file": "subs/workspace/subs/catalog/subs/ui/src/catalog-card.tsx",
+        "consumer": "collection-review/workspace/catalog/ui",
+        "providers": [
+          "collection-review/workspace/catalog/core",
+          "collection-review/workspace/shared-ui"
+        ]
+      },
+      {
+        "file": "subs/workspace/subs/reviews/src/mcp.ts",
+        "consumer": "collection-review/workspace/reviews",
+        "providers": [
+          "collection-review/workspace/contracts",
+          "collection-review/workspace/reviews/core",
+          "collection-review"
+        ]
+      },
+      {
+        "file": "subs/workspace/subs/reviews/src/router.ts",
+        "consumer": "collection-review/workspace/reviews",
+        "providers": [
+          "collection-review/workspace/contracts",
+          "collection-review/workspace/reviews/core",
+          "collection-review"
+        ]
+      },
+      {
+        "file": "subs/workspace/subs/reviews/src/session.ts",
+        "consumer": "collection-review/workspace/reviews",
+        "providers": [
+          "collection-review/workspace/contracts"
+        ]
+      },
+      {
+        "file": "subs/workspace/subs/reviews/src/tests/router.test.ts",
+        "consumer": "collection-review/workspace/reviews",
+        "providers": [
+          "collection-review"
+        ]
+      },
+      {
+        "file": "subs/workspace/subs/reviews/src/tests/sessions.test.ts",
+        "consumer": "collection-review/workspace/reviews",
+        "providers": [
+          "collection-review"
+        ]
+      },
+      {
+        "file": "subs/workspace/subs/reviews/src/tests/typing.test.ts",
+        "consumer": "collection-review/workspace/reviews",
+        "providers": [
+          "collection-review",
+          "collection-review/workspace/reviews/core"
+        ]
+      },
+      {
+        "file": "subs/workspace/subs/reviews/subs/core/src/interfaces/port.ts",
+        "consumer": "collection-review/workspace/reviews/core",
+        "providers": [
+          "collection-review/workspace/contracts"
+        ]
+      },
+      {
+        "file": "subs/workspace/subs/reviews/subs/core/src/runtime.ts",
+        "consumer": "collection-review/workspace/reviews/core",
+        "providers": [
+          "collection-review/workspace/reviews/core/controller",
+          "collection-review/workspace/reviews/validation",
+          "collection-review/workspace/contracts"
+        ]
+      },
+      {
+        "file": "subs/workspace/subs/reviews/subs/core/src/tests/runtime.test.ts",
+        "consumer": "collection-review/workspace/reviews/core",
+        "providers": [
+          "collection-review/workspace/catalog/core"
+        ]
+      },
+      {
+        "file": "subs/workspace/subs/reviews/subs/core/subs/controller/src/controller.ts",
+        "consumer": "collection-review/workspace/reviews/core/controller",
+        "providers": [
+          "collection-review/workspace/reviews/core/tasks"
+        ]
+      },
+      {
+        "file": "subs/workspace/subs/reviews/subs/core/subs/controller/src/tests/controller.test.ts",
+        "consumer": "collection-review/workspace/reviews/core/controller",
+        "providers": [
+          "collection-review/workspace/reviews/core",
+          "collection-review/workspace/contracts"
+        ]
+      },
+      {
+        "file": "subs/workspace/subs/reviews/subs/core/subs/tasks/src/inspection-task.ts",
+        "consumer": "collection-review/workspace/reviews/core/tasks",
+        "providers": [
+          "collection-review/workspace/contracts",
+          "collection-review/workspace/reviews/core"
+        ]
+      },
+      {
+        "file": "subs/workspace/subs/reviews/subs/core/subs/tasks/src/result.ts",
+        "consumer": "collection-review/workspace/reviews/core/tasks",
+        "providers": [
+          "collection-review/workspace/contracts"
+        ]
+      },
+      {
+        "file": "subs/workspace/subs/reviews/subs/core/subs/tasks/src/tests/inspection-task.test.ts",
+        "consumer": "collection-review/workspace/reviews/core/tasks",
+        "providers": [
+          "collection-review/workspace/reviews/core",
+          "collection-review/workspace/contracts"
+        ]
+      },
+      {
+        "file": "subs/workspace/subs/reviews/subs/core/subs/tasks/src/tests/result.test.ts",
+        "consumer": "collection-review/workspace/reviews/core/tasks",
+        "providers": [
+          "collection-review/workspace/contracts"
+        ]
+      },
+      {
+        "file": "subs/workspace/subs/reviews/subs/ui/src/review-panel.tsx",
+        "consumer": "collection-review/workspace/reviews/ui",
+        "providers": [
+          "collection-review/workspace/reviews/ui/pure-ui",
+          "collection-review"
+        ]
+      },
+      {
+        "file": "subs/workspace/subs/reviews/subs/ui/src/tests/review-panel.test.tsx",
+        "consumer": "collection-review/workspace/reviews/ui",
+        "providers": [
+          "collection-review",
+          "collection-review/workspace/reviews/ui/pure-ui"
+        ]
+      },
+      {
+        "file": "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/format.ts",
+        "consumer": "collection-review/workspace/reviews/ui/pure-ui",
+        "providers": [
+          "collection-review/workspace/contracts"
+        ]
+      },
+      {
+        "file": "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.tsx",
+        "consumer": "collection-review/workspace/reviews/ui/pure-ui",
+        "providers": [
+          "collection-review/workspace/shared-ui",
+          "collection-review/workspace/contracts"
+        ]
+      },
+      {
+        "file": "subs/workspace/subs/reviews/subs/validation/src/tests/validate.test.ts",
+        "consumer": "collection-review/workspace/reviews/validation",
+        "providers": [
+          "collection-review/workspace/contracts"
+        ]
+      },
+      {
+        "file": "subs/workspace/subs/reviews/subs/validation/src/validate.ts",
+        "consumer": "collection-review/workspace/reviews/validation",
+        "providers": [
+          "collection-review/workspace/contracts"
+        ]
+      },
+      {
+        "file": "subs/workspace/subs/shared-ui/src/status-badge.tsx",
+        "consumer": "collection-review/workspace/shared-ui",
+        "providers": [
+          "collection-review/workspace/contracts"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "toolkit",
+    "modules": 11,
+    "inputId": "input/1:879be0c5570cd65062732c258f62fab9785cf1bfd3a21fb5efac3c1ee8cbc4a1",
+    "files": [
+      {
+        "file": "src/batch.ts",
+        "consumer": "ramify",
+        "providers": [
+          "ramify/analysis",
+          "ramify/analysis/model"
+        ]
+      },
+      {
+        "file": "src/cli-entry.ts",
+        "consumer": "ramify",
+        "providers": [
+          "ramify/cli"
+        ]
+      },
+      {
+        "file": "src/client.ts",
+        "consumer": "ramify",
+        "providers": [
+          "ramify/daemon"
+        ]
+      },
+      {
+        "file": "src/daemon-entry.ts",
+        "consumer": "ramify",
+        "providers": [
+          "ramify/daemon"
+        ]
+      },
+      {
+        "file": "src/interfaces/batch.ts",
+        "consumer": "ramify",
+        "providers": [
+          "ramify/analysis"
+        ]
+      },
+      {
+        "file": "src/interfaces/service.ts",
+        "consumer": "ramify",
+        "providers": [
+          "ramify/analysis",
+          "ramify/analysis/project",
+          "ramify/daemon",
+          "ramify/daemon/contexts"
+        ]
+      },
+      {
+        "file": "src/resident-assembly.ts",
+        "consumer": "ramify",
+        "providers": [
+          "ramify/analysis",
+          "ramify/analysis/model",
+          "ramify/daemon",
+          "ramify/daemon/contexts"
+        ]
+      },
+      {
+        "file": "src/resident-budgets.ts",
+        "consumer": "ramify",
+        "providers": [
+          "ramify/daemon",
+          "ramify/daemon/contexts"
+        ]
+      },
+      {
+        "file": "src/tests/batch-cli.test.ts",
+        "consumer": "ramify",
+        "providers": [
+          "ramify/cli",
+          "ramify/analysis"
+        ]
+      },
+      {
+        "file": "src/tests/daemon-identity.test.ts",
+        "consumer": "ramify",
+        "providers": [
+          "ramify/daemon"
+        ]
+      },
+      {
+        "file": "src/tests/daemon-suspended-shutdown.test.ts",
+        "consumer": "ramify",
+        "providers": [
+          "ramify/daemon"
+        ]
+      },
+      {
+        "file": "src/tests/fixture.ts",
+        "consumer": "ramify",
+        "providers": [
+          "ramify/cli",
+          "ramify/analysis"
+        ]
+      },
+      {
+        "file": "src/tests/quick-environment.test.ts",
+        "consumer": "ramify",
+        "providers": [
+          "ramify/daemon"
+        ]
+      },
+      {
+        "file": "src/tests/quick-environment.ts",
+        "consumer": "ramify",
+        "providers": [
+          "ramify/analysis",
+          "ramify/daemon",
+          "ramify/daemon/contexts"
+        ]
+      },
+      {
+        "file": "src/tests/resident-cli.test.ts",
+        "consumer": "ramify",
+        "providers": [
+          "ramify/cli",
+          "ramify/daemon",
+          "ramify/daemon/contexts"
+        ]
+      },
+      {
+        "file": "subs/analysis/src/evaluate-accesses.ts",
+        "consumer": "ramify/analysis",
+        "providers": [
+          "ramify/analysis/model",
+          "ramify/analysis/typescript"
+        ]
+      },
+      {
+        "file": "subs/analysis/src/index.ts",
+        "consumer": "ramify/analysis",
+        "providers": [
+          "ramify/analysis/model",
+          "ramify/analysis/descriptions",
+          "ramify/analysis/project",
+          "ramify/analysis/typescript"
+        ]
+      },
+      {
+        "file": "subs/analysis/src/interfaces/analysis.ts",
+        "consumer": "ramify/analysis",
+        "providers": [
+          "ramify/analysis/model",
+          "ramify/analysis/descriptions",
+          "ramify/analysis/project",
+          "ramify/analysis/typescript"
+        ]
+      },
+      {
+        "file": "subs/analysis/src/inventory-entry.ts",
+        "consumer": "ramify/analysis",
+        "providers": [
+          "ramify/analysis/model",
+          "ramify/analysis/project"
+        ]
+      },
+      {
+        "file": "subs/analysis/src/inventory.ts",
+        "consumer": "ramify/analysis",
+        "providers": [
+          "ramify/analysis/descriptions",
+          "ramify/analysis/model",
+          "ramify/analysis/project"
+        ]
+      },
+      {
+        "file": "subs/analysis/src/report-data.ts",
+        "consumer": "ramify/analysis",
+        "providers": [
+          "ramify/analysis/model",
+          "ramify/analysis/descriptions",
+          "ramify/analysis/project"
+        ]
+      },
+      {
+        "file": "subs/analysis/src/report.ts",
+        "consumer": "ramify/analysis",
+        "providers": [
+          "ramify/analysis/model",
+          "ramify/analysis/project",
+          "ramify/analysis/typescript"
+        ]
+      },
+      {
+        "file": "subs/analysis/src/resolve-project.ts",
+        "consumer": "ramify/analysis",
+        "providers": [
+          "ramify/analysis/project"
+        ]
+      },
+      {
+        "file": "subs/analysis/src/retained-products.ts",
+        "consumer": "ramify/analysis",
+        "providers": [
+          "ramify/analysis/descriptions",
+          "ramify/analysis/typescript",
+          "ramify/analysis/project"
+        ]
+      },
+      {
+        "file": "subs/analysis/src/run-analysis.ts",
+        "consumer": "ramify/analysis",
+        "providers": [
+          "ramify/analysis/descriptions",
+          "ramify/analysis/model",
+          "ramify/analysis/project",
+          "ramify/analysis/typescript"
+        ]
+      },
+      {
+        "file": "subs/analysis/src/tests/evaluate-accesses.test.ts",
+        "consumer": "ramify/analysis",
+        "providers": [
+          "ramify/analysis/descriptions",
+          "ramify/analysis/model",
+          "ramify/analysis/project",
+          "ramify/analysis/typescript"
+        ]
+      },
+      {
+        "file": "subs/analysis/src/tests/increment.test.ts",
+        "consumer": "ramify/analysis",
+        "providers": [
+          "ramify/analysis/model"
+        ]
+      },
+      {
+        "file": "subs/analysis/src/tests/inventory.test.ts",
+        "consumer": "ramify/analysis",
+        "providers": [
+          "ramify/analysis/model"
+        ]
+      },
+      {
+        "file": "subs/analysis/src/tests/report-capacity.test.ts",
+        "consumer": "ramify/analysis",
+        "providers": [
+          "ramify/analysis/model"
+        ]
+      },
+      {
+        "file": "subs/analysis/src/tests/session.test.ts",
+        "consumer": "ramify/analysis",
+        "providers": [
+          "ramify/analysis/model"
+        ]
+      },
+      {
+        "file": "subs/analysis/src/tests/shared-globals.test.ts",
+        "consumer": "ramify/analysis",
+        "providers": [
+          "ramify/analysis/model"
+        ]
+      },
+      {
+        "file": "subs/analysis/src/tests/validation.test.ts",
+        "consumer": "ramify/analysis",
+        "providers": [
+          "ramify/analysis/model"
+        ]
+      },
+      {
+        "file": "subs/analysis/src/validation-entry.ts",
+        "consumer": "ramify/analysis",
+        "providers": [
+          "ramify/analysis/descriptions",
+          "ramify/analysis/project",
+          "ramify/analysis/typescript"
+        ]
+      },
+      {
+        "file": "subs/analysis/src/validation.ts",
+        "consumer": "ramify/analysis",
+        "providers": [
+          "ramify/analysis/descriptions",
+          "ramify/analysis/model",
+          "ramify/analysis/project",
+          "ramify/analysis/typescript"
+        ]
+      },
+      {
+        "file": "subs/analysis/subs/descriptions/src/interfaces/linking.ts",
+        "consumer": "ramify/analysis/descriptions",
+        "providers": [
+          "ramify/analysis/model",
+          "ramify/analysis/project",
+          "ramify/analysis/typescript"
+        ]
+      },
+      {
+        "file": "subs/analysis/subs/descriptions/src/link.ts",
+        "consumer": "ramify/analysis/descriptions",
+        "providers": [
+          "ramify/analysis/model"
+        ]
+      },
+      {
+        "file": "subs/analysis/subs/descriptions/src/tests/linking.test.ts",
+        "consumer": "ramify/analysis/descriptions",
+        "providers": [
+          "ramify/analysis/model"
+        ]
+      },
+      {
+        "file": "subs/analysis/subs/project/src/interfaces/project.ts",
+        "consumer": "ramify/analysis/project",
+        "providers": [
+          "ramify/analysis/descriptions"
+        ]
+      },
+      {
+        "file": "subs/analysis/subs/project/src/inventory.ts",
+        "consumer": "ramify/analysis/project",
+        "providers": [
+          "ramify/analysis/descriptions"
+        ]
+      },
+      {
+        "file": "subs/analysis/subs/typescript/src/accesses.ts",
+        "consumer": "ramify/analysis/typescript",
+        "providers": [
+          "ramify/analysis/model"
+        ]
+      },
+      {
+        "file": "subs/analysis/subs/typescript/src/catalog.ts",
+        "consumer": "ramify/analysis/typescript",
+        "providers": [
+          "ramify/analysis/model",
+          "ramify/analysis/project"
+        ]
+      },
+      {
+        "file": "subs/analysis/subs/typescript/src/interfaces/source.ts",
+        "consumer": "ramify/analysis/typescript",
+        "providers": [
+          "ramify/analysis/model",
+          "ramify/analysis/project"
+        ]
+      },
+      {
+        "file": "subs/analysis/subs/typescript/src/resolution.ts",
+        "consumer": "ramify/analysis/typescript",
+        "providers": [
+          "ramify/analysis/project"
+        ]
+      },
+      {
+        "file": "subs/analysis/subs/typescript/src/tests/fixtures.ts",
+        "consumer": "ramify/analysis/typescript",
+        "providers": [
+          "ramify/analysis/model",
+          "ramify/analysis/project"
+        ]
+      },
+      {
+        "file": "subs/analysis/subs/typescript/src/tests/lifetime.test.ts",
+        "consumer": "ramify/analysis/typescript",
+        "providers": [
+          "ramify/analysis/project"
+        ]
+      },
+      {
+        "file": "subs/cli/src/check-command.ts",
+        "consumer": "ramify/cli",
+        "providers": [
+          "ramify/analysis",
+          "ramify/daemon",
+          "ramify/daemon/contexts"
+        ]
+      },
+      {
+        "file": "subs/cli/src/command-support.ts",
+        "consumer": "ramify/cli",
+        "providers": [
+          "ramify/analysis"
+        ]
+      },
+      {
+        "file": "subs/cli/src/daemon-command.ts",
+        "consumer": "ramify/cli",
+        "providers": [
+          "ramify/analysis"
+        ]
+      },
+      {
+        "file": "subs/cli/src/errors.ts",
+        "consumer": "ramify/cli",
+        "providers": [
+          "ramify",
+          "ramify/daemon"
+        ]
+      },
+      {
+        "file": "subs/cli/src/format.ts",
+        "consumer": "ramify/cli",
+        "providers": [
+          "ramify/analysis",
+          "ramify/analysis/model"
+        ]
+      },
+      {
+        "file": "subs/cli/src/interfaces/cli.ts",
+        "consumer": "ramify/cli",
+        "providers": [
+          "ramify",
+          "ramify/daemon",
+          "ramify/daemon/contexts",
+          "ramify/analysis"
+        ]
+      },
+      {
+        "file": "subs/cli/src/run-cli.ts",
+        "consumer": "ramify/cli",
+        "providers": [
+          "ramify/analysis"
+        ]
+      },
+      {
+        "file": "subs/cli/src/tests/errors.test.ts",
+        "consumer": "ramify/cli",
+        "providers": [
+          "ramify",
+          "ramify/daemon"
+        ]
+      },
+      {
+        "file": "subs/cli/src/watch-command.ts",
+        "consumer": "ramify/cli",
+        "providers": [
+          "ramify/analysis",
+          "ramify/daemon",
+          "ramify/daemon/contexts"
+        ]
+      },
+      {
+        "file": "subs/daemon/src/client-entry.ts",
+        "consumer": "ramify/daemon",
+        "providers": [
+          "ramify/daemon/contexts",
+          "ramify"
+        ]
+      },
+      {
+        "file": "subs/daemon/src/connection.ts",
+        "consumer": "ramify/daemon",
+        "providers": [
+          "ramify",
+          "ramify/analysis",
+          "ramify/daemon/contexts"
+        ]
+      },
+      {
+        "file": "subs/daemon/src/context-types.ts",
+        "consumer": "ramify/daemon",
+        "providers": [
+          "ramify/daemon/contexts"
+        ]
+      },
+      {
+        "file": "subs/daemon/src/filesystem-watcher.ts",
+        "consumer": "ramify/daemon",
+        "providers": [
+          "ramify/daemon/contexts"
+        ]
+      },
+      {
+        "file": "subs/daemon/src/host.ts",
+        "consumer": "ramify/daemon",
+        "providers": [
+          "ramify",
+          "ramify/daemon/contexts"
+        ]
+      },
+      {
+        "file": "subs/daemon/src/interfaces/daemon.ts",
+        "consumer": "ramify/daemon",
+        "providers": [
+          "ramify",
+          "ramify/daemon/contexts"
+        ]
+      },
+      {
+        "file": "subs/daemon/src/service.ts",
+        "consumer": "ramify/daemon",
+        "providers": [
+          "ramify/analysis",
+          "ramify/daemon/contexts",
+          "ramify"
+        ]
+      },
+      {
+        "file": "subs/daemon/src/system-clock.ts",
+        "consumer": "ramify/daemon",
+        "providers": [
+          "ramify/daemon/contexts"
+        ]
+      },
+      {
+        "file": "subs/daemon/src/tests/ipc-fixture.ts",
+        "consumer": "ramify/daemon",
+        "providers": [
+          "ramify",
+          "ramify/daemon/contexts"
+        ]
+      },
+      {
+        "file": "subs/daemon/src/tests/service.test.ts",
+        "consumer": "ramify/daemon",
+        "providers": [
+          "ramify"
+        ]
+      },
+      {
+        "file": "subs/daemon/src/tests/watcher.test.ts",
+        "consumer": "ramify/daemon",
+        "providers": [
+          "ramify/daemon/contexts"
+        ]
+      },
+      {
+        "file": "subs/daemon/src/validation.ts",
+        "consumer": "ramify/daemon",
+        "providers": [
+          "ramify"
+        ]
+      },
+      {
+        "file": "subs/daemon/subs/contexts/src/context-manager.ts",
+        "consumer": "ramify/daemon/contexts",
+        "providers": [
+          "ramify/analysis",
+          "ramify/analysis/project"
+        ]
+      },
+      {
+        "file": "subs/daemon/subs/contexts/src/context.ts",
+        "consumer": "ramify/daemon/contexts",
+        "providers": [
+          "ramify/analysis",
+          "ramify/analysis/project"
+        ]
+      },
+      {
+        "file": "subs/daemon/subs/contexts/src/history.ts",
+        "consumer": "ramify/daemon/contexts",
+        "providers": [
+          "ramify/analysis"
+        ]
+      },
+      {
+        "file": "subs/daemon/subs/contexts/src/interfaces/contexts.ts",
+        "consumer": "ramify/daemon/contexts",
+        "providers": [
+          "ramify/analysis",
+          "ramify/analysis/project"
+        ]
+      },
+      {
+        "file": "subs/daemon/subs/contexts/src/queue.ts",
+        "consumer": "ramify/daemon/contexts",
+        "providers": [
+          "ramify/analysis",
+          "ramify/analysis/project"
+        ]
+      },
+      {
+        "file": "subs/daemon/subs/contexts/src/tests/history-fixture.ts",
+        "consumer": "ramify/daemon/contexts",
+        "providers": [
+          "ramify/analysis"
+        ]
+      },
+      {
+        "file": "subs/daemon/subs/contexts/src/tests/history.test.ts",
+        "consumer": "ramify/daemon/contexts",
+        "providers": [
+          "ramify/analysis"
+        ]
+      },
+      {
+        "file": "subs/daemon/subs/contexts/src/tests/scripted-driver.ts",
+        "consumer": "ramify/daemon/contexts",
+        "providers": [
+          "ramify/analysis",
+          "ramify/analysis/project"
+        ]
+      },
+      {
+        "file": "subs/daemon/subs/contexts/src/tests/tokens.test.ts",
+        "consumer": "ramify/daemon/contexts",
+        "providers": [
+          "ramify/analysis/project"
+        ]
+      },
+      {
+        "file": "subs/daemon/subs/contexts/src/tokens.ts",
+        "consumer": "ramify/daemon/contexts",
+        "providers": [
+          "ramify/analysis/project"
+        ]
+      },
+      {
+        "file": "subs/presentation/src/ModelDiagram.tsx",
+        "consumer": "ramify/presentation",
+        "providers": [
+          "ramify/presentation/layout"
+        ]
+      },
+      {
+        "file": "subs/presentation/src/diagram-definition.ts",
+        "consumer": "ramify/presentation",
+        "providers": [
+          "ramify/analysis/model"
+        ]
+      },
+      {
+        "file": "subs/presentation/src/diagrams/example1.ts",
+        "consumer": "ramify/presentation",
+        "providers": [
+          "ramify/analysis/model"
+        ]
+      },
+      {
+        "file": "subs/presentation/src/diagrams/example1a.ts",
+        "consumer": "ramify/presentation",
+        "providers": [
+          "ramify/analysis/model"
+        ]
+      },
+      {
+        "file": "subs/presentation/src/diagrams/example1b.ts",
+        "consumer": "ramify/presentation",
+        "providers": [
+          "ramify/analysis/model"
+        ]
+      },
+      {
+        "file": "subs/presentation/src/diagrams/example2.ts",
+        "consumer": "ramify/presentation",
+        "providers": [
+          "ramify/analysis/model"
+        ]
+      },
+      {
+        "file": "subs/presentation/src/diagrams/example3.ts",
+        "consumer": "ramify/presentation",
+        "providers": [
+          "ramify/analysis/model"
+        ]
+      },
+      {
+        "file": "subs/presentation/src/diagrams/example4.ts",
+        "consumer": "ramify/presentation",
+        "providers": [
+          "ramify/analysis/model"
+        ]
+      },
+      {
+        "file": "subs/presentation/src/diagrams/fixture-model.ts",
+        "consumer": "ramify/presentation",
+        "providers": [
+          "ramify/analysis/model"
+        ]
+      },
+      {
+        "file": "subs/presentation/src/diagrams/shop-tree.ts",
+        "consumer": "ramify/presentation",
+        "providers": [
+          "ramify/analysis/model"
+        ]
+      },
+      {
+        "file": "subs/presentation/src/diagrams/shop.ts",
+        "consumer": "ramify/presentation",
+        "providers": [
+          "ramify/analysis/model"
+        ]
+      },
+      {
+        "file": "subs/presentation/src/focus-diagram.ts",
+        "consumer": "ramify/presentation",
+        "providers": [
+          "ramify/presentation/layout",
+          "ramify/analysis/model"
+        ]
+      },
+      {
+        "file": "subs/presentation/src/layout-chords.ts",
+        "consumer": "ramify/presentation",
+        "providers": [
+          "ramify/presentation/layout",
+          "ramify/analysis/model"
+        ]
+      },
+      {
+        "file": "subs/presentation/src/layout-lanes.ts",
+        "consumer": "ramify/presentation",
+        "providers": [
+          "ramify/presentation/layout",
+          "ramify/analysis/model"
+        ]
+      },
+      {
+        "file": "subs/presentation/src/layout-legend.ts",
+        "consumer": "ramify/presentation",
+        "providers": [
+          "ramify/presentation/layout"
+        ]
+      },
+      {
+        "file": "subs/presentation/src/layout-nodes.ts",
+        "consumer": "ramify/presentation",
+        "providers": [
+          "ramify/presentation/layout",
+          "ramify/analysis/model"
+        ]
+      },
+      {
+        "file": "subs/presentation/src/layout.ts",
+        "consumer": "ramify/presentation",
+        "providers": [
+          "ramify/presentation/layout"
+        ]
+      },
+      {
+        "file": "subs/presentation/src/model-access.ts",
+        "consumer": "ramify/presentation",
+        "providers": [
+          "ramify/analysis/model"
+        ]
+      },
+      {
+        "file": "subs/presentation/src/tests/example1-stages.test.ts",
+        "consumer": "ramify/presentation",
+        "providers": [
+          "ramify/analysis/model"
+        ]
+      },
+      {
+        "file": "subs/presentation/src/tests/layout.test.ts",
+        "consumer": "ramify/presentation",
+        "providers": [
+          "ramify/presentation/layout"
+        ]
+      },
+      {
+        "file": "subs/presentation/src/tree-diagram.ts",
+        "consumer": "ramify/presentation",
+        "providers": [
+          "ramify/presentation/layout",
+          "ramify/analysis/model"
+        ]
+      },
+      {
+        "file": "subs/presentation/src/validate.ts",
+        "consumer": "ramify/presentation",
+        "providers": [
+          "ramify/analysis/model"
+        ]
+      }
+    ]
+  }
+]

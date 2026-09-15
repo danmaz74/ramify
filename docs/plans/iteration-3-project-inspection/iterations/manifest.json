@@ -1,0 +1,72 @@
+{
+  "createdAt": "2026-09-11T00:00:00.000Z",
+  "iterations": [
+    {
+      "file": "iteration1.md",
+      "index": 1,
+      "parallelGroup": null,
+      "title": "Contract package, probes and review points"
+    },
+    {
+      "file": "iteration2.md",
+      "index": 2,
+      "parallelGroup": null,
+      "title": "Availability in the model and the `--plan 3` harness"
+    },
+    {
+      "file": "iteration3.md",
+      "index": 3,
+      "parallelGroup": "after-2",
+      "title": "Consumer rule and the availability listing"
+    },
+    {
+      "file": "iteration4.md",
+      "index": 4,
+      "parallelGroup": "after-2",
+      "title": "Symbol details in the compiler helper"
+    },
+    {
+      "file": "iteration5.md",
+      "index": 5,
+      "parallelGroup": null,
+      "title": "Explanations and incoming usage"
+    },
+    {
+      "file": "iteration6.md",
+      "index": 6,
+      "parallelGroup": null,
+      "title": "The `symbol-details` capability and stage"
+    },
+    {
+      "file": "iteration7.md",
+      "index": 7,
+      "parallelGroup": null,
+      "title": "Batch inspection and the three commands"
+    },
+    {
+      "file": "iteration8.md",
+      "index": 8,
+      "parallelGroup": null,
+      "title": "The `inspect` service operation and the resident path"
+    },
+    {
+      "file": "iteration9.md",
+      "index": 9,
+      "parallelGroup": null,
+      "title": "Join with Plan 5: resident details and the compact history"
+    },
+    {
+      "file": "iteration10.md",
+      "index": 10,
+      "parallelGroup": null,
+      "title": "Process evidence and query measurements"
+    },
+    {
+      "file": "iteration11.md",
+      "index": 11,
+      "parallelGroup": null,
+      "title": "Declarations, document revisions, self-check and completion"
+    }
+  ],
+  "planPath": "main-plan.md"
+}
