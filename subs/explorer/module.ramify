@@ -1,0 +1,5 @@
+ramify 1
+module explorer tagged [ui, browser, dispatch]
+
+expose-src ProjectExplorerPage from "ProjectExplorerPage.tsx" tagged [ui, browser, dispatch] to parent
+expose-src createProjectExplorerBrowserApp from "browser-app.tsx" tagged [ui, browser, dispatch] to parent

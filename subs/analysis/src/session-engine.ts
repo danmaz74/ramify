@@ -2,13 +2,15 @@ import { createHash } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
 import { parseDescription } from '../subs/descriptions/src/parse.js';
 import type { ParsedDescription } from '../subs/descriptions/src/interfaces/syntax.js';
-import { resolveTagRegistry } from '../subs/model/src/index.js';
+import { originalKey, resolveTagRegistry } from '../subs/model/src/index.js';
 import type { CapturedInput, ProjectObserver, ProjectResolution } from '../subs/project/src/interfaces/project.js';
 import { observeProject } from '../subs/project/src/observer.js';
 import { resolveProjectRoot } from '../subs/project/src/resolve-root.js';
+import type { SymbolDetail, SymbolDetailRequest } from '../subs/typescript/src/interfaces/source.js';
+import { planApiViewRequests, projectApiView } from './api-view.js';
 import type { AnalysisDiagnostic, AnalysisInputs, AnalysisReport, RunControl } from './interfaces/analysis.js';
-import type { FindingDelta, OperationTimings, RetainedSession, SessionChange, SessionInputs, SessionOpen, SessionRevision, SessionStatus,
-  SessionUpdate, VerifyOutcome } from './interfaces/session.js';
+import type { ApiViewQuery, ApiViewQueryOutcome, FindingDelta, OperationTimings, RetainedSession, SessionChange, SessionInputs, SessionOpen,
+  SessionExplorerDetailsOutcome, SessionRevision, SessionStatus, SessionUpdate, VerifyOutcome } from './interfaces/session.js';
 import { detached, diagnostic } from './report-data.js';
 import { copyReport } from './report-copy.js';
 import { ReportDraft, WorkLimit, availableCapabilities } from './report.js';
@@ -31,6 +33,13 @@ interface Version {
 
 /** Distinct invocation requests whose resolutions a session keeps for reuse. */
 const knownResolutions = 4;
+const explorerDetailLimits = {
+  maxSignatureBytes: 2048,
+  maxDocumentationBytes: 512,
+  maxOverloads: 8,
+  maxResultBytes: 32 * 1024 ** 2,
+} as const;
+const maximumExplorerDetailRequests = 50;
 const positiveIntegers = (values: readonly unknown[]): boolean => values.every(value => Number.isSafeInteger(value) && (value as number) > 0);
 
 /** Findings that appeared, disappeared or only moved between two complete lists. */
@@ -249,6 +258,116 @@ class Session implements RetainedSession {
 
   releaseCompiler(): Promise<void> {
     return this.#serialize(async () => { await this.#state.adapter?.releaseCompiler(); });
+  }
+
+  /**
+   * Project one ephemeral API-view directly from the retained `SessionFacts` of
+   * the session's current valid revision; `report()` and a second project
+   * inventory or model are never used. Only `query.sequence` equal to the
+   * session's current sequence is accepted. A hot compiler answers directly; a
+   * warm one is recreated from the observer's retained captured view (see
+   * `#rehydrate`) without publishing a revision. Newly observed content during
+   * that rehydration, or a sequence that stopped being current while this
+   * queued operation waited, makes the query `superseded`/`invalid-revision`
+   * instead of substituting stale or historical data.
+   */
+  apiView(query: ApiViewQuery, control: RunControl = {}): Promise<ApiViewQueryOutcome> {
+    return this.#serialize(async () => {
+      if (this.#disposed) return { status: 'unavailable', reason: 'invalid-revision', message: 'Retained session is disposed' };
+      const signal = control.signal;
+      if (signal?.aborted) return { status: 'cancelled' };
+      const state = this.#state;
+      if (!this.#current || query.sequence !== this.#sequence) {
+        return { status: 'unavailable', reason: 'invalid-revision',
+          message: `Sequence ${query.sequence} is not the session's current revision (${this.#sequence})` };
+      }
+      const facts = state.facts;
+      if (!facts) return { status: 'unavailable', reason: 'analysis-failed', message: 'Session facts are not retained' };
+      const planned = planApiViewRequests(facts, query.selection);
+      if (planned.status === 'unavailable') return planned;
+      if (planned.requests.length) {
+        if (!state.adapter) return { status: 'unavailable', reason: 'analysis-failed', message: 'No retained compiler is available for this session' };
+        if (!state.adapter.hot) {
+          const rehydration = await this.#rehydrate(signal);
+          if (rehydration) return rehydration;
+        }
+      }
+      let details: readonly SymbolDetail[];
+      try {
+        details = planned.requests.length ? await state.adapter!.details(planned.requests, query.details, signal) : [];
+      } catch (error) {
+        if (isCancellation(error, signal)) return { status: 'cancelled' };
+        const message = error instanceof Error ? error.message : String(error);
+        const reason = error instanceof Object && 'code' in error && (error as { code?: unknown }).code === 'resource-limit'
+          ? 'resource-limit' : 'analysis-failed';
+        return { status: 'unavailable', reason, message };
+      }
+      const lookup = new Map(details.map(detail => [`${originalKey(detail.original)} ${detail.exportName}`, detail]));
+      const detailsOf = (request: SymbolDetailRequest): SymbolDetail => {
+        const found = lookup.get(`${originalKey(request.original)} ${request.exportName}`);
+        if (!found) throw new Error(`No symbol detail was returned for ${request.exportName} of ${originalKey(request.original)}`);
+        return found;
+      };
+      return projectApiView(facts, query.sequence, this.#current.inputId, query.selection, detailsOf,
+        { maxAreaBytes: query.maxAreaBytes, maxInvocationBytes: query.maxInvocationBytes });
+    });
+  }
+
+  explorerDetails(sequence: number, requests: readonly SymbolDetailRequest[],
+    control: RunControl = {}): Promise<SessionExplorerDetailsOutcome> {
+    return this.#serialize(async () => {
+      if (control.signal?.aborted) return { status: 'cancelled' };
+      if (this.#disposed) return { status: 'unavailable', reason: 'compiler-released', message: 'Retained session is disposed' };
+      if (!this.#current || sequence !== this.#sequence) return { status: 'superseded', sequence: this.#sequence };
+      if (this.#state.facts?.invalid || this.#current.outcome.execution !== 'completed') {
+        return { status: 'unavailable', reason: 'invalid-current', message: 'The current revision is not a valid completed analysis' };
+      }
+      const adapter = this.#state.adapter;
+      if (!adapter?.hot) {
+        return { status: 'unavailable', reason: 'compiler-released', message: 'The current revision no longer has a retained compiler' };
+      }
+      const unique = new Set(requests.map(request => `${originalKey(request.original)}\u0000${request.exportName}`));
+      if (unique.size > maximumExplorerDetailRequests) {
+        return { status: 'unavailable', reason: 'resource-limit',
+          message: `Explorer details accept at most ${maximumExplorerDetailRequests} distinct requests` };
+      }
+      try {
+        const details = await adapter.details(requests, explorerDetailLimits, control.signal);
+        return { status: 'ready', sequence, details };
+      } catch (error) {
+        if (isCancellation(error, control.signal)) return { status: 'cancelled' };
+        const reason = error instanceof Object && 'code' in error
+          && (error as { code?: unknown }).code === 'resource-limit' ? 'resource-limit' : 'analysis-failed';
+        return { status: 'unavailable', reason,
+          message: error instanceof Error ? error.message : String(error) };
+      }
+    });
+  }
+
+  /**
+   * Recreate one compiler from the observer's retained captured view: an
+   * update with no named changes reopens a released adapter directly from
+   * disk, exactly as a real structural or broad revision step would, without a
+   * project inventory walk (the observer's inventory and inputs are reused,
+   * only the compiler's own reads are repeated). `#promote` then compares
+   * those reads against the retained capture exactly as it does after every
+   * real revision computation; any discrepancy (or an incomplete/invalid
+   * re-observation) marks the session stale for the next real update and
+   * reports the query as superseded rather than answering from drifted state.
+   * Returns null when rehydration observed nothing new.
+   */
+  async #rehydrate(signal?: AbortSignal): Promise<ApiViewQueryOutcome | null> {
+    const state = this.#state;
+    if (!state.observer) return { status: 'unavailable', reason: 'analysis-failed', message: 'Session has no observer to rehydrate a compiler from' };
+    try {
+      await state.adapter!.update({ changed: [], created: [], deleted: [], inventory: null, invalidateAll: false }, signal);
+      await this.#promote(signal);
+    } catch (error) {
+      if (isCancellation(error, signal)) return { status: 'cancelled' };
+      state.stale = true;
+      return { status: 'superseded', sequence: this.#sequence, observedInputId: state.observer.inputId };
+    }
+    return null;
   }
 
   dispose(): Promise<void> {

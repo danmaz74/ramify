@@ -4,12 +4,20 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { performance } from 'node:perf_hooks';
 import type { RetainedSession } from '../../analysis/src/interfaces/session.js';
 import type { RunControl } from '../../analysis/src/interfaces/analysis.js';
-import type { CheckOutcome, ContextEvent, ContextStatus, ContextToken, OpenOutcome, SubscriptionHandle, Unavailable } from '../subs/contexts/src/interfaces/contexts.js';
+import type { ApiViewQueryLimits, CheckOutcome, ContextEvent, ContextStatus, ContextToken, OpenOutcome, SubscriptionHandle, Unavailable } from '../subs/contexts/src/interfaces/contexts.js';
 import { createContextManager } from '../subs/contexts/src/context-manager.js';
-import type { DaemonCounters, RamifyService, ServiceErrorCode, ServiceResult } from '../../../src/interfaces/service.js';
+import type { DaemonCounters, MaterializeOutcome, MaterializeParams, RamifyService, ServiceErrorCode, ServiceResult } from '../../../src/interfaces/service.js';
 import type { DaemonService, DaemonServiceOptions, ServiceLease, StopDisposition } from './interfaces/daemon.js';
 import { validateServiceRequest } from './validation.js';
 import { transportCounters } from './host-counters.js';
+
+/** `contracts.md`'s iteration-1 frozen `RetainedSession.apiView` bounds. Passed
+ * explicitly to `createContextManager`, rather than relying on its own equal
+ * default, so the production wiring self-documents the frozen numbers. */
+const apiViewLimits: ApiViewQueryLimits = {
+  details: { maxSignatureBytes: 2048, maxDocumentationBytes: 512, maxOverloads: 8, maxResultBytes: 32 * 1024 ** 2 },
+  maxAreaBytes: 32 * 1024 ** 2, maxInvocationBytes: 256 * 1024 ** 2,
+};
 
 const serviceDiagnostics = channel('ramify.daemon.service');
 const stopRequests = new AsyncLocalStorage<string>();
@@ -35,7 +43,7 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
   let disposed = false;
   let disposePromise: Promise<void> | undefined;
   const observed = new Map<string, number>();
-  const manager = createContextManager({ ...options, engine: options.instance.engine, generationId: () => `gen/1:${randomUUID()}`,
+  const manager = createContextManager({ ...options, apiViewLimits, engine: options.instance.engine, generationId: () => `gen/1:${randomUUID()}`,
     driver: {
       resolve: (request, control, known) => options.driver.resolve(request, control, known),
       async open(project, setup, control) {
@@ -56,7 +64,8 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
             return result;
           },
           report: session.report.bind(session), releaseRevision: session.releaseRevision.bind(session),
-          status: session.status.bind(session), releaseCompiler: session.releaseCompiler.bind(session), dispose: session.dispose.bind(session),
+          status: session.status.bind(session), releaseCompiler: session.releaseCompiler.bind(session),
+          apiView: session.apiView.bind(session), explorerDetails: session.explorerDetails.bind(session), dispose: session.dispose.bind(session),
         };
         return { ...opened, session: counted };
       },
@@ -75,6 +84,22 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
     opening: Set<AbortController>; released: boolean }>();
   const stops = new Set<(disposition: StopDisposition) => void>();
   const key = (token: ContextToken) => `${token.context}/${token.generation}`;
+  // A per-project-root FIFO chain: `apiView`'s revision slot is released before
+  // `materialize` publishes, so two overlapping materialize invocations for the
+  // same project could otherwise publish out of order. Acquired before calling
+  // `contexts.apiView`, released once `publisher.publish` settles (including
+  // cancellation or disconnect); never blocks `check`. See contracts.md "Root
+  // service and wire", Revision (iteration 8).
+  const publicationLocks = new Map<string, Promise<unknown>>();
+  function withPublicationLock<T>(root: string, run: () => Promise<T>): Promise<T> {
+    const prior = publicationLocks.get(root) ?? Promise.resolve();
+    const settledPrior = prior.then(() => undefined, () => undefined);
+    const result = settledPrior.then(run);
+    const tail = result.then(() => undefined, () => undefined);
+    publicationLocks.set(root, tail);
+    void tail.finally(() => { if (publicationLocks.get(root) === tail) publicationLocks.delete(root); });
+    return result;
+  }
   function observe(): readonly ContextStatus[] {
     const list = manager.list();
     const live = new Set<string>();
@@ -124,6 +149,45 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
         value.handle.close(); state.subscriptions.delete(subscription);
       }
     }
+    /** Query the revision-bound projection, then publish it while the per-root
+     * lock is held; maps every context and publisher outcome without ever
+     * converting a domain failure to success. Runs entirely inside
+     * `withPublicationLock`, so a queued sibling invocation for the same root
+     * cannot start until this one's publish (or non-projected outcome) settles. */
+    async function runMaterialize(params: MaterializeParams, root: string, control?: RunControl): Promise<MaterializeOutcome> {
+      const outcome = await manager.apiView({ token: params.token, requestId: params.requestId, freshness: params.freshness,
+        selection: params.selection, ...(params.deadlineMs === undefined ? {} : { deadlineMs: params.deadlineMs }) }, pair(params.token), control);
+      // `outcome.status === 'projected'` is checked first (a positive equality
+      // narrow, which TS handles correctly) so every other branch below never
+      // needs to touch `.revision`/`.projection`: TS does not narrow away the
+      // remaining `{ status: 'pending' | 'cold'; ... }` member by elimination
+      // (confirmed: neither `||`-combined nor separate equality checks against
+      // both of its literal values remove it from what a later branch sees),
+      // so every branch here is an explicit positive check, never a fallthrough.
+      if (outcome.status === 'projected') {
+        const published = await options.publisher.publish(root, outcome.revision.revision, outcome.projection, params.requestId, control);
+        if (published.status === 'cancelled') return { status: 'cancelled', requestId: outcome.requestId };
+        if (published.status === 'unavailable') {
+          // The publisher's own reason vocabulary ('invalid-path'/'resource-limit') is
+          // one layer lower than MaterializeOutcome's frozen reason union, which has no
+          // member of either exact name; fold them onto their nearest existing member
+          // ('invalid-location'/'resource-unavailable', already how the session layer
+          // folds its own 'resource-limit') rather than widening the frozen union.
+          const reason = published.reason === 'invalid-path' ? 'invalid-location'
+            : published.reason === 'resource-limit' ? 'resource-unavailable' : published.reason;
+          return { status: 'unavailable', requestId: outcome.requestId, reason, message: published.message };
+        }
+        return { status: 'materialized', requestId: outcome.requestId, revision: outcome.revision, freshness: outcome.freshness,
+          targets: published.targets, bytesWritten: published.bytesWritten, ...(outcome.timings ? { timings: outcome.timings } : {}) };
+      }
+      if (outcome.status === 'pending') return { status: 'pending', requestId: outcome.requestId, current: outcome.current };
+      if (outcome.status === 'cold') return { status: 'cold', requestId: outcome.requestId, current: outcome.current };
+      if (outcome.status === 'deadline-exceeded') return { status: 'deadline-exceeded', requestId: outcome.requestId, revision: outcome.revision, elapsedMs: outcome.elapsedMs };
+      if (outcome.status === 'superseded') return { status: 'superseded', requestId: outcome.requestId, revision: outcome.revision };
+      if (outcome.status === 'cancelled') return { status: 'cancelled', requestId: outcome.requestId };
+      if (outcome.status === 'unavailable') return { status: 'unavailable', requestId: outcome.requestId, reason: outcome.reason, message: outcome.message };
+      throw new Error(`Unhandled apiView outcome status: ${(outcome as { status: string }).status}`);
+    }
     const service: RamifyService = {
       async openContext(params, control) {
         const invalid = guard<OpenOutcome>('openContext', params); if (invalid) return invalid;
@@ -170,6 +234,26 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
         observe();
         // A client subtracts the service's own handling from its round trip to find transport.
         return success(result.status === 'reported' && result.timings
+          ? { ...result, timings: Object.freeze({ ...result.timings, service: performance.now() - handling }) } : result);
+      },
+      async explorerDetails(params, control) {
+        const invalid = guard<Awaited<ReturnType<RamifyService['explorerDetails']>> extends ServiceResult<infer T> ? T : never>('explorerDetails', params);
+        if (invalid) return invalid;
+        const result = await manager.explorerDetails(params, pair(params.token), control);
+        observe();
+        return success(result);
+      },
+      async materialize(params, control) {
+        const invalid = guard<MaterializeOutcome>('materialize', params); if (invalid) return invalid;
+        const status = manager.status(params.token);
+        if ('status' in status) {
+          return success({ status: 'unavailable', requestId: params.requestId, reason: status.reason, message: status.message });
+        }
+        const root = status.selection.root;
+        const handling = performance.now();
+        const result = await withPublicationLock(root, () => runMaterialize(params, root, control));
+        observe();
+        return success(result.status === 'materialized' && result.timings
           ? { ...result, timings: Object.freeze({ ...result.timings, service: performance.now() - handling }) } : result);
       },
       async subscribe(params, listener) {
@@ -265,6 +349,8 @@ export async function dispatchServiceRequest(service: RamifyService, operation: 
     case 'openContext': return service.openContext(input, control);
     case 'contextStatus': return service.contextStatus(input);
     case 'check': return service.check(input, control);
+    case 'explorerDetails': return service.explorerDetails(input, control);
+    case 'materialize': return service.materialize(input, control);
     case 'subscribe': return listener ? service.subscribe(input, listener) : failure('invalid-request', 'Subscription listener is required');
     case 'unsubscribe': return service.unsubscribe(input);
     case 'closeContext': return service.closeContext(input);

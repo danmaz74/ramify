@@ -30,13 +30,18 @@ const modelNames = [
   'resolveTagRegistry', 'createDefaultTagRegistry', 'deriveSourceAreas', 'assignOriginalTags',
   'originalKey', 'buildModel', 'explainVisibility', 'explainImport',
 ];
+// Plan 2A relays from owners.md "Cross-subtree relay additions".
+const availabilityNames = ['AvailableForm', 'AvailableOriginal', 'listAvailableOriginals'];
+const symbolDetailNames = ['SymbolDetailLimits', 'SymbolDetailRequest', 'SymbolDetail'];
+const apiViewNames = ['ApiViewCategory', 'ApiViewEntry', 'ApiViewFile', 'ApiViewAreaProjection', 'ApiViewModuleProjection',
+  'ApiViewProjection', 'ApiViewSelection', 'ApiViewQuery', 'ApiViewQueryOutcome'];
 const linkingNames = ['LinkInputs', 'ExpandedSelection', 'LinkIssue', 'LinkedDescriptions'];
 const analysisNames = ['Capability', 'StageId', 'RunControl', 'AnalysisLimits', 'AnalysisInputs',
   'InventoryInputs', 'InventorySnapshot', 'InventoryRun', 'ValidationRun', 'CapabilityExecution',
   'StageExecution', 'AnalysisCode', 'AnalysisDiagnostic', 'AccessResult', 'AnalysisSnapshot',
   'AnalysisSummary', 'AnalysisReport', 'AnalysisRun', 'AnalysisSession', 'SessionLimits', 'SessionInputs',
   'SessionChange', 'RevisionPath', 'CheckedSet', 'FindingDelta', 'RevisionTimings', 'OperationTimings', 'SessionRevision',
-  'SessionUpdate', 'VerifyOutcome', 'SessionStatus', 'RetainedSession', 'SessionOpen'];
+  'SessionUpdate', 'VerifyOutcome', 'SessionExplorerDetailsOutcome', 'SessionStatus', 'RetainedSession', 'SessionOpen'];
 const syntaxNames = ['TextSpan', 'DescriptionToken', 'DescriptionIssue', 'NamedSelection',
   'DescriptionSelection', 'DescriptionStatement', 'DescriptionDocument', 'ParsedDescription', 'DescriptionParser'];
 
@@ -50,7 +55,7 @@ const observerNames = ['ObservationSink', 'InputChangeKind', 'ObservedChange', '
 const contextNames = ['ContextId', 'GenerationId', 'RevisionId', 'LeaseId', 'ContextToken', 'ContextSetup',
   'ContextSelection', 'InputFingerprints', 'RevisionCause', 'ContextRevision', 'ContextState', 'SynchronizationState',
   'ContextStatus', 'ExpectedContent', 'Freshness', 'FreshnessRecord', 'CheckRequest', 'CheckDelta', 'UnavailableReason', 'Unavailable',
-  'CheckOutcome', 'ReplyTimings', 'OpenOutcome', 'ContextEvent', 'SubscriptionHandle', 'WatchEvent', 'WatcherHandle', 'WatcherPort',
+  'CheckOutcome', 'ExplorerDetailsRequest', 'ContextExplorerDetailsOutcome', 'ReplyTimings', 'OpenOutcome', 'ContextEvent', 'SubscriptionHandle', 'WatchEvent', 'WatcherHandle', 'WatcherPort',
   'ClockPort', 'ContextBudgets'];
 const controlledNames = ['createControlledWatcher', 'createControlledClock', 'ControlledWatcher', 'ControlledClock'];
 const residentNames = ['DaemonInstance', 'LogEntry', 'DaemonBudgets', 'EndpointSelection', 'DaemonRecord',
@@ -65,6 +70,12 @@ const presentationNames = ['DiagramDefinition', 'TreeDiagramDefinition', 'FocusD
   'ModelDiagram', 'ModelDiagramSvg', 'TreeDiagram', 'TreeDiagramSvg', 'FocusDiagram', 'FocusDiagramSvg',
   'shopDiagram', 'example1Diagram', 'example1aDiagram', 'example1bDiagram', 'example2Diagram',
   'example3Diagram', 'example4Diagram', 'shopTreeDiagram', 'shopFocusDiagram'];
+const projectViewModelNames = ['ProjectExplorerModel', 'ExplorerModule', 'ExplorerFile', 'ExplorerMetrics',
+  'ExplorerEdge', 'ExplorerAccess', 'ExplorerSelection', 'ExplorerExport',
+  'ExplorerExposure', 'ExplorerCoverage', 'ExplorerSummary'];
+const projectViewProps = ['ProjectExplorerViewProps', 'ExplorerDiscussionProps', 'ExplorerDiscussionSelection', 'ExportDetailState'];
+const explorerServiceNames = ['ExplorerProjectionInput', 'ProjectViewInput', 'ExplorerDetailsInput',
+  'ExplorerDetailsResult', 'ContextStatusInput', 'ContextStatusResult', 'ExplorerProcessRecord'];
 const presentationStatements = [
   src(['ModelDiagram', 'ModelDiagramSvg'], 'ModelDiagram.tsx', uiBrowser),
   src(['TreeDiagram', 'TreeDiagramSvg'], 'TreeDiagram.tsx', uiBrowser),
@@ -76,6 +87,9 @@ const presentationStatements = [
   ...['shop', 'example1', 'example1a', 'example1b', 'example2', 'example3', 'example4']
     .map((name) => src([`${name}Diagram`], `diagrams/${name}.ts`, uiBrowser)),
   src(['shopTreeDiagram', 'shopFocusDiagram'], 'diagrams/shop-tree.ts', uiBrowser),
+  sub(projectViewModelNames, 'project-view'), sub(['ModuleGraphRadial'], 'project-view'),
+  sub(['ModuleGraphProps', 'GraphSelection'], 'project-view'), sub(['ProjectExplorerView'], 'project-view'),
+  sub(projectViewProps, 'project-view'),
 ];
 const layoutStatements = [
   src('*', 'interfaces/layout.ts'),
@@ -97,25 +111,39 @@ const toolkit: readonly Fixture[] = [
   { path: '', name: 'ramify', tags: ['dispatch'], statements: [
     src('*', 'interfaces/batch.ts', null, descendants), src('*', 'interfaces/service.ts', null, descendants),
     statement('expose-test', ['createQuickEnvironment', 'QuickEnvironment'], 'quick-environment.ts', descendants),
-    sub(modelNames, 'analysis', descendants), sub([...syntaxNames, ...linkingNames], 'analysis', descendants),
-    sub([...projectNames, ...observerNames.slice(1)], 'analysis', descendants), sub(sourceNames, 'analysis', descendants),
-    sub(analysisNames, 'analysis', descendants), sub(presentationNames, 'presentation', descendants),
-    sub([...contextNames, ...residentNames, ...controlledNames], 'daemon', descendants),
+    sub([...modelNames, ...availabilityNames], 'analysis', descendants), sub([...syntaxNames, ...linkingNames], 'analysis', descendants),
+    sub([...projectNames, ...observerNames.slice(1), 'isRamifyGeneratedPath'], 'analysis', descendants),
+    sub([...sourceNames, ...symbolDetailNames], 'analysis', descendants),
+    sub([...analysisNames, ...apiViewNames], 'analysis', descendants), sub(presentationNames, 'presentation', descendants),
+    sub([...projectViewModelNames, 'ModuleGraphProps', 'GraphSelection'], 'presentation', descendants),
+    sub(['ModuleGraphRadial'], 'presentation', descendants), sub(projectViewProps, 'presentation', descendants),
+    sub(['ProjectExplorerView'], 'presentation', descendants),
+    sub(explorerServiceNames, 'service-api', descendants), sub(['createProjectExplorerModel'], 'service-api', descendants),
+    sub(['createExplorerRouter', 'ExplorerRouter', 'startExplorerWebProcess'], 'service-api', descendants),
+    sub(['selectExplorerEndpoint', 'readExplorerProcessRecord', 'reusableExplorerProcess', 'probeExplorerReadiness',
+      'explorerProjectUrl', 'ExplorerEndpointSelection', 'ensureExplorerWebProcess', 'ExplorerLaunchOptions',
+      'ExplorerProcessLaunch'], 'service-api', descendants),
+    sub(['ProjectExplorerPage', 'createProjectExplorerBrowserApp'], 'explorer', descendants),
+    sub([...contextNames, ...residentNames, ...controlledNames, 'MaterializedTarget'], 'daemon', descendants),
+    sub(['connectDaemon', 'selectEndpoint'], 'daemon', descendants),
   ] },
-  { path: 'subs/analysis/', name: 'analysis', tags: [], statements: [sub('*', 'model', both), sub([...syntaxNames, ...linkingNames], 'descriptions', both), sub([...projectNames, ...observerNames], 'project', both), sub(sourceNames, 'typescript', both), src(['validateProject'], 'validation.ts'), src('*', 'interfaces/analysis.ts'), src(['acquireInventory'], 'inventory.ts'), src(['createAnalysisSession'], 'session.ts'), src(['analyzeProject'], 'analyze-project.ts'), src(['resolveProject'], 'resolve-project.ts'), src('*', 'interfaces/session.ts'), src(['openRetainedSession'], 'retained-session.ts')] },
+  { path: 'subs/analysis/', name: 'analysis', tags: [], statements: [sub('*', 'model', both), sub([...syntaxNames, ...linkingNames], 'descriptions', both), sub([...projectNames, ...observerNames, 'isRamifyGeneratedPath'], 'project', both), sub([...sourceNames, ...symbolDetailNames], 'typescript', both), src(['validateProject'], 'validation.ts'), src('*', 'interfaces/analysis.ts'), src(['acquireInventory'], 'inventory.ts'), src(['createAnalysisSession'], 'session.ts'), src(['analyzeProject'], 'analyze-project.ts'), src(['resolveProject'], 'resolve-project.ts'), src('*', 'interfaces/session.ts'), src(['openRetainedSession'], 'retained-session.ts'), src(['planApiViewRequests', 'projectApiView'], 'api-view.ts')] },
   { path: 'subs/analysis/subs/descriptions/', name: 'descriptions', tags: browser, statements: [src(['parseDescription'], 'parse.ts', browser), src('*', 'interfaces/syntax.ts'), src(['linkDescriptions'], 'link.ts', browser), src('*', 'interfaces/linking.ts')] },
   { path: 'subs/analysis/subs/model/', name: 'model', tags: browser, statements: [
     src('*', 'interfaces/model.ts'), src(['resolveTagRegistry', 'createDefaultTagRegistry'], 'registry.ts', browser),
     src(['deriveSourceAreas', 'assignOriginalTags'], 'profiles.ts', browser), src(['originalKey'], 'identity.ts', browser),
     src(['buildModel'], 'model.ts', browser), src(['explainVisibility', 'explainImport'], 'decisions.ts', browser),
+    src(['listAvailableOriginals'], 'availability.ts', browser),
   ] },
-  { path: 'subs/analysis/subs/project/', name: 'project', tags: [], statements: [src(['readProject'], 'read-project.ts'), src('*', 'interfaces/project.ts'), src(['resolveProjectRoot'], 'resolve-root.ts'), src(['observeProject'], 'observer.ts')] },
+  { path: 'subs/analysis/subs/project/', name: 'project', tags: [], statements: [src(['readProject'], 'read-project.ts'), src('*', 'interfaces/project.ts'), src(['resolveProjectRoot'], 'resolve-root.ts'), src(['observeProject'], 'observer.ts'), src(['isRamifyGeneratedPath'], 'generated-path.ts')] },
   { path: 'subs/analysis/subs/typescript/', name: 'typescript', tags: [], statements: [src(['createSourceAnalysis'], 'source-analysis.ts'), src('*', 'interfaces/source.ts'), src(['createAccessInterpreter'], 'access-interpreter.ts'),
-      src(['describeFiles', 'assembleCatalog'], 'descriptions.ts'), src(['createRetainedSourceAnalysis'], 'retained-source-analysis.ts')] },
+      src(['describeFiles', 'assembleCatalog'], 'descriptions.ts'), src(['createRetainedSourceAnalysis'], 'retained-source-analysis.ts'),
+      src(['describeSymbolDetails'], 'symbol-details.ts')] },
   { path: 'subs/cli/', name: 'cli', tags: ['dispatch'], statements: [src(['runCli'], 'run-cli.ts'), src('*', 'interfaces/cli.ts')] },
   { path: 'subs/daemon/', name: 'daemon', tags: ['dispatch'], statements: [
     src(['createDaemonService', 'dispatchServiceRequest'], 'service.ts'),
     src(['createFilesystemWatcher'], 'filesystem-watcher.ts'),
+    src(['createFilesystemApiViewPublisher'], 'api-view-publisher.ts'),
     src(['createSystemClock'], 'system-clock.ts'),
     src(['connectDaemon'], 'connect-daemon.ts'),
     src(['encodeMessage', 'decodeMessage'], 'codec.ts'),
@@ -129,8 +157,28 @@ const toolkit: readonly Fixture[] = [
     src('*', 'interfaces/contexts.ts'),
     statement('expose-test', controlledNames, 'controlled-ports.ts'),
   ] },
+  { path: 'subs/explorer/', name: 'explorer', tags: ['ui', 'browser', 'dispatch'], statements: [
+    src(['ProjectExplorerPage'], 'ProjectExplorerPage.tsx', ['ui', 'browser', 'dispatch']),
+    src(['createProjectExplorerBrowserApp'], 'browser-app.tsx', ['ui', 'browser', 'dispatch']),
+  ] },
+  { path: 'subs/integration-tests/', name: 'integration-tests', tags: ['testing', 'ui', 'dispatch'], statements: [] },
   { path: 'subs/presentation/', name: 'presentation', tags: uiBrowser, statements: presentationStatements },
   { path: 'subs/presentation/subs/layout/', name: 'layout', tags: browser, statements: layoutStatements },
+  { path: 'subs/presentation/subs/project-view/', name: 'project-view', tags: uiBrowser, statements: [
+    src('*', 'interfaces/project-view.ts'), src(['ModuleGraphRadial'], 'ModuleGraphRadial.tsx', uiBrowser),
+    src(['ModuleGraphProps', 'GraphSelection'], 'moduleGraphShared.ts'),
+    src(['ProjectExplorerView'], 'ProjectExplorerView.tsx', uiBrowser),
+    src(['ProjectExplorerViewProps', 'ExplorerDiscussionProps', 'ExplorerDiscussionSelection'], 'ProjectExplorerView.tsx'),
+    src(['ExportDetailState'], 'ExportList.tsx'),
+  ] },
+  { path: 'subs/service-api/', name: 'service-api', tags: ['dispatch'], statements: [
+    src('*', 'interfaces/explorer-service.ts'), src(['createProjectExplorerModel'], 'project-view.ts'),
+    src(['createExplorerRouter', 'ExplorerRouter'], 'router.ts'),
+    src(['startExplorerWebProcess', 'ExplorerWebProcess'], 'web-process.ts'),
+    src(['selectExplorerEndpoint', 'readExplorerProcessRecord', 'reusableExplorerProcess', 'probeExplorerReadiness',
+      'explorerProjectUrl', 'ExplorerEndpointSelection'], 'web-discovery.ts'),
+    src(['ensureExplorerWebProcess', 'ExplorerLaunchOptions', 'ExplorerProcessLaunch'], 'web-launcher.ts'),
+  ] },
 ];
 const workspace = 'subs/workspace/';
 const catalog = `${workspace}subs/catalog/`;
@@ -198,7 +246,7 @@ describe('all current project descriptions as exact-text parser fixtures', () =>
     }
   }
 
-  it('covers exactly eleven toolkit and fifteen reference descriptions without omitting an owner', async () => {
+  it('covers exactly fifteen toolkit and fifteen reference descriptions without omitting an owner', async () => {
     // This fixture inventory walk is not application acquisition or an ownership implementation.
     async function nestedDescriptions(directory: URL): Promise<string[]> {
       const entries = await readdir(directory, { withFileTypes: true });
@@ -208,7 +256,7 @@ describe('all current project descriptions as exact-text parser fixtures', () =>
       }));
       return [...entries.filter((entry) => entry.isFile() && entry.name === 'module.ramify').map((entry) => entry.name), ...nested.flat()];
     }
-    expect(toolkit).toHaveLength(11);
+    expect(toolkit).toHaveLength(15);
     expect(reference).toHaveLength(15);
     for (const [prefix, fixtures] of [['', toolkit], ['examples/collection-review/', reference]] as const) {
       const actual = ['module.ramify', ...(await nestedDescriptions(new URL(`${prefix}subs/`, root))).map((path) => `subs/${path}`)];

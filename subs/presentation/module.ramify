@@ -21,3 +21,10 @@ expose-src example2Diagram from "diagrams/example2.ts" tagged [ui, browser] to p
 expose-src example3Diagram from "diagrams/example3.ts" tagged [ui, browser] to parent
 expose-src example4Diagram from "diagrams/example4.ts" tagged [ui, browser] to parent
 expose-src shopTreeDiagram, shopFocusDiagram from "diagrams/shop-tree.ts" tagged [ui, browser] to parent
+
+// P1-P3: project explorer compatibility vocabulary and lifted radial graph.
+expose-sub ProjectExplorerModel, ExplorerModule, ExplorerFile, ExplorerMetrics, ExplorerEdge, ExplorerAccess, ExplorerSelection, ExplorerExport, ExplorerExposure, ExplorerCoverage, ExplorerSummary from project-view to parent
+expose-sub ModuleGraphRadial from project-view to parent
+expose-sub ModuleGraphProps, GraphSelection from project-view to parent
+expose-sub ProjectExplorerView from project-view to parent
+expose-sub ProjectExplorerViewProps, ExplorerDiscussionProps, ExplorerDiscussionSelection, ExportDetailState from project-view to parent

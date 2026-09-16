@@ -74,6 +74,10 @@ export async function runCliProcess(options: CliProcessOptions): Promise<void> {
       }, stderr: text => write(process.stderr, text),
       connect: createServiceConnector(manifest.version, options.location),
       batch: options.batch,
+      explore: (input, control) => import('./explore-launcher.js').then(module => module.launchInstalledExplorer(input,
+        { packageRoot: options.packageRoot, version: manifest.version, ...(options.location ? { location: options.location } : {}),
+          ...(process.env.RAMIFY_ENDPOINT_DIR ? { endpointDirectory: process.env.RAMIFY_ENDPOINT_DIR } : {}) }, control)),
+      openBrowser: (url, control) => import('./explore-launcher.js').then(module => module.openPlatformBrowser(url, control)),
       ...(options.buildIdentity === undefined ? {} : { buildRefusal: createBuildRefusal(manifest.version, options.packageRoot, options.buildIdentity) }),
     }, { signal: controller.signal });
   } catch (error) {

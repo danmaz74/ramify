@@ -2,6 +2,14 @@ import fs from 'node:fs';
 import { lstat, readdir, realpath } from 'node:fs/promises';
 import { isAbsolute, join, relative, sep } from 'node:path';
 import type { ClockPort, WatchBatch, WatchEvent, WatcherHandle, WatcherPort } from '../subs/contexts/src/interfaces/contexts.js';
+// Cross-subtree relay pending (coordinator): `isRamifyGeneratedPath` is owned
+// by `analysis/project` and reaches `daemon` only through the root's and
+// `analysis`'s named `expose-sub` relay lists, not yet amended for this name.
+// This relative import follows the same physical path the daemon's other
+// direct `../../analysis/...` imports already use (see connection.ts,
+// service.ts) and compiles today; it is not yet a legal Ramify import until
+// those two relay lines are extended.
+import { isRamifyGeneratedPath } from '../../analysis/subs/project/src/generated-path.js';
 
 const excluded = new Set(['node_modules', '.git', 'dist', '.reference-work']);
 const maximumPaths = 10_000;
@@ -95,7 +103,7 @@ async function watchTree(root: string, listener: (events: readonly WatchEvent[],
       if (isAbsolute(name) || !name || path === '..' || path.startsWith(`..${sep}`) || isAbsolute(path)) {
         dirty = true; rescanAll = true; enqueue('', 'overflow'); return;
       }
-      if (path.split(sep).some(part => excluded.has(part))) return;
+      if (path.split(sep).some(part => excluded.has(part) || isRamifyGeneratedPath(part))) return;
       if (kind === 'rename') { dirty = true; changedDirectories.add(directory); }
       enqueue(path, kind === 'rename' ? 'renamed' : 'changed');
     };
@@ -154,7 +162,7 @@ async function watchTree(root: string, listener: (events: readonly WatchEvent[],
       }
       const children = new Set<string>();
       for (const entry of entries) {
-        if (entry.isDirectory() && !entry.isSymbolicLink() && !excluded.has(entry.name)) {
+        if (entry.isDirectory() && !entry.isSymbolicLink() && !excluded.has(entry.name) && !isRamifyGeneratedPath(entry.name)) {
           const path = join(directory, entry.name); children.add(path);
           // Re-stat direct children on rename so replacement of an existing
           // directory cannot keep a watcher attached to its old inode.

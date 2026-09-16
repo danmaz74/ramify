@@ -1,0 +1,86 @@
+{
+  "schemaVersion": "ramify.plan2a-platform/1",
+  "phase": "plan2a-platform",
+  "measuredAt": "2026-09-15T17:22:39.332Z",
+  "evidenceKind": "platform",
+  "fixture": {
+    "source": "scripts/reference-harness/plan2a-materialize-fixture.ts",
+    "files": [
+      "module.ramify",
+      "subs/app/module.ramify",
+      "subs/app/src/index.ts",
+      "subs/app/src/tests/index.test.ts",
+      "subs/lib/module.ramify",
+      "subs/lib/src/api.ts",
+      "tsconfig.json"
+    ]
+  },
+  "environment": {
+    "node": "v22.23.2",
+    "platform": "linux",
+    "release": "6.8.0-85-generic",
+    "arch": "x64"
+  },
+  "cases": {
+    "firstPublication": {
+      "code": 0,
+      "stdout": "Root: /ramify/.reference-work/plan2a-platform-manifest-CtgJYZ\nMaterialized: revision 1; 4 target(s), 3 entries, 711 bytes written, 0 unchanged\n"
+    },
+    "noOpRepeat": {
+      "code": 0,
+      "stdout": "Root: /ramify/.reference-work/plan2a-platform-manifest-CtgJYZ\nMaterialized: revision 1; 4 target(s), 3 entries, 0 bytes written, 4 unchanged\n",
+      "zeroBytesWritten": true,
+      "manifestUnchanged": true
+    },
+    "symlinkRefusal": {
+      "code": 2,
+      "stdout": "Root: /ramify/.reference-work/plan2a-platform-symlink-1y5U2U\nNot materialized (symlink): \"subs/app/src/.ramify\" or one of its contents is a symlink\nNo complete refresh was claimed.\n",
+      "symlinkUntouched": true
+    },
+    "rollback": {
+      "code": 2,
+      "stdout": "Root: /ramify/.reference-work/plan2a-platform-rollback-AW5g1c\nNot materialized (output-failure): EACCES: permission denied, open '/ramify/.reference-work/plan2a-platform-rollback-AW5g1c/subs/app/src/.ramify.tmp-f2e14133f6cec8df181035fc125d262c.marker.json'\nNo complete refresh was claimed.\n",
+      "oldBytesPreserved": true
+    }
+  },
+  "manifest": [
+    {
+      "path": "src/.ramify/_meta.json",
+      "bytes": 138,
+      "sha256": "fe9f990fc05b4011b817db68e3a467c20991393a1565e8cfd61b6908687b4bcd"
+    },
+    {
+      "path": "src/.ramify/children/subs/lib/src/api.ts.md",
+      "bytes": 50,
+      "sha256": "1803954891d45f9ec501a60859da59c3cd2a4dd027fd84119931a60f8dc50dd6"
+    },
+    {
+      "path": "subs/app/src/.ramify/_meta.json",
+      "bytes": 142,
+      "sha256": "378beac99ec4ff919ef8eeb40274289b53895f71c8f39090794e7623dc4a196d"
+    },
+    {
+      "path": "subs/app/src/.ramify/external/subs/lib/src/api.ts.md",
+      "bytes": 50,
+      "sha256": "1803954891d45f9ec501a60859da59c3cd2a4dd027fd84119931a60f8dc50dd6"
+    },
+    {
+      "path": "subs/app/src/tests/.ramify/_meta.json",
+      "bytes": 139,
+      "sha256": "004985c38596920d9b831113afe7d6dc8341c30154bf6a12391c75d9a6aa5887"
+    },
+    {
+      "path": "subs/app/src/tests/.ramify/external/subs/lib/src/api.ts.md",
+      "bytes": 50,
+      "sha256": "1803954891d45f9ec501a60859da59c3cd2a4dd027fd84119931a60f8dc50dd6"
+    },
+    {
+      "path": "subs/lib/src/.ramify/_meta.json",
+      "bytes": 142,
+      "sha256": "736eb69c701546da3deb3ce39bc7b905e554735cb37a97e75a89b2005834813e"
+    }
+  ],
+  "passed": true,
+  "failures": [],
+  "completedAt": "2026-09-15T17:22:42.803Z"
+}

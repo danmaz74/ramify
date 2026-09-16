@@ -344,3 +344,60 @@ The resident recipe now asserts actual retained revision paths and correlates
 each edit with its worker reply. Covered synchronized requests may reuse a
 revision captured before acknowledgment. Settled retained workers and compiler
 servers are expected live resources; cleanup is checked when their daemon stops.
+
+## Plan 2A materialize scale and platform measurements
+
+```sh
+npm run build
+npm run measure:plan2a
+```
+
+The command runs the installed `ramify materialize` against isolated copies of
+the reference example (R) and the toolkit itself (T), the S100 synthetic
+fixture, an S1000 sanity/smoke run, and a repeated-materialization plateau on R
+and S100, each under its own owned `RAMIFY_ENDPOINT_DIR`. It records files,
+entries, final bytes, ordinary/tests duplication, the largest ordinary and
+tests area, cold and warm (repeat) latency, bytes written, and the daemon's
+peak combined RSS/heap — the host process's own `daemon status` reading plus
+its open context's worker thread and native compiler child, none of which
+appear in the host's own reading alone. S500 is excluded from the default run
+by the carried-forward Plan 5 measurement-policy decision (not required); run
+it explicitly with `-- --workload synthetic-500` if ever needed. S1000 is a
+sanity/smoke run: its real observed outcome (this host currently completes it,
+cold and warm, in a few minutes each) is recorded, never forced or retried
+toward a nicer number. `-- --workload <name>` runs one workload; `-- --output
+FILE` names the raw report. Every completed invocation also appends a lossless
+gzip record to `results/index.json`, identifying the exact source, build,
+recipe and dependency versions, checked again at verification time.
+
+```sh
+node scripts/measurements/verify-plan2a-evidence.mjs I2A-12:reference-scale
+```
+
+Without a report path (or `RAMIFY_PLAN2A_MEASUREMENT_REPORT`), the reader
+selects the newest archive whose recorded inputs match the current source,
+build and recipe files, and recomputes every predicate from the raw
+measurement. The nine `scale-evidence` reference-harness handlers use this
+reader rather than re-running a heavy workload inside the verification gate.
+
+```sh
+npm run measure:plan2a-platform
+```
+
+Materializes the small, checked-in
+[`plan2a-materialize-fixture.ts`](../reference-harness/plan2a-materialize-fixture.ts)
+through the real installed CLI and daemon, and records: the first publication,
+a real unchanged-repeat no-op, a real symlinked-target refusal, and a real
+rollback (a genuine `EACCES` fault forces a failed second publish; the earlier
+target is restored byte-for-byte) — plus a relative-path/bytes/SHA-256 manifest
+of every generated file. The report is written to
+`scripts/measurements/results/plan2a-platform-<platform>.json` (checked in
+directly, not gzip-archived, since it is small and meant to be diffed).
+
+This host is Linux only. **A macOS runner must execute `npm run build` then
+`npm run measure:plan2a-platform` unchanged**, producing
+`scripts/measurements/results/plan2a-platform-darwin.json`; commit that file
+beside the existing `plan2a-platform-linux.json`. Until both exist, the
+`I2A-12:linux-macos-bytes` reference-harness leaf fails honestly (a real,
+current Linux report with no macOS counterpart), rather than passing on Linux
+evidence alone.

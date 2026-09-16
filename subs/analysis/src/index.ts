@@ -12,3 +12,5 @@ export type * from '../subs/typescript/src/interfaces/source.js';
 export { resolveProject } from './resolve-project.js';
 export { openRetainedSession } from './retained-session.js';
 export type * from './interfaces/session.js';
+export { planApiViewRequests, projectApiView } from './api-view.js';
+export type { ApiViewProjectOutcome } from './api-view.js';

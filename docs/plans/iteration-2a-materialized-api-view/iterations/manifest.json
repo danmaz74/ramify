@@ -1,0 +1,73 @@
+{
+  "_cucumberViz": {
+    "editMode": "mcp-only",
+    "generatedBy": "cucumber-viz",
+    "mcpTool": "planning.write_iteration_manifest",
+    "message": "Do not edit directly. Use the planning MCP tool.",
+    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
+  },
+  "createdAt": "2026-09-15T00:00:00.000Z",
+  "iterations": [
+    {
+      "file": "iteration1.md",
+      "index": 1,
+      "parallelGroup": null,
+      "title": "Contract review and scale probes"
+    },
+    {
+      "file": "iteration2.md",
+      "index": 2,
+      "parallelGroup": "provider-foundations",
+      "title": "Generated-output isolation and harness ledger"
+    },
+    {
+      "file": "iteration3.md",
+      "index": 3,
+      "parallelGroup": "provider-foundations",
+      "title": "Model availability enumeration"
+    },
+    {
+      "file": "iteration4.md",
+      "index": 4,
+      "parallelGroup": "provider-foundations",
+      "title": "TypeScript symbol details"
+    },
+    {
+      "file": "iteration5.md",
+      "index": 5,
+      "parallelGroup": null,
+      "title": "Complete API-view projection"
+    },
+    {
+      "file": "iteration6.md",
+      "index": 6,
+      "parallelGroup": "runtime-halves",
+      "title": "Markdown rendering and transactional publication"
+    },
+    {
+      "file": "iteration7.md",
+      "index": 7,
+      "parallelGroup": "runtime-halves",
+      "title": "Retained-session and context query"
+    },
+    {
+      "file": "iteration8.md",
+      "index": 8,
+      "parallelGroup": null,
+      "title": "Daemon service, client and CLI command"
+    },
+    {
+      "file": "iteration9.md",
+      "index": 9,
+      "parallelGroup": null,
+      "title": "Agent workflow, process and resource evidence"
+    },
+    {
+      "file": "iteration10.md",
+      "index": 10,
+      "parallelGroup": null,
+      "title": "Final declarations, regressions and Plan 3 handoff"
+    }
+  ],
+  "planPath": "main-plan.md"
+}

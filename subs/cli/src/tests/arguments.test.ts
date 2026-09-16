@@ -72,6 +72,8 @@ describe('resident command grammar', () => {
     { argv: ['daemon', 'status', '--format', 'json'], expected: { command: 'daemon', action: 'status', format: 'json' } },
     { argv: ['daemon', 'stop'], expected: { command: 'daemon', action: 'stop', format: 'human' } },
     { argv: ['daemon', 'stop', '--format', 'json'], expected: { command: 'daemon', action: 'stop', format: 'json' } },
+    { argv: ['explore'], expected: { command: 'explore' } },
+    { argv: ['explore', '--root', 'a project'], expected: { command: 'explore', root: 'a project' } },
   ])('preserves the complete selection for $argv', ({ argv, expected }) => {
     expect(parseArguments(argv)).toEqual(expected);
   });
@@ -90,6 +92,9 @@ describe('resident command grammar', () => {
     { argv: ['daemon', 'stop', '--format', 'json', '--format', 'json'] },
     { argv: ['daemon', 'status', 'stop'] }, { argv: ['daemon', 'stop', '--help'] },
     { argv: ['check', '--format', 'json', '--format', 'json'] },
+    { argv: ['explore', '--root'] }, { argv: ['explore', '--root', 'a', '--root', 'b'] },
+    { argv: ['explore', '--batch'] }, { argv: ['explore', '--format', 'json'] },
+    { argv: ['explore', '--help'] }, { argv: ['explore', 'file.ts'] },
   ])('rejects unsupported or ambiguous grammar $argv', ({ argv }) => {
     expect(() => parseArguments(argv)).toThrow();
   });
@@ -118,5 +123,52 @@ describe('changed command grammar', () => {
   it('accepts the positive deadline boundaries', () => {
     for (const value of [1, 600_000]) expect(parseArguments(['check', '--changed', 'a.ts', '--deadline', String(value)]))
       .toMatchObject({ deadlineMs: value });
+  });
+});
+
+describe('materialize command grammar', () => {
+  it.each([
+    { argv: ['materialize'], expected: { command: 'materialize', all: false } },
+    { argv: ['materialize', '--all'], expected: { command: 'materialize', all: true } },
+    { argv: ['materialize', '--from', 'subs/app'], expected: { command: 'materialize', all: false, from: 'subs/app' } },
+    { argv: ['materialize', '--root', '../project'], expected: { command: 'materialize', all: false, root: '../project' } },
+    { argv: ['materialize', '--root', '../project', '--from', 'subs/app'],
+      expected: { command: 'materialize', all: false, root: '../project', from: 'subs/app' } },
+    { argv: ['materialize', '--from', 'a project/subs/app', '--root', 'a root'],
+      expected: { command: 'materialize', all: false, from: 'a project/subs/app', root: 'a root' } },
+  ])('preserves the complete selection for $argv', ({ argv, expected }) => {
+    expect(parseArguments(argv)).toEqual(expected);
+  });
+
+  it.each([
+    { argv: ['materialize', '--all', '--from', 'subs/app'] }, { argv: ['materialize', '--from', 'subs/app', '--all'] },
+    { argv: ['materialize', '--all', '--all'] }, { argv: ['materialize', '--from', 'a', '--from', 'b'] },
+    { argv: ['materialize', '--root', 'a', '--root', 'b'] }, { argv: ['materialize', '--from', ''] },
+    { argv: ['materialize', '--root', ''] }, { argv: ['materialize', '--from'] }, { argv: ['materialize', '--root'] },
+    { argv: ['materialize', '--batch'] }, { argv: ['materialize', '--changed', 'a.ts'] },
+    { argv: ['materialize', '--format', 'json'] }, { argv: ['materialize', '--since', 'rev/1:x:1'] },
+    { argv: ['materialize', '--deadline', '500'] }, { argv: ['materialize', '--help'] },
+    { argv: ['materialize', 'file.ts'] },
+  ])('rejects unsupported or ambiguous grammar $argv', ({ argv }) => {
+    expect(() => parseArguments(argv)).toThrow();
+  });
+
+  it('lists the materialize grammar and exit codes in --help without dispatching', async () => {
+    const stdout: string[] = [];
+    const exit = await runCli(['--help'], { cwd: '/project', version: '1', connect: async () => { throw new Error('Unexpected daemon connection'); },
+      stdout: text => { stdout.push(text); }, stderr: text => { throw new Error(text); }, batch: async () => { throw new Error('Unexpected batch'); } });
+    expect(exit).toBe(0);
+    expect(stdout.join('')).toContain('ramify materialize [--from <path>] [--all] [--root <dir>]');
+    expect(stdout.join('')).toContain('ramify explore [--root <dir>]');
+  });
+
+  it('rejects materialize before dispatch, like every other unsupported grammar', async () => {
+    let calls = 0;
+    const stderr: string[] = [];
+    const exit = await runCli(['materialize', '--all', '--from', 'subs/app'], { cwd: '/project', version: '1',
+      connect: async () => { calls++; throw new Error('Unexpected daemon connection'); }, stdout: () => {}, stderr: text => { stderr.push(text); },
+      batch: async () => { calls++; throw new Error('Unexpected batch'); } });
+    expect([exit, calls]).toEqual([2, 0]);
+    expect(stderr.join('')).toContain('invalid-invocation');
   });
 });

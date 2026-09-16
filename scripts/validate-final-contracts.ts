@@ -22,6 +22,7 @@ function manifest(document: DescriptionDocument): unknown {
 
 const plan1 = 'docs/plans/done/iteration-1-project-verifier';
 const plan2 = 'docs/plans/done/iteration-2-resident-verification';
+const plan2a = 'docs/plans/iteration-2a-materialized-api-view';
 interface ReviewedOwner { readonly directory: string; readonly purpose: string; readonly document: DescriptionDocument }
 interface PackageMetadata {
   readonly type: string; readonly main: string; readonly types: string;
@@ -55,7 +56,7 @@ function description(text: string): DescriptionDocument {
 
 /** Plan 2 abbreviates unchanged named lists. Expand only from the archived
  * Plan 1 review, never from the implementation being checked. */
-export function reviewedOwners(baseline: string, resident: string, retained?: string, retainedIteration = 10): ReadonlyMap<string, ReviewedOwner> {
+export function reviewedOwners(baseline: string, resident: string, retained?: string, retainedIteration = 10, materialized?: string): ReadonlyMap<string, ReviewedOwner> {
   const owners = new Map<string, ReviewedOwner>();
   function add(review: string, abbreviations: boolean): number {
     let count = 0;
@@ -98,6 +99,7 @@ export function reviewedOwners(baseline: string, resident: string, retained?: st
     // 10. Do not claim that future behavior while validating iteration 9.
     if (retainedIteration < 10) owners.set('cli', { ...owners.get('cli')!, purpose: previousCli.purpose });
   }
+  if (materialized) assert.equal(add(materialized, true), 6, 'All six Plan 2A final declaration owners must be present');
   assert.equal(owners.size, 11, 'All eleven final owners must be present');
   return owners;
 }
@@ -166,7 +168,11 @@ for (const [name, entry] of Object.entries(metadata.exports)) {
 
 export async function validateFinalContracts(root: string) {
   const read = (path: string) => readFile(resolve(root, path), 'utf8');
-  const expected = reviewedOwners(await read(`${plan1}/owners.md`), await read(`${plan2}/owners.md`), await read('docs/plans/iteration-5-fast-incremental-checks/owners.md'));
+  // Plan 5's own completion gate (I5-14:declarations-final) greps this file
+  // for the literal path below to confirm it reads Plan 5's owners.md as its
+  // third reviewed layer; keep this exact literal, not the `plan5` constant.
+  const expected = reviewedOwners(await read(`${plan1}/owners.md`), await read(`${plan2}/owners.md`),
+    await read('docs/plans/iteration-5-fast-incremental-checks/owners.md'), 10, await read(`${plan2a}/owners.md`));
   const metadata = reviewedPackage(await read(`${plan1}/contracts.md`), await read(`${plan2}/contracts.md`));
   const errors: Error[] = [];
   for (const owner of expected.values()) {

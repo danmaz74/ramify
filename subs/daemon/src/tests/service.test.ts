@@ -81,6 +81,22 @@ describe('validated daemon service', () => {
     const status = await environment.service.daemonStatus(); expect(status.ok && status.value.contexts).toEqual([]);
     expect(await dispatchServiceRequest(environment.service, 'unknown', {})).toMatchObject({ ok: false, error: { code: 'unsupported-operation' } });
   });
+  it('exposes revision-bound explorer details through direct, shared and codec-backed dispatch', async () => {
+    const { environment, params } = await fixture();
+    const opened = await environment.service.openContext(params);
+    if (!opened.ok || opened.value.status !== 'opened') throw new Error('Expected opened context');
+    const checked = await environment.service.check({ token: opened.value.token, requestId: 'publish-details',
+      freshness: { mode: 'synchronized', expect: [] } });
+    if (!checked.ok || checked.value.status !== 'reported' || !checked.value.published) throw new Error('Expected publication');
+    const request = { token: opened.value.token, revision: checked.value.revision.revision,
+      requests: [{ original: { kind: 'code' as const, owner: 'fixture', file: 'index.ts', binding: 'value' }, exportName: 'value' }] };
+    const direct = await environment.service.explorerDetails({ ...request, requestId: 'details-direct' });
+    expect(direct).toMatchObject({ ok: true, value: { status: 'ready', details: [{ state: 'described', signature: 'const value: 1' }] } });
+    const shared = await dispatchServiceRequest(environment.service, 'explorerDetails', { ...request, requestId: 'details-shared' });
+    expect(shared).toMatchObject({ ok: true, value: { status: 'ready', revision: checked.value.revision } });
+    const codec = await environment.request('explorerDetails', { ...request, requestId: 'details-codec' });
+    expect(codec).toMatchObject({ ok: true, value: { status: 'ready', details: [{ exportName: 'value' }] } });
+  });
   it('releases one client/context pair while retaining its other subscription', async () => {
     const { environment, params, root } = await fixture();
     const secondRoot = await mkdtemp(join(tmpdir(), 'ramify-service-second-')); roots.push(secondRoot);

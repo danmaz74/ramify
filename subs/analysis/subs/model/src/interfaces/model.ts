@@ -120,3 +120,8 @@ export interface ImportDecision {
   readonly checkedOrigins: readonly SourceOrigin[];
   readonly blockingOrigins: readonly SourceOrigin[];
 }
+export type AvailableForm = 'value' | 'type-only';
+export interface AvailableOriginal {
+  readonly original: OriginalId;
+  readonly form: AvailableForm;
+}

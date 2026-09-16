@@ -107,6 +107,7 @@ export function instrumentCompiler(state: SessionState) {
   state.adapter = {
     get hot() { return adapter.hot; }, update, describe, dispose,
     catalog: adapter.catalog.bind(adapter), releaseCompiler: adapter.releaseCompiler.bind(adapter),
+    details: adapter.details.bind(adapter),
     interpreter: () => ({ interpret, replaceDescriptions: interpreter.replaceDescriptions.bind(interpreter),
       dispose: interpreter.dispose.bind(interpreter) }),
   };

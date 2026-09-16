@@ -93,11 +93,14 @@ const capabilityPrerequisites: Readonly<Record<VerificationCapability, readonly 
   engine: [], compiler: [], observer: [], hosting: [], supersession: [], 'hook-cli': [], 'live-equivalence': [], 'fast-measure': [],
   increment: [], contexts: [], 'daemon-service': [], ipc: [], client: [],
   'daemon-process': [], lifecycle: [], equivalence: [], 'resident-measure': [], completion: [],
+  'provider-review': [], isolation: [], availability: [], 'symbol-details': [], projection: [], rendering: [],
+  publication: [], 'revision-query': [], 'service-operation': [], 'cli-command': [], 'agent-workflow': [],
+  'scale-evidence': [], 'final-declarations': [],
 };
 
 export function requiredCapabilities(instance: ReferenceInstance): VerificationCapability[] {
-  // Plan 2 capabilities are complete evidence providers, not Plan 1 pipeline stages.
-  if (/^I[25]-/.test(instance.id)) return [...instance.requiredCapabilities].sort();
+  // Plan 2/5/2A capabilities are complete evidence providers, not Plan 1 pipeline stages.
+  if (/^I(?:2A|[25])-/.test(instance.id)) return [...instance.requiredCapabilities].sort();
   const needed = new Set<VerificationCapability>();
   function visit(capability: VerificationCapability): void {
     if (needed.has(capability)) return;
@@ -127,7 +130,7 @@ export interface InstanceExecution {
 
 export interface VerificationReport {
   readonly schemaVersion: 1;
-  readonly plan: 1 | 2 | 5;
+  readonly plan: 1 | 2 | 5 | '2a';
   readonly mode: 'plan-verification' | 'iteration-verification';
   readonly iteration: number | null;
   readonly requiredIterations: readonly number[];

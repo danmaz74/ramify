@@ -73,9 +73,11 @@ export function persistMeasurement(report, output, directory, note, options = {}
 /** Append standard concatenated gzip members, each with at most 4 MiB of raw
  * JSON. Member boundaries do not change a single byte of the pretty payload. */
 export function archiveMeasurement(report, directory, note, options = {}) {
-  assert.ok(['ramify.batch-measurements/1', 'ramify.resident-measurements/1', 'ramify.fast-measurements/1'].includes(report.schemaVersion));
+  assert.ok(['ramify.batch-measurements/1', 'ramify.resident-measurements/1', 'ramify.fast-measurements/1',
+    'ramify.plan2a-measurements/1'].includes(report.schemaVersion));
   const resident = report.schemaVersion === 'ramify.resident-measurements/1';
   const fast = report.schemaVersion === 'ramify.fast-measurements/1';
+  const plan2a = report.schemaVersion === 'ramify.plan2a-measurements/1';
   mkdirSync(directory, { recursive: true });
   const lock = join(directory, '.archive.lock');
   writeFileSync(lock, `${process.pid}\n`, { flag: 'wx' });
@@ -92,7 +94,7 @@ export function archiveMeasurement(report, directory, note, options = {}) {
     }
     assert.equal(index.schemaVersion, 'ramify.batch-measurement-archive/1');
     assert.ok(Array.isArray(index.records));
-    const file = `${fast ? 'fast' : resident ? 'resident' : 'batch'}-${report.measuredAt.replaceAll(':', '-')}-${id}.json.gz`;
+    const file = `${fast ? 'fast' : resident ? 'resident' : plan2a ? 'plan2a' : 'batch'}-${report.measuredAt.replaceAll(':', '-')}-${id}.json.gz`;
     archivePath = join(directory, file);
     const fd = openSync(archivePath, 'wx');
     archiveCreated = true;

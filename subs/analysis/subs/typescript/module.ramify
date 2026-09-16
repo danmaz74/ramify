@@ -10,3 +10,5 @@ expose-src createAccessInterpreter from "access-interpreter.ts" to parent
 expose-src describeFiles, assembleCatalog from "descriptions.ts" to parent
 // T5: the retained compiler adapter with one live snapshot.
 expose-src createRetainedSourceAnalysis from "retained-source-analysis.ts" to parent
+// Plan 2A iteration 4: bounded, body-free symbol-detail extraction.
+expose-src describeSymbolDetails from "symbol-details.ts" to parent

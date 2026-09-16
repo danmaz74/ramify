@@ -1,6 +1,6 @@
 import type { AnalysisReport, AnalysisSummary, Capability, RunControl, AnalysisDiagnostic } from '../../../../../analysis/src/interfaces/analysis.js';
-import type { CheckedSet, RevisionTimings, SessionStatus, SessionOpen } from '../../../../../analysis/src/interfaces/session.js';
-import type { SourceLimit } from '../../../../../analysis/subs/typescript/src/interfaces/source.js';
+import type { ApiViewProjection, ApiViewSelection, CheckedSet, RevisionTimings, SessionStatus, SessionOpen } from '../../../../../analysis/src/interfaces/session.js';
+import type { SourceLimit, SymbolDetail, SymbolDetailLimits, SymbolDetailRequest } from '../../../../../analysis/subs/typescript/src/interfaces/source.js';
 import type { ProjectRequest, ProjectScope, ProjectResolution, OutsideSourceWarning } from '../../../../../analysis/subs/project/src/interfaces/project.js';
 
 export type ContextId = string;
@@ -159,6 +159,54 @@ export type CheckOutcome =
   | { readonly status: 'deadline-exceeded'; readonly requestId: string; readonly elapsedMs: number; readonly revision: ContextRevision | null }
   | { readonly status: 'cancelled'; readonly requestId: string }
   | (Unavailable & { readonly requestId: string });
+/** One serialized, synchronized API-view request: always synchronized freshness
+ * (materialization never uses `published` freshness or a `since` baseline). */
+export interface ApiViewRequest {
+  readonly token: ContextToken;
+  readonly requestId: string;
+  readonly freshness: Extract<Freshness, { readonly mode: 'synchronized' }>;
+  readonly selection: ApiViewSelection;
+  readonly deadlineMs?: number;
+}
+export type ContextApiViewOutcome =
+  | { readonly status: 'projected'; readonly requestId: string;
+      readonly revision: ContextRevision; readonly freshness: FreshnessRecord;
+      readonly projection: ApiViewProjection; readonly timings?: ReplyTimings }
+  | { readonly status: 'pending' | 'cold'; readonly requestId: string;
+      readonly current: ContextStatus }
+  | { readonly status: 'deadline-exceeded'; readonly requestId: string;
+      readonly revision: ContextRevision | null; readonly elapsedMs: number }
+  | { readonly status: 'superseded'; readonly requestId: string;
+      readonly revision: ContextRevision | null }
+  | { readonly status: 'cancelled'; readonly requestId: string }
+  | (Unavailable & { readonly requestId: string });
+export interface ExplorerDetailsRequest {
+  readonly token: ContextToken;
+  readonly requestId: string;
+  readonly revision: RevisionId;
+  readonly requests: readonly SymbolDetailRequest[];
+}
+export type ContextExplorerDetailsOutcome =
+  | { readonly status: 'ready'; readonly requestId: string;
+      readonly revision: ContextRevision;
+      readonly details: readonly SymbolDetail[] }
+  | { readonly status: 'superseded'; readonly requestId: string;
+      readonly revision: ContextRevision | null }
+  | { readonly status: 'unavailable'; readonly requestId: string;
+      readonly reason: UnavailableReason | 'compiler-released'
+        | 'invalid-current' | 'resource-limit' | 'analysis-failed';
+      readonly message: string }
+  | { readonly status: 'cancelled'; readonly requestId: string };
+/** The frozen symbol-detail and area/invocation byte bounds `ContextManager.apiView`
+ * passes to `RetainedSession.apiView`; not part of `ApiViewRequest` since a caller
+ * cannot loosen them per request. `ContextManagerOptions.apiViewLimits` defaults to
+ * the values contracts.md froze in iteration 1 when a caller supplies none, so a
+ * controlled test may tune them without every production caller needing an edit. */
+export interface ApiViewQueryLimits {
+  readonly details: SymbolDetailLimits;
+  readonly maxAreaBytes: number;
+  readonly maxInvocationBytes: number;
+}
 export type OpenOutcome =
   | { readonly status: 'opened'; readonly token: ContextToken; readonly created: boolean;
       readonly current: ContextStatus }
@@ -224,12 +272,23 @@ export interface ContextManagerOptions {
   readonly budgets: ContextBudgets;
   readonly engine: string;
   readonly generationId: () => GenerationId;
+  /** Frozen `RetainedSession.apiView` bounds; defaults to contracts.md's iteration-1
+   * frozen values when omitted. */
+  readonly apiViewLimits?: ApiViewQueryLimits;
 }
 export interface ContextManager {
   open(request: ProjectRequest, setup: ContextSetup, lease: LeaseId, control?: RunControl): Promise<OpenOutcome>;
   status(token: ContextToken): ContextStatus | Unavailable;
   list(): readonly ContextStatus[];
   check(request: CheckRequest, lease: LeaseId, control?: RunControl): Promise<CheckOutcome>;
+  /** Reuses `check`'s scheduler, expected-content rendezvous, generation, lease,
+   * deadline and cancellation rules: the request joins the same per-context queue
+   * as revision publication, is answered from exactly one current revision, and
+   * the session query runs while that revision's slot is held, its ephemeral
+   * projection released once this call returns. */
+  apiView(request: ApiViewRequest, lease: LeaseId, control?: RunControl): Promise<ContextApiViewOutcome>;
+  explorerDetails(request: ExplorerDetailsRequest, lease: LeaseId,
+    control?: RunControl): Promise<ContextExplorerDetailsOutcome>;
   subscribe(token: ContextToken, lease: LeaseId,
     listener: (event: ContextEvent) => void): SubscriptionHandle | Unavailable;
   release(lease: LeaseId): void;

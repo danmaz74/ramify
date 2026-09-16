@@ -1,0 +1,14 @@
+{
+  "createdAt": "2026-09-15T00:00:00.000Z",
+  "updatedAt": "2026-09-16T00:00:00.000Z",
+  "iterations": [
+    { "file": "iteration1.md", "index": 1, "parallelGroup": null, "title": "Reuse baseline and compatibility contract" },
+    { "file": "iteration2.md", "index": 2, "parallelGroup": null, "title": "Lift the radial graph" },
+    { "file": "iteration3.md", "index": 3, "parallelGroup": null, "title": "Lift the page and details" },
+    { "file": "iteration4.md", "index": 4, "parallelGroup": null, "title": "Report projection and detail bridge" },
+    { "file": "iteration5.md", "index": 5, "parallelGroup": null, "title": "Web process and connected explorer" },
+    { "file": "iteration6.md", "index": 6, "parallelGroup": null, "title": "ramify explore" },
+    { "file": "iteration7.md", "index": 7, "parallelGroup": null, "title": "Browser acceptance and reuse report" }
+  ],
+  "planPath": "main-plan.md"
+}

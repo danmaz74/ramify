@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { instanceFromSeed, inventoryDocument, planDirectory, plan2Directory, plan2InventoryDocument, plan5Directory, plan5InventoryDocument, verificationCapabilities } from './instances.js';
+import { instanceFromSeed, inventoryDocument, planDirectory, plan2Directory, plan2InventoryDocument, plan2aDirectory, plan2aGroupCapabilities, plan2aInventoryDocument, plan5Directory, plan5InventoryDocument, verificationCapabilities } from './instances.js';
 import type { EvidenceKind, FixtureCode, InstanceSeed, ReferenceInstance } from './instances.js';
 
 export const repositoryRoot = fileURLToPath(new URL('../../', import.meta.url));
@@ -15,7 +15,7 @@ export const iterationPrerequisites: Readonly<Record<number, readonly number[]>>
 };
 
 export interface ReviewedPlan {
-  readonly number?: 1 | 2 | 5;
+  readonly number?: 1 | 2 | 5 | '2a';
   readonly members: readonly InstanceSeed[];
   readonly prerequisites: Readonly<Record<number, readonly number[]>>;
   readonly supersessions?: Readonly<Record<string, { readonly by: string; readonly amendment: string }>>;
@@ -31,7 +31,7 @@ function requireCondition(condition: unknown, message: string): asserts conditio
   if (!condition) throw new Error(`Invalid reviewed Plan 1 inventory: ${message}`);
 }
 
-function familyIds(cell: string): string[] {
+export function familyIds(cell: string): string[] {
   const ids: string[] = [];
   for (const match of cell.matchAll(/([A-Z]+)(\d{2})(?:[–-](?:[A-Z]+)?(\d{2}))?/g)) {
     for (let n = Number(match[2]); n <= Number(match[3] ?? match[2]); n++) {
@@ -149,9 +149,16 @@ export function validateInstancePointers(records: readonly ReferenceInstance[], 
     'docs/architecture/memory-lifecycle.md',
   ].flatMap((path) => tableRows(readFileSync(resolve(root, path), 'utf8'))
     .filter((row) => /^[A-Z]+\d{2}$/.test(row[0])).map((row) => row[0])));
+  // Plan 2A's I2A-11 (iteration 9, not yet implemented) cites a forward-declared
+  // "H01-H03" agent-workflow evidence family in main-plan.md's acceptance matrix;
+  // no architecture document yet carries an `H01`-style row for it. This is a
+  // narrowly scoped exemption, analogous to the existing 'harness' one below,
+  // not a claim that the family is otherwise validated.
+  const forwardDeclaredFamilies = new Set(['H01', 'H02', 'H03']);
   for (const record of records) {
     for (const family of record.families) {
       if (family === 'harness' && ['I2-28', 'I5-02'].includes(record.matrixId)) continue;
+      if (forwardDeclaredFamilies.has(family) && record.matrixId === 'I2A-11') continue;
       if (!families.has(family)) issues.push(`Unknown family ${family}: ${record.id}`);
     }
   }
@@ -302,4 +309,73 @@ export function readReviewedPlan5(root = repositoryRoot): ReviewedPlan {
   for (const group of matrix.keys()) require(members.some(member => member[0].startsWith(group + ':')), `empty matrix group ${group}`);
   require(rows.some(row => row[0] === 'Total' && row[1] === '103'), 'declared total differs');
   return { number: 5, members, prerequisites: plan5Prerequisites };
+}
+
+/**
+ * Reviewed Plan 2A scheduling. Unlike Plan 2/5, `subcases.md`'s leaves table
+ * carries no per-leaf capability or family column (`ID | It. | Fixture/
+ * evidence | Independent expectation`, four cells): every leaf's capability
+ * and families come from `plan2aGroupCapabilities` and main-plan.md's
+ * acceptance matrix (one row per I2A-NN group), not a per-leaf cell.
+ */
+export const plan2aPrerequisites: Readonly<Record<number, readonly number[]>> = {
+  1: [], 2: [1], 3: [1], 4: [1], 5: [2, 3, 4], 6: [5], 7: [5], 8: [6, 7], 9: [8], 10: [9],
+};
+const plan2aTitles = [
+  'Contract review and scale probes', 'Generated-output isolation and harness ledger',
+  'Model availability enumeration', 'TypeScript symbol details',
+  'Complete API-view projection', 'Markdown rendering and transactional publication',
+  'Retained-session and context query', 'Daemon service, client and CLI command',
+  'Agent workflow, process and resource evidence', 'Final declarations, regressions and Plan 3 handoff',
+];
+export function readReviewedPlan2a(root = repositoryRoot): ReviewedPlan {
+  const require = (condition: unknown, message: string): void => {
+    if (!condition) throw new Error(`Invalid reviewed Plan 2A inventory: ${message}`);
+  };
+  const read = (path: string) => readFileSync(resolve(root, path), 'utf8');
+  const rows = tableRows(read(plan2aInventoryDocument));
+  const main = tableRows(read(`${plan2aDirectory}/main-plan.md`));
+  const leaves = rows.filter(row => /^I2A-\d{2}:/.test(row[0]));
+  require(leaves.length === 104 && new Set(leaves.map(row => row[0])).size === 104
+    && leaves.every(row => row.length === 4), 'expected 104 distinct complete leaves');
+  const matrixRows = main.filter(row => /^I2A-\d{2}$/.test(row[0]) && row.length === 4);
+  const matrix = new Map(matrixRows.map(row => [row[0], row]));
+  require(matrixRows.length === 13 && matrix.size === 13, 'expected thirteen distinct matrix groups');
+  const sequence = main.filter(row => /^\d+$/.test(row[0]) && row.length === 4 && /^\d+$/.test(row[0]) && Number(row[0]) <= 10);
+  require(sequence.length === 10, 'expected ten sequence rows');
+  const members: InstanceSeed[] = leaves.map(([id, iteration, fixtureEvidence, expectation]) => {
+    const matrixId = id.split(':')[0]!;
+    const group = matrix.get(matrixId);
+    require(group, `missing matrix group ${matrixId} for ${id}`);
+    require(Number(group![2]) === Number(iteration), `iteration for ${id} differs from its matrix group`);
+    const families = familyIds(group![3]!);
+    require(families.length > 0, `no families resolved for group ${matrixId}`);
+    const capability = plan2aGroupCapabilities[matrixId];
+    require(capability, `no authored capability for group ${matrixId}`);
+    const lastComma = fixtureEvidence.lastIndexOf(',');
+    const evidence = (lastComma === -1 ? fixtureEvidence : fixtureEvidence.slice(lastComma + 1)).trim();
+    const selection = lastComma === -1 ? '—' : fixtureEvidence.slice(0, lastComma).trim();
+    require(['api', 'unit', 'session', 'quick', 'ipc', 'process', 'measurement', 'platform', 'document'].includes(evidence), `unknown evidence ${evidence} for ${id}`);
+    const codes = selection === '—' ? ['—'] : selection.split(/[/,]/).map(part => part.trim()).filter(Boolean);
+    require(codes.length && codes.every(code => ['R', 'T', 'F', 'S100', 'S500', 'S1000', 'Q', 'M', 'W', 'A', 'P', 'X', 'H', '—'].includes(code)), `unknown fixture ${selection} for ${id}`);
+    require(/^(?:[1-9]|10)$/.test(iteration), `invalid implementing iteration for ${id}`);
+    return [id, Number(iteration), families, capability, codes[0] as FixtureCode,
+      '', expectation, null, null, { selection, evidence: evidence as EvidenceKind }];
+  });
+  for (let offset = 0; offset < 10; offset++) {
+    const index = offset + 1, row = sequence[offset];
+    require(row[0] === String(index) && row[1] === plan2aTitles[offset], `sequence index/title differs at ${index}`);
+    const prerequisites = index === 1 ? [] : row[2]!.match(/\d+/g)?.map(Number) ?? [];
+    require(JSON.stringify(prerequisites) === JSON.stringify(plan2aPrerequisites[index]), `iteration ${index} prerequisites differ from main plan`);
+    const assigned = members.filter(member => member[1] === index);
+    if (index === 1) continue;
+    const membership = rows.filter(candidate => candidate[0] === String(index) && candidate.length === 3);
+    require(membership.length === 1, `iteration ${index} missing from the subcases membership table`);
+    const membershipPrerequisites = membership[0]![1].match(/\d+/g)?.map(Number) ?? [];
+    require(JSON.stringify(membershipPrerequisites) === JSON.stringify(plan2aPrerequisites[index]), `iteration ${index} prerequisites differ from subcase membership list`);
+    const groups = [...new Set(assigned.map(member => member[0].split(':')[0]))].sort();
+    require(JSON.stringify(membership[0]![2].match(/I2A-\d{2}/g)?.sort() ?? []) === JSON.stringify(groups), `iteration ${index} matrix assignments differ from membership list`);
+  }
+  for (const group of matrix.keys()) require(members.some(member => member[0].startsWith(group + ':')), `empty matrix group ${group}`);
+  return { number: '2a', members, prerequisites: plan2aPrerequisites };
 }

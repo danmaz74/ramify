@@ -1,0 +1,265 @@
+{
+  "probe": "plan2a/typescript-detail-feasibility",
+  "recordedAt": "2026-09-15T10:14:40.694Z",
+  "nodeVersion": "v22.23.2",
+  "platform": "linux",
+  "architecture": "x64",
+  "typescript": "7.0.2",
+  "baseCommit": "71643d522eb053336e4c01fcf9836ec52b58fbad",
+  "scriptSha256": "6b3b804e6b69715378d648240d54ba7d8b095ed14a756b4a615c25f2b5c28bf9",
+  "evidence": {
+    "typescriptVersion": "7.0.2",
+    "apiEntry": "typescript/unstable/sync (the same entry the toolkit's catalog.ts already uses to resolve exports)",
+    "limits": {
+      "maxSignatureBytes": 2048,
+      "maxDocumentationBytes": 512,
+      "maxOverloads": 8
+    },
+    "cases": {
+      "declaration-kind:function-overloaded": {
+        "name": "add",
+        "state": "described",
+        "kind": "FunctionDeclaration",
+        "method": "signatureToSignatureDeclaration(CallSignature) [body-free \"for free\"]",
+        "declarationFile": "src/originals.ts",
+        "isAlias": false,
+        "signature": "function add(a: number, b: number): number;\nfunction add(a: string, b: string): string;",
+        "signatureBytes": 87,
+        "documentation": "Adds two values of the same kind together.",
+        "documentationBytes": 42,
+        "overloadsAvailable": 2,
+        "overloadsRetained": 2,
+        "truncated": []
+      },
+      "declaration-kind:class": {
+        "name": "Widget",
+        "state": "described",
+        "kind": "ClassDeclaration",
+        "method": "printNode(real declaration) [interface/type-alias/enum: body-free by TypeScript syntax; class: NOT body-free -- gap]",
+        "declarationFile": "src/originals.ts",
+        "isAlias": false,
+        "signature": "export class Widget {\n    constructor(public readonly id: string) {\n    }\n    render(): string { return this.id; }\n}",
+        "signatureBytes": 116,
+        "documentation": "A minimal widget with one rendering method.",
+        "documentationBytes": 43,
+        "overloadsAvailable": 1,
+        "overloadsRetained": 1,
+        "truncated": []
+      },
+      "declaration-kind:interface": {
+        "name": "Shape",
+        "state": "described",
+        "kind": "InterfaceDeclaration",
+        "method": "printNode(real declaration) [interface/type-alias/enum: body-free by TypeScript syntax; class: NOT body-free -- gap]",
+        "declarationFile": "src/originals.ts",
+        "isAlias": false,
+        "signature": "export interface Shape {\n    readonly kind: string;\n    area(): number;\n}",
+        "signatureBytes": 73,
+        "documentation": "A shape that can report its own area.",
+        "documentationBytes": 37,
+        "overloadsAvailable": 1,
+        "overloadsRetained": 1,
+        "truncated": []
+      },
+      "declaration-kind:type-alias": {
+        "name": "Id",
+        "state": "described",
+        "kind": "TypeAliasDeclaration",
+        "method": "printNode(real declaration) [interface/type-alias/enum: body-free by TypeScript syntax; class: NOT body-free -- gap]",
+        "declarationFile": "src/originals.ts",
+        "isAlias": false,
+        "signature": "export type Id = string | number;",
+        "signatureBytes": 33,
+        "documentation": "An identifier is either numeric or textual.",
+        "documentationBytes": 43,
+        "overloadsAvailable": 1,
+        "overloadsRetained": 1,
+        "truncated": []
+      },
+      "declaration-kind:variable": {
+        "name": "total",
+        "state": "described",
+        "kind": "VariableDeclaration",
+        "method": "typeToTypeNode(getTypeOfSymbol) [body-free alternative to printing the real declaration, which carries an initializer]",
+        "declarationFile": "src/originals.ts",
+        "isAlias": false,
+        "signature": "const total: number",
+        "signatureBytes": 19,
+        "documentation": "The fixed total used by every probe request.",
+        "documentationBytes": 44,
+        "overloadsAvailable": 1,
+        "overloadsRetained": 1,
+        "truncated": []
+      },
+      "declaration-kind:enum": {
+        "name": "Color",
+        "state": "described",
+        "kind": "EnumDeclaration",
+        "method": "printNode(real declaration) [interface/type-alias/enum: body-free by TypeScript syntax; class: NOT body-free -- gap]",
+        "declarationFile": "src/originals.ts",
+        "isAlias": false,
+        "signature": "export enum Color {\n    Red,\n    Green,\n    Blue\n}",
+        "signatureBytes": 50,
+        "documentation": "Primary colors used by the probe fixture.",
+        "documentationBytes": 41,
+        "overloadsAvailable": 1,
+        "overloadsRetained": 1,
+        "truncated": []
+      },
+      "declaration-kind:default-export": {
+        "name": "default",
+        "state": "described",
+        "kind": "FunctionDeclaration",
+        "method": "signatureToSignatureDeclaration(CallSignature) [body-free \"for free\"]",
+        "declarationFile": "src/originals.ts",
+        "isAlias": false,
+        "signature": "function default(name: string): string;",
+        "signatureBytes": 39,
+        "documentation": "The default export greets a name.",
+        "documentationBytes": 33,
+        "overloadsAvailable": 1,
+        "overloadsRetained": 1,
+        "truncated": []
+      },
+      "no-documentation": {
+        "name": "undocumented",
+        "state": "described",
+        "kind": "VariableDeclaration",
+        "method": "typeToTypeNode(getTypeOfSymbol) [body-free alternative to printing the real declaration, which carries an initializer]",
+        "declarationFile": "src/originals.ts",
+        "isAlias": false,
+        "signature": "const undocumented: number",
+        "signatureBytes": 26,
+        "documentationBytes": 0,
+        "overloadsAvailable": 1,
+        "overloadsRetained": 1,
+        "truncated": []
+      },
+      "unicode-documentation-full-budget": {
+        "name": "unicodeDoc",
+        "state": "described",
+        "kind": "VariableDeclaration",
+        "method": "typeToTypeNode(getTypeOfSymbol) [body-free alternative to printing the real declaration, which carries an initializer]",
+        "declarationFile": "src/originals.ts",
+        "isAlias": false,
+        "signature": "const unicodeDoc: string",
+        "signatureBytes": 24,
+        "documentation": "日本語のドキュメント文字列で、複数バイト文字が境界で分割されないことを確認するために十分な長さを持つ説明文です。これはさらに長くするための追加の文章です。",
+        "documentationBytes": 231,
+        "overloadsAvailable": 1,
+        "overloadsRetained": 1,
+        "truncated": []
+      },
+      "unicode-documentation-tight-budget": {
+        "name": "unicodeDoc",
+        "state": "truncated",
+        "kind": "VariableDeclaration",
+        "method": "typeToTypeNode(getTypeOfSymbol) [body-free alternative to printing the real declaration, which carries an initializer]",
+        "declarationFile": "src/originals.ts",
+        "isAlias": false,
+        "signature": "const unicodeDoc: string",
+        "signatureBytes": 24,
+        "documentation": "日本語のドキュメント文字列",
+        "documentationBytes": 39,
+        "overloadsAvailable": 1,
+        "overloadsRetained": 1,
+        "truncated": [
+          "documentation"
+        ]
+      },
+      "overload-bound-truncated": {
+        "name": "add",
+        "state": "truncated",
+        "kind": "FunctionDeclaration",
+        "method": "signatureToSignatureDeclaration(CallSignature) [body-free \"for free\"]",
+        "declarationFile": "src/originals.ts",
+        "isAlias": false,
+        "signature": "function add(a: number, b: number): number;",
+        "signatureBytes": 43,
+        "documentation": "Adds two values of the same kind together.",
+        "documentationBytes": 42,
+        "overloadsAvailable": 2,
+        "overloadsRetained": 1,
+        "truncated": [
+          "overloads"
+        ]
+      },
+      "signature-bound-truncated": {
+        "name": "add",
+        "state": "truncated",
+        "kind": "FunctionDeclaration",
+        "method": "signatureToSignatureDeclaration(CallSignature) [body-free \"for free\"]",
+        "declarationFile": "src/originals.ts",
+        "isAlias": false,
+        "signature": "function add(a: number, ",
+        "signatureBytes": 24,
+        "documentation": "Adds two values of the same kind together.",
+        "documentationBytes": 42,
+        "overloadsAvailable": 2,
+        "overloadsRetained": 2,
+        "truncated": [
+          "signature"
+        ]
+      },
+      "unsupported-declaration:namespace": {
+        "name": "Grouped",
+        "state": "unavailable",
+        "reason": "unsupported-declaration",
+        "kind": "ModuleDeclaration"
+      },
+      "missing-export": {
+        "name": "doesNotExist",
+        "state": "unavailable",
+        "reason": "missing-export"
+      },
+      "forwarded-alias:identity": {
+        "name": "forwardedTotal",
+        "state": "described",
+        "kind": "VariableDeclaration",
+        "method": "typeToTypeNode(getTypeOfSymbol) [body-free alternative to printing the real declaration, which carries an initializer]",
+        "declarationFile": "src/originals.ts",
+        "isAlias": true,
+        "signature": "const forwardedTotal: number",
+        "signatureBytes": 28,
+        "documentation": "The fixed total used by every probe request.",
+        "documentationBytes": 44,
+        "overloadsAvailable": 1,
+        "overloadsRetained": 1,
+        "truncated": []
+      },
+      "isolated-after-failure:function": {
+        "name": "add",
+        "state": "described",
+        "kind": "FunctionDeclaration",
+        "method": "signatureToSignatureDeclaration(CallSignature) [body-free \"for free\"]",
+        "declarationFile": "src/originals.ts",
+        "isAlias": false,
+        "signature": "function add(a: number, b: number): number;\nfunction add(a: string, b: string): string;",
+        "signatureBytes": 87,
+        "documentation": "Adds two values of the same kind together.",
+        "documentationBytes": 42,
+        "overloadsAvailable": 2,
+        "overloadsRetained": 2,
+        "truncated": []
+      }
+    },
+    "isolationCheck": {
+      "missingExportDidNotAbort": true,
+      "laterValidRequestStillDescribed": true
+    },
+    "aliasCheck": {
+      "resolvedToDefiningFile": true,
+      "notForwardFile": true
+    },
+    "unicodeRoundTrip": {
+      "decodesWithoutReplacementCharacter": true
+    },
+    "gaps": [
+      "No byte-safe UTF-8 truncation helper exists in subs/ today; this probe's truncateUtf8Bytes is net-new and would need a production home (likely analysis/typescript).",
+      "No code today builds or prints a synthetic signature/type node, or dispatches by declaration kind for signature shaping; every describe() branch above is net-new for iteration 4.",
+      "Body-free CLASS rendering is not solved: printing the real ClassDeclaration node includes every method/constructor body. A synthetic reconstruction (e.g. printing member signatures individually, no factory API confirmed yet) is needed.",
+      "Printing the real VariableDeclaration node includes its initializer; this probe's typeToTypeNode-based reconstruction is one workable alternative, not the only one.",
+      "compiler-failure could not be independently forced in this probe (it requires a genuine checker-internal fault); isolation is instead demonstrated via the missing-export and unsupported-declaration cases in the same batch, which is the same isolation contract."
+    ]
+  }
+}

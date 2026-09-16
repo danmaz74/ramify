@@ -7,10 +7,10 @@ expose-sub * from model to parent, descendants
 expose-sub TextSpan, DescriptionToken, DescriptionIssue, NamedSelection, DescriptionSelection, DescriptionStatement, DescriptionDocument, ParsedDescription, DescriptionParser, LinkInputs, ExpandedSelection, LinkIssue, LinkedDescriptions from descriptions to parent, descendants
 
 // A7: project vocabulary supplied to assembly and children.
-expose-sub ProjectRequest, ProjectScope, CapturedInput, InventoryArea, ModulePurpose, InventoryModule, InventoryFile, ExactReference, OutsideSourceWarning, ProjectInventory, ProjectIssue, AcquisitionLimits, ProjectInputView, ProjectReadOptions, ProjectRead, ProjectResolution, RetainedConfiguration, ObservationSink, InputChangeKind, ObservedChange, InventoryUpdate, ProjectObserver, ProjectObserve from project to parent, descendants
+expose-sub ProjectRequest, ProjectScope, CapturedInput, InventoryArea, ModulePurpose, InventoryModule, InventoryFile, ExactReference, OutsideSourceWarning, ProjectInventory, ProjectIssue, AcquisitionLimits, ProjectInputView, ProjectReadOptions, ProjectRead, ProjectResolution, RetainedConfiguration, ObservationSink, InputChangeKind, ObservedChange, InventoryUpdate, ProjectObserver, ProjectObserve, isRamifyGeneratedPath from project to parent, descendants
 
 // A8: current source catalog vocabulary.
-expose-sub CatalogOriginal, CatalogExport, FileExports, SourceCatalog, SourceTarget, WrittenForm, AccessSelection, SourceAccess, SourceLimit, SourceWorkLimits, SourceAnalysisInputs, SourceAnalysis from typescript to parent, descendants
+expose-sub CatalogOriginal, CatalogExport, FileExports, SourceCatalog, SourceTarget, WrittenForm, AccessSelection, SourceAccess, SourceLimit, SourceWorkLimits, SourceAnalysisInputs, SourceAnalysis, SymbolDetailLimits, SymbolDetailRequest, SymbolDetail from typescript to parent, descendants
 
 // A1/A4: validation operations and implemented analysis vocabulary.
 expose-src validateProject from "validation.ts" to parent
@@ -28,3 +28,9 @@ expose-src resolveProject from "resolve-project.ts" to parent
 // A11/A12: the retained session and its plain-data vocabulary.
 expose-src * from "interfaces/session.ts" to parent
 expose-src openRetainedSession from "retained-session.ts" to parent
+
+// A13: pure API-view projection, joining availability, catalog and detail
+// results into complete, bounded area projections; no filesystem or
+// retention access. planApiViewRequests names the detail requests a query
+// needs; projectApiView folds their results into the frozen projection.
+expose-src planApiViewRequests, projectApiView from "api-view.ts" to parent

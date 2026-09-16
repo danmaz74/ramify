@@ -10,3 +10,5 @@ expose-src resolveProjectRoot from "resolve-root.ts" to parent
 
 // P4: live observation of one project for the retained session.
 expose-src observeProject from "observer.ts" to parent
+// P5: the canonical reserved generated-output path predicate.
+expose-src isRamifyGeneratedPath from "generated-path.ts" to parent

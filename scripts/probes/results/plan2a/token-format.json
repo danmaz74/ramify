@@ -1,0 +1,58 @@
+{
+  "probe": "plan2a/token-format",
+  "recordedAt": "2026-09-15T10:16:42.133Z",
+  "nodeVersion": "v22.23.2",
+  "platform": "linux",
+  "architecture": "x64",
+  "typescript": "7.0.2",
+  "baseCommit": "71643d522eb053336e4c01fcf9836ec52b58fbad",
+  "scriptSha256": "0a6903233eca79cc4c8b0a8745bf3229bda4ded1c7479062281410fdf31f5a81",
+  "evidence": {
+    "method": "Compact Markdown per the specification's exact template vs. a deliberately verbose JSON record naming every field the spec's omission rules forbid (availability, provider, definingPath, originalId, tags, exposurePath, availabilityReason, exposureAlias, generatedAt), over up to 40 real available entries per fixture sampled with the same explainImport-derived availability as scale-baseline.ts. Signature text is the same raw-declaration-span proxy as scale-baseline.ts (see that file's header), not a rendered iteration-4 signature; the compact-vs-verbose byte/token RATIO this leaf cares about is dominated by structural boilerplate, not by exact signature content, so the proxy is fair for both sides.",
+    "tokenizerAvailability": "None of tiktoken, gpt-tokenizer or js-tiktoken is declared in package.json or present in node_modules (confirmed by search). Byte counts below are exact; approxTokensBytesOverFour and approxTokensBoundarySplit are named, clearly-labeled heuristics only, not real tokenizer output.",
+    "omissionSetRetained": [
+      "availability",
+      "provider",
+      "definingPath",
+      "originalId",
+      "tags",
+      "exposurePath",
+      "availabilityReason",
+      "exposureAlias/alias",
+      "generatedAt/timestamp",
+      "kind field (conveyed by the signature itself)"
+    ],
+    "results": {
+      "R": {
+        "status": "sampled",
+        "sampledEntries": 40,
+        "compact": {
+          "bytes": 12508,
+          "approxTokensBytesOverFour": 3127,
+          "approxTokensBoundarySplit": 1231
+        },
+        "verbose": {
+          "bytes": 34169,
+          "approxTokensBytesOverFour": 8543,
+          "approxTokensBoundarySplit": 2864
+        },
+        "overheadRatio": 2.73
+      },
+      "T": {
+        "status": "sampled",
+        "sampledEntries": 40,
+        "compact": {
+          "bytes": 18580,
+          "approxTokensBytesOverFour": 4645,
+          "approxTokensBoundarySplit": 1792
+        },
+        "verbose": {
+          "bytes": 36695,
+          "approxTokensBytesOverFour": 9174,
+          "approxTokensBoundarySplit": 3289
+        },
+        "overheadRatio": 1.97
+      }
+    }
+  }
+}

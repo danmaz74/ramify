@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
-import type { AnalysisDriver, ContextBudgets, ContextSetup } from '../interfaces/contexts.js';
+import type { ApiViewQueryLimits, AnalysisDriver, ContextBudgets, ContextSetup } from '../interfaces/contexts.js';
 import type { AnalysisInputs, AnalysisReport, RunControl } from '../../../../../analysis/src/interfaces/analysis.js';
-import type { OperationTimings, RetainedSession, SessionChange, SessionRevision, SessionStatus, SessionUpdate, VerifyOutcome } from '../../../../../analysis/src/interfaces/session.js';
+import type { ApiViewQuery, ApiViewQueryOutcome, OperationTimings, RetainedSession, SessionChange, SessionRevision, SessionStatus, SessionUpdate, VerifyOutcome } from '../../../../../analysis/src/interfaces/session.js';
+import type { SymbolDetailRequest } from '../../../../../analysis/subs/typescript/src/interfaces/source.js';
 import type { CapturedInput, ProjectRequest, ProjectResolution } from '../../../../../analysis/subs/project/src/interfaces/project.js';
 import { historyReport } from './history-fixture.js';
 
@@ -11,6 +12,10 @@ export const testBudgets: ContextBudgets = {
   maxQueuedPaths: 10_000, maxConcurrentAnalyses: 1, warmIdleMs: 600_000,
   coldRetainMs: 1_800_000, debounceMs: 100, sweepIntervalMs: 30_000, updateDeadlineMs: 2000,
   demoteDeadlineMs: 5000,
+};
+export const testApiViewLimits: ApiViewQueryLimits = {
+  details: { maxSignatureBytes: 2048, maxDocumentationBytes: 512, maxOverloads: 8, maxResultBytes: 32 * 1024 ** 2 },
+  maxAreaBytes: 32 * 1024 ** 2, maxInvocationBytes: 256 * 1024 ** 2,
 };
 export function hash(content: string): string { return createHash('sha256').update(content).digest('hex'); }
 
@@ -60,6 +65,8 @@ export interface ScriptedSession {
   readonly project: ProjectRequest;
   readonly reportCalls: number[];
   readonly releasedRevisions: number[];
+  readonly apiViewCalls: ApiViewQuery[];
+  readonly explorerDetailsCalls: readonly { readonly sequence: number; readonly requests: readonly SymbolDetailRequest[] }[];
   releaseCompilerCalls: number;
   disposeCalls: number;
 }
@@ -73,6 +80,9 @@ export function createScriptedDriver() {
   const verifyPending: ((session: RetainedSession) => Promise<VerifyOutcome> | VerifyOutcome)[] = [];
   /** Scripted `releaseCompiler` answers; one that never resolves models an unresponsive session. */
   const releasePending: ((session: RetainedSession) => Promise<void> | void)[] = [];
+  /** Scripted `apiView` answers, consumed in order; the default projects an
+   * empty, deterministic projection from the session's current revision. */
+  const apiViewPending: ((session: RetainedSession, query: ApiViewQuery) => Promise<ApiViewQueryOutcome> | ApiViewQueryOutcome)[] = [];
   const missingReports = new Set<number>();
   let fallback = capture(1);
   let factBytes = 100;
@@ -111,6 +121,7 @@ export function createScriptedDriver() {
       let sessionDisposed = false;
       let invocation: Pick<AnalysisInputs, 'project' | 'capabilities'> = { project, capabilities: setup.capabilities };
       const reports = new Map<number, AnalysisReport>();
+      const explorerDetailsCalls: { sequence: number; requests: readonly SymbolDetailRequest[] }[] = [];
       function accept(next: ScriptedCapture): Extract<SessionUpdate, { status: 'revised' }> {
         const report: AnalysisReport = { ...next.report, request: { ...next.report.request, project: invocation.project, capabilities: invocation.capabilities } };
         const comparable = (value: AnalysisReport) => JSON.stringify({ ...value, runId: '' });
@@ -169,15 +180,36 @@ export function createScriptedDriver() {
           if (next) await next(session);
           level = 'warm';
         },
+        async apiView(query, runControl) {
+          entry.apiViewCalls.push(query);
+          if (runControl?.signal?.aborted) return { status: 'cancelled' };
+          const next = apiViewPending.shift();
+          if (next) return await next(session, query);
+          if (!current || query.sequence !== current.sequence) {
+            return { status: 'unavailable', reason: 'invalid-revision', message: `Sequence ${query.sequence} is not current` };
+          }
+          return { status: 'projected', projection: { schema: 'ramify.api-view-projection/1', sequence: query.sequence,
+            inputId: current.inputId, modules: [], bytes: 0 } };
+        },
+        async explorerDetails(sequence, requests, runControl) {
+          explorerDetailsCalls.push({ sequence, requests });
+          if (runControl?.signal?.aborted) return { status: 'cancelled' };
+          if (!current || sequence !== current.sequence) return { status: 'superseded', sequence: current?.sequence ?? 0 };
+          if (level !== 'hot') return { status: 'unavailable', reason: 'compiler-released', message: 'Compiler released' };
+          return { status: 'ready', sequence, details: requests.map(request => ({
+            state: 'unavailable' as const, original: request.original, exportName: request.exportName,
+            reason: 'missing-export' as const,
+          })) };
+        },
         async dispose() { if (sessionDisposed) return; entry.disposeCalls++; sessionDisposed = true; current = null; currentReport = null; reports.clear(); retainedBytes = 0; },
       };
-      const entry: ScriptedSession = { session, project, reportCalls: [], releasedRevisions: [], releaseCompilerCalls: 0, disposeCalls: 0 };
+      const entry: ScriptedSession = { session, project, reportCalls: [], releasedRevisions: [], apiViewCalls: [], explorerDetailsCalls, releaseCompilerCalls: 0, disposeCalls: 0 };
       sessions.push(entry);
       return { status: 'opened', session, revision: initial.revision };
     },
     async dispose() { disposed = true; },
   };
-  return { driver, calls, pending, sessions, reportCalls, verifyCalls, verifyPending, releasePending, missingReports, resolveCalls,
+  return { driver, calls, pending, sessions, reportCalls, verifyCalls, verifyPending, releasePending, apiViewPending, missingReports, resolveCalls,
     /** Resolutions actually performed: calls that returned no known resolution. */
     get resolutions() { return resolveCalls.filter(call => !call.reused).length; },
     /** Change the discovery answers: every earlier resolution is invalid, optionally with a moved root. */

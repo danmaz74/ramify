@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 import type { RetainedSession, SessionRevision } from '../../../analysis/src/interfaces/session.js';
 import type { AnalysisDriver, ContextBudgets } from '../../subs/contexts/src/interfaces/contexts.js';
 import { createControlledClock, createControlledWatcher } from '../../subs/contexts/src/tests/controlled-ports.js';
-import type { LogEntry } from '../interfaces/daemon.js';
+import type { ApiViewPublisher, LogEntry } from '../interfaces/daemon.js';
 import { createDaemonService } from '../service.js';
+
+/** None of these tests exercise `materialize`; a call would be a real defect. */
+const publisher: ApiViewPublisher = { async publish() { throw new Error('Unexpected ApiViewPublisher.publish call'); } };
 
 const budgets: ContextBudgets = {
   maxContexts: 8, maxHotContexts: 2, maxHistoryRevisions: 8, maxHistoryBytes: 1024 ** 2,
@@ -39,14 +42,15 @@ describe('daemon session audit accounting', () => {
       async report() { return null; }, async releaseRevision() {},
       status() { return { level: 'hot', sequence: current.sequence, observedInputs: 0, factBytes: 100,
         worker: { heapUsed: 100, rss: 100 }, compiler: { pid: null, rss: null }, lastSweepAt: null }; },
-      async releaseCompiler() {}, async dispose() { sessionDisposed = true; },
+      async releaseCompiler() {}, async apiView() { return { status: 'cancelled' }; },
+      async explorerDetails() { return { status: 'cancelled' }; }, async dispose() { sessionDisposed = true; },
     };
     const driver: AnalysisDriver = {
       async resolve(request) { return { status: 'resolved', root: '/fixture', selection: 'given', invokedFrom: request.cwd, configuration: 'tsconfig.json' }; },
       async open() { return { status: 'opened', session, revision: current }; },
       async dispose() { driverDisposed = true; },
     };
-    const service = createDaemonService({ driver, watcher, clock, budgets,
+    const service = createDaemonService({ driver, watcher, clock, budgets, publisher,
       instance: { instanceId: 'audit-counter-test', pid: process.pid, version: '0.0.0', engine: 'test-engine', buildKey: '0000000000000000' },
       log: entry => logs.push(entry) });
     try {
@@ -90,14 +94,15 @@ describe('daemon racing-hook attribution', () => {
       async report() { return null; }, async releaseRevision() {},
       status() { return { level: 'hot', sequence: current.sequence, observedInputs: 1, factBytes: 100,
         worker: { heapUsed: 100, rss: 100 }, compiler: { pid: null, rss: null }, lastSweepAt: null }; },
-      async releaseCompiler() {}, async dispose() {},
+      async releaseCompiler() {}, async apiView() { return { status: 'cancelled' }; },
+      async explorerDetails() { return { status: 'cancelled' }; }, async dispose() {},
     };
     const driver: AnalysisDriver = {
       async resolve(request) { return { status: 'resolved', root: '/fixture', selection: 'given', invokedFrom: request.cwd, configuration: 'tsconfig.json' }; },
       async open() { return { status: 'opened', session, revision: current }; },
       async dispose() {},
     };
-    const service = createDaemonService({ driver, watcher, clock, budgets: { ...budgets, sweepIntervalMs: 60_000, warmIdleMs: 60_000, coldRetainMs: 120_000 },
+    const service = createDaemonService({ driver, watcher, clock, budgets: { ...budgets, sweepIntervalMs: 60_000, warmIdleMs: 60_000, coldRetainMs: 120_000 }, publisher,
       instance: { instanceId: 'racing-attribution-test', pid: process.pid, version: '0.0.0', engine: 'test-engine', buildKey: '0000000000000000' },
       log: () => {} });
     try {
@@ -141,14 +146,15 @@ describe('daemon sweep accounting after reacquisition', () => {
       async report() { return null; }, async releaseRevision() {},
       status() { return { level: 'hot', sequence: current.sequence, observedInputs: 0, factBytes: 100,
         worker: { heapUsed: 100, rss: 100 }, compiler: { pid: null, rss: null }, lastSweepAt: null }; },
-      async releaseCompiler() {}, async dispose() {},
+      async releaseCompiler() {}, async apiView() { return { status: 'cancelled' }; },
+      async explorerDetails() { return { status: 'cancelled' }; }, async dispose() {},
     };
     const driver: AnalysisDriver = {
       async resolve(request) { return { status: 'resolved', root: '/fixture', selection: 'given', invokedFrom: request.cwd, configuration: 'tsconfig.json' }; },
       async open() { return { status: 'opened', session, revision: current }; },
       async dispose() {},
     };
-    const service = createDaemonService({ driver, watcher, clock, budgets: { ...budgets, sweepIntervalMs: 60_000, warmIdleMs: 60_000, coldRetainMs: 120_000 },
+    const service = createDaemonService({ driver, watcher, clock, budgets: { ...budgets, sweepIntervalMs: 60_000, warmIdleMs: 60_000, coldRetainMs: 120_000 }, publisher,
       instance: { instanceId: 'reacquisition-sweep-test', pid: process.pid, version: '0.0.0', engine: 'test-engine', buildKey: '0000000000000000' },
       log: () => {} });
     const counted = async (): Promise<{ analyses: number; sweeps: number }> => {

@@ -74,6 +74,12 @@ The [Plan 5 completion report](docs/plans/iteration-5-fast-incremental-checks/it
 records its evidence and remaining gaps.
 The Ramify MCP server, interactive explorer and browser verifier remain future
 work; browser tag matching is implemented.
+`ramify materialize` publishes a per-module, gitignored Markdown API catalog
+(`src[/tests]/.ramify/{external,children}`) an agent searches with a documented
+`rg` command instead of exploring source; the [materialized API discovery
+specification](docs/architecture/materialized-api-view.spec.md) and [Plan 2A
+completion report](docs/plans/iteration-2a-materialized-api-view/iterations/iteration10-results.md)
+record its scope, measured limits and the one outstanding macOS platform gap.
 
 ## Check a project
 
@@ -93,6 +99,9 @@ npx ramify check --batch
 npx ramify watch --format json
 npx ramify daemon status
 npx ramify daemon stop
+npx ramify materialize
+npx ramify materialize --from subs/workspace/subs/reviews/src/tests
+npx ramify materialize --all --root /path/to/project
 ```
 
 From this checkout, the same executable can check the reference directly:

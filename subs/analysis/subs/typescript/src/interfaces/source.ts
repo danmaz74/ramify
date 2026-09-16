@@ -97,6 +97,25 @@ export interface SourceLimit {
   readonly compilerCode?: number;
   readonly related: readonly SourceLocation[];
 }
+export interface SymbolDetailLimits {
+  readonly maxSignatureBytes: number;
+  readonly maxDocumentationBytes: number;
+  readonly maxOverloads: number;
+  readonly maxResultBytes: number;
+}
+export interface SymbolDetailRequest {
+  readonly original: OriginalId;
+  readonly exportName: string;
+}
+export type SymbolDetail =
+  | { readonly state: 'described'; readonly original: OriginalId; readonly exportName: string;
+      readonly signature: string; readonly documentation?: string }
+  | { readonly state: 'truncated'; readonly original: OriginalId; readonly exportName: string;
+      readonly signature: string; readonly documentation?: string;
+      readonly truncated: readonly ('signature' | 'documentation' | 'overloads')[] }
+  | { readonly state: 'unavailable'; readonly original: OriginalId; readonly exportName: string;
+      readonly reason: 'missing-file' | 'missing-export' | 'identity-mismatch'
+        | 'unsupported-declaration' | 'compiler-failure' };
 export interface SourceWorkLimits {
   readonly maxExports: number;
   readonly maxAccesses: number;
@@ -175,6 +194,12 @@ export interface RetainedSourceAnalysis {
     readonly reach?: MembershipReach }>;
   describe(files: readonly string[], signal?: AbortSignal): Promise<{ readonly descriptions: readonly FileDescription[];
     readonly delta: CatalogDelta }>;
+  /** Bounded, body-free signatures and first-documentation-paragraphs for the
+   * requested defining-file exports. One result per unique request in request
+   * order; an invalid request or a total encoded result above
+   * `limits.maxResultBytes` rejects with `SourceFailure`. An isolated
+   * valid-request failure is an `unavailable` entry, never a rejection. */
+  details(requests: readonly SymbolDetailRequest[], limits: SymbolDetailLimits, signal?: AbortSignal): Promise<readonly SymbolDetail[]>;
   catalog(): SourceCatalog;
   interpreter(): AccessInterpreter;
   releaseCompiler(): Promise<void>;

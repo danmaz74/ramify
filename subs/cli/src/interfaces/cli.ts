@@ -1,13 +1,21 @@
 import type { BatchOperation } from '../../../../src/interfaces/batch.js';
 import type { DaemonStatus } from '../../../../src/interfaces/service.js';
 import type { ServiceConnector, DaemonRecord } from '../../../daemon/src/interfaces/daemon.js';
-import type { ContextStatus, ContextRevision, ReplyTimings, RevisionId } from '../../../daemon/src/context-types.js';
-import type { AnalysisReport, AnalysisDiagnostic } from '../../../analysis/src/interfaces/analysis.js';
+import type { ContextStatus, ContextRevision, ContextToken, ReplyTimings, RevisionId } from '../../../daemon/src/context-types.js';
+import type { AnalysisReport, AnalysisDiagnostic, RunControl } from '../../../analysis/src/interfaces/analysis.js';
 import type { RevisionPath, CheckedSet, RevisionTimings } from '../../../analysis/src/interfaces/session.js';
 import type { OutsideSourceWarning } from '../../../analysis/subs/project/src/interfaces/project.js';
 import type { SourceLimit } from '../../../analysis/subs/typescript/src/interfaces/source.js';
 
 export type CliExitCode = 0 | 1 | 2 | 130;
+export interface ExplorerLaunch {
+  readonly url: string;
+  readonly started: boolean;
+  /** Stops only the process started by this invocation. Reused processes are never owned. */
+  cleanup(): Promise<void>;
+}
+export type ExplorerLauncher = (input: { readonly token: ContextToken }, control?: RunControl) => Promise<ExplorerLaunch>;
+export type BrowserOpener = (url: string, control?: RunControl) => Promise<void>;
 export interface CliEnvironment {
   readonly cwd: string;
   readonly version: string;
@@ -15,6 +23,10 @@ export interface CliEnvironment {
   readonly stderr: (text: string) => void;
   readonly batch: BatchOperation;
   readonly connect: ServiceConnector;
+  /** Root-owned lazy process assembly; present in installed CLI entries. */
+  readonly explore?: ExplorerLauncher;
+  /** Root-owned platform browser port; tests inject a controlled implementation. */
+  readonly openBrowser?: BrowserOpener;
   /** Resolves a refusal when this client cannot run the installed build, otherwise null.
    * A command awaits it before it connects or runs batch; help and version do not. */
   readonly buildRefusal?: () => Promise<string | null>;

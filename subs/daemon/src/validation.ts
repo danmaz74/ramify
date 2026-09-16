@@ -2,7 +2,8 @@ import { posix } from 'node:path';
 import type { ServiceError, ServiceOperation } from '../../../src/interfaces/service.js';
 
 const operations: ReadonlySet<string> = new Set<ServiceOperation>([
-  'openContext', 'contextStatus', 'check', 'subscribe', 'unsubscribe', 'closeContext', 'daemonStatus', 'stopDaemon',
+  'openContext', 'contextStatus', 'check', 'subscribe', 'unsubscribe', 'closeContext', 'daemonStatus', 'stopDaemon', 'materialize',
+  'explorerDetails',
 ]);
 const uuid = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 const contextId = /^ctx\/1:[0-9a-f]{64}$/;
@@ -35,6 +36,16 @@ function array(value: unknown, item: (value: unknown) => boolean, maximum = Infi
 function text(value: unknown): value is string { return typeof value === 'string'; }
 function nonempty(value: unknown): value is string { return text(value) && value.length > 0; }
 function matches(value: unknown, expression: RegExp): boolean { return text(value) && value.match(expression)?.[0] === value; }
+function canonicalText(value: unknown): value is string {
+  return nonempty(value) && !/[\u0000-\u001f\u007f\uD800-\uDFFF]/u.test(value);
+}
+function canonicalPath(value: unknown): value is string {
+  return canonicalText(value) && !value.includes('\\') && !/^[a-zA-Z][a-zA-Z\d+.-]*:/.test(value)
+    && value.split('/').every(part => part !== '' && part !== '.' && part !== '..');
+}
+function moduleId(value: unknown): value is string {
+  return text(value) && value.split('/').every(part => /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(part));
+}
 
 function token(value: unknown): boolean {
   return record(value, ['context', 'generation'])
@@ -70,6 +81,39 @@ function freshness(value: unknown): boolean {
   }, 10_000);
 }
 
+/** A canonical project-relative path (`/`-separated, no leading/trailing slash,
+ * no empty/`.`/`..` segment), or the literal `.` selecting the project root
+ * itself. Mirrors `analysis`'s own local `canonicalPath` check (that helper is
+ * not exposed outside its owner) plus the `.` exception `resolveModules` grants. */
+function fromPath(value: unknown): value is string {
+  if (!nonempty(value) || value.includes('\\') || value.includes('\0')) return false;
+  if (value === '.') return true;
+  if (value.startsWith('/') || value.endsWith('/')) return false;
+  return value.split('/').every(segment => segment !== '' && segment !== '.' && segment !== '..');
+}
+
+function selection(value: unknown): boolean {
+  if (record(value, ['scope']) && value.scope === 'all') return true;
+  return record(value, ['scope', 'from']) && value.scope === 'module' && fromPath(value.from);
+}
+
+function original(value: unknown): boolean {
+  return record(value, ['kind', 'owner', 'file', 'binding'])
+    && (value.kind === 'code' || value.kind === 'resource')
+    && moduleId(value.owner) && canonicalPath(value.file) && canonicalText(value.binding);
+}
+
+function detailRequest(value: unknown): boolean {
+  return record(value, ['original', 'exportName']) && original(value.original)
+    && canonicalText(value.exportName);
+}
+
+/** `MaterializeParams.freshness` is always synchronized: a materialize
+ * request never uses `published` freshness or a `since` baseline. */
+function synchronizedFreshness(value: unknown): boolean {
+  return freshness(value) && record(value, ['mode', 'expect']) && value.mode === 'synchronized';
+}
+
 /** Shared structural validation before dispatch to the real context manager. */
 export function validateServiceRequest(operation: unknown, params: unknown): ServiceError | null {
   if (!text(operation) || !operations.has(operation)) {
@@ -88,6 +132,22 @@ export function validateServiceRequest(operation: unknown, params: unknown): Ser
         && (!Object.hasOwn(params, 'since') || matches(params.since, revisionId))
         && (!Object.hasOwn(params, 'deadlineMs') || (typeof params.deadlineMs === 'number'
           && Number.isSafeInteger(params.deadlineMs) && params.deadlineMs > 0 && params.deadlineMs <= 600_000)); break;
+      case 'materialize': valid = record(params, ['token', 'requestId', 'freshness', 'selection'], ['deadlineMs']) && token(params.token)
+        && matches(params.requestId, requestId) && synchronizedFreshness(params.freshness) && selection(params.selection)
+        && (!Object.hasOwn(params, 'deadlineMs') || (typeof params.deadlineMs === 'number'
+          && Number.isSafeInteger(params.deadlineMs) && params.deadlineMs > 0 && params.deadlineMs <= 600_000)); break;
+      case 'explorerDetails': {
+        if (!record(params, ['token', 'requestId', 'revision', 'requests']) || !token(params.token)
+          || !matches(params.requestId, requestId) || !matches(params.revision, revisionId)
+          || !array(params.requests, detailRequest, 10_000)) break;
+        const unique = new Set((params.requests as readonly { readonly original: {
+          readonly kind: string; readonly owner: string; readonly file: string; readonly binding: string;
+        }; readonly exportName: string }[]).map(item => JSON.stringify([
+          item.original.kind, item.original.owner, item.original.file, item.original.binding, item.exportName,
+        ])));
+        valid = unique.size <= 50;
+        break;
+      }
       case 'unsubscribe': valid = record(params, ['subscription']) && nonempty(params.subscription); break;
       case 'daemonStatus': valid = record(params, []); break;
       case 'stopDaemon': valid = record(params, ['instanceId']) && nonempty(params.instanceId); break;

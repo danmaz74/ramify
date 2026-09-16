@@ -1,23 +1,40 @@
 import type { SessionChange } from '../../../../analysis/src/interfaces/session.js';
 import type { ProjectRequest } from '../../../../analysis/subs/project/src/interfaces/project.js';
-import type { CheckOutcome, CheckRequest, ContextSetup, WatchBatch } from './interfaces/contexts.js';
+import type { ApiViewRequest, CheckOutcome, CheckRequest, ContextApiViewOutcome, ContextRevision, ContextSetup, Unavailable, WatchBatch } from './interfaces/contexts.js';
 
 export interface Invocation { readonly project: ProjectRequest; readonly setup: ContextSetup }
 export interface PendingCheck {
+  readonly kind: 'check';
   readonly request: CheckRequest;
   readonly lease: string;
   readonly acknowledged: number;
   readonly invocation: Invocation;
   readonly resolve: (outcome: CheckOutcome) => void;
-  readonly revisionAtAcknowledgment: import('./interfaces/contexts.js').ContextRevision | null;
+  readonly revisionAtAcknowledgment: ContextRevision | null;
   readonly needsSweep: boolean;
   cleanup: () => void;
   settled: boolean;
   deadlineExpired: boolean;
 }
+/** A queued, serialized API-view request: the same rendezvous shape as
+ * `PendingCheck`, batched and delivered alongside it in the same capture. */
+export interface PendingApiView {
+  readonly kind: 'apiView';
+  readonly request: ApiViewRequest;
+  readonly lease: string;
+  readonly acknowledged: number;
+  readonly invocation: Invocation;
+  readonly resolve: (outcome: ContextApiViewOutcome) => void;
+  readonly revisionAtAcknowledgment: ContextRevision | null;
+  readonly needsSweep: boolean;
+  cleanup: () => void;
+  settled: boolean;
+  deadlineExpired: boolean;
+}
+export type PendingEntry = PendingCheck | PendingApiView;
 export interface RunningCapture {
   readonly controller: AbortController;
-  readonly requests: readonly PendingCheck[];
+  readonly requests: readonly PendingEntry[];
   readonly changes: readonly SessionChange[];
   readonly background: boolean;
   /** A required sweep makes requests wait; a periodic sweep is maintenance. */
@@ -45,4 +62,17 @@ export function complete(entry: PendingCheck, outcome: CheckOutcome): void {
   entry.settled = true;
   entry.cleanup();
   entry.resolve(outcome);
+}
+export function completeApiView(entry: PendingApiView, outcome: ContextApiViewOutcome): void {
+  if (entry.settled) return;
+  entry.settled = true;
+  entry.cleanup();
+  entry.resolve(outcome);
+}
+/** Complete a mixed-kind entry with an outcome shape valid for both kinds:
+ * cancellation or an `Unavailable` reason, the only two members every
+ * `CheckOutcome` and `ContextApiViewOutcome` union shares. */
+export function completeEntry(entry: PendingEntry,
+  outcome: (Unavailable & { readonly requestId: string }) | { readonly status: 'cancelled'; readonly requestId: string }): void {
+  if (entry.kind === 'check') complete(entry, outcome); else completeApiView(entry, outcome);
 }

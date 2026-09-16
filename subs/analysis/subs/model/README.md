@@ -9,6 +9,14 @@ or `explainImport`; questions with unknown originals or inconsistent source
 profiles are caller errors. The adapter must classify binding requests and
 report missing exports or unresolved access before asking the model.
 
+`listAvailableOriginals` enumerates every foreign original available to a
+consumer's source area, sharing `explainImport`'s testing-origin, visibility
+and tag-requirement rules through one private requirement helper: an original
+is present precisely when at least one of its requests would be
+`explainImport`-allowed there, in exactly the `value` or `type-only` form that
+request would allow, never both. Same-owner originals are absent; results are
+unique by original identity and byte-ordered by owner, then file, then binding.
+
 Module IDs use declared name chains. Original IDs use the original owner,
 source-relative file and lexical binding or resource binding. `SourceOrigin.file`
 and area roots are project-relative. Derived areas retain intended ordinary

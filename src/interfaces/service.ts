@@ -1,11 +1,14 @@
 import type { RunControl } from '../../subs/analysis/src/interfaces/analysis.js';
 import type { ProjectRequest } from '../../subs/analysis/subs/project/src/interfaces/project.js';
+import type { ApiViewSelection } from '../../subs/analysis/src/interfaces/session.js';
+import type { MaterializedTarget } from '../../subs/daemon/src/interfaces/daemon.js';
 import type { ContextToken, ContextSetup, ContextStatus, ContextBudgets, CheckOutcome, Freshness, RevisionId,
-  OpenOutcome, ContextEvent } from '../../subs/daemon/src/context-types.js';
+  ContextRevision, FreshnessRecord, UnavailableReason, ReplyTimings,
+  OpenOutcome, ContextEvent, ExplorerDetailsRequest, ContextExplorerDetailsOutcome } from '../../subs/daemon/src/context-types.js';
 
 export type ServiceOperation = 'openContext' | 'contextStatus' | 'check' | 'subscribe'
-  | 'unsubscribe' | 'closeContext' | 'daemonStatus' | 'stopDaemon';
-export type ServiceCapability = 'contexts' | 'check' | 'subscribe' | 'daemon-control';
+  | 'unsubscribe' | 'closeContext' | 'daemonStatus' | 'stopDaemon' | 'materialize' | 'explorerDetails';
+export type ServiceCapability = 'contexts' | 'check' | 'subscribe' | 'daemon-control' | 'materialize' | 'explorerDetails';
 export type ServiceErrorCode = 'invalid-request' | 'unsupported-operation'
   | 'unknown-context' | 'expired-generation' | 'resource-unavailable'
   | 'unknown-subscription' | 'wrong-instance' | 'stopping' | 'cancelled' | 'internal-error' | 'incompatible';
@@ -67,13 +70,42 @@ export interface DaemonStatus {
 }
 export interface StopParams { readonly instanceId: string }
 export interface StopAcknowledged { readonly instanceId: string; readonly stopping: true }
+/** One serialized, synchronized materialize request: joins iteration 7's
+ * revision-bound projection query to iteration 6's transactional filesystem
+ * publication. Always synchronized freshness; never falls back to batch. */
+export interface MaterializeParams {
+  readonly token: ContextToken;
+  readonly requestId: string;
+  readonly freshness: Extract<Freshness, { readonly mode: 'synchronized' }>;
+  readonly selection: ApiViewSelection;
+  readonly deadlineMs?: number;
+}
+export type MaterializeOutcome =
+  | { readonly status: 'materialized'; readonly requestId: string;
+      readonly revision: ContextRevision; readonly freshness: FreshnessRecord;
+      readonly targets: readonly MaterializedTarget[];
+      readonly bytesWritten: number; readonly timings?: ReplyTimings }
+  | { readonly status: 'pending' | 'cold'; readonly requestId: string;
+      readonly current: ContextStatus }
+  | { readonly status: 'deadline-exceeded'; readonly requestId: string;
+      readonly revision: ContextRevision | null; readonly elapsedMs: number }
+  | { readonly status: 'superseded'; readonly requestId: string;
+      readonly revision: ContextRevision | null }
+  | { readonly status: 'cancelled'; readonly requestId: string }
+  | { readonly status: 'unavailable'; readonly requestId: string;
+      readonly reason: UnavailableReason | 'invalid-location' | 'invalid-projection'
+        | 'symlink' | 'output-failure' | 'rollback-failure';
+      readonly message: string };
 export interface RamifyService {
   openContext(params: OpenContextParams, control?: RunControl): Promise<ServiceResult<OpenOutcome>>;
   contextStatus(params: ContextParams): Promise<ServiceResult<ContextStatus>>;
   check(params: CheckParams, control?: RunControl): Promise<ServiceResult<CheckOutcome>>;
+  explorerDetails(params: ExplorerDetailsRequest,
+    control?: RunControl): Promise<ServiceResult<ContextExplorerDetailsOutcome>>;
   subscribe(params: ContextParams, listener: (event: ContextEvent) => void): Promise<ServiceResult<SubscriptionOpened>>;
   unsubscribe(params: UnsubscribeParams): Promise<ServiceResult<null>>;
   closeContext(params: ContextParams): Promise<ServiceResult<null>>;
   daemonStatus(): Promise<ServiceResult<DaemonStatus>>;
   stopDaemon(params: StopParams): Promise<ServiceResult<StopAcknowledged>>;
+  materialize(params: MaterializeParams, control?: RunControl): Promise<ServiceResult<MaterializeOutcome>>;
 }

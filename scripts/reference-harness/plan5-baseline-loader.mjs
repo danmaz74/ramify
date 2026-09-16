@@ -30,6 +30,16 @@ if (engine === 'baseline') {
   sources.set(resolve(repo, 'dist/subs/analysis/subs/typescript/src/retained-source-analysis.js'),
     "export function createRetainedSourceAnalysis() { throw new Error('The pinned baseline engine has no retained adapter'); }\n"
     + "export function retainedCompilerEvidence() { throw new Error('The pinned baseline engine has no retained adapter'); }\n");
+  // Plan 2A's `availability.ts` (model owner) is reachable from the model
+  // barrel `index.ts`, which this batch replay imports for unrelated engine
+  // entries; it is not itself an enginePaths file, so it always loads from
+  // the real worktree dist, and its own `decisions.js` import would then hit
+  // the pinned, pre-Plan-2A `decisions.ts` intercepted above (which predates
+  // the `requirementsFor` export it names) and crash the whole barrel load.
+  // The pinned engine predates `listAvailableOriginals` and the batch replay
+  // never calls it, so the baseline serves the same kind of explicit stub.
+  sources.set(resolve(repo, 'dist/subs/analysis/subs/model/src/availability.js'),
+    "export function listAvailableOriginals() { throw new Error('The pinned baseline engine has no availability provider'); }\n");
 }
 registerHooks({ load(url, context, next) {
   if (url.startsWith('file:')) {

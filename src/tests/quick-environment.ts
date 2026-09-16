@@ -9,9 +9,13 @@ import type { AnalysisDriver, ContextBudgets, ContextEvent } from '../../subs/da
 import { createDaemonService, dispatchServiceRequest } from '../../subs/daemon/src/service.js';
 import { createControlledClock, createControlledWatcher } from '../../subs/daemon/subs/contexts/src/tests/controlled-ports.js';
 import type { ControlledClock, ControlledWatcher } from '../../subs/daemon/subs/contexts/src/tests/controlled-ports.js';
-import type { DaemonInstance, DaemonService, ServiceConnector, ServiceConnection, WireMessage, DaemonRecord,
+import type { ApiViewPublisher, DaemonInstance, DaemonService, ServiceConnector, ServiceConnection, WireMessage, DaemonRecord,
   DisconnectReason, StopDisposition } from '../../subs/daemon/src/interfaces/daemon.js';
+import { createFilesystemApiViewPublisher } from '../../subs/daemon/src/api-view-publisher.js';
 import { encodeMessage, decodeMessage } from '../../subs/daemon/src/codec.js';
+
+// Frozen (iteration 1): see contracts.md's "Renderer and publisher" section.
+const publishLimits = { maxAreaBytes: 32 * 1024 ** 2, maxInvocationBytes: 256 * 1024 ** 2, maxStagedBytes: 256 * 1024 ** 2 };
 
 export interface QuickEnvironment {
   readonly service: DaemonService;
@@ -25,12 +29,13 @@ export interface QuickEnvironment {
 
 /** Real service and analysis, with only time, watching and transport controlled. */
 export async function createQuickEnvironment(options: Partial<ContextBudgets> = {},
-  fixture: { readonly instance?: DaemonInstance; readonly driver?: AnalysisDriver } = {}): Promise<QuickEnvironment> {
+  fixture: { readonly instance?: DaemonInstance; readonly driver?: AnalysisDriver; readonly publisher?: ApiViewPublisher } = {}): Promise<QuickEnvironment> {
   const watcher = createControlledWatcher(), clock = createControlledClock(Date.now());
   const instance = fixture.instance ?? { instanceId: randomUUID(), pid: process.pid, version: '0.0.0',
     engine: 'ramify.ts@0.0.0+typescript@7.0.2', buildKey: '0000000000000000' };
   const startedAt = clock.now();
-  const assembly = { watcher, clock, budgets: { ...contextBudgets, ...options }, instance, log() {} };
+  const publisher = fixture.publisher ?? createFilesystemApiViewPublisher(publishLimits);
+  const assembly = { watcher, clock, budgets: { ...contextBudgets, ...options }, instance, log() {}, publisher };
   const service = fixture.driver ? createDaemonService({ ...assembly, driver: fixture.driver }) : assembleResidentService(assembly);
   const connections = new Set<ServiceConnection>();
   let disposed = false, stopped: StopDisposition | null = null;
@@ -51,7 +56,7 @@ export async function createQuickEnvironment(options: Partial<ContextBudgets> = 
       client: { name: 'quick', version: instance.version }, buildKey: instance.buildKey, engine: instance.engine } });
     if (hello.type !== 'hello') throw new Error('Unexpected quick handshake');
     const welcome = through({ type: 'welcome', welcome: { protocol: 'ramify.ipc/1', instance,
-      capabilities: ['contexts', 'check', 'subscribe', 'daemon-control'],
+      capabilities: ['contexts', 'check', 'subscribe', 'daemon-control', 'materialize', 'explorerDetails'],
       limits: { maxRequestBytes: daemonBudgets.maxRequestBytes, maxResponseBytes: daemonBudgets.maxResponseBytes,
         leaseMs: daemonBudgets.leaseMs, pingMs: daemonBudgets.pingMs } } });
     if (welcome.type !== 'welcome') throw new Error('Unexpected quick welcome');
@@ -89,6 +94,8 @@ export async function createQuickEnvironment(options: Partial<ContextBudgets> = 
       openContext: (params, control) => call('openContext', params, control),
       contextStatus: params => call('contextStatus', params),
       check: (params, control) => call('check', params, control),
+      explorerDetails: (params, control) => call('explorerDetails', params, control),
+      materialize: (params, control) => call('materialize', params, control),
       async subscribe(params, listener) {
         let subscriptionId: string | undefined;
         const initial: ContextEvent[] = [];

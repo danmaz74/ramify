@@ -39,6 +39,7 @@ exit and reclaim its memory without discarding warm analysis.
 | [Quick testing](quick-testing.spec.md) | In-process execution of real client/service flows, the boundaries replaced in quick mode, and complementary transport/process tests. |
 | [CLI invocation](cli-invocation.spec.md) | How `ramify check` selects the project, finds the compiler configuration, treats files outside modules, reports and exits. |
 | [Optimization](optimization.md) | Process-level optimization decisions, starting with the Bun-compiled per-invocation client that avoids Node startup on every hook. |
+| [Materialized API discovery](materialized-api-view.spec.md) | Implemented generated, gitignored API documentation for agent discovery with `rg`, including ordinary and testing-area projections; `ramify materialize`. |
 
 The [tooling roadmap](../roadmap.md) owns migration and
 delivery order. Its first detailed plan is

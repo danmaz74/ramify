@@ -1,5 +1,7 @@
 import type { AnalysisInputs, AnalysisReport } from './interfaces/analysis.js';
-import type { OperationTimings, SessionChange, SessionOpen, SessionRevision, SessionStatus, SessionUpdate, VerifyOutcome } from './interfaces/session.js';
+import type { ApiViewQuery, ApiViewQueryOutcome, OperationTimings, SessionChange, SessionOpen, SessionRevision, SessionStatus, SessionUpdate,
+  SessionExplorerDetailsOutcome, VerifyOutcome } from './interfaces/session.js';
+import type { SymbolDetailRequest } from '../subs/typescript/src/interfaces/source.js';
 
 /** Private worker protocol. AbortSignal and session handles never cross it. */
 export type SessionCommand =
@@ -8,10 +10,14 @@ export type SessionCommand =
       readonly invocation?: Pick<AnalysisInputs, 'project' | 'capabilities'> }
   | { readonly operation: 'sweep' | 'verify' | 'releaseCompiler' | 'dispose' }
   | { readonly operation: 'report'; readonly sequence?: number }
-  | { readonly operation: 'releaseRevision'; readonly sequence: number };
+  | { readonly operation: 'releaseRevision'; readonly sequence: number }
+  | { readonly operation: 'apiView'; readonly query: ApiViewQuery }
+  | { readonly operation: 'explorerDetails'; readonly sequence: number;
+      readonly requests: readonly SymbolDetailRequest[] };
 export type WorkerRequest = (SessionCommand & { readonly id: number }) | { readonly operation: 'cancel'; readonly id: number };
 export type WorkerOpen = Exclude<SessionOpen, { status: 'opened' }> | { readonly status: 'opened'; readonly revision: SessionRevision };
-export type WorkerResult = WorkerOpen | SessionUpdate | VerifyOutcome | AnalysisReport | null
+export type WorkerResult = WorkerOpen | SessionUpdate | VerifyOutcome | AnalysisReport | ApiViewQueryOutcome
+  | SessionExplorerDetailsOutcome | null
   | { readonly status: 'unchanged'; readonly timings?: OperationTimings };
 export type WorkerMessage =
   | { readonly kind: 'ready'; readonly heapLimit: number; readonly oldGenerationMiB: number }

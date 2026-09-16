@@ -10,8 +10,10 @@ import type { SourceArea } from '../../model/src/interfaces/model.js';
 import { AccessInterpretation } from './accesses.js';
 import { createDescriptionSet, type DescriptionSet } from './descriptions.js';
 import type { AccessInterpreter, CatalogDelta, CatalogExport, FileDescription, MembershipReach, RetainedSourceAnalysis,
-  RetainedSourceInputs, SourceCatalog, SourceChangeSet, SourceWorkLimits } from './interfaces/source.js';
+  RetainedSourceInputs, SourceCatalog, SourceChangeSet, SourceWorkLimits, SymbolDetail, SymbolDetailLimits,
+  SymbolDetailRequest } from './interfaces/source.js';
 import type { CatalogHost } from './resolution.js';
+import { describeSymbolDetails } from './symbol-details.js';
 import { referencesOnly, syntheticCandidate, syntheticInputs } from './synthetic.js';
 import { FILE_BYTES, SourceFailure, freezeData, type HelperInputs } from './wire.js';
 
@@ -232,6 +234,12 @@ class RetainedSourceState implements RetainedSourceAnalysis {
     this.#check();
     if (!this.#described) throw new SourceFailure('unavailable', 'Describe the current update before reading its catalog');
     return freezeData(this.#set.catalog());
+  }
+
+  async details(requests: readonly SymbolDetailRequest[], limits: SymbolDetailLimits, signal?: AbortSignal): Promise<readonly SymbolDetail[]> {
+    this.#check(signal);
+    const project = this.#requireProject();
+    return this.#guarded(() => describeSymbolDetails(project, { inventory: this.#inventory, areas: this.#areas }, requests, limits, signal));
   }
 
   interpreter(): AccessInterpreter {

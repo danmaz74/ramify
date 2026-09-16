@@ -1,0 +1,555 @@
+{
+  "probe": "plan2a/scale-baseline",
+  "recordedAt": "2026-09-15T10:18:36.820Z",
+  "nodeVersion": "v22.23.2",
+  "platform": "linux",
+  "architecture": "x64",
+  "typescript": "7.0.2",
+  "baseCommit": "71643d522eb053336e4c01fcf9836ec52b58fbad",
+  "scriptSha256": "1415620bfe323f59d46733f3c8e311a7a32a72b3492503ad4bb3b4a541ab082d",
+  "evidence": {
+    "method": "Real explainImport(model, question) decisions from ramify.ts/model, one call per (module source area, foreign original, request) triple, for R and T. Byte figures are a raw-declaration-span proxy (see file header), not a rendering. S100/S500/S1000 use the checked-in syntheticOwnerFiles generator via materializeSynthetic; their module.ramify files declare no expose-src, so availability is genuinely zero.",
+    "predecessorRefusal": {
+      "fixture": "S1000",
+      "provider": "RetainedSession (Plan 5)",
+      "limit": "maxRetainedFactBytes = 100663296 bytes (96 MiB)",
+      "observed": "167266182 bytes (159.5 MiB) of retained facts; cold check exits 2 with resource-limit",
+      "source": "docs/plans/done/iteration-5-fast-incremental-checks/iterations/iteration13-results.md (rows ~258, ~587-588)",
+      "appliesToThisProbe": false,
+      "reason": "This probe uses the disposable batch AnalysisSession (createAnalysisSession/analyze), not RetainedSession; Plan 5's retained-fact refusal does not directly apply, though the batch path has its own, separately-configured maxReportBytes bound (also 96 MiB by convention, not identity)."
+    },
+    "results": {
+      "R": {
+        "label": "R",
+        "root": "/ramify/examples/collection-review",
+        "status": "completed",
+        "elapsedMs": 3472.069203,
+        "summary": {
+          "owners": 15,
+          "sourceFiles": 54,
+          "originals": 89,
+          "exposures": 79
+        },
+        "totals": {
+          "ordinaryEntries": 267,
+          "testEntries": 290,
+          "duplicatedAcrossAreas": 267
+        },
+        "modules": [
+          {
+            "module": "collection-review",
+            "ordinary": {
+              "files": 4,
+              "entries": 6,
+              "projectedBytesProxy": 4528,
+              "children": 6,
+              "external": 0
+            },
+            "tests": {
+              "files": 4,
+              "entries": 6,
+              "projectedBytesProxy": 4528,
+              "children": 6,
+              "external": 0
+            }
+          },
+          {
+            "module": "collection-review/integration-tests",
+            "ordinary": {
+              "files": 3,
+              "entries": 6,
+              "projectedBytesProxy": 2182,
+              "children": 0,
+              "external": 6
+            },
+            "tests": {
+              "files": 3,
+              "entries": 6,
+              "projectedBytesProxy": 2182,
+              "children": 0,
+              "external": 6
+            }
+          },
+          {
+            "module": "collection-review/workspace",
+            "ordinary": {
+              "files": 7,
+              "entries": 27,
+              "projectedBytesProxy": 4912,
+              "children": 22,
+              "external": 5
+            },
+            "tests": {
+              "files": 12,
+              "entries": 34,
+              "projectedBytesProxy": 10779,
+              "children": 28,
+              "external": 6
+            }
+          },
+          {
+            "module": "collection-review/workspace/catalog",
+            "ordinary": {
+              "files": 4,
+              "entries": 25,
+              "projectedBytesProxy": 3855,
+              "children": 3,
+              "external": 22
+            },
+            "tests": {
+              "files": 6,
+              "entries": 27,
+              "projectedBytesProxy": 5598,
+              "children": 4,
+              "external": 23
+            }
+          },
+          {
+            "module": "collection-review/workspace/catalog/core",
+            "ordinary": {
+              "files": 1,
+              "entries": 17,
+              "projectedBytesProxy": 1779,
+              "children": 0,
+              "external": 17
+            },
+            "tests": {
+              "files": 1,
+              "entries": 17,
+              "projectedBytesProxy": 1779,
+              "children": 0,
+              "external": 17
+            }
+          },
+          {
+            "module": "collection-review/workspace/catalog/ui",
+            "ordinary": {
+              "files": 3,
+              "entries": 20,
+              "projectedBytesProxy": 2251,
+              "children": 0,
+              "external": 20
+            },
+            "tests": {
+              "files": 4,
+              "entries": 21,
+              "projectedBytesProxy": 2500,
+              "children": 0,
+              "external": 21
+            }
+          },
+          {
+            "module": "collection-review/workspace/contracts",
+            "ordinary": {
+              "files": 0,
+              "entries": 0,
+              "projectedBytesProxy": 0,
+              "children": 0,
+              "external": 0
+            },
+            "tests": {
+              "files": 1,
+              "entries": 1,
+              "projectedBytesProxy": 249,
+              "children": 0,
+              "external": 1
+            }
+          },
+          {
+            "module": "collection-review/workspace/reviews",
+            "ordinary": {
+              "files": 6,
+              "entries": 26,
+              "projectedBytesProxy": 3422,
+              "children": 4,
+              "external": 22
+            },
+            "tests": {
+              "files": 8,
+              "entries": 28,
+              "projectedBytesProxy": 5165,
+              "children": 4,
+              "external": 24
+            }
+          },
+          {
+            "module": "collection-review/workspace/reviews/core",
+            "ordinary": {
+              "files": 5,
+              "entries": 21,
+              "projectedBytesProxy": 2903,
+              "children": 3,
+              "external": 18
+            },
+            "tests": {
+              "files": 6,
+              "entries": 22,
+              "projectedBytesProxy": 3152,
+              "children": 3,
+              "external": 19
+            }
+          },
+          {
+            "module": "collection-review/workspace/reviews/core/controller",
+            "ordinary": {
+              "files": 5,
+              "entries": 21,
+              "projectedBytesProxy": 3067,
+              "children": 0,
+              "external": 21
+            },
+            "tests": {
+              "files": 6,
+              "entries": 22,
+              "projectedBytesProxy": 3316,
+              "children": 0,
+              "external": 22
+            }
+          },
+          {
+            "module": "collection-review/workspace/reviews/core/tasks",
+            "ordinary": {
+              "files": 3,
+              "entries": 19,
+              "projectedBytesProxy": 2355,
+              "children": 0,
+              "external": 19
+            },
+            "tests": {
+              "files": 4,
+              "entries": 20,
+              "projectedBytesProxy": 2604,
+              "children": 0,
+              "external": 20
+            }
+          },
+          {
+            "module": "collection-review/workspace/reviews/ui",
+            "ordinary": {
+              "files": 5,
+              "entries": 26,
+              "projectedBytesProxy": 3791,
+              "children": 2,
+              "external": 24
+            },
+            "tests": {
+              "files": 8,
+              "entries": 29,
+              "projectedBytesProxy": 5706,
+              "children": 2,
+              "external": 27
+            }
+          },
+          {
+            "module": "collection-review/workspace/reviews/ui/pure-ui",
+            "ordinary": {
+              "files": 2,
+              "entries": 19,
+              "projectedBytesProxy": 2104,
+              "children": 0,
+              "external": 19
+            },
+            "tests": {
+              "files": 4,
+              "entries": 21,
+              "projectedBytesProxy": 2525,
+              "children": 0,
+              "external": 21
+            }
+          },
+          {
+            "module": "collection-review/workspace/reviews/validation",
+            "ordinary": {
+              "files": 1,
+              "entries": 17,
+              "projectedBytesProxy": 1779,
+              "children": 0,
+              "external": 17
+            },
+            "tests": {
+              "files": 2,
+              "entries": 18,
+              "projectedBytesProxy": 2028,
+              "children": 0,
+              "external": 18
+            }
+          },
+          {
+            "module": "collection-review/workspace/shared-ui",
+            "ordinary": {
+              "files": 1,
+              "entries": 17,
+              "projectedBytesProxy": 1779,
+              "children": 0,
+              "external": 17
+            },
+            "tests": {
+              "files": 2,
+              "entries": 18,
+              "projectedBytesProxy": 2028,
+              "children": 0,
+              "external": 18
+            }
+          }
+        ]
+      },
+      "T": {
+        "label": "T",
+        "root": "/ramify",
+        "status": "completed",
+        "elapsedMs": 14784.505238999998,
+        "summary": {
+          "owners": 11,
+          "sourceFiles": 284,
+          "originals": 808,
+          "exposures": 601
+        },
+        "totals": {
+          "ordinaryEntries": 1591,
+          "testEntries": 1635,
+          "duplicatedAcrossAreas": 1591
+        },
+        "modules": [
+          {
+            "module": "ramify",
+            "ordinary": {
+              "files": 29,
+              "entries": 191,
+              "projectedBytesProxy": 117496,
+              "children": 191,
+              "external": 0
+            },
+            "tests": {
+              "files": 30,
+              "entries": 195,
+              "projectedBytesProxy": 121361,
+              "children": 195,
+              "external": 0
+            }
+          },
+          {
+            "module": "ramify/analysis",
+            "ordinary": {
+              "files": 21,
+              "entries": 129,
+              "projectedBytesProxy": 74334,
+              "children": 99,
+              "external": 30
+            },
+            "tests": {
+              "files": 22,
+              "entries": 133,
+              "projectedBytesProxy": 78199,
+              "children": 99,
+              "external": 34
+            }
+          },
+          {
+            "module": "ramify/analysis/descriptions",
+            "ordinary": {
+              "files": 11,
+              "entries": 130,
+              "projectedBytesProxy": 56525,
+              "children": 0,
+              "external": 130
+            },
+            "tests": {
+              "files": 12,
+              "entries": 134,
+              "projectedBytesProxy": 60390,
+              "children": 0,
+              "external": 134
+            }
+          },
+          {
+            "module": "ramify/analysis/model",
+            "ordinary": {
+              "files": 7,
+              "entries": 111,
+              "projectedBytesProxy": 35190,
+              "children": 0,
+              "external": 111
+            },
+            "tests": {
+              "files": 8,
+              "entries": 115,
+              "projectedBytesProxy": 39055,
+              "children": 0,
+              "external": 115
+            }
+          },
+          {
+            "module": "ramify/analysis/project",
+            "ordinary": {
+              "files": 12,
+              "entries": 120,
+              "projectedBytesProxy": 52596,
+              "children": 0,
+              "external": 120
+            },
+            "tests": {
+              "files": 13,
+              "entries": 124,
+              "projectedBytesProxy": 56461,
+              "children": 0,
+              "external": 124
+            }
+          },
+          {
+            "module": "ramify/analysis/typescript",
+            "ordinary": {
+              "files": 12,
+              "entries": 131,
+              "projectedBytesProxy": 56270,
+              "children": 0,
+              "external": 131
+            },
+            "tests": {
+              "files": 13,
+              "entries": 135,
+              "projectedBytesProxy": 60135,
+              "children": 0,
+              "external": 135
+            }
+          },
+          {
+            "module": "ramify/cli",
+            "ordinary": {
+              "files": 16,
+              "entries": 177,
+              "projectedBytesProxy": 70113,
+              "children": 0,
+              "external": 177
+            },
+            "tests": {
+              "files": 18,
+              "entries": 183,
+              "projectedBytesProxy": 81559,
+              "children": 0,
+              "external": 183
+            }
+          },
+          {
+            "module": "ramify/daemon",
+            "ordinary": {
+              "files": 16,
+              "entries": 167,
+              "projectedBytesProxy": 118775,
+              "children": 37,
+              "external": 130
+            },
+            "tests": {
+              "files": 18,
+              "entries": 173,
+              "projectedBytesProxy": 130221,
+              "children": 41,
+              "external": 132
+            }
+          },
+          {
+            "module": "ramify/daemon/contexts",
+            "ordinary": {
+              "files": 12,
+              "entries": 112,
+              "projectedBytesProxy": 51181,
+              "children": 0,
+              "external": 112
+            },
+            "tests": {
+              "files": 12,
+              "entries": 112,
+              "projectedBytesProxy": 51181,
+              "children": 0,
+              "external": 112
+            }
+          },
+          {
+            "module": "ramify/presentation",
+            "ordinary": {
+              "files": 23,
+              "entries": 181,
+              "projectedBytesProxy": 85267,
+              "children": 39,
+              "external": 142
+            },
+            "tests": {
+              "files": 24,
+              "entries": 185,
+              "projectedBytesProxy": 89132,
+              "children": 39,
+              "external": 146
+            }
+          },
+          {
+            "module": "ramify/presentation/layout",
+            "ordinary": {
+              "files": 13,
+              "entries": 142,
+              "projectedBytesProxy": 59980,
+              "children": 0,
+              "external": 142
+            },
+            "tests": {
+              "files": 14,
+              "entries": 146,
+              "projectedBytesProxy": 63845,
+              "children": 0,
+              "external": 146
+            }
+          }
+        ]
+      },
+      "S100": {
+        "fixture": "S100",
+        "status": "completed",
+        "owners": 100,
+        "files": 1402,
+        "bytes": 1164385,
+        "contentMapSha256": "d5b77b9ff57c443b35f386f40598506ff20c51c4ec75b800371f0cec089c0897",
+        "elapsedMs": 5924.326245999997,
+        "summary": {
+          "owners": 100,
+          "sourceFiles": 1100,
+          "originals": 1100,
+          "exposures": 0
+        },
+        "availableEntries": 0,
+        "availableEntriesReason": "The synthetic generator (scripts/probes/fixtures/synthetic-owners.ts) declares module tags but no expose-src statements, so model.exposures is empty and every cross-module original is not-visible."
+      },
+      "S500": {
+        "fixture": "S500",
+        "status": "completed",
+        "owners": 500,
+        "files": 7002,
+        "bytes": 5820161,
+        "contentMapSha256": "07cb3d1b9d4dee4200c86c05ef90dfff4f59168ae4e9003c1efff2ebdc6c7fc5",
+        "elapsedMs": 57778.506061,
+        "summary": {
+          "owners": 500,
+          "sourceFiles": 5500,
+          "originals": 5500,
+          "exposures": 0
+        },
+        "availableEntries": 0,
+        "availableEntriesReason": "The synthetic generator (scripts/probes/fixtures/synthetic-owners.ts) declares module tags but no expose-src statements, so model.exposures is empty and every cross-module original is not-visible."
+      },
+      "S1000": {
+        "fixture": "S1000",
+        "status": "completed",
+        "owners": 1000,
+        "files": 14002,
+        "bytes": 11641012,
+        "contentMapSha256": "0f1ee6d693912b2bc925f41b5543487fa1b42055497e75599bfe8aef13c38c59",
+        "elapsedMs": 100669.676435,
+        "summary": {
+          "owners": 1000,
+          "sourceFiles": 11000,
+          "originals": 11000,
+          "exposures": 0
+        },
+        "availableEntries": 0,
+        "availableEntriesReason": "The synthetic generator (scripts/probes/fixtures/synthetic-owners.ts) declares module tags but no expose-src statements, so model.exposures is empty and every cross-module original is not-visible."
+      }
+    }
+  }
+}

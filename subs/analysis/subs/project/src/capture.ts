@@ -5,6 +5,7 @@ import { basename, dirname, join, relative, resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import type { AcquisitionLimits, CapturedInput } from './interfaces/project.js';
 import { AcquisitionError, Cancelled, byteOrder, freeze, hash, missing, within } from './data.js';
+import { isRamifyGeneratedSegment } from './generated-path.js';
 
 type Role = CapturedInput['role'];
 type Kind = 'file' | 'directory' | 'symlink' | 'other' | 'absent';
@@ -277,6 +278,11 @@ export class Capture {
         const directory = await opendir(entry.path);
         for await (const child of directory) {
           this.check();
+          // A reserved generated name never joins a recorded listing: a
+          // directory's captured entries and identity stay insensitive to
+          // generated churn, so a directory whose only change is a `.ramify`
+          // sibling appearing or disappearing never reports as changed.
+          if (isRamifyGeneratedSegment(child.name)) continue;
           const childPath = join(entry.path, child.name);
           this.#admit(Buffer.byteLength(childPath) * 2 + 4, path);
           entries.push(childPath);
@@ -411,7 +417,12 @@ export class Capture {
         different = (await readdir(dirname(entry.path))).includes(basename(entry.path)) !== entry.exactName;
       }
       if (!different && entry.entries) {
-        const names = (await readdir(entry.path)).sort(byteOrder).map(name => join(entry.path, name));
+        // A recorded listing never held a reserved generated name
+        // (readDirectory omits it); the freshly read listing must be
+        // filtered the same way, so a `.ramify` sibling appearing or
+        // disappearing alone never reports this directory as changed.
+        const names = (await readdir(entry.path)).filter(name => !isRamifyGeneratedSegment(name))
+          .sort(byteOrder).map(name => join(entry.path, name));
         different = JSON.stringify(names) !== JSON.stringify(entry.entries);
       }
       if (!different && entry.bytes) {

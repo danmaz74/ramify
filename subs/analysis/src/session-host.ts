@@ -1,6 +1,8 @@
 import { SessionWorker as Worker } from './session-supervisor.js';
 import type { AnalysisInputs, AnalysisReport, RunControl } from './interfaces/analysis.js';
-import type { OperationTimings, RetainedSession, SessionChange, SessionInputs, SessionOpen, SessionRevision, SessionStatus, SessionUpdate, VerifyOutcome } from './interfaces/session.js';
+import type { ApiViewQuery, ApiViewQueryOutcome, OperationTimings, RetainedSession, SessionChange, SessionInputs, SessionOpen, SessionRevision, SessionStatus, SessionUpdate, VerifyOutcome } from './interfaces/session.js';
+import type { SessionExplorerDetailsOutcome } from './interfaces/session.js';
+import type { SymbolDetailRequest } from '../subs/typescript/src/interfaces/source.js';
 import type { SessionCommand, WorkerMessage, WorkerOpen, WorkerResult } from './session-messages.js';
 import { timedResult } from './session-messages.js';
 import { diagnostic } from './report-data.js';
@@ -162,6 +164,32 @@ class SessionHost implements RetainedSession {
   }
   async releaseRevision(sequence: number): Promise<void> { await this.#request({ operation: 'releaseRevision', sequence }); }
   async releaseCompiler(): Promise<void> { await this.#request({ operation: 'releaseCompiler' }); }
+  async apiView(query: ApiViewQuery, control: RunControl = {}): Promise<ApiViewQueryOutcome> {
+    if (control.signal?.aborted) return { status: 'cancelled' };
+    try { return await this.#request({ operation: 'apiView', query }, control) as ApiViewQueryOutcome; }
+    catch (error) {
+      // A disposed session (the immediate rejection this host raises without a
+      // round trip, or one discovered mid-flight) reports the same stable
+      // reason the direct engine gives a query after its own disposal.
+      const disposed = error instanceof Error && 'code' in error && (error as { code?: unknown }).code === 'session-disposed';
+      if (disposed) return { status: 'unavailable', reason: 'invalid-revision', message: 'Retained session is disposed' };
+      const reported = await this.#reportedFailure(error as Error);
+      return { status: 'unavailable', reason: 'analysis-failed', message: reported.report.diagnostics[0]?.message ?? String(error) };
+    }
+  }
+  async explorerDetails(sequence: number, requests: readonly SymbolDetailRequest[],
+    control: RunControl = {}): Promise<SessionExplorerDetailsOutcome> {
+    if (control.signal?.aborted) return { status: 'cancelled' };
+    try { return await this.#request({ operation: 'explorerDetails', sequence, requests }, control) as SessionExplorerDetailsOutcome; }
+    catch (error) {
+      const disposed = error instanceof Error && 'code' in error
+        && (error as { code?: unknown }).code === 'session-disposed';
+      if (disposed) return { status: 'unavailable', reason: 'compiler-released', message: 'Retained session is disposed' };
+      const reported = await this.#reportedFailure(error as Error);
+      return { status: 'unavailable', reason: 'analysis-failed',
+        message: reported.report.diagnostics[0]?.message ?? String(error) };
+    }
+  }
 
   dispose(): Promise<void> {
     if (this.#disposal) return this.#disposal;

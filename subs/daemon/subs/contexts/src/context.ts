@@ -1,8 +1,17 @@
 import type { RetainedSession } from '../../../../analysis/src/interfaces/session.js';
 import type { ProjectRequest, ProjectResolution, ProjectScope } from '../../../../analysis/subs/project/src/interfaces/project.js';
-import type { ContextEvent, ContextRevision, ContextSelection, ContextState, ContextToken, SynchronizationState, WatchBatch, WatcherHandle } from './interfaces/contexts.js';
+import type { ContextEvent, ContextExplorerDetailsOutcome, ContextRevision, ContextSelection, ContextState, ContextToken, ExplorerDetailsRequest, SynchronizationState, WatchBatch, WatcherHandle } from './interfaces/contexts.js';
 import type { RevisionHistory } from './history.js';
-import type { Invocation, PendingCheck, RunningCapture } from './queue.js';
+import type { Invocation, PendingEntry, RunningCapture } from './queue.js';
+
+export interface ExplorerDetailDelivery {
+  readonly request: ExplorerDetailsRequest;
+  readonly lease: string;
+  readonly controller: AbortController;
+  readonly resolve: (outcome: ContextExplorerDetailsOutcome) => void;
+  cleanup: () => void;
+  settled: boolean;
+}
 
 /** Live state stays owner-private; status and revision exports are detached data. */
 export interface LiveContext {
@@ -15,12 +24,13 @@ export interface LiveContext {
   readonly resolutions: Map<string, ProjectResolution>;
   readonly subscriptions: Map<string, { lease: string; listener: (event: ContextEvent) => void }>;
   history: RevisionHistory<ContextRevision>;
-  readonly queue: PendingCheck[];
-  readonly deliveries: Set<PendingCheck>;
+  readonly queue: PendingEntry[];
+  readonly deliveries: Set<PendingEntry>;
+  readonly explorerDeliveries: Set<ExplorerDetailDelivery>;
   readonly paths: Map<string, 'changed' | 'created' | 'deleted' | 'unknown'>;
   /** Queued paths only synchronized requests named, with those requests. A watcher event,
    * a restored capture or a bound reset makes a path a known change and removes it. */
-  readonly requested: Map<string, Set<PendingCheck>>;
+  readonly requested: Map<string, Set<PendingEntry>>;
   /** Watcher batches behind `paths`: the earliest receipt and latest flush, until a capture consumes them. */
   watched: WatchBatch | null;
   lastActivityAt: number;

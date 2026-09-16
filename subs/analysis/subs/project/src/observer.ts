@@ -4,6 +4,7 @@ import { acquireProject } from './read-project.js';
 import type { AcquiredProject } from './read-project.js';
 import { AcquisitionError, Cancelled, byteOrder, freeze, within } from './data.js';
 import { excludedDirectory, inventoryFileKind, outsideSourceWarnings } from './inventory.js';
+import { isRamifyGeneratedPath } from './generated-path.js';
 import { readPurpose } from './purpose.js';
 import { exactReferences } from './references.js';
 import { ReportedObservations, inputIdentity, reportedInput } from './observations.js';
@@ -210,6 +211,10 @@ class Observer implements ProjectObserver {
   }
 
   #classify(path: string): Classified {
+    // Generated final and transient publisher output is never a real input:
+    // ignore it before it can become owned, structural, description, readme
+    // or otherwise-observed evidence, at any segment position.
+    if (isRamifyGeneratedPath(relative(this.#capture.root, path))) return { kind: 'ignored', path };
     const name = basename(path);
     if (!within(this.#capture.root, path)) {
       return this.#capture.recorded(path) ? { kind: 'input', path } : { kind: 'ignored', path };

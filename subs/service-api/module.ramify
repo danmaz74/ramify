@@ -1,0 +1,9 @@
+ramify 1
+module service-api tagged [dispatch]
+
+expose-src * from "interfaces/explorer-service.ts" to parent
+expose-src createProjectExplorerModel from "project-view.ts" to parent
+expose-src createExplorerRouter, ExplorerRouter from "router.ts" to parent
+expose-src startExplorerWebProcess, ExplorerWebProcess from "web-process.ts" to parent
+expose-src selectExplorerEndpoint, readExplorerProcessRecord, reusableExplorerProcess, probeExplorerReadiness, explorerProjectUrl, ExplorerEndpointSelection from "web-discovery.ts" to parent
+expose-src ensureExplorerWebProcess, ExplorerLaunchOptions, ExplorerProcessLaunch from "web-launcher.ts" to parent

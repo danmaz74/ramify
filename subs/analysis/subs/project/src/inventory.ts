@@ -1,6 +1,7 @@
 import { basename, join, relative } from 'node:path';
 import { Capture } from './capture.js';
 import { AcquisitionError, byteOrder, freeze, hash, within } from './data.js';
+import { isRamifyGeneratedPath } from './generated-path.js';
 import { readPurpose } from './purpose.js';
 import { exactReferences } from './references.js';
 import type { DescriptionParser } from '../../descriptions/src/interfaces/syntax.js';
@@ -57,7 +58,10 @@ export async function inventoryProject(capture: Capture, scope: Omit<ProjectScop
   const excludedRoots: string[] = [];
   const queue: Walk[] = [{ directory: capture.root, boundary: null }];
   const names = new Map<string, InventoryModule>();
-  const selected = config.files.filter(path => within(capture.root, path));
+  // Generated output is isolated before any compiler selection can admit it,
+  // even when an explicit tsconfig `files`/`include` entry names it directly.
+  const selected = config.files.filter(path => within(capture.root, path)
+    && !isRamifyGeneratedPath(relative(capture.root, path)));
   function snapshot(): ProjectInventory {
     return freeze({
       scope: { ...scope, walkedAreas: modules.flatMap(module => module.areas.map(area => area.root)).sort(byteOrder),
@@ -135,6 +139,10 @@ export async function inventoryProject(capture: Capture, scope: Omit<ProjectScop
         }
       }
       for (const path of entries) {
+        // Isolate the reserved `.ramify` catalog and its transient stage/
+        // rollback siblings before observation, walk descent or file
+        // classification can admit anything beneath them.
+        if (isRamifyGeneratedPath(basename(path))) continue;
         const kind = await capture.kind(path);
         if (kind === 'directory') {
           const ownSource = boundary && within(join(boundary.directory, 'src'), path);

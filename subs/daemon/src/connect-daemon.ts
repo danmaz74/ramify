@@ -134,7 +134,8 @@ export async function connectDaemon(options: ConnectOptions): Promise<ConnectOut
     const connection: ServiceConnection = {
       get state() { return state; }, get reason() { return reason; }, get daemon() { return current!.daemon; },
       openContext: (...args) => current!.openContext(...args), contextStatus: params => current!.contextStatus(params),
-      check: (...args) => current!.check(...args), subscribe: (...args) => current!.subscribe(...args),
+      check: (...args) => current!.check(...args), explorerDetails: (...args) => current!.explorerDetails(...args),
+      materialize: (...args) => current!.materialize(...args), subscribe: (...args) => current!.subscribe(...args),
       unsubscribe: params => current!.unsubscribe(params), closeContext: params => current!.closeContext(params),
       daemonStatus: () => current!.daemonStatus(), stopDaemon: params => current!.stopDaemon(params),
       recover(authorization) {

@@ -9,6 +9,7 @@ import { Capture } from './capture.js';
 import { AcquisitionError, Cancelled } from './data.js';
 import { FRAME_BYTES, CHUNK_BYTES } from './configuration-data.js';
 import type { ConfigurationData } from './configuration-data.js';
+import { isRamifyGeneratedPath } from './generated-path.js';
 
 /** Configuration-only supervised process. One callback operation is in flight. */
 export async function readConfiguration(capture: Capture, config: string): Promise<ConfigurationData> {
@@ -85,6 +86,9 @@ export async function readConfiguration(capture: Capture, config: string): Promi
       case 'readDirectory': {
         const files: string[] = [], directories: string[] = [];
         for (const path of await capture.readDirectory(frame.path)) {
+          // Generated output is invisible to the compiler's own `include`/`exclude`
+          // glob resolution, before any entry can become an observed input.
+          if (isRamifyGeneratedPath(basename(path))) continue;
           // Compiler file selection cannot use symlinks to invent owned roots.
           const kind = await capture.kind(path);
           if (kind === 'file') files.push(basename(path));

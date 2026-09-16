@@ -1,5 +1,7 @@
 import type { RamifyService, ServiceOperation, ServiceCapability, ServiceResult, ServiceError, ServiceErrorCode } from '../../../../src/interfaces/service.js';
-import type { AnalysisDriver, WatcherPort, ClockPort, ContextBudgets, ContextEvent } from '../../subs/contexts/src/interfaces/contexts.js';
+import type { AnalysisDriver, WatcherPort, ClockPort, ContextBudgets, ContextEvent, RevisionId } from '../../subs/contexts/src/interfaces/contexts.js';
+import type { ApiViewProjection } from '../../../analysis/src/interfaces/session.js';
+import type { RunControl } from '../../../analysis/src/interfaces/analysis.js';
 
 export interface DaemonInstance {
   readonly instanceId: string;
@@ -25,6 +27,11 @@ export interface DaemonServiceOptions {
   readonly budgets: ContextBudgets;
   readonly instance: DaemonInstance;
   readonly log: (entry: LogEntry) => void;
+  /** The injected transactional filesystem publisher `materialize` calls after
+   * a projected, revision-bound `ContextApiViewOutcome`. Production callers
+   * supply `createFilesystemApiViewPublisher(limits)`; tests inject a
+   * controlled publisher. */
+  readonly publisher: ApiViewPublisher;
 }
 export interface ServiceLease {
   readonly id: string;
@@ -172,3 +179,47 @@ export type WireMessage =
   | { readonly type: 'ping' }
   | { readonly type: 'pong' }
   | { readonly type: 'goodbye'; readonly reason: DisconnectReason };
+
+/** Positive, finite byte ceilings the filesystem publisher enforces before
+ * writing anything for one `publish` call. Frozen (iteration 1):
+ * `maxAreaBytes: 32 * 1024 * 1024`, `maxInvocationBytes: 256 * 1024 * 1024`,
+ * `maxStagedBytes: 256 * 1024 * 1024`. */
+export interface ApiViewPublishLimits {
+  readonly maxAreaBytes: number;
+  readonly maxInvocationBytes: number;
+  readonly maxStagedBytes: number;
+}
+/** One published or unchanged generated `.ramify` directory. `path` is the
+ * canonical project-relative directory (`<area.root>/.ramify`); `files` and
+ * `entries` count the rendered documents plus `_meta.json`; `bytes` is the
+ * area's current total rendered size regardless of `changed`. */
+export interface MaterializedTarget {
+  readonly module: string;
+  readonly area: 'ordinary' | 'tests';
+  readonly path: string;
+  readonly files: number;
+  readonly entries: number;
+  readonly bytes: number;
+  readonly changed: boolean;
+}
+export type PublishApiViewOutcome =
+  | { readonly status: 'published'; readonly targets: readonly MaterializedTarget[];
+      readonly bytesWritten: number }
+  | { readonly status: 'cancelled' }
+  | { readonly status: 'unavailable'; readonly reason: 'invalid-path'
+      | 'symlink' | 'resource-limit' | 'output-failure' | 'rollback-failure';
+      readonly message: string };
+
+/** The daemon-owned transactional filesystem publisher: renders and safely
+ * replaces every module's generated `.ramify` directory for one projection at
+ * one revision, staging and switching every requested target before any
+ * previous complete view is discarded. */
+export interface ApiViewPublisher {
+  publish(
+    root: string,
+    revision: RevisionId,
+    projection: ApiViewProjection,
+    requestId: string,
+    control?: RunControl,
+  ): Promise<PublishApiViewOutcome>;
+}

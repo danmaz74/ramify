@@ -7,15 +7,35 @@ export const verificationCapabilities = [
   'increment', 'contexts', 'daemon-service', 'ipc', 'client', 'daemon-process',
   'engine', 'compiler', 'observer', 'hosting', 'supersession', 'hook-cli', 'live-equivalence', 'fast-measure',
   'lifecycle', 'equivalence', 'resident-measure', 'completion',
+  // Plan 2A group-scoped capabilities (main-plan.md's acceptance matrix, one per I2A-NN group).
+  'provider-review', 'isolation', 'availability', 'symbol-details', 'projection', 'rendering',
+  'publication', 'revision-query', 'service-operation', 'cli-command', 'agent-workflow',
+  'scale-evidence', 'final-declarations',
 ] as const;
 
 export type VerificationCapability = (typeof verificationCapabilities)[number];
-export type FixtureCode = 'A' | 'W' | 'R' | 'F' | 'J' | 'T' | 'M' | 'H' | 'Q' | 'P' | 'S100' | 'S500' | 'S1000' | '—';
-export type EvidenceKind = 'api' | 'unit' | 'session' | 'quick' | 'ipc' | 'process' | 'measurement';
+export type FixtureCode = 'A' | 'W' | 'R' | 'F' | 'J' | 'T' | 'M' | 'H' | 'Q' | 'P' | 'X' | 'S100' | 'S500' | 'S1000' | '—';
+export type EvidenceKind = 'api' | 'unit' | 'session' | 'quick' | 'ipc' | 'process' | 'measurement' | 'platform' | 'document';
 export const plan5Directory = 'docs/plans/iteration-5-fast-incremental-checks';
 export const plan5InventoryDocument = `${plan5Directory}/subcases.md`;
 export const plan2Directory = 'docs/plans/done/iteration-2-resident-verification';
 export const plan2InventoryDocument = `${plan2Directory}/subcases.md`;
+export const plan2aDirectory = 'docs/plans/iteration-2a-materialized-api-view';
+export const plan2aInventoryDocument = `${plan2aDirectory}/subcases.md`;
+/**
+ * Plan 2A's leaves table has no per-leaf capability column (unlike Plan 2/5):
+ * only main-plan.md's group-level acceptance matrix names one, in free prose.
+ * This is the one authored mapping both `readReviewedPlan2a` (plan.ts) and
+ * `plan2a-instances.ts` import, so a leaf's assigned capability is always
+ * consistent between the reviewed-document parser and the executable seeds.
+ */
+export const plan2aGroupCapabilities: Readonly<Record<string, VerificationCapability>> = {
+  'I2A-01': 'provider-review', 'I2A-02': 'isolation', 'I2A-03': 'availability',
+  'I2A-04': 'symbol-details', 'I2A-05': 'projection', 'I2A-06': 'rendering',
+  'I2A-07': 'publication', 'I2A-08': 'revision-query', 'I2A-09': 'service-operation',
+  'I2A-10': 'cli-command', 'I2A-11': 'agent-workflow', 'I2A-12': 'scale-evidence',
+  'I2A-13': 'final-declarations',
+};
 
 export const planDirectory = 'docs/plans/done/iteration-1-project-verifier';
 export const inventoryDocument = `${planDirectory}/subcases.md`;
@@ -74,6 +94,7 @@ export function capabilitiesFor(scope: string, iteration: number): VerificationC
 }
 
 export function instanceFromSeed(seed: InstanceSeed): ReferenceInstance {
+  if (seed[0].startsWith('I2A-')) return plan2aInstanceFromSeed(seed);
   if (seed[9]) {
     const record = plan2InstanceFromSeed(seed);
     if (!seed[0].startsWith('I5-')) return record;
@@ -117,6 +138,37 @@ export function instanceFromSeed(seed: InstanceSeed): ReferenceInstance {
           : prefix === 'PC' ? ['docs/architecture/processes-and-clients.md#acceptance-evidence']
           : prefix === 'QT' ? ['docs/architecture/quick-testing.spec.md#complementary-verification'] : [])),
       `${planDirectory}/iterations/iteration${iteration}.md`,
+    ],
+  };
+}
+
+/**
+ * Plan 2A meanings never inherit Plan 1 resource-stage or fixture recipes, and
+ * its leaves carry no matrix-row capability of their own: `capabilityScope`
+ * comes from `plan2aGroupCapabilities`, keyed by the leaf's own group.
+ */
+function plan2aInstanceFromSeed(seed: InstanceSeed): ReferenceInstance {
+  const [id, iteration, families, capabilityScope, code, mutation, expectation, , , resident] = seed;
+  if (!resident) throw new Error(`Missing Plan 2A metadata: ${id}`);
+  const [matrixId, subcase] = id.split(':');
+  if (plan2aGroupCapabilities[matrixId!] !== capabilityScope) throw new Error(`Capability mismatch for ${id}: expected ${plan2aGroupCapabilities[matrixId!]}`);
+  const requiredCapabilities = [capabilityScope] as VerificationCapability[];
+  const disk = code !== 'M' && code !== 'H' && code !== '—';
+  return {
+    id, matrixId, subcase, variant: null, iteration, families, capabilityScope,
+    requiredCapabilities, evidenceKind: resident.evidence,
+    fixture: {
+      code, root: disk ? `.reference-work/<run-id>/${id}/project/` : null,
+      configuration: disk && resident.selection !== 'P' ? 'tsconfig.json (discover; whole-project)' : null,
+      registry: disk ? 'Default resolved registry' : 'Not applicable; scripted or document evidence',
+      recipe: `${plan2aInventoryDocument}#fixtures-and-evidence`, selection: resident.selection,
+    },
+    mutation: { summary: mutation, variant: null }, expectation: { summary: expectation, variant: null },
+    expectedCoverage: { convention: `${plan2aInventoryDocument}#fixtures-and-evidence`, details: expectation },
+    pointers: [
+      `${plan2aDirectory}/main-plan.md#acceptance-matrix`,
+      `${plan2aInventoryDocument}#required-leaves`,
+      `${plan2aDirectory}/iterations/iteration${iteration}.md`,
     ],
   };
 }

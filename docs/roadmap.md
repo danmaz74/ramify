@@ -1,11 +1,11 @@
 # Ramify implementation roadmap
 
-**Date:** 2026-09-11. **Status:** Plan 1 is complete. Its batch engine, CLI and
+**Date:** 2026-09-16. **Status:** Plan 1 is complete. Its batch engine, CLI and
 self-check are merged on `main`, where the unfiltered 308-instance gate passed
 on 2026-09-10; the [completion report](plans/done/iteration-1-project-verifier/iterations/iteration15-results.md)
 records the evidence and the inputs carried forward. Plan 2 is complete and
-merged. Every remaining deliverable has the authoring brief below; Plans 3,
-5 and 7 also have detailed plan artifacts.
+merged. Every remaining deliverable has the authoring brief below; the table
+links every detailed plan artifact currently available.
 Implementation completion must be established by each plan's evidence.
 
 **Revision, 2026-09-11:** overlays are removed and the change-previews
@@ -23,6 +23,13 @@ iteration depends on Plan 5.
 is a draft for selecting modules to test from Plan 5's live dependency facts,
 through the API, CLI and MCP. It follows the retained-session provider;
 its MCP integration also requires Plan 4's stdio adapter.
+
+**Revision, 2026-09-15:** [Plan 2A: materialized API discovery](#plan-2a-materialized-api-discovery)
+is a separate predecessor to Plan 3. It generates complete ordinary and testing
+foreign-API documentation beneath each module's `.ramify` directory for search
+with `rg`. It supersedes Plan 3's proposed `ramify available`/MCP search surface
+without replacing the existing Plan 3 artifact; that artifact is preserved and
+must receive a separate successor review before execution.
 
 The intended system is defined in the [architecture documents](architecture/README.md).
 They own the decided process/client, resource and testing architecture, plus
@@ -161,37 +168,37 @@ cannot import UI contracts. Do not weaken tags to preserve the old combined barr
 Each plan delivers a usable capability and has an explicit completion gate.
 A requested missing or unrun checker stage cannot count as passed. Completed
 bounded analysis with documented coverage limits is a different outcome, as
-specified by the source principles. Plans 2–7 below are the proposed
-sequence; their detailed plans are written before their implementation. Plans
-3 and 5 both follow Plan 2 and may be implemented at the same time: Plan 3's
-first seven iterations need nothing Plan 5 delivers, and its eighth joins
-Plan 5's retained session.
+specified by the source principles. The table below is the proposed sequence;
+detailed plans are written before implementation. Plan 2A follows Plan 5's
+retained session and executes before the separately reviewed Plan 3 successor.
 
 | Plan | Working deliverable | Required predecessors | Plan artifact |
 | --- | --- | --- | --- |
 | [1. Verify a project](#plan-1-batch-project-verification) | Complete: the batch engine/CLI checks the real reference and Ramify itself, and the 308-instance gate passed on `main`. | None. | [Detailed Plan 1](plans/done/iteration-1-project-verifier/main-plan.md); [completion evidence and limits](plans/done/iteration-1-project-verifier/iterations/iteration15-results.md). |
 | [2. Keep verification current](#plan-2-resident-verification) | A resident daemon watches, reconciles and checks projects through local CLI commands. | Plan 1. | Complete: merged on 2026-09-11. [Detailed Plan 2](plans/done/iteration-2-resident-verification/main-plan.md); [completion report](plans/done/iteration-2-resident-verification/iterations/iteration14-results.md). |
 | [5. Check fast after a write](#plan-5-fast-incremental-checks) | A retained analysis session inside the daemon answers an agent's post-write hook for the written file in tens of milliseconds, exactly as a batch check would. | Plan 2. | Brief below; [Detailed Plan 5](plans/iteration-5-fast-incremental-checks/main-plan.md), complete on 2026-09-14 on branch `close/plan5-completion`, not merged to `main`; its [completion report](plans/iteration-5-fast-incremental-checks/iterations/iteration13-results.md) records the delivered scope, the gates and the remaining gaps. |
-| [3. Understand a project](#plan-3-project-inspection) | An agent working in a module lists the foreign symbols available there with the specifier to write, searches them, and explains why one is or is not available. | Plan 2; Plan 5 for the join iteration only. | Brief below; [Detailed Plan 3](plans/iteration-3-project-inspection/main-plan.md), a draft awaiting its iteration 1 contract review. |
+| [2A. Materialize API discovery](#plan-2a-materialized-api-discovery) | Complete: `ramify materialize` generates ordinary and testing foreign-API documentation beneath each module for explicit `rg` search. | Plan 5's retained session and contexts. | [Detailed Plan 2A](plans/iteration-2a-materialized-api-view/main-plan.md); [completion report](plans/iteration-2a-materialized-api-view/iterations/iteration10-results.md). |
+| [2B. Generated project views](#plan-2b-generated-project-views) | Draft: generic generated views with `ramify materialize --view`, adding `.exported_symbols/` and `docs/modules/`. | Plan 2A. | [Detailed Plan 2B](plans/iteration-2b-generated-views/main-plan.md), draft for review. |
+| [3. Understand a project](#plan-3-project-inspection) | Remaining project explanations, module summaries and usage queries are selected in a successor review after filesystem discovery exists. | Plan 2A. | The existing [Detailed Plan 3](plans/iteration-3-project-inspection/main-plan.md) is preserved but must be revised and reviewed before execution. |
 | [4. Use Ramify through MCP](#plan-4-mcp-access) | A host-launched stdio adapter exposes the daemon's checks and inspection. | Plan 2's service and Plan 3's queries for this deliverable's full scope. | Brief below; detailed plan not yet written. |
 | [7. Find modules affected by changes](#plan-7-affected-modules) | An on-demand reverse dependency query uses retained facts to select modules for testing through API, CLI and MCP. | Plan 5's retained session and contexts; Plan 4's stdio provider for MCP. | [Detailed Plan 7](plans/iteration-7-affected-modules/main-plan.md), draft awaiting contract review. |
-| [6. Explore visually](#plan-6-project-explorer) | A standalone live explorer through a separate tRPC web process. | Plans 2–3; optional integrations may consume Plan 4. | Brief below; detailed plan not yet written. |
+| [6. Explore visually](#plan-6-project-explorer) | Complete: a standalone live explorer through a separate tRPC web process. | Plan 2's published report and lightweight client. | [Detailed Plan 6](plans/iteration-6-project-explorer/main-plan.md) and [completion report](plans/iteration-6-project-explorer/iterations/iteration7-results.md). |
+| [6A. Show only Ramify-module imports](#plan-6a-module-only-project-explorer) | Draft: narrow the explorer to Ramify modules and cross-module imports while retaining external facts in analysis. | Completed Plan 6. | [Detailed Plan 6A](plans/iteration-6a-module-only-project-explorer/main-plan.md), draft for contract review. |
 
 The table order is the proposed implementation order; Plan 5 keeps the
-number the withdrawn change-previews deliverable released. Dependency requirements
-are narrower: Plans 3 and 5 are concurrent, the explorer can be delivered
-without MCP, and a
-check-only MCP adapter could be delivered after Plan 2. The planned Plan 4
-also exposes inspection, so its full gate includes Plan 3. Keep any rescheduling
-explicit rather than silently deleting capabilities from a plan.
+number the withdrawn change-previews deliverable released and Plan 2A is an
+inserted predecessor rather than a renumbering. The explorer can be delivered
+without MCP, and a check-only MCP adapter could be delivered after Plan 2. The
+planned Plan 4 also exposes the remaining inspection operations, so its full
+gate includes the reviewed Plan 3 successor. Keep any rescheduling explicit
+rather than silently deleting capabilities from a plan.
 
-`docs/plans/iteration-3-project-inspection/` and
-`docs/plans/iteration-5-fast-incremental-checks/` hold the two draft plans,
-each with one `main-plan.md`, its review package and an iterations manifest;
-the completed plans are under `docs/plans/done/`. The remaining reserved names
-are `iteration-4-mcp-access` and `iteration-6-project-explorer`; they are not
-existing artifacts. Replace a brief's status with a real link when its plan is
-written; do not create empty plans or broken links in advance.
+Detailed plan directories hold one `main-plan.md`, their review package and an
+iterations manifest. Completed historical plans may remain in their active path
+when linked completion evidence already depends on that identity. The remaining
+reserved name is `iteration-4-mcp-access`; it is not an existing artifact.
+Replace a brief's status with a real link when its plan is written; do not create
+empty plans or broken links in advance.
 
 Future identity, freshness and query requirements inform the first
 engine contract review. Their complete protocols are reviewed with the relevant
@@ -207,9 +214,9 @@ capabilities is completed only when all its scheduled parts have evidence:
 
 | Case family | Plans 1–2 | Later plans |
 | --- | --- | --- |
-| [PC01–PC10](architecture/processes-and-clients.md#acceptance-evidence) | 1: batch/help startup and applicable PC01 checks. 2: PC01–PC04/PC09, daemon parts of PC06, local-service PC07 and CLI/direct-client PC10. | 3: query-client equivalence; 4: PC08 and MCP portions of PC06–PC07/PC10; 6: PC05 and web portions including PC10. Optional HTTP MCP cases apply only when implemented. |
-| [ML01–ML08](architecture/memory-lifecycle.md#measurement-and-acceptance) | 1: batch peak memory, result retention and disposal. 2: resident entry footprint, context/history/work bounds, repeated edits and local slow consumers. | 3: bounded inspection/enrichment; 4: ML08 stdio portions; 6: web/browser footprint, serialization and ML05 open-close cycles. |
-| [QT01–QT08](architecture/quick-testing.spec.md#complementary-verification) | 1: batch QT01/QT03 and actual CLI process cases. 2: IPC QT04, daemon QT05 and relevant resource QT07. | 3: real query flows; 4: QT08; 6: QT02/QT06, HTTP QT04, web QT05 and remaining resource QT07. |
+| [PC01–PC10](architecture/processes-and-clients.md#acceptance-evidence) | 1: batch/help startup and applicable PC01 checks. 2: PC01–PC04/PC09, daemon parts of PC06, local-service PC07 and CLI/direct-client PC10. | 2A: materialization service/client and real process publication; 3: remaining query-client equivalence; 4: PC08 and MCP portions of PC06–PC07/PC10; 6: PC05 and web portions including PC10. Optional HTTP MCP cases apply only when implemented. |
+| [ML01–ML08](architecture/memory-lifecycle.md#measurement-and-acceptance) | 1: batch peak memory, result retention and disposal. 2: resident entry footprint, context/history/work bounds, repeated edits and local slow consumers. | 2A: bounded projection, compiler details and transactional staging; 3: remaining inspection/enrichment; 4: ML08 stdio portions; 6: web/browser footprint, serialization and ML05 open-close cycles. |
+| [QT01–QT08](architecture/quick-testing.spec.md#complementary-verification) | 1: batch QT01/QT03 and actual CLI process cases. 2: IPC QT04, daemon QT05 and relevant resource QT07. | 2A: direct, IPC and real materialization flows; 3: remaining query flows; 4: QT08; 6: QT02/QT06, HTTP QT04, web QT05 and remaining resource QT07. |
 
 Browser-promise verification is a separate capability. Plan and implement its
 algorithm explicitly before claiming it ran; the availability checker continues
@@ -367,17 +374,80 @@ local-service PC07, CLI/direct-client PC10 and the applicable ML/QT cases. Inclu
 Hand off a documented client API, lifecycle/error tables, codecs, revision and
 freshness guarantees, per-platform transport details, resource budgets,
 event/direct-test adapters and runnable concurrency/recovery fixtures.
-Plans 3–6 reuse them.
+Plan 2A and Plans 3–6 reuse them.
+
+## Plan 2A: Materialized API discovery
+
+**Detailed plan:** [Plan 2A: Materialized API discovery](plans/iteration-2a-materialized-api-view/main-plan.md),
+implemented; its [completion report](plans/iteration-2a-materialized-api-view/iterations/iteration10-results.md)
+records the gate counts, measured limits and the one remaining gap (Linux and
+macOS byte-identical evidence is measured on Linux only; the completion report
+names the exact command a macOS host must still run). **Prerequisite:** Plan 5's
+retained session, compiler lifecycle, contexts and resident client are on the
+execution base. Its recorded performance waivers and S1000 retained-fact limit
+remain explicit predecessor constraints, not successful evidence.
+
+**Working outcome.** `ramify materialize [--from <path>] [--all] [--root
+<dir>]` writes compact foreign-API Markdown beneath each selected module's
+`src/.ramify/` and, only when it already exists, `src/tests/.ramify/`. Ordinary
+and testing views are independently complete. Each partitions defining files
+into `children/` and `external/`, carries a minimal revision metadata file and
+is searched through the exact explicit `rg` paths in project `AGENTS.md`.
+
+**Ownership and implementation.** No owner or package entry is added. `model`
+enumerates available foreign originals using enforcement's rules;
+`typescript` extracts bounded body-free signatures and documentation from the
+defining-file export; `analysis` produces a complete ephemeral projection from
+the current retained facts; contexts binds it to one synchronized revision;
+daemon renders and transactionally publishes generated files; CLI exposes the
+terminating command. Project acquisition, observation and watching exclude the
+final and transient generated directories before they can become inputs.
+
+The large projection stays inside the daemon and is never an MCP or IPC search
+document. A warm session may rehydrate its compiler from its retained captured
+input view, but the operation performs no second inventory/model/report pass
+and publishes no revision. Input drift, limits, cancellation, symlinks or
+publication failure cannot publish a partial available set or replace a prior
+complete view. Repeating equal output performs no target writes.
+
+**Acceptance and handoff.** Execute the plan's 104 I2A leaves across model,
+compiler, projection, isolation, transactional publication, retained/context,
+service/IPC/CLI, `rg`, process and Linux/macOS evidence. Measure file/entry
+counts, bytes, duplication, largest areas, warm latency, no-op writes and peak
+memory on the reference, toolkit and S100/S500/S1000 fixtures; an unsupported
+scale is an explicit bounded outcome. Hand off availability/detail/projection
+contracts and the generated schema to Plan 3. Preserve the existing Plan 3
+directory unchanged; its remaining scope receives a separate review.
+
+## Plan 2B: Generated project views
+
+**Detailed plan:** [Plan 2B: Generated project views](plans/iteration-2b-generated-views/main-plan.md),
+draft for review. **Prerequisite:** Plan 2A's completion gate is recorded; Plan
+2B changes no Plan 2A document.
+
+**Working outcome.** `ramify materialize [--view <id>]...` publishes any
+registered view from one revision through one transactional publisher. Plan 2B
+adds `.exported_symbols/`, with each module's `exposed-symbols.txt`,
+`internal-exports.txt` and `tests.txt`, and `docs/modules/`, with a `docs`
+symlink to each module's `src/docs`. The API view's output stays byte-identical.
+
+**Ownership and implementation.** A new `analysis/views` owner, pending review,
+holds pure view definitions. Materialization only produces output: Plan 2B
+restores Plan 2A's decision-engine, context-queue and session-query changes to
+read-only forms, and a reserved-output table in `analysis/project` is the only
+analysis-side effect of any view.
+
+**Acceptance and handoff.** Execute the plan's 73 I2B leaves, prove check
+invariance with and without materialization and the unchanged Plan 1, 2, 5 and
+2A gates, and hand off the view registry contract for later views.
 
 ## Plan 3: Project inspection
 
 **Detailed plan:** [Plan 3: Project inspection](plans/iteration-3-project-inspection/main-plan.md),
-a draft awaiting its iteration 1 contract review. **Prerequisites:** met on
-2026-09-11; Plan 2's daemon, contexts, revisions, client and CLI commands are
-merged. Plan 5 is not a prerequisite of this plan's first eight iterations:
-they are written to be implemented in parallel with it. Only the ninth, the
-join, requires Plan 5's retained session and compact history, and it extends
-Plan 5's session contract with one detail operation.
+preserved as a pre-Plan-2A draft. **Prerequisite:** Plan 2A must complete, then
+this plan must be revised and reviewed as a successor before any iteration is
+executed. Its current iteration dependencies and contracts are not execution
+instructions after the materialized-view decision.
 
 **Revision, 2026-09-11:** this brief was rewritten around the agent's use
 case. The earlier version described the backend of the explorer, whose
@@ -385,7 +455,15 @@ central query was whether a named consumer may import a named original. That
 is the wrong first question. The observed-usage aggregates, counting units,
 drill-down identifiers, cursors and ranking it listed have moved to Plan 6.
 
-**Working outcome.** An agent implementing a feature works inside one
+**Revision, 2026-09-15:** Plan 2A now owns availability enumeration, symbol
+details and primary agent discovery through materialized `.ramify` Markdown.
+The proposed `ramify available` command, its search response and an MCP search
+equivalent below are superseded. Explanations, module summaries and observed
+usage remain possible Plan 3 scope, to be selected in the required successor
+review. The text below is retained as input to that review, not as an approved
+implementation contract.
+
+**Superseded discovery outcome retained for review.** An agent implementing a feature works inside one
 module's `src/`. It reads that module's internals with ordinary tools and
 treats every other module as a library. Its most frequent question is which
 foreign symbols it may already import from where it stands. From that
@@ -401,7 +479,7 @@ would make an invisible one visible. Human and JSON clients receive the same
 revision-qualified answers, and every listed specifier passes `ramify check`
 when written into the area it was listed for.
 
-### Ownership and required implementation
+### Existing draft ownership to reconcile
 
 No owner is added. `model` gains the enumeration of the originals available
 to a source area, alongside today's per-original `explainVisibility` and
@@ -427,7 +505,7 @@ whenever the original is available, because the defining file is the
 original's own area. Proposed exposure edits are labeled proposals, never
 existing permissions.
 
-### Decisions resolved in the detailed plan
+### Existing draft decisions to reconcile
 
 The plan's [resolved decisions](plans/iteration-3-project-inspection/main-plan.md#resolved-decisions)
 fix the consumer rule, the spelling rule, the export name shown per row, the
@@ -437,7 +515,7 @@ owned rather than subtree usage, the three commands and one document, and the
 parallel schedule with Plan 5. Its review points RP-2 to RP-6 name the
 alternatives for iteration 1.
 
-### Required evidence and next-plan inputs
+### Existing draft evidence and next-plan inputs
 
 Use DA12, the query portions of DA13–DA15, H01–H04, PC03, ML06 and QT01,
 QT03, QT04; retain the applicable quick-service and actual IPC and process
@@ -471,10 +549,9 @@ Plan 3's inspection contracts for this plan's full tool/resource set.
 initializes a stdio session and performs checks, module inspection and
 explanations through the existing daemon. Calls from multiple hosts reuse
 compatible analysis while keeping each host's context selections separate.
-The availability listing of [Plan 3](#plan-3-project-inspection) is the
-primary tool: an agent host that cannot run a shell command asks it the same
-question `ramify available` answers, and its consumer parameter is a path,
-never a module name alone.
+Plan 2A's primary API discovery is local generated documentation searched with
+`rg`; Plan 4 adds no duplicate availability-search tool. The successor Plan 3
+review decides which remaining inspection/explanation operations Plan 4 exposes.
 
 ### Ownership and required implementation
 
@@ -575,6 +652,13 @@ next context's check. The workload now passes, and the
 [addendum](plans/iteration-5-fast-incremental-checks/iterations/iteration13-results.md#addendum-2026-09-14-the-many-contexts-stall)
 records the diagnosis, the fix, its tests and the measured run.
 
+**Content relevance, 2026-09-15.** A draft successor plan,
+[content relevance](plans/iteration-5-content-relevance/main-plan.md), separates
+files whose bytes a consumer reads from files that matter only by existing. It
+stops the daemon reading, hashing and re-sweeping the second kind, drops watcher
+events that cannot affect the result, and answers a hook naming only such paths
+without an update. Its iteration files follow its review decisions.
+
 **Inputs inherited from Plan 2.** Its own measurement archive records the
 compiler-state deferral trigger as fired: source-edit medians of 6.7 s on
 the reference and 10.8 s on S100 through the daemon. The
@@ -661,9 +745,24 @@ withdrawn without starting.
 
 ## Plan 6: Project explorer
 
-**Detailed plan:** not yet written. **Prerequisites:** Plan 2's revisioned
-service/notifications and Plan 3's inspection/evidence queries. MCP is an
-optional integration, not a prerequisite for the core explorer.
+**Detailed artifact:** [Plan 6](plans/iteration-6-project-explorer/main-plan.md),
+completed on 2026-09-16 with its [view model](plans/iteration-6-project-explorer/view-model.md),
+[lift inventory](plans/iteration-6-project-explorer/lift-inventory.md) and
+[acceptance matrix](plans/iteration-6-project-explorer/acceptance.md). The
+[completion report](plans/iteration-6-project-explorer/iterations/iteration7-results.md)
+retains the real-browser, process, measurement and reuse evidence.
+**Prerequisites:** Plan 2's revisioned contexts, its published report scope and
+its lightweight client. MCP is an optional integration, not a prerequisite for
+the core explorer.
+
+**Revision, 2026-09-15:** Plan 3's inspection and evidence queries are no
+longer a prerequisite. The retained snapshot that `check` already projects at
+report scope carries ownership, contracts, accesses and decisions, so the
+explorer projects those facts rather than waiting on a separate query surface.
+Plan 3's agent-facing availability search serves a different use case, and the
+detailed plan depends on no part of Plan 3 or Plan 2A. The same revision
+records the verified cucumber-viz inventory: its source tree was renamed, two
+test files this brief names do not exist, and the router path below is stale.
 
 **Revision, 2026-09-11:** this plan now owns the observed-usage aggregates
 the earlier Plan 3 brief listed. Define observed file-target edges separately
@@ -771,6 +870,24 @@ configuration and measured limits. A consuming application must be able to use
 the extracted view without importing the standalone server or an agent platform.
 
 
+## Plan 6A: Module-only project explorer
+
+**Detailed artifact:** [Plan 6A](plans/iteration-6a-module-only-project-explorer/main-plan.md),
+a draft with its
+[view-model amendment](plans/iteration-6a-module-only-project-explorer/view-model-amendment.md)
+and [acceptance matrix](plans/iteration-6a-module-only-project-explorer/acceptance.md).
+**Prerequisite:** the completed Plan 6 projection, reusable view, connected
+explorer and browser runner.
+
+**Working outcome.** The explorer displays Ramify modules and observed imports
+between different Ramify modules. Package, builtin, standard-library,
+outside-module and unresolved targets remain in source analysis for correctness
+and coverage, but do not enter explorer transport, metrics, graph nodes,
+selection or details. The successor plan preserves Plan 6's historical evidence
+and proves omission with positive cross-module controls at projection,
+component, HTTP and real-browser boundaries.
+
+
 ## Plan 7: Affected modules
 
 **Detailed artifact:** [Plan 7](plans/iteration-7-affected-modules/main-plan.md),
@@ -817,11 +934,13 @@ source/architecture document; do not depend on conversation history.
 | Producer | Required handoff | Consumers |
 | --- | --- | --- |
 | Plan 1 | Implemented package/session/report contracts; canonical source/export facts and exposure evidence; reference instance map; scope/configuration/compiler decisions; self-check and batch resource results. | All later plans. |
-| Plan 2 | Context/generation/revision and freshness contracts; local codecs/client; event ordering and distinct idle-exit/crash/explicit-stop rules; restricted fallback policy; daemon-owned direct-service harness; measured limits and per-platform transport details. | Plans 3–6. |
-| Plan 3 | Inspection query schemas and the `ramify.inspect/1` document; the consumer-area and import-spelling rules; the availability enumeration and its agreement with enforcement; symbol-detail contracts, limits and explicit unavailable states; owned-usage definitions; consumer-aware fixtures. | Plans 4–6. |
+| Plan 2 | Context/generation/revision and freshness contracts; local codecs/client; event ordering and distinct idle-exit/crash/explicit-stop rules; restricted fallback policy; daemon-owned direct-service harness; measured limits and per-platform transport details. | Plan 2A and Plans 3–6. |
+| Plan 2A | Availability enumeration and enforcement agreement; bounded symbol details; complete ordinary/testing projections; deterministic `.ramify` schema and transactional publisher; `ramify materialize` and agent `rg` workflow; scale/resource/platform evidence. | Plan 3 and agent hosts; Plan 4 does not duplicate its search surface. |
+| Plan 3 | The reviewed remaining inspection/explanation schemas, owned-usage definitions and consumer fixtures after Plan 2A's providers and discovery surface are removed from its scope. | Plans 4–6. |
 | Plan 4 | MCP tool/resource schemas and host launch setup; protocol/session lifecycle; actual and in-memory protocol clients; capability and error mapping. | Plan 7; optional later MCP hosting. |
-| Plan 5 | The compact check reply and revision delta; the hook command and host adapter contract; the session and revision vocabulary; retained per-file targets, originals, forwarding paths, owned shim dependencies, inventory and coverage; the observed-input identity; hook latency budgets and hot/warm memory bounds; the Plan 2 supersession record. | Plans 3, 4, 6 and 7; agent hook hosts. |
+| Plan 5 | The compact check reply and revision delta; the hook command and host adapter contract; the session and revision vocabulary; retained per-file targets, originals, forwarding paths, owned shim dependencies, inventory and coverage; the observed-input identity; hook latency budgets and hot/warm memory bounds; the Plan 2 supersession record. | Plan 2A; Plans 3, 4, 6 and 7; agent hook hosts. |
 | Plan 6 | Reusable view exports/props, web lifecycle and query-to-view contracts; extraction provenance; quick/HTTP/browser evidence and measured memory behavior. | Consuming applications and later visualization features. |
+| Plan 6A | Module-only explorer DTO and metrics; module/edge-only selection; report-preservation, HTTP and browser evidence for omitted external targets. | Consuming applications and later visualization features. |
 | Plan 7 | Live module graph semantics; affected query and test-selection contracts; revision/coverage outcomes; CLI/MCP schemas; on-demand construction, temporary memory and query resource evidence. | Test-runner integrations and later explorer features. |
 
 Across every handoff, preserve the distinctions between original and accessed
@@ -899,7 +1018,7 @@ writing future plans; they do not block the current Plan 1 gate.
 | Browser-promise verification | Matching the declared browser tag is part of ordinary checking. Proving the promise is a separate verifier with its own capability, coverage and owner findings. | A separately scoped plan if verification is requested. Until then, requesting it returns unavailable. |
 | MCP Streamable HTTP | Optional hosting of the same MCP module in the web process; no MCP-to-tRPC forwarding layer. | Only when HTTP hosting is needed; specify MCP sessions, cancellation/reconnect, local access policy and shared web lifetime. |
 | Discussion and host/editor integrations | Injected UI integration points can be reused. Agent launching, write authority and host workflow lifecycle remain separate responsibilities. | Concrete consumer needs justify their own adapters and cases, including remaining H04 portions. |
-| Advanced search, metrics and placement suggestions | Plan 3 delivers the availability listing and search over names, signatures and documentation. Ranking, complexity formulas, source-text search across modules and barrel spellings remain additional features, and a proposed exposure is never an existing permission. | After defining the user workflow, counting/scoring semantics, scope and output limits. |
+| Advanced search, metrics and placement suggestions | Plan 2A delivers literal `rg` search over generated names, signatures and documentation. Structured query search, ranking, complexity formulas, source-text search across modules and barrel spellings remain additional features, and a proposed exposure is never an existing permission. | After defining the user workflow, counting/scoring semantics, scope and output limits. |
 | Persistent caches, worker pools and process recycling | No requirement to add them speculatively. They must preserve context generations, input identity and explicit unavailable/recovery results. | Only after measurements identify a problem and demonstrate a useful improvement. |
 | Live module audits and selective verification | [Analysis proposal](analysis/live-module-audits.md): retain applicable test evidence per task, derive live module status, invalidate from source and shared inputs, and run required audits on request with Git provenance. | Possible follow-up to Plans 5 and 7; resolve task mapping, execution input consistency, persistence and reuse policy before assigning a delivery plan. |
 | Design probes P01–P06 and independent policies X01–X02 | Probes are not adopted rules. Naming/API quality, cycles and build/bundling policies are not importability checks. | Separate explicit design or policy work; do not turn them into baseline acceptance failures. |

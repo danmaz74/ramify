@@ -50,6 +50,23 @@ describe('one captured filesystem view', () => {
     await put(root, '.reference-work/new-run/trace.txt', 'new');
     expect(await capture.seal()).toEqual({ status: 'coherent', inputs: before });
   });
+  // Restored pre-Plan-2A rule (user decision): presence and change detection
+  // are exactly directory existence/membership, with no generated-content
+  // awareness. `materialize` itself never creates `src/` or `src/tests/`
+  // (enforced at the publisher, not here), so the scenario below is a
+  // deliberately out-of-band directory appearing by some other means.
+  it('reports a probed-absent directory changed once it exists at all, even holding only its own generated catalog', async () => {
+    expect(await capture.directoryExists('src')).toBe(false);
+    await put(root, 'src/.ramify/_meta.json', '{}');
+    expect(await capture.seal()).toEqual({ status: 'changed', paths: ['src'] });
+  });
+  it('excludes a .ramify sibling from a tracked directory listing, so its own appearance alone is not a change', async () => {
+    await put(root, 'src/a.ts', 'a');
+    expect(await capture.readDirectory('src')).toEqual([join(root, 'src/a.ts')]);
+    const before = capture.inputs;
+    await put(root, 'src/.ramify/_meta.json', '{}');
+    expect(await capture.seal()).toEqual({ status: 'coherent', inputs: before });
+  });
   it('still detects replacement of an unenumerated directory by a file', async () => {
     await put(root, '.reference-work/existing.txt', 'existing');
     expect(await capture.directoryExists('.reference-work')).toBe(true);

@@ -21,5 +21,16 @@ examples/collection-review/.reference-work/
 # Unique production-build staging directories.
 .reference-work/
 
+# Materialized API-view catalogs and the publisher's reserved transient
+# staging/rollback siblings (defense against commits; the generated-path
+# predicate that isolates them at every runtime boundary is authoritative,
+# not this file). Matches the closed enumeration only: `.ramify`,
+# `.ramify.tmp-<suffix>`, `.ramify.old-<suffix>`, at any depth. Near-miss
+# names such as `.ramify-other` or `.ramify.tmp` (no suffix) are ordinary
+# and intentionally left tracked.
+.ramify/
+.ramify.tmp-*/
+.ramify.old-*/
+
 # Host-specific compose interpolation, e.g. RESTART_POLICY on the server.
 .devcontainer/.env

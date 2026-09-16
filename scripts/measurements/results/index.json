@@ -3321,6 +3321,528 @@
           "passed": false
         }
       ]
+    },
+    {
+      "file": "plan2a-2026-09-15T17-05-08.019Z-1b3c1537-9a91-437e-8bf7-448b3e532377.json.gz",
+      "rawSha256": "3a65b4a43aca34320bc018ffee7c52d11d36b866c63b8844474893452d06b11d",
+      "gzipSha256": "98b5044d9e3d93923093e1c6af80a75790314275f2933631c0669bc1579c0577",
+      "rawBytes": 21702,
+      "gzipBytes": 5393,
+      "gzipMembers": [
+        {
+          "offset": 0,
+          "length": 5393,
+          "rawBytes": 21702,
+          "rawSha256": "3a65b4a43aca34320bc018ffee7c52d11d36b866c63b8844474893452d06b11d",
+          "gzipSha256": "98b5044d9e3d93923093e1c6af80a75790314275f2933631c0669bc1579c0577"
+        }
+      ],
+      "note": "Real ramify materialize scale/resource observations (Plan 2A I2A-12); performance is an ideal budget, correctness and cleanup remain binding.",
+      "measuredAt": "2026-09-15T17:05:08.019Z",
+      "completedAt": "2026-09-15T17:05:11.696Z",
+      "phase": "plan2a",
+      "passed": false,
+      "payloadSchema": "ramify.plan2a-measurements/1",
+      "build": {
+        "files": 329,
+        "sha256": "401abbe0b7bfe8bf45ce6b95e5eee970e865c5f79de7182337b634b6997dfab5"
+      },
+      "workloads": [
+        {
+          "name": "I2A-12:reference-scale",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2A-12:toolkit-scale",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2A-12:synthetic-100",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2A-12:synthetic-500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2A-12:synthetic-1000",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2A-12:repeat-plateau",
+          "status": "not-executed",
+          "passed": false
+        }
+      ]
+    },
+    {
+      "file": "plan2a-2026-09-15T17-05-26.425Z-8e8dbff9-3a0d-4b44-b3f5-09e826b01b3d.json.gz",
+      "rawSha256": "e1485df880099bf44c6f98e5256b603a12c4e8458abdd977a4100c8df2f1a33b",
+      "gzipSha256": "5d15d98a68ec95111804df0ab5265603c898751905c9c0a4420593e7395cd7ba",
+      "rawBytes": 1277903,
+      "gzipBytes": 91904,
+      "gzipMembers": [
+        {
+          "offset": 0,
+          "length": 91904,
+          "rawBytes": 1277903,
+          "rawSha256": "e1485df880099bf44c6f98e5256b603a12c4e8458abdd977a4100c8df2f1a33b",
+          "gzipSha256": "5d15d98a68ec95111804df0ab5265603c898751905c9c0a4420593e7395cd7ba"
+        }
+      ],
+      "note": "Real ramify materialize scale/resource observations (Plan 2A I2A-12); performance is an ideal budget, correctness and cleanup remain binding.",
+      "measuredAt": "2026-09-15T17:05:26.425Z",
+      "completedAt": "2026-09-15T17:13:03.785Z",
+      "phase": "plan2a",
+      "passed": true,
+      "payloadSchema": "ramify.plan2a-measurements/1",
+      "build": {
+        "files": 329,
+        "sha256": "401abbe0b7bfe8bf45ce6b95e5eee970e865c5f79de7182337b634b6997dfab5"
+      },
+      "workloads": [
+        {
+          "name": "I2A-12:reference-scale",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2A-12:toolkit-scale",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2A-12:synthetic-100",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2A-12:synthetic-500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2A-12:synthetic-1000",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2A-12:repeat-plateau",
+          "status": "measured",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "file": "plan2a-2026-09-15T17-13-43.892Z-2fe7c40d-afbd-430b-8d13-74a26161cdd9.json.gz",
+      "rawSha256": "169e2f7fb02eec3702cdbedc2a14c054a725f6a6cae0f1d553ff7bc1fbe0ce8e",
+      "gzipSha256": "8508c56b9d2f5c7fe5f5b40294e0c64f919e3e70dff2dbb921998c736fb0c70b",
+      "rawBytes": 827807,
+      "gzipBytes": 61086,
+      "gzipMembers": [
+        {
+          "offset": 0,
+          "length": 61086,
+          "rawBytes": 827807,
+          "rawSha256": "169e2f7fb02eec3702cdbedc2a14c054a725f6a6cae0f1d553ff7bc1fbe0ce8e",
+          "gzipSha256": "8508c56b9d2f5c7fe5f5b40294e0c64f919e3e70dff2dbb921998c736fb0c70b"
+        }
+      ],
+      "note": "Real ramify materialize scale/resource observations (Plan 2A I2A-12); performance is an ideal budget, correctness and cleanup remain binding.",
+      "measuredAt": "2026-09-15T17:13:43.892Z",
+      "completedAt": "2026-09-15T17:18:51.736Z",
+      "phase": "plan2a",
+      "passed": false,
+      "payloadSchema": "ramify.plan2a-measurements/1",
+      "build": {
+        "files": 329,
+        "sha256": "401abbe0b7bfe8bf45ce6b95e5eee970e865c5f79de7182337b634b6997dfab5"
+      },
+      "workloads": [
+        {
+          "name": "I2A-12:reference-scale",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2A-12:toolkit-scale",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2A-12:synthetic-100",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2A-12:synthetic-500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2A-12:synthetic-1000",
+          "status": "measured",
+          "passed": false
+        },
+        {
+          "name": "I2A-12:repeat-plateau",
+          "status": "not-executed",
+          "passed": false
+        }
+      ]
+    },
+    {
+      "file": "plan2a-2026-09-15T17-19-24.339Z-387598ea-ac50-48a3-a0c2-3c15fe92216d.json.gz",
+      "rawSha256": "94a637ae7d711da85b2bb296ef4724e929430a212ad446ba033c4222f62d2365",
+      "gzipSha256": "f4b0cc1b2aaafd2acc0d562c93d6a03b1a69efe2a674bf4da9832d4dedda693e",
+      "rawBytes": 1505158,
+      "gzipBytes": 102297,
+      "gzipMembers": [
+        {
+          "offset": 0,
+          "length": 102297,
+          "rawBytes": 1505158,
+          "rawSha256": "94a637ae7d711da85b2bb296ef4724e929430a212ad446ba033c4222f62d2365",
+          "gzipSha256": "f4b0cc1b2aaafd2acc0d562c93d6a03b1a69efe2a674bf4da9832d4dedda693e"
+        }
+      ],
+      "note": "Real ramify materialize scale/resource observations (Plan 2A I2A-12); performance is an ideal budget, correctness and cleanup remain binding.",
+      "measuredAt": "2026-09-15T17:19:24.339Z",
+      "completedAt": "2026-09-15T17:28:24.128Z",
+      "phase": "plan2a",
+      "passed": false,
+      "payloadSchema": "ramify.plan2a-measurements/1",
+      "build": {
+        "files": 329,
+        "sha256": "401abbe0b7bfe8bf45ce6b95e5eee970e865c5f79de7182337b634b6997dfab5"
+      },
+      "workloads": [
+        {
+          "name": "I2A-12:reference-scale",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2A-12:toolkit-scale",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2A-12:synthetic-100",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2A-12:synthetic-500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2A-12:synthetic-1000",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2A-12:repeat-plateau",
+          "status": "not-executed",
+          "passed": false
+        }
+      ]
+    },
+    {
+      "file": "plan2a-2026-09-15T17-29-33.660Z-b5c57cf5-3030-46e2-ae52-37391aedd20a.json.gz",
+      "rawSha256": "2f5c2c1a53a5e347ba6e7683120b31aa30101802e4a9c0fed69ab75493127549",
+      "gzipSha256": "368f7f8981c3c473ed4383050bc2e1a63e3cdfc93d68cbb375daca9b9d54949a",
+      "rawBytes": 131122,
+      "gzipBytes": 14783,
+      "gzipMembers": [
+        {
+          "offset": 0,
+          "length": 14783,
+          "rawBytes": 131122,
+          "rawSha256": "2f5c2c1a53a5e347ba6e7683120b31aa30101802e4a9c0fed69ab75493127549",
+          "gzipSha256": "368f7f8981c3c473ed4383050bc2e1a63e3cdfc93d68cbb375daca9b9d54949a"
+        }
+      ],
+      "note": "Real ramify materialize scale/resource observations (Plan 2A I2A-12); performance is an ideal budget, correctness and cleanup remain binding.",
+      "measuredAt": "2026-09-15T17:29:33.660Z",
+      "completedAt": "2026-09-15T17:34:46.991Z",
+      "phase": "plan2a",
+      "passed": false,
+      "payloadSchema": "ramify.plan2a-measurements/1",
+      "build": {
+        "files": 329,
+        "sha256": "401abbe0b7bfe8bf45ce6b95e5eee970e865c5f79de7182337b634b6997dfab5"
+      },
+      "workloads": [
+        {
+          "name": "I2A-12:reference-scale",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2A-12:toolkit-scale",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2A-12:synthetic-100",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2A-12:synthetic-500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2A-12:synthetic-1000",
+          "status": "measured",
+          "passed": false
+        },
+        {
+          "name": "I2A-12:repeat-plateau",
+          "status": "measured",
+          "passed": false
+        }
+      ]
+    },
+    {
+      "file": "plan2a-2026-09-15T17-35-36.969Z-235c3b10-bb45-45b3-a977-dda32ef529d4.json.gz",
+      "rawSha256": "9eeb4b4f6e0d510be959fbdc3296a56f04c7425fd5bbf80d625f0f64795c648d",
+      "gzipSha256": "ca111573f41ebb7ad87051050e728a94d652159aeccb1122878a0fb95d50dcab",
+      "rawBytes": 19563,
+      "gzipBytes": 4982,
+      "gzipMembers": [
+        {
+          "offset": 0,
+          "length": 4982,
+          "rawBytes": 19563,
+          "rawSha256": "9eeb4b4f6e0d510be959fbdc3296a56f04c7425fd5bbf80d625f0f64795c648d",
+          "gzipSha256": "ca111573f41ebb7ad87051050e728a94d652159aeccb1122878a0fb95d50dcab"
+        }
+      ],
+      "note": "Real ramify materialize scale/resource observations (Plan 2A I2A-12); performance is an ideal budget, correctness and cleanup remain binding.",
+      "measuredAt": "2026-09-15T17:35:36.969Z",
+      "completedAt": "2026-09-15T17:35:41.808Z",
+      "phase": "plan2a",
+      "passed": false,
+      "payloadSchema": "ramify.plan2a-measurements/1",
+      "build": {
+        "files": 329,
+        "sha256": "401abbe0b7bfe8bf45ce6b95e5eee970e865c5f79de7182337b634b6997dfab5"
+      },
+      "workloads": [
+        {
+          "name": "I2A-12:reference-scale",
+          "status": "measured",
+          "passed": false
+        },
+        {
+          "name": "I2A-12:toolkit-scale",
+          "status": "measured",
+          "passed": false
+        },
+        {
+          "name": "I2A-12:synthetic-100",
+          "status": "measured",
+          "passed": false
+        },
+        {
+          "name": "I2A-12:synthetic-500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2A-12:synthetic-1000",
+          "status": "measured",
+          "passed": false
+        },
+        {
+          "name": "I2A-12:repeat-plateau",
+          "status": "measured",
+          "passed": false
+        }
+      ]
+    },
+    {
+      "file": "plan2a-2026-09-15T17-37-57.001Z-c77d6a89-17ce-49d1-a0a3-5275a92efb73.json.gz",
+      "rawSha256": "14205d18b758a7239897b218ec69954bcb513ca3ae77001d4d9c470d68a2acf7",
+      "gzipSha256": "a8cb531e05a36137665683bf6bb4e02ba1f0ab6df9f26c685a31a9e4b3013eaa",
+      "rawBytes": 1649268,
+      "gzipBytes": 115088,
+      "gzipMembers": [
+        {
+          "offset": 0,
+          "length": 115088,
+          "rawBytes": 1649268,
+          "rawSha256": "14205d18b758a7239897b218ec69954bcb513ca3ae77001d4d9c470d68a2acf7",
+          "gzipSha256": "a8cb531e05a36137665683bf6bb4e02ba1f0ab6df9f26c685a31a9e4b3013eaa"
+        }
+      ],
+      "note": "Real ramify materialize scale/resource observations (Plan 2A I2A-12); performance is an ideal budget, correctness and cleanup remain binding.",
+      "measuredAt": "2026-09-15T17:37:57.001Z",
+      "completedAt": "2026-09-15T17:47:42.625Z",
+      "phase": "plan2a",
+      "passed": true,
+      "payloadSchema": "ramify.plan2a-measurements/1",
+      "build": {
+        "files": 329,
+        "sha256": "afb7ee3557780d86a4e55c87e060945ab875987c833c5da8921ec554985c79de"
+      },
+      "workloads": [
+        {
+          "name": "I2A-12:reference-scale",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2A-12:toolkit-scale",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2A-12:synthetic-100",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2A-12:synthetic-500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2A-12:synthetic-1000",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2A-12:repeat-plateau",
+          "status": "measured",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "file": "plan2a-2026-09-15T17-59-19.808Z-777e51b6-5ab9-43bd-8c21-ba88c1d79e7c.json.gz",
+      "rawSha256": "b7b2bfcbeb886f597fff999e95380bfdabdb3c6a3d90b5b582b7237a3d1c6d0f",
+      "gzipSha256": "0e0ffa1192819ddaf495b09cea4cd1c1334a06ae9b10f05f405f83e7c205b128",
+      "rawBytes": 1654498,
+      "gzipBytes": 115029,
+      "gzipMembers": [
+        {
+          "offset": 0,
+          "length": 115029,
+          "rawBytes": 1654498,
+          "rawSha256": "b7b2bfcbeb886f597fff999e95380bfdabdb3c6a3d90b5b582b7237a3d1c6d0f",
+          "gzipSha256": "0e0ffa1192819ddaf495b09cea4cd1c1334a06ae9b10f05f405f83e7c205b128"
+        }
+      ],
+      "note": "Real ramify materialize scale/resource observations (Plan 2A I2A-12); performance is an ideal budget, correctness and cleanup remain binding.",
+      "measuredAt": "2026-09-15T17:59:19.808Z",
+      "completedAt": "2026-09-15T18:09:05.657Z",
+      "phase": "plan2a",
+      "passed": true,
+      "payloadSchema": "ramify.plan2a-measurements/1",
+      "build": {
+        "files": 329,
+        "sha256": "afb7ee3557780d86a4e55c87e060945ab875987c833c5da8921ec554985c79de"
+      },
+      "workloads": [
+        {
+          "name": "I2A-12:reference-scale",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2A-12:toolkit-scale",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2A-12:synthetic-100",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2A-12:synthetic-500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2A-12:synthetic-1000",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2A-12:repeat-plateau",
+          "status": "measured",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "file": "plan2a-2026-09-15T21-32-16.525Z-9d9d1885-fdb5-4bf2-80ad-c406a01912fd.json.gz",
+      "rawSha256": "3ad0236a7cb94fbb54c7775c36d90a582257b324f6ed1e89d8e8bf897f57fd81",
+      "gzipSha256": "31dfa5afd27ec0f2884d8b922c036b44b7de1f358562a2bbd743780268078605",
+      "rawBytes": 1656073,
+      "gzipBytes": 115114,
+      "gzipMembers": [
+        {
+          "offset": 0,
+          "length": 115114,
+          "rawBytes": 1656073,
+          "rawSha256": "3ad0236a7cb94fbb54c7775c36d90a582257b324f6ed1e89d8e8bf897f57fd81",
+          "gzipSha256": "31dfa5afd27ec0f2884d8b922c036b44b7de1f358562a2bbd743780268078605"
+        }
+      ],
+      "note": "Real ramify materialize scale/resource observations (Plan 2A I2A-12); performance is an ideal budget, correctness and cleanup remain binding.",
+      "measuredAt": "2026-09-15T21:32:16.525Z",
+      "completedAt": "2026-09-15T21:42:04.948Z",
+      "phase": "plan2a",
+      "passed": true,
+      "payloadSchema": "ramify.plan2a-measurements/1",
+      "build": {
+        "files": 329,
+        "sha256": "549f873aba4b928c25e3ebef00765ec6615f13026900dbc9c66aaf10d7ea119b"
+      },
+      "workloads": [
+        {
+          "name": "I2A-12:reference-scale",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2A-12:toolkit-scale",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2A-12:synthetic-100",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2A-12:synthetic-500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2A-12:synthetic-1000",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2A-12:repeat-plateau",
+          "status": "measured",
+          "passed": true
+        }
+      ]
     }
   ],
   "finalRecord": "merged-main.json.gz"

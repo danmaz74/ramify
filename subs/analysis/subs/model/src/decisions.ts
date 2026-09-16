@@ -1,4 +1,4 @@
-import type { Exposure, ExposureHop, ImportDecision, ImportQuestion, Model, ModuleId, OriginalId, SourceOrigin, TagRequirement, VisibilityDecision } from './interfaces/model.js';
+import type { BindingRequest, Exposure, ExposureHop, ImportDecision, ImportQuestion, Model, ModuleId, Original, OriginalId, SourceArea, SourceOrigin, TagRequirement, VisibilityDecision } from './interfaces/model.js';
 import { compare, immutable, locations, validLocation } from './data.js';
 import { originalKey } from './identity.js';
 import { canonicalOrigin } from './model.js';
@@ -97,6 +97,30 @@ function visibilityFor(model: Model, receiver: Model['modules'][number], owned: 
     ineffective: exposures.filter((exposure) => ineffective.has(exposure)) });
 }
 
+/** A non-testing profile cannot receive a testing-classified defining origin. */
+export function testingBlocked(profile: readonly string[], area: SourceArea): boolean {
+  return !profile.includes('testing') && area.profile.includes('testing');
+}
+
+/**
+ * The tag conjuncts an importer profile must satisfy to receive `original`
+ * under `request`, in registry order. Shared by `explainImport` and the
+ * available-original enumeration so both apply identical tag rules.
+ */
+export function requirementsFor(model: Model, importerProfile: readonly string[], original: Original,
+  request: BindingRequest): TagRequirement[] {
+  const requirements: TagRequirement[] = [];
+  for (const kind of ['required-importer', 'required-symbol'] as const) {
+    for (const definition of model.registry.definitions.filter((item) => item.kind === kind)) {
+      const applies = kind === 'required-importer' ? original.tags.includes(definition.name)
+        : request === 'value' && importerProfile.includes(definition.name);
+      if (applies) requirements.push({ tag: definition.name, kind,
+        satisfied: (kind === 'required-importer' ? importerProfile : original.tags).includes(definition.name) });
+    }
+  }
+  return requirements;
+}
+
 export function explainImport(model: Model, question: ImportQuestion): ImportDecision {
   function origin(value: SourceOrigin): SourceOrigin {
     const established = canonicalOrigin(model.modules, value);
@@ -117,8 +141,7 @@ export function explainImport(model: Model, question: ImportQuestion): ImportDec
   const establishedQuestion: ImportQuestion = { importer, target, forwarding, location: locations([question.location])[0],
     selection: original ? { original: original.id, request: question.selection!.request } : null };
   const checkedOrigins = [target, ...forwarding, ...(original ? [original.origin] : [])];
-  const blockingOrigins = importer.area.profile.includes('testing') ? []
-    : checkedOrigins.filter(({ area }) => area.profile.includes('testing'));
+  const blockingOrigins = checkedOrigins.filter(({ area }) => testingBlocked(importer.area.profile, area));
   function decision(status: ImportDecision['status'], reason: ImportDecision['reason'],
     visibility: VisibilityDecision | null = null, requirements: readonly TagRequirement[] = []): ImportDecision {
     return immutable({ status, reason, question: establishedQuestion, original, visibility,
@@ -129,15 +152,7 @@ export function explainImport(model: Model, question: ImportQuestion): ImportDec
   const visibility = visibilityFor(model, requireModule(model, importer.area.owner), original);
   if (original.id.owner === importer.area.owner) return decision('allowed', 'same-owner', visibility);
   if (!visibility.visible) return decision('denied', 'not-visible', visibility);
-  const requirements: TagRequirement[] = [];
-  for (const kind of ['required-importer', 'required-symbol'] as const) {
-    for (const definition of model.registry.definitions.filter((item) => item.kind === kind)) {
-      const applies = kind === 'required-importer' ? original.tags.includes(definition.name)
-        : question.selection!.request === 'value' && importer.area.profile.includes(definition.name);
-      if (applies) requirements.push({ tag: definition.name, kind,
-        satisfied: (kind === 'required-importer' ? importer.area.profile : original.tags).includes(definition.name) });
-    }
-  }
+  const requirements = requirementsFor(model, importer.area.profile, original, question.selection!.request);
   const failed = requirements.find(({ satisfied }) => !satisfied);
   return failed ? decision('denied', failed.kind === 'required-importer' ? 'required-importer-tag' : 'required-symbol-tag', visibility, requirements)
     : decision('allowed', 'exposed', visibility, requirements);

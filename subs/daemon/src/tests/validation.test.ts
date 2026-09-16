@@ -120,6 +120,23 @@ describe('service request structure', () => {
     expect(reads).toBe(0);
   });
 
+  it('validates explorer detail identities and limits distinct requests to 50', () => {
+    const detail = (index: number) => ({ original: { kind: 'code', owner: 'fixture', file: 'api.ts', binding: `value${index}` }, exportName: `value${index}` });
+    const requests = Array.from({ length: 50 }, (_, index) => detail(index));
+    const params = { token, requestId: 'details-1', revision, requests };
+    expect(validateServiceRequest('explorerDetails', params)).toBeNull();
+    expect(validateServiceRequest('explorerDetails', { ...params, requests: [...requests, requests[0]] })).toBeNull();
+    expect(validateServiceRequest('explorerDetails', { ...params, requests: [...requests, detail(50)] })?.code).toBe('invalid-request');
+    for (const invalid of [
+      { ...params, revision: 'rev/1:bad' },
+      { ...params, requests: [{ ...detail(0), exportName: '' }] },
+      { ...params, requests: [{ ...detail(0), original: { ...detail(0).original, kind: 'external' } }] },
+      { ...params, requests: [{ ...detail(0), original: { ...detail(0).original, owner: 'Fixture' } }] },
+      { ...params, requests: [{ ...detail(0), original: { ...detail(0).original, file: '../api.ts' } }] },
+      { ...params, requests: [{ ...detail(0), extra: true }] },
+    ]) expect(validateServiceRequest('explorerDetails', invalid)?.code).toBe('invalid-request');
+  });
+
   it('accepts 10,000 expectations and rejects 10,001 before processing them', () => {
     const expectList = Array.from({ length: 10_000 }, (_, index) => ({ path: `src/${index}.ts`, sha256: null }));
     const request = { ...synchronized, freshness: { mode: 'synchronized', expect: expectList } };

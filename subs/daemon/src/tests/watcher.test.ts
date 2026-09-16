@@ -100,6 +100,39 @@ describe('filesystem watcher', () => {
     });
   });
 
+  it('never attaches to or reports events for reserved .ramify names, while near-misses and a neighboring real event stay visible', async () => {
+    await fixture(async (root, state) => {
+      const reserved = ['.ramify', '.ramify.tmp-abc123', '.ramify.old-abc123'];
+      const nearMisses = ['.ramify-other', '.ramify2', '.ramify.tmp', '.ramifyx'];
+      for (const parent of [root, join(root, 'src'), join(root, 'src', 'nested')]) {
+        for (const name of [...reserved, ...nearMisses]) {
+          await mkdir(join(parent, name, 'child'), { recursive: true });
+          await writeFile(join(parent, name, 'child', 'inside.ts'), 'before');
+        }
+      }
+      await state.open();
+      // No directory watch is ever attached beneath a reserved name, at any depth.
+      expect(state.paths.some(path => relative(root, path).split(sep).some(part => reserved.includes(part)))).toBe(false);
+      // A near-miss name is ordinary: it and its children are watched normally.
+      for (const name of nearMisses) expect(state.paths.some(path => relative(root, path).split(sep).includes(name))).toBe(true);
+      for (const parent of [root, join(root, 'src'), join(root, 'src', 'nested')]) {
+        for (const name of [...reserved, ...nearMisses]) {
+          await writeFile(join(parent, name, 'child', 'inside.ts'), 'after');
+        }
+      }
+      // A neighboring real source event, the positive control, still publishes.
+      await writeFile(join(root, 'src', 'nested', 'value.ts'), 'positive control');
+      await until(() => state.batches.flat().some(event => event.path.endsWith('value.ts')));
+      const events = state.batches.flat();
+      expect(events.some(event => event.path.split(sep).some(part => reserved.includes(part)))).toBe(false);
+      // A near-miss segment is ordinary: its content changes remain visible.
+      for (const name of nearMisses) {
+        expect(events.some(event => event.path.endsWith(join(name, 'child', 'inside.ts')))).toBe(true);
+      }
+      expect(events.some(event => event.path.endsWith('value.ts'))).toBe(true);
+    });
+  });
+
   it('attaches new directories and observes their later edits', async () => {
     await fixture(async (root, state) => {
       await state.open();

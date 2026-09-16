@@ -5,8 +5,9 @@ import type { AnalysisLimits, RunControl } from '../subs/analysis/src/interfaces
 import type { RetainedSession, SessionLimits } from '../subs/analysis/src/interfaces/session.js';
 import { createDefaultTagRegistry } from '../subs/analysis/subs/model/src/registry.js';
 import type { AnalysisDriver, WatcherPort, ClockPort, ContextBudgets } from '../subs/daemon/src/context-types.js';
-import type { DaemonInstance, LogEntry, DaemonService } from '../subs/daemon/src/interfaces/daemon.js';
+import type { ApiViewPublisher, DaemonInstance, LogEntry, DaemonService } from '../subs/daemon/src/interfaces/daemon.js';
 import { createDaemonService } from '../subs/daemon/src/service.js';
+import { createFilesystemApiViewPublisher } from '../subs/daemon/src/api-view-publisher.js';
 
 export interface ResidentAssemblyOptions {
   readonly watcher: WatcherPort;
@@ -14,7 +15,14 @@ export interface ResidentAssemblyOptions {
   readonly budgets: ContextBudgets;
   readonly instance: DaemonInstance;
   readonly log: (entry: LogEntry) => void;
+  /** Injected transactional filesystem publisher for `materialize`; defaults to
+   * `createFilesystemApiViewPublisher` at contracts.md's frozen iteration-1
+   * limits. Tests inject a controlled publisher. */
+  readonly publisher?: ApiViewPublisher;
 }
+
+// Frozen (iteration 1): see contracts.md's "Renderer and publisher" section.
+const publishLimits = { maxAreaBytes: 32 * 1024 ** 2, maxInvocationBytes: 256 * 1024 ** 2, maxStagedBytes: 256 * 1024 ** 2 };
 
 // Preserve the batch dispatch limits; equality is exercised at the public flow.
 const limits: AnalysisLimits = {
@@ -55,7 +63,8 @@ function sessionDriver(capacity: SessionLimits): AnalysisDriver {
       update: session.update.bind(session), sweep: session.sweep.bind(session),
       verify: session.verify.bind(session), report: session.report.bind(session),
       releaseRevision: session.releaseRevision.bind(session), status: session.status.bind(session),
-      releaseCompiler: session.releaseCompiler.bind(session),
+      releaseCompiler: session.releaseCompiler.bind(session), apiView: session.apiView.bind(session),
+      explorerDetails: session.explorerDetails.bind(session),
       dispose() {
         closing ??= Promise.resolve().then(() => session.dispose()).then(() => { sessions.delete(handle); });
         return closing;
@@ -100,8 +109,9 @@ function sessionDriver(capacity: SessionLimits): AnalysisDriver {
 }
 
 export function assembleResidentService(options: ResidentAssemblyOptions): DaemonService {
-  return createDaemonService({ ...options, driver: sessionDriver({ ...sessionLimits,
-    maxRetainedFactBytes: Math.min(sessionLimits.maxRetainedFactBytes, options.budgets.maxRetainedBytesPerContext),
-    updateDeadlineMs: options.budgets.updateDeadlineMs, sweepIntervalMs: options.budgets.sweepIntervalMs,
-  }) });
+  return createDaemonService({ ...options, publisher: options.publisher ?? createFilesystemApiViewPublisher(publishLimits),
+    driver: sessionDriver({ ...sessionLimits,
+      maxRetainedFactBytes: Math.min(sessionLimits.maxRetainedFactBytes, options.budgets.maxRetainedBytesPerContext),
+      updateDeadlineMs: options.budgets.updateDeadlineMs, sweepIntervalMs: options.budgets.sweepIntervalMs,
+    }) });
 }

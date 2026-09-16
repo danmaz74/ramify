@@ -15,10 +15,11 @@ export interface SocketConnection extends RamifyService {
   close(): Promise<void>;
 }
 
-/** A check reply learns its client transport: the round trip less the service's own handling. */
+/** A check or materialize reply learns its client transport: the round trip
+ * less the service's own handling. */
 function transported(result: ServiceResult<unknown>, roundTrip: number): ServiceResult<unknown> {
   const value = result.ok ? result.value as { readonly status?: unknown; readonly timings?: { readonly service?: unknown } } | null : null;
-  if (!result.ok || value?.status !== 'reported' || typeof value.timings?.service !== 'number') return result;
+  if (!result.ok || (value?.status !== 'reported' && value?.status !== 'materialized') || typeof value.timings?.service !== 'number') return result;
   return { ok: true, value: { ...value, timings: { ...value.timings, clientTransport: Math.max(0, roundTrip - value.timings.service) } } };
 }
 
@@ -118,7 +119,7 @@ export async function openSocketConnection(endpoint: EndpointSelection, options:
     const sent = performance.now();
     return new Promise(resolve => {
       const abortRequest = () => { if (pending.has(id)) send({ type: 'cancel', id }); };
-      pending.set(id, { finish: result => resolve((op === 'check' ? transported(result, performance.now() - sent) : result) as ServiceResult<T>),
+      pending.set(id, { finish: result => resolve((op === 'check' || op === 'materialize' ? transported(result, performance.now() - sent) : result) as ServiceResult<T>),
         cleanup: () => control?.signal?.removeEventListener('abort', abortRequest), listen });
       try {
         send({ type: 'request', id, op, params });
@@ -134,6 +135,8 @@ export async function openSocketConnection(endpoint: EndpointSelection, options:
     openContext: (params, control) => request('openContext', params, control),
     contextStatus: params => request('contextStatus', params),
     check: (params, control) => request('check', params, control),
+    explorerDetails: (params, control) => request('explorerDetails', params, control),
+    materialize: (params, control) => request('materialize', params, control),
     subscribe: (params, listener) => request('subscribe', params, undefined, listener),
     unsubscribe: async params => { const result = await request<null>('unsubscribe', params); if (result.ok) subscriptions.delete(params.subscription); return result; },
     closeContext: params => request('closeContext', params), daemonStatus: () => request('daemonStatus', {}),

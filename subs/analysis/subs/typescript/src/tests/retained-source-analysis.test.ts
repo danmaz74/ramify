@@ -4,8 +4,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { ObservationSink } from '../../../project/src/interfaces/project.js';
 import { createRetainedSourceAnalysis, retainedCompilerEvidence } from '../retained-source-analysis.js';
 import { createSourceAnalysis } from '../source-analysis.js';
-import type { RetainedSourceAnalysis, RetainedSourceInputs, SourceChangeSet } from '../interfaces/source.js';
-import { acquire, areasFor, configuration, drop, fixture, put, sourceLimits } from './fixtures.js';
+import type { RetainedSourceAnalysis, RetainedSourceInputs, SourceChangeSet, SymbolDetailLimits } from '../interfaces/source.js';
+import { acquire, areasFor, code, configuration, drop, fixture, put, sourceLimits } from './fixtures.js';
 import { retainedMembershipWitness } from './retained-membership.js';
 
 const roots: string[] = [];
@@ -348,4 +348,61 @@ describe('retained source analysis', () => {
     const inputs = await inputsOf(root);
     await expect(createRetainedSourceAnalysis(inputs)).rejects.toMatchObject({ code: 'unavailable', message: expect.stringContaining('Solution-style') });
   }, 30_000);
+
+  describe('symbol details', () => {
+    const limits: SymbolDetailLimits = { maxSignatureBytes: 2048, maxDocumentationBytes: 512, maxOverloads: 8, maxResultBytes: 32 * 1024 * 1024 };
+
+    it('describes a defining-file export from the live compiler', async () => {
+      const root = await start(project);
+      const analysis = await open(root);
+      const [result] = await analysis.details([{ original: code('api.ts', 'value'), exportName: 'value' }], limits);
+      // `value` has no explicit type annotation, so its checker type is the
+      // narrowed literal `1` rather than a widened `number`; see symbol-details.ts's
+      // `renderVariable` for the documented rationale.
+      expect(result).toEqual({ state: 'described', original: code('api.ts', 'value'), exportName: 'value', signature: 'const value: 1' });
+    });
+
+    it('rejects with unavailable once the compiler is released, and answers again after the next update', async () => {
+      const root = await start(project);
+      const analysis = await open(root);
+      await analysis.describe([]);
+      await analysis.releaseCompiler();
+      await expect(analysis.details([{ original: code('api.ts', 'value'), exportName: 'value' }], limits))
+        .rejects.toMatchObject({ code: 'unavailable' });
+      await analysis.update(none);
+      const [result] = await analysis.details([{ original: code('api.ts', 'value'), exportName: 'value' }], limits);
+      expect(result).toMatchObject({ state: 'described' });
+    }, 60_000);
+
+    it('rejects the in-flight call with read-failure and discards the compiler when the server is lost', async () => {
+      const root = await start(project);
+      const analysis = await open(root);
+      await analysis.describe([]);
+      const pid = retainedCompilerEvidence(analysis).serverPid!;
+      process.kill(pid, 'SIGKILL');
+      expect(await gone(pid)).toBe(true);
+      await expect(analysis.details([{ original: code('api.ts', 'value'), exportName: 'value' }], limits))
+        .rejects.toMatchObject({ code: 'read-failure' });
+      expect(analysis.hot).toBe(false);
+    }, 60_000);
+
+    it('rejects with disposed after disposal', async () => {
+      const root = await start(project);
+      const analysis = await open(root);
+      await analysis.describe([]);
+      await analysis.dispose();
+      await expect(analysis.details([{ original: code('api.ts', 'value'), exportName: 'value' }], limits))
+        .rejects.toMatchObject({ code: 'disposed' });
+    }, 60_000);
+
+    it('rejects an already-cancelled call with no result', async () => {
+      const root = await start(project);
+      const analysis = await open(root);
+      await analysis.describe([]);
+      const controller = new AbortController();
+      controller.abort();
+      await expect(analysis.details([{ original: code('api.ts', 'value'), exportName: 'value' }], limits, controller.signal))
+        .rejects.toMatchObject({ code: 'cancelled' });
+    }, 60_000);
+  });
 });

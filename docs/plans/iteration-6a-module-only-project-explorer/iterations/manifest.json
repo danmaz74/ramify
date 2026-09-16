@@ -1,0 +1,11 @@
+{
+  "createdAt": "2026-09-16T00:00:00.000Z",
+  "updatedAt": "2026-09-16T00:00:00.000Z",
+  "iterations": [
+    { "file": "iteration1.md", "index": 1, "parallelGroup": null, "title": "Module-only contract and baseline" },
+    { "file": "iteration2.md", "index": 2, "parallelGroup": null, "title": "Module-only report projection" },
+    { "file": "iteration3.md", "index": 3, "parallelGroup": null, "title": "Module-only project view" },
+    { "file": "iteration4.md", "index": 4, "parallelGroup": null, "title": "Connected workflow and browser gate" }
+  ],
+  "planPath": "main-plan.md"
+}

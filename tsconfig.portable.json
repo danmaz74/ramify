@@ -7,7 +7,8 @@
   "include": [
     "subs/analysis/subs/model/src/**/*",
     "subs/analysis/subs/descriptions/src/**/*",
-    "subs/presentation/subs/layout/src/**/*"
+    "subs/presentation/subs/layout/src/**/*",
+    "subs/presentation/subs/project-view/src/**/*"
   ],
   "exclude": ["node_modules", "dist", "subs/**/src/tests/**/*"]
 }

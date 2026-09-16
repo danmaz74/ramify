@@ -9,3 +9,5 @@ expose-src deriveSourceAreas, assignOriginalTags from "profiles.ts" tagged [brow
 expose-src originalKey from "identity.ts" tagged [browser] to parent
 expose-src buildModel from "model.ts" tagged [browser] to parent
 expose-src explainVisibility, explainImport from "decisions.ts" tagged [browser] to parent
+// M7: pure available-original enumeration, sharing decisions.ts's requirement helper.
+expose-src listAvailableOriginals from "availability.ts" tagged [browser] to parent
