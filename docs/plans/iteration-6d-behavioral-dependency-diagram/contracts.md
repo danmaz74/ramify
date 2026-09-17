@@ -5,6 +5,12 @@
 implementation may split declarations across owner-local files without changing
 their serialized shapes.
 
+**Revision, 2026-09-17, iteration 8:** C8-C10 specify the scope-aware roll-up
+accepted in the [main plan's revision](main-plan.md#review-decisions), and C7's
+default settings change with them. C1-C6 are unchanged: the analyzer, the daemon
+operation, the projection, the DTO and the wire result stay exactly as
+implemented, and nothing in C8-C10 starts an analysis run.
+
 ## C1. Compiler evidence
 
 The existing aggregate fact remains the headline input. `accesses` preserves
@@ -472,8 +478,264 @@ currently displayed project view is discarded.
 UI settings are local and default on every page load to:
 
 ```ts
-{ showNonBehavioral: false, linkTarget: 'imported-module' }
+{ showNonBehavioral: false, depthMode: 'level', showOutsideScope: true }
 ```
 
-They persist across refresh of the same mounted page but are not stored in a
-cookie, URL or server cache in Plan 6D.
+They persist across refresh of the same mounted page and across scope changes,
+but are not stored in a cookie, URL or server cache in Plan 6D. The earlier
+`linkTarget: 'imported-module'` default is replaced by `depthMode`, as C9
+records.
+
+## C8. Scope, roll-up and drawn links
+
+`presentation/project-view` owns these pure functions. They read the C5 model
+the view already receives and add no request, no DTO field and no analysis.
+
+```ts
+export type DependencyDepthMode = 'level' | 'exact';
+
+/** The region the graph shows. */
+export interface DependencyScope {
+  /** The module whose own source the frame represents; null when there is none. */
+  readonly frameModule: ModuleId | null;
+  /** The scope's children before the class filter: its candidate nodes. */
+  readonly nodes: readonly ModuleId[];
+  /** The depth of `nodes`; an outside end maps to depth `depth - 1`. */
+  readonly depth: number;
+}
+
+export type ScopeEnd =
+  | { readonly kind: 'node'; readonly module: ModuleId;
+      readonly inScope: boolean }
+  | { readonly kind: 'frame' };
+
+export function dependencyScope(
+  model: ProjectExplorerModel, scopeModuleId: ModuleId | null): DependencyScope;
+
+export function scopeEnd(module: ModuleId, scope: DependencyScope,
+  depthMode: DependencyDepthMode, tree: ModuleTreeIndex): ScopeEnd;
+```
+
+`dependencyScope` reproduces the view's existing scope selection: the children
+of `scopeModuleId`; otherwise the root module's children when exactly one
+top-level module has children; otherwise the top-level modules. `frameModule` is
+`scopeModuleId`, the root module in the second case and null in the third.
+`depth` is the module-tree depth of `nodes`.
+
+In `level` mode `scopeEnd` applies these clauses in order:
+
+1. `module` is one of `scope.nodes` or a descendant of one: that node, in scope.
+2. `module` is `scope.frameModule`: the frame.
+3. Otherwise `module` is outside the scope: its ancestor at depth
+   `scope.depth - 1`, or `module` itself when its depth is at most
+   `scope.depth - 1`, not in scope.
+
+In `exact` mode every end is its own module, in scope when it is the frame
+module or a descendant of it, and there is no frame folding: a module that is
+not a displayed node is drawn out of view exactly as iteration 6 drew it.
+
+An end never depends on the class filter or on the settings. `ModuleTreeIndex`
+is the parent and children index the view already builds from
+`ProjectExplorerModel.modules`; no new served field is needed.
+
+```ts
+export interface ActiveDependencyEdge {
+  readonly id: string;
+  readonly depthMode: DependencyDepthMode;
+  /** The consuming node at this scope. */
+  readonly consumer: ModuleId;
+  /** The providing node at this scope. */
+  readonly provider: ModuleId;
+  readonly behavioral: number;
+  readonly nonBehavioral: number;
+  readonly displayed: number;
+  readonly emphasis: 'behavioral' | 'non-behavioral';
+  readonly status: 'allowed' | 'limited' | 'denied';
+  /** One end is outside the scope's subtree; false when the scope covers
+   * the project. */
+  readonly leavesScope: boolean;
+  readonly coverageIds: readonly string[];
+  /** The exact edges rolled into this link; exactly one in `exact` mode. */
+  readonly sources: readonly DependencyGraphOriginalEdge[];
+}
+
+export function scopeDependencyLinks(input: {
+  readonly model: DependencyGraphModel;
+  readonly scope: DependencyScope;
+  /** The class-filtered nodes actually drawn at this scope. */
+  readonly displayed: ReadonlySet<ModuleId>;
+  readonly tree: ModuleTreeIndex;
+  readonly settings: DependencySettings;
+}): readonly ActiveDependencyEdge[];
+
+/** True when every module maps to a node or the frame: nothing can leave. */
+export function scopeCoversProject(scope: DependencyScope,
+  modules: readonly ModuleId[], tree: ModuleTreeIndex): boolean;
+```
+
+`scopeDependencyLinks` reads `model.originalOwnerEdges` only, and never
+`importedModuleEdges`:
+
+1. Map both ends of each edge with `scopeEnd`.
+2. Drop an edge with a frame end. It is drawn at no scope and appears only in
+   the panel numbers of C10.
+3. Drop an edge whose two ends map to one node: it is internal to that node.
+4. Drop an edge with no end in `displayed`, as iteration 6 dropped an edge
+   between two out-of-view modules.
+5. Group the remaining edges by the ordered pair of mapped node IDs. Each group
+   is one link, and `sources` holds its edges ordered by consumer then provider.
+6. Count the group's pairs. A pair is `(exact consumer module, original
+   identity)`, taken from every contributing edge's evidence rows; the original
+   identity is the view's existing `OriginalId` key. A pair is behavioral when
+   any of its rows is behavioral, and non-behavioral otherwise. `behavioral` and
+   `nonBehavioral` are the numbers of pairs of each class, never a sum of the
+   contributing edges' counts. The two agree, because a pair has exactly one
+   consumer module and exactly one original owner; tests verify the equality
+   rather than substituting the sum.
+7. `status` is denied, then limited, then allowed over all contributing
+   evidence. `coverageIds` is their sorted union.
+8. `displayed` is `behavioral + (showNonBehavioral ? nonBehavioral : 0)`, a link
+   with `displayed === 0` is not drawn, and `emphasis` is behavioral when
+   `behavioral > 0`, as iteration 6 fixed it.
+9. `leavesScope` is true when either mapped end is not in scope. When
+   `settings.showOutsideScope` is false such a link is not drawn.
+10. Links are ordered by consumer then provider in UTF-8 byte order.
+
+In `exact` mode clause 2 never applies and clause 3 never applies, because
+every end is its own module and C2 serializes no self-loop. Clause 4 keeps
+iteration 6's drawn set exactly: a link between a displayed node and one of its
+own descendants stays drawn, with the descendant out of view.
+`scopeCoversProject` is true when the scope's subtree contains every module,
+which holds at the project scope of a single-root project. When it is true no
+link can leave the scope, the toggle is not rendered and `showOutsideScope` is
+ignored.
+
+Link IDs are:
+
+```text
+level: scoped-link/1:level:<scope module ID or ->:<JSON([consumer, provider])>
+exact: the model's own dependency-edge/1:original-owner:<digest>
+```
+
+A rolled-up ID contains its scope, so it cannot survive a scope change. An
+exact ID is the C5 edge ID, so it survives while that link is still drawn. The
+view hashes nothing.
+
+Out-of-view nodes are the mapped ends that are not in `displayed`, as today,
+and keep the existing level helper. `linkWidth`, `edgeStatus` and the colour
+encoding keep their iteration 6 meaning over the rolled-up `displayed` count.
+`activeDependencyEdges` is replaced by `scopeDependencyLinks`;
+`ActiveDependencyEdge.projection` becomes `depthMode` and its single `source`
+becomes `sources`.
+
+## C9. Settings, controls and selection
+
+```ts
+export interface DependencySettings {
+  readonly showNonBehavioral: boolean;
+  readonly depthMode: DependencyDepthMode;
+  readonly showOutsideScope: boolean;
+}
+
+export const defaultDependencySettings: DependencySettings = Object.freeze({
+  showNonBehavioral: false, depthMode: 'level', showOutsideScope: true,
+});
+```
+
+`DependencyLinkTarget` and `linkTarget` are removed from the reusable
+interfaces, the view, the explorer page and the browser acceptance helpers.
+
+The controls are:
+
+| Control | Accessible name | Behavior |
+| --- | --- | --- |
+| Checkbox | `Show non-behavioral dependencies` | Unchanged from iteration 6. |
+| Radio group `Link depth` | `Modules at this level`, `Exact module` | Keeps iteration 6's roving tab stop and arrow/Home/End keys. |
+| Checkbox | `Show dependencies that leave this module` | Default on. Absent when `scopeCoversProject` is true. |
+
+All three are disabled while no dependency model is loaded. None invokes a data
+callback: `onDependencySettingsChange` reports the new value, and the explorer
+page keeps the settings across scope changes and refreshes.
+
+Selection reconciliation keeps iteration 6's effect shape, with the page's
+selection state authoritative:
+
+- A module selection survives while that module is a displayed node; otherwise
+  the view reports `onSelectModule(null)`. Out-of-view nodes stay unselectable.
+- A link selection survives only while its exact ID is among the drawn links.
+  Hiding non-behavioral links clears a non-behavioral-only selection; hiding
+  leaving links clears a selected leaving link; changing the depth mode clears a
+  rolled-up selection; changing the scope clears a rolled-up selection and keeps
+  an exact selection while its link is still drawn; a new model clears a
+  selection whose ID it no longer contains.
+- Reconciliation never requests data and never changes the scope.
+
+Drilling into a node and breadcrumb navigation change only `scopeModuleId`, as
+today. The new scope's frame is that module, its children become the nodes, and
+the links that were internal to it become visible. C6 and C7 are unchanged, so
+`dependencyView` is still requested only by the page's revision-bound hook: no
+control and no scope change issues a request.
+
+## C10. Panel numbers per scope
+
+```ts
+export interface SubtreeDependencyCounts {
+  readonly uses: DependencyGraphCount;
+  readonly ownedUsedByOthers: DependencyGraphCount;
+  readonly usedThrough: DependencyGraphImportedCount;
+}
+
+/** The measured totals of a module and all of its descendants. */
+export function subtreeDependencyCounts(model: DependencyGraphModel,
+  module: ModuleId, tree: ModuleTreeIndex): SubtreeDependencyCounts;
+
+/** The distinct pairs the given links carry. */
+export function scopeLinkCounts(
+  links: readonly ActiveDependencyEdge[]): DependencyGraphCount;
+```
+
+`subtreeDependencyCounts` adds the C5 rows of the module and its descendants
+component by component. The sums are distinct counts, because a `(consumer
+module, original)` pair appears in exactly one consumer's row and an imported
+triple in exactly one imported module's row.
+
+`scopeLinkCounts` adds the links' counts, which are distinct pairs because a
+pair maps to exactly one ordered node pair. The panels use the scope's links
+after the internal, frame, touching and leaving rules and before the
+non-behavioral display filter, so a panel number does not move when the
+non-behavioral setting changes; the non-behavioral card keeps its `not drawn`
+and `shown` note.
+
+| Panel | Filtered | Measured |
+| --- | --- | --- |
+| No selection | `This view`: `scopeLinkCounts` of the scope's links | `Whole project`: `model.project` |
+| Module node | `At this level`: the scope's links with this node as consumer, and as provider | `Including internals`: `subtreeDependencyCounts` |
+| Rolled-up link | `At this level`: the link's own counts | the contributing exact modules and their counts |
+| Exact link | the link's counts, as iteration 6 | the same |
+
+The panels show, in each scope:
+
+- No selection: the two headline card pairs above; `Not drawn at this level` as
+  their component-wise difference, described as internal to a displayed node,
+  folded into the scope's own source, or outside the scope while leaving links
+  are hidden; `Displayed links`, coverage, revision and input as today; and, in
+  a drilled-in scope, a `Scope's own source` section with the frame module's own
+  `Uses` and `Owned originals used by others` rows and the statement that its
+  links are not drawn at this scope.
+- A displayed module node: `Uses` and `Owned originals used by others`, each
+  `At this level` against `Including internals`; `Used through this module` with
+  its imported unit, `Including internals` only, in a disclosure, because no
+  drawn link uses the imported unit; `Links displayed`, owned and subtree files
+  and coverage as today.
+- A rolled-up link: its `At this level` cards; a `Rolled-up modules` section
+  listing each contributing edge as exact consumer and exact original owner with
+  its counts; an `Imported through` disclosure summing the contributing edges'
+  `importedThrough` entries per module; supporting consumer and original
+  declaration files, status and reason badges and coverage IDs; and the
+  referenced originals grouped by original with their exact consumer and owner.
+- An exact link: iteration 6's original-owner panel, unchanged.
+
+`This view` and `At this level` follow the drawn scope, including the class
+filter. `Whole project` and `Including internals` are the measured numbers and
+change with no scope, control or filter. Every number comes from the C5 model;
+the view recomputes nothing the projection already measured.

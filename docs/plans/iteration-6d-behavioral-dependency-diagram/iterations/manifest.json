@@ -43,6 +43,12 @@
       "index": 7,
       "parallelGroup": null,
       "title": "Connect the page and run the gate"
+    },
+    {
+      "file": "iteration8.md",
+      "index": 8,
+      "parallelGroup": null,
+      "title": "Scope-aware roll-up of dependency links"
     }
   ],
   "planPath": "main-plan.md"

@@ -3,6 +3,12 @@
 **Date:** 2026-09-17. **Status:** accepted strict gate, 2026-09-17. Companion to the
 [plan](main-plan.md) and [contracts](contracts.md).
 
+**Revision, 2026-09-17, iteration 8:** the scope-aware roll-up accepted in the
+[plan's revision](main-plan.md#review-decisions) removes the endpoint-projection
+control, so BD30-BD32 and BD34-BD40 are edited in place and re-executed in
+iteration 8; the iteration 6 and 7 results keep their earlier wording as those
+rows' history. BD44-BD52 are new. BD01-BD29, BD33 and BD41-BD43 are unchanged.
+
 ## Fixtures
 
 - `path-facts`: compiler-backed project where consumer `A` reaches one original
@@ -16,6 +22,12 @@
 - `reference`: Collection Review.
 - `toolkit`: Ramify.
 - `mutation`: isolated small real project whose edit publishes a new input ID.
+- `nested-levels`: presentation-owned project structure and hand-written
+  dependency model of the served C5 shape, with `app/a` (children `app/a/left`
+  and `app/a/right`), `app/b` (child `app/b/core`), `app/c` and `app/idle`, and
+  dependencies whose ends are the scope module's own source, a grandchild of
+  another module, and a module shallower than the scope, so every clause of the
+  C8 mapping has a case. It is valid for pure and component rows only.
 
 ## Classifier and projection
 
@@ -70,22 +82,41 @@
 
 | ID | Iter | Evidence | Required witness |
 | --- | ---: | --- | --- |
-| BD30 | 6 | component | Default renders behavioral imported-module links; non-behavioral-only and occurrence-only edges are absent. Nodes remain visible while dependency data is pending. |
-| BD31 | 6 | component | Toggle adds non-behavioral counts/edges locally; switching link target uses original-owner endpoints locally; neither action requests data. |
-| BD32 | 6 | component | Forwarded original links to B by default and B/A alternatively. Both-boundaries fixture renders two default links and one original-owner dependency. |
+| BD30 | 6, 8 | component | Default renders the behavioral links of `originalOwnerEdges` rolled up to the current scope; non-behavioral-only and occurrence-only links are absent. Nodes remain visible while dependency data is pending. |
+| BD31 | 6, 8 | component | The non-behavioral toggle adds counts and links locally; the depth selector switches between rolled-up and exact ends locally; neither action requests data. |
+| BD32 | 6, 8 | component | A forwarded original links to its original owner in both depth modes: `app/a -> app/b` rolled up at the project scope, and `app/a -> app/b/core` with `app/b/core` out of view in `Exact module`. The imported module `app/b` appears only in the panel's imported-through breakdown. Both-boundaries renders one link and one headline dependency. |
 | BD33 | 6 | component | An edge with behavioral evidence takes its status's full-strength colour and a non-behavioral-only edge the lighter, muted one; every edge keeps the direction animation's dashes; logarithmic width is bounded. |
-| BD34 | 6 | component | Project panel shows both headline cards, displayed links, coverage and revision; non-behavioral says `not drawn` or `shown` and no ratio/pie/confidence appears. |
-| BD35 | 6 | component | Module panel distinguishes Uses, Used through this module and Owned originals used by others with their correct units and active/alternate ordering. |
-| BD36 | 6 | component | Each edge panel uses its projection-specific labels and breakdown; evidence lists only referenced classified originals and labels accesses as supporting occurrences. |
-| BD37 | 6 | component | Scope, filters and out-of-view nodes use active links; changing settings reconciles/clears selection by projection-specific ID; node size does not change. |
-| BD38 | 6 | component/a11y | Controls have keyboard/label support; waiting, analyzing, unavailable, measured-zero, partial, superseded and stale states are distinguishable. |
-| BD39 | 7 | HTTP/browser | Real `reference` server reaches ready, defaults correctly, exercises both controls and panel scopes, and performs no second request for control changes. |
-| BD40 | 7 | HTTP/browser | Real `forwarding` fixture proves B versus B/A endpoints, per-original status evidence and both-boundaries count behavior. |
+| BD34 | 6, 8 | component | Project panel shows `This view` against `Whole project` headline cards, the numbers not drawn at this level, displayed links, coverage and revision; non-behavioral says `not drawn` or `shown` and no ratio/pie/confidence appears. |
+| BD35 | 6, 8 | component | Module panel shows `Uses` and `Owned originals used by others` as `At this level` against `Including internals`, and keeps `Used through this module` with its imported unit, measured only, in a disclosure. |
+| BD36 | 6, 8 | component | The rolled-up link panel lists the exact modules rolled into the link and its imported-through breakdown; the exact link panel keeps iteration 6's labels; evidence lists only referenced classified originals and labels accesses as supporting occurrences. |
+| BD37 | 6, 8 | component | Scope, filters and out-of-view nodes use the current scope's links; the class filter changes the displayed nodes without changing how an end maps; changing a setting or the scope reconciles or clears the selection by its exact ID; node size does not change. |
+| BD38 | 6, 8 | component/a11y | All three controls have keyboard and label support, and the leaving-scope toggle is absent at a scope that covers the project; waiting, analyzing, unavailable, measured-zero, partial, superseded and stale states are distinguishable. |
+| BD39 | 7, 8 | HTTP/browser | Real `reference` server reaches ready and renders the rolled-up default, which is zero links at its project scope and the positive links of BD45 inside `workspace`; it exercises all three controls in a drilled-in scope, covers every panel scope, and performs no second request for a control or scope change. |
+| BD40 | 7, 8 | HTTP/browser | Real `forwarding` fixture proves the rolled-up and the exact ends of a forwarded original, per-original status evidence and both-boundaries count behavior. |
 | BD41 | 7 | HTTP/browser | `mutation` publishes a newer revision during and after analysis; polling stops on superseded, the old graph remains coherent and stale, refresh obtains matching structure/counts, and late old results cannot overwrite it. |
 | BD42 | 7 | process/browser | Ten settled refreshes, hidden-page polling, an edit during a job, and server close meet the lifecycle limits, with recorded daemon settled memory with and without a retained result, analyzer peak memory, server memory and `behaviorRuns`. |
 | BD43 | 7 | regression | Focused tests, type-check, production build, self-check, real browser gate, BD24 isolation evidence and zero `behaviorRuns` for ordinary and changed-file checks pass on one source revision. |
 
+## Scope-aware roll-up
+
+| ID | Iter | Evidence | Required witness |
+| --- | ---: | --- | --- |
+| BD44 | 8 | pure | `nested-levels`: `scopeEnd` maps an end inside the scope to the child containing it, an end outside to its ancestor at the scope module's depth, an end shallower than that depth to itself, and the scope module's own source to the frame; `exact` mode maps every end to itself with no frame. Ends do not change with the class filter or the settings. |
+| BD45 | 8 | pure/component | No drawn link has both ends mapping to one node, at any scope. On `reference` the project scope shows `integration-tests` and `workspace`, draws zero links and hides the 20 edges internal to those nodes; drilling into `workspace` draws 9 scope links carrying 7 behavioral and 41 non-behavioral dependencies, including `catalog -> contracts` 0/9 and `reviews -> contracts` 0/24. |
+| BD46 | 8 | pure | `nested-levels` in a nested scope: an outside end deeper than the scope shows as its ancestor at the scope module's depth in one out-of-view node, several deep ends of one subtree collapse into one link, and a link with no displayed end is not drawn. |
+| BD47 | 8 | component | `forwarding`: `app/b/core -> app/b` is drawn at no scope, internal at the project scope and a frame end inside `app/b`, while `app/b`'s module panel keeps it in `Including internals` (1/1 against 1/0 at this level) and the drilled-in scope panel reports the scope's own source. |
+| BD48 | 8 | pure | A rolled-up link's counts are the distinct `(consumer module, original)` pairs of its subtrees, calculated in the test from evidence rows and settled behavioral when any row is behavioral; they equal the sum of the contributing edges' counts for every `reference` scope; `status` is denied over limited over allowed across contributing evidence, `coverageIds` is their sorted union, and `sources` is complete and ordered. |
+| BD49 | 8 | component | The leaving-scope toggle defaults on; off removes every link with an end outside the scope together with its out-of-view nodes, keeps the in-scope links, clears a selected leaving link, and the control is absent at a scope that covers the project. |
+| BD50 | 8 | component | A rolled-up link ID contains its scope, so drilling or changing the depth mode clears that selection; an exact selection survives a scope change while its link is still drawn; a module selection survives while its node is displayed; no reconciliation invokes a data callback. |
+| BD51 | 8 | component | Panels in each scope show `This view` against `Whole project` with `Not drawn at this level` equal to the difference (`reference` inside `workspace`: 7/41 against 17/48, so 10 and 7 not drawn), and per module `At this level` against `Including internals` (`catalog`: `Uses` 1/11 against 3/13, owned originals 3/0 against 6/2), with `Used through this module` in a disclosure and the rolled-up link panel listing its contributing exact modules. |
+| BD52 | 8 | HTTP/browser | Over a real daemon and explorer server on `reference`, every control and every scope change draws its independently calculated links while the `dependencyView` request count, `dependencyDiagrams` and `behaviorRuns` stay at their values from the first ready response. |
+
 Returning old occurrence links while pending fails BD30. Returning an empty
-graph fails because every fixture contains positive controls. Component tests
-do not establish BD39–BD42, and a clean browser rendering does not establish
-hook isolation.
+graph fails wherever the fixture has a positive control at that scope;
+`reference`'s project scope, where every dependency is internal to a node or
+folded into the frame, is BD45's recorded exception. Component tests
+do not establish BD39–BD42 or BD52, and a clean browser rendering does not
+establish hook isolation. The hand-written `nested-levels` model establishes
+BD44 and BD46 only; it cannot stand in for the served models in BD39, BD40 or
+BD52. Summing child links instead of counting distinct pairs fails BD48 even
+where the two agree, because the test calculates the pairs.

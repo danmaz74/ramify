@@ -2,8 +2,10 @@
 
 **Date:** 2026-09-17. **Status:** implemented on branch
 `feat/plan6d-behavioral-dependency-diagram`; every BD row passes, as the
-[completion report](iterations/iteration7-results.md) records. This is
-a focused successor to the implemented
+[completion report](iterations/iteration7-results.md) records. Iteration 8 is an
+accepted revision authored on top of it: its scope-aware roll-up of the drawn
+links is specified here, in the contracts and in the matrix, and is not yet
+implemented. This is a focused successor to the implemented
 [Plan 6B](../iteration-6b-resident-explorer-server/main-plan.md) and
 [Plan 6C](../iteration-6c-module-tree-view/main-plan.md). It uses the behavioral
 classification and modularity projection already implemented at `70d7f46`.
@@ -27,22 +29,27 @@ explorer. The batch probe remains a terminating tool for recorded baselines.
 ## Product decision
 
 The module explorer at `/analysis/latest` becomes a behavioral dependency
-diagram. Its default links show referenced behavioral symbols from each
-consumer module to the module named by the consumer's import. A forwarded
-symbol therefore links to the forwarding/imported module by default, without
-changing the symbol's original owner.
+diagram. Every displayed node stands for its module's own source together with
+all of its descendants, and each end of a dependency is drawn at the node that
+represents it in the current scope. The default links show referenced behavioral
+symbols from one displayed subtree to the module that defines the original, so a
+symbol forwarded through another module's barrel links to its original owner.
+The imported boundary remains a panel unit.
 
-Two independent controls change the displayed links without rerunning analysis:
+Three controls change the displayed links without rerunning analysis:
 
 ```text
 [ ] Show non-behavioral dependencies
-Link targets: [ Imported modules ] [ Original owners ]
+Link depth: [ Modules at this level ] [ Exact module ]
+[x] Show dependencies that leave this module    (a drilled-in scope only)
 ```
 
 The first control adds referenced type/data dependencies. The second chooses
-between the consumer-facing imported boundary and the module that defines the
-original. Imported but unreferenced symbols, symbol-free imports and unknown
-classifications make no link. Unknown classifications make coverage partial.
+between the rolled-up nodes of the current scope and the exact consuming and
+defining modules. The third hides the links with one end outside the scope; a
+scope that covers the project has no outside and does not render it. Imported
+but unreferenced symbols, symbol-free imports and unknown classifications make
+no link. Unknown classifications make coverage partial.
 
 The existing occurrence-based edges remain in the ordinary project report and
 in bounded supporting evidence. They no longer drive the default analysis
@@ -128,9 +135,21 @@ remain authoritative.
 - A headline dependency is one distinct `(consumer module, original)` pair.
   One original used by two consumer modules counts once for each consumer.
 - An imported-boundary dependency is one distinct
-  `(consumer module, imported module, original)` triple. The same original used
-  through two imported modules can create two default links but one headline
-  dependency.
+  `(consumer module, imported module, original)` triple. It is a panel unit:
+  the same original used through two imported modules is two imported
+  boundaries under one headline dependency, and the diagram draws one link.
+- At any scope a node represents its module's whole subtree. An end inside the
+  scope maps to the child of the scope that contains it, an end outside the
+  scope maps to its ancestor at the scope module's depth, and an end shallower
+  than that depth maps to itself.
+- A link whose two ends map to one node is internal to that node and is not
+  drawn at that scope. Drilling into the node makes it visible.
+- The scope module's own source is folded into the frame and has no node of its
+  own, so a link with one end in it is not drawn at that scope. Its
+  dependencies stay in the panel numbers.
+- A rolled-up link's count is the number of distinct `(consumer module,
+  original)` pairs between the two subtrees, not a sum of child links. No scope
+  and no control changes the measured headline counts.
 - A classifier access fact is one distinct `(consumer file, original,
   SourceAccess.id)` triple. Several aliases of the same original in that one
   access are combined because they have the same imported boundary.
@@ -145,8 +164,10 @@ remain authoritative.
   `consumer != importedModule`, so neither projection creates a self-loop. A
   consumer that reaches a foreign original through its own module barrel
   remains in `Uses` and the original-owner projection but has no imported-module
-  link. External, outside-module and unresolved facts stay in `AnalysisReport`
-  and coverage and do not become dependency-diagram entities.
+  link. Both collections stay in the DTO; the diagram draws the original-owner
+  collection, whose unit is the headline dependency unit. External,
+  outside-module and unresolved facts stay in `AnalysisReport` and coverage and
+  do not become dependency-diagram entities.
 - An evidence row's allowed/limited/denied status comes from the import
   decisions for that original in its contributing accesses, never from other
   originals selected by the same access.
@@ -271,11 +292,12 @@ stops polling while hidden and after ready, superseded or unavailable. No event
 stream is introduced.
 ## Diagram and information panel
 
-The default active collection is `importedModuleEdges` with only behavioral
-counts. Enabling non-behavioral dependencies adds their counts and reveals
-non-behavioral-only edges. Choosing original owners switches to
-`originalOwnerEdges`. Both collections arrive in one ready response, so either
-control is local UI state.
+The drawn links always come from `originalOwnerEdges`, rolled up to the current
+scope, with only behavioral counts by default. Enabling non-behavioral
+dependencies adds their counts and reveals non-behavioral-only links.
+`Exact module` stops the roll-up and draws each exact consuming and defining
+module, as iteration 6 drew that collection. Both collections arrive in one
+ready response, so every control and every scope change is local UI state.
 
 - Colour carries both behavior and status: each status has a full-strength
   colour for an edge with behavioral evidence and a lighter one for a
@@ -287,21 +309,28 @@ control is local UI state.
   behavior or status.
 - Width uses a bounded logarithmic scale over the displayed classified count.
 - Node size uses owned source-file count and stays fixed while controls change.
-- Edge IDs contain the projection and ordered endpoint pair. Switching the
-  projection clears an edge selection unless the exact active ID remains.
+- Link IDs contain the depth mode, the scope and the ordered endpoint pair. A
+  rolled-up ID therefore changes with the scope; changing the depth mode or the
+  scope clears a link selection unless the identical ID is still drawn.
 - Existing hierarchy scope, breadcrumbs, out-of-view related modules,
-  class filters, pan/zoom and minimap operate over the active edge collection.
+  class filters, pan/zoom and minimap operate over the current scope's links.
+  The class filter selects which of the scope's children are displayed; it
+  never changes how an end maps to a node.
 
-The right panel follows the analysis document exactly:
+The right panel shows the filtered and the measured numbers side by side, each
+labelled:
 
-- no selection: project behavioral/non-behavioral headline counts, displayed
-  links, coverage and revision;
-- module: `Uses`, active incoming role, alternate incoming role in a disclosure,
-  owned/subtree files and coverage;
-- imported edge: behavioral/non-behavioral used originals via this boundary,
-  original-owner breakdown and supporting files/status/coverage;
-- original-owner edge: behavioral/non-behavioral dependencies,
-  imported-through breakdown and supporting files/status/coverage.
+- no selection: `This view` against `Whole project` headline counts, the
+  numbers not drawn at this level, displayed links, coverage, revision and, in
+  a drilled-in scope, the scope's own source;
+- module: `Uses` and `Owned originals used by others`, each `At this level`
+  against `Including internals`, `Used through this module` with its imported
+  unit in a disclosure, owned/subtree files and coverage;
+- rolled-up link: its `At this level` counts, the exact modules rolled into it,
+  an imported-through breakdown in a disclosure and supporting
+  files/status/coverage;
+- exact link: behavioral/non-behavioral dependencies, imported-through
+  breakdown and supporting files/status/coverage.
 
 The non-behavioral headline card remains visible and says `not drawn` while the
 setting is off and `shown` while it is on. There is no ratio, pie chart or
@@ -351,10 +380,13 @@ analyzer's peak memory in the real workflow.
 | 5 | Relay dependency views in the explorer server | `service-api` | `dependencyView` states, DTO mapping and lifecycle over a real daemon; no analysis code in the server. |
 | 6 | Render dependency controls and panels | `presentation/project-view` | Pure component implements both projections, settings and all panel scopes. |
 | 7 | Connect the page and run the gate | `explorer` and `integration-tests` | Real daemon/server/browser workflow, lifecycle budgets, hook isolation and documentation pass. |
+| 8 | Scope-aware roll-up of dependency links | `presentation/project-view`, `explorer`, `integration-tests` | Every scope draws only links between distinct nodes of that level; controls and scope changes start no analysis. |
 
 Iterations run in order. Iteration 6 may not substitute fixture-only edge data
 for iteration 5's real transport, and no iteration may derive imported links
-from the old aggregate behavior facts.
+from the old aggregate behavior facts. Iteration 8 revises the delivered
+presentation only: it changes no daemon, analyzer, service-api or projection
+code and introduces no analysis run.
 
 ## Review decisions
 
@@ -384,6 +416,52 @@ the graph already used for its direction animation. Behavior now joins status in
 the colour dimension and the animation keeps the dashes. BD33 covers the
 colours.
 
+**Revision, 2026-09-17, iteration 8:** reviewing the rendered diagram showed
+that the root scope drew links between a module and its own descendants, and to
+descendants of other modules as dashed out-of-view nodes. Those dependencies
+are internal to a module at that level. These decisions replace the endpoint
+projection control with scope-aware roll-up and are accepted:
+
+1. A node represents its module's whole subtree at every scope. At the root
+   scope `analysis -> cli` covers every dependency from anything under
+   `analysis` onto anything under `cli`.
+2. Roll-up is recursive and applies at every scope: an end inside the scope
+   maps to the child of the scope that contains it, an end outside the scope
+   maps to its ancestor at the scope module's depth, and an end shallower than
+   that depth maps to itself. Inside `analysis`, `daemon/contexts` shows as
+   `daemon`.
+3. A link whose two ends map to one node is internal and is not drawn at that
+   scope; it becomes visible after drilling into that node.
+4. The scope module's own source is folded into the frame, with no node of its
+   own, rather than taking a node beside its children. Links whose only ends
+   are that own source and one child are therefore drawn at no scope; they stay
+   in the panel numbers.
+5. The `Imported modules`/`Original owners` selector is removed. A depth
+   selector replaces it: `Modules at this level`, the default, and
+   `Exact module`, iteration 6's ends. The aliasing distinction is not a
+   control.
+6. The drawn links follow the module that defines the code. The original-owner
+   collection never loses a dependency reached through the consumer's own
+   barrel and its unit is this plan's headline dependency unit, so the drawn
+   links and the headline counts agree. The imported-module collection stays in
+   the DTO and serves panel breakdowns.
+7. In a drilled-in scope a toggle shows or hides the links that leave that
+   scope, on by default. A scope that covers the project has no outside, so the
+   control does not apply there.
+8. Panels show the filtered and the measured numbers side by side, each
+   labelled: `This view` against `Whole project` for the project panel, and
+   `At this level` against `Including internals` per module. The fixed headline
+   units and the measured totals do not change.
+9. `Show non-behavioral dependencies` keeps its meaning.
+
+Contracts C8-C10 specify them, C7's default settings change with them, and
+acceptance rows BD30-BD32 and BD34-BD40 are edited in place and re-executed in
+iteration 8. The iteration 6 and 7 results keep the earlier wording as the
+history of those rows. The decisions also supersede the modularity analysis
+document's control block. Completion boundary item 2 stands: the projection
+still produces both endpoint collections, and only the original-owner one is
+drawn.
+
 Changing one of these decisions requires revising this plan and its affected
 acceptance rows first; do not resolve it ad hoc in a later iteration.
 
@@ -396,3 +474,12 @@ known coverage limits. Later work may add test source filters, runtime/type-load
 filtering, historical trends, confidence estimates, alternative layouts, an MCP
 or CLI client of the same operation, or module-move suggestions. None may
 reinterpret the two headline counts delivered here.
+
+Iteration 8 defers one control: an option that draws the scope module's own
+source as a separate node beside its children, making the links in both
+directions between that own source and each child visible at that scope. A
+parent has children to delegate to them, so a parent depending on its children
+is the expected shape and adds nothing at that level; a child using vocabulary
+its parent exposes to its descendants is the interesting direction and is worth
+seeing. The option changes no analysis: only the scope mapping and the drawn
+links.
