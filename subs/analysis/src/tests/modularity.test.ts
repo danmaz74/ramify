@@ -362,8 +362,6 @@ describe('modularity projection: availability and determinism', () => {
     expect(failedCheck.status === 'projected' && failedCheck.report.provenance.check).toBe('failed');
     expect(projectModularity({ revision: 'r', report, limits: { ...limits, maxReportBytes: 100 } }))
       .toMatchObject({ status: 'unavailable', reason: 'resource-limit' });
-    expect(() => projectModularity({ revision: 'r', report, limits, ownership: { id: 'c', modules: [], files: [] } }))
-      .toThrow(/Candidate ownership/);
   });
 
   it('produces byte-identical JSON independent of input order and run identity', () => {

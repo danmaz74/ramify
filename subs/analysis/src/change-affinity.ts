@@ -5,7 +5,8 @@ import type {
   OwnerPairAffinity,
 } from './interfaces/modularity.js';
 import type { ModuleId } from '../subs/model/src/interfaces/model.js';
-import { byteOrder, completeReport, declaredOwnership, ratio, viewFacts } from './modularity-context.js';
+import { resolveOwnership } from './modularity-candidate.js';
+import { byteOrder, completeReport, ratio, viewFacts } from './modularity-context.js';
 
 /**
  * Pure change-affinity projection of section 8 of
@@ -19,10 +20,9 @@ export function projectChangeAffinity(input: ChangeAffinityInput): ChangeAffinit
     return { status: 'unavailable', reason: 'analysis-incomplete',
       message: 'The analysis report is not a completed analysis with its registry, snapshot, catalog and model' };
   }
-  if (input.ownership !== undefined) {
-    throw new Error('Candidate ownership is not implemented; the projection supports declared ownership only');
-  }
-  const ownership = declaredOwnership(report);
+  const resolved = resolveOwnership(report, input.ownership);
+  if (resolved.status === 'invalid') return { status: 'invalid-ownership', issues: resolved.issues };
+  const { ownership } = resolved;
   const view = viewFacts(report, filter, ownership, []);
   const ownerOf = (path: string): ModuleId | null => view.sources.has(path) ? ownership.ownerOf(path) : null;
 

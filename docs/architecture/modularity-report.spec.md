@@ -2,8 +2,8 @@
 
 **Date:** 2026-09-17. **Status:** Contract under implementation. Iteration 2
 implements the opt-in evidence, iteration 3 the declared-ownership
-projection and iteration 4 change affinity, the Git adapter and the baseline
-probe; candidate ownership is not implemented. It
+projection, iteration 4 change affinity, the Git adapter and the baseline
+probe, and iteration 5 candidate ownership and the comparison. It
 fixes the units, filters, formulas, coverage rules, ordering and identity that
 the
 [project modularity analysis](../analysis/2026-09-17-project-modularity-analysis.md#proposed-execution-path)
@@ -35,7 +35,7 @@ remain authoritative for those rules. Dependency vocabulary follows the
 | --- | --- | --- |
 | Reference discovery and behavior-capability classification while the compiler is alive; frozen `DependencyBehaviorFacts` | `analysis/typescript` | `src/interfaces/dependency-behavior.ts` (contract), implementation in iteration 2 |
 | The opt-in `dependency-behavior` capability in batch analysis; attaching its facts to the snapshot | `analysis` | existing batch pipeline |
-| Contract types; pure projection of `{revision, report}`; deduplication, coverage and aggregates; candidate ownership validation; pure change-affinity projection | `analysis` | `src/interfaces/modularity.ts`, `src/modularity.ts`, `src/change-affinity.ts` |
+| Contract types; pure projection of `{revision, report}`; deduplication, coverage and aggregates; candidate ownership validation and boundary changes; pure change-affinity projection | `analysis` | `src/interfaces/modularity.ts`, `src/modularity*.ts`, `src/change-affinity.ts` |
 | Git history adapter producing `ChangeHistory` | modularity probe | `scripts/probes/modularity/git-history.ts` |
 | Probe that runs the analysis, the projections and writes JSON and Markdown | modularity probe | `scripts/probes/modularity/baseline.ts`, rendering in `markdown.ts` |
 
@@ -526,7 +526,8 @@ worktree:
 - `modules`: the complete candidate tree; each module's `id`, `name` and
   `parent` satisfy the identity, single-root, known-parent and acyclicity rules
   the model applies to `ModuleRecord`, and the root id equals the declared root
-  id; source areas and directories are not required;
+  id; `headerTags` names tags of the analysis registry; source areas and
+  directories are not required;
 - `files`: inventory files reassigned to candidate owners; every other file
   keeps its declared owner.
 
@@ -534,23 +535,32 @@ Validation returns `invalid-ownership` with every issue, ordered by code then
 subject, when:
 
 - the id is invalid (`invalid-candidate-id`);
-- a module identity, name or parent is invalid (`invalid-module-id`), repeated
+- a module identity, name, parent or header tag is invalid (`invalid-module-id`), repeated
   (`duplicate-module`) or the tree has no single root, a cycle or an unknown
   parent (`invalid-tree`);
 - a reassigned path is not an inventory file (`unknown-file`) or is listed
   twice (`duplicate-file`);
 - a reassigned file names, or a retained file keeps, an owner absent from the
   candidate tree (`unknown-owner`);
-- any file's testing classification would change (`classification-change`).
-  A candidate moves boundaries; it never changes the production subset.
+- any file's testing classification would change (`classification-change`),
+  whether a reassigned file's new owner or a retained file's owner changes
+  the header tags read by the [source filter](#source-filter). A candidate
+  moves boundaries; it never changes the production subset.
+
+An issue's subject is the module id or file path it concerns, a positional
+label such as `modules[2]` when that value is not text, or empty for the
+candidate id and the tree as a whole. A file listed more than once reports
+only `duplicate-file`; a file absent from the inventory reports only
+`unknown-file`.
 
 Under candidate ownership the projection recomputes every measure with the
 candidate owners. Exposure-dependent values are unavailable or null as stated
 above. Behavioral dependencies are deduplicated again from the same facts.
 `boundaryChanges` lists, in both filters, every application occurrence whose
 `(consumer, provider)` differs from declared ownership, classified as
-`became-cross-owner`, `became-same-owner` or `changed-owners`, ordered by access
-id. The list stops at `maxBoundaryChanges` with `truncated` set and `total`
+`became-cross-owner`, `became-same-owner` or `changed-owners` (every other
+difference, including a same-owner occurrence whose single owner changes),
+ordered by access id. The list stops at `maxBoundaryChanges` with `truncated` set and `total`
 exact. Under declared ownership `boundaryChanges` is null.
 
 Candidate modules may own no files; they then appear only in `modules`.
@@ -598,15 +608,33 @@ contract. Byte order means UTF-8 code unit order.
 
 Iteration 4's probe writes one `ModularityDocument` as JSON and a Markdown
 rendering of the same data, containing the declared evaluation and any
-candidates. Change affinity uses the production filter. The Markdown contains,
-in order: project summary and coverage; exact-owner and subtree tables;
+candidates. Change affinity uses the production filter. The Markdown of one
+evaluation contains, in order: summary and coverage; boundary changes under
+candidate ownership; exact-owner and subtree tables;
 runtime and type-only edge and cycle tables; behavioral and non-behavioral
 dependency counts; contract breadth and repository interface use; connectedness
-and context size; and ranked evidence. Each ranked table orders by exactly one
+and context size; change affinity; and ranked evidence. Each ranked table orders by exactly one
 named measure, descending, ties by id; explanations are role-aware, and no
 measures are combined into a score. Partial and unavailable values are labelled
 as such in every table. Evidence written into the repository goes under
 `scripts/probes/results/modularity/`.
+
+A document with candidates first renders a comparison, then the declared
+evaluation and each candidate evaluation one heading level lower. The
+comparison keeps every measure in its own row with the declared value and each
+candidate's value: production exact locality, cross-owner occurrences and edges
+(all loads and runtime), owners, runtime and type-only cycle components and
+their member counts, behavioral and non-behavioral dependency totals, test
+exact locality and cross-owner occurrences, sufficient change-affinity pairs
+and boundary changes. Each candidate value carries a verdict against declared
+ownership in the direction the analysis
+[decision rule](../analysis/2026-09-17-project-modularity-analysis.md#decision-rule)
+prefers: `improves`, `worsens` or `unchanged`; `differs` when no direction is
+preferred; `not comparable` when either value is unavailable. A verdict on a
+partial value is provisional. Per candidate, the comparison lists its verdicts
+by kind without netting them and the exact-owner boundary breadth of changed
+owners: owners whose production files differ, that exist under only one
+ownership, or that a listed production boundary change names.
 
 The probe (`npm run probe:modularity`) writes `<name>.json` and `<name>.md`,
 `baseline` by default. It requests the shared CLI check capabilities plus
@@ -614,9 +642,15 @@ The probe (`npm run probe:modularity`) writes `<name>.json` and `<name>.md`,
 reports from that single analysis report. Its default history is `HEAD`, all
 parents, merges excluded, with `minOwnerCommits` 5, `minSharedCommits` 3 and
 `maxOwnersPerCommit` 5; every value is recorded in the change-affinity report.
+Each repeatable `--candidate <file.json>` names one `CandidateOwnership`,
+projected from the same report, history and thresholds; candidate ids must be
+distinct, and evaluations are ordered by id. The output is named with
+`--name`.
 It refuses, with exit code 2, when the worktree is not clean without
 `--allow-dirty`, when `HEAD` or cleanliness changes during the analysis, or when
-the history head differs from the analyzed commit. Markdown structural
+the history head differs from the analyzed commit, and when a candidate file is
+unreadable or a candidate returns `invalid-ownership`, listing every issue.
+Markdown structural
 positions (composition root or parent, provider, leaf consumer, connected
 owner) are read from the ownership tree and production edges to explain a
 ranking; they are not declared roles.
@@ -635,4 +669,6 @@ ranking; they are not declared roles.
 - **Iteration 5** adds candidate validation, candidate recomputation and
   `boundaryChanges` to both projections.
 - **Iteration 6** writes the Candidate A and B mappings as `CandidateOwnership`
-  inputs and evaluates them.
+  inputs under `scripts/probes/modularity/candidates/` and evaluates them with
+  one probe run whose `--name` output lands beside the baseline in
+  `scripts/probes/results/modularity/`.

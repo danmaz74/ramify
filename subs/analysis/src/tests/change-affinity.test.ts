@@ -6,7 +6,6 @@ import type {
   ChangeAffinityReport,
   ChangeAffinityThresholds,
   ChangeHistory,
-  CandidateOwnership,
 } from '../index.js';
 import { buildReport, graphSpec, paths } from './modularity-fixture.js';
 
@@ -98,11 +97,9 @@ describe('change affinity projection', () => {
     expect(JSON.stringify(projected({ history: reordered, thresholds: shuffled }))).toBe(JSON.stringify(projected()));
   });
 
-  it('is unavailable for an incomplete analysis and rejects candidate ownership until it is implemented', () => {
+  it('is unavailable for an incomplete analysis', () => {
     const incomplete: AnalysisReport = { ...report, outcome: { ...report.outcome, execution: 'incomplete' } };
     expect(projectChangeAffinity({ revision: 'r', report: incomplete, history, thresholds, filter: 'production' }))
       .toMatchObject({ status: 'unavailable', reason: 'analysis-incomplete' });
-    const ownership: CandidateOwnership = { id: 'x', modules: [], files: [] };
-    expect(() => projected({ ownership })).toThrow(/not implemented/);
   });
 });

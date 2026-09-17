@@ -7,18 +7,30 @@
 // JSON with a Markdown rendering. It refuses when the worktree is dirty
 // (unless --allow-dirty, recorded as `clean: false`), when HEAD moves during
 // the run, or when the history head differs from the analyzed commit.
+// Each repeatable --candidate names a JSON `CandidateOwnership`; candidates are
+// projected from the same report, history and thresholds, and an invalid
+// candidate refuses with its ownership issues.
 //
 //     npm run build
 //     npm run probe:modularity -- [--root <dir>] [--out <dir>] [--name <basename>]
 //       [--range <rev-range>] [--first-parent] [--include-merges]
 //       [--min-owner-commits <n>] [--min-shared-commits <n>]
 //       [--max-owners-per-commit <n|none>] [--exclude-commit <rev>]... [--allow-dirty]
+//       [--candidate <file.json>]...
 
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import type { AnalysisLimits, Capability, ChangeAffinityThresholds, ModularityDocument } from 'ramify.ts/analysis';
+import type {
+  AnalysisLimits,
+  CandidateOwnership,
+  Capability,
+  ChangeAffinityThresholds,
+  ModularityDocument,
+  ModularityEvaluation,
+  OwnershipIssue,
+} from 'ramify.ts/analysis';
 import { git, readGitHistory, repositoryState, utf8Order } from './git-history.js';
 import { renderMarkdown } from './markdown.js';
 
@@ -57,6 +69,7 @@ async function main(): Promise<void> {
     'max-owners-per-commit': { type: 'string', default: '5' },
     'exclude-commit': { type: 'string', multiple: true, default: [] },
     'allow-dirty': { type: 'boolean', default: false },
+    candidate: { type: 'string', multiple: true, default: [] },
   } });
   const root = resolve(values.root);
   if (!/^[A-Za-z0-9._-]+$/.test(values.name)) throw new Refusal(`--name must be a plain file basename: ${values.name}`);
@@ -65,6 +78,7 @@ async function main(): Promise<void> {
   if (!before.clean && !values['allow-dirty']) {
     throw new Refusal(`The worktree is not clean (${before.changes.length} changes); commit first or pass --allow-dirty:\n${before.changes.slice(0, 20).join('\n')}`);
   }
+  const candidates = await readCandidates(values.candidate);
   const thresholds: ChangeAffinityThresholds = {
     minOwnerCommits: count(values['min-owner-commits'], 'min-owner-commits'),
     minSharedCommits: count(values['min-shared-commits'], 'min-shared-commits'),
@@ -94,14 +108,30 @@ async function main(): Promise<void> {
   const affinity = projectChangeAffinity({ revision, report, history, thresholds, filter: 'production' });
   if (affinity.status !== 'projected') throw new Refusal(`Change affinity projection ${affinity.status}: ${JSON.stringify(affinity)}`);
 
+  const evaluations: ModularityEvaluation[] = [];
+  for (const ownership of candidates) {
+    const candidateModularity = projectModularity({ revision, report, ownership, limits: modularityLimits });
+    if (candidateModularity.status === 'invalid-ownership') throw new Refusal(invalidOwnership(ownership, candidateModularity.issues));
+    if (candidateModularity.status !== 'projected') {
+      throw new Refusal(`Candidate ${JSON.stringify(ownership.id)} modularity projection ${candidateModularity.status}: ${JSON.stringify(candidateModularity)}`);
+    }
+    const candidateAffinity = projectChangeAffinity({ revision, report, ownership, history, thresholds, filter: 'production' });
+    if (candidateAffinity.status === 'invalid-ownership') throw new Refusal(invalidOwnership(ownership, candidateAffinity.issues));
+    if (candidateAffinity.status !== 'projected') {
+      throw new Refusal(`Candidate ${JSON.stringify(ownership.id)} change affinity projection ${candidateAffinity.status}: ${JSON.stringify(candidateAffinity)}`);
+    }
+    evaluations.push({ modularity: candidateModularity.report, changeAffinity: candidateAffinity.report });
+  }
+
   const document: ModularityDocument = {
     schemaVersion: 'ramify.modularity-document/1',
     repository: { commit: before.commit, clean: before.clean },
     declared: { modularity: modularity.report, changeAffinity: affinity.report },
-    candidates: [],
+    candidates: evaluations,
   };
   const json = JSON.stringify(document, null, 1) + '\n';
-  const markdown = renderMarkdown(document, { title: `Modularity baseline at ${before.commit.slice(0, 12)}` });
+  const markdown = renderMarkdown(document, {
+    title: `${evaluations.length ? 'Modularity comparison' : 'Modularity baseline'} at ${before.commit.slice(0, 12)}` });
   const out = resolve(values.out);
   await mkdir(out, { recursive: true });
   await writeFile(resolve(out, `${values.name}.json`), json);
@@ -114,9 +144,37 @@ async function main(): Promise<void> {
     check: report.outcome.check, coverage: modularity.report.coverage.state,
     production: production.summary.all, behavior: production.behavior,
     changeAffinity: affinity.report.commits,
+    candidates: evaluations.map(evaluation => ({ id: evaluation.modularity.provenance.candidateId,
+      production: evaluation.modularity.views[0]!.summary.all, boundaryChanges: evaluation.modularity.boundaryChanges!.total })),
     written: [`${values.name}.json`, `${values.name}.md`].map(file => relative(process.cwd(), resolve(out, file))),
     bytes: { json: Buffer.byteLength(json), markdown: Buffer.byteLength(markdown) },
   }, null, 2));
+}
+
+/** Reads candidate files before the analysis; ids must be distinct, and evaluations are ordered by id in byte order. */
+async function readCandidates(files: readonly string[]): Promise<CandidateOwnership[]> {
+  const candidates: CandidateOwnership[] = [];
+  for (const file of files) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(await readFile(resolve(file), 'utf8'));
+    } catch (error) {
+      throw new Refusal(`--candidate ${file} is not a readable JSON file: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Refusal(`--candidate ${file} must contain one CandidateOwnership object`);
+    }
+    candidates.push(parsed as CandidateOwnership);
+  }
+  const ids = candidates.map(candidate => String(candidate.id));
+  const repeated = ids.filter((id, index) => ids.indexOf(id) !== index);
+  if (repeated.length) throw new Refusal(`Candidate ids must be distinct: ${[...new Set(repeated)].join(', ')}`);
+  return candidates.sort((left, right) => utf8Order(String(left.id), String(right.id)));
+}
+
+function invalidOwnership(ownership: CandidateOwnership, issues: readonly OwnershipIssue[]): string {
+  return `Candidate ${JSON.stringify(ownership.id)} is invalid ownership (${issues.length} issues):\n`
+    + issues.map(issue => `  ${issue.code} ${JSON.stringify(issue.subject)}: ${issue.message}`).join('\n');
 }
 
 main().catch(error => {

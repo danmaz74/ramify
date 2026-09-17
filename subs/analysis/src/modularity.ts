@@ -7,8 +7,9 @@ import type {
   ModularityReport,
   ModularityView,
   OwnerMetrics,
-  SourceFilter,
 } from './interfaces/modularity.js';
+import type { SourceAccess } from '../subs/typescript/src/interfaces/source.js';
+import { boundaryChanges, resolveOwnership } from './modularity-candidate.js';
 import {
   byteOrder,
   completeReport,
@@ -24,6 +25,7 @@ import {
   type CompleteReport,
   type Occurrence,
   type OwnershipResolver,
+  type ViewFacts,
 } from './modularity-context.js';
 import { boundaryMetrics, cycleComponents, edgeGroups, edgeMetrics, stabilityMetrics, viewSummary } from './modularity-graph.js';
 import { behaviorByOwner, behaviorTotal, connectedness, contextSize, exposedOriginals, interfaceUse } from './modularity-owner.js';
@@ -39,10 +41,9 @@ export function projectModularity(input: ModularityInput): ModularityOutcome {
     return { status: 'unavailable', reason: 'analysis-incomplete',
       message: 'The analysis report is not a completed analysis with its registry, snapshot, catalog and model' };
   }
-  if (input.ownership !== undefined) {
-    throw new Error('Candidate ownership is not implemented; the projection supports declared ownership only');
-  }
-  const projected = project(input.revision, report, declaredOwnership(report));
+  const resolved = resolveOwnership(report, input.ownership);
+  if (resolved.status === 'invalid') return { status: 'invalid-ownership', issues: resolved.issues };
+  const projected = project(input.revision, report, resolved.ownership, input.limits.maxBoundaryChanges);
   const bytes = Buffer.byteLength(JSON.stringify(projected), 'utf8');
   if (bytes > input.limits.maxReportBytes) {
     return { status: 'unavailable', reason: 'resource-limit',
@@ -51,13 +52,13 @@ export function projectModularity(input: ModularityInput): ModularityOutcome {
   return { status: 'projected', report: projected };
 }
 
-function project(revision: string, report: CompleteReport, ownership: OwnershipResolver): ModularityReport {
+function project(revision: string, report: CompleteReport, ownership: OwnershipResolver, maxBoundaryChanges: number): ModularityReport {
   const coverage = new CoverageFacts(report);
   const originals = new OriginalFacts(report);
   const tree = new OwnershipTree(ownership);
   const occurrences = report.snapshot.accesses.map(access => resolveOccurrence(access, ownership, originals));
-  const views = (['production', 'test'] as const)
-    .map(filter => projectView(report, filter, ownership, tree, occurrences, coverage, originals));
+  const facts = (['production', 'test'] as const).map(filter => viewFacts(report, filter, ownership, occurrences));
+  const views = facts.map(view => projectView(report, view, ownership, tree, coverage, originals));
   const collected = views.flatMap(viewCoverage);
   const partial = collected.length > 0 || report.outcome.coverage === 'partial';
   const detail: MetricCoverage = {
@@ -71,8 +72,14 @@ function project(revision: string, report: CompleteReport, ownership: OwnershipR
     coverage: { state: partial ? 'partial' : 'complete', detail },
     modules: ownership.modules,
     views,
-    boundaryChanges: null,
+    boundaryChanges: ownership.mode === 'declared' ? null : boundaryChanges(facts,
+      declaredOccurrences(report, originals), maxBoundaryChanges),
   };
+}
+
+function declaredOccurrences(report: CompleteReport, originals: OriginalFacts): ReadonlyMap<SourceAccess, Occurrence> {
+  const declared = declaredOwnership(report);
+  return new Map(report.snapshot.accesses.map(access => [access, resolveOccurrence(access, declared, originals)]));
 }
 
 function provenance(revision: string, report: CompleteReport, ownership: OwnershipResolver): ModularityProvenance {
@@ -91,11 +98,11 @@ function provenance(revision: string, report: CompleteReport, ownership: Ownersh
   };
 }
 
-function projectView(report: CompleteReport, filter: SourceFilter, ownership: OwnershipResolver, tree: OwnershipTree,
-  occurrences: readonly Occurrence[], coverage: CoverageFacts, originals: OriginalFacts): ModularityView {
-  const view = viewFacts(report, filter, ownership, occurrences);
+function projectView(report: CompleteReport, view: ViewFacts, ownership: OwnershipResolver, tree: OwnershipTree,
+  coverage: CoverageFacts, originals: OriginalFacts): ModularityView {
+  const { filter } = view;
   const edges = edgeGroups(view);
-  const exposed = exposedOriginals(report, view, ownership, originals);
+  const exposed = ownership.declaredExposure ? exposedOriginals(report, view, ownership, originals) : new Map();
   const behavior = behaviorByOwner(report, view, coverage, ownership, originals);
   const listed = tree.ids.filter(id => [...tree.subtree(id)].some(member => view.filesByOwner.has(member)));
   const owners = listed.map((owner): OwnerMetrics => {

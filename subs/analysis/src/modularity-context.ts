@@ -73,8 +73,8 @@ export const inVariant = (occurrence: Occurrence, variant: LoadVariant): boolean
   variant === 'all' || occurrence.runtime === (variant === 'runtime');
 
 /**
- * The ownership in use. Declared ownership reads the inventory; iteration 5
- * substitutes a validated candidate mapping behind the same interface.
+ * The ownership in use. Declared ownership reads the inventory; a validated
+ * candidate mapping (`modularity-candidate.ts`) substitutes behind the same interface.
  */
 export interface OwnershipResolver {
   readonly mode: 'declared' | 'candidate';
@@ -286,7 +286,10 @@ export class OriginalFacts {
 const declaredKey = (original: OriginalId): string =>
   JSON.stringify([original.kind, original.owner, original.file, original.binding]);
 
-/** Testing classification is fixed by declarations; candidate ownership may not change it. */
+/**
+ * Declared testing classification. Candidate validation rejects any file whose
+ * classification under its candidate owner's header tags differs, so views read this.
+ */
 export function testingClassified(report: CompleteReport, file: InventoryFile): boolean {
   if (file.area === 'tests') return true;
   return report.snapshot.areas.some(area => area.owner === file.owner && area.kind === 'ordinary'
