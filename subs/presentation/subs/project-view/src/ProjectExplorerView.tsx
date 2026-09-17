@@ -12,18 +12,26 @@ import type {
   ProjectExplorerModel,
 } from './interfaces/project-view.js';
 import type {
+  DependencyDepthMode,
+  DependencyGraphCount,
   DependencyGraphEvidence,
   DependencyGraphModel,
+  DependencyGraphOriginalEdge,
   DependencyGraphState,
-  DependencyLinkTarget,
   DependencySettings,
 } from './interfaces/dependency-view.js';
 import {
-  activeDependencyEdges,
   defaultDependencySettings,
+  dependencyScope,
   idleDependencyGraph,
+  originalIdentity,
+  scopeCoversProject,
+  scopeDependencyLinks,
+  scopeLinkCounts,
+  subtreeDependencyCounts,
   type ActiveDependencyEdge,
 } from './dependency-graph.js';
+import { indexModuleTree } from './module-tree.js';
 import type { GraphSelection, ModuleGraphProps } from './moduleGraphShared.js';
 import {
   getPresentationClassColor,
@@ -79,9 +87,9 @@ export interface ProjectExplorerViewProps {
   readonly onDependencySettingsChange?: (settings: DependencySettings) => void;
 }
 
-const linkTargetOptions: readonly { readonly value: DependencyLinkTarget; readonly label: string }[] = [
-  { value: 'imported-module', label: 'Imported modules' },
-  { value: 'original-owner', label: 'Original owners' },
+const depthOptions: readonly { readonly value: DependencyDepthMode; readonly label: string }[] = [
+  { value: 'level', label: 'Modules at this level' },
+  { value: 'exact', label: 'Exact module' },
 ];
 
 /** Sections that start collapsed: raw occurrences are secondary evidence. */
@@ -122,7 +130,7 @@ export function ProjectExplorerView({
   const [toggledSections, setToggledSections] = useState<Set<string>>(new Set());
   const [localSettings, setLocalSettings] = useState<DependencySettings>(defaultDependencySettings);
   const settings = dependencySettings ?? localSettings;
-  const linkTargetRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const depthRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [sidebarWidth, setSidebarWidth] = useState(360);
   const isResizing = useRef(false);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -178,19 +186,20 @@ export function ProjectExplorerView({
     () => new Set(selectedPresentationClasses),
     [selectedPresentationClasses],
   );
-  const modulesInScope = useMemo(() => {
-    if (!data) return [];
-    if (scopeModuleId) return modules.filter((module) => module.parent === scopeModuleId);
-
-    const topLevel = modules.filter((module) => module.parent === null);
-    const root = modulesById.get(data.rootModuleId);
-    if (topLevel.length === 1 && root && root.children.length > 0) {
-      return root.children
-        .map((childId) => modulesById.get(childId))
-        .filter((module): module is ExplorerModule => module != null);
-    }
-    return topLevel;
-  }, [data, modules, modulesById, scopeModuleId]);
+  const tree = useMemo(() => indexModuleTree(modules, data?.rootModuleId), [data?.rootModuleId, modules]);
+  // The scope's frame and candidate nodes, before the class filter and independent of the settings.
+  const scope = useMemo(
+    () => data ? dependencyScope(data, scopeModuleId) : null,
+    [data, scopeModuleId],
+  );
+  const modulesInScope = useMemo(() => (scope?.nodes ?? [])
+    .map((id) => modulesById.get(id))
+    .filter((module): module is ExplorerModule => module != null),
+  [modulesById, scope]);
+  const coversProject = useMemo(
+    () => scope !== null && scopeCoversProject(scope, modules.map((module) => module.id), tree),
+    [modules, scope, tree],
+  );
 
   const classEntries = useMemo(() => {
     const allClasses = [...new Set(modules.map((module) => module.presentationClass))].sort();
@@ -213,61 +222,58 @@ export function ProjectExplorerView({
     [modulesForGraph],
   );
   const dependencyData = dependencies.data;
-  const { showNonBehavioral, linkTarget } = settings;
+  const { showNonBehavioral, depthMode, showOutsideScope } = settings;
   // Keyed by setting values, so an equal recreated settings object keeps the same links.
-  const activeEdges = useMemo(
-    () => dependencyData ? activeDependencyEdges(dependencyData, { showNonBehavioral, linkTarget }) : [],
-    [dependencyData, showNonBehavioral, linkTarget],
+  // The scope's links before the non-behavioral display filter: the panels count these.
+  const scopeLinks = useMemo(
+    () => dependencyData && scope
+      ? scopeDependencyLinks({ model: dependencyData, scope, displayed: visibleModuleIds, tree,
+        settings: { showNonBehavioral: true, depthMode, showOutsideScope } })
+      : [],
+    [dependencyData, depthMode, scope, showOutsideScope, tree, visibleModuleIds],
+  );
+  // The links actually drawn: the same set after the non-behavioral display filter.
+  const graphEdges = useMemo(
+    () => dependencyData && scope
+      ? scopeDependencyLinks({ model: dependencyData, scope, displayed: visibleModuleIds, tree,
+        settings: { showNonBehavioral, depthMode, showOutsideScope } })
+      : [],
+    [dependencyData, depthMode, scope, showNonBehavioral, showOutsideScope, tree, visibleModuleIds],
   );
   const dependencyRows = useMemo(
     () => new Map((dependencyData?.modules ?? []).map((row) => [row.id, row])),
     [dependencyData],
   );
+  /** The mapped ends that are not displayed nodes; a filtered-out child receives its subtree's ends. */
   const outOfViewModules = useMemo(() => {
-    if (modulesForGraph.length === 0) return [];
     const related = new Set<string>();
-    for (const edge of activeEdges) {
-      if (visibleModuleIds.has(edge.consumer) && !visibleModuleIds.has(edge.provider)) {
-        related.add(edge.provider);
-      }
-      if (visibleModuleIds.has(edge.provider) && !visibleModuleIds.has(edge.consumer)) {
-        related.add(edge.consumer);
-      }
+    for (const edge of graphEdges) {
+      if (!visibleModuleIds.has(edge.provider)) related.add(edge.provider);
+      if (!visibleModuleIds.has(edge.consumer)) related.add(edge.consumer);
     }
     return [...related]
       .map((id) => modulesById.get(id))
       .filter((module): module is ExplorerModule => module != null);
-  }, [activeEdges, modulesById, modulesForGraph.length, visibleModuleIds]);
+  }, [graphEdges, modulesById, visibleModuleIds]);
   const outOfViewLevelById = useMemo(() => {
     const result: Record<string, number> = {};
-    const visibleDepth = modulesForGraph.length > 0
-      ? Math.min(...modulesForGraph.map((module) => moduleDepth(module.id, modulesById)))
-      : 0;
+    const visibleDepth = scope?.depth ?? 0;
     for (const module of outOfViewModules) {
       result[module.id] = Math.max(1, visibleDepth - moduleDepth(module.id, modulesById));
     }
     return result;
-  }, [modulesById, modulesForGraph, outOfViewModules]);
-  const allVisibleModuleIds = useMemo(
-    () => new Set([...visibleModuleIds, ...outOfViewModules.map((module) => module.id)]),
-    [outOfViewModules, visibleModuleIds],
+  }, [modulesById, outOfViewModules, scope]);
+  const graphEdgesById = useMemo(
+    () => new Map(graphEdges.map((edge) => [edge.id, edge])),
+    [graphEdges],
   );
 
   useEffect(() => {
     if (selectedModuleId && !visibleModuleIds.has(selectedModuleId)) onSelectModule(null);
   }, [onSelectModule, selectedModuleId, visibleModuleIds]);
 
-  /** Links drawn in this scope: active links touching a visible module. */
-  const graphEdges = useMemo(() => activeEdges.filter((edge) =>
-    (visibleModuleIds.has(edge.consumer) || visibleModuleIds.has(edge.provider))
-      && allVisibleModuleIds.has(edge.consumer) && allVisibleModuleIds.has(edge.provider)),
-  [activeEdges, allVisibleModuleIds, visibleModuleIds]);
-  const graphEdgesById = useMemo(
-    () => new Map(graphEdges.map((edge) => [edge.id, edge])),
-    [graphEdges],
-  );
-
-  // A selection survives a settings, scope or data change only as the same projection-specific ID.
+  // A selection survives a settings, scope or data change only as the same link ID. A rolled-up ID
+  // names its scope and depth mode, so changing either clears it; an exact ID can survive.
   useEffect(() => {
     if (selectedEdge && !graphEdgesById.has(selectedEdge.id)) onSelectEdge(null);
   }, [graphEdgesById, onSelectEdge, selectedEdge]);
@@ -460,11 +466,11 @@ export function ProjectExplorerView({
 
   function renderDependencyControls(): React.ReactElement {
     const unavailable = dependencyData === null;
-    const selectedIndex = linkTargetOptions.findIndex((option) => option.value === settings.linkTarget);
+    const selectedIndex = depthOptions.findIndex((option) => option.value === settings.depthMode);
     const choose = (index: number) => {
-      const option = linkTargetOptions[(index + linkTargetOptions.length) % linkTargetOptions.length]!;
-      if (option.value !== settings.linkTarget) changeSettings({ ...settings, linkTarget: option.value });
-      linkTargetRefs.current[linkTargetOptions.indexOf(option)]?.focus();
+      const option = depthOptions[(index + depthOptions.length) % depthOptions.length]!;
+      if (option.value !== settings.depthMode) changeSettings({ ...settings, depthMode: option.value });
+      depthRefs.current[depthOptions.indexOf(option)]?.focus();
     };
     return (
       <div className="module-arch__filters module-arch__dependency-controls" role="group" aria-label="Dependencies">
@@ -479,15 +485,26 @@ export function ProjectExplorerView({
             />
             <span className="module-arch__filter-label">Show non-behavioral dependencies</span>
           </label>
+          {!coversProject && (
+            <label className={`module-arch__filter-item${unavailable ? ' module-arch__filter-item--disabled' : ''}`}>
+              <input
+                type="checkbox"
+                checked={settings.showOutsideScope}
+                disabled={unavailable}
+                onChange={(event) => changeSettings({ ...settings, showOutsideScope: event.target.checked })}
+              />
+              <span className="module-arch__filter-label">Show dependencies that leave this module</span>
+            </label>
+          )}
           <div className="module-arch__segmented">
-            <span className="module-arch__segmented-label" id="module-arch-link-targets">Link targets</span>
-            <div role="radiogroup" aria-labelledby="module-arch-link-targets" className="module-arch__segmented-options">
-              {linkTargetOptions.map((option, index) => {
-                const checked = option.value === settings.linkTarget;
+            <span className="module-arch__segmented-label" id="module-arch-link-depth">Link depth</span>
+            <div role="radiogroup" aria-labelledby="module-arch-link-depth" className="module-arch__segmented-options">
+              {depthOptions.map((option, index) => {
+                const checked = option.value === settings.depthMode;
                 return (
                   <button
                     key={option.value}
-                    ref={(element) => { linkTargetRefs.current[index] = element; }}
+                    ref={(element) => { depthRefs.current[index] = element; }}
                     type="button"
                     role="radio"
                     aria-checked={checked}
@@ -499,7 +516,7 @@ export function ProjectExplorerView({
                       const next = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? selectedIndex + 1
                         : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? selectedIndex - 1
                           : event.key === 'Home' ? 0
-                            : event.key === 'End' ? linkTargetOptions.length - 1 : null;
+                            : event.key === 'End' ? depthOptions.length - 1 : null;
                       if (next === null) return;
                       event.preventDefault();
                       choose(next);
@@ -516,7 +533,17 @@ export function ProjectExplorerView({
     );
   }
 
+  function moduleName(id: string): string {
+    return modulesById.get(id)?.name ?? id;
+  }
+
   function renderProjectDetail(): React.ReactNode {
+    const thisView = scopeLinkCounts(scopeLinks);
+    const frameRow = scopeModuleId !== null ? dependencyRows.get(scopeModuleId) ?? null : null;
+    const notDrawn = dependencyData
+      ? { behavioral: dependencyData.project.behavioral - thisView.behavioral,
+        nonBehavioral: dependencyData.project.nonBehavioral - thisView.nonBehavioral }
+      : { behavioral: 0, nonBehavioral: 0 };
     return (
       <div className="module-arch__detail">
         <div className="module-arch__detail-header">
@@ -524,10 +551,18 @@ export function ProjectExplorerView({
           <p className="module-arch__detail-description">{headlineHelp}</p>
         </div>
         <section className="module-arch__role" aria-label="Project dependencies">
-          {dependencyData
-            ? headlineCards(dependencyData.project.behavioral, dependencyData.project.nonBehavioral,
-              'Behavioral dependencies', 'Non-behavioral dependencies')
-            : dependencyPlaceholder()}
+          {dependencyData ? (
+            <>
+              {cardPair('This view', thisView, 'Behavioral dependencies', 'Non-behavioral dependencies')}
+              {cardPair('Whole project', dependencyData.project, 'Behavioral dependencies', 'Non-behavioral dependencies')}
+              <p className="module-arch__not-drawn"
+                data-not-drawn={`${notDrawn.behavioral}/${notDrawn.nonBehavioral}`}>
+                Not drawn at this level: {notDrawn.behavioral} behavioral and {notDrawn.nonBehavioral} non-behavioral.
+                They are internal to a displayed node, folded into the scope&apos;s own source, or outside the scope
+                while leaving links are hidden.
+              </p>
+            </>
+          ) : dependencyPlaceholder()}
           <div className="module-arch__detail-metrics">
             {dependencyData && metric(displayedLinks, 'Displayed module links')}
             {dependencyData && metric(coverageText(dependencyData), 'Coverage')}
@@ -542,6 +577,18 @@ export function ProjectExplorerView({
             </p>
           )}
         </section>
+        {frameRow && scopeModuleId !== null && (
+          <section className="module-arch__role" aria-label="Scope's own source">
+            <h4 className="module-arch__role-title">Scope&apos;s own source</h4>
+            {cardPair('Uses', frameRow.uses, 'Behavioral dependencies', 'Non-behavioral dependencies')}
+            {cardPair('Owned originals used by others', frameRow.ownedUsedByOthers,
+              'Behavioral dependencies', 'Non-behavioral dependencies')}
+            <p className="module-arch__sidebar-hint">
+              {moduleName(scopeModuleId)}&apos;s own source is folded into the frame, so its links are not drawn
+              at this scope.
+            </p>
+          </section>
+        )}
         <p className="module-arch__sidebar-hint">Select a module or link to inspect details</p>
       </div>
     );
@@ -552,26 +599,11 @@ export function ProjectExplorerView({
     const dependents = model.edges.filter((edge) => edge.provider === module.id);
     const coverage = model.coverage.filter((item) => item.moduleIds.includes(module.id));
     const row = dependencyRows.get(module.id) ?? null;
-    const linksDisplayed = activeEdges.filter((edge) => edge.consumer === module.id || edge.provider === module.id).length;
-    const imported = settings.linkTarget === 'imported-module';
-    const usedThrough = row && (
-      <section className="module-arch__role" aria-label="Used through this module" key="used-through">
-        {imported && <h4 className="module-arch__role-title">Used through this module</h4>}
-        {headlineCards(row.usedThrough.behavioralUsedOriginals, row.usedThrough.nonBehavioralUsedOriginals,
-          'Behavioral used originals via this module', 'Non-behavioral used originals via this module')}
-      </section>
-    );
-    const owned = row && (
-      <section className="module-arch__role" aria-label="Owned originals used by others" key="owned">
-        {!imported && <h4 className="module-arch__role-title">Owned originals used by others</h4>}
-        {headlineCards(row.ownedUsedByOthers.behavioral, row.ownedUsedByOthers.nonBehavioral,
-          'Behavioral dependencies', 'Non-behavioral dependencies')}
-      </section>
-    );
-    // The alternate role is titled by its disclosure summary.
-    const [activeRole, alternateRole, alternateLabel] = imported
-      ? [usedThrough, owned, 'Owned originals used by others']
-      : [owned, usedThrough, 'Used through this module'];
+    const subtree = dependencyData ? subtreeDependencyCounts(dependencyData, module.id, tree) : null;
+    const atLevelUses = scopeLinkCounts(scopeLinks.filter((link) => link.consumer === module.id));
+    const atLevelOwned = scopeLinkCounts(scopeLinks.filter((link) => link.provider === module.id));
+    const linksDisplayed = graphEdges
+      .filter((link) => link.consumer === module.id || link.provider === module.id).length;
     return (
       <div className="module-arch__detail">
         <div className="module-arch__detail-header">
@@ -592,17 +624,30 @@ export function ProjectExplorerView({
           )}
         </div>
 
-        {row ? (
+        {row && subtree ? (
           <>
             <section className="module-arch__role" aria-label="Uses">
               <h4 className="module-arch__role-title">Uses</h4>
-              {headlineCards(row.uses.behavioral, row.uses.nonBehavioral,
+              {cardPair('At this level', atLevelUses, 'Behavioral dependencies', 'Non-behavioral dependencies')}
+              {cardPair('Including internals', subtree.uses, 'Behavioral dependencies', 'Non-behavioral dependencies')}
+            </section>
+            <section className="module-arch__role" aria-label="Owned originals used by others">
+              <h4 className="module-arch__role-title">Owned originals used by others</h4>
+              {cardPair('At this level', atLevelOwned, 'Behavioral dependencies', 'Non-behavioral dependencies')}
+              {cardPair('Including internals', subtree.ownedUsedByOthers,
                 'Behavioral dependencies', 'Non-behavioral dependencies')}
             </section>
-            {activeRole}
             <details className="module-arch__alternate-role">
-              <summary>{alternateLabel}</summary>
-              {alternateRole}
+              <summary>Used through this module</summary>
+              <section className="module-arch__role" aria-label="Used through this module">
+                {cardPair('Including internals',
+                  { behavioral: subtree.usedThrough.behavioralUsedOriginals,
+                    nonBehavioral: subtree.usedThrough.nonBehavioralUsedOriginals },
+                  'Behavioral used originals via this module', 'Non-behavioral used originals via this module')}
+                <p className="module-arch__sidebar-hint">
+                  An imported boundary is a panel unit: no drawn link uses it.
+                </p>
+              </section>
             </details>
           </>
         ) : (
@@ -681,91 +726,125 @@ export function ProjectExplorerView({
   }
 
   function renderLinkDetail(link: ActiveDependencyEdge): React.ReactNode {
-    const consumer = modulesById.get(link.consumer)?.name ?? link.consumer;
-    const provider = modulesById.get(link.provider)?.name ?? link.provider;
-    const edge = link.source;
-    const imported = edge.projection === 'imported-module';
-    const reasons = [...new Set(edge.evidence.map((item) => item.reasons).flat())].sort();
-    const coverageIds = [...new Set(edge.evidence.flatMap((item) => item.coverageIds))].sort();
-    const linkCoverage = model.coverage.filter((item) => coverageIds.includes(item.limit.id));
+    const consumer = moduleName(link.consumer);
+    const provider = moduleName(link.provider);
+    const rolled = link.depthMode === 'level';
+    const entries = link.sources.flatMap((edge) =>
+      edge.evidence.map((item) => ({ consumer: edge.consumer, item })));
+    const reasons = [...new Set(entries.map((entry) => entry.item.reasons).flat())].sort();
+    const linkCoverage = model.coverage.filter((item) => link.coverageIds.includes(item.limit.id));
     const files = (select: (item: DependencyGraphEvidence) => readonly string[]) =>
-      [...new Set(edge.evidence.flatMap(select))].sort();
-    const unit = imported ? 'used originals via this boundary' : 'dependencies';
+      [...new Set(entries.flatMap((entry) => select(entry.item)))].sort();
+    const breakdown = (
+      <ul className="module-arch__breakdown">
+        {importedThroughTotals(link.sources)
+          .map((item) => breakdownRow(item.module, item.behavioral, item.nonBehavioral))}
+      </ul>
+    );
     return (
       <div className="module-arch__detail">
         <div className="module-arch__detail-header">
-          <h3 className="module-arch__detail-name">{imported ? 'Imported-module link' : 'Original-owner link'}</h3>
+          <h3 className="module-arch__detail-name">{rolled ? 'Rolled-up link' : 'Original-owner link'}</h3>
           <span className="module-arch__detail-path">{consumer} {' -> '} {provider}</span>
           {statusBadge(link.status)}
           {reasonBadges(reasons)}
         </div>
-        <section className="module-arch__role" aria-label={imported ? 'Used originals via this boundary' : 'Dependencies'}>
+        <section className="module-arch__role" aria-label="Dependencies">
           <h4 className="module-arch__role-title">
-            {imported ? `${consumer} uses through ${provider}` : `${consumer} depends on originals owned by ${provider}`}
+            {rolled
+              ? `Everything under ${consumer} depends on originals owned under ${provider}`
+              : `${consumer} depends on originals owned by ${provider}`}
           </h4>
-          {headlineCards(link.behavioral, link.nonBehavioral, `Behavioral ${unit}`, `Non-behavioral ${unit}`)}
+          {rolled
+            ? cardPair('At this level', link, 'Behavioral dependencies', 'Non-behavioral dependencies')
+            : headlineCards(link.behavioral, link.nonBehavioral,
+              'Behavioral dependencies', 'Non-behavioral dependencies')}
           <div className="module-arch__detail-metrics">
-            {metric(link.behavioral + link.nonBehavioral, `Total classified ${imported ? 'originals via this boundary' : 'dependencies'}`)}
+            {metric(link.behavioral + link.nonBehavioral, 'Total classified dependencies')}
           </div>
         </section>
-        <section className="module-arch__role" aria-label={imported ? 'Original owners' : 'Imported through'}>
-          <h4 className="module-arch__role-title">{imported ? 'Original owners' : 'Imported through'}</h4>
-          <ul className="module-arch__breakdown">
-            {edge.projection === 'imported-module'
-              ? edge.originalOwners.map((item) => breakdownRow(item.owner,
-                item.counts.behavioralUsedOriginals, item.counts.nonBehavioralUsedOriginals))
-              : edge.importedThrough.map((item) => breakdownRow(item.module,
-                item.counts.behavioralUsedOriginals, item.counts.nonBehavioralUsedOriginals))}
-          </ul>
-        </section>
+        {rolled && (
+          <section className="module-arch__role" aria-label="Rolled-up modules">
+            <h4 className="module-arch__role-title">Rolled-up modules</h4>
+            <ul className="module-arch__breakdown">
+              {link.sources.map((edge) => (
+                <li key={edge.id} className="module-arch__breakdown-item"
+                  data-consumer={edge.consumer} data-provider={edge.provider}>
+                  <span className="module-arch__dependency-name">
+                    {moduleName(edge.consumer)} {' -> '} {moduleName(edge.provider)}
+                  </span>
+                  <span>{edge.counts.behavioral} behavioral</span>
+                  <span>{edge.counts.nonBehavioral} non-behavioral</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+        {rolled ? (
+          <details className="module-arch__alternate-role">
+            <summary>Imported through</summary>
+            <section className="module-arch__role" aria-label="Imported through">{breakdown}</section>
+          </details>
+        ) : (
+          <section className="module-arch__role" aria-label="Imported through">
+            <h4 className="module-arch__role-title">Imported through</h4>
+            {breakdown}
+          </section>
+        )}
         {collapsible('edge-files', 'Supporting files', (
           <dl className="module-arch__file-groups">
             {fileGroup('Consumer files', files((item) => item.consumerFiles))}
-            {imported
-              ? fileGroup('Imported module files', files((item) => item.importedFiles))
-              : fileGroup('Original declaration files', files((item) => item.originalFiles))}
+            {fileGroup('Original declaration files', files((item) => item.originalFiles))}
             <dt>Coverage</dt>
             <dd>
-              <span>{coverageIds.length === 0 ? 'No coverage limits on this link' : coverageIds.join(', ')}</span>
+              <span>{link.coverageIds.length === 0
+                ? 'No coverage limits on this link' : link.coverageIds.join(', ')}</span>
               {linkCoverage.length > 0 && renderCoverage(linkCoverage)}
             </dd>
           </dl>
         ))}
-        {collapsible('edge-originals', 'Referenced originals', renderEvidence(edge.evidence, imported),
-          new Set(edge.evidence.map((item) => originalKey(item))).size)}
+        {collapsible('edge-originals', 'Referenced originals', renderEvidence(entries, rolled),
+          new Set(entries.map((entry) => originalIdentity(entry.item.original))).size)}
         {renderDiscussion({ kind: 'edge', id: link.id, edge: link }, `${consumer} -> ${provider}`, 'edge-discussion')}
       </div>
     );
   }
 
-  function renderEvidence(evidence: readonly DependencyGraphEvidence[], imported: boolean): React.ReactNode {
-    const groups = new Map<string, DependencyGraphEvidence[]>();
-    for (const item of evidence) {
-      const key = originalKey(item);
-      groups.set(key, [...(groups.get(key) ?? []), item]);
+  function renderEvidence(
+    entries: readonly { readonly consumer: string; readonly item: DependencyGraphEvidence }[],
+    rolled: boolean,
+  ): React.ReactNode {
+    const groups = new Map<string, { readonly consumer: string; readonly item: DependencyGraphEvidence }[]>();
+    for (const entry of entries) {
+      const key = originalIdentity(entry.item.original);
+      groups.set(key, [...(groups.get(key) ?? []), entry]);
     }
     return (
       <ul className="module-arch__evidence-list">
         {[...groups.entries()].map(([key, items]) => {
-          const first = items[0]!;
+          const first = items[0]!.item;
           return (
             <li key={key} className="module-arch__evidence-item" data-original={key}>
               <span className="module-arch__evidence-original">{first.original.binding}</span>
               <span className="module-arch__detail-path">
-                {first.original.file} ({modulesById.get(first.originalOwner)?.name ?? first.originalOwner})
+                {first.original.file} ({moduleName(first.originalOwner)})
               </span>
-              {items.map((item) => (
-                <div key={item.importedModule} className="module-arch__evidence-path">
-                  <span className="module-arch__dependency-badge">{item.classification}</span>
-                  {statusBadge(item.status)}
-                  {reasonBadges(item.reasons)}
-                  {!imported && (
+              {items.map((entry, index) => (
+                <div key={`${entry.consumer}|${entry.item.importedModule}|${index}`}
+                  className="module-arch__evidence-path">
+                  <span className="module-arch__dependency-badge">{entry.item.classification}</span>
+                  {statusBadge(entry.item.status)}
+                  {reasonBadges(entry.item.reasons)}
+                  {rolled && (
                     <span className="module-arch__detail-path">
-                      imported through {modulesById.get(item.importedModule)?.name ?? item.importedModule}
+                      {moduleName(entry.consumer)} {' -> '} {moduleName(entry.item.originalOwner)}
                     </span>
                   )}
+                  <span className="module-arch__detail-path">
+                    imported through {moduleName(entry.item.importedModule)}
+                  </span>
                   <span className="module-arch__evidence-occurrences">
-                    Supporting occurrences: {item.accessIds.length}
+                    Supporting occurrences: {entry.item.accessIds.length}
                   </span>
                 </div>
               ))}
@@ -773,6 +852,16 @@ export function ProjectExplorerView({
           );
         })}
       </ul>
+    );
+  }
+
+  function cardPair(label: string, counts: DependencyGraphCount,
+    behavioralLabel: string, nonBehavioralLabel: string): React.ReactElement {
+    return (
+      <div className="module-arch__card-pair" role="group" aria-label={label}>
+        <h5 className="module-arch__card-pair-label">{label}</h5>
+        {headlineCards(counts.behavioral, counts.nonBehavioral, behavioralLabel, nonBehavioralLabel)}
+      </div>
     );
   }
 
@@ -935,8 +1024,19 @@ function fileGroup(label: string, files: readonly string[]): React.ReactNode {
   );
 }
 
-function originalKey(item: DependencyGraphEvidence): string {
-  return JSON.stringify([item.original.kind, item.original.owner, item.original.file, item.original.binding]);
+/** Imported boundaries of every contributing edge, summed per imported module in first-seen order. */
+function importedThroughTotals(sources: readonly DependencyGraphOriginalEdge[]): {
+  readonly module: string; readonly behavioral: number; readonly nonBehavioral: number }[] {
+  const totals = new Map<string, { module: string; behavioral: number; nonBehavioral: number }>();
+  for (const edge of sources) {
+    for (const item of edge.importedThrough) {
+      const found = totals.get(item.module) ?? { module: item.module, behavioral: 0, nonBehavioral: 0 };
+      found.behavioral += item.counts.behavioralUsedOriginals;
+      found.nonBehavioral += item.counts.nonBehavioralUsedOriginals;
+      totals.set(item.module, found);
+    }
+  }
+  return [...totals.values()];
 }
 
 function coverageText(model: DependencyGraphModel): string {

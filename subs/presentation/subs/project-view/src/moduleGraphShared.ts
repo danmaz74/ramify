@@ -9,7 +9,7 @@ import type { Edge, Node } from '@xyflow/react';
 import type { ExplorerModule } from './interfaces/project-view.js';
 import { linkWidth, type ActiveDependencyEdge } from './dependency-graph.js';
 
-/** A selected link, identified by its projection-specific ID. */
+/** A selected link, identified by its scoped or exact link ID. */
 export type GraphSelection = {
   readonly kind: 'edge';
   readonly id: string;
@@ -18,7 +18,7 @@ export type GraphSelection = {
 
 export interface ModuleGraphProps {
   readonly modules: readonly ExplorerModule[];
-  /** Links of the active dependency collection under the current settings. */
+  /** The links drawn at the current scope under the current settings. */
   readonly edges: readonly ActiveDependencyEdge[];
   readonly outOfViewModules?: readonly ExplorerModule[];
   readonly outOfViewLevelById?: Readonly<Record<string, number>>;

@@ -339,6 +339,25 @@
   letter-spacing: 0.03em;
 }
 
+.module-arch__card-pair {
+  margin-bottom: 8px;
+}
+
+.module-arch__card-pair-label {
+  margin: 0 0 4px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.module-arch__not-drawn {
+  margin: 4px 0 8px;
+  color: #475569;
+  font-size: 11px;
+}
+
 .module-arch__headline-cards {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

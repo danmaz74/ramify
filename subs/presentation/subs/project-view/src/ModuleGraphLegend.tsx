@@ -3,6 +3,7 @@
 // 44b7f30e0fdfda79ead8363ef4c85c100e36fda0.
 
 import type React from 'react';
+import type { DependencyDepthMode } from './interfaces/dependency-view.js';
 import {
   getPresentationClassColor,
   getPresentationClassLabel,
@@ -12,11 +13,14 @@ export interface ModuleGraphLegendProps {
   readonly presentationClasses: readonly string[];
   /** Whether non-behavioral-only links are currently drawn. */
   readonly showsNonBehavioralLinks?: boolean;
+  /** The unit of the drawn links; omitted while none is drawn. */
+  readonly depthMode?: DependencyDepthMode;
 }
 
 export default function ModuleGraphLegend({
   presentationClasses,
   showsNonBehavioralLinks = false,
+  depthMode,
 }: ModuleGraphLegendProps): React.ReactElement {
   return (
     <div className="module-arch__graph-legend" aria-hidden="true">
@@ -34,6 +38,13 @@ export default function ModuleGraphLegend({
         <span className="module-arch__graph-legend-edge module-arch__graph-legend-edge--ok" />
         <span>Link: behavioral or mixed</span>
       </div>
+      {depthMode && (
+        <div className="module-arch__graph-legend-row">
+          <span>{depthMode === 'level'
+            ? 'Link unit: a module and everything under it'
+            : 'Link unit: one exact consumer and original owner'}</span>
+        </div>
+      )}
       {showsNonBehavioralLinks && (
         <div className="module-arch__graph-legend-row">
           <span className="module-arch__graph-legend-edge module-arch__graph-legend-edge--non-behavioral" />

@@ -88,12 +88,18 @@ export interface DependencyGraphModel {
   };
 }
 
-export type DependencyLinkTarget = 'imported-module' | 'original-owner';
+/**
+ * How deep the drawn link's ends are. `level` rolls every end up to the node of the current
+ * scope that contains it; `exact` draws each defining module itself.
+ */
+export type DependencyDepthMode = 'level' | 'exact';
 
 /** Local display settings; changing them never requests data. */
 export interface DependencySettings {
   readonly showNonBehavioral: boolean;
-  readonly linkTarget: DependencyLinkTarget;
+  readonly depthMode: DependencyDepthMode;
+  /** Whether links with an end outside the scope's subtree are drawn. */
+  readonly showOutsideScope: boolean;
 }
 
 export type DependencyPhase =

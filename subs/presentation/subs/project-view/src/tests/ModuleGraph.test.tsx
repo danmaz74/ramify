@@ -14,13 +14,22 @@ import { getPresentationClassColor } from '../moduleTypePresentation.js';
 import { flowDashArray, type GraphSelection } from '../moduleGraphShared.js';
 import type { ExplorerModule } from '../interfaces/project-view.js';
 import {
-  activeDependencyEdges,
+  dependencyScope,
   linkWidth,
   maximumLinkWidth,
   minimumLinkWidth,
+  scopeDependencyLinks,
   type ActiveDependencyEdge,
 } from '../dependency-graph.js';
-import { forwardingProject, mappedDependencyModels } from './dependency-fixtures.js';
+import { indexModuleTree } from '../module-tree.js';
+import type { DependencyGraphModel, DependencySettings } from '../interfaces/dependency-view.js';
+import type { ProjectExplorerModel } from '../interfaces/project-view.js';
+import {
+  forwardingProject,
+  mappedDependencyModels,
+  nestedLevelsDependencies,
+  nestedLevelsProject,
+} from './dependency-fixtures.js';
 
 const reactFlowPropsHistory: Array<Record<string, unknown>> = [];
 
@@ -62,7 +71,7 @@ vi.mock('@xyflow/react', () => {
 });
 
 describe('ModuleGraphRadial', () => {
-  const edgeId = 'dependency-edge/1:imported-module:a-b';
+  const edgeId = 'dependency-edge/1:original-owner:a-b';
 
   beforeEach(() => {
     cleanup();
@@ -138,7 +147,7 @@ describe('ModuleGraphRadial', () => {
 
   it('scales link width by the displayed classified count and disables animation', () => {
     const edges = createEdges();
-    edges.push({ ...edges[0]!, id: 'dependency-edge/1:imported-module:b-a', consumer: 'b', provider: 'a', displayed: 12 });
+    edges.push({ ...edges[0]!, id: 'dependency-edge/1:original-owner:b-a', consumer: 'b', provider: 'a', displayed: 12 });
     renderGraph({ edges });
     const graphEdges = getLastReactFlowProps().edges as Array<Record<string, any>>;
     expect(graphEdges[0].animated).toBe(false);
@@ -146,51 +155,65 @@ describe('ModuleGraphRadial', () => {
     expect(graphEdges[1].style.strokeWidth).toBeGreaterThan(graphEdges[0].style.strokeWidth);
   });
 
-  it('BD33 encodes behavior and status as colour and count as a bounded logarithmic width, with directional dashes and count as a bounded logarithmic width', () => {
-    const { forwarding, bothBoundaries } = mappedDependencyModels();
-    const project = forwardingProject();
-    const mixed = activeDependencyEdges(bothBoundaries, { showNonBehavioral: true, linkTarget: 'imported-module' });
-    const onlyNonBehavioral = activeDependencyEdges(forwarding, { showNonBehavioral: true, linkTarget: 'imported-module' });
-    const edges = [...mixed, ...onlyNonBehavioral.filter((edge) => edge.provider === 'app/c' || edge.consumer === 'app/b/core')];
-    renderComponent(<ModuleGraphRadial modules={project.modules} edges={edges} selectedModuleId={null}
+  it('BD33 encodes behavior and status as colour and count as a bounded logarithmic width, with directional dashes', () => {
+    const { forwarding } = mappedDependencyModels();
+    const forwardingModel = forwardingProject();
+    const nestedModel = nestedLevelsProject();
+    const nested = nestedLevelsDependencies();
+    const rolled = scopedLinks(forwardingModel, forwarding, 'level');
+    const exact = scopedLinks(forwardingModel, forwarding, 'exact');
+    const nestedRolled = scopedLinks(nestedModel, nested, 'level');
+    const nestedExact = scopedLinks(nestedModel, nested, 'exact');
+    const pick = (links: readonly ActiveDependencyEdge[], consumer: string, provider: string) =>
+      links.find((link) => link.consumer === consumer && link.provider === provider)!;
+
+    // Behavioral and allowed: the full-strength neutral colour.
+    const allowed = pick(rolled, 'app/b', 'app/c');
+    expect(allowed).toMatchObject({ behavioral: 1, nonBehavioral: 0, emphasis: 'behavioral', status: 'allowed' });
+    expect(strokeOf(forwardingModel, allowed)).toBe('#64748b');
+    // Behavioral and denied: the full-strength red.
+    const denied = pick(rolled, 'app/a', 'app/b');
+    expect(denied).toMatchObject({ emphasis: 'behavioral', status: 'denied' });
+    expect(strokeOf(forwardingModel, denied)).toBe('#ef4444');
+    // Non-behavioral only and limited: the lighter amber.
+    const limited = pick(rolled, 'app/a', 'app/c');
+    expect(limited).toMatchObject({ behavioral: 0, nonBehavioral: 1, emphasis: 'non-behavioral', status: 'limited' });
+    expect(strokeOf(forwardingModel, limited)).toBe('#fcd34d');
+    // Non-behavioral only and allowed: the lighter neutral, muted.
+    const muted = pick(exact, 'app/b/core', 'app/b');
+    expect(muted).toMatchObject({ behavioral: 0, nonBehavioral: 1, emphasis: 'non-behavioral', status: 'allowed' });
+    expect(strokeOf(forwardingModel, muted)).toBe('#cbd5e1');
+    expect(styleOf(forwardingModel, muted).opacity).toBeLessThan(styleOf(forwardingModel, allowed).opacity);
+    // Non-behavioral only and denied: the lighter red.
+    const lightDenied = pick(nestedExact, 'app/a/left', 'app/b');
+    expect(lightDenied).toMatchObject({ behavioral: 0, nonBehavioral: 1, emphasis: 'non-behavioral', status: 'denied' });
+    expect(strokeOf(nestedModel, lightDenied)).toBe('#fca5a5');
+
+    // The dash pattern is the direction animation, so every link carries it whatever its behavior.
+    cleanup();
+    renderComponent(<ModuleGraphRadial modules={nestedModel.modules} edges={nestedRolled} selectedModuleId={null}
       selectedEdgeId={null} onSelectModule={vi.fn()} onSelectEdge={vi.fn()} />);
     const drawn = getLastReactFlowProps().edges as Array<Record<string, any>>;
-    expect(drawn).toHaveLength(edges.length);
-
-    // bothBoundaries a -> b: 1 behavioral + 1 non-behavioral, allowed: full-strength neutral colour.
-    const mixedLink = drawn[0]!;
-    expect(mixedLink.data.edge).toMatchObject({ consumer: 'app/a', provider: 'app/b', behavioral: 1, nonBehavioral: 1, displayed: 2 });
-    expect(mixedLink.style.stroke).toBe('#64748b');
-    // bothBoundaries a -> c: behavioral, limited: full-strength amber.
-    const limitedLink = drawn[1]!;
-    expect(limitedLink.data.edge).toMatchObject({ provider: 'app/c', status: 'limited', emphasis: 'behavioral' });
-    expect(limitedLink.style.stroke).toBe('#f59e0b');
-    // forwarding a -> c: non-behavioral only with denied evidence: the lighter denied colour.
-    const deniedLink = drawn.find((edge) => edge.data.edge.status === 'denied')!;
-    expect(deniedLink.data.edge).toMatchObject({ behavioral: 0, nonBehavioral: 2, emphasis: 'non-behavioral' });
-    expect(deniedLink.style.stroke).toBe('#fca5a5');
-    // forwarding b/core -> b: non-behavioral only, allowed: the lighter neutral colour, muted.
-    const muted = drawn.find((edge) => edge.source === 'app/b/core' && edge.target === 'app/b')!;
-    expect(muted.style.stroke).toBe('#cbd5e1');
-    expect(muted.style.opacity).toBeLessThan(mixedLink.style.opacity);
-    // The dash pattern is the direction animation, so every link carries it whatever its behavior.
+    expect(drawn).toHaveLength(nestedRolled.length);
     for (const link of drawn) expect(link.style.strokeDasharray).toBe(flowDashArray);
+    expect(drawn.every((link: Record<string, any>) => link.animated === false)).toBe(true);
 
-    // Status is a property of the edge's evidence, not of the settings: the owner link a -> b/core is
-    // behavioral through b (allowed) and non-behavioral through c (denied), and stays denied when hidden paths are off.
+    // Status belongs to the contributing evidence, not to the settings.
     for (const showNonBehavioral of [false, true]) {
-      const ownerLink = activeDependencyEdges(forwarding, { showNonBehavioral, linkTarget: 'original-owner' })
-        .find((edge) => edge.consumer === 'app/a' && edge.provider === 'app/b/core')!;
-      expect(ownerLink).toMatchObject({ emphasis: 'behavioral', status: 'denied' });
+      const link = scopedLinks(forwardingModel, forwarding, 'level', { showNonBehavioral })
+        .find((item) => item.consumer === 'app/a' && item.provider === 'app/b')!;
+      expect(link).toMatchObject({ emphasis: 'behavioral', status: 'denied' });
     }
 
     // Width: logarithmic over the displayed count, bounded at both ends.
+    const mixed = pick(nestedRolled, 'app/a', 'app/b');
+    expect(mixed).toMatchObject({ behavioral: 2, nonBehavioral: 2, displayed: 4 });
     expect(linkWidth(1)).toBe(minimumLinkWidth);
     expect(linkWidth(2)).toBeGreaterThan(linkWidth(1));
     expect(linkWidth(4) - linkWidth(2)).toBeCloseTo(linkWidth(2) - linkWidth(1));
     expect(linkWidth(1_000_000)).toBe(maximumLinkWidth);
-    expect(mixedLink.style.strokeWidth).toBe(linkWidth(2));
-    expect(deniedLink.style.strokeWidth).toBe(linkWidth(2));
+    expect(styleOf(nestedModel, mixed).strokeWidth).toBe(linkWidth(4));
+    expect(styleOf(forwardingModel, allowed).strokeWidth).toBe(linkWidth(1));
   });
 
   it('BD37 sizes nodes by owned source files, independently of dependency settings', () => {
@@ -198,14 +221,14 @@ describe('ModuleGraphRadial', () => {
     const project = forwardingProject();
     const diameters: Array<Record<string, number>> = [];
     for (const settings of [
-      { showNonBehavioral: false, linkTarget: 'imported-module' as const },
-      { showNonBehavioral: true, linkTarget: 'imported-module' as const },
-      { showNonBehavioral: false, linkTarget: 'original-owner' as const },
-      { showNonBehavioral: true, linkTarget: 'original-owner' as const },
+      { showNonBehavioral: false, depthMode: 'level' as const, showOutsideScope: true },
+      { showNonBehavioral: true, depthMode: 'level' as const, showOutsideScope: true },
+      { showNonBehavioral: false, depthMode: 'exact' as const, showOutsideScope: true },
+      { showNonBehavioral: true, depthMode: 'exact' as const, showOutsideScope: false },
     ]) {
       cleanup();
       renderComponent(<ModuleGraphRadial modules={project.modules}
-        edges={activeDependencyEdges(forwarding, settings)} selectedModuleId={null}
+        edges={scopedLinks(project, forwarding, settings.depthMode, settings)} selectedModuleId={null}
         selectedEdgeId={null} onSelectModule={vi.fn()} onSelectEdge={vi.fn()} />);
       const nodes = getLastReactFlowProps().nodes as Array<Record<string, any>>;
       diameters.push(Object.fromEntries(nodes.map((node) => [node.id, node.data.diameter])));
@@ -223,9 +246,22 @@ describe('ModuleGraphRadial', () => {
     expect(Math.max(...Object.values(size))).toBe(170);
   });
 
+  it('labels the link unit of the drawn links', () => {
+    const { forwarding } = mappedDependencyModels();
+    const project = forwardingProject();
+    const rendered = renderComponent(<ModuleGraphRadial modules={project.modules}
+      edges={scopedLinks(project, forwarding, 'level')} selectedModuleId={null}
+      selectedEdgeId={null} onSelectModule={vi.fn()} onSelectEdge={vi.fn()} />);
+    expect(screen.getByText('Link unit: a module and everything under it')).toBeTruthy();
+    rendered.rerender(<ModuleGraphRadial modules={project.modules}
+      edges={scopedLinks(project, forwarding, 'exact')} selectedModuleId={null}
+      selectedEdgeId={null} onSelectModule={vi.fn()} onSelectEdge={vi.fn()} />);
+    expect(screen.getByText('Link unit: one exact consumer and original owner')).toBeTruthy();
+  });
+
   it('renders module edges to out-of-view modules without making them selectable', () => {
     const outOfView = createModule('c', 'Module C', null, [], 'ui', 1, 0, 0, 0.1);
-    const edge = { ...createEdges()[0]!, id: 'dependency-edge/1:imported-module:a-c', provider: 'c' };
+    const edge = { ...createEdges()[0]!, id: 'dependency-edge/1:original-owner:a-c', provider: 'c' };
     const onSelectModule = vi.fn();
     renderGraph({ edges: [edge], outOfViewModules: [outOfView], onSelectModule });
     const graph = getLastReactFlowProps();
@@ -329,8 +365,8 @@ function createModule(id: string, name: string, parent: string | null, children:
 
 function createEdges(): ActiveDependencyEdge[] {
   return [{
-    id: 'dependency-edge/1:imported-module:a-b',
-    projection: 'imported-module',
+    id: 'dependency-edge/1:original-owner:a-b',
+    depthMode: 'exact',
     consumer: 'a',
     provider: 'b',
     behavioral: 1,
@@ -338,11 +374,40 @@ function createEdges(): ActiveDependencyEdge[] {
     displayed: 1,
     emphasis: 'behavioral',
     status: 'allowed',
-    source: {
-      id: 'dependency-edge/1:imported-module:a-b', projection: 'imported-module', consumer: 'a', provider: 'b',
-      counts: { behavioralUsedOriginals: 1, nonBehavioralUsedOriginals: 0 },
-      originalOwners: [{ owner: 'b', counts: { behavioralUsedOriginals: 1, nonBehavioralUsedOriginals: 0 } }],
+    leavesScope: false,
+    coverageIds: [],
+    sources: [{
+      id: 'dependency-edge/1:original-owner:a-b', projection: 'original-owner', consumer: 'a', provider: 'b',
+      counts: { behavioral: 1, nonBehavioral: 0 },
+      importedThrough: [{ module: 'b', counts: { behavioralUsedOriginals: 1, nonBehavioralUsedOriginals: 0 } }],
       evidence: [],
-    },
+    }],
   }];
+}
+
+/** The links one project's whole scope draws, with every candidate node displayed. */
+function scopedLinks(project: ProjectExplorerModel, model: DependencyGraphModel,
+  depthMode: DependencySettings['depthMode'],
+  overrides: Partial<DependencySettings> = {}): ActiveDependencyEdge[] {
+  const scope = dependencyScope(project, null);
+  return scopeDependencyLinks({
+    model,
+    scope,
+    displayed: new Set(scope.nodes),
+    tree: indexModuleTree(project.modules, project.rootModuleId),
+    settings: { showNonBehavioral: true, depthMode, showOutsideScope: true, ...overrides },
+  });
+}
+
+function styleOf(project: ProjectExplorerModel, link: ActiveDependencyEdge): Record<string, any> {
+  cleanup();
+  renderComponent(<ModuleGraphRadial modules={project.modules} edges={[link]} selectedModuleId={null}
+    selectedEdgeId={null} onSelectModule={vi.fn()} onSelectEdge={vi.fn()} />);
+  const edges = getLastReactFlowProps().edges as Array<Record<string, any>>;
+  expect(edges).toHaveLength(1);
+  return edges[0]!.style as Record<string, any>;
+}
+
+function strokeOf(project: ProjectExplorerModel, link: ActiveDependencyEdge): string {
+  return styleOf(project, link).stroke as string;
 }

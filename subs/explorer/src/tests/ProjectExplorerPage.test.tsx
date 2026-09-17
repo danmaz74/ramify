@@ -344,8 +344,8 @@ describe('connected dependency view (C7)', () => {
 
     fireEvent.click(screen.getByRole('checkbox', { name: 'Show non-behavioral dependencies' }));
     expect(links()).toEqual(['root/a to root/b', 'root/b to root/a']);
-    fireEvent.click(screen.getByRole('radio', { name: 'Original owners' }));
-    expect(screen.getByRole('radio', { name: 'Original owners' })).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(screen.getByRole('radio', { name: 'Exact module' }));
+    expect(screen.getByRole('radio', { name: 'Exact module' })).toHaveAttribute('aria-checked', 'true');
     expect(links()).toEqual(['root/a to root/b', 'root/b to root/a']);
     await new Promise(resolve => setTimeout(resolve, 1500));
     expect(dependencyCalls(client)).toHaveLength(3);

@@ -209,46 +209,189 @@ async function clickGraphEdge(page: Page, id: string): Promise<void> {
   assert.ok(found, `Graph edge ${id} was not rendered`);
 }
 
-function initialVisible(model: ProjectExplorerModel): readonly string[] {
-  const top = model.modules.filter(module => module.parent === null);
+interface LinkSettings {
+  readonly showNonBehavioral: boolean;
+  readonly depthMode: 'level' | 'exact';
+  readonly showOutsideScope: boolean;
+}
+const defaultLinks: LinkSettings = { showNonBehavioral: false, depthMode: 'level', showOutsideScope: true };
+
+interface ScopeShape {
+  readonly frameModule: string | null;
+  readonly nodes: readonly string[];
+  readonly depth: number;
+}
+
+/** Ancestors of a module, root first, from the project model alone. */
+function ancestorsOfModule(model: ProjectExplorerModel, id: string): string[] {
+  const byId = new Map(model.modules.map(module => [module.id, module]));
+  const result: string[] = [];
+  let parent = byId.get(id)?.parent ?? null;
+  while (parent !== null) { result.unshift(parent); parent = byId.get(parent)?.parent ?? null; }
+  return result;
+}
+
+const containedBy = (model: ProjectExplorerModel, id: string, ancestor: string): boolean =>
+  id === ancestor || ancestorsOfModule(model, id).includes(ancestor);
+
+/** The frame and candidate nodes of one scope, reproducing the view's scope selection. */
+function scopeOf(model: ProjectExplorerModel, scopeModuleId: string | null): ScopeShape {
+  if (scopeModuleId !== null) {
+    return { frameModule: scopeModuleId, depth: ancestorsOfModule(model, scopeModuleId).length + 1,
+      nodes: model.modules.filter(module => module.parent === scopeModuleId).map(module => module.id) };
+  }
+  const topLevel = model.modules.filter(module => module.parent === null);
   const root = model.modules.find(module => module.id === model.rootModuleId);
-  return top.length === 1 && root && root.children.length > 0 ? root.children : top.map(module => module.id);
+  if (topLevel.length === 1 && root && root.children.length > 0) {
+    return { frameModule: root.id, nodes: [...root.children], depth: ancestorsOfModule(model, root.id).length + 1 };
+  }
+  return { frameModule: null, nodes: topLevel.map(module => module.id), depth: 0 };
 }
 
-interface LinkSettings { readonly showNonBehavioral: boolean; readonly linkTarget: 'imported-module' | 'original-owner' }
-const defaultLinks: LinkSettings = { showNonBehavioral: false, linkTarget: 'imported-module' };
+type ScopeEndShape = { readonly kind: 'frame' }
+  | { readonly kind: 'node'; readonly module: string; readonly inScope: boolean };
 
-/** The active links of one setting, computed independently of the view from the served model's counts. */
-function activeLinks(deps: ExplorerDependencyModel, settings: LinkSettings): { id: string; consumer: string; provider: string;
-  behavioral: number; nonBehavioral: number }[] {
-  const edges = settings.linkTarget === 'imported-module'
-    ? deps.importedModuleEdges.map(edge => ({ id: edge.id, consumer: edge.consumer, provider: edge.provider,
-      behavioral: edge.counts.behavioralUsedOriginals, nonBehavioral: edge.counts.nonBehavioralUsedOriginals }))
-    : deps.originalOwnerEdges.map(edge => ({ id: edge.id, consumer: edge.consumer, provider: edge.provider,
-      behavioral: edge.counts.behavioral, nonBehavioral: edge.counts.nonBehavioral }));
-  return edges.filter(edge => edge.behavioral + (settings.showNonBehavioral ? edge.nonBehavioral : 0) > 0);
+/** Where one exact module lands at a scope, calculated from the project structure. */
+function endOf(model: ProjectExplorerModel, scope: ScopeShape, id: string,
+  depthMode: LinkSettings['depthMode']): ScopeEndShape {
+  if (depthMode === 'exact') {
+    return { kind: 'node', module: id,
+      inScope: scope.frameModule === null || containedBy(model, id, scope.frameModule) };
+  }
+  for (const node of scope.nodes) if (containedBy(model, id, node)) return { kind: 'node', module: node, inScope: true };
+  if (scope.frameModule !== null && id === scope.frameModule) return { kind: 'frame' };
+  const outside = scope.depth - 1;
+  const chain = [...ancestorsOfModule(model, id), id];
+  return { kind: 'node', inScope: false,
+    module: chain.length - 1 <= outside ? id : chain[outside] ?? chain[0]! };
 }
 
-/** Link IDs drawn when `visible` modules are in view: active links touching one of them. */
-function expectedLinks(deps: ExplorerDependencyModel, settings: LinkSettings, visible: ReadonlySet<string>): string[] {
-  return activeLinks(deps, settings).filter(edge => visible.has(edge.consumer) || visible.has(edge.provider))
-    .map(edge => edge.id).sort();
+const coversProject = (model: ProjectExplorerModel, scope: ScopeShape): boolean =>
+  model.modules.every(module => (scope.frameModule !== null && containedBy(model, module.id, scope.frameModule))
+    || scope.nodes.some(node => containedBy(model, module.id, node)));
+
+/** The modules a scope displays: its candidate nodes, before any class filter. */
+const visibleAt = (model: ProjectExplorerModel, scopeModuleId: string | null): readonly string[] =>
+  scopeOf(model, scopeModuleId).nodes;
+
+function initialVisible(model: ProjectExplorerModel): readonly string[] {
+  return visibleAt(model, null);
 }
 
-/** Modules drawn out of view: the other endpoint of an active link from a module in view. */
-function expectedOutOfView(deps: ExplorerDependencyModel, settings: LinkSettings, visible: ReadonlySet<string>): string[] {
+interface ScopeLink {
+  readonly id: string;
+  readonly consumer: string;
+  readonly provider: string;
+  readonly behavioral: number;
+  readonly nonBehavioral: number;
+  readonly leavesScope: boolean;
+  readonly sources: readonly string[];
+}
+
+/**
+ * The links one scope draws, computed independently of the view: the ends map from the project
+ * structure, and each group's counts are its distinct `(exact consumer module, original)` pairs,
+ * settled behavioral when any of its evidence rows is behavioral.
+ */
+function scopeLinks(model: ProjectExplorerModel, deps: ExplorerDependencyModel,
+  scopeModuleId: string | null, settings: LinkSettings = defaultLinks,
+  displayedNodes?: readonly string[]): ScopeLink[] {
+  const scope = scopeOf(model, scopeModuleId);
+  const displayed = new Set(displayedNodes ?? scope.nodes);
+  const covers = coversProject(model, scope);
+  const groups = new Map<string, { consumer: string; provider: string; leavesScope: boolean;
+    sources: ExplorerDependencyModel['originalOwnerEdges'][number][] }>();
+  for (const edge of deps.originalOwnerEdges) {
+    const consumer = endOf(model, scope, edge.consumer, settings.depthMode);
+    const provider = endOf(model, scope, edge.provider, settings.depthMode);
+    if (consumer.kind === 'frame' || provider.kind === 'frame') continue;
+    if (consumer.module === provider.module) continue;
+    if (!displayed.has(consumer.module) && !displayed.has(provider.module)) continue;
+    const key = JSON.stringify([consumer.module, provider.module]);
+    const group = groups.get(key)
+      ?? { consumer: consumer.module, provider: provider.module, leavesScope: false, sources: [] };
+    group.leavesScope = group.leavesScope || (!covers && (!consumer.inScope || !provider.inScope));
+    group.sources.push(edge);
+    groups.set(key, group);
+  }
+  const byPair = (left: { consumer: string; provider: string }, right: { consumer: string; provider: string }) =>
+    left.consumer < right.consumer ? -1 : left.consumer > right.consumer ? 1
+      : left.provider < right.provider ? -1 : left.provider > right.provider ? 1 : 0;
+  const result: ScopeLink[] = [];
+  for (const group of groups.values()) {
+    if (group.leavesScope && !settings.showOutsideScope) continue;
+    const sources = [...group.sources].sort(byPair);
+    const pairs = new Map<string, boolean>();
+    for (const edge of sources) {
+      for (const item of edge.evidence) {
+        const key = JSON.stringify([edge.consumer, item.original]);
+        pairs.set(key, (pairs.get(key) ?? false) || item.classification === 'behavioral');
+      }
+    }
+    let behavioral = 0, nonBehavioral = 0;
+    for (const settled of pairs.values()) { if (settled) behavioral += 1; else nonBehavioral += 1; }
+    if (behavioral + (settings.showNonBehavioral ? nonBehavioral : 0) === 0) continue;
+    result.push({
+      id: settings.depthMode === 'exact' ? sources[0]!.id
+        : `scoped-link/1:level:${scope.frameModule ?? '-'}:${JSON.stringify([group.consumer, group.provider])}`,
+      consumer: group.consumer, provider: group.provider, behavioral, nonBehavioral,
+      leavesScope: group.leavesScope, sources: sources.map(edge => edge.id),
+    });
+  }
+  return result.sort(byPair);
+}
+
+/** Link IDs drawn at one scope, in the order the DOM comparison uses. */
+function expectedLinks(model: ProjectExplorerModel, deps: ExplorerDependencyModel,
+  scopeModuleId: string | null, settings: LinkSettings = defaultLinks,
+  displayedNodes?: readonly string[]): string[] {
+  return scopeLinks(model, deps, scopeModuleId, settings, displayedNodes).map(link => link.id).sort();
+}
+
+/** Modules drawn out of view: the mapped ends of a drawn link that are not displayed nodes. */
+function expectedOutOfView(model: ProjectExplorerModel, deps: ExplorerDependencyModel,
+  scopeModuleId: string | null, settings: LinkSettings = defaultLinks,
+  displayedNodes?: readonly string[]): string[] {
+  const displayed = new Set(displayedNodes ?? visibleAt(model, scopeModuleId));
   const related = new Set<string>();
-  for (const edge of activeLinks(deps, settings)) {
-    if (visible.has(edge.consumer) && !visible.has(edge.provider)) related.add(edge.provider);
-    if (visible.has(edge.provider) && !visible.has(edge.consumer)) related.add(edge.consumer);
+  for (const link of scopeLinks(model, deps, scopeModuleId, settings, displayedNodes)) {
+    if (!displayed.has(link.consumer)) related.add(link.consumer);
+    if (!displayed.has(link.provider)) related.add(link.provider);
   }
   return [...related].sort();
 }
 
+/** The counts the scope's panels show: its links before the non-behavioral display filter. */
+function scopeCounts(model: ProjectExplorerModel, deps: ExplorerDependencyModel,
+  scopeModuleId: string | null, settings: LinkSettings = defaultLinks,
+  displayedNodes?: readonly string[]): { behavioral: number; nonBehavioral: number } {
+  return scopeLinks(model, deps, scopeModuleId, { ...settings, showNonBehavioral: true }, displayedNodes)
+    .reduce((sum, link) => ({ behavioral: sum.behavioral + link.behavioral,
+      nonBehavioral: sum.nonBehavioral + link.nonBehavioral }), { behavioral: 0, nonBehavioral: 0 });
+}
+
+/** The measured totals of a module and all of its descendants, from the served rows. */
+function subtreeCounts(model: ProjectExplorerModel, deps: ExplorerDependencyModel, id: string): {
+  uses: { behavioral: number; nonBehavioral: number };
+  ownedUsedByOthers: { behavioral: number; nonBehavioral: number };
+  usedThrough: { behavioralUsedOriginals: number; nonBehavioralUsedOriginals: number };
+} {
+  const rows = deps.modules.filter(row => containedBy(model, row.id, id));
+  const add = (select: (row: ExplorerDependencyModel['modules'][number]) => number) =>
+    rows.reduce((sum, row) => sum + select(row), 0);
+  return {
+    uses: { behavioral: add(row => row.uses.behavioral), nonBehavioral: add(row => row.uses.nonBehavioral) },
+    ownedUsedByOthers: { behavioral: add(row => row.ownedUsedByOthers.behavioral),
+      nonBehavioral: add(row => row.ownedUsedByOthers.nonBehavioral) },
+    usedThrough: { behavioralUsedOriginals: add(row => row.usedThrough.behavioralUsedOriginals),
+      nonBehavioralUsedOriginals: add(row => row.usedThrough.nonBehavioralUsedOriginals) },
+  };
+}
+
 function expectedSubtitle(model: ProjectExplorerModel, deps: ExplorerDependencyModel, settings = defaultLinks): string {
-  const visible = new Set(initialVisible(model));
-  const links = expectedLinks(deps, settings, visible).length;
-  return `Showing ${visible.size} of ${model.modules.length} modules, ${links} displayed ${links === 1 ? 'link' : 'links'}`;
+  const visible = initialVisible(model);
+  const links = expectedLinks(model, deps, null, settings).length;
+  return `Showing ${visible.length} of ${model.modules.length} modules, ${links} displayed ${links === 1 ? 'link' : 'links'}`;
 }
 
 function reportExternalWitness(check: ReadyCheck): Record<string, unknown> {
@@ -315,18 +458,18 @@ async function waitForLinks(page: Page, expected: readonly string[], what: strin
 }
 
 /**
- * Module nodes only, and the links are exactly the dependency model's active links in the root scope:
- * no occurrence edge of the project model is drawn.
+ * Module nodes only, and the links are exactly the scope roll-up of the dependency model at the
+ * project scope: no occurrence edge of the project model is drawn.
  */
 async function assertModuleOnlyDom(page: Page, model: ProjectExplorerModel, deps: ExplorerDependencyModel,
   settings = defaultLinks): Promise<Record<string, unknown>> {
   const moduleIds = new Set(model.modules.map(module => module.id));
-  const visible = new Set(initialVisible(model));
-  const expected = expectedLinks(deps, settings, visible);
-  const renderedEdges = await waitForLinks(page, expected, 'Root-scope links');
+  const visible = initialVisible(model);
+  const expected = expectedLinks(model, deps, null, settings);
+  const renderedEdges = await waitForLinks(page, expected, 'Project-scope links');
   const renderedNodes = await renderedNodeIds(page);
   assert.ok(renderedNodes.every(id => moduleIds.has(id)), `Rendered a non-module node: ${JSON.stringify(renderedNodes)}`);
-  assert.deepEqual(renderedNodes, [...visible, ...expectedOutOfView(deps, settings, visible)].sort());
+  assert.deepEqual(renderedNodes, [...visible, ...expectedOutOfView(model, deps, null, settings)].sort());
   const occurrenceEdges = new Set(model.edges.map(edge => edge.id));
   assert.ok(renderedEdges.every(id => !occurrenceEdges.has(id)), 'Rendered an occurrence edge');
   assert.equal(await page.getByRole('heading', { name: 'Other target' }).count(), 0);
@@ -409,8 +552,31 @@ async function setShowNonBehavioral(page: Page, value: boolean): Promise<void> {
   if (await box.isChecked() !== value) await box.click();
 }
 
-async function setLinkTarget(page: Page, target: LinkSettings['linkTarget']): Promise<void> {
-  await page.getByRole('radio', { name: target === 'imported-module' ? 'Imported modules' : 'Original owners' }).click();
+async function setLinkDepth(page: Page, depthMode: LinkSettings['depthMode']): Promise<void> {
+  await page.getByRole('radio', { name: depthMode === 'level' ? 'Modules at this level' : 'Exact module' }).click();
+}
+
+/** The leaving-scope toggle; it is absent at a scope that covers the project. */
+async function setShowOutsideScope(page: Page, value: boolean): Promise<void> {
+  const box = page.getByRole('checkbox', { name: 'Show dependencies that leave this module' });
+  if (await box.count() === 0) {
+    assert.ok(value, 'The leaving-scope toggle is absent, so it cannot be turned off');
+    return;
+  }
+  if (await box.isChecked() !== value) await box.click();
+}
+
+/** Every control at once, in the order the page applies them. */
+async function applyLinkSettings(page: Page, settings: LinkSettings): Promise<void> {
+  await setShowNonBehavioral(page, settings.showNonBehavioral);
+  await setLinkDepth(page, settings.depthMode);
+  await setShowOutsideScope(page, settings.showOutsideScope);
+}
+
+/** One labelled card pair of a panel region, such as `This view` or `Including internals`. */
+async function labelledCards(scope: ReturnType<Page['locator']>, label: string): Promise<{
+  behavioral: number; nonBehavioral: number; note: string }> {
+  return headlineCards(scope.locator(`.module-arch__card-pair[aria-label="${label}"]`).first());
 }
 
 async function expandSection(page: Page, title: string): Promise<void> {
@@ -554,62 +720,108 @@ async function refreshTo(page: Page, revision: ContextRevision, dependencies = t
   if (dependencies) await waitForDependencies(page, revision.revision);
 }
 
-/** BD39 on the reference: panels, both controls, scopes and out-of-view modules over the served model. */
+/**
+ * BD39 and BD52 on the reference: the rolled-up default, every panel scope, all three controls and
+ * a drilled-in scope over the served model, with no further dependency request.
+ */
 async function exerciseReference(page: Page, model: ProjectExplorerModel, deps: ExplorerDependencyModel,
   requests: RequestLog): Promise<Record<string, unknown>> {
-  const visible = new Set(initialVisible(model));
+  const visible = initialVisible(model);
   assert.equal(await page.locator('.module-arch__subtitle').textContent(), expectedSubtitle(model, deps));
   const requestsBefore = requests.dependencyViews();
   const sidebar = page.locator('.module-arch__sidebar');
+  const projectPanelRegion = () => sidebar.getByRole('region', { name: 'Project dependencies' });
 
-  // Project panel.
+  // Project panel: every dependency of the reference is internal to a top-level node or folded
+  // into the root's own source, so this scope draws nothing.
   await page.locator('.module-arch__detail-name').filter({ hasText: 'Project dependencies' }).waitFor();
-  const projectCards = await headlineCards(sidebar.getByRole('region', { name: 'Project dependencies' }));
-  assert.deepEqual(projectCards, { behavioral: deps.project.behavioral, nonBehavioral: deps.project.nonBehavioral, note: 'not drawn' });
-  const defaultIds = expectedLinks(deps, defaultLinks, visible);
-  assert.ok(defaultIds.length > 0, 'Reference has no default behavioral link');
+  const defaultIds = expectedLinks(model, deps, null);
+  assert.deepEqual(defaultIds, [], `The reference project scope drew links: ${JSON.stringify(defaultIds)}`);
+  const projectView = scopeCounts(model, deps, null);
+  const whole = { behavioral: deps.project.behavioral, nonBehavioral: deps.project.nonBehavioral };
+  assert.deepEqual(await labelledCards(projectPanelRegion(), 'This view'),
+    { ...projectView, note: 'not drawn' });
+  assert.deepEqual(await labelledCards(projectPanelRegion(), 'Whole project'), { ...whole, note: 'not drawn' });
+  const notDrawn = await sidebar.locator('.module-arch__not-drawn').getAttribute('data-not-drawn');
+  assert.equal(notDrawn, `${whole.behavioral - projectView.behavioral}/${whole.nonBehavioral - projectView.nonBehavioral}`);
   assert.equal(await metricValue(page, 'Displayed module links'), String(defaultIds.length));
   const coverage = await metricValue(page, 'Coverage');
   assert.equal(coverage, deps.state === 'complete' ? 'Complete' : `Partial: ${deps.coverage.unknownDependencies} omitted`);
   assert.equal(await metricValue(page, 'Input'), deps.inputId);
-  const projectPanel = { cards: projectCards, displayedLinks: defaultIds.length, coverage, inputId: deps.inputId };
+  // The project scope covers a single-root project, so no link can leave it.
+  assert.equal(await page.getByRole('checkbox', { name: 'Show dependencies that leave this module' }).count(), 0);
+  const projectPanel = { thisView: projectView, wholeProject: whole, notDrawn,
+    displayedLinks: defaultIds.length, coverage, inputId: deps.inputId };
 
-  // Both controls, locally: every combination draws exactly its independent link set.
+  // Drill into the one scope whose children carry the links, and exercise all three controls there.
+  const nested = model.modules.filter(item => visible.includes(item.id) && item.children.length > 0);
+  assert.ok(nested.length > 0, 'Reference has no nested visible module');
+  const scoped = nested.reduce((best, item) =>
+    scopeLinks(model, deps, item.id, { ...defaultLinks, showNonBehavioral: true }).length
+      > scopeLinks(model, deps, best.id, { ...defaultLinks, showNonBehavioral: true }).length ? item : best);
+  await clickGraphNode(page, scoped.id, true);
+  await page.getByRole('navigation', { name: 'Module navigation' }).waitFor();
+  const scopeChildren = visibleAt(model, scoped.id);
+  await waitForLinks(page, expectedLinks(model, deps, scoped.id), `Links inside ${scoped.id}`);
+
   const combinations: Record<string, unknown>[] = [];
   for (const settings of [
-    { showNonBehavioral: true, linkTarget: 'imported-module' },
-    { showNonBehavioral: true, linkTarget: 'original-owner' },
-    { showNonBehavioral: false, linkTarget: 'original-owner' },
+    { showNonBehavioral: true, depthMode: 'level', showOutsideScope: true },
+    { showNonBehavioral: true, depthMode: 'level', showOutsideScope: false },
+    { showNonBehavioral: true, depthMode: 'exact', showOutsideScope: true },
+    { showNonBehavioral: false, depthMode: 'exact', showOutsideScope: true },
     defaultLinks,
   ] as const satisfies readonly LinkSettings[]) {
-    await setShowNonBehavioral(page, settings.showNonBehavioral);
-    await setLinkTarget(page, settings.linkTarget);
-    const expected = expectedLinks(deps, settings, visible);
-    const rendered = await waitForLinks(page, expected, `Links for ${JSON.stringify(settings)}`);
-    assert.deepEqual(await renderedNodeIds(page), [...visible, ...expectedOutOfView(deps, settings, visible)].sort());
-    const cards = await headlineCards(sidebar.getByRole('region', { name: 'Project dependencies' }));
-    assert.deepEqual(cards, { behavioral: deps.project.behavioral, nonBehavioral: deps.project.nonBehavioral,
-      note: settings.showNonBehavioral ? 'shown' : 'not drawn' });
-    combinations.push({ settings, links: rendered.length, outOfView: expectedOutOfView(deps, settings, visible), note: cards.note });
+    await applyLinkSettings(page, settings);
+    const expected = expectedLinks(model, deps, scoped.id, settings);
+    const rendered = await waitForLinks(page, expected, `Links for ${JSON.stringify(settings)} inside ${scoped.id}`);
+    const outOfView = expectedOutOfView(model, deps, scoped.id, settings);
+    assert.deepEqual(await renderedNodeIds(page), [...scopeChildren, ...outOfView].sort());
+    const counts = scopeCounts(model, deps, scoped.id, settings);
+    const cards = await labelledCards(projectPanelRegion(), 'This view');
+    assert.deepEqual(cards, { ...counts, note: settings.showNonBehavioral ? 'shown' : 'not drawn' });
+    assert.deepEqual(await labelledCards(projectPanelRegion(), 'Whole project'),
+      { ...whole, note: settings.showNonBehavioral ? 'shown' : 'not drawn' });
+    combinations.push({ settings, links: rendered.length, outOfView, thisView: counts, note: cards.note });
   }
-  assert.ok(new Set(combinations.map(item => item.links)).size > 1, `Settings did not change the drawn links: ${JSON.stringify(combinations)}`);
+  assert.ok(new Set(combinations.map(item => item.links)).size > 1,
+    `The controls did not change the drawn links: ${JSON.stringify(combinations)}`);
+  // The scope's own source is reported, not drawn.
+  const ownSource = sidebar.getByRole('region', { name: "Scope's own source" });
+  const ownRow = deps.modules.find(row => row.id === scoped.id)!;
+  assert.deepEqual(await labelledCards(ownSource, 'Uses'), { ...ownRow.uses, note: 'not drawn' });
+  assert.deepEqual(await labelledCards(ownSource, 'Owned originals used by others'),
+    { ...ownRow.ownedUsedByOthers, note: 'not drawn' });
 
-  // Module panel.
+  // Module panel at this scope: the filtered numbers against the measured subtree totals.
+  await setShowNonBehavioral(page, true);
   const rows = new Map(deps.modules.map(row => [row.id, row]));
-  const module = model.modules.filter(item => visible.has(item.id))
-      .sort((left, right) => (rows.get(right.id)!.uses.behavioral + rows.get(right.id)!.usedThrough.behavioralUsedOriginals)
-        - (rows.get(left.id)!.uses.behavioral + rows.get(left.id)!.usedThrough.behavioralUsedOriginals))[0];
-  assert.ok(module, 'Reference graph has no selectable visible module');
-  const row = rows.get(module.id)!;
+  const level = scopeLinks(model, deps, scoped.id, { ...defaultLinks, showNonBehavioral: true });
+  const module = model.modules.filter(item => scopeChildren.includes(item.id))
+    .sort((left, right) => level.filter(link => link.consumer === right.id).length
+      - level.filter(link => link.consumer === left.id).length)[0];
+  assert.ok(module, 'The drilled-in scope has no selectable module');
   await clickGraphNode(page, module.id);
   await page.locator('.module-arch__detail-name').filter({ hasText: module.name }).waitFor();
-  const uses = await headlineCards(sidebar.getByRole('region', { name: 'Uses' }));
-  assert.deepEqual([uses.behavioral, uses.nonBehavioral], [row.uses.behavioral, row.uses.nonBehavioral]);
-  const usedThrough = await headlineCards(sidebar.getByRole('region', { name: 'Used through this module' }));
-  assert.deepEqual([usedThrough.behavioral, usedThrough.nonBehavioral],
-    [row.usedThrough.behavioralUsedOriginals, row.usedThrough.nonBehavioralUsedOriginals]);
+  const subtree = subtreeCounts(model, deps, module.id);
+  const atLevel = (select: (link: ScopeLink) => boolean) => level.filter(select)
+    .reduce((sum, link) => ({ behavioral: sum.behavioral + link.behavioral,
+      nonBehavioral: sum.nonBehavioral + link.nonBehavioral }), { behavioral: 0, nonBehavioral: 0 });
+  const usesRegion = sidebar.getByRole('region', { name: 'Uses' });
+  assert.deepEqual(await labelledCards(usesRegion, 'At this level'),
+    { ...atLevel(link => link.consumer === module.id), note: 'shown' });
+  assert.deepEqual(await labelledCards(usesRegion, 'Including internals'), { ...subtree.uses, note: 'shown' });
+  const ownedRegion = sidebar.getByRole('region', { name: 'Owned originals used by others' });
+  assert.deepEqual(await labelledCards(ownedRegion, 'At this level'),
+    { ...atLevel(link => link.provider === module.id), note: 'shown' });
+  assert.deepEqual(await labelledCards(ownedRegion, 'Including internals'),
+    { ...subtree.ownedUsedByOthers, note: 'shown' });
+  const throughRegion = sidebar.getByRole('region', { name: 'Used through this module' });
+  assert.deepEqual(await labelledCards(throughRegion, 'Including internals'),
+    { behavioral: subtree.usedThrough.behavioralUsedOriginals,
+      nonBehavioral: subtree.usedThrough.nonBehavioralUsedOriginals, note: 'shown' });
   assert.equal(await metricValue(page, 'Links displayed'),
-    String(activeLinks(deps, defaultLinks).filter(edge => edge.consumer === module.id || edge.provider === module.id).length));
+    String(level.filter(link => link.consumer === module.id || link.provider === module.id).length));
   let detailState = 'no-export';
   if (module.exports.length > 0) {
     await page.locator('.export-list__toggle').first().click();
@@ -617,19 +829,29 @@ async function exerciseReference(page: Page, model: ProjectExplorerModel, deps: 
     detailState = await page.locator('.export-list__signature-container').first().innerText();
     await page.locator('.export-list__locations').first().waitFor();
   }
-  const modulePanel = { module: module.id, uses: row.uses, usedThrough: row.usedThrough, detailState };
+  const modulePanel = { module: module.id, atLevelUses: atLevel(link => link.consumer === module.id),
+    subtreeUses: subtree.uses, subtreeOwned: subtree.ownedUsedByOthers, rows: rows.get(module.id), detailState };
 
-  // Imported-module link panel.
-  const importedEdge = deps.importedModuleEdges.find(edge => defaultIds.includes(edge.id))!;
-  await clickGraphEdge(page, importedEdge.id);
-  await page.getByRole('heading', { name: 'Imported-module link' }).waitFor();
-  const importedCards = await headlineCards(sidebar.getByRole('region', { name: 'Used originals via this boundary' }));
-  assert.deepEqual([importedCards.behavioral, importedCards.nonBehavioral],
-    [importedEdge.counts.behavioralUsedOriginals, importedEdge.counts.nonBehavioralUsedOriginals]);
-  assert.equal(await sidebar.getByRole('region', { name: 'Original owners' }).locator('li').count(), importedEdge.originalOwners.length);
+  // Rolled-up link panel: its contributing exact modules and its imported-through breakdown.
+  const rolled = level.find(link => link.sources.length > 1) ?? level[0]!;
+  await clickGraphEdge(page, rolled.id);
+  await page.getByRole('heading', { name: 'Rolled-up link' }).waitFor();
+  assert.deepEqual(await labelledCards(sidebar.getByRole('region', { name: 'Dependencies' }), 'At this level'),
+    { behavioral: rolled.behavioral, nonBehavioral: rolled.nonBehavioral, note: 'shown' });
+  const rolledModules = await sidebar.getByRole('region', { name: 'Rolled-up modules' })
+    .locator('.module-arch__breakdown-item').evaluateAll(items => items.map(item =>
+      [item.getAttribute('data-consumer'), item.getAttribute('data-provider')]));
+  assert.deepEqual(rolledModules, rolled.sources.map(id => {
+    const edge = deps.originalOwnerEdges.find(item => item.id === id)!;
+    return [edge.consumer, edge.provider];
+  }));
+  const importedThrough = new Set(rolled.sources.flatMap(id =>
+    deps.originalOwnerEdges.find(item => item.id === id)!.importedThrough.map(item => item.module)));
+  assert.equal(await sidebar.getByRole('region', { name: 'Imported through' }).locator('li').count(), importedThrough.size);
   await expandSection(page, 'Referenced originals');
-  const importedEvidence = await sidebar.locator('.module-arch__evidence-item').count();
-  assert.equal(importedEvidence, new Set(importedEdge.evidence.map(item => JSON.stringify(item.original))).size);
+  const rolledOriginals = await sidebar.locator('.module-arch__evidence-item').count();
+  assert.equal(rolledOriginals, new Set(rolled.sources.flatMap(id =>
+    deps.originalOwnerEdges.find(item => item.id === id)!.evidence.map(item => JSON.stringify(item.original)))).size);
 
   const separator = page.getByRole('separator', { name: 'Resize sidebar' });
   const beforeWidth = (await sidebar.boundingBox())!.width;
@@ -640,19 +862,23 @@ async function exerciseReference(page: Page, model: ProjectExplorerModel, deps: 
   const afterWidth = (await sidebar.boundingBox())!.width;
   assert.ok(afterWidth > beforeWidth + 30, `Sidebar did not resize: ${beforeWidth} -> ${afterWidth}`);
 
-  // Original-owner link panel: switching the projection clears the imported selection.
-  await setLinkTarget(page, 'original-owner');
-  const ownerIds = expectedLinks(deps, { showNonBehavioral: false, linkTarget: 'original-owner' }, visible);
-  await waitForLinks(page, ownerIds, 'Original-owner links');
+  // Exact link panel: changing the depth mode clears the rolled-up selection.
+  await setLinkDepth(page, 'exact');
+  const exactIds = expectedLinks(model, deps, scoped.id, { ...defaultLinks, showNonBehavioral: true, depthMode: 'exact' });
+  await waitForLinks(page, exactIds, 'Exact links inside the scope');
   await page.locator('.module-arch__detail-name').filter({ hasText: 'Project dependencies' }).waitFor();
-  const ownerEdge = deps.originalOwnerEdges.find(edge => ownerIds.includes(edge.id))!;
-  await clickGraphEdge(page, ownerEdge.id);
+  const exactLink = scopeLinks(model, deps, scoped.id, { ...defaultLinks, showNonBehavioral: true, depthMode: 'exact' })[0]!;
+  await clickGraphEdge(page, exactLink.id);
   await page.getByRole('heading', { name: 'Original-owner link' }).waitFor();
-  const ownerCards = await headlineCards(sidebar.getByRole('region', { name: 'Dependencies' }));
-  assert.deepEqual([ownerCards.behavioral, ownerCards.nonBehavioral], [ownerEdge.counts.behavioral, ownerEdge.counts.nonBehavioral]);
-  assert.equal(await sidebar.getByRole('region', { name: 'Imported through' }).locator('li').count(), ownerEdge.importedThrough.length);
-  await setLinkTarget(page, 'imported-module');
-  await waitForLinks(page, defaultIds, 'Default links after the owner panel');
+  const exactCards = await headlineCards(sidebar.getByRole('region', { name: 'Dependencies' }));
+  assert.deepEqual([exactCards.behavioral, exactCards.nonBehavioral], [exactLink.behavioral, exactLink.nonBehavioral]);
+  const exactEdge = deps.originalOwnerEdges.find(item => item.id === exactLink.id)!;
+  assert.equal(await sidebar.getByRole('region', { name: 'Imported through' }).locator('li').count(),
+    exactEdge.importedThrough.length);
+  await setLinkDepth(page, 'level');
+  await waitForLinks(page, expectedLinks(model, deps, scoped.id, { ...defaultLinks, showNonBehavioral: true }),
+    'Rolled-up links after the exact panel');
+  await setShowNonBehavioral(page, false);
 
   const viewport = page.locator('.react-flow__viewport');
   const transformBefore = await viewport.getAttribute('style');
@@ -669,48 +895,57 @@ async function exerciseReference(page: Page, model: ProjectExplorerModel, deps: 
   const transformPan = await viewport.getAttribute('style');
   assert.notEqual(transformPan, transformZoom, 'Pan did not change the viewport transform');
 
-  // Hierarchy scope: the scope's children and the active links' out-of-view modules.
-  const scopes: Record<string, unknown>[] = [];
-  const nested = model.modules.filter(item => visible.has(item.id) && item.children.length > 0);
-  assert.ok(nested.length > 0, 'Reference has no nested visible module');
-  for (const drill of nested) {
-    await clickGraphNode(page, drill.id, true);
-    await page.getByRole('navigation', { name: 'Module navigation' }).waitFor();
-    const scoped = new Set(drill.children);
-    const scopedLinks = await waitForLinks(page, expectedLinks(deps, defaultLinks, scoped), `Links inside ${drill.id}`);
-    const scopedOutOfView = expectedOutOfView(deps, defaultLinks, scoped);
-    assert.deepEqual(await renderedNodeIds(page), [...scoped, ...scopedOutOfView].sort());
-    scopes.push({ scope: drill.id, children: drill.children.length, links: scopedLinks.length, outOfView: scopedOutOfView });
-    await page.getByRole('button', { name: 'All Modules' }).click();
-    await waitForLinks(page, defaultIds, 'Default links after leaving a scope');
-  }
-  assert.ok(scopes.some(item => (item.outOfView as string[]).length > 0) || expectedOutOfView(deps, { showNonBehavioral: false, linkTarget: 'original-owner' }, visible).length > 0,
-    `No scope or projection drew an out-of-view module: ${JSON.stringify(scopes)}`);
-
-  // A fixed item: a checked-state filter would select another class after the click.
+  // The class filter changes the displayed nodes without changing how an end maps.
   const filterItems = page.locator('.module-arch__filters[aria-label="Presentation class filters"] .module-arch__filter-item');
-  const filterIndex = (await filterItems.locator('input').evaluateAll(inputs =>
-    inputs.map(input => (input as HTMLInputElement).checked && !(input as HTMLInputElement).disabled))).indexOf(true);
+  const checkedStates = await filterItems.locator('input').evaluateAll(inputs =>
+    inputs.map(input => (input as HTMLInputElement).checked && !(input as HTMLInputElement).disabled));
+  const filterIndex = checkedStates.indexOf(true);
   assert.ok(filterIndex >= 0, 'No enabled checked class filter');
+  const hiddenClass = (await filterItems.nth(filterIndex).locator('.module-arch__filter-label').textContent()) ?? '';
   const checked = filterItems.nth(filterIndex).locator('input');
   const beforeFilter = await page.locator('.react-flow__node').count();
   await checked.click();
-  await page.waitForTimeout(100);
+  await page.waitForTimeout(150);
   const afterFilter = await page.locator('.react-flow__node').count();
   assert.ok(afterFilter < beforeFilter, `Filter did not reduce graph nodes: ${beforeFilter} -> ${afterFilter}`);
   await checked.click();
-  await waitForLinks(page, defaultIds, 'Default links after the filter');
+  await waitForLinks(page, expectedLinks(model, deps, scoped.id), 'Default links after the filter');
+  const scopes = [{ scope: scoped.id, children: scopeChildren.length,
+    links: expectedLinks(model, deps, scoped.id).length,
+    outOfView: expectedOutOfView(model, deps, scoped.id), hiddenClass,
+    filter: { beforeNodes: beforeFilter, afterNodes: afterFilter } }];
 
-  // No control, selection or scope change requested dependency data again.
-  assert.equal(requests.dependencyViews(), requestsBefore, 'A control change requested the dependency view');
+  // Back to the project scope, then into a grandchild scope: the roll-up applies at every level.
+  await page.getByRole('button', { name: 'All Modules' }).click();
+  await waitForLinks(page, defaultIds, 'Project-scope links after leaving a scope');
+  await clickGraphNode(page, scoped.id, true);
+  const grandchild = model.modules.find(item => scopeChildren.includes(item.id) && item.children.length > 0);
+  if (grandchild) {
+    await clickGraphNode(page, grandchild.id, true);
+    const inner = expectedLinks(model, deps, grandchild.id);
+    await waitForLinks(page, inner, `Links inside ${grandchild.id}`);
+    assert.deepEqual(await renderedNodeIds(page),
+      [...visibleAt(model, grandchild.id), ...expectedOutOfView(model, deps, grandchild.id)].sort());
+    scopes.push({ scope: grandchild.id, children: visibleAt(model, grandchild.id).length, links: inner.length,
+      outOfView: expectedOutOfView(model, deps, grandchild.id), hiddenClass: '',
+      filter: { beforeNodes: 0, afterNodes: 0 } });
+  }
+  await page.getByRole('button', { name: 'All Modules' }).click();
+  await waitForLinks(page, defaultIds, 'Project-scope links at the end');
+  assert.ok(scopes.some(item => (item.outOfView as string[]).length > 0),
+    `No scope drew an out-of-view module: ${JSON.stringify(scopes)}`);
+
+  // BD52: no control, selection or scope change requested dependency data again.
+  assert.equal(requests.dependencyViews(), requestsBefore, 'A control or scope change requested the dependency view');
   return { projectPanel, combinations, modulePanel,
-    importedLinkPanel: { id: importedEdge.id, consumer: importedEdge.consumer, provider: importedEdge.provider, counts: importedEdge.counts,
-      originalOwners: importedEdge.originalOwners.length, referencedOriginals: importedEvidence },
-    originalOwnerLinkPanel: { id: ownerEdge.id, consumer: ownerEdge.consumer, provider: ownerEdge.provider, counts: ownerEdge.counts,
-      importedThrough: ownerEdge.importedThrough.length },
+    rolledUpLinkPanel: { id: rolled.id, consumer: rolled.consumer, provider: rolled.provider,
+      behavioral: rolled.behavioral, nonBehavioral: rolled.nonBehavioral, sources: rolled.sources,
+      rolledModules, importedThrough: importedThrough.size, referencedOriginals: rolledOriginals },
+    exactLinkPanel: { id: exactLink.id, consumer: exactLink.consumer, provider: exactLink.provider,
+      behavioral: exactLink.behavioral, nonBehavioral: exactLink.nonBehavioral,
+      importedThrough: exactEdge.importedThrough.length },
     scopes, dependencyViewRequests: { beforeControls: requestsBefore, afterControls: requests.dependencyViews() },
-    sidebar: { beforeWidth, afterWidth }, viewport: { before: transformBefore, zoom: transformZoom, pan: transformPan },
-    filter: { beforeNodes: beforeFilter, afterNodes: afterFilter } };
+    sidebar: { beforeWidth, afterWidth }, viewport: { before: transformBefore, zoom: transformZoom, pan: transformPan } };
 }
 
 const version = '0.0.0';
@@ -955,7 +1190,7 @@ async function runFixture(kind: 'reference' | 'toolkit', project: { root: string
       reportRevision: check.revision.revision,
       reportModules: check.report!.snapshot!.inventory!.modules.length, projectedModules: ready.view.modules.length,
       visibleModules: visible.size, reportAccesses: check.report!.snapshot!.accesses.length,
-      occurrenceEdges: ready.view.edges.length, visibleLinks: expectedLinks(deps, defaultLinks, visible).length, encodedBytes };
+      occurrenceEdges: ready.view.edges.length, visibleLinks: expectedLinks(ready.view, deps, null).length, encodedBytes };
     assert.equal(countEvidence.reportModules, countEvidence.projectedModules);
     const dependencies = { revision: check.revision.revision, inputId: deps.inputId, state: deps.state, project: deps.project,
       coverage: deps.coverage, modules: deps.modules.length, importedModuleEdges: deps.importedModuleEdges.length,
@@ -1544,61 +1779,109 @@ async function runForwarding(project: { root: string }, browser: Browser): Promi
     assert.deepEqual(ownerDBA.importedThrough.map(item => item.module), [B, BA]);
     assert.deepEqual(deps.modules.find(row => row.id === D)!.uses, { behavioral: 1, nonBehavioral: 0 });
 
-    const visible = new Set(initialVisible(model));
+    const visible = initialVisible(model);
     assert.deepEqual([...visible].sort(), [A, B, C, D, E]);
-    // Default: behavioral links to the imported modules B and B/A, with B/A out of view.
-    const defaultLinks_ = await waitForLinks(page, [importedAB.id, importedDB.id, importedDBA.id].sort(), 'Forwarding default links');
-    assert.deepEqual(await renderedNodeIds(page), [A, B, BA, C, D, E].sort());
-    const cards = await headlineCards(page.locator('.module-arch__sidebar').getByRole('region', { name: 'Project dependencies' }));
-    assert.deepEqual(cards, { behavioral: 2, nonBehavioral: 3, note: 'not drawn' });
+    // Default: the rolled-up links onto the `b` subtree, whose ends are both displayed nodes.
+    const rolled = scopeLinks(model, deps, null);
+    assert.deepEqual(rolled.map(link => [link.consumer, link.provider, link.behavioral, link.nonBehavioral]),
+      [[A, B, 1, 1], [D, B, 1, 0]]);
+    const rolledIds = await waitForLinks(page, expectedLinks(model, deps, null), 'Forwarding rolled-up links');
+    assert.deepEqual(await renderedNodeIds(page), [A, B, C, D, E].sort());
+    const sidebar = page.locator('.module-arch__sidebar');
+    const projectRegion = sidebar.getByRole('region', { name: 'Project dependencies' });
+    assert.deepEqual(await labelledCards(projectRegion, 'Whole project'),
+      { behavioral: 2, nonBehavioral: 3, note: 'not drawn' });
+    assert.deepEqual(await labelledCards(projectRegion, 'This view'),
+      { ...scopeCounts(model, deps, null), note: 'not drawn' });
     const requestsBefore = opened.requests.dependencyViews();
 
-    // Per-original status on A -> B: act allowed, secret denied, and the link is denied.
+    // Per-original status on the rolled-up A -> B: act allowed, secret denied, and the link is denied.
     await setShowNonBehavioral(page, true);
-    await waitForLinks(page, expectedLinks(deps, { showNonBehavioral: true, linkTarget: 'imported-module' }, visible), 'Forwarding non-behavioral links');
-    await clickGraphEdge(page, importedAB.id);
-    await page.getByRole('heading', { name: 'Imported-module link' }).waitFor();
-    const importedStatus = await page.locator('.module-arch__sidebar .module-arch__detail-header .module-arch__dependency-badge').first().textContent();
-    assert.equal(importedStatus, 'denied');
-    const importedRows = await evidenceRows(page);
-    assert.deepEqual(importedRows.map(row => [row.original, row.paths.map(path => [path.classification, path.status])]),
+    const withNonBehavioral = { ...defaultLinks, showNonBehavioral: true };
+    await waitForLinks(page, expectedLinks(model, deps, null, withNonBehavioral), 'Forwarding non-behavioral links');
+    const rolledAB = scopeLinks(model, deps, null, withNonBehavioral)
+      .find(link => link.consumer === A && link.provider === B)!;
+    assert.deepEqual(rolledAB.sources, [ownerABA.id]);
+    await clickGraphEdge(page, rolledAB.id);
+    await page.getByRole('heading', { name: 'Rolled-up link' }).waitFor();
+    const rolledStatus = await sidebar.locator('.module-arch__detail-header .module-arch__dependency-badge').first().textContent();
+    assert.equal(rolledStatus, 'denied');
+    const rolledRows = await evidenceRows(page);
+    assert.deepEqual(rolledRows.map(row => [row.original, row.paths.map(path => [path.classification, path.status])]),
       [['act', [['behavioral', 'allowed']]], ['secret', [['non-behavioral', 'denied']]]]);
-    const importedOwners = await page.locator('.module-arch__sidebar').getByRole('region', { name: 'Original owners' }).locator('li').evaluateAll(items =>
-      items.map(item => item.getAttribute('data-module')));
-    assert.deepEqual(importedOwners, [BA]);
+    // The rolled-up panel names the exact modules the link covers.
+    const rolledModules = await sidebar.getByRole('region', { name: 'Rolled-up modules' })
+      .locator('.module-arch__breakdown-item').evaluateAll(items => items.map(item =>
+        [item.getAttribute('data-consumer'), item.getAttribute('data-provider')]));
+    assert.deepEqual(rolledModules, [[A, BA]]);
+    const rolledThrough = await sidebar.getByRole('region', { name: 'Imported through' }).locator('li')
+      .evaluateAll(items => items.map(item => item.getAttribute('data-module')));
+    assert.deepEqual(rolledThrough, [B]);
 
-    // Original owners: A links to B/A, imported through B.
-    await setLinkTarget(page, 'original-owner');
-    const ownerLinks = await waitForLinks(page, expectedLinks(deps, { showNonBehavioral: true, linkTarget: 'original-owner' }, visible), 'Forwarding owner links');
-    assert.ok(ownerLinks.includes(ownerABA.id) && !ownerLinks.includes(importedAB.id));
+    // Exact ends: A links to B/A, with B/A out of view, and there is no A -> B exact link.
+    await setLinkDepth(page, 'exact');
+    const exactSettings = { ...defaultLinks, showNonBehavioral: true, depthMode: 'exact' as const };
+    const exactIds = await waitForLinks(page, expectedLinks(model, deps, null, exactSettings), 'Forwarding exact links');
+    assert.ok(exactIds.includes(ownerABA.id));
+    assert.deepEqual(await renderedNodeIds(page), [A, B, BA, C, D, E].sort());
+    assert.deepEqual(expectedOutOfView(model, deps, null, exactSettings), [BA]);
+    assert.equal(deps.originalOwnerEdges.some(edge => edge.consumer === A && edge.provider === B), false);
     await clickGraphEdge(page, ownerABA.id);
     await page.getByRole('heading', { name: 'Original-owner link' }).waitFor();
-    const ownerThrough = await page.locator('.module-arch__sidebar').getByRole('region', { name: 'Imported through' }).locator('li').evaluateAll(items =>
-      items.map(item => item.getAttribute('data-module')));
+    const ownerThrough = await sidebar.getByRole('region', { name: 'Imported through' }).locator('li')
+      .evaluateAll(items => items.map(item => item.getAttribute('data-module')));
     assert.deepEqual(ownerThrough, [B]);
     const ownerRows = await evidenceRows(page);
     assert.deepEqual(ownerRows.map(row => [row.original, row.paths.map(path => [path.classification, path.status])]),
       [['act', [['behavioral', 'allowed']]], ['secret', [['non-behavioral', 'denied']]]]);
 
-    // Both boundaries: D's one dependency, two imported-module links and one original-owner link.
+    // Both boundaries: D's one dependency, drawn once and imported through B and B/A.
     await setShowNonBehavioral(page, false);
-    await waitForLinks(page, [ownerABA.id, ownerDBA.id].sort(), 'Forwarding behavioral owner links');
+    await waitForLinks(page, expectedLinks(model, deps, null, { ...defaultLinks, depthMode: 'exact' }),
+      'Forwarding behavioral exact links');
     await clickGraphEdge(page, ownerDBA.id);
     await page.getByRole('heading', { name: 'Original-owner link' }).waitFor();
-    const dCards = await headlineCards(page.locator('.module-arch__sidebar').getByRole('region', { name: 'Dependencies' }));
+    const dCards = await headlineCards(sidebar.getByRole('region', { name: 'Dependencies' }));
     assert.deepEqual([dCards.behavioral, dCards.nonBehavioral], [1, 0]);
-    const dThrough = await page.locator('.module-arch__sidebar').getByRole('region', { name: 'Imported through' }).locator('li').evaluateAll(items =>
-      items.map(item => item.getAttribute('data-module')));
+    const dThrough = await sidebar.getByRole('region', { name: 'Imported through' }).locator('li')
+      .evaluateAll(items => items.map(item => item.getAttribute('data-module')));
     assert.deepEqual(dThrough, [B, BA]);
     const dRows = await evidenceRows(page);
     assert.deepEqual(dRows.map(row => [row.original, row.paths.length]), [['act', 2]]);
-    await setLinkTarget(page, 'imported-module');
-    await waitForLinks(page, defaultLinks_, 'Forwarding default links again');
+    await setLinkDepth(page, 'level');
+    await waitForLinks(page, rolledIds, 'Forwarding rolled-up links again');
     await clickGraphNode(page, D);
     await page.locator('.module-arch__detail-name').filter({ hasText: 'd' }).waitFor();
-    const dUses = await headlineCards(page.locator('.module-arch__sidebar').getByRole('region', { name: 'Uses' }));
-    assert.deepEqual([dUses.behavioral, dUses.nonBehavioral], [1, 0]);
-    assert.equal(await metricValue(page, 'Links displayed'), '2');
+    const dSubtree = subtreeCounts(model, deps, D);
+    assert.deepEqual(await labelledCards(sidebar.getByRole('region', { name: 'Uses' }), 'At this level'),
+      { behavioral: 1, nonBehavioral: 0, note: 'not drawn' });
+    assert.deepEqual(await labelledCards(sidebar.getByRole('region', { name: 'Uses' }), 'Including internals'),
+      { ...dSubtree.uses, note: 'not drawn' });
+    assert.equal(await metricValue(page, 'Links displayed'), '1');
+
+    // Drilled into `b`: the child's dependency on its parent's own source is folded into the frame.
+    await clickGraphNode(page, B, true);
+    await page.getByRole('navigation', { name: 'Module navigation' }).waitFor();
+    const insideB = { ...defaultLinks, showNonBehavioral: true };
+    await setShowNonBehavioral(page, true);
+    const insideIds = await waitForLinks(page, expectedLinks(model, deps, B, insideB), 'Links inside b');
+    const insideLinks = scopeLinks(model, deps, B, insideB);
+    assert.deepEqual(insideLinks.map(link => [link.consumer, link.provider]), [[A, BA]]);
+    assert.equal(deps.originalOwnerEdges.some(edge => edge.consumer === BA && edge.provider === B), true);
+    const bRow = deps.modules.find(row => row.id === B)!;
+    const ownSource = sidebar.getByRole('region', { name: "Scope's own source" });
+    assert.deepEqual(await labelledCards(ownSource, 'Uses'), { ...bRow.uses, note: 'shown' });
+    assert.deepEqual(await labelledCards(ownSource, 'Owned originals used by others'),
+      { ...bRow.ownedUsedByOthers, note: 'shown' });
+    // The leaving-scope toggle applies here and removes every link with an outside end.
+    await setShowOutsideScope(page, false);
+    await waitForLinks(page, expectedLinks(model, deps, B, { ...insideB, showOutsideScope: false }), 'Links inside b, staying');
+    assert.deepEqual(await renderedNodeIds(page), [...visibleAt(model, B)].sort());
+    await setShowOutsideScope(page, true);
+    await waitForLinks(page, insideIds, 'Links inside b again');
+    await page.getByRole('button', { name: 'All Modules' }).click();
+    await setShowNonBehavioral(page, false);
+    await waitForLinks(page, rolledIds, 'Forwarding rolled-up links at the end');
     assert.equal(opened.requests.dependencyViews(), requestsBefore, 'A forwarding control change requested the dependency view');
     const counters = await daemonDiagramState(connection, token);
     return { root: project.root, revision: check.revision.revision, inputId: deps.inputId, checkOutcome: check.report!.outcome,
@@ -1608,8 +1891,10 @@ async function runForwarding(project: { root: string }, browser: Browser): Promi
         status: edge.evidence.map(item => `${item.original.binding}:${item.status}`) })),
       originalOwnerEdges: deps.originalOwnerEdges.map(edge => ({ consumer: edge.consumer, provider: edge.provider, counts: edge.counts,
         importedThrough: edge.importedThrough.map(item => item.module) })),
-      dom: { defaultLinks: defaultLinks_.length, ownerLinksWithNonBehavioral: ownerLinks.length, importedStatus, importedRows, ownerThrough, ownerRows,
-        bothBoundaries: { defaultLinksFromD: 2, ownerLink: ownerDBA.id, cards: dCards, importedThrough: dThrough, uses: dUses } },
+      dom: { rolledUpLinks: rolled.map(link => [link.consumer, link.provider, link.behavioral, link.nonBehavioral]),
+        exactLinks: exactIds.length, rolledStatus, rolledRows, rolledModules, rolledThrough, ownerThrough, ownerRows,
+        bothBoundaries: { ownerLink: ownerDBA.id, cards: dCards, importedThrough: dThrough, uses: dSubtree.uses },
+        insideB: { links: insideLinks.map(link => [link.consumer, link.provider]), ownSource: bRow } },
       dependencyViewRequests: { total: opened.requests.dependencyViews(), beforeControls: requestsBefore }, counters };
   } finally {
     await context?.close().catch(() => {});
@@ -1700,8 +1985,10 @@ async function runDependencyLifecycle(project: { root: string }, other: { root: 
     const first = await readyDependencies(origin, published.revision);
     const firstRequests = opened.requests.dependencyViews();
     assert.deepEqual(first.project, { behavioral: 1, nonBehavioral: 1 });
-    const visible = new Set(['fixture/consumer', 'fixture/provider']);
-    const firstLinks = await waitForLinks(page, expectedLinks(first, defaultLinks, visible), 'Mutation links');
+    const mutationModel = (createProjectExplorerModel({ revision: published.revision,
+      report: published.report! }) as ReadyProjection).view;
+    assert.deepEqual([...initialVisible(mutationModel)].sort(), ['fixture/consumer', 'fixture/provider']);
+    const firstLinks = await waitForLinks(page, expectedLinks(mutationModel, first, null), 'Mutation links');
     assert.equal(firstLinks.length, 1);
     const serverAfterReady = await rss(server.record.pid);
 
@@ -1794,7 +2081,7 @@ async function runDependencyLifecycle(project: { root: string }, other: { root: 
     await pause(3000);
     assert.equal(opened.requests.dependencyViews(), unavailableRequests, 'Polling continued after unavailable');
     assert.deepEqual(await renderedEdgeIds(page), []);
-    assert.deepEqual(await renderedNodeIds(page), [...visible].sort());
+    assert.deepEqual(await renderedNodeIds(page), [...initialVisible(mutationModel)].sort());
     const unavailable = { revision: failureRevision.revision.revision, killedAnalyzer: failedAnalyzer, status: unavailableStatus,
       pollingStoppedFor: 3000, stateHistory: await dependencyStateHistory(page, failureRevision.revision.revision),
       counters: await daemonDiagramState(connection, token) };

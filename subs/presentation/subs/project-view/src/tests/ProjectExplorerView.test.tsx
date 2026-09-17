@@ -20,15 +20,31 @@ import type {
 import type { GraphSelection, ModuleGraphProps } from '../moduleGraphShared.js';
 import type { ExplorerDiscussionProps, ProjectExplorerViewProps } from '../ProjectExplorerView.js';
 import type { DependencyGraphModel, DependencyGraphState, DependencySettings } from '../interfaces/dependency-view.js';
-import { activeDependencyEdges, defaultDependencySettings } from '../dependency-graph.js';
+import {
+  defaultDependencySettings,
+  dependencyScope,
+  scopeCoversProject,
+  scopeDependencyLinks,
+  scopeEnd,
+  scopeLinkCounts,
+  subtreeDependencyCounts,
+  type ActiveDependencyEdge,
+} from '../dependency-graph.js';
+import { indexModuleTree } from '../module-tree.js';
 import {
   collectionReview,
-  expectedImportedEdges,
+  expectedAncestors,
+  expectedCoversProject,
+  expectedDepth,
+  expectedEnd,
   expectedModule,
-  expectedOwnerEdges,
   expectedProject,
+  expectedScope,
+  expectedScopeLinks,
   forwardingProject,
   mappedDependencyModels,
+  nestedLevelsDependencies,
+  nestedLevelsProject,
 } from './dependency-fixtures.js';
 
 afterEach(cleanup);
@@ -71,11 +87,11 @@ describe('ProjectExplorerView', () => {
     const selectedEdge = linkSelection();
     const props = createProps({ selectedEdge, selectedModuleId: null });
     const { rerender } = render(<ProjectExplorerView {...props} />);
-    expect(screen.getByText('Imported-module link')).toBeInTheDocument();
+    expect(screen.getByText('Rolled-up link')).toBeInTheDocument();
     expect(screen.getAllByText(/Module A\s*->\s*Module B/).length).toBeGreaterThan(0);
     expect(screen.getByText('Referenced originals')).toBeInTheDocument();
     rerender(<ProjectExplorerView {...props} />);
-    expect(screen.getByText('Imported-module link')).toBeInTheDocument();
+    expect(screen.getByText('Rolled-up link')).toBeInTheDocument();
     expect(screen.getAllByText(/Module A\s*->\s*Module B/).length).toBeGreaterThan(0);
     expect(screen.getByText('Referenced originals')).toBeInTheDocument();
   });
@@ -150,14 +166,25 @@ describe('ProjectExplorerView', () => {
   it('renders the single-root overview, breadcrumbs, drill-down and out-of-view modules', () => {
     const onNavigateToScope = vi.fn();
     const onDrillDown = vi.fn();
-    render(<ProjectExplorerView {...createProps({
+    const { rerender } = render(<ProjectExplorerView {...createProps({
       breadcrumbTrail: [{ id: null, label: 'Project' }, { id: 'root', label: 'Root' }],
       onNavigateToScope,
       onDrillDown,
     })} />);
     const graph = screen.getByTestId('mock-module-graph');
     expect(graph).toHaveAttribute('data-modules', 'a,b');
-    expect(graph).toHaveAttribute('data-out-of-view', 'root');
+    // Both ends of the one link map to displayed nodes, so nothing is out of view.
+    expect(graph).toHaveAttribute('data-out-of-view', '');
+    // Filtering B out keeps it as the link's related node.
+    rerender(<ProjectExplorerView {...createProps({
+      breadcrumbTrail: [{ id: null, label: 'Project' }, { id: 'root', label: 'Root' }],
+      onNavigateToScope, onDrillDown, selectedPresentationClasses: ['browser+ui'],
+    })} />);
+    expect(screen.getByTestId('mock-module-graph')).toHaveAttribute('data-out-of-view', 'b');
+    rerender(<ProjectExplorerView {...createProps({
+      breadcrumbTrail: [{ id: null, label: 'Project' }, { id: 'root', label: 'Root' }],
+      onNavigateToScope, onDrillDown,
+    })} />);
     fireEvent.click(screen.getByRole('button', { name: 'Project' }));
     expect(onNavigateToScope).toHaveBeenCalledWith(null);
     fireEvent.click(screen.getByRole('button', { name: 'Drill into Module A' }));
@@ -315,95 +342,94 @@ describe('Plan 6D dependency diagram', () => {
 
   const projectRegion = () => screen.getByRole('region', { name: 'Project dependencies' });
   const nonBehavioralToggle = () => screen.getByRole('checkbox', { name: 'Show non-behavioral dependencies' });
-  const linkTarget = (name: 'Imported modules' | 'Original owners') => within(
-    screen.getByRole('radiogroup', { name: 'Link targets' })).getByRole('radio', { name });
+  const leavingToggle = () => screen.getByRole('checkbox', { name: 'Show dependencies that leave this module' });
+  const depthOption = (name: 'Modules at this level' | 'Exact module') => within(
+    screen.getByRole('radiogroup', { name: 'Link depth' })).getByRole('radio', { name });
+  /** One labelled card pair of a panel region, such as `This view` or `Including internals`. */
+  const pair = (region: HTMLElement, label: string) =>
+    cards(within(region).getByRole('group', { name: label, hidden: true }));
+  const numbers = (region: HTMLElement, label: string) => {
+    const value = pair(region, label);
+    return { behavioral: Number(value.behavioral), nonBehavioral: Number(value.nonBehavioral) };
+  };
+  const region = (name: string) => screen.getByRole('region', { name, hidden: true });
+  /** The drawn links, as independently comparable strings. */
+  const drawn = () => lastGraph().edges
+    .map((edge) => `${edge.consumer}>${edge.provider}:${edge.behavioral}/${edge.nonBehavioral}`);
+  const drawnOf = (links: readonly { consumer: string; provider: string;
+    behavioral: number; nonBehavioral: number }[]) => links
+    .map((link) => `${link.consumer}>${link.provider}:${link.behavioral}/${link.nonBehavioral}`);
+  const outOfView = () => (lastGraph().outOfViewModules ?? []).map((module) => module.id);
+  const notDrawn = () => document.querySelector('.module-arch__not-drawn')?.getAttribute('data-not-drawn') ?? '';
+  const settings = (overrides: Partial<DependencySettings> = {}): DependencySettings =>
+    ({ ...defaultDependencySettings, ...overrides });
 
-  it('BD30 draws behavioral imported-module links by default and never occurrence edges, with nodes while pending', () => {
+  const workspace = 'collection-review/workspace';
+
+  it('BD30 draws the scope roll-up of behavioral original-owner links and never occurrence edges', () => {
     const { project, dependencies } = collectionReview();
-    const expected = expectedImportedEdges(dependencies);
-    const behavioralIds = [...expected].filter(([, value]) => value.behavioral > 0).map(([id]) => id);
-    const nonBehavioralOnly = [...expected].filter(([, value]) => value.behavioral === 0).map(([id]) => id);
-    expect(behavioralIds.length).toBeGreaterThan(0);
+    const expected = expectedScopeLinks({ project, dependencies, scopeModuleId: workspace });
+    const withNonBehavioral = expectedScopeLinks({ project, dependencies, scopeModuleId: workspace,
+      showNonBehavioral: true });
+    const nonBehavioralOnly = withNonBehavioral.filter((link) => link.behavioral === 0);
+    expect(expected.length).toBeGreaterThan(0);
     expect(nonBehavioralOnly.length).toBeGreaterThan(0);
 
     const { rerender } = render(<ProjectExplorerView {...diagramProps(project, readyDependencies(dependencies),
-      { scopeModuleId: 'collection-review/workspace' })} />);
+      { scopeModuleId: workspace })} />);
     let graph = lastGraph();
-    expect(graph.edges.length).toBeGreaterThan(0);
-    const inView = new Set([...graph.modules, ...(graph.outOfViewModules ?? [])].map((module) => module.id));
-    const visible = new Set(graph.modules.map((module) => module.id));
-    // Exactly the behavioral imported-module links touching this scope, with independently counted units.
-    expect(graph.edges.map((edge) => edge.id).sort()).toEqual(behavioralIds.filter((id) => {
-      const edge = expected.get(id)!;
-      return (visible.has(edge.consumer) || visible.has(edge.provider)) && inView.has(edge.consumer) && inView.has(edge.provider);
-    }).sort());
+    expect(drawn()).toEqual(drawnOf(expected));
     for (const edge of graph.edges) {
-      expect(edge.projection).toBe('imported-module');
-      expect([edge.consumer, edge.provider, edge.behavioral, edge.displayed])
-        .toEqual([expected.get(edge.id)!.consumer, expected.get(edge.id)!.provider,
-          expected.get(edge.id)!.behavioral, expected.get(edge.id)!.behavioral]);
+      expect(edge.depthMode).toBe('level');
+      expect(edge.displayed).toBe(edge.behavioral);
+      expect(edge.sources.length).toBeGreaterThan(0);
     }
-    const drawn = new Set(graph.edges.map((edge) => edge.id));
+    const ids = new Set(graph.edges.map((edge) => edge.id));
     expect(project.edges.length).toBeGreaterThan(0);
-    expect(project.edges.some((edge) => drawn.has(edge.id))).toBe(false);
-    expect(nonBehavioralOnly.some((id) => drawn.has(id))).toBe(false);
-    // Over the full collection the default is exactly the behavioral imported-module links.
-    expect(activeDependencyEdges(dependencies, defaultDependencySettings).map((edge) => edge.id)).toEqual(behavioralIds);
+    expect(project.edges.some((edge) => ids.has(edge.id))).toBe(false);
+    for (const link of nonBehavioralOnly) {
+      expect(graph.edges.some((edge) => edge.consumer === link.consumer && edge.provider === link.provider)).toBe(false);
+    }
 
     // Pending: the module nodes stay, no link is drawn, and no occurrence edge replaces them.
     for (const phase of ['waiting', 'analyzing'] as const) {
       rerender(<ProjectExplorerView {...diagramProps(project, { data: null, phase, reason: null, isStale: false },
-        { scopeModuleId: 'collection-review/workspace' })} />);
+        { scopeModuleId: workspace })} />);
       graph = lastGraph();
       expect(graph.modules.map((module) => module.id)).toEqual(project.modules
-        .filter((module) => module.parent === 'collection-review/workspace').map((module) => module.id));
+        .filter((module) => module.parent === workspace).map((module) => module.id));
       expect(graph.edges).toEqual([]);
       expect(graph.outOfViewModules).toEqual([]);
       expect(screen.getAllByText(/Computing behavioral dependencies/).length).toBeGreaterThan(0);
     }
   });
 
-  it('BD31 applies both controls locally from one loaded result without requesting data', () => {
+  it('BD31 applies the non-behavioral and depth controls locally from one loaded result', () => {
     const { project, dependencies } = collectionReview();
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(() => { throw new Error('fetch requested data'); });
     const onSettings = vi.fn();
-    const props = diagramProps(project, readyDependencies(dependencies), { onDependencySettingsChange: onSettings });
-    render(<ProjectExplorerView {...props} />);
-    const project0 = expectedProject(dependencies);
-    expect(cards(projectRegion())).toEqual({ behavioral: String(project0.behavioral),
-      nonBehavioral: String(project0.nonBehavioral), note: 'not drawn' });
-    const allImported = expectedImportedEdges(dependencies);
-    const displayed = () => new Map(activeDependencyEdges(dependencies, {
-      showNonBehavioral: nonBehavioralToggle().matches(':checked'),
-      linkTarget: linkTarget('Imported modules').getAttribute('aria-checked') === 'true' ? 'imported-module' : 'original-owner',
-    }).map((edge) => [edge.id, edge]));
+    render(<ProjectExplorerView {...diagramProps(project, readyDependencies(dependencies),
+      { scopeModuleId: workspace, onDependencySettingsChange: onSettings })} />);
+    const measured = expectedProject(dependencies);
+    expect(pair(projectRegion(), 'Whole project')).toEqual({ behavioral: String(measured.behavioral),
+      nonBehavioral: String(measured.nonBehavioral), note: 'not drawn' });
+    expect(drawn()).toEqual(drawnOf(expectedScopeLinks({ project, dependencies, scopeModuleId: workspace })));
 
     fireEvent.click(nonBehavioralToggle());
-    expect(onSettings).toHaveBeenLastCalledWith({ showNonBehavioral: true, linkTarget: 'imported-module' });
+    expect(onSettings).toHaveBeenLastCalledWith(settings({ showNonBehavioral: true }));
     expect(nonBehavioralToggle()).toBeChecked();
-    expect(cards(projectRegion()).note).toBe('shown');
-    // Headline counts do not change with the setting.
-    expect(cards(projectRegion()).behavioral).toBe(String(project0.behavioral));
-    for (const edge of lastGraph().edges) {
-      const value = allImported.get(edge.id)!;
-      expect(edge.displayed).toBe(value.behavioral + value.nonBehavioral);
-    }
+    expect(pair(projectRegion(), 'Whole project').note).toBe('shown');
+    expect(drawn()).toEqual(drawnOf(expectedScopeLinks({ project, dependencies, scopeModuleId: workspace,
+      showNonBehavioral: true })));
     expect(lastGraph().edges.some((edge) => edge.behavioral === 0)).toBe(true);
-    expect(displayed().size).toBe(allImported.size);
+    // The measured card does not move with the setting.
+    expect(pair(projectRegion(), 'Whole project').behavioral).toBe(String(measured.behavioral));
 
-    fireEvent.click(linkTarget('Original owners'));
-    expect(onSettings).toHaveBeenLastCalledWith({ showNonBehavioral: true, linkTarget: 'original-owner' });
-    const owners = expectedOwnerEdges(dependencies);
-    expect(lastGraph().edges.length).toBeGreaterThan(0);
-    for (const edge of lastGraph().edges) {
-      expect(edge.projection).toBe('original-owner');
-      const value = owners.get(edge.id)!;
-      expect([edge.consumer, edge.provider, edge.behavioral, edge.nonBehavioral])
-        .toEqual([value.consumer, value.provider, value.behavioral, value.nonBehavioral]);
-    }
-    // Original-owner units sum to the headline counts.
-    expect([...owners.values()].reduce((sum, value) => sum + value.behavioral, 0)).toBe(project0.behavioral);
-    expect([...owners.values()].reduce((sum, value) => sum + value.nonBehavioral, 0)).toBe(project0.nonBehavioral);
+    fireEvent.click(depthOption('Exact module'));
+    expect(onSettings).toHaveBeenLastCalledWith(settings({ showNonBehavioral: true, depthMode: 'exact' }));
+    expect(drawn()).toEqual(drawnOf(expectedScopeLinks({ project, dependencies, scopeModuleId: workspace,
+      depthMode: 'exact', showNonBehavioral: true })));
+    expect(lastGraph().edges.every((edge) => edge.depthMode === 'exact' && edge.sources.length === 1)).toBe(true);
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
 
@@ -411,248 +437,278 @@ describe('Plan 6D dependency diagram', () => {
     cleanup();
     const controlled = vi.fn();
     render(<ProjectExplorerView {...diagramProps(project, readyDependencies(dependencies), {
-      dependencySettings: defaultDependencySettings, onDependencySettingsChange: controlled })} />);
+      scopeModuleId: workspace, dependencySettings: defaultDependencySettings,
+      onDependencySettingsChange: controlled })} />);
     fireEvent.click(nonBehavioralToggle());
-    expect(controlled).toHaveBeenCalledWith({ showNonBehavioral: true, linkTarget: 'imported-module' });
+    expect(controlled).toHaveBeenCalledWith(settings({ showNonBehavioral: true }));
     expect(nonBehavioralToggle()).not.toBeChecked();
   });
 
-  it('BD32 links a forwarded original to its imported module by default and its owner alternatively', () => {
+  it('BD32 links a forwarded original to its original owner in both depth modes', () => {
     const { forwarding, bothBoundaries } = mappedDependencyModels();
-    const ids = (model: DependencyGraphModel, settings: DependencySettings) => {
-      const rendered = render(<ProjectExplorerView {...diagramProps(forwardingProject(), readyDependencies(model),
-        { dependencySettings: settings })} />);
-      const result = lastGraph().edges.map((edge) => `${edge.consumer}>${edge.provider}:${edge.behavioral}/${edge.nonBehavioral}`);
-      const outOfView = lastGraph().outOfViewModules?.map((module) => module.id) ?? [];
+    const project = forwardingProject();
+    const show = (model: DependencyGraphModel, next: DependencySettings) => {
+      const rendered = render(<ProjectExplorerView {...diagramProps(project, readyDependencies(model),
+        { dependencySettings: next })} />);
+      const result = { links: drawn(), outOfView: outOfView() };
       rendered.unmount();
-      return { result, outOfView };
+      return result;
     };
-    const imported = { showNonBehavioral: false, linkTarget: 'imported-module' } as const;
-    const owner = { showNonBehavioral: false, linkTarget: 'original-owner' } as const;
-    // The forwarded `run`, owned by b/core, is imported through b: A -> B by default, A -> B/A as owner.
-    expect(ids(forwarding, imported).result).toEqual(['app/a>app/b:1/0', 'app/b>app/c:1/0']);
-    const forwardedOwner = ids(forwarding, owner);
-    expect(forwardedOwner.result).toEqual(['app/a>app/b/core:1/0', 'app/b>app/c:1/0']);
-    expect(forwardedOwner.outOfView).toEqual(['app/b/core']);
+    // The forwarded `run`, owned by b/core, rolls up to `app/b` and is exactly `app/b/core`.
+    expect(show(forwarding, settings()).links).toEqual(['app/a>app/b:1/0', 'app/b>app/c:1/0']);
+    const exact = show(forwarding, settings({ depthMode: 'exact' }));
+    expect(exact.links).toEqual(['app/a>app/b/core:1/0', 'app/b>app/c:1/0']);
+    expect(exact.outOfView).toEqual(['app/b/core']);
 
-    // One original through b and c: two default links, one original-owner dependency.
-    expect(ids(bothBoundaries, imported).result).toEqual(['app/a>app/b:1/1', 'app/a>app/c:1/0']);
-    expect(ids(bothBoundaries, owner).result).toEqual(['app/a>app/b/core:1/0']);
+    // The imported module `app/b` is no endpoint in `Exact module`; it is only a panel breakdown.
+    const exactLink = scopedLinks(project, forwarding, settings({ depthMode: 'exact' }))
+      .find((link) => link.consumer === 'app/a')!;
+    expect(exactLink.provider).toBe('app/b/core');
+    const rendered = render(<ProjectExplorerView {...diagramProps(project, readyDependencies(forwarding), {
+      dependencySettings: settings({ depthMode: 'exact' }),
+      selectedEdge: { kind: 'edge', id: exactLink.id, edge: exactLink } })} />);
+    expect([...region('Imported through').querySelectorAll('[data-module]')]
+      .map((row) => row.getAttribute('data-module'))).toEqual(['app/b', 'app/c']);
+    rendered.unmount();
+
+    // One original through b and c: one rolled-up link and one headline dependency.
+    expect(show(bothBoundaries, settings()).links).toEqual(['app/a>app/b:1/0']);
+    expect(show(bothBoundaries, settings({ depthMode: 'exact' })).links).toEqual(['app/a>app/b/core:1/0']);
     expect(expectedProject(bothBoundaries)).toEqual({ behavioral: 1, nonBehavioral: 1 });
-    render(<ProjectExplorerView {...diagramProps(forwardingProject(), readyDependencies(bothBoundaries),
-      { dependencySettings: owner })} />);
-    expect(cards(projectRegion())).toMatchObject({ behavioral: '1', nonBehavioral: '1' });
+    render(<ProjectExplorerView {...diagramProps(project, readyDependencies(bothBoundaries))} />);
+    expect(pair(projectRegion(), 'Whole project')).toMatchObject({ behavioral: '1', nonBehavioral: '1' });
   });
 
-  it('BD34 summarizes the project with both headline cards, displayed links, coverage and revision only', () => {
+  it('BD34 labels the filtered and measured project cards, the numbers not drawn, links, coverage and revision', () => {
     const { forwarding, zero } = mappedDependencyModels();
     const project = forwardingProject();
     const { rerender } = render(<ProjectExplorerView {...diagramProps(project, readyDependencies(forwarding))} />);
-    const expected = expectedProject(forwarding);
-    const region = projectRegion();
-    expect(cards(region)).toEqual({ behavioral: String(expected.behavioral), nonBehavioral: String(expected.nonBehavioral),
-      note: 'not drawn' });
-    expect(within(region).getByText('Behavioral dependencies')).toBeInTheDocument();
-    expect(within(region).getByText('Non-behavioral dependencies')).toBeInTheDocument();
+    const measured = expectedProject(forwarding);
+    const thisView = expectedScopeLinks({ project, dependencies: forwarding, showNonBehavioral: true })
+      .reduce((sum, link) => ({ behavioral: sum.behavioral + link.behavioral,
+        nonBehavioral: sum.nonBehavioral + link.nonBehavioral }), { behavioral: 0, nonBehavioral: 0 });
+    expect(thisView).toEqual({ behavioral: 2, nonBehavioral: 1 });
+    expect(pair(projectRegion(), 'This view')).toEqual({ behavioral: String(thisView.behavioral),
+      nonBehavioral: String(thisView.nonBehavioral), note: 'not drawn' });
+    expect(pair(projectRegion(), 'Whole project')).toEqual({ behavioral: String(measured.behavioral),
+      nonBehavioral: String(measured.nonBehavioral), note: 'not drawn' });
+    expect(notDrawn()).toBe(`${measured.behavioral - thisView.behavioral}/${measured.nonBehavioral - thisView.nonBehavioral}`);
+    expect(screen.getByText(/Not drawn at this level/)).toBeInTheDocument();
+    expect(within(projectRegion()).getAllByText('Behavioral dependencies').length).toBe(2);
     const metricValue = (label: string) => within(projectRegion()).getByText(label).closest('.module-arch__metric')!
       .querySelector('.module-arch__metric-value')!.textContent;
     expect(metricValue('Displayed module links')).toBe(String(lastGraph().edges.length));
     expect(metricValue('Coverage')).toBe(`Partial: ${forwarding.coverage.unknownDependencies} omitted`);
-    expect(within(region).getByText(/Some dependencies were omitted: 1 unknown dependency/)).toBeInTheDocument();
+    expect(within(projectRegion()).getByText(/Some dependencies were omitted: 1 unknown dependency/)).toBeInTheDocument();
     expect(metricValue('Revision')).toBe(project.revision);
     expect(metricValue('Input')).toBe(forwarding.inputId);
     expect(screen.getByText(/One headline dependency per consumer module and referenced original symbol/)).toBeInTheDocument();
     const sidebar = document.querySelector('.module-arch__sidebar') as HTMLElement;
     expect(sidebar.textContent).not.toMatch(/ratio|%|confidence|pie/i);
     expect(sidebar.querySelector('svg, canvas')).toBeNull();
+    // At the project scope there is no drilled-in frame, so no own-source section.
+    expect(screen.queryByRole('region', { name: "Scope's own source" })).not.toBeInTheDocument();
 
     fireEvent.click(nonBehavioralToggle());
-    expect(cards(projectRegion()).note).toBe('shown');
+    expect(pair(projectRegion(), 'This view').note).toBe('shown');
+    // A panel number does not move with the non-behavioral setting.
+    expect(pair(projectRegion(), 'This view').behavioral).toBe(String(thisView.behavioral));
+    expect(notDrawn()).toBe(`${measured.behavioral - thisView.behavioral}/${measured.nonBehavioral - thisView.nonBehavioral}`);
     expect(metricValue('Displayed module links')).toBe(String(lastGraph().edges.length));
 
     rerender(<ProjectExplorerView {...diagramProps(project, readyDependencies(zero))} />);
-    expect(cards(projectRegion())).toMatchObject({ behavioral: '0', nonBehavioral: '0' });
+    expect(pair(projectRegion(), 'Whole project')).toMatchObject({ behavioral: '0', nonBehavioral: '0' });
     expect(metricValue('Coverage')).toBe('Complete');
     expect(metricValue('Displayed module links')).toBe('0');
   });
 
-  it('BD35 separates Uses, Used through this module and Owned originals used by others, active role first', () => {
+  it('BD35 shows Uses and owned originals as At this level against Including internals', () => {
     const { forwarding } = mappedDependencyModels();
     const project = forwardingProject();
-    const expected = expectedModule(forwarding, 'app/b');
+    const tree = indexModuleTree(project.modules, project.rootModuleId);
+    const subtree = subtreeDependencyCounts(forwarding, 'app/b', tree);
     render(<ProjectExplorerView {...diagramProps(project, readyDependencies(forwarding), { selectedModuleId: 'app/b' })} />);
     const regions = () => [...document.querySelectorAll('.module-arch__sidebar section[aria-label]')]
       .map((section) => [section.getAttribute('aria-label'), section.closest('details') ? 'disclosure' : 'primary']);
-    expect(regions()).toEqual([['Uses', 'primary'], ['Used through this module', 'primary'],
-      ['Owned originals used by others', 'disclosure']]);
-    const values = (name: string) => {
-      const { behavioral, nonBehavioral } = cards(screen.getByRole('region', { name, hidden: true }));
-      return { behavioral: Number(behavioral), nonBehavioral: Number(nonBehavioral) };
-    };
-    expect(values('Uses')).toEqual(expected.uses);
-    expect(values('Used through this module')).toEqual(expected.usedThrough);
-    expect(values('Owned originals used by others')).toEqual(expected.ownedUsedByOthers);
-    // Distinct units: b forwards nothing of its own to a but is the boundary of a's use.
-    expect(expected.usedThrough).toEqual({ behavioral: 1, nonBehavioral: 1 });
-    expect(expected.ownedUsedByOthers).toEqual({ behavioral: 0, nonBehavioral: 1 });
-    expect(within(screen.getByRole('region', { name: 'Used through this module' }))
-      .getByText('Behavioral used originals via this module')).toBeInTheDocument();
-    const linksDisplayed = () => screen.getByText('Links displayed').closest('.module-arch__metric')!.textContent;
-    expect(linksDisplayed()).toBe(`${activeDependencyEdges(forwarding, defaultDependencySettings)
-      .filter((edge) => edge.consumer === 'app/b' || edge.provider === 'app/b').length}Links displayed`);
-
-    fireEvent.click(linkTarget('Original owners'));
     expect(regions()).toEqual([['Uses', 'primary'], ['Owned originals used by others', 'primary'],
       ['Used through this module', 'disclosure']]);
-    expect(values('Uses')).toEqual(expected.uses);
-    expect(values('Owned originals used by others')).toEqual(expected.ownedUsedByOthers);
+    // The measured subtree totals come from the served rows of `app/b` and `app/b/core`.
+    expect(subtree.uses).toEqual({ behavioral: 1, nonBehavioral: 1 });
+    expect(subtree.ownedUsedByOthers).toEqual({ behavioral: 1, nonBehavioral: 1 });
+    expect(numbers(region('Uses'), 'Including internals')).toEqual(subtree.uses);
+    expect(numbers(region('Uses'), 'At this level')).toEqual({ behavioral: 1, nonBehavioral: 0 });
+    expect(numbers(region('Owned originals used by others'), 'Including internals'))
+      .toEqual(subtree.ownedUsedByOthers);
+    expect(numbers(region('Owned originals used by others'), 'At this level'))
+      .toEqual({ behavioral: 1, nonBehavioral: 0 });
+    // `Used through this module` keeps its imported unit, measured only.
+    const through = region('Used through this module');
+    expect(numbers(through, 'Including internals')).toEqual({ behavioral: subtree.usedThrough.behavioralUsedOriginals,
+      nonBehavioral: subtree.usedThrough.nonBehavioralUsedOriginals });
+    expect(within(through).queryByRole('group', { name: 'At this level', hidden: true })).not.toBeInTheDocument();
+    expect(within(through).getByText('Behavioral used originals via this module')).toBeInTheDocument();
+    const linksDisplayed = () => screen.getByText('Links displayed').closest('.module-arch__metric')!.textContent;
+    expect(linksDisplayed()).toBe(`${scopedLinks(project, forwarding)
+      .filter((link) => link.consumer === 'app/b' || link.provider === 'app/b').length}Links displayed`);
+
     fireEvent.click(nonBehavioralToggle());
-    expect(values('Uses')).toEqual(expected.uses);
-    expect(linksDisplayed()).toBe(`${activeDependencyEdges(forwarding, { showNonBehavioral: true, linkTarget: 'original-owner' })
-      .filter((edge) => edge.consumer === 'app/b' || edge.provider === 'app/b').length}Links displayed`);
+    expect(numbers(region('Uses'), 'Including internals')).toEqual(subtree.uses);
+    expect(numbers(region('Uses'), 'At this level')).toEqual({ behavioral: 1, nonBehavioral: 0 });
+    expect(linksDisplayed()).toBe(`${scopedLinks(project, forwarding, { showNonBehavioral: true })
+      .filter((link) => link.consumer === 'app/b' || link.provider === 'app/b').length}Links displayed`);
   });
 
-  it('BD36 labels each link panel in its projection unit and lists only referenced classified originals', () => {
-    const { forwarding } = mappedDependencyModels();
-    const project = forwardingProject();
-    const importedSettings = { showNonBehavioral: true, linkTarget: 'imported-module' } as const;
-    const importedLink = activeDependencyEdges(forwarding, importedSettings)
-      .find((edge) => edge.consumer === 'app/a' && edge.provider === 'app/c')!;
-    const expectedImported = expectedImportedEdges(forwarding).get(importedLink.id)!;
-    const rendered = render(<ProjectExplorerView {...diagramProps(project, readyDependencies(forwarding), {
-      dependencySettings: importedSettings, selectedEdge: { kind: 'edge', id: importedLink.id, edge: importedLink } })} />);
-    expect(screen.getByRole('heading', { name: 'Imported-module link' })).toBeInTheDocument();
-    const usage = screen.getByRole('region', { name: 'Used originals via this boundary' });
-    expect(within(usage).getByText('Behavioral used originals via this boundary')).toBeInTheDocument();
-    expect(within(usage).getByText('Non-behavioral used originals via this boundary')).toBeInTheDocument();
-    expect(cards(usage)).toEqual({ behavioral: String(expectedImported.behavioral),
-      nonBehavioral: String(expectedImported.nonBehavioral), note: 'shown' });
-    expect(within(usage).getByText('Total classified originals via this boundary').closest('.module-arch__metric'))
-      .toHaveTextContent(String(expectedImported.behavioral + expectedImported.nonBehavioral));
-    const owners = screen.getByRole('region', { name: 'Original owners' });
-    expect([...owners.querySelectorAll('[data-module]')].map((row) => [row.getAttribute('data-module'), row.textContent]))
-      .toEqual([['app/b/core', 'core0 behavioral2 non-behavioral']]);
-    expect(screen.getByText('Imported module files')).toBeInTheDocument();
-    expect(screen.queryByText('Original declaration files')).not.toBeInTheDocument();
-    const evidence = [...document.querySelectorAll('.module-arch__evidence-item')];
-    // `run` (denied) and the known path of `x`; the unknown path of `x` and unused imports are absent.
-    expect(evidence.map((item) => item.querySelector('.module-arch__evidence-original')!.textContent)).toEqual(['run', 'x']);
-    expect(document.querySelector('.module-arch__sidebar')!.textContent).not.toContain('unknown');
-    expect(screen.getAllByText(/Supporting occurrences: 1/)).toHaveLength(2);
+  it('BD36 lists the rolled-up modules of a link and keeps the exact link panel labels', () => {
+    const nestedProject = nestedLevelsProject();
+    const nested = nestedLevelsDependencies();
+    // Rolled up inside `app/a`: two exact edges of `app/a/left` onto the `app/b` subtree.
+    const rolled = scopedLinks(nestedProject, nested, { showNonBehavioral: true }, 'app/a')
+      .find((link) => link.consumer === 'app/a/left' && link.provider === 'app/b')!;
+    expect(rolled.sources.map((edge) => [edge.consumer, edge.provider]))
+      .toEqual([['app/a/left', 'app/b'], ['app/a/left', 'app/b/core']]);
+    const rendered = render(<ProjectExplorerView {...diagramProps(nestedProject, readyDependencies(nested), {
+      scopeModuleId: 'app/a', dependencySettings: settings({ showNonBehavioral: true }),
+      selectedEdge: { kind: 'edge', id: rolled.id, edge: rolled } })} />);
+    expect(screen.getByRole('heading', { name: 'Rolled-up link' })).toBeInTheDocument();
+    expect(numbers(region('Dependencies'), 'At this level')).toEqual({ behavioral: 1, nonBehavioral: 2 });
+    expect(within(region('Dependencies')).getByText('Total classified dependencies')
+      .closest('.module-arch__metric')).toHaveTextContent('3');
+    expect([...region('Rolled-up modules').querySelectorAll('.module-arch__breakdown-item')]
+      .map((row) => [row.getAttribute('data-consumer'), row.getAttribute('data-provider'), row.textContent]))
+      .toEqual([['app/a/left', 'app/b', 'left  ->  b0 behavioral1 non-behavioral'],
+        ['app/a/left', 'app/b/core', 'left  ->  core1 behavioral1 non-behavioral']]);
+    // The imported-through breakdown sums the contributing edges per imported module.
+    expect([...region('Imported through').querySelectorAll('[data-module]')]
+      .map((row) => [row.getAttribute('data-module'), row.textContent]))
+      .toEqual([['app/b', 'b1 behavioral1 non-behavioral'], ['app/b/core', 'core0 behavioral1 non-behavioral']]);
+    expect(screen.getByText('limit-nested-1')).toBeInTheDocument();
+    // One row per original, each naming its exact consumer and owner.
+    const rows = [...document.querySelectorAll('.module-arch__evidence-item')];
+    expect(rows.map((row) => row.querySelector('.module-arch__evidence-original')!.textContent))
+      .toEqual(['delta', 'alpha', 'beta']);
+    expect(rows[0]!.querySelector('.module-arch__evidence-path')!.textContent)
+      .toBe('non-behavioraldeniednot-visibleleft  ->  bimported through bSupporting occurrences: 1');
     rendered.unmount();
 
-    const ownerSettings = { showNonBehavioral: false, linkTarget: 'original-owner' } as const;
-    const ownerLink = activeDependencyEdges(forwarding, ownerSettings)
-      .find((edge) => edge.consumer === 'app/a' && edge.provider === 'app/b/core')!;
-    const expectedOwner = expectedOwnerEdges(forwarding).get(ownerLink.id)!;
+    // The exact link panel keeps iteration 6's original-owner labels.
+    const { forwarding } = mappedDependencyModels();
+    const project = forwardingProject();
+    const exactLink = scopedLinks(project, forwarding, { depthMode: 'exact' })
+      .find((link) => link.consumer === 'app/a' && link.provider === 'app/b/core')!;
     render(<ProjectExplorerView {...diagramProps(project, readyDependencies(forwarding), {
-      dependencySettings: ownerSettings, selectedEdge: { kind: 'edge', id: ownerLink.id, edge: ownerLink } })} />);
+      dependencySettings: settings({ depthMode: 'exact' }),
+      selectedEdge: { kind: 'edge', id: exactLink.id, edge: exactLink } })} />);
     expect(screen.getByRole('heading', { name: 'Original-owner link' })).toBeInTheDocument();
-    const dependencies = screen.getByRole('region', { name: 'Dependencies' });
+    const dependencies = region('Dependencies');
     expect(within(dependencies).getByText('Behavioral dependencies')).toBeInTheDocument();
-    expect(cards(dependencies)).toEqual({ behavioral: String(expectedOwner.behavioral),
-      nonBehavioral: String(expectedOwner.nonBehavioral), note: 'not drawn' });
+    expect(cards(dependencies)).toEqual({ behavioral: '1', nonBehavioral: '0', note: 'not drawn' });
     expect(within(dependencies).getByText('Total classified dependencies')).toBeInTheDocument();
     expect(screen.queryByText(/via this boundary/)).not.toBeInTheDocument();
-    const through = screen.getByRole('region', { name: 'Imported through' });
-    expect([...through.querySelectorAll('[data-module]')].map((row) => [row.getAttribute('data-module'), row.textContent]))
+    expect(screen.queryByRole('region', { name: 'Rolled-up modules' })).not.toBeInTheDocument();
+    expect([...region('Imported through').querySelectorAll('[data-module]')]
+      .map((row) => [row.getAttribute('data-module'), row.textContent]))
       .toEqual([['app/b', 'b1 behavioral0 non-behavioral'], ['app/c', 'c0 behavioral1 non-behavioral']]);
     expect(screen.getByText('Original declaration files')).toBeInTheDocument();
-    // One primary row per original; its two boundaries are listed beneath it.
-    const rows = [...document.querySelectorAll('.module-arch__evidence-item')];
-    expect(rows).toHaveLength(1);
-    expect([...rows[0]!.querySelectorAll('.module-arch__evidence-path')].map((row) => row.textContent))
+    // Only referenced classified originals; accesses are labelled supporting occurrences.
+    const exactRows = [...document.querySelectorAll('.module-arch__evidence-item')];
+    expect(exactRows).toHaveLength(1);
+    expect(document.querySelector('.module-arch__sidebar')!.textContent).not.toContain('unknown');
+    expect([...exactRows[0]!.querySelectorAll('.module-arch__evidence-path')].map((row) => row.textContent))
       .toEqual(['behavioralallowedexposedimported through bSupporting occurrences: 1',
         'non-behavioraldeniednot-visibleimported through cSupporting occurrences: 1']);
   });
 
-  it('BD37 reconciles scope, filters, out-of-view modules and selection against the active links', () => {
+  it('BD37 reconciles scope, filters, out-of-view nodes and selection against the scope links', () => {
     const { forwarding, bothBoundaries } = mappedDependencyModels();
     const project = forwardingProject();
-    const outOfView = () => (lastGraph().outOfViewModules ?? []).map((module) => module.id);
     const props = diagramProps(project, readyDependencies(forwarding));
     const { rerender } = render(<ProjectExplorerView {...props} />);
     expect(outOfView()).toEqual([]);
     fireEvent.click(nonBehavioralToggle());
-    expect(outOfView()).toEqual(['app/b/core']);
+    // The non-behavioral rolled-up links stay inside the displayed nodes.
+    expect(outOfView()).toEqual([]);
     fireEvent.click(nonBehavioralToggle());
-    fireEvent.click(linkTarget('Original owners'));
+    fireEvent.click(depthOption('Exact module'));
     expect(outOfView()).toEqual(['app/b/core']);
+    fireEvent.click(depthOption('Modules at this level'));
 
-    // A filter hiding `c` makes it out of view only while an active link reaches it.
-    rerender(<ProjectExplorerView {...props} selectedPresentationClasses={['untagged']}
-      dependencySettings={{ showNonBehavioral: false, linkTarget: 'imported-module' }} />);
+    // A filter hiding `app/a` and `app/c` keeps them as the links' related nodes: the mapping
+    // is unchanged, only the displayed set is.
+    const filtered = expectedScopeLinks({ project, dependencies: forwarding,
+      displayed: ['app/b', 'app/idle'] });
+    rerender(<ProjectExplorerView {...props} selectedPresentationClasses={['untagged']} />);
     expect(lastGraph().modules.map((module) => module.id)).toEqual(['app/b', 'app/idle']);
+    expect(drawn()).toEqual(drawnOf(filtered));
     expect(outOfView()).toEqual(['app/a', 'app/c']);
-    rerender(<ProjectExplorerView {...props} selectedPresentationClasses={['untagged']}
-      dependencySettings={{ showNonBehavioral: false, linkTarget: 'original-owner' }} />);
-    expect(outOfView().sort()).toEqual(['app/c']);
     cleanup();
 
-    // Scope: inside b, only links touching b/core are drawn.
-    render(<ProjectExplorerView {...diagramProps(project, readyDependencies(forwarding), { scopeModuleId: 'app/b',
-      dependencySettings: { showNonBehavioral: true, linkTarget: 'imported-module' } })} />);
-    expect(lastGraph().edges.map((edge) => `${edge.consumer}>${edge.provider}`)).toEqual(['app/b/core>app/b']);
-    expect(outOfView()).toEqual(['app/b']);
+    // Scope: inside `app/b` only links that reach `app/b/core` are drawn; `app/b/core -> app/b`
+    // has a frame end and is drawn nowhere.
+    render(<ProjectExplorerView {...diagramProps(project, readyDependencies(forwarding),
+      { scopeModuleId: 'app/b', dependencySettings: settings({ showNonBehavioral: true }) })} />);
+    expect(drawn()).toEqual(['app/a>app/b/core:1/0']);
+    expect(outOfView()).toEqual(['app/a']);
     cleanup();
 
-    // Selection: the imported a -> c link has a different ID from the original-owner a -> c link.
+    // Selection: a rolled-up ID names its scope, so the same pair has a different ID inside `app/b`.
     const onSelectEdge = vi.fn();
-    const settings = { showNonBehavioral: true, linkTarget: 'imported-module' } as const;
-    const importedAC = activeDependencyEdges(bothBoundaries, settings).find((edge) => edge.provider === 'app/c')!;
-    const ownerAC = activeDependencyEdges(bothBoundaries, { ...settings, linkTarget: 'original-owner' })
-      .find((edge) => edge.provider === 'app/c')!;
-    expect(ownerAC.consumer).toBe(importedAC.consumer);
-    expect(ownerAC.id).not.toBe(importedAC.id);
-    const selection = (edge: typeof importedAC): GraphSelection => ({ kind: 'edge', id: edge.id, edge });
-    const view = (next: DependencySettings, selected: GraphSelection, model = bothBoundaries) =>
+    const rolledAtProject = scopedLinks(project, forwarding, { showNonBehavioral: true })
+      .find((link) => link.consumer === 'app/a')!;
+    const rolledInsideB = scopedLinks(project, forwarding, { showNonBehavioral: true }, 'app/b')
+      .find((link) => link.consumer === 'app/a')!;
+    expect(rolledAtProject.id).not.toBe(rolledInsideB.id);
+    const view = (next: DependencySettings, selected: GraphSelection, scopeModuleId: string | null = null,
+      model = forwarding) =>
       <ProjectExplorerView {...diagramProps(project, readyDependencies(model), { dependencySettings: next,
-        selectedEdge: selected, onSelectEdge })} />;
-    const selected = render(view(settings, selection(importedAC)));
+        scopeModuleId, selectedEdge: selected, onSelectEdge })} />;
+    const selection = (edge: ActiveDependencyEdge): GraphSelection => ({ kind: 'edge', id: edge.id, edge });
+    const selected = render(view(settings({ showNonBehavioral: true }), selection(rolledAtProject)));
     expect(onSelectEdge).not.toHaveBeenCalled();
-    selected.rerender(view({ ...settings, linkTarget: 'original-owner' }, selection(importedAC)));
+    selected.rerender(view(settings({ showNonBehavioral: true }), selection(rolledAtProject), 'app/b'));
     expect(onSelectEdge).toHaveBeenCalledWith(null);
     onSelectEdge.mockClear();
 
-    // The mixed a -> b link keeps its ID when non-behavioral links are hidden.
-    const mixed = activeDependencyEdges(bothBoundaries, settings).find((edge) => edge.provider === 'app/b')!;
-    selected.rerender(view(settings, selection(mixed)));
-    selected.rerender(view({ ...settings, showNonBehavioral: false }, selection(mixed)));
+    // A behavioral rolled-up link keeps its ID when non-behavioral links are hidden.
+    const behavioral = scopedLinks(project, bothBoundaries).find((link) => link.provider === 'app/b')!;
+    selected.rerender(view(settings({ showNonBehavioral: true }), selection(behavioral), null, bothBoundaries));
+    selected.rerender(view(settings(), selection(behavioral), null, bothBoundaries));
     expect(onSelectEdge).not.toHaveBeenCalled();
-    expect(screen.getByRole('heading', { name: 'Imported-module link' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Rolled-up link' })).toBeInTheDocument();
     // A non-behavioral-only link is cleared when the setting hides it.
-    const nonBehavioral = activeDependencyEdges(forwarding, settings)
-      .find((edge) => edge.emphasis === 'non-behavioral')!;
-    selected.rerender(view(settings, selection(nonBehavioral), forwarding));
+    const nonBehavioral = scopedLinks(project, forwarding, { showNonBehavioral: true })
+      .find((link) => link.emphasis === 'non-behavioral')!;
+    selected.rerender(view(settings({ showNonBehavioral: true }), selection(nonBehavioral)));
     expect(onSelectEdge).not.toHaveBeenCalled();
-    selected.rerender(view({ ...settings, showNonBehavioral: false }, selection(nonBehavioral), forwarding));
+    selected.rerender(view(settings(), selection(nonBehavioral)));
     expect(onSelectEdge).toHaveBeenCalledWith(null);
   });
 
-  it('BD38 gives the controls labels and keyboard behavior and distinguishes every dependency state', () => {
+  it('BD38 gives the three controls labels and keyboard behavior and distinguishes every dependency state', () => {
     const { forwarding, zero, bothBoundaries } = mappedDependencyModels();
     const project = forwardingProject();
     const { rerender } = render(<ProjectExplorerView {...diagramProps(project, readyDependencies(bothBoundaries))} />);
     expect(screen.getByRole('group', { name: 'Dependencies' })).toBeInTheDocument();
-    const imported = linkTarget('Imported modules');
-    const owners = linkTarget('Original owners');
-    expect(imported).toHaveAttribute('aria-checked', 'true');
-    expect(imported).toHaveAttribute('tabindex', '0');
-    expect(owners).toHaveAttribute('tabindex', '-1');
-    imported.focus();
-    fireEvent.keyDown(imported, { key: 'ArrowRight' });
-    expect(linkTarget('Original owners')).toHaveAttribute('aria-checked', 'true');
-    expect(document.activeElement).toBe(linkTarget('Original owners'));
-    expect(lastGraph().edges.every((edge) => edge.projection === 'original-owner')).toBe(true);
-    fireEvent.keyDown(linkTarget('Original owners'), { key: 'Home' });
-    expect(linkTarget('Imported modules')).toHaveAttribute('aria-checked', 'true');
-    expect(document.activeElement).toBe(linkTarget('Imported modules'));
-    fireEvent.keyDown(linkTarget('Imported modules'), { key: 'End' });
-    expect(linkTarget('Original owners')).toHaveAttribute('aria-checked', 'true');
-    fireEvent.keyDown(linkTarget('Original owners'), { key: 'ArrowLeft' });
-    expect(linkTarget('Imported modules')).toHaveAttribute('aria-checked', 'true');
-    fireEvent.keyDown(linkTarget('Imported modules'), { key: 'Tab' });
-    expect(linkTarget('Imported modules')).toHaveAttribute('aria-checked', 'true');
+    const level = depthOption('Modules at this level');
+    expect(level).toHaveAttribute('aria-checked', 'true');
+    expect(level).toHaveAttribute('tabindex', '0');
+    expect(depthOption('Exact module')).toHaveAttribute('tabindex', '-1');
+    level.focus();
+    fireEvent.keyDown(level, { key: 'ArrowRight' });
+    expect(depthOption('Exact module')).toHaveAttribute('aria-checked', 'true');
+    expect(document.activeElement).toBe(depthOption('Exact module'));
+    expect(lastGraph().edges.every((edge) => edge.depthMode === 'exact')).toBe(true);
+    fireEvent.keyDown(depthOption('Exact module'), { key: 'Home' });
+    expect(depthOption('Modules at this level')).toHaveAttribute('aria-checked', 'true');
+    expect(document.activeElement).toBe(depthOption('Modules at this level'));
+    fireEvent.keyDown(depthOption('Modules at this level'), { key: 'End' });
+    expect(depthOption('Exact module')).toHaveAttribute('aria-checked', 'true');
+    fireEvent.keyDown(depthOption('Exact module'), { key: 'ArrowLeft' });
+    expect(depthOption('Modules at this level')).toHaveAttribute('aria-checked', 'true');
+    fireEvent.keyDown(depthOption('Modules at this level'), { key: 'Tab' });
+    expect(depthOption('Modules at this level')).toHaveAttribute('aria-checked', 'true');
+    // The project scope of a single-root project has no outside, so the toggle does not apply.
+    expect(screen.queryByRole('checkbox', { name: 'Show dependencies that leave this module' }))
+      .not.toBeInTheDocument();
 
     const states: Array<[DependencyGraphState, string, RegExp, boolean]> = [
       [{ data: null, phase: 'idle', reason: null, isStale: false }, 'idle', /not been requested/, false],
@@ -678,9 +734,392 @@ describe('Plan 6D dependency diagram', () => {
       expect(lastGraph().edges.length > 0).toBe(drawsLinks);
       const controlsDisabled = state.data === null;
       expect(nonBehavioralToggle()).toHaveProperty('disabled', controlsDisabled);
-      expect(linkTarget('Imported modules')).toHaveProperty('disabled', controlsDisabled);
+      expect(depthOption('Modules at this level')).toHaveProperty('disabled', controlsDisabled);
     }
     expect(seen.size).toBe(states.length);
+
+    // In a drilled-in scope all three controls are present and keyboard-reachable.
+    cleanup();
+    render(<ProjectExplorerView {...diagramProps(nestedLevelsProject(),
+      readyDependencies(nestedLevelsDependencies()), { scopeModuleId: 'app/a' })} />);
+    expect(leavingToggle()).toBeChecked();
+    expect(leavingToggle()).toHaveProperty('disabled', false);
+    expect(depthOption('Modules at this level')).toHaveAttribute('aria-checked', 'true');
+  });
+});
+
+describe('Plan 6D scope-aware roll-up', () => {
+  const graphProps: ModuleGraphProps[] = [];
+  function RecordingGraph(props: ModuleGraphProps): React.ReactElement {
+    graphProps.push(props);
+    return <MockGraph {...props} />;
+  }
+  const lastGraph = () => graphProps.at(-1)!;
+  afterEach(() => { graphProps.length = 0; });
+
+  function viewProps(project: ProjectExplorerModel, model: DependencyGraphModel,
+    overrides: Overrides = {}): ProjectExplorerViewProps {
+    return createProps({
+      data: project,
+      dependencies: readyDependencies(model),
+      selectedPresentationClasses: [...new Set(project.modules.map((module) => module.presentationClass))],
+      GraphComponent: RecordingGraph,
+      DiscussionComponent: undefined,
+      ...overrides,
+    });
+  }
+
+  const drawn = () => lastGraph().edges
+    .map((edge) => `${edge.consumer}>${edge.provider}:${edge.behavioral}/${edge.nonBehavioral}`);
+  const drawnOf = (links: readonly { consumer: string; provider: string;
+    behavioral: number; nonBehavioral: number }[]) => links
+    .map((link) => `${link.consumer}>${link.provider}:${link.behavioral}/${link.nonBehavioral}`);
+  const outOfView = () => (lastGraph().outOfViewModules ?? []).map((module) => module.id);
+  const settings = (overrides: Partial<DependencySettings> = {}): DependencySettings =>
+    ({ ...defaultDependencySettings, ...overrides });
+  const pair = (host: HTMLElement, label: string) => {
+    const group = within(host).getByRole('group', { name: label, hidden: true });
+    return {
+      behavioral: Number(group.querySelector('[data-headline="behavioral"] .module-arch__headline-value')!.textContent),
+      nonBehavioral: Number(group.querySelector('[data-headline="non-behavioral"] .module-arch__headline-value')!.textContent),
+    };
+  };
+  const region = (name: string) => screen.getByRole('region', { name, hidden: true });
+
+  const workspace = 'collection-review/workspace';
+  const contracts = 'collection-review/workspace/contracts';
+  const catalog = 'collection-review/workspace/catalog';
+  const reviews = 'collection-review/workspace/reviews';
+
+  it('BD44 maps every end of a scope: containing node, frame, shallower ancestor and exact module', () => {
+    const project = nestedLevelsProject();
+    const tree = indexModuleTree(project.modules, project.rootModuleId);
+    const inside = dependencyScope(project, 'app/a');
+    expect(inside).toEqual({ frameModule: 'app/a', nodes: ['app/a/left', 'app/a/right'], depth: 2 });
+    expect(inside).toEqual(expectedScope(project, 'app/a'));
+    // Inside the scope: the child that contains the end.
+    expect(scopeEnd('app/a/left', inside, 'level', tree))
+      .toEqual({ kind: 'node', module: 'app/a/left', inScope: true });
+    // The scope module's own source: the frame.
+    expect(scopeEnd('app/a', inside, 'level', tree)).toEqual({ kind: 'frame' });
+    // Outside and deeper: the ancestor at the scope module's depth.
+    expect(expectedDepth(project, 'app/b/core')).toBe(2);
+    expect(scopeEnd('app/b/core', inside, 'level', tree))
+      .toEqual({ kind: 'node', module: 'app/b', inScope: false });
+    // Outside and no deeper than that depth: itself.
+    expect(scopeEnd('app/c', inside, 'level', tree)).toEqual({ kind: 'node', module: 'app/c', inScope: false });
+    expect(scopeEnd('app', inside, 'level', tree)).toEqual({ kind: 'node', module: 'app', inScope: false });
+    // `exact` maps every end to itself and has no frame.
+    for (const id of project.modules.map((module) => module.id)) {
+      const end = scopeEnd(id, inside, 'exact', tree);
+      expect(end).toEqual({ kind: 'node', module: id,
+        inScope: id === 'app/a' || expectedAncestors(project, id).includes('app/a') });
+      expect(end).toEqual(expectedEnd(project, expectedScope(project, 'app/a'), id, 'exact'));
+    }
+    // Every clause agrees with the independent mapping, at every scope and in both modes.
+    for (const scopeModuleId of [null, ...project.modules.map((module) => module.id)]) {
+      const scope = dependencyScope(project, scopeModuleId);
+      const expected = expectedScope(project, scopeModuleId);
+      expect(scope).toEqual(expected);
+      expect(scopeCoversProject(scope, project.modules.map((module) => module.id), tree))
+        .toBe(expectedCoversProject(project, expected));
+      for (const depthMode of ['level', 'exact'] as const) {
+        for (const id of project.modules.map((module) => module.id)) {
+          expect(scopeEnd(id, scope, depthMode, tree)).toEqual(expectedEnd(project, expected, id, depthMode));
+        }
+      }
+    }
+    // An end never depends on the class filter or the settings: the mapping takes neither.
+    const reference = project.modules.map((module) => scopeEnd(module.id, inside, 'level', tree));
+    expect(project.modules.map((module) => scopeEnd(module.id, inside, 'level', tree))).toEqual(reference);
+  });
+
+  it('BD45 draws no link whose ends map to one node, at any scope', () => {
+    const { project, dependencies } = collectionReview();
+    const tree = indexModuleTree(project.modules, project.rootModuleId);
+    for (const scopeModuleId of [null, ...project.modules.map((module) => module.id)]) {
+      const scope = dependencyScope(project, scopeModuleId);
+      for (const depthMode of ['level', 'exact'] as const) {
+        const links = scopeDependencyLinks({ model: dependencies, scope, displayed: new Set(scope.nodes), tree,
+          settings: { showNonBehavioral: true, depthMode, showOutsideScope: true } });
+        for (const link of links) expect(link.consumer).not.toBe(link.provider);
+        expect(drawnOf(links)).toEqual(drawnOf(expectedScopeLinks({ project, dependencies, scopeModuleId,
+          depthMode, showNonBehavioral: true })));
+      }
+    }
+
+    // The project scope shows the two top-level children and draws nothing: every dependency is
+    // internal to one of them or folded into the root's own source.
+    const projectScope = dependencyScope(project, null);
+    expect(projectScope.nodes).toEqual(['collection-review/integration-tests', workspace]);
+    render(<ProjectExplorerView {...viewProps(project, dependencies)} />);
+    expect(lastGraph().modules.map((module) => module.id)).toEqual(projectScope.nodes);
+    expect(lastGraph().edges).toEqual([]);
+    const internal = dependencies.originalOwnerEdges.filter((edge) => {
+      const ends = [edge.consumer, edge.provider]
+        .map((id) => scopeEnd(id, projectScope, 'level', tree));
+      return ends[0]!.kind === 'node' && ends[1]!.kind === 'node' && ends[0]!.module === ends[1]!.module;
+    });
+    expect(internal).toHaveLength(20);
+    cleanup();
+
+    // Drilling into `workspace` makes its children's links visible.
+    const inside = expectedScopeLinks({ project, dependencies, scopeModuleId: workspace, showNonBehavioral: true });
+    expect(inside).toHaveLength(9);
+    expect(scopeLinkCounts(scopedLinks(project, dependencies, { showNonBehavioral: true }, workspace)))
+      .toEqual({ behavioral: 7, nonBehavioral: 41 });
+    render(<ProjectExplorerView {...viewProps(project, dependencies,
+      { scopeModuleId: workspace, dependencySettings: settings({ showNonBehavioral: true }) })} />);
+    expect(drawn()).toEqual(drawnOf(inside));
+    expect(drawn()).toContain(`${catalog}>${contracts}:0/9`);
+    expect(drawn()).toContain(`${reviews}>${contracts}:0/24`);
+  });
+
+  it('BD46 rolls several deep ends of one subtree into one link and drops a link with no displayed end', () => {
+    const project = nestedLevelsProject();
+    const dependencies = nestedLevelsDependencies();
+    const tree = indexModuleTree(project.modules, project.rootModuleId);
+    const scope = dependencyScope(project, 'app/a');
+    const links = scopeDependencyLinks({ model: dependencies, scope, displayed: new Set(scope.nodes), tree,
+      settings: { showNonBehavioral: true, depthMode: 'level', showOutsideScope: true } });
+    expect(drawnOf(links)).toEqual(drawnOf(expectedScopeLinks({ project, dependencies, scopeModuleId: 'app/a',
+      showNonBehavioral: true })));
+    // Two exact edges onto the `app/b` subtree collapse into one link with one out-of-view node.
+    const rolled = links.find((link) => link.consumer === 'app/a/left' && link.provider === 'app/b')!;
+    expect(rolled.sources.map((edge) => [edge.consumer, edge.provider]))
+      .toEqual([['app/a/left', 'app/b'], ['app/a/left', 'app/b/core']]);
+    expect(links.some((link) => link.consumer === 'app/b/core' || link.provider === 'app/b/core')).toBe(false);
+    // `app/c -> app` has no displayed end inside `app/a` and is not drawn.
+    expect(dependencies.originalOwnerEdges.some((edge) => edge.consumer === 'app/c' && edge.provider === 'app')).toBe(true);
+    expect(links.some((link) => link.consumer === 'app/c' || link.provider === 'app')).toBe(false);
+    // The frame ends are drawn nowhere.
+    expect(links.some((link) => link.consumer === 'app/a' || link.provider === 'app/a')).toBe(false);
+
+    render(<ProjectExplorerView {...viewProps(project, dependencies,
+      { scopeModuleId: 'app/a', dependencySettings: settings({ showNonBehavioral: true }) })} />);
+    expect(drawn()).toEqual(drawnOf(links));
+    expect(outOfView().sort()).toEqual(['app', 'app/b', 'app/c']);
+  });
+
+  it('BD47 draws a parent-and-child dependency at no scope and keeps it in the measured totals', () => {
+    const { forwarding } = mappedDependencyModels();
+    const project = forwardingProject();
+    const tree = indexModuleTree(project.modules, project.rootModuleId);
+    const edge = forwarding.originalOwnerEdges
+      .find((item) => item.consumer === 'app/b/core' && item.provider === 'app/b')!;
+    expect(edge.counts).toEqual({ behavioral: 0, nonBehavioral: 1 });
+    // Internal at the project scope, a frame end inside `app/b`: the roll-up draws it nowhere.
+    for (const scopeModuleId of [null, ...project.modules.map((module) => module.id)]) {
+      const scope = dependencyScope(project, scopeModuleId);
+      const links = scopeDependencyLinks({ model: forwarding, scope, displayed: new Set(scope.nodes), tree,
+        settings: { showNonBehavioral: true, depthMode: 'level', showOutsideScope: true } });
+      expect(links.some((link) => link.sources.includes(edge))).toBe(false);
+    }
+    // `Exact module` keeps iteration 6's ends: inside `app/b` it is drawn with `app/b` out of view.
+    const exactInsideB = scopeDependencyLinks({ model: forwarding, scope: dependencyScope(project, 'app/b'),
+      displayed: new Set(['app/b/core']), tree,
+      settings: { showNonBehavioral: true, depthMode: 'exact', showOutsideScope: true } });
+    expect(exactInsideB.map((link) => [link.consumer, link.provider]))
+      .toEqual([['app/a', 'app/b/core'], ['app/b/core', 'app/b']]);
+    const projectScope = dependencyScope(project, null);
+    expect(scopeEnd('app/b/core', projectScope, 'level', tree))
+      .toEqual({ kind: 'node', module: 'app/b', inScope: true });
+    const insideB = dependencyScope(project, 'app/b');
+    expect(scopeEnd('app/b', insideB, 'level', tree)).toEqual({ kind: 'frame' });
+
+    // `app/b`'s module panel keeps the dependency in `Including internals`.
+    render(<ProjectExplorerView {...viewProps(project, forwarding, { selectedModuleId: 'app/b' })} />);
+    expect(pair(region('Uses'), 'Including internals')).toEqual({ behavioral: 1, nonBehavioral: 1 });
+    expect(pair(region('Uses'), 'At this level')).toEqual({ behavioral: 1, nonBehavioral: 0 });
+    cleanup();
+
+    // The drilled-in scope reports the frame module's own source.
+    render(<ProjectExplorerView {...viewProps(project, forwarding, { scopeModuleId: 'app/b' })} />);
+    const own = region("Scope's own source");
+    expect(pair(own, 'Uses')).toEqual({ behavioral: 1, nonBehavioral: 0 });
+    expect(pair(own, 'Owned originals used by others')).toEqual({ behavioral: 0, nonBehavioral: 1 });
+    expect(within(own).getByText(/own source is folded into the frame/)).toBeInTheDocument();
+  });
+
+  it('BD48 counts a rolled-up link as distinct pairs, with settled status, coverage and ordered sources', () => {
+    const { project, dependencies } = collectionReview();
+    const tree = indexModuleTree(project.modules, project.rootModuleId);
+    // On the reference the distinct pairs equal the sum of the contributing edges, at every scope.
+    let rolledUp = 0;
+    for (const scopeModuleId of [null, ...project.modules.map((module) => module.id)]) {
+      const scope = dependencyScope(project, scopeModuleId);
+      const links = scopeDependencyLinks({ model: dependencies, scope, displayed: new Set(scope.nodes), tree,
+        settings: { showNonBehavioral: true, depthMode: 'level', showOutsideScope: true } });
+      const expected = expectedScopeLinks({ project, dependencies, scopeModuleId, showNonBehavioral: true });
+      expect(links.map((link) => [link.consumer, link.provider, link.behavioral, link.nonBehavioral, link.sources.map((edge) => edge.id)]))
+        .toEqual(expected.map((link) => [link.consumer, link.provider, link.behavioral, link.nonBehavioral, link.sources]));
+      for (const link of links) {
+        const sum = link.sources.reduce((total, edge) => ({
+          behavioral: total.behavioral + edge.counts.behavioral,
+          nonBehavioral: total.nonBehavioral + edge.counts.nonBehavioral }), { behavioral: 0, nonBehavioral: 0 });
+        expect({ behavioral: link.behavioral, nonBehavioral: link.nonBehavioral }).toEqual(sum);
+        if (link.sources.length > 1) rolledUp += 1;
+      }
+    }
+    expect(rolledUp).toBeGreaterThan(0);
+
+    // Status, coverage and ordering over several contributing edges.
+    const nestedProject = nestedLevelsProject();
+    const nested = nestedLevelsDependencies();
+    const link = scopedLinks(nestedProject, nested, { showNonBehavioral: true }, 'app/a')
+      .find((item) => item.consumer === 'app/a/left' && item.provider === 'app/b')!;
+    expect(link.sources).toHaveLength(2);
+    // `delta` is denied and `beta` limited, so the link is denied.
+    expect(link.sources.flatMap((edge) => edge.evidence.map((item) => item.status)).sort())
+      .toEqual(['allowed', 'denied', 'limited']);
+    expect(link.status).toBe('denied');
+    expect(link.coverageIds).toEqual(['limit-nested-1']);
+    // Three distinct pairs, one settled behavioral because one of its rows is.
+    expect({ behavioral: link.behavioral, nonBehavioral: link.nonBehavioral })
+      .toEqual({ behavioral: 1, nonBehavioral: 2 });
+    expect(link.sources.map((edge) => edge.provider)).toEqual(['app/b', 'app/b/core']);
+    expect(link.depthMode).toBe('level');
+    expect(link.id).toContain('scoped-link/1:level:app/a:');
+  });
+
+  it('BD49 hides the links that leave the scope with their out-of-view nodes', () => {
+    const project = nestedLevelsProject();
+    const dependencies = nestedLevelsDependencies();
+    const onSelectEdge = vi.fn();
+    const inside = scopedLinks(project, dependencies, { showNonBehavioral: true }, 'app/a');
+    const leaving = inside.filter((link) => link.leavesScope);
+    const staying = inside.filter((link) => !link.leavesScope);
+    expect(leaving.length).toBeGreaterThan(0);
+    expect(staying.length).toBeGreaterThan(0);
+    render(<ProjectExplorerView {...viewProps(project, dependencies,
+      { scopeModuleId: 'app/a', onSelectEdge })} />);
+    // The default is on.
+    expect(screen.getByRole('checkbox', { name: 'Show dependencies that leave this module' })).toBeChecked();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Show non-behavioral dependencies' }));
+    expect(drawn()).toEqual(drawnOf(inside));
+    expect(outOfView().length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Show dependencies that leave this module' }));
+    expect(drawn()).toEqual(drawnOf(staying));
+    expect(outOfView()).toEqual([]);
+    expect(drawnOf(expectedScopeLinks({ project, dependencies, scopeModuleId: 'app/a',
+      showNonBehavioral: true, showOutsideScope: false }))).toEqual(drawn());
+    cleanup();
+
+    // A selected leaving link is cleared when the toggle hides it.
+    onSelectEdge.mockClear();
+    const selected: GraphSelection = { kind: 'edge', id: leaving[0]!.id, edge: leaving[0]! };
+    const rendered = render(<ProjectExplorerView {...viewProps(project, dependencies, { scopeModuleId: 'app/a',
+      selectedEdge: selected, onSelectEdge, dependencySettings: settings({ showNonBehavioral: true }) })} />);
+    expect(onSelectEdge).not.toHaveBeenCalled();
+    rendered.rerender(<ProjectExplorerView {...viewProps(project, dependencies, { scopeModuleId: 'app/a',
+      selectedEdge: selected, onSelectEdge,
+      dependencySettings: settings({ showNonBehavioral: true, showOutsideScope: false }) })} />);
+    expect(onSelectEdge).toHaveBeenCalledWith(null);
+    rendered.unmount();
+
+    // A scope that covers the project has no outside, so the control is absent there.
+    render(<ProjectExplorerView {...viewProps(project, dependencies, { onSelectEdge })} />);
+    expect(screen.queryByRole('checkbox', { name: 'Show dependencies that leave this module' }))
+      .not.toBeInTheDocument();
+  });
+
+  it('BD50 reconciles a selection by its exact link ID without invoking a data callback', () => {
+    const { project, dependencies } = collectionReview();
+    const onSelectEdge = vi.fn();
+    const onSelectModule = vi.fn();
+    const failing = (name: string) => vi.fn(() => { throw new Error(`${name} requested data`); });
+    const base = (overrides: Overrides) => viewProps(project, dependencies, {
+      onSelectEdge, onSelectModule, onRefresh: failing('refresh'), onToggleExport: failing('export detail'),
+      onToggleDependency: failing('occurrence detail'), onNavigateToScope: failing('scope'), ...overrides });
+    const rolled = scopedLinks(project, dependencies, { showNonBehavioral: true }, workspace)[0]!;
+    // An exact link whose end stays displayed in both scopes: `catalog/core` onto `contracts`.
+    const exact = scopedLinks(project, dependencies, { showNonBehavioral: true, depthMode: 'exact' }, workspace)
+      .find((link) => link.consumer === `${catalog}/core` && link.provider === contracts)!;
+    const selection = (edge: ActiveDependencyEdge): GraphSelection => ({ kind: 'edge', id: edge.id, edge });
+
+    // A rolled-up ID names its scope and depth mode.
+    expect(rolled.id).toContain(`scoped-link/1:level:${workspace}:`);
+    const rendered = render(<ProjectExplorerView {...base({ scopeModuleId: workspace,
+      dependencySettings: settings({ showNonBehavioral: true }), selectedEdge: selection(rolled) })} />);
+    expect(onSelectEdge).not.toHaveBeenCalled();
+    rendered.rerender(<ProjectExplorerView {...base({ scopeModuleId: catalog,
+      dependencySettings: settings({ showNonBehavioral: true }), selectedEdge: selection(rolled) })} />);
+    expect(onSelectEdge).toHaveBeenCalledWith(null);
+    onSelectEdge.mockClear();
+    rendered.rerender(<ProjectExplorerView {...base({ scopeModuleId: workspace,
+      dependencySettings: settings({ showNonBehavioral: true, depthMode: 'exact' }),
+      selectedEdge: selection(rolled) })} />);
+    expect(onSelectEdge).toHaveBeenCalledWith(null);
+    onSelectEdge.mockClear();
+
+    // An exact selection survives a scope change while its link is still drawn.
+    expect(exact.id).toBe(exact.sources[0]!.id);
+    rendered.rerender(<ProjectExplorerView {...base({ scopeModuleId: workspace,
+      dependencySettings: settings({ showNonBehavioral: true, depthMode: 'exact' }),
+      selectedEdge: selection(exact) })} />);
+    expect(onSelectEdge).not.toHaveBeenCalled();
+    rendered.rerender(<ProjectExplorerView {...base({ scopeModuleId: catalog,
+      dependencySettings: settings({ showNonBehavioral: true, depthMode: 'exact' }),
+      selectedEdge: selection(exact) })} />);
+    expect(onSelectEdge).not.toHaveBeenCalled();
+    expect(lastGraph().edges.some((edge) => edge.id === exact.id)).toBe(true);
+
+    // A module selection survives while its node is displayed, and is cleared otherwise.
+    rendered.rerender(<ProjectExplorerView {...base({ scopeModuleId: workspace, selectedModuleId: catalog })} />);
+    expect(onSelectModule).not.toHaveBeenCalled();
+    rendered.rerender(<ProjectExplorerView {...base({ scopeModuleId: catalog, selectedModuleId: catalog })} />);
+    expect(onSelectModule).toHaveBeenCalledWith(null);
+  });
+
+  it('BD51 labels the filtered numbers of each scope against the measured ones', () => {
+    const { project, dependencies } = collectionReview();
+    const tree = indexModuleTree(project.modules, project.rootModuleId);
+    const measured = expectedProject(dependencies);
+    expect(measured).toEqual({ behavioral: 17, nonBehavioral: 48 });
+
+    // The project scope draws nothing, so nothing of the project is at this level.
+    const { rerender } = render(<ProjectExplorerView {...viewProps(project, dependencies)} />);
+    const projectRegion = () => screen.getByRole('region', { name: 'Project dependencies' });
+    expect(pair(projectRegion(), 'This view')).toEqual({ behavioral: 0, nonBehavioral: 0 });
+    expect(pair(projectRegion(), 'Whole project')).toEqual(measured);
+    expect(document.querySelector('.module-arch__not-drawn')!.getAttribute('data-not-drawn')).toBe('17/48');
+
+    // Inside `workspace`: 7/41 of 17/48, so 10 and 7 are not drawn at this level.
+    rerender(<ProjectExplorerView {...viewProps(project, dependencies, { scopeModuleId: workspace })} />);
+    expect(pair(projectRegion(), 'This view')).toEqual({ behavioral: 7, nonBehavioral: 41 });
+    expect(pair(projectRegion(), 'Whole project')).toEqual(measured);
+    expect(document.querySelector('.module-arch__not-drawn')!.getAttribute('data-not-drawn')).toBe('10/7');
+    const own = region("Scope's own source");
+    expect(pair(own, 'Uses')).toEqual({ behavioral: 2, nonBehavioral: 1 });
+
+    // `catalog` at that scope: Uses 1/11 against 3/13, owned originals 3/0 against 6/2.
+    rerender(<ProjectExplorerView {...viewProps(project, dependencies,
+      { scopeModuleId: workspace, selectedModuleId: catalog })} />);
+    const subtree = subtreeDependencyCounts(dependencies, catalog, tree);
+    expect(subtree.uses).toEqual({ behavioral: 3, nonBehavioral: 13 });
+    expect(subtree.ownedUsedByOthers).toEqual({ behavioral: 6, nonBehavioral: 2 });
+    expect(pair(region('Uses'), 'At this level')).toEqual({ behavioral: 1, nonBehavioral: 11 });
+    expect(pair(region('Uses'), 'Including internals')).toEqual(subtree.uses);
+    expect(pair(region('Owned originals used by others'), 'At this level')).toEqual({ behavioral: 3, nonBehavioral: 0 });
+    expect(pair(region('Owned originals used by others'), 'Including internals')).toEqual(subtree.ownedUsedByOthers);
+    // `Used through this module` stays measured, in a disclosure.
+    const through = region('Used through this module');
+    expect(through.closest('details')).not.toBeNull();
+    expect(pair(through, 'Including internals')).toEqual({ behavioral: subtree.usedThrough.behavioralUsedOriginals,
+      nonBehavioral: subtree.usedThrough.nonBehavioralUsedOriginals });
+
+    // The rolled-up link panel lists its contributing exact modules.
+    const link = scopedLinks(project, dependencies, { showNonBehavioral: true }, workspace)
+      .find((item) => item.consumer === reviews && item.provider === contracts)!;
+    expect(link.sources.length).toBeGreaterThan(1);
+    rerender(<ProjectExplorerView {...viewProps(project, dependencies, { scopeModuleId: workspace,
+      dependencySettings: settings({ showNonBehavioral: true }),
+      selectedEdge: { kind: 'edge', id: link.id, edge: link } })} />);
+    expect(pair(region('Dependencies'), 'At this level')).toEqual({ behavioral: 0, nonBehavioral: 24 });
+    expect([...region('Rolled-up modules').querySelectorAll('.module-arch__breakdown-item')]
+      .map((row) => [row.getAttribute('data-consumer'), row.getAttribute('data-provider')]))
+      .toEqual(link.sources.map((edge) => [edge.consumer, edge.provider]));
   });
 });
 
@@ -725,8 +1164,22 @@ function readyDependencies(data: DependencyGraphModel, state: Partial<Dependency
   return { data, phase: 'ready', reason: null, isStale: false, ...state };
 }
 
-function linkSelection(settings: DependencySettings = defaultDependencySettings): GraphSelection {
-  const edge = activeDependencyEdges(createDependencies(), settings)[0]!;
+/** The links one project's whole scope draws, with every candidate node displayed. */
+function scopedLinks(project: ProjectExplorerModel, model: DependencyGraphModel,
+  overrides: Partial<DependencySettings> = {}, scopeModuleId: string | null = null,
+  displayed?: readonly string[]): ActiveDependencyEdge[] {
+  const scope = dependencyScope(project, scopeModuleId);
+  return scopeDependencyLinks({
+    model,
+    scope,
+    displayed: new Set(displayed ?? scope.nodes),
+    tree: indexModuleTree(project.modules, project.rootModuleId),
+    settings: { ...defaultDependencySettings, ...overrides },
+  });
+}
+
+function linkSelection(settings: Partial<DependencySettings> = {}): GraphSelection {
+  const edge = scopedLinks(createModel(), createDependencies(), settings)[0]!;
   return { kind: 'edge', id: edge.id, edge };
 }
 

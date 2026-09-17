@@ -76,7 +76,7 @@ const projectViewModelNames = ['ProjectExplorerModel', 'ExplorerModule', 'Explor
 const projectViewProps = ['ProjectExplorerViewProps', 'ExplorerDiscussionProps', 'ExplorerDiscussionSelection', 'ExportDetailState'];
 const dependencyViewNames = ['DependencyGraphCount', 'DependencyGraphImportedCount', 'DependencyGraphModule',
   'DependencyGraphEvidence', 'DependencyGraphImportedEdge', 'DependencyGraphOriginalEdge', 'DependencyGraphEdge',
-  'DependencyGraphModel', 'DependencyLinkTarget', 'DependencySettings', 'DependencyPhase', 'DependencyGraphState'];
+  'DependencyGraphModel', 'DependencyDepthMode', 'DependencySettings', 'DependencyPhase', 'DependencyGraphState'];
 const explorerServiceNames = ['ExplorerProjectionInput', 'ProjectViewInput', 'ExplorerDetailsInput',
   'ExplorerDetailsResult', 'ServerBindingKind', 'ServerStatusResult', 'ExplorerProcessRecord'];
 const explorerDependencyNames = ['ExplorerDependencyModelInput', 'ExplorerDependencyCount', 'ExplorerImportedCount',

@@ -274,7 +274,8 @@ export function ModuleGraphRadial({
         />
       </ReactFlow>
       <ModuleGraphLegend presentationClasses={presentationClasses}
-        showsNonBehavioralLinks={moduleEdges.some((edge) => edge.emphasis === 'non-behavioral')} />
+        showsNonBehavioralLinks={moduleEdges.some((edge) => edge.emphasis === 'non-behavioral')}
+        depthMode={moduleEdges[0]?.depthMode} />
     </div>
   );
 }
@@ -312,7 +313,9 @@ export function ownedSourceFiles(module: ExplorerModule): number {
 }
 
 function linkTitle(link: ActiveDependencyEdge): string {
-  const unit = link.projection === 'imported-module' ? 'used originals via this boundary' : 'dependencies';
+  const unit = link.depthMode === 'level'
+    ? 'dependencies of these modules and everything under them'
+    : 'dependencies of these exact modules';
   return `${link.consumer} -> ${link.provider}: ${link.behavioral} behavioral, `
     + `${link.nonBehavioral} non-behavioral ${unit}`;
 }
