@@ -184,6 +184,7 @@ retained session and executes before the separately reviewed Plan 3 successor.
 | [7. Find modules affected by changes](#plan-7-affected-modules) | An on-demand reverse dependency query uses retained facts to select modules for testing through API, CLI and MCP. | Plan 5's retained session and contexts; Plan 4's stdio provider for MCP. | [Detailed Plan 7](plans/iteration-7-affected-modules/main-plan.md), draft awaiting contract review. |
 | [6. Explore visually](#plan-6-project-explorer) | Complete: a standalone live explorer through a separate tRPC web process. | Plan 2's published report and lightweight client. | [Detailed Plan 6](plans/iteration-6-project-explorer/main-plan.md) and [completion report](plans/iteration-6-project-explorer/iterations/iteration7-results.md). |
 | [6A. Show only Ramify-module imports](#plan-6a-module-only-project-explorer) | Draft: narrow the explorer to Ramify modules and cross-module imports while retaining external facts in analysis. | Completed Plan 6. | [Detailed Plan 6A](plans/iteration-6a-module-only-project-explorer/main-plan.md), draft for contract review. |
+| [6B. Serve the explorer continuously](#plan-6b-resident-explorer-server) | Implemented: a PM2-manageable explorer server that owns and subscribes to one project context, with a home page and a stable `/analysis/latest` URL. | Completed Plans 6 and 6A. | [Detailed Plan 6B](plans/iteration-6b-resident-explorer-server/main-plan.md) and [completion report](plans/iteration-6b-resident-explorer-server/iterations/iteration4-results.md). |
 
 The table order is the proposed implementation order; Plan 5 keeps the
 number the withdrawn change-previews deliverable released and Plan 2A is an
@@ -888,6 +889,23 @@ and proves omission with positive cross-module controls at projection,
 component, HTTP and real-browser boundaries.
 
 
+## Plan 6B: Resident explorer server
+
+**Detailed artifact:** [Plan 6B](plans/iteration-6b-resident-explorer-server/main-plan.md),
+implemented on 2026-09-17. The
+[completion report](plans/iteration-6b-resident-explorer-server/iterations/iteration4-results.md)
+records the process, browser and memory evidence and the remaining gaps.
+**Prerequisite:** the completed Plan 6 web process and Plan 6A explorer.
+
+**Working outcome.** A process manager such as PM2 runs the explorer server for
+one project. The server opens and subscribes to that project's daemon context,
+recovers after evictions and daemon failures, respects explicit daemon stops,
+and serves a home page at `/` and the explorer at `/analysis/latest`. The page
+marks fresher analysis across generation changes. This replaces Plan 6's
+on-demand web lifetime for the explorer; [processes and clients](architecture/processes-and-clients.md)
+describes the resident server.
+
+
 ## Plan 7: Affected modules
 
 **Detailed artifact:** [Plan 7](plans/iteration-7-affected-modules/main-plan.md),
@@ -941,6 +959,7 @@ source/architecture document; do not depend on conversation history.
 | Plan 5 | The compact check reply and revision delta; the hook command and host adapter contract; the session and revision vocabulary; retained per-file targets, originals, forwarding paths, owned shim dependencies, inventory and coverage; the observed-input identity; hook latency budgets and hot/warm memory bounds; the Plan 2 supersession record. | Plan 2A; Plans 3, 4, 6 and 7; agent hook hosts. |
 | Plan 6 | Reusable view exports/props, web lifecycle and query-to-view contracts; extraction provenance; quick/HTTP/browser evidence and measured memory behavior. | Consuming applications and later visualization features. |
 | Plan 6A | Module-only explorer DTO and metrics; module/edge-only selection; report-preservation, HTTP and browser evidence for omitted external targets. | Consuming applications and later visualization features. |
+| Plan 6B | Resident server entry and project binding; token-free router and routes; per-project discovery record; `ramify explore` reuse; the PM2 `explorer` app; RS13–RS17 evidence with measured server and daemon memory. | Later explorer pages and any multi-project or pushed-event explorer plan. |
 | Plan 7 | Live module graph semantics; affected query and test-selection contracts; revision/coverage outcomes; CLI/MCP schemas; on-demand construction, temporary memory and query resource evidence. | Test-runner integrations and later explorer features. |
 
 Across every handoff, preserve the distinctions between original and accessed

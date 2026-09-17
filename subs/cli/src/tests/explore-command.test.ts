@@ -16,9 +16,9 @@ function connection(open: ServiceConnection['openContext'], closed: string[]): S
 }
 
 describe('explore command', () => {
-  it('selects the requested root, launches from an opaque token and opens once', async () => {
+  it('selects the requested root, launches by resolved root and project key, prints and opens /analysis/latest', async () => {
     const calls: unknown[] = [], closed: string[] = [], output: string[] = [];
-    const token = { context: 'ctx/1:opaque', generation: 'gen/1:opaque' } as const;
+    const token = { context: `ctx/1:0123456789abcdef${'0'.repeat(48)}`, generation: 'gen/1:opaque' } as const;
     const service = connection(async params => {
       calls.push(params);
       return { ok: true, value: { status: 'opened', token, current: { selection: { root: '/canonical/project' } } } } as never;
@@ -27,15 +27,15 @@ describe('explore command', () => {
       cwd: '/working/subdir', version: '1', stdout: text => output.push(text), stderr: text => { throw new Error(text); },
       batch: async () => { throw new Error('Explore must not invoke batch'); },
       connect: async options => { expect(options.start).toBe('if-needed'); return { status: 'connected', connection: service, started: true }; },
-      explore: async input => { calls.push(input); return { url: 'http://127.0.0.1:4321/explore/ctx%2F1%3Aopaque/gen%2F1%3Aopaque',
+      explore: async input => { calls.push(input); return { url: 'http://127.0.0.1:4321/analysis/latest',
         started: true, cleanup: async () => { throw new Error('Successful launch must remain running'); } }; },
       openBrowser: async url => { calls.push(url); },
     });
     expect(result).toBe(0);
     expect(calls[0]).toMatchObject({ project: { cwd: '/working/subdir', root: '../project', scope: 'whole-project', configuration: 'discover' } });
-    expect(calls.slice(1)).toEqual([{ token }, 'http://127.0.0.1:4321/explore/ctx%2F1%3Aopaque/gen%2F1%3Aopaque']);
-    expect(output).toEqual(['Explorer: http://127.0.0.1:4321/explore/ctx%2F1%3Aopaque/gen%2F1%3Aopaque\n']);
-    expect(closed).toEqual(['context:ctx/1:opaque', 'connection']);
+    expect(calls.slice(1)).toEqual([{ root: '/canonical/project', projectKey: '0123456789abcdef' }, 'http://127.0.0.1:4321/analysis/latest']);
+    expect(output).toEqual(['Explorer: http://127.0.0.1:4321/analysis/latest\n']);
+    expect(closed).toEqual([`context:${token.context}`, 'connection']);
   });
 
   it('reports daemon unavailability without launch, opener or batch fallback', async () => {
@@ -52,22 +52,23 @@ describe('explore command', () => {
     expect(stderr.join('')).toContain('daemon unavailable');
   });
 
-  it('cleans up an owned first launch when the browser opener fails', async () => {
+  it('prints the URL, keeps a started server and exits 0 when the browser opener fails', async () => {
     const closed: string[] = [];
-    const token = { context: 'ctx', generation: 'gen' } as const;
+    const token = { context: `ctx/1:fedcba9876543210${'f'.repeat(48)}`, generation: 'gen' } as const;
     let cleanups = 0, batchCalls = 0;
     const service = connection(async () => ({ ok: true,
       value: { status: 'opened', token, current: { selection: { root: '/project' } } } } as never), closed);
-    const stderr: string[] = [];
-    const result = await runCli(['explore'], { cwd: '/project', version: '1', stdout: () => {}, stderr: text => stderr.push(text),
+    const stdout: string[] = [], stderr: string[] = [];
+    const result = await runCli(['explore'], { cwd: '/project', version: '1', stdout: text => stdout.push(text), stderr: text => stderr.push(text),
       connect: async () => ({ status: 'connected', connection: service, started: false }),
       batch: async () => { batchCalls++; throw new Error('Unexpected batch'); },
-      explore: async () => ({ url: 'http://127.0.0.1:1/explore/ctx/gen', started: true,
+      explore: async () => ({ url: 'http://127.0.0.1:1/analysis/latest', started: true,
         cleanup: async () => { cleanups++; } }),
       openBrowser: async () => { throw new Error('controlled opener refusal'); },
     });
-    expect([result, cleanups, batchCalls]).toEqual([2, 1, 0]);
+    expect([result, cleanups, batchCalls]).toEqual([0, 0, 0]);
+    expect(stdout).toEqual(['Explorer: http://127.0.0.1:1/analysis/latest\n']);
     expect(stderr.join('')).toContain('Could not open the browser: controlled opener refusal');
-    expect(closed).toEqual(['context:ctx', 'connection']);
+    expect(closed).toEqual([`context:${token.context}`, 'connection']);
   });
 });

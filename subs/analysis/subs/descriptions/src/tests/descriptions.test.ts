@@ -75,7 +75,7 @@ const projectViewModelNames = ['ProjectExplorerModel', 'ExplorerModule', 'Explor
   'ExplorerExposure', 'ExplorerCoverage', 'ExplorerSummary'];
 const projectViewProps = ['ProjectExplorerViewProps', 'ExplorerDiscussionProps', 'ExplorerDiscussionSelection', 'ExportDetailState'];
 const explorerServiceNames = ['ExplorerProjectionInput', 'ProjectViewInput', 'ExplorerDetailsInput',
-  'ExplorerDetailsResult', 'ContextStatusInput', 'ContextStatusResult', 'ExplorerProcessRecord'];
+  'ExplorerDetailsResult', 'ServerBindingKind', 'ServerStatusResult', 'ExplorerProcessRecord'];
 const presentationStatements = [
   src(['ModelDiagram', 'ModelDiagramSvg'], 'ModelDiagram.tsx', uiBrowser),
   src(['TreeDiagram', 'TreeDiagramSvg'], 'TreeDiagram.tsx', uiBrowser),
@@ -120,12 +120,13 @@ const toolkit: readonly Fixture[] = [
     sub(['ProjectExplorerView'], 'presentation', descendants),
     sub(explorerServiceNames, 'service-api', descendants), sub(['createProjectExplorerModel'], 'service-api', descendants),
     sub(['createExplorerRouter', 'ExplorerRouter', 'startExplorerWebProcess'], 'service-api', descendants),
+    sub(['createProjectBinding', 'ProjectBinding', 'BindingState'], 'service-api', descendants),
     sub(['selectExplorerEndpoint', 'readExplorerProcessRecord', 'reusableExplorerProcess', 'probeExplorerReadiness',
-      'explorerProjectUrl', 'ExplorerEndpointSelection', 'ensureExplorerWebProcess', 'ExplorerLaunchOptions',
+      'explorerProjectUrl', 'explorerProjectKey', 'ExplorerEndpointSelection', 'ensureExplorerWebProcess', 'ExplorerLaunchOptions',
       'ExplorerProcessLaunch'], 'service-api', descendants),
     sub(['ProjectExplorerPage', 'createProjectExplorerBrowserApp'], 'explorer', descendants),
     sub([...contextNames, ...residentNames, ...controlledNames, 'MaterializedTarget'], 'daemon', descendants),
-    sub(['connectDaemon', 'selectEndpoint'], 'daemon', descendants),
+    sub(['connectDaemon', 'selectEndpoint', 'readDaemonRecord'], 'daemon', descendants),
   ] },
   { path: 'subs/analysis/', name: 'analysis', tags: [], statements: [sub('*', 'model', both), sub([...syntaxNames, ...linkingNames], 'descriptions', both), sub([...projectNames, ...observerNames, 'isRamifyGeneratedPath'], 'project', both), sub([...sourceNames, ...symbolDetailNames], 'typescript', both), src(['validateProject'], 'validation.ts'), src('*', 'interfaces/analysis.ts'), src(['acquireInventory'], 'inventory.ts'), src(['createAnalysisSession'], 'session.ts'), src(['analyzeProject'], 'analyze-project.ts'), src(['resolveProject'], 'resolve-project.ts'), src('*', 'interfaces/session.ts'), src(['openRetainedSession'], 'retained-session.ts'), src(['planApiViewRequests', 'projectApiView'], 'api-view.ts')] },
   { path: 'subs/analysis/subs/descriptions/', name: 'descriptions', tags: browser, statements: [src(['parseDescription'], 'parse.ts', browser), src('*', 'interfaces/syntax.ts'), src(['linkDescriptions'], 'link.ts', browser), src('*', 'interfaces/linking.ts')] },
@@ -139,7 +140,8 @@ const toolkit: readonly Fixture[] = [
   { path: 'subs/analysis/subs/typescript/', name: 'typescript', tags: [], statements: [src(['createSourceAnalysis'], 'source-analysis.ts'), src('*', 'interfaces/source.ts'), src(['createAccessInterpreter'], 'access-interpreter.ts'),
       src(['describeFiles', 'assembleCatalog'], 'descriptions.ts'), src(['createRetainedSourceAnalysis'], 'retained-source-analysis.ts'),
       src(['describeSymbolDetails'], 'symbol-details.ts')] },
-  { path: 'subs/cli/', name: 'cli', tags: ['dispatch'], statements: [src(['runCli'], 'run-cli.ts'), src('*', 'interfaces/cli.ts')] },
+  { path: 'subs/cli/', name: 'cli', tags: ['dispatch'], statements: [src(['runCli'], 'run-cli.ts'), src('*', 'interfaces/cli.ts'),
+    src(['capabilities'], 'command-support.ts')] },
   { path: 'subs/daemon/', name: 'daemon', tags: ['dispatch'], statements: [
     src(['createDaemonService', 'dispatchServiceRequest'], 'service.ts'),
     src(['createFilesystemWatcher'], 'filesystem-watcher.ts'),
@@ -176,8 +178,9 @@ const toolkit: readonly Fixture[] = [
     src(['createExplorerRouter', 'ExplorerRouter'], 'router.ts'),
     src(['startExplorerWebProcess', 'ExplorerWebProcess'], 'web-process.ts'),
     src(['selectExplorerEndpoint', 'readExplorerProcessRecord', 'reusableExplorerProcess', 'probeExplorerReadiness',
-      'explorerProjectUrl', 'ExplorerEndpointSelection'], 'web-discovery.ts'),
+      'explorerProjectUrl', 'explorerProjectKey', 'ExplorerEndpointSelection'], 'web-discovery.ts'),
     src(['ensureExplorerWebProcess', 'ExplorerLaunchOptions', 'ExplorerProcessLaunch'], 'web-launcher.ts'),
+    src(['createProjectBinding', 'ProjectBinding', 'BindingState'], 'project-binding.ts'),
   ] },
 ];
 const workspace = 'subs/workspace/';

@@ -1,17 +1,20 @@
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, symlink, writeFile, copyFile } from 'node:fs/promises';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { chmod, mkdir, mkdtemp, open, readFile, readdir, realpath, rm, stat, symlink, writeFile, copyFile } from 'node:fs/promises';
 import { cpus, platform, release, totalmem } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright-core';
 import { connectDaemon } from '../../daemon/src/connect-daemon.js';
-import { selectEndpoint } from '../../daemon/src/discovery.js';
-import type { ServiceConnection } from '../../daemon/src/interfaces/daemon.js';
+import { readDaemonRecord, selectEndpoint } from '../../daemon/src/discovery.js';
+import type { EndpointSelection, ServiceConnection } from '../../daemon/src/interfaces/daemon.js';
 import type { CheckOutcome, ContextRevision, ContextToken } from '../../daemon/subs/contexts/src/interfaces/contexts.js';
 import { createProjectExplorerModel } from '../../service-api/src/project-view.js';
-import { ensureExplorerWebProcess } from '../../service-api/src/web-launcher.js';
-import { explorerProjectUrl, selectExplorerEndpoint } from '../../service-api/src/web-discovery.js';
+import type { ExplorerProcessRecord, ServerStatusResult } from '../../service-api/src/interfaces/explorer-service.js';
+import { explorerProjectKey, readExplorerProcessRecord, selectExplorerEndpoint } from '../../service-api/src/web-discovery.js';
 import type { ProjectExplorerModel } from '../../presentation/subs/project-view/src/interfaces/project-view.js';
 
 const packageRoot = resolve(fileURLToPath(new URL('../../..', import.meta.url)));
@@ -93,32 +96,6 @@ async function waitForPidExit(pid: number): Promise<void> {
     await new Promise(resolvePause => setTimeout(resolvePause, 25));
   }
   throw new Error(`Process ${pid} survived cleanup`);
-}
-
-async function inspectorMemory(log: string): Promise<NodeJS.MemoryUsage> {
-  const deadline = performance.now() + 5000;
-  let url: string | undefined;
-  while (performance.now() < deadline) {
-    const content = await readFile(log, 'utf8').catch(() => '');
-    url = /Debugger listening on (ws:\/\/[^\s]+)/.exec(content)?.[1];
-    if (url) break;
-    await new Promise(resolvePause => setTimeout(resolvePause, 25));
-  }
-  assert.ok(url, 'Explorer Node inspector URL was not recorded');
-  return new Promise<NodeJS.MemoryUsage>((accept, reject) => {
-    const socket = new WebSocket(url!);
-    const timer = setTimeout(() => { socket.close(); reject(new Error('Explorer inspector timed out')); }, 5000);
-    socket.addEventListener('open', () => socket.send(JSON.stringify({ id: 1, method: 'Runtime.evaluate',
-      params: { expression: 'JSON.stringify(process.memoryUsage())', returnByValue: true } })));
-    socket.addEventListener('message', event => {
-      const message = JSON.parse(String(event.data)) as { id?: number; result?: { result?: { value?: string } }; error?: unknown };
-      if (message.id !== 1) return;
-      clearTimeout(timer); socket.close();
-      if (message.error || !message.result?.result?.value) reject(new Error(`Explorer inspector failed: ${JSON.stringify(message)}`));
-      else accept(JSON.parse(message.result.result.value) as NodeJS.MemoryUsage);
-    });
-    socket.addEventListener('error', () => { clearTimeout(timer); reject(new Error('Explorer inspector connection failed')); });
-  });
 }
 
 async function installBrowserInstrumentation(context: BrowserContext): Promise<void> {
@@ -374,23 +351,202 @@ async function exerciseReference(page: Page, model: ProjectExplorerModel): Promi
     filter: { beforeNodes: beforeFilter, afterNodes: afterFilter }, navigation: drill?.id ?? 'no-nested-visible-module' };
 }
 
-async function runFixture(kind: 'reference' | 'toolkit', project: { root: string }, scratch: string,
-  browser: Browser): Promise<Record<string, unknown>> {
-  const processRoot = await realpath(await mkdtemp(join('/tmp', 'rx7-')));
-  const endpointDirectory = join(processRoot, 'e'); await mkdir(endpointDirectory, { mode: 0o700 });
-  const endpoint = await selectEndpoint({ packageRoot, version: '0.0.0', endpointDirectory });
-  const connected = await connectDaemon({ start: 'if-needed', client: { name: `iteration7-${kind}`, version: '0.0.0' },
-    engine: 'ramify.ts@0.0.0+typescript@7.0.2', daemonEntry: join(packageRoot, 'dist/src/daemon-entry.js'), packageRoot, endpointDirectory });
+const version = '0.0.0';
+const explorerEntry = join(packageRoot, 'dist/src/explorer-entry.js');
+const ramifyCommand = join(packageRoot, 'dist/src/ramify');
+
+const pause = (ms: number) => new Promise<void>(resolvePause => setTimeout(resolvePause, ms));
+
+async function until<T>(read: () => Promise<T | null | undefined | false>, timeoutMs: number, describe: () => string | Promise<string>): Promise<T> {
+  const deadline = performance.now() + timeoutMs;
+  for (;;) {
+    const value = await read();
+    if (value) return value;
+    if (performance.now() > deadline) throw new Error(`Condition not reached within ${timeoutMs} ms: ${await describe()}`);
+    await pause(100);
+  }
+}
+
+function alive(pid: number): boolean {
+  try { process.kill(pid, 0); return true; }
+  catch (error) { if ((error as NodeJS.ErrnoException).code === 'ESRCH') return false; throw error; }
+}
+
+/** Resident set size from procfs; the acceptance host is Linux. */
+async function rss(pid: number): Promise<{ readonly pid: number; readonly rssBytes: number; readonly peakRssBytes: number }> {
+  const status = await readFile(`/proc/${pid}/status`, 'utf8');
+  const field = (name: string) => Number(new RegExp(`^${name}:\\s+(\\d+) kB$`, 'm').exec(status)?.[1] ?? Number.NaN) * 1024;
+  return { pid, rssBytes: field('VmRSS'), peakRssBytes: field('VmHWM') };
+}
+
+/** RSS of a process plus its descendants, such as the daemon's per-context session supervisors. */
+async function treeRss(pid: number): Promise<{ readonly pid: number; readonly rssBytes: number; readonly peakRssBytes: number;
+  readonly descendants: readonly { readonly pid: number; readonly rssBytes: number }[]; readonly treeRssBytes: number }> {
+  const parents = new Map<number, number[]>();
+  for (const name of await readdir('/proc')) {
+    if (!/^\d+$/.test(name)) continue;
+    const stat = await readFile(`/proc/${name}/stat`, 'utf8').catch(() => null);
+    const parent = stat ? Number(stat.slice(stat.lastIndexOf(')') + 2).split(' ')[1]) : Number.NaN;
+    if (Number.isSafeInteger(parent)) parents.set(parent, [...(parents.get(parent) ?? []), Number(name)]);
+  }
+  const own = await rss(pid), descendants: { pid: number; rssBytes: number }[] = [];
+  const pending = [...(parents.get(pid) ?? [])];
+  while (pending.length > 0) {
+    const child = pending.shift()!;
+    const measured = await rss(child).catch(() => null);
+    if (measured) descendants.push({ pid: child, rssBytes: measured.rssBytes });
+    pending.push(...(parents.get(child) ?? []));
+  }
+  return { ...own, descendants, treeRssBytes: own.rssBytes + descendants.reduce((sum, item) => sum + item.rssBytes, 0) };
+}
+
+/** Processes whose command line runs the explorer entry for exactly this root. */
+async function explorerPids(root: string): Promise<number[]> {
+  const pids: number[] = [];
+  for (const name of await readdir('/proc')) {
+    if (!/^\d+$/.test(name)) continue;
+    const args = (await readFile(`/proc/${name}/cmdline`, 'utf8').catch(() => '')).split('\0');
+    const rootIndex = args.indexOf('--root');
+    if (args.some(arg => arg.endsWith('dist/src/explorer-entry.js')) && rootIndex >= 0 && args[rootIndex + 1] === root) pids.push(Number(name));
+  }
+  return pids.sort((a, b) => a - b);
+}
+
+interface Isolated { readonly processRoot: string; readonly directory: string; readonly endpoint: EndpointSelection }
+
+/** A private endpoint directory: no daemon or server of another session is ever touched. */
+async function isolatedEndpoint(): Promise<Isolated> {
+  const processRoot = await realpath(await mkdtemp(join('/tmp', 'rx6b-')));
+  const directory = join(processRoot, 'e'); await mkdir(directory, { mode: 0o700 });
+  return { processRoot, directory, endpoint: await selectEndpoint({ packageRoot, version, endpointDirectory: directory }) };
+}
+
+async function connectHarness(isolated: Isolated, start: 'if-needed' | 'never', name: string): Promise<ServiceConnection> {
+  const connected = await connectDaemon({ start, client: { name, version }, engine: `ramify.ts@${version}+typescript@7.0.2`,
+    daemonEntry: start === 'never' ? null : join(packageRoot, 'dist/src/daemon-entry.js'), packageRoot, endpointDirectory: isolated.directory });
   assert.equal(connected.status, 'connected', JSON.stringify(connected));
-  const connection = connected.connection;
-  let token: ContextToken | undefined;
-  let web: Awaited<ReturnType<typeof ensureExplorerWebProcess>> | undefined;
-  let page: Page | undefined;
+  return (connected as Extract<typeof connected, { status: 'connected' }>).connection;
+}
+
+async function openProject(connection: ServiceConnection, root: string): Promise<ContextToken> {
+  const opened = await connection.openContext({ project: { cwd: root, root, scope: 'whole-project', configuration: 'discover' },
+    setup: { registry: 'default', capabilities } });
+  assert.ok(opened.ok && opened.value.status === 'opened', JSON.stringify(opened));
+  return opened.value.token;
+}
+
+/** Stop the isolated daemon, if one runs, and wait for its process to exit. */
+async function stopIsolatedDaemon(isolated: Isolated): Promise<void> {
+  const record = await readDaemonRecord(isolated.endpoint).catch(() => null);
+  if (!record || record.state === 'stopped' || !alive(record.pid)) return;
+  const connected = await connectDaemon({ start: 'never', client: { name: 'acceptance-cleanup', version },
+    engine: `ramify.ts@${version}+typescript@7.0.2`, daemonEntry: null, packageRoot, endpointDirectory: isolated.directory }).catch(() => null);
+  if (connected?.status === 'connected') {
+    await connected.connection.stopDaemon({ instanceId: connected.connection.daemon.instance.instanceId }).catch(() => {});
+    await connected.connection.close().catch(() => {});
+  }
+  await waitForPidExit(record.pid).catch(() => { if (alive(record.pid)) process.kill(record.pid, 'SIGKILL'); });
+}
+
+async function stopServerPid(pid: number): Promise<void> {
+  if (!alive(pid)) return;
+  process.kill(pid, 'SIGTERM');
+  await waitForPidExit(pid).catch(() => { if (alive(pid)) process.kill(pid, 'SIGKILL'); });
+}
+
+async function serverStatus(record: Pick<ExplorerProcessRecord, 'origin'>): Promise<ServerStatusResult> {
+  const response = await fetch(`${record.origin}/trpc/serverStatus`);
+  const body = await response.json() as { result?: { data?: ServerStatusResult } };
+  assert.ok(response.ok && body.result?.data, JSON.stringify(body));
+  return body.result.data;
+}
+
+async function daemonRecordEvidence(isolated: Isolated): Promise<Record<string, unknown> | null> {
+  const record = await readDaemonRecord(isolated.endpoint);
+  return record && { pid: record.pid, instanceId: record.instanceId, state: record.state, stopped: record.stopped,
+    startedAt: record.startedAt, alive: alive(record.pid) };
+}
+
+interface CommandResult { readonly code: number | null; readonly signal: NodeJS.Signals | null; readonly stdout: string; readonly stderr: string; readonly durationMs: number }
+
+function runCommand(args: readonly string[], env: NodeJS.ProcessEnv, timeoutMs = 180_000): Promise<CommandResult> {
+  const started = performance.now();
+  return new Promise((resolveRun, reject) => {
+    const child = spawn(ramifyCommand, args, { cwd: packageRoot, env, stdio: ['ignore', 'pipe', 'pipe'] });
+    let stdout = '', stderr = '';
+    child.stdout.setEncoding('utf8').on('data', text => { stdout += text; });
+    child.stderr.setEncoding('utf8').on('data', text => { stderr += text; });
+    const timer = setTimeout(() => { child.kill('SIGKILL'); reject(new Error(`ramify ${args.join(' ')} timed out: ${stdout} ${stderr}`)); }, timeoutMs);
+    child.once('error', error => { clearTimeout(timer); reject(error); });
+    child.once('exit', (code, signal) => { clearTimeout(timer); resolveRun({ code, signal, stdout, stderr, durationMs: performance.now() - started }); });
+  });
+}
+
+/** PATH directories for the installed CLI. `opener` records each URL instead of starting a desktop browser;
+ * `no-opener` has no `xdg-open`, so the platform opener fails as on a host without one. */
+async function commandPaths(scratch: string): Promise<{ readonly opener: string; readonly noOpener: string; readonly opened: string }> {
+  const opener = join(scratch, 'bin-opener'), noOpener = join(scratch, 'bin-no-opener'), opened = join(scratch, 'opened.txt');
+  for (const directory of [opener, noOpener]) {
+    await mkdir(directory, { recursive: true });
+    await symlink(process.execPath, join(directory, 'node'));
+    for (const tool of ['uname', 'readlink']) await symlink(await realpath(`/usr/bin/${tool}`), join(directory, tool));
+  }
+  await writeFile(join(opener, 'xdg-open'), `#!/bin/sh\nprintf '%s\\n' "$1" >> '${opened}'\n`);
+  await chmod(join(opener, 'xdg-open'), 0o755);
+  return { opener, noOpener, opened };
+}
+
+function commandEnvironment(isolated: Isolated, path: string): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env, PATH: path, RAMIFY_ENDPOINT_DIR: isolated.directory };
+  delete env.NODE_OPTIONS; delete env.RAMIFY_DAEMON_ENTRY;
+  return env;
+}
+
+/** Run `ramify explore --root` and return the discovered record of the server it printed. */
+async function exploreWithCli(isolated: Isolated, root: string, path: string): Promise<{ readonly command: CommandResult;
+  readonly url: string; readonly record: ExplorerProcessRecord }> {
+  const command = await runCommand(['explore', '--root', root], commandEnvironment(isolated, path));
+  assert.equal(command.code, 0, JSON.stringify(command));
+  const url = /^Explorer: (\S+)$/m.exec(command.stdout)?.[1];
+  assert.ok(url, JSON.stringify(command));
+  assert.match(url, /^http:\/\/127\.0\.0\.1:\d+\/analysis\/latest$/);
+  const records = (await readdir(isolated.directory)).filter(name => /^explorer-[0-9a-f]{16}-[0-9a-f]{16}\.json$/.test(name));
+  const matching: ExplorerProcessRecord[] = [];
+  for (const name of records) {
+    const projectKey = name.slice(-21, -5);
+    const record = await readExplorerProcessRecord(selectExplorerEndpoint(isolated.endpoint, projectKey));
+    if (record && record.root === root && record.state === 'running') matching.push(record);
+  }
+  assert.equal(matching.length, 1, JSON.stringify({ records, matching }));
+  assert.equal(url, `${matching[0]!.origin}/analysis/latest`);
+  return { command, url, record: matching[0]! };
+}
+
+async function openExplorerPage(browser: Browser, url: string, viewport: { width: number; height: number }): Promise<{ context: BrowserContext; page: Page }> {
+  const context = await browser.newContext({ viewport });
+  await installBrowserInstrumentation(context);
+  const page = await context.newPage();
+  await page.goto(url, { waitUntil: 'networkidle', timeout: 120_000 });
+  await page.getByRole('heading', { name: 'Project Explorer' }).waitFor({ timeout: 120_000 });
+  return { context, page };
+}
+
+/** RS17: the Plan 6/6A workflow on a server that `ramify explore` started, at `/analysis/latest`. */
+async function runFixture(kind: 'reference' | 'toolkit', project: { root: string }, scratch: string,
+  browser: Browser, paths: Awaited<ReturnType<typeof commandPaths>>): Promise<Record<string, unknown>> {
+  const isolated = await isolatedEndpoint();
+  let connection: ServiceConnection | undefined;
+  let serverPid: number | undefined;
+  let context: BrowserContext | undefined;
   try {
-    const opened = await connection.openContext({ project: { cwd: project.root, root: project.root, scope: 'whole-project', configuration: 'discover' },
-      setup: { registry: 'default', capabilities } });
-    assert.ok(opened.ok && opened.value.status === 'opened', JSON.stringify(opened));
-    token = opened.value.token;
+    // A running daemon without this project's context: `ramify explore` opens the context cold.
+    connection = await connectHarness(isolated, 'if-needed', `acceptance-${kind}`);
+    const explored = await exploreWithCli(isolated, project.root, paths.opener);
+    serverPid = explored.record.pid;
+    const openedUrls = (await readFile(paths.opened, 'utf8')).trim().split('\n');
+    assert.equal(openedUrls.at(-1), explored.url);
+    const token = await openProject(connection, project.root);
+    assert.equal(explorerProjectKey(token.context), explorerProjectKey(explored.record.context));
     const check = await checkPublished(connection, token);
     const projectionStarted = performance.now();
     const projected = createProjectExplorerModel({ revision: check.revision, report: check.report! });
@@ -402,19 +558,9 @@ async function runFixture(kind: 'reference' | 'toolkit', project: { root: string
     assertModuleOnlyModel(ready.view);
     const externalAccesses = reportExternalWitness(check);
 
-    const previousNodeOptions = process.env.NODE_OPTIONS;
-    process.env.NODE_OPTIONS = '--inspect=127.0.0.1:0';
-    try {
-      web = await ensureExplorerWebProcess({ endpoint: selectExplorerEndpoint(endpoint), version: '0.0.0',
-        explorerEntry: join(packageRoot, 'dist/src/explorer-entry.js'), startupMs: 15_000 });
-    } finally {
-      if (previousNodeOptions === undefined) delete process.env.NODE_OPTIONS; else process.env.NODE_OPTIONS = previousNodeOptions;
-    }
-    const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
-    await installBrowserInstrumentation(context); page = await context.newPage();
-    await page.goto(explorerProjectUrl(web.record, token), { waitUntil: 'networkidle', timeout: 120_000 });
-    await page.getByRole('heading', { name: 'Project Explorer' }).waitFor();
-    try { await page.locator('.module-arch__revision').filter({ hasText: ready.view.revision }).waitFor({ timeout: 30_000 }); }
+    const opened = await openExplorerPage(browser, explored.url, { width: 1440, height: 1000 });
+    context = opened.context; const page = opened.page;
+    try { await page.locator('.module-arch__revision').filter({ hasText: ready.view.revision }).waitFor({ timeout: 60_000 }); }
     catch (error) { throw new Error(`Browser did not display ${ready.view.revision}: ${await page.locator('body').innerText()}`, { cause: error }); }
     assert.equal(await page.locator('.module-arch__subtitle').textContent(), expectedSubtitle(ready.view));
     const dom = await assertModuleOnlyDom(page, ready.view);
@@ -440,7 +586,7 @@ async function runFixture(kind: 'reference' | 'toolkit', project: { root: string
       const baseline = refreshBaseline;
       for (let cycle = 1; cycle <= 10; cycle++) {
         const published = await publishMutation(connection, token, project.root, 'README.md',
-          `# Collection Review\n\nIteration 7 explicit refresh cycle ${cycle}.\n`);
+          `# Collection Review\n\nIteration 4 explicit refresh cycle ${cycle}.\n`);
         await refreshTo(page, published.revision);
         const settled = await snapshot(page);
         const stable: boolean = settled.listeners === baseline.listeners
@@ -451,51 +597,85 @@ async function runFixture(kind: 'reference' | 'toolkit', project: { root: string
         refreshes.push({ cycle, revision: published.revision, settled, stable });
       }
     }
+    assert.equal(page.url(), explored.url, 'The explorer URL changed during the workflow');
     const daemon = await connection.daemonStatus(); assert.ok(daemon.ok, JSON.stringify(daemon));
-    const webMemory = await inspectorMemory(selectExplorerEndpoint(endpoint).log);
-    await context.close(); page = undefined;
-    return { kind, root: project.root, revision: check.revision, projectionDurationMs, encodedBytes,
+    const webMemory = await rss(explored.record.pid);
+    return { kind, root: project.root, url: explored.url, finalUrl: page.url(),
+      explore: { exitCode: explored.command.code, durationMs: explored.command.durationMs, stdout: explored.command.stdout,
+        stderr: explored.command.stderr, serverPid: explored.record.pid, defaultStartupMs: 5000 },
+      revision: check.revision, projectionDurationMs, encodedBytes,
       counts: countEvidence, externalAccesses, dom, interactions, refreshBaseline, refreshes,
-      memory: { web: { pid: web.record.pid, ...webMemory }, daemon: { pid: daemon.value.pid, ...daemon.value.memory,
+      memory: { web: webMemory, daemon: { ...(await treeRss(daemon.value.pid)), ...daemon.value.memory,
         contexts: daemon.value.contexts.map(item => ({ context: item.token.context, history: item.history,
           retainedBytes: item.retainedBytes, leases: item.leases, pending: item.pending })) } } };
   } finally {
-    if (page) await page.context().close().catch(() => {});
-    if (token) await connection.closeContext({ token }).catch(() => {});
-    if (web) { const pid = web.record.pid; await web.terminateOwned().catch(() => {}); await waitForPidExit(pid).catch(() => {}); }
-    const instance = connection.daemon.instance;
-    await connection.stopDaemon({ instanceId: instance.instanceId }).catch(() => {});
-    await connection.close().catch(() => {});
-    await waitForPidExit(instance.pid).catch(() => {});
-    await rm(processRoot, { recursive: true, force: true });
+    await context?.close().catch(() => {});
+    if (serverPid !== undefined) await stopServerPid(serverPid);
+    await connection?.close().catch(() => {});
+    await stopIsolatedDaemon(isolated);
+    await rm(isolated.processRoot, { recursive: true, force: true });
     void scratch;
   }
 }
 
-async function runMutations(project: { root: string }, browser: Browser): Promise<Record<string, unknown>> {
-  const processRoot = await realpath(await mkdtemp(join('/tmp', 'rx7-'))), endpointDirectory = join(processRoot, 'e');
-  await mkdir(endpointDirectory, { mode: 0o700 });
-  const endpoint = await selectEndpoint({ packageRoot, version: '0.0.0', endpointDirectory });
-  const connected = await connectDaemon({ start: 'if-needed', client: { name: 'iteration7-mutations', version: '0.0.0' },
-    engine: 'ramify.ts@0.0.0+typescript@7.0.2', daemonEntry: join(packageRoot, 'dist/src/daemon-entry.js'), packageRoot, endpointDirectory });
-  assert.equal(connected.status, 'connected', JSON.stringify(connected));
-  const connection = connected.connection;
-  let token: ContextToken | undefined, web: Awaited<ReturnType<typeof ensureExplorerWebProcess>> | undefined;
-  let context: Awaited<ReturnType<Browser['newContext']>> | undefined;
+async function forcePoll(page: Page): Promise<void> {
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+}
+
+/** RS13–RS16 on the mutation fixture, against one server started as a process manager starts it. */
+async function runMutations(project: { root: string }, other: { root: string }, scratch: string, browser: Browser,
+  paths: Awaited<ReturnType<typeof commandPaths>>): Promise<Record<string, unknown>> {
+  const isolated = await isolatedEndpoint();
+  const probe = await new Promise<number>((resolvePort, reject) => {
+    const server = createServer(); server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => { const address = server.address() as AddressInfo; server.close(() => resolvePort(address.port)); });
+  });
+  const logPath = join(isolated.processRoot, 'server.log');
+  const log = await open(logPath, 'w', 0o600);
+  // Foreground, fixed port, environment-selected endpoint: exactly the PM2 `explorer` app's invocation.
+  const server = spawn(process.execPath, [explorerEntry, '--root', project.root, '--port', String(probe)],
+    { cwd: packageRoot, stdio: ['ignore', log.fd, log.fd], env: commandEnvironment(isolated, process.env.PATH ?? '') });
+  const serverExit = new Promise<[number | null, NodeJS.Signals | null]>(resolveExit => server.once('exit', (code, signal) => resolveExit([code, signal])));
+  const serverLog = () => readFile(logPath, 'utf8').catch(() => '');
+  let connection: ServiceConnection | undefined;
+  let context: BrowserContext | undefined;
+  let otherServerPid: number | undefined;
   try {
-    const opened = await connection.openContext({ project: { cwd: project.root, root: project.root, scope: 'whole-project', configuration: 'discover' },
-      setup: { registry: 'default', capabilities } });
-    assert.ok(opened.ok && opened.value.status === 'opened', JSON.stringify(opened)); token = opened.value.token;
+    assert.ok(server.pid);
+    const discovered = await until(async () => {
+      const names = (await readdir(isolated.directory)).filter(name => /^explorer-[0-9a-f]{16}-[0-9a-f]{16}\.json$/.test(name));
+      return names.length === 1 ? readExplorerProcessRecord(selectExplorerEndpoint(isolated.endpoint, names[0]!.slice(-21, -5))) : null;
+    }, 120_000, serverLog);
+    assert.equal(discovered.pid, server.pid); assert.equal(discovered.port, probe); assert.equal(discovered.root, project.root);
+    const latestUrl = `${discovered.origin}/analysis/latest`;
+    const daemonAtStart = await readDaemonRecord(isolated.endpoint);
+    assert.ok(daemonAtStart && daemonAtStart.state === 'running', 'The server did not start the isolated daemon');
+
+    connection = await connectHarness(isolated, 'never', 'acceptance-mutations');
+    let token = await openProject(connection, project.root);
+    assert.equal(token.context, discovered.context);
     const initial = await checkPublished(connection, token);
-    web = await ensureExplorerWebProcess({ endpoint: selectExplorerEndpoint(endpoint), version: '0.0.0',
-      explorerEntry: join(packageRoot, 'dist/src/explorer-entry.js'), startupMs: 15_000 });
+
+    // Home page: the page list, root and binding state.
     context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-    await installBrowserInstrumentation(context); const page = await context.newPage();
-    await page.goto(explorerProjectUrl(web.record, token), { waitUntil: 'networkidle', timeout: 120_000 });
+    await installBrowserInstrumentation(context);
+    const page = await context.newPage();
+    await page.goto(`${discovered.origin}/`, { waitUntil: 'networkidle', timeout: 120_000 });
+    await page.getByRole('heading', { name: 'Ramify', level: 1 }).waitFor();
+    await page.locator('dd[data-binding="ready"]').waitFor({ timeout: 15_000 });
+    const home = { binding: await page.locator('dd[data-binding]').getAttribute('data-binding'),
+      text: await page.locator('dl').first().innerText() };
+    assert.ok(home.text.includes(project.root), home.text);
+    await page.getByRole('navigation', { name: 'Pages' }).getByRole('link', { name: 'Module explorer' }).click();
+    await page.waitForURL(latestUrl);
+    await page.getByRole('heading', { name: 'Project Explorer' }).waitFor({ timeout: 120_000 });
+
+    // RS13: an edit makes the control stale and the refresh shows it at the same URL.
     const initialProjection = createProjectExplorerModel({ revision: initial.revision, report: initial.report! });
     assert.equal(initialProjection.status, 'ready'); const initialModel = (initialProjection as ReadyProjection).view;
     assertModuleOnlyModel(initialModel);
-    await page.locator('.module-arch__revision').filter({ hasText: initialModel.revision }).waitFor();
+    await page.locator('.module-arch__revision').filter({ hasText: initialModel.revision }).waitFor({ timeout: 60_000 });
+    assert.equal(await page.getByRole('button', { name: 'Refresh', exact: true }).isDisabled(), true);
 
     const npmOnlySource = "import * as React from 'react';\nexport const reactVersion = React.version;\n";
     const npmOnly = await publishMutation(connection, token, project.root, 'subs/consumer/src/npm-only.ts', npmOnlySource);
@@ -548,7 +728,8 @@ async function runMutations(project: { root: string }, browser: Browser): Promis
     const extraToggle = page.locator('.export-list__toggle').filter({ hasText: 'extra' });
     await extraToggle.click();
     await extraToggle.locator('..').locator('.export-list__barrel-badge').filter({ hasText: 'parent' }).waitFor();
-    return { initialRevision: initial.revision,
+    assert.equal(page.url(), latestUrl);
+    const rs13 = { url: latestUrl, finalUrl: page.url(), home, initialRevision: initial.revision,
       npmOnly: { revision: npmOnly.revision, reportInputBefore: initial.report!.inputId,
         reportInputAfter: npmOnly.report!.inputId, reportAccessesBefore: initialAccesses.length,
         reportAccessesAfter: npmOnlyAccesses.length, addedAccess: npmWitness.id,
@@ -556,28 +737,160 @@ async function runMutations(project: { root: string }, browser: Browser): Promis
       readme: { revision: readme.revision, visiblePurpose: 'Provides the changed browser purpose.' },
       source: { revision: source.revision, edge: sourceEdge.id, accessCount: sourceEdge.accessCount },
       exposure: { revision: exposure.revision, export: extra.name, destinations: extra.exposures.flatMap(item => item.destinations) } };
+
+    // RS14 memory: server and daemon RSS before and after ten edits, each refreshed in the page.
+    const daemonPid = (await readDaemonRecord(isolated.endpoint))!.pid;
+    const memoryBefore = { server: await rss(server.pid), daemon: await treeRss(daemonPid) };
+    const edits: Record<string, unknown>[] = [];
+    for (let cycle = 1; cycle <= 10; cycle++) {
+      const published = await publishMutation(connection, token, project.root, 'README.md',
+        `# Fixture\n\nOwns the mutation acceptance project, edit ${cycle}.\n`);
+      await refreshTo(page, published.revision);
+      edits.push({ cycle, revision: published.revision.revision });
+    }
+    const memoryAfter = { server: await rss(server.pid), daemon: await treeRss(daemonPid) };
+    const lastBeforeKill = (edits.at(-1) as { revision: string }).revision;
+
+    // RS14: kill the daemon. The page shows the notice and recovers at the same URL with a newer generation.
+    await connection.close().catch(() => {}); connection = undefined;
+    const killedAt = Date.now();
+    process.kill(daemonPid, 'SIGKILL');
+    await waitForPidExit(daemonPid);
+    const notice = page.locator('p[role="status"]');
+    const noticeText = await until(async () => {
+      await forcePoll(page);
+      return await notice.count() > 0 ? (await notice.first().textContent()) ?? '' : null;
+    }, 30_000, async () => `no connection notice; server status ${JSON.stringify(await serverStatus(discovered).catch(String))}`);
+    const modelKeptDuringOutage = await page.locator('.module-arch__revision').textContent();
+    assert.equal(modelKeptDuringOutage, `Revision ${lastBeforeKill}`);
+    const restarted = await until(async () => {
+      const record = await readDaemonRecord(isolated.endpoint);
+      return record && record.state === 'running' && record.pid !== daemonPid && alive(record.pid) ? record : null;
+    }, 60_000, serverLog);
+    const recoveredStatus = await until(async () => {
+      const status = await serverStatus(discovered);
+      return status.binding === 'ready' ? status : null;
+    }, 60_000, serverLog);
+    assert.equal(recoveredStatus.daemonPid, restarted.pid);
+    await until(async () => { await forcePoll(page); return await notice.count() === 0; }, 30_000, () => 'notice remained after recovery');
+    connection = await connectHarness(isolated, 'never', 'acceptance-mutations-recovered');
+    token = await openProject(connection, project.root);
+    const recovered = await checkPublished(connection, token);
+    const generationOf = (revision: string) => revision.slice('rev/1:'.length, revision.lastIndexOf(':'));
+    assert.notEqual(generationOf(recovered.revision.revision), generationOf(lastBeforeKill));
+    await refreshTo(page, recovered.revision);
+    assert.equal(page.url(), latestUrl);
+    const serverLogText = await serverLog();
+    const rs14 = { killedDaemonPid: daemonPid, killedAt, noticeText, modelKeptDuringOutage,
+      restartedDaemon: { pid: restarted.pid, instanceId: restarted.instanceId, startedAt: restarted.startedAt },
+      serverStatusAfterRecovery: recoveredStatus, revisionBeforeKill: lastBeforeKill, revisionAfterRecovery: recovered.revision.revision,
+      generationBefore: generationOf(lastBeforeKill), generationAfter: generationOf(recovered.revision.revision),
+      recoveredUrl: page.url(), serverRestartedDaemon: recoveredStatus.daemonPid === restarted.pid,
+      bindingLog: serverLogText.split('\n').filter(line => line.startsWith('{')).slice(-12),
+      memory: { edits, before: memoryBefore, afterTenEdits: memoryAfter,
+        afterRecovery: { server: await rss(server.pid), daemon: await treeRss(restarted.pid) } } };
+
+    // RS15: an explicit stop is respected; `ramify check` restarts the daemon and the server resumes.
+    await connection.close().catch(() => {}); connection = undefined;
+    const stop = await runCommand(['daemon', 'stop'], commandEnvironment(isolated, paths.opener));
+    assert.equal(stop.code, 0, JSON.stringify(stop));
+    await waitForPidExit(restarted.pid);
+    const stoppedStatus = await until(async () => {
+      const status = await serverStatus(discovered);
+      return status.binding === 'daemon-stopped' ? status : null;
+    }, 30_000, serverLog);
+    await until(async () => { await forcePoll(page); return await notice.count() > 0; }, 15_000, () => 'no notice while stopped');
+    const stoppedNotice = await notice.first().textContent();
+    const stoppedObservations: Record<string, unknown>[] = [];
+    for (let index = 0; index < 4; index++) {
+      await pause(4000);
+      const status = await serverStatus(discovered), record = await readDaemonRecord(isolated.endpoint);
+      assert.equal(status.binding, 'daemon-stopped', JSON.stringify(status));
+      assert.ok(record && record.state === 'stopped' && record.stopped?.reason === 'explicit' && record.pid === restarted.pid,
+        `The server restarted an explicitly stopped daemon: ${JSON.stringify(record)}`);
+      stoppedObservations.push({ atMs: 4000 * (index + 1), binding: status.binding, daemonPid: status.daemonPid,
+        record: { pid: record.pid, state: record.state, stopped: record.stopped }, daemonAlive: alive(record.pid) });
+    }
+    const checkStartedAt = Date.now();
+    const check = await runCommand(['check', '--root', project.root], commandEnvironment(isolated, paths.opener));
+    assert.ok(check.code === 0 || check.code === 1, JSON.stringify(check));
+    const checkDaemon = await readDaemonRecord(isolated.endpoint);
+    assert.ok(checkDaemon && checkDaemon.state === 'running' && checkDaemon.pid !== restarted.pid && checkDaemon.startedAt >= checkStartedAt,
+      JSON.stringify(checkDaemon));
+    const resumed = await until(async () => {
+      const status = await serverStatus(discovered);
+      return status.binding === 'ready' ? status : null;
+    }, 30_000, serverLog);
+    assert.equal(resumed.daemonPid, checkDaemon.pid);
+    const rs15 = { stop: { exitCode: stop.code, stdout: stop.stdout, stderr: stop.stderr }, stoppedStatus, stoppedNotice,
+      stoppedObservations, check: { exitCode: check.code, durationMs: check.durationMs, startedAt: checkStartedAt },
+      daemonStartedByCheck: { pid: checkDaemon.pid, startedAt: checkDaemon.startedAt, instanceId: checkDaemon.instanceId },
+      resumedStatus: resumed, resumeMs: Date.now() - checkStartedAt - check.durationMs };
+
+    // RS16: `ramify explore` reuses this server (no second PID); another root gets a separate server.
+    const pidsBefore = await explorerPids(project.root);
+    assert.deepEqual(pidsBefore, [server.pid]);
+    const reuse = await runCommand(['explore', '--root', project.root], commandEnvironment(isolated, paths.noOpener));
+    assert.equal(reuse.code, 0, JSON.stringify(reuse));
+    assert.ok(reuse.stdout.includes(`Explorer: ${latestUrl}\n`), JSON.stringify(reuse));
+    assert.match(reuse.stderr, /Could not open the browser/);
+    const pidsAfter = await explorerPids(project.root);
+    assert.deepEqual(pidsAfter, [server.pid]);
+    assert.equal((await readExplorerProcessRecord(selectExplorerEndpoint(isolated.endpoint, discovered.context.slice(6, 22))))?.pid, server.pid);
+    const separate = await exploreWithCli(isolated, other.root, paths.opener);
+    otherServerPid = separate.record.pid;
+    assert.notEqual(separate.record.pid, server.pid);
+    assert.notEqual(separate.record.port, discovered.port);
+    assert.notEqual(explorerProjectKey(separate.record.context), explorerProjectKey(discovered.context));
+    assert.deepEqual(await explorerPids(other.root), [separate.record.pid]);
+    assert.deepEqual(await explorerPids(project.root), [server.pid]);
+    const otherStatus = await serverStatus(separate.record);
+    assert.equal(otherStatus.binding, 'ready'); assert.equal(otherStatus.root, other.root);
+    await stopServerPid(separate.record.pid); otherServerPid = undefined;
+    const otherStopped = await readExplorerProcessRecord(selectExplorerEndpoint(isolated.endpoint, explorerProjectKey(separate.record.context)));
+    const rs16 = { reuse: { exitCode: reuse.code, stdout: reuse.stdout, stderr: reuse.stderr, durationMs: reuse.durationMs,
+      explorerPidsBefore: pidsBefore, explorerPidsAfter: pidsAfter, serverPid: server.pid },
+    separate: { exitCode: separate.command.code, stdout: separate.command.stdout, durationMs: separate.command.durationMs,
+      url: separate.url, pid: separate.record.pid, port: separate.record.port, projectKey: explorerProjectKey(separate.record.context),
+      status: otherStatus, stoppedRecord: otherStopped && { state: otherStopped.state, stopped: otherStopped.stopped } },
+    firstProjectKey: explorerProjectKey(discovered.context) };
+
+    await context.close(); context = undefined;
+    server.kill('SIGINT');
+    const exit = await serverExit;
+    assert.deepEqual(exit, [0, null]);
+    const finalRecord = await readExplorerProcessRecord(selectExplorerEndpoint(isolated.endpoint, explorerProjectKey(discovered.context)));
+    assert.equal(finalRecord?.stopped?.reason, 'explicit');
+    return { server: { pid: server.pid, port: discovered.port, origin: discovered.origin, exit, finalRecordState: finalRecord.state },
+      rs13, rs14, rs15, rs16, daemonAtStart: await Promise.resolve({ pid: daemonAtStart.pid, startedAt: daemonAtStart.startedAt }),
+      daemonAtEnd: await daemonRecordEvidence(isolated) };
   } finally {
     await context?.close().catch(() => {});
-    if (token) await connection.closeContext({ token }).catch(() => {});
-    if (web) { const pid = web.record.pid; await web.terminateOwned().catch(() => {}); await waitForPidExit(pid).catch(() => {}); }
-    const instance = connection.daemon.instance;
-    await connection.stopDaemon({ instanceId: instance.instanceId }).catch(() => {});
-    await connection.close().catch(() => {}); await waitForPidExit(instance.pid).catch(() => {});
-    await rm(processRoot, { recursive: true, force: true });
+    if (otherServerPid !== undefined) await stopServerPid(otherServerPid);
+    if (server.exitCode === null && server.signalCode === null) { server.kill('SIGTERM'); await Promise.race([serverExit, pause(5000)]); }
+    if (server.exitCode === null && server.signalCode === null) server.kill('SIGKILL');
+    await log.close().catch(() => {});
+    await connection?.close().catch(() => {});
+    await stopIsolatedDaemon(isolated);
+    await rm(isolated.processRoot, { recursive: true, force: true });
+    void scratch;
   }
 }
 
 async function main(): Promise<void> {
   assert.ok((await stat(chromiumPath)).isFile(), `Chromium executable not found: ${chromiumPath}`);
   assert.ok((await stat(join(packageRoot, 'dist/explorer/index.html'))).isFile(), 'Run npm run build before browser acceptance');
-  const args = process.argv.slice(2), outputIndex = args.indexOf('--output');
-  assert.ok(args.length === 0 || outputIndex === 0 && args.length === 2, 'Usage: npm run measure:project-explorer -- [--output FILE]');
-  const output = resolve(outputIndex === 0 ? args[1]! : join(packageRoot, 'docs/plans/iteration-6a-module-only-project-explorer/evidence/iteration4-browser-acceptance.json'));
+  const args = process.argv.slice(2), outputIndex = args.indexOf('--output'), onlyIndex = args.indexOf('--only');
+  const only = onlyIndex >= 0 ? args[onlyIndex + 1] : undefined;
+  assert.ok(args.length === (outputIndex >= 0 ? 2 : 0) + (onlyIndex >= 0 ? 2 : 0)
+    && (outputIndex < 0 || args[outputIndex + 1]) && (only === undefined || ['reference', 'toolkit', 'mutations'].includes(only)),
+  'Usage: npm run measure:project-explorer -- [--output FILE] [--only reference|toolkit|mutations]');
+  const output = resolve(outputIndex >= 0 ? args[outputIndex + 1]! : join(packageRoot, 'docs/plans/iteration-6b-resident-explorer-server/evidence/iteration4-browser-acceptance.json'));
   const scratch = await realpath(await mkdtemp(join('/tmp', 'ramify-explorer-acceptance-')));
   const manifest = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8')) as { dependencies: Record<string, string>; devDependencies: Record<string, string> };
   const runtimeIdentity = JSON.parse(await readFile(join(packageRoot, 'dist/runtime-identity.json'), 'utf8')) as { buildIdentity: string; buildKey?: string };
-  const report: Record<string, unknown> = { schemaVersion: 'ramify.module-only-project-explorer-acceptance/1', measuredAt: new Date().toISOString(),
-    status: 'incomplete', passed: false, command: ['npm', 'run', 'measure:project-explorer', '--', '--output', output],
+  const report: Record<string, unknown> = { schemaVersion: 'ramify.resident-explorer-acceptance/1', measuredAt: new Date().toISOString(),
+    status: 'incomplete', passed: false, command: ['npm', 'run', 'measure:project-explorer', '--', ...args],
     environment: { node: process.version, versions: process.versions, platform: platform(), release: release(),
       cpuCount: cpus().length, cpuModel: cpus()[0]?.model, totalMemoryBytes: totalmem(), chromiumPath,
       dependencies: { playwrightCore: manifest.devDependencies['playwright-core'], react: manifest.dependencies.react,
@@ -588,12 +901,21 @@ async function main(): Promise<void> {
     browser = await chromium.launch({ executablePath: chromiumPath, headless: true,
       args: ['--no-sandbox', '--disable-dev-shm-usage'] });
     (report.environment as Record<string, unknown>).chromiumVersion = browser.version();
-    const reference = await isolatedProject('reference', scratch), toolkit = await isolatedProject('toolkit', scratch), mutations = await mutationProject(scratch);
-    try {
-      (report.workloads as Record<string, unknown>).reference = await runFixture('reference', reference, scratch, browser);
-      (report.workloads as Record<string, unknown>).toolkit = await runFixture('toolkit', toolkit, scratch, browser);
-      (report.workloads as Record<string, unknown>).mutations = await runMutations(mutations, browser);
-    } finally { await Promise.all([reference.dispose(), toolkit.dispose(), mutations.dispose()]); }
+    const paths = await commandPaths(scratch);
+    const workloads = report.workloads as Record<string, unknown>;
+    if (only === undefined || only === 'reference') {
+      const reference = await isolatedProject('reference', scratch);
+      try { workloads.reference = await runFixture('reference', reference, scratch, browser, paths); } finally { await reference.dispose(); }
+    }
+    if (only === undefined || only === 'toolkit') {
+      const toolkit = await isolatedProject('toolkit', scratch);
+      try { workloads.toolkit = await runFixture('toolkit', toolkit, scratch, browser, paths); } finally { await toolkit.dispose(); }
+    }
+    if (only === undefined || only === 'mutations') {
+      const mutations = await mutationProject(scratch), other = await mutationProject(scratch);
+      try { workloads.mutations = await runMutations(mutations, other, scratch, browser, paths); }
+      finally { await Promise.all([mutations.dispose(), other.dispose()]); }
+    }
     report.status = 'passed'; report.passed = true;
   } catch (error) {
     (report.failures as unknown[]).push(error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : String(error));

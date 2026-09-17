@@ -1,7 +1,7 @@
 import type { BatchOperation } from '../../../../src/interfaces/batch.js';
 import type { DaemonStatus } from '../../../../src/interfaces/service.js';
 import type { ServiceConnector, DaemonRecord } from '../../../daemon/src/interfaces/daemon.js';
-import type { ContextStatus, ContextRevision, ContextToken, ReplyTimings, RevisionId } from '../../../daemon/src/context-types.js';
+import type { ContextStatus, ContextRevision, ReplyTimings, RevisionId } from '../../../daemon/src/context-types.js';
 import type { AnalysisReport, AnalysisDiagnostic, RunControl } from '../../../analysis/src/interfaces/analysis.js';
 import type { RevisionPath, CheckedSet, RevisionTimings } from '../../../analysis/src/interfaces/session.js';
 import type { OutsideSourceWarning } from '../../../analysis/subs/project/src/interfaces/project.js';
@@ -11,10 +11,12 @@ export type CliExitCode = 0 | 1 | 2 | 130;
 export interface ExplorerLaunch {
   readonly url: string;
   readonly started: boolean;
-  /** Stops only the process started by this invocation. Reused processes are never owned. */
+  /** Stops only the process started by this invocation. Reused processes are never owned.
+   * `ramify explore` never calls it: the server it starts is resident. */
   cleanup(): Promise<void>;
 }
-export type ExplorerLauncher = (input: { readonly token: ContextToken }, control?: RunControl) => Promise<ExplorerLaunch>;
+/** `root` is the context's resolved project root; `projectKey` the first 16 hex digits of its context ID. */
+export type ExplorerLauncher = (input: { readonly root: string; readonly projectKey: string }, control?: RunControl) => Promise<ExplorerLaunch>;
 export type BrowserOpener = (url: string, control?: RunControl) => Promise<void>;
 export interface CliEnvironment {
   readonly cwd: string;

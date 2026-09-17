@@ -1,13 +1,15 @@
 # Processes and clients
 
-**Date:** 2026-09-11; revised 2026-09-14. **Status:** Batch checking, help and
+**Date:** 2026-09-11; revised 2026-09-17. **Status:** Batch checking, help and
 version, the resident daemon with its service, IPC host and lightweight client,
-`ramify check` in its complete and hook forms, `watch` and `daemon status`/`stop`
-are implemented. The MCP adapter, unsaved-content overlays and the explorer are not implemented;
+`ramify check` in its complete and hook forms, `watch`, `materialize`,
+`daemon status`/`stop`, `explore` and the resident explorer server
+([Plan 6B](../plans/iteration-6b-resident-explorer-server/main-plan.md)) are
+implemented. The MCP adapter and unsaved-content overlays are not implemented;
 their command spellings, contracts and wire details still require review.
 
-In the resident design, the analysis daemon is the backend. A separate, on-demand
-web process serves visualization. The CLI connects directly to the daemon for
+In the resident design, the analysis daemon is the backend. A separate, resident
+web process per project serves visualization. The CLI connects directly to the daemon for
 ordinary analysis commands and can run the same engine in batch mode. Its MCP serving
 mode runs an adapter for an editor or agent host, also connecting directly to
 the daemon. This split keeps MCP and web allocations out of the daemon's
@@ -19,7 +21,7 @@ resident lifetime.
 the daemon answers from each context's retained analysis session. That session
 runs in a worker thread inside a supervisor process with one compiler server.
 `--batch` creates a fresh batch session whose finite compiler helpers exit during
-the invocation. The diagram's MCP and web paths are not implemented yet.
+the invocation. The diagram's MCP path is not implemented yet.
 
 ```mermaid
 flowchart LR
@@ -31,7 +33,7 @@ flowchart LR
   end
   MCP -->|local IPC| API
   Browser[Browser] -->|HTTP and notifications| Web
-  subgraph WebProcess[On-demand web process]
+  subgraph WebProcess[Resident explorer server per project]
     Web[tRPC API and built frontend assets]
   end
   Web -->|local IPC| API
@@ -55,7 +57,7 @@ flowchart LR
 | External Node service client | An integrating program uses the lightweight `connectDaemon` client for analysis requests and subscriptions. | Its host owns process lifetime; each connection and operation follows the shared bounded lease and cleanup rules. |
 | Daemon | Project/worktree contexts, coherent inputs, watchers, compiler sessions, checking, semantic queries, bounded history and local service delivery. | Retained for interactive use, with inactive-context eviction and idle shutdown. |
 | MCP adapter | MCP definitions, input schemas, protocol sessions and translation to the daemon service. | The host-launched `ramify mcp` process serves its stdio connection, then releases resources and exits. |
-| Web server | HTTP/tRPC routing, browser notifications, built static assets and bounded connection/request state. May later mount MCP over HTTP. | Started on demand; exits after all relevant client leases expire and an inactivity grace period passes. |
+| Web server | One project's daemon connection, context and subscription; HTTP/tRPC routing, built static assets and bounded connection/request state. May later mount MCP over HTTP. | Resident: started by a process manager or by `ramify explore`, and runs until a signal stops it. It has no idle exit. |
 
 Direct service clients are external Node programs using `connectDaemon`, without
 an MCP or web adapter. They use the same IPC validation, compatibility handshake,
@@ -129,9 +131,9 @@ project state and unavailable execution.
 
 ## CLI commands
 
-`check` in its three forms, `watch`, `daemon status`, `daemon stop`, `--help` and
-`--version` are implemented. `inspect`, `explain`, `explore` and `mcp` remain
-unavailable invocations; their rows below record the design.
+`check` in its three forms, `watch`, `materialize`, `explore`, `daemon status`,
+`daemon stop`, `--help` and `--version` are implemented. `inspect`, `explain` and
+`mcp` remain unavailable invocations; their rows below record the design.
 The implemented invocation contract of `check`, covering root selection,
 configuration discovery, warnings and exits, is [CLI invocation](cli-invocation.spec.md).
 
@@ -142,7 +144,7 @@ configuration discovery, warnings and exits, is [CLI invocation](cli-invocation.
 | `ramify inspect ...`, `ramify explain ...` | Query the selected project's analysis with explicit freshness/revision semantics, print the result and exit. |
 | `ramify watch` | Keep a bounded subscription open and render published updates. The daemon owns watching and analysis. |
 | `ramify check --batch` | Load the engine only for this mode, in the CLI process or its Node child, create a fresh session, run the check and dispose it on exit. CI uses this independent mode. |
-| `ramify explore` | Ensure a compatible daemon, start or reuse a compatible web process, open the browser at the selected project and exit. Visualization is a later capability. |
+| `ramify explore` | Ensure a compatible daemon and open the selected project's context, then reuse that project's ready explorer server, whoever started it, or start one detached. Print `<origin>/analysis/latest`, open it in the platform browser and exit 0. If the browser cannot be opened, the URL is still printed, the command still exits 0 and the server keeps running. |
 | `ramify mcp` | Lazily load the MCP adapter and serve the host's stdio connection in this process. Resolve a compatible daemon for analysis requests; no web server or per-call CLI subprocess is required. |
 | `ramify daemon status` | Inspect an existing daemon without starting one or loading an analysis engine merely to report absence. |
 | `ramify daemon stop` | Request shutdown of the selected daemon instance and report completion or failure. Selection must not silently target another compatible instance. |
@@ -269,6 +271,26 @@ notifications over the network, while quick tests deliver the same mapped events
 in-process. Exact socket mounting and event schemas remain review items. Clients
 can recover by fetching current state instead of requiring an unbounded replay.
 
+The explorer server serves one project. It owns a project binding: one daemon
+connection, one context opened with the same setup as `ramify explore`, and one
+subscription that holds that context against idle eviction. The binding reopens
+the context after an eviction and reconnects, with bounded backoff, after a
+connection failure; each reconnect may start the daemon. After an explicit stop
+it only polls without starting, and resumes once another client starts the
+daemon. Browsers send no context or generation identity. The router reads the
+binding for each request, answers `unavailable` while it is not ready and treats a
+revision from an earlier generation as superseded.
+
+The routes are `/`, a home page listing the server's pages, the project root,
+binding state and daemon PID; `/analysis/latest`, the explorer on the newest
+published revision; `/health/ready`; and `/trpc`. Old `/explore/*` URLs redirect
+to `/analysis/latest`. The listener binds `127.0.0.1`, on a fixed port when one is
+given, and accepts only loopback `Host` and `Origin` values. The implemented page
+polls server status every three seconds while visible instead of receiving
+events. A newer published revision, including one from a new generation, marks
+its refresh control stale; while the binding is not ready the page keeps its
+model and shows a connection notice. Pushed events remain a later option.
+
 Serve built frontend assets in normal use. Vite and frontend compilation belong
 to a separate development entry point and lifetime. Reusing the web architecture
 does not mean importing a host application's complete router, service registry,
@@ -282,20 +304,28 @@ handshake before dispatching a command. A stale endpoint record does not prove
 a process is alive; competing launches must not produce duplicate owners of one
 context merely because their first checks raced.
 
-Daemon and web entry points have independent lifecycles. Explorer launch reuses
-a compatible web process and connects it to the selected daemon. A web restart
-does not restart the daemon, and a closed browser does not stop unrelated CLI,
-editor or watch sessions. Daemon recovery must never kill another compatible
-instance still serving clients.
+Daemon and web entry points have independent lifecycles. Each explorer server
+advertises one discovery record per build and project,
+`explorer-<buildKey>-<projectKey>.json` in the daemon endpoint directory, where
+the project key is the first 16 hex digits of the context ID. The server writes
+the record once its binding is first ready, so a server that has never reached
+the daemon, such as one started while the daemon is explicitly stopped, is not
+discoverable until then. `ramify explore` reuses any ready record for its build
+and project, including a process-manager server, and otherwise starts
+`explorer-entry.js --root <root>` detached. A server started either way is
+resident. The server and the shell must select the same endpoint directory
+(`RAMIFY_ENDPOINT_DIR` or `XDG_RUNTIME_DIR`); otherwise they use different daemons.
 
-Web clients hold renewable, expiring activity leases so crashed tabs and broken
-connections eventually release subscriptions and revision references. Clean
-disconnects release them promptly. After the last lease expires and the idle
-grace period passes, the web process closes its listener, releases daemon
-references and exits. Browser unload events alone are insufficient for cleanup.
-The web process does not own the daemon's shutdown decision. If optional MCP
-HTTP hosting is added, its active session leases participate in this same idle
-decision; a temporarily closed HTTP stream does not end a live MCP session.
+The explorer server has no browser leases and no idle exit. `SIGINT` or `SIGTERM`
+closes its listener, marks its record stopped with reason `explicit`, releases
+the subscription, context and connection, and exits 0. Its subscription counts as
+daemon activity, so the daemon does not idle-exit while a server runs, and the
+context's retained analysis stays in memory for that time. A web restart does not
+restart the daemon, and a closed browser does not stop unrelated CLI, editor or
+watch sessions. The web process does not own the daemon's shutdown decision.
+Daemon recovery must never kill another compatible instance still serving clients.
+If optional MCP HTTP hosting is added, its sessions need their own bounded
+lifecycle; a temporarily closed HTTP stream does not end a live MCP session.
 
 If the daemon stops, clients receive disconnection/unavailability. Recovery
 distinguishes three outcomes:
@@ -376,7 +406,7 @@ They are implementation obligations, not current passing tests.
 | PC02 | Concurrent commands coordinate startup, select the right worktree/setup and preserve compatible clients during version negotiation. |
 | PC03 | Check/inspect/explain reach the daemon directly and agree with equivalent batch inputs; a delayed watcher cannot hide a just-saved change. |
 | PC04 | Watch interruption and command exit release subscriptions/revision references; inactive project retention follows the daemon policy. |
-| PC05 | Explore starts/reuses the separate web process. Browser loss expires its leases; idle exit waits for the last client lease, including any optional HTTP MCP sessions. Web exit/restart leaves warm daemon contexts intact. |
+| PC05 | Explore reuses the project's ready explorer server, including a process-manager server, or starts one detached, and prints and opens `/analysis/latest`; opener failure still exits 0 and leaves the server running. The server is resident per project: it holds one subscription, has no idle exit, recovers after context eviction, daemon failure and daemon restart at the same URL, stays paused after an explicit stop until another client starts the daemon, and exits 0 on a signal. Web exit/restart leaves warm daemon contexts intact. |
 | PC06 | Idle exit, unexpected failure and explicit stop have distinct recovery outcomes, including a missed shutdown notification. Idle clients do not restart without work; a next request may restart after idle exit; valid watch leases prevent idle exit; existing clients respect explicit stop until explicitly resumed. Stale endpoints and incompatible versions remain bounded. |
 | PC07 | tRPC, MCP and local clients return matching semantic results; actual wire tests preserve errors, revision identity and serialization without a second analyzer. |
 | PC08 | The MCP host launches one stdio adapter for its connection; calls reuse daemon analysis without starting the web server. Connection/process loss releases leases and leaves other daemon clients intact. If HTTP hosting is added, MCP activity participates in web lifetime and preserves protocol cancellation. |
@@ -384,7 +414,9 @@ They are implementation obligations, not current passing tests.
 | PC10 | After exhausted recovery, only an eligible terminating CLI command runs a visible batch fallback and disposes its session. Watch, MCP, web and external clients return unavailable without loading or spawning another analyzer. |
 
 CLI and daemon lifecycle evidence is delivered with the local daemon. Web-specific
-parts of these requirements are delivered with later visualization. MCP-specific
+parts are delivered by the explorer plans; Plan 6B's
+[completion report](../plans/iteration-6b-resident-explorer-server/iterations/iteration4-results.md)
+records PC05's current evidence. MCP-specific
 parts accompany the later MCP adapter and do not depend on visualization. The
 [quick-testing architecture](quick-testing.spec.md) distinguishes the evidence each
 test mode can establish.

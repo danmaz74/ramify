@@ -32,15 +32,17 @@ expose-sub ProjectExplorerViewProps, ExplorerDiscussionProps, ExplorerDiscussion
 expose-sub ProjectExplorerView from presentation to descendants
 
 // P4: explorer projection service contracts relayed to later connected owners.
-expose-sub ExplorerProjectionInput, ProjectViewInput, ExplorerDetailsInput, ExplorerDetailsResult, ContextStatusInput, ContextStatusResult, ExplorerProcessRecord from service-api to descendants
+expose-sub ExplorerProjectionInput, ProjectViewInput, ExplorerDetailsInput, ExplorerDetailsResult, ServerBindingKind, ServerStatusResult, ExplorerProcessRecord from service-api to descendants
 expose-sub createProjectExplorerModel from service-api to descendants
 expose-sub createExplorerRouter, ExplorerRouter, startExplorerWebProcess from service-api to descendants
-expose-sub selectExplorerEndpoint, readExplorerProcessRecord, reusableExplorerProcess, probeExplorerReadiness, explorerProjectUrl, ExplorerEndpointSelection, ensureExplorerWebProcess, ExplorerLaunchOptions, ExplorerProcessLaunch from service-api to descendants
+// P8: resident project binding for the explorer server entry.
+expose-sub createProjectBinding, ProjectBinding, BindingState from service-api to descendants
+expose-sub selectExplorerEndpoint, readExplorerProcessRecord, reusableExplorerProcess, probeExplorerReadiness, explorerProjectUrl, explorerProjectKey, ExplorerEndpointSelection, ensureExplorerWebProcess, ExplorerLaunchOptions, ExplorerProcessLaunch from service-api to descendants
 
 // P5: connected browser assembly; the CLI consumes these only in explore mode.
 expose-sub ProjectExplorerPage, createProjectExplorerBrowserApp from explorer to descendants
 
 // R7: resident vocabulary and controlled test ports relayed unchanged from daemon.
 expose-sub ContextId, GenerationId, RevisionId, LeaseId, ContextToken, ContextSetup, ContextSelection, InputFingerprints, RevisionCause, ContextRevision, ContextState, SynchronizationState, ContextStatus, ExpectedContent, Freshness, FreshnessRecord, CheckRequest, CheckDelta, UnavailableReason, Unavailable, CheckOutcome, ExplorerDetailsRequest, ContextExplorerDetailsOutcome, ReplyTimings, OpenOutcome, ContextEvent, SubscriptionHandle, WatchEvent, WatcherHandle, WatcherPort, ClockPort, ContextBudgets, DaemonInstance, LogEntry, DaemonBudgets, EndpointSelection, DaemonRecord, StopDisposition, Handshake, Welcome, ConnectTimeouts, ConnectOptions, ConnectionState, DisconnectReason, RecoveryOutcome, ServiceConnection, ConnectOutcome, ServiceConnector, WireMessage, createControlledWatcher, createControlledClock, ControlledWatcher, ControlledClock, MaterializedTarget from daemon to descendants
-// P7: the real-browser integration owner starts an isolated installed daemon.
-expose-sub connectDaemon, selectEndpoint from daemon to descendants
+// P7: the real-browser integration owner starts an isolated installed daemon and reads its record.
+expose-sub connectDaemon, selectEndpoint, readDaemonRecord from daemon to descendants

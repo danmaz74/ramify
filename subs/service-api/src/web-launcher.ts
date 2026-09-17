@@ -1,13 +1,19 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { constants } from 'node:fs';
 import { open, readFile, unlink } from 'node:fs/promises';
+import { isAbsolute } from 'node:path';
 import type { ExplorerProcessRecord } from './interfaces/explorer-service.js';
-import { explorerProcessAlive, readExplorerProcessRecord, reusableExplorerProcess,
+import { explorerProcessAlive, explorerProjectKey, readExplorerProcessRecord, reusableExplorerProcess,
   type ExplorerEndpointSelection } from './web-discovery.js';
 
 interface LockRecord { readonly pid: number; readonly at: number }
 export interface ExplorerLaunchOptions {
+  /** The per-project endpoint: `selectExplorerEndpoint(daemonEndpoint, projectKey)`. */
   readonly endpoint: ExplorerEndpointSelection;
+  /** The resolved project root the spawned server binds. */
+  readonly root: string;
+  /** Must equal `endpoint.projectKey`; the first 16 hex digits of the project's context ID. */
+  readonly projectKey: string;
   readonly version: string;
   readonly explorerEntry: string;
   readonly runtime?: string;
@@ -70,10 +76,12 @@ async function stopChild(child: ChildProcess): Promise<void> {
   });
 }
 
-/** Coordinate one detached process per build and prove HTTP compatibility before returning. */
+/** Coordinate one detached process per build and project, and prove HTTP compatibility before returning.
+ * A reused server may have been started by anyone, including a process manager. */
 export async function ensureExplorerWebProcess(options: ExplorerLaunchOptions): Promise<ExplorerProcessLaunch> {
   const startupMs = options.startupMs ?? 5000;
-  if (!Number.isSafeInteger(startupMs) || startupMs <= 0 || !options.version || !/^[0-9a-f]{16}$/.test(options.endpoint.buildKey)) {
+  if (!Number.isSafeInteger(startupMs) || startupMs <= 0 || !options.version || !/^[0-9a-f]{16}$/.test(options.endpoint.buildKey)
+    || options.projectKey !== options.endpoint.projectKey || !isAbsolute(options.root)) {
     throw new Error('Invalid explorer launch options');
   }
   const deadline = performance.now() + startupMs;
@@ -87,7 +95,7 @@ export async function ensureExplorerWebProcess(options: ExplorerLaunchOptions): 
     const previous = await readExplorerProcessRecord(options.endpoint);
     if (previous && explorerProcessAlive(previous.pid)) {
       if (previous.version !== options.version || previous.buildKey !== options.endpoint.buildKey
-        || previous.protocol !== 'ramify.explorer-http/1') {
+        || explorerProjectKey(previous.context) !== options.projectKey || previous.protocol !== 'ramify.explorer-http/1') {
         throw new Error('Existing explorer process is incompatible with the requested build');
       }
       while (performance.now() < deadline && explorerProcessAlive(previous.pid)) {
@@ -104,9 +112,10 @@ export async function ensureExplorerWebProcess(options: ExplorerLaunchOptions): 
       if (!process.getuid || !info.isFile() || info.uid !== process.getuid() || (info.mode & 0o077) !== 0) {
         throw new Error('Unsafe explorer log file');
       }
-      child = spawn(options.runtime ?? process.execPath, [options.explorerEntry,
-        '--endpoint-dir', options.endpoint.directory, '--build-key', options.endpoint.buildKey, '--version', options.version],
-      { detached: true, stdio: ['ignore', log.fd, log.fd] });
+      // The entry derives its endpoint as the CLI does; the environment selects the same directory.
+      child = spawn(options.runtime ?? process.execPath, [options.explorerEntry, '--root', options.root],
+        { detached: true, stdio: ['ignore', log.fd, log.fd],
+          env: { ...process.env, RAMIFY_ENDPOINT_DIR: options.endpoint.directory } });
       await new Promise<void>((resolve, reject) => {
         child!.once('spawn', resolve);
         child!.once('error', (error: NodeJS.ErrnoException) => reject(new Error(

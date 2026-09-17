@@ -1,13 +1,15 @@
 import type { RunControl } from '../../analysis/src/interfaces/analysis.js';
 import type { ContextToken } from '../../daemon/src/context-types.js';
+import { explorerProjectKey } from '../../service-api/src/web-discovery.js';
 import type { CliEnvironment, CliExitCode, ExplorerLaunch } from './interfaces/cli.js';
 import { capabilities } from './command-support.js';
 import { CliFailure, disconnectFailure, serviceFailure } from './errors.js';
 
 interface ExploreArguments { readonly root?: string }
 
-/** Open one resident context, hand its opaque identity to the local web process,
- * and return after the platform opener has accepted the navigation request. */
+/** Select one project through the resident daemon, start or reuse that project's
+ * resident explorer server and open its latest analysis page. The server outlives
+ * this command, including when the platform opener fails. */
 export async function exploreCommand(args: ExploreArguments, environment: CliEnvironment,
   control: RunControl): Promise<CliExitCode> {
   if (!environment.explore || !environment.openBrowser) {
@@ -36,16 +38,16 @@ export async function exploreCommand(args: ExploreArguments, environment: CliEnv
       opened.value.reason === 'disposed' || opened.value.reason === 'configuration-changed' ? 'unavailable' : opened.value.reason,
       opened.value.message, opened.value);
     token = opened.value.token;
-    launched = await environment.explore({ token }, control);
-    try {
-      control.signal?.throwIfAborted();
-      await environment.openBrowser(launched.url, control);
-    }
-    catch (error) {
-      if (launched.started) await launched.cleanup().catch(() => {});
-      throw new CliFailure('unavailable', `Could not open the browser: ${error instanceof Error ? error.message : String(error)}`, error);
-    }
+    launched = await environment.explore({ root: opened.value.current.selection.root,
+      projectKey: explorerProjectKey(token.context) }, control);
+    control.signal?.throwIfAborted();
     environment.stdout(`Explorer: ${launched.url}\n`);
+    try { await environment.openBrowser(launched.url, control); }
+    catch (error) {
+      control.signal?.throwIfAborted();
+      // The resident server keeps running; the printed URL remains usable.
+      environment.stderr(`Warning: Could not open the browser: ${error instanceof Error ? error.message : String(error)}\n`);
+    }
     return 0;
   } finally {
     try { if (token && connection.state === 'connected') await connection.closeContext({ token }); }

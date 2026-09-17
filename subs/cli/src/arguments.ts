@@ -33,9 +33,11 @@ absence uses that directory. --all refreshes every module; --all and --from
 are mutually exclusive. There is no --batch, --changed or --format for
 materialize, and it never falls back to batch.
 
-explore selects one project through the resident daemon, starts or reuses the
-local explorer process, opens its opaque context URL in the platform browser
-and exits. It never falls back to batch analysis.
+explore selects one project through the resident daemon, starts or reuses that
+project's resident explorer server, prints its /analysis/latest URL, opens it in
+the platform browser and exits. The server keeps running after explore exits,
+also when the browser cannot be opened; stop it with a signal. explore never
+falls back to batch analysis.
 
 Exit codes: 0 completed, 1 violations or invalid input, 2 unable to complete,
 130 interrupted. Warnings and analysis limits alone do not fail a check.
