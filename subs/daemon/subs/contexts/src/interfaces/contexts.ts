@@ -2,6 +2,8 @@ import type { AnalysisReport, AnalysisSummary, Capability, RunControl, AnalysisD
 import type { ApiViewProjection, ApiViewSelection, CheckedSet, RevisionTimings, SessionStatus, SessionOpen } from '../../../../../analysis/src/interfaces/session.js';
 import type { SourceLimit, SymbolDetail, SymbolDetailLimits, SymbolDetailRequest } from '../../../../../analysis/subs/typescript/src/interfaces/source.js';
 import type { ProjectRequest, ProjectScope, ProjectResolution, OutsideSourceWarning } from '../../../../../analysis/subs/project/src/interfaces/project.js';
+import type { DependencyDiagramFacts } from '../../../../../analysis/src/interfaces/dependency-diagram.js';
+import type { DependencyDiagramRunner } from '../../../../../analysis/src/interfaces/dependency-analyzer.js';
 
 export type ContextId = string;
 export type GenerationId = string;
@@ -197,6 +199,26 @@ export type ContextExplorerDetailsOutcome =
         | 'invalid-current' | 'resource-limit' | 'analysis-failed';
       readonly message: string }
   | { readonly status: 'cancelled'; readonly requestId: string };
+/** One on-demand dependency diagram at an exact published revision. */
+export interface DependencyDiagramRequest {
+  readonly token: ContextToken;
+  readonly requestId: string;
+  readonly revision: RevisionId;
+}
+export type ContextDependencyDiagramOutcome =
+  | { readonly status: 'ready'; readonly requestId: string;
+      readonly revision: ContextRevision;
+      readonly diagram: DependencyDiagramFacts }
+  | { readonly status: 'busy'; readonly requestId: string;
+      readonly revision: ContextRevision;
+      readonly reason: 'analysis-running' | 'inputs-changed' }
+  | { readonly status: 'superseded'; readonly requestId: string;
+      readonly revision: ContextRevision | null }
+  | { readonly status: 'cancelled'; readonly requestId: string }
+  | { readonly status: 'unavailable'; readonly requestId: string;
+      readonly reason: 'resource-unavailable' | 'invalid-current'
+        | 'analysis-failed' | 'resource-limit';
+      readonly message: string };
 /** The frozen symbol-detail and area/invocation byte bounds `ContextManager.apiView`
  * passes to `RetainedSession.apiView`; not part of `ApiViewRequest` since a caller
  * cannot loosen them per request. `ContextManagerOptions.apiViewLimits` defaults to
@@ -275,6 +297,9 @@ export interface ContextManagerOptions {
   /** Frozen `RetainedSession.apiView` bounds; defaults to contracts.md's iteration-1
    * frozen values when omitted. */
   readonly apiViewLimits?: ApiViewQueryLimits;
+  /** The injected dependency analyzer runner; without one, `dependencyDiagram`
+   * answers `unavailable/resource-unavailable` and starts no work. */
+  readonly dependencyDiagrams?: DependencyDiagramRunner;
 }
 export interface ContextManager {
   open(request: ProjectRequest, setup: ContextSetup, lease: LeaseId, control?: RunControl): Promise<OpenOutcome>;
@@ -289,6 +314,12 @@ export interface ContextManager {
   apiView(request: ApiViewRequest, lease: LeaseId, control?: RunControl): Promise<ContextApiViewOutcome>;
   explorerDetails(request: ExplorerDetailsRequest, lease: LeaseId,
     control?: RunControl): Promise<ContextExplorerDetailsOutcome>;
+  /** Answers in C4's order: superseded, invalid-current, ready from the retained
+   * result, join the running job, busy while another job runs, otherwise start one.
+   * A job never enters the context queue or the retained session. An unknown
+   * context, an earlier generation or disposal answers as `Unavailable`. */
+  dependencyDiagram(request: DependencyDiagramRequest, lease: LeaseId,
+    control?: RunControl): Promise<ContextDependencyDiagramOutcome | (Unavailable & { readonly requestId: string })>;
   subscribe(token: ContextToken, lease: LeaseId,
     listener: (event: ContextEvent) => void): SubscriptionHandle | Unavailable;
   release(lease: LeaseId): void;

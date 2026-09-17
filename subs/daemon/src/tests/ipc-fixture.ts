@@ -10,8 +10,10 @@ import { openSocketConnection } from '../connection.js';
 import { selectEndpoint } from '../discovery.js';
 import { connectDaemon } from '../connect-daemon.js';
 import type { AnalysisDriver } from '../context-types.js';
+import type { DependencyDiagramRunner } from '../../../analysis/src/interfaces/dependency-analyzer.js';
 
-export async function ipcFixture(overrides: Partial<DaemonBudgets> = {}, publicClient = false, driver?: AnalysisDriver) {
+export async function ipcFixture(overrides: Partial<DaemonBudgets> = {}, publicClient = false, driver?: AnalysisDriver,
+  dependencyDiagrams?: DependencyDiagramRunner) {
   const directory = await mkdtemp('/tmp/ri-');
   const project = join(directory, 'project');
   await mkdir(join(project, 'src'), { recursive: true });
@@ -21,7 +23,7 @@ export async function ipcFixture(overrides: Partial<DaemonBudgets> = {}, publicC
   await writeFile(join(project, 'src/index.ts'), 'export const value = 1;\n');
   const selected = publicClient ? await selectEndpoint({ packageRoot: process.cwd(), version: '0.0.0', endpointDirectory: directory }) : undefined;
   const instance = selected ? { instanceId: randomUUID(), pid: process.pid, version: '0.0.0', engine: 'ramify.ts@0.0.0+typescript@7.0.2', buildKey: selected.buildKey } : undefined;
-  const environment = await createQuickEnvironment({}, { instance, driver });
+  const environment = await createQuickEnvironment({}, { instance, driver, ...(dependencyDiagrams ? { dependencyDiagrams } : {}) });
   const buildKey = environment.service.instance.buildKey;
   const prefix = join(directory, `daemon-${buildKey}`);
   const endpoint: EndpointSelection = { directory, buildIdentity: '0'.repeat(64), buildKey, socket: `${prefix}.sock`, record: `${prefix}.json`, lock: `${prefix}.lock`, log: `${prefix}.log` };

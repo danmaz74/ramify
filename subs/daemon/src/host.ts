@@ -132,7 +132,7 @@ export function createSocketHost(options: StartDaemonOptions, activityChanged: (
         }
         ready = true; lease = service.lease(handshake.client.name);
         send({ type: 'welcome', welcome: { protocol: 'ramify.ipc/1', instance: service.instance,
-          capabilities: ['contexts', 'check', 'subscribe', 'daemon-control', 'materialize', 'explorerDetails'], limits: {
+          capabilities: ['contexts', 'check', 'subscribe', 'daemon-control', 'materialize', 'explorerDetails', 'dependencyDiagram'], limits: {
             maxRequestBytes: budgets.maxRequestBytes, maxResponseBytes: budgets.maxResponseBytes, leaseMs: budgets.leaseMs, pingMs: budgets.pingMs,
           } } });
         return;

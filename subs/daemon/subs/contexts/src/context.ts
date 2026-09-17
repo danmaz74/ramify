@@ -1,6 +1,7 @@
 import type { RetainedSession } from '../../../../analysis/src/interfaces/session.js';
+import type { DependencyDiagramFacts } from '../../../../analysis/src/interfaces/dependency-diagram.js';
 import type { ProjectRequest, ProjectResolution, ProjectScope } from '../../../../analysis/subs/project/src/interfaces/project.js';
-import type { ContextEvent, ContextExplorerDetailsOutcome, ContextRevision, ContextSelection, ContextState, ContextToken, ExplorerDetailsRequest, SynchronizationState, WatchBatch, WatcherHandle } from './interfaces/contexts.js';
+import type { ContextEvent, ContextExplorerDetailsOutcome, ContextRevision, ContextSelection, ContextState, ContextToken, ExplorerDetailsRequest, RevisionId, SynchronizationState, WatchBatch, WatcherHandle } from './interfaces/contexts.js';
 import type { RevisionHistory } from './history.js';
 import type { Invocation, PendingEntry, RunningCapture } from './queue.js';
 
@@ -11,6 +12,14 @@ export interface ExplorerDetailDelivery {
   readonly resolve: (outcome: ContextExplorerDetailsOutcome) => void;
   cleanup: () => void;
   settled: boolean;
+}
+
+/** The context's single retained dependency diagram, for its published revision only. */
+export interface RetainedDiagram {
+  readonly revision: RevisionId;
+  readonly diagram: DependencyDiagramFacts;
+  /** UTF-8 bytes of the diagram's JSON, counted in the context's retained bytes. */
+  readonly bytes: number;
 }
 
 /** Live state stays owner-private; status and revision exports are detached data. */
@@ -27,6 +36,8 @@ export interface LiveContext {
   readonly queue: PendingEntry[];
   readonly deliveries: Set<PendingEntry>;
   readonly explorerDeliveries: Set<ExplorerDetailDelivery>;
+  /** Released on newer publication, eviction and close; demotion and cooling keep it. */
+  diagram: RetainedDiagram | null;
   readonly paths: Map<string, 'changed' | 'created' | 'deleted' | 'unknown'>;
   /** Queued paths only synchronized requests named, with those requests. A watcher event,
    * a restored capture or a bound reset makes a path a known change and removes it. */

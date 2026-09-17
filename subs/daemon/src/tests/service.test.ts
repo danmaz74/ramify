@@ -6,16 +6,19 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { createQuickEnvironment } from '../../../../src/tests/quick-environment.js';
 import { dispatchServiceRequest } from '../service.js';
 import type { QuickEnvironment } from '../../../../src/tests/quick-environment.js';
+import type { AnalysisReport } from '../../../analysis/src/interfaces/analysis.js';
+import type { DependencyAnalyzerOutcome, DependencyDiagramRunner } from '../../../analysis/src/interfaces/dependency-analyzer.js';
+import type { ProjectRequest } from '../../../analysis/subs/project/src/interfaces/project.js';
 
 const roots: string[] = [], environments: QuickEnvironment[] = [];
 afterEach(async () => { for (const environment of environments.splice(0)) await environment.dispose(); for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });
-async function fixture() {
+async function fixture(dependencyDiagrams?: DependencyDiagramRunner) {
   const root = await mkdtemp(join(tmpdir(), 'ramify-service-test-')); roots.push(root);
   await mkdir(join(root, 'src'));
   await writeFile(join(root, 'module.ramify'), 'ramify 1\nmodule fixture\n');
   await writeFile(join(root, 'tsconfig.json'), '{"compilerOptions":{"types":[],"module":"ESNext","moduleResolution":"bundler"},"include":["src"]}');
   await writeFile(join(root, 'src/index.ts'), 'export const value = 1;\n');
-  const environment = await createQuickEnvironment(); environments.push(environment);
+  const environment = await createQuickEnvironment({}, dependencyDiagrams ? { dependencyDiagrams } : {}); environments.push(environment);
   return { root, environment, params: { project: { cwd: root, root, scope: 'whole-project' as const, configuration: 'discover' as const }, setup: { registry: 'default' as const, capabilities: ['registry', 'layout', 'descriptions'] as const } } };
 }
 
@@ -99,6 +102,62 @@ describe('validated daemon service', () => {
     expect(shared).toMatchObject({ ok: true, value: { status: 'ready', revision: checked.value.revision } });
     const codec = await environment.request('explorerDetails', { ...request, requestId: 'details-codec' });
     expect(codec).toMatchObject({ ok: true, value: { status: 'ready', details: [{ exportName: 'value' }] } });
+  });
+  it('BD23: serves dependency diagrams through direct, shared and codec-backed dispatch with validation and counters', async () => {
+    const runs: { readonly project: ProjectRequest; readonly report: AnalysisReport }[] = [];
+    let next: (input: { readonly report: AnalysisReport }) => DependencyAnalyzerOutcome = () => { throw new Error('No scripted outcome'); };
+    const { environment, params, root } = await fixture({ async run(input) { runs.push(input); return next(input); } });
+    const opened = await environment.service.openContext(params);
+    if (!opened.ok || opened.value.status !== 'opened') throw new Error('Expected opened context');
+    const token = opened.value.token;
+    const checked = await environment.service.check({ token, requestId: 'publish-diagram', freshness: { mode: 'synchronized', expect: [] } });
+    if (!checked.ok || checked.value.status !== 'reported' || !checked.value.published) throw new Error('Expected publication');
+    const revision = checked.value.revision;
+    const diagram = { inputId: revision.fingerprints.inputId, modules: ['fixture'], boundaries: [],
+      headline: { behavioralDependencies: 0, nonBehavioralDependencies: 0 }, coverage: { state: 'complete' as const, unknownDependencies: 0, limitIds: [] } };
+    next = () => ({ status: 'ready', diagram, behaviorRuns: 1, timings: { acquireMs: 1, classifyMs: 1, projectMs: 1, totalMs: 3 } });
+    const before = await environment.service.daemonStatus();
+    if (!before.ok) throw new Error('Expected daemon status');
+    expect(before.value.counters).toMatchObject({ behaviorRuns: 0, dependencyDiagrams: 0, dependencyDiagramInputChanges: 0 });
+
+    const request = { token, revision: revision.revision };
+    expect(await environment.service.dependencyDiagram({ ...request, requestId: 'diagram-direct' }))
+      .toEqual({ ok: true, value: { status: 'ready', requestId: 'diagram-direct', revision, diagram } });
+    expect(runs).toHaveLength(1);
+    expect(runs[0]!.project).toEqual(runs[0]!.report.request.project);
+    expect([runs[0]!.report.inputId, runs[0]!.report.outcome.execution]).toEqual([revision.fingerprints.inputId, 'completed']);
+    expect(await dispatchServiceRequest(environment.service, 'dependencyDiagram', { ...request, requestId: 'diagram-shared' }))
+      .toEqual({ ok: true, value: { status: 'ready', requestId: 'diagram-shared', revision, diagram } });
+    expect(await environment.request('dependencyDiagram', { ...request, requestId: 'diagram-codec' }))
+      .toEqual({ ok: true, value: { status: 'ready', requestId: 'diagram-codec', revision, diagram } });
+    expect(runs).toHaveLength(1);
+    expect(await environment.service.dependencyDiagram({ ...request, requestId: 'diagram-old', revision: revision.revision.replace(/:1$/, ':7') }))
+      .toEqual({ ok: true, value: { status: 'superseded', requestId: 'diagram-old', revision } });
+    expect(await environment.service.dependencyDiagram({ token: { ...token, context: `ctx/1:${'0'.repeat(64)}` }, requestId: 'diagram-unknown', revision: revision.revision }))
+      .toMatchObject({ ok: false, error: { code: 'unknown-context' } });
+    for (const invalid of [{ ...request, requestId: 'x', extra: true }, { ...request, requestId: 'x', revision: 'rev/1:bad' }, request]) {
+      expect(await environment.request('dependencyDiagram', invalid)).toMatchObject({ ok: false, error: { code: 'invalid-request' } });
+    }
+    const status = await environment.service.daemonStatus();
+    if (!status.ok) throw new Error('Expected daemon status');
+    expect(status.value.counters).toMatchObject({ behaviorRuns: 1, dependencyDiagrams: 1, dependencyDiagramInputChanges: 0,
+      rejectedRequests: before.value.counters.rejectedRequests + 3 });
+    const context = status.value.contexts.find(item => item.token.context === token.context)!;
+    const factBytes = context.session?.factBytes ?? 0;
+    expect(context.retainedBytes).toBe(factBytes + Buffer.byteLength(JSON.stringify(diagram)));
+
+    // A newer revision releases the result; an analyzer that sees changed inputs answers busy and is counted.
+    await writeFile(join(root, 'src/index.ts'), 'export const value = 2;\n');
+    const edited = await environment.service.check({ token, requestId: 'publish-edit', freshness: { mode: 'synchronized', expect: [] } });
+    if (!edited.ok || edited.value.status !== 'reported' || !edited.value.published) throw new Error('Expected publication');
+    expect(edited.value.report).toMatchObject({ outcome: { execution: 'completed' } });
+    const released = await environment.service.daemonStatus();
+    expect(released.ok && released.value.contexts[0]!.retainedBytes).toBe(released.ok ? released.value.contexts[0]!.session?.factBytes ?? 0 : -1);
+    next = () => ({ status: 'inputs-changed', paths: ['src/index.ts'] });
+    expect(await environment.service.dependencyDiagram({ token, requestId: 'diagram-changed', revision: edited.value.revision.revision }))
+      .toEqual({ ok: true, value: { status: 'busy', requestId: 'diagram-changed', revision: edited.value.revision, reason: 'inputs-changed' } });
+    const counted = await environment.service.daemonStatus();
+    expect(counted.ok && counted.value.counters).toMatchObject({ behaviorRuns: 1, dependencyDiagrams: 2, dependencyDiagramInputChanges: 1 });
   });
   it('releases one client/context pair while retaining its other subscription', async () => {
     const { environment, params, root } = await fixture();

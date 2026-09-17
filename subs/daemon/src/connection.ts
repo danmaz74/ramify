@@ -136,6 +136,7 @@ export async function openSocketConnection(endpoint: EndpointSelection, options:
     contextStatus: params => request('contextStatus', params),
     check: (params, control) => request('check', params, control),
     explorerDetails: (params, control) => request('explorerDetails', params, control),
+    dependencyDiagram: (params, control) => request('dependencyDiagram', params, control),
     materialize: (params, control) => request('materialize', params, control),
     subscribe: (params, listener) => request('subscribe', params, undefined, listener),
     unsubscribe: async params => { const result = await request<null>('unsubscribe', params); if (result.ok) subscriptions.delete(params.subscription); return result; },

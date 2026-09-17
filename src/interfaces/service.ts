@@ -4,11 +4,13 @@ import type { ApiViewSelection } from '../../subs/analysis/src/interfaces/sessio
 import type { MaterializedTarget } from '../../subs/daemon/src/interfaces/daemon.js';
 import type { ContextToken, ContextSetup, ContextStatus, ContextBudgets, CheckOutcome, Freshness, RevisionId,
   ContextRevision, FreshnessRecord, UnavailableReason, ReplyTimings,
-  OpenOutcome, ContextEvent, ExplorerDetailsRequest, ContextExplorerDetailsOutcome } from '../../subs/daemon/src/context-types.js';
+  OpenOutcome, ContextEvent, ExplorerDetailsRequest, ContextExplorerDetailsOutcome,
+  DependencyDiagramRequest, ContextDependencyDiagramOutcome } from '../../subs/daemon/src/context-types.js';
 
 export type ServiceOperation = 'openContext' | 'contextStatus' | 'check' | 'subscribe'
-  | 'unsubscribe' | 'closeContext' | 'daemonStatus' | 'stopDaemon' | 'materialize' | 'explorerDetails';
-export type ServiceCapability = 'contexts' | 'check' | 'subscribe' | 'daemon-control' | 'materialize' | 'explorerDetails';
+  | 'unsubscribe' | 'closeContext' | 'daemonStatus' | 'stopDaemon' | 'materialize' | 'explorerDetails' | 'dependencyDiagram';
+export type ServiceCapability = 'contexts' | 'check' | 'subscribe' | 'daemon-control' | 'materialize' | 'explorerDetails'
+  | 'dependencyDiagram';
 export type ServiceErrorCode = 'invalid-request' | 'unsupported-operation'
   | 'unknown-context' | 'expired-generation' | 'resource-unavailable'
   | 'unknown-subscription' | 'wrong-instance' | 'stopping' | 'cancelled' | 'internal-error' | 'incompatible';
@@ -51,6 +53,12 @@ export interface DaemonCounters {
   readonly evictions: number;
   readonly rejectedRequests: number;
   readonly disconnectedSlowConsumers: number;
+  /** Classifier runs the dependency analyzer reported for ready diagrams. */
+  readonly behaviorRuns: number;
+  /** Dependency analyzer jobs the daemon started. */
+  readonly dependencyDiagrams: number;
+  /** Dependency analyzer jobs that ended because the project's inputs differed from the published revision. */
+  readonly dependencyDiagramInputChanges: number;
 }
 export interface DaemonStatus {
   readonly instanceId: string;
@@ -102,6 +110,8 @@ export interface RamifyService {
   check(params: CheckParams, control?: RunControl): Promise<ServiceResult<CheckOutcome>>;
   explorerDetails(params: ExplorerDetailsRequest,
     control?: RunControl): Promise<ServiceResult<ContextExplorerDetailsOutcome>>;
+  dependencyDiagram(params: DependencyDiagramRequest, control?: RunControl):
+    Promise<ServiceResult<ContextDependencyDiagramOutcome>>;
   subscribe(params: ContextParams, listener: (event: ContextEvent) => void): Promise<ServiceResult<SubscriptionOpened>>;
   unsubscribe(params: UnsubscribeParams): Promise<ServiceResult<null>>;
   closeContext(params: ContextParams): Promise<ServiceResult<null>>;

@@ -1,6 +1,11 @@
 import { reportCapacity } from './report-capacity.js';
 import { sessionLimits } from './resident-budgets.js';
-import { openRetainedSession, resolveProject } from '../subs/analysis/src/index.js';
+import { fileURLToPath } from 'node:url';
+// Direct owner files, not the analysis package entry: the daemon process never loads the dependency analyzer.
+import { openRetainedSession } from '../subs/analysis/src/retained-session.js';
+import { resolveProject } from '../subs/analysis/src/resolve-project.js';
+import type { DependencyDiagramRunner } from '../subs/analysis/src/interfaces/dependency-analyzer.js';
+import { createProcessDependencyAnalyzer } from './dependency-analyzer-process.js';
 import type { AnalysisLimits, RunControl } from '../subs/analysis/src/interfaces/analysis.js';
 import type { RetainedSession, SessionLimits } from '../subs/analysis/src/interfaces/session.js';
 import { createDefaultTagRegistry } from '../subs/analysis/subs/model/src/registry.js';
@@ -19,7 +24,14 @@ export interface ResidentAssemblyOptions {
    * `createFilesystemApiViewPublisher` at contracts.md's frozen iteration-1
    * limits. Tests inject a controlled publisher. */
   readonly publisher?: ApiViewPublisher;
+  /** Injected dependency diagram runner; defaults to one analyzer process per job running the built
+   * `dependency-analyzer-entry.js` with this Node runtime. */
+  readonly dependencyDiagrams?: DependencyDiagramRunner;
 }
+
+/** The built analyzer entry beside this module; source runs use the package's built entry. */
+export const dependencyAnalyzerEntry = fileURLToPath(new URL(import.meta.url.endsWith('.ts')
+  ? '../dist/src/dependency-analyzer-entry.js' : './dependency-analyzer-entry.js', import.meta.url));
 
 // Frozen (iteration 1): see contracts.md's "Renderer and publisher" section.
 const publishLimits = { maxAreaBytes: 32 * 1024 ** 2, maxInvocationBytes: 256 * 1024 ** 2, maxStagedBytes: 256 * 1024 ** 2 };
@@ -110,6 +122,7 @@ function sessionDriver(capacity: SessionLimits): AnalysisDriver {
 
 export function assembleResidentService(options: ResidentAssemblyOptions): DaemonService {
   return createDaemonService({ ...options, publisher: options.publisher ?? createFilesystemApiViewPublisher(publishLimits),
+    dependencyDiagrams: options.dependencyDiagrams ?? createProcessDependencyAnalyzer(process.execPath, dependencyAnalyzerEntry),
     driver: sessionDriver({ ...sessionLimits,
       maxRetainedFactBytes: Math.min(sessionLimits.maxRetainedFactBytes, options.budgets.maxRetainedBytesPerContext),
       updateDeadlineMs: options.budgets.updateDeadlineMs, sweepIntervalMs: options.budgets.sweepIntervalMs,

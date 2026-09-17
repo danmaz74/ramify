@@ -4,6 +4,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { performance } from 'node:perf_hooks';
 import type { RetainedSession } from '../../analysis/src/interfaces/session.js';
 import type { RunControl } from '../../analysis/src/interfaces/analysis.js';
+import type { DependencyDiagramRunner } from '../../analysis/src/interfaces/dependency-analyzer.js';
 import type { ApiViewQueryLimits, CheckOutcome, ContextEvent, ContextStatus, ContextToken, OpenOutcome, SubscriptionHandle, Unavailable } from '../subs/contexts/src/interfaces/contexts.js';
 import { createContextManager } from '../subs/contexts/src/context-manager.js';
 import type { DaemonCounters, MaterializeOutcome, MaterializeParams, RamifyService, ServiceErrorCode, ServiceResult } from '../../../src/interfaces/service.js';
@@ -38,12 +39,24 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
   const startedAt = options.clock.now();
   const counters = { revisions: 0, analyses: 0, cancelledAnalyses: 0, reusedRevisions: 0, coalescedEvents: 0,
     evictions: 0, rejectedRequests: 0, disconnectedSlowConsumers: 0, sweeps: 0, audits: 0, auditMismatches: 0,
-    coveredRequests: 0, coldOutcomes: 0, deadlineOutcomes: 0 } satisfies DaemonCounters;
+    coveredRequests: 0, coldOutcomes: 0, deadlineOutcomes: 0, behaviorRuns: 0, dependencyDiagrams: 0,
+    dependencyDiagramInputChanges: 0 } satisfies DaemonCounters;
+  const runner = options.dependencyDiagrams;
+  /** Counts each analyzer job and its reported classifier runs; the daemon never classifies itself. */
+  const dependencyDiagrams: DependencyDiagramRunner | undefined = runner && {
+    async run(input, control) {
+      counters.dependencyDiagrams++;
+      const outcome = await runner.run(input, control);
+      if (outcome.status === 'ready') counters.behaviorRuns += outcome.behaviorRuns;
+      if (outcome.status === 'inputs-changed') counters.dependencyDiagramInputChanges++;
+      return outcome;
+    },
+  };
   let stopping = false;
   let disposed = false;
   let disposePromise: Promise<void> | undefined;
   const observed = new Map<string, number>();
-  const manager = createContextManager({ ...options, apiViewLimits, engine: options.instance.engine, generationId: () => `gen/1:${randomUUID()}`,
+  const manager = createContextManager({ ...options, apiViewLimits, dependencyDiagrams, engine: options.instance.engine, generationId: () => `gen/1:${randomUUID()}`,
     driver: {
       resolve: (request, control, known) => options.driver.resolve(request, control, known),
       async open(project, setup, control) {
@@ -243,6 +256,19 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
         observe();
         return success(result);
       },
+      async dependencyDiagram(params, control) {
+        const invalid = guard<Awaited<ReturnType<RamifyService['dependencyDiagram']>> extends ServiceResult<infer T> ? T : never>('dependencyDiagram', params);
+        if (invalid) return invalid;
+        const result = await manager.dependencyDiagram(params, pair(params.token), control);
+        observe();
+        if (result.status !== 'unavailable') return success(result);
+        switch (result.reason) {
+          case 'resource-unavailable': case 'invalid-current': case 'analysis-failed': case 'resource-limit':
+            return success({ status: 'unavailable', requestId: result.requestId, reason: result.reason, message: result.message });
+          case 'disposed': return failure('stopping', 'Daemon is stopping');
+          default: return domainError(result as Unavailable);
+        }
+      },
       async materialize(params, control) {
         const invalid = guard<MaterializeOutcome>('materialize', params); if (invalid) return invalid;
         const status = manager.status(params.token);
@@ -350,6 +376,7 @@ export async function dispatchServiceRequest(service: RamifyService, operation: 
     case 'contextStatus': return service.contextStatus(input);
     case 'check': return service.check(input, control);
     case 'explorerDetails': return service.explorerDetails(input, control);
+    case 'dependencyDiagram': return service.dependencyDiagram(input, control);
     case 'materialize': return service.materialize(input, control);
     case 'subscribe': return listener ? service.subscribe(input, listener) : failure('invalid-request', 'Subscription listener is required');
     case 'unsubscribe': return service.unsubscribe(input);

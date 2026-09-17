@@ -6,6 +6,8 @@ import { ipcFixture } from './ipc-fixture.js';
 import { eventually } from './socket-fixture.js';
 import { encodeJsonFrame } from '../codec.js';
 import type { ContextEvent } from '../context-types.js';
+import type { DependencyAnalyzerOutcome, DependencyDiagramRunner } from '../../../analysis/src/interfaces/dependency-analyzer.js';
+import type { RunControl } from '../../../analysis/src/interfaces/analysis.js';
 
  describe('IPC framing and shared service dispatch', () => {
   it('preserves validation errors and tokens while releasing subscription leases on close', async () => {
@@ -130,4 +132,62 @@ import type { ContextEvent } from '../context-types.js';
     } finally { await fixture.dispose(); }
   });
 
+  it('BD23: negotiates dependencyDiagram and maps every outcome through the public client, framing a large result', async () => {
+    let next: (control?: RunControl) => Promise<DependencyAnalyzerOutcome> = async () => ({ status: 'cancelled' });
+    const runner: DependencyDiagramRunner = { run: (_input, control) => next(control) };
+    const fixture = await ipcFixture({}, true, undefined, runner);
+    try {
+      const client = await fixture.connect();
+      expect(client.daemon.capabilities).toContain('dependencyDiagram');
+      const opened = await client.openContext(fixture.params);
+      if (!opened.ok || opened.value.status !== 'opened') throw new Error('Open failed');
+      const token = opened.value.token;
+      const checked = await client.check({ token, requestId: 'publish', freshness: { mode: 'synchronized', expect: [] } });
+      if (!checked.ok || checked.value.status !== 'reported' || !checked.value.published) throw new Error('Publication failed');
+      const revision = checked.value.revision;
+      const request = (requestId: string, value = revision.revision) => ({ token, requestId, revision: value });
+
+      next = async () => ({ status: 'unavailable', reason: 'resource-limit', message: 'Diagram exceeds 16777216 bytes' });
+      expect(await client.dependencyDiagram(request('limit'))).toEqual({ ok: true, value: { status: 'unavailable', requestId: 'limit',
+        reason: 'resource-limit', message: 'resource-limit: Diagram exceeds 16777216 bytes' } });
+      next = async () => ({ status: 'unavailable', reason: 'analysis-failed', message: 'helper exited' });
+      expect(await client.dependencyDiagram(request('failed'))).toMatchObject({ ok: true, value: { status: 'unavailable', reason: 'analysis-failed' } });
+      next = async () => ({ status: 'inputs-changed', paths: ['src/index.ts'] });
+      expect(await client.dependencyDiagram(request('changed'))).toEqual({ ok: true, value: { status: 'busy', requestId: 'changed', revision, reason: 'inputs-changed' } });
+
+      // Cancellation over the wire detaches the only caller and aborts the job.
+      let aborted: Promise<void> | undefined;
+      next = control => new Promise(resolve => {
+        aborted = new Promise(done => control!.signal!.addEventListener('abort', () => { done(); resolve({ status: 'cancelled' }); }, { once: true }));
+      });
+      const controller = new AbortController();
+      const cancelled = client.dependencyDiagram(request('cancelled'), { signal: controller.signal });
+      await eventually(() => aborted !== undefined);
+      controller.abort();
+      expect(await cancelled).toEqual({ ok: true, value: { status: 'cancelled', requestId: 'cancelled' } });
+      await aborted;
+
+      // A large ready result is framed within the negotiated response capacity.
+      const modules = Array.from({ length: 600_000 }, (_, index) => `module-${String(index).padStart(12, '0')}`);
+      const diagram = { inputId: revision.fingerprints.inputId, modules, boundaries: [],
+        headline: { behavioralDependencies: 0, nonBehavioralDependencies: 0 }, coverage: { state: 'complete' as const, unknownDependencies: 0, limitIds: [] } };
+      const encoded = Buffer.byteLength(JSON.stringify(diagram));
+      expect(encoded).toBeGreaterThan(12 * 1024 ** 2);
+      expect(encoded).toBeLessThan(fixture.budgets.maxResponseBytes);
+      next = async () => ({ status: 'ready', diagram, behaviorRuns: 1, timings: { acquireMs: 1, classifyMs: 1, projectMs: 1, totalMs: 3 } });
+      const ready = await client.dependencyDiagram(request('ready'));
+      expect(ready.ok && ready.value.status === 'ready' && ready.value.diagram.modules.length).toBe(modules.length);
+      expect(ready).toMatchObject({ ok: true, value: { status: 'ready', requestId: 'ready', revision } });
+      expect(await client.dependencyDiagram(request('superseded', revision.revision.replace(/:1$/, ':5'))))
+        .toEqual({ ok: true, value: { status: 'superseded', requestId: 'superseded', revision } });
+      expect(await client.dependencyDiagram({ ...request('unknown'), token: { ...token, context: `ctx/1:${'0'.repeat(64)}` } }))
+        .toMatchObject({ ok: false, error: { code: 'unknown-context' } });
+      expect(await client.dependencyDiagram({ ...request('invalid'), extra: true } as never)).toMatchObject({ ok: false, error: { code: 'invalid-request' } });
+      const status = await client.daemonStatus();
+      expect(status.ok && status.value.counters).toMatchObject({ dependencyDiagrams: 5, behaviorRuns: 1, dependencyDiagramInputChanges: 1 });
+      // Existing operations keep their requests and outputs.
+      expect(await client.check({ token, requestId: 'after', freshness: { mode: 'published', wait: false } }))
+        .toMatchObject({ ok: true, value: { status: 'reported', published: true, revision: { revision: revision.revision } } });
+    } finally { await fixture.dispose(); }
+  }, 60_000);
 });

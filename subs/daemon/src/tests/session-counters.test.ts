@@ -103,6 +103,7 @@ describe('daemon racing-hook attribution', () => {
       async dispose() {},
     };
     const service = createDaemonService({ driver, watcher, clock, budgets: { ...budgets, sweepIntervalMs: 60_000, warmIdleMs: 60_000, coldRetainMs: 120_000 }, publisher,
+      dependencyDiagrams: { async run() { throw new Error('Unexpected dependency analyzer run'); } },
       instance: { instanceId: 'racing-attribution-test', pid: process.pid, version: '0.0.0', engine: 'test-engine', buildKey: '0000000000000000' },
       log: () => {} });
     try {
@@ -124,6 +125,8 @@ describe('daemon racing-hook attribution', () => {
       expect(after.value.counters.analyses - before.value.counters.analyses).toBe(1);
       expect(after.value.counters.revisions - before.value.counters.revisions).toBe(1);
       expect(after.value.counters.coveredRequests - before.value.counters.coveredRequests).toBe(1);
+      // A changed-file hook and its watcher update never start dependency analysis.
+      expect(after.value.counters).toMatchObject({ behaviorRuns: 0, dependencyDiagrams: 0, dependencyDiagramInputChanges: 0 });
     } finally { finish?.(); await service.dispose(); await watcher.dispose(); clock.dispose(); }
   });
 });

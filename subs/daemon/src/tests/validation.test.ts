@@ -137,6 +137,19 @@ describe('service request structure', () => {
     ]) expect(validateServiceRequest('explorerDetails', invalid)?.code).toBe('invalid-request');
   });
 
+  it('BD23: validates a dependency diagram request as exactly a token, request ID and revision', () => {
+    const params = { token, requestId: 'diagram-1', revision };
+    const before = JSON.stringify(params);
+    expect(validateServiceRequest('dependencyDiagram', params)).toBeNull();
+    expect(JSON.stringify(params)).toBe(before);
+    const { requestId: _requestId, ...missing } = params;
+    for (const invalid of [
+      missing, { ...params, revision: 'rev/1:bad' }, { ...params, revision: `rev/1:${uuid}:0` }, { ...params, requestId: '' },
+      { ...params, requestId: 'x'.repeat(129) }, { ...params, token: { ...token, generation: 'gen/1:bad' } },
+      { ...params, extra: true }, { ...params, requests: [] }, null, [],
+    ]) expect(validateServiceRequest('dependencyDiagram', invalid)?.code).toBe('invalid-request');
+  });
+
   it('accepts 10,000 expectations and rejects 10,001 before processing them', () => {
     const expectList = Array.from({ length: 10_000 }, (_, index) => ({ path: `src/${index}.ts`, sha256: null }));
     const request = { ...synchronized, freshness: { mode: 'synchronized', expect: expectList } };

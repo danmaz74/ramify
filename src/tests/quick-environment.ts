@@ -5,6 +5,7 @@ import { runBatch } from '../batch.js';
 import type { BatchOperation } from '../interfaces/batch.js';
 import type { ServiceOperation, ServiceResult, SubscriptionOpened } from '../interfaces/service.js';
 import type { RunControl } from '../../subs/analysis/src/interfaces/analysis.js';
+import type { DependencyDiagramRunner } from '../../subs/analysis/src/interfaces/dependency-analyzer.js';
 import type { AnalysisDriver, ContextBudgets, ContextEvent } from '../../subs/daemon/src/context-types.js';
 import { createDaemonService, dispatchServiceRequest } from '../../subs/daemon/src/service.js';
 import { createControlledClock, createControlledWatcher } from '../../subs/daemon/subs/contexts/src/tests/controlled-ports.js';
@@ -29,13 +30,15 @@ export interface QuickEnvironment {
 
 /** Real service and analysis, with only time, watching and transport controlled. */
 export async function createQuickEnvironment(options: Partial<ContextBudgets> = {},
-  fixture: { readonly instance?: DaemonInstance; readonly driver?: AnalysisDriver; readonly publisher?: ApiViewPublisher } = {}): Promise<QuickEnvironment> {
+  fixture: { readonly instance?: DaemonInstance; readonly driver?: AnalysisDriver; readonly publisher?: ApiViewPublisher;
+    readonly dependencyDiagrams?: DependencyDiagramRunner } = {}): Promise<QuickEnvironment> {
   const watcher = createControlledWatcher(), clock = createControlledClock(Date.now());
   const instance = fixture.instance ?? { instanceId: randomUUID(), pid: process.pid, version: '0.0.0',
     engine: 'ramify.ts@0.0.0+typescript@7.0.2', buildKey: '0000000000000000' };
   const startedAt = clock.now();
   const publisher = fixture.publisher ?? createFilesystemApiViewPublisher(publishLimits);
-  const assembly = { watcher, clock, budgets: { ...contextBudgets, ...options }, instance, log() {}, publisher };
+  const assembly = { watcher, clock, budgets: { ...contextBudgets, ...options }, instance, log() {}, publisher,
+    ...(fixture.dependencyDiagrams ? { dependencyDiagrams: fixture.dependencyDiagrams } : {}) };
   const service = fixture.driver ? createDaemonService({ ...assembly, driver: fixture.driver }) : assembleResidentService(assembly);
   const connections = new Set<ServiceConnection>();
   let disposed = false, stopped: StopDisposition | null = null;
@@ -56,7 +59,7 @@ export async function createQuickEnvironment(options: Partial<ContextBudgets> = 
       client: { name: 'quick', version: instance.version }, buildKey: instance.buildKey, engine: instance.engine } });
     if (hello.type !== 'hello') throw new Error('Unexpected quick handshake');
     const welcome = through({ type: 'welcome', welcome: { protocol: 'ramify.ipc/1', instance,
-      capabilities: ['contexts', 'check', 'subscribe', 'daemon-control', 'materialize', 'explorerDetails'],
+      capabilities: ['contexts', 'check', 'subscribe', 'daemon-control', 'materialize', 'explorerDetails', 'dependencyDiagram'],
       limits: { maxRequestBytes: daemonBudgets.maxRequestBytes, maxResponseBytes: daemonBudgets.maxResponseBytes,
         leaseMs: daemonBudgets.leaseMs, pingMs: daemonBudgets.pingMs } } });
     if (welcome.type !== 'welcome') throw new Error('Unexpected quick welcome');
@@ -95,6 +98,7 @@ export async function createQuickEnvironment(options: Partial<ContextBudgets> = 
       contextStatus: params => call('contextStatus', params),
       check: (params, control) => call('check', params, control),
       explorerDetails: (params, control) => call('explorerDetails', params, control),
+      dependencyDiagram: (params, control) => call('dependencyDiagram', params, control),
       materialize: (params, control) => call('materialize', params, control),
       async subscribe(params, listener) {
         let subscriptionId: string | undefined;

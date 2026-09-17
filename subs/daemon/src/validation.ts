@@ -3,7 +3,7 @@ import type { ServiceError, ServiceOperation } from '../../../src/interfaces/ser
 
 const operations: ReadonlySet<string> = new Set<ServiceOperation>([
   'openContext', 'contextStatus', 'check', 'subscribe', 'unsubscribe', 'closeContext', 'daemonStatus', 'stopDaemon', 'materialize',
-  'explorerDetails',
+  'explorerDetails', 'dependencyDiagram',
 ]);
 const uuid = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 const contextId = /^ctx\/1:[0-9a-f]{64}$/;
@@ -148,6 +148,8 @@ export function validateServiceRequest(operation: unknown, params: unknown): Ser
         valid = unique.size <= 50;
         break;
       }
+      case 'dependencyDiagram': valid = record(params, ['token', 'requestId', 'revision']) && token(params.token)
+        && matches(params.requestId, requestId) && matches(params.revision, revisionId); break;
       case 'unsubscribe': valid = record(params, ['subscription']) && nonempty(params.subscription); break;
       case 'daemonStatus': valid = record(params, []); break;
       case 'stopDaemon': valid = record(params, ['instanceId']) && nonempty(params.instanceId); break;

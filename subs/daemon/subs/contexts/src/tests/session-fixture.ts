@@ -3,15 +3,18 @@ import { createContextManager } from '../context-manager.js';
 import { createGenerationId } from '../tokens.js';
 import type { ApiViewQueryLimits, ApiViewRequest, CheckRequest, ContextBudgets, ContextStatus, ContextToken } from '../interfaces/contexts.js';
 import type { ApiViewSelection } from '../../../../../analysis/src/interfaces/session.js';
+import type { DependencyDiagramRunner } from '../../../../../analysis/src/interfaces/dependency-analyzer.js';
 import { createControlledClock, createControlledWatcher } from './controlled-ports.js';
 import { createScriptedDriver, flush, testApiViewLimits, testBudgets } from './scripted-driver.js';
 
-export function sessionEnvironment(budgets: Partial<ContextBudgets> = {}, apiViewLimits: ApiViewQueryLimits = testApiViewLimits) {
+export function sessionEnvironment(budgets: Partial<ContextBudgets> = {}, apiViewLimits: ApiViewQueryLimits = testApiViewLimits,
+  dependencyDiagrams?: DependencyDiagramRunner) {
   const script = createScriptedDriver();
   const clock = createControlledClock();
   const watcher = createControlledWatcher();
   const manager = createContextManager({ driver: script.driver, clock, watcher,
-    budgets: { ...testBudgets, ...budgets }, engine: 'test-engine', generationId: createGenerationId, apiViewLimits });
+    budgets: { ...testBudgets, ...budgets }, engine: 'test-engine', generationId: createGenerationId, apiViewLimits,
+    ...(dependencyDiagrams ? { dependencyDiagrams } : {}) });
   let sequence = 0;
   async function open(root = '/fixture', lease = 'lease', cwd = root) {
     const result = await manager.open({ cwd, root, scope: 'whole-project', configuration: 'discover' },

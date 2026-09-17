@@ -2,6 +2,7 @@ import type { RamifyService, ServiceOperation, ServiceCapability, ServiceResult,
 import type { AnalysisDriver, WatcherPort, ClockPort, ContextBudgets, ContextEvent, RevisionId } from '../../subs/contexts/src/interfaces/contexts.js';
 import type { ApiViewProjection } from '../../../analysis/src/interfaces/session.js';
 import type { RunControl } from '../../../analysis/src/interfaces/analysis.js';
+import type { DependencyDiagramRunner } from '../../../analysis/src/interfaces/dependency-analyzer.js';
 
 export interface DaemonInstance {
   readonly instanceId: string;
@@ -32,6 +33,9 @@ export interface DaemonServiceOptions {
    * supply `createFilesystemApiViewPublisher(limits)`; tests inject a
    * controlled publisher. */
   readonly publisher: ApiViewPublisher;
+  /** The injected dependency analyzer runner `dependencyDiagram` starts one job with.
+   * Root assembly supplies the process runner; without one the operation is unavailable. */
+  readonly dependencyDiagrams?: DependencyDiagramRunner;
 }
 export interface ServiceLease {
   readonly id: string;

@@ -178,3 +178,14 @@ describe('revision capture timings', () => {
     }
   });
 });
+
+describe('BD23: service capability negotiation', () => {
+  const welcome = (capabilities: readonly string[]) => ({ type: 'welcome', welcome: { protocol: 'ramify.ipc/1',
+    instance: { instanceId: 'daemon-1', pid: 1, version: '0.0.0', engine: 'engine', buildKey: '0000000000000000' },
+    capabilities, limits: { maxRequestBytes: 1, maxResponseBytes: 1, leaseMs: 1, pingMs: 1 } } });
+  it('accepts the dependencyDiagram capability beside the existing capabilities and still rejects unknown names', () => {
+    const message = welcome(['contexts', 'check', 'subscribe', 'daemon-control', 'materialize', 'explorerDetails', 'dependencyDiagram']);
+    expect(decodeMessage(encodeMessage(message as never))).toEqual(message);
+    expect(() => encodeMessage(welcome(['dependencyDiagrams']) as never)).toThrow('Invalid IPC message schema');
+  });
+});

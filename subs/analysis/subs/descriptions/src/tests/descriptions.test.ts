@@ -55,7 +55,7 @@ const observerNames = ['ObservationSink', 'InputChangeKind', 'ObservedChange', '
 const contextNames = ['ContextId', 'GenerationId', 'RevisionId', 'LeaseId', 'ContextToken', 'ContextSetup',
   'ContextSelection', 'InputFingerprints', 'RevisionCause', 'ContextRevision', 'ContextState', 'SynchronizationState',
   'ContextStatus', 'ExpectedContent', 'Freshness', 'FreshnessRecord', 'CheckRequest', 'CheckDelta', 'UnavailableReason', 'Unavailable',
-  'CheckOutcome', 'ExplorerDetailsRequest', 'ContextExplorerDetailsOutcome', 'ReplyTimings', 'OpenOutcome', 'ContextEvent', 'SubscriptionHandle', 'WatchEvent', 'WatcherHandle', 'WatcherPort',
+  'CheckOutcome', 'ExplorerDetailsRequest', 'ContextExplorerDetailsOutcome', 'DependencyDiagramRequest', 'ContextDependencyDiagramOutcome', 'ReplyTimings', 'OpenOutcome', 'ContextEvent', 'SubscriptionHandle', 'WatchEvent', 'WatcherHandle', 'WatcherPort',
   'ClockPort', 'ContextBudgets'];
 const controlledNames = ['createControlledWatcher', 'createControlledClock', 'ControlledWatcher', 'ControlledClock'];
 const residentNames = ['DaemonInstance', 'LogEntry', 'DaemonBudgets', 'EndpointSelection', 'DaemonRecord',
@@ -117,7 +117,9 @@ const toolkit: readonly Fixture[] = [
     sub([...modelNames, ...availabilityNames], 'analysis', descendants), sub([...syntaxNames, ...linkingNames], 'analysis', descendants),
     sub([...projectNames, ...observerNames.slice(1), 'isRamifyGeneratedPath'], 'analysis', descendants),
     sub([...sourceNames, ...symbolDetailNames], 'analysis', descendants),
-    sub([...analysisNames, ...apiViewNames], 'analysis', descendants), sub(presentationNames, 'presentation', descendants),
+    sub([...analysisNames, ...apiViewNames], 'analysis', descendants),
+    sub(['DependencyBoundaryFact', 'DependencyDiagramFacts', 'DependencyDiagramOutcome', 'BehavioralDependencyMetrics'], 'analysis', descendants),
+    sub(['DependencyDiagramRunner', 'DependencyAnalyzerOutcome'], 'analysis', descendants), sub(presentationNames, 'presentation', descendants),
     sub([...projectViewModelNames, 'ModuleGraphProps', 'GraphSelection'], 'presentation', descendants),
     sub(['ModuleGraphRadial'], 'presentation', descendants), sub(projectViewProps, 'presentation', descendants),
     sub(['ProjectExplorerView'], 'presentation', descendants),
@@ -132,7 +134,10 @@ const toolkit: readonly Fixture[] = [
     sub([...contextNames, ...residentNames, ...controlledNames, 'MaterializedTarget'], 'daemon', descendants),
     sub(['connectDaemon', 'selectEndpoint', 'readDaemonRecord'], 'daemon', descendants),
   ] },
-  { path: 'subs/analysis/', name: 'analysis', tags: [], statements: [sub('*', 'model', both), sub([...syntaxNames, ...linkingNames], 'descriptions', both), sub([...projectNames, ...observerNames, 'isRamifyGeneratedPath'], 'project', both), sub([...sourceNames, ...symbolDetailNames], 'typescript', both), src(['validateProject'], 'validation.ts'), src('*', 'interfaces/analysis.ts'), src(['acquireInventory'], 'inventory.ts'), src(['createAnalysisSession'], 'session.ts'), src(['analyzeProject'], 'analyze-project.ts'), src(['resolveProject'], 'resolve-project.ts'), src('*', 'interfaces/session.ts'), src(['openRetainedSession'], 'retained-session.ts'), src(['planApiViewRequests', 'projectApiView'], 'api-view.ts')] },
+  { path: 'subs/analysis/', name: 'analysis', tags: [], statements: [sub('*', 'model', both), sub([...syntaxNames, ...linkingNames], 'descriptions', both), sub([...projectNames, ...observerNames, 'isRamifyGeneratedPath'], 'project', both), sub([...sourceNames, ...symbolDetailNames], 'typescript', both), src(['validateProject'], 'validation.ts'), src('*', 'interfaces/analysis.ts'), src(['acquireInventory'], 'inventory.ts'), src(['createAnalysisSession'], 'session.ts'), src(['analyzeProject'], 'analyze-project.ts'), src(['resolveProject'], 'resolve-project.ts'), src('*', 'interfaces/session.ts'), src(['openRetainedSession'], 'retained-session.ts'), src(['planApiViewRequests', 'projectApiView'], 'api-view.ts'),
+    src(['DependencyBoundaryFact', 'DependencyDiagramFacts', 'DependencyDiagramOutcome'], 'interfaces/dependency-diagram.ts'),
+    src(['BehavioralDependencyMetrics'], 'interfaces/modularity.ts'),
+    src(['analyzeDependencyDiagram'], 'dependency-analyzer.ts'), src('*', 'interfaces/dependency-analyzer.ts')] },
   { path: 'subs/analysis/subs/descriptions/', name: 'descriptions', tags: browser, statements: [src(['parseDescription'], 'parse.ts', browser), src('*', 'interfaces/syntax.ts'), src(['linkDescriptions'], 'link.ts', browser), src('*', 'interfaces/linking.ts')] },
   { path: 'subs/analysis/subs/model/', name: 'model', tags: browser, statements: [
     src('*', 'interfaces/model.ts'), src(['resolveTagRegistry', 'createDefaultTagRegistry'], 'registry.ts', browser),
