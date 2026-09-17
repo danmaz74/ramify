@@ -1,8 +1,10 @@
 # Modularity report
 
-**Date:** 2026-09-17. **Status:** Proposed contract for review; nothing here
-is implemented. It fixes the units, filters, formulas, coverage rules,
-ordering and identity that the
+**Date:** 2026-09-17. **Status:** Contract under implementation. Iteration 2
+implements the opt-in evidence and iteration 3 the declared-ownership
+projection; change affinity and candidate ownership are not implemented. It
+fixes the units, filters, formulas, coverage rules, ordering and identity that
+the
 [project modularity analysis](../analysis/2026-09-17-project-modularity-analysis.md#proposed-execution-path)
 names as execution step 1. Thresholds, rankings that combine measures and
 module moves are out of scope. The TypeScript contract is
@@ -87,10 +89,13 @@ Only application occurrences form dependencies. External (`package`, `builtin`,
 `standard-library`), `outside-module` and `unresolved` occurrences are counted
 separately and never contribute to an edge.
 
-**Original identity.** The triple `(kind, file, binding)` of an `OriginalId`.
-The `owner` field is ignored; an original's owner is always the owner of its
-defining file in the ownership in use, so candidate ownership moves originals
-with their files.
+**Original identity.** The triple `(kind, defining file, binding)` of an
+`OriginalId`. `OriginalId.file` is relative to the declared owner's ordinary
+`src/`, so the defining file is the project-relative path of the catalog
+original's `origin.file`, equivalently that root joined with `file`. The `owner`
+field serves only this resolution; an original's owner is always the owner of
+its defining file in the ownership in use, so candidate ownership moves
+originals with their files.
 
 **Selected symbol.** The pair `(original identity, exportedName)` of an
 `AccessSelection` whose `original` is non-null. Selections with a null original
@@ -290,9 +295,10 @@ connected components with at least two members are reported.
   not a runtime component. Its `runtimeComponents` lists the runtime components
   contained in it.
 
-For each component, over occurrences whose consumer and provider are both
-members: `occurrences` (all loads), `runtimeOccurrences`, `files` (distinct
-consumer and provider files) and `selectedSymbols`.
+For each component, over the cross-owner occurrences of view edges whose
+consumer and provider are both members: `occurrences` (all loads),
+`runtimeOccurrences`, `files` (distinct consumer and provider files) and
+`selectedSymbols`. Same-owner occurrences are not part of a component.
 
 **Witnesses.** For each member in byte order, a breadth-first search over the
 component's edges in its own graph (runtime graph for a runtime component, all
@@ -411,23 +417,32 @@ prevent projection: denied occurrences are still source evidence, and
 | Connectedness | occurrences from files of `O` | files of `O` |
 | Context size | occurrences from the counted files | the counted files |
 
+The files of an owner or subtree are its files in the view's subset; context
+size adds the counted resources.
+
 A metric is partial when any of these holds:
 
 1. an occurrence in scope names a `coverageIds` entry;
 2. an occurrence in scope from a scope file has an `unresolved` or
    `outside-module` target (counted in `unattributedAccesses`);
-3. a selection in scope has a status other than `resolved`;
-4. a file in scope has `FileExports.state` other than `complete`, or a
-   `report.coverage` limit is located in a file in scope;
+3. a selection of an application occurrence in scope has a status other than
+   `resolved`; external selections never resolve to an original;
+4. a source file in scope has `FileExports.state` other than `complete`, or a
+   `report.coverage` limit is located in a file in scope. A resource without a
+   compiler export description is limited only through the accesses that name
+   it;
 5. a `report.coverage` limit is located in no inventory file; it applies to
    every metric;
 6. for behavior only, a deduplicated dependency in scope is `unknown`, a fact in
-   scope names a limit, or the facts' status is `failed`.
+   scope names a limit, or the facts' status is `failed`, which attributes every
+   `DependencyBehaviorFacts.limits` id to every behavior metric.
 
 `limitIds` lists the attributed `SourceLimit` and `BehaviorLimit` ids in byte
 order, including the ids named by `FileExports.issueIds`. The report-level
 `coverage` is `partial` when any metric in either view is partial or
-`report.outcome.coverage` is `partial`.
+`report.outcome.coverage` is `partial`. Its `detail` lists the limit ids of every
+partial metric, the sum over views of the `all` summary's unattributed accesses
+and the sum over views of the behavior total's unknown dependencies.
 
 ### Behavioral availability
 

@@ -21,7 +21,7 @@ export type BehaviorClassification = 'behavioral' | 'non-behavioral' | 'unused' 
  * One fact per distinct (consumer file, original) pair over resolved application
  * selections, whatever the current ownership of either file, so a candidate
  * ownership can deduplicate them again. The original's `owner` is the declared
- * owner; modularity derives ownership from `original.file` instead.
+ * owner; modularity derives ownership from the original's defining file instead.
  */
 export interface DependencyBehaviorFact {
   readonly consumer: SourceOrigin;
