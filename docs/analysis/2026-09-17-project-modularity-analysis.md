@@ -588,6 +588,9 @@ coverage behavior, ordering and revision identity before adding thresholds. The
 behavioral split uses the dependency glossary's consumer/original unit and its
 unused, unknown and mixed-evidence rules.
 
+The contract is recorded in the
+[modularity report specification](../architecture/modularity-report.spec.md).
+
 ### 2. Add opt-in behavioral evidence
 
 Add a `dependency-behavior` analysis capability used only by an explicit
