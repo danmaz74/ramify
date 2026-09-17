@@ -1,6 +1,6 @@
 # Daemon and analysis architecture
 
-**Date:** 2026-09-11; revised 2026-09-14. **Status:** Implemented across eleven
+**Date:** 2026-09-11; revised 2026-09-17. **Status:** Implemented across eleven
 owners: the batch engine, the resident daemon with its context manager, service
 and lightweight client, and the retained analysis session that answers the
 bounded hook check. [Implemented retained session](#implemented-retained-session)
@@ -9,7 +9,8 @@ requirements are decided in the [architecture overview](README.md). The
 [Plan 1 handoff](../plans/done/iteration-1-project-verifier/iterations/iteration15-results.md)
 records batch evidence, the [Plan 2 remediation](../plans/done/iteration-2-resident-verification/remediation-2026-09-11.md)
 records resident evidence, and the [Plan 5 completion report](../plans/iteration-5-fast-incremental-checks/iterations/iteration13-results.md)
-records the retained session's evidence and limits. The MCP adapter, unsaved-content overlays and the explorer are not implemented.
+records the retained session's evidence and limits. The on-demand `dependencyDiagram` operation and its analyzer
+process are implemented by [Plan 6D](../plans/iteration-6d-behavioral-dependency-diagram/iterations/iteration7-results.md). The MCP adapter and unsaved-content overlays are not implemented.
 
 The resident design calls for a long-lived local backend that maintains the
 analyzed state of each active project, updates that state as files change, and
@@ -677,6 +678,14 @@ schemas and transport framing are review items, not new `module.ramify` syntax.
 | Explanations | Explain an original binding's exposure and tag/origin decisions for a specified consumer area, or drill into a recorded source occurrence. |
 | Change notifications | Announce published revisions, status changes and updated findings; a reconnect can fetch a complete snapshot without replaying an unbounded event history. |
 | Symbol intelligence | Search usable exports and request optional details at a specified revision, with access evidence and explicit missing enrichment. |
+| Dependency diagram | `dependencyDiagram({ token, requestId, revision })` answers the behavioral dependency diagram of the context's exact current published revision, only when a client requests it. A revision that is not current is `superseded`; a retained result is `ready`; an equal running job is joined; while any other job runs the answer is `busy/analysis-running`; otherwise one job starts. The job runs a separate analyzer process that verifies the project's inputs against the published report, classifies the report's recorded imports in its own compiler helper, projects the diagram and exits. Changed inputs answer `busy/inputs-changed`; a newer publication aborts the job and answers its callers `superseded`; the last caller's cancellation aborts it. A result above its byte limit or the retained budget is `unavailable/resource-limit`. Checks, hooks, watches, materialization and the retained session never classify behavior. |
+
+At most one diagram job runs daemon-wide, and each context retains at most one
+result, for its current published revision, counted in its `retainedBytes`. A
+newer publication, eviction and daemon disposal release it. The daemon loads no
+analyzer or classifier module; root injects the process runner. The explorer's
+`dependencyView` procedure is the implemented client; a later MCP or CLI client
+can request the same operation without another compiler feature.
 
 The minimal interactive surface includes context management, checking and module
 inspection/explanations. Rich capability search, import suggestions and placement

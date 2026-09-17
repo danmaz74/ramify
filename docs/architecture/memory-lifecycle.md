@@ -1,6 +1,6 @@
 # Memory lifecycle
 
-**Date:** 2026-09-11; revised 2026-09-14. **Status:** Decided resource-management
+**Date:** 2026-09-11; revised 2026-09-17. **Status:** Decided resource-management
 requirements, implemented for the resident daemon and its retained analysis
 sessions with the defaults below. Hook latency on the reference and 100-owner
 projects is measured against its acceptable-time budget; memory plateaus, the
@@ -65,6 +65,7 @@ alone are insufficient when entries contain arbitrarily large source or results.
 | Historical revisions | Context retention has explicit byte/count/age limits and bounded request leases. Retain identifiers, evidence and supported historical content; do not keep a full compiler program per revision. |
 | Optional enrichment and search | Use lazy, byte-bounded caches keyed by context/generation/revision and query. Cache eviction cannot alter completed enforcement results. |
 | Edit and analysis queues | Coalesce changes and supersede obsolete work. Bound queued bytes, concurrent analysis and enrichment; release canceled work's captured inputs. |
+| Dependency diagrams | The daemon runs at most one diagram job, in a separate analyzer process with its own compiler helper, so classifier and compiler allocations are reclaimed by process exit. Each context retains at most one result, for its current published revision, counted in `retainedBytes` and released by a newer publication, eviction or disposal; a result above 16 MiB or the retained budget is refused, never truncated. The explorer server holds one in-flight request and one settled model of at most 16 MiB per binding. |
 | IPC/HTTP/MCP requests and responses | Bound message bodies, batches, result sizes and in-flight requests. Scope/page large queries so serialization does not create uncontrolled transient copies. |
 | Events and client connections | Bound listeners, retained revisions and queued bytes. Clean disconnects release promptly; activity leases expire abandoned clients. |
 
@@ -120,6 +121,13 @@ duplicate compiler state. Bound their count and lifetime; spawning a worker per
 request is not the architecture. If measurements justify process recycling,
 preserve generation changes and explicit unavailable/reconnect outcomes rather
 than presenting a rebuilt session as the old one.
+
+The dependency analyzer is a bounded subprocess of this kind: one per requested
+diagram job, never per check, watch or browser poll. Its peak memory is outside
+the daemon's settled memory, which grows only by the retained result.
+[Plan 6D's completion report](../plans/iteration-6d-behavioral-dependency-diagram/iterations/iteration7-results.md)
+records the analyzer's peak memory and the daemon's settled memory with and
+without a retained result in the real browser workflow.
 
 ### Retained sessions and their levels
 

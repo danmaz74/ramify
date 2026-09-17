@@ -5,7 +5,10 @@ version, the resident daemon with its service, IPC host and lightweight client,
 `ramify check` in its complete and hook forms, `watch`, `materialize`,
 `daemon status`/`stop`, `explore` and the resident explorer server
 ([Plan 6B](../plans/iteration-6b-resident-explorer-server/main-plan.md)) are
-implemented. The MCP adapter and unsaved-content overlays are not implemented;
+implemented, as are the explorer's on-demand behavioral dependency diagram and
+the daemon-started dependency analyzer process
+([Plan 6D](../plans/iteration-6d-behavioral-dependency-diagram/main-plan.md)).
+The MCP adapter and unsaved-content overlays are not implemented;
 their command spellings, contracts and wire details still require review.
 
 In the resident design, the analysis daemon is the backend. A separate, resident
@@ -45,6 +48,10 @@ flowchart LR
     Worker[Session worker thread] --> Server[Compiler server]
   end
   Engine -->|plain-data messages| Worker
+  subgraph AnalyzerProcess[Dependency analyzer process per diagram job]
+    Analyzer[Input verification, classification and projection] --> AnalyzerHelper[Compiler helper]
+  end
+  Contexts -->|on request, published report| Analyzer
   subgraph BatchProcess[CLI process in batch mode]
     Batch[Batch command] --> Fresh[Fresh session of the same engine]
   end
@@ -56,6 +63,7 @@ flowchart LR
 | CLI | Argument parsing, local connection, command formatting and launch/control requests. Batch mode additionally owns its fresh engine session: in process for the Node entry, in a Node child for the [compiled client](optimization.md#native-client). MCP mode dispatches to the adapter below. | One command, except explicit watch or MCP serving modes. |
 | External Node service client | An integrating program uses the lightweight `connectDaemon` client for analysis requests and subscriptions. | Its host owns process lifetime; each connection and operation follows the shared bounded lease and cleanup rules. |
 | Daemon | Project/worktree contexts, coherent inputs, watchers, compiler sessions, checking, semantic queries, bounded history and local service delivery. | Retained for interactive use, with inactive-context eviction and idle shutdown. |
+| Dependency analyzer | One `dependencyDiagram` job: acquiring the project again, verifying its inputs against the published report, classifying the report's recorded imports in a compiler helper and projecting the diagram. It builds no export catalog, interprets no imports and opens no retained session. | Started by the daemon only for a requested diagram, at most one daemon-wide. It exits with its helper when the job settles; cancellation, supersession, the 120-second deadline and an oversized response terminate both within the 5-second disposal limit. |
 | MCP adapter | MCP definitions, input schemas, protocol sessions and translation to the daemon service. | The host-launched `ramify mcp` process serves its stdio connection, then releases resources and exits. |
 | Web server | One project's daemon connection, context and subscription; HTTP/tRPC routing, built static assets and bounded connection/request state. May later mount MCP over HTTP. | Resident: started by a process manager or by `ramify explore`, and runs until a signal stops it. It has no idle exit. |
 
@@ -293,6 +301,18 @@ events. A newer published revision, including one from a new generation, marks
 its refresh control stale; while the binding is not ready the page keeps its
 model and shows a connection notice. Pushed events remain a later option.
 
+The analysis page requests the behavioral dependency diagram through the
+`dependencyView({ revision })` procedure once its project view is ready. The
+server relays it to the daemon's `dependencyDiagram` operation and maps the
+result to the browser model without loading compiler or analysis code. Per
+binding it holds at most one in-flight daemon request and one settled model,
+both for the newest requested revision; a daemon `busy` answer is remembered for
+one second as `waiting`, and a newer publication, eviction or server close
+releases both. The page polls a pending answer at most once per second while
+visible, stops on a ready, superseded or unavailable answer, and shows a result
+only for its displayed revision and input ID. Refresh loads the newest project
+view first and then requests its diagram; display settings change no request.
+
 Serve built frontend assets in normal use. Vite and frontend compilation belong
 to a separate development entry point and lifetime. Reusing the web architecture
 does not mean importing a host application's complete router, service registry,
@@ -385,6 +405,9 @@ The resident entry-point requirements remain:
   which relays selected contracts to descendants through ordinary declarations;
   `service-api` can receive them for optional HTTP hosting without owning the
   MCP definitions.
+- The dependency analyzer entry, `src/dependency-analyzer-entry.ts`, is the only
+  entry that loads the analyzer and behavior classifier. The daemon starts it
+  through root's injected process runner and loads neither.
 - Later web entry assembles `service-api [dispatch]` with the lightweight daemon
   client. Browser application code belongs to `explorer [ui, browser, dispatch]`;
   reusable project views belong below `presentation [ui, browser]`.

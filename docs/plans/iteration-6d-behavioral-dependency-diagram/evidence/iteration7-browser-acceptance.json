@@ -1,0 +1,4290 @@
+{
+  "schemaVersion": "ramify.resident-explorer-acceptance/1",
+  "measuredAt": "2026-09-17T16:51:36.005Z",
+  "status": "passed",
+  "passed": true,
+  "command": [
+    "npm",
+    "run",
+    "measure:project-explorer",
+    "--",
+    "--output",
+    "docs/plans/iteration-6d-behavioral-dependency-diagram/evidence/iteration7-browser-acceptance.json"
+  ],
+  "environment": {
+    "node": "v22.23.2",
+    "versions": {
+      "node": "22.23.2",
+      "acorn": "8.16.0",
+      "ada": "2.9.2",
+      "amaro": "1.1.8",
+      "ares": "1.34.6",
+      "brotli": "1.1.0",
+      "cjs_module_lexer": "2.2.0",
+      "cldr": "48.0",
+      "icu": "78.2",
+      "llhttp": "9.4.3",
+      "modules": "127",
+      "napi": "10",
+      "nbytes": "0.1.3",
+      "ncrypto": "0.0.1",
+      "nghttp2": "1.69.0",
+      "openssl": "3.5.7",
+      "simdjson": "4.5.0",
+      "simdutf": "6.4.2",
+      "sqlite": "3.51.3",
+      "tz": "2026a",
+      "undici": "6.28.0",
+      "unicode": "17.0",
+      "uv": "1.51.0",
+      "uvwasi": "0.0.23",
+      "v8": "12.4.254.21-node.56",
+      "zlib": "1.3.1-e00f703",
+      "zstd": "1.5.7"
+    },
+    "platform": "linux",
+    "release": "6.8.0-85-generic",
+    "cpuCount": 12,
+    "cpuModel": "Intel(R) Xeon(R) E-2176G CPU @ 3.70GHz",
+    "totalMemoryBytes": 67274752000,
+    "chromiumPath": "/usr/bin/chromium",
+    "dependencies": {
+      "playwrightCore": "1.63.0",
+      "react": "^19.2.8",
+      "reactDom": "^19.2.8",
+      "xyflow": "^12.10.0",
+      "vite": "^8.3.0"
+    },
+    "chromiumVersion": "151.0.7922.173"
+  },
+  "inputs": {
+    "buildIdentity": "84324afd24f211ab7f08b8bd074f983416053545c6fade8b05c1b0e29e3f579e"
+  },
+  "workloads": {
+    "reference": {
+      "kind": "reference",
+      "root": "/tmp/ramify-explorer-acceptance-wUhMtK/reference-QR6YMu",
+      "url": "http://127.0.0.1:40307/analysis/latest",
+      "finalUrl": "http://127.0.0.1:40307/analysis/latest",
+      "explore": {
+        "exitCode": 0,
+        "durationMs": 568.672012,
+        "stdout": "Explorer: http://127.0.0.1:40307/analysis/latest\n",
+        "stderr": "",
+        "serverPid": 158181,
+        "defaultStartupMs": 5000
+      },
+      "revision": {
+        "token": {
+          "context": "ctx/1:e85a8a30520d0599c9ff9eee5c30f958208317fc24d4fca33b1f7f2878f9f42a",
+          "generation": "gen/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9"
+        },
+        "revision": "rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:1",
+        "sequence": 1,
+        "publishedAt": 1789663898133,
+        "cause": "open",
+        "fingerprints": {
+          "inputId": "input/1:c62fa9e2e83ec77a04a7ca0b961fbbfb645a84b9e3502a334ffe2806918855ff",
+          "declarations": "4478c90a77ab75380ef3dbea40970a0eaf58164fe50fc9740072ddc28e4df346",
+          "source": "10aded85514d6b853b213fa0acd47940195a618d78bb598226c7196accf9b5d1",
+          "configuration": "23aa853cad15ff232e87243067b20e9eeef83a7b95ce6560f34cbe7416e9a489",
+          "registry": "1080a60800d9e5bddc69f51489c636a776bacaadb5368f46db4aa0947c67e3ba",
+          "engine": "15ffbb4f9f5a3d2d22aa435e1835d6bfe262aca8bdfdc376f1245df846065b97"
+        },
+        "changed": [],
+        "checked": {
+          "path": "cold",
+          "files": [
+            "src/assembly.ts",
+            "src/interfaces/protocol.ts",
+            "src/main.ts",
+            "src/protocol.ts",
+            "src/server.ts",
+            "src/tests/assembly.test.ts",
+            "src/tests/http.test.ts",
+            "src/tests/protocol-typing.test.ts",
+            "src/tests/setup.ts",
+            "subs/integration-tests/src/features/collection-review.viz.feature",
+            "subs/integration-tests/src/steps/collection-review.steps.ts",
+            "subs/integration-tests/src/support/hooks.ts",
+            "subs/integration-tests/src/support/initialization.ts",
+            "subs/integration-tests/src/support/world.ts",
+            "subs/workspace/src/app.tsx",
+            "subs/workspace/src/client.ts",
+            "subs/workspace/src/index.html",
+            "subs/workspace/src/main.tsx",
+            "subs/workspace/src/styles.css",
+            "subs/workspace/src/tests/shell.test.tsx",
+            "subs/workspace/subs/catalog/src/mcp.ts",
+            "subs/workspace/subs/catalog/src/router.ts",
+            "subs/workspace/subs/catalog/src/tests/adapters.test.ts",
+            "subs/workspace/subs/catalog/subs/core/src/catalog.ts",
+            "subs/workspace/subs/catalog/subs/core/src/history.ts",
+            "subs/workspace/subs/catalog/subs/core/src/records.ts",
+            "subs/workspace/subs/catalog/subs/core/src/tests/catalog.test.ts",
+            "subs/workspace/subs/catalog/subs/core/src/tests/fixture.ts",
+            "subs/workspace/subs/catalog/subs/ui/src/catalog-card.module.css",
+            "subs/workspace/subs/catalog/subs/ui/src/catalog-card.tsx",
+            "subs/workspace/subs/catalog/subs/ui/src/tests/catalog-card.test.tsx",
+            "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts",
+            "subs/workspace/subs/contracts/src/tests/vocabulary.test.ts",
+            "subs/workspace/subs/reviews/src/mcp.ts",
+            "subs/workspace/subs/reviews/src/router.ts",
+            "subs/workspace/subs/reviews/src/session.ts",
+            "subs/workspace/subs/reviews/src/tests/router.test.ts",
+            "subs/workspace/subs/reviews/src/tests/sessions.test.ts",
+            "subs/workspace/subs/reviews/src/tests/typing.test.ts",
+            "subs/workspace/subs/reviews/subs/core/src/interfaces/port.ts",
+            "subs/workspace/subs/reviews/subs/core/src/runtime.ts",
+            "subs/workspace/subs/reviews/subs/core/src/tests/runtime.test.ts",
+            "subs/workspace/subs/reviews/subs/core/subs/controller/src/controller.ts",
+            "subs/workspace/subs/reviews/subs/core/subs/controller/src/tests/controller.test.ts",
+            "subs/workspace/subs/reviews/subs/core/subs/tasks/src/inspection-task.ts",
+            "subs/workspace/subs/reviews/subs/core/subs/tasks/src/result.ts",
+            "subs/workspace/subs/reviews/subs/core/subs/tasks/src/tests/inspection-task.test.ts",
+            "subs/workspace/subs/reviews/subs/core/subs/tasks/src/tests/result.test.ts",
+            "subs/workspace/subs/reviews/subs/ui/src/review-panel.tsx",
+            "subs/workspace/subs/reviews/subs/ui/src/tests/review-panel.test.tsx",
+            "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/format.ts",
+            "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.module.css",
+            "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.tsx",
+            "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/tests/format.test.ts",
+            "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/tests/review-result.test.tsx",
+            "subs/workspace/subs/reviews/subs/validation/src/tests/validate.test.ts",
+            "subs/workspace/subs/reviews/subs/validation/src/validate.ts",
+            "subs/workspace/subs/shared-ui/src/status-badge.tsx",
+            "subs/workspace/subs/shared-ui/src/tests/status-badge.test.tsx"
+          ],
+          "accesses": 294,
+          "modelRebuilt": true
+        },
+        "delta": {
+          "added": 0,
+          "removed": 0,
+          "positionOnly": 0
+        },
+        "timings": {
+          "classify": 0,
+          "inventory": 213.85471,
+          "compiler": 533.0804519999999,
+          "descriptions": 126.56282399999998,
+          "accesses": 108.53634099999988,
+          "link": 28.594884999999977,
+          "decide": 15.772911999999906,
+          "publish": 8.287456999999904,
+          "total": 1506.463594
+        },
+        "capture": {
+          "invocationCheck": 0,
+          "promotion": 0,
+          "workerStatus": 0,
+          "workerRoundTrip": 0,
+          "sweep": 0,
+          "watch": null
+        },
+        "outcome": {
+          "execution": "completed",
+          "check": "passed",
+          "coverage": "complete"
+        },
+        "summary": {
+          "complete": true,
+          "owners": 15,
+          "sourceFiles": 54,
+          "resources": 5,
+          "originals": 89,
+          "accesses": 294,
+          "allowed": 166,
+          "denied": 0,
+          "errors": 0,
+          "warnings": 2,
+          "coverageNotes": 0,
+          "external": 128
+        }
+      },
+      "projectionDurationMs": 8.06344399999989,
+      "encodedBytes": 224390,
+      "counts": {
+        "displayed": "Showing 2 of 15 modules, 2 displayed links",
+        "displayedRevision": "Revision rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:1",
+        "reportRevision": "rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:1",
+        "reportModules": 15,
+        "projectedModules": 15,
+        "visibleModules": 2,
+        "reportAccesses": 294,
+        "occurrenceEdges": 32,
+        "visibleLinks": 2,
+        "encodedBytes": 224390
+      },
+      "dependencies": {
+        "revision": "rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:1",
+        "inputId": "input/1:c62fa9e2e83ec77a04a7ca0b961fbbfb645a84b9e3502a334ffe2806918855ff",
+        "state": "complete",
+        "project": {
+          "behavioral": 17,
+          "nonBehavioral": 48
+        },
+        "coverage": {
+          "unknownDependencies": 0,
+          "limitIds": []
+        },
+        "modules": 15,
+        "importedModuleEdges": 28,
+        "originalOwnerEdges": 28,
+        "encodedBytes": 116219,
+        "pageToReadyMs": 3609,
+        "browserDependencyViewRequests": 4,
+        "memory": {
+          "withoutRetainedDiagram": {
+            "behaviorRuns": 0,
+            "dependencyDiagrams": 0,
+            "dependencyDiagramInputChanges": 0,
+            "retainedBytes": 1311004,
+            "daemonPid": 158133,
+            "analyzerProcesses": 0,
+            "tree": {
+              "pid": 158133,
+              "rssBytes": 77168640,
+              "peakRssBytes": 81522688,
+              "descendants": [
+                {
+                  "pid": 158175,
+                  "rssBytes": 147390464
+                },
+                {
+                  "pid": 158227,
+                  "rssBytes": 176816128
+                }
+              ],
+              "treeRssBytes": 401375232
+            },
+            "heap": {
+              "rss": 77168640,
+              "heapUsed": 9932040,
+              "external": 2262416
+            }
+          },
+          "withRetainedDiagram": {
+            "behaviorRuns": 1,
+            "dependencyDiagrams": 1,
+            "dependencyDiagramInputChanges": 0,
+            "retainedBytes": 1358816,
+            "daemonPid": 158133,
+            "analyzerProcesses": 0,
+            "tree": {
+              "pid": 158133,
+              "rssBytes": 91701248,
+              "peakRssBytes": 91701248,
+              "descendants": [
+                {
+                  "pid": 158175,
+                  "rssBytes": 162463744
+                },
+                {
+                  "pid": 158227,
+                  "rssBytes": 176816128
+                }
+              ],
+              "treeRssBytes": 430981120
+            },
+            "heap": {
+              "rss": 91570176,
+              "heapUsed": 19375912,
+              "external": 7286273
+            }
+          },
+          "analyzer": {
+            "samples": 95,
+            "processes": [
+              {
+                "pid": 158344,
+                "role": "analyzer",
+                "firstSeenMs": 699,
+                "lastSeenMs": 3467,
+                "peakRssBytes": 142217216
+              },
+              {
+                "pid": 158355,
+                "role": "configuration-helper",
+                "firstSeenMs": 795,
+                "lastSeenMs": 842,
+                "peakRssBytes": 61890560
+              },
+              {
+                "pid": 158362,
+                "role": "native-compiler",
+                "firstSeenMs": 842,
+                "lastSeenMs": 842,
+                "peakRssBytes": 12976128
+              },
+              {
+                "pid": 158369,
+                "role": "compiler-helper",
+                "firstSeenMs": 981,
+                "lastSeenMs": 3195,
+                "peakRssBytes": 123613184
+              },
+              {
+                "pid": 158376,
+                "role": "native-compiler",
+                "firstSeenMs": 1090,
+                "lastSeenMs": 3195,
+                "peakRssBytes": 162267136
+              }
+            ],
+            "peakCombinedRssBytes": 408170496,
+            "peakRssBytes": {
+              "analyzer": 142217216,
+              "configuration-helper": 61890560,
+              "compiler-helper": 123613184,
+              "native-compiler": 162267136
+            }
+          }
+        }
+      },
+      "externalAccesses": {
+        "totalAccesses": 294,
+        "nonApplicationAccesses": 128,
+        "targetKinds": [
+          "external"
+        ],
+        "specifiers": [
+          "@cucumber/cucumber",
+          "@modelcontextprotocol/sdk/client/index.js",
+          "@modelcontextprotocol/sdk/client/streamableHttp.js",
+          "@modelcontextprotocol/sdk/inMemory.js",
+          "@modelcontextprotocol/sdk/server/index.js",
+          "@modelcontextprotocol/sdk/server/streamableHttp.js",
+          "@modelcontextprotocol/sdk/types.js",
+          "@trpc/client",
+          "@trpc/server",
+          "@trpc/server/adapters/fetch",
+          "@trpc/server/adapters/standalone",
+          "node:assert/strict",
+          "node:crypto",
+          "node:http",
+          "react",
+          "react-dom/client",
+          "react-dom/server",
+          "vitest",
+          "zod"
+        ]
+      },
+      "dom": {
+        "renderedNodes": [
+          "collection-review/integration-tests",
+          "collection-review/workspace",
+          "collection-review/workspace/catalog/ui",
+          "collection-review/workspace/reviews/ui"
+        ],
+        "renderedEdges": [
+          "dependency-edge/1:imported-module:8707a56b7f7da654601c2be5d26586f4c8f93ee99b660473a2e6a217d2780c0f",
+          "dependency-edge/1:imported-module:9cd63fffdc180db1ca161236ba19806ee3d172d44fcf51d2851a94ac69e5ec85"
+        ],
+        "occurrenceEdges": 32,
+        "otherTargetDetails": 0
+      },
+      "interactions": {
+        "projectPanel": {
+          "cards": {
+            "behavioral": 17,
+            "nonBehavioral": 48,
+            "note": "not drawn"
+          },
+          "displayedLinks": 2,
+          "coverage": "Complete",
+          "inputId": "input/1:c62fa9e2e83ec77a04a7ca0b961fbbfb645a84b9e3502a334ffe2806918855ff"
+        },
+        "combinations": [
+          {
+            "settings": {
+              "showNonBehavioral": true,
+              "linkTarget": "imported-module"
+            },
+            "links": 3,
+            "outOfView": [
+              "collection-review",
+              "collection-review/workspace/catalog/ui",
+              "collection-review/workspace/reviews/ui"
+            ],
+            "note": "shown"
+          },
+          {
+            "settings": {
+              "showNonBehavioral": true,
+              "linkTarget": "original-owner"
+            },
+            "links": 3,
+            "outOfView": [
+              "collection-review",
+              "collection-review/workspace/catalog/ui",
+              "collection-review/workspace/reviews/ui"
+            ],
+            "note": "shown"
+          },
+          {
+            "settings": {
+              "showNonBehavioral": false,
+              "linkTarget": "original-owner"
+            },
+            "links": 2,
+            "outOfView": [
+              "collection-review/workspace/catalog/ui",
+              "collection-review/workspace/reviews/ui"
+            ],
+            "note": "not drawn"
+          },
+          {
+            "settings": {
+              "showNonBehavioral": false,
+              "linkTarget": "imported-module"
+            },
+            "links": 2,
+            "outOfView": [
+              "collection-review/workspace/catalog/ui",
+              "collection-review/workspace/reviews/ui"
+            ],
+            "note": "not drawn"
+          }
+        ],
+        "modulePanel": {
+          "module": "collection-review/workspace",
+          "uses": {
+            "behavioral": 2,
+            "nonBehavioral": 1
+          },
+          "usedThrough": {
+            "behavioralUsedOriginals": 0,
+            "nonBehavioralUsedOriginals": 0
+          },
+          "detailState": "ALIASES\nApp\nCAPABILITY\nvalue\nDEFINED IN\nsubs/workspace/src/app.tsx\n\nTags: dispatch, ui\n\nSOURCE LOCATIONS\nsubs/workspace/src/app.tsx:83:1\nEXPOSURES None declared\nfunction App(): ReactElement<unknown, string | JSXElementConstructor<any>>;\n\nThe application: it owns the client, loads the records, and renders them."
+        },
+        "importedLinkPanel": {
+          "id": "dependency-edge/1:imported-module:8707a56b7f7da654601c2be5d26586f4c8f93ee99b660473a2e6a217d2780c0f",
+          "consumer": "collection-review/workspace",
+          "provider": "collection-review/workspace/catalog/ui",
+          "counts": {
+            "behavioralUsedOriginals": 1,
+            "nonBehavioralUsedOriginals": 0
+          },
+          "originalOwners": 1,
+          "referencedOriginals": 1
+        },
+        "originalOwnerLinkPanel": {
+          "id": "dependency-edge/1:original-owner:8707a56b7f7da654601c2be5d26586f4c8f93ee99b660473a2e6a217d2780c0f",
+          "consumer": "collection-review/workspace",
+          "provider": "collection-review/workspace/catalog/ui",
+          "counts": {
+            "behavioral": 1,
+            "nonBehavioral": 0
+          },
+          "importedThrough": 1
+        },
+        "scopes": [
+          {
+            "scope": "collection-review/workspace",
+            "children": 4,
+            "links": 6,
+            "outOfView": [
+              "collection-review",
+              "collection-review/workspace/catalog/core",
+              "collection-review/workspace/catalog/ui",
+              "collection-review/workspace/reviews/core",
+              "collection-review/workspace/reviews/ui/pure-ui"
+            ]
+          }
+        ],
+        "dependencyViewRequests": {
+          "beforeControls": 4,
+          "afterControls": 4
+        },
+        "sidebar": {
+          "beforeWidth": 360,
+          "afterWidth": 448
+        },
+        "viewport": {
+          "before": "transform: translate(-184.394px, -77.9305px) scale(1.02483);",
+          "zoom": "transform: translate(-315.573px, -164.017px) scale(1.2298);",
+          "pan": "transform: translate(-245.573px, -124.017px) scale(1.2298);"
+        },
+        "filter": {
+          "beforeNodes": 4,
+          "afterNodes": 1
+        }
+      },
+      "refreshBaseline": {
+        "listeners": 24,
+        "listenerTypes": {
+          "DOMContentLoaded": 1,
+          "selectionchange": 1,
+          "visibilitychange": 1,
+          "keydown": 5,
+          "keyup": 5,
+          "blur": 5,
+          "contextmenu": 5,
+          "resize": 1
+        },
+        "intervals": 1,
+        "timeouts": 0,
+        "models": 1,
+        "graphNodes": 4,
+        "graphEdges": 2,
+        "revision": "Revision rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:1"
+      },
+      "sameRevisionReloads": [
+        {
+          "cycle": 1,
+          "settled": {
+            "listeners": 24,
+            "listenerTypes": {
+              "DOMContentLoaded": 1,
+              "selectionchange": 1,
+              "visibilitychange": 1,
+              "keydown": 5,
+              "keyup": 5,
+              "blur": 5,
+              "contextmenu": 5,
+              "resize": 1
+            },
+            "intervals": 1,
+            "timeouts": 0,
+            "models": 1,
+            "graphNodes": 4,
+            "graphEdges": 2,
+            "revision": "Revision rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:1"
+          },
+          "dependencyViewRequests": 1,
+          "behaviorRuns": 1,
+          "dependencyDiagrams": 1,
+          "retainedBytes": 1358816
+        },
+        {
+          "cycle": 2,
+          "settled": {
+            "listeners": 24,
+            "listenerTypes": {
+              "DOMContentLoaded": 1,
+              "selectionchange": 1,
+              "visibilitychange": 1,
+              "keydown": 5,
+              "keyup": 5,
+              "blur": 5,
+              "contextmenu": 5,
+              "resize": 1
+            },
+            "intervals": 1,
+            "timeouts": 0,
+            "models": 1,
+            "graphNodes": 4,
+            "graphEdges": 2,
+            "revision": "Revision rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:1"
+          },
+          "dependencyViewRequests": 1,
+          "behaviorRuns": 1,
+          "dependencyDiagrams": 1,
+          "retainedBytes": 1358816
+        },
+        {
+          "cycle": 3,
+          "settled": {
+            "listeners": 24,
+            "listenerTypes": {
+              "DOMContentLoaded": 1,
+              "selectionchange": 1,
+              "visibilitychange": 1,
+              "keydown": 5,
+              "keyup": 5,
+              "blur": 5,
+              "contextmenu": 5,
+              "resize": 1
+            },
+            "intervals": 1,
+            "timeouts": 0,
+            "models": 1,
+            "graphNodes": 4,
+            "graphEdges": 2,
+            "revision": "Revision rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:1"
+          },
+          "dependencyViewRequests": 1,
+          "behaviorRuns": 1,
+          "dependencyDiagrams": 1,
+          "retainedBytes": 1358816
+        },
+        {
+          "cycle": 4,
+          "settled": {
+            "listeners": 24,
+            "listenerTypes": {
+              "DOMContentLoaded": 1,
+              "selectionchange": 1,
+              "visibilitychange": 1,
+              "keydown": 5,
+              "keyup": 5,
+              "blur": 5,
+              "contextmenu": 5,
+              "resize": 1
+            },
+            "intervals": 1,
+            "timeouts": 0,
+            "models": 1,
+            "graphNodes": 4,
+            "graphEdges": 2,
+            "revision": "Revision rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:1"
+          },
+          "dependencyViewRequests": 1,
+          "behaviorRuns": 1,
+          "dependencyDiagrams": 1,
+          "retainedBytes": 1358816
+        },
+        {
+          "cycle": 5,
+          "settled": {
+            "listeners": 24,
+            "listenerTypes": {
+              "DOMContentLoaded": 1,
+              "selectionchange": 1,
+              "visibilitychange": 1,
+              "keydown": 5,
+              "keyup": 5,
+              "blur": 5,
+              "contextmenu": 5,
+              "resize": 1
+            },
+            "intervals": 1,
+            "timeouts": 0,
+            "models": 1,
+            "graphNodes": 4,
+            "graphEdges": 2,
+            "revision": "Revision rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:1"
+          },
+          "dependencyViewRequests": 1,
+          "behaviorRuns": 1,
+          "dependencyDiagrams": 1,
+          "retainedBytes": 1358816
+        },
+        {
+          "cycle": 6,
+          "settled": {
+            "listeners": 24,
+            "listenerTypes": {
+              "DOMContentLoaded": 1,
+              "selectionchange": 1,
+              "visibilitychange": 1,
+              "keydown": 5,
+              "keyup": 5,
+              "blur": 5,
+              "contextmenu": 5,
+              "resize": 1
+            },
+            "intervals": 1,
+            "timeouts": 0,
+            "models": 1,
+            "graphNodes": 4,
+            "graphEdges": 2,
+            "revision": "Revision rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:1"
+          },
+          "dependencyViewRequests": 1,
+          "behaviorRuns": 1,
+          "dependencyDiagrams": 1,
+          "retainedBytes": 1358816
+        },
+        {
+          "cycle": 7,
+          "settled": {
+            "listeners": 24,
+            "listenerTypes": {
+              "DOMContentLoaded": 1,
+              "selectionchange": 1,
+              "visibilitychange": 1,
+              "keydown": 5,
+              "keyup": 5,
+              "blur": 5,
+              "contextmenu": 5,
+              "resize": 1
+            },
+            "intervals": 1,
+            "timeouts": 0,
+            "models": 1,
+            "graphNodes": 4,
+            "graphEdges": 2,
+            "revision": "Revision rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:1"
+          },
+          "dependencyViewRequests": 1,
+          "behaviorRuns": 1,
+          "dependencyDiagrams": 1,
+          "retainedBytes": 1358816
+        },
+        {
+          "cycle": 8,
+          "settled": {
+            "listeners": 24,
+            "listenerTypes": {
+              "DOMContentLoaded": 1,
+              "selectionchange": 1,
+              "visibilitychange": 1,
+              "keydown": 5,
+              "keyup": 5,
+              "blur": 5,
+              "contextmenu": 5,
+              "resize": 1
+            },
+            "intervals": 1,
+            "timeouts": 0,
+            "models": 1,
+            "graphNodes": 4,
+            "graphEdges": 2,
+            "revision": "Revision rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:1"
+          },
+          "dependencyViewRequests": 1,
+          "behaviorRuns": 1,
+          "dependencyDiagrams": 1,
+          "retainedBytes": 1358816
+        },
+        {
+          "cycle": 9,
+          "settled": {
+            "listeners": 24,
+            "listenerTypes": {
+              "DOMContentLoaded": 1,
+              "selectionchange": 1,
+              "visibilitychange": 1,
+              "keydown": 5,
+              "keyup": 5,
+              "blur": 5,
+              "contextmenu": 5,
+              "resize": 1
+            },
+            "intervals": 1,
+            "timeouts": 0,
+            "models": 1,
+            "graphNodes": 4,
+            "graphEdges": 2,
+            "revision": "Revision rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:1"
+          },
+          "dependencyViewRequests": 1,
+          "behaviorRuns": 1,
+          "dependencyDiagrams": 1,
+          "retainedBytes": 1358816
+        },
+        {
+          "cycle": 10,
+          "settled": {
+            "listeners": 24,
+            "listenerTypes": {
+              "DOMContentLoaded": 1,
+              "selectionchange": 1,
+              "visibilitychange": 1,
+              "keydown": 5,
+              "keyup": 5,
+              "blur": 5,
+              "contextmenu": 5,
+              "resize": 1
+            },
+            "intervals": 1,
+            "timeouts": 0,
+            "models": 1,
+            "graphNodes": 4,
+            "graphEdges": 2,
+            "revision": "Revision rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:1"
+          },
+          "dependencyViewRequests": 1,
+          "behaviorRuns": 1,
+          "dependencyDiagrams": 1,
+          "retainedBytes": 1358816
+        }
+      ],
+      "refreshes": [
+        {
+          "cycle": 1,
+          "revision": {
+            "token": {
+              "context": "ctx/1:e85a8a30520d0599c9ff9eee5c30f958208317fc24d4fca33b1f7f2878f9f42a",
+              "generation": "gen/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9"
+            },
+            "revision": "rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:2",
+            "sequence": 2,
+            "publishedAt": 1789663921145,
+            "cause": "request",
+            "fingerprints": {
+              "inputId": "input/1:51577accdc2d75631ec2cd0fcb0e39df400954aa3d8830c1bb20211f199c56c7",
+              "declarations": "4478c90a77ab75380ef3dbea40970a0eaf58164fe50fc9740072ddc28e4df346",
+              "source": "10aded85514d6b853b213fa0acd47940195a618d78bb598226c7196accf9b5d1",
+              "configuration": "23aa853cad15ff232e87243067b20e9eeef83a7b95ce6560f34cbe7416e9a489",
+              "registry": "1080a60800d9e5bddc69f51489c636a776bacaadb5368f46db4aa0947c67e3ba",
+              "engine": "15ffbb4f9f5a3d2d22aa435e1835d6bfe262aca8bdfdc376f1245df846065b97"
+            },
+            "changed": [
+              "README.md"
+            ],
+            "checked": {
+              "path": "metadata",
+              "files": [],
+              "accesses": 0,
+              "modelRebuilt": false
+            },
+            "delta": {
+              "added": 0,
+              "removed": 0,
+              "positionOnly": 0
+            },
+            "timings": {
+              "classify": 9.062309000000823,
+              "inventory": 1.5336029999998573,
+              "compiler": 0,
+              "descriptions": 0,
+              "accesses": 0,
+              "link": 0,
+              "decide": 0,
+              "publish": 7.859908999998879,
+              "total": 22.93824300000051
+            },
+            "capture": {
+              "invocationCheck": 148.8562039999997,
+              "promotion": 0.02812199999971199,
+              "workerStatus": 0.10399899999902118,
+              "workerRoundTrip": 477.6555550000012,
+              "sweep": 297.1362580000023,
+              "watch": null
+            },
+            "outcome": {
+              "execution": "completed",
+              "check": "passed",
+              "coverage": "complete"
+            },
+            "summary": {
+              "complete": true,
+              "owners": 15,
+              "sourceFiles": 54,
+              "resources": 5,
+              "originals": 89,
+              "accesses": 294,
+              "allowed": 166,
+              "denied": 0,
+              "errors": 0,
+              "warnings": 2,
+              "coverageNotes": 0,
+              "external": 128
+            }
+          },
+          "inputId": "input/1:51577accdc2d75631ec2cd0fcb0e39df400954aa3d8830c1bb20211f199c56c7",
+          "settled": {
+            "listeners": 24,
+            "listenerTypes": {
+              "DOMContentLoaded": 1,
+              "selectionchange": 1,
+              "visibilitychange": 1,
+              "keydown": 5,
+              "keyup": 5,
+              "blur": 5,
+              "contextmenu": 5,
+              "resize": 1
+            },
+            "intervals": 1,
+            "timeouts": 0,
+            "models": 1,
+            "graphNodes": 4,
+            "graphEdges": 2,
+            "revision": "Revision rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:2"
+          },
+          "stable": true
+        },
+        {
+          "cycle": 2,
+          "revision": {
+            "token": {
+              "context": "ctx/1:e85a8a30520d0599c9ff9eee5c30f958208317fc24d4fca33b1f7f2878f9f42a",
+              "generation": "gen/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9"
+            },
+            "revision": "rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:3",
+            "sequence": 3,
+            "publishedAt": 1789663925385,
+            "cause": "request",
+            "fingerprints": {
+              "inputId": "input/1:c2d8df0ca573cbb5d46d4e8213bd933bd2f4beac3845d5cfe11f2517e9d083df",
+              "declarations": "4478c90a77ab75380ef3dbea40970a0eaf58164fe50fc9740072ddc28e4df346",
+              "source": "10aded85514d6b853b213fa0acd47940195a618d78bb598226c7196accf9b5d1",
+              "configuration": "23aa853cad15ff232e87243067b20e9eeef83a7b95ce6560f34cbe7416e9a489",
+              "registry": "1080a60800d9e5bddc69f51489c636a776bacaadb5368f46db4aa0947c67e3ba",
+              "engine": "15ffbb4f9f5a3d2d22aa435e1835d6bfe262aca8bdfdc376f1245df846065b97"
+            },
+            "changed": [
+              "README.md"
+            ],
+            "checked": {
+              "path": "metadata",
+              "files": [],
+              "accesses": 0,
+              "modelRebuilt": false
+            },
+            "delta": {
+              "added": 0,
+              "removed": 0,
+              "positionOnly": 0
+            },
+            "timings": {
+              "classify": 20.110264999999345,
+              "inventory": 3.8598170000004757,
+              "compiler": 0,
+              "descriptions": 0,
+              "accesses": 0,
+              "link": 0,
+              "decide": 0,
+              "publish": 7.205752999998367,
+              "total": 36.15194699999847
+            },
+            "capture": {
+              "invocationCheck": 2.218246000000363,
+              "promotion": 0.03770700000313809,
+              "workerStatus": 0.09739700000136509,
+              "workerRoundTrip": 370.0169089999981,
+              "sweep": 315.5078949999988,
+              "watch": null
+            },
+            "outcome": {
+              "execution": "completed",
+              "check": "passed",
+              "coverage": "complete"
+            },
+            "summary": {
+              "complete": true,
+              "owners": 15,
+              "sourceFiles": 54,
+              "resources": 5,
+              "originals": 89,
+              "accesses": 294,
+              "allowed": 166,
+              "denied": 0,
+              "errors": 0,
+              "warnings": 2,
+              "coverageNotes": 0,
+              "external": 128
+            }
+          },
+          "inputId": "input/1:c2d8df0ca573cbb5d46d4e8213bd933bd2f4beac3845d5cfe11f2517e9d083df",
+          "settled": {
+            "listeners": 24,
+            "listenerTypes": {
+              "DOMContentLoaded": 1,
+              "selectionchange": 1,
+              "visibilitychange": 1,
+              "keydown": 5,
+              "keyup": 5,
+              "blur": 5,
+              "contextmenu": 5,
+              "resize": 1
+            },
+            "intervals": 1,
+            "timeouts": 0,
+            "models": 1,
+            "graphNodes": 4,
+            "graphEdges": 2,
+            "revision": "Revision rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:3"
+          },
+          "stable": true
+        },
+        {
+          "cycle": 3,
+          "revision": {
+            "token": {
+              "context": "ctx/1:e85a8a30520d0599c9ff9eee5c30f958208317fc24d4fca33b1f7f2878f9f42a",
+              "generation": "gen/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9"
+            },
+            "revision": "rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:4",
+            "sequence": 4,
+            "publishedAt": 1789663929424,
+            "cause": "request",
+            "fingerprints": {
+              "inputId": "input/1:345427f5271e5834b30f5993c360729ccad2deea18425e2ff12dff68f8657827",
+              "declarations": "4478c90a77ab75380ef3dbea40970a0eaf58164fe50fc9740072ddc28e4df346",
+              "source": "10aded85514d6b853b213fa0acd47940195a618d78bb598226c7196accf9b5d1",
+              "configuration": "23aa853cad15ff232e87243067b20e9eeef83a7b95ce6560f34cbe7416e9a489",
+              "registry": "1080a60800d9e5bddc69f51489c636a776bacaadb5368f46db4aa0947c67e3ba",
+              "engine": "15ffbb4f9f5a3d2d22aa435e1835d6bfe262aca8bdfdc376f1245df846065b97"
+            },
+            "changed": [
+              "README.md"
+            ],
+            "checked": {
+              "path": "metadata",
+              "files": [],
+              "accesses": 0,
+              "modelRebuilt": false
+            },
+            "delta": {
+              "added": 0,
+              "removed": 0,
+              "positionOnly": 0
+            },
+            "timings": {
+              "classify": 19.668400999998994,
+              "inventory": 1.5626159999992524,
+              "compiler": 0,
+              "descriptions": 0,
+              "accesses": 0,
+              "link": 0,
+              "decide": 0,
+              "publish": 12.576323000001139,
+              "total": 43.05192200000238
+            },
+            "capture": {
+              "invocationCheck": 0.8092240000005404,
+              "promotion": 0.07982499999707215,
+              "workerStatus": 0.10620900000503752,
+              "workerRoundTrip": 298.96698299999844,
+              "sweep": 243.62557599999855,
+              "watch": null
+            },
+            "outcome": {
+              "execution": "completed",
+              "check": "passed",
+              "coverage": "complete"
+            },
+            "summary": {
+              "complete": true,
+              "owners": 15,
+              "sourceFiles": 54,
+              "resources": 5,
+              "originals": 89,
+              "accesses": 294,
+              "allowed": 166,
+              "denied": 0,
+              "errors": 0,
+              "warnings": 2,
+              "coverageNotes": 0,
+              "external": 128
+            }
+          },
+          "inputId": "input/1:345427f5271e5834b30f5993c360729ccad2deea18425e2ff12dff68f8657827",
+          "settled": {
+            "listeners": 24,
+            "listenerTypes": {
+              "DOMContentLoaded": 1,
+              "selectionchange": 1,
+              "visibilitychange": 1,
+              "keydown": 5,
+              "keyup": 5,
+              "blur": 5,
+              "contextmenu": 5,
+              "resize": 1
+            },
+            "intervals": 1,
+            "timeouts": 0,
+            "models": 1,
+            "graphNodes": 4,
+            "graphEdges": 2,
+            "revision": "Revision rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:4"
+          },
+          "stable": true
+        },
+        {
+          "cycle": 4,
+          "revision": {
+            "token": {
+              "context": "ctx/1:e85a8a30520d0599c9ff9eee5c30f958208317fc24d4fca33b1f7f2878f9f42a",
+              "generation": "gen/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9"
+            },
+            "revision": "rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:5",
+            "sequence": 5,
+            "publishedAt": 1789663933490,
+            "cause": "request",
+            "fingerprints": {
+              "inputId": "input/1:ffd62143e17e54fb45a73a89df6a2db1060c19dad03c74055a74deb3fc831f98",
+              "declarations": "4478c90a77ab75380ef3dbea40970a0eaf58164fe50fc9740072ddc28e4df346",
+              "source": "10aded85514d6b853b213fa0acd47940195a618d78bb598226c7196accf9b5d1",
+              "configuration": "23aa853cad15ff232e87243067b20e9eeef83a7b95ce6560f34cbe7416e9a489",
+              "registry": "1080a60800d9e5bddc69f51489c636a776bacaadb5368f46db4aa0947c67e3ba",
+              "engine": "15ffbb4f9f5a3d2d22aa435e1835d6bfe262aca8bdfdc376f1245df846065b97"
+            },
+            "changed": [
+              "README.md"
+            ],
+            "checked": {
+              "path": "metadata",
+              "files": [],
+              "accesses": 0,
+              "modelRebuilt": false
+            },
+            "delta": {
+              "added": 0,
+              "removed": 0,
+              "positionOnly": 0
+            },
+            "timings": {
+              "classify": 25.94377600000007,
+              "inventory": 3.2330829999991693,
+              "compiler": 0,
+              "descriptions": 0,
+              "accesses": 0,
+              "link": 0,
+              "decide": 0,
+              "publish": 8.179446000001917,
+              "total": 43.27522599999793
+            },
+            "capture": {
+              "invocationCheck": 1.5465229999972507,
+              "promotion": 0.08269899999868358,
+              "workerStatus": 0.09343100000114646,
+              "workerRoundTrip": 329.6461219999983,
+              "sweep": 274.2554830000008,
+              "watch": null
+            },
+            "outcome": {
+              "execution": "completed",
+              "check": "passed",
+              "coverage": "complete"
+            },
+            "summary": {
+              "complete": true,
+              "owners": 15,
+              "sourceFiles": 54,
+              "resources": 5,
+              "originals": 89,
+              "accesses": 294,
+              "allowed": 166,
+              "denied": 0,
+              "errors": 0,
+              "warnings": 2,
+              "coverageNotes": 0,
+              "external": 128
+            }
+          },
+          "inputId": "input/1:ffd62143e17e54fb45a73a89df6a2db1060c19dad03c74055a74deb3fc831f98",
+          "settled": {
+            "listeners": 24,
+            "listenerTypes": {
+              "DOMContentLoaded": 1,
+              "selectionchange": 1,
+              "visibilitychange": 1,
+              "keydown": 5,
+              "keyup": 5,
+              "blur": 5,
+              "contextmenu": 5,
+              "resize": 1
+            },
+            "intervals": 1,
+            "timeouts": 0,
+            "models": 1,
+            "graphNodes": 4,
+            "graphEdges": 2,
+            "revision": "Revision rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:5"
+          },
+          "stable": true
+        },
+        {
+          "cycle": 5,
+          "revision": {
+            "token": {
+              "context": "ctx/1:e85a8a30520d0599c9ff9eee5c30f958208317fc24d4fca33b1f7f2878f9f42a",
+              "generation": "gen/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9"
+            },
+            "revision": "rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:6",
+            "sequence": 6,
+            "publishedAt": 1789663937596,
+            "cause": "request",
+            "fingerprints": {
+              "inputId": "input/1:0ddc1ef36d3b5e569619cd68f1530192e0b5d1b5af57673331bc507b6cabc2c9",
+              "declarations": "4478c90a77ab75380ef3dbea40970a0eaf58164fe50fc9740072ddc28e4df346",
+              "source": "10aded85514d6b853b213fa0acd47940195a618d78bb598226c7196accf9b5d1",
+              "configuration": "23aa853cad15ff232e87243067b20e9eeef83a7b95ce6560f34cbe7416e9a489",
+              "registry": "1080a60800d9e5bddc69f51489c636a776bacaadb5368f46db4aa0947c67e3ba",
+              "engine": "15ffbb4f9f5a3d2d22aa435e1835d6bfe262aca8bdfdc376f1245df846065b97"
+            },
+            "changed": [
+              "README.md"
+            ],
+            "checked": {
+              "path": "metadata",
+              "files": [],
+              "accesses": 0,
+              "modelRebuilt": false
+            },
+            "delta": {
+              "added": 0,
+              "removed": 0,
+              "positionOnly": 0
+            },
+            "timings": {
+              "classify": 23.269931000002543,
+              "inventory": 2.6035349999947357,
+              "compiler": 0,
+              "descriptions": 0,
+              "accesses": 0,
+              "link": 0,
+              "decide": 0,
+              "publish": 9.970928999995522,
+              "total": 43.46805599999789
+            },
+            "capture": {
+              "invocationCheck": 1.6008999999976368,
+              "promotion": 0.05850700000155484,
+              "workerStatus": 0.09919499999523396,
+              "workerRoundTrip": 351.0172999999995,
+              "sweep": 294.50651199999993,
+              "watch": null
+            },
+            "outcome": {
+              "execution": "completed",
+              "check": "passed",
+              "coverage": "complete"
+            },
+            "summary": {
+              "complete": true,
+              "owners": 15,
+              "sourceFiles": 54,
+              "resources": 5,
+              "originals": 89,
+              "accesses": 294,
+              "allowed": 166,
+              "denied": 0,
+              "errors": 0,
+              "warnings": 2,
+              "coverageNotes": 0,
+              "external": 128
+            }
+          },
+          "inputId": "input/1:0ddc1ef36d3b5e569619cd68f1530192e0b5d1b5af57673331bc507b6cabc2c9",
+          "settled": {
+            "listeners": 24,
+            "listenerTypes": {
+              "DOMContentLoaded": 1,
+              "selectionchange": 1,
+              "visibilitychange": 1,
+              "keydown": 5,
+              "keyup": 5,
+              "blur": 5,
+              "contextmenu": 5,
+              "resize": 1
+            },
+            "intervals": 1,
+            "timeouts": 0,
+            "models": 1,
+            "graphNodes": 4,
+            "graphEdges": 2,
+            "revision": "Revision rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:6"
+          },
+          "stable": true
+        },
+        {
+          "cycle": 6,
+          "revision": {
+            "token": {
+              "context": "ctx/1:e85a8a30520d0599c9ff9eee5c30f958208317fc24d4fca33b1f7f2878f9f42a",
+              "generation": "gen/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9"
+            },
+            "revision": "rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:7",
+            "sequence": 7,
+            "publishedAt": 1789663941629,
+            "cause": "request",
+            "fingerprints": {
+              "inputId": "input/1:c166affa1f91137cf75bb23424cd84f57b0b379f25c56aeb079b4f4b49d61051",
+              "declarations": "4478c90a77ab75380ef3dbea40970a0eaf58164fe50fc9740072ddc28e4df346",
+              "source": "10aded85514d6b853b213fa0acd47940195a618d78bb598226c7196accf9b5d1",
+              "configuration": "23aa853cad15ff232e87243067b20e9eeef83a7b95ce6560f34cbe7416e9a489",
+              "registry": "1080a60800d9e5bddc69f51489c636a776bacaadb5368f46db4aa0947c67e3ba",
+              "engine": "15ffbb4f9f5a3d2d22aa435e1835d6bfe262aca8bdfdc376f1245df846065b97"
+            },
+            "changed": [
+              "README.md"
+            ],
+            "checked": {
+              "path": "metadata",
+              "files": [],
+              "accesses": 0,
+              "modelRebuilt": false
+            },
+            "delta": {
+              "added": 0,
+              "removed": 0,
+              "positionOnly": 0
+            },
+            "timings": {
+              "classify": 12.937129999998433,
+              "inventory": 1.0184860000008484,
+              "compiler": 0,
+              "descriptions": 0,
+              "accesses": 0,
+              "link": 0,
+              "decide": 0,
+              "publish": 8.820705999998609,
+              "total": 27.77434799999901
+            },
+            "capture": {
+              "invocationCheck": 0.42370399999344954,
+              "promotion": 0.026787999995576683,
+              "workerStatus": 0.12250199999834877,
+              "workerRoundTrip": 322.2656010000064,
+              "sweep": 278.9201150000008,
+              "watch": null
+            },
+            "outcome": {
+              "execution": "completed",
+              "check": "passed",
+              "coverage": "complete"
+            },
+            "summary": {
+              "complete": true,
+              "owners": 15,
+              "sourceFiles": 54,
+              "resources": 5,
+              "originals": 89,
+              "accesses": 294,
+              "allowed": 166,
+              "denied": 0,
+              "errors": 0,
+              "warnings": 2,
+              "coverageNotes": 0,
+              "external": 128
+            }
+          },
+          "inputId": "input/1:c166affa1f91137cf75bb23424cd84f57b0b379f25c56aeb079b4f4b49d61051",
+          "settled": {
+            "listeners": 24,
+            "listenerTypes": {
+              "DOMContentLoaded": 1,
+              "selectionchange": 1,
+              "visibilitychange": 1,
+              "keydown": 5,
+              "keyup": 5,
+              "blur": 5,
+              "contextmenu": 5,
+              "resize": 1
+            },
+            "intervals": 1,
+            "timeouts": 0,
+            "models": 1,
+            "graphNodes": 4,
+            "graphEdges": 2,
+            "revision": "Revision rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:7"
+          },
+          "stable": true
+        },
+        {
+          "cycle": 7,
+          "revision": {
+            "token": {
+              "context": "ctx/1:e85a8a30520d0599c9ff9eee5c30f958208317fc24d4fca33b1f7f2878f9f42a",
+              "generation": "gen/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9"
+            },
+            "revision": "rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:8",
+            "sequence": 8,
+            "publishedAt": 1789663945830,
+            "cause": "request",
+            "fingerprints": {
+              "inputId": "input/1:b9fa2ad8dcbf18aed7dc429e27d889284059a58f227ef2ae791f1d982bd390ac",
+              "declarations": "4478c90a77ab75380ef3dbea40970a0eaf58164fe50fc9740072ddc28e4df346",
+              "source": "10aded85514d6b853b213fa0acd47940195a618d78bb598226c7196accf9b5d1",
+              "configuration": "23aa853cad15ff232e87243067b20e9eeef83a7b95ce6560f34cbe7416e9a489",
+              "registry": "1080a60800d9e5bddc69f51489c636a776bacaadb5368f46db4aa0947c67e3ba",
+              "engine": "15ffbb4f9f5a3d2d22aa435e1835d6bfe262aca8bdfdc376f1245df846065b97"
+            },
+            "changed": [
+              "README.md"
+            ],
+            "checked": {
+              "path": "metadata",
+              "files": [],
+              "accesses": 0,
+              "modelRebuilt": false
+            },
+            "delta": {
+              "added": 0,
+              "removed": 0,
+              "positionOnly": 0
+            },
+            "timings": {
+              "classify": 35.06920499999978,
+              "inventory": 3.4355429999995977,
+              "compiler": 0,
+              "descriptions": 0,
+              "accesses": 0,
+              "link": 0,
+              "decide": 0,
+              "publish": 9.103469000001496,
+              "total": 54.746336999996856
+            },
+            "capture": {
+              "invocationCheck": 1.4058769999974174,
+              "promotion": 0.04545999999390915,
+              "workerStatus": 0.10450800000398885,
+              "workerRoundTrip": 340.6335040000049,
+              "sweep": 272.4529410000032,
+              "watch": null
+            },
+            "outcome": {
+              "execution": "completed",
+              "check": "passed",
+              "coverage": "complete"
+            },
+            "summary": {
+              "complete": true,
+              "owners": 15,
+              "sourceFiles": 54,
+              "resources": 5,
+              "originals": 89,
+              "accesses": 294,
+              "allowed": 166,
+              "denied": 0,
+              "errors": 0,
+              "warnings": 2,
+              "coverageNotes": 0,
+              "external": 128
+            }
+          },
+          "inputId": "input/1:b9fa2ad8dcbf18aed7dc429e27d889284059a58f227ef2ae791f1d982bd390ac",
+          "settled": {
+            "listeners": 24,
+            "listenerTypes": {
+              "DOMContentLoaded": 1,
+              "selectionchange": 1,
+              "visibilitychange": 1,
+              "keydown": 5,
+              "keyup": 5,
+              "blur": 5,
+              "contextmenu": 5,
+              "resize": 1
+            },
+            "intervals": 1,
+            "timeouts": 0,
+            "models": 1,
+            "graphNodes": 4,
+            "graphEdges": 2,
+            "revision": "Revision rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:8"
+          },
+          "stable": true
+        },
+        {
+          "cycle": 8,
+          "revision": {
+            "token": {
+              "context": "ctx/1:e85a8a30520d0599c9ff9eee5c30f958208317fc24d4fca33b1f7f2878f9f42a",
+              "generation": "gen/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9"
+            },
+            "revision": "rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:9",
+            "sequence": 9,
+            "publishedAt": 1789663949967,
+            "cause": "request",
+            "fingerprints": {
+              "inputId": "input/1:ea020729f8991c12b4f14561a359f1c2c0e0c8c3aa1f61e0071c430931fc3cee",
+              "declarations": "4478c90a77ab75380ef3dbea40970a0eaf58164fe50fc9740072ddc28e4df346",
+              "source": "10aded85514d6b853b213fa0acd47940195a618d78bb598226c7196accf9b5d1",
+              "configuration": "23aa853cad15ff232e87243067b20e9eeef83a7b95ce6560f34cbe7416e9a489",
+              "registry": "1080a60800d9e5bddc69f51489c636a776bacaadb5368f46db4aa0947c67e3ba",
+              "engine": "15ffbb4f9f5a3d2d22aa435e1835d6bfe262aca8bdfdc376f1245df846065b97"
+            },
+            "changed": [
+              "README.md"
+            ],
+            "checked": {
+              "path": "metadata",
+              "files": [],
+              "accesses": 0,
+              "modelRebuilt": false
+            },
+            "delta": {
+              "added": 0,
+              "removed": 0,
+              "positionOnly": 0
+            },
+            "timings": {
+              "classify": 26.329687999997986,
+              "inventory": 3.2060749999945983,
+              "compiler": 0,
+              "descriptions": 0,
+              "accesses": 0,
+              "link": 0,
+              "decide": 0,
+              "publish": 8.729786000003514,
+              "total": 44.46174600000086
+            },
+            "capture": {
+              "invocationCheck": 1.5631949999951757,
+              "promotion": 0.03365800000028685,
+              "workerStatus": 0.13465700000233483,
+              "workerRoundTrip": 345.3511759999965,
+              "sweep": 288.5385499999975,
+              "watch": null
+            },
+            "outcome": {
+              "execution": "completed",
+              "check": "passed",
+              "coverage": "complete"
+            },
+            "summary": {
+              "complete": true,
+              "owners": 15,
+              "sourceFiles": 54,
+              "resources": 5,
+              "originals": 89,
+              "accesses": 294,
+              "allowed": 166,
+              "denied": 0,
+              "errors": 0,
+              "warnings": 2,
+              "coverageNotes": 0,
+              "external": 128
+            }
+          },
+          "inputId": "input/1:ea020729f8991c12b4f14561a359f1c2c0e0c8c3aa1f61e0071c430931fc3cee",
+          "settled": {
+            "listeners": 24,
+            "listenerTypes": {
+              "DOMContentLoaded": 1,
+              "selectionchange": 1,
+              "visibilitychange": 1,
+              "keydown": 5,
+              "keyup": 5,
+              "blur": 5,
+              "contextmenu": 5,
+              "resize": 1
+            },
+            "intervals": 1,
+            "timeouts": 0,
+            "models": 1,
+            "graphNodes": 4,
+            "graphEdges": 2,
+            "revision": "Revision rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:9"
+          },
+          "stable": true
+        },
+        {
+          "cycle": 9,
+          "revision": {
+            "token": {
+              "context": "ctx/1:e85a8a30520d0599c9ff9eee5c30f958208317fc24d4fca33b1f7f2878f9f42a",
+              "generation": "gen/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9"
+            },
+            "revision": "rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:10",
+            "sequence": 10,
+            "publishedAt": 1789663954062,
+            "cause": "request",
+            "fingerprints": {
+              "inputId": "input/1:9a7dedd4c9c9132877c1b8d5c1ad55d07b8d7a4dd51300b3b701f898df4b8f20",
+              "declarations": "4478c90a77ab75380ef3dbea40970a0eaf58164fe50fc9740072ddc28e4df346",
+              "source": "10aded85514d6b853b213fa0acd47940195a618d78bb598226c7196accf9b5d1",
+              "configuration": "23aa853cad15ff232e87243067b20e9eeef83a7b95ce6560f34cbe7416e9a489",
+              "registry": "1080a60800d9e5bddc69f51489c636a776bacaadb5368f46db4aa0947c67e3ba",
+              "engine": "15ffbb4f9f5a3d2d22aa435e1835d6bfe262aca8bdfdc376f1245df846065b97"
+            },
+            "changed": [
+              "README.md"
+            ],
+            "checked": {
+              "path": "metadata",
+              "files": [],
+              "accesses": 0,
+              "modelRebuilt": false
+            },
+            "delta": {
+              "added": 0,
+              "removed": 0,
+              "positionOnly": 0
+            },
+            "timings": {
+              "classify": 31.59685300000274,
+              "inventory": 3.0412230000001728,
+              "compiler": 0,
+              "descriptions": 0,
+              "accesses": 0,
+              "link": 0,
+              "decide": 0,
+              "publish": 9.519803000002867,
+              "total": 51.55974799999967
+            },
+            "capture": {
+              "invocationCheck": 1.591932999996061,
+              "promotion": 0.044568000004801434,
+              "workerStatus": 0.09965300000476418,
+              "workerRoundTrip": 355.40646600000036,
+              "sweep": 291.21388200000365,
+              "watch": null
+            },
+            "outcome": {
+              "execution": "completed",
+              "check": "passed",
+              "coverage": "complete"
+            },
+            "summary": {
+              "complete": true,
+              "owners": 15,
+              "sourceFiles": 54,
+              "resources": 5,
+              "originals": 89,
+              "accesses": 294,
+              "allowed": 166,
+              "denied": 0,
+              "errors": 0,
+              "warnings": 2,
+              "coverageNotes": 0,
+              "external": 128
+            }
+          },
+          "inputId": "input/1:9a7dedd4c9c9132877c1b8d5c1ad55d07b8d7a4dd51300b3b701f898df4b8f20",
+          "settled": {
+            "listeners": 24,
+            "listenerTypes": {
+              "DOMContentLoaded": 1,
+              "selectionchange": 1,
+              "visibilitychange": 1,
+              "keydown": 5,
+              "keyup": 5,
+              "blur": 5,
+              "contextmenu": 5,
+              "resize": 1
+            },
+            "intervals": 1,
+            "timeouts": 0,
+            "models": 1,
+            "graphNodes": 4,
+            "graphEdges": 2,
+            "revision": "Revision rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:10"
+          },
+          "stable": true
+        },
+        {
+          "cycle": 10,
+          "revision": {
+            "token": {
+              "context": "ctx/1:e85a8a30520d0599c9ff9eee5c30f958208317fc24d4fca33b1f7f2878f9f42a",
+              "generation": "gen/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9"
+            },
+            "revision": "rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:11",
+            "sequence": 11,
+            "publishedAt": 1789663958120,
+            "cause": "request",
+            "fingerprints": {
+              "inputId": "input/1:d0ac063988d5398d0874e1238d9172402a7fe3420d5d55eafb6b643a41d240b6",
+              "declarations": "4478c90a77ab75380ef3dbea40970a0eaf58164fe50fc9740072ddc28e4df346",
+              "source": "10aded85514d6b853b213fa0acd47940195a618d78bb598226c7196accf9b5d1",
+              "configuration": "23aa853cad15ff232e87243067b20e9eeef83a7b95ce6560f34cbe7416e9a489",
+              "registry": "1080a60800d9e5bddc69f51489c636a776bacaadb5368f46db4aa0947c67e3ba",
+              "engine": "15ffbb4f9f5a3d2d22aa435e1835d6bfe262aca8bdfdc376f1245df846065b97"
+            },
+            "changed": [
+              "README.md"
+            ],
+            "checked": {
+              "path": "metadata",
+              "files": [],
+              "accesses": 0,
+              "modelRebuilt": false
+            },
+            "delta": {
+              "added": 0,
+              "removed": 0,
+              "positionOnly": 0
+            },
+            "timings": {
+              "classify": 29.427964000002248,
+              "inventory": 3.040834999999788,
+              "compiler": 0,
+              "descriptions": 0,
+              "accesses": 0,
+              "link": 0,
+              "decide": 0,
+              "publish": 8.982027999998536,
+              "total": 47.50171400000545
+            },
+            "capture": {
+              "invocationCheck": 1.4709460000012768,
+              "promotion": 0.04126700000051642,
+              "workerStatus": 0.10761999999522232,
+              "workerRoundTrip": 350.0802909999984,
+              "sweep": 290.5553510000027,
+              "watch": null
+            },
+            "outcome": {
+              "execution": "completed",
+              "check": "passed",
+              "coverage": "complete"
+            },
+            "summary": {
+              "complete": true,
+              "owners": 15,
+              "sourceFiles": 54,
+              "resources": 5,
+              "originals": 89,
+              "accesses": 294,
+              "allowed": 166,
+              "denied": 0,
+              "errors": 0,
+              "warnings": 2,
+              "coverageNotes": 0,
+              "external": 128
+            }
+          },
+          "inputId": "input/1:d0ac063988d5398d0874e1238d9172402a7fe3420d5d55eafb6b643a41d240b6",
+          "settled": {
+            "listeners": 24,
+            "listenerTypes": {
+              "DOMContentLoaded": 1,
+              "selectionchange": 1,
+              "visibilitychange": 1,
+              "keydown": 5,
+              "keyup": 5,
+              "blur": 5,
+              "contextmenu": 5,
+              "resize": 1
+            },
+            "intervals": 1,
+            "timeouts": 0,
+            "models": 1,
+            "graphNodes": 4,
+            "graphEdges": 2,
+            "revision": "Revision rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:11"
+          },
+          "stable": true
+        }
+      ],
+      "publishCycles": {
+        "before": {
+          "behaviorRuns": 1,
+          "dependencyDiagrams": 1,
+          "dependencyDiagramInputChanges": 0,
+          "retainedBytes": 1358816,
+          "daemonPid": 158133,
+          "analyzerProcesses": 0
+        },
+        "after": {
+          "behaviorRuns": 11,
+          "dependencyDiagrams": 11,
+          "dependencyDiagramInputChanges": 0,
+          "retainedBytes": 10532469,
+          "daemonPid": 158133,
+          "analyzerProcesses": 0
+        }
+      },
+      "memory": {
+        "web": {
+          "pid": 158181,
+          "rssBytes": 126046208,
+          "peakRssBytes": 130232320
+        },
+        "daemon": {
+          "pid": 158133,
+          "rssBytes": 123179008,
+          "peakRssBytes": 127410176,
+          "descendants": [
+            {
+              "pid": 158175,
+              "rssBytes": 199712768
+            },
+            {
+              "pid": 158227,
+              "rssBytes": 177602560
+            }
+          ],
+          "treeRssBytes": 500494336,
+          "rss": 123179008,
+          "heapUsed": 26339904,
+          "external": 9882811,
+          "counters": {
+            "revisions": 11,
+            "analyses": 31,
+            "cancelledAnalyses": 0,
+            "reusedRevisions": 0,
+            "coalescedEvents": 10,
+            "evictions": 0,
+            "rejectedRequests": 0,
+            "disconnectedSlowConsumers": 0,
+            "sweeps": 10,
+            "audits": 0,
+            "auditMismatches": 0,
+            "coveredRequests": 0,
+            "coldOutcomes": 0,
+            "deadlineOutcomes": 0,
+            "behaviorRuns": 11,
+            "dependencyDiagrams": 11,
+            "dependencyDiagramInputChanges": 0
+          },
+          "contexts": [
+            {
+              "context": "ctx/1:e85a8a30520d0599c9ff9eee5c30f958208317fc24d4fca33b1f7f2878f9f42a",
+              "history": {
+                "retained": 8,
+                "bytes": 15075,
+                "oldest": "rev/1:1ae2e5a1-2bf6-4ebb-a5e5-d72b214930a9:4"
+              },
+              "retainedBytes": 10532469,
+              "leases": {
+                "subscriptions": 1,
+                "requests": 0
+              },
+              "pending": {
+                "requests": 0,
+                "changedPaths": 0,
+                "analysisRunning": false
+              }
+            }
+          ]
+        }
+      }
+    },
+    "toolkit": {
+      "kind": "toolkit",
+      "root": "/tmp/ramify-explorer-acceptance-wUhMtK/toolkit-4fXT6Z",
+      "url": "http://127.0.0.1:43733/analysis/latest",
+      "finalUrl": "http://127.0.0.1:43733/analysis/latest",
+      "explore": {
+        "exitCode": 0,
+        "durationMs": 675.5339309999981,
+        "stdout": "Explorer: http://127.0.0.1:43733/analysis/latest\n",
+        "stderr": "",
+        "serverPid": 159101,
+        "defaultStartupMs": 5000
+      },
+      "revision": {
+        "token": {
+          "context": "ctx/1:2c14304a4b99b91ff14e9cac0a04b285281be284bdc17bc10e5d1fe177520f10",
+          "generation": "gen/1:b19db03b-e9d5-4efc-beb9-267a360cbb64"
+        },
+        "revision": "rev/1:b19db03b-e9d5-4efc-beb9-267a360cbb64:1",
+        "sequence": 1,
+        "publishedAt": 1789663967822,
+        "cause": "open",
+        "fingerprints": {
+          "inputId": "input/1:dd4a1924476a7de8b8940dd30443f88355655f4a4ee323b9e27a6357d748ec68",
+          "declarations": "f46308caefbb16dd5dd0b70ada630977e5f212770295d82b834acba3413a644f",
+          "source": "ed27e2089d75f31eec1e1d6b4cd8acf5fafc6b4b9a1121df442002c144cc9bbc",
+          "configuration": "312ad99ad51f344652423f0715fce8b7b1abbad6220c907d7c911a0eaa2eb302",
+          "registry": "1080a60800d9e5bddc69f51489c636a776bacaadb5368f46db4aa0947c67e3ba",
+          "engine": "15ffbb4f9f5a3d2d22aa435e1835d6bfe262aca8bdfdc376f1245df846065b97"
+        },
+        "changed": [],
+        "checked": {
+          "path": "cold",
+          "files": [
+            "src/batch-entry.ts",
+            "src/batch-process.ts",
+            "src/batch.ts",
+            "src/cli-entry.ts",
+            "src/cli-process.ts",
+            "src/client.ts",
+            "src/compiled-entry.ts",
+            "src/daemon-entry.ts",
+            "src/dependency-analyzer-entry.ts",
+            "src/dependency-analyzer-process.ts",
+            "src/explore-launcher.ts",
+            "src/explorer-entry.ts",
+            "src/interfaces/batch.ts",
+            "src/interfaces/service.ts",
+            "src/publication-queue.ts",
+            "src/ramify",
+            "src/report-capacity.ts",
+            "src/resident-assembly.ts",
+            "src/resident-budgets.ts",
+            "src/tests/.gitkeep",
+            "src/tests/batch-cli.test.ts",
+            "src/tests/cli-process.test.ts",
+            "src/tests/compiled-client.test.ts",
+            "src/tests/daemon-identity.test.ts",
+            "src/tests/daemon-suspended-shutdown.test.ts",
+            "src/tests/dependency-analyzer-process.test.ts",
+            "src/tests/dependency-diagram-daemon.test.ts",
+            "src/tests/dependency-view-server.test.ts",
+            "src/tests/entry-boundaries.test.ts",
+            "src/tests/entry-boundary-cases.ts",
+            "src/tests/explorer-process.test.ts",
+            "src/tests/fixture.ts",
+            "src/tests/launcher-script.test.ts",
+            "src/tests/lifecycle-process-cases.ts",
+            "src/tests/lifecycle-process-fixture.mjs",
+            "src/tests/lifecycle-process.test.ts",
+            "src/tests/lifecycle-process.ts",
+            "src/tests/process-probe.mjs",
+            "src/tests/process-tracing.test.ts",
+            "src/tests/process.ts",
+            "src/tests/project-view-reports.test.ts",
+            "src/tests/publication-queue.test.ts",
+            "src/tests/quick-environment.test.ts",
+            "src/tests/quick-environment.ts",
+            "src/tests/resident-assembly.test.ts",
+            "src/tests/resident-cli.test.ts",
+            "subs/analysis/src/analyze-project.ts",
+            "subs/analysis/src/api-view.ts",
+            "subs/analysis/src/change-affinity.ts",
+            "subs/analysis/src/dependency-analyzer.ts",
+            "subs/analysis/src/dependency-diagram.ts",
+            "subs/analysis/src/evaluate-accesses.ts",
+            "subs/analysis/src/index.ts",
+            "subs/analysis/src/interfaces/analysis.ts",
+            "subs/analysis/src/interfaces/dependency-analyzer.ts",
+            "subs/analysis/src/interfaces/dependency-diagram.ts",
+            "subs/analysis/src/interfaces/modularity.ts",
+            "subs/analysis/src/interfaces/session.ts",
+            "subs/analysis/src/inventory-entry.ts",
+            "subs/analysis/src/inventory.ts",
+            "subs/analysis/src/modularity-candidate.ts",
+            "subs/analysis/src/modularity-context.ts",
+            "subs/analysis/src/modularity-graph.ts",
+            "subs/analysis/src/modularity-owner.ts",
+            "subs/analysis/src/modularity.ts",
+            "subs/analysis/src/report-copy.ts",
+            "subs/analysis/src/report-data.ts",
+            "subs/analysis/src/report.ts",
+            "subs/analysis/src/resolve-project.ts",
+            "subs/analysis/src/retained-session.ts",
+            "subs/analysis/src/run-analysis.ts",
+            "subs/analysis/src/session-audit.ts",
+            "subs/analysis/src/session-engine.ts",
+            "subs/analysis/src/session-facts.ts",
+            "subs/analysis/src/session-host.ts",
+            "subs/analysis/src/session-messages.ts",
+            "subs/analysis/src/session-processes.ts",
+            "subs/analysis/src/session-revision.ts",
+            "subs/analysis/src/session-source-loader.ts",
+            "subs/analysis/src/session-supervisor-entry.ts",
+            "subs/analysis/src/session-supervisor-messages.ts",
+            "subs/analysis/src/session-supervisor.ts",
+            "subs/analysis/src/session-worker.ts",
+            "subs/analysis/src/session.ts",
+            "subs/analysis/src/tests/api-view-session.test.ts",
+            "subs/analysis/src/tests/api-view.test.ts",
+            "subs/analysis/src/tests/change-affinity.test.ts",
+            "subs/analysis/src/tests/dependency-analyzer.test.ts",
+            "subs/analysis/src/tests/dependency-behavior-capability.test.ts",
+            "subs/analysis/src/tests/dependency-diagram.test.ts",
+            "subs/analysis/src/tests/evaluate-accesses.test.ts",
+            "subs/analysis/src/tests/explorer-details.test.ts",
+            "subs/analysis/src/tests/inventory.test.ts",
+            "subs/analysis/src/tests/membership-differential.test.ts",
+            "subs/analysis/src/tests/modularity-batch.test.ts",
+            "subs/analysis/src/tests/modularity-candidate.test.ts",
+            "subs/analysis/src/tests/modularity-fixture.ts",
+            "subs/analysis/src/tests/modularity.test.ts",
+            "subs/analysis/src/tests/report-capacity.test.ts",
+            "subs/analysis/src/tests/report-copy.test.ts",
+            "subs/analysis/src/tests/report-publication.test.ts",
+            "subs/analysis/src/tests/retained-session.test.ts",
+            "subs/analysis/src/tests/root-resolution.test.ts",
+            "subs/analysis/src/tests/rss-sampling.test.ts",
+            "subs/analysis/src/tests/session-audit.test.ts",
+            "subs/analysis/src/tests/session-input-witness.ts",
+            "subs/analysis/src/tests/session-revision.test.ts",
+            "subs/analysis/src/tests/session-test-fixture.ts",
+            "subs/analysis/src/tests/session-worker-fixture.ts",
+            "subs/analysis/src/tests/session-worker.test.ts",
+            "subs/analysis/src/tests/session.test.ts",
+            "subs/analysis/src/tests/shared-globals.test.ts",
+            "subs/analysis/src/tests/validation.test.ts",
+            "subs/analysis/src/validation-entry.ts",
+            "subs/analysis/src/validation.ts",
+            "subs/analysis/subs/descriptions/src/interfaces/linking.ts",
+            "subs/analysis/subs/descriptions/src/interfaces/syntax.ts",
+            "subs/analysis/subs/descriptions/src/link.ts",
+            "subs/analysis/subs/descriptions/src/parse.ts",
+            "subs/analysis/subs/descriptions/src/tests/.gitkeep",
+            "subs/analysis/subs/descriptions/src/tests/descriptions.test.ts",
+            "subs/analysis/subs/descriptions/src/tests/grammar.test.ts",
+            "subs/analysis/subs/descriptions/src/tests/linking.test.ts",
+            "subs/analysis/subs/descriptions/src/tests/locations.test.ts",
+            "subs/analysis/subs/descriptions/src/tokenize.ts",
+            "subs/analysis/subs/model/src/availability.ts",
+            "subs/analysis/subs/model/src/data.ts",
+            "subs/analysis/subs/model/src/decisions.ts",
+            "subs/analysis/subs/model/src/identity.ts",
+            "subs/analysis/subs/model/src/index.ts",
+            "subs/analysis/subs/model/src/interfaces/model.ts",
+            "subs/analysis/subs/model/src/model.ts",
+            "subs/analysis/subs/model/src/profiles.ts",
+            "subs/analysis/subs/model/src/registry.ts",
+            "subs/analysis/subs/model/src/tests/.gitkeep",
+            "subs/analysis/subs/model/src/tests/availability.test.ts",
+            "subs/analysis/subs/model/src/tests/available-originals.test.ts",
+            "subs/analysis/subs/model/src/tests/decision-lookups.test.ts",
+            "subs/analysis/subs/model/src/tests/decisions.test.ts",
+            "subs/analysis/subs/model/src/tests/dependency-locations.test.ts",
+            "subs/analysis/subs/model/src/tests/fixtures.ts",
+            "subs/analysis/subs/model/src/tests/identity-model.test.ts",
+            "subs/analysis/subs/model/src/tests/recorded-decisions.ts",
+            "subs/analysis/subs/model/src/tests/registry-profiles.test.ts",
+            "subs/analysis/subs/model/src/tests/tags.test.ts",
+            "subs/analysis/subs/model/src/tests/tree.test.ts",
+            "subs/analysis/subs/project/src/capture.ts",
+            "subs/analysis/subs/project/src/configuration-data.ts",
+            "subs/analysis/subs/project/src/configuration-helper.ts",
+            "subs/analysis/subs/project/src/configuration.ts",
+            "subs/analysis/subs/project/src/data.ts",
+            "subs/analysis/subs/project/src/generated-path.ts",
+            "subs/analysis/subs/project/src/interfaces/project.ts",
+            "subs/analysis/subs/project/src/inventory.ts",
+            "subs/analysis/subs/project/src/observations.ts",
+            "subs/analysis/subs/project/src/observer.ts",
+            "subs/analysis/subs/project/src/purpose.ts",
+            "subs/analysis/subs/project/src/read-project.ts",
+            "subs/analysis/subs/project/src/references.ts",
+            "subs/analysis/subs/project/src/resolve-root.ts",
+            "subs/analysis/subs/project/src/selection.ts",
+            "subs/analysis/subs/project/src/tests/.gitkeep",
+            "subs/analysis/subs/project/src/tests/capture-retirement.ts",
+            "subs/analysis/subs/project/src/tests/capture.test.ts",
+            "subs/analysis/subs/project/src/tests/fixtures.ts",
+            "subs/analysis/subs/project/src/tests/generated-path.test.ts",
+            "subs/analysis/subs/project/src/tests/input-list.test.ts",
+            "subs/analysis/subs/project/src/tests/observer.test.ts",
+            "subs/analysis/subs/project/src/tests/project.test.ts",
+            "subs/analysis/subs/project/src/tests/purpose.test.ts",
+            "subs/analysis/subs/project/src/tests/references.test.ts",
+            "subs/analysis/subs/project/src/tests/resolve-root.test.ts",
+            "subs/analysis/subs/project/src/tests/sweep.test.ts",
+            "subs/analysis/subs/typescript/src/access-interpreter.ts",
+            "subs/analysis/subs/typescript/src/accesses.ts",
+            "subs/analysis/subs/typescript/src/behavior-classifier.ts",
+            "subs/analysis/subs/typescript/src/bridge.ts",
+            "subs/analysis/subs/typescript/src/catalog.ts",
+            "subs/analysis/subs/typescript/src/compiler-helper.ts",
+            "subs/analysis/subs/typescript/src/descriptions.ts",
+            "subs/analysis/subs/typescript/src/interfaces/dependency-behavior.ts",
+            "subs/analysis/subs/typescript/src/interfaces/source.ts",
+            "subs/analysis/subs/typescript/src/namespace-uses.ts",
+            "subs/analysis/subs/typescript/src/resolution.ts",
+            "subs/analysis/subs/typescript/src/retained-source-analysis.ts",
+            "subs/analysis/subs/typescript/src/source-analysis.ts",
+            "subs/analysis/subs/typescript/src/symbol-details.ts",
+            "subs/analysis/subs/typescript/src/synthetic.ts",
+            "subs/analysis/subs/typescript/src/tests/access-interpreter.test.ts",
+            "subs/analysis/subs/typescript/src/tests/accesses.test.ts",
+            "subs/analysis/subs/typescript/src/tests/catalog.test.ts",
+            "subs/analysis/subs/typescript/src/tests/compiler-paths.test.ts",
+            "subs/analysis/subs/typescript/src/tests/coverage.test.ts",
+            "subs/analysis/subs/typescript/src/tests/cyclic-stars.test.ts",
+            "subs/analysis/subs/typescript/src/tests/dependency-behavior.test.ts",
+            "subs/analysis/subs/typescript/src/tests/descriptions.test.ts",
+            "subs/analysis/subs/typescript/src/tests/fixtures.ts",
+            "subs/analysis/subs/typescript/src/tests/lifetime.test.ts",
+            "subs/analysis/subs/typescript/src/tests/resource-bindings.test.ts",
+            "subs/analysis/subs/typescript/src/tests/resource-suffixes.test.ts",
+            "subs/analysis/subs/typescript/src/tests/resources.test.ts",
+            "subs/analysis/subs/typescript/src/tests/retained-membership.test.ts",
+            "subs/analysis/subs/typescript/src/tests/retained-membership.ts",
+            "subs/analysis/subs/typescript/src/tests/retained-source-analysis.test.ts",
+            "subs/analysis/subs/typescript/src/tests/retention.test.ts",
+            "subs/analysis/subs/typescript/src/tests/symbol-details.test.ts",
+            "subs/analysis/subs/typescript/src/wire.ts",
+            "subs/cli/src/arguments.ts",
+            "subs/cli/src/changed-command.ts",
+            "subs/cli/src/check-command.ts",
+            "subs/cli/src/command-support.ts",
+            "subs/cli/src/daemon-command.ts",
+            "subs/cli/src/errors.ts",
+            "subs/cli/src/explore-command.ts",
+            "subs/cli/src/format.ts",
+            "subs/cli/src/index.ts",
+            "subs/cli/src/interfaces/cli.ts",
+            "subs/cli/src/materialize-command.ts",
+            "subs/cli/src/run-cli.ts",
+            "subs/cli/src/tests/.gitkeep",
+            "subs/cli/src/tests/arguments.test.ts",
+            "subs/cli/src/tests/capabilities.test.ts",
+            "subs/cli/src/tests/changed-cleanup.ts",
+            "subs/cli/src/tests/changed-command.test.ts",
+            "subs/cli/src/tests/errors.test.ts",
+            "subs/cli/src/tests/exhausted-recovery.ts",
+            "subs/cli/src/tests/explore-command.test.ts",
+            "subs/cli/src/tests/materialize-command.test.ts",
+            "subs/cli/src/watch-command.ts",
+            "subs/daemon/src/api-view-documents.ts",
+            "subs/daemon/src/api-view-publisher.ts",
+            "subs/daemon/src/client-entry.ts",
+            "subs/daemon/src/codec.ts",
+            "subs/daemon/src/connect-daemon.ts",
+            "subs/daemon/src/connection.ts",
+            "subs/daemon/src/context-types.ts",
+            "subs/daemon/src/daemon-log.ts",
+            "subs/daemon/src/discovery.ts",
+            "subs/daemon/src/filesystem-watcher.ts",
+            "subs/daemon/src/host-counters.ts",
+            "subs/daemon/src/host.ts",
+            "subs/daemon/src/interfaces/daemon.ts",
+            "subs/daemon/src/launcher.ts",
+            "subs/daemon/src/outbound.ts",
+            "subs/daemon/src/records.ts",
+            "subs/daemon/src/request-identities.ts",
+            "subs/daemon/src/service.ts",
+            "subs/daemon/src/start-coordination.ts",
+            "subs/daemon/src/start-daemon.ts",
+            "subs/daemon/src/system-clock.ts",
+            "subs/daemon/src/tests/api-view-documents.test.ts",
+            "subs/daemon/src/tests/api-view-fixtures.ts",
+            "subs/daemon/src/tests/api-view-publisher-crash-recovery.test.ts",
+            "subs/daemon/src/tests/api-view-publisher.test.ts",
+            "subs/daemon/src/tests/codec.test.ts",
+            "subs/daemon/src/tests/connect.test.ts",
+            "subs/daemon/src/tests/crash-recovery-child.ts",
+            "subs/daemon/src/tests/daemon-log.test.ts",
+            "subs/daemon/src/tests/discovery-fixture.ts",
+            "subs/daemon/src/tests/discovery.test.ts",
+            "subs/daemon/src/tests/host.test.ts",
+            "subs/daemon/src/tests/ipc-fixture.ts",
+            "subs/daemon/src/tests/ipc.test.ts",
+            "subs/daemon/src/tests/launcher.test.ts",
+            "subs/daemon/src/tests/outbound.test.ts",
+            "subs/daemon/src/tests/request-identities.test.ts",
+            "subs/daemon/src/tests/service.test.ts",
+            "subs/daemon/src/tests/session-counters.test.ts",
+            "subs/daemon/src/tests/socket-fixture.ts",
+            "subs/daemon/src/tests/system-clock.test.ts",
+            "subs/daemon/src/tests/validation.test.ts",
+            "subs/daemon/src/tests/watcher.test.ts",
+            "subs/daemon/src/validation.ts",
+            "subs/daemon/subs/contexts/src/context-manager.ts",
+            "subs/daemon/subs/contexts/src/context.ts",
+            "subs/daemon/subs/contexts/src/history.ts",
+            "subs/daemon/subs/contexts/src/interfaces/contexts.ts",
+            "subs/daemon/subs/contexts/src/queue.ts",
+            "subs/daemon/subs/contexts/src/tests/api-view.test.ts",
+            "subs/daemon/subs/contexts/src/tests/context-manager.test.ts",
+            "subs/daemon/subs/contexts/src/tests/controlled-ports.test.ts",
+            "subs/daemon/subs/contexts/src/tests/controlled-ports.ts",
+            "subs/daemon/subs/contexts/src/tests/covering.test.ts",
+            "subs/daemon/subs/contexts/src/tests/deadlines.test.ts",
+            "subs/daemon/subs/contexts/src/tests/dependency-diagram.test.ts",
+            "subs/daemon/subs/contexts/src/tests/explorer-details.test.ts",
+            "subs/daemon/subs/contexts/src/tests/history-fixture.ts",
+            "subs/daemon/subs/contexts/src/tests/history.test.ts",
+            "subs/daemon/subs/contexts/src/tests/hot-budget.test.ts",
+            "subs/daemon/subs/contexts/src/tests/root-resolution.test.ts",
+            "subs/daemon/subs/contexts/src/tests/scripted-driver.ts",
+            "subs/daemon/subs/contexts/src/tests/session-driver.test.ts",
+            "subs/daemon/subs/contexts/src/tests/session-fixture.ts",
+            "subs/daemon/subs/contexts/src/tests/tokens.test.ts",
+            "subs/daemon/subs/contexts/src/tokens.ts",
+            "subs/explorer/src/HomePage.tsx",
+            "subs/explorer/src/ModuleTreePage.tsx",
+            "subs/explorer/src/ProjectExplorerPage.tsx",
+            "subs/explorer/src/app-shell.css",
+            "subs/explorer/src/browser-app.tsx",
+            "subs/explorer/src/browser-entry.tsx",
+            "subs/explorer/src/published-dependency-view.ts",
+            "subs/explorer/src/published-project-view.ts",
+            "subs/explorer/src/revision-freshness.ts",
+            "subs/explorer/src/tests/HomePage.test.tsx",
+            "subs/explorer/src/tests/ModuleTreePage.test.tsx",
+            "subs/explorer/src/tests/ProjectExplorerFocus.test.tsx",
+            "subs/explorer/src/tests/ProjectExplorerPage.test.tsx",
+            "subs/explorer/src/tests/real-router-model.ts",
+            "subs/explorer/src/tests/revision-freshness.test.ts",
+            "subs/integration-tests/src/browser-acceptance.ts",
+            "subs/integration-tests/src/explorer-router.test.ts",
+            "subs/integration-tests/src/project-view-projection.test.ts",
+            "subs/presentation/src/FocusDiagram.tsx",
+            "subs/presentation/src/ModelDiagram.tsx",
+            "subs/presentation/src/TreeDiagram.tsx",
+            "subs/presentation/src/diagram-definition.ts",
+            "subs/presentation/src/diagrams/example1.ts",
+            "subs/presentation/src/diagrams/example1a.ts",
+            "subs/presentation/src/diagrams/example1b.ts",
+            "subs/presentation/src/diagrams/example2.ts",
+            "subs/presentation/src/diagrams/example3.ts",
+            "subs/presentation/src/diagrams/example4.ts",
+            "subs/presentation/src/diagrams/fixture-model.ts",
+            "subs/presentation/src/diagrams/series.ts",
+            "subs/presentation/src/diagrams/shop-tree.ts",
+            "subs/presentation/src/diagrams/shop.ts",
+            "subs/presentation/src/focus-diagram.ts",
+            "subs/presentation/src/index.ts",
+            "subs/presentation/src/layout-chords.ts",
+            "subs/presentation/src/layout-lanes.ts",
+            "subs/presentation/src/layout-legend.ts",
+            "subs/presentation/src/layout-nodes.ts",
+            "subs/presentation/src/layout.ts",
+            "subs/presentation/src/model-access.ts",
+            "subs/presentation/src/tests/.gitkeep",
+            "subs/presentation/src/tests/emitted-diagrams.test.ts",
+            "subs/presentation/src/tests/example1-stages.test.ts",
+            "subs/presentation/src/tests/example2.test.ts",
+            "subs/presentation/src/tests/example3.test.ts",
+            "subs/presentation/src/tests/example4.test.ts",
+            "subs/presentation/src/tests/focus-diagram.test.ts",
+            "subs/presentation/src/tests/interaction.test.ts",
+            "subs/presentation/src/tests/layout.test.ts",
+            "subs/presentation/src/tests/model-access.test.ts",
+            "subs/presentation/src/tests/render.test.ts",
+            "subs/presentation/src/tests/tree-diagram.test.ts",
+            "subs/presentation/src/tests/validate.test.ts",
+            "subs/presentation/src/theme.ts",
+            "subs/presentation/src/tree-diagram.ts",
+            "subs/presentation/src/tree-render.tsx",
+            "subs/presentation/src/validate.ts",
+            "subs/presentation/subs/layout/src/bounds.ts",
+            "subs/presentation/subs/layout/src/chord-placement.ts",
+            "subs/presentation/subs/layout/src/focus-placement.ts",
+            "subs/presentation/subs/layout/src/geometry.ts",
+            "subs/presentation/subs/layout/src/index.ts",
+            "subs/presentation/subs/layout/src/interfaces/layout.ts",
+            "subs/presentation/subs/layout/src/lane-placement.ts",
+            "subs/presentation/subs/layout/src/legend-placement.ts",
+            "subs/presentation/subs/layout/src/node-placement.ts",
+            "subs/presentation/subs/layout/src/tests/.gitkeep",
+            "subs/presentation/subs/layout/src/tests/placement.test.ts",
+            "subs/presentation/subs/layout/src/tests/viewport.test.ts",
+            "subs/presentation/subs/layout/src/tree-placement.ts",
+            "subs/presentation/subs/layout/src/viewport.ts",
+            "subs/presentation/subs/project-view/src/ExportList.tsx",
+            "subs/presentation/subs/project-view/src/ModuleGraphLegend.tsx",
+            "subs/presentation/subs/project-view/src/ModuleGraphRadial.tsx",
+            "subs/presentation/subs/project-view/src/ModuleTreeView.tsx",
+            "subs/presentation/subs/project-view/src/ProjectExplorerView.tsx",
+            "subs/presentation/subs/project-view/src/auto-fit.ts",
+            "subs/presentation/subs/project-view/src/dependency-graph.ts",
+            "subs/presentation/subs/project-view/src/interfaces/dependency-view.ts",
+            "subs/presentation/subs/project-view/src/interfaces/project-view.ts",
+            "subs/presentation/subs/project-view/src/module-tree.css",
+            "subs/presentation/subs/project-view/src/module-tree.ts",
+            "subs/presentation/subs/project-view/src/moduleGraphShared.ts",
+            "subs/presentation/subs/project-view/src/moduleTypePresentation.ts",
+            "subs/presentation/subs/project-view/src/project-view.css",
+            "subs/presentation/subs/project-view/src/styles.d.ts",
+            "subs/presentation/subs/project-view/src/tests/ModuleGraph.test.tsx",
+            "subs/presentation/subs/project-view/src/tests/ModuleTreeView.test.tsx",
+            "subs/presentation/subs/project-view/src/tests/ProjectExplorerView.test.tsx",
+            "subs/presentation/subs/project-view/src/tests/auto-fit.test.tsx",
+            "subs/presentation/subs/project-view/src/tests/dependency-fixtures.ts",
+            "subs/presentation/subs/project-view/src/tests/fixtures/dependency-models.json",
+            "subs/presentation/subs/project-view/src/tests/module-tree-fixture.ts",
+            "subs/presentation/subs/project-view/src/tests/module-tree.test.ts",
+            "subs/service-api/src/dependency-model.ts",
+            "subs/service-api/src/dependency-view.ts",
+            "subs/service-api/src/interfaces/explorer-dependencies.ts",
+            "subs/service-api/src/interfaces/explorer-service.ts",
+            "subs/service-api/src/project-binding.ts",
+            "subs/service-api/src/project-view.ts",
+            "subs/service-api/src/router.ts",
+            "subs/service-api/src/tests/dependency-model.test.ts",
+            "subs/service-api/src/tests/dependency-view.test.ts",
+            "subs/service-api/src/tests/project-binding-fakes.ts",
+            "subs/service-api/src/tests/project-binding.test.ts",
+            "subs/service-api/src/tests/project-view.test.ts",
+            "subs/service-api/src/tests/web-launcher-fixture.mjs",
+            "subs/service-api/src/tests/web-launcher.test.ts",
+            "subs/service-api/src/tests/web-process.test.ts",
+            "subs/service-api/src/web-discovery.ts",
+            "subs/service-api/src/web-launcher.ts",
+            "subs/service-api/src/web-process.ts"
+          ],
+          "accesses": 5617,
+          "modelRebuilt": true
+        },
+        "delta": {
+          "added": 0,
+          "removed": 0,
+          "positionOnly": 0
+        },
+        "timings": {
+          "classify": 0,
+          "inventory": 563.597713,
+          "compiler": 689.2103930000001,
+          "descriptions": 1182.089666,
+          "accesses": 1455.3261150000003,
+          "link": 203.9692359999999,
+          "decide": 259.1465310000003,
+          "publish": 134.55749100000048,
+          "total": 4907.711447000001
+        },
+        "capture": {
+          "invocationCheck": 0,
+          "promotion": 0,
+          "workerStatus": 0,
+          "workerRoundTrip": 0,
+          "sweep": 0,
+          "watch": null
+        },
+        "outcome": {
+          "execution": "completed",
+          "check": "passed",
+          "coverage": "complete"
+        },
+        "summary": {
+          "complete": true,
+          "owners": 15,
+          "sourceFiles": 395,
+          "resources": 12,
+          "originals": 1205,
+          "accesses": 5617,
+          "allowed": 3901,
+          "denied": 0,
+          "errors": 0,
+          "warnings": 0,
+          "coverageNotes": 0,
+          "external": 1716
+        }
+      },
+      "projectionDurationMs": 343.7158090000012,
+      "encodedBytes": 2747473,
+      "counts": {
+        "displayed": "Showing 7 of 15 modules, 14 displayed links",
+        "displayedRevision": "Revision rev/1:b19db03b-e9d5-4efc-beb9-267a360cbb64:1",
+        "reportRevision": "rev/1:b19db03b-e9d5-4efc-beb9-267a360cbb64:1",
+        "reportModules": 15,
+        "projectedModules": 15,
+        "visibleModules": 7,
+        "reportAccesses": 5617,
+        "occurrenceEdges": 57,
+        "visibleLinks": 14,
+        "encodedBytes": 2747473
+      },
+      "dependencies": {
+        "revision": "rev/1:b19db03b-e9d5-4efc-beb9-267a360cbb64:1",
+        "inputId": "input/1:dd4a1924476a7de8b8940dd30443f88355655f4a4ee323b9e27a6357d748ec68",
+        "state": "complete",
+        "project": {
+          "behavioral": 70,
+          "nonBehavioral": 367
+        },
+        "coverage": {
+          "unknownDependencies": 0,
+          "limitIds": []
+        },
+        "modules": 15,
+        "importedModuleEdges": 48,
+        "originalOwnerEdges": 50,
+        "encodedBytes": 653834,
+        "pageToReadyMs": 10819,
+        "browserDependencyViewRequests": 9,
+        "memory": {
+          "withoutRetainedDiagram": {
+            "behaviorRuns": 0,
+            "dependencyDiagrams": 0,
+            "dependencyDiagramInputChanges": 0,
+            "retainedBytes": 20603814,
+            "daemonPid": 159052,
+            "analyzerProcesses": 0,
+            "tree": {
+              "pid": 159052,
+              "rssBytes": 93552640,
+              "peakRssBytes": 167337984,
+              "descendants": [
+                {
+                  "pid": 159095,
+                  "rssBytes": 364392448
+                },
+                {
+                  "pid": 159164,
+                  "rssBytes": 400424960
+                }
+              ],
+              "treeRssBytes": 858370048
+            },
+            "heap": {
+              "rss": 93552640,
+              "heapUsed": 20982208,
+              "external": 2413265
+            }
+          },
+          "withRetainedDiagram": {
+            "behaviorRuns": 1,
+            "dependencyDiagrams": 1,
+            "dependencyDiagramInputChanges": 0,
+            "retainedBytes": 20937296,
+            "daemonPid": 159052,
+            "analyzerProcesses": 0,
+            "tree": {
+              "pid": 159052,
+              "rssBytes": 148594688,
+              "peakRssBytes": 250961920,
+              "descendants": [
+                {
+                  "pid": 159095,
+                  "rssBytes": 404484096
+                },
+                {
+                  "pid": 159164,
+                  "rssBytes": 400424960
+                }
+              ],
+              "treeRssBytes": 953503744
+            },
+            "heap": {
+              "rss": 148594688,
+              "heapUsed": 43412248,
+              "external": 4745110
+            }
+          },
+          "analyzer": {
+            "samples": 247,
+            "processes": [
+              {
+                "pid": 159250,
+                "role": "analyzer",
+                "firstSeenMs": 4291,
+                "lastSeenMs": 9890,
+                "peakRssBytes": 258473984
+              },
+              {
+                "pid": 159262,
+                "role": "configuration-helper",
+                "firstSeenMs": 4620,
+                "lastSeenMs": 4714,
+                "peakRssBytes": 62976000
+              },
+              {
+                "pid": 159269,
+                "role": "native-compiler",
+                "firstSeenMs": 4668,
+                "lastSeenMs": 4668,
+                "peakRssBytes": 13762560
+              },
+              {
+                "pid": 159276,
+                "role": "compiler-helper",
+                "firstSeenMs": 5133,
+                "lastSeenMs": 9472,
+                "peakRssBytes": 251875328
+              },
+              {
+                "pid": 159283,
+                "role": "native-compiler",
+                "firstSeenMs": 5270,
+                "lastSeenMs": 9425,
+                "peakRssBytes": 383778816
+              }
+            ],
+            "peakCombinedRssBytes": 871976960,
+            "peakRssBytes": {
+              "analyzer": 258473984,
+              "configuration-helper": 62976000,
+              "compiler-helper": 251875328,
+              "native-compiler": 383778816
+            }
+          }
+        }
+      },
+      "externalAccesses": {
+        "totalAccesses": 5617,
+        "nonApplicationAccesses": 1716,
+        "targetKinds": [
+          "external"
+        ],
+        "specifiers": [
+          "@testing-library/jest-dom/vitest",
+          "@testing-library/react",
+          "@trpc/client",
+          "@trpc/server",
+          "@trpc/server/adapters/express",
+          "@xyflow/react",
+          "d3-hierarchy",
+          "d3-shape",
+          "express",
+          "node:assert",
+          "node:assert/strict",
+          "node:async_hooks",
+          "node:buffer",
+          "node:child_process",
+          "node:crypto",
+          "node:dgram",
+          "node:diagnostics_channel",
+          "node:events",
+          "node:fs",
+          "node:fs/promises",
+          "node:http",
+          "node:module",
+          "node:net",
+          "node:os",
+          "node:path",
+          "node:perf_hooks",
+          "node:readline",
+          "node:timers/promises",
+          "node:url",
+          "node:util",
+          "node:v8",
+          "node:worker_threads",
+          "node:zlib",
+          "playwright-core",
+          "react",
+          "react-dom/client",
+          "react-dom/server",
+          "typescript/unstable/ast",
+          "typescript/unstable/sync",
+          "vitest",
+          "zod"
+        ]
+      },
+      "dom": {
+        "renderedNodes": [
+          "ramify",
+          "ramify/analysis",
+          "ramify/analysis/descriptions",
+          "ramify/analysis/model",
+          "ramify/analysis/project",
+          "ramify/analysis/typescript",
+          "ramify/cli",
+          "ramify/daemon",
+          "ramify/daemon/contexts",
+          "ramify/explorer",
+          "ramify/integration-tests",
+          "ramify/presentation",
+          "ramify/presentation/layout",
+          "ramify/presentation/project-view",
+          "ramify/service-api"
+        ],
+        "renderedEdges": [
+          "dependency-edge/1:imported-module:053477de311657013d5c9c6924f878805ddabd7debff8498249188dfe45ec434",
+          "dependency-edge/1:imported-module:0b040c5ae137c4034283e484d378590293b13ee5146d2d6bcf04acf316124272",
+          "dependency-edge/1:imported-module:120a4e76a317bcc74b551a0a2b48b49c06f85ac2e8d46ac07505d52c1fd1f8dd",
+          "dependency-edge/1:imported-module:1961f0cf9551717c7110d60616de002377e18d5f846824bd5e413d7b2041cb62",
+          "dependency-edge/1:imported-module:302a720d48b594c6ce7c360c763f03fc434697ddc1de67ea6e3a07ad9686ca97",
+          "dependency-edge/1:imported-module:40bf8dfbd674492d58f14242a041f545441f153d64cfdfff54e09c85f98c6c34",
+          "dependency-edge/1:imported-module:41d86a70aa675a2b2ac568a318aafead65fbb7a67ac608e100fa1a62f55bd462",
+          "dependency-edge/1:imported-module:5b0f022ab526ffac8d916b529d2e40193ad4926f3c806d2c3ada49983a9bd096",
+          "dependency-edge/1:imported-module:7249ae3d184174765ce5120bd741a7bedd24567209fb63e8663d2664bfa8a0d7",
+          "dependency-edge/1:imported-module:a4b6354f6ffdeb7ea6ca999d7bbfac03375eaee095f5fc4f3dcbfa7fc277f6fc",
+          "dependency-edge/1:imported-module:ad8b7e017af26833f664777cb6bf41fb86e114059425c4d5c2255c744a39f415",
+          "dependency-edge/1:imported-module:e54b60a036b84142e8be5fecf3e0d2e7328cb13780ef19897133f4497a5ebef1",
+          "dependency-edge/1:imported-module:e5792a85858cb7793ba73a212434c3d3c92cd8d78e9ed297af1d9d9d33a60668",
+          "dependency-edge/1:imported-module:fd1b782f5ef9074215914547149f1575dc7bb52d67a48dad3868bd99b9d3616c"
+        ],
+        "occurrenceEdges": 57,
+        "otherTargetDetails": 0
+      },
+      "interactions": null,
+      "refreshBaseline": null,
+      "sameRevisionReloads": [],
+      "refreshes": [],
+      "publishCycles": null,
+      "memory": {
+        "web": {
+          "pid": 159101,
+          "rssBytes": 153370624,
+          "peakRssBytes": 176848896
+        },
+        "daemon": {
+          "pid": 159052,
+          "rssBytes": 148594688,
+          "peakRssBytes": 250961920,
+          "descendants": [
+            {
+              "pid": 159095,
+              "rssBytes": 404484096
+            },
+            {
+              "pid": 159164,
+              "rssBytes": 400424960
+            }
+          ],
+          "treeRssBytes": 953503744,
+          "rss": 148594688,
+          "heapUsed": 43540152,
+          "external": 4920407,
+          "counters": {
+            "revisions": 1,
+            "analyses": 1,
+            "cancelledAnalyses": 0,
+            "reusedRevisions": 0,
+            "coalescedEvents": 0,
+            "evictions": 0,
+            "rejectedRequests": 0,
+            "disconnectedSlowConsumers": 0,
+            "sweeps": 0,
+            "audits": 0,
+            "auditMismatches": 0,
+            "coveredRequests": 0,
+            "coldOutcomes": 0,
+            "deadlineOutcomes": 0,
+            "behaviorRuns": 1,
+            "dependencyDiagrams": 1,
+            "dependencyDiagramInputChanges": 0
+          },
+          "contexts": [
+            {
+              "context": "ctx/1:2c14304a4b99b91ff14e9cac0a04b285281be284bdc17bc10e5d1fe177520f10",
+              "history": {
+                "retained": 1,
+                "bytes": 20483,
+                "oldest": "rev/1:b19db03b-e9d5-4efc-beb9-267a360cbb64:1"
+              },
+              "retainedBytes": 20937296,
+              "leases": {
+                "subscriptions": 1,
+                "requests": 0
+              },
+              "pending": {
+                "requests": 0,
+                "changedPaths": 0,
+                "analysisRunning": false
+              }
+            }
+          ]
+        }
+      }
+    },
+    "mutations": {
+      "server": {
+        "pid": 159314,
+        "port": 41907,
+        "origin": "http://127.0.0.1:41907",
+        "exit": [
+          0,
+          null
+        ],
+        "finalRecordState": "stopped"
+      },
+      "rs13": {
+        "url": "http://127.0.0.1:41907/analysis/latest",
+        "finalUrl": "http://127.0.0.1:41907/analysis/latest",
+        "home": {
+          "binding": "ready",
+          "text": "Project root\n/tmp/ramify-explorer-acceptance-wUhMtK/mutations-xEXRAg\nBinding\nConnected\nDaemon PID\n159326"
+        },
+        "initialRevision": {
+          "token": {
+            "context": "ctx/1:a68ab8ebcbe80659dcd95aa9ecee16c80053a9c913659ddc55147fd336c7661e",
+            "generation": "gen/1:f0304e89-b14c-426a-9b7d-58e95b977591"
+          },
+          "revision": "rev/1:f0304e89-b14c-426a-9b7d-58e95b977591:1",
+          "sequence": 1,
+          "publishedAt": 1789663984488,
+          "cause": "open",
+          "fingerprints": {
+            "inputId": "input/1:cbb70c57a9b39c6021ac6c50d56e02b17110f3499839c0d17be97da10b2377b5",
+            "declarations": "5d3cf6d634f3a94487d32e58376aa0f1e4ee6dd22e13664dc3c2613ead1608fc",
+            "source": "fab985733482445998a2583b75efc7e89e5b944cf37adb3eefa0768cfad92e6e",
+            "configuration": "2a138ceeec9c3a655f1de437f5f57b5827636115b799b686c23d63e4337619af",
+            "registry": "1080a60800d9e5bddc69f51489c636a776bacaadb5368f46db4aa0947c67e3ba",
+            "engine": "15ffbb4f9f5a3d2d22aa435e1835d6bfe262aca8bdfdc376f1245df846065b97"
+          },
+          "changed": [],
+          "checked": {
+            "path": "cold",
+            "files": [
+              "src/index.ts",
+              "subs/consumer/src/use.ts",
+              "subs/provider/src/interfaces/api.ts"
+            ],
+            "accesses": 1,
+            "modelRebuilt": true
+          },
+          "delta": {
+            "added": 1,
+            "removed": 0,
+            "positionOnly": 0
+          },
+          "timings": {
+            "classify": 0,
+            "inventory": 106.360796,
+            "compiler": 128.597693,
+            "descriptions": 10.840442999999993,
+            "accesses": 3.080569999999966,
+            "link": 3.5508669999999825,
+            "decide": 1.1560569999999757,
+            "publish": 1.191090000000031,
+            "total": 299.304097
+          },
+          "capture": {
+            "invocationCheck": 0,
+            "promotion": 0,
+            "workerStatus": 0,
+            "workerRoundTrip": 0,
+            "sweep": 0,
+            "watch": null
+          },
+          "outcome": {
+            "execution": "completed",
+            "check": "failed",
+            "coverage": "complete"
+          },
+          "summary": {
+            "complete": true,
+            "owners": 3,
+            "sourceFiles": 3,
+            "resources": 0,
+            "originals": 3,
+            "accesses": 1,
+            "allowed": 0,
+            "denied": 1,
+            "errors": 1,
+            "warnings": 0,
+            "coverageNotes": 0,
+            "external": 0
+          }
+        },
+        "npmOnly": {
+          "revision": {
+            "token": {
+              "context": "ctx/1:a68ab8ebcbe80659dcd95aa9ecee16c80053a9c913659ddc55147fd336c7661e",
+              "generation": "gen/1:f0304e89-b14c-426a-9b7d-58e95b977591"
+            },
+            "revision": "rev/1:f0304e89-b14c-426a-9b7d-58e95b977591:2",
+            "sequence": 2,
+            "publishedAt": 1789663986776,
+            "cause": "request",
+            "fingerprints": {
+              "inputId": "input/1:c7b75b1728bf702eb576d20d2483e179070de21c83afed73974757da5061ff49",
+              "declarations": "5d3cf6d634f3a94487d32e58376aa0f1e4ee6dd22e13664dc3c2613ead1608fc",
+              "source": "1d0c3b35929a3a97f068bfd066250ff9db1b17bb3368b731b5fa682007ecc60a",
+              "configuration": "2a138ceeec9c3a655f1de437f5f57b5827636115b799b686c23d63e4337619af",
+              "registry": "1080a60800d9e5bddc69f51489c636a776bacaadb5368f46db4aa0947c67e3ba",
+              "engine": "15ffbb4f9f5a3d2d22aa435e1835d6bfe262aca8bdfdc376f1245df846065b97"
+            },
+            "changed": [
+              "subs/consumer/src",
+              "subs/consumer/src/npm-only.ts"
+            ],
+            "checked": {
+              "path": "broad",
+              "files": [
+                "src/index.ts",
+                "subs/consumer/src/npm-only.ts",
+                "subs/consumer/src/use.ts",
+                "subs/provider/src/interfaces/api.ts"
+              ],
+              "accesses": 2,
+              "modelRebuilt": true
+            },
+            "delta": {
+              "added": 0,
+              "removed": 0,
+              "positionOnly": 0
+            },
+            "timings": {
+              "classify": 0.8545490000001337,
+              "inventory": 3.749279999999999,
+              "compiler": 103.21259199999986,
+              "descriptions": 14.456625000000258,
+              "accesses": 2.9054800000003524,
+              "link": 1.9406619999999748,
+              "decide": 0.38421900000003006,
+              "publish": 0.39445599999999104,
+              "total": 181.63377900000023
+            },
+            "capture": {
+              "invocationCheck": 0.8208190000000286,
+              "promotion": 52.423019999999724,
+              "workerStatus": 0.1318970000002082,
+              "workerRoundTrip": 222.94097499999998,
+              "sweep": 38.887870999999905,
+              "watch": null
+            },
+            "outcome": {
+              "execution": "completed",
+              "check": "failed",
+              "coverage": "complete"
+            },
+            "summary": {
+              "complete": true,
+              "owners": 3,
+              "sourceFiles": 4,
+              "resources": 0,
+              "originals": 4,
+              "accesses": 2,
+              "allowed": 0,
+              "denied": 1,
+              "errors": 1,
+              "warnings": 0,
+              "coverageNotes": 0,
+              "external": 1
+            }
+          },
+          "reportInputBefore": "input/1:cbb70c57a9b39c6021ac6c50d56e02b17110f3499839c0d17be97da10b2377b5",
+          "reportInputAfter": "input/1:c7b75b1728bf702eb576d20d2483e179070de21c83afed73974757da5061ff49",
+          "reportAccessesBefore": 1,
+          "reportAccessesAfter": 2,
+          "addedAccess": "access/1:0fc08fca50d199f67c67ff9d5191565dbee067053d80bb4ee75075bfb7baca34",
+          "topology": {
+            "modules": [
+              {
+                "id": "fixture",
+                "parent": null,
+                "children": [
+                  "fixture/consumer",
+                  "fixture/provider"
+                ]
+              },
+              {
+                "id": "fixture/consumer",
+                "parent": "fixture",
+                "children": []
+              },
+              {
+                "id": "fixture/provider",
+                "parent": "fixture",
+                "children": []
+              }
+            ],
+            "edges": [
+              {
+                "id": "4:edge16:fixture/consumer16:fixture/provider",
+                "consumer": "fixture/consumer",
+                "provider": "fixture/provider"
+              }
+            ]
+          },
+          "visibleImportMetrics": {
+            "summary": {
+              "edges": 1,
+              "accessOccurrences": 1,
+              "selectedSymbols": 1,
+              "deniedAccesses": 1,
+              "limitedAccesses": 0
+            },
+            "modules": [
+              {
+                "id": "fixture",
+                "dependencies": 0,
+                "dependents": 0,
+                "accessOccurrences": 0,
+                "selectedSymbols": 0,
+                "deniedAccesses": 0,
+                "limitedAccesses": 0
+              },
+              {
+                "id": "fixture/consumer",
+                "dependencies": 1,
+                "dependents": 0,
+                "accessOccurrences": 1,
+                "selectedSymbols": 1,
+                "deniedAccesses": 1,
+                "limitedAccesses": 0
+              },
+              {
+                "id": "fixture/provider",
+                "dependencies": 0,
+                "dependents": 1,
+                "accessOccurrences": 0,
+                "selectedSymbols": 0,
+                "deniedAccesses": 0,
+                "limitedAccesses": 0
+              }
+            ],
+            "edges": [
+              {
+                "id": "4:edge16:fixture/consumer16:fixture/provider",
+                "accessCount": 1,
+                "symbolCount": 1,
+                "status": "denied",
+                "reasons": [
+                  "not-visible"
+                ]
+              }
+            ]
+          },
+          "dom": {
+            "renderedNodes": [
+              "fixture/consumer",
+              "fixture/provider"
+            ],
+            "renderedEdges": [],
+            "occurrenceEdges": 1,
+            "otherTargetDetails": 0
+          }
+        },
+        "readme": {
+          "revision": {
+            "token": {
+              "context": "ctx/1:a68ab8ebcbe80659dcd95aa9ecee16c80053a9c913659ddc55147fd336c7661e",
+              "generation": "gen/1:f0304e89-b14c-426a-9b7d-58e95b977591"
+            },
+            "revision": "rev/1:f0304e89-b14c-426a-9b7d-58e95b977591:3",
+            "sequence": 3,
+            "publishedAt": 1789663988100,
+            "cause": "request",
+            "fingerprints": {
+              "inputId": "input/1:0d792bb9edaa3effffad2865697e10a501f8a4bfc7ff85276d0b7b483fe9ea77",
+              "declarations": "5d3cf6d634f3a94487d32e58376aa0f1e4ee6dd22e13664dc3c2613ead1608fc",
+              "source": "1d0c3b35929a3a97f068bfd066250ff9db1b17bb3368b731b5fa682007ecc60a",
+              "configuration": "2a138ceeec9c3a655f1de437f5f57b5827636115b799b686c23d63e4337619af",
+              "registry": "1080a60800d9e5bddc69f51489c636a776bacaadb5368f46db4aa0947c67e3ba",
+              "engine": "15ffbb4f9f5a3d2d22aa435e1835d6bfe262aca8bdfdc376f1245df846065b97"
+            },
+            "changed": [
+              "subs/provider/README.md"
+            ],
+            "checked": {
+              "path": "metadata",
+              "files": [],
+              "accesses": 0,
+              "modelRebuilt": false
+            },
+            "delta": {
+              "added": 0,
+              "removed": 0,
+              "positionOnly": 0
+            },
+            "timings": {
+              "classify": 0.3544809999998506,
+              "inventory": 1.4567590000001474,
+              "compiler": 0,
+              "descriptions": 0,
+              "accesses": 0,
+              "link": 0,
+              "decide": 0,
+              "publish": 0.34139600000025894,
+              "total": 2.3306069999998726
+            },
+            "capture": {
+              "invocationCheck": 0.5457390000001396,
+              "promotion": 0.018078999999943335,
+              "workerStatus": 0.0815429999997832,
+              "workerRoundTrip": 41.43719599999986,
+              "sweep": 37.52839099999983,
+              "watch": null
+            },
+            "outcome": {
+              "execution": "completed",
+              "check": "failed",
+              "coverage": "complete"
+            },
+            "summary": {
+              "complete": true,
+              "owners": 3,
+              "sourceFiles": 4,
+              "resources": 0,
+              "originals": 4,
+              "accesses": 2,
+              "allowed": 0,
+              "denied": 1,
+              "errors": 1,
+              "warnings": 0,
+              "coverageNotes": 0,
+              "external": 1
+            }
+          },
+          "visiblePurpose": "Provides the changed browser purpose."
+        },
+        "source": {
+          "revision": {
+            "token": {
+              "context": "ctx/1:a68ab8ebcbe80659dcd95aa9ecee16c80053a9c913659ddc55147fd336c7661e",
+              "generation": "gen/1:f0304e89-b14c-426a-9b7d-58e95b977591"
+            },
+            "revision": "rev/1:f0304e89-b14c-426a-9b7d-58e95b977591:4",
+            "sequence": 4,
+            "publishedAt": 1789663989396,
+            "cause": "request",
+            "fingerprints": {
+              "inputId": "input/1:48603ff96cb449447f0e45fcb2c2bb53c7c618aeaa6ac9b82226ad425e662f7f",
+              "declarations": "5d3cf6d634f3a94487d32e58376aa0f1e4ee6dd22e13664dc3c2613ead1608fc",
+              "source": "f8926b794efd85e5d9b535cfde1963fe18e25da6a5088999af84c472c394f3ca",
+              "configuration": "2a138ceeec9c3a655f1de437f5f57b5827636115b799b686c23d63e4337619af",
+              "registry": "1080a60800d9e5bddc69f51489c636a776bacaadb5368f46db4aa0947c67e3ba",
+              "engine": "15ffbb4f9f5a3d2d22aa435e1835d6bfe262aca8bdfdc376f1245df846065b97"
+            },
+            "changed": [
+              "subs/consumer/src",
+              "subs/consumer/src/use-again.ts"
+            ],
+            "checked": {
+              "path": "membership",
+              "files": [
+                "subs/consumer/src/use-again.ts"
+              ],
+              "accesses": 1,
+              "modelRebuilt": true
+            },
+            "delta": {
+              "added": 1,
+              "removed": 0,
+              "positionOnly": 0
+            },
+            "timings": {
+              "classify": 0.3941720000002533,
+              "inventory": 2.226039000000128,
+              "compiler": 6.900520000000142,
+              "descriptions": 3.724099000000024,
+              "accesses": 0.825036000000182,
+              "link": 1.9002870000003895,
+              "decide": 0.7405769999995755,
+              "publish": 0.30763499999920896,
+              "total": 18.816365000000587
+            },
+            "capture": {
+              "invocationCheck": 0.3945579999999609,
+              "promotion": 1.2708399999992253,
+              "workerStatus": 0.10633400000006077,
+              "workerRoundTrip": 62.49463800000012,
+              "sweep": 42.27998600000046,
+              "watch": null
+            },
+            "outcome": {
+              "execution": "completed",
+              "check": "failed",
+              "coverage": "complete"
+            },
+            "summary": {
+              "complete": true,
+              "owners": 3,
+              "sourceFiles": 5,
+              "resources": 0,
+              "originals": 5,
+              "accesses": 3,
+              "allowed": 0,
+              "denied": 2,
+              "errors": 2,
+              "warnings": 0,
+              "coverageNotes": 0,
+              "external": 1
+            }
+          },
+          "edge": "4:edge16:fixture/consumer16:fixture/provider",
+          "accessCount": 2,
+          "link": "dependency-edge/1:imported-module:37e849082fcabf6d71426548394fb48d38d5e1218f4383c54c503493466366a3",
+          "linkCounts": {
+            "behavioralUsedOriginals": 0,
+            "nonBehavioralUsedOriginals": 1
+          },
+          "supportingOccurrences": 2
+        },
+        "exposure": {
+          "revision": {
+            "token": {
+              "context": "ctx/1:a68ab8ebcbe80659dcd95aa9ecee16c80053a9c913659ddc55147fd336c7661e",
+              "generation": "gen/1:f0304e89-b14c-426a-9b7d-58e95b977591"
+            },
+            "revision": "rev/1:f0304e89-b14c-426a-9b7d-58e95b977591:5",
+            "sequence": 5,
+            "publishedAt": 1789663990784,
+            "cause": "request",
+            "fingerprints": {
+              "inputId": "input/1:6ccc0a54454ed8cd28d060f9bf8bd9f9998b7987d149b9b78954c38cf6ff5ffc",
+              "declarations": "d10bd4160d220703ae8dc4c70154f26cc19be4fdc7b44d74e6ee25b951936946",
+              "source": "f8926b794efd85e5d9b535cfde1963fe18e25da6a5088999af84c472c394f3ca",
+              "configuration": "2a138ceeec9c3a655f1de437f5f57b5827636115b799b686c23d63e4337619af",
+              "registry": "1080a60800d9e5bddc69f51489c636a776bacaadb5368f46db4aa0947c67e3ba",
+              "engine": "15ffbb4f9f5a3d2d22aa435e1835d6bfe262aca8bdfdc376f1245df846065b97"
+            },
+            "changed": [
+              "subs/provider/module.ramify"
+            ],
+            "checked": {
+              "path": "description",
+              "files": [],
+              "accesses": 2,
+              "modelRebuilt": true
+            },
+            "delta": {
+              "added": 0,
+              "removed": 0,
+              "positionOnly": 2
+            },
+            "timings": {
+              "classify": 0.4186650000001464,
+              "inventory": 1.0360659999996642,
+              "compiler": 0,
+              "descriptions": 0,
+              "accesses": 0,
+              "link": 1.3544480000000476,
+              "decide": 0.5691720000004352,
+              "publish": 0.2542859999994107,
+              "total": 3.806942000000163
+            },
+            "capture": {
+              "invocationCheck": 0.44879600000058417,
+              "promotion": 0.015754999999444408,
+              "workerStatus": 0.07644499999969412,
+              "workerRoundTrip": 43.099019999999655,
+              "sweep": 37.60024599999997,
+              "watch": null
+            },
+            "outcome": {
+              "execution": "completed",
+              "check": "failed",
+              "coverage": "complete"
+            },
+            "summary": {
+              "complete": true,
+              "owners": 3,
+              "sourceFiles": 5,
+              "resources": 0,
+              "originals": 5,
+              "accesses": 3,
+              "allowed": 0,
+              "denied": 2,
+              "errors": 2,
+              "warnings": 0,
+              "coverageNotes": 0,
+              "external": 1
+            }
+          },
+          "export": "extra",
+          "destinations": [
+            "parent"
+          ]
+        }
+      },
+      "rs14": {
+        "killedDaemonPid": 159326,
+        "killedAt": 1789664005093,
+        "noticeText": "Reconnecting to the daemon: Daemon socket closed unexpectedly",
+        "modelKeptDuringOutage": "Revision rev/1:f0304e89-b14c-426a-9b7d-58e95b977591:15",
+        "restartedDaemon": {
+          "pid": 160235,
+          "instanceId": "f0c94ece-efb1-40a7-bcbd-c1287ae23317",
+          "startedAt": 1789664006203
+        },
+        "serverStatusAfterRecovery": {
+          "root": "/tmp/ramify-explorer-acceptance-wUhMtK/mutations-xEXRAg",
+          "binding": "ready",
+          "message": null,
+          "published": null,
+          "daemonPid": 160235
+        },
+        "revisionBeforeKill": "rev/1:f0304e89-b14c-426a-9b7d-58e95b977591:15",
+        "revisionAfterRecovery": "rev/1:6734da75-f1db-4039-b42e-31f3cbc1a38a:1",
+        "generationBefore": "f0304e89-b14c-426a-9b7d-58e95b977591",
+        "generationAfter": "6734da75-f1db-4039-b42e-31f3cbc1a38a",
+        "recoveredUrl": "http://127.0.0.1:41907/analysis/latest",
+        "serverRestartedDaemon": true,
+        "bindingLog": [
+          "{\"at\":\"2026-09-17T16:53:04.102Z\",\"level\":\"info\",\"event\":\"binding-ready\",\"message\":\"Context ctx/1:a68ab8ebcbe80659dcd95aa9ecee16c80053a9c913659ddc55147fd336c7661e generation gen/1:f0304e89-b14c-426a-9b7d-58e95b977591\"}",
+          "{\"at\":\"2026-09-17T16:53:25.097Z\",\"level\":\"warn\",\"event\":\"binding-retrying\",\"message\":\"Daemon socket closed unexpectedly\"}",
+          "{\"at\":\"2026-09-17T16:53:26.338Z\",\"level\":\"info\",\"event\":\"binding-ready\",\"message\":\"Context ctx/1:a68ab8ebcbe80659dcd95aa9ecee16c80053a9c913659ddc55147fd336c7661e generation gen/1:6734da75-f1db-4039-b42e-31f3cbc1a38a\"}"
+        ],
+        "memory": {
+          "edits": [
+            {
+              "cycle": 1,
+              "revision": "rev/1:f0304e89-b14c-426a-9b7d-58e95b977591:6"
+            },
+            {
+              "cycle": 2,
+              "revision": "rev/1:f0304e89-b14c-426a-9b7d-58e95b977591:7"
+            },
+            {
+              "cycle": 3,
+              "revision": "rev/1:f0304e89-b14c-426a-9b7d-58e95b977591:8"
+            },
+            {
+              "cycle": 4,
+              "revision": "rev/1:f0304e89-b14c-426a-9b7d-58e95b977591:9"
+            },
+            {
+              "cycle": 5,
+              "revision": "rev/1:f0304e89-b14c-426a-9b7d-58e95b977591:10"
+            },
+            {
+              "cycle": 6,
+              "revision": "rev/1:f0304e89-b14c-426a-9b7d-58e95b977591:11"
+            },
+            {
+              "cycle": 7,
+              "revision": "rev/1:f0304e89-b14c-426a-9b7d-58e95b977591:12"
+            },
+            {
+              "cycle": 8,
+              "revision": "rev/1:f0304e89-b14c-426a-9b7d-58e95b977591:13"
+            },
+            {
+              "cycle": 9,
+              "revision": "rev/1:f0304e89-b14c-426a-9b7d-58e95b977591:14"
+            },
+            {
+              "cycle": 10,
+              "revision": "rev/1:f0304e89-b14c-426a-9b7d-58e95b977591:15"
+            }
+          ],
+          "before": {
+            "server": {
+              "pid": 159314,
+              "rssBytes": 79716352,
+              "peakRssBytes": 89903104
+            },
+            "daemon": {
+              "pid": 159326,
+              "rssBytes": 64475136,
+              "peakRssBytes": 71081984,
+              "descendants": [
+                {
+                  "pid": 159351,
+                  "rssBytes": 106176512
+                },
+                {
+                  "pid": 159392,
+                  "rssBytes": 73924608
+                }
+              ],
+              "treeRssBytes": 244576256
+            }
+          },
+          "afterTenEdits": {
+            "server": {
+              "pid": 159314,
+              "rssBytes": 80613376,
+              "peakRssBytes": 89903104
+            },
+            "daemon": {
+              "pid": 159326,
+              "rssBytes": 70242304,
+              "peakRssBytes": 71081984,
+              "descendants": [
+                {
+                  "pid": 159351,
+                  "rssBytes": 109920256
+                },
+                {
+                  "pid": 159392,
+                  "rssBytes": 74055680
+                }
+              ],
+              "treeRssBytes": 254218240
+            }
+          },
+          "afterRecovery": {
+            "server": {
+              "pid": 159314,
+              "rssBytes": 82726912,
+              "peakRssBytes": 89903104
+            },
+            "daemon": {
+              "pid": 160235,
+              "rssBytes": 65536000,
+              "peakRssBytes": 65536000,
+              "descendants": [
+                {
+                  "pid": 160260,
+                  "rssBytes": 98422784
+                },
+                {
+                  "pid": 160301,
+                  "rssBytes": 58851328
+                }
+              ],
+              "treeRssBytes": 222810112
+            }
+          }
+        }
+      },
+      "rs15": {
+        "stop": {
+          "exitCode": 0,
+          "stdout": "Stopped: daemon stopped explicitly\n",
+          "stderr": ""
+        },
+        "stoppedStatus": {
+          "root": "/tmp/ramify-explorer-acceptance-wUhMtK/mutations-xEXRAg",
+          "binding": "daemon-stopped",
+          "message": null,
+          "published": null,
+          "daemonPid": null
+        },
+        "stoppedNotice": "The daemon was stopped explicitly",
+        "stoppedObservations": [
+          {
+            "atMs": 4000,
+            "binding": "daemon-stopped",
+            "daemonPid": null,
+            "record": {
+              "pid": 160235,
+              "state": "stopped",
+              "stopped": {
+                "at": 1789664008163,
+                "reason": "explicit",
+                "requestId": "1"
+              }
+            },
+            "daemonAlive": false
+          },
+          {
+            "atMs": 8000,
+            "binding": "daemon-stopped",
+            "daemonPid": null,
+            "record": {
+              "pid": 160235,
+              "state": "stopped",
+              "stopped": {
+                "at": 1789664008163,
+                "reason": "explicit",
+                "requestId": "1"
+              }
+            },
+            "daemonAlive": false
+          },
+          {
+            "atMs": 12000,
+            "binding": "daemon-stopped",
+            "daemonPid": null,
+            "record": {
+              "pid": 160235,
+              "state": "stopped",
+              "stopped": {
+                "at": 1789664008163,
+                "reason": "explicit",
+                "requestId": "1"
+              }
+            },
+            "daemonAlive": false
+          },
+          {
+            "atMs": 16000,
+            "binding": "daemon-stopped",
+            "daemonPid": null,
+            "record": {
+              "pid": 160235,
+              "state": "stopped",
+              "stopped": {
+                "at": 1789664008163,
+                "reason": "explicit",
+                "requestId": "1"
+              }
+            },
+            "daemonAlive": false
+          }
+        ],
+        "check": {
+          "exitCode": 1,
+          "durationMs": 735.8577000000078,
+          "startedAt": 1789664024394
+        },
+        "daemonStartedByCheck": {
+          "pid": 160437,
+          "startedAt": 1789664024494,
+          "instanceId": "9d5abea8-a509-482f-9ca5-86e649d14a9f"
+        },
+        "resumedStatus": {
+          "root": "/tmp/ramify-explorer-acceptance-wUhMtK/mutations-xEXRAg",
+          "binding": "ready",
+          "message": null,
+          "published": {
+            "token": {
+              "context": "ctx/1:a68ab8ebcbe80659dcd95aa9ecee16c80053a9c913659ddc55147fd336c7661e",
+              "generation": "gen/1:93d9f2b0-d3ac-436d-bf37-819d64ef6131"
+            },
+            "revision": "rev/1:93d9f2b0-d3ac-436d-bf37-819d64ef6131:1",
+            "sequence": 1,
+            "publishedAt": 1789664025066,
+            "cause": "open",
+            "fingerprints": {
+              "inputId": "input/1:8c9805d7498d49cfe38d1072ef9563393ba11f8a04531f23ffa52b59092f2971",
+              "declarations": "d10bd4160d220703ae8dc4c70154f26cc19be4fdc7b44d74e6ee25b951936946",
+              "source": "685f4fb247af80724a251401619c6eb0517eef9beb897fc3d62a982ee4538f73",
+              "configuration": "2a138ceeec9c3a655f1de437f5f57b5827636115b799b686c23d63e4337619af",
+              "registry": "1080a60800d9e5bddc69f51489c636a776bacaadb5368f46db4aa0947c67e3ba",
+              "engine": "15ffbb4f9f5a3d2d22aa435e1835d6bfe262aca8bdfdc376f1245df846065b97"
+            },
+            "changed": [],
+            "checked": {
+              "path": "cold",
+              "files": [
+                "src/index.ts",
+                "subs/consumer/src/npm-only.ts",
+                "subs/consumer/src/use-again.ts",
+                "subs/consumer/src/use.ts",
+                "subs/provider/src/interfaces/api.ts"
+              ],
+              "accesses": 3,
+              "modelRebuilt": true
+            },
+            "delta": {
+              "added": 2,
+              "removed": 0,
+              "positionOnly": 0
+            },
+            "timings": {
+              "classify": 0,
+              "inventory": 113.46458399999999,
+              "compiler": 144.566672,
+              "descriptions": 18.334280999999976,
+              "accesses": 5.139395000000036,
+              "link": 4.370186999999987,
+              "decide": 1.483553000000029,
+              "publish": 1.3567490000000362,
+              "total": 349.97779399999996
+            },
+            "capture": {
+              "invocationCheck": 0,
+              "promotion": 0,
+              "workerStatus": 0,
+              "workerRoundTrip": 0,
+              "sweep": 0,
+              "watch": null
+            },
+            "outcome": {
+              "execution": "completed",
+              "check": "failed",
+              "coverage": "complete"
+            },
+            "summary": {
+              "complete": true,
+              "owners": 3,
+              "sourceFiles": 5,
+              "resources": 0,
+              "originals": 5,
+              "accesses": 3,
+              "allowed": 0,
+              "denied": 2,
+              "errors": 2,
+              "warnings": 0,
+              "coverageNotes": 0,
+              "external": 1
+            }
+          },
+          "daemonPid": 160437
+        },
+        "resumeMs": 3294.1422999999922
+      },
+      "rs16": {
+        "reuse": {
+          "exitCode": 0,
+          "stdout": "Explorer: http://127.0.0.1:41907/analysis/latest\n",
+          "stderr": "Warning: Could not open the browser: Cannot run xdg-open (ENOENT)\n",
+          "durationMs": 34.83896300001652,
+          "explorerPidsBefore": [
+            159314
+          ],
+          "explorerPidsAfter": [
+            159314
+          ],
+          "serverPid": 159314
+        },
+        "separate": {
+          "exitCode": 0,
+          "stdout": "Explorer: http://127.0.0.1:41877/analysis/latest\n",
+          "durationMs": 478.0334270000167,
+          "url": "http://127.0.0.1:41877/analysis/latest",
+          "pid": 160579,
+          "port": 41877,
+          "projectKey": "7a5527c133ba8435",
+          "status": {
+            "root": "/tmp/ramify-explorer-acceptance-wUhMtK/mutations-ZdlOOs",
+            "binding": "ready",
+            "message": null,
+            "published": {
+              "token": {
+                "context": "ctx/1:7a5527c133ba843507bc61ed2f2c67988a4aeac2fd2b508ffa0e0b7d5260715b",
+                "generation": "gen/1:da80fd50-9c83-47ab-a041-e9a8ba50a937"
+              },
+              "revision": "rev/1:da80fd50-9c83-47ab-a041-e9a8ba50a937:1",
+              "sequence": 1,
+              "publishedAt": 1789664029150,
+              "cause": "open",
+              "fingerprints": {
+                "inputId": "input/1:c2e02191ce505843e32458da44ecd487801bb76a26b9bc92ba678c412319dfe3",
+                "declarations": "5d3cf6d634f3a94487d32e58376aa0f1e4ee6dd22e13664dc3c2613ead1608fc",
+                "source": "e8dd4e77d1f3a75e195e54d2ebf8c42f26d981addf6b7851daac4f6b7cbda5d1",
+                "configuration": "2a138ceeec9c3a655f1de437f5f57b5827636115b799b686c23d63e4337619af",
+                "registry": "1080a60800d9e5bddc69f51489c636a776bacaadb5368f46db4aa0947c67e3ba",
+                "engine": "15ffbb4f9f5a3d2d22aa435e1835d6bfe262aca8bdfdc376f1245df846065b97"
+              },
+              "changed": [],
+              "checked": {
+                "path": "cold",
+                "files": [
+                  "src/index.ts",
+                  "subs/consumer/src/use.ts",
+                  "subs/provider/src/interfaces/api.ts"
+                ],
+                "accesses": 1,
+                "modelRebuilt": true
+              },
+              "delta": {
+                "added": 1,
+                "removed": 0,
+                "positionOnly": 0
+              },
+              "timings": {
+                "classify": 0,
+                "inventory": 109.55717899999999,
+                "compiler": 137.29210600000002,
+                "descriptions": 10.605415999999991,
+                "accesses": 3.0004630000000247,
+                "link": 3.595629000000031,
+                "decide": 1.1677569999999946,
+                "publish": 1.219220000000007,
+                "total": 316.60066900000004
+              },
+              "capture": {
+                "invocationCheck": 0,
+                "promotion": 0,
+                "workerStatus": 0,
+                "workerRoundTrip": 0,
+                "sweep": 0,
+                "watch": null
+              },
+              "outcome": {
+                "execution": "completed",
+                "check": "failed",
+                "coverage": "complete"
+              },
+              "summary": {
+                "complete": true,
+                "owners": 3,
+                "sourceFiles": 3,
+                "resources": 0,
+                "originals": 3,
+                "accesses": 1,
+                "allowed": 0,
+                "denied": 1,
+                "errors": 1,
+                "warnings": 0,
+                "coverageNotes": 0,
+                "external": 0
+              }
+            },
+            "daemonPid": 160437
+          },
+          "stoppedRecord": {
+            "state": "stopped",
+            "stopped": {
+              "at": 1789664029250,
+              "reason": "explicit"
+            }
+          }
+        },
+        "firstProjectKey": "a68ab8ebcbe80659"
+      },
+      "daemonAtStart": {
+        "pid": 159326,
+        "startedAt": 1789663983916
+      },
+      "daemonAtEnd": {
+        "pid": 160437,
+        "instanceId": "9d5abea8-a509-482f-9ca5-86e649d14a9f",
+        "state": "running",
+        "stopped": null,
+        "startedAt": 1789664024494,
+        "alive": true
+      }
+    },
+    "forwarding": {
+      "root": "/tmp/ramify-explorer-acceptance-wUhMtK/forwarding-UJrH8i",
+      "revision": "rev/1:f17b4152-2e29-4cf9-8904-db11f82b9656:1",
+      "inputId": "input/1:fdb6f77deffb758c1c0818f38dfdd15457dbb83e383d5b0ac1a8976570f35adf",
+      "checkOutcome": {
+        "execution": "completed",
+        "check": "failed",
+        "coverage": "complete"
+      },
+      "project": {
+        "behavioral": 2,
+        "nonBehavioral": 3
+      },
+      "partial": {
+        "state": "partial",
+        "text": "Partial coverage: 1 unknown dependency omitted",
+        "coverage": {
+          "unknownDependencies": 1,
+          "limitIds": [
+            "behavior-limit/1:cc70272606018a524930ed4db11c5c8e442295eb877e3e2e728d9911dac94e23"
+          ]
+        },
+        "coverageWarning": "Some dependencies were omitted: 1 unknown dependency (1 coverage limit)."
+      },
+      "stateHistory": [
+        "idle",
+        "analyzing",
+        "partial"
+      ],
+      "modules": [
+        "fixture",
+        "fixture/a",
+        "fixture/b",
+        "fixture/b/a",
+        "fixture/c",
+        "fixture/d",
+        "fixture/e"
+      ],
+      "importedModuleEdges": [
+        {
+          "consumer": "fixture/a",
+          "provider": "fixture/b",
+          "counts": {
+            "behavioralUsedOriginals": 1,
+            "nonBehavioralUsedOriginals": 1
+          },
+          "status": [
+            "act:allowed",
+            "secret:denied"
+          ]
+        },
+        {
+          "consumer": "fixture/b",
+          "provider": "fixture/b/a",
+          "counts": {
+            "behavioralUsedOriginals": 0,
+            "nonBehavioralUsedOriginals": 2
+          },
+          "status": [
+            "act:allowed",
+            "secret:denied"
+          ]
+        },
+        {
+          "consumer": "fixture/d",
+          "provider": "fixture/b",
+          "counts": {
+            "behavioralUsedOriginals": 1,
+            "nonBehavioralUsedOriginals": 0
+          },
+          "status": [
+            "act:allowed"
+          ]
+        },
+        {
+          "consumer": "fixture/d",
+          "provider": "fixture/b/a",
+          "counts": {
+            "behavioralUsedOriginals": 1,
+            "nonBehavioralUsedOriginals": 0
+          },
+          "status": [
+            "act:allowed"
+          ]
+        }
+      ],
+      "originalOwnerEdges": [
+        {
+          "consumer": "fixture/a",
+          "provider": "fixture/b/a",
+          "counts": {
+            "behavioral": 1,
+            "nonBehavioral": 1
+          },
+          "importedThrough": [
+            "fixture/b"
+          ]
+        },
+        {
+          "consumer": "fixture/b",
+          "provider": "fixture/b/a",
+          "counts": {
+            "behavioral": 0,
+            "nonBehavioral": 2
+          },
+          "importedThrough": [
+            "fixture/b/a"
+          ]
+        },
+        {
+          "consumer": "fixture/d",
+          "provider": "fixture/b/a",
+          "counts": {
+            "behavioral": 1,
+            "nonBehavioral": 0
+          },
+          "importedThrough": [
+            "fixture/b",
+            "fixture/b/a"
+          ]
+        }
+      ],
+      "dom": {
+        "defaultLinks": 3,
+        "ownerLinksWithNonBehavioral": 3,
+        "importedStatus": "denied",
+        "importedRows": [
+          {
+            "original": "act",
+            "paths": [
+              {
+                "classification": "behavioral",
+                "status": "allowed",
+                "occurrences": "Supporting occurrences: 1"
+              }
+            ]
+          },
+          {
+            "original": "secret",
+            "paths": [
+              {
+                "classification": "non-behavioral",
+                "status": "denied",
+                "occurrences": "Supporting occurrences: 1"
+              }
+            ]
+          }
+        ],
+        "ownerThrough": [
+          "fixture/b"
+        ],
+        "ownerRows": [
+          {
+            "original": "act",
+            "paths": [
+              {
+                "classification": "behavioral",
+                "status": "allowed",
+                "occurrences": "Supporting occurrences: 1"
+              }
+            ]
+          },
+          {
+            "original": "secret",
+            "paths": [
+              {
+                "classification": "non-behavioral",
+                "status": "denied",
+                "occurrences": "Supporting occurrences: 1"
+              }
+            ]
+          }
+        ],
+        "bothBoundaries": {
+          "defaultLinksFromD": 2,
+          "ownerLink": "dependency-edge/1:original-owner:b3f1f4b925ac35e6448b8e3ecd2e2680e052ed12b3d2a8faf3f94cd0eb0abc69",
+          "cards": {
+            "behavioral": 1,
+            "nonBehavioral": 0,
+            "note": "not drawn"
+          },
+          "importedThrough": [
+            "fixture/b",
+            "fixture/b/a"
+          ],
+          "uses": {
+            "behavioral": 1,
+            "nonBehavioral": 0,
+            "note": "not drawn"
+          }
+        }
+      },
+      "dependencyViewRequests": {
+        "total": 2,
+        "beforeControls": 2
+      },
+      "counters": {
+        "behaviorRuns": 1,
+        "dependencyDiagrams": 1,
+        "dependencyDiagramInputChanges": 0,
+        "retainedBytes": 69954,
+        "daemonPid": 160669,
+        "analyzerProcesses": 0
+      }
+    },
+    "dependencies": {
+      "root": "/tmp/ramify-explorer-acceptance-wUhMtK/dependency-mutation-L3Pq9f",
+      "zeroRuns": {
+        "ordinaryCheck": {
+          "exitCode": 0,
+          "durationMs": 347
+        },
+        "changedFileCheck": {
+          "exitCode": 0,
+          "durationMs": 42,
+          "changed": "subs/consumer/src/use.ts"
+        },
+        "clientCheck": "rev/1:ec68f7ee-2b0b-4520-8ad3-8f2968e5c919:4",
+        "counters": {
+          "behaviorRuns": 0,
+          "dependencyDiagrams": 0,
+          "dependencyDiagramInputChanges": 0,
+          "retainedBytes": 143576,
+          "daemonPid": 160867,
+          "analyzerProcesses": 0
+        }
+      },
+      "firstDiagram": {
+        "revision": "rev/1:ec68f7ee-2b0b-4520-8ad3-8f2968e5c919:4",
+        "inputId": "input/1:08e40d46d3510ad4cd3d8f1c1ccfe3bec126fdf33bc0fa377555562bc66ea8b8",
+        "project": {
+          "behavioral": 1,
+          "nonBehavioral": 1
+        },
+        "browserDependencyViewRequests": 2
+      },
+      "memory": {
+        "daemonWithoutRetainedDiagram": {
+          "behaviorRuns": 0,
+          "dependencyDiagrams": 0,
+          "dependencyDiagramInputChanges": 0,
+          "retainedBytes": 143576,
+          "daemonPid": 160867,
+          "analyzerProcesses": 0,
+          "tree": {
+            "pid": 160867,
+            "rssBytes": 65986560,
+            "peakRssBytes": 65986560,
+            "descendants": [
+              {
+                "pid": 160892,
+                "rssBytes": 101920768
+              },
+              {
+                "pid": 160958,
+                "rssBytes": 46923776
+              }
+            ],
+            "treeRssBytes": 214831104
+          },
+          "heap": {
+            "rss": 65986560,
+            "heapUsed": 8919216,
+            "external": 2467248
+          }
+        },
+        "daemonWithRetainedDiagram": {
+          "behaviorRuns": 1,
+          "dependencyDiagrams": 1,
+          "dependencyDiagramInputChanges": 0,
+          "retainedBytes": 144947,
+          "daemonPid": 160867,
+          "analyzerProcesses": 0,
+          "tree": {
+            "pid": 160867,
+            "rssBytes": 66248704,
+            "peakRssBytes": 66248704,
+            "descendants": [
+              {
+                "pid": 160892,
+                "rssBytes": 103755776
+              },
+              {
+                "pid": 160958,
+                "rssBytes": 46923776
+              }
+            ],
+            "treeRssBytes": 216928256
+          },
+          "heap": {
+            "rss": 66248704,
+            "heapUsed": 9757328,
+            "external": 2873378
+          }
+        },
+        "analyzer": {
+          "samples": 48,
+          "processes": [
+            {
+              "pid": 161055,
+              "role": "analyzer",
+              "firstSeenMs": 341,
+              "lastSeenMs": 985,
+              "peakRssBytes": 83427328
+            },
+            {
+              "pid": 161066,
+              "role": "configuration-helper",
+              "firstSeenMs": 432,
+              "lastSeenMs": 481,
+              "peakRssBytes": 63045632
+            },
+            {
+              "pid": 161080,
+              "role": "compiler-helper",
+              "firstSeenMs": 529,
+              "lastSeenMs": 940,
+              "peakRssBytes": 91242496
+            },
+            {
+              "pid": 161087,
+              "role": "native-compiler",
+              "firstSeenMs": 625,
+              "lastSeenMs": 941,
+              "peakRssBytes": 44564480
+            }
+          ],
+          "peakCombinedRssBytes": 213504000,
+          "peakRssBytes": {
+            "analyzer": 83427328,
+            "configuration-helper": 63045632,
+            "compiler-helper": 91242496,
+            "native-compiler": 44564480
+          }
+        },
+        "server": {
+          "atStart": {
+            "pid": 160855,
+            "rssBytes": 83755008,
+            "peakRssBytes": 83755008
+          },
+          "afterReady": {
+            "pid": 160855,
+            "rssBytes": 86114304,
+            "peakRssBytes": 86114304
+          },
+          "beforeClose": {
+            "pid": 160855,
+            "rssBytes": 81846272,
+            "peakRssBytes": 88997888
+          }
+        }
+      },
+      "afterAnalysis": {
+        "staleRevision": "rev/1:ec68f7ee-2b0b-4520-8ad3-8f2968e5c919:4",
+        "newerRevision": "rev/1:ec68f7ee-2b0b-4520-8ad3-8f2968e5c919:5",
+        "staleStatus": {
+          "state": "stale",
+          "text": "Stale dependency diagram for input input/1:08e40d46d3510ad4cd3d8f1c1ccfe3bec126fdf33bc0fa377555562bc66ea8b8. Refresh to update."
+        },
+        "staleCards": {
+          "behavioral": 1,
+          "nonBehavioral": 1,
+          "note": "not drawn"
+        },
+        "staleLinks": [
+          "dependency-edge/1:imported-module:37e849082fcabf6d71426548394fb48d38d5e1218f4383c54c503493466366a3"
+        ],
+        "refreshedInputId": "input/1:bc10e62581b541274a3cfccf7b78e5698f720e6d4987f645750a31b9a4a1e24f",
+        "refreshedCards": {
+          "behavioral": 2,
+          "nonBehavioral": 1,
+          "note": "not drawn"
+        },
+        "retainedBytes": {
+          "withDiagram": 144947,
+          "afterNewerPublication": 181204
+        }
+      },
+      "hiddenPolling": {
+        "waitingRevision": "rev/1:ec68f7ee-2b0b-4520-8ad3-8f2968e5c919:6",
+        "otherContext": "ctx/1:11b92d5017b906ffdbad5b8327749ca7ab22bfa523a53b0bf40996f65527fd36",
+        "otherDiagram": {
+          "inputId": "input/1:d01c5f00adf0e7e9b7cbe309b6b4a15ef0bea197ce1d865ad5fb0644fdcb68b9"
+        },
+        "visibleWaitingRequestTimes": [
+          141943,
+          142951,
+          145437
+        ],
+        "pendingAtHide": {
+          "state": "analyzing",
+          "text": "Computing behavioral dependencies"
+        },
+        "otherRunningAtHide": true,
+        "serverPhasesOverHttp": [
+          "pending/waiting",
+          "pending/waiting",
+          "pending/waiting",
+          "pending/waiting",
+          "pending/waiting",
+          "pending/analyzing",
+          "pending/waiting",
+          "pending/waiting",
+          "pending/waiting",
+          "pending/analyzing",
+          "pending/waiting",
+          "pending/waiting"
+        ],
+        "hiddenMs": 3100,
+        "hiddenRequests": 0,
+        "hiddenState": {
+          "state": "analyzing",
+          "text": "Computing behavioral dependencies"
+        },
+        "stateHistory": [
+          "analyzing",
+          "complete"
+        ],
+        "resumedRequests": 2,
+        "minimumVisibleGapMs": 1009,
+        "resumedProject": {
+          "behavioral": 1,
+          "nonBehavioral": 1
+        }
+      },
+      "unavailable": {
+        "revision": "rev/1:ec68f7ee-2b0b-4520-8ad3-8f2968e5c919:7",
+        "killedAnalyzer": 161343,
+        "status": {
+          "state": "unavailable",
+          "text": "Dependency diagram unavailable: analysis-failed: analysis-failed: Dependency analyzer process exited with SIGKILL."
+        },
+        "pollingStoppedFor": 3000,
+        "stateHistory": [
+          "idle",
+          "analyzing",
+          "unavailable"
+        ],
+        "counters": {
+          "behaviorRuns": 4,
+          "dependencyDiagrams": 5,
+          "dependencyDiagramInputChanges": 0,
+          "retainedBytes": 254726,
+          "daemonPid": 160867,
+          "analyzerProcesses": 0
+        }
+      },
+      "duringJob": {
+        "attempts": [
+          {
+            "attempt": 1,
+            "revision": "rev/1:ec68f7ee-2b0b-4520-8ad3-8f2968e5c919:8",
+            "newerRevision": "rev/1:ec68f7ee-2b0b-4520-8ad3-8f2968e5c919:9",
+            "analyzerPid": 161361,
+            "analyzerAliveAtEdit": true,
+            "reached": "superseded",
+            "analyzerExitFromEditMs": 51,
+            "counters": {
+              "before": {
+                "behaviorRuns": 4,
+                "dependencyDiagrams": 5,
+                "dependencyDiagramInputChanges": 0,
+                "retainedBytes": 292354,
+                "daemonPid": 160867,
+                "analyzerProcesses": 0
+              },
+              "after": {
+                "behaviorRuns": 4,
+                "dependencyDiagrams": 6,
+                "dependencyDiagramInputChanges": 0,
+                "retainedBytes": 292354,
+                "daemonPid": 160867,
+                "analyzerProcesses": 0
+              }
+            }
+          }
+        ],
+        "witness": {
+          "attempt": 1,
+          "revision": "rev/1:ec68f7ee-2b0b-4520-8ad3-8f2968e5c919:8",
+          "newerRevision": "rev/1:ec68f7ee-2b0b-4520-8ad3-8f2968e5c919:9",
+          "analyzerPid": 161361,
+          "analyzerAliveAtEdit": true,
+          "reached": "superseded",
+          "analyzerExitFromEditMs": 51,
+          "counters": {
+            "before": {
+              "behaviorRuns": 4,
+              "dependencyDiagrams": 5,
+              "dependencyDiagramInputChanges": 0,
+              "retainedBytes": 292354,
+              "daemonPid": 160867,
+              "analyzerProcesses": 0
+            },
+            "after": {
+              "behaviorRuns": 4,
+              "dependencyDiagrams": 6,
+              "dependencyDiagramInputChanges": 0,
+              "retainedBytes": 292354,
+              "daemonPid": 160867,
+              "analyzerProcesses": 0
+            }
+          },
+          "pollingStoppedFor": 3000,
+          "stateHistory": [
+            "idle",
+            "analyzing",
+            "superseded"
+          ],
+          "matching": {
+            "inputId": "input/1:fd364d651bab630e222734107bfaa30bbc0fc0ad5e3842dc81ab73574901166f",
+            "project": {
+              "behavioral": 1,
+              "nonBehavioral": 1
+            }
+          },
+          "inputsChanged": 0
+        }
+      },
+      "late": {
+        "heldRevision": "rev/1:ec68f7ee-2b0b-4520-8ad3-8f2968e5c919:10",
+        "heldInputId": "input/1:4b26c20e407f684b940357410c29035150c8e0114442e0b6c5b82a19ab28f04c",
+        "heldBodyBytes": 6444,
+        "heldAnswer": "ready",
+        "currentRevision": "rev/1:ec68f7ee-2b0b-4520-8ad3-8f2968e5c919:11",
+        "currentInputId": "input/1:9113261ae27cb5324d19fb7b778f1219b1559afaae3f2cccbc9811d417b70164",
+        "shownCards": {
+          "behavioral": 1,
+          "nonBehavioral": 1,
+          "note": "not drawn"
+        },
+        "settledPage": {
+          "listeners": 37,
+          "listenerTypes": {
+            "DOMContentLoaded": 1,
+            "selectionchange": 1,
+            "visibilitychange": 1,
+            "keydown": 5,
+            "keyup": 5,
+            "blur": 5,
+            "contextmenu": 6,
+            "resize": 1,
+            "__playwright_global_listeners_check__": 1,
+            "mousemove": 1,
+            "pointerdown": 1,
+            "pointerup": 1,
+            "touchstart": 1,
+            "touchend": 1,
+            "touchcancel": 1,
+            "mousedown": 1,
+            "mouseup": 1,
+            "click": 1,
+            "auxclick": 1,
+            "dblclick": 1
+          },
+          "intervals": 1,
+          "timeouts": 0,
+          "models": 1,
+          "graphNodes": 2,
+          "graphEdges": 1,
+          "revision": "Revision rev/1:ec68f7ee-2b0b-4520-8ad3-8f2968e5c919:11"
+        }
+      },
+      "close": {
+        "revision": "rev/1:ec68f7ee-2b0b-4520-8ad3-8f2968e5c919:12",
+        "analyzerPid": 161549,
+        "serverExitMs": 101,
+        "analyzerAliveAtServerExit": false,
+        "analyzerExitFromCloseMs": 9,
+        "settledAfterCloseMs": 1291,
+        "counters": {
+          "before": {
+            "behaviorRuns": 7,
+            "dependencyDiagrams": 9,
+            "dependencyDiagramInputChanges": 0,
+            "retainedBytes": 295822,
+            "daemonPid": 160867,
+            "analyzerProcesses": 0
+          },
+          "after": {
+            "behaviorRuns": 7,
+            "dependencyDiagrams": 10,
+            "dependencyDiagramInputChanges": 0,
+            "retainedBytes": 295822,
+            "daemonPid": 160867,
+            "analyzerProcesses": 0,
+            "tree": {
+              "pid": 160867,
+              "rssBytes": 67473408,
+              "peakRssBytes": 87302144,
+              "descendants": [
+                {
+                  "pid": 160892,
+                  "rssBytes": 107999232
+                },
+                {
+                  "pid": 161176,
+                  "rssBytes": 125513728
+                },
+                {
+                  "pid": 160958,
+                  "rssBytes": 49283072
+                },
+                {
+                  "pid": 161202,
+                  "rssBytes": 177995776
+                }
+              ],
+              "treeRssBytes": 528265216
+            },
+            "heap": {
+              "rss": 67473408,
+              "heapUsed": 10232536,
+              "external": 2444136
+            }
+          }
+        },
+        "serverBeforeClose": {
+          "pid": 160855,
+          "rssBytes": 81846272,
+          "peakRssBytes": 88997888
+        }
+      }
+    },
+    "tree": {
+      "toolkit": {
+        "kind": "toolkit",
+        "root": "/tmp/ramify-explorer-acceptance-wUhMtK/toolkit-0ksjsY",
+        "revision": "rev/1:70abbd76-893f-4a88-a193-390407c6b5a6:1",
+        "modules": 15,
+        "encodedBytes": 2747473,
+        "firstRender": {
+          "projectViewResponseEnd": 2417.1000022888184,
+          "treeRenderedAt": 2477.1000022888184,
+          "firstRenderMs": 60
+        },
+        "mt14": {
+          "treeUrl": "http://127.0.0.1:44747/modules/latest",
+          "initialNodes": 15,
+          "collapsed": {
+            "parent": "ramify/analysis",
+            "label": "+4",
+            "nodes": 11
+          },
+          "selected": "ramify/analysis/model",
+          "purpose": "The model defines canonical module and original identities, validates the shared tag registry, derives source profiles, and explains visibility and importability from grounded exposure evidence without filesystem, compiler or UI dependencies.",
+          "explorerUrl": "http://127.0.0.1:44747/analysis/latest?module=ramify%2Fanalysis%2Fmodel",
+          "breadcrumb": "All Modules\n/\nramify\n/\nanalysis",
+          "backUrl": "http://127.0.0.1:44747/modules/latest?module=ramify%2Fanalysis%2Fmodel"
+        },
+        "fullHeight": {
+          "tree": {
+            "viewport": {
+              "width": 1440,
+              "height": 1000
+            },
+            "canvasTop": 101,
+            "canvasBottom": 979,
+            "canvasHeight": 878,
+            "canvasWidth": 1031,
+            "nodes": 15,
+            "outside": 0,
+            "minimapNodes": 15,
+            "documentHeight": 1000
+          },
+          "treeAfterResize": {
+            "viewport": {
+              "width": 1100,
+              "height": 700
+            },
+            "canvasTop": 101,
+            "canvasBottom": 679,
+            "canvasHeight": 578,
+            "canvasWidth": 691,
+            "nodes": 15,
+            "outside": 0,
+            "minimapNodes": 15,
+            "documentHeight": 700
+          },
+          "explorer": {
+            "viewport": {
+              "width": 1440,
+              "height": 1000
+            },
+            "canvasTop": 321,
+            "canvasBottom": 979,
+            "canvasHeight": 658,
+            "canvasWidth": 1031,
+            "nodes": 4,
+            "outside": 0,
+            "minimapNodes": 4,
+            "documentHeight": 1000
+          }
+        },
+        "consoleErrors": []
+      },
+      "mutations": {
+        "kind": "mutations",
+        "root": "/tmp/ramify-explorer-acceptance-wUhMtK/mutations-Rkk7Qc",
+        "revision": "rev/1:93593317-a7cf-40b3-9c5a-9cb9ab69875d:1",
+        "modules": 3,
+        "encodedBytes": 5439,
+        "firstRender": {
+          "projectViewResponseEnd": 152.4000015258789,
+          "treeRenderedAt": 178.20000076293945,
+          "firstRenderMs": 25.799999237060547
+        },
+        "mt15": {
+          "treeUrl": "http://127.0.0.1:34173/modules/latest",
+          "finalUrl": "http://127.0.0.1:34173/modules/latest",
+          "selected": "fixture/provider",
+          "added": "fixture/extra",
+          "before": 3,
+          "after": 4,
+          "refreshedRevision": "rev/1:93593317-a7cf-40b3-9c5a-9cb9ab69875d:2"
+        },
+        "consoleErrors": []
+      },
+      "reference": {
+        "kind": "reference",
+        "root": "/tmp/ramify-explorer-acceptance-wUhMtK/reference-8leEoe",
+        "revision": "rev/1:00afca24-a884-4105-9bc9-475db9dfe67e:1",
+        "modules": 15,
+        "mt16": {
+          "firstRender": {
+            "projectViewResponseEnd": 390.0999984741211,
+            "treeRenderedAt": 451,
+            "firstRenderMs": 60.900001525878906
+          },
+          "collapse": {
+            "module": "collection-review/workspace",
+            "descendants": 12,
+            "collapseMs": 22.5,
+            "expandMs": 29.300003051757812,
+            "collapsedNodes": 3,
+            "expandedNodes": 15
+          },
+          "bundle": {
+            "files": {
+              "index-BDZqHwiG.js": 203229
+            },
+            "gzipBytes": 203229
+          },
+          "baselineGzipBytes": 193873,
+          "addedGzipBytes": 9356,
+          "budgetBytes": 25600,
+          "encodedBytes": 224390
+        },
+        "consoleErrors": []
+      }
+    }
+  },
+  "failures": [],
+  "completedAt": "2026-09-17T16:54:48.855Z"
+}
