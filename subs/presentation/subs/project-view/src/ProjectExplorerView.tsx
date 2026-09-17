@@ -53,6 +53,8 @@ export interface ProjectExplorerViewProps {
   readonly breadcrumbTrail: readonly { readonly id: string | null; readonly label: string }[];
   readonly onDrillDown: (moduleId: string) => void;
   readonly onNavigateToScope: (scopeId: string | null) => void;
+  /** When set, a module's details link to it in the module tree. */
+  readonly onOpenModuleTree?: (moduleId: string) => void;
 }
 
 export function ProjectExplorerView({
@@ -79,6 +81,7 @@ export function ProjectExplorerView({
   breadcrumbTrail,
   onDrillDown,
   onNavigateToScope,
+  onOpenModuleTree,
 }: ProjectExplorerViewProps): React.ReactElement {
   const [copiedImportPath, setCopiedImportPath] = useState<string | null>(null);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
@@ -405,6 +408,11 @@ export function ProjectExplorerView({
               ? module.purpose.paragraph
               : `Purpose unavailable: ${module.purpose.state}`}
           </p>
+          {onOpenModuleTree && (
+            <button type="button" className="module-arch__submodule-enter" onClick={() => onOpenModuleTree(module.id)}>
+              Show in module tree
+            </button>
+          )}
         </div>
 
         {collapsible('mod-metrics', 'Metrics', (

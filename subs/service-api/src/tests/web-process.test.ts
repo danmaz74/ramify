@@ -65,14 +65,14 @@ async function freePort(): Promise<number> {
 }
 
 describe('RS09: resident explorer web process', () => {
-  it('serves the app at / and /analysis/latest, redirects /explore/*, and enforces Host and Origin', async () => {
+  it('serves the app at /, /analysis/latest and /modules/latest (MT10), redirects /explore/*, and enforces Host and Origin', async () => {
     const { root, assets } = await directory('ramify-explorer-web-');
     const web = await start({ binding: stubBinding({ kind: 'ready', token }).binding, assetsDirectory: assets,
       endpointDirectory: root, buildKey: '0123456789abcdef', version: '0.0.0' });
     const { port } = web;
     const local = `localhost:${port}`, loopback = `127.0.0.1:${port}`;
     for (const host of [local, loopback]) {
-      for (const path of ['/', '/analysis/latest']) {
+      for (const path of ['/', '/analysis/latest', '/modules/latest', '/modules/latest?module=a%2Fb']) {
         const page = await call(port, path, { Host: host });
         expect([host, path, page.status]).toEqual([host, path, 200]);
         expect(page.body).toContain('Explorer fixture');
@@ -90,6 +90,7 @@ describe('RS09: resident explorer web process', () => {
 
     for (const host of ['localhost', '127.0.0.1', `localhost:${port + 1}`, `example.test:${port}`, `[::1]:${port}`]) {
       expect([host, (await call(port, '/', { Host: host })).status]).toEqual([host, 403]);
+      expect([host, (await call(port, '/modules/latest', { Host: host })).status]).toEqual([host, 403]);
     }
     for (const origin of [`http://${local}`, `http://${loopback}`]) {
       expect([origin, (await call(port, '/trpc/serverStatus', { Host: local, Origin: origin })).status]).toEqual([origin, 200]);

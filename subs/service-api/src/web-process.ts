@@ -100,8 +100,8 @@ export async function startExplorerWebProcess(options: ExplorerWebProcessOptions
   // depend on URL limits. tRPC rejects POST queries unless the HTTP adapter opts
   // into the same method override used by the client.
   app.use('/trpc', trpcExpress.createExpressMiddleware({ router, allowMethodOverride: true }));
-  // Browser pages: the home page and the newest published analysis share one application.
-  for (const page of ['/', '/analysis/latest']) app.get(page, (_request, response) => response.sendFile(index));
+  // Browser pages: the home page, the import explorer and the module tree share one application.
+  for (const page of ['/', '/analysis/latest', '/modules/latest']) app.get(page, (_request, response) => response.sendFile(index));
   // Earlier launchers opened token URLs; they now land on the stable page.
   app.use('/explore', (request, response) => {
     if (request.method !== 'GET' && request.method !== 'HEAD') {

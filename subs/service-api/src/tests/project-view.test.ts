@@ -140,7 +140,7 @@ describe('createProjectExplorerModel', () => {
     const roundTripped = JSON.parse(encoded) as unknown;
     expect(roundTripped).toEqual(first.view);
     const encodedBytes = Buffer.byteLength(encoded, 'utf8');
-    expect(encodedBytes).toBe(5_826);
+    expect(encodedBytes).toBe(5_880);
     expect(encodedBytes).toBeLessThanOrEqual(8_485);
     const serializedKeys = new Set<string>();
     const serializedStrings = new Set<string>();
@@ -182,6 +182,21 @@ describe('createProjectExplorerModel', () => {
       expect.objectContaining({ limit: expect.objectContaining({ id: 'coverage-global' }), moduleIds: [], edgeIds: [] }),
       expect.objectContaining({ limit: expect.objectContaining({ id: 'coverage-target' }), moduleIds: ['fixture/consumer'], edgeIds: [] }),
     ]);
+  });
+
+  it('gives an original exported from two files of one owner distinct export IDs', () => {
+    const { report, revision } = fixture();
+    const snapshot = report.snapshot as unknown as { inventory: { files: unknown[] }; catalog: { files: unknown[] } };
+    snapshot.inventory.files.push({ path: 'subs/provider/src/index.ts', owner: 'fixture/provider', area: 'ordinary',
+      kind: 'source', sha256: 'e', bytes: 1 });
+    snapshot.catalog.files.push({ file: 'subs/provider/src/index.ts', state: 'complete', issueIds: [], descriptionFiles: [],
+      exports: [{ name: 'Alias', original, namespace: null, forwarding: [providerOrigin] }] });
+    const projected = createProjectExplorerModel({ revision, report });
+    if (projected.status !== 'ready') throw new Error(JSON.stringify(projected));
+    const exports = projected.view.modules.find(module => module.id === 'fixture/provider')!.exports;
+    const values = exports.filter(item => item.aliases.includes('Alias'));
+    expect(values.map(item => item.file).sort()).toEqual(['subs/provider/src/api.ts', 'subs/provider/src/index.ts']);
+    expect(new Set(exports.map(item => item.id)).size).toBe(exports.length);
   });
 
   it('refuses invalid/incomplete inputs and an encoded model above 16 MiB without partial output', () => {

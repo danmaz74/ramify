@@ -283,7 +283,9 @@ revision from an earlier generation as superseded.
 
 The routes are `/`, a home page listing the server's pages, the project root,
 binding state and daemon PID; `/analysis/latest`, the explorer on the newest
-published revision; `/health/ready`; and `/trpc`. Old `/explore/*` URLs redirect
+published revision; `/modules/latest`, the module tree on the same revision;
+`/health/ready`; and `/trpc`. Both pages accept `?module=<id>` to focus one module
+on first load, and each links to the other in a new tab. Old `/explore/*` URLs redirect
 to `/analysis/latest`. The listener binds `127.0.0.1`, on a fixed port when one is
 given, and accepts only loopback `Host` and `Origin` values. The implemented page
 polls server status every three seconds while visible instead of receiving

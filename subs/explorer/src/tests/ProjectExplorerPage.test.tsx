@@ -12,7 +12,8 @@ import type { ProjectExplorerModel } from '../../../presentation/subs/project-vi
 import type { ModuleGraphProps } from '../../../presentation/subs/project-view/src/moduleGraphShared.js';
 import type { ContextRevision, ContextToken } from '../../../daemon/subs/contexts/src/interfaces/contexts.js';
 import type { ServerStatusResult } from '../../../service-api/src/interfaces/explorer-service.js';
-import { ProjectExplorerPage, type ExplorerClient } from '../ProjectExplorerPage.js';
+import { ProjectExplorerPage } from '../ProjectExplorerPage.js';
+import type { ExplorerClient } from '../published-project-view.js';
 
 vi.mock('../../../presentation/subs/project-view/src/ModuleGraphRadial.js', () => ({
   ModuleGraphRadial: (props: ModuleGraphProps) => <div data-testid="connected-graph">

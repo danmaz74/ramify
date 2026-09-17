@@ -28,3 +28,9 @@ expose-sub ModuleGraphRadial from project-view to parent
 expose-sub ModuleGraphProps, GraphSelection from project-view to parent
 expose-sub ProjectExplorerView from project-view to parent
 expose-sub ProjectExplorerViewProps, ExplorerDiscussionProps, ExplorerDiscussionSelection, ExportDetailState from project-view to parent
+
+// P4: the module tree view, laid out by the neutral tree placement.
+expose-sub ModuleTreeView from project-view to parent
+expose-sub ModuleTreeViewProps from project-view to parent
+expose-sub indexModuleTree, collapsibleAtDepth, ancestorsOf from project-view to parent
+expose-sub placeTree, Point from layout to descendants

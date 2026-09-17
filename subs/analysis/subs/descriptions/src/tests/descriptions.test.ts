@@ -90,6 +90,9 @@ const presentationStatements = [
   sub(projectViewModelNames, 'project-view'), sub(['ModuleGraphRadial'], 'project-view'),
   sub(['ModuleGraphProps', 'GraphSelection'], 'project-view'), sub(['ProjectExplorerView'], 'project-view'),
   sub(projectViewProps, 'project-view'),
+  sub(['ModuleTreeView'], 'project-view'), sub(['ModuleTreeViewProps'], 'project-view'),
+  sub(['indexModuleTree', 'collapsibleAtDepth', 'ancestorsOf'], 'project-view'),
+  sub(['placeTree', 'Point'], 'layout', descendants),
 ];
 const layoutStatements = [
   src('*', 'interfaces/layout.ts'),
@@ -118,6 +121,7 @@ const toolkit: readonly Fixture[] = [
     sub([...projectViewModelNames, 'ModuleGraphProps', 'GraphSelection'], 'presentation', descendants),
     sub(['ModuleGraphRadial'], 'presentation', descendants), sub(projectViewProps, 'presentation', descendants),
     sub(['ProjectExplorerView'], 'presentation', descendants),
+    sub(['ModuleTreeView', 'ModuleTreeViewProps', 'indexModuleTree', 'collapsibleAtDepth', 'ancestorsOf'], 'presentation', descendants),
     sub(explorerServiceNames, 'service-api', descendants), sub(['createProjectExplorerModel'], 'service-api', descendants),
     sub(['createExplorerRouter', 'ExplorerRouter', 'startExplorerWebProcess'], 'service-api', descendants),
     sub(['createProjectBinding', 'ProjectBinding', 'BindingState'], 'service-api', descendants),
@@ -172,6 +176,8 @@ const toolkit: readonly Fixture[] = [
     src(['ProjectExplorerView'], 'ProjectExplorerView.tsx', uiBrowser),
     src(['ProjectExplorerViewProps', 'ExplorerDiscussionProps', 'ExplorerDiscussionSelection'], 'ProjectExplorerView.tsx'),
     src(['ExportDetailState'], 'ExportList.tsx'),
+    src(['ModuleTreeView'], 'ModuleTreeView.tsx', uiBrowser), src(['ModuleTreeViewProps'], 'ModuleTreeView.tsx'),
+    src(['indexModuleTree', 'collapsibleAtDepth', 'ancestorsOf'], 'module-tree.ts', uiBrowser),
   ] },
   { path: 'subs/service-api/', name: 'service-api', tags: ['dispatch'], statements: [
     src('*', 'interfaces/explorer-service.ts'), src(['createProjectExplorerModel'], 'project-view.ts'),

@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import type { ServerStatusResult } from '../../service-api/src/interfaces/explorer-service.js';
-import { bindingStateText, type ExplorerClient } from './ProjectExplorerPage.js';
+import { bindingStateText, type ExplorerClient } from './published-project-view.js';
 
 /** The server's pages; the home page lists each one. */
-export const serverPages = [{ label: 'Module explorer', path: '/analysis/latest' }] as const;
+export const serverPages = [
+  { label: 'Module explorer', path: '/analysis/latest' },
+  { label: 'Module tree', path: '/modules/latest' },
+] as const;
 
 export interface HomePageProps {
   readonly client: Pick<ExplorerClient, 'serverStatus'>;

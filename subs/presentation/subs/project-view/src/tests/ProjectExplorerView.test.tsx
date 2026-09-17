@@ -23,6 +23,15 @@ import type { ExplorerDiscussionProps, ProjectExplorerViewProps } from '../Proje
 afterEach(cleanup);
 
 describe('ProjectExplorerView', () => {
+  it('MT13 shows the module tree link only when an opener is supplied', () => {
+    const onOpenModuleTree = vi.fn();
+    const { rerender } = render(<ProjectExplorerView {...createProps({ selectedModuleId: 'a' })} />);
+    expect(screen.queryByRole('button', { name: 'Show in module tree' })).toBeNull();
+    rerender(<ProjectExplorerView {...createProps({ selectedModuleId: 'a' })} onOpenModuleTree={onOpenModuleTree} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Show in module tree' }));
+    expect(onOpenModuleTree).toHaveBeenCalledWith('a');
+  });
+
   it('renders module type checkboxes and toggles a type filter', () => {
     const onTogglePresentationClass = vi.fn();
     const { container } = render(

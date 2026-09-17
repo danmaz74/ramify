@@ -30,6 +30,7 @@ expose-sub ProjectExplorerModel, ExplorerModule, ExplorerFile, ExplorerMetrics, 
 expose-sub ModuleGraphRadial from presentation to descendants
 expose-sub ProjectExplorerViewProps, ExplorerDiscussionProps, ExplorerDiscussionSelection, ExportDetailState from presentation to descendants
 expose-sub ProjectExplorerView from presentation to descendants
+expose-sub ModuleTreeView, ModuleTreeViewProps, indexModuleTree, collapsibleAtDepth, ancestorsOf from presentation to descendants
 
 // P4: explorer projection service contracts relayed to later connected owners.
 expose-sub ExplorerProjectionInput, ProjectViewInput, ExplorerDetailsInput, ExplorerDetailsResult, ServerBindingKind, ServerStatusResult, ExplorerProcessRecord from service-api to descendants

@@ -5,11 +5,11 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { ServerStatusResult } from '../../../service-api/src/interfaces/explorer-service.js';
 import { HomePage } from '../HomePage.js';
-import { selectBrowserPage } from '../browser-app.js';
+import { selectBrowserPage, selectInitialModule } from '../browser-app.js';
 
 afterEach(() => { cleanup(); });
 
-describe('RS11: home page', () => {
+describe('RS11/MT10: home page', () => {
   it('lists the module explorer link with the project root, binding state and daemon PID', async () => {
     const status: ServerStatusResult = { root: '/work/project', binding: 'ready', message: null, published: null, daemonPid: 4242 };
     render(<HomePage client={{ async serverStatus() { return status; } }} pollIntervalMs={60_000} />);
@@ -18,9 +18,11 @@ describe('RS11: home page', () => {
     expect(screen.getByText('Connected')).toHaveAttribute('data-binding', 'ready');
     expect(screen.getByText('4242')).toBeInTheDocument();
     const links = within(screen.getByRole('navigation', { name: 'Pages' })).getAllByRole('link');
-    expect(links).toHaveLength(1);
+    expect(links).toHaveLength(2);
     expect(links[0]).toHaveTextContent('Module explorer');
     expect(links[0]).toHaveAttribute('href', '/analysis/latest');
+    expect(links[1]).toHaveTextContent('Module tree');
+    expect(links[1]).toHaveAttribute('href', '/modules/latest');
   });
 
   it('shows a binding that is not ready with its message and no daemon PID', async () => {
@@ -35,7 +37,16 @@ describe('RS11: home page', () => {
   it('selects the page by pathname', () => {
     expect(selectBrowserPage('/')).toBe('home');
     expect(selectBrowserPage('/analysis/latest')).toBe('explorer');
+    expect(selectBrowserPage('/modules/latest')).toBe('tree');
     expect(selectBrowserPage('/analysis/other')).toBe('home');
     expect(selectBrowserPage('/explore/a/b')).toBe('home');
+  });
+});
+
+describe('MT13: module query parameter', () => {
+  it('decodes the module parameter and ignores an empty one', () => {
+    expect(selectInitialModule('?module=ramify%2Fanalysis%2Fmodel')).toBe('ramify/analysis/model');
+    expect(selectInitialModule('?module=')).toBeNull();
+    expect(selectInitialModule('')).toBeNull();
   });
 });

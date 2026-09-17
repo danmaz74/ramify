@@ -877,14 +877,227 @@ async function runMutations(project: { root: string }, other: { root: string }, 
   }
 }
 
+/** A foreground server for one root on a free fixed port, as the PM2 `explorer` app runs it. */
+async function startTreeServer(isolated: Isolated, root: string): Promise<{
+  readonly record: ExplorerProcessRecord; readonly stop: () => Promise<void>; readonly log: () => Promise<string> }> {
+  const port = await new Promise<number>((resolvePort, reject) => {
+    const probe = createServer(); probe.once('error', reject);
+    probe.listen(0, '127.0.0.1', () => { const address = probe.address() as AddressInfo; probe.close(() => resolvePort(address.port)); });
+  });
+  const logPath = join(isolated.processRoot, `tree-server-${port}.log`);
+  const log = await open(logPath, 'w', 0o600);
+  const server = spawn(process.execPath, [explorerEntry, '--root', root, '--port', String(port)],
+    { cwd: packageRoot, stdio: ['ignore', log.fd, log.fd], env: commandEnvironment(isolated, process.env.PATH ?? '') });
+  const exited = new Promise<void>(resolveExit => server.once('exit', () => resolveExit()));
+  const readLog = () => readFile(logPath, 'utf8').catch(() => '');
+  const stop = async () => {
+    if (server.exitCode === null && server.signalCode === null) { server.kill('SIGTERM'); await Promise.race([exited, pause(5000)]); }
+    if (server.exitCode === null && server.signalCode === null) server.kill('SIGKILL');
+    await log.close().catch(() => {});
+  };
+  try {
+    const record = await until(async () => {
+      const names = (await readdir(isolated.directory)).filter(name => /^explorer-[0-9a-f]{16}-[0-9a-f]{16}\.json$/.test(name));
+      for (const name of names) {
+        const found = await readExplorerProcessRecord(selectExplorerEndpoint(isolated.endpoint, name.slice(-21, -5)));
+        if (found && found.pid === server.pid && found.state === 'running') return found;
+      }
+      return null;
+    }, 120_000, readLog);
+    return { record, stop, log: readLog };
+  } catch (error) { await stop(); throw error; }
+}
+
+/** Instruments the page with the time the first tree node appeared. */
+async function installTreeTiming(context: BrowserContext): Promise<void> {
+  await context.addInitScript({ content: `(() => {
+    const observer = new MutationObserver(() => {
+      if (document.querySelector('.module-tree__node')) { window.__ramifyTreeRenderedAt = performance.now(); observer.disconnect(); }
+    });
+    document.addEventListener('DOMContentLoaded', () => observer.observe(document.body, { childList: true, subtree: true }));
+  })();` });
+}
+
+async function treeNodeIds(page: Page): Promise<string[]> {
+  return page.locator('.react-flow__node').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-id') ?? ''));
+}
+
+/** Milliseconds from a toggle click to the second animation frame after it. */
+async function toggleToPaint(page: Page, label: string): Promise<number> {
+  return page.evaluate(async name => {
+    const button = [...document.querySelectorAll('button')].find(item => item.getAttribute('aria-label') === name);
+    if (!button) throw new Error(`No toggle ${name}`);
+    const started = performance.now();
+    button.click();
+    await new Promise(resolveFrame => requestAnimationFrame(() => requestAnimationFrame(resolveFrame)));
+    return performance.now() - started;
+  }, label);
+}
+
+async function openTreePage(context: BrowserContext, url: string, revision: string): Promise<Page> {
+  const page = await context.newPage();
+  await page.goto(url, { waitUntil: 'networkidle', timeout: 120_000 });
+  await page.getByRole('heading', { name: 'Module tree' }).waitFor({ timeout: 120_000 });
+  await page.locator('.module-arch__revision').filter({ hasText: revision }).waitFor({ timeout: 60_000 });
+  return page;
+}
+
+async function gzipBundleBytes(): Promise<{ readonly files: Record<string, number>; readonly gzipBytes: number }> {
+  const { gzipSync } = await import('node:zlib');
+  const assets = join(packageRoot, 'dist/explorer/assets');
+  const files: Record<string, number> = {};
+  for (const name of (await readdir(assets)).filter(item => item.endsWith('.js'))) {
+    files[name] = gzipSync(await readFile(join(assets, name))).length;
+  }
+  return { files, gzipBytes: Object.values(files).reduce((sum, bytes) => sum + bytes, 0) };
+}
+
+/** Plan 6C: MT14 on the toolkit, MT15 on the mutation fixture and MT16 on the reference. */
+async function runModuleTree(kind: 'reference' | 'toolkit' | 'mutations', project: { root: string },
+  browser: Browser): Promise<Record<string, unknown>> {
+  const isolated = await isolatedEndpoint();
+  let server: Awaited<ReturnType<typeof startTreeServer>> | undefined;
+  let connection: ServiceConnection | undefined;
+  let context: BrowserContext | undefined;
+  const consoleErrors: string[] = [];
+  try {
+    server = await startTreeServer(isolated, project.root);
+    connection = await connectHarness(isolated, 'never', `acceptance-tree-${kind}`);
+    const token = await openProject(connection, project.root);
+    const check = await checkPublished(connection, token);
+    const projected = createProjectExplorerModel({ revision: check.revision, report: check.report! });
+    assert.equal(projected.status, 'ready', JSON.stringify(projected));
+    const model = (projected as ReadyProjection).view;
+    const encodedBytes = Buffer.byteLength(JSON.stringify(model));
+    const treeUrl = `${server.record.origin}/modules/latest`;
+
+    context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+    await installTreeTiming(context);
+    context.on('page', page => {
+      page.on('console', message => { if (message.type() === 'error') consoleErrors.push(`${message.text()} (${message.location().url})`); });
+      page.on('response', response => { if (response.status() >= 400) consoleErrors.push(`HTTP ${response.status()} ${response.url()}`); });
+    });
+    const page = await openTreePage(context, treeUrl, model.revision);
+    const expectedVisible = model.modules.length;
+    const initialNodes = await treeNodeIds(page);
+    const firstRender = await page.evaluate(() => {
+      const view = performance.getEntriesByType('resource').filter(entry => entry.name.includes('projectView'))
+        .map(entry => (entry as PerformanceResourceTiming).responseEnd);
+      const rendered = (window as unknown as { __ramifyTreeRenderedAt?: number }).__ramifyTreeRenderedAt;
+      return { projectViewResponseEnd: view[0] ?? null, treeRenderedAt: rendered ?? null,
+        firstRenderMs: rendered !== undefined && view[0] !== undefined ? rendered - view[0] : null };
+    });
+    const subtitle = await page.locator('.module-arch__subtitle').textContent();
+    assert.ok(subtitle?.startsWith(`${model.modules.length} modules, depth `), subtitle ?? '');
+
+    if (kind === 'toolkit') {
+      // MT14: collapse, select, double-click to the import explorer and back.
+      assert.equal(initialNodes.length, expectedVisible);
+      const target = model.modules.find(item => item.id.endsWith('/analysis/model'));
+      const parent = target && model.modules.find(item => item.id === target.parent);
+      assert.ok(target && parent && target.purpose.state === 'present', 'Toolkit has no analysis/model module with a README');
+      await page.getByRole('button', { name: `Collapse ${parent.name}` }).click();
+      await until(async () => !(await treeNodeIds(page)).includes(target.id), 10_000, () => 'collapse did not hide the child');
+      const collapsedLabel = await page.getByRole('button', { name: `Expand ${parent.name}` }).textContent();
+      const collapsedNodes = (await treeNodeIds(page)).length;
+      await page.getByRole('button', { name: `Expand ${parent.name}` }).click();
+      await until(async () => (await treeNodeIds(page)).includes(target.id), 10_000, () => 'expand did not show the child');
+      await clickGraphNode(page, target.id);
+      await page.locator('.module-arch__detail-description').filter({ hasText: target.purpose.paragraph }).waitFor();
+      const explorerPromise = context.waitForEvent('page');
+      await clickGraphNode(page, target.id, true);
+      const explorer = await explorerPromise;
+      await explorer.waitForLoadState('networkidle');
+      const expectedExplorerUrl = `${server.record.origin}/analysis/latest?module=${encodeURIComponent(target.id)}`;
+      assert.equal(explorer.url(), expectedExplorerUrl);
+      await explorer.getByRole('heading', { name: 'Project Explorer' }).waitFor({ timeout: 60_000 });
+      await explorer.locator('.module-arch__detail-name').filter({ hasText: target.name }).waitFor({ timeout: 60_000 });
+      const breadcrumb = await explorer.getByRole('navigation', { name: 'Module navigation' }).innerText();
+      assert.ok(breadcrumb.includes(parent.name), breadcrumb);
+      const treePromise = context.waitForEvent('page');
+      await explorer.getByRole('button', { name: 'Show in module tree' }).click();
+      const back = await treePromise;
+      await back.waitForLoadState('networkidle');
+      assert.equal(back.url(), `${treeUrl}?module=${encodeURIComponent(target.id)}`);
+      await back.getByRole('heading', { name: 'Module tree' }).waitFor({ timeout: 60_000 });
+      await back.locator('.module-arch__detail-name').filter({ hasText: target.name }).waitFor({ timeout: 60_000 });
+      await back.locator(`.module-tree__node--selected[data-module-id="${target.id}"]`).waitFor({ timeout: 10_000 });
+      assert.deepEqual(consoleErrors, []);
+      return { kind, root: project.root, revision: model.revision, modules: model.modules.length, encodedBytes, firstRender,
+        mt14: { treeUrl, initialNodes: initialNodes.length, collapsed: { parent: parent.id, label: collapsedLabel, nodes: collapsedNodes },
+          selected: target.id, purpose: target.purpose.paragraph, explorerUrl: explorer.url(), breadcrumb,
+          backUrl: back.url() }, consoleErrors };
+    }
+
+    if (kind === 'mutations') {
+      // MT15: a new module appears after refresh at the same URL, and the selection survives.
+      const selected = model.modules.find(item => item.id.endsWith('/provider'));
+      assert.ok(selected, 'Mutation fixture has no provider module');
+      await clickGraphNode(page, selected.id);
+      await page.locator('.module-arch__detail-name').filter({ hasText: selected.name }).waitFor();
+      await put(project.root, 'subs/extra/README.md', '# Extra\n\nAdded while the tree is open.\n');
+      await put(project.root, 'subs/extra/src/index.ts', 'export const extra = 1;\n');
+      const added = await publishMutation(connection, token, project.root, 'subs/extra/module.ramify', 'ramify 1\nmodule extra\n');
+      const addedId = `${model.rootModuleId}/extra`;
+      assert.ok(added.report!.snapshot!.inventory!.modules.some(item => item.id === addedId), 'The new module was not analysed');
+      await forcePoll(page);
+      const refresh = page.getByRole('button', { name: 'Refresh (stale)' });
+      await refresh.waitFor({ state: 'visible', timeout: 15_000 });
+      await refresh.click();
+      await page.locator('.module-arch__revision').filter({ hasText: added.revision.revision }).waitFor({ timeout: 60_000 });
+      await until(async () => (await treeNodeIds(page)).includes(addedId), 10_000, () => 'the added module was not rendered');
+      assert.equal(await page.locator('.module-arch__detail-name').textContent(), selected.name);
+      assert.equal(page.url(), treeUrl);
+      assert.deepEqual(consoleErrors, []);
+      return { kind, root: project.root, revision: model.revision, modules: model.modules.length, encodedBytes, firstRender,
+        mt15: { treeUrl, finalUrl: page.url(), selected: selected.id, added: addedId, before: initialNodes.length,
+          after: (await treeNodeIds(page)).length, refreshedRevision: added.revision.revision }, consoleErrors };
+    }
+
+    // MT16: first render, collapse and expand budgets, bundle size and transport size.
+    const index = new Map(model.modules.map(item => [item.id, item]));
+    const subtree = (id: string): number => (index.get(id)?.children ?? []).reduce((sum, child) => sum + 1 + subtree(child), 0);
+    const root = index.get(model.rootModuleId)!;
+    const largest = [...root.children].sort((left, right) => subtree(right) - subtree(left))[0];
+    assert.ok(largest && subtree(largest) > 0, 'Reference root has no child with descendants');
+    const largestName = index.get(largest)!.name;
+    const collapseMs = await toggleToPaint(page, `Collapse ${largestName}`);
+    const collapsedNodes = (await treeNodeIds(page)).length;
+    const expandMs = await toggleToPaint(page, `Expand ${largestName}`);
+    const expandedNodes = (await treeNodeIds(page)).length;
+    assert.equal(collapsedNodes, initialNodes.length - subtree(largest));
+    assert.equal(expandedNodes, initialNodes.length);
+    assert.ok(firstRender.firstRenderMs !== null && firstRender.firstRenderMs <= 500, JSON.stringify(firstRender));
+    assert.ok(collapseMs <= 100 && expandMs <= 100, JSON.stringify({ collapseMs, expandMs }));
+    const bundle = await gzipBundleBytes();
+    assert.ok(bundle.gzipBytes - planSixBBundleGzipBytes <= treeBundleBudgetBytes, JSON.stringify(bundle));
+    assert.deepEqual(consoleErrors, []);
+    return { kind, root: project.root, revision: model.revision, modules: model.modules.length,
+      mt16: { firstRender, collapse: { module: largest, descendants: subtree(largest), collapseMs, expandMs, collapsedNodes, expandedNodes },
+        bundle, baselineGzipBytes: planSixBBundleGzipBytes, addedGzipBytes: bundle.gzipBytes - planSixBBundleGzipBytes,
+        budgetBytes: treeBundleBudgetBytes, encodedBytes }, consoleErrors };
+  } finally {
+    await context?.close().catch(() => {});
+    await connection?.close().catch(() => {});
+    await server?.stop();
+    await stopIsolatedDaemon(isolated);
+    await rm(isolated.processRoot, { recursive: true, force: true });
+  }
+}
+
+/** Plan 6B's explorer JavaScript at commit 25f50ee, gzipped by node:zlib as `gzipBundleBytes` measures it. */
+const planSixBBundleGzipBytes = 193_873;
+/** T7: the tree page may add at most 25 KiB gzipped. */
+const treeBundleBudgetBytes = 25 * 1024;
+
 async function main(): Promise<void> {
   assert.ok((await stat(chromiumPath)).isFile(), `Chromium executable not found: ${chromiumPath}`);
   assert.ok((await stat(join(packageRoot, 'dist/explorer/index.html'))).isFile(), 'Run npm run build before browser acceptance');
   const args = process.argv.slice(2), outputIndex = args.indexOf('--output'), onlyIndex = args.indexOf('--only');
   const only = onlyIndex >= 0 ? args[onlyIndex + 1] : undefined;
   assert.ok(args.length === (outputIndex >= 0 ? 2 : 0) + (onlyIndex >= 0 ? 2 : 0)
-    && (outputIndex < 0 || args[outputIndex + 1]) && (only === undefined || ['reference', 'toolkit', 'mutations'].includes(only)),
-  'Usage: npm run measure:project-explorer -- [--output FILE] [--only reference|toolkit|mutations]');
+    && (outputIndex < 0 || args[outputIndex + 1]) && (only === undefined || ['reference', 'toolkit', 'mutations', 'tree'].includes(only)),
+  'Usage: npm run measure:project-explorer -- [--output FILE] [--only reference|toolkit|mutations|tree]');
   const output = resolve(outputIndex >= 0 ? args[outputIndex + 1]! : join(packageRoot, 'docs/plans/iteration-6b-resident-explorer-server/evidence/iteration4-browser-acceptance.json'));
   const scratch = await realpath(await mkdtemp(join('/tmp', 'ramify-explorer-acceptance-')));
   const manifest = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8')) as { dependencies: Record<string, string>; devDependencies: Record<string, string> };
@@ -915,6 +1128,16 @@ async function main(): Promise<void> {
       const mutations = await mutationProject(scratch), other = await mutationProject(scratch);
       try { workloads.mutations = await runMutations(mutations, other, scratch, browser, paths); }
       finally { await Promise.all([mutations.dispose(), other.dispose()]); }
+    }
+    if (only === undefined || only === 'tree') {
+      const tree: Record<string, unknown> = {};
+      const toolkit = await isolatedProject('toolkit', scratch);
+      try { tree.toolkit = await runModuleTree('toolkit', toolkit, browser); } finally { await toolkit.dispose(); }
+      const mutations = await mutationProject(scratch);
+      try { tree.mutations = await runModuleTree('mutations', mutations, browser); } finally { await mutations.dispose(); }
+      const reference = await isolatedProject('reference', scratch);
+      try { tree.reference = await runModuleTree('reference', reference, browser); } finally { await reference.dispose(); }
+      workloads.tree = tree;
     }
     report.status = 'passed'; report.passed = true;
   } catch (error) {

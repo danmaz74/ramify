@@ -185,6 +185,7 @@ retained session and executes before the separately reviewed Plan 3 successor.
 | [6. Explore visually](#plan-6-project-explorer) | Complete: a standalone live explorer through a separate tRPC web process. | Plan 2's published report and lightweight client. | [Detailed Plan 6](plans/iteration-6-project-explorer/main-plan.md) and [completion report](plans/iteration-6-project-explorer/iterations/iteration7-results.md). |
 | [6A. Show only Ramify-module imports](#plan-6a-module-only-project-explorer) | Draft: narrow the explorer to Ramify modules and cross-module imports while retaining external facts in analysis. | Completed Plan 6. | [Detailed Plan 6A](plans/iteration-6a-module-only-project-explorer/main-plan.md), draft for contract review. |
 | [6B. Serve the explorer continuously](#plan-6b-resident-explorer-server) | Implemented: a PM2-manageable explorer server that owns and subscribes to one project context, with a home page and a stable `/analysis/latest` URL. | Completed Plans 6 and 6A. | [Detailed Plan 6B](plans/iteration-6b-resident-explorer-server/main-plan.md) and [completion report](plans/iteration-6b-resident-explorer-server/iterations/iteration4-results.md). |
+| [6C. Browse the module tree](#plan-6c-module-tree-view) | Implemented: a collapsible top-down module tree page at `/modules/latest` with a detail panel, linked both ways with the import explorer. | Completed Plan 6B. | [Detailed Plan 6C](plans/iteration-6c-module-tree-view/main-plan.md) and [completion report](plans/iteration-6c-module-tree-view/iterations/iteration3-results.md). |
 
 The table order is the proposed implementation order; Plan 5 keeps the
 number the withdrawn change-previews deliverable released and Plan 2A is an
@@ -906,6 +907,22 @@ on-demand web lifetime for the explorer; [processes and clients](architecture/pr
 describes the resident server.
 
 
+## Plan 6C: Module tree view
+
+**Detailed artifact:** [Plan 6C](plans/iteration-6c-module-tree-view/main-plan.md),
+implemented; its [completion report](plans/iteration-6c-module-tree-view/iterations/iteration3-results.md)
+records MT01–MT16 evidence.
+**Prerequisite:** the completed Plan 6B resident server, home page and
+revision comparison.
+
+**Working outcome.** The resident server serves a module tree at
+`/modules/latest`: modules only, root at the top, collapsible nodes and a
+right-hand panel with the selected module's README purpose, structure, files,
+import summary, exports and coverage notes. Double-clicking a node opens the
+import explorer in a new tab focused on that module, and the explorer links
+back. The page reuses the existing project view procedure and model.
+
+
 ## Plan 7: Affected modules
 
 **Detailed artifact:** [Plan 7](plans/iteration-7-affected-modules/main-plan.md),
@@ -959,7 +976,8 @@ source/architecture document; do not depend on conversation history.
 | Plan 5 | The compact check reply and revision delta; the hook command and host adapter contract; the session and revision vocabulary; retained per-file targets, originals, forwarding paths, owned shim dependencies, inventory and coverage; the observed-input identity; hook latency budgets and hot/warm memory bounds; the Plan 2 supersession record. | Plan 2A; Plans 3, 4, 6 and 7; agent hook hosts. |
 | Plan 6 | Reusable view exports/props, web lifecycle and query-to-view contracts; extraction provenance; quick/HTTP/browser evidence and measured memory behavior. | Consuming applications and later visualization features. |
 | Plan 6A | Module-only explorer DTO and metrics; module/edge-only selection; report-preservation, HTTP and browser evidence for omitted external targets. | Consuming applications and later visualization features. |
-| Plan 6B | Resident server entry and project binding; token-free router and routes; per-project discovery record; `ramify explore` reuse; the PM2 `explorer` app; RS13–RS17 evidence with measured server and daemon memory. | Later explorer pages and any multi-project or pushed-event explorer plan. |
+| Plan 6B | Resident server entry and project binding; token-free router and routes; per-project discovery record; `ramify explore` reuse; the PM2 `explorer` app; RS13–RS17 evidence with measured server and daemon memory. | Plan 6C and any later multi-project or pushed-event explorer plan. |
+| Plan 6C | Module tree view props and helpers; shared published-view hook; `?module=` focus contract for both pages; layout timings and tree transport size. | Later explorer pages and a possible tree-specific projection. |
 | Plan 7 | Live module graph semantics; affected query and test-selection contracts; revision/coverage outcomes; CLI/MCP schemas; on-demand construction, temporary memory and query resource evidence. | Test-runner integrations and later explorer features. |
 
 Across every handoff, preserve the distinctions between original and accessed

@@ -133,7 +133,7 @@ function exportGroups(
     const request: SymbolDetailRequest | null = original?.kind === 'code' && requestName
       ? { original, exportName: requestName } : null;
     return {
-      id: tupleId(['export', key ?? file, primary]),
+      id: tupleId(['export', file, key ?? file, primary]),
       name: primary,
       aliases,
       original,
