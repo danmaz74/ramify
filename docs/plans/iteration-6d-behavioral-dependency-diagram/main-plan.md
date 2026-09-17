@@ -1,8 +1,8 @@
 # Plan 6D: Behavioral dependency diagram
 
-**Date:** 2026-09-17. **Status:** review decisions accepted on 2026-09-17;
-ready for implementation. No Plan 6D implementation or acceptance evidence is
-established by this document. This is
+**Date:** 2026-09-17. **Status:** implemented on branch
+`feat/plan6d-behavioral-dependency-diagram`; every BD row passes, as the
+[completion report](iterations/iteration7-results.md) records. This is
 a focused successor to the implemented
 [Plan 6B](../iteration-6b-resident-explorer-server/main-plan.md) and
 [Plan 6C](../iteration-6c-module-tree-view/main-plan.md). It uses the behavioral
