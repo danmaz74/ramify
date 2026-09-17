@@ -1,6 +1,8 @@
+import { rm } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import type { DependencyBehaviorFacts } from '../interfaces/dependency-behavior.js';
-import { withCatalog } from './fixtures.js';
+import type { DependencyBehaviorFact, DependencyBehaviorFacts } from '../interfaces/dependency-behavior.js';
+import type { SourceAccess } from '../interfaces/source.js';
+import { analyze, fixture, withCatalog } from './fixtures.js';
 
 const api = `export function run(): number { return 1; }
 export class Service { start(): void {} }
@@ -109,6 +111,7 @@ export type Loaded = import('./api.js').Shape;
     const forwardedRun = facts.facts.find(fact => fact.consumer.file === 'src/forward.ts' && fact.original.binding === 'run')!;
     expect(forwardedRun.accessIds).toHaveLength(2);
     expect(forwardedRun.accessIds).toEqual([...forwardedRun.accessIds].sort((a, b) => Buffer.compare(Buffer.from(a), Buffer.from(b))));
+    expect(facts.facts.every(fact => JSON.stringify(fact.accessIds) === JSON.stringify(fact.accesses.map(item => item.accessId)))).toBe(true);
     const keys = facts.facts.map(fact => [fact.consumer.file, fact.original.file, fact.original.binding, fact.original.kind].join('\u0000'));
     expect(keys).toEqual([...keys].sort((a, b) => Buffer.compare(Buffer.from(a), Buffer.from(b))));
     expect(facts.facts.every(fact => fact.consumer.area.owner === 'fixture')).toBe(true);
@@ -120,8 +123,154 @@ export type Loaded = import('./api.js').Shape;
     'src/api.ts': 'export const value = 1;\nexport function act(): void {}\n',
     'src/use.ts': "import { value, act } from './api.js';\nexport { act };\n",
   }, async ({ source }) => {
+    // The helper reports its classifier runs with every result; the catalog opened this lifetime without one.
+    expect(source.behaviorRuns()).toBe(0);
     const facts = await source.dependencyBehavior();
+    expect(source.behaviorRuns()).toBe(1);
     expect(byBinding(facts, 'src/use.ts')).toEqual({ value: ['unused', []], act: ['non-behavioral', ['forwarding']] });
     expect(facts.limits).toEqual([]);
   }), 60_000);
+
+  describe('path-facts: one original reached through imported modules B and C', () => {
+    const core = `export function act(): void {}
+export class Service { start(): void {} }
+export const settings = { size: 1 };
+export interface Shape { size: number }
+export const loose: any = 1;
+`;
+    const forwarder = "export { act, Service, settings, type Shape, loose } from '../../core/src/index.js';\n";
+    const B = "'../subs/b/src/index.js'", C = "'../subs/c/src/index.js'";
+    const consumers: Record<string, string> = {
+      'src/only-b.ts': `import { act } from ${B};\nimport { act as actC } from ${C};\nact();\n`,
+      'src/both.ts': `import { act } from ${B};\nimport { act as actC } from ${C};\nact();\nexport type Signature = typeof actC;\n`,
+      'src/neither.ts': `import { act } from ${B};\nimport { act as actC } from ${C};\n`,
+      'src/aliases.ts': `import { act, act as again } from ${B};\nimport { act as second } from ${B};\nact();\nact();\nagain();\n`,
+      'src/kinds.ts': `import { Service, settings, type Shape } from ${B};
+import { act, settings as settingsC } from ${C};
+new Service();
+[0].forEach(act);
+act();
+export const shape: Shape = settings;
+export { settingsC };
+export { act as forwardedAct } from ${B};
+`,
+      'src/limited.ts': `import { loose } from ${B};\nimport { loose as looseC } from ${C};\nvoid (loose + 1);\n`,
+      // The defaulted destructure gives the local an any type, so only the B path records a limit.
+      'src/settled.ts': `import * as viaB from ${B};\nimport { act } from ${C};\nconst { act: run = undefined as any } = viaB;\nvoid run;\nact();\n`,
+    };
+    const owners = ['core', 'b', 'c'].map(name => ({ name, directory: `subs/${name}`, tags: [] as string[] }));
+
+    async function pathFacts(check: (facts: DependencyBehaviorFacts, accesses: readonly SourceAccess[]) => void): Promise<void> {
+      const root = await fixture({
+        'subs/core/src/index.ts': core, 'subs/b/src/index.ts': forwarder, 'subs/c/src/index.ts': forwarder, ...consumers,
+      }, owners);
+      let result: Awaited<ReturnType<typeof analyze>> | undefined;
+      try {
+        result = await analyze(root);
+        const { accesses } = await result.source.accesses();
+        check(await result.source.dependencyBehavior(), accesses);
+      } finally { await result?.dispose(); await rm(root, { recursive: true, force: true }); }
+    }
+
+    /** The fact of one consumer file and original binding owned by `core`. */
+    const factOf = (facts: DependencyBehaviorFacts, consumer: string, binding: string): DependencyBehaviorFact => {
+      const found = facts.facts.find(fact => fact.consumer.file === `src/${consumer}.ts` && fact.original.binding === binding
+        && fact.original.owner === 'fixture/core');
+      if (!found) throw new Error(`No fact for ${consumer} ${binding}`);
+      return found;
+    };
+    /** Each access fact joined to the module its access imports: [imported module, classification, evidence, limit codes]. */
+    const paths = (facts: DependencyBehaviorFacts, accesses: readonly SourceAccess[], fact: DependencyBehaviorFact) =>
+      fact.accesses.map(item => {
+        const access = accesses.find(candidate => candidate.id === item.accessId);
+        if (!access || access.target.kind !== 'application') throw new Error(`Access ${item.accessId} has no application target`);
+        return [access.target.origin.area.owner, item.classification, item.evidence,
+          item.limitIds.map(id => facts.limits.find(limit => limit.id === id)?.code)] as const;
+      });
+    const precedence = ['behavioral', 'unknown', 'non-behavioral', 'unused'] as const;
+    const evidenceOrder = ['call', 'construction', 'callable-reference', 'data', 'type', 'forwarding'];
+    const order = (a: string, b: string): number => Buffer.compare(Buffer.from(a), Buffer.from(b));
+
+    it('keeps every import path of one original separately classified and reproduces each aggregate from them', () => pathFacts((facts, accesses) => {
+      expect(facts.status).toBe('completed');
+      // BD01: only the B path is used; the C path stays unused while the headline fact is behavioral.
+      const onlyB = factOf(facts, 'only-b', 'act');
+      expect(onlyB.classification).toBe('behavioral');
+      expect(paths(facts, accesses, onlyB).sort()).toEqual([
+        ['fixture/b', 'behavioral', ['call'], []],
+        ['fixture/c', 'unused', [], []],
+      ]);
+      // BD02: both paths used, each with its own evidence; neither used is one unused dependency with no used path.
+      expect(paths(facts, accesses, factOf(facts, 'both', 'act')).sort()).toEqual([
+        ['fixture/b', 'behavioral', ['call'], []],
+        ['fixture/c', 'non-behavioral', ['type'], []],
+      ]);
+      expect(factOf(facts, 'both', 'act')).toMatchObject({ classification: 'behavioral', evidence: ['call', 'type'] });
+      const neither = factOf(facts, 'neither', 'act');
+      expect(neither).toMatchObject({ classification: 'unused', evidence: [], limitIds: [] });
+      expect(paths(facts, accesses, neither).map(([, classification]) => classification)).toEqual(['unused', 'unused']);
+      // BD03: repeated references add no access fact and aliases add no aggregate fact. The interpreter records one
+      // selection per access, so each specifier is its own path to B; every access ID is kept for later deduplication.
+      const aliases = factOf(facts, 'aliases', 'act');
+      expect(facts.facts.filter(fact => fact.consumer.file === 'src/aliases.ts')).toHaveLength(1);
+      expect(paths(facts, accesses, aliases).sort()).toEqual([
+        ['fixture/b', 'behavioral', ['call'], []],
+        ['fixture/b', 'behavioral', ['call'], []],
+        ['fixture/b', 'unused', [], []],
+      ]);
+      expect(aliases).toMatchObject({ classification: 'behavioral', evidence: ['call'] });
+      expect(new Set(aliases.accessIds).size).toBe(3);
+      // BD04: evidence and precedence per access and per aggregate.
+      expect(factOf(facts, 'kinds', 'Service')).toMatchObject({ classification: 'behavioral', evidence: ['construction'] });
+      expect(paths(facts, accesses, factOf(facts, 'kinds', 'Shape'))).toEqual([['fixture/b', 'non-behavioral', ['type'], []]]);
+      const act = factOf(facts, 'kinds', 'act');
+      expect(act).toMatchObject({ classification: 'behavioral', evidence: ['call', 'callable-reference', 'forwarding'] });
+      expect(paths(facts, accesses, act).sort()).toEqual([
+        ['fixture/b', 'non-behavioral', ['forwarding'], []],
+        ['fixture/c', 'behavioral', ['call', 'callable-reference'], []],
+      ]);
+      const settings = factOf(facts, 'kinds', 'settings');
+      expect(settings).toMatchObject({ classification: 'non-behavioral', evidence: ['data', 'forwarding'] });
+      expect(paths(facts, accesses, settings).sort()).toEqual([
+        ['fixture/b', 'non-behavioral', ['data'], []],
+        ['fixture/c', 'non-behavioral', ['forwarding'], []],
+      ]);
+      // BD05: a limit on the B path leaves the C path unused and makes the unsettled aggregate unknown.
+      const limited = factOf(facts, 'limited', 'loose');
+      expect(paths(facts, accesses, limited).sort()).toEqual([
+        ['fixture/b', 'unknown', [], ['unclassified-capability']],
+        ['fixture/c', 'unused', [], []],
+      ]);
+      expect(limited).toMatchObject({ classification: 'unknown', evidence: [], limitIds: limited.accesses[0]!.limitIds.length
+        ? limited.accesses[0]!.limitIds : limited.accesses[1]!.limitIds });
+      // BD05: behavioral evidence on the C path settles the aggregate; the B path keeps its own limit.
+      const settled = factOf(facts, 'settled', 'act');
+      expect(settled).toMatchObject({ classification: 'behavioral', evidence: ['call'], limitIds: [] });
+      const settledPaths = paths(facts, accesses, settled).sort();
+      expect(settledPaths.map(([owner, classification]) => [owner, classification])).toEqual([['fixture/b', 'unknown'], ['fixture/c', 'behavioral']]);
+      expect(settledPaths[0]![3]).toHaveLength(1);
+
+      // Every aggregate equals the access-ID set and the fixed precedence over its access facts.
+      for (const fact of facts.facts) {
+        expect(fact.accesses.length).toBeGreaterThan(0);
+        expect(fact.accessIds).toEqual(fact.accesses.map(item => item.accessId));
+        expect(fact.accessIds).toEqual([...new Set(fact.accessIds)].sort(order));
+        const classification = precedence.find(candidate => fact.accesses.some(item => item.classification === candidate));
+        expect(fact.classification).toBe(classification);
+        expect(fact.limitIds).toEqual(classification === 'unknown'
+          ? [...new Set(fact.accesses.flatMap(item => item.limitIds))].sort(order) : []);
+        expect(fact.evidence).toEqual(classification === 'unknown' ? []
+          : evidenceOrder.filter(kind => fact.accesses.some(item => item.evidence.includes(kind as never))));
+        for (const item of fact.accesses) {
+          expect(item.limitIds.length > 0).toBe(item.classification === 'unknown');
+          expect(item.classification === 'unused').toBe(!item.evidence.length && !item.limitIds.length);
+        }
+      }
+      // Limits named by any access fact are present once, ordered and frozen.
+      const named = new Set(facts.facts.flatMap(fact => fact.accesses.flatMap(item => item.limitIds)));
+      expect(facts.limits.map(limit => limit.id)).toEqual([...named].sort(order));
+      expect(Object.isFrozen(settled.accesses) && Object.isFrozen(settled.accesses[0]) && Object.isFrozen(facts.limits)).toBe(true);
+      expect(JSON.parse(JSON.stringify(facts))).toEqual(facts);
+    }), 60_000);
+  });
 });

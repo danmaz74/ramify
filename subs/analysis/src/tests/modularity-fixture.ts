@@ -90,7 +90,7 @@ export function buildReport(spec: FixtureSpec): AnalysisReport {
   const behavior: DependencyBehaviorFacts | undefined = spec.behavior === undefined || spec.behavior === 'missing' ? undefined : {
     status: spec.behavior.status ?? 'completed',
     facts: spec.behavior.facts.map(fact => ({ consumer: { file: fact.consumer, area: area(fact.consumer) },
-      original: originalId(fact.file, fact.binding), accessIds: [], classification: fact.classification,
+      original: originalId(fact.file, fact.binding), accessIds: [], accesses: [], classification: fact.classification,
       evidence: [], limitIds: fact.limitIds ?? [] })),
     limits: (spec.behavior.limits ?? []).map(id => ({ id, code: 'compiler-failure', location: null, message: id })),
   };

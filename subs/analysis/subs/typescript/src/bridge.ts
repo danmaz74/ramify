@@ -38,6 +38,7 @@ export class CompilerBridge {
   #interpretationInputs: unknown;
   #descriptionInputs: unknown;
   #replacements: { descriptions: Parameters<AccessInterpreter['replaceDescriptions']>[0]; removed: readonly string[] }[] = [];
+  #behaviorRuns = 0;
   #derivedBytes = 0;
   #derivedCount = 0;
   #capturedBytes = 0;
@@ -78,6 +79,9 @@ export class CompilerBridge {
   }
 
   ready(): Promise<unknown> { return this.#ready; }
+
+  /** Classifier runs the helper last reported; it remains readable after disposal. */
+  get behaviorRuns(): number { return this.#behaviorRuns; }
 
   catalog(signal?: AbortSignal): Promise<SourceCatalog> {
     return this.#query('catalog', signal) as Promise<SourceCatalog>;
@@ -277,7 +281,9 @@ export class CompilerBridge {
     }
     if (frame.kind === 'result') {
       const operation = this.#operation;
-      if (frame.operation !== operation.name || typeof frame.more !== 'boolean') throw new SourceFailure('protocol-error', 'Unexpected source result');
+      if (frame.operation !== operation.name || typeof frame.more !== 'boolean' || !Number.isSafeInteger(frame.behaviorRuns)
+        || (frame.behaviorRuns as number) < this.#behaviorRuns) throw new SourceFailure('protocol-error', 'Unexpected source result');
+      this.#behaviorRuns = frame.behaviorRuns as number;
       // Subset calls account new reads as they arrive. Re-materializing the
       // captured input list here would rehash and sort the entire project.
       if (!operation.size && operation.name !== 'interpret' && operation.name !== 'describe' && operation.name !== 'behavior') this.#capturedBytes = this.#inputs!.view.inputs.reduce((total, input) => total + input.bytes, 0);

@@ -4,7 +4,7 @@ import { API } from 'typescript/unstable/sync';
 import { buildCatalog } from './catalog.js';
 import { createDescriptionSet } from './descriptions.js';
 import { AccessInterpretation } from './accesses.js';
-import { classifyDependencyBehavior } from './behavior-classifier.js';
+import { behaviorRuns, classifyDependencyBehavior } from './behavior-classifier.js';
 import type { AccessInterpreter, CatalogExport, SourceCatalog } from './interfaces/source.js';
 import { referencesOnly, syntheticCandidate, syntheticInputs } from './synthetic.js';
 import { CHUNK_BYTES, FRAME_BYTES, READ_RESPONSE_BYTES, RESULT_BYTES, SourceFailure, decodeChunk, encode } from './wire.js';
@@ -68,11 +68,13 @@ function request(method: string, path: string, data?: unknown): unknown {
   return JSON.parse(Buffer.concat(chunks, size).toString('utf8'));
 }
 
+/** Every result reports this helper's classifier runs, so a lifetime that never classified shows zero. */
 function result(operation: Operation, value: unknown): void {
   const bytes = encode(value, RESULT_BYTES);
   for (let offset = 0; offset < bytes.length; offset += CHUNK_BYTES) {
     const id = ++sequence;
-    send({ kind: 'result', operation, id, chunk: bytes.subarray(offset, offset + CHUNK_BYTES).toString('base64'), more: offset + CHUNK_BYTES < bytes.length });
+    send({ kind: 'result', operation, id, chunk: bytes.subarray(offset, offset + CHUNK_BYTES).toString('base64'),
+      more: offset + CHUNK_BYTES < bytes.length, behaviorRuns: behaviorRuns() });
     if (receive().id !== id) throw new SourceFailure('protocol-error', 'Unexpected source result acknowledgement');
   }
 }

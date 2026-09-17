@@ -4,13 +4,18 @@ import type { AnalysisReport, Capability, SessionInputs } from '../index.js';
 import { openSessionEngine } from '../session-engine.js';
 import { fixture, paths, replace, revised, timeout } from './session-test-fixture.js';
 
-/** Every entry to the classifier: the batch adapter operation, whose compiler helper runs the
- * classifier in a child process, and the classifier function should any in-process path load it. */
-const entries = vi.hoisted(() => ({ adapter: 0, classifier: 0, fail: false }));
+/**
+ * The classifier's `behaviorRuns` counter wherever it can run: every batch compiler helper
+ * reports its own count with each result, and an in-process path would load the classifier
+ * module in this test process. `adapter` counts requests that reached the batch operation.
+ */
+const entries = vi.hoisted(() => ({ adapter: 0, fail: false, lifetimes: [] as { behaviorRuns(): number }[],
+  inProcess: undefined as (() => number) | undefined }));
 vi.mock('../../subs/typescript/src/source-analysis.js', async importOriginal => {
   const actual = await importOriginal<typeof import('../../subs/typescript/src/source-analysis.js')>();
   return { ...actual, createSourceAnalysis: async (...args: Parameters<typeof actual.createSourceAnalysis>) => {
     const source = await actual.createSourceAnalysis(...args);
+    entries.lifetimes.push(source);
     return { ...source, dependencyBehavior: (signal?: AbortSignal) => {
       entries.adapter++;
       return entries.fail ? Promise.reject(Object.assign(new Error('injected helper failure'), { code: 'read-failure' })) : source.dependencyBehavior(signal);
@@ -18,9 +23,13 @@ vi.mock('../../subs/typescript/src/source-analysis.js', async importOriginal => 
   } };
 });
 vi.mock('../../subs/typescript/src/behavior-classifier.js', async importOriginal => {
-  const actual = await importOriginal<Record<string, (...args: unknown[]) => unknown>>();
-  return { ...actual, classifyDependencyBehavior: (...args: unknown[]) => { entries.classifier++; return actual.classifyDependencyBehavior!(...args); } };
+  const actual = await importOriginal<{ behaviorRuns(): number }>();
+  entries.inProcess = actual.behaviorRuns;
+  return actual;
 });
+/** Classifier runs across every helper lifetime and this process. */
+const behaviorRuns = (): number => entries.lifetimes.reduce((total, source) => total + source.behaviorRuns(), 0) + (entries.inProcess?.() ?? 0);
+const reset = (): void => { Object.assign(entries, { adapter: 0, fail: false, lifetimes: [] }); };
 
 const behaviorFiles = {
   [paths.description]: 'ramify 1\nmodule branch\nexpose-src value, compute from "provider.ts" to parent\nexpose-src value from "provider.ts" to descendants\n',
@@ -47,9 +56,12 @@ function withoutBehavior(report: AnalysisReport): unknown {
 
 describe('opt-in dependency-behavior capability', () => {
   it('attaches facts only to an explicitly requesting batch analysis without changing its findings', () => fixture(async (_root, inputs) => {
-    Object.assign(entries, { adapter: 0, classifier: 0, fail: false });
+    reset();
     const ordinary = await batch(inputs, inputs.capabilities);
     expect(entries.adapter).toBe(0);
+    // The ordinary batch's helper reported results, all with zero classifier runs.
+    expect(entries.lifetimes.length).toBeGreaterThan(0);
+    expect(behaviorRuns()).toBe(0);
     const serialized = JSON.stringify(ordinary);
     expect(serialized).not.toContain('dependency-behavior');
     expect(serialized).not.toContain('dependencyBehavior');
@@ -58,6 +70,7 @@ describe('opt-in dependency-behavior capability', () => {
 
     const requested = await batch(inputs, [...inputs.capabilities, 'dependency-behavior']);
     expect(entries.adapter).toBe(1);
+    expect(behaviorRuns()).toBe(1);
     expect(requested.capabilities.at(-1)).toEqual({ capability: 'dependency-behavior', available: true, requested: true, executed: true });
     expect(requested.outcome).toEqual(ordinary.outcome);
     expect(withoutBehavior(requested)).toEqual(withoutBehavior(ordinary));
@@ -68,11 +81,13 @@ describe('opt-in dependency-behavior capability', () => {
       ['fixture/branch', 'compute', 'behavioral', ['call']],
       ['fixture/branch', 'value', 'non-behavioral', ['data']],
     ]);
+    expect(facts.facts.every(fact => fact.accesses.map(item => item.accessId).join() === fact.accessIds.join())).toBe(true);
     expect(Object.isFrozen(facts.facts[0])).toBe(true);
 
     entries.fail = true;
     const failed = await batch(inputs, [...inputs.capabilities, 'dependency-behavior']);
     entries.fail = false;
+    expect(behaviorRuns()).toBe(1);
     expect(failed.capabilities.at(-1)).toMatchObject({ capability: 'dependency-behavior', executed: true });
     expect(failed.snapshot!.dependencyBehavior).toEqual({ status: 'failed', facts: [], limits: [expect.objectContaining({
       id: expect.stringMatching(/^behavior-limit\/1:[0-9a-f]{64}$/), code: 'compiler-failure', location: null })] });
@@ -80,7 +95,7 @@ describe('opt-in dependency-behavior capability', () => {
   }, behaviorFiles), timeout);
 
   it('never enters the classifier in retained sessions or changed-file updates, which reject the capability', () => fixture(async (root, inputs) => {
-    Object.assign(entries, { adapter: 0, classifier: 0, fail: false });
+    reset();
     const refused = await openSessionEngine({ ...inputs, capabilities: [...inputs.capabilities, 'dependency-behavior'] });
     expect(refused.status).toBe('reported');
     if (refused.status !== 'reported') throw new Error('Expected a refused open');
@@ -108,6 +123,10 @@ describe('opt-in dependency-behavior capability', () => {
       expect(published!.capabilities.map(item => item.capability)).toEqual(priorCapabilities);
       expect(published!.request.capabilities).toEqual(inputs.capabilities);
     } finally { await handle.dispose(); }
-    expect(entries).toEqual({ adapter: 0, classifier: 0, fail: false });
+    expect(entries.adapter).toBe(0);
+    expect(behaviorRuns()).toBe(0);
+    // The retained adapter keeps its compiler in this process: it starts no batch helper and never loads the classifier.
+    expect(entries.lifetimes).toEqual([]);
+    expect(entries.inProcess).toBeUndefined();
   }, behaviorFiles), timeout);
 });

@@ -507,10 +507,22 @@ Iteration 2 implements this contract.
   outside default and external library files, so array, string and promise
   methods do not make a value behavior-capable. `any`, `unknown` and
   unconstrained types are `unclassified-capability` limits.
+- Each fact's `accesses` holds one `DependencyBehaviorAccessFact` per
+  `SourceAccess` that selects the original, in the order of `accessIds`, which
+  names exactly the same IDs. Each access fact is classified from the evidence
+  and limits of its own selections, so use through one import path never makes
+  another look referenced. The aggregate classification is the first of
+  behavioral, unknown, non-behavioral and unused among its access facts; its
+  evidence is the union of their evidence unless it is `unknown`, and its
+  `limitIds` are the union of their limit ids when it is `unknown`. An `unknown`
+  access fact keeps the partial evidence observed beside its limit.
 - `evidence` lists the distinct evidence kinds observed, in the declaration
   order of `BehaviorEvidence`. Evidence strength or confidence is not public.
-  `limits` lists only limits named by `unknown` facts. `failed` means the
+  `limits` lists only limits named by `unknown` access facts. `failed` means the
   classification operation failed as a whole; its facts are then empty.
+- Every classifier run increments the classifier's `behaviorRuns` counter. A
+  batch compiler helper reports its count with every result, and
+  `SourceAnalysis.behaviorRuns()` returns the lifetime's latest report.
 - Facts are ordered by consumer file, then original file, binding and kind;
   limits by id; both in byte order.
 - Acceptance shows the classifier executes zero times in ordinary and

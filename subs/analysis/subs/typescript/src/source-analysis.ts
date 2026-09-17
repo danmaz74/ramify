@@ -15,6 +15,7 @@ export async function createSourceAnalysis(inputs: SourceAnalysisInputs): Promis
       catalog: (signal?: AbortSignal) => bridge.catalog(signal),
       accesses: (signal?: AbortSignal) => bridge.accesses(signal),
       dependencyBehavior: (signal?: AbortSignal) => bridge.dependencyBehavior(signal),
+      behaviorRuns: () => bridge.behaviorRuns,
       dispose: () => bridge.dispose(),
     });
   } catch (error) { await bridge.dispose(); throw error; }

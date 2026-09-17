@@ -137,6 +137,8 @@ export interface SourceAnalysis {
     readonly coverage: readonly SourceLimit[] }>;
   /** The opt-in `dependency-behavior` facts over the accesses of this lifetime. */
   dependencyBehavior(signal?: AbortSignal): Promise<DependencyBehaviorFacts>;
+  /** Classifier runs this lifetime's compiler helper has reported; readable after disposal. */
+  behaviorRuns(): number;
   dispose(): Promise<void>;
 }
 
