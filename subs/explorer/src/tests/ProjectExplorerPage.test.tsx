@@ -128,33 +128,23 @@ describe('connected project explorer revision state', () => {
     expect(screen.queryByText('Late Module')).not.toBeInTheDocument();
   });
 
-  it('reconciles only a module edge with the same ID across newer revisions', async () => {
-    let current = 1;
+  it('draws no occurrence edge and keeps occurrences as module evidence until dependency data is connected', async () => {
+    // Plan 6D iteration 6: links come only from a dependency result, which iteration 7 connects.
     const client: ExplorerClient = {
-      async projectView() {
-        return { status: 'ready', revision: revision(current),
-          view: model(current, current < 3 ? { edgeAccessCount: current } : {}) };
-      },
-      async serverStatus() { return status(current); },
+      async projectView() { return { status: 'ready', revision: revision(1), view: model(1, { edgeAccessCount: 2 }) }; },
+      async serverStatus() { return status(1); },
       async explorerDetails() { return { status: 'unavailable', reason: 'unused' }; },
       async dependencyView() { throw new Error('No page requests dependency views before Plan 6D iteration 7'); },
     };
-    render(<ProjectExplorerPage client={client} pollIntervalMs={10} />);
+    render(<ProjectExplorerPage client={client} pollIntervalMs={60_000} />);
     await screen.findByText(`Revision ${revisionId(1)}`);
-    fireEvent.click(screen.getByRole('button', { name: 'a to root' }));
-    expect(screen.getByRole('heading', { name: 'Dependency Edge' })).toBeInTheDocument();
-
-    current = 2;
-    fireEvent.click(await screen.findByRole('button', { name: 'Refresh (stale)' }));
-    await screen.findByText(`Revision ${revisionId(2)}`);
-    expect(screen.getByRole('heading', { name: 'Dependency Edge' })).toBeInTheDocument();
-    const accessMetric = screen.getByText('Access occurrences').closest('.module-arch__metric');
-    expect(accessMetric).toHaveTextContent('2');
-
-    current = 3;
-    fireEvent.click(await screen.findByRole('button', { name: 'Refresh (stale)' }));
-    await screen.findByText(`Revision ${revisionId(3)}`);
-    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Dependency Edge' })).not.toBeInTheDocument());
+    const moduleA = await screen.findByRole('button', { name: 'Module A' });
+    expect(screen.queryByRole('button', { name: 'a to root' })).not.toBeInTheDocument();
+    expect(screen.getAllByText('Behavioral dependencies have not been requested').length).toBeGreaterThan(0);
+    fireEvent.click(moduleA);
+    fireEvent.click(screen.getByRole('button', { name: /Source evidence: import occurrences/ }));
+    expect(screen.getByText('Occurrences this module imports')).toBeInTheDocument();
+    expect(screen.getByText('2 accesses')).toBeInTheDocument();
   });
 
   it('drops an old detail response on refresh and loads the current revision detail on re-expansion', async () => {

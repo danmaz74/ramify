@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import type { DependencyBoundaryFact, DependencyDiagramFacts } from '../../../analysis/src/interfaces/dependency-diagram.js';
 import type { ContextRevision } from '../../../daemon/subs/contexts/src/interfaces/contexts.js';
@@ -188,5 +188,40 @@ describe('BD25: createExplorerDependencyModel', () => {
       const runtime = [...source.matchAll(/^import\s+(?!type\s)[^;]*?from\s+['"]([^'"]+)['"]/gm)].map(match => match[1]!);
       expect([file, runtime.filter(specifier => specifier !== 'node:crypto' && !specifier.startsWith('./'))]).toEqual([file, []]);
     }
+  });
+});
+
+/**
+ * The presentation owner cannot import this mapping, so its projection-divergence fixture is a
+ * serialized output of the real mapping. `RAMIFY_UPDATE_DEPENDENCY_FIXTURES=1` rewrites it.
+ */
+describe('presentation dependency fixture', () => {
+  it('equals the mapping of the forwarding, both-boundaries and measured-zero diagrams', async () => {
+    const shared = original('app/b/core', 'run.ts', 'run');
+    const bothBoundaries: DependencyDiagramFacts = {
+      inputId,
+      modules: ['app', 'app/a', 'app/b', 'app/b/core', 'app/c'],
+      headline: { behavioralDependencies: 1, nonBehavioralDependencies: 1 },
+      boundaries: [
+        fact('app/a', 'app/b', shared, 'behavioral'),
+        fact('app/a', 'app/b', shape, 'non-behavioral'),
+        fact('app/a', 'app/c', shared, 'behavioral', 'limited', { limitIds: [] }),
+      ],
+      coverage: { state: 'complete', unknownDependencies: 0, limitIds: [] },
+    };
+    const zero: DependencyDiagramFacts = { inputId, modules: ['app', 'app/a', 'app/b', 'app/b/core', 'app/c', 'app/idle'],
+      headline: { behavioralDependencies: 0, nonBehavioralDependencies: 0 }, boundaries: [],
+      coverage: { state: 'complete', unknownDependencies: 0, limitIds: [] } };
+    const fixture = `${JSON.stringify({
+      forwarding: mapped(diagram()).model,
+      bothBoundaries: mapped(bothBoundaries).model,
+      zero: mapped(zero).model,
+    }, null, 2)}\n`;
+    const path = new URL('../../../presentation/subs/project-view/src/tests/fixtures/dependency-models.json', import.meta.url);
+    if (process.env.RAMIFY_UPDATE_DEPENDENCY_FIXTURES === '1') {
+      await mkdir(new URL('.', path), { recursive: true });
+      await writeFile(path, fixture);
+    }
+    expect(await readFile(path, 'utf8')).toBe(fixture);
   });
 });

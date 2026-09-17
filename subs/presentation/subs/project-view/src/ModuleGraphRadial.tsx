@@ -15,6 +15,7 @@ import {
 import type { EdgeProps, Node, NodeProps } from '@xyflow/react';
 import { useAutoFit } from './auto-fit.js';
 import type { ExplorerModule } from './interfaces/project-view.js';
+import type { ActiveDependencyEdge } from './dependency-graph.js';
 import ModuleGraphLegend from './ModuleGraphLegend.js';
 import {
   buildGraphEdges,
@@ -40,9 +41,9 @@ interface ModuleCircleData extends Record<string, unknown> {
   readonly presentationClass: string;
   readonly presentationClassLabel: string;
   readonly presentationClassColor: string;
-  readonly complexityScore: number;
   readonly fileCount: number;
-  readonly dependencyCount: number;
+  /** Displayed links this module consumes. */
+  readonly linkCount: number;
   readonly limitedCount: number;
   readonly deniedCount: number;
   readonly isSelected: boolean;
@@ -66,7 +67,9 @@ function ModuleCircleNodeView({ data }: NodeProps<ModuleCircleNode>): React.Reac
     ? { text: `${data.deniedCount} denied`, bg: '#fef2f2', border: '#fecaca', color: '#dc2626' }
     : data.limitedCount > 0
       ? { text: `${data.limitedCount} limited`, bg: '#fffbeb', border: '#fde68a', color: '#d97706' }
-      : { text: 'ok', bg: '#f0fdf4', border: '#bbf7d0', color: '#15803d' };
+      : data.linkCount > 0
+        ? { text: 'allowed', bg: '#f0fdf4', border: '#bbf7d0', color: '#15803d' }
+        : null;
 
   return (
     <div
@@ -92,9 +95,9 @@ function ModuleCircleNodeView({ data }: NodeProps<ModuleCircleNode>): React.Reac
         opacity: data.isOutOfView ? 0.65 : undefined,
         position: 'relative',
       }}
-      title={`${data.path}\nApproximate complexity ${Math.round(data.complexityScore * 100)}%`}
+      title={`${data.path}\n${data.fileCount} owned source files`}
     >
-      <div
+      {healthBadge && <div
         style={{
           position: 'absolute',
           bottom: -8,
@@ -114,7 +117,7 @@ function ModuleCircleNodeView({ data }: NodeProps<ModuleCircleNode>): React.Reac
         }}
       >
         {healthBadge.text}
-      </div>
+      </div>}
       {data.isOutOfView && data.outOfViewLevel != null && (
         <div style={cornerBadgeStyle('bottom')}>-{data.outOfViewLevel}</div>
       )}
@@ -141,16 +144,8 @@ function ModuleCircleNodeView({ data }: NodeProps<ModuleCircleNode>): React.Reac
         <div style={{ fontSize: '9px', color: borderColor, marginBottom: '3px', fontWeight: 700 }}>
           {data.presentationClassLabel}
         </div>
-        <div style={{ marginTop: '-1px', marginBottom: '4px' }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            minWidth: '24px', padding: '1px 6px', borderRadius: '999px', background: '#eff6ff',
-            border: '1px solid #bfdbfe', color: '#1d4ed8', fontSize: '9px', fontWeight: 700,
-            lineHeight: 1.1 }}>
-            ~{Math.round(data.complexityScore * 100)}
-          </span>
-        </div>
         <div style={{ fontSize: '9px', color: '#64748b', lineHeight: 1.2 }}>
-          {data.fileCount} files | {data.dependencyCount} deps
+          {data.fileCount} source files
         </div>
       </div>
     </div>
@@ -165,7 +160,9 @@ function ChordArrowEdge({
   targetY,
   markerEnd: _markerEnd,
   style,
+  data,
 }: EdgeProps): React.ReactElement {
+  const link = (data as { edge?: ActiveDependencyEdge } | undefined)?.edge;
   const pull = 0.78;
   const c1x = sourceX + (CHART_CENTER_X - sourceX) * pull;
   const c1y = sourceY + (CHART_CENTER_Y - sourceY) * pull;
@@ -179,11 +176,12 @@ function ChordArrowEdge({
       fill="none"
       stroke={style?.stroke || '#64748b'}
       strokeWidth={style?.strokeWidth || 2}
-      strokeDasharray="8 4"
+      strokeDasharray={style?.strokeDasharray}
       strokeLinecap="round"
       opacity={style?.opacity || 0.82}
-      style={{ animation: 'module-arch-edge-flow 1.5s linear infinite' }}
-    />
+    >
+      {link && <title>{linkTitle(link)}</title>}
+    </path>
   );
 }
 
@@ -214,26 +212,21 @@ export function ModuleGraphRadial({
   const allRingNodes = useMemo<ModuleCircleNode[]>(() => {
     const totalCount = modules.length + outOfViewModules.length;
     const baseRadius = getRingRadius(totalCount);
-    const complexityScores = modules.map((module) => module.metrics.approximateIcs);
-    const minComplexity = complexityScores.length > 0 ? Math.min(...complexityScores) : 0;
-    const maxComplexity = complexityScores.length > 0 ? Math.max(...complexityScores) : 0;
-    const complexityRange = Math.max(1, maxComplexity - minComplexity);
+    const diameters = nodeDiameters(modules);
     const result: ModuleCircleNode[] = [];
 
     for (let index = 0; index < modules.length; index += 1) {
       const module = modules[index];
-      const complexity = module.metrics.approximateIcs;
-      result.push(moduleNode(module, index, totalCount, baseRadius,
-        MIN_DIAMETER + ((complexity - minComplexity) / complexityRange) * (MAX_DIAMETER - MIN_DIAMETER),
-        module.id === selectedModuleId));
+      result.push(moduleNode(module, index, totalCount, baseRadius, diameters.get(module.id) ?? MIN_DIAMETER,
+        module.id === selectedModuleId, linkHealth(module.id, moduleEdges)));
     }
     for (let index = 0; index < outOfViewModules.length; index += 1) {
       const module = outOfViewModules[index];
       result.push(moduleNode(module, modules.length + index, totalCount, baseRadius, MIN_DIAMETER,
-        false, true, outOfViewLevelById[module.id]));
+        false, linkHealth(module.id, moduleEdges), true, outOfViewLevelById[module.id]));
     }
     return result;
-  }, [modules, outOfViewModules, outOfViewLevelById, selectedModuleId]);
+  }, [modules, moduleEdges, outOfViewModules, outOfViewLevelById, selectedModuleId]);
 
   const graphEdges = useMemo(() => buildGraphEdges({
     edges: moduleEdges,
@@ -242,8 +235,7 @@ export function ModuleGraphRadial({
     edgeType: 'chordArrow',
     markerSize: 18,
     allowedStroke: '#64748b',
-  }).map((edge) => ({ ...edge, style: { ...edge.style, opacity: 0.82 } })),
-  [moduleEdges, allNodeIds, selectedEdgeId]);
+  }), [moduleEdges, allNodeIds, selectedEdgeId]);
 
   const interactions = useModuleGraphInteractions({
     selectedModuleId,
@@ -279,13 +271,52 @@ export function ModuleGraphRadial({
           nodeColor={(node) => (node.data as ModuleCircleData).presentationClassColor}
         />
       </ReactFlow>
-      <ModuleGraphLegend presentationClasses={presentationClasses} />
+      <ModuleGraphLegend presentationClasses={presentationClasses}
+        showsDottedLinks={moduleEdges.some((edge) => edge.pattern === 'dotted')} />
     </div>
   );
 }
 
+interface LinkHealth {
+  readonly links: number;
+  readonly limited: number;
+  readonly denied: number;
+}
+
+function linkHealth(id: string, edges: readonly ActiveDependencyEdge[]): LinkHealth {
+  const outgoing = edges.filter((edge) => edge.consumer === id);
+  return {
+    links: outgoing.length,
+    limited: outgoing.filter((edge) => edge.status === 'limited').length,
+    denied: outgoing.filter((edge) => edge.status === 'denied').length,
+  };
+}
+
+/**
+ * Node diameter from owned source files on a square-root scale over the given modules. It is
+ * independent of dependency settings, so the controls never resize nodes.
+ */
+export function nodeDiameters(modules: readonly ExplorerModule[]): Map<string, number> {
+  const sizes = modules.map((module) => Math.sqrt(ownedSourceFiles(module)));
+  const minimum = sizes.length > 0 ? Math.min(...sizes) : 0;
+  const range = sizes.length > 0 ? Math.max(...sizes) - minimum : 0;
+  return new Map(modules.map((module, index) => [module.id, range === 0
+    ? MIN_DIAMETER
+    : MIN_DIAMETER + ((sizes[index]! - minimum) / range) * (MAX_DIAMETER - MIN_DIAMETER)]));
+}
+
+export function ownedSourceFiles(module: ExplorerModule): number {
+  return module.files.filter((file) => file.kind === 'source').length;
+}
+
+function linkTitle(link: ActiveDependencyEdge): string {
+  const unit = link.projection === 'imported-module' ? 'used originals via this boundary' : 'dependencies';
+  return `${link.consumer} -> ${link.provider}: ${link.behavioral} behavioral, `
+    + `${link.nonBehavioral} non-behavioral ${unit}`;
+}
+
 function moduleNode(module: ExplorerModule, slot: number, total: number, radius: number,
-  diameter: number, selected: boolean, outOfView = false,
+  diameter: number, selected: boolean, health: LinkHealth, outOfView = false,
   outOfViewLevel?: number): ModuleCircleNode {
   const angle = slotAngle(slot, total);
   const presentationClass = getPresentationClass(module);
@@ -302,11 +333,10 @@ function moduleNode(module: ExplorerModule, slot: number, total: number, radius:
       presentationClass,
       presentationClassLabel: getPresentationClassLabel(presentationClass),
       presentationClassColor: getPresentationClassColor(presentationClass),
-      complexityScore: module.metrics.approximateIcs,
-      fileCount: module.metrics.ownedFiles,
-      dependencyCount: module.metrics.dependencies,
-      limitedCount: module.metrics.limitedAccesses,
-      deniedCount: module.metrics.deniedAccesses,
+      fileCount: ownedSourceFiles(module),
+      linkCount: health.links,
+      limitedCount: health.limited,
+      deniedCount: health.denied,
       isSelected: selected,
       diameter,
       angle,

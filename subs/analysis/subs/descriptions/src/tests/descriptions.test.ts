@@ -74,6 +74,9 @@ const projectViewModelNames = ['ProjectExplorerModel', 'ExplorerModule', 'Explor
   'ExplorerEdge', 'ExplorerAccess', 'ExplorerSelection', 'ExplorerExport',
   'ExplorerExposure', 'ExplorerCoverage', 'ExplorerSummary'];
 const projectViewProps = ['ProjectExplorerViewProps', 'ExplorerDiscussionProps', 'ExplorerDiscussionSelection', 'ExportDetailState'];
+const dependencyViewNames = ['DependencyGraphCount', 'DependencyGraphImportedCount', 'DependencyGraphModule',
+  'DependencyGraphEvidence', 'DependencyGraphImportedEdge', 'DependencyGraphOriginalEdge', 'DependencyGraphEdge',
+  'DependencyGraphModel', 'DependencyLinkTarget', 'DependencySettings', 'DependencyPhase', 'DependencyGraphState'];
 const explorerServiceNames = ['ExplorerProjectionInput', 'ProjectViewInput', 'ExplorerDetailsInput',
   'ExplorerDetailsResult', 'ServerBindingKind', 'ServerStatusResult', 'ExplorerProcessRecord'];
 const explorerDependencyNames = ['ExplorerDependencyModelInput', 'ExplorerDependencyCount', 'ExplorerImportedCount',
@@ -95,6 +98,7 @@ const presentationStatements = [
   sub(projectViewProps, 'project-view'),
   sub(['ModuleTreeView'], 'project-view'), sub(['ModuleTreeViewProps'], 'project-view'),
   sub(['indexModuleTree', 'collapsibleAtDepth', 'ancestorsOf'], 'project-view'),
+  sub([...dependencyViewNames, 'ActiveDependencyEdge'], 'project-view'), sub(['defaultDependencySettings'], 'project-view'),
   sub(['placeTree', 'Point'], 'layout', descendants),
 ];
 const layoutStatements = [
@@ -127,6 +131,7 @@ const toolkit: readonly Fixture[] = [
     sub(['ModuleGraphRadial'], 'presentation', descendants), sub(projectViewProps, 'presentation', descendants),
     sub(['ProjectExplorerView'], 'presentation', descendants),
     sub(['ModuleTreeView', 'ModuleTreeViewProps', 'indexModuleTree', 'collapsibleAtDepth', 'ancestorsOf'], 'presentation', descendants),
+    sub([...dependencyViewNames, 'ActiveDependencyEdge', 'defaultDependencySettings'], 'presentation', descendants),
     sub(explorerServiceNames, 'service-api', descendants), sub(['createProjectExplorerModel'], 'service-api', descendants),
     sub(explorerDependencyNames, 'service-api', descendants),
     sub(['createExplorerRouter', 'ExplorerRouter', 'startExplorerWebProcess'], 'service-api', descendants),
@@ -180,7 +185,9 @@ const toolkit: readonly Fixture[] = [
   { path: 'subs/presentation/', name: 'presentation', tags: uiBrowser, statements: presentationStatements },
   { path: 'subs/presentation/subs/layout/', name: 'layout', tags: browser, statements: layoutStatements },
   { path: 'subs/presentation/subs/project-view/', name: 'project-view', tags: uiBrowser, statements: [
-    src('*', 'interfaces/project-view.ts'), src(['ModuleGraphRadial'], 'ModuleGraphRadial.tsx', uiBrowser),
+    src('*', 'interfaces/project-view.ts'), src('*', 'interfaces/dependency-view.ts'),
+    src(['ActiveDependencyEdge'], 'dependency-graph.ts'), src(['defaultDependencySettings'], 'dependency-graph.ts', uiBrowser),
+    src(['ModuleGraphRadial'], 'ModuleGraphRadial.tsx', uiBrowser),
     src(['ModuleGraphProps', 'GraphSelection'], 'moduleGraphShared.ts'),
     src(['ProjectExplorerView'], 'ProjectExplorerView.tsx', uiBrowser),
     src(['ProjectExplorerViewProps', 'ExplorerDiscussionProps', 'ExplorerDiscussionSelection'], 'ProjectExplorerView.tsx'),

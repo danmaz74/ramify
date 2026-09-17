@@ -63,10 +63,6 @@ export function ProjectExplorerPage({ client, pollIntervalMs = 3000,
       setExpandedExportId(null);
       setExportDetail({ state: 'idle' });
     }
-    if (selectedEdge) {
-      const edge = data.edges.find(item => item.id === selectedEdge.id);
-      setSelectedEdge(edge ? { kind: 'edge', id: edge.id, edge } : null);
-    }
   }, [data]);
 
   useEffect(() => {

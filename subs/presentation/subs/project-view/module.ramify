@@ -2,6 +2,9 @@ ramify 1
 module project-view tagged [ui, browser]
 
 expose-src * from "interfaces/project-view.ts" to parent
+expose-src * from "interfaces/dependency-view.ts" to parent
+expose-src ActiveDependencyEdge from "dependency-graph.ts" to parent
+expose-src defaultDependencySettings from "dependency-graph.ts" tagged [ui, browser] to parent
 expose-src ModuleGraphRadial from "ModuleGraphRadial.tsx" tagged [ui, browser] to parent
 expose-src ModuleGraphProps, GraphSelection from "moduleGraphShared.ts" to parent
 expose-src ProjectExplorerView from "ProjectExplorerView.tsx" tagged [ui, browser] to parent

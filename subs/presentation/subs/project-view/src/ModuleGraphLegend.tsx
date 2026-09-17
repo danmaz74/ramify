@@ -10,10 +10,13 @@ import {
 
 export interface ModuleGraphLegendProps {
   readonly presentationClasses: readonly string[];
+  /** Whether non-behavioral-only links are currently drawn. */
+  readonly showsDottedLinks?: boolean;
 }
 
 export default function ModuleGraphLegend({
   presentationClasses,
+  showsDottedLinks = false,
 }: ModuleGraphLegendProps): React.ReactElement {
   return (
     <div className="module-arch__graph-legend" aria-hidden="true">
@@ -28,28 +31,32 @@ export default function ModuleGraphLegend({
         </div>
       ))}
       <div className="module-arch__graph-legend-row">
-        <span className="module-arch__graph-legend-badge module-arch__graph-legend-badge--healthy">ok</span>
-        <span>Module accesses: allowed</span>
-      </div>
-      <div className="module-arch__graph-legend-row">
-        <span className="module-arch__graph-legend-badge module-arch__graph-legend-badge--warn">limited</span>
-        <span>Module accesses: limited</span>
-      </div>
-      <div className="module-arch__graph-legend-row">
-        <span className="module-arch__graph-legend-badge module-arch__graph-legend-badge--error">denied</span>
-        <span>Module accesses: denied</span>
-      </div>
-      <div className="module-arch__graph-legend-row">
         <span className="module-arch__graph-legend-edge module-arch__graph-legend-edge--ok" />
-        <span>Edge: allowed</span>
+        <span>Link: behavioral or mixed</span>
       </div>
+      {showsDottedLinks && (
+        <div className="module-arch__graph-legend-row">
+          <span className="module-arch__graph-legend-edge module-arch__graph-legend-edge--dotted" />
+          <span>Link: non-behavioral only</span>
+        </div>
+      )}
       <div className="module-arch__graph-legend-row">
         <span className="module-arch__graph-legend-edge module-arch__graph-legend-edge--warn" />
-        <span>Edge: limited evidence</span>
+        <span>Link status: limited</span>
       </div>
       <div className="module-arch__graph-legend-row">
         <span className="module-arch__graph-legend-edge module-arch__graph-legend-edge--error" />
-        <span>Edge: denied</span>
+        <span>Link status: denied</span>
+      </div>
+      <div className="module-arch__graph-legend-row">
+        <span className="module-arch__graph-legend-badge module-arch__graph-legend-badge--error">denied</span>
+        <span>Module badge: its displayed outgoing links</span>
+      </div>
+      <div className="module-arch__graph-legend-row">
+        <span>Width: displayed classified count</span>
+      </div>
+      <div className="module-arch__graph-legend-row">
+        <span>Module size: owned source files</span>
       </div>
     </div>
   );

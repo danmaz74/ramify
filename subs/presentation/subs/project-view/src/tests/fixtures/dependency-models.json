@@ -1,0 +1,1035 @@
+{
+  "forwarding": {
+    "schemaVersion": "ramify.explorer-dependencies/1",
+    "inputId": "input/1:dependency-model",
+    "state": "partial",
+    "project": {
+      "behavioral": 2,
+      "nonBehavioral": 2
+    },
+    "modules": [
+      {
+        "id": "app",
+        "uses": {
+          "behavioral": 0,
+          "nonBehavioral": 0
+        },
+        "usedThrough": {
+          "behavioralUsedOriginals": 0,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "ownedUsedByOthers": {
+          "behavioral": 0,
+          "nonBehavioral": 0
+        }
+      },
+      {
+        "id": "app/a",
+        "uses": {
+          "behavioral": 1,
+          "nonBehavioral": 1
+        },
+        "usedThrough": {
+          "behavioralUsedOriginals": 0,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "ownedUsedByOthers": {
+          "behavioral": 0,
+          "nonBehavioral": 0
+        }
+      },
+      {
+        "id": "app/b",
+        "uses": {
+          "behavioral": 1,
+          "nonBehavioral": 0
+        },
+        "usedThrough": {
+          "behavioralUsedOriginals": 1,
+          "nonBehavioralUsedOriginals": 1
+        },
+        "ownedUsedByOthers": {
+          "behavioral": 0,
+          "nonBehavioral": 1
+        }
+      },
+      {
+        "id": "app/b/core",
+        "uses": {
+          "behavioral": 0,
+          "nonBehavioral": 1
+        },
+        "usedThrough": {
+          "behavioralUsedOriginals": 0,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "ownedUsedByOthers": {
+          "behavioral": 1,
+          "nonBehavioral": 0
+        }
+      },
+      {
+        "id": "app/c",
+        "uses": {
+          "behavioral": 0,
+          "nonBehavioral": 0
+        },
+        "usedThrough": {
+          "behavioralUsedOriginals": 1,
+          "nonBehavioralUsedOriginals": 2
+        },
+        "ownedUsedByOthers": {
+          "behavioral": 1,
+          "nonBehavioral": 1
+        }
+      },
+      {
+        "id": "app/idle",
+        "uses": {
+          "behavioral": 0,
+          "nonBehavioral": 0
+        },
+        "usedThrough": {
+          "behavioralUsedOriginals": 0,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "ownedUsedByOthers": {
+          "behavioral": 0,
+          "nonBehavioral": 0
+        }
+      }
+    ],
+    "importedModuleEdges": [
+      {
+        "id": "dependency-edge/1:imported-module:86c0389626d8c4290767291b3a72290b9e6eb76c78cbf3990895fd2ef18a58fc",
+        "projection": "imported-module",
+        "consumer": "app/a",
+        "provider": "app/b",
+        "counts": {
+          "behavioralUsedOriginals": 1,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "originalOwners": [
+          {
+            "owner": "app/b/core",
+            "counts": {
+              "behavioralUsedOriginals": 1,
+              "nonBehavioralUsedOriginals": 0
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "app/b/core",
+              "file": "run.ts",
+              "binding": "run"
+            },
+            "originalOwner": "app/b/core",
+            "importedModule": "app/b",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "subs/a/src/use.ts"
+            ],
+            "importedFiles": [
+              "subs/b/src/index.ts"
+            ],
+            "originalFiles": [
+              "subs/b/subs/core/src/run.ts"
+            ],
+            "accessIds": [
+              "app/a->app/b:run"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:imported-module:a7ed24b6bd62e7083c90bfbdd0d1b951ef49ef1a1973c39a12b6c5e8db18b27e",
+        "projection": "imported-module",
+        "consumer": "app/a",
+        "provider": "app/c",
+        "counts": {
+          "behavioralUsedOriginals": 0,
+          "nonBehavioralUsedOriginals": 2
+        },
+        "originalOwners": [
+          {
+            "owner": "app/b/core",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 2
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "app/b/core",
+              "file": "run.ts",
+              "binding": "run"
+            },
+            "originalOwner": "app/b/core",
+            "importedModule": "app/c",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/a/src/use.ts"
+            ],
+            "importedFiles": [
+              "subs/c/src/index.ts"
+            ],
+            "originalFiles": [
+              "subs/b/subs/core/src/run.ts"
+            ],
+            "accessIds": [
+              "app/a->app/c:run"
+            ],
+            "status": "denied",
+            "reasons": [
+              "not-visible"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "app/b/core",
+              "file": "x.ts",
+              "binding": "x"
+            },
+            "originalOwner": "app/b/core",
+            "importedModule": "app/c",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/a/src/use.ts"
+            ],
+            "importedFiles": [
+              "subs/c/src/index.ts"
+            ],
+            "originalFiles": [
+              "subs/b/subs/core/src/x.ts"
+            ],
+            "accessIds": [
+              "app/a->app/c:x"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:imported-module:5e35336641f48461b1b3ca20210670883d74c90a83da761d037ce0e7ee689e3e",
+        "projection": "imported-module",
+        "consumer": "app/b",
+        "provider": "app/c",
+        "counts": {
+          "behavioralUsedOriginals": 1,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "originalOwners": [
+          {
+            "owner": "app/c",
+            "counts": {
+              "behavioralUsedOriginals": 1,
+              "nonBehavioralUsedOriginals": 0
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "app/c",
+              "file": "u.ts",
+              "binding": "u"
+            },
+            "originalOwner": "app/c",
+            "importedModule": "app/c",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "subs/b/src/use.ts"
+            ],
+            "importedFiles": [
+              "subs/c/src/index.ts"
+            ],
+            "originalFiles": [
+              "subs/c/src/u.ts"
+            ],
+            "accessIds": [
+              "app/b->app/c:u"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:imported-module:c534f4538575c54b4c350c0ef9af417a6595e1765f3f160d9908396bed533c7a",
+        "projection": "imported-module",
+        "consumer": "app/b/core",
+        "provider": "app/b",
+        "counts": {
+          "behavioralUsedOriginals": 0,
+          "nonBehavioralUsedOriginals": 1
+        },
+        "originalOwners": [
+          {
+            "owner": "app/b",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 1
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "app/b",
+              "file": "s.ts",
+              "binding": "s"
+            },
+            "originalOwner": "app/b",
+            "importedModule": "app/b",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/b/subs/core/src/use.ts"
+            ],
+            "importedFiles": [
+              "subs/b/src/index.ts"
+            ],
+            "originalFiles": [
+              "subs/b/src/s.ts"
+            ],
+            "accessIds": [
+              "app/b/core->app/b:s"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      }
+    ],
+    "originalOwnerEdges": [
+      {
+        "id": "dependency-edge/1:original-owner:23f3d2ee878136e0c0a4b103d4bacd06b82843d817a419193688b6985df4525b",
+        "projection": "original-owner",
+        "consumer": "app/a",
+        "provider": "app/b/core",
+        "counts": {
+          "behavioral": 1,
+          "nonBehavioral": 0
+        },
+        "importedThrough": [
+          {
+            "module": "app/b",
+            "counts": {
+              "behavioralUsedOriginals": 1,
+              "nonBehavioralUsedOriginals": 0
+            }
+          },
+          {
+            "module": "app/c",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 1
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "app/b/core",
+              "file": "run.ts",
+              "binding": "run"
+            },
+            "originalOwner": "app/b/core",
+            "importedModule": "app/b",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "subs/a/src/use.ts"
+            ],
+            "importedFiles": [
+              "subs/b/src/index.ts"
+            ],
+            "originalFiles": [
+              "subs/b/subs/core/src/run.ts"
+            ],
+            "accessIds": [
+              "app/a->app/b:run"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "app/b/core",
+              "file": "run.ts",
+              "binding": "run"
+            },
+            "originalOwner": "app/b/core",
+            "importedModule": "app/c",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/a/src/use.ts"
+            ],
+            "importedFiles": [
+              "subs/c/src/index.ts"
+            ],
+            "originalFiles": [
+              "subs/b/subs/core/src/run.ts"
+            ],
+            "accessIds": [
+              "app/a->app/c:run"
+            ],
+            "status": "denied",
+            "reasons": [
+              "not-visible"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:original-owner:a7ed24b6bd62e7083c90bfbdd0d1b951ef49ef1a1973c39a12b6c5e8db18b27e",
+        "projection": "original-owner",
+        "consumer": "app/a",
+        "provider": "app/c",
+        "counts": {
+          "behavioral": 0,
+          "nonBehavioral": 1
+        },
+        "importedThrough": [
+          {
+            "module": "app/a",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 1
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "app/c",
+              "file": "types.ts",
+              "binding": "Shape"
+            },
+            "originalOwner": "app/c",
+            "importedModule": "app/a",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/a/src/use.ts"
+            ],
+            "importedFiles": [
+              "subs/a/src/index.ts"
+            ],
+            "originalFiles": [
+              "subs/c/src/types.ts"
+            ],
+            "accessIds": [
+              "app/a->app/a:Shape"
+            ],
+            "status": "limited",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:original-owner:5e35336641f48461b1b3ca20210670883d74c90a83da761d037ce0e7ee689e3e",
+        "projection": "original-owner",
+        "consumer": "app/b",
+        "provider": "app/c",
+        "counts": {
+          "behavioral": 1,
+          "nonBehavioral": 0
+        },
+        "importedThrough": [
+          {
+            "module": "app/c",
+            "counts": {
+              "behavioralUsedOriginals": 1,
+              "nonBehavioralUsedOriginals": 0
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "app/c",
+              "file": "u.ts",
+              "binding": "u"
+            },
+            "originalOwner": "app/c",
+            "importedModule": "app/c",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "subs/b/src/use.ts"
+            ],
+            "importedFiles": [
+              "subs/c/src/index.ts"
+            ],
+            "originalFiles": [
+              "subs/c/src/u.ts"
+            ],
+            "accessIds": [
+              "app/b->app/c:u"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:original-owner:c534f4538575c54b4c350c0ef9af417a6595e1765f3f160d9908396bed533c7a",
+        "projection": "original-owner",
+        "consumer": "app/b/core",
+        "provider": "app/b",
+        "counts": {
+          "behavioral": 0,
+          "nonBehavioral": 1
+        },
+        "importedThrough": [
+          {
+            "module": "app/b",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 1
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "app/b",
+              "file": "s.ts",
+              "binding": "s"
+            },
+            "originalOwner": "app/b",
+            "importedModule": "app/b",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/b/subs/core/src/use.ts"
+            ],
+            "importedFiles": [
+              "subs/b/src/index.ts"
+            ],
+            "originalFiles": [
+              "subs/b/src/s.ts"
+            ],
+            "accessIds": [
+              "app/b/core->app/b:s"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      }
+    ],
+    "coverage": {
+      "unknownDependencies": 1,
+      "limitIds": [
+        "limit-x"
+      ]
+    }
+  },
+  "bothBoundaries": {
+    "schemaVersion": "ramify.explorer-dependencies/1",
+    "inputId": "input/1:dependency-model",
+    "state": "complete",
+    "project": {
+      "behavioral": 1,
+      "nonBehavioral": 1
+    },
+    "modules": [
+      {
+        "id": "app",
+        "uses": {
+          "behavioral": 0,
+          "nonBehavioral": 0
+        },
+        "usedThrough": {
+          "behavioralUsedOriginals": 0,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "ownedUsedByOthers": {
+          "behavioral": 0,
+          "nonBehavioral": 0
+        }
+      },
+      {
+        "id": "app/a",
+        "uses": {
+          "behavioral": 1,
+          "nonBehavioral": 1
+        },
+        "usedThrough": {
+          "behavioralUsedOriginals": 0,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "ownedUsedByOthers": {
+          "behavioral": 0,
+          "nonBehavioral": 0
+        }
+      },
+      {
+        "id": "app/b",
+        "uses": {
+          "behavioral": 0,
+          "nonBehavioral": 0
+        },
+        "usedThrough": {
+          "behavioralUsedOriginals": 1,
+          "nonBehavioralUsedOriginals": 1
+        },
+        "ownedUsedByOthers": {
+          "behavioral": 0,
+          "nonBehavioral": 0
+        }
+      },
+      {
+        "id": "app/b/core",
+        "uses": {
+          "behavioral": 0,
+          "nonBehavioral": 0
+        },
+        "usedThrough": {
+          "behavioralUsedOriginals": 0,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "ownedUsedByOthers": {
+          "behavioral": 1,
+          "nonBehavioral": 0
+        }
+      },
+      {
+        "id": "app/c",
+        "uses": {
+          "behavioral": 0,
+          "nonBehavioral": 0
+        },
+        "usedThrough": {
+          "behavioralUsedOriginals": 1,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "ownedUsedByOthers": {
+          "behavioral": 0,
+          "nonBehavioral": 1
+        }
+      }
+    ],
+    "importedModuleEdges": [
+      {
+        "id": "dependency-edge/1:imported-module:86c0389626d8c4290767291b3a72290b9e6eb76c78cbf3990895fd2ef18a58fc",
+        "projection": "imported-module",
+        "consumer": "app/a",
+        "provider": "app/b",
+        "counts": {
+          "behavioralUsedOriginals": 1,
+          "nonBehavioralUsedOriginals": 1
+        },
+        "originalOwners": [
+          {
+            "owner": "app/b/core",
+            "counts": {
+              "behavioralUsedOriginals": 1,
+              "nonBehavioralUsedOriginals": 0
+            }
+          },
+          {
+            "owner": "app/c",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 1
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "app/b/core",
+              "file": "run.ts",
+              "binding": "run"
+            },
+            "originalOwner": "app/b/core",
+            "importedModule": "app/b",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "subs/a/src/use.ts"
+            ],
+            "importedFiles": [
+              "subs/b/src/index.ts"
+            ],
+            "originalFiles": [
+              "subs/b/subs/core/src/run.ts"
+            ],
+            "accessIds": [
+              "app/a->app/b:run"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "app/c",
+              "file": "types.ts",
+              "binding": "Shape"
+            },
+            "originalOwner": "app/c",
+            "importedModule": "app/b",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/a/src/use.ts"
+            ],
+            "importedFiles": [
+              "subs/b/src/index.ts"
+            ],
+            "originalFiles": [
+              "subs/c/src/types.ts"
+            ],
+            "accessIds": [
+              "app/a->app/b:Shape"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:imported-module:a7ed24b6bd62e7083c90bfbdd0d1b951ef49ef1a1973c39a12b6c5e8db18b27e",
+        "projection": "imported-module",
+        "consumer": "app/a",
+        "provider": "app/c",
+        "counts": {
+          "behavioralUsedOriginals": 1,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "originalOwners": [
+          {
+            "owner": "app/b/core",
+            "counts": {
+              "behavioralUsedOriginals": 1,
+              "nonBehavioralUsedOriginals": 0
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "app/b/core",
+              "file": "run.ts",
+              "binding": "run"
+            },
+            "originalOwner": "app/b/core",
+            "importedModule": "app/c",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "subs/a/src/use.ts"
+            ],
+            "importedFiles": [
+              "subs/c/src/index.ts"
+            ],
+            "originalFiles": [
+              "subs/b/subs/core/src/run.ts"
+            ],
+            "accessIds": [
+              "app/a->app/c:run"
+            ],
+            "status": "limited",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      }
+    ],
+    "originalOwnerEdges": [
+      {
+        "id": "dependency-edge/1:original-owner:23f3d2ee878136e0c0a4b103d4bacd06b82843d817a419193688b6985df4525b",
+        "projection": "original-owner",
+        "consumer": "app/a",
+        "provider": "app/b/core",
+        "counts": {
+          "behavioral": 1,
+          "nonBehavioral": 0
+        },
+        "importedThrough": [
+          {
+            "module": "app/b",
+            "counts": {
+              "behavioralUsedOriginals": 1,
+              "nonBehavioralUsedOriginals": 0
+            }
+          },
+          {
+            "module": "app/c",
+            "counts": {
+              "behavioralUsedOriginals": 1,
+              "nonBehavioralUsedOriginals": 0
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "app/b/core",
+              "file": "run.ts",
+              "binding": "run"
+            },
+            "originalOwner": "app/b/core",
+            "importedModule": "app/b",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "subs/a/src/use.ts"
+            ],
+            "importedFiles": [
+              "subs/b/src/index.ts"
+            ],
+            "originalFiles": [
+              "subs/b/subs/core/src/run.ts"
+            ],
+            "accessIds": [
+              "app/a->app/b:run"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "app/b/core",
+              "file": "run.ts",
+              "binding": "run"
+            },
+            "originalOwner": "app/b/core",
+            "importedModule": "app/c",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "subs/a/src/use.ts"
+            ],
+            "importedFiles": [
+              "subs/c/src/index.ts"
+            ],
+            "originalFiles": [
+              "subs/b/subs/core/src/run.ts"
+            ],
+            "accessIds": [
+              "app/a->app/c:run"
+            ],
+            "status": "limited",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:original-owner:a7ed24b6bd62e7083c90bfbdd0d1b951ef49ef1a1973c39a12b6c5e8db18b27e",
+        "projection": "original-owner",
+        "consumer": "app/a",
+        "provider": "app/c",
+        "counts": {
+          "behavioral": 0,
+          "nonBehavioral": 1
+        },
+        "importedThrough": [
+          {
+            "module": "app/b",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 1
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "app/c",
+              "file": "types.ts",
+              "binding": "Shape"
+            },
+            "originalOwner": "app/c",
+            "importedModule": "app/b",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/a/src/use.ts"
+            ],
+            "importedFiles": [
+              "subs/b/src/index.ts"
+            ],
+            "originalFiles": [
+              "subs/c/src/types.ts"
+            ],
+            "accessIds": [
+              "app/a->app/b:Shape"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      }
+    ],
+    "coverage": {
+      "unknownDependencies": 0,
+      "limitIds": []
+    }
+  },
+  "zero": {
+    "schemaVersion": "ramify.explorer-dependencies/1",
+    "inputId": "input/1:dependency-model",
+    "state": "complete",
+    "project": {
+      "behavioral": 0,
+      "nonBehavioral": 0
+    },
+    "modules": [
+      {
+        "id": "app",
+        "uses": {
+          "behavioral": 0,
+          "nonBehavioral": 0
+        },
+        "usedThrough": {
+          "behavioralUsedOriginals": 0,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "ownedUsedByOthers": {
+          "behavioral": 0,
+          "nonBehavioral": 0
+        }
+      },
+      {
+        "id": "app/a",
+        "uses": {
+          "behavioral": 0,
+          "nonBehavioral": 0
+        },
+        "usedThrough": {
+          "behavioralUsedOriginals": 0,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "ownedUsedByOthers": {
+          "behavioral": 0,
+          "nonBehavioral": 0
+        }
+      },
+      {
+        "id": "app/b",
+        "uses": {
+          "behavioral": 0,
+          "nonBehavioral": 0
+        },
+        "usedThrough": {
+          "behavioralUsedOriginals": 0,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "ownedUsedByOthers": {
+          "behavioral": 0,
+          "nonBehavioral": 0
+        }
+      },
+      {
+        "id": "app/b/core",
+        "uses": {
+          "behavioral": 0,
+          "nonBehavioral": 0
+        },
+        "usedThrough": {
+          "behavioralUsedOriginals": 0,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "ownedUsedByOthers": {
+          "behavioral": 0,
+          "nonBehavioral": 0
+        }
+      },
+      {
+        "id": "app/c",
+        "uses": {
+          "behavioral": 0,
+          "nonBehavioral": 0
+        },
+        "usedThrough": {
+          "behavioralUsedOriginals": 0,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "ownedUsedByOthers": {
+          "behavioral": 0,
+          "nonBehavioral": 0
+        }
+      },
+      {
+        "id": "app/idle",
+        "uses": {
+          "behavioral": 0,
+          "nonBehavioral": 0
+        },
+        "usedThrough": {
+          "behavioralUsedOriginals": 0,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "ownedUsedByOthers": {
+          "behavioral": 0,
+          "nonBehavioral": 0
+        }
+      }
+    ],
+    "importedModuleEdges": [],
+    "originalOwnerEdges": [],
+    "coverage": {
+      "unknownDependencies": 0,
+      "limitIds": []
+    }
+  }
+}

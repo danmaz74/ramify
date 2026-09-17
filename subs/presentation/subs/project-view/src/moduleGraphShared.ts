@@ -6,17 +6,20 @@ import { useCallback } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import { MarkerType } from '@xyflow/react';
 import type { Edge, Node } from '@xyflow/react';
-import type { ExplorerEdge, ExplorerModule } from './interfaces/project-view.js';
+import type { ExplorerModule } from './interfaces/project-view.js';
+import { linkWidth, type ActiveDependencyEdge } from './dependency-graph.js';
 
+/** A selected link, identified by its projection-specific ID. */
 export type GraphSelection = {
   readonly kind: 'edge';
   readonly id: string;
-  readonly edge: ExplorerEdge;
+  readonly edge: ActiveDependencyEdge;
 };
 
 export interface ModuleGraphProps {
   readonly modules: readonly ExplorerModule[];
-  readonly edges: readonly ExplorerEdge[];
+  /** Links of the active dependency collection under the current settings. */
+  readonly edges: readonly ActiveDependencyEdge[];
   readonly outOfViewModules?: readonly ExplorerModule[];
   readonly outOfViewLevelById?: Readonly<Record<string, number>>;
   readonly selectedModuleId: string | null;
@@ -27,7 +30,7 @@ export interface ModuleGraphProps {
 }
 
 interface BuildGraphEdgesOptions {
-  readonly edges: readonly ExplorerEdge[];
+  readonly edges: readonly ActiveDependencyEdge[];
   readonly nodeIdSet: ReadonlySet<string>;
   readonly selectedEdgeId: string | null;
   readonly edgeType: Edge['type'];
@@ -48,7 +51,9 @@ export function buildGraphEdges({
   for (const edge of edges) {
     if (!nodeIdSet.has(edge.consumer) || !nodeIdSet.has(edge.provider)) continue;
     const isSelected = edge.id === selectedEdgeId;
-    const stroke = getEdgeStroke(edge.status, allowedStroke);
+    const stroke = edge.pattern === 'dotted' && edge.status === 'allowed'
+      ? mutedStroke
+      : getEdgeStroke(edge.status, allowedStroke);
     result.push({
       id: edge.id,
       source: edge.consumer,
@@ -56,7 +61,7 @@ export function buildGraphEdges({
       type: edgeType,
       animated: false,
       data: { kind: 'edge', id: edge.id, edge } satisfies GraphSelection,
-      style: selectedEdgeStyle(isSelected, stroke, edge.accessCount),
+      style: selectedEdgeStyle(isSelected, stroke, edge),
       markerEnd: marker(isSelected, stroke, markerSize),
     });
   }
@@ -106,21 +111,23 @@ export function useModuleGraphInteractions({
   return { onNodeClick, onEdgeClick, onPaneClick, onNodeDoubleClick };
 }
 
-function getEdgeStroke(status: ExplorerEdge['status'], allowedStroke: string): string {
+const mutedStroke = '#cbd5e1';
+
+/** Line pattern encodes behavior; colour encodes status. */
+export const dottedDashArray = '2 5';
+
+function getEdgeStroke(status: ActiveDependencyEdge['status'], allowedStroke: string): string {
   if (status === 'denied') return '#ef4444';
   if (status === 'limited') return '#f59e0b';
   return allowedStroke;
 }
 
-function getStrokeWidth(accessCount: number): number {
-  const safeCount = Math.max(1, accessCount);
-  return Math.min(6, 1.4 + Math.log2(safeCount + 1) * 1.1);
-}
-
-function selectedEdgeStyle(selected: boolean, stroke: string, accessCount: number): Edge['style'] {
+function selectedEdgeStyle(selected: boolean, stroke: string, edge: ActiveDependencyEdge): Edge['style'] {
   return {
     stroke: selected ? '#1d4ed8' : stroke,
-    strokeWidth: getStrokeWidth(accessCount),
+    strokeWidth: linkWidth(edge.displayed),
+    strokeDasharray: edge.pattern === 'dotted' ? dottedDashArray : undefined,
+    opacity: edge.pattern === 'dotted' ? 0.7 : 0.85,
     filter: selected ? 'drop-shadow(0 0 4px rgba(30, 64, 175, 0.5))' : undefined,
   };
 }
