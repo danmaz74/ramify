@@ -17,6 +17,26 @@
   height: 100%;
 }
 
+@keyframes module-arch-edge-flow {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    /* Negative, so the dashes travel from the consumer towards the provider. */
+    stroke-dashoffset: -24;
+  }
+}
+
+.module-arch__graph-edge {
+  animation: module-arch-edge-flow 1.5s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .module-arch__graph-edge {
+    animation: none;
+  }
+}
+
 .module-arch__graph-legend {
   position: absolute;
   left: 12px;
@@ -96,9 +116,8 @@
   border-top-color: #94a3b8;
 }
 
-.module-arch__graph-legend-edge--dotted {
+.module-arch__graph-legend-edge--non-behavioral {
   border-top-color: #cbd5e1;
-  border-top-style: dotted;
 }
 
 .module-arch__graph-legend-edge--warn {

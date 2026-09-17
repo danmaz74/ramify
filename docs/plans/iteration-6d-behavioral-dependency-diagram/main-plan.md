@@ -277,9 +277,14 @@ non-behavioral-only edges. Choosing original owners switches to
 `originalOwnerEdges`. Both collections arrive in one ready response, so either
 control is local UI state.
 
-- A mixed edge is solid; a non-behavioral-only edge is muted and dotted.
+- Colour carries both behavior and status: each status has a full-strength
+  colour for an edge with behavioral evidence and a lighter one for a
+  non-behavioral-only edge, which is also muted.
 - Allowed/denied/limited remains a badge/colour dimension, with precedence
   denied, limited, allowed over the per-original status of the edge's evidence.
+- The dash pattern is reserved for the existing direction animation, whose
+  dashes travel from consumer to provider on every edge. It never encodes
+  behavior or status.
 - Width uses a bounded logarithmic scale over the displayed classified count.
 - Node size uses owned source-file count and stays fixed while controls change.
 - Edge IDs contain the projection and ordered endpoint pair. Switching the
@@ -372,6 +377,12 @@ All decisions below were accepted on 2026-09-17:
    history of older diagram results.
 5. Replace the analysis page's default occurrence links while retaining raw
    occurrences as supporting evidence and leaving `/modules/latest` unchanged.
+
+**Revision, 2026-09-17, after implementation:** iteration 6 encoded
+non-behavioral-only edges as a dotted pattern, which took over the dash pattern
+the graph already used for its direction animation. Behavior now joins status in
+the colour dimension and the animation keeps the dashes. BD33 covers the
+colours.
 
 Changing one of these decisions requires revising this plan and its affected
 acceptance rows first; do not resolve it ad hoc in a later iteration.

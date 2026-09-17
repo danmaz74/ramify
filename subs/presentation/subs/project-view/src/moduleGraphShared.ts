@@ -51,9 +51,7 @@ export function buildGraphEdges({
   for (const edge of edges) {
     if (!nodeIdSet.has(edge.consumer) || !nodeIdSet.has(edge.provider)) continue;
     const isSelected = edge.id === selectedEdgeId;
-    const stroke = edge.pattern === 'dotted' && edge.status === 'allowed'
-      ? mutedStroke
-      : getEdgeStroke(edge.status, allowedStroke);
+    const stroke = getEdgeStroke(edge.status, edge.emphasis, allowedStroke);
     result.push({
       id: edge.id,
       source: edge.consumer,
@@ -113,21 +111,29 @@ export function useModuleGraphInteractions({
 
 const mutedStroke = '#cbd5e1';
 
-/** Line pattern encodes behavior; colour encodes status. */
-export const dottedDashArray = '2 5';
+/**
+ * Colour encodes status and behavior: each status has a full-strength behavioral colour and a
+ * lighter non-behavioral one. The dash pattern is reserved for the direction animation.
+ */
+export const flowDashArray = '8 4';
 
-function getEdgeStroke(status: ActiveDependencyEdge['status'], allowedStroke: string): string {
-  if (status === 'denied') return '#ef4444';
-  if (status === 'limited') return '#f59e0b';
-  return allowedStroke;
+function getEdgeStroke(
+  status: ActiveDependencyEdge['status'],
+  emphasis: ActiveDependencyEdge['emphasis'],
+  allowedStroke: string,
+): string {
+  const behavioral = emphasis === 'behavioral';
+  if (status === 'denied') return behavioral ? '#ef4444' : '#fca5a5';
+  if (status === 'limited') return behavioral ? '#f59e0b' : '#fcd34d';
+  return behavioral ? allowedStroke : mutedStroke;
 }
 
 function selectedEdgeStyle(selected: boolean, stroke: string, edge: ActiveDependencyEdge): Edge['style'] {
   return {
     stroke: selected ? '#1d4ed8' : stroke,
     strokeWidth: linkWidth(edge.displayed),
-    strokeDasharray: edge.pattern === 'dotted' ? dottedDashArray : undefined,
-    opacity: edge.pattern === 'dotted' ? 0.7 : 0.85,
+    strokeDasharray: flowDashArray,
+    opacity: edge.emphasis === 'non-behavioral' ? 0.7 : 0.85,
     filter: selected ? 'drop-shadow(0 0 4px rgba(30, 64, 175, 0.5))' : undefined,
   };
 }

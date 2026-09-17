@@ -73,7 +73,7 @@
 | BD30 | 6 | component | Default renders behavioral imported-module links; non-behavioral-only and occurrence-only edges are absent. Nodes remain visible while dependency data is pending. |
 | BD31 | 6 | component | Toggle adds non-behavioral counts/edges locally; switching link target uses original-owner endpoints locally; neither action requests data. |
 | BD32 | 6 | component | Forwarded original links to B by default and B/A alternatively. Both-boundaries fixture renders two default links and one original-owner dependency. |
-| BD33 | 6 | component | Mixed edge is solid, non-behavioral-only is muted/dotted, logarithmic width is bounded, and status remains a separate badge/colour dimension. |
+| BD33 | 6 | component | An edge with behavioral evidence takes its status's full-strength colour and a non-behavioral-only edge the lighter, muted one; every edge keeps the direction animation's dashes; logarithmic width is bounded. |
 | BD34 | 6 | component | Project panel shows both headline cards, displayed links, coverage and revision; non-behavioral says `not drawn` or `shown` and no ratio/pie/confidence appears. |
 | BD35 | 6 | component | Module panel distinguishes Uses, Used through this module and Owned originals used by others with their correct units and active/alternate ordering. |
 | BD36 | 6 | component | Each edge panel uses its projection-specific labels and breakdown; evidence lists only referenced classified originals and labels accesses as supporting occurrences. |

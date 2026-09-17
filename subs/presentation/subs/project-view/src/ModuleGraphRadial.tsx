@@ -19,6 +19,7 @@ import type { ActiveDependencyEdge } from './dependency-graph.js';
 import ModuleGraphLegend from './ModuleGraphLegend.js';
 import {
   buildGraphEdges,
+  flowDashArray,
   useModuleGraphInteractions,
   type ModuleGraphProps,
 } from './moduleGraphShared.js';
@@ -174,9 +175,10 @@ function ChordArrowEdge({
       id={id}
       d={path}
       fill="none"
+      className="module-arch__graph-edge"
       stroke={style?.stroke || '#64748b'}
       strokeWidth={style?.strokeWidth || 2}
-      strokeDasharray={style?.strokeDasharray}
+      strokeDasharray={style?.strokeDasharray ?? flowDashArray}
       strokeLinecap="round"
       opacity={style?.opacity || 0.82}
     >
@@ -272,7 +274,7 @@ export function ModuleGraphRadial({
         />
       </ReactFlow>
       <ModuleGraphLegend presentationClasses={presentationClasses}
-        showsDottedLinks={moduleEdges.some((edge) => edge.pattern === 'dotted')} />
+        showsNonBehavioralLinks={moduleEdges.some((edge) => edge.emphasis === 'non-behavioral')} />
     </div>
   );
 }

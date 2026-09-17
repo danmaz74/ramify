@@ -11,12 +11,12 @@ import {
 export interface ModuleGraphLegendProps {
   readonly presentationClasses: readonly string[];
   /** Whether non-behavioral-only links are currently drawn. */
-  readonly showsDottedLinks?: boolean;
+  readonly showsNonBehavioralLinks?: boolean;
 }
 
 export default function ModuleGraphLegend({
   presentationClasses,
-  showsDottedLinks = false,
+  showsNonBehavioralLinks = false,
 }: ModuleGraphLegendProps): React.ReactElement {
   return (
     <div className="module-arch__graph-legend" aria-hidden="true">
@@ -34,9 +34,9 @@ export default function ModuleGraphLegend({
         <span className="module-arch__graph-legend-edge module-arch__graph-legend-edge--ok" />
         <span>Link: behavioral or mixed</span>
       </div>
-      {showsDottedLinks && (
+      {showsNonBehavioralLinks && (
         <div className="module-arch__graph-legend-row">
-          <span className="module-arch__graph-legend-edge module-arch__graph-legend-edge--dotted" />
+          <span className="module-arch__graph-legend-edge module-arch__graph-legend-edge--non-behavioral" />
           <span>Link: non-behavioral only</span>
         </div>
       )}

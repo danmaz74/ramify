@@ -30,8 +30,8 @@ export interface ActiveDependencyEdge {
   readonly nonBehavioral: number;
   /** The classified count the current setting displays. */
   readonly displayed: number;
-  /** Solid when any behavioral count supports the link; dotted for non-behavioral-only. */
-  readonly pattern: 'solid' | 'dotted';
+  /** Behavioral when any behavioral count supports the link; non-behavioral otherwise. Colour shows it. */
+  readonly emphasis: 'behavioral' | 'non-behavioral';
   /** Denied, then limited, then allowed over all of the edge's evidence; settings never change it. */
   readonly status: 'allowed' | 'limited' | 'denied';
   readonly source: DependencyGraphEdge;
@@ -60,7 +60,7 @@ export function activeDependencyEdges(
       behavioral,
       nonBehavioral,
       displayed,
-      pattern: behavioral > 0 ? 'solid' : 'dotted',
+      emphasis: behavioral > 0 ? 'behavioral' : 'non-behavioral',
       status: edgeStatus(edge),
       source: edge,
     });

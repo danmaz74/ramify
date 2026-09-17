@@ -11,7 +11,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render as renderComponent, screen } from '@testing-library/react';
 import { ModuleGraphRadial } from '../ModuleGraphRadial.js';
 import { getPresentationClassColor } from '../moduleTypePresentation.js';
-import { dottedDashArray, type GraphSelection } from '../moduleGraphShared.js';
+import { flowDashArray, type GraphSelection } from '../moduleGraphShared.js';
 import type { ExplorerModule } from '../interfaces/project-view.js';
 import {
   activeDependencyEdges,
@@ -146,7 +146,7 @@ describe('ModuleGraphRadial', () => {
     expect(graphEdges[1].style.strokeWidth).toBeGreaterThan(graphEdges[0].style.strokeWidth);
   });
 
-  it('BD33 encodes behavior as line pattern, status as colour and count as a bounded logarithmic width', () => {
+  it('BD33 encodes behavior and status as colour and count as a bounded logarithmic width, with directional dashes and count as a bounded logarithmic width', () => {
     const { forwarding, bothBoundaries } = mappedDependencyModels();
     const project = forwardingProject();
     const mixed = activeDependencyEdges(bothBoundaries, { showNonBehavioral: true, linkTarget: 'imported-module' });
@@ -157,33 +157,31 @@ describe('ModuleGraphRadial', () => {
     const drawn = getLastReactFlowProps().edges as Array<Record<string, any>>;
     expect(drawn).toHaveLength(edges.length);
 
-    // bothBoundaries a -> b: 1 behavioral + 1 non-behavioral, allowed: solid, neutral colour.
+    // bothBoundaries a -> b: 1 behavioral + 1 non-behavioral, allowed: full-strength neutral colour.
     const mixedLink = drawn[0]!;
     expect(mixedLink.data.edge).toMatchObject({ consumer: 'app/a', provider: 'app/b', behavioral: 1, nonBehavioral: 1, displayed: 2 });
-    expect(mixedLink.style.strokeDasharray).toBeUndefined();
     expect(mixedLink.style.stroke).toBe('#64748b');
-    // bothBoundaries a -> c: behavioral, limited: still solid, amber.
+    // bothBoundaries a -> c: behavioral, limited: full-strength amber.
     const limitedLink = drawn[1]!;
-    expect(limitedLink.data.edge).toMatchObject({ provider: 'app/c', status: 'limited', pattern: 'solid' });
-    expect(limitedLink.style.strokeDasharray).toBeUndefined();
+    expect(limitedLink.data.edge).toMatchObject({ provider: 'app/c', status: 'limited', emphasis: 'behavioral' });
     expect(limitedLink.style.stroke).toBe('#f59e0b');
-    // forwarding a -> c: non-behavioral only with denied evidence: dotted, and the colour still shows denied.
-    const deniedDotted = drawn.find((edge) => edge.data.edge.status === 'denied')!;
-    expect(deniedDotted.data.edge).toMatchObject({ behavioral: 0, nonBehavioral: 2, pattern: 'dotted' });
-    expect(deniedDotted.style.strokeDasharray).toBe(dottedDashArray);
-    expect(deniedDotted.style.stroke).toBe('#ef4444');
-    // forwarding b/core -> b: non-behavioral only, allowed: dotted and muted.
+    // forwarding a -> c: non-behavioral only with denied evidence: the lighter denied colour.
+    const deniedLink = drawn.find((edge) => edge.data.edge.status === 'denied')!;
+    expect(deniedLink.data.edge).toMatchObject({ behavioral: 0, nonBehavioral: 2, emphasis: 'non-behavioral' });
+    expect(deniedLink.style.stroke).toBe('#fca5a5');
+    // forwarding b/core -> b: non-behavioral only, allowed: the lighter neutral colour, muted.
     const muted = drawn.find((edge) => edge.source === 'app/b/core' && edge.target === 'app/b')!;
-    expect(muted.style.strokeDasharray).toBe(dottedDashArray);
     expect(muted.style.stroke).toBe('#cbd5e1');
     expect(muted.style.opacity).toBeLessThan(mixedLink.style.opacity);
+    // The dash pattern is the direction animation, so every link carries it whatever its behavior.
+    for (const link of drawn) expect(link.style.strokeDasharray).toBe(flowDashArray);
 
     // Status is a property of the edge's evidence, not of the settings: the owner link a -> b/core is
     // behavioral through b (allowed) and non-behavioral through c (denied), and stays denied when hidden paths are off.
     for (const showNonBehavioral of [false, true]) {
       const ownerLink = activeDependencyEdges(forwarding, { showNonBehavioral, linkTarget: 'original-owner' })
         .find((edge) => edge.consumer === 'app/a' && edge.provider === 'app/b/core')!;
-      expect(ownerLink).toMatchObject({ pattern: 'solid', status: 'denied' });
+      expect(ownerLink).toMatchObject({ emphasis: 'behavioral', status: 'denied' });
     }
 
     // Width: logarithmic over the displayed count, bounded at both ends.
@@ -192,7 +190,7 @@ describe('ModuleGraphRadial', () => {
     expect(linkWidth(4) - linkWidth(2)).toBeCloseTo(linkWidth(2) - linkWidth(1));
     expect(linkWidth(1_000_000)).toBe(maximumLinkWidth);
     expect(mixedLink.style.strokeWidth).toBe(linkWidth(2));
-    expect(deniedDotted.style.strokeWidth).toBe(linkWidth(2));
+    expect(deniedLink.style.strokeWidth).toBe(linkWidth(2));
   });
 
   it('BD37 sizes nodes by owned source files, independently of dependency settings', () => {
@@ -338,7 +336,7 @@ function createEdges(): ActiveDependencyEdge[] {
     behavioral: 1,
     nonBehavioral: 0,
     displayed: 1,
-    pattern: 'solid',
+    emphasis: 'behavioral',
     status: 'allowed',
     source: {
       id: 'dependency-edge/1:imported-module:a-b', projection: 'imported-module', consumer: 'a', provider: 'b',

@@ -621,10 +621,11 @@ describe('Plan 6D dependency diagram', () => {
     expect(onSelectEdge).not.toHaveBeenCalled();
     expect(screen.getByRole('heading', { name: 'Imported-module link' })).toBeInTheDocument();
     // A non-behavioral-only link is cleared when the setting hides it.
-    const dotted = activeDependencyEdges(forwarding, settings).find((edge) => edge.pattern === 'dotted')!;
-    selected.rerender(view(settings, selection(dotted), forwarding));
+    const nonBehavioral = activeDependencyEdges(forwarding, settings)
+      .find((edge) => edge.emphasis === 'non-behavioral')!;
+    selected.rerender(view(settings, selection(nonBehavioral), forwarding));
     expect(onSelectEdge).not.toHaveBeenCalled();
-    selected.rerender(view({ ...settings, showNonBehavioral: false }, selection(dotted), forwarding));
+    selected.rerender(view({ ...settings, showNonBehavioral: false }, selection(nonBehavioral), forwarding));
     expect(onSelectEdge).toHaveBeenCalledWith(null);
   });
 
