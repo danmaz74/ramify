@@ -186,6 +186,7 @@ retained session and executes before the separately reviewed Plan 3 successor.
 | [6A. Show only Ramify-module imports](#plan-6a-module-only-project-explorer) | Draft: narrow the explorer to Ramify modules and cross-module imports while retaining external facts in analysis. | Completed Plan 6. | [Detailed Plan 6A](plans/iteration-6a-module-only-project-explorer/main-plan.md), draft for contract review. |
 | [6B. Serve the explorer continuously](#plan-6b-resident-explorer-server) | Implemented: a PM2-manageable explorer server that owns and subscribes to one project context, with a home page and a stable `/analysis/latest` URL. | Completed Plans 6 and 6A. | [Detailed Plan 6B](plans/iteration-6b-resident-explorer-server/main-plan.md) and [completion report](plans/iteration-6b-resident-explorer-server/iterations/iteration4-results.md). |
 | [6C. Browse the module tree](#plan-6c-module-tree-view) | Implemented: a collapsible top-down module tree page at `/modules/latest` with a detail panel, linked both ways with the import explorer. | Completed Plan 6B. | [Detailed Plan 6C](plans/iteration-6c-module-tree-view/main-plan.md) and [completion report](plans/iteration-6c-module-tree-view/iterations/iteration3-results.md). |
+| [6D. Show behavioral dependencies](#plan-6d-behavioral-dependency-diagram) | Accepted plan: make the analysis graph default to used behavioral symbols through imported-module boundaries, with non-behavioral and original-owner alternatives, classified on request by a lean analyzer the daemon starts. | Completed Plans 6B–6C and the implemented opt-in modularity analysis. | [Detailed Plan 6D](plans/iteration-6d-behavioral-dependency-diagram/main-plan.md), decisions accepted; ready for implementation. |
 
 The table order is the proposed implementation order; Plan 5 keeps the
 number the withdrawn change-previews deliverable released and Plan 2A is an
@@ -428,10 +429,14 @@ draft for review. **Prerequisite:** Plan 2A's completion gate is recorded; Plan
 2B changes no Plan 2A document.
 
 **Working outcome.** `ramify materialize [--view <id>]...` publishes any
-registered view from one revision through one transactional publisher. Plan 2B
-adds `.exported_symbols/`, with each module's `exposed-symbols.txt`,
-`internal-exports.txt` and `tests.txt`, and `docs/modules/`, with a `docs`
-symlink to each module's `src/docs`. The API view's output stays byte-identical.
+registered view from one revision through one transactional publisher. The
+current detailed draft proposes `.exported_symbols/` text inventories and
+`docs/modules/`; its required successor review must replace the symbol
+inventories with the deterministic, agent-only `module.json`, `behavior.jsonl`
+and `supporting.jsonl` contract in the
+[capability-architecture analysis](analysis/2026-09-17-code-derived-capability-architecture.md).
+Dependency records join that view after Plan 6D's daemon-side projection. Human
+consumption remains in the explorer. The API view's output stays byte-identical.
 
 **Ownership and implementation.** A new `analysis/views` owner, pending review,
 holds pure view definitions. Materialization only produces output: Plan 2B
@@ -923,6 +928,27 @@ import explorer in a new tab focused on that module, and the explorer links
 back. The page reuses the existing project view procedure and model.
 
 
+## Plan 6D: Behavioral dependency diagram
+
+**Detailed artifact:** [Plan 6D](plans/iteration-6d-behavioral-dependency-diagram/main-plan.md),
+an accepted plan with its [contracts](plans/iteration-6d-behavioral-dependency-diagram/contracts.md)
+and [acceptance matrix](plans/iteration-6d-behavioral-dependency-diagram/acceptance.md).
+**Prerequisites:** the completed resident explorer and module-tree work, plus
+the implemented batch-only dependency-behavior capability and modularity
+projection. MCP and the candidate module restructures are not prerequisites.
+
+**Working outcome.** `/analysis/latest` explicitly requests dependency behavior.
+The daemon starts a separate lean analyzer that classifies the published
+revision's recorded imports over verified inputs, leaving checks and the
+retained session unchanged. Its graph defaults to
+referenced behavioral symbols linked through the module named by each import.
+A local setting adds referenced type/data dependencies, and an alternative
+projection links the same analysis to original owners. Project, module and edge
+panels display the distinct headline and imported-boundary units with exact
+revision and coverage state. The module tree remains on its ordinary published
+project view.
+
+
 ## Plan 7: Affected modules
 
 **Detailed artifact:** [Plan 7](plans/iteration-7-affected-modules/main-plan.md),
@@ -978,6 +1004,7 @@ source/architecture document; do not depend on conversation history.
 | Plan 6A | Module-only explorer DTO and metrics; module/edge-only selection; report-preservation, HTTP and browser evidence for omitted external targets. | Consuming applications and later visualization features. |
 | Plan 6B | Resident server entry and project binding; token-free router and routes; per-project discovery record; `ramify explore` reuse; the PM2 `explorer` app; RS13–RS17 evidence with measured server and daemon memory. | Plan 6C and any later multi-project or pushed-event explorer plan. |
 | Plan 6C | Module tree view props and helpers; shared published-view hook; `?module=` focus contract for both pages; layout timings and tree transport size. | Later explorer pages and a possible tree-specific projection. |
+| Plan 6D | Per-import-path behavior facts; on-demand daemon `dependencyDiagram` operation with its lean analyzer process, time, memory and retention evidence; imported-module/original-owner dependency DTOs; controls, panels, lifecycle and browser evidence. | Later modularity trends, source-filter controls and redesign assistance. |
 | Plan 7 | Live module graph semantics; affected query and test-selection contracts; revision/coverage outcomes; CLI/MCP schemas; on-demand construction, temporary memory and query resource evidence. | Test-runner integrations and later explorer features. |
 
 Across every handoff, preserve the distinctions between original and accessed
@@ -1055,7 +1082,7 @@ writing future plans; they do not block the current Plan 1 gate.
 | Browser-promise verification | Matching the declared browser tag is part of ordinary checking. Proving the promise is a separate verifier with its own capability, coverage and owner findings. | A separately scoped plan if verification is requested. Until then, requesting it returns unavailable. |
 | MCP Streamable HTTP | Optional hosting of the same MCP module in the web process; no MCP-to-tRPC forwarding layer. | Only when HTTP hosting is needed; specify MCP sessions, cancellation/reconnect, local access policy and shared web lifetime. |
 | Discussion and host/editor integrations | Injected UI integration points can be reused. Agent launching, write authority and host workflow lifecycle remain separate responsibilities. | Concrete consumer needs justify their own adapters and cases, including remaining H04 portions. |
-| Advanced search, metrics and placement suggestions | Plan 2A delivers literal `rg` search over generated names, signatures and documentation. Structured query search, ranking, complexity formulas, source-text search across modules and barrel spellings remain additional features, and a proposed exposure is never an existing permission. | After defining the user workflow, counting/scoring semantics, scope and output limits. |
+| Code-derived capability discovery, advanced search, metrics and placement suggestions | The [capability-architecture analysis](analysis/2026-09-17-code-derived-capability-architecture.md) proposes a deterministic, agent-only materialized symbol tree paired with Plan 2A's consumer availability view and Plan 6D's observed dependency facts; humans use the explorer. Plan 2A already delivers literal `rg` search over available names, signatures and documentation. Structured query search, ranking, complexity formulas, source-text search across modules and barrel spellings remain additional features, and a proposed exposure is never an existing permission. | Revise Plan 2B around JSON/JSONL behavior-capable provider records after reconciling its prerequisite, then add dependency records and summaries after Plan 6D's analysis/daemon provider exists; neither requires an MCP search command or generated prose. |
 | Persistent caches, worker pools and process recycling | No requirement to add them speculatively. They must preserve context generations, input identity and explicit unavailable/recovery results. | Only after measurements identify a problem and demonstrate a useful improvement. |
 | Live module audits and selective verification | [Analysis proposal](analysis/live-module-audits.md): retain applicable test evidence per task, derive live module status, invalidate from source and shared inputs, and run required audits on request with Git provenance. | Possible follow-up to Plans 5 and 7; resolve task mapping, execution input consistency, persistence and reuse policy before assigning a delivery plan. |
 | Design probes P01–P06 and independent policies X01–X02 | Probes are not adopted rules. Naming/API quality, cycles and build/bundling policies are not importability checks. | Separate explicit design or policy work; do not turn them into baseline acceptance failures. |

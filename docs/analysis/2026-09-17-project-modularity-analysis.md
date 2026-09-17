@@ -163,6 +163,16 @@ implemented
 [`ExplorerMetrics`](../../subs/presentation/subs/project-view/src/interfaces/project-view.ts)
 and [projection](../../subs/service-api/src/project-view.ts).
 
+Its current edge is an ordered pair of importer owner and target-file owner,
+created by one or more cross-owner `SourceAccess` occurrences. Edge thickness is
+based on occurrence count. That is not the behavioral dependency unit: a
+forwarded original may have a different owner from the target file, one access
+may select several originals, and an imported selection may never be
+referenced. The behavioral diagram therefore requires a semantic replacement
+of the edge evidence and weight, not a client-side filter over the current
+edges. The default projection retains the target-file owner as its endpoint;
+an alternate projection groups the same used-symbol facts by original owner.
+
 Its `approximateIcs` is not a cohesion or modularity score. It is only:
 
 ```text
@@ -458,6 +468,12 @@ Confidence or evidence strength may remain an internal implementation detail.
 Unknown classifications affect coverage and neither headline count; they do
 not create a third public metric.
 
+The diagram may aggregate the same behavioral/non-behavioral classification by
+imported-module boundary and by original-owner edge. Those projections do not
+add a third dependency classification. Imported-boundary edge counts use the
+boundary-specific unit defined below and are not substitutes for the
+project/module headline count.
+
 ### 5. Stability direction
 
 Report afferent/efferent module counts and instability with runtime/type
@@ -497,6 +513,239 @@ state. A metric affected by an unresolved target, incomplete export set or
 omitted scope is partial, never measured zero. Git-derived and runtime-derived
 facts carry their own provenance because they are not part of the source
 analysis revision.
+
+## Proposed dependency diagram
+
+The implementation follow-up is
+[Plan 6D: Behavioral dependency diagram](../plans/iteration-6d-behavioral-dependency-diagram/main-plan.md).
+The complementary provider-side and agentic feature-planning workflow is
+analyzed in
+[Code-derived capability discovery for project architecture](2026-09-17-code-derived-capability-architecture.md).
+
+### Default and optional views
+
+The analysis diagram should default to a **behavioral, imported-module** view.
+For an import by `A-A-A` that resolves to a file owned by `B`, where `B`
+forwards an original owned by `B-A-A`, the default link is `A-A-A -> B`.
+This represents the consumer-facing module boundary selected in source. The
+behavioral classification still comes from the referenced original and its
+behavior capability.
+
+The imported module is the owner of the resolved source target named by the
+consumer's import. It is the immediate source boundary, not every module in a
+forwarding or exposure chain. Ramify still records `B-A-A` as the original
+owner; choosing `B` as the displayed endpoint does not transfer ownership.
+
+Add two independent controls:
+
+```text
+[ ] Show non-behavioral dependencies
+Link targets: [ Imported modules ] [ Original owners ]
+```
+
+The non-behavioral setting is off by default. `Imported modules` is the default
+link target. Use a segmented choice for link targets rather than a checkbox:
+the two projections are alternatives, not two sets of dependency arrows to
+overlay. Place both in a small “Dependencies” control group beside, but
+visually separate from, the existing declared-tag filters. They change relation
+evidence and endpoint attribution rather than module membership and should not
+be buried in the selection-dependent information panel.
+
+Turning it on adds the classified non-behavioral evidence to the same graph. It
+does not replace the behavioral view. The resulting rules are:
+
+| Setting | Link exists when | Link weight within the selected projection |
+| --- | --- | --- |
+| Off | behavioral count is greater than zero | behavioral classified count |
+| On | behavioral plus non-behavioral count is greater than zero | total classified count |
+
+The headline totals use the glossary's distinct
+`(consumer module, original symbol)` unit. Edge weights use the selected
+projection's unit below. Repeated references and aliases through the same
+imported module do not thicken a link. Imported but unreferenced symbols,
+symbol-free loads and unknown classifications create no link in either
+behavioral setting. Unknown classifications still make coverage partial.
+
+Endpoint attribution has two projections:
+
+| Link target | Grouping | Interpretation |
+| --- | --- | --- |
+| Imported modules | distinct `(consumer, imported module, original)` facts grouped by `consumer -> imported module` | Contract/source boundary the consumer selected |
+| Original owners | distinct `(consumer, original)` dependencies grouped by `consumer -> original owner` | Module that implements or defines the selected original |
+
+If one consumer references the same original through both `B` and `C`, the
+headline project/module count remains one while the default diagram shows both
+boundary links. That is useful evidence that the consumer relies on two import
+surfaces. Imported-boundary edge counts therefore need not sum to the headline
+count and must be labeled “used originals via this boundary.” Original-owner
+edge counts do sum to the headline count within the same scope and coverage.
+Do not choose one arbitrary boundary merely to force additivity, and do not
+change the agreed headline unit to `(consumer, imported module, original)`.
+
+An edge supported by any behavioral classified fact uses the standard solid
+arrow. A non-behavioral-only edge, visible only when the setting is on, uses a
+muted dotted arrow. Keep allowed, denied and limited status in color and badges
+rather than also using the line pattern for status. A mixed edge remains solid
+and its exact behavioral and non-behavioral counts appear in its tooltip and
+detail panel. Use a bounded logarithmic width scale based on the displayed
+classified count so one high-count edge does not dominate the canvas.
+
+The behavioral setting affects edge visibility and weight. The link-target
+choice changes endpoints, edge IDs, the displayed-link count and out-of-view
+related modules. Neither changes the two headline counts in the information
+panel. If a selected edge is absent after either change, clear that selection;
+otherwise reconcile it only to an edge with the same projection-specific ID.
+
+Keep node size stable while either control changes. The current
+`approximateIcs` includes a provider-module count from the old access graph and
+should not control this diagram. Use a simple owned-file size scale initially;
+later modularity metrics may replace it only under a separately reviewed visual
+encoding.
+
+### Right-hand information panel
+
+Keep the two requested headline dependency counts visually primary at project
+and consumer-module scopes. Original-owner edges use the same labels and unit;
+imported-module edges use the explicit “used originals via this boundary”
+labels because their counts may overlap. Do not show confidence percentages or
+a behavioral ratio. A short help label should say: “One headline dependency per
+consumer module and referenced original symbol.”
+
+Render the pair as adjacent number cards in a fixed order: behavioral first in
+the diagram's primary blue, non-behavioral second in neutral gray. The colors
+distinguish categories rather than good and bad. When the setting is off, keep
+the non-behavioral number visible and append “not drawn”; when it is on, append
+“shown”. Avoid a pie chart because the two counts are estimates with possible
+omitted unknowns, not necessarily a complete whole.
+
+When nothing is selected, replace the current empty prompt with a project
+summary:
+
+| Field | Meaning |
+| --- | --- |
+| Behavioral dependencies | Project-wide distinct consumer/original pairs classified behavioral |
+| Non-behavioral dependencies | Project-wide distinct consumer/original pairs classified non-behavioral |
+| Displayed module links | Links visible under the current behavioral setting, link-target projection and diagram scope |
+| Coverage | Complete, or partial with a statement that some dependencies were omitted |
+| Revision | Exact analyzed revision/input identity |
+
+For a selected module, distinguish its three possible roles:
+
+| Group | Fields |
+| --- | --- |
+| Uses | Headline behavioral and non-behavioral dependencies for which the module is the consumer |
+| Used through this module | Behavioral and non-behavioral originals external consumers reference through source targets owned by this module |
+| Owned originals used by others | Behavioral and non-behavioral dependencies for which the module owns the original |
+
+`Uses` retains the agreed consumer/original headline unit. `Used through this
+module` describes façade or import-boundary use and uses distinct
+`(consumer, imported module, original)` facts. `Owned originals used by others`
+describes implementation ownership and uses the headline dependency unit
+grouped by original owner. This prevents a re-exporting module from looking as
+though it implemented the forwarded behavior while still showing its real
+architectural role.
+
+Place the incoming group matching the active link-target projection directly
+below `Uses`, and put the alternate incoming group in a secondary disclosure.
+All counts remain stable while the behavioral setting changes; only a
+separately labeled “links displayed” value follows it. Owned files, subtree
+files and coverage remain useful secondary facts. Remove `Selected symbols`
+from the headline group because it uses the old original/name unit, and move
+raw access occurrences to a secondary source-evidence section.
+
+For a selected imported-module edge, show:
+
+1. consumer and imported module;
+2. behavioral used originals via this boundary;
+3. non-behavioral used originals via this boundary;
+4. total classified originals via this boundary;
+5. original-owner breakdown, such as `B-A-A: 7`; and
+6. participating consumer/target files, status and coverage.
+
+For a selected original-owner edge, show:
+
+1. consumer and original owner;
+2. behavioral dependencies;
+3. non-behavioral dependencies;
+4. total classified dependencies;
+5. imported-through module breakdown, such as `B: 7`; and
+6. participating consumer/original-declaration files, status and coverage.
+
+The imported-module edge labels deliberately say “via this boundary” because
+their counts can overlap with another boundary edge. The original-owner edge
+uses the ordinary dependency labels because each consumer/original dependency
+has exactly one original owner.
+
+If source evidence remains expandable, list only referenced classified symbols
+as the primary rows, one row per original. Import occurrences may appear below
+them as supporting evidence, clearly labeled as occurrences rather than
+dependencies. Do not show an unused imported selection as though it contributed
+to the edge.
+
+### Projection contract
+
+Use one small shape for the agreed headline dependency unit and a separately
+named shape for the imported-boundary projection:
+
+```ts
+interface BehavioralDependencyMetrics {
+  readonly behavioralDependencies: number;
+  readonly nonBehavioralDependencies: number;
+}
+
+interface ImportedBoundaryMetrics {
+  readonly behavioralUsedOriginals: number;
+  readonly nonBehavioralUsedOriginals: number;
+}
+
+interface ExplorerDependencyMetrics {
+  readonly project: BehavioralDependencyMetrics;
+  readonly outgoingByModule: ReadonlyMap<ModuleId, BehavioralDependencyMetrics>;
+  readonly incomingByImportedModule: ReadonlyMap<ModuleId, ImportedBoundaryMetrics>;
+  readonly incomingByOriginalOwner: ReadonlyMap<ModuleId, BehavioralDependencyMetrics>;
+  readonly importedModuleEdges: ReadonlyMap<string, ImportedBoundaryMetrics>;
+  readonly originalOwnerEdges: ReadonlyMap<string, BehavioralDependencyMetrics>;
+}
+```
+
+The serialized explorer DTO should use arrays/objects rather than JavaScript
+`Map`, but preserve these scopes and their distinct field names and units.
+The pure service projection receives frozen used-symbol facts containing the
+consumer, imported-through module, original identity, original owner and
+classification. It produces both edge collections from the same facts.
+Presentation receives both projections and their two category counts; changing
+the link target or behavioral setting requires no additional server or compiler
+request.
+
+The imported-module edge collection deduplicates by
+`(consumer, imported module, original)`. The original-owner collection and the
+project/outgoing headline aggregates deduplicate by `(consumer, original)`.
+Do not serialize a single ambiguous `byEdge` map or describe
+`incomingByImportedModule` as ownership.
+
+An optional used-symbol row may carry original identity, a display name,
+classification, imported-through module, original owner and supporting file
+IDs. Reference-level confidence and classifier internals remain outside the
+public view model. Existing access status and coverage must be associated only
+with supporting classified symbol evidence when determining a displayed edge's
+status; unrelated unused or symbol-free imports must not color that edge.
+
+### Availability and refresh
+
+Opening or explicitly refreshing the dependency-analysis diagram is an
+explicit modularity-analysis request. It may start the opt-in disposable batch
+session from execution step 2. It must not add `dependency-behavior` to the
+resident check, watch, changed-file hook or ordinary explorer publication.
+Cache at most a bounded set of completed results by exact input identity.
+
+While the explicit analysis is pending, render the module nodes with a clear
+“Computing behavioral dependencies” state and no fallback import-occurrence
+links. If the live project publishes a new revision, mark the completed diagram
+stale and keep its revision visible; refresh starts analysis for the new input.
+Never combine module structure from one revision with dependency counts from
+another. An unavailable classifier makes the behavioral diagram unavailable,
+and a partial classifier shows the known graph plus the coverage warning; zero
+is reserved for a completed classification with no dependencies in that scope.
 
 ## Redesign candidates
 
@@ -594,11 +843,11 @@ The contract is recorded in the
 ### 2. Add opt-in behavioral evidence
 
 Add a `dependency-behavior` analysis capability used only by an explicit
-modularity-analysis probe or command. Do not add it to the shared capability
-list used by `ramify check`, `ramify check --changed`, watch, materialization or
-the resident explorer. It must not change check findings, check completion,
-exit codes, the hook's two-second deadline or the work needed to publish the
-revision that answers a hook.
+modularity-analysis probe, command or dependency-diagram request. Do not add it
+to the shared capability list used by `ramify check`, `ramify check --changed`,
+watch, materialization or ordinary resident-explorer publication. It must not
+change check findings, check completion, exit codes, the hook's two-second
+deadline or the work needed to publish the revision that answers a hook.
 
 `analysis/typescript` owns reference discovery and behavior-capability
 classification while its TypeScript checker is alive. It emits frozen plain
@@ -651,14 +900,53 @@ The first implementation can be an analysis probe. Promote it to a supported
 CLI or generated view only after the metric contract survives the Ramify and
 reference-project baselines.
 
-### 5. Add counterfactual ownership
+### 5. Integrate the dependency diagram
+
+Extend the explorer DTO with project and outgoing-module headline counts, plus
+separate imported-module and original-owner incoming/edge projections. Build
+the default links by consumer and imported target-file owner from referenced,
+classified symbol facts. Build the alternate links by consumer and original
+owner from those same facts. Do not filter or relabel the existing raw
+target-file/access-occurrence edges as a substitute.
+
+`service-api` owns the pure revision-bound DTO projection and the bounded
+request/result states. `presentation/project-view` owns the default
+behavioral/imported-module rendering, original-owner alternative,
+non-behavioral-only visual treatment and information-panel layout. `explorer`
+owns both controls, refresh, pending/stale handling and projection-specific
+selection reconciliation. Neither service nor presentation performs source
+interpretation. The analysis execution provider owns the disposable batch job
+and a bounded exact-input cache; it must not borrow the hook's resident context.
+
+Implement this after the two-count baseline has been reproduced for Ramify and
+the reference project. Acceptance covers at least:
+
+- a referenced function creating a default link;
+- a type-only or data-only dependency appearing only when the setting is on;
+- an unused imported symbol appearing in neither view;
+- repeated references and aliases in one consumer counting once;
+- the same original used by two consumers counting once for each consumer;
+- mixed evidence for one consumer/original pair counting as behavioral;
+- a forwarded import linking to its imported module by default and to its
+  original owner in the alternate projection;
+- one original referenced through two imported modules producing two default
+  boundary links but one project/module headline dependency;
+- unknown classification omitting the dependency while making coverage partial;
+- both controls, drill-down, out-of-view nodes and selection using the active
+  projection and filtered edge set;
+- project, module and edge panel counts agreeing with their documented units
+  and the same frozen facts;
+- revision change never mixing old counts with new module structure; and
+- ordinary and changed-file checks invoking the classifier zero times.
+
+### 6. Add counterfactual ownership
 
 Accept an in-memory file-to-candidate-owner mapping and recompute the same
 metrics without changing the worktree. Validate that every candidate still
 forms a legal module tree and record which imports would become new boundary
 accesses. Compare current, split and merge alternatives side by side.
 
-### 6. Evaluate the first two candidates
+### 7. Evaluate the first two candidates
 
 Run Candidate A and Candidate B first. Review the resulting contracts and
 source ownership with the affected owners. Use Candidate C only if the first
@@ -669,14 +957,14 @@ The [candidate evaluation](2026-09-17-modularity-candidate-evaluation.md)
 records this step at `d9aa856`: its results, required exposure changes,
 recommendations and why Candidate C is not warranted.
 
-### 7. Move one boundary at a time
+### 8. Move one boundary at a time
 
 For an accepted candidate, update declarations and source together, run the
 self-check and affected tests, and reproduce the modularity baseline. Preserve
 or improve runtime acyclicity and coverage. Record regressions in boundary
 breadth, interface size or context size even when the check passes.
 
-### 8. Calibrate thresholds from project history
+### 9. Calibrate thresholds from project history
 
 Do not begin with universal targets. After several real snapshots and accepted
 changes, derive project-specific review bands from the observed distribution.
