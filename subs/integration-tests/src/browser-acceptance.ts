@@ -7,13 +7,14 @@ import { chmod, mkdir, mkdtemp, open, readFile, readdir, realpath, rm, stat, sym
 import { cpus, platform, release, totalmem } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { chromium, type Browser, type BrowserContext, type Page } from 'playwright-core';
+import { chromium, type Browser, type BrowserContext, type Page, type Route } from 'playwright-core';
 import { connectDaemon } from '../../daemon/src/connect-daemon.js';
 import { readDaemonRecord, selectEndpoint } from '../../daemon/src/discovery.js';
 import type { EndpointSelection, ServiceConnection } from '../../daemon/src/interfaces/daemon.js';
 import type { CheckOutcome, ContextRevision, ContextToken } from '../../daemon/subs/contexts/src/interfaces/contexts.js';
 import { createProjectExplorerModel } from '../../service-api/src/project-view.js';
 import type { ExplorerProcessRecord, ServerStatusResult } from '../../service-api/src/interfaces/explorer-service.js';
+import type { DependencyViewResult, ExplorerDependencyModel } from '../../service-api/src/interfaces/explorer-dependencies.js';
 import { explorerProjectKey, readExplorerProcessRecord, selectExplorerEndpoint } from '../../service-api/src/web-discovery.js';
 import type { ProjectExplorerModel } from '../../presentation/subs/project-view/src/interfaces/project-view.js';
 
@@ -151,6 +152,28 @@ async function installBrowserInstrumentation(context: BrowserContext): Promise<v
   })();` });
 }
 
+/** Records every dependency state the page displays, so transient states are observed. */
+async function installDependencyStateHistory(context: BrowserContext): Promise<void> {
+  await context.addInitScript({ content: `(() => {
+    const history = []; let last = null;
+    Object.defineProperty(window, '__ramifyDependencyStates', { configurable: false, value: history });
+    const record = () => {
+      const element = document.querySelector('.module-arch__dependency-status');
+      const revision = document.querySelector('.module-arch__revision');
+      const state = element ? element.getAttribute('data-dependency-state') + '@' + (revision ? revision.textContent : '') : null;
+      if (state !== null && state !== last) { history.push({ at: performance.now(), state }); last = state; }
+    };
+    document.addEventListener('DOMContentLoaded', () => new MutationObserver(record)
+      .observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-dependency-state'], characterData: true }));
+  })();` });
+}
+
+/** The dependency states displayed for `revision`, in order. */
+async function dependencyStateHistory(page: Page, revision: string): Promise<string[]> {
+  const history = await page.evaluate(() => (window as unknown as { __ramifyDependencyStates: { state: string }[] }).__ramifyDependencyStates);
+  return history.filter(item => item.state.endsWith(`@Revision ${revision}`)).map(item => item.state.slice(0, item.state.indexOf('@')));
+}
+
 async function snapshot(page: Page): Promise<BrowserSnapshot> {
   const read = () => page.evaluate(() => (window as unknown as { __ramifyAcceptanceSnapshot(): BrowserSnapshot }).__ramifyAcceptanceSnapshot());
   const deadline = performance.now() + 3000;
@@ -192,10 +215,40 @@ function initialVisible(model: ProjectExplorerModel): readonly string[] {
   return top.length === 1 && root && root.children.length > 0 ? root.children : top.map(module => module.id);
 }
 
-function expectedSubtitle(model: ProjectExplorerModel): string {
+interface LinkSettings { readonly showNonBehavioral: boolean; readonly linkTarget: 'imported-module' | 'original-owner' }
+const defaultLinks: LinkSettings = { showNonBehavioral: false, linkTarget: 'imported-module' };
+
+/** The active links of one setting, computed independently of the view from the served model's counts. */
+function activeLinks(deps: ExplorerDependencyModel, settings: LinkSettings): { id: string; consumer: string; provider: string;
+  behavioral: number; nonBehavioral: number }[] {
+  const edges = settings.linkTarget === 'imported-module'
+    ? deps.importedModuleEdges.map(edge => ({ id: edge.id, consumer: edge.consumer, provider: edge.provider,
+      behavioral: edge.counts.behavioralUsedOriginals, nonBehavioral: edge.counts.nonBehavioralUsedOriginals }))
+    : deps.originalOwnerEdges.map(edge => ({ id: edge.id, consumer: edge.consumer, provider: edge.provider,
+      behavioral: edge.counts.behavioral, nonBehavioral: edge.counts.nonBehavioral }));
+  return edges.filter(edge => edge.behavioral + (settings.showNonBehavioral ? edge.nonBehavioral : 0) > 0);
+}
+
+/** Link IDs drawn when `visible` modules are in view: active links touching one of them. */
+function expectedLinks(deps: ExplorerDependencyModel, settings: LinkSettings, visible: ReadonlySet<string>): string[] {
+  return activeLinks(deps, settings).filter(edge => visible.has(edge.consumer) || visible.has(edge.provider))
+    .map(edge => edge.id).sort();
+}
+
+/** Modules drawn out of view: the other endpoint of an active link from a module in view. */
+function expectedOutOfView(deps: ExplorerDependencyModel, settings: LinkSettings, visible: ReadonlySet<string>): string[] {
+  const related = new Set<string>();
+  for (const edge of activeLinks(deps, settings)) {
+    if (visible.has(edge.consumer) && !visible.has(edge.provider)) related.add(edge.provider);
+    if (visible.has(edge.provider) && !visible.has(edge.consumer)) related.add(edge.consumer);
+  }
+  return [...related].sort();
+}
+
+function expectedSubtitle(model: ProjectExplorerModel, deps: ExplorerDependencyModel, settings = defaultLinks): string {
   const visible = new Set(initialVisible(model));
-  const edges = model.edges.filter(edge => visible.has(edge.consumer) && visible.has(edge.provider)).length;
-  return `Showing ${visible.size} of ${model.modules.length} modules, ${edges} module dependencies`;
+  const links = expectedLinks(deps, settings, visible).length;
+  return `Showing ${visible.size} of ${model.modules.length} modules, ${links} displayed ${links === 1 ? 'link' : 'links'}`;
 }
 
 function reportExternalWitness(check: ReadyCheck): Record<string, unknown> {
@@ -244,16 +297,230 @@ function visibleImportMetrics(model: ProjectExplorerModel): Record<string, unkno
   };
 }
 
-async function assertModuleOnlyDom(page: Page, model: ProjectExplorerModel): Promise<Record<string, unknown>> {
+async function renderedEdgeIds(page: Page): Promise<string[]> {
+  return (await page.locator('.react-flow__edge').evaluateAll(edges => edges.map(edge =>
+    edge.getAttribute('data-testid')?.replace(/^rf__edge-/, '') ?? ''))).sort();
+}
+
+async function renderedNodeIds(page: Page): Promise<string[]> {
+  return (await page.locator('.react-flow__node').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-id') ?? ''))).sort();
+}
+
+/** The drawn links become exactly the expected IDs; the graph re-renders a frame after a settings change. */
+async function waitForLinks(page: Page, expected: readonly string[], what: string): Promise<string[]> {
+  return until(async () => {
+    const rendered = await renderedEdgeIds(page);
+    return JSON.stringify(rendered) === JSON.stringify(expected) ? rendered : null;
+  }, 10_000, async () => `${what}: rendered ${JSON.stringify(await renderedEdgeIds(page))}, expected ${JSON.stringify(expected)}`);
+}
+
+/**
+ * Module nodes only, and the links are exactly the dependency model's active links in the root scope:
+ * no occurrence edge of the project model is drawn.
+ */
+async function assertModuleOnlyDom(page: Page, model: ProjectExplorerModel, deps: ExplorerDependencyModel,
+  settings = defaultLinks): Promise<Record<string, unknown>> {
   const moduleIds = new Set(model.modules.map(module => module.id));
-  const edgeIds = new Set(model.edges.map(edge => edge.id));
-  const renderedNodes = await page.locator('.react-flow__node').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-id')));
-  const renderedEdges = await page.locator('.react-flow__edge').evaluateAll(edges => edges.map(edge =>
-    edge.getAttribute('data-testid')?.replace(/^rf__edge-/, '') ?? null));
-  assert.ok(renderedNodes.every(id => id !== null && moduleIds.has(id)), `Rendered a non-module node: ${JSON.stringify(renderedNodes)}`);
-  assert.ok(renderedEdges.every(id => id !== null && edgeIds.has(id)), `Rendered a non-module edge: ${JSON.stringify(renderedEdges)}`);
+  const visible = new Set(initialVisible(model));
+  const expected = expectedLinks(deps, settings, visible);
+  const renderedEdges = await waitForLinks(page, expected, 'Root-scope links');
+  const renderedNodes = await renderedNodeIds(page);
+  assert.ok(renderedNodes.every(id => moduleIds.has(id)), `Rendered a non-module node: ${JSON.stringify(renderedNodes)}`);
+  assert.deepEqual(renderedNodes, [...visible, ...expectedOutOfView(deps, settings, visible)].sort());
+  const occurrenceEdges = new Set(model.edges.map(edge => edge.id));
+  assert.ok(renderedEdges.every(id => !occurrenceEdges.has(id)), 'Rendered an occurrence edge');
   assert.equal(await page.getByRole('heading', { name: 'Other target' }).count(), 0);
-  return { renderedNodes, renderedEdges, otherTargetDetails: 0 };
+  return { renderedNodes, renderedEdges, occurrenceEdges: model.edges.length, otherTargetDetails: 0 };
+}
+
+const settledDependencyStates = new Set(['complete', 'partial', 'zero']);
+
+/** Daemon and server state added to a dependency wait's failure; set by the running workflow. */
+let dependencyDiagnostics: (() => Promise<unknown>) | null = null;
+
+async function dependencyStatus(page: Page): Promise<{ readonly state: string | null; readonly text: string | null }> {
+  const status = page.locator('.module-arch__dependency-status');
+  if (await status.count() === 0) return { state: null, text: null };
+  return { state: await status.getAttribute('data-dependency-state'), text: await status.textContent() };
+}
+
+/** Waits until the page displays `revision` with a settled dependency result; unavailable and superseded fail. */
+async function waitForDependencies(page: Page, revision: string, timeoutMs = 180_000,
+  accepted: ReadonlySet<string> = settledDependencyStates): Promise<string> {
+  await page.locator('.module-arch__revision').filter({ hasText: revision }).waitFor({ timeout: timeoutMs });
+  return until(async () => {
+    const status = await dependencyStatus(page);
+    if (status.state && !accepted.has(status.state) && (status.state === 'unavailable' || status.state === 'superseded')) {
+      throw new Error(`Dependency view ${status.state} at ${revision}: ${status.text}`);
+    }
+    return status.state && accepted.has(status.state) ? status.state : null;
+  }, timeoutMs, async () => `dependency state at ${revision}: ${JSON.stringify(await dependencyStatus(page))}; ${
+    JSON.stringify(await dependencyDiagnostics?.().catch(String) ?? null)}`);
+}
+
+async function dependencyViewOver(origin: string, revision: string): Promise<DependencyViewResult> {
+  const response = await fetch(`${origin}/trpc/dependencyView?input=${encodeURIComponent(JSON.stringify({ revision }))}`);
+  const body = await response.json() as { result?: { data?: DependencyViewResult } };
+  assert.ok(response.ok && body.result?.data, JSON.stringify(body));
+  return body.result.data;
+}
+
+/** The served ready model of `revision`, bound to its exact revision and input ID. */
+async function readyDependencies(origin: string, revision: ContextRevision): Promise<ExplorerDependencyModel> {
+  const result = await dependencyViewOver(origin, revision.revision);
+  assert.equal(result.status, 'ready', JSON.stringify(result));
+  const ready = result as Extract<DependencyViewResult, { readonly status: 'ready' }>;
+  assert.equal(ready.revision.revision, revision.revision);
+  assert.equal(ready.revision.fingerprints.inputId, revision.fingerprints.inputId);
+  assert.equal(ready.view.inputId, revision.fingerprints.inputId);
+  return ready.view;
+}
+
+/** Browser requests to the explorer's procedures, as the page sent them over HTTP. */
+interface RequestLog {
+  readonly entries: { readonly at: number; readonly procedures: readonly string[]; readonly body: string | null }[];
+  dependencyViews(): number;
+}
+
+function recordRequests(page: Page): RequestLog {
+  const entries: RequestLog['entries'][number][] = [];
+  page.on('request', request => {
+    const url = new URL(request.url());
+    if (!url.pathname.startsWith('/trpc/')) return;
+    entries.push({ at: performance.now(), procedures: url.pathname.slice('/trpc/'.length).split(','), body: request.postData() });
+  });
+  return { entries, dependencyViews: () => entries.reduce((sum, entry) => sum + entry.procedures.filter(name => name === 'dependencyView').length, 0) };
+}
+
+async function headlineCards(scope: ReturnType<Page['locator']>): Promise<{ behavioral: number; nonBehavioral: number; note: string }> {
+  return { behavioral: Number(await scope.locator('[data-headline="behavioral"] .module-arch__headline-value').first().textContent()),
+    nonBehavioral: Number(await scope.locator('[data-headline="non-behavioral"] .module-arch__headline-value').first().textContent()),
+    note: (await scope.locator('[data-headline="non-behavioral"] .module-arch__headline-note').first().textContent()) ?? '' };
+}
+
+async function metricValue(page: Page, label: string): Promise<string> {
+  const item = page.locator('.module-arch__sidebar .module-arch__metric')
+    .filter({ has: page.locator('.module-arch__metric-label', { hasText: new RegExp(`^${label}$`) }) }).first();
+  return (await item.locator('.module-arch__metric-value').textContent()) ?? '';
+}
+
+async function setShowNonBehavioral(page: Page, value: boolean): Promise<void> {
+  const box = page.getByRole('checkbox', { name: 'Show non-behavioral dependencies' });
+  if (await box.isChecked() !== value) await box.click();
+}
+
+async function setLinkTarget(page: Page, target: LinkSettings['linkTarget']): Promise<void> {
+  await page.getByRole('radio', { name: target === 'imported-module' ? 'Imported modules' : 'Original owners' }).click();
+}
+
+async function expandSection(page: Page, title: string): Promise<void> {
+  const header = page.locator('.module-arch__sidebar .module-arch__collapsible-header').filter({ hasText: title }).first();
+  if (await header.getAttribute('aria-expanded') !== 'true') await header.click();
+}
+
+/** Direct children of a process from procfs, across its threads. */
+async function childPids(pid: number): Promise<number[]> {
+  const tasks = await readdir(`/proc/${pid}/task`).catch(() => [] as string[]);
+  const children = new Set<number>();
+  for (const task of tasks) {
+    const text = await readFile(`/proc/${pid}/task/${task}/children`, 'utf8').catch(() => '');
+    for (const value of text.trim().split(/\s+/).filter(Boolean)) children.add(Number(value));
+  }
+  return [...children];
+}
+
+interface TreeProcess { readonly pid: number; readonly parent: number; readonly depth: number; readonly args: string }
+
+async function processTree(root: number): Promise<TreeProcess[]> {
+  const result: TreeProcess[] = [];
+  const pending: [number, number, number][] = (await childPids(root)).map(pid => [pid, root, 1]);
+  while (pending.length > 0) {
+    const [pid, parent, depth] = pending.shift()!;
+    const args = (await readFile(`/proc/${pid}/cmdline`, 'utf8').catch(() => '')).split('\0').join(' ');
+    result.push({ pid, parent, depth, args });
+    for (const child of await childPids(pid)) pending.push([child, pid, depth + 1]);
+  }
+  return result;
+}
+
+/** Analyzer processes the daemon started, with their compiler helper and native compiler descendants. */
+type AnalyzerRole = 'analyzer' | 'configuration-helper' | 'compiler-helper' | 'native-compiler';
+
+async function analyzerTree(daemonPid: number): Promise<(TreeProcess & { readonly role: AnalyzerRole })[]> {
+  const tree = await processTree(daemonPid);
+  const analyzers = new Set(tree.filter(item => item.parent === daemonPid && item.args.includes('dependency-analyzer-entry.js')).map(item => item.pid));
+  const members = new Map<number, AnalyzerRole>([...analyzers].map(pid => [pid, 'analyzer']));
+  // Breadth-first order: a parent precedes its children.
+  for (const item of tree) {
+    const parentRole = members.get(item.parent);
+    if (parentRole && !members.has(item.pid)) {
+      members.set(item.pid, parentRole !== 'analyzer' ? 'native-compiler'
+        : item.args.includes('configuration-helper.') ? 'configuration-helper' : 'compiler-helper');
+    }
+  }
+  return tree.filter(item => members.has(item.pid)).map(item => ({ ...item, role: members.get(item.pid)! }));
+}
+
+interface AnalyzerMemory {
+  readonly samples: number;
+  readonly processes: readonly { readonly pid: number; readonly role: string; readonly peakRssBytes: number; readonly firstSeenMs: number; readonly lastSeenMs: number }[];
+  readonly peakRssBytes: Readonly<Record<AnalyzerRole, number>>;
+  readonly peakCombinedRssBytes: number;
+}
+
+/** Samples the analyzer tree's resident memory; each process's VmHWM is its own peak while it lives. */
+function sampleAnalyzerMemory(daemonPid: number, intervalMs = 40): { stop(): Promise<AnalyzerMemory> } {
+  const started = performance.now();
+  const peaks = new Map<number, { pid: number; role: string; peakRssBytes: number; firstSeenMs: number; lastSeenMs: number }>();
+  let samples = 0, combinedPeak = 0, running = true;
+  const loop = (async () => {
+    while (running) {
+      let combined = 0;
+      for (const item of await analyzerTree(daemonPid).catch(() => [])) {
+        const measured = await rss(item.pid).catch(() => null);
+        if (!measured || !Number.isFinite(measured.peakRssBytes)) continue;
+        combined += measured.rssBytes;
+        const at = performance.now() - started, previous = peaks.get(item.pid);
+        peaks.set(item.pid, { pid: item.pid, role: previous?.role ?? item.role, firstSeenMs: previous?.firstSeenMs ?? at, lastSeenMs: at,
+          peakRssBytes: Math.max(previous?.peakRssBytes ?? 0, measured.peakRssBytes, measured.rssBytes) });
+      }
+      combinedPeak = Math.max(combinedPeak, combined);
+      samples++;
+      await pause(intervalMs);
+    }
+  })();
+  return {
+    async stop() {
+      running = false; await loop;
+      const processes = [...peaks.values()].map(item => ({ ...item, firstSeenMs: Math.round(item.firstSeenMs), lastSeenMs: Math.round(item.lastSeenMs) }));
+      const peak = (role: string) => Math.max(0, ...processes.filter(item => item.role === role).map(item => item.peakRssBytes));
+      return { samples, processes, peakCombinedRssBytes: combinedPeak,
+        peakRssBytes: { analyzer: peak('analyzer'), 'configuration-helper': peak('configuration-helper'),
+          'compiler-helper': peak('compiler-helper'), 'native-compiler': peak('native-compiler') } };
+    },
+  };
+}
+
+/** Diagram counters and the context's retained bytes, with the daemon's settled tree memory. */
+async function daemonDiagramState(connection: ServiceConnection, token: ContextToken): Promise<{
+  readonly behaviorRuns: number; readonly dependencyDiagrams: number; readonly dependencyDiagramInputChanges: number;
+  readonly retainedBytes: number | null; readonly daemonPid: number; readonly analyzerProcesses: number }> {
+  const status = await connection.daemonStatus();
+  assert.ok(status.ok, JSON.stringify(status));
+  const counters = status.value.counters as unknown as Record<string, number>;
+  const context = status.value.contexts.find(item => item.token.context === token.context);
+  return { behaviorRuns: counters.behaviorRuns!, dependencyDiagrams: counters.dependencyDiagrams!,
+    dependencyDiagramInputChanges: counters.dependencyDiagramInputChanges!, retainedBytes: context?.retainedBytes ?? null,
+    daemonPid: status.value.pid, analyzerProcesses: (await analyzerTree(status.value.pid)).length };
+}
+
+/** Settled daemon memory: no analyzer process remains, then the daemon tree's resident memory. */
+async function settledDaemonMemory(connection: ServiceConnection, token: ContextToken): Promise<Record<string, unknown>> {
+  const state = await until(async () => { const current = await daemonDiagramState(connection, token); return current.analyzerProcesses === 0 ? current : null; },
+    10_000, () => 'analyzer process still running');
+  await pause(1000);
+  const status = await connection.daemonStatus(); assert.ok(status.ok);
+  return { ...state, tree: await treeRss(state.daemonPid), heap: status.value.memory };
 }
 
 async function checkPublished(connection: ServiceConnection, token: ContextToken): Promise<ReadyCheck> {
@@ -278,21 +545,71 @@ async function publishMutation(connection: ServiceConnection, token: ContextToke
   return result.value as ReadyCheck;
 }
 
-async function refreshTo(page: Page, revision: ContextRevision): Promise<void> {
+async function refreshTo(page: Page, revision: ContextRevision, dependencies = true): Promise<void> {
   await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
   const refresh = page.getByRole('button', { name: 'Refresh (stale)' });
   await refresh.waitFor({ state: 'visible', timeout: 15_000 });
   await refresh.click();
   await page.locator('.module-arch__revision').filter({ hasText: revision.revision }).waitFor({ timeout: 120_000 });
+  if (dependencies) await waitForDependencies(page, revision.revision);
 }
 
-async function exerciseReference(page: Page, model: ProjectExplorerModel): Promise<Record<string, unknown>> {
-  const visible = initialVisible(model);
-  assert.equal(await page.locator('.module-arch__subtitle').textContent(), expectedSubtitle(model));
-  const module = model.modules.find(item => visible.includes(item.id) && item.exports.length > 0) ?? model.modules.find(item => visible.includes(item.id));
+/** BD39 on the reference: panels, both controls, scopes and out-of-view modules over the served model. */
+async function exerciseReference(page: Page, model: ProjectExplorerModel, deps: ExplorerDependencyModel,
+  requests: RequestLog): Promise<Record<string, unknown>> {
+  const visible = new Set(initialVisible(model));
+  assert.equal(await page.locator('.module-arch__subtitle').textContent(), expectedSubtitle(model, deps));
+  const requestsBefore = requests.dependencyViews();
+  const sidebar = page.locator('.module-arch__sidebar');
+
+  // Project panel.
+  await page.locator('.module-arch__detail-name').filter({ hasText: 'Project dependencies' }).waitFor();
+  const projectCards = await headlineCards(sidebar.getByRole('region', { name: 'Project dependencies' }));
+  assert.deepEqual(projectCards, { behavioral: deps.project.behavioral, nonBehavioral: deps.project.nonBehavioral, note: 'not drawn' });
+  const defaultIds = expectedLinks(deps, defaultLinks, visible);
+  assert.ok(defaultIds.length > 0, 'Reference has no default behavioral link');
+  assert.equal(await metricValue(page, 'Displayed module links'), String(defaultIds.length));
+  const coverage = await metricValue(page, 'Coverage');
+  assert.equal(coverage, deps.state === 'complete' ? 'Complete' : `Partial: ${deps.coverage.unknownDependencies} omitted`);
+  assert.equal(await metricValue(page, 'Input'), deps.inputId);
+  const projectPanel = { cards: projectCards, displayedLinks: defaultIds.length, coverage, inputId: deps.inputId };
+
+  // Both controls, locally: every combination draws exactly its independent link set.
+  const combinations: Record<string, unknown>[] = [];
+  for (const settings of [
+    { showNonBehavioral: true, linkTarget: 'imported-module' },
+    { showNonBehavioral: true, linkTarget: 'original-owner' },
+    { showNonBehavioral: false, linkTarget: 'original-owner' },
+    defaultLinks,
+  ] as const satisfies readonly LinkSettings[]) {
+    await setShowNonBehavioral(page, settings.showNonBehavioral);
+    await setLinkTarget(page, settings.linkTarget);
+    const expected = expectedLinks(deps, settings, visible);
+    const rendered = await waitForLinks(page, expected, `Links for ${JSON.stringify(settings)}`);
+    assert.deepEqual(await renderedNodeIds(page), [...visible, ...expectedOutOfView(deps, settings, visible)].sort());
+    const cards = await headlineCards(sidebar.getByRole('region', { name: 'Project dependencies' }));
+    assert.deepEqual(cards, { behavioral: deps.project.behavioral, nonBehavioral: deps.project.nonBehavioral,
+      note: settings.showNonBehavioral ? 'shown' : 'not drawn' });
+    combinations.push({ settings, links: rendered.length, outOfView: expectedOutOfView(deps, settings, visible), note: cards.note });
+  }
+  assert.ok(new Set(combinations.map(item => item.links)).size > 1, `Settings did not change the drawn links: ${JSON.stringify(combinations)}`);
+
+  // Module panel.
+  const rows = new Map(deps.modules.map(row => [row.id, row]));
+  const module = model.modules.filter(item => visible.has(item.id))
+      .sort((left, right) => (rows.get(right.id)!.uses.behavioral + rows.get(right.id)!.usedThrough.behavioralUsedOriginals)
+        - (rows.get(left.id)!.uses.behavioral + rows.get(left.id)!.usedThrough.behavioralUsedOriginals))[0];
   assert.ok(module, 'Reference graph has no selectable visible module');
+  const row = rows.get(module.id)!;
   await clickGraphNode(page, module.id);
   await page.locator('.module-arch__detail-name').filter({ hasText: module.name }).waitFor();
+  const uses = await headlineCards(sidebar.getByRole('region', { name: 'Uses' }));
+  assert.deepEqual([uses.behavioral, uses.nonBehavioral], [row.uses.behavioral, row.uses.nonBehavioral]);
+  const usedThrough = await headlineCards(sidebar.getByRole('region', { name: 'Used through this module' }));
+  assert.deepEqual([usedThrough.behavioral, usedThrough.nonBehavioral],
+    [row.usedThrough.behavioralUsedOriginals, row.usedThrough.nonBehavioralUsedOriginals]);
+  assert.equal(await metricValue(page, 'Links displayed'),
+    String(activeLinks(deps, defaultLinks).filter(edge => edge.consumer === module.id || edge.provider === module.id).length));
   let detailState = 'no-export';
   if (module.exports.length > 0) {
     await page.locator('.export-list__toggle').first().click();
@@ -300,15 +617,20 @@ async function exerciseReference(page: Page, model: ProjectExplorerModel): Promi
     detailState = await page.locator('.export-list__signature-container').first().innerText();
     await page.locator('.export-list__locations').first().waitFor();
   }
+  const modulePanel = { module: module.id, uses: row.uses, usedThrough: row.usedThrough, detailState };
 
-  const edgeIds = await page.locator('.react-flow__edge').evaluateAll(edges => edges.map(edge =>
-    edge.getAttribute('data-testid')?.replace(/^rf__edge-/, '') ?? ''));
-  const moduleEdge = model.edges.find(edge => edgeIds.includes(edge.id));
-  assert.ok(moduleEdge, 'Reference graph has no rendered module edge');
-  await clickGraphEdge(page, moduleEdge.id);
-  await page.getByRole('heading', { name: 'Dependency Edge' }).waitFor();
+  // Imported-module link panel.
+  const importedEdge = deps.importedModuleEdges.find(edge => defaultIds.includes(edge.id))!;
+  await clickGraphEdge(page, importedEdge.id);
+  await page.getByRole('heading', { name: 'Imported-module link' }).waitFor();
+  const importedCards = await headlineCards(sidebar.getByRole('region', { name: 'Used originals via this boundary' }));
+  assert.deepEqual([importedCards.behavioral, importedCards.nonBehavioral],
+    [importedEdge.counts.behavioralUsedOriginals, importedEdge.counts.nonBehavioralUsedOriginals]);
+  assert.equal(await sidebar.getByRole('region', { name: 'Original owners' }).locator('li').count(), importedEdge.originalOwners.length);
+  await expandSection(page, 'Referenced originals');
+  const importedEvidence = await sidebar.locator('.module-arch__evidence-item').count();
+  assert.equal(importedEvidence, new Set(importedEdge.evidence.map(item => JSON.stringify(item.original))).size);
 
-  const sidebar = page.locator('.module-arch__sidebar');
   const separator = page.getByRole('separator', { name: 'Resize sidebar' });
   const beforeWidth = (await sidebar.boundingBox())!.width;
   const box = await separator.boundingBox();
@@ -318,6 +640,20 @@ async function exerciseReference(page: Page, model: ProjectExplorerModel): Promi
   const afterWidth = (await sidebar.boundingBox())!.width;
   assert.ok(afterWidth > beforeWidth + 30, `Sidebar did not resize: ${beforeWidth} -> ${afterWidth}`);
 
+  // Original-owner link panel: switching the projection clears the imported selection.
+  await setLinkTarget(page, 'original-owner');
+  const ownerIds = expectedLinks(deps, { showNonBehavioral: false, linkTarget: 'original-owner' }, visible);
+  await waitForLinks(page, ownerIds, 'Original-owner links');
+  await page.locator('.module-arch__detail-name').filter({ hasText: 'Project dependencies' }).waitFor();
+  const ownerEdge = deps.originalOwnerEdges.find(edge => ownerIds.includes(edge.id))!;
+  await clickGraphEdge(page, ownerEdge.id);
+  await page.getByRole('heading', { name: 'Original-owner link' }).waitFor();
+  const ownerCards = await headlineCards(sidebar.getByRole('region', { name: 'Dependencies' }));
+  assert.deepEqual([ownerCards.behavioral, ownerCards.nonBehavioral], [ownerEdge.counts.behavioral, ownerEdge.counts.nonBehavioral]);
+  assert.equal(await sidebar.getByRole('region', { name: 'Imported through' }).locator('li').count(), ownerEdge.importedThrough.length);
+  await setLinkTarget(page, 'imported-module');
+  await waitForLinks(page, defaultIds, 'Default links after the owner panel');
+
   const viewport = page.locator('.react-flow__viewport');
   const transformBefore = await viewport.getAttribute('style');
   await page.locator('.react-flow__controls-zoomin').click();
@@ -326,29 +662,55 @@ async function exerciseReference(page: Page, model: ProjectExplorerModel): Promi
   assert.notEqual(transformZoom, transformBefore, 'Zoom did not change the viewport transform');
   const pane = page.locator('.react-flow__pane');
   const paneBox = await pane.boundingBox(); assert.ok(paneBox);
-  await page.mouse.move(paneBox.x + paneBox.width / 2, paneBox.y + paneBox.height / 2);
-  await page.mouse.down(); await page.mouse.move(paneBox.x + paneBox.width / 2 + 70, paneBox.y + paneBox.height / 2 + 40, { steps: 5 }); await page.mouse.up();
+  // From an empty corner of the pane, clear of module nodes and links.
+  await page.mouse.move(paneBox.x + 40, paneBox.y + 40);
+  await page.mouse.down(); await page.mouse.move(paneBox.x + 110, paneBox.y + 80, { steps: 5 }); await page.mouse.up();
   await page.waitForTimeout(100);
   const transformPan = await viewport.getAttribute('style');
   assert.notEqual(transformPan, transformZoom, 'Pan did not change the viewport transform');
 
-  const drill = model.modules.find(item => visible.includes(item.id) && item.children.length > 0);
-  if (drill) {
+  // Hierarchy scope: the scope's children and the active links' out-of-view modules.
+  const scopes: Record<string, unknown>[] = [];
+  const nested = model.modules.filter(item => visible.has(item.id) && item.children.length > 0);
+  assert.ok(nested.length > 0, 'Reference has no nested visible module');
+  for (const drill of nested) {
     await clickGraphNode(page, drill.id, true);
     await page.getByRole('navigation', { name: 'Module navigation' }).waitFor();
+    const scoped = new Set(drill.children);
+    const scopedLinks = await waitForLinks(page, expectedLinks(deps, defaultLinks, scoped), `Links inside ${drill.id}`);
+    const scopedOutOfView = expectedOutOfView(deps, defaultLinks, scoped);
+    assert.deepEqual(await renderedNodeIds(page), [...scoped, ...scopedOutOfView].sort());
+    scopes.push({ scope: drill.id, children: drill.children.length, links: scopedLinks.length, outOfView: scopedOutOfView });
     await page.getByRole('button', { name: 'All Modules' }).click();
+    await waitForLinks(page, defaultIds, 'Default links after leaving a scope');
   }
-  const filter = page.locator('.module-arch__filter-item').filter({ has: page.locator('input:not(:disabled):checked') }).first();
-  const checked = filter.locator('input');
+  assert.ok(scopes.some(item => (item.outOfView as string[]).length > 0) || expectedOutOfView(deps, { showNonBehavioral: false, linkTarget: 'original-owner' }, visible).length > 0,
+    `No scope or projection drew an out-of-view module: ${JSON.stringify(scopes)}`);
+
+  // A fixed item: a checked-state filter would select another class after the click.
+  const filterItems = page.locator('.module-arch__filters[aria-label="Presentation class filters"] .module-arch__filter-item');
+  const filterIndex = (await filterItems.locator('input').evaluateAll(inputs =>
+    inputs.map(input => (input as HTMLInputElement).checked && !(input as HTMLInputElement).disabled))).indexOf(true);
+  assert.ok(filterIndex >= 0, 'No enabled checked class filter');
+  const checked = filterItems.nth(filterIndex).locator('input');
   const beforeFilter = await page.locator('.react-flow__node').count();
   await checked.click();
   await page.waitForTimeout(100);
   const afterFilter = await page.locator('.react-flow__node').count();
   assert.ok(afterFilter < beforeFilter, `Filter did not reduce graph nodes: ${beforeFilter} -> ${afterFilter}`);
   await checked.click();
-  return { module: module.id, moduleEdge: moduleEdge.id, detailState,
+  await waitForLinks(page, defaultIds, 'Default links after the filter');
+
+  // No control, selection or scope change requested dependency data again.
+  assert.equal(requests.dependencyViews(), requestsBefore, 'A control change requested the dependency view');
+  return { projectPanel, combinations, modulePanel,
+    importedLinkPanel: { id: importedEdge.id, consumer: importedEdge.consumer, provider: importedEdge.provider, counts: importedEdge.counts,
+      originalOwners: importedEdge.originalOwners.length, referencedOriginals: importedEvidence },
+    originalOwnerLinkPanel: { id: ownerEdge.id, consumer: ownerEdge.consumer, provider: ownerEdge.provider, counts: ownerEdge.counts,
+      importedThrough: ownerEdge.importedThrough.length },
+    scopes, dependencyViewRequests: { beforeControls: requestsBefore, afterControls: requests.dependencyViews() },
     sidebar: { beforeWidth, afterWidth }, viewport: { before: transformBefore, zoom: transformZoom, pan: transformPan },
-    filter: { beforeNodes: beforeFilter, afterNodes: afterFilter }, navigation: drill?.id ?? 'no-nested-visible-module' };
+    filter: { beforeNodes: beforeFilter, afterNodes: afterFilter } };
 }
 
 const version = '0.0.0';
@@ -522,13 +884,16 @@ async function exploreWithCli(isolated: Isolated, root: string, path: string): P
   return { command, url, record: matching[0]! };
 }
 
-async function openExplorerPage(browser: Browser, url: string, viewport: { width: number; height: number }): Promise<{ context: BrowserContext; page: Page }> {
+async function openExplorerPage(browser: Browser, url: string, viewport: { width: number; height: number }): Promise<{
+  context: BrowserContext; page: Page; requests: RequestLog }> {
   const context = await browser.newContext({ viewport });
   await installBrowserInstrumentation(context);
+  await installDependencyStateHistory(context);
   const page = await context.newPage();
+  const requests = recordRequests(page);
   await page.goto(url, { waitUntil: 'networkidle', timeout: 120_000 });
   await page.getByRole('heading', { name: 'Project Explorer' }).waitFor({ timeout: 120_000 });
-  return { context, page };
+  return { context, page, requests };
 }
 
 /** RS17: the Plan 6/6A workflow on a server that `ramify explore` started, at `/analysis/latest`. */
@@ -558,44 +923,94 @@ async function runFixture(kind: 'reference' | 'toolkit', project: { root: string
     assertModuleOnlyModel(ready.view);
     const externalAccesses = reportExternalWitness(check);
 
+    // Ordinary checks never run the classifier; the context retains no diagram before the page asks.
+    const daemonPid = (await daemonDiagramState(connection, token)).daemonPid;
+    const diagnosticConnection = connection;
+    dependencyDiagnostics = async () => ({ daemon: await daemonDiagramState(diagnosticConnection, token),
+      server: await dependencyViewOver(explored.record.origin, (await serverStatus(explored.record)).published?.revision ?? 'none').catch(String) });
+    const beforePage = await settledDaemonMemory(connection, token);
+    assert.equal(beforePage.behaviorRuns, 0, JSON.stringify(beforePage));
+    assert.equal(beforePage.dependencyDiagrams, 0, JSON.stringify(beforePage));
+
+    const sampler = sampleAnalyzerMemory(daemonPid);
+    const pageStarted = performance.now();
     const opened = await openExplorerPage(browser, explored.url, { width: 1440, height: 1000 });
     context = opened.context; const page = opened.page;
     try { await page.locator('.module-arch__revision').filter({ hasText: ready.view.revision }).waitFor({ timeout: 60_000 }); }
     catch (error) { throw new Error(`Browser did not display ${ready.view.revision}: ${await page.locator('body').innerText()}`, { cause: error }); }
-    assert.equal(await page.locator('.module-arch__subtitle').textContent(), expectedSubtitle(ready.view));
-    const dom = await assertModuleOnlyDom(page, ready.view);
+    const dependencyState = await waitForDependencies(page, ready.view.revision);
+    const dependencyReadyMs = performance.now() - pageStarted;
+    const withDiagram = await settledDaemonMemory(connection, token);
+    const analyzerMemory = await sampler.stop();
+    assert.equal(withDiagram.behaviorRuns, 1, JSON.stringify(withDiagram));
+    assert.equal(withDiagram.dependencyDiagrams, 1, JSON.stringify(withDiagram));
+    assert.ok(analyzerMemory.peakRssBytes.analyzer > 0 && analyzerMemory.peakRssBytes['compiler-helper'] > 0, JSON.stringify(analyzerMemory));
+    const deps = await readyDependencies(explored.record.origin, check.revision);
+    assert.equal(dependencyState, deps.state === 'partial' ? 'partial' : deps.project.behavioral + deps.project.nonBehavioral === 0 ? 'zero' : 'complete');
+    assert.equal(await page.locator('.module-arch__subtitle').textContent(), expectedSubtitle(ready.view, deps));
+    const dom = await assertModuleOnlyDom(page, ready.view, deps);
     const visible = new Set(initialVisible(ready.view));
-    const visibleEdges = ready.view.edges.filter(edge => visible.has(edge.consumer) && visible.has(edge.provider)).length;
     const countEvidence = { displayed: await page.locator('.module-arch__subtitle').textContent(),
       displayedRevision: await page.locator('.module-arch__revision').textContent(),
       reportRevision: check.revision.revision,
       reportModules: check.report!.snapshot!.inventory!.modules.length, projectedModules: ready.view.modules.length,
       visibleModules: visible.size, reportAccesses: check.report!.snapshot!.accesses.length,
-      projectedEdges: ready.view.edges.length, visibleEdges, encodedBytes };
+      occurrenceEdges: ready.view.edges.length, visibleLinks: expectedLinks(deps, defaultLinks, visible).length, encodedBytes };
     assert.equal(countEvidence.reportModules, countEvidence.projectedModules);
+    const dependencies = { revision: check.revision.revision, inputId: deps.inputId, state: deps.state, project: deps.project,
+      coverage: deps.coverage, modules: deps.modules.length, importedModuleEdges: deps.importedModuleEdges.length,
+      originalOwnerEdges: deps.originalOwnerEdges.length, encodedBytes: Buffer.byteLength(JSON.stringify(deps)),
+      pageToReadyMs: Math.round(dependencyReadyMs), browserDependencyViewRequests: opened.requests.dependencyViews(),
+      memory: { withoutRetainedDiagram: beforePage, withRetainedDiagram: withDiagram, analyzer: analyzerMemory } };
 
-    const interactions = kind === 'reference' ? await exerciseReference(page, ready.view) : null;
+    const interactions = kind === 'reference' ? await exerciseReference(page, ready.view, deps, opened.requests) : null;
     const refreshes: Record<string, unknown>[] = [];
+    const sameRevisionReloads: Record<string, unknown>[] = [];
     let refreshBaseline: BrowserSnapshot | null = null;
+    let publishCycles: Record<string, unknown> | null = null;
     if (kind === 'reference') {
       // Start the repeated-use observation from a clean, fully rendered page;
       // the preceding interaction workflow deliberately leaves selected UI.
       await page.reload({ waitUntil: 'networkidle', timeout: 120_000 });
-      await page.locator('.module-arch__revision').filter({ hasText: ready.view.revision }).waitFor();
+      await waitForDependencies(page, ready.view.revision);
       refreshBaseline = await snapshot(page);
       const baseline = refreshBaseline;
+      const stableTo = (settled: BrowserSnapshot) => settled.listeners === baseline.listeners
+        && settled.intervals === baseline.intervals && settled.timeouts === baseline.timeouts
+        && settled.models === baseline.models && settled.graphNodes === baseline.graphNodes
+        && settled.graphEdges === baseline.graphEdges;
+      // BD42: ten settled refreshes of the same revision answer from retention and start no analyzer.
+      const reloadStart = await daemonDiagramState(connection, token);
+      for (let cycle = 1; cycle <= 10; cycle++) {
+        const requestsBefore = opened.requests.dependencyViews();
+        await page.reload({ waitUntil: 'networkidle', timeout: 120_000 });
+        await waitForDependencies(page, ready.view.revision);
+        const settled = await snapshot(page);
+        const state = await daemonDiagramState(connection, token);
+        assert.ok(stableTo(settled), `Reload ${cycle} did not settle to baseline: ${JSON.stringify({ refreshBaseline, settled })}`);
+        assert.equal(state.behaviorRuns, reloadStart.behaviorRuns);
+        assert.equal(state.dependencyDiagrams, reloadStart.dependencyDiagrams);
+        assert.equal(state.retainedBytes, reloadStart.retainedBytes);
+        sameRevisionReloads.push({ cycle, settled, dependencyViewRequests: opened.requests.dependencyViews() - requestsBefore,
+          behaviorRuns: state.behaviorRuns, dependencyDiagrams: state.dependencyDiagrams, retainedBytes: state.retainedBytes });
+      }
+      const publishStart = await daemonDiagramState(connection, token);
       for (let cycle = 1; cycle <= 10; cycle++) {
         const published = await publishMutation(connection, token, project.root, 'README.md',
           `# Collection Review\n\nIteration 4 explicit refresh cycle ${cycle}.\n`);
         await refreshTo(page, published.revision);
         const settled = await snapshot(page);
-        const stable: boolean = settled.listeners === baseline.listeners
-          && settled.intervals === baseline.intervals && settled.timeouts === baseline.timeouts
-          && settled.models === baseline.models && settled.graphNodes === baseline.graphNodes
-          && settled.graphEdges === baseline.graphEdges;
+        const stable: boolean = stableTo(settled);
         assert.ok(stable, `Refresh ${cycle} did not settle to baseline: ${JSON.stringify({ refreshBaseline, settled })}`);
-        refreshes.push({ cycle, revision: published.revision, settled, stable });
+        const shown = await readyDependencies(explored.record.origin, published.revision);
+        assert.deepEqual(shown.project, deps.project);
+        refreshes.push({ cycle, revision: published.revision, inputId: shown.inputId, settled, stable });
       }
+      const publishEnd = await daemonDiagramState(connection, token);
+      // Each new revision is one on-demand diagram; the retained diagram stays one current result.
+      assert.equal(publishEnd.dependencyDiagrams - publishStart.dependencyDiagrams, 10);
+      assert.equal(publishEnd.behaviorRuns - publishStart.behaviorRuns, 10);
+      publishCycles = { before: publishStart, after: publishEnd };
     }
     assert.equal(page.url(), explored.url, 'The explorer URL changed during the workflow');
     const daemon = await connection.daemonStatus(); assert.ok(daemon.ok, JSON.stringify(daemon));
@@ -604,8 +1019,8 @@ async function runFixture(kind: 'reference' | 'toolkit', project: { root: string
       explore: { exitCode: explored.command.code, durationMs: explored.command.durationMs, stdout: explored.command.stdout,
         stderr: explored.command.stderr, serverPid: explored.record.pid, defaultStartupMs: 5000 },
       revision: check.revision, projectionDurationMs, encodedBytes,
-      counts: countEvidence, externalAccesses, dom, interactions, refreshBaseline, refreshes,
-      memory: { web: webMemory, daemon: { ...(await treeRss(daemon.value.pid)), ...daemon.value.memory,
+      counts: countEvidence, dependencies, externalAccesses, dom, interactions, refreshBaseline, sameRevisionReloads, refreshes, publishCycles,
+      memory: { web: webMemory, daemon: { ...(await treeRss(daemon.value.pid)), ...daemon.value.memory, counters: daemon.value.counters,
         contexts: daemon.value.contexts.map(item => ({ context: item.token.context, history: item.history,
           retainedBytes: item.retainedBytes, leases: item.leases, pending: item.pending })) } } };
   } finally {
@@ -674,7 +1089,7 @@ async function runMutations(project: { root: string }, other: { root: string }, 
     const initialProjection = createProjectExplorerModel({ revision: initial.revision, report: initial.report! });
     assert.equal(initialProjection.status, 'ready'); const initialModel = (initialProjection as ReadyProjection).view;
     assertModuleOnlyModel(initialModel);
-    await page.locator('.module-arch__revision').filter({ hasText: initialModel.revision }).waitFor({ timeout: 60_000 });
+    await waitForDependencies(page, initialModel.revision);
     assert.equal(await page.getByRole('button', { name: 'Refresh', exact: true }).isDisabled(), true);
 
     const npmOnlySource = "import * as React from 'react';\nexport const reactVersion = React.version;\n";
@@ -692,7 +1107,7 @@ async function runMutations(project: { root: string }, other: { root: string }, 
     assert.deepEqual(visibleImportMetrics(npmModel), visibleImportMetrics(initialModel));
     await refreshTo(page, npmOnly.revision);
     assert.equal(await page.locator('.module-arch__revision').textContent(), `Revision ${npmOnly.revision.revision}`);
-    const npmDom = await assertModuleOnlyDom(page, npmModel);
+    const npmDom = await assertModuleOnlyDom(page, npmModel, await readyDependencies(discovered.origin, npmOnly.revision));
 
     await clickGraphNode(page, 'fixture/provider');
     await page.locator('.module-arch__detail-description').filter({ hasText: 'Provides the initial browser value.' }).waitFor();
@@ -709,10 +1124,18 @@ async function runMutations(project: { root: string }, other: { root: string }, 
     const sourceModel = (sourceProjection as ReadyProjection).view;
     const sourceEdge = sourceModel.edges.find(item => item.consumer === 'fixture/consumer' && item.provider === 'fixture/provider');
     assert.ok(sourceEdge && sourceEdge.accessCount === 2, JSON.stringify(sourceEdge));
-    await clickGraphEdge(page, sourceEdge.id);
-    await page.getByRole('heading', { name: 'Dependency Edge' }).waitFor();
-    assert.equal(await page.locator('.module-arch__metric').filter({ hasText: 'Access occurrences' })
-      .locator('.module-arch__metric-value').textContent(), '2');
+    // The consumer's data use of the provider is a non-behavioral link; its evidence counts both occurrences.
+    const sourceDeps = await readyDependencies(discovered.origin, source.revision);
+    const sourceLink = sourceDeps.importedModuleEdges.find(item => item.consumer === 'fixture/consumer' && item.provider === 'fixture/provider');
+    assert.ok(sourceLink && sourceLink.counts.behavioralUsedOriginals === 0 && sourceLink.counts.nonBehavioralUsedOriginals === 1, JSON.stringify(sourceLink));
+    assert.deepEqual(await renderedEdgeIds(page), []);
+    await setShowNonBehavioral(page, true);
+    await waitForLinks(page, [sourceLink.id], 'Non-behavioral source link');
+    await clickGraphEdge(page, sourceLink.id);
+    await page.getByRole('heading', { name: 'Imported-module link' }).waitFor();
+    await expandSection(page, 'Referenced originals');
+    assert.equal(await page.locator('.module-arch__evidence-occurrences').textContent(), 'Supporting occurrences: 2');
+    await setShowNonBehavioral(page, false);
 
     const declaration = 'ramify 1\nmodule provider\nexpose-src publicValue, extra from "interfaces/api.ts" to parent\n';
     const exposure = await publishMutation(connection, token, project.root, 'subs/provider/module.ramify', declaration);
@@ -735,7 +1158,8 @@ async function runMutations(project: { root: string }, other: { root: string }, 
         reportAccessesAfter: npmOnlyAccesses.length, addedAccess: npmWitness.id,
         topology: topology(npmModel), visibleImportMetrics: visibleImportMetrics(npmModel), dom: npmDom },
       readme: { revision: readme.revision, visiblePurpose: 'Provides the changed browser purpose.' },
-      source: { revision: source.revision, edge: sourceEdge.id, accessCount: sourceEdge.accessCount },
+      source: { revision: source.revision, edge: sourceEdge.id, accessCount: sourceEdge.accessCount, link: sourceLink.id,
+        linkCounts: sourceLink.counts, supportingOccurrences: 2 },
       exposure: { revision: exposure.revision, export: extra.name, destinations: extra.exposures.flatMap(item => item.destinations) } };
 
     // RS14 memory: server and daemon RSS before and after ten edits, each refreshed in the page.
@@ -977,6 +1401,517 @@ async function gzipBundleBytes(): Promise<{ readonly files: Record<string, numbe
   return { files, gzipBytes: Object.values(files).reduce((sum, bytes) => sum + bytes, 0) };
 }
 
+const tsconfigFixture = JSON.stringify({ compilerOptions: { module: 'ESNext', moduleResolution: 'Bundler', types: [], skipLibCheck: true }, include: ['src', 'subs'] });
+
+async function writeProject(scratch: string, name: string, files: Readonly<Record<string, string>>): Promise<{ root: string; dispose(): Promise<void> }> {
+  const root = await realpath(await mkdtemp(join(scratch, `${name}-`)));
+  for (const [path, value] of Object.entries(files)) await put(root, path, value);
+  await symlink(join(packageRoot, 'node_modules'), join(root, 'node_modules'));
+  return { root, dispose: () => rm(root, { recursive: true, force: true }) };
+}
+
+/**
+ * `forwarding`: A, B and B/A, where B forwards originals owned by B/A. A's one access selects the allowed
+ * `act` and the denied `secret`, and A imports C's `helper` without using it. D uses `act` through B and
+ * directly through B/A. E's use of C's `any` value is unknown, so coverage is partial.
+ */
+function forwardingProject(scratch: string): Promise<{ root: string; dispose(): Promise<void> }> {
+  return writeProject(scratch, 'forwarding', {
+    'module.ramify': 'ramify 1\nmodule fixture\nexpose-sub act from b to descendants\nexpose-sub helper, loose from c to descendants\n',
+    'README.md': '# Fixture\n\nOwns the forwarding acceptance project.\n',
+    'package.json': '{"type":"module"}\n',
+    'tsconfig.json': tsconfigFixture,
+    'src/index.ts': 'export const rootValue = 1;\n',
+    'subs/a/module.ramify': 'ramify 1\nmodule a\n',
+    'subs/a/README.md': '# A\n\nUses originals forwarded by B.\n',
+    'subs/a/src/use.ts': "import { act, secret } from '../../b/src/index.js';\nimport { helper } from '../../c/src/index.js';\nact();\nexport const level = secret.level;\n",
+    'subs/b/module.ramify': 'ramify 1\nmodule b\nexpose-sub act from a to parent\n',
+    'subs/b/README.md': '# B\n\nForwards originals owned by its child.\n',
+    'subs/b/src/index.ts': "export { act, secret } from '../subs/a/src/index.js';\n",
+    'subs/b/subs/a/module.ramify': 'ramify 1\nmodule a\nexpose-src act from "index.ts" to parent\n',
+    'subs/b/subs/a/README.md': '# B/A\n\nOwns the forwarded originals.\n',
+    'subs/b/subs/a/src/index.ts': 'export function act(): void {}\nexport const secret = { level: 1 };\n',
+    'subs/c/module.ramify': 'ramify 1\nmodule c\nexpose-src helper, loose from "index.ts" to parent\n',
+    'subs/c/README.md': '# C\n\nProvides an import that A never uses.\n',
+    'subs/c/src/index.ts': 'export function helper(): void {}\nexport const loose: any = 1;\n',
+    'subs/d/module.ramify': 'ramify 1\nmodule d\n',
+    'subs/d/README.md': '# D\n\nUses one original through two imported modules.\n',
+    'subs/d/src/use.ts': "import { act } from '../../b/src/index.js';\nimport { act as direct } from '../../b/subs/a/src/index.js';\nact();\ndirect();\n",
+    'subs/e/module.ramify': 'ramify 1\nmodule e\n',
+    'subs/e/README.md': '# E\n\nUses a value whose capability the classifier cannot determine.\n',
+    'subs/e/src/use.ts': "import { loose } from '../../c/src/index.js';\nvoid (loose + 1);\n",
+  });
+}
+
+/** The consumer source of the dependency mutation fixture: `twice` adds a second behavioral dependency. */
+function consumerSource(edit: number, twice: boolean): string {
+  return "import { act, helper, type Shape } from '../../provider/src/interfaces/api.js';\n"
+    + 'export const shape: Shape = { size: act() };\n'
+    + (twice ? 'export const twice = helper(act());\n' : '') + `// edit ${edit}\n`;
+}
+
+/** `mutation` for Plan 6D: an isolated small project whose consumer edits publish new input IDs and counts. */
+function dependencyMutationProject(scratch: string): Promise<{ root: string; dispose(): Promise<void> }> {
+  return writeProject(scratch, 'dependency-mutation', {
+    'module.ramify': 'ramify 1\nmodule fixture\nexpose-sub act, helper, Shape from provider to descendants\n',
+    'README.md': '# Fixture\n\nOwns the dependency mutation acceptance project.\n',
+    'package.json': '{"type":"module"}\n',
+    'tsconfig.json': tsconfigFixture,
+    'src/index.ts': 'export const rootValue = 1;\n',
+    'subs/provider/module.ramify': 'ramify 1\nmodule provider\nexpose-src act, helper, Shape from "interfaces/api.ts" to parent\n',
+    'subs/provider/README.md': '# Provider\n\nProvides behavior and a type.\n',
+    'subs/provider/src/interfaces/api.ts': 'export function act(): number { return 1; }\nexport function helper(value: number): number { return value + 1; }\nexport interface Shape { readonly size: number }\n',
+    'subs/consumer/module.ramify': 'ramify 1\nmodule consumer\n',
+    'subs/consumer/README.md': '# Consumer\n\nUses the provider.\n',
+    'subs/consumer/src/use.ts': consumerSource(0, false),
+  });
+}
+
+function linkBetween<T extends { readonly consumer: string; readonly provider: string }>(edges: readonly T[], consumer: string, provider: string): T {
+  const found = edges.find(edge => edge.consumer === consumer && edge.provider === provider);
+  assert.ok(found, `No link ${consumer} -> ${provider}: ${JSON.stringify(edges.map(edge => [edge.consumer, edge.provider]))}`);
+  return found;
+}
+
+async function evidenceRows(page: Page): Promise<{ original: string; paths: { classification: string; status: string; occurrences: string }[] }[]> {
+  await expandSection(page, 'Referenced originals');
+  return page.locator('.module-arch__sidebar .module-arch__evidence-item').evaluateAll(items => items.map(item => ({
+    original: item.querySelector('.module-arch__evidence-original')?.textContent ?? '',
+    paths: [...item.querySelectorAll('.module-arch__evidence-path')].map(path => {
+      const badges = [...path.querySelectorAll('.module-arch__dependency-badge')].map(badge => badge.textContent ?? '');
+      return { classification: badges[0] ?? '', status: badges[1] ?? '', occurrences: path.querySelector('.module-arch__evidence-occurrences')?.textContent ?? '' };
+    }),
+  })));
+}
+
+/** One foreground server for `root` with the harness connection and its project context. */
+async function serveProject(isolated: Isolated, root: string, name: string): Promise<{ server: Awaited<ReturnType<typeof startTreeServer>>;
+  connection: ServiceConnection; token: ContextToken; daemonPid: number }> {
+  const server = await startTreeServer(isolated, root);
+  try {
+    const connection = await connectHarness(isolated, 'never', name);
+    const token = await openProject(connection, root);
+    assert.equal(token.context, server.record.context);
+    return { server, connection, token, daemonPid: (await daemonDiagramState(connection, token)).daemonPid };
+  } catch (error) { await server.stop(); throw error; }
+}
+
+/** BD40: B versus B/A endpoints, per-original status and both boundaries on the real forwarding fixture. */
+async function runForwarding(project: { root: string }, browser: Browser): Promise<Record<string, unknown>> {
+  const isolated = await isolatedEndpoint();
+  let served: Awaited<ReturnType<typeof serveProject>> | undefined;
+  let context: BrowserContext | undefined;
+  try {
+    served = await serveProject(isolated, project.root, 'acceptance-forwarding');
+    const { connection, token, server } = served;
+    const check = await checkPublished(connection, token);
+    const projected = createProjectExplorerModel({ revision: check.revision, report: check.report! });
+    assert.equal(projected.status, 'ready', JSON.stringify(projected));
+    const model = (projected as ReadyProjection).view;
+    const opened = await openExplorerPage(browser, `${server.record.origin}/analysis/latest`, { width: 1440, height: 1000 });
+    context = opened.context; const page = opened.page;
+    const state = await waitForDependencies(page, check.revision.revision);
+    const deps = await readyDependencies(server.record.origin, check.revision);
+    const id = (name: string) => `${model.rootModuleId}${name ? `/${name}` : ''}`;
+    const [A, B, BA, C, D, E] = [id('a'), id('b'), id('b/a'), id('c'), id('d'), id('e')];
+    // Partial: the unknown dependency is omitted from every count and link, and the page says so.
+    assert.equal(state, 'partial');
+    assert.equal(deps.state, 'partial');
+    assert.equal(deps.coverage.unknownDependencies, 1);
+    const partialText = (await dependencyStatus(page)).text;
+    assert.equal(partialText, 'Partial coverage: 1 unknown dependency omitted');
+    assert.equal(await metricValue(page, 'Coverage'), 'Partial: 1 omitted');
+    const coverageWarning = await page.locator('.module-arch__sidebar .module-arch__coverage-warning').textContent();
+    assert.ok(coverageWarning?.includes('1 unknown dependency'), coverageWarning ?? '');
+    assert.deepEqual(deps.modules.find(row => row.id === E)!.uses, { behavioral: 0, nonBehavioral: 0 });
+
+    // Units: A uses act (behavioral) and secret (non-behavioral) through B; B forwards both; D uses act through B and B/A.
+    assert.deepEqual(deps.project, { behavioral: 2, nonBehavioral: 3 });
+    const importedAB = linkBetween(deps.importedModuleEdges, A, B);
+    assert.deepEqual(importedAB.counts, { behavioralUsedOriginals: 1, nonBehavioralUsedOriginals: 1 });
+    assert.deepEqual(importedAB.originalOwners.map(item => item.owner), [BA]);
+    const ownerABA = linkBetween(deps.originalOwnerEdges, A, BA);
+    assert.deepEqual(ownerABA.counts, { behavioral: 1, nonBehavioral: 1 });
+    assert.equal(deps.importedModuleEdges.some(edge => edge.consumer === A && edge.provider === BA), false);
+    assert.equal(deps.originalOwnerEdges.some(edge => edge.consumer === A && edge.provider === B), false);
+    // The unused import of C makes no link in either projection.
+    assert.equal([...deps.importedModuleEdges, ...deps.originalOwnerEdges].some(edge => [C, E].includes(edge.consumer) || [C, E].includes(edge.provider)), false);
+    const importedDB = linkBetween(deps.importedModuleEdges, D, B), importedDBA = linkBetween(deps.importedModuleEdges, D, BA);
+    const ownerDBA = linkBetween(deps.originalOwnerEdges, D, BA);
+    assert.deepEqual([importedDB.counts, importedDBA.counts], [{ behavioralUsedOriginals: 1, nonBehavioralUsedOriginals: 0 },
+      { behavioralUsedOriginals: 1, nonBehavioralUsedOriginals: 0 }]);
+    assert.deepEqual(ownerDBA.counts, { behavioral: 1, nonBehavioral: 0 });
+    assert.deepEqual(ownerDBA.importedThrough.map(item => item.module), [B, BA]);
+    assert.deepEqual(deps.modules.find(row => row.id === D)!.uses, { behavioral: 1, nonBehavioral: 0 });
+
+    const visible = new Set(initialVisible(model));
+    assert.deepEqual([...visible].sort(), [A, B, C, D, E]);
+    // Default: behavioral links to the imported modules B and B/A, with B/A out of view.
+    const defaultLinks_ = await waitForLinks(page, [importedAB.id, importedDB.id, importedDBA.id].sort(), 'Forwarding default links');
+    assert.deepEqual(await renderedNodeIds(page), [A, B, BA, C, D, E].sort());
+    const cards = await headlineCards(page.locator('.module-arch__sidebar').getByRole('region', { name: 'Project dependencies' }));
+    assert.deepEqual(cards, { behavioral: 2, nonBehavioral: 3, note: 'not drawn' });
+    const requestsBefore = opened.requests.dependencyViews();
+
+    // Per-original status on A -> B: act allowed, secret denied, and the link is denied.
+    await setShowNonBehavioral(page, true);
+    await waitForLinks(page, expectedLinks(deps, { showNonBehavioral: true, linkTarget: 'imported-module' }, visible), 'Forwarding non-behavioral links');
+    await clickGraphEdge(page, importedAB.id);
+    await page.getByRole('heading', { name: 'Imported-module link' }).waitFor();
+    const importedStatus = await page.locator('.module-arch__sidebar .module-arch__detail-header .module-arch__dependency-badge').first().textContent();
+    assert.equal(importedStatus, 'denied');
+    const importedRows = await evidenceRows(page);
+    assert.deepEqual(importedRows.map(row => [row.original, row.paths.map(path => [path.classification, path.status])]),
+      [['act', [['behavioral', 'allowed']]], ['secret', [['non-behavioral', 'denied']]]]);
+    const importedOwners = await page.locator('.module-arch__sidebar').getByRole('region', { name: 'Original owners' }).locator('li').evaluateAll(items =>
+      items.map(item => item.getAttribute('data-module')));
+    assert.deepEqual(importedOwners, [BA]);
+
+    // Original owners: A links to B/A, imported through B.
+    await setLinkTarget(page, 'original-owner');
+    const ownerLinks = await waitForLinks(page, expectedLinks(deps, { showNonBehavioral: true, linkTarget: 'original-owner' }, visible), 'Forwarding owner links');
+    assert.ok(ownerLinks.includes(ownerABA.id) && !ownerLinks.includes(importedAB.id));
+    await clickGraphEdge(page, ownerABA.id);
+    await page.getByRole('heading', { name: 'Original-owner link' }).waitFor();
+    const ownerThrough = await page.locator('.module-arch__sidebar').getByRole('region', { name: 'Imported through' }).locator('li').evaluateAll(items =>
+      items.map(item => item.getAttribute('data-module')));
+    assert.deepEqual(ownerThrough, [B]);
+    const ownerRows = await evidenceRows(page);
+    assert.deepEqual(ownerRows.map(row => [row.original, row.paths.map(path => [path.classification, path.status])]),
+      [['act', [['behavioral', 'allowed']]], ['secret', [['non-behavioral', 'denied']]]]);
+
+    // Both boundaries: D's one dependency, two imported-module links and one original-owner link.
+    await setShowNonBehavioral(page, false);
+    await waitForLinks(page, [ownerABA.id, ownerDBA.id].sort(), 'Forwarding behavioral owner links');
+    await clickGraphEdge(page, ownerDBA.id);
+    await page.getByRole('heading', { name: 'Original-owner link' }).waitFor();
+    const dCards = await headlineCards(page.locator('.module-arch__sidebar').getByRole('region', { name: 'Dependencies' }));
+    assert.deepEqual([dCards.behavioral, dCards.nonBehavioral], [1, 0]);
+    const dThrough = await page.locator('.module-arch__sidebar').getByRole('region', { name: 'Imported through' }).locator('li').evaluateAll(items =>
+      items.map(item => item.getAttribute('data-module')));
+    assert.deepEqual(dThrough, [B, BA]);
+    const dRows = await evidenceRows(page);
+    assert.deepEqual(dRows.map(row => [row.original, row.paths.length]), [['act', 2]]);
+    await setLinkTarget(page, 'imported-module');
+    await waitForLinks(page, defaultLinks_, 'Forwarding default links again');
+    await clickGraphNode(page, D);
+    await page.locator('.module-arch__detail-name').filter({ hasText: 'd' }).waitFor();
+    const dUses = await headlineCards(page.locator('.module-arch__sidebar').getByRole('region', { name: 'Uses' }));
+    assert.deepEqual([dUses.behavioral, dUses.nonBehavioral], [1, 0]);
+    assert.equal(await metricValue(page, 'Links displayed'), '2');
+    assert.equal(opened.requests.dependencyViews(), requestsBefore, 'A forwarding control change requested the dependency view');
+    const counters = await daemonDiagramState(connection, token);
+    return { root: project.root, revision: check.revision.revision, inputId: deps.inputId, checkOutcome: check.report!.outcome,
+      project: deps.project, partial: { state, text: partialText, coverage: deps.coverage, coverageWarning },
+      stateHistory: await dependencyStateHistory(page, check.revision.revision), modules: model.modules.map(item => item.id),
+      importedModuleEdges: deps.importedModuleEdges.map(edge => ({ consumer: edge.consumer, provider: edge.provider, counts: edge.counts,
+        status: edge.evidence.map(item => `${item.original.binding}:${item.status}`) })),
+      originalOwnerEdges: deps.originalOwnerEdges.map(edge => ({ consumer: edge.consumer, provider: edge.provider, counts: edge.counts,
+        importedThrough: edge.importedThrough.map(item => item.module) })),
+      dom: { defaultLinks: defaultLinks_.length, ownerLinksWithNonBehavioral: ownerLinks.length, importedStatus, importedRows, ownerThrough, ownerRows,
+        bothBoundaries: { defaultLinksFromD: 2, ownerLink: ownerDBA.id, cards: dCards, importedThrough: dThrough, uses: dUses } },
+      dependencyViewRequests: { total: opened.requests.dependencyViews(), beforeControls: requestsBefore }, counters };
+  } finally {
+    await context?.close().catch(() => {});
+    await served?.connection.close().catch(() => {});
+    await served?.server.stop();
+    await stopIsolatedDaemon(isolated);
+    await rm(isolated.processRoot, { recursive: true, force: true });
+  }
+}
+
+async function setHidden(page: Page, hidden: boolean): Promise<void> {
+  // A source string: the page receives no transpiler helpers.
+  await page.evaluate(hidden
+    ? `Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' }); document.dispatchEvent(new Event('visibilitychange'))`
+    : `delete document.visibilityState; document.dispatchEvent(new Event('visibilitychange'))`);
+}
+
+/** Waits, polling tightly, until the daemon has started an analyzer process. */
+async function analyzerStarted(daemonPid: number, timeoutMs = 30_000): Promise<number> {
+  const deadline = performance.now() + timeoutMs;
+  while (performance.now() < deadline) {
+    const tree = await analyzerTree(daemonPid);
+    const analyzer = tree.find(item => item.role === 'analyzer');
+    if (analyzer) return analyzer.pid;
+    await pause(5);
+  }
+  throw new Error('No analyzer process started');
+}
+
+/** Milliseconds from now until `pid` exits, observed every 10 ms; rejects after `timeoutMs`. */
+function watchExit(pid: number, timeoutMs: number): Promise<number> {
+  const started = performance.now();
+  return (async () => {
+    while (alive(pid)) {
+      if (performance.now() - started > timeoutMs) throw new Error(`process ${pid} still alive after ${timeoutMs} ms`);
+      await pause(10);
+    }
+    return Math.round(performance.now() - started);
+  })();
+}
+
+async function waitForExit(pid: number, timeoutMs: number): Promise<number> {
+  const started = performance.now();
+  await until(async () => !alive(pid), timeoutMs, () => `process ${pid} still alive`);
+  return Math.round(performance.now() - started);
+}
+
+/** BD41–BD43 on the dependency mutation fixture: zero-run checks, staleness, hidden polling, edits during a job, late responses and close. */
+async function runDependencyLifecycle(project: { root: string }, other: { root: string }, browser: Browser,
+  paths: Awaited<ReturnType<typeof commandPaths>>): Promise<Record<string, unknown>> {
+  const isolated = await isolatedEndpoint();
+  let served: Awaited<ReturnType<typeof serveProject>> | undefined;
+  let context: BrowserContext | undefined;
+  let edit = 0;
+  const publishConsumer = async (twice: boolean) => {
+    edit++;
+    return publishMutation(served!.connection, served!.token, project.root, 'subs/consumer/src/use.ts', consumerSource(edit, twice));
+  };
+  try {
+    served = await serveProject(isolated, project.root, 'acceptance-dependencies');
+    const { connection, token, server, daemonPid } = served;
+    const origin = server.record.origin;
+    dependencyDiagnostics = async () => ({ daemon: await daemonDiagramState(connection, token),
+      server: await dependencyViewOver(origin, (await serverStatus(server.record)).published?.revision ?? 'none').catch(String) });
+
+    // Zero classifier runs for ordinary and changed-file checks through the CLI and the daemon client.
+    const env = commandEnvironment(isolated, paths.opener);
+    const ordinary = await runCommand(['check', '--root', project.root], env);
+    assert.equal(ordinary.code, 0, JSON.stringify(ordinary));
+    edit++;
+    await put(project.root, 'subs/consumer/src/use.ts', consumerSource(edit, false));
+    const changed = await runCommand(['check', '--root', project.root, '--changed', 'subs/consumer/src/use.ts'], env);
+    assert.equal(changed.code, 0, JSON.stringify(changed));
+    const published = await publishConsumer(false);
+    const zeroRuns = await daemonDiagramState(connection, token);
+    assert.deepEqual([zeroRuns.behaviorRuns, zeroRuns.dependencyDiagrams, zeroRuns.dependencyDiagramInputChanges], [0, 0, 0]);
+    const withoutDiagram = await settledDaemonMemory(connection, token);
+    const serverAtStart = await rss(server.record.pid);
+
+    // First request: the page asks for its revision and the daemon starts one analyzer.
+    const sampler = sampleAnalyzerMemory(daemonPid);
+    const opened = await openExplorerPage(browser, `${origin}/analysis/latest`, { width: 1280, height: 900 });
+    context = opened.context; const page = opened.page;
+    await waitForDependencies(page, published.revision.revision);
+    const withDiagram = await settledDaemonMemory(connection, token);
+    const analyzerMemory = await sampler.stop();
+    assert.deepEqual([withDiagram.behaviorRuns, withDiagram.dependencyDiagrams], [1, 1]);
+    const first = await readyDependencies(origin, published.revision);
+    const firstRequests = opened.requests.dependencyViews();
+    assert.deepEqual(first.project, { behavioral: 1, nonBehavioral: 1 });
+    const visible = new Set(['fixture/consumer', 'fixture/provider']);
+    const firstLinks = await waitForLinks(page, expectedLinks(first, defaultLinks, visible), 'Mutation links');
+    assert.equal(firstLinks.length, 1);
+    const serverAfterReady = await rss(server.record.pid);
+
+    // After analysis: a newer publication keeps the coherent old graph as stale until refresh.
+    const afterReady = await publishConsumer(true);
+    await forcePoll(page);
+    await page.getByRole('button', { name: 'Refresh (stale)' }).waitFor({ timeout: 15_000 });
+    const staleStatus = await dependencyStatus(page);
+    assert.equal(staleStatus.state, 'stale');
+    assert.equal(await page.locator('.module-arch__revision').textContent(), `Revision ${published.revision.revision}`);
+    assert.deepEqual(await renderedEdgeIds(page), firstLinks);
+    assert.equal(await metricValue(page, 'Input'), first.inputId);
+    const staleCards = await headlineCards(page.locator('.module-arch__sidebar').getByRole('region', { name: 'Project dependencies' }));
+    assert.deepEqual([staleCards.behavioral, staleCards.nonBehavioral], [1, 1]);
+    const releasedOnPublication = await daemonDiagramState(connection, token);
+    await refreshTo(page, afterReady.revision);
+    const second = await readyDependencies(origin, afterReady.revision);
+    assert.deepEqual(second.project, { behavioral: 2, nonBehavioral: 1 });
+    assert.equal(await metricValue(page, 'Input'), second.inputId);
+    const refreshedCards = await headlineCards(page.locator('.module-arch__sidebar').getByRole('region', { name: 'Project dependencies' }));
+    assert.deepEqual([refreshedCards.behavioral, refreshedCards.nonBehavioral], [2, 1]);
+    const afterAnalysis = { staleRevision: published.revision.revision, newerRevision: afterReady.revision.revision, staleStatus,
+      staleCards, staleLinks: firstLinks, refreshedInputId: second.inputId, refreshedCards,
+      retainedBytes: { withDiagram: withDiagram.retainedBytes, afterNewerPublication: releasedOnPublication.retainedBytes } };
+
+    // Waiting and hidden-page polling: another context's job holds the daemon's one slot.
+    const otherToken = await openProject(connection, other.root);
+    const otherCheck = await checkPublished(connection, otherToken);
+    const waitingRevision = await publishConsumer(false);
+    await forcePoll(page);
+    await page.getByRole('button', { name: 'Refresh (stale)' }).waitFor({ timeout: 15_000 });
+    const beforeOther = await daemonDiagramState(connection, token);
+    const otherJob = connection.dependencyDiagram({ token: otherToken, requestId: `acceptance-other-${crypto.randomUUID()}`, revision: otherCheck.revision.revision });
+    let otherSettled = false;
+    void otherJob.then(() => { otherSettled = true; }, () => { otherSettled = true; });
+    await until(async () => (await daemonDiagramState(connection, token)).dependencyDiagrams > beforeOther.dependencyDiagrams, 10_000, () => 'the other job did not start');
+    await page.getByRole('button', { name: 'Refresh (stale)' }).click();
+    await page.locator('.module-arch__revision').filter({ hasText: waitingRevision.revision.revision }).waitFor({ timeout: 60_000 });
+    // The server's answers over HTTP while the other job runs: busy is remembered as waiting for one second.
+    const serverPhases: string[] = [];
+    while (!otherSettled && serverPhases.length < 40) {
+      const answer = await dependencyViewOver(origin, waitingRevision.revision.revision);
+      serverPhases.push(answer.status === 'pending' ? `pending/${answer.phase}` : answer.status);
+      if (serverPhases.length === 2) break;
+      await pause(250);
+    }
+    const pendingAtHide = await dependencyStatus(page);
+    assert.ok(pendingAtHide.state === 'waiting' || pendingAtHide.state === 'analyzing', JSON.stringify(pendingAtHide));
+    const visibleWaiting = opened.requests.entries.filter(entry => entry.procedures.includes('dependencyView')).slice(-3).map(entry => Math.round(entry.at));
+    await setHidden(page, true);
+    await pause(100);
+    const hiddenStart = opened.requests.dependencyViews();
+    const otherRunningAtHide = !otherSettled;
+    while (!otherSettled && serverPhases.length < 40) {
+      const answer = await dependencyViewOver(origin, waitingRevision.revision.revision);
+      serverPhases.push(answer.status === 'pending' ? `pending/${answer.phase}` : answer.status);
+      await pause(250);
+    }
+    assert.ok(otherRunningAtHide, 'The other job settled before the page was hidden');
+    assert.ok(serverPhases.includes('pending/waiting'), `The server never answered waiting: ${JSON.stringify(serverPhases)}`);
+    const otherOutcome = await otherJob;
+    assert.ok(otherOutcome.ok && otherOutcome.value.status === 'ready', JSON.stringify(otherOutcome).slice(0, 500));
+    await pause(3000);
+    const hiddenRequests = opened.requests.dependencyViews() - hiddenStart;
+    const hiddenState = await dependencyStatus(page);
+    assert.equal(hiddenRequests, 0, 'The hidden page polled the dependency view');
+    assert.ok(hiddenState.state === 'waiting' || hiddenState.state === 'analyzing', JSON.stringify(hiddenState));
+    await setHidden(page, false);
+    await waitForDependencies(page, waitingRevision.revision.revision);
+    const resumed = await readyDependencies(origin, waitingRevision.revision);
+    const pollTimes = opened.requests.entries.filter(entry => entry.procedures.includes('dependencyView') && entry.at > 0).map(entry => entry.at);
+    const hiddenPolling = { waitingRevision: waitingRevision.revision.revision, otherContext: otherToken.context,
+      otherDiagram: { inputId: otherCheck.revision.fingerprints.inputId }, visibleWaitingRequestTimes: visibleWaiting,
+      pendingAtHide, otherRunningAtHide, serverPhasesOverHttp: serverPhases,
+      hiddenMs: 3000 + 100, hiddenRequests, hiddenState, stateHistory: await dependencyStateHistory(page, waitingRevision.revision.revision), resumedRequests: opened.requests.dependencyViews() - hiddenStart,
+      minimumVisibleGapMs: Math.round(Math.min(...pollTimes.slice(1).map((at, index) => at - pollTimes[index]!).filter(gap => gap > 50))),
+      resumedProject: resumed.project };
+    await connection.closeContext({ token: otherToken });
+
+    // An analyzer failure is unavailable with its reason; polling stops and the modules stay drawn.
+    const failureRevision = await publishConsumer(true);
+    await forcePoll(page);
+    await page.getByRole('button', { name: 'Refresh (stale)' }).waitFor({ timeout: 15_000 });
+    await page.getByRole('button', { name: 'Refresh (stale)' }).click();
+    const failedAnalyzer = await analyzerStarted(daemonPid);
+    process.kill(failedAnalyzer, 'SIGKILL');
+    await waitForDependencies(page, failureRevision.revision.revision, 60_000, new Set(['unavailable']));
+    const unavailableStatus = await dependencyStatus(page);
+    const unavailableRequests = opened.requests.dependencyViews();
+    await pause(3000);
+    assert.equal(opened.requests.dependencyViews(), unavailableRequests, 'Polling continued after unavailable');
+    assert.deepEqual(await renderedEdgeIds(page), []);
+    assert.deepEqual(await renderedNodeIds(page), [...visible].sort());
+    const unavailable = { revision: failureRevision.revision.revision, killedAnalyzer: failedAnalyzer, status: unavailableStatus,
+      pollingStoppedFor: 3000, stateHistory: await dependencyStateHistory(page, failureRevision.revision.revision),
+      counters: await daemonDiagramState(connection, token) };
+
+    // An edit during the job: it supersedes the job or changes its inputs; polling stops and refresh obtains the new model.
+    const duringAttempts: Record<string, unknown>[] = [];
+    let during: Record<string, unknown> | null = null;
+    for (let attempt = 1; attempt <= 3 && during === null; attempt++) {
+      const target = await publishConsumer(attempt % 2 === 1);
+      await forcePoll(page);
+      await page.getByRole('button', { name: 'Refresh (stale)' }).waitFor({ timeout: 15_000 });
+      const before = await daemonDiagramState(connection, token);
+      await page.getByRole('button', { name: 'Refresh (stale)' }).click();
+      const analyzerPid = await analyzerStarted(daemonPid);
+      const analyzerExit = watchExit(analyzerPid, 5000);
+      edit++;
+      const text = consumerSource(edit, attempt % 2 === 0);
+      await put(project.root, 'subs/consumer/src/use.ts', text);
+      const analyzerAliveAtEdit = alive(analyzerPid);
+      const newer = await publishMutation(connection, token, project.root, 'subs/consumer/src/use.ts', text);
+      const reached = await waitForDependencies(page, target.revision.revision, 60_000, new Set(['superseded', 'complete', 'stale']));
+      const analyzerExitMs = await analyzerExit;
+      const after = await daemonDiagramState(connection, token);
+      const record = { attempt, revision: target.revision.revision, newerRevision: newer.revision.revision, analyzerPid, analyzerAliveAtEdit,
+        reached, analyzerExitFromEditMs: analyzerExitMs, counters: { before, after } };
+      duringAttempts.push(record);
+      if (reached !== 'superseded') { await refreshTo(page, newer.revision); continue; }
+      const stopped = opened.requests.dependencyViews();
+      await pause(3000);
+      assert.equal(opened.requests.dependencyViews(), stopped, 'Polling continued after superseded');
+      assert.deepEqual(await renderedEdgeIds(page), [], 'A superseded request drew links for the newer model');
+      assert.equal(after.behaviorRuns, before.behaviorRuns, 'The aborted job reported a classifier run');
+      await refreshTo(page, newer.revision);
+      const matching = await readyDependencies(origin, newer.revision);
+      const shownCards = await headlineCards(page.locator('.module-arch__sidebar').getByRole('region', { name: 'Project dependencies' }));
+      assert.deepEqual([shownCards.behavioral, shownCards.nonBehavioral], [matching.project.behavioral, matching.project.nonBehavioral]);
+      assert.equal(await metricValue(page, 'Input'), newer.revision.fingerprints.inputId);
+      const refreshedModel = createProjectExplorerModel({ revision: newer.revision, report: newer.report! });
+      assert.equal(refreshedModel.status, 'ready');
+      assert.deepEqual((refreshedModel as ReadyProjection).view.modules.map(item => item.id).sort(), matching.modules.map(item => item.id));
+      during = { ...record, pollingStoppedFor: 3000, stateHistory: await dependencyStateHistory(page, target.revision.revision), matching: { inputId: matching.inputId, project: matching.project },
+        inputsChanged: after.dependencyDiagramInputChanges - before.dependencyDiagramInputChanges };
+    }
+    assert.ok(during, `No edit reached a running job: ${JSON.stringify(duringAttempts)}`);
+
+    // A late response to the earlier revision cannot overwrite the refreshed graph.
+    const lateRevision = await publishConsumer(true);
+    await forcePoll(page);
+    await page.getByRole('button', { name: 'Refresh (stale)' }).waitFor({ timeout: 15_000 });
+    let held: Route | null = null;
+    await page.route(url => url.pathname.includes('dependencyView'), async route => {
+      if (held === null && (route.request().postData() ?? '').includes(lateRevision.revision.revision)) { held = route; return; }
+      await route.continue();
+    });
+    await page.getByRole('button', { name: 'Refresh (stale)' }).click();
+    await page.locator('.module-arch__revision').filter({ hasText: lateRevision.revision.revision }).waitFor({ timeout: 60_000 });
+    await until(async () => held !== null, 15_000, () => 'the page sent no dependency request for the late revision');
+    await until(async () => (await dependencyViewOver(origin, lateRevision.revision.revision)).status === 'ready', 120_000, () => 'late revision not ready');
+    const lateResponse = await (held as unknown as Route).fetch();
+    const lateBody = await lateResponse.text();
+    assert.ok(lateBody.includes('"status":"ready"') && lateBody.includes(lateRevision.revision.fingerprints.inputId), lateBody.slice(0, 300));
+    const current = await publishConsumer(false);
+    await refreshTo(page, current.revision);
+    const currentDeps = await readyDependencies(origin, current.revision);
+    await (held as unknown as Route).fulfill({ response: lateResponse });
+    await pause(1500);
+    assert.equal(await page.locator('.module-arch__revision').textContent(), `Revision ${current.revision.revision}`);
+    assert.equal(await metricValue(page, 'Input'), currentDeps.inputId);
+    const lateCards = await headlineCards(page.locator('.module-arch__sidebar').getByRole('region', { name: 'Project dependencies' }));
+    assert.deepEqual([lateCards.behavioral, lateCards.nonBehavioral], [currentDeps.project.behavioral, currentDeps.project.nonBehavioral]);
+    assert.equal((await dependencyStatus(page)).state, 'complete');
+    await page.unrouteAll({ behavior: 'ignoreErrors' });
+    const settledPage = await snapshot(page);
+    assert.equal(settledPage.timeouts, 0, 'A settled page kept a polling timer');
+    const late = { heldRevision: lateRevision.revision.revision, heldInputId: lateRevision.revision.fingerprints.inputId,
+      heldBodyBytes: lateBody.length, heldAnswer: 'ready', currentRevision: current.revision.revision, currentInputId: currentDeps.inputId,
+      shownCards: lateCards, settledPage };
+
+    // Server close during a job: the in-flight request is aborted and the analyzer exits.
+    const closeRevision = await publishConsumer(true);
+    await forcePoll(page);
+    await page.getByRole('button', { name: 'Refresh (stale)' }).waitFor({ timeout: 15_000 });
+    const beforeClose = await daemonDiagramState(connection, token);
+    const serverBeforeClose = await rss(server.record.pid);
+    await page.getByRole('button', { name: 'Refresh (stale)' }).click();
+    const closeAnalyzer = await analyzerStarted(daemonPid);
+    const analyzerExit = watchExit(closeAnalyzer, 5000);
+    const closeStarted = performance.now();
+    process.kill(server.record.pid, 'SIGINT');
+    const serverExitMs = await waitForExit(server.record.pid, 20_000);
+    const analyzerAliveAtServerExit = alive(closeAnalyzer);
+    const analyzerExitMs = await analyzerExit;
+    const afterClose = await settledDaemonMemory(connection, token);
+    assert.equal(afterClose.behaviorRuns, beforeClose.behaviorRuns, 'A job whose only caller closed reported a classifier run');
+    const close = { revision: closeRevision.revision.revision, analyzerPid: closeAnalyzer, serverExitMs, analyzerAliveAtServerExit,
+      analyzerExitFromCloseMs: analyzerExitMs, settledAfterCloseMs: Math.round(performance.now() - closeStarted),
+      counters: { before: beforeClose, after: afterClose }, serverBeforeClose };
+    await context.close(); context = undefined;
+
+    return { root: project.root, zeroRuns: { ordinaryCheck: { exitCode: ordinary.code, durationMs: Math.round(ordinary.durationMs) },
+      changedFileCheck: { exitCode: changed.code, durationMs: Math.round(changed.durationMs), changed: 'subs/consumer/src/use.ts' },
+      clientCheck: published.revision.revision, counters: zeroRuns },
+    firstDiagram: { revision: published.revision.revision, inputId: first.inputId, project: first.project,
+      browserDependencyViewRequests: firstRequests },
+    memory: { daemonWithoutRetainedDiagram: withoutDiagram, daemonWithRetainedDiagram: withDiagram, analyzer: analyzerMemory,
+      server: { atStart: serverAtStart, afterReady: serverAfterReady, beforeClose: serverBeforeClose } },
+    afterAnalysis, hiddenPolling, unavailable, duringJob: { attempts: duringAttempts, witness: during }, late, close };
+  } finally {
+    dependencyDiagnostics = null;
+    await context?.close().catch(() => {});
+    await served?.connection.close().catch(() => {});
+    await served?.server.stop();
+    await stopIsolatedDaemon(isolated);
+    await rm(isolated.processRoot, { recursive: true, force: true });
+  }
+}
+
 /** Plan 6C: MT14 on the toolkit, MT15 on the mutation fixture and MT16 on the reference. */
 async function runModuleTree(kind: 'reference' | 'toolkit' | 'mutations', project: { root: string },
   browser: Browser): Promise<Record<string, unknown>> {
@@ -1130,8 +2065,9 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2), outputIndex = args.indexOf('--output'), onlyIndex = args.indexOf('--only');
   const only = onlyIndex >= 0 ? args[onlyIndex + 1] : undefined;
   assert.ok(args.length === (outputIndex >= 0 ? 2 : 0) + (onlyIndex >= 0 ? 2 : 0)
-    && (outputIndex < 0 || args[outputIndex + 1]) && (only === undefined || ['reference', 'toolkit', 'mutations', 'tree'].includes(only)),
-  'Usage: npm run measure:project-explorer -- [--output FILE] [--only reference|toolkit|mutations|tree]');
+    && (outputIndex < 0 || args[outputIndex + 1])
+    && (only === undefined || ['reference', 'toolkit', 'mutations', 'forwarding', 'dependencies', 'tree'].includes(only)),
+  'Usage: npm run measure:project-explorer -- [--output FILE] [--only reference|toolkit|mutations|forwarding|dependencies|tree]');
   const output = resolve(outputIndex >= 0 ? args[outputIndex + 1]! : join(packageRoot, 'docs/plans/iteration-6b-resident-explorer-server/evidence/iteration4-browser-acceptance.json'));
   const scratch = await realpath(await mkdtemp(join('/tmp', 'ramify-explorer-acceptance-')));
   const manifest = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8')) as { dependencies: Record<string, string>; devDependencies: Record<string, string> };
@@ -1162,6 +2098,15 @@ async function main(): Promise<void> {
       const mutations = await mutationProject(scratch), other = await mutationProject(scratch);
       try { workloads.mutations = await runMutations(mutations, other, scratch, browser, paths); }
       finally { await Promise.all([mutations.dispose(), other.dispose()]); }
+    }
+    if (only === undefined || only === 'forwarding') {
+      const forwarding = await forwardingProject(scratch);
+      try { workloads.forwarding = await runForwarding(forwarding, browser); } finally { await forwarding.dispose(); }
+    }
+    if (only === undefined || only === 'dependencies') {
+      const mutation = await dependencyMutationProject(scratch), reference = await isolatedProject('reference', scratch);
+      try { workloads.dependencies = await runDependencyLifecycle(mutation, reference, browser, paths); }
+      finally { await Promise.all([mutation.dispose(), reference.dispose()]); }
     }
     if (only === undefined || only === 'tree') {
       const tree: Record<string, unknown> = {};
