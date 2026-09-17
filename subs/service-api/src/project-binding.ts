@@ -14,7 +14,20 @@ export interface ProjectBinding {
   state(): BindingState;
   /** The connected service while the state is `ready`; otherwise null. */
   service(): RamifyService | null;
+  /** Receives the bound context's events while subscribed; returns the listener's release. */
+  observe(listener: (event: ContextEvent) => void): () => void;
   close(): Promise<void>;
+}
+
+/** The browser-facing reason a request cannot use the binding in its current state. */
+export function unavailableReason(binding: ProjectBinding): string {
+  const state = binding.state();
+  switch (state.kind) {
+    case 'connecting': return 'Connecting to the project';
+    case 'daemon-stopped': return 'Daemon stopped explicitly';
+    case 'retrying': case 'project-unavailable': return state.message;
+    case 'ready': return 'Project connection changed';
+  }
 }
 
 /** Connects to the daemon; `onState` receives the returned connection's later transitions. */
@@ -65,6 +78,7 @@ export function createProjectBinding(options: ProjectBindingOptions): ProjectBin
   let cancelTimer: (() => void) | null = null;
   let pending: AttemptMode | null = null;
   let running: Promise<void> | null = null;
+  const observers = new Set<(event: ContextEvent) => void>();
 
   const setState = (next: BindingState) => { current = next; };
   const quietly = async (work: () => Promise<unknown>) => { try { await work(); } catch { /* Best-effort release. */ } };
@@ -129,8 +143,12 @@ export function createProjectBinding(options: ProjectBindingOptions): ProjectBin
   }
 
   function onEvent(event: ContextEvent): void {
-    if (closed || event.type !== 'context-evicted' || !token) return;
+    if (closed || !token) return;
     if (event.token.context !== token.context || event.token.generation !== token.generation) return;
+    for (const observer of [...observers]) {
+      try { observer(event); } catch { /* An observer never changes the binding. */ }
+    }
+    if (event.type !== 'context-evicted') return;
     log('info', 'binding-context-evicted', `Context evicted (${event.reason}); reopening`);
     token = null; subscription = null;
     setState({ kind: 'connecting' });
@@ -221,9 +239,15 @@ export function createProjectBinding(options: ProjectBindingOptions): ProjectBin
     root,
     state: () => current,
     service: () => !closed && current.kind === 'ready' ? connection : null,
+    observe(listener) {
+      if (closed) return () => {};
+      observers.add(listener);
+      return () => { observers.delete(listener); };
+    },
     close() {
       closing ??= (async () => {
         closed = true;
+        observers.clear();
         epoch++;
         pending = null;
         cancelTimer?.(); cancelTimer = null;

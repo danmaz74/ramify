@@ -41,6 +41,8 @@ expose-sub ModuleTreeView, ModuleTreeViewProps, indexModuleTree, collapsibleAtDe
 // P4: explorer projection service contracts relayed to later connected owners.
 expose-sub ExplorerProjectionInput, ProjectViewInput, ExplorerDetailsInput, ExplorerDetailsResult, ServerBindingKind, ServerStatusResult, ExplorerProcessRecord from service-api to descendants
 expose-sub createProjectExplorerModel from service-api to descendants
+// P9: explorer dependency DTO and dependencyView result, relayed to the connected page.
+expose-sub ExplorerDependencyModelInput, ExplorerDependencyCount, ExplorerImportedCount, ExplorerDependencyModule, ExplorerDependencyEvidence, ExplorerImportedDependencyEdge, ExplorerOriginalDependencyEdge, ExplorerDependencyModel, ExplorerDependencyModelOutcome, DependencyViewInput, DependencyViewResult from service-api to descendants
 expose-sub createExplorerRouter, ExplorerRouter, startExplorerWebProcess from service-api to descendants
 // P8: resident project binding for the explorer server entry.
 expose-sub createProjectBinding, ProjectBinding, BindingState from service-api to descendants

@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import express from 'express';
 import * as trpcExpress from '@trpc/server/adapters/express';
 import type { ExplorerProcessRecord } from './interfaces/explorer-service.js';
+import { createDependencyViews, type DependencyViews } from './dependency-view.js';
 import type { ProjectBinding } from './project-binding.js';
 import { createExplorerRouter } from './router.js';
 import { explorerProjectKey } from './web-discovery.js';
@@ -24,6 +25,8 @@ export interface ExplorerWebProcess {
   readonly server: Server;
   readonly port: number;
   readonly origin: string;
+  /** The binding's dependency-view state, closed with the process. */
+  readonly dependencyViews: DependencyViews;
   /** The discovery record once the binding first became ready, otherwise null. */
   record(): ExplorerProcessRecord | null;
   /** Resolves with the running record once written; rejects if the process closes first. */
@@ -91,7 +94,8 @@ export async function startExplorerWebProcess(options: ExplorerWebProcessOptions
     next();
   });
 
-  const router = createExplorerRouter({ binding: options.binding });
+  const dependencyViews = createDependencyViews({ binding: options.binding });
+  const router = createExplorerRouter({ binding: options.binding, dependencyViews });
   app.get('/health/ready', (_request, response) => response.json({
     schemaVersion: 'ramify.explorer-record/1', instanceId, version: options.version,
     buildKey: options.buildKey, protocol: 'ramify.explorer-http/1',
@@ -112,13 +116,18 @@ export async function startExplorerWebProcess(options: ExplorerWebProcessOptions
   });
   app.use(express.static(options.assetsDirectory, { dotfiles: 'deny', fallthrough: true, index: false }));
 
-  await new Promise<void>((resolve, reject) => {
-    const fail = (error: Error) => { server.off('listening', ready); reject(error); };
-    const ready = () => { server.off('error', fail); resolve(); };
-    server.once('error', fail);
-    server.once('listening', ready);
-    server.listen(port, '127.0.0.1');
-  });
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const fail = (error: Error) => { server.off('listening', ready); reject(error); };
+      const ready = () => { server.off('error', fail); resolve(); };
+      server.once('error', fail);
+      server.once('listening', ready);
+      server.listen(port, '127.0.0.1');
+    });
+  } catch (error) {
+    dependencyViews.close();
+    throw error;
+  }
   const address = server.address();
   if (!address || typeof address === 'string') throw new Error('Explorer did not bind a TCP port');
   hosts = new Set([`127.0.0.1:${address.port}`, `localhost:${address.port}`]);
@@ -159,12 +168,14 @@ export async function startExplorerWebProcess(options: ExplorerWebProcessOptions
     server,
     port: address.port,
     origin,
+    dependencyViews,
     record: () => running,
     advertised,
     async close(reason = 'explicit') {
       if (closed) return;
       closed = true;
       clearInterval(timer);
+      dependencyViews.close();
       await writing;
       settle.reject(new Error('Explorer process closed before its record was written'));
       await new Promise<void>((resolve, reject) => {

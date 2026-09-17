@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createQuickEnvironment, type QuickEnvironment } from '../../../src/tests/quick-environment.js';
+import type { DependencyDiagramRunner } from '../../analysis/src/interfaces/dependency-analyzer.js';
 import type { ContextEvent } from '../../daemon/src/context-types.js';
 import type { ServiceConnection } from '../../daemon/src/interfaces/daemon.js';
 import { createProjectBinding, type ProjectBinding } from '../../service-api/src/project-binding.js';
@@ -26,6 +27,8 @@ async function until(predicate: () => boolean | Promise<boolean>, timeoutMs = 30
 function bind(environment: QuickEnvironment, root: string) {
   const listeners: ((event: ContextEvent) => void)[] = [];
   const subscriptions: string[] = [];
+  /** Every service request the binding's connection sent, with its parameters. */
+  const requests: { readonly operation: string; readonly params: string }[] = [];
   let raw: ServiceConnection | undefined;
   const binding: ProjectBinding = createProjectBinding({ root, setup, clock: environment.clock,
     connect: async ({ start }) => {
@@ -33,16 +36,23 @@ function bind(environment: QuickEnvironment, root: string) {
       if (outcome.status !== 'connected') return outcome;
       const connection = outcome.connection;
       raw = connection;
-      return { ...outcome, connection: { ...connection, get state() { return connection.state; },
+      const recorded = Object.fromEntries((['openContext', 'contextStatus', 'check', 'explorerDetails', 'dependencyDiagram',
+        'materialize', 'unsubscribe', 'closeContext', 'daemonStatus'] as const).map(operation => [operation,
+        (params: unknown, control?: unknown) => {
+          requests.push({ operation, params: JSON.stringify(params) ?? '' });
+          return (connection[operation] as (params: unknown, control?: unknown) => unknown)(params, control);
+        }]));
+      return { ...outcome, connection: { ...connection, ...recorded, get state() { return connection.state; },
         get reason() { return connection.reason; },
         async subscribe(params, listener) {
           listeners.push(listener);
+          requests.push({ operation: 'subscribe', params: JSON.stringify(params) });
           const result = await connection.subscribe(params, listener);
           if (result.ok) subscriptions.push(result.value.subscription);
           return result;
         } } };
     } });
-  return { binding, listeners, subscriptions, raw: () => raw! };
+  return { binding, listeners, subscriptions, requests, raw: () => raw! };
 }
 
 async function readyToken(binding: ProjectBinding) {
@@ -198,6 +208,74 @@ describe('RS07-RS08: token-free explorer router over a real project binding', ()
       if (latest.status !== 'ready') throw new Error(JSON.stringify(latest));
       expect(await caller.explorerDetails({ revision: latest.revision.revision, requests: [request] }))
         .toMatchObject({ status: 'ready', revision: { revision: again.value.revision.revision } });
+    } finally { await binding.close(); await environment.dispose(); }
+  }), 120_000);
+
+  it('BD29: dependencyView reaches ready at one input ID through the real resident service; only dependencyDiagram reaches the analyzer', () => fixture(async root => {
+    const runs: Parameters<DependencyDiagramRunner['run']>[0][] = [];
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const runner: DependencyDiagramRunner = {
+      async run(input) {
+        runs.push(input);
+        await gate;
+        const report = input.report;
+        return { status: 'ready', behaviorRuns: 1, timings: { acquireMs: 1, classifyMs: 1, projectMs: 1, totalMs: 3 },
+          diagram: { inputId: report.inputId!, modules: report.snapshot!.inventory.modules.map(module => module.id),
+            headline: { behavioralDependencies: 1, nonBehavioralDependencies: 0 },
+            boundaries: [{ consumer: 'fixture/consumer', importedModule: 'fixture', originalOwner: 'fixture',
+              original: { kind: 'code', owner: 'fixture', file: 'interfaces/api.ts', binding: 'value' }, classification: 'behavioral',
+              consumerFiles: ['subs/consumer/src/use.ts'], importedFiles: ['src/interfaces/api.ts'], originalFiles: ['src/interfaces/api.ts'],
+              accessIds: ['access'], status: 'allowed', reasons: ['exposed'], limitIds: [] }],
+            coverage: { state: 'complete', unknownDependencies: 0, limitIds: [] } } };
+      },
+    };
+    const environment = await createQuickEnvironment({}, { dependencyDiagrams: runner });
+    const bound = bind(environment, root);
+    const { binding } = bound;
+    try {
+      const caller = createExplorerRouter({ binding, requestId: () => 'explorer-test' }).createCaller({});
+      const token = await readyToken(binding);
+      const published = await environment.service.check({ token, requestId: 'await-opening', scope: 'report',
+        freshness: { mode: 'published', wait: true } });
+      if (!published.ok || published.value.status !== 'reported' || published.value.revision === null) throw new Error(JSON.stringify(published));
+      const revision = published.value.revision;
+      // Existing procedures stay compatible and never start the analyzer.
+      const view = await caller.projectView({ revision: revision.revision });
+      if (view.status !== 'ready') throw new Error(JSON.stringify(view));
+      expect(await caller.serverStatus()).toMatchObject({ binding: 'ready', published: { revision: revision.revision } });
+      const loadable = view.view.modules.flatMap(module => module.exports).find(item => item.signature.state === 'loadable');
+      if (!loadable || loadable.signature.state !== 'loadable') throw new Error('Expected a loadable export');
+      expect(await caller.explorerDetails({ revision: revision.revision, requests: [loadable.signature.request] })).toMatchObject({ status: 'ready' });
+      expect(runs).toHaveLength(0);
+
+      expect(await caller.dependencyView({ revision: revision.revision })).toEqual({ status: 'pending', revision, phase: 'analyzing' });
+      await until(() => runs.length > 0);
+      expect(await caller.dependencyView({ revision: revision.revision })).toEqual({ status: 'pending', revision, phase: 'analyzing' });
+      expect(runs).toHaveLength(1);
+      expect(runs[0]!.report.inputId).toBe(revision.fingerprints.inputId);
+      release();
+      let ready: Awaited<ReturnType<typeof caller.dependencyView>> | undefined;
+      await until(async () => (ready = await caller.dependencyView({ revision: revision.revision })).status === 'ready');
+      if (ready?.status !== 'ready') throw new Error(JSON.stringify(ready));
+      expect(ready.revision).toEqual(revision);
+      expect(ready.view).toMatchObject({ inputId: revision.fingerprints.inputId, state: 'complete', project: { behavioral: 1, nonBehavioral: 0 } });
+      expect(ready.view.modules.map(module => module.id)).toEqual(view.view.modules.map(module => module.id).sort());
+      expect(ready.view.importedModuleEdges.map(edge => [edge.consumer, edge.provider])).toEqual([['fixture/consumer', 'fixture']]);
+      for (let index = 0; index < 10; index++) expect(await caller.dependencyView({ revision: revision.revision })).toMatchObject({ status: 'ready' });
+      expect(runs).toHaveLength(1);
+      const daemon = await environment.service.daemonStatus();
+      if (!daemon.ok) throw new Error(JSON.stringify(daemon));
+      expect(daemon.value.counters).toMatchObject({ dependencyDiagrams: 1, behaviorRuns: 1 });
+
+      // Only dependencyDiagram requests the diagram; no request the explorer sends names the capability.
+      const operations = new Set(bound.requests.map(request => request.operation));
+      expect([...operations].sort()).toEqual(['check', 'contextStatus', 'daemonStatus', 'dependencyDiagram', 'explorerDetails', 'openContext', 'subscribe']);
+      expect(bound.requests.filter(request => request.operation === 'dependencyDiagram').map(request => JSON.parse(request.params)))
+        .toEqual([{ token, requestId: 'explorer-test', revision: revision.revision }]);
+      expect(bound.requests.filter(request => request.params.includes('dependency-behavior'))).toEqual([]);
+      expect(runs[0]!.report.request.capabilities).not.toContain('dependency-behavior');
+      expect(published.value.report?.request.capabilities).not.toContain('dependency-behavior');
     } finally { await binding.close(); await environment.dispose(); }
   }), 120_000);
 });

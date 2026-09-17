@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { capabilities } from '../subs/cli/src/command-support.js';
 import { connectDaemon } from '../subs/daemon/src/connect-daemon.js';
+import type { ContextEvent } from '../subs/daemon/src/context-types.js';
 import { selectEndpoint } from '../subs/daemon/src/discovery.js';
 import { createSystemClock } from '../subs/daemon/src/system-clock.js';
 import { createProjectBinding, type ProjectBinding } from '../subs/service-api/src/project-binding.js';
@@ -52,8 +53,10 @@ try {
   process.once('SIGINT', signal);
   // Listen before connecting, so a busy port fails without starting a daemon. Until the
   // binding exists, requests see it connecting.
+  const observers = new Set<(event: ContextEvent) => void>();
   const deferred: ProjectBinding = { root, state: () => binding?.state() ?? { kind: 'connecting' },
-    service: () => binding?.service() ?? null, close: async () => { await binding?.close(); } };
+    service: () => binding?.service() ?? null, close: async () => { await binding?.close(); },
+    observe: listener => { observers.add(listener); return () => { observers.delete(listener); }; } };
   web = await startExplorerWebProcess({ binding: deferred, assetsDirectory: join(packageRoot, 'dist/explorer'),
     endpointDirectory: endpoint.directory, buildKey: endpoint.buildKey, version, port });
   // A signal during startup already finished stopping; release the listener it could not see.
@@ -65,6 +68,7 @@ try {
       const line = `${JSON.stringify({ at: new Date().toISOString(), ...entry })}\n`;
       if (entry.level === 'warn') process.stderr.write(line); else process.stdout.write(line);
     } });
+  binding?.observe(event => { for (const observer of [...observers]) observer(event); });
   if (!stopping) process.stdout.write(`Explorer serving ${root} at ${web.origin}/\n`);
   await stopped;
 } catch (error) {

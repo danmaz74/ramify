@@ -76,6 +76,9 @@ const projectViewModelNames = ['ProjectExplorerModel', 'ExplorerModule', 'Explor
 const projectViewProps = ['ProjectExplorerViewProps', 'ExplorerDiscussionProps', 'ExplorerDiscussionSelection', 'ExportDetailState'];
 const explorerServiceNames = ['ExplorerProjectionInput', 'ProjectViewInput', 'ExplorerDetailsInput',
   'ExplorerDetailsResult', 'ServerBindingKind', 'ServerStatusResult', 'ExplorerProcessRecord'];
+const explorerDependencyNames = ['ExplorerDependencyModelInput', 'ExplorerDependencyCount', 'ExplorerImportedCount',
+  'ExplorerDependencyModule', 'ExplorerDependencyEvidence', 'ExplorerImportedDependencyEdge', 'ExplorerOriginalDependencyEdge',
+  'ExplorerDependencyModel', 'ExplorerDependencyModelOutcome', 'DependencyViewInput', 'DependencyViewResult'];
 const presentationStatements = [
   src(['ModelDiagram', 'ModelDiagramSvg'], 'ModelDiagram.tsx', uiBrowser),
   src(['TreeDiagram', 'TreeDiagramSvg'], 'TreeDiagram.tsx', uiBrowser),
@@ -125,6 +128,7 @@ const toolkit: readonly Fixture[] = [
     sub(['ProjectExplorerView'], 'presentation', descendants),
     sub(['ModuleTreeView', 'ModuleTreeViewProps', 'indexModuleTree', 'collapsibleAtDepth', 'ancestorsOf'], 'presentation', descendants),
     sub(explorerServiceNames, 'service-api', descendants), sub(['createProjectExplorerModel'], 'service-api', descendants),
+    sub(explorerDependencyNames, 'service-api', descendants),
     sub(['createExplorerRouter', 'ExplorerRouter', 'startExplorerWebProcess'], 'service-api', descendants),
     sub(['createProjectBinding', 'ProjectBinding', 'BindingState'], 'service-api', descendants),
     sub(['selectExplorerEndpoint', 'readExplorerProcessRecord', 'reusableExplorerProcess', 'probeExplorerReadiness',
@@ -185,7 +189,8 @@ const toolkit: readonly Fixture[] = [
     src(['indexModuleTree', 'collapsibleAtDepth', 'ancestorsOf'], 'module-tree.ts', uiBrowser),
   ] },
   { path: 'subs/service-api/', name: 'service-api', tags: ['dispatch'], statements: [
-    src('*', 'interfaces/explorer-service.ts'), src(['createProjectExplorerModel'], 'project-view.ts'),
+    src('*', 'interfaces/explorer-service.ts'), src('*', 'interfaces/explorer-dependencies.ts'),
+    src(['createProjectExplorerModel'], 'project-view.ts'),
     src(['createExplorerRouter', 'ExplorerRouter'], 'router.ts'),
     src(['startExplorerWebProcess', 'ExplorerWebProcess'], 'web-process.ts'),
     src(['selectExplorerEndpoint', 'readExplorerProcessRecord', 'reusableExplorerProcess', 'probeExplorerReadiness',

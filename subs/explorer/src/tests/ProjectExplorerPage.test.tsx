@@ -87,6 +87,7 @@ describe('connected project explorer revision state', () => {
       const client: ExplorerClient = {
         async projectView() { return result.view; },
         async explorerDetails() { return { status: 'unavailable', reason: 'unused' }; },
+        async dependencyView() { throw new Error('No page requests dependency views before Plan 6D iteration 7'); },
         async serverStatus() { return result.status; },
       };
       render(<ProjectExplorerPage client={client} pollIntervalMs={60_000} />);
@@ -110,6 +111,7 @@ describe('connected project explorer revision state', () => {
       },
       async serverStatus() { return status(2); },
       async explorerDetails() { return { status: 'unavailable', reason: 'unused' }; },
+      async dependencyView() { throw new Error('No page requests dependency views before Plan 6D iteration 7'); },
     };
     render(<ProjectExplorerPage client={client} pollIntervalMs={10} />);
     await screen.findByText(`Revision ${revisionId(1)}`);
@@ -135,6 +137,7 @@ describe('connected project explorer revision state', () => {
       },
       async serverStatus() { return status(current); },
       async explorerDetails() { return { status: 'unavailable', reason: 'unused' }; },
+      async dependencyView() { throw new Error('No page requests dependency views before Plan 6D iteration 7'); },
     };
     render(<ProjectExplorerPage client={client} pollIntervalMs={10} />);
     await screen.findByText(`Revision ${revisionId(1)}`);
@@ -161,6 +164,7 @@ describe('connected project explorer revision state', () => {
     const client: ExplorerClient = {
       async projectView(input) { sequence = input.revision ? 2 : sequence; return { status: 'ready', revision: revision(sequence), view: model(sequence, { exportItem: true }) }; },
       async serverStatus() { return status(2); },
+      async dependencyView() { throw new Error('No page requests dependency views before Plan 6D iteration 7'); },
       async explorerDetails() {
         details++;
         if (details === 1) return oldDetail.promise;
@@ -193,6 +197,7 @@ describe('connected project explorer revision state', () => {
       },
       async serverStatus() { return published; },
       async explorerDetails() { return { status: 'unavailable', reason: 'unused' }; },
+      async dependencyView() { throw new Error('No page requests dependency views before Plan 6D iteration 7'); },
     };
     render(<ProjectExplorerPage client={client} pollIntervalMs={10} />);
     await screen.findByText(`Revision ${revisionId(5)}`);
@@ -215,6 +220,7 @@ describe('connected project explorer revision state', () => {
       async projectView() { const current = published.published!; return { status: 'ready', revision: current, view: model(current.sequence) }; },
       async serverStatus() { return published; },
       async explorerDetails() { return { status: 'unavailable', reason: 'unused' }; },
+      async dependencyView() { throw new Error('No page requests dependency views before Plan 6D iteration 7'); },
     };
     render(<ProjectExplorerPage client={client} pollIntervalMs={10} />);
     await screen.findByText(`Revision ${revisionId(1)}`);
@@ -229,6 +235,7 @@ describe('connected project explorer revision state', () => {
       async projectView() { return viewResult; },
       async serverStatus() { return published; },
       async explorerDetails() { return { status: 'unavailable', reason: 'unused' }; },
+      async dependencyView() { throw new Error('No page requests dependency views before Plan 6D iteration 7'); },
     };
     render(<ProjectExplorerPage client={client} pollIntervalMs={10} />);
     await screen.findByText(`Revision ${revisionId(3)}`);

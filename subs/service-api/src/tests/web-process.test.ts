@@ -23,7 +23,7 @@ afterEach(async () => {
 function stubBinding(initial: BindingState, service: RamifyService | null = null) {
   let state = initial;
   const binding: ProjectBinding = { root: '/project/root', state: () => state,
-    service: () => state.kind === 'ready' ? service : null, close: async () => {} };
+    service: () => state.kind === 'ready' ? service : null, observe: () => () => {}, close: async () => {} };
   return { binding, set(next: BindingState) { state = next; } };
 }
 
@@ -151,5 +151,30 @@ describe('RS09: resident explorer web process', () => {
     expect(await client.serverStatus.query()).toEqual({ root: '/project/root', binding: 'retrying',
       message: 'Daemon connection unavailable', published: null, daemonPid: null });
     expect(await client.projectView.query({})).toEqual({ status: 'unavailable', reason: 'Daemon connection unavailable' });
+  });
+
+  it('BD26-BD27: relays dependencyView over HTTP and aborts and releases its state on close', async () => {
+    const { root, assets } = await directory('ramify-explorer-web-dependencies-');
+    const revision = { token, revision: 'rev/1:00000000-0000-4000-8000-000000000000:2', sequence: 2,
+      fingerprints: { inputId: 'input/1:web' } };
+    const signals: AbortSignal[] = [];
+    const service = {
+      contextStatus: async () => ({ ok: true, value: { published: revision } }),
+      dependencyDiagram: (_request: unknown, control?: { signal?: AbortSignal }) => new Promise(resolve => {
+        signals.push(control!.signal!);
+        control!.signal!.addEventListener('abort', () => resolve({ ok: true, value: { status: 'cancelled', requestId: 'x' } }));
+      }),
+    } as unknown as RamifyService;
+    const web = await start({ binding: stubBinding({ kind: 'ready', token }, service).binding, assetsDirectory: assets,
+      endpointDirectory: root, buildKey: '0123456789abcdef', version: '0.0.0' });
+    const client = createTRPCClient<ExplorerRouter>({ links: [httpBatchLink({ url: `${web.origin}/trpc`, methodOverride: 'POST' })] });
+    expect(await client.dependencyView.query({ revision: revision.revision })).toEqual({ status: 'pending', revision, phase: 'analyzing' });
+    expect(await client.dependencyView.query({ revision: revision.revision.replace(/:2$/, ':1') }))
+      .toEqual({ status: 'superseded', current: revision.revision, reason: expect.any(String) });
+    expect(signals).toHaveLength(1);
+    expect(web.dependencyViews.status()).toMatchObject({ inFlight: revision.revision, counters: { daemonRequests: 1 } });
+    await web.close();
+    expect(signals[0]!.aborted).toBe(true);
+    expect(web.dependencyViews.status()).toMatchObject({ closed: true, inFlight: null, settled: null, busy: null });
   });
 });

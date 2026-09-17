@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { DependencyViewResult } from '../../service-api/src/interfaces/explorer-dependencies.js';
 import type { ExplorerDetailsResult, ServerStatusResult } from '../../service-api/src/interfaces/explorer-service.js';
 import type { ContextRevision, ContextStatus, RevisionId } from '../../daemon/subs/contexts/src/interfaces/contexts.js';
 import type { SymbolDetailRequest } from '../../analysis/subs/typescript/src/interfaces/source.js';
@@ -16,6 +17,8 @@ export interface ExplorerClient {
   explorerDetails(input: { readonly revision: RevisionId;
     readonly requests: readonly SymbolDetailRequest[] }): Promise<ExplorerDetailsResult>;
   serverStatus(): Promise<ServerStatusResult>;
+  /** The behavioral dependency view of one exact published revision; pending while the daemon analyzes. */
+  dependencyView(input: { readonly revision: RevisionId }): Promise<DependencyViewResult>;
 }
 
 export interface PublishedProjectView {

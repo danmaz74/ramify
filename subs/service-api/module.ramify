@@ -2,6 +2,7 @@ ramify 1
 module service-api tagged [dispatch]
 
 expose-src * from "interfaces/explorer-service.ts" to parent
+expose-src * from "interfaces/explorer-dependencies.ts" to parent
 expose-src createProjectExplorerModel from "project-view.ts" to parent
 expose-src createExplorerRouter, ExplorerRouter from "router.ts" to parent
 expose-src startExplorerWebProcess, ExplorerWebProcess from "web-process.ts" to parent

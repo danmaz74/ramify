@@ -1,7 +1,25 @@
 import type { ServiceResult, SubscriptionOpened } from '../../../../src/interfaces/service.js';
-import type { ContextEvent, ContextStatus, ContextToken, OpenOutcome } from '../../../daemon/src/context-types.js';
+import type { DependencyDiagramFacts } from '../../../analysis/src/interfaces/dependency-diagram.js';
+import type {
+  ContextDependencyDiagramOutcome,
+  ContextEvent,
+  ContextRevision,
+  ContextStatus,
+  ContextToken,
+  DependencyDiagramRequest,
+  OpenOutcome,
+} from '../../../daemon/src/context-types.js';
 import type { ConnectionState, DaemonRecord, DisconnectReason, ServiceConnection } from '../../../daemon/src/interfaces/daemon.js';
 import type { ProjectBindingConnector } from '../project-binding.js';
+
+/** One daemon `dependencyDiagram` call the fake holds until the test settles it. */
+export interface FakeDiagramCall {
+  readonly request: DependencyDiagramRequest;
+  readonly signal: AbortSignal | undefined;
+  readonly settled: boolean;
+  /** Answer the call; ignored once it settled (an aborted call already answered `cancelled`). */
+  settle(result: ServiceResult<ContextDependencyDiagramOutcome>): void;
+}
 
 /** What a connect attempt finds: `stopped` carries the record's stop reason. */
 export type FakeDaemon =
@@ -24,6 +42,16 @@ export interface FakeConnection {
   emit(event: ContextEvent): void;
   /** Report a transport transition to the binding, as `connectDaemon`'s `onState` does. */
   drop(state: ConnectionState, reason: DisconnectReason): void;
+  /** The published revision `contextStatus` reports; null before the first publication. */
+  published: ContextRevision | null;
+  /** `contextStatus` calls answered. */
+  readonly statusCalls: number;
+  /** Every `dependencyDiagram` call in arrival order. */
+  readonly diagramCalls: readonly FakeDiagramCall[];
+  /** Calls whose signal was aborted before the test settled them. */
+  readonly abortedDiagrams: number;
+  /** Set `published` and deliver its `revision-published` event to the subscribers. */
+  publish(revision: ContextRevision): void;
 }
 
 export interface FakeConnector {
@@ -60,6 +88,8 @@ function fakeConnection(onState: (state: ConnectionState, reason: DisconnectReas
   const scripted: ((token: ContextToken) => OpenOutcome | Promise<OpenOutcome>)[] = [];
   const subscriptions = new Map<string, (event: ContextEvent) => void>();
   const contexts = new Set<string>();
+  const diagramCalls: FakeDiagramCall[] = [];
+  let published: ContextRevision | null = null, statusCalls = 0, abortedDiagrams = 0;
   const live = () => state === 'connected';
   const connection = {
     get state() { return state; },
@@ -86,6 +116,30 @@ function fakeConnection(onState: (state: ConnectionState, reason: DisconnectReas
       if (!live()) return cancelled<null>();
       subscriptions.delete(params.subscription); return ok(null);
     },
+    async contextStatus(params: { token: ContextToken }) {
+      if (!live()) return cancelled<ContextStatus>();
+      statusCalls++;
+      return ok({ token: params.token, published } as unknown as ContextStatus);
+    },
+    dependencyDiagram(request: DependencyDiagramRequest, control?: { readonly signal?: AbortSignal }) {
+      if (!live()) return Promise.resolve(cancelled<ContextDependencyDiagramOutcome>());
+      return new Promise<ServiceResult<ContextDependencyDiagramOutcome>>(resolve => {
+        let settled = false;
+        const answer = (result: ServiceResult<ContextDependencyDiagramOutcome>) => {
+          if (settled) return;
+          settled = true;
+          control?.signal?.removeEventListener('abort', aborted);
+          resolve(result);
+        };
+        const aborted = () => {
+          if (settled) return;
+          abortedDiagrams++;
+          answer(ok({ status: 'cancelled', requestId: request.requestId }));
+        };
+        diagramCalls.push({ request, signal: control?.signal, get settled() { return settled; }, settle: answer });
+        if (control?.signal?.aborted) aborted(); else control?.signal?.addEventListener('abort', aborted, { once: true });
+      });
+    },
     async closeContext(params: { token: ContextToken }) {
       if (!live()) return cancelled<null>();
       contexts.delete(key(params.token)); return ok(null);
@@ -108,6 +162,44 @@ function fakeConnection(onState: (state: ConnectionState, reason: DisconnectReas
     drop(next, why) {
       state = next; reason = why; subscriptions.clear(); contexts.clear(); onState(next, why);
     },
+    get published() { return published; },
+    set published(value) { published = value; },
+    get statusCalls() { return statusCalls; },
+    diagramCalls,
+    get abortedDiagrams() { return abortedDiagrams; },
+    publish(revision) {
+      published = revision;
+      for (const listener of [...subscriptions.values()]) listener({ type: 'revision-published', token: revision.token, revision, coalesced: 0 });
+    },
+  };
+}
+
+/** A revision of a fake token; `rev/1:<uuid>:<sequence>` matches the router's revision format. */
+export function fakeRevision(token: ContextToken, sequence: number, inputId = `input/1:fake-${sequence}`): ContextRevision {
+  return { token, revision: `rev/1:00000000-0000-4000-8000-000000000000:${sequence}`, sequence,
+    fingerprints: { inputId } } as unknown as ContextRevision;
+}
+
+/**
+ * A consistent diagram: `boundaries` behavioral dependencies of `app/consumer` on
+ * originals owned by `app/provider`, each through `app/provider`. `padding` adds
+ * bytes to every consumer file name, to reach a chosen encoded size.
+ */
+export function fakeDiagram(inputId: string, boundaries = 1, padding = 0): DependencyDiagramFacts {
+  const file = `subs/consumer/src/use${'x'.repeat(padding)}.ts`;
+  return {
+    inputId,
+    modules: ['app', 'app/consumer', 'app/provider'],
+    headline: { behavioralDependencies: boundaries, nonBehavioralDependencies: 0 },
+    boundaries: Array.from({ length: boundaries }, (_, index) => {
+      const binding = `value${String(index).padStart(6, '0')}`;
+      return { consumer: 'app/consumer', importedModule: 'app/provider', originalOwner: 'app/provider',
+        original: { kind: 'code' as const, owner: 'app/provider', file: 'api.ts', binding },
+        classification: 'behavioral' as const, consumerFiles: [file], importedFiles: ['subs/provider/src/api.ts'],
+        originalFiles: ['subs/provider/src/api.ts'], accessIds: [`access-${index}`], status: 'allowed' as const,
+        reasons: ['exposed' as const], limitIds: [] };
+    }),
+    coverage: { state: 'complete', unknownDependencies: 0, limitIds: [] },
   };
 }
 

@@ -40,5 +40,6 @@ function browserClient(): ExplorerClient {
     projectView: input => client.projectView.query(input),
     explorerDetails: input => client.explorerDetails.query({ ...input, requests: [...input.requests] }),
     serverStatus: () => client.serverStatus.query(),
+    dependencyView: input => client.dependencyView.query(input),
   };
 }

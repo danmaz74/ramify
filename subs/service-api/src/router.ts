@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { initTRPC } from '@trpc/server';
 import { z } from 'zod';
+import { createDependencyViews, type DependencyViews } from './dependency-view.js';
+import type { DependencyViewResult } from './interfaces/explorer-dependencies.js';
 import type { ServerStatusResult } from './interfaces/explorer-service.js';
-import type { ProjectBinding } from './project-binding.js';
+import { unavailableReason, type ProjectBinding } from './project-binding.js';
 import { createProjectExplorerModel } from './project-view.js';
 
 const revision = z.string().regex(/^rev\/1:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:[1-9][0-9]*$/);
@@ -18,6 +20,8 @@ const detailRequest = z.strictObject({
 export interface ExplorerRouterOptions {
   readonly binding: ProjectBinding;
   readonly requestId?: () => string;
+  /** The binding's dependency-view state; the router creates one when omitted. Its owner closes it. */
+  readonly dependencyViews?: DependencyViews;
 }
 
 const reason = (value: unknown): string => value instanceof Error ? value.message : String(value);
@@ -25,22 +29,13 @@ const reason = (value: unknown): string => value instanceof Error ? value.messag
 /** `rev/1:<uuid>:<sequence>` belongs to generation `gen/1:<uuid>`. */
 const generationOf = (id: string): string => `gen/1:${id.slice('rev/1:'.length, id.lastIndexOf(':'))}`;
 
-function unavailableReason(binding: ProjectBinding): string {
-  const state = binding.state();
-  switch (state.kind) {
-    case 'connecting': return 'Connecting to the project';
-    case 'daemon-stopped': return 'Daemon stopped explicitly';
-    case 'retrying': case 'project-unavailable': return state.message;
-    case 'ready': return 'Project connection changed';
-  }
-}
-
-/** The browser's three procedures. No input carries a token: every request reads
+/** The browser's procedures. No input carries a token: every request reads
  * the server's project binding, and every fact comes from its resident service. */
 export function createExplorerRouter(options: ExplorerRouterOptions) {
   const t = initTRPC.create();
   const { binding } = options;
   const requestId = options.requestId ?? randomUUID;
+  const dependencyViews = options.dependencyViews ?? createDependencyViews({ binding, requestId });
   /** The token and service of one ready state, read together. */
   const current = () => {
     const state = binding.state(), service = binding.service();
@@ -103,6 +98,8 @@ export function createExplorerRouter(options: ExplorerRouterOptions) {
       return { status: 'unavailable' as const,
         reason: outcome.status === 'unavailable' ? outcome.message : `Detail request ${outcome.status}` };
     }),
+    dependencyView: t.procedure.input(z.strictObject({ revision })).query(({ input }): Promise<DependencyViewResult> =>
+      dependencyViews.view(input)),
   });
 }
 
