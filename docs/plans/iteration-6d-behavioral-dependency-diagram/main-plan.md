@@ -1,11 +1,14 @@
 # Plan 6D: Behavioral dependency diagram
 
-**Date:** 2026-09-17. **Status:** implemented on branch
-`feat/plan6d-behavioral-dependency-diagram`; every BD row passes. Iterations 1-7
+**Date:** 2026-09-17. **Status:** iterations 1-8 are implemented on branch
+`feat/plan6d-behavioral-dependency-diagram`; BD01-BD52 pass. Iterations 1-7
 are recorded in their [gate report](iterations/iteration7-results.md), and the
 accepted iteration 8 revision, the scope-aware roll-up of the drawn links, is
 implemented and recorded in its
-[completion report](iterations/iteration8-results.md). This is a focused successor to the implemented
+[completion report](iterations/iteration8-results.md). The accepted iteration 9
+revision, an optional node for the scope module's own source, is specified here
+and in [C11](contracts.md#c11-the-scope-modules-own-source-as-a-node) and is not
+implemented; BD53-BD61 are open. This is a focused successor to the implemented
 [Plan 6B](../iteration-6b-resident-explorer-server/main-plan.md) and
 [Plan 6C](../iteration-6c-module-tree-view/main-plan.md). It uses the behavioral
 classification and modularity projection already implemented at `70d7f46`.
@@ -36,18 +39,22 @@ symbols from one displayed subtree to the module that defines the original, so a
 symbol forwarded through another module's barrel links to its original owner.
 The imported boundary remains a panel unit.
 
-Three controls change the displayed links without rerunning analysis:
+Four controls change the displayed links without rerunning analysis:
 
 ```text
 [ ] Show non-behavioral dependencies
 Link depth: [ Modules at this level ] [ Exact module ]
 [x] Show dependencies that leave this module    (a drilled-in scope only)
+[ ] Show this module's own source as a node     (a drilled-in scope only)
 ```
 
 The first control adds referenced type/data dependencies. The second chooses
 between the rolled-up nodes of the current scope and the exact consuming and
 defining modules. The third hides the links with one end outside the scope; a
-scope that covers the project has no outside and does not render it. Imported
+scope that covers the project has no outside and does not render it. The fourth
+draws the scope module's own source as its own node beside its children, so the
+links in both directions between that own source and each child become visible;
+it is off by default, and only a drilled-in scope renders it. Imported
 but unreferenced symbols, symbol-free imports and unknown classifications make
 no link. Unknown classifications make coverage partial.
 
@@ -144,9 +151,11 @@ remain authoritative.
   than that depth maps to itself.
 - A link whose two ends map to one node is internal to that node and is not
   drawn at that scope. Drilling into the node makes it visible.
-- The scope module's own source is folded into the frame and has no node of its
-  own, so a link with one end in it is not drawn at that scope. Its
-  dependencies stay in the panel numbers.
+- By default the scope module's own source is folded into the frame and has no
+  node of its own, so a link with one end in it is not drawn at that scope and
+  its dependencies stay in the panel numbers. In a drilled-in scope the
+  own-source control draws that own source as its own node instead, and those
+  links are drawn between it and the scope's children.
 - A rolled-up link's count is the number of distinct `(consumer module,
   original)` pairs between the two subtrees, not a sum of child links. No scope
   and no control changes the measured headline counts.
@@ -316,6 +325,11 @@ ready response, so every control and every scope change is local UI state.
   class filters, pan/zoom and minimap operate over the current scope's links.
   The class filter selects which of the scope's children are displayed; it
   never changes how an end maps to a node.
+- The own-source node, drawn only while the own-source control is on, stands for
+  the scope module's own source alone and never for its subtree. It is labelled
+  `<module name> · own source`, is a rounded square rather than a circle,
+  carries no sub-module count and no drill-down, and takes the module nodes'
+  size scale without changing their diameters.
 
 The right panel shows the filtered and the measured numbers side by side, each
 labelled:
@@ -326,6 +340,9 @@ labelled:
 - module: `Uses` and `Owned originals used by others`, each `At this level`
   against `Including internals`, `Used through this module` with its imported
   unit in a disclosure, owned/subtree files and coverage;
+- own-source node: the same two rows as `At this level` against
+  `Excluding internals`, its measured imported unit in a disclosure, its
+  displayed links and its owned source files;
 - rolled-up link: its `At this level` counts, the exact modules rolled into it,
   an imported-through breakdown in a disclosure and supporting
   files/status/coverage;
@@ -381,12 +398,14 @@ analyzer's peak memory in the real workflow.
 | 6 | Render dependency controls and panels | `presentation/project-view` | Pure component implements both projections, settings and all panel scopes. |
 | 7 | Connect the page and run the gate | `explorer` and `integration-tests` | Real daemon/server/browser workflow, lifecycle budgets, hook isolation and documentation pass. |
 | 8 | Scope-aware roll-up of dependency links | `presentation/project-view`, `explorer`, `integration-tests` | Every scope draws only links between distinct nodes of that level; controls and scope changes start no analysis. |
+| 9 | An optional node for the scope module's own source | `presentation/project-view`, `explorer`, `integration-tests` | A drilled-in scope can draw its own source as a node carrying both link directions to its children; the control starts no analysis. |
 
 Iterations run in order. Iteration 6 may not substitute fixture-only edge data
 for iteration 5's real transport, and no iteration may derive imported links
-from the old aggregate behavior facts. Iteration 8 revises the delivered
-presentation only: it changes no daemon, analyzer, service-api or projection
-code and introduces no analysis run.
+from the old aggregate behavior facts. Iterations 8 and 9 revise the delivered
+presentation only: they change no daemon, analyzer, service-api or projection
+code and introduce no analysis run. Iteration 9 changes the scope mapping, the
+drawn links, one setting and the panels, and nothing else.
 
 ## Review decisions
 
@@ -462,6 +481,48 @@ document's control block. Completion boundary item 2 stands: the projection
 still produces both endpoint collections, and only the original-owner one is
 drawn.
 
+**Revision, 2026-09-17, iteration 9:** reviewing iteration 8 asked for the
+reverse direction to become visible. A parent has children to delegate to them,
+so a parent depending on its children is the expected shape, while a child using
+vocabulary its parent exposes to its descendants is the interesting direction.
+These decisions promote that deferral to iteration 9 and are accepted. They
+revise decision 4 above, whose folding remains the default.
+
+1. A new control draws the scope module's own source as its own node beside its
+   children. Only a drilled-in scope, where the view has a scope module,
+   renders it; the project scope does not, whether its frame is the root module
+   or nothing, because there the control does not apply.
+2. It is off by default, so iteration 8's drawn links remain the default view.
+3. The node is labelled `<module name> · own source`, for example
+   `analysis · own source`, and is visually distinct from a module node: a
+   rounded square in the module's tag-class colour, with no sub-module count and
+   no drill-down.
+4. While it is on, the ends iteration 8 maps to the frame map to that node
+   instead, so the links in both directions between the parent's own source and
+   each child are drawn and leave the `Not drawn at this level` tally. The rest
+   of the scope mapping, the internal-link rule and the outside-end rule are
+   unchanged, so an own-source end paired with an end outside the scope is an
+   ordinary leaving link under `Show dependencies that leave this module`.
+5. `Exact module` already draws the scope module itself, so the control has no
+   effect there; it is disabled while that depth mode is selected and keeps its
+   value.
+6. Selecting the node shows a panel for the scope module's own source at that
+   scope: `Uses` and `Owned originals used by others` as `At this level` against
+   `Excluding internals`, the measured imported unit in a disclosure, its
+   displayed links and its owned source files.
+7. The control changes no analysis. No control change may reach a dependency
+   request, and the daemon, the analyzer, the service-api DTO and the
+   projection do not change.
+8. Ownership is unchanged: `presentation/project-view [ui, browser]`,
+   `explorer [ui, browser, dispatch]`,
+   `integration-tests [testing, ui, dispatch]` and documentation.
+
+C11 specifies them; C7's defaults, C8's clause 2 and its settings-independence
+statement, C9's settings and controls and C10's panel list are edited in place;
+and BD53-BD61 are the new acceptance rows. BD44, BD47 and BD51 are qualified in
+place with the control's default value, and iteration 8's evidence, recorded at
+that default, still establishes them.
+
 Changing one of these decisions requires revising this plan and its affected
 acceptance rows first; do not resolve it ad hoc in a later iteration.
 
@@ -475,11 +536,6 @@ filtering, historical trends, confidence estimates, alternative layouts, an MCP
 or CLI client of the same operation, or module-move suggestions. None may
 reinterpret the two headline counts delivered here.
 
-Iteration 8 defers one control: an option that draws the scope module's own
-source as a separate node beside its children, making the links in both
-directions between that own source and each child visible at that scope. A
-parent has children to delegate to them, so a parent depending on its children
-is the expected shape and adds nothing at that level; a child using vocabulary
-its parent exposes to its descendants is the interesting direction and is worth
-seeing. The option changes no analysis: only the scope mapping and the drawn
-links.
+Iteration 8's deferred own-source control is no longer deferred. It is accepted
+work, specified in the iteration 9 revision above and in C11, and planned as
+iteration 9; it changes no analysis, only the scope mapping and the drawn links.

@@ -8,8 +8,15 @@
 control, so BD30-BD32 and BD34-BD40 are edited in place and re-executed in
 iteration 8; the iteration 6 and 7 results keep their earlier wording as those
 rows' history. BD44-BD52 are new. BD01-BD29, BD33 and BD41-BD43 are unchanged.
-Every row passes, as the
+Every row through BD52 passes, as the
 [iteration 8 completion report](iterations/iteration8-results.md) records.
+
+**Revision, 2026-09-17, iteration 9:** the optional node for the scope module's
+own source, accepted in the [plan's iteration 9 revision](main-plan.md#review-decisions)
+and specified in [C11](contracts.md#c11-the-scope-modules-own-source-as-a-node),
+adds BD53-BD61. BD44, BD47 and BD51 are qualified in place with the control's
+default value, which is off; iteration 8's evidence was recorded at that default
+and still establishes them. No other row changes, and BD53-BD61 are open.
 
 ## Fixtures
 
@@ -29,7 +36,9 @@ Every row passes, as the
   and `app/a/right`), `app/b` (child `app/b/core`), `app/c` and `app/idle`, and
   dependencies whose ends are the scope module's own source, a grandchild of
   another module, and a module shallower than the scope, so every clause of the
-  C8 mapping has a case. It is valid for pure and component rows only.
+  C8 mapping has a case. Its `app/a -> app/a/left` edge is the parent-own-source
+  end C11's control draws as a link onto a child. It is valid for pure and
+  component rows only.
 
 ## Classifier and projection
 
@@ -103,15 +112,29 @@ Every row passes, as the
 
 | ID | Iter | Evidence | Required witness |
 | --- | ---: | --- | --- |
-| BD44 | 8 | pure | `nested-levels`: `scopeEnd` maps an end inside the scope to the child containing it, an end outside to its ancestor at the scope module's depth, an end shallower than that depth to itself, and the scope module's own source to the frame; `exact` mode maps every end to itself with no frame. Ends do not change with the class filter or the settings. |
+| BD44 | 8 | pure | `nested-levels`: `scopeEnd` maps an end inside the scope to the child containing it, an end outside to its ancestor at the scope module's depth, an end shallower than that depth to itself, and, while the own-source control is off, the scope module's own source to the frame; `exact` mode maps every end to itself with no frame. Ends do not change with the class filter or with the display settings; the own-source control reaches the mapping only through the scope, as BD53 records. |
 | BD45 | 8 | pure/component | No drawn link has both ends mapping to one node, at any scope. On `reference` the project scope shows `integration-tests` and `workspace`, draws zero links and hides the 20 edges internal to those nodes; drilling into `workspace` draws 9 scope links carrying 7 behavioral and 41 non-behavioral dependencies, including `catalog -> contracts` 0/9 and `reviews -> contracts` 0/24. |
 | BD46 | 8 | pure | `nested-levels` in a nested scope: an outside end deeper than the scope shows as its ancestor at the scope module's depth in one out-of-view node, several deep ends of one subtree collapse into one link, and a link with no displayed end is not drawn. |
-| BD47 | 8 | component | `forwarding`: `app/b/core -> app/b` is drawn at no scope, internal at the project scope and a frame end inside `app/b`, while `app/b`'s module panel keeps it in `Including internals` (1/1 against 1/0 at this level) and the drilled-in scope panel reports the scope's own source. |
+| BD47 | 8 | component | `forwarding`: with the own-source control off, its default, `app/b/core -> app/b` is drawn at no scope, internal at the project scope and a frame end inside `app/b`, while `app/b`'s module panel keeps it in `Including internals` (1/1 against 1/0 at this level) and the drilled-in scope panel reports the scope's own source. |
 | BD48 | 8 | pure | A rolled-up link's counts are the distinct `(consumer module, original)` pairs of its subtrees, calculated in the test from evidence rows and settled behavioral when any row is behavioral; they equal the sum of the contributing edges' counts for every `reference` scope; `status` is denied over limited over allowed across contributing evidence, `coverageIds` is their sorted union, and `sources` is complete and ordered. |
 | BD49 | 8 | component | The leaving-scope toggle defaults on; off removes every link with an end outside the scope together with its out-of-view nodes, keeps the in-scope links, clears a selected leaving link, and the control is absent at a scope that covers the project. |
 | BD50 | 8 | component | A rolled-up link ID contains its scope, so drilling or changing the depth mode clears that selection; an exact selection survives a scope change while its link is still drawn; a module selection survives while its node is displayed; no reconciliation invokes a data callback. |
-| BD51 | 8 | component | Panels in each scope show `This view` against `Whole project` with `Not drawn at this level` equal to the difference (`reference` inside `workspace`: 7/41 against 17/48, so 10 and 7 not drawn), and per module `At this level` against `Including internals` (`catalog`: `Uses` 1/11 against 3/13, owned originals 3/0 against 6/2), with `Used through this module` in a disclosure and the rolled-up link panel listing its contributing exact modules. |
+| BD51 | 8 | component | Panels in each scope show `This view` against `Whole project` with `Not drawn at this level` equal to the difference (`reference` inside `workspace` with the own-source control off: 7/41 against 17/48, so 10 and 7 not drawn), and per module `At this level` against `Including internals` (`catalog`: `Uses` 1/11 against 3/13, owned originals 3/0 against 6/2), with `Used through this module` in a disclosure and the rolled-up link panel listing its contributing exact modules. |
 | BD52 | 8 | HTTP/browser | Over a real daemon and explorer server on `reference`, every control and every scope change draws its independently calculated links while the `dependencyView` request count, `dependencyDiagrams` and `behaviorRuns` stay at their values from the first ready response. |
+
+## The scope module's own source as a node
+
+| ID | Iter | Evidence | Required witness |
+| --- | ---: | --- | --- |
+| BD53 | 9 | pure | `nested-levels`: with `showOwnSourceNode` on, `dependencyScope` in a drilled-in scope returns the scope module as `ownSourceNode` and `scopeEnd` maps that module to the own-source node, in scope, while clauses 1 and 3 give the ends BD44 records. `ownSourceNode` is null at the project scope, although its frame is the root module, and `exact` mode maps every end as BD44 records. Ends still do not change with the class filter or with the other settings. |
+| BD54 | 9 | pure/component | Both directions are drawn: `nested-levels` inside `app/a` draws the own-source node onto `app/a/left` for `app/a -> app/a/left`, and `forwarding` inside `app/b` draws `app/b/core` onto the own-source node for the edge BD47 records as drawn at no scope. Each link's consumer and provider, counts, status and ID match an independent calculation, and each disappears again when the control is switched off. |
+| BD55 | 9 | pure | `reference`: inside `workspace` with the control on, exactly the 3 edges iteration 8 folded into the frame become drawn, grouped by their mapped node pairs, and every other link keeps its endpoints, counts, status, `sources` and ID. The project scope still draws 0 links with the 8 folded edges undrawn, because the control is not rendered there. |
+| BD56 | 9 | component | `reference` inside `workspace`: turning the control on raises `This view` by exactly the own-source links' distinct pairs and lowers `Not drawn at this level` by the same amounts, component by component; `Whole project` stays 17/48 and `This view` plus `Not drawn at this level` still equals it. The iteration records the exact numbers, and the not-drawn explanation then names only the internal and the outside causes. |
+| BD57 | 9 | component | The control is absent at `reference`'s project scope and at every scope reached with no scope module; in a drilled-in scope it is present, off by default, named `Show this module's own source as a node`, keyboard-reachable and labelled like the other checkboxes, and disabled with its value kept while `Exact module` is selected. Toggling it invokes `onDependencySettingsChange` only: `onRefresh`, `onToggleExport`, `onToggleDependency` and `onNavigateToScope` are not called. |
+| BD58 | 9 | component | The node is labelled `<module name> · own source`, carries `data-own-source`, is distinguishable from a module node, shows no sub-module count and invokes no `onDrillDown`; the displayed module nodes' diameters are identical with the control on and off. |
+| BD59 | 9 | component | Selecting the node shows `Uses` and `Owned originals used by others` as `At this level` against `Excluding internals`, with `Excluding internals` equal to the scope module's served row and `At this level` equal to the independently calculated own-source links; `Used through this module` is measured only, in a disclosure; its displayed links and owned source files appear; and the project panel's `Scope's own source` section states that the own source is drawn as its own node. |
+| BD60 | 9 | component | An own-source node selection survives while the node is drawn and is cleared, through `onSelectModule(null)`, by switching the control off, by a scope change and by `Exact module`; a selected own-source link is cleared by the same three changes through `onSelectEdge(null)`; a child-to-child link selection and a module selection survive the toggle because their IDs do not change. No reconciliation invokes a data callback. |
+| BD61 | 9 | HTTP/browser | Over a real daemon and explorer server on `reference`, drilling into `workspace` and toggling the control draws the independently calculated links in both directions, and the `dependencyView` request count, `dependencyDiagrams` and `behaviorRuns` stay at their values from the first ready response, as BD52 recorded them for the other controls. |
 
 Returning old occurrence links while pending fails BD30. Returning an empty
 graph fails wherever the fixture has a positive control at that scope;
@@ -119,6 +142,9 @@ graph fails wherever the fixture has a positive control at that scope;
 folded into the frame, is BD45's recorded exception. Component tests
 do not establish BD39–BD42 or BD52, and a clean browser rendering does not
 establish hook isolation. The hand-written `nested-levels` model establishes
-BD44 and BD46 only; it cannot stand in for the served models in BD39, BD40 or
-BD52. Summing child links instead of counting distinct pairs fails BD48 even
-where the two agree, because the test calculates the pairs.
+BD44, BD46, BD53 and its own half of BD54 only; it cannot stand in for the
+served models in BD39, BD40, BD52 or BD61. Summing child links instead of counting distinct pairs fails BD48 even
+where the two agree, because the test calculates the pairs. A component row
+that toggles the own-source control without comparing the drawn set with an
+independent calculation does not establish BD54-BD56, and component evidence
+does not establish BD61's request and counter values.

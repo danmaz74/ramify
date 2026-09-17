@@ -11,6 +11,14 @@ default settings change with them. C1-C6 are unchanged: the analyzer, the daemon
 operation, the projection, the DTO and the wire result stay exactly as
 implemented, and nothing in C8-C10 starts an analysis run.
 
+**Revision, 2026-09-17, iteration 9:** C11 specifies the optional node for the
+scope module's own source accepted in the
+[plan's iteration 9 revision](main-plan.md#review-decisions). C7's defaults,
+C8's clause 2 and its settings-independence statement, C9's settings and
+controls and C10's panel list are edited in place and point at it; C11 is
+authoritative for the option. C1-C6 remain unchanged, and nothing in C11 starts
+an analysis run.
+
 ## C1. Compiler evidence
 
 The existing aggregate fact remains the headline input. `accesses` preserves
@@ -478,13 +486,16 @@ currently displayed project view is discarded.
 UI settings are local and default on every page load to:
 
 ```ts
-{ showNonBehavioral: false, depthMode: 'level', showOutsideScope: true }
+{ showNonBehavioral: false, depthMode: 'level', showOutsideScope: true,
+  showOwnSourceNode: false }
 ```
 
 They persist across refresh of the same mounted page and across scope changes,
-but are not stored in a cookie, URL or server cache in Plan 6D. The earlier
+but are not stored in a cookie, URL or server cache in Plan 6D. A scope that
+does not render a control keeps that control's value, so `showOwnSourceNode`
+survives navigation through the project scope. The earlier
 `linkTarget: 'imported-module'` default is replaced by `depthMode`, as C9
-records.
+records, and `showOwnSourceNode` is C11's.
 
 ## C8. Scope, roll-up and drawn links
 
@@ -525,7 +536,8 @@ top-level module has children; otherwise the top-level modules. `frameModule` is
 In `level` mode `scopeEnd` applies these clauses in order:
 
 1. `module` is one of `scope.nodes` or a descendant of one: that node, in scope.
-2. `module` is `scope.frameModule`: the frame.
+2. `module` is `scope.frameModule`: the frame, or the own-source node when C11's
+   control draws it.
 3. Otherwise `module` is outside the scope: its ancestor at depth
    `scope.depth - 1`, or `module` itself when its depth is at most
    `scope.depth - 1`, not in scope.
@@ -534,17 +546,18 @@ In `exact` mode every end is its own module, in scope when it is the frame
 module or a descendant of it, and there is no frame folding: a module that is
 not a displayed node is drawn out of view exactly as iteration 6 drew it.
 
-An end never depends on the class filter or on the settings. `ModuleTreeIndex`
-is the parent and children index the view already builds from
-`ProjectExplorerModel.modules`; no new served field is needed.
+An end never depends on the class filter or on the display settings. The
+own-source control reaches the mapping only through `DependencyScope`, as C11
+fixes. `ModuleTreeIndex` is the parent and children index the view already
+builds from `ProjectExplorerModel.modules`; no new served field is needed.
 
 ```ts
 export interface ActiveDependencyEdge {
   readonly id: string;
   readonly depthMode: DependencyDepthMode;
-  /** The consuming node at this scope. */
+  /** The consuming node at this scope; a `ScopeNodeId` once C11 applies. */
   readonly consumer: ModuleId;
-  /** The providing node at this scope. */
+  /** The providing node at this scope; a `ScopeNodeId` once C11 applies. */
   readonly provider: ModuleId;
   readonly behavioral: number;
   readonly nonBehavioral: number;
@@ -635,10 +648,13 @@ export interface DependencySettings {
   readonly showNonBehavioral: boolean;
   readonly depthMode: DependencyDepthMode;
   readonly showOutsideScope: boolean;
+  /** Whether a drilled-in scope draws its own source as a node; C11. */
+  readonly showOwnSourceNode: boolean;
 }
 
 export const defaultDependencySettings: DependencySettings = Object.freeze({
   showNonBehavioral: false, depthMode: 'level', showOutsideScope: true,
+  showOwnSourceNode: false,
 });
 ```
 
@@ -652,8 +668,9 @@ The controls are:
 | Checkbox | `Show non-behavioral dependencies` | Unchanged from iteration 6. |
 | Radio group `Link depth` | `Modules at this level`, `Exact module` | Keeps iteration 6's roving tab stop and arrow/Home/End keys. |
 | Checkbox | `Show dependencies that leave this module` | Default on. Absent when `scopeCoversProject` is true. |
+| Checkbox | `Show this module's own source as a node` | Default off. Absent unless the view has a scope module; disabled in `Exact module`, keeping its value. C11. |
 
-All three are disabled while no dependency model is loaded. None invokes a data
+All four are disabled while no dependency model is loaded. None invokes a data
 callback: `onDependencySettingsChange` reports the new value, and the explorer
 page keeps the settings across scope changes and refreshes.
 
@@ -710,6 +727,7 @@ and `shown` note.
 | --- | --- | --- |
 | No selection | `This view`: `scopeLinkCounts` of the scope's links | `Whole project`: `model.project` |
 | Module node | `At this level`: the scope's links with this node as consumer, and as provider | `Including internals`: `subtreeDependencyCounts` |
+| Own-source node (C11) | `At this level`: the scope's links with that node as consumer, and as provider | `Excluding internals`: the scope module's own C5 row |
 | Rolled-up link | `At this level`: the link's own counts | the contributing exact modules and their counts |
 | Exact link | the link's counts, as iteration 6 | the same |
 
@@ -721,7 +739,10 @@ The panels show, in each scope:
   are hidden; `Displayed links`, coverage, revision and input as today; and, in
   a drilled-in scope, a `Scope's own source` section with the frame module's own
   `Uses` and `Owned originals used by others` rows and the statement that its
-  links are not drawn at this scope.
+  links are not drawn at this scope. While C11's control draws the own-source
+  node, that statement becomes the statement that the own source is drawn as its
+  own node here, and the difference names only the internal and the outside
+  causes.
 - A displayed module node: `Uses` and `Owned originals used by others`, each
   `At this level` against `Including internals`; `Used through this module` with
   its imported unit, `Including internals` only, in a disclosure, because no
@@ -733,9 +754,184 @@ The panels show, in each scope:
   `importedThrough` entries per module; supporting consumer and original
   declaration files, status and reason badges and coverage IDs; and the
   referenced originals grouped by original with their exact consumer and owner.
+- The own-source node, while C11's control draws it: its own panel, which C11
+  fixes.
 - An exact link: iteration 6's original-owner panel, unchanged.
 
 `This view` and `At this level` follow the drawn scope, including the class
-filter. `Whole project` and `Including internals` are the measured numbers and
-change with no scope, control or filter. Every number comes from the C5 model;
-the view recomputes nothing the projection already measured.
+filter. `Whole project`, `Including internals` and C11's `Excluding internals`
+are the measured numbers and change with no scope, control or filter. Every
+number comes from the C5 model; the view recomputes nothing the projection
+already measured.
+
+## C11. The scope module's own source as a node
+
+`presentation/project-view` owns this option. It changes the scope, the mapping
+of one end and the panels, and nothing else: no request, no DTO field, no
+projection and no analysis.
+
+```ts
+export interface DependencySettings {
+  readonly showNonBehavioral: boolean;
+  readonly depthMode: DependencyDepthMode;
+  readonly showOutsideScope: boolean;
+  /** Whether a drilled-in scope draws its own source as a node beside its children. */
+  readonly showOwnSourceNode: boolean;
+}
+
+export const defaultDependencySettings: DependencySettings = Object.freeze({
+  showNonBehavioral: false, depthMode: 'level', showOutsideScope: true,
+  showOwnSourceNode: false,
+});
+```
+
+### The scope
+
+```ts
+/** A drawn node: a module ID, or an own-source node ID. */
+export type ScopeNodeId = string;
+
+export interface DependencyScope {
+  readonly frameModule: ModuleId | null;
+  readonly nodes: readonly ModuleId[];
+  readonly depth: number;
+  /** The scope module whose own source is drawn as a node; null when it is folded. */
+  readonly ownSourceNode: ModuleId | null;
+}
+
+export function dependencyScope(model: ProjectExplorerModel, scopeModuleId: ModuleId | null,
+  showOwnSourceNode?: boolean): DependencyScope;
+
+/** The drawn node's ID, `own-source/1:<module ID>`; never equal to a module ID. */
+export function ownSourceNodeId(module: ModuleId): ScopeNodeId;
+
+/** The module of an own-source node ID, or null for any other node ID. */
+export function ownSourceNodeModule(nodeId: ScopeNodeId): ModuleId | null;
+```
+
+`ownSourceNode` is `scopeModuleId` when the model contains that module and
+`showOwnSourceNode` is true, and null otherwise. It is null at the project
+scope even where `frameModule` is the root module, because only a drilled-in
+scope renders the control. `frameModule`, `nodes` and `depth` keep their C8
+meaning: the own-source node is not a child of the scope, the class filter does
+not select it, and it is drawn whenever `ownSourceNode` is not null. Omitting
+the third argument keeps C8's folded scope.
+
+### The changed clause
+
+`ScopeEnd` gains one variant, and C8's clause 2 is the only clause that changes:
+
+```ts
+export type ScopeEnd =
+  | { readonly kind: 'node'; readonly module: ModuleId; readonly inScope: boolean }
+  | { readonly kind: 'own-source'; readonly module: ModuleId }
+  | { readonly kind: 'frame' };
+```
+
+In `level` mode an end equal to `scope.frameModule` is
+`{ kind: 'own-source', module }` when `scope.ownSourceNode` is not null, and
+`{ kind: 'frame' }` otherwise. An own-source end is always in scope. Clauses 1
+and 3 are untouched, and no other end can reach the own-source node: a module
+in the frame's subtree is either the frame itself or a descendant of one of the
+frame's children, so clause 3's ancestor at depth `scope.depth - 1` is never
+the frame module. In `exact` mode `scopeEnd` returns before clause 2, so the
+setting changes no end there.
+
+### Link identity, counts and status
+
+The node ID of an end is `ownSourceNodeId(end.module)` for an own-source end and
+`end.module` for a node end, and `scopeDependencyLinks` groups by the ordered
+pair of node IDs exactly as C8 does. Its clauses read:
+
+- clause 2 drops an edge with a frame end, which now happens only while the
+  control is off;
+- clause 3 compares node IDs, so an own-source end never equals a module end;
+  with C2 serializing no self-loop, no edge is internal to the own-source node;
+- clause 4 treats the own-source node as displayed whenever it is drawn, so an
+  edge with an own-source end is never dropped for want of a displayed end;
+- clause 6 is unchanged: the contributing edges' exact consumer is the frame
+  module itself, so an own-source link's pairs are
+  `(frame module, original identity)` pairs, counted and settled behavioral
+  exactly as for any other link, never summed;
+- clauses 7, 8 and 10 are unchanged, and the own-source node ID takes part in
+  the same ordering by consumer then provider;
+- clause 9 is unchanged: an own-source end is in scope, so a link between it and
+  a child never leaves the scope, while a link between it and an out-of-scope
+  end does and `showOutsideScope` hides it with the other leaving links.
+
+`ActiveDependencyEdge.consumer` and `provider` are `ScopeNodeId`, so a
+rolled-up link ID carries the own-source node ID:
+
+```text
+scoped-link/1:level:<scope module ID>:<JSON(["own-source/1:<module>", child])>
+```
+
+Turning the control on or off changes no other link's ID, because folding only
+ever dropped edges with a frame end. `scopeLinkCounts`,
+`subtreeDependencyCounts`, `edgeStatus`, `linkWidth` and the colour encoding are
+unchanged; `subtreeDependencyCounts` is never called with an own-source node ID.
+
+### Drawn node
+
+The graph receives the own-source node beside the displayed modules:
+
+```ts
+readonly ownSourceNode: { readonly id: ScopeNodeId; readonly module: ExplorerModule } | null;
+```
+
+- Its accessible name and label are `<module name> · own source`, for
+  example `analysis · own source`, and it carries
+  `data-own-source="<module ID>"` so a test selects it by identity.
+- It is a rounded square rather than a circle, in the frame module's tag-class
+  colour, and shows no sub-module count.
+- `nodeDiameters` keeps taking the displayed child modules only, so no module
+  node resizes when the control is toggled. The own-source node's diameter uses
+  that same scale over the frame module's owned source-file count, clamped to
+  the existing minimum and maximum.
+- It is not a drill-down target: activating it selects it and `onDrillDown` is
+  not invoked, because drilling into the frame module is the current scope.
+- Out-of-view nodes are still the mapped ends that are not displayed nodes; the
+  own-source node ID is never one of them, and `ownSourceNodeModule` keeps it
+  out of the module lookups.
+
+### Selection
+
+The page's selection state stays authoritative and its reconciliation keeps
+C9's shape:
+
+- A selected own-source node survives while that node is drawn: the view counts
+  it as displayed, so the C9 module effect does not clear it at once. The view
+  reports `onSelectModule(null)` when `showOwnSourceNode` is switched off, when
+  the scope changes and when the depth mode becomes `exact`.
+- A selected link whose ID names the own-source node leaves the drawn set under
+  those same three changes, so C9's existing effect reports
+  `onSelectEdge(null)`. No new mechanism is added.
+- A selected child-to-child link and a selected module node survive the toggle,
+  because their IDs do not change with it.
+- Reconciliation still requests no data and changes no scope, and no control
+  change reaches the dependency hook.
+
+### Panel
+
+Selecting the own-source node shows the scope module's own source at that scope:
+
+- a header of `<module name> · own source`, the module's directory and the
+  statement that the node is that module's own source, not its subtree;
+- `Uses` and `Owned originals used by others`, each `At this level` against
+  `Excluding internals`. `At this level` is `scopeLinkCounts` over the scope's
+  links with the own-source node as consumer, and as provider.
+  `Excluding internals` is the scope module's own C5 row, the measured totals of
+  its own source, and changes with no scope, control or filter;
+- `Used through this module` with its imported unit, `Excluding internals` only,
+  in a disclosure, as the module panel has it;
+- `Links displayed` for that node, its owned source-file count and the coverage
+  notes naming the module;
+- a hint that the module's `Including internals` numbers appear on its own node
+  in the enclosing scope.
+
+`Excluding internals` names the module's own source across the whole project,
+against `Including internals`, which adds its descendants. The project panel's
+`Scope's own source` section keeps its measured rows in this scope and states
+that the own source is drawn as its own node, and `Not drawn at this level`
+remains the component-wise difference, whose explanation then names only the
+internal and the outside causes.

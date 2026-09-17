@@ -49,6 +49,12 @@
       "index": 8,
       "parallelGroup": null,
       "title": "Scope-aware roll-up of dependency links"
+    },
+    {
+      "file": "iteration9.md",
+      "index": 9,
+      "parallelGroup": null,
+      "title": "An optional node for the scope module's own source"
     }
   ],
   "planPath": "main-plan.md"
