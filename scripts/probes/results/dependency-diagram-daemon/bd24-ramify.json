@@ -1,0 +1,100 @@
+{
+  "schemaVersion": "ramify.bd24/1",
+  "project": "ramify (copy of tracked toolkit inputs)",
+  "revision": "rev/1:9ac42335-3341-467e-ac60-2a3752b9b9ff:1",
+  "inputId": "input/1:e63f8a96b9270a523c52b480f3d3eaed632b597bcadf9b75fb9a94c7e3a34d7f",
+  "elapsedMs": 6633,
+  "diagramBytes": 326735,
+  "headline": {
+    "behavioralDependencies": 70,
+    "nonBehavioralDependencies": 359
+  },
+  "boundaries": 479,
+  "modules": 15,
+  "coverage": {
+    "state": "complete",
+    "unknownDependencies": 0,
+    "limitIds": []
+  },
+  "jobStillRunningAfterWatchAndHook": true,
+  "counters": {
+    "afterReady": {
+      "revisions": 1,
+      "analyses": 3,
+      "cancelledAnalyses": 0,
+      "reusedRevisions": 2,
+      "coalescedEvents": 0,
+      "evictions": 0,
+      "rejectedRequests": 0,
+      "disconnectedSlowConsumers": 0,
+      "sweeps": 1,
+      "audits": 0,
+      "auditMismatches": 0,
+      "coveredRequests": 1,
+      "coldOutcomes": 0,
+      "deadlineOutcomes": 0,
+      "behaviorRuns": 1,
+      "dependencyDiagrams": 1,
+      "dependencyDiagramInputChanges": 0
+    },
+    "afterEdit": {
+      "revisions": 2,
+      "analyses": 5,
+      "cancelledAnalyses": 0,
+      "reusedRevisions": 2,
+      "coalescedEvents": 0,
+      "evictions": 0,
+      "rejectedRequests": 0,
+      "disconnectedSlowConsumers": 0,
+      "sweeps": 1,
+      "audits": 0,
+      "auditMismatches": 0,
+      "coveredRequests": 1,
+      "coldOutcomes": 0,
+      "deadlineOutcomes": 0,
+      "behaviorRuns": 1,
+      "dependencyDiagrams": 1,
+      "dependencyDiagramInputChanges": 0
+    }
+  },
+  "retainedBytes": {
+    "withDiagram": 20134474,
+    "sessionFactBytes": 19807739,
+    "afterEdit": 39615478
+  },
+  "processes": {
+    "daemon": 96271,
+    "analyzer": 96340,
+    "analyzerTree": [
+      96340,
+      96351,
+      96364,
+      96378,
+      96385
+    ],
+    "residentTree": [
+      96271,
+      96282,
+      96289,
+      96296,
+      96308,
+      96315,
+      96322,
+      96414
+    ]
+  },
+  "loads": {
+    "daemonAnalyzer": 0,
+    "residentAnalyzer": 0,
+    "residentClassifier": 0,
+    "residentHelperSpawns": 0,
+    "otherTracedClassifier": 0,
+    "otherTracedProcesses": 6,
+    "analyzerClassifier": 1,
+    "analyzerHelperSpawns": 1
+  },
+  "hooks": {
+    "duringJob": 0,
+    "afterEdit": 0
+  }
+}
