@@ -216,6 +216,22 @@ describe('lean dependency analyzer', () => {
     }
   }, timeout);
 
+  it('accepts a report whose invocation found or named the same root from another directory (BD16)', async () => {
+    // A resident context publishes reports for invocations from other working directories; the root
+    // selection is not an input, so it never reports inputs-changed.
+    await withProject(forwarding, async (root, request) => {
+      const expected = ready(await analyzeDependencyDiagram({ project: request, report: await batch(request, checkCapabilities), limits: analyzerLimits }));
+      for (const invocation of [{ ...request, cwd: join(root, 'subs/b') }, { cwd: join(root, 'subs/b/src'), scope: 'whole-project', configuration: 'discover' }] as const) {
+        const report = await batch(invocation, checkCapabilities);
+        expect(report.snapshot!.inventory.scope.invokedFrom).not.toBe(root);
+        const outcome = ready(await analyzeDependencyDiagram({ project: request, report, limits: analyzerLimits }));
+        // The report's input ID covers its invocation's scope; the classified facts are equal.
+        expect(outcome.diagram.inputId).toBe(report.inputId);
+        expect({ ...outcome.diagram, inputId: expected.diagram.inputId }).toEqual(expected.diagram);
+      }
+    });
+  }, timeout);
+
   it('refuses an incomplete report, an oversized diagram and a cancelled run without starting work (BD17)', async () => {
     await withProject(forwarding, async (_root, request) => {
       const report = await batch(request, checkCapabilities);

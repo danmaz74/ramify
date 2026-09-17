@@ -33,12 +33,21 @@ function differingInputs(captured: readonly CapturedInput[], recorded: readonly 
     && item.sha256 === input.sha256 && item.bytes === input.bytes)).map(input => input.path));
 }
 
+/**
+ * The inventory without the invocation's root selection. One context serves invocations from other
+ * working directories that name or find the same root, and its published report can record another
+ * invocation than the request the analyzer acquires with; neither field is a project input.
+ */
+function inputInventory(inventory: ProjectInventory): ProjectInventory {
+  return { ...inventory, scope: { ...inventory.scope, selection: 'given', invokedFrom: '' } };
+}
+
 /** Owned files and module descriptions that differ between two inventories, and the root when their scopes differ. */
 function inventoryPaths(current: ProjectInventory, recorded: ProjectInventory): string[] {
   const files = (inventory: ProjectInventory) => new Map(inventory.files.map(file => [file.path, JSON.stringify(file)]));
   const modules = (inventory: ProjectInventory) => new Map(inventory.modules.map(module => [module.description.status === 'valid'
     ? module.description.document.file : `${module.directory ? `${module.directory}/` : ''}module.ramify`, JSON.stringify(module)]));
-  const paths: string[] = JSON.stringify(current.scope) === JSON.stringify(recorded.scope) ? [] : ['.'];
+  const paths: string[] = JSON.stringify(inputInventory(current).scope) === JSON.stringify(inputInventory(recorded).scope) ? [] : ['.'];
   for (const [left, right] of [[files(current), files(recorded)], [modules(current), modules(recorded)]]) {
     for (const path of new Set([...left!.keys(), ...right!.keys()])) if (left!.get(path) !== right!.get(path)) paths.push(path);
   }
@@ -110,7 +119,7 @@ export async function analyzeDependencyDiagram(input: DependencyAnalyzerInput, c
     }
     view = acquired.view;
     const areas = areasOf(report, view.inventory);
-    if (!areas || JSON.stringify(view.inventory) !== JSON.stringify(report.snapshot.inventory)
+    if (!areas || JSON.stringify(inputInventory(view.inventory)) !== JSON.stringify(inputInventory(report.snapshot.inventory))
       || JSON.stringify(areas) !== JSON.stringify(report.snapshot.areas)) {
       const paths = sorted([...differingInputs(view.inputs, report.snapshot.inputs), ...inventoryPaths(view.inventory, report.snapshot.inventory)]);
       throw new InputsChanged(paths.length ? paths : ['.']);
