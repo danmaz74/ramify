@@ -143,7 +143,7 @@ const toolkit: readonly Fixture[] = [
   { path: 'subs/analysis/subs/project/', name: 'project', tags: [], statements: [src(['readProject'], 'read-project.ts'), src('*', 'interfaces/project.ts'), src(['resolveProjectRoot'], 'resolve-root.ts'), src(['observeProject'], 'observer.ts'), src(['isRamifyGeneratedPath'], 'generated-path.ts')] },
   { path: 'subs/analysis/subs/typescript/', name: 'typescript', tags: [], statements: [src(['createSourceAnalysis'], 'source-analysis.ts'), src('*', 'interfaces/source.ts'), src(['createAccessInterpreter'], 'access-interpreter.ts'),
       src(['describeFiles', 'assembleCatalog'], 'descriptions.ts'), src(['createRetainedSourceAnalysis'], 'retained-source-analysis.ts'),
-      src(['describeSymbolDetails'], 'symbol-details.ts')] },
+      src(['describeSymbolDetails'], 'symbol-details.ts'), src('*', 'interfaces/dependency-behavior.ts')] },
   { path: 'subs/cli/', name: 'cli', tags: ['dispatch'], statements: [src(['runCli'], 'run-cli.ts'), src('*', 'interfaces/cli.ts'),
     src(['capabilities'], 'command-support.ts')] },
   { path: 'subs/daemon/', name: 'daemon', tags: ['dispatch'], statements: [
