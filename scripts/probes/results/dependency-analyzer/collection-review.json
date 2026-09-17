@@ -1,0 +1,252 @@
+{
+ "schemaVersion": "ramify.dependency-analyzer-measurement/1",
+ "repository": {
+  "commit": "9195d9e904d0a37309feb99d37a60e1503e836f4",
+  "clean": true
+ },
+ "project": "examples/collection-review",
+ "inputId": "input/1:7e21fb92685210b6b8a8e61f241637bdb91c0549353da4821987bdd41515d6cf",
+ "environment": {
+  "node": "v22.23.2",
+  "platform": "linux",
+  "release": "6.8.0-85-generic",
+  "cpu": "Intel(R) Xeon(R) E-2176G CPU @ 3.70GHz",
+  "parallelism": 12,
+  "totalMemoryBytes": 67274752000,
+  "sampleIntervalMs": 25
+ },
+ "headline": {
+  "behavioralDependencies": 17,
+  "nonBehavioralDependencies": 48
+ },
+ "coverage": {
+  "state": "complete",
+  "unknownDependencies": 0,
+  "limitIds": []
+ },
+ "boundaries": 65,
+ "modules": 15,
+ "baselineEquality": [
+  {
+   "artifact": "scripts/probes/results/modularity/plan6d-reference.json",
+   "equal": true
+  }
+ ],
+ "median": {
+  "batch": {
+   "wallMs": 3218,
+   "peakCombinedRssBytes": 449040384,
+   "peakProcessRssBytes": 154869760,
+   "peakHelperRssBytes": 151838720,
+   "peakNativeRssBytes": 177602560
+  },
+  "analyzer": {
+   "wallMs": 2779,
+   "peakCombinedRssBytes": 405278720,
+   "peakProcessRssBytes": 136843264,
+   "peakHelperRssBytes": 125542400,
+   "peakNativeRssBytes": 160301056,
+   "acquireMs": 499,
+   "classifyMs": 2191,
+   "projectMs": 5,
+   "totalMs": 2698
+  }
+ },
+ "runs": [
+  {
+   "run": 1,
+   "batch": {
+    "wallMs": 3344,
+    "peakCombinedRssBytes": 453951488,
+    "peakRssBytes": {
+     "process": 151359488,
+     "configurationHelper": 63328256,
+     "compilerHelper": 154787840,
+     "nativeCompiler": 179306496
+    },
+    "processes": 5,
+    "samples": 56,
+    "reportBytes": 1750891
+   },
+   "analyzer": {
+    "wallMs": 2778,
+    "peakCombinedRssBytes": 409788416,
+    "peakRssBytes": {
+     "process": 141561856,
+     "configurationHelper": 63180800,
+     "compilerHelper": 122408960,
+     "nativeCompiler": 161218560
+    },
+    "processes": 5,
+    "samples": 47,
+    "requestBytes": 1641287,
+    "responseBytes": 47979,
+    "diagramBytes": 47812,
+    "behaviorRuns": 1,
+    "timings": {
+     "acquireMs": 499,
+     "classifyMs": 2191,
+     "projectMs": 5,
+     "totalMs": 2696
+    }
+   },
+   "equalsBatchDiagram": true
+  },
+  {
+   "run": 2,
+   "batch": {
+    "wallMs": 3218,
+    "peakCombinedRssBytes": 441270272,
+    "peakRssBytes": {
+     "process": 154169344,
+     "configurationHelper": 62263296,
+     "compilerHelper": 151838720,
+     "nativeCompiler": 178520064
+    },
+    "processes": 5,
+    "samples": 54,
+    "reportBytes": 1750891
+   },
+   "analyzer": {
+    "wallMs": 2800,
+    "peakCombinedRssBytes": 405278720,
+    "peakRssBytes": {
+     "process": 130490368,
+     "configurationHelper": 63152128,
+     "compilerHelper": 125542400,
+     "nativeCompiler": 159907840
+    },
+    "processes": 5,
+    "samples": 47,
+    "requestBytes": 1641287,
+    "responseBytes": 47978,
+    "diagramBytes": 47812,
+    "behaviorRuns": 1,
+    "timings": {
+     "acquireMs": 501,
+     "classifyMs": 2210,
+     "projectMs": 5,
+     "totalMs": 2717
+    }
+   },
+   "equalsBatchDiagram": true
+  },
+  {
+   "run": 3,
+   "batch": {
+    "wallMs": 3180,
+    "peakCombinedRssBytes": 445636608,
+    "peakRssBytes": {
+     "process": 155680768,
+     "configurationHelper": 59490304,
+     "compilerHelper": 149602304,
+     "nativeCompiler": 176685056
+    },
+    "processes": 5,
+    "samples": 54,
+    "reportBytes": 1750891
+   },
+   "analyzer": {
+    "wallMs": 2779,
+    "peakCombinedRssBytes": 396394496,
+    "peakRssBytes": {
+     "process": 138489856,
+     "configurationHelper": 63131648,
+     "compilerHelper": 126173184,
+     "nativeCompiler": 154664960
+    },
+    "processes": 5,
+    "samples": 47,
+    "requestBytes": 1641287,
+    "responseBytes": 47986,
+    "diagramBytes": 47812,
+    "behaviorRuns": 1,
+    "timings": {
+     "acquireMs": 510,
+     "classifyMs": 2182,
+     "projectMs": 5,
+     "totalMs": 2698
+    }
+   },
+   "equalsBatchDiagram": true
+  },
+  {
+   "run": 4,
+   "batch": {
+    "wallMs": 3151,
+    "peakCombinedRssBytes": 454758400,
+    "peakRssBytes": {
+     "process": 155615232,
+     "configurationHelper": 61091840,
+     "compilerHelper": 156651520,
+     "nativeCompiler": 176553984
+    },
+    "processes": 4,
+    "samples": 53,
+    "reportBytes": 1750891
+   },
+   "analyzer": {
+    "wallMs": 2780,
+    "peakCombinedRssBytes": 405630976,
+    "peakRssBytes": {
+     "process": 136843264,
+     "configurationHelper": 62865408,
+     "compilerHelper": 127922176,
+     "nativeCompiler": 160301056
+    },
+    "processes": 5,
+    "samples": 47,
+    "requestBytes": 1641287,
+    "responseBytes": 47978,
+    "diagramBytes": 47812,
+    "behaviorRuns": 1,
+    "timings": {
+     "acquireMs": 489,
+     "classifyMs": 2204,
+     "projectMs": 5,
+     "totalMs": 2699
+    }
+   },
+   "equalsBatchDiagram": true
+  },
+  {
+   "run": 5,
+   "batch": {
+    "wallMs": 3355,
+    "peakCombinedRssBytes": 449040384,
+    "peakRssBytes": {
+     "process": 154869760,
+     "configurationHelper": 61349888,
+     "compilerHelper": 150011904,
+     "nativeCompiler": 177602560
+    },
+    "processes": 4,
+    "samples": 55,
+    "reportBytes": 1750891
+   },
+   "analyzer": {
+    "wallMs": 2732,
+    "peakCombinedRssBytes": 403529728,
+    "peakRssBytes": {
+     "process": 131358720,
+     "configurationHelper": 63025152,
+     "compilerHelper": 123891712,
+     "nativeCompiler": 160956416
+    },
+    "processes": 5,
+    "samples": 46,
+    "requestBytes": 1641287,
+    "responseBytes": 47985,
+    "diagramBytes": 47812,
+    "behaviorRuns": 1,
+    "timings": {
+     "acquireMs": 486,
+     "classifyMs": 2159,
+     "projectMs": 6,
+     "totalMs": 2651
+    }
+   },
+   "equalsBatchDiagram": true
+  }
+ ]
+}
