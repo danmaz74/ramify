@@ -1,0 +1,139 @@
+{
+  "id": "B1-projection-child",
+  "modules": [
+    {
+      "id": "ramify",
+      "name": "ramify",
+      "parent": null,
+      "headerTags": [
+        "dispatch"
+      ]
+    },
+    {
+      "id": "ramify/analysis",
+      "name": "analysis",
+      "parent": "ramify",
+      "headerTags": []
+    },
+    {
+      "id": "ramify/analysis/descriptions",
+      "name": "descriptions",
+      "parent": "ramify/analysis",
+      "headerTags": [
+        "browser"
+      ]
+    },
+    {
+      "id": "ramify/analysis/model",
+      "name": "model",
+      "parent": "ramify/analysis",
+      "headerTags": [
+        "browser"
+      ]
+    },
+    {
+      "id": "ramify/analysis/project",
+      "name": "project",
+      "parent": "ramify/analysis",
+      "headerTags": []
+    },
+    {
+      "id": "ramify/analysis/typescript",
+      "name": "typescript",
+      "parent": "ramify/analysis",
+      "headerTags": []
+    },
+    {
+      "id": "ramify/cli",
+      "name": "cli",
+      "parent": "ramify",
+      "headerTags": [
+        "dispatch"
+      ]
+    },
+    {
+      "id": "ramify/daemon",
+      "name": "daemon",
+      "parent": "ramify",
+      "headerTags": [
+        "dispatch"
+      ]
+    },
+    {
+      "id": "ramify/daemon/contexts",
+      "name": "contexts",
+      "parent": "ramify/daemon",
+      "headerTags": []
+    },
+    {
+      "id": "ramify/explorer",
+      "name": "explorer",
+      "parent": "ramify",
+      "headerTags": [
+        "browser",
+        "dispatch",
+        "ui"
+      ]
+    },
+    {
+      "id": "ramify/integration-tests",
+      "name": "integration-tests",
+      "parent": "ramify",
+      "headerTags": [
+        "dispatch",
+        "testing",
+        "ui"
+      ]
+    },
+    {
+      "id": "ramify/presentation",
+      "name": "presentation",
+      "parent": "ramify",
+      "headerTags": [
+        "browser",
+        "ui"
+      ]
+    },
+    {
+      "id": "ramify/presentation/layout",
+      "name": "layout",
+      "parent": "ramify/presentation",
+      "headerTags": [
+        "browser"
+      ]
+    },
+    {
+      "id": "ramify/presentation/project-view",
+      "name": "project-view",
+      "parent": "ramify/presentation",
+      "headerTags": [
+        "browser",
+        "ui"
+      ]
+    },
+    {
+      "id": "ramify/service-api",
+      "name": "service-api",
+      "parent": "ramify",
+      "headerTags": [
+        "dispatch"
+      ]
+    },
+    {
+      "id": "ramify/service-api/projection",
+      "name": "projection",
+      "parent": "ramify/service-api",
+      "headerTags": []
+    }
+  ],
+  "files": [
+    {
+      "path": "subs/service-api/src/project-view.ts",
+      "owner": "ramify/service-api/projection"
+    },
+    {
+      "path": "subs/service-api/src/tests/project-view.test.ts",
+      "owner": "ramify/service-api/projection"
+    }
+  ]
+}

@@ -1,0 +1,247 @@
+{
+  "id": "A2-retained-session-15",
+  "modules": [
+    {
+      "id": "ramify",
+      "name": "ramify",
+      "parent": null,
+      "headerTags": [
+        "dispatch"
+      ]
+    },
+    {
+      "id": "ramify/analysis",
+      "name": "analysis",
+      "parent": "ramify",
+      "headerTags": []
+    },
+    {
+      "id": "ramify/analysis/descriptions",
+      "name": "descriptions",
+      "parent": "ramify/analysis",
+      "headerTags": [
+        "browser"
+      ]
+    },
+    {
+      "id": "ramify/analysis/model",
+      "name": "model",
+      "parent": "ramify/analysis",
+      "headerTags": [
+        "browser"
+      ]
+    },
+    {
+      "id": "ramify/analysis/project",
+      "name": "project",
+      "parent": "ramify/analysis",
+      "headerTags": []
+    },
+    {
+      "id": "ramify/analysis/retained-session",
+      "name": "retained-session",
+      "parent": "ramify/analysis",
+      "headerTags": []
+    },
+    {
+      "id": "ramify/analysis/typescript",
+      "name": "typescript",
+      "parent": "ramify/analysis",
+      "headerTags": []
+    },
+    {
+      "id": "ramify/cli",
+      "name": "cli",
+      "parent": "ramify",
+      "headerTags": [
+        "dispatch"
+      ]
+    },
+    {
+      "id": "ramify/daemon",
+      "name": "daemon",
+      "parent": "ramify",
+      "headerTags": [
+        "dispatch"
+      ]
+    },
+    {
+      "id": "ramify/daemon/contexts",
+      "name": "contexts",
+      "parent": "ramify/daemon",
+      "headerTags": []
+    },
+    {
+      "id": "ramify/explorer",
+      "name": "explorer",
+      "parent": "ramify",
+      "headerTags": [
+        "browser",
+        "dispatch",
+        "ui"
+      ]
+    },
+    {
+      "id": "ramify/integration-tests",
+      "name": "integration-tests",
+      "parent": "ramify",
+      "headerTags": [
+        "dispatch",
+        "testing",
+        "ui"
+      ]
+    },
+    {
+      "id": "ramify/presentation",
+      "name": "presentation",
+      "parent": "ramify",
+      "headerTags": [
+        "browser",
+        "ui"
+      ]
+    },
+    {
+      "id": "ramify/presentation/layout",
+      "name": "layout",
+      "parent": "ramify/presentation",
+      "headerTags": [
+        "browser"
+      ]
+    },
+    {
+      "id": "ramify/presentation/project-view",
+      "name": "project-view",
+      "parent": "ramify/presentation",
+      "headerTags": [
+        "browser",
+        "ui"
+      ]
+    },
+    {
+      "id": "ramify/service-api",
+      "name": "service-api",
+      "parent": "ramify",
+      "headerTags": [
+        "dispatch"
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "subs/analysis/src/api-view.ts",
+      "owner": "ramify/analysis/retained-session"
+    },
+    {
+      "path": "subs/analysis/src/interfaces/session.ts",
+      "owner": "ramify/analysis/retained-session"
+    },
+    {
+      "path": "subs/analysis/src/retained-session.ts",
+      "owner": "ramify/analysis/retained-session"
+    },
+    {
+      "path": "subs/analysis/src/session-audit.ts",
+      "owner": "ramify/analysis/retained-session"
+    },
+    {
+      "path": "subs/analysis/src/session-engine.ts",
+      "owner": "ramify/analysis/retained-session"
+    },
+    {
+      "path": "subs/analysis/src/session-facts.ts",
+      "owner": "ramify/analysis/retained-session"
+    },
+    {
+      "path": "subs/analysis/src/session-host.ts",
+      "owner": "ramify/analysis/retained-session"
+    },
+    {
+      "path": "subs/analysis/src/session-messages.ts",
+      "owner": "ramify/analysis/retained-session"
+    },
+    {
+      "path": "subs/analysis/src/session-processes.ts",
+      "owner": "ramify/analysis/retained-session"
+    },
+    {
+      "path": "subs/analysis/src/session-revision.ts",
+      "owner": "ramify/analysis/retained-session"
+    },
+    {
+      "path": "subs/analysis/src/session-source-loader.ts",
+      "owner": "ramify/analysis/retained-session"
+    },
+    {
+      "path": "subs/analysis/src/session-supervisor-entry.ts",
+      "owner": "ramify/analysis/retained-session"
+    },
+    {
+      "path": "subs/analysis/src/session-supervisor-messages.ts",
+      "owner": "ramify/analysis/retained-session"
+    },
+    {
+      "path": "subs/analysis/src/session-supervisor.ts",
+      "owner": "ramify/analysis/retained-session"
+    },
+    {
+      "path": "subs/analysis/src/session-worker.ts",
+      "owner": "ramify/analysis/retained-session"
+    },
+    {
+      "path": "subs/analysis/src/tests/api-view-session.test.ts",
+      "owner": "ramify/analysis/retained-session"
+    },
+    {
+      "path": "subs/analysis/src/tests/api-view.test.ts",
+      "owner": "ramify/analysis/retained-session"
+    },
+    {
+      "path": "subs/analysis/src/tests/explorer-details.test.ts",
+      "owner": "ramify/analysis/retained-session"
+    },
+    {
+      "path": "subs/analysis/src/tests/membership-differential.test.ts",
+      "owner": "ramify/analysis/retained-session"
+    },
+    {
+      "path": "subs/analysis/src/tests/report-publication.test.ts",
+      "owner": "ramify/analysis/retained-session"
+    },
+    {
+      "path": "subs/analysis/src/tests/retained-session.test.ts",
+      "owner": "ramify/analysis/retained-session"
+    },
+    {
+      "path": "subs/analysis/src/tests/root-resolution.test.ts",
+      "owner": "ramify/analysis/retained-session"
+    },
+    {
+      "path": "subs/analysis/src/tests/rss-sampling.test.ts",
+      "owner": "ramify/analysis/retained-session"
+    },
+    {
+      "path": "subs/analysis/src/tests/session-audit.test.ts",
+      "owner": "ramify/analysis/retained-session"
+    },
+    {
+      "path": "subs/analysis/src/tests/session-input-witness.ts",
+      "owner": "ramify/analysis/retained-session"
+    },
+    {
+      "path": "subs/analysis/src/tests/session-revision.test.ts",
+      "owner": "ramify/analysis/retained-session"
+    },
+    {
+      "path": "subs/analysis/src/tests/session-test-fixture.ts",
+      "owner": "ramify/analysis/retained-session"
+    },
+    {
+      "path": "subs/analysis/src/tests/session-worker-fixture.ts",
+      "owner": "ramify/analysis/retained-session"
+    },
+    {
+      "path": "subs/analysis/src/tests/session-worker.test.ts",
+      "owner": "ramify/analysis/retained-session"
+    }
+  ]
+}
