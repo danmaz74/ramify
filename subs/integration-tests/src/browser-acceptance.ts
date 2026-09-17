@@ -579,6 +579,14 @@ async function labelledCards(scope: ReturnType<Page['locator']>, label: string):
   return headlineCards(scope.locator(`.module-arch__card-pair[aria-label="${label}"]`).first());
 }
 
+/** Opens a `<details>` panel section, so its content reaches the accessibility tree. */
+async function openDisclosure(page: Page, summary: string): Promise<void> {
+  const details = page.locator('.module-arch__sidebar details.module-arch__alternate-role')
+    .filter({ has: page.locator('summary', { hasText: summary }) }).first();
+  if (await details.count() === 0) return;
+  if (!await details.evaluate(node => (node as HTMLDetailsElement).open)) await details.locator('summary').click();
+}
+
 async function expandSection(page: Page, title: string): Promise<void> {
   const header = page.locator('.module-arch__sidebar .module-arch__collapsible-header').filter({ hasText: title }).first();
   if (await header.getAttribute('aria-expanded') !== 'true') await header.click();
@@ -816,6 +824,7 @@ async function exerciseReference(page: Page, model: ProjectExplorerModel, deps: 
     { ...atLevel(link => link.provider === module.id), note: 'shown' });
   assert.deepEqual(await labelledCards(ownedRegion, 'Including internals'),
     { ...subtree.ownedUsedByOthers, note: 'shown' });
+  await openDisclosure(page, 'Used through this module');
   const throughRegion = sidebar.getByRole('region', { name: 'Used through this module' });
   assert.deepEqual(await labelledCards(throughRegion, 'Including internals'),
     { behavioral: subtree.usedThrough.behavioralUsedOriginals,
@@ -847,6 +856,7 @@ async function exerciseReference(page: Page, model: ProjectExplorerModel, deps: 
   }));
   const importedThrough = new Set(rolled.sources.flatMap(id =>
     deps.originalOwnerEdges.find(item => item.id === id)!.importedThrough.map(item => item.module)));
+  await openDisclosure(page, 'Imported through');
   assert.equal(await sidebar.getByRole('region', { name: 'Imported through' }).locator('li').count(), importedThrough.size);
   await expandSection(page, 'Referenced originals');
   const rolledOriginals = await sidebar.locator('.module-arch__evidence-item').count();
@@ -895,25 +905,33 @@ async function exerciseReference(page: Page, model: ProjectExplorerModel, deps: 
   const transformPan = await viewport.getAttribute('style');
   assert.notEqual(transformPan, transformZoom, 'Pan did not change the viewport transform');
 
-  // The class filter changes the displayed nodes without changing how an end maps.
-  const filterItems = page.locator('.module-arch__filters[aria-label="Presentation class filters"] .module-arch__filter-item');
-  const checkedStates = await filterItems.locator('input').evaluateAll(inputs =>
-    inputs.map(input => (input as HTMLInputElement).checked && !(input as HTMLInputElement).disabled));
-  const filterIndex = checkedStates.indexOf(true);
-  assert.ok(filterIndex >= 0, 'No enabled checked class filter');
-  const hiddenClass = (await filterItems.nth(filterIndex).locator('.module-arch__filter-label').textContent()) ?? '';
-  const checked = filterItems.nth(filterIndex).locator('input');
+  // The class filter changes the displayed nodes without changing how an end maps: a
+  // filtered-out child keeps receiving its subtree's ends and becomes a related node.
+  const children = model.modules.filter(item => scopeChildren.includes(item.id));
+  const classes = [...new Set(children.map(item => item.presentationClass))].sort();
+  assert.ok(classes.length > 1, `The drilled-in scope has one tag class: ${JSON.stringify(classes)}`);
+  const hiddenClass = classes[0]!;
+  const stillDisplayed = children.filter(item => item.presentationClass !== hiddenClass).map(item => item.id);
+  const hiddenChildren = children.filter(item => item.presentationClass === hiddenClass).map(item => item.id);
+  assert.ok(hiddenChildren.length > 0 && stillDisplayed.length > 0);
+  const checked = page.locator(
+    `.module-arch__filters[aria-label="Presentation class filters"] .module-arch__filter-item[data-presentation-class="${hiddenClass}"] input`);
   const beforeFilter = await page.locator('.react-flow__node').count();
   await checked.click();
-  await page.waitForTimeout(150);
+  const filteredLinks = await waitForLinks(page, expectedLinks(model, deps, scoped.id, defaultLinks, stillDisplayed),
+    'Links after the class filter');
+  const filteredOutOfView = expectedOutOfView(model, deps, scoped.id, defaultLinks, stillDisplayed);
+  assert.deepEqual(await renderedNodeIds(page), [...stillDisplayed, ...filteredOutOfView].sort());
+  const subtitle = await page.locator('.module-arch__subtitle').textContent();
+  assert.ok(subtitle?.includes(`Showing ${stillDisplayed.length} sub-modules`), subtitle ?? '');
   const afterFilter = await page.locator('.react-flow__node').count();
-  assert.ok(afterFilter < beforeFilter, `Filter did not reduce graph nodes: ${beforeFilter} -> ${afterFilter}`);
   await checked.click();
   await waitForLinks(page, expectedLinks(model, deps, scoped.id), 'Default links after the filter');
-  const scopes = [{ scope: scoped.id, children: scopeChildren.length,
+  const scopes: Record<string, unknown>[] = [{ scope: scoped.id, children: scopeChildren.length,
     links: expectedLinks(model, deps, scoped.id).length,
     outOfView: expectedOutOfView(model, deps, scoped.id), hiddenClass,
-    filter: { beforeNodes: beforeFilter, afterNodes: afterFilter } }];
+    filter: { beforeNodes: beforeFilter, afterNodes: afterFilter, hiddenChildren,
+      displayed: stillDisplayed, links: filteredLinks.length, outOfView: filteredOutOfView } }];
 
   // Back to the project scope, then into a grandchild scope: the roll-up applies at every level.
   await page.getByRole('button', { name: 'All Modules' }).click();
@@ -927,8 +945,7 @@ async function exerciseReference(page: Page, model: ProjectExplorerModel, deps: 
     assert.deepEqual(await renderedNodeIds(page),
       [...visibleAt(model, grandchild.id), ...expectedOutOfView(model, deps, grandchild.id)].sort());
     scopes.push({ scope: grandchild.id, children: visibleAt(model, grandchild.id).length, links: inner.length,
-      outOfView: expectedOutOfView(model, deps, grandchild.id), hiddenClass: '',
-      filter: { beforeNodes: 0, afterNodes: 0 } });
+      outOfView: expectedOutOfView(model, deps, grandchild.id) });
   }
   await page.getByRole('button', { name: 'All Modules' }).click();
   await waitForLinks(page, defaultIds, 'Project-scope links at the end');
@@ -1814,6 +1831,7 @@ async function runForwarding(project: { root: string }, browser: Browser): Promi
       .locator('.module-arch__breakdown-item').evaluateAll(items => items.map(item =>
         [item.getAttribute('data-consumer'), item.getAttribute('data-provider')]));
     assert.deepEqual(rolledModules, [[A, BA]]);
+    await openDisclosure(page, 'Imported through');
     const rolledThrough = await sidebar.getByRole('region', { name: 'Imported through' }).locator('li')
       .evaluateAll(items => items.map(item => item.getAttribute('data-module')));
     assert.deepEqual(rolledThrough, [B]);
@@ -1853,21 +1871,23 @@ async function runForwarding(project: { root: string }, browser: Browser): Promi
     await clickGraphNode(page, D);
     await page.locator('.module-arch__detail-name').filter({ hasText: 'd' }).waitFor();
     const dSubtree = subtreeCounts(model, deps, D);
+    await openDisclosure(page, 'Used through this module');
     assert.deepEqual(await labelledCards(sidebar.getByRole('region', { name: 'Uses' }), 'At this level'),
       { behavioral: 1, nonBehavioral: 0, note: 'not drawn' });
     assert.deepEqual(await labelledCards(sidebar.getByRole('region', { name: 'Uses' }), 'Including internals'),
       { ...dSubtree.uses, note: 'not drawn' });
     assert.equal(await metricValue(page, 'Links displayed'), '1');
 
-    // Drilled into `b`: the child's dependency on its parent's own source is folded into the frame.
+    // Drilled into `b`: `b`'s own source is folded into the frame, so no drawn link has it as an end.
     await clickGraphNode(page, B, true);
     await page.getByRole('navigation', { name: 'Module navigation' }).waitFor();
     const insideB = { ...defaultLinks, showNonBehavioral: true };
     await setShowNonBehavioral(page, true);
     const insideIds = await waitForLinks(page, expectedLinks(model, deps, B, insideB), 'Links inside b');
     const insideLinks = scopeLinks(model, deps, B, insideB);
-    assert.deepEqual(insideLinks.map(link => [link.consumer, link.provider]), [[A, BA]]);
-    assert.equal(deps.originalOwnerEdges.some(edge => edge.consumer === BA && edge.provider === B), true);
+    assert.deepEqual(insideLinks.map(link => [link.consumer, link.provider]), [[A, BA], [D, BA]]);
+    assert.equal(insideLinks.some(link => link.consumer === B || link.provider === B), false);
+    assert.equal(endOf(model, scopeOf(model, B), B, 'level').kind, 'frame');
     const bRow = deps.modules.find(row => row.id === B)!;
     const ownSource = sidebar.getByRole('region', { name: "Scope's own source" });
     assert.deepEqual(await labelledCards(ownSource, 'Uses'), { ...bRow.uses, note: 'shown' });

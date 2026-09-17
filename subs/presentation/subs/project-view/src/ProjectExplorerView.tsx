@@ -339,6 +339,7 @@ export function ProjectExplorerView({
                 <label
                   className={`module-arch__filter-item${unavailable ? ' module-arch__filter-item--disabled' : ''}`}
                   key={entry.id}
+                  data-presentation-class={entry.id}
                 >
                   <input
                     type="checkbox"
