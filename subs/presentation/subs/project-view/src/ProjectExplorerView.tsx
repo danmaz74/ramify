@@ -574,7 +574,13 @@ export function ProjectExplorerView({
     );
   }
 
+  /** A drawn node's name: a module's own name, or the own-source node's label. */
   function moduleName(id: string): string {
+    const own = ownSourceNodeModule(id);
+    if (own !== null) {
+      const module = modulesById.get(own);
+      return module ? ownSourceLabel(module) : id;
+    }
     return modulesById.get(id)?.name ?? id;
   }
 
@@ -871,9 +877,8 @@ export function ProjectExplorerView({
         </div>
         <section className="module-arch__role" aria-label="Dependencies">
           <h4 className="module-arch__role-title">
-            {rolled
-              ? `Everything under ${consumer} depends on originals owned under ${provider}`
-              : `${consumer} depends on originals owned by ${provider}`}
+            {sentence(`${linkEndPhrase(link.consumer, rolled)} depends on originals owned by `
+              + linkEndPhrase(link.provider, rolled))}
           </h4>
           {rolled
             ? cardPair('At this level', link, 'Behavioral dependencies', 'Non-behavioral dependencies')
@@ -928,6 +933,13 @@ export function ProjectExplorerView({
         {renderDiscussion({ kind: 'edge', id: link.id, edge: link }, `${consumer} -> ${provider}`, 'edge-discussion')}
       </div>
     );
+  }
+
+  /** What a link's end stands for: one module's own source, a whole subtree or one exact module. */
+  function linkEndPhrase(id: string, rolled: boolean): string {
+    const own = ownSourceNodeModule(id);
+    if (own !== null) return `${moduleName(own)}'s own source`;
+    return rolled ? `everything under ${moduleName(id)}` : moduleName(id);
   }
 
   function renderEvidence(
@@ -1121,6 +1133,11 @@ export function ProjectExplorerView({
 }
 
 export default ProjectExplorerView;
+
+/** One sentence of prose, capitalized. */
+function sentence(text: string): string {
+  return text.slice(0, 1).toUpperCase() + text.slice(1);
+}
 
 function metric(value: React.ReactNode, label: string): React.ReactElement {
   return (

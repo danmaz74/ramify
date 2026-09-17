@@ -1489,6 +1489,10 @@ describe("Plan 6D the scope module's own source as a node", () => {
     const selection: GraphSelection = { kind: 'edge', id: ownLink.id, edge: ownLink };
     rendered.rerender(<ProjectExplorerView {...base({ selectedEdge: selection })} />);
     expect(onSelectEdge).not.toHaveBeenCalled();
+    // Its panel names the node, not its raw ID.
+    expect(document.querySelector('.module-arch__detail-path')!.textContent)
+      .toContain('workspace \u00b7 own source');
+    expect(screen.getByText(/own source depends on originals owned by/)).toBeInTheDocument();
     for (const overrides of [
       { dependencySettings: settings({ showNonBehavioral: true }) },
       { scopeModuleId: child },
