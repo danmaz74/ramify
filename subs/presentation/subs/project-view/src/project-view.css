@@ -119,7 +119,7 @@
   box-sizing: border-box;
   width: 100%;
   height: 100%;
-  min-height: 640px;
+  min-height: 480px;
   padding: 20px;
   color: #0f172a;
   background: #f8fafc;
@@ -135,7 +135,7 @@
 .module-arch {
   display: flex;
   flex-direction: column;
-  min-height: 600px;
+  min-height: 440px;
   height: 100%;
   gap: 16px;
 }
@@ -270,7 +270,7 @@
 
 .module-arch__content {
   display: flex;
-  min-height: 460px;
+  min-height: 300px;
   flex: 1;
   overflow: hidden;
   border: 1px solid #e2e8f0;

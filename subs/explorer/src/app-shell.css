@@ -1,0 +1,7 @@
+/* The standalone server's pages fill the browser window; embedded views fill their container. */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}

@@ -114,6 +114,29 @@ The full Vitest suite was not run by hand; per project practice it belongs to th
 - No manual PM2 check was repeated. The server process, arguments and routes are unchanged apart from `/modules/latest`.
 - Every other deferral in the main plan remains.
 
+## Follow-up: full-height pages
+
+The standalone pages used only about 640 px of the window. The lifted CSS relied on
+`height: 100%` from a host container, and the explorer's `index.html` provided none.
+
+- `subs/explorer/src/app-shell.css`, imported by `browser-entry.tsx`, gives `html`, `body` and `#root`
+  the full height. The reusable views still fill whatever container embeds them.
+- `ProjectExplorerPage` is a column: the notice line, then the view with `flex: 1; min-height: 0`.
+- The minimum heights are lower: page 480 px, layout 440 px, content 300 px.
+- `useAutoFit` (`project-view/src/auto-fit.ts`) fits both canvases once nodes exist and again after
+  each canvas resize, until the viewer pans or zooms. Collapsing or filtering keeps the viewport.
+  A focused tree (`centerModuleId`) is not refitted.
+- Both views set `initialWidth`/`initialHeight` on their controlled nodes. Before this, the minimap
+  drew no nodes, because controlled nodes never receive their measured size.
+
+Evidence:
+
+- [Full browser run](../evidence/followup-full-height-browser-acceptance.json), which passed every workload including RS13–RS17.
+  At 1440 × 1000 the tree canvas is 878 px tall and the explorer canvas reaches the window's bottom padding.
+  After resizing to 1100 × 700, the tree refits to 578 px. No node lies outside either canvas, both minimaps draw every node,
+  and the document does not scroll.
+- `auto-fit.test.tsx` covers the first fit, the resize refit, viewer versus programmatic moves, and the disabled case.
+
 ## Handoff
 
 - `ModuleTreeView`/`ModuleTreeViewProps` with `centerModuleId`, and the helpers `indexModuleTree`, `collapsibleAtDepth` and `ancestorsOf`.

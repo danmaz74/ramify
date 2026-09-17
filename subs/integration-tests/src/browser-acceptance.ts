@@ -908,6 +908,31 @@ async function startTreeServer(isolated: Isolated, root: string): Promise<{
   } catch (error) { await stop(); throw error; }
 }
 
+/**
+ * The graph canvas fills the window below the header, and after fitting every rendered node lies
+ * inside it. Waits for the fit, which runs a frame after nodes or the canvas size change.
+ */
+async function canvasFit(page: Page, canvasSelector: string): Promise<Record<string, unknown>> {
+  const viewport = page.viewportSize()!;
+  return until(async () => {
+    const measured = await page.evaluate(selector => {
+      const canvas = document.querySelector(selector)?.getBoundingClientRect();
+      if (!canvas) return null;
+      const nodes = [...document.querySelectorAll('.react-flow__node')].map(node => node.getBoundingClientRect());
+      const outside = nodes.filter(box => box.left < canvas.left - 1 || box.right > canvas.right + 1
+        || box.top < canvas.top - 1 || box.bottom > canvas.bottom + 1).length;
+      return { canvasTop: canvas.top, canvasBottom: canvas.bottom, canvasHeight: canvas.height, canvasWidth: canvas.width, nodes: nodes.length, outside,
+        minimapNodes: document.querySelectorAll('.react-flow__minimap-node').length,
+        documentHeight: document.documentElement.scrollHeight };
+    }, canvasSelector);
+    if (!measured || measured.nodes === 0 || measured.outside > 0) return null;
+    // The canvas runs from below the header to the window's bottom page padding, without page scroll.
+    if (measured.canvasBottom < viewport.height - 40 || measured.documentHeight > viewport.height) return null;
+    return { viewport, ...measured };
+  }, 10_000, async () => `canvas ${canvasSelector} did not fill the window and fit: ${JSON.stringify(await page.evaluate(selector => ({
+    canvas: document.querySelector(selector)?.getBoundingClientRect(), documentHeight: document.documentElement.scrollHeight }), canvasSelector))}`);
+}
+
 /** Instruments the page with the time the first tree node appeared. */
 async function installTreeTiming(context: BrowserContext): Promise<void> {
   await context.addInitScript({ content: `(() => {
@@ -993,6 +1018,13 @@ async function runModuleTree(kind: 'reference' | 'toolkit' | 'mutations', projec
     if (kind === 'toolkit') {
       // MT14: collapse, select, double-click to the import explorer and back.
       assert.equal(initialNodes.length, expectedVisible);
+      // Full height: the tree fills the window, fits, and fits again after the window shrinks.
+      const treeFit = await canvasFit(page, '.module-tree__canvas');
+      assert.ok((treeFit.minimapNodes as number) > 0, JSON.stringify(treeFit));
+      await page.setViewportSize({ width: 1100, height: 700 });
+      const treeRefit = await canvasFit(page, '.module-tree__canvas');
+      await page.setViewportSize({ width: 1440, height: 1000 });
+      await canvasFit(page, '.module-tree__canvas');
       const target = model.modules.find(item => item.id.endsWith('/analysis/model'));
       const parent = target && model.modules.find(item => item.id === target.parent);
       assert.ok(target && parent && target.purpose.state === 'present', 'Toolkit has no analysis/model module with a README');
@@ -1014,6 +1046,8 @@ async function runModuleTree(kind: 'reference' | 'toolkit' | 'mutations', projec
       await explorer.locator('.module-arch__detail-name').filter({ hasText: target.name }).waitFor({ timeout: 60_000 });
       const breadcrumb = await explorer.getByRole('navigation', { name: 'Module navigation' }).innerText();
       assert.ok(breadcrumb.includes(parent.name), breadcrumb);
+      const explorerFit = await canvasFit(explorer, '.module-arch__radial-canvas');
+      assert.ok((explorerFit.minimapNodes as number) > 0, JSON.stringify(explorerFit));
       const treePromise = context.waitForEvent('page');
       await explorer.getByRole('button', { name: 'Show in module tree' }).click();
       const back = await treePromise;
@@ -1026,7 +1060,7 @@ async function runModuleTree(kind: 'reference' | 'toolkit' | 'mutations', projec
       return { kind, root: project.root, revision: model.revision, modules: model.modules.length, encodedBytes, firstRender,
         mt14: { treeUrl, initialNodes: initialNodes.length, collapsed: { parent: parent.id, label: collapsedLabel, nodes: collapsedNodes },
           selected: target.id, purpose: target.purpose.paragraph, explorerUrl: explorer.url(), breadcrumb,
-          backUrl: back.url() }, consoleErrors };
+          backUrl: back.url() }, fullHeight: { tree: treeFit, treeAfterResize: treeRefit, explorer: explorerFit }, consoleErrors };
     }
 
     if (kind === 'mutations') {

@@ -13,6 +13,7 @@ import {
   BackgroundVariant,
 } from '@xyflow/react';
 import type { EdgeProps, Node, NodeProps } from '@xyflow/react';
+import { useAutoFit } from './auto-fit.js';
 import type { ExplorerModule } from './interfaces/project-view.js';
 import ModuleGraphLegend from './ModuleGraphLegend.js';
 import {
@@ -187,6 +188,7 @@ function ChordArrowEdge({
 }
 
 const nodeTypes = { moduleCircle: ModuleCircleNodeView };
+const radialFitOptions = { padding: 0.14, minZoom: 0.35, maxZoom: 1.3 };
 const edgeTypes = { chordArrow: ChordArrowEdge };
 
 export function ModuleGraphRadial({
@@ -251,9 +253,10 @@ export function ModuleGraphRadial({
     onDrillDown,
   });
   const presentationClasses = getOrderedPresentationClasses(modules.map(getPresentationClass));
+  const autoFit = useAutoFit(allRingNodes.length, radialFitOptions);
 
   return (
-    <div className="module-arch__radial-canvas">
+    <div className="module-arch__radial-canvas" ref={autoFit.containerRef}>
       <ReactFlow
         nodes={allRingNodes}
         edges={graphEdges}
@@ -263,8 +266,10 @@ export function ModuleGraphRadial({
         onEdgeClick={interactions.onEdgeClick}
         onPaneClick={interactions.onPaneClick}
         onNodeDoubleClick={interactions.onNodeDoubleClick}
+        onInit={autoFit.onInit}
+        onMoveStart={autoFit.onMoveStart}
         fitView
-        fitViewOptions={{ padding: 0.14, minZoom: 0.35, maxZoom: 1.3 }}
+        fitViewOptions={radialFitOptions}
         proOptions={{ hideAttribution: true }}
       >
         <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="#dbe3f0" />
@@ -288,6 +293,9 @@ function moduleNode(module: ExplorerModule, slot: number, total: number, radius:
     id: module.id,
     type: 'moduleCircle',
     position: circlePosition(angle, radius, diameter),
+    // Controlled nodes never receive measurements back; the minimap needs their size.
+    initialWidth: diameter,
+    initialHeight: diameter,
     data: {
       name: module.name,
       path: module.directory,

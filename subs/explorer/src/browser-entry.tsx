@@ -1,3 +1,4 @@
+import './app-shell.css';
 import { createProjectExplorerBrowserApp, selectBrowserPage, selectInitialModule } from './browser-app.js';
 
 const container = document.getElementById('root');

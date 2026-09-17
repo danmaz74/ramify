@@ -25,6 +25,7 @@ import {
   TREE_NODE_HEIGHT,
   TREE_NODE_WIDTH,
 } from './module-tree.js';
+import { useAutoFit } from './auto-fit.js';
 import { getPresentationClassColor, getPresentationClassLabel } from './moduleTypePresentation.js';
 import './project-view.css';
 import './module-tree.css';
@@ -137,6 +138,7 @@ function TreeElbowEdge({ id, data }: EdgeProps<TreeEdge>): React.ReactElement | 
 }
 
 const nodeTypes = { moduleTreeNode: ModuleTreeNodeView };
+const treeFitOptions = { padding: 0.12, minZoom: 0.1, maxZoom: 1.2 };
 const edgeTypes = { treeElbow: TreeElbowEdge };
 
 export function ModuleTreeView({
@@ -159,7 +161,6 @@ export function ModuleTreeView({
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [sidebarWidth, setSidebarWidth] = useState(360);
   const contentRef = useRef<HTMLDivElement>(null);
-  const [flow, setFlow] = useState<ReactFlowInstance<TreeNode, TreeEdge> | null>(null);
   const centered = useRef<string | null>(null);
 
   const index = useMemo(() => indexModuleTree(data?.modules ?? [], data?.rootModuleId), [data]);
@@ -181,6 +182,9 @@ export function ModuleTreeView({
       id: node.id,
       type: 'moduleTreeNode',
       position: { x: node.x, y: node.y },
+      // Controlled nodes never receive measurements back; the minimap needs their size.
+      initialWidth: TREE_NODE_WIDTH,
+      initialHeight: TREE_NODE_HEIGHT,
       draggable: false,
       selectable: module !== null,
       data: {
@@ -199,6 +203,8 @@ export function ModuleTreeView({
   const edges = useMemo<TreeEdge[]>(() => layout.edges.map(edge => ({
     id: edge.id, source: edge.parent, target: edge.child, type: 'treeElbow', data: { points: edge.points },
   })), [layout]);
+  const autoFit = useAutoFit<ReactFlowInstance<TreeNode, TreeEdge>>(nodes.length, treeFitOptions, centerModuleId === null);
+  const flow = autoFit.flow;
 
   useEffect(() => {
     if (!flow || !centerModuleId || centered.current === centerModuleId) return;
@@ -273,7 +279,7 @@ export function ModuleTreeView({
 
         <div className="module-arch__content" ref={contentRef}>
           <div className="module-arch__main">
-            <div className="module-tree__canvas" role="tree" aria-label="Module tree">
+            <div className="module-tree__canvas" role="tree" aria-label="Module tree" ref={autoFit.containerRef}>
               <ReactFlow
                 nodes={nodes}
                 edges={edges}
@@ -285,9 +291,10 @@ export function ModuleTreeView({
                 onNodeDoubleClick={(_event, node) => { if (node.id !== PROJECT_NODE_ID) onOpenModule(node.id); }}
                 onPaneClick={() => onSelectModule(null)}
                 zoomOnDoubleClick={false}
-                onInit={setFlow}
+                onInit={autoFit.onInit}
+                onMoveStart={autoFit.onMoveStart}
                 fitView={centerModuleId === null}
-                fitViewOptions={{ padding: 0.12, minZoom: 0.2, maxZoom: 1.2 }}
+                fitViewOptions={treeFitOptions}
                 minZoom={0.1}
                 proOptions={{ hideAttribution: true }}
               >

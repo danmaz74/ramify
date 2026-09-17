@@ -162,14 +162,14 @@ export function ProjectExplorerPage({ client, pollIntervalMs = 3000,
     onNavigateToScope={id => { setScopeModuleId(id); setSelectedModuleId(null); setSelectedEdge(null); }}
     onOpenModuleTree={openModuleTree} />;
   const notice = [bindingNotice, focusNotice].filter(Boolean).join(' · ');
-  if (notice === '') return view;
-  return <>
-    <p role="status" className="project-explorer-page__connection-notice"
+  // The notice takes its line and the view fills the remaining height.
+  return <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    {notice !== '' && <p role="status" className="project-explorer-page__connection-notice"
       style={{ margin: 0, padding: '0.4rem 1rem', background: '#fff4ce', color: '#5c4400', fontSize: '0.875rem' }}>
       {notice}
-    </p>
-    {view}
-  </>;
+    </p>}
+    <div style={{ flex: 1, minHeight: 0 }}>{view}</div>
+  </div>;
 }
 
 /**
