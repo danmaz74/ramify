@@ -26,6 +26,12 @@ export type CompleteReport = AnalysisReport & {
   };
 };
 
+/** A completed analysis with the registry, snapshot, catalog and model every projection reads. */
+export function completeReport(report: AnalysisReport): report is CompleteReport {
+  return report.outcome.execution === 'completed' && report.inputId !== null && report.registry !== null
+    && report.snapshot !== null && report.snapshot.catalog !== null && report.snapshot.model !== null;
+}
+
 /** UTF-8 byte order without encoding: UTF-16 units reordered to code point order. */
 export function byteOrder(left: string, right: string): number {
   if (left === right) return 0;

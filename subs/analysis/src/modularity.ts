@@ -1,4 +1,3 @@
-import type { AnalysisReport } from './interfaces/analysis.js';
 import type {
   Metric,
   MetricCoverage,
@@ -12,6 +11,7 @@ import type {
 } from './interfaces/modularity.js';
 import {
   byteOrder,
+  completeReport,
   CoverageFacts,
   declaredOwnership,
   loadVariants,
@@ -49,11 +49,6 @@ export function projectModularity(input: ModularityInput): ModularityOutcome {
       message: `The modularity report needs ${bytes} bytes, above the limit of ${input.limits.maxReportBytes}` };
   }
   return { status: 'projected', report: projected };
-}
-
-function completeReport(report: AnalysisReport): report is CompleteReport {
-  return report.outcome.execution === 'completed' && report.inputId !== null && report.registry !== null
-    && report.snapshot !== null && report.snapshot.catalog !== null && report.snapshot.model !== null;
 }
 
 function project(revision: string, report: CompleteReport, ownership: OwnershipResolver): ModularityReport {

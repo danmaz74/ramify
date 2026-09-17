@@ -1,8 +1,9 @@
 # Modularity report
 
 **Date:** 2026-09-17. **Status:** Contract under implementation. Iteration 2
-implements the opt-in evidence and iteration 3 the declared-ownership
-projection; change affinity and candidate ownership are not implemented. It
+implements the opt-in evidence, iteration 3 the declared-ownership
+projection and iteration 4 change affinity, the Git adapter and the baseline
+probe; candidate ownership is not implemented. It
 fixes the units, filters, formulas, coverage rules, ordering and identity that
 the
 [project modularity analysis](../analysis/2026-09-17-project-modularity-analysis.md#proposed-execution-path)
@@ -36,7 +37,7 @@ remain authoritative for those rules. Dependency vocabulary follows the
 | The opt-in `dependency-behavior` capability in batch analysis; attaching its facts to the snapshot | `analysis` | existing batch pipeline |
 | Contract types; pure projection of `{revision, report}`; deduplication, coverage and aggregates; candidate ownership validation; pure change-affinity projection | `analysis` | `src/interfaces/modularity.ts`, `src/modularity.ts`, `src/change-affinity.ts` |
 | Git history adapter producing `ChangeHistory` | modularity probe | `scripts/probes/modularity/git-history.ts` |
-| Probe that runs the analysis, the projections and writes JSON and Markdown | modularity probe | `scripts/probes/modularity/baseline.ts` |
+| Probe that runs the analysis, the projections and writes JSON and Markdown | modularity probe | `scripts/probes/modularity/baseline.ts`, rendering in `markdown.ts` |
 
 **Projection owner.** `analysis` owns the `AnalysisReport` contract that is the
 projection's only source input, and the modularity analysis already assigns it
@@ -74,7 +75,8 @@ supported command would move the adapter into `cli`, still outside `analysis`.
 - Iteration 3 adds `export type * from './interfaces/modularity.js'` and the
   projection function to `subs/analysis/src/index.ts`, the `ramify.ts/analysis`
   package entry the probe uses. No `module.ramify` exposure is needed while no
-  other owner imports the projection. A later owner consumer requires
+  other owner imports the projection. Iteration 4 adds `projectChangeAffinity`
+  to the same entry. A later owner consumer requires
   `expose-src` of the interface file and projection to `parent`, and root
   re-exposure to descendants.
 
@@ -339,10 +341,12 @@ Change affinity is not part of `ModularityReport`. It is a separate
 adapter, with its own provenance, so the source report stays deterministic for
 one analysis.
 
-The adapter reads commits in `range`, with rename detection disabled so a rename
-lists both paths, first-parent or not and merges excluded or included as
-recorded, and rewrites repository-relative paths relative to the project root,
-dropping paths outside it. `head` is the full id of the last commit.
+The adapter reads commits in `range`, oldest first, with rename detection
+disabled so a rename lists both paths, first-parent or not and merges excluded
+or included as recorded; an included merge lists its changes against its first
+parent. It rewrites repository-relative paths relative to the project root,
+dropping paths outside it. `head` is the full id of the range's newest commit,
+before the merge filter applies.
 
 The projection maps each path through the ownership in use to the owner of an
 inventory file in the filter's subset; other paths are unmapped. Then:
@@ -358,7 +362,9 @@ shared(A, B)      = sampled commits whose owners include A and B
 affinity(A, B)    = shared(A, B) / (commits(A) + commits(B) - shared(A, B))
 ```
 
-`unmappedPaths` counts distinct unmapped paths across non-excluded commits. An
+`unmappedPaths` counts distinct unmapped paths across commits excluded neither
+explicitly nor as broad. `owners` lists every owner of at least one file in the
+filter's subset, including owners with zero commits. An
 owner is `sufficient` when `commits(A) >= minOwnerCommits`; a pair when both
 owners are sufficient and `shared >= minSharedCommits`. Insufficient values are
 retained with their raw counts, never hidden or presented as signals. Only
@@ -367,7 +373,8 @@ order.
 
 Staged plan-delivery or omnibus commits are not blended silently: they are
 excluded only by the recorded `maxOwnersPerCommit` or `excludedCommits` filter,
-and the counts of excluded commits are reported.
+and the counts of excluded commits are reported. `excludedCommits` holds full
+commit ids and serializes deduplicated in byte order.
 
 ### 9. Context size
 
@@ -600,6 +607,19 @@ named measure, descending, ties by id; explanations are role-aware, and no
 measures are combined into a score. Partial and unavailable values are labelled
 as such in every table. Evidence written into the repository goes under
 `scripts/probes/results/modularity/`.
+
+The probe (`npm run probe:modularity`) writes `<name>.json` and `<name>.md`,
+`baseline` by default. It requests the shared CLI check capabilities plus
+`dependency-behavior` in one disposable batch analysis and projects both
+reports from that single analysis report. Its default history is `HEAD`, all
+parents, merges excluded, with `minOwnerCommits` 5, `minSharedCommits` 3 and
+`maxOwnersPerCommit` 5; every value is recorded in the change-affinity report.
+It refuses, with exit code 2, when the worktree is not clean without
+`--allow-dirty`, when `HEAD` or cleanliness changes during the analysis, or when
+the history head differs from the analyzed commit. Markdown structural
+positions (composition root or parent, provider, leaf consumer, connected
+owner) are read from the ownership tree and production edges to explain a
+ranking; they are not declared roles.
 
 ## Iteration handoff
 

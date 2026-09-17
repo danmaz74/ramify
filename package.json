@@ -69,6 +69,7 @@
     "measure:batch": "node scripts/measurements/run.mjs",
     "measure:resident": "node scripts/measurements/resident.mjs",
     "measure:fast": "node scripts/measurements/fast.mjs",
+    "probe:modularity": "tsx scripts/probes/modularity/baseline.ts",
     "measure:plan2a": "node --import tsx scripts/measurements/plan2a.mjs",
     "measure:plan2a-platform": "node --import tsx scripts/measurements/plan2a-platform.mjs",
     "measure:project-explorer": "tsx subs/integration-tests/src/browser-acceptance.ts",

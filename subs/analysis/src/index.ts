@@ -16,4 +16,5 @@ export type * from './interfaces/session.js';
 export { planApiViewRequests, projectApiView } from './api-view.js';
 export type { ApiViewProjectOutcome } from './api-view.js';
 export { projectModularity } from './modularity.js';
+export { projectChangeAffinity } from './change-affinity.js';
 export type * from './interfaces/modularity.js';
