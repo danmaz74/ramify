@@ -1,0 +1,62 @@
+{
+  "schemaVersion": "ramify.bd28/1",
+  "project": "collection-review (copy of tracked inputs)",
+  "revision": "rev/1:e56390e6-8657-4e67-8507-dabaea6de55c:1",
+  "inputId": "input/1:6a281d2ab7b6249ddcc7f9287b7081674af62270ac5246236d64f18d54f6db36",
+  "elapsedMs": 3025,
+  "phases": [
+    "pending/analyzing",
+    "pending/analyzing",
+    "pending/analyzing",
+    "ready"
+  ],
+  "dependencyView": {
+    "encodedBytes": 116219,
+    "state": "complete",
+    "project": {
+      "behavioral": 17,
+      "nonBehavioral": 48
+    },
+    "modules": 15,
+    "importedModuleEdges": 28,
+    "originalOwnerEdges": 28,
+    "coverage": {
+      "unknownDependencies": 0,
+      "limitIds": []
+    }
+  },
+  "projectViewBytes": 224384,
+  "counters": {
+    "revisions": 1,
+    "analyses": 1,
+    "cancelledAnalyses": 0,
+    "reusedRevisions": 0,
+    "coalescedEvents": 0,
+    "evictions": 0,
+    "rejectedRequests": 0,
+    "disconnectedSlowConsumers": 0,
+    "sweeps": 0,
+    "audits": 0,
+    "auditMismatches": 0,
+    "coveredRequests": 0,
+    "coldOutcomes": 0,
+    "deadlineOutcomes": 0,
+    "behaviorRuns": 1,
+    "dependencyDiagrams": 1,
+    "dependencyDiagramInputChanges": 0
+  },
+  "server": {
+    "pid": 111294,
+    "loadedModules": 289,
+    "analysisRuntimeLoads": 0,
+    "serviceApiLoads": [
+      "dist/subs/service-api/src/project-binding.js",
+      "dist/subs/service-api/src/web-process.js",
+      "dist/subs/service-api/src/dependency-view.js",
+      "dist/subs/service-api/src/router.js",
+      "dist/subs/service-api/src/web-discovery.js",
+      "dist/subs/service-api/src/dependency-model.js",
+      "dist/subs/service-api/src/project-view.js"
+    ]
+  }
+}

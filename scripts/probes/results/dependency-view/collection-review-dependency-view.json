@@ -1,0 +1,5255 @@
+{
+  "status": "ready",
+  "revision": {
+    "token": {
+      "context": "ctx/1:fe89b581e9a33d407a7ac0d8ee5ae356a0125c59a0cf21045a9796fd097d4f74",
+      "generation": "gen/1:e56390e6-8657-4e67-8507-dabaea6de55c"
+    },
+    "revision": "rev/1:e56390e6-8657-4e67-8507-dabaea6de55c:1",
+    "sequence": 1,
+    "publishedAt": 1789655023354,
+    "cause": "open",
+    "fingerprints": {
+      "inputId": "input/1:6a281d2ab7b6249ddcc7f9287b7081674af62270ac5246236d64f18d54f6db36",
+      "declarations": "4478c90a77ab75380ef3dbea40970a0eaf58164fe50fc9740072ddc28e4df346",
+      "source": "bde2f89eab01643b237ed99d190487ed3fc023ac1e5cbca63cf8a8e9f7f14b0b",
+      "configuration": "23aa853cad15ff232e87243067b20e9eeef83a7b95ce6560f34cbe7416e9a489",
+      "registry": "1080a60800d9e5bddc69f51489c636a776bacaadb5368f46db4aa0947c67e3ba",
+      "engine": "15ffbb4f9f5a3d2d22aa435e1835d6bfe262aca8bdfdc376f1245df846065b97"
+    },
+    "changed": [],
+    "checked": {
+      "path": "cold",
+      "files": [
+        "src/assembly.ts",
+        "src/interfaces/protocol.ts",
+        "src/main.ts",
+        "src/protocol.ts",
+        "src/server.ts",
+        "src/tests/assembly.test.ts",
+        "src/tests/http.test.ts",
+        "src/tests/protocol-typing.test.ts",
+        "src/tests/setup.ts",
+        "subs/integration-tests/src/features/collection-review.viz.feature",
+        "subs/integration-tests/src/steps/collection-review.steps.ts",
+        "subs/integration-tests/src/support/hooks.ts",
+        "subs/integration-tests/src/support/initialization.ts",
+        "subs/integration-tests/src/support/world.ts",
+        "subs/workspace/src/app.tsx",
+        "subs/workspace/src/client.ts",
+        "subs/workspace/src/index.html",
+        "subs/workspace/src/main.tsx",
+        "subs/workspace/src/styles.css",
+        "subs/workspace/src/tests/shell.test.tsx",
+        "subs/workspace/subs/catalog/src/mcp.ts",
+        "subs/workspace/subs/catalog/src/router.ts",
+        "subs/workspace/subs/catalog/src/tests/adapters.test.ts",
+        "subs/workspace/subs/catalog/subs/core/src/catalog.ts",
+        "subs/workspace/subs/catalog/subs/core/src/history.ts",
+        "subs/workspace/subs/catalog/subs/core/src/records.ts",
+        "subs/workspace/subs/catalog/subs/core/src/tests/catalog.test.ts",
+        "subs/workspace/subs/catalog/subs/core/src/tests/fixture.ts",
+        "subs/workspace/subs/catalog/subs/ui/src/catalog-card.module.css",
+        "subs/workspace/subs/catalog/subs/ui/src/catalog-card.tsx",
+        "subs/workspace/subs/catalog/subs/ui/src/tests/catalog-card.test.tsx",
+        "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts",
+        "subs/workspace/subs/contracts/src/tests/vocabulary.test.ts",
+        "subs/workspace/subs/reviews/src/mcp.ts",
+        "subs/workspace/subs/reviews/src/router.ts",
+        "subs/workspace/subs/reviews/src/session.ts",
+        "subs/workspace/subs/reviews/src/tests/router.test.ts",
+        "subs/workspace/subs/reviews/src/tests/sessions.test.ts",
+        "subs/workspace/subs/reviews/src/tests/typing.test.ts",
+        "subs/workspace/subs/reviews/subs/core/src/interfaces/port.ts",
+        "subs/workspace/subs/reviews/subs/core/src/runtime.ts",
+        "subs/workspace/subs/reviews/subs/core/src/tests/runtime.test.ts",
+        "subs/workspace/subs/reviews/subs/core/subs/controller/src/controller.ts",
+        "subs/workspace/subs/reviews/subs/core/subs/controller/src/tests/controller.test.ts",
+        "subs/workspace/subs/reviews/subs/core/subs/tasks/src/inspection-task.ts",
+        "subs/workspace/subs/reviews/subs/core/subs/tasks/src/result.ts",
+        "subs/workspace/subs/reviews/subs/core/subs/tasks/src/tests/inspection-task.test.ts",
+        "subs/workspace/subs/reviews/subs/core/subs/tasks/src/tests/result.test.ts",
+        "subs/workspace/subs/reviews/subs/ui/src/review-panel.tsx",
+        "subs/workspace/subs/reviews/subs/ui/src/tests/review-panel.test.tsx",
+        "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/format.ts",
+        "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.module.css",
+        "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.tsx",
+        "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/tests/format.test.ts",
+        "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/tests/review-result.test.tsx",
+        "subs/workspace/subs/reviews/subs/validation/src/tests/validate.test.ts",
+        "subs/workspace/subs/reviews/subs/validation/src/validate.ts",
+        "subs/workspace/subs/shared-ui/src/status-badge.tsx",
+        "subs/workspace/subs/shared-ui/src/tests/status-badge.test.tsx"
+      ],
+      "accesses": 294,
+      "modelRebuilt": true
+    },
+    "delta": {
+      "added": 0,
+      "removed": 0,
+      "positionOnly": 0
+    },
+    "timings": {
+      "classify": 0,
+      "inventory": 209.98553700000002,
+      "compiler": 532.8075429999999,
+      "descriptions": 138.87939099999994,
+      "accesses": 99.92328199999997,
+      "link": 23.537896000000046,
+      "decide": 16.029465000000073,
+      "publish": 8.433380999999827,
+      "total": 1469.803872
+    },
+    "capture": {
+      "invocationCheck": 0,
+      "promotion": 0,
+      "workerStatus": 0,
+      "workerRoundTrip": 0,
+      "sweep": 0,
+      "watch": null
+    },
+    "outcome": {
+      "execution": "completed",
+      "check": "passed",
+      "coverage": "complete"
+    },
+    "summary": {
+      "complete": true,
+      "owners": 15,
+      "sourceFiles": 54,
+      "resources": 5,
+      "originals": 89,
+      "accesses": 294,
+      "allowed": 166,
+      "denied": 0,
+      "errors": 0,
+      "warnings": 2,
+      "coverageNotes": 0,
+      "external": 128
+    }
+  },
+  "view": {
+    "schemaVersion": "ramify.explorer-dependencies/1",
+    "inputId": "input/1:6a281d2ab7b6249ddcc7f9287b7081674af62270ac5246236d64f18d54f6db36",
+    "state": "complete",
+    "project": {
+      "behavioral": 17,
+      "nonBehavioral": 48
+    },
+    "modules": [
+      {
+        "id": "collection-review",
+        "uses": {
+          "behavioral": 5,
+          "nonBehavioral": 1
+        },
+        "usedThrough": {
+          "behavioralUsedOriginals": 0,
+          "nonBehavioralUsedOriginals": 7
+        },
+        "ownedUsedByOthers": {
+          "behavioral": 0,
+          "nonBehavioral": 7
+        }
+      },
+      {
+        "id": "collection-review/integration-tests",
+        "uses": {
+          "behavioral": 0,
+          "nonBehavioral": 0
+        },
+        "usedThrough": {
+          "behavioralUsedOriginals": 0,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "ownedUsedByOthers": {
+          "behavioral": 0,
+          "nonBehavioral": 0
+        }
+      },
+      {
+        "id": "collection-review/workspace",
+        "uses": {
+          "behavioral": 2,
+          "nonBehavioral": 1
+        },
+        "usedThrough": {
+          "behavioralUsedOriginals": 0,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "ownedUsedByOthers": {
+          "behavioral": 0,
+          "nonBehavioral": 0
+        }
+      },
+      {
+        "id": "collection-review/workspace/catalog",
+        "uses": {
+          "behavioral": 2,
+          "nonBehavioral": 6
+        },
+        "usedThrough": {
+          "behavioralUsedOriginals": 2,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "ownedUsedByOthers": {
+          "behavioral": 2,
+          "nonBehavioral": 0
+        }
+      },
+      {
+        "id": "collection-review/workspace/catalog/core",
+        "uses": {
+          "behavioral": 0,
+          "nonBehavioral": 6
+        },
+        "usedThrough": {
+          "behavioralUsedOriginals": 3,
+          "nonBehavioralUsedOriginals": 2
+        },
+        "ownedUsedByOthers": {
+          "behavioral": 3,
+          "nonBehavioral": 2
+        }
+      },
+      {
+        "id": "collection-review/workspace/catalog/ui",
+        "uses": {
+          "behavioral": 1,
+          "nonBehavioral": 1
+        },
+        "usedThrough": {
+          "behavioralUsedOriginals": 1,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "ownedUsedByOthers": {
+          "behavioral": 1,
+          "nonBehavioral": 0
+        }
+      },
+      {
+        "id": "collection-review/workspace/contracts",
+        "uses": {
+          "behavioral": 0,
+          "nonBehavioral": 0
+        },
+        "usedThrough": {
+          "behavioralUsedOriginals": 0,
+          "nonBehavioralUsedOriginals": 34
+        },
+        "ownedUsedByOthers": {
+          "behavioral": 0,
+          "nonBehavioral": 34
+        }
+      },
+      {
+        "id": "collection-review/workspace/reviews",
+        "uses": {
+          "behavioral": 1,
+          "nonBehavioral": 9
+        },
+        "usedThrough": {
+          "behavioralUsedOriginals": 2,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "ownedUsedByOthers": {
+          "behavioral": 2,
+          "nonBehavioral": 0
+        }
+      },
+      {
+        "id": "collection-review/workspace/reviews/core",
+        "uses": {
+          "behavioral": 2,
+          "nonBehavioral": 7
+        },
+        "usedThrough": {
+          "behavioralUsedOriginals": 1,
+          "nonBehavioralUsedOriginals": 4
+        },
+        "ownedUsedByOthers": {
+          "behavioral": 1,
+          "nonBehavioral": 4
+        }
+      },
+      {
+        "id": "collection-review/workspace/reviews/core/controller",
+        "uses": {
+          "behavioral": 2,
+          "nonBehavioral": 0
+        },
+        "usedThrough": {
+          "behavioralUsedOriginals": 1,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "ownedUsedByOthers": {
+          "behavioral": 1,
+          "nonBehavioral": 0
+        }
+      },
+      {
+        "id": "collection-review/workspace/reviews/core/tasks",
+        "uses": {
+          "behavioral": 0,
+          "nonBehavioral": 8
+        },
+        "usedThrough": {
+          "behavioralUsedOriginals": 2,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "ownedUsedByOthers": {
+          "behavioral": 2,
+          "nonBehavioral": 0
+        }
+      },
+      {
+        "id": "collection-review/workspace/reviews/ui",
+        "uses": {
+          "behavioral": 1,
+          "nonBehavioral": 2
+        },
+        "usedThrough": {
+          "behavioralUsedOriginals": 1,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "ownedUsedByOthers": {
+          "behavioral": 1,
+          "nonBehavioral": 0
+        }
+      },
+      {
+        "id": "collection-review/workspace/reviews/ui/pure-ui",
+        "uses": {
+          "behavioral": 1,
+          "nonBehavioral": 4
+        },
+        "usedThrough": {
+          "behavioralUsedOriginals": 1,
+          "nonBehavioralUsedOriginals": 1
+        },
+        "ownedUsedByOthers": {
+          "behavioral": 1,
+          "nonBehavioral": 1
+        }
+      },
+      {
+        "id": "collection-review/workspace/reviews/validation",
+        "uses": {
+          "behavioral": 0,
+          "nonBehavioral": 2
+        },
+        "usedThrough": {
+          "behavioralUsedOriginals": 1,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "ownedUsedByOthers": {
+          "behavioral": 1,
+          "nonBehavioral": 0
+        }
+      },
+      {
+        "id": "collection-review/workspace/shared-ui",
+        "uses": {
+          "behavioral": 0,
+          "nonBehavioral": 1
+        },
+        "usedThrough": {
+          "behavioralUsedOriginals": 2,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "ownedUsedByOthers": {
+          "behavioral": 2,
+          "nonBehavioral": 0
+        }
+      }
+    ],
+    "importedModuleEdges": [
+      {
+        "id": "dependency-edge/1:imported-module:e60acf7f9ba732e2085d8e475db9bf938acd9113efe42e25478a638eb1c67533",
+        "projection": "imported-module",
+        "consumer": "collection-review",
+        "provider": "collection-review/workspace/catalog",
+        "counts": {
+          "behavioralUsedOriginals": 2,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "originalOwners": [
+          {
+            "owner": "collection-review/workspace/catalog",
+            "counts": {
+              "behavioralUsedOriginals": 2,
+              "nonBehavioralUsedOriginals": 0
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/catalog",
+              "file": "mcp.ts",
+              "binding": "createCatalogTools"
+            },
+            "originalOwner": "collection-review/workspace/catalog",
+            "importedModule": "collection-review/workspace/catalog",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "src/assembly.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/catalog/src/mcp.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/catalog/src/mcp.ts"
+            ],
+            "accessIds": [
+              "access/1:6666dd93c85452fc567a9300f22174a84d5898035f77ba120e2cece6de3c0da0"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/catalog",
+              "file": "router.ts",
+              "binding": "createCatalogRouter"
+            },
+            "originalOwner": "collection-review/workspace/catalog",
+            "importedModule": "collection-review/workspace/catalog",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "src/assembly.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/catalog/src/router.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/catalog/src/router.ts"
+            ],
+            "accessIds": [
+              "access/1:eb667e6eba662f56bf6141ee6ef5a49bd8c0f737a701f198a35c7e5a5ec22cad"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:imported-module:2993543de900bbd4d7f6afc4e558360ae093bbad195c791402a22b6d5c7c36d6",
+        "projection": "imported-module",
+        "consumer": "collection-review",
+        "provider": "collection-review/workspace/catalog/core",
+        "counts": {
+          "behavioralUsedOriginals": 1,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "originalOwners": [
+          {
+            "owner": "collection-review/workspace/catalog/core",
+            "counts": {
+              "behavioralUsedOriginals": 1,
+              "nonBehavioralUsedOriginals": 0
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/catalog/core",
+              "file": "catalog.ts",
+              "binding": "inspect"
+            },
+            "originalOwner": "collection-review/workspace/catalog/core",
+            "importedModule": "collection-review/workspace/catalog/core",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "src/assembly.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/catalog/subs/core/src/catalog.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/catalog/subs/core/src/catalog.ts"
+            ],
+            "accessIds": [
+              "access/1:0e7b570c00dd9f2bef4a56607f40fd0aeb2bfa96a0d7d287ab83714eed9811b2"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:imported-module:55df106abd522c1f179a036b8f7eda5ca0d1aa9defb47c6135d91382e2e77d6c",
+        "projection": "imported-module",
+        "consumer": "collection-review",
+        "provider": "collection-review/workspace/reviews",
+        "counts": {
+          "behavioralUsedOriginals": 2,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "originalOwners": [
+          {
+            "owner": "collection-review/workspace/reviews",
+            "counts": {
+              "behavioralUsedOriginals": 2,
+              "nonBehavioralUsedOriginals": 0
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/reviews",
+              "file": "mcp.ts",
+              "binding": "createReviewsTools"
+            },
+            "originalOwner": "collection-review/workspace/reviews",
+            "importedModule": "collection-review/workspace/reviews",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "src/assembly.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/reviews/src/mcp.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/reviews/src/mcp.ts"
+            ],
+            "accessIds": [
+              "access/1:af8fdce448c6606553d123eec69c9d90600460536e924ef59c710efc56ea9c88"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/reviews",
+              "file": "router.ts",
+              "binding": "createReviewsRouter"
+            },
+            "originalOwner": "collection-review/workspace/reviews",
+            "importedModule": "collection-review/workspace/reviews",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "src/assembly.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/reviews/src/router.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/reviews/src/router.ts"
+            ],
+            "accessIds": [
+              "access/1:e9d591767933bf17d83b550443543109df8d7a7b69d2887fd972c3de3cddffae"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:imported-module:50ca433e6aec330e31d1e84eecea3bc2f6720d185b9bce91654e2e67a84423e6",
+        "projection": "imported-module",
+        "consumer": "collection-review",
+        "provider": "collection-review/workspace/reviews/core",
+        "counts": {
+          "behavioralUsedOriginals": 0,
+          "nonBehavioralUsedOriginals": 1
+        },
+        "originalOwners": [
+          {
+            "owner": "collection-review/workspace/reviews/core",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 1
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/reviews/core",
+              "file": "interfaces/port.ts",
+              "binding": "InspectionPort"
+            },
+            "originalOwner": "collection-review/workspace/reviews/core",
+            "importedModule": "collection-review/workspace/reviews/core",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "src/assembly.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/interfaces/port.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/interfaces/port.ts"
+            ],
+            "accessIds": [
+              "access/1:fd44db3c1953e66cf0e0c18dc967c989041fd4808af68426f30fa752d4df8a0c"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:imported-module:d8ad42b08b86b7b1b73999e3bb640cf50c01332d77fe147678d8a383b56d1d89",
+        "projection": "imported-module",
+        "consumer": "collection-review/workspace",
+        "provider": "collection-review",
+        "counts": {
+          "behavioralUsedOriginals": 0,
+          "nonBehavioralUsedOriginals": 1
+        },
+        "originalOwners": [
+          {
+            "owner": "collection-review",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 1
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review",
+              "file": "assembly.ts",
+              "binding": "AppRouter"
+            },
+            "originalOwner": "collection-review",
+            "importedModule": "collection-review",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/src/app.tsx",
+              "subs/workspace/src/client.ts"
+            ],
+            "importedFiles": [
+              "src/interfaces/protocol.ts"
+            ],
+            "originalFiles": [
+              "src/assembly.ts"
+            ],
+            "accessIds": [
+              "access/1:95f072f80dfc6a912a5aa6bd378fe1bdc9a18ab91259a8f2ff0d3323cc912db6",
+              "access/1:d65a9ca71de8943af0785a070e3e9228f751519a0ca0f0e28b49adb84a7e6450"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:imported-module:8707a56b7f7da654601c2be5d26586f4c8f93ee99b660473a2e6a217d2780c0f",
+        "projection": "imported-module",
+        "consumer": "collection-review/workspace",
+        "provider": "collection-review/workspace/catalog/ui",
+        "counts": {
+          "behavioralUsedOriginals": 1,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "originalOwners": [
+          {
+            "owner": "collection-review/workspace/catalog/ui",
+            "counts": {
+              "behavioralUsedOriginals": 1,
+              "nonBehavioralUsedOriginals": 0
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/catalog/ui",
+              "file": "catalog-card.tsx",
+              "binding": "CatalogCard"
+            },
+            "originalOwner": "collection-review/workspace/catalog/ui",
+            "importedModule": "collection-review/workspace/catalog/ui",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "subs/workspace/src/app.tsx"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/catalog/subs/ui/src/catalog-card.tsx"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/catalog/subs/ui/src/catalog-card.tsx"
+            ],
+            "accessIds": [
+              "access/1:55319fa702728f652995941ac62aae5782bb97561b78e17fdf38484c567fe5e3"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:imported-module:9cd63fffdc180db1ca161236ba19806ee3d172d44fcf51d2851a94ac69e5ec85",
+        "projection": "imported-module",
+        "consumer": "collection-review/workspace",
+        "provider": "collection-review/workspace/reviews/ui",
+        "counts": {
+          "behavioralUsedOriginals": 1,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "originalOwners": [
+          {
+            "owner": "collection-review/workspace/reviews/ui",
+            "counts": {
+              "behavioralUsedOriginals": 1,
+              "nonBehavioralUsedOriginals": 0
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/reviews/ui",
+              "file": "review-panel.tsx",
+              "binding": "ReviewPanel"
+            },
+            "originalOwner": "collection-review/workspace/reviews/ui",
+            "importedModule": "collection-review/workspace/reviews/ui",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "subs/workspace/src/app.tsx"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/reviews/subs/ui/src/review-panel.tsx"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/reviews/subs/ui/src/review-panel.tsx"
+            ],
+            "accessIds": [
+              "access/1:62a017e22fdbe22a41b02c0e2dd3816f2a2dddf10fa236fa25ec55d662edd624"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:imported-module:8b2ee2a6dd0b74de8736fe2817fc0d138469d76cbf479294b859b508a6c45ee4",
+        "projection": "imported-module",
+        "consumer": "collection-review/workspace/catalog",
+        "provider": "collection-review",
+        "counts": {
+          "behavioralUsedOriginals": 0,
+          "nonBehavioralUsedOriginals": 2
+        },
+        "originalOwners": [
+          {
+            "owner": "collection-review",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 2
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review",
+              "file": "interfaces/protocol.ts",
+              "binding": "McpToolContribution"
+            },
+            "originalOwner": "collection-review",
+            "importedModule": "collection-review",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/catalog/src/mcp.ts"
+            ],
+            "importedFiles": [
+              "src/interfaces/protocol.ts"
+            ],
+            "originalFiles": [
+              "src/interfaces/protocol.ts"
+            ],
+            "accessIds": [
+              "access/1:a74706fec9d54f323747aecebd246c1f5dfb0f169b7f42e97a758f883c30768e"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review",
+              "file": "interfaces/protocol.ts",
+              "binding": "ProtocolFacilities"
+            },
+            "originalOwner": "collection-review",
+            "importedModule": "collection-review",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/catalog/src/router.ts"
+            ],
+            "importedFiles": [
+              "src/interfaces/protocol.ts"
+            ],
+            "originalFiles": [
+              "src/interfaces/protocol.ts"
+            ],
+            "accessIds": [
+              "access/1:197f72694ecfdb4598c628ecaf5cdc81b0fbb55455ac494f883c732dc67cef25"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:imported-module:e7f76aeeb3a53927e46b6c03e45e6e6341a7678354249175f1310c3676e028e7",
+        "projection": "imported-module",
+        "consumer": "collection-review/workspace/catalog",
+        "provider": "collection-review/workspace/catalog/core",
+        "counts": {
+          "behavioralUsedOriginals": 2,
+          "nonBehavioralUsedOriginals": 1
+        },
+        "originalOwners": [
+          {
+            "owner": "collection-review/workspace/catalog/core",
+            "counts": {
+              "behavioralUsedOriginals": 2,
+              "nonBehavioralUsedOriginals": 1
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/catalog/core",
+              "file": "catalog.ts",
+              "binding": "CatalogSummary"
+            },
+            "originalOwner": "collection-review/workspace/catalog/core",
+            "importedModule": "collection-review/workspace/catalog/core",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/catalog/src/router.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/catalog/subs/core/src/catalog.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/catalog/subs/core/src/catalog.ts"
+            ],
+            "accessIds": [
+              "access/1:61e75c896dbcf58175125eb00f57aebe536b84935d007a62ce9499f491853d23"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/catalog/core",
+              "file": "catalog.ts",
+              "binding": "getRecord"
+            },
+            "originalOwner": "collection-review/workspace/catalog/core",
+            "importedModule": "collection-review/workspace/catalog/core",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/catalog/src/router.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/catalog/subs/core/src/catalog.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/catalog/subs/core/src/catalog.ts"
+            ],
+            "accessIds": [
+              "access/1:0a9cef9373dc0162a6898f6a0f215873d15940cf3969e4c03914ea432d1af751"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/catalog/core",
+              "file": "catalog.ts",
+              "binding": "inspect"
+            },
+            "originalOwner": "collection-review/workspace/catalog/core",
+            "importedModule": "collection-review/workspace/catalog/core",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/catalog/src/mcp.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/catalog/subs/core/src/catalog.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/catalog/subs/core/src/catalog.ts"
+            ],
+            "accessIds": [
+              "access/1:3fcdbf432de53f970397947a2d52cfd86bc68e786cc5b6df835320ca6ae71cb8"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:imported-module:5e94687bfd396e99ed23000b2182514d2c75c6552c954943abc58412c8f43541",
+        "projection": "imported-module",
+        "consumer": "collection-review/workspace/catalog",
+        "provider": "collection-review/workspace/contracts",
+        "counts": {
+          "behavioralUsedOriginals": 0,
+          "nonBehavioralUsedOriginals": 3
+        },
+        "originalOwners": [
+          {
+            "owner": "collection-review/workspace/contracts",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 3
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "Observation"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/catalog/src/mcp.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:579de68f25bab754db7d9837ecdc303f349b0570c94ab51ee595044e62641ca6"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "recordIdSchema"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/catalog/src/mcp.ts",
+              "subs/workspace/subs/catalog/src/router.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:4286af718190439ec5ef372a2f1a8824952fa70ab0ec49c7d65c87c049fe6c1b",
+              "access/1:467915f7c9847e678cd787042344be6bd10a8299dfa5be6aa3536edf57f86171"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "revisionScopeSchema"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/catalog/src/mcp.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:72be40b9dc1c60e94d5df058c7ea39edbec4efeb5e03073d1ef30988c08c0679"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:imported-module:c9e32bf6ef2726b6ef28d5af2a17fd8a3f016149f992dfaa16b21c762c8fd5fa",
+        "projection": "imported-module",
+        "consumer": "collection-review/workspace/catalog/core",
+        "provider": "collection-review/workspace/contracts",
+        "counts": {
+          "behavioralUsedOriginals": 0,
+          "nonBehavioralUsedOriginals": 6
+        },
+        "originalOwners": [
+          {
+            "owner": "collection-review/workspace/contracts",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 6
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "InspectionReport"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/catalog/subs/core/src/catalog.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:81f98bb71c87201b00b63f9487c1bbc9b5ee42bd6edbcb12144ff88ad8e7563a"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "ObservationCallback"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/catalog/subs/core/src/catalog.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:033a8315c38711816f96ad6705d16a2e20c5070be410afb7d4d578e20ae7c631"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "RecordId"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/catalog/subs/core/src/catalog.ts",
+              "subs/workspace/subs/catalog/subs/core/src/records.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:0ad3ac722b118c3804166312bc21f216ee3c8956d178f6f925769746ea22cc73",
+              "access/1:3c34fda68672559c674244770446fb9f475ef7f8ad15b830ff792357463fc5c0"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "RevisionChain"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/catalog/subs/core/src/catalog.ts",
+              "subs/workspace/subs/catalog/subs/core/src/history.ts",
+              "subs/workspace/subs/catalog/subs/core/src/records.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:0ae17076a5871d1b260f51a8bf33afc1302c8f8d07135c07dd78afb056bdc40d",
+              "access/1:9a3d9f168f9dff54442e8678982e4772e471a6c060f95feafeec0aac2c0d31fb",
+              "access/1:faf00e8192e8868bdad29738f8bbd1b821dccaf0ec5c7a816992745c3ccec710"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "RevisionScope"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/catalog/subs/core/src/catalog.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:b153480ad42083d37e55f8adbf9a90712394cd39b55d4965662552774f9489a2"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "revisionChainSchema"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/catalog/subs/core/src/records.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:648e3c7e00484cd7bee0a79c73775ced0d85abfd72986d674066736a5151589c"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:imported-module:d16fe1566dfe0733b08944027aff3b56626929231da4e56da9f86e2f88c21c89",
+        "projection": "imported-module",
+        "consumer": "collection-review/workspace/catalog/ui",
+        "provider": "collection-review/workspace/catalog/core",
+        "counts": {
+          "behavioralUsedOriginals": 0,
+          "nonBehavioralUsedOriginals": 1
+        },
+        "originalOwners": [
+          {
+            "owner": "collection-review/workspace/catalog/core",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 1
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/catalog/core",
+              "file": "catalog.ts",
+              "binding": "CatalogSummary"
+            },
+            "originalOwner": "collection-review/workspace/catalog/core",
+            "importedModule": "collection-review/workspace/catalog/core",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/catalog/subs/ui/src/catalog-card.tsx"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/catalog/subs/core/src/catalog.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/catalog/subs/core/src/catalog.ts"
+            ],
+            "accessIds": [
+              "access/1:95e29cf2019061bb915a9ee02709cb64dd45aa64668bcc80f63777dfd4cd2677"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:imported-module:37489a25e198de4c07d0d05c8eed32c10be3266d50afbca0dc54c955aaf5629e",
+        "projection": "imported-module",
+        "consumer": "collection-review/workspace/catalog/ui",
+        "provider": "collection-review/workspace/shared-ui",
+        "counts": {
+          "behavioralUsedOriginals": 1,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "originalOwners": [
+          {
+            "owner": "collection-review/workspace/shared-ui",
+            "counts": {
+              "behavioralUsedOriginals": 1,
+              "nonBehavioralUsedOriginals": 0
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/shared-ui",
+              "file": "status-badge.tsx",
+              "binding": "StatusBadge"
+            },
+            "originalOwner": "collection-review/workspace/shared-ui",
+            "importedModule": "collection-review/workspace/shared-ui",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/catalog/subs/ui/src/catalog-card.tsx"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/shared-ui/src/status-badge.tsx"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/shared-ui/src/status-badge.tsx"
+            ],
+            "accessIds": [
+              "access/1:46ba12aa0d745c27b2d6d5b9deac9a1a50d225633627e60b5d21c3a2bea85fb3"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:imported-module:c79cf21fd4550d9b92c44f7152fbc2375e873450efbf182b6c5c6de560f38828",
+        "projection": "imported-module",
+        "consumer": "collection-review/workspace/reviews",
+        "provider": "collection-review",
+        "counts": {
+          "behavioralUsedOriginals": 0,
+          "nonBehavioralUsedOriginals": 3
+        },
+        "originalOwners": [
+          {
+            "owner": "collection-review",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 3
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review",
+              "file": "interfaces/protocol.ts",
+              "binding": "McpToolContribution"
+            },
+            "originalOwner": "collection-review",
+            "importedModule": "collection-review",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/src/mcp.ts"
+            ],
+            "importedFiles": [
+              "src/interfaces/protocol.ts"
+            ],
+            "originalFiles": [
+              "src/interfaces/protocol.ts"
+            ],
+            "accessIds": [
+              "access/1:229d6fb3564a6de34d5d5d08a5920fe949886bf927de32d0c88c9556bbb3d947"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review",
+              "file": "interfaces/protocol.ts",
+              "binding": "ProtocolFacilities"
+            },
+            "originalOwner": "collection-review",
+            "importedModule": "collection-review",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/src/router.ts"
+            ],
+            "importedFiles": [
+              "src/interfaces/protocol.ts"
+            ],
+            "originalFiles": [
+              "src/interfaces/protocol.ts"
+            ],
+            "accessIds": [
+              "access/1:81bebbc154995ab8009d939fc6bdd33a9603768e4f1d90162df8e381d9dde3ab"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review",
+              "file": "interfaces/protocol.ts",
+              "binding": "ToolInvocation"
+            },
+            "originalOwner": "collection-review",
+            "importedModule": "collection-review",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/src/mcp.ts"
+            ],
+            "importedFiles": [
+              "src/interfaces/protocol.ts"
+            ],
+            "originalFiles": [
+              "src/interfaces/protocol.ts"
+            ],
+            "accessIds": [
+              "access/1:5b93deea916ee079cfa3794a58276d242760a3806e6e8f4c66839c6a731b3ffb"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:imported-module:a0f4a2a72deb8dbd60790470feb0a30d8cd796586d98433d479596853e6d9208",
+        "projection": "imported-module",
+        "consumer": "collection-review/workspace/reviews",
+        "provider": "collection-review/workspace/contracts",
+        "counts": {
+          "behavioralUsedOriginals": 0,
+          "nonBehavioralUsedOriginals": 4
+        },
+        "originalOwners": [
+          {
+            "owner": "collection-review/workspace/contracts",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 4
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "RecordId"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/src/mcp.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:48811cd2996a49f8d00a01a1be4abadb4156d28cda5b37ec3b14f3fd4f520075"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "RevisionScope"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/src/mcp.ts",
+              "subs/workspace/subs/reviews/src/session.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:441911e8ef3e308d90e31f9186f7cb629cb3b250d07d962521e316ad83821ee1",
+              "access/1:e45a486d2450869a4d28da4c6f28ebd4b62e55a52221a13d739d7c7db86821a5"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "recordIdSchema"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/src/mcp.ts",
+              "subs/workspace/subs/reviews/src/router.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:62be46fde6ed39316cd0dbeab144d312058bfc70e51dea1fb4026a18bb3bbb6d",
+              "access/1:f9f7fe70fdd86eb77cd01836dc3d4d0da2496afe5c08ec608db7e8d770ed83eb"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "revisionScopeSchema"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/src/mcp.ts",
+              "subs/workspace/subs/reviews/src/router.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:6335c631e15305521299beaad6fabd3897837ce4336fe3090db9a415202f199a",
+              "access/1:e30bfab4be855a8e51148e73f8adfc452cfbb0c36a4180712f86f3fb6ed03563"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:imported-module:f9b71bf9c871d45e765921b7e46f23f153c18d9a6824c1509b4e88f635fbd7c6",
+        "projection": "imported-module",
+        "consumer": "collection-review/workspace/reviews",
+        "provider": "collection-review/workspace/reviews/core",
+        "counts": {
+          "behavioralUsedOriginals": 1,
+          "nonBehavioralUsedOriginals": 2
+        },
+        "originalOwners": [
+          {
+            "owner": "collection-review/workspace/reviews/core",
+            "counts": {
+              "behavioralUsedOriginals": 1,
+              "nonBehavioralUsedOriginals": 2
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/reviews/core",
+              "file": "interfaces/port.ts",
+              "binding": "InspectionPort"
+            },
+            "originalOwner": "collection-review/workspace/reviews/core",
+            "importedModule": "collection-review/workspace/reviews/core",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/src/mcp.ts",
+              "subs/workspace/subs/reviews/src/router.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/interfaces/port.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/interfaces/port.ts"
+            ],
+            "accessIds": [
+              "access/1:62b7ba2b564869adc3c31e4e0498b7bf32d48ffb815547a4863d6d9bfc43c4b3",
+              "access/1:a2fa147409cd7bfd0b16438de1af95ce656a20fc9d40e1ab7ebecd2c6ef02a4b"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/reviews/core",
+              "file": "runtime.ts",
+              "binding": "ReviewOutcome"
+            },
+            "originalOwner": "collection-review/workspace/reviews/core",
+            "importedModule": "collection-review/workspace/reviews/core",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/src/router.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/runtime.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/runtime.ts"
+            ],
+            "accessIds": [
+              "access/1:974e9cd2728142732c51ab7f72a2d0356ab593146b9f4423afc02ad3c0aec5c6"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/reviews/core",
+              "file": "runtime.ts",
+              "binding": "createReviewRuntime"
+            },
+            "originalOwner": "collection-review/workspace/reviews/core",
+            "importedModule": "collection-review/workspace/reviews/core",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/src/mcp.ts",
+              "subs/workspace/subs/reviews/src/router.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/runtime.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/runtime.ts"
+            ],
+            "accessIds": [
+              "access/1:5a6f251b59e5d5053f5d2ceeafd2e5d3849558909ef8c939b2dd5054b8ca7c76",
+              "access/1:6878122a0930c820f841b1de978566cf3d7ef1982a50f290554ea7963caf31cc"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:imported-module:b793aeaa54eb9b1c5ba1bd6218d62e7aa9700cf9c26d88f2143d108ee24d461a",
+        "projection": "imported-module",
+        "consumer": "collection-review/workspace/reviews/core",
+        "provider": "collection-review/workspace/contracts",
+        "counts": {
+          "behavioralUsedOriginals": 0,
+          "nonBehavioralUsedOriginals": 7
+        },
+        "originalOwners": [
+          {
+            "owner": "collection-review/workspace/contracts",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 7
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "Finding"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/runtime.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:09f9eef7004c238a4c5d6e08714027938db655e11c69e7061257cb348d61c8be"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "InspectionReport"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/interfaces/port.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:2814ec0e6b67eee848b5dc2c3d625401daad43ef0348c45301cb0a9558132882"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "Observation"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/runtime.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:3c9f99234e20797ce2bb3718de4597ca7604928d585ff386419bc886dcd11e1c"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "ObservationCallback"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/interfaces/port.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:a163d237a827969773addc376958904af10faaf8dc3ab466d6261e1e35bc0e48"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "RecordId"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/interfaces/port.ts",
+              "subs/workspace/subs/reviews/subs/core/src/runtime.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:3ab7e79a4f46cfbacaa172afc805b753f6da96688a9a4e727dcc1c8299bd3665",
+              "access/1:556da060bb62bdd5adaddf7e7a139f5f1da15c5ddc2c3f88cdc294ce7fc64f86"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "ReviewStatus"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/runtime.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:21be5f79321ec1bf25ea8b49db022d3c0fc627361a54de454f15bc41052648ad"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "RevisionScope"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/interfaces/port.ts",
+              "subs/workspace/subs/reviews/subs/core/src/runtime.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:35e91c1a637790cf792cfd6268a8924ea88caedc648fdb806b60ff34c1854698",
+              "access/1:65db2b85fc3a58f9236743245ab2f836c885a121ae28b7c9c260a54b9a464c61"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:imported-module:20f3801fbfcece964110d4b343fe29e5472bbe13276b36b792dc9447bd45b39b",
+        "projection": "imported-module",
+        "consumer": "collection-review/workspace/reviews/core",
+        "provider": "collection-review/workspace/reviews/core/controller",
+        "counts": {
+          "behavioralUsedOriginals": 1,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "originalOwners": [
+          {
+            "owner": "collection-review/workspace/reviews/core/controller",
+            "counts": {
+              "behavioralUsedOriginals": 1,
+              "nonBehavioralUsedOriginals": 0
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/reviews/core/controller",
+              "file": "controller.ts",
+              "binding": "tick"
+            },
+            "originalOwner": "collection-review/workspace/reviews/core/controller",
+            "importedModule": "collection-review/workspace/reviews/core/controller",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/runtime.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/reviews/subs/core/subs/controller/src/controller.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/reviews/subs/core/subs/controller/src/controller.ts"
+            ],
+            "accessIds": [
+              "access/1:bf2b1332d39a3b8aba515723ee5e13487523fd426182d49b40eef4e79ec0c756"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:imported-module:9b306389961fb6461e7b150d52edaca61ec8f036dddadb169c8fe2cf1364fd9c",
+        "projection": "imported-module",
+        "consumer": "collection-review/workspace/reviews/core",
+        "provider": "collection-review/workspace/reviews/validation",
+        "counts": {
+          "behavioralUsedOriginals": 1,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "originalOwners": [
+          {
+            "owner": "collection-review/workspace/reviews/validation",
+            "counts": {
+              "behavioralUsedOriginals": 1,
+              "nonBehavioralUsedOriginals": 0
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/reviews/validation",
+              "file": "validate.ts",
+              "binding": "validateRevisionChain"
+            },
+            "originalOwner": "collection-review/workspace/reviews/validation",
+            "importedModule": "collection-review/workspace/reviews/validation",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/runtime.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/reviews/subs/validation/src/validate.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/reviews/subs/validation/src/validate.ts"
+            ],
+            "accessIds": [
+              "access/1:c28baf02e058bad76ecddcbd13861a589f7e11d7b99ecd2d49ba78e9db6f3617"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:imported-module:2e0cc60e9839133cfaaa030fe55213b1e4e97e7684e95d2ba167f142afaae54c",
+        "projection": "imported-module",
+        "consumer": "collection-review/workspace/reviews/core/controller",
+        "provider": "collection-review/workspace/reviews/core/tasks",
+        "counts": {
+          "behavioralUsedOriginals": 2,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "originalOwners": [
+          {
+            "owner": "collection-review/workspace/reviews/core/tasks",
+            "counts": {
+              "behavioralUsedOriginals": 2,
+              "nonBehavioralUsedOriginals": 0
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/reviews/core/tasks",
+              "file": "inspection-task.ts",
+              "binding": "runInspectionTask"
+            },
+            "originalOwner": "collection-review/workspace/reviews/core/tasks",
+            "importedModule": "collection-review/workspace/reviews/core/tasks",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/subs/controller/src/controller.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/reviews/subs/core/subs/tasks/src/inspection-task.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/reviews/subs/core/subs/tasks/src/inspection-task.ts"
+            ],
+            "accessIds": [
+              "access/1:47706aa5337f8501fc9cef39b5cd449ed3888de61f11a38a298373e2c28aa174"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/reviews/core/tasks",
+              "file": "result.ts",
+              "binding": "summarizeTaskResult"
+            },
+            "originalOwner": "collection-review/workspace/reviews/core/tasks",
+            "importedModule": "collection-review/workspace/reviews/core/tasks",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/subs/controller/src/controller.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/reviews/subs/core/subs/tasks/src/result.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/reviews/subs/core/subs/tasks/src/result.ts"
+            ],
+            "accessIds": [
+              "access/1:b0f710177b189b60b8a36b81da11624b0f560faef3fb2f248e7cbf7d18113ad2"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:imported-module:89e4a7b514bc539bc2c9c441348580d0b9d9532177c8356c768372dd067c621c",
+        "projection": "imported-module",
+        "consumer": "collection-review/workspace/reviews/core/tasks",
+        "provider": "collection-review/workspace/contracts",
+        "counts": {
+          "behavioralUsedOriginals": 0,
+          "nonBehavioralUsedOriginals": 7
+        },
+        "originalOwners": [
+          {
+            "owner": "collection-review/workspace/contracts",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 7
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "Finding"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/subs/tasks/src/inspection-task.ts",
+              "subs/workspace/subs/reviews/subs/core/subs/tasks/src/result.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:03d3350207ace20162c9610e134f77ee573ea02687eb8709dca9ef6aaa278132",
+              "access/1:89fdba281964ee390badfbf21a19f432c4a05c9231ab17902a8b37e80a7bbf71"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "InspectionReport"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/subs/tasks/src/inspection-task.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:eb3821a38518bb787325489b70bba02451aabf26701a31930955d953ef05401b"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "Observation"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/subs/tasks/src/inspection-task.ts",
+              "subs/workspace/subs/reviews/subs/core/subs/tasks/src/result.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:5b3f78c3352600ece28879a0f19923b5d029108f9e0a06fd051307eac1e586c8",
+              "access/1:81a5372353805f8b940d86ad1c13dc2d2e53037a6847cf75ed64523fda2eba24"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "ObservationCallback"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/subs/tasks/src/inspection-task.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:a39fffb662305081018d2c85e1355e2c44fe6cefaa0628fdce1a614e9aab5606"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "RecordId"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/subs/tasks/src/inspection-task.ts",
+              "subs/workspace/subs/reviews/subs/core/subs/tasks/src/result.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:105b2ff91b147b3dd919065e29d127db4b845695a12bbf941c0f2dde159f6138",
+              "access/1:57c705494f4bdbbd496b570dc8427d4f95a2f30a012fd7c043c5d8a7e4632f08"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "ReviewStatus"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/subs/tasks/src/result.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:d81c7d9ae1f414c7a195c37c65f4c5913a1eac327d01a0f102967f705feb63ed"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "RevisionScope"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/subs/tasks/src/inspection-task.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:fd82484c749a43c46d9206e5ae419f27b6a9e840755bb18f9bd71a40c8979b7a"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:imported-module:e8f768853a72068fa7c4980f3e0c659ea273a81af59e036d40e052f91c22603a",
+        "projection": "imported-module",
+        "consumer": "collection-review/workspace/reviews/core/tasks",
+        "provider": "collection-review/workspace/reviews/core",
+        "counts": {
+          "behavioralUsedOriginals": 0,
+          "nonBehavioralUsedOriginals": 1
+        },
+        "originalOwners": [
+          {
+            "owner": "collection-review/workspace/reviews/core",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 1
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/reviews/core",
+              "file": "interfaces/port.ts",
+              "binding": "InspectionPort"
+            },
+            "originalOwner": "collection-review/workspace/reviews/core",
+            "importedModule": "collection-review/workspace/reviews/core",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/subs/tasks/src/inspection-task.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/interfaces/port.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/interfaces/port.ts"
+            ],
+            "accessIds": [
+              "access/1:130d47daba8d74012f2f247237ad10ddf667ca2a2bc793651f4b240dbde8c3d0"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:imported-module:b65616e7b7d5c9833aa5cfec22f033ac44592f5c8878b4b2ea02120525c4b313",
+        "projection": "imported-module",
+        "consumer": "collection-review/workspace/reviews/ui",
+        "provider": "collection-review",
+        "counts": {
+          "behavioralUsedOriginals": 0,
+          "nonBehavioralUsedOriginals": 1
+        },
+        "originalOwners": [
+          {
+            "owner": "collection-review",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 1
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review",
+              "file": "assembly.ts",
+              "binding": "AppRouter"
+            },
+            "originalOwner": "collection-review",
+            "importedModule": "collection-review",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/ui/src/review-panel.tsx"
+            ],
+            "importedFiles": [
+              "src/interfaces/protocol.ts"
+            ],
+            "originalFiles": [
+              "src/assembly.ts"
+            ],
+            "accessIds": [
+              "access/1:8d669d47091e88ab4758124116ead30c3905a2d9966fab690d0ad4a72664e813"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:imported-module:20055daea0d515b8c75d6bbab9d51f74f57cc65ed40912acd7cc7209d80b0f25",
+        "projection": "imported-module",
+        "consumer": "collection-review/workspace/reviews/ui",
+        "provider": "collection-review/workspace/reviews/ui/pure-ui",
+        "counts": {
+          "behavioralUsedOriginals": 1,
+          "nonBehavioralUsedOriginals": 1
+        },
+        "originalOwners": [
+          {
+            "owner": "collection-review/workspace/reviews/ui/pure-ui",
+            "counts": {
+              "behavioralUsedOriginals": 1,
+              "nonBehavioralUsedOriginals": 1
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/reviews/ui/pure-ui",
+              "file": "review-result.tsx",
+              "binding": "ReviewResult"
+            },
+            "originalOwner": "collection-review/workspace/reviews/ui/pure-ui",
+            "importedModule": "collection-review/workspace/reviews/ui/pure-ui",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/ui/src/review-panel.tsx"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.tsx"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.tsx"
+            ],
+            "accessIds": [
+              "access/1:153156981e54b11d8bfa121544462f05a6c4cf7cb293af78edb0a1b1b8137d87"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/reviews/ui/pure-ui",
+              "file": "review-result.tsx",
+              "binding": "ReviewResultProps"
+            },
+            "originalOwner": "collection-review/workspace/reviews/ui/pure-ui",
+            "importedModule": "collection-review/workspace/reviews/ui/pure-ui",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/ui/src/review-panel.tsx"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.tsx"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.tsx"
+            ],
+            "accessIds": [
+              "access/1:71fa30a205f037da495689ed51a5563afb4481d29da2f90d5e0b15dd3bdb8f7a"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:imported-module:70d64172c2e4d912b252f9fab5c0b833cccafaaa6a193949fd7cf4fad6406f56",
+        "projection": "imported-module",
+        "consumer": "collection-review/workspace/reviews/ui/pure-ui",
+        "provider": "collection-review/workspace/contracts",
+        "counts": {
+          "behavioralUsedOriginals": 0,
+          "nonBehavioralUsedOriginals": 4
+        },
+        "originalOwners": [
+          {
+            "owner": "collection-review/workspace/contracts",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 4
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "Finding"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/format.ts",
+              "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.tsx"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:39cf954dc27c3b419967737cfb157a1061ac01ee676040cc18a4388102da3696",
+              "access/1:c3ff750eaa7fa2a44838f6e2e1432682915adad8372d292805b066a8314d5fd9"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "Observation"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.tsx"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:6efa70e5b89d2611dd3449c925992ccf8b4eb44c86bac3a9881c49d896d48704"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "RecordId"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.tsx"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:2e15d750bfa79bde4ddf27dc217f1391382fc58f63294eac5bf54025ce375f3b"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "ReviewStatus"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.tsx"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:cec46940d7a3e4351052334a09b949a975479e310eaa438617e473033c8ebc60"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:imported-module:a619f109e612b155318ff78c357997fb37008eeb1a82ab994dd914f063f9422f",
+        "projection": "imported-module",
+        "consumer": "collection-review/workspace/reviews/ui/pure-ui",
+        "provider": "collection-review/workspace/shared-ui",
+        "counts": {
+          "behavioralUsedOriginals": 1,
+          "nonBehavioralUsedOriginals": 0
+        },
+        "originalOwners": [
+          {
+            "owner": "collection-review/workspace/shared-ui",
+            "counts": {
+              "behavioralUsedOriginals": 1,
+              "nonBehavioralUsedOriginals": 0
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/shared-ui",
+              "file": "status-badge.tsx",
+              "binding": "StatusBadge"
+            },
+            "originalOwner": "collection-review/workspace/shared-ui",
+            "importedModule": "collection-review/workspace/shared-ui",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.tsx"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/shared-ui/src/status-badge.tsx"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/shared-ui/src/status-badge.tsx"
+            ],
+            "accessIds": [
+              "access/1:a03a0b8b16465a54f0407c715d536c65e6ba5cf76108e74f592c0ad75856e8f4"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:imported-module:00065890cbe26db8aec397d39574edb0092ffa64e1851e414cc159bccfa5463c",
+        "projection": "imported-module",
+        "consumer": "collection-review/workspace/reviews/validation",
+        "provider": "collection-review/workspace/contracts",
+        "counts": {
+          "behavioralUsedOriginals": 0,
+          "nonBehavioralUsedOriginals": 2
+        },
+        "originalOwners": [
+          {
+            "owner": "collection-review/workspace/contracts",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 2
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "Finding"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/validation/src/validate.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:5e756fac18097e20bbb4fd5ae729557c8877c00670ef6fcbc2650c10162c5af1"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "InspectionReport"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/validation/src/validate.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:a4a25f073ba245650a02a997ac2eebe5f5407635f487d9ca1c9a882cf3d2d368"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:imported-module:58d63064df108e7d4f8a1fe834cde097c277078edd31bdc6fd7b8109804414c0",
+        "projection": "imported-module",
+        "consumer": "collection-review/workspace/shared-ui",
+        "provider": "collection-review/workspace/contracts",
+        "counts": {
+          "behavioralUsedOriginals": 0,
+          "nonBehavioralUsedOriginals": 1
+        },
+        "originalOwners": [
+          {
+            "owner": "collection-review/workspace/contracts",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 1
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "ReviewStatus"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/shared-ui/src/status-badge.tsx"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:420814fe424abfeaa1c109e2afb0e47a426795c21f1fbb2095c511b81eb1c7f9"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      }
+    ],
+    "originalOwnerEdges": [
+      {
+        "id": "dependency-edge/1:original-owner:e60acf7f9ba732e2085d8e475db9bf938acd9113efe42e25478a638eb1c67533",
+        "projection": "original-owner",
+        "consumer": "collection-review",
+        "provider": "collection-review/workspace/catalog",
+        "counts": {
+          "behavioral": 2,
+          "nonBehavioral": 0
+        },
+        "importedThrough": [
+          {
+            "module": "collection-review/workspace/catalog",
+            "counts": {
+              "behavioralUsedOriginals": 2,
+              "nonBehavioralUsedOriginals": 0
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/catalog",
+              "file": "mcp.ts",
+              "binding": "createCatalogTools"
+            },
+            "originalOwner": "collection-review/workspace/catalog",
+            "importedModule": "collection-review/workspace/catalog",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "src/assembly.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/catalog/src/mcp.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/catalog/src/mcp.ts"
+            ],
+            "accessIds": [
+              "access/1:6666dd93c85452fc567a9300f22174a84d5898035f77ba120e2cece6de3c0da0"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/catalog",
+              "file": "router.ts",
+              "binding": "createCatalogRouter"
+            },
+            "originalOwner": "collection-review/workspace/catalog",
+            "importedModule": "collection-review/workspace/catalog",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "src/assembly.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/catalog/src/router.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/catalog/src/router.ts"
+            ],
+            "accessIds": [
+              "access/1:eb667e6eba662f56bf6141ee6ef5a49bd8c0f737a701f198a35c7e5a5ec22cad"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:original-owner:2993543de900bbd4d7f6afc4e558360ae093bbad195c791402a22b6d5c7c36d6",
+        "projection": "original-owner",
+        "consumer": "collection-review",
+        "provider": "collection-review/workspace/catalog/core",
+        "counts": {
+          "behavioral": 1,
+          "nonBehavioral": 0
+        },
+        "importedThrough": [
+          {
+            "module": "collection-review/workspace/catalog/core",
+            "counts": {
+              "behavioralUsedOriginals": 1,
+              "nonBehavioralUsedOriginals": 0
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/catalog/core",
+              "file": "catalog.ts",
+              "binding": "inspect"
+            },
+            "originalOwner": "collection-review/workspace/catalog/core",
+            "importedModule": "collection-review/workspace/catalog/core",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "src/assembly.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/catalog/subs/core/src/catalog.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/catalog/subs/core/src/catalog.ts"
+            ],
+            "accessIds": [
+              "access/1:0e7b570c00dd9f2bef4a56607f40fd0aeb2bfa96a0d7d287ab83714eed9811b2"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:original-owner:55df106abd522c1f179a036b8f7eda5ca0d1aa9defb47c6135d91382e2e77d6c",
+        "projection": "original-owner",
+        "consumer": "collection-review",
+        "provider": "collection-review/workspace/reviews",
+        "counts": {
+          "behavioral": 2,
+          "nonBehavioral": 0
+        },
+        "importedThrough": [
+          {
+            "module": "collection-review/workspace/reviews",
+            "counts": {
+              "behavioralUsedOriginals": 2,
+              "nonBehavioralUsedOriginals": 0
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/reviews",
+              "file": "mcp.ts",
+              "binding": "createReviewsTools"
+            },
+            "originalOwner": "collection-review/workspace/reviews",
+            "importedModule": "collection-review/workspace/reviews",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "src/assembly.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/reviews/src/mcp.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/reviews/src/mcp.ts"
+            ],
+            "accessIds": [
+              "access/1:af8fdce448c6606553d123eec69c9d90600460536e924ef59c710efc56ea9c88"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/reviews",
+              "file": "router.ts",
+              "binding": "createReviewsRouter"
+            },
+            "originalOwner": "collection-review/workspace/reviews",
+            "importedModule": "collection-review/workspace/reviews",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "src/assembly.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/reviews/src/router.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/reviews/src/router.ts"
+            ],
+            "accessIds": [
+              "access/1:e9d591767933bf17d83b550443543109df8d7a7b69d2887fd972c3de3cddffae"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:original-owner:50ca433e6aec330e31d1e84eecea3bc2f6720d185b9bce91654e2e67a84423e6",
+        "projection": "original-owner",
+        "consumer": "collection-review",
+        "provider": "collection-review/workspace/reviews/core",
+        "counts": {
+          "behavioral": 0,
+          "nonBehavioral": 1
+        },
+        "importedThrough": [
+          {
+            "module": "collection-review/workspace/reviews/core",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 1
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/reviews/core",
+              "file": "interfaces/port.ts",
+              "binding": "InspectionPort"
+            },
+            "originalOwner": "collection-review/workspace/reviews/core",
+            "importedModule": "collection-review/workspace/reviews/core",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "src/assembly.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/interfaces/port.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/interfaces/port.ts"
+            ],
+            "accessIds": [
+              "access/1:fd44db3c1953e66cf0e0c18dc967c989041fd4808af68426f30fa752d4df8a0c"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:original-owner:d8ad42b08b86b7b1b73999e3bb640cf50c01332d77fe147678d8a383b56d1d89",
+        "projection": "original-owner",
+        "consumer": "collection-review/workspace",
+        "provider": "collection-review",
+        "counts": {
+          "behavioral": 0,
+          "nonBehavioral": 1
+        },
+        "importedThrough": [
+          {
+            "module": "collection-review",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 1
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review",
+              "file": "assembly.ts",
+              "binding": "AppRouter"
+            },
+            "originalOwner": "collection-review",
+            "importedModule": "collection-review",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/src/app.tsx",
+              "subs/workspace/src/client.ts"
+            ],
+            "importedFiles": [
+              "src/interfaces/protocol.ts"
+            ],
+            "originalFiles": [
+              "src/assembly.ts"
+            ],
+            "accessIds": [
+              "access/1:95f072f80dfc6a912a5aa6bd378fe1bdc9a18ab91259a8f2ff0d3323cc912db6",
+              "access/1:d65a9ca71de8943af0785a070e3e9228f751519a0ca0f0e28b49adb84a7e6450"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:original-owner:8707a56b7f7da654601c2be5d26586f4c8f93ee99b660473a2e6a217d2780c0f",
+        "projection": "original-owner",
+        "consumer": "collection-review/workspace",
+        "provider": "collection-review/workspace/catalog/ui",
+        "counts": {
+          "behavioral": 1,
+          "nonBehavioral": 0
+        },
+        "importedThrough": [
+          {
+            "module": "collection-review/workspace/catalog/ui",
+            "counts": {
+              "behavioralUsedOriginals": 1,
+              "nonBehavioralUsedOriginals": 0
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/catalog/ui",
+              "file": "catalog-card.tsx",
+              "binding": "CatalogCard"
+            },
+            "originalOwner": "collection-review/workspace/catalog/ui",
+            "importedModule": "collection-review/workspace/catalog/ui",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "subs/workspace/src/app.tsx"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/catalog/subs/ui/src/catalog-card.tsx"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/catalog/subs/ui/src/catalog-card.tsx"
+            ],
+            "accessIds": [
+              "access/1:55319fa702728f652995941ac62aae5782bb97561b78e17fdf38484c567fe5e3"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:original-owner:9cd63fffdc180db1ca161236ba19806ee3d172d44fcf51d2851a94ac69e5ec85",
+        "projection": "original-owner",
+        "consumer": "collection-review/workspace",
+        "provider": "collection-review/workspace/reviews/ui",
+        "counts": {
+          "behavioral": 1,
+          "nonBehavioral": 0
+        },
+        "importedThrough": [
+          {
+            "module": "collection-review/workspace/reviews/ui",
+            "counts": {
+              "behavioralUsedOriginals": 1,
+              "nonBehavioralUsedOriginals": 0
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/reviews/ui",
+              "file": "review-panel.tsx",
+              "binding": "ReviewPanel"
+            },
+            "originalOwner": "collection-review/workspace/reviews/ui",
+            "importedModule": "collection-review/workspace/reviews/ui",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "subs/workspace/src/app.tsx"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/reviews/subs/ui/src/review-panel.tsx"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/reviews/subs/ui/src/review-panel.tsx"
+            ],
+            "accessIds": [
+              "access/1:62a017e22fdbe22a41b02c0e2dd3816f2a2dddf10fa236fa25ec55d662edd624"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:original-owner:8b2ee2a6dd0b74de8736fe2817fc0d138469d76cbf479294b859b508a6c45ee4",
+        "projection": "original-owner",
+        "consumer": "collection-review/workspace/catalog",
+        "provider": "collection-review",
+        "counts": {
+          "behavioral": 0,
+          "nonBehavioral": 2
+        },
+        "importedThrough": [
+          {
+            "module": "collection-review",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 2
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review",
+              "file": "interfaces/protocol.ts",
+              "binding": "McpToolContribution"
+            },
+            "originalOwner": "collection-review",
+            "importedModule": "collection-review",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/catalog/src/mcp.ts"
+            ],
+            "importedFiles": [
+              "src/interfaces/protocol.ts"
+            ],
+            "originalFiles": [
+              "src/interfaces/protocol.ts"
+            ],
+            "accessIds": [
+              "access/1:a74706fec9d54f323747aecebd246c1f5dfb0f169b7f42e97a758f883c30768e"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review",
+              "file": "interfaces/protocol.ts",
+              "binding": "ProtocolFacilities"
+            },
+            "originalOwner": "collection-review",
+            "importedModule": "collection-review",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/catalog/src/router.ts"
+            ],
+            "importedFiles": [
+              "src/interfaces/protocol.ts"
+            ],
+            "originalFiles": [
+              "src/interfaces/protocol.ts"
+            ],
+            "accessIds": [
+              "access/1:197f72694ecfdb4598c628ecaf5cdc81b0fbb55455ac494f883c732dc67cef25"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:original-owner:e7f76aeeb3a53927e46b6c03e45e6e6341a7678354249175f1310c3676e028e7",
+        "projection": "original-owner",
+        "consumer": "collection-review/workspace/catalog",
+        "provider": "collection-review/workspace/catalog/core",
+        "counts": {
+          "behavioral": 2,
+          "nonBehavioral": 1
+        },
+        "importedThrough": [
+          {
+            "module": "collection-review/workspace/catalog/core",
+            "counts": {
+              "behavioralUsedOriginals": 2,
+              "nonBehavioralUsedOriginals": 1
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/catalog/core",
+              "file": "catalog.ts",
+              "binding": "CatalogSummary"
+            },
+            "originalOwner": "collection-review/workspace/catalog/core",
+            "importedModule": "collection-review/workspace/catalog/core",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/catalog/src/router.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/catalog/subs/core/src/catalog.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/catalog/subs/core/src/catalog.ts"
+            ],
+            "accessIds": [
+              "access/1:61e75c896dbcf58175125eb00f57aebe536b84935d007a62ce9499f491853d23"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/catalog/core",
+              "file": "catalog.ts",
+              "binding": "getRecord"
+            },
+            "originalOwner": "collection-review/workspace/catalog/core",
+            "importedModule": "collection-review/workspace/catalog/core",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/catalog/src/router.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/catalog/subs/core/src/catalog.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/catalog/subs/core/src/catalog.ts"
+            ],
+            "accessIds": [
+              "access/1:0a9cef9373dc0162a6898f6a0f215873d15940cf3969e4c03914ea432d1af751"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/catalog/core",
+              "file": "catalog.ts",
+              "binding": "inspect"
+            },
+            "originalOwner": "collection-review/workspace/catalog/core",
+            "importedModule": "collection-review/workspace/catalog/core",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/catalog/src/mcp.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/catalog/subs/core/src/catalog.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/catalog/subs/core/src/catalog.ts"
+            ],
+            "accessIds": [
+              "access/1:3fcdbf432de53f970397947a2d52cfd86bc68e786cc5b6df835320ca6ae71cb8"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:original-owner:5e94687bfd396e99ed23000b2182514d2c75c6552c954943abc58412c8f43541",
+        "projection": "original-owner",
+        "consumer": "collection-review/workspace/catalog",
+        "provider": "collection-review/workspace/contracts",
+        "counts": {
+          "behavioral": 0,
+          "nonBehavioral": 3
+        },
+        "importedThrough": [
+          {
+            "module": "collection-review/workspace/contracts",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 3
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "Observation"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/catalog/src/mcp.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:579de68f25bab754db7d9837ecdc303f349b0570c94ab51ee595044e62641ca6"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "recordIdSchema"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/catalog/src/mcp.ts",
+              "subs/workspace/subs/catalog/src/router.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:4286af718190439ec5ef372a2f1a8824952fa70ab0ec49c7d65c87c049fe6c1b",
+              "access/1:467915f7c9847e678cd787042344be6bd10a8299dfa5be6aa3536edf57f86171"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "revisionScopeSchema"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/catalog/src/mcp.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:72be40b9dc1c60e94d5df058c7ea39edbec4efeb5e03073d1ef30988c08c0679"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:original-owner:c9e32bf6ef2726b6ef28d5af2a17fd8a3f016149f992dfaa16b21c762c8fd5fa",
+        "projection": "original-owner",
+        "consumer": "collection-review/workspace/catalog/core",
+        "provider": "collection-review/workspace/contracts",
+        "counts": {
+          "behavioral": 0,
+          "nonBehavioral": 6
+        },
+        "importedThrough": [
+          {
+            "module": "collection-review/workspace/contracts",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 6
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "InspectionReport"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/catalog/subs/core/src/catalog.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:81f98bb71c87201b00b63f9487c1bbc9b5ee42bd6edbcb12144ff88ad8e7563a"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "ObservationCallback"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/catalog/subs/core/src/catalog.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:033a8315c38711816f96ad6705d16a2e20c5070be410afb7d4d578e20ae7c631"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "RecordId"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/catalog/subs/core/src/catalog.ts",
+              "subs/workspace/subs/catalog/subs/core/src/records.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:0ad3ac722b118c3804166312bc21f216ee3c8956d178f6f925769746ea22cc73",
+              "access/1:3c34fda68672559c674244770446fb9f475ef7f8ad15b830ff792357463fc5c0"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "RevisionChain"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/catalog/subs/core/src/catalog.ts",
+              "subs/workspace/subs/catalog/subs/core/src/history.ts",
+              "subs/workspace/subs/catalog/subs/core/src/records.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:0ae17076a5871d1b260f51a8bf33afc1302c8f8d07135c07dd78afb056bdc40d",
+              "access/1:9a3d9f168f9dff54442e8678982e4772e471a6c060f95feafeec0aac2c0d31fb",
+              "access/1:faf00e8192e8868bdad29738f8bbd1b821dccaf0ec5c7a816992745c3ccec710"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "RevisionScope"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/catalog/subs/core/src/catalog.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:b153480ad42083d37e55f8adbf9a90712394cd39b55d4965662552774f9489a2"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "revisionChainSchema"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/catalog/subs/core/src/records.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:648e3c7e00484cd7bee0a79c73775ced0d85abfd72986d674066736a5151589c"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:original-owner:d16fe1566dfe0733b08944027aff3b56626929231da4e56da9f86e2f88c21c89",
+        "projection": "original-owner",
+        "consumer": "collection-review/workspace/catalog/ui",
+        "provider": "collection-review/workspace/catalog/core",
+        "counts": {
+          "behavioral": 0,
+          "nonBehavioral": 1
+        },
+        "importedThrough": [
+          {
+            "module": "collection-review/workspace/catalog/core",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 1
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/catalog/core",
+              "file": "catalog.ts",
+              "binding": "CatalogSummary"
+            },
+            "originalOwner": "collection-review/workspace/catalog/core",
+            "importedModule": "collection-review/workspace/catalog/core",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/catalog/subs/ui/src/catalog-card.tsx"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/catalog/subs/core/src/catalog.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/catalog/subs/core/src/catalog.ts"
+            ],
+            "accessIds": [
+              "access/1:95e29cf2019061bb915a9ee02709cb64dd45aa64668bcc80f63777dfd4cd2677"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:original-owner:37489a25e198de4c07d0d05c8eed32c10be3266d50afbca0dc54c955aaf5629e",
+        "projection": "original-owner",
+        "consumer": "collection-review/workspace/catalog/ui",
+        "provider": "collection-review/workspace/shared-ui",
+        "counts": {
+          "behavioral": 1,
+          "nonBehavioral": 0
+        },
+        "importedThrough": [
+          {
+            "module": "collection-review/workspace/shared-ui",
+            "counts": {
+              "behavioralUsedOriginals": 1,
+              "nonBehavioralUsedOriginals": 0
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/shared-ui",
+              "file": "status-badge.tsx",
+              "binding": "StatusBadge"
+            },
+            "originalOwner": "collection-review/workspace/shared-ui",
+            "importedModule": "collection-review/workspace/shared-ui",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/catalog/subs/ui/src/catalog-card.tsx"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/shared-ui/src/status-badge.tsx"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/shared-ui/src/status-badge.tsx"
+            ],
+            "accessIds": [
+              "access/1:46ba12aa0d745c27b2d6d5b9deac9a1a50d225633627e60b5d21c3a2bea85fb3"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:original-owner:c79cf21fd4550d9b92c44f7152fbc2375e873450efbf182b6c5c6de560f38828",
+        "projection": "original-owner",
+        "consumer": "collection-review/workspace/reviews",
+        "provider": "collection-review",
+        "counts": {
+          "behavioral": 0,
+          "nonBehavioral": 3
+        },
+        "importedThrough": [
+          {
+            "module": "collection-review",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 3
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review",
+              "file": "interfaces/protocol.ts",
+              "binding": "McpToolContribution"
+            },
+            "originalOwner": "collection-review",
+            "importedModule": "collection-review",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/src/mcp.ts"
+            ],
+            "importedFiles": [
+              "src/interfaces/protocol.ts"
+            ],
+            "originalFiles": [
+              "src/interfaces/protocol.ts"
+            ],
+            "accessIds": [
+              "access/1:229d6fb3564a6de34d5d5d08a5920fe949886bf927de32d0c88c9556bbb3d947"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review",
+              "file": "interfaces/protocol.ts",
+              "binding": "ProtocolFacilities"
+            },
+            "originalOwner": "collection-review",
+            "importedModule": "collection-review",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/src/router.ts"
+            ],
+            "importedFiles": [
+              "src/interfaces/protocol.ts"
+            ],
+            "originalFiles": [
+              "src/interfaces/protocol.ts"
+            ],
+            "accessIds": [
+              "access/1:81bebbc154995ab8009d939fc6bdd33a9603768e4f1d90162df8e381d9dde3ab"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review",
+              "file": "interfaces/protocol.ts",
+              "binding": "ToolInvocation"
+            },
+            "originalOwner": "collection-review",
+            "importedModule": "collection-review",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/src/mcp.ts"
+            ],
+            "importedFiles": [
+              "src/interfaces/protocol.ts"
+            ],
+            "originalFiles": [
+              "src/interfaces/protocol.ts"
+            ],
+            "accessIds": [
+              "access/1:5b93deea916ee079cfa3794a58276d242760a3806e6e8f4c66839c6a731b3ffb"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:original-owner:a0f4a2a72deb8dbd60790470feb0a30d8cd796586d98433d479596853e6d9208",
+        "projection": "original-owner",
+        "consumer": "collection-review/workspace/reviews",
+        "provider": "collection-review/workspace/contracts",
+        "counts": {
+          "behavioral": 0,
+          "nonBehavioral": 4
+        },
+        "importedThrough": [
+          {
+            "module": "collection-review/workspace/contracts",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 4
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "RecordId"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/src/mcp.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:48811cd2996a49f8d00a01a1be4abadb4156d28cda5b37ec3b14f3fd4f520075"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "RevisionScope"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/src/mcp.ts",
+              "subs/workspace/subs/reviews/src/session.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:441911e8ef3e308d90e31f9186f7cb629cb3b250d07d962521e316ad83821ee1",
+              "access/1:e45a486d2450869a4d28da4c6f28ebd4b62e55a52221a13d739d7c7db86821a5"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "recordIdSchema"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/src/mcp.ts",
+              "subs/workspace/subs/reviews/src/router.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:62be46fde6ed39316cd0dbeab144d312058bfc70e51dea1fb4026a18bb3bbb6d",
+              "access/1:f9f7fe70fdd86eb77cd01836dc3d4d0da2496afe5c08ec608db7e8d770ed83eb"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "revisionScopeSchema"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/src/mcp.ts",
+              "subs/workspace/subs/reviews/src/router.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:6335c631e15305521299beaad6fabd3897837ce4336fe3090db9a415202f199a",
+              "access/1:e30bfab4be855a8e51148e73f8adfc452cfbb0c36a4180712f86f3fb6ed03563"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:original-owner:f9b71bf9c871d45e765921b7e46f23f153c18d9a6824c1509b4e88f635fbd7c6",
+        "projection": "original-owner",
+        "consumer": "collection-review/workspace/reviews",
+        "provider": "collection-review/workspace/reviews/core",
+        "counts": {
+          "behavioral": 1,
+          "nonBehavioral": 2
+        },
+        "importedThrough": [
+          {
+            "module": "collection-review/workspace/reviews/core",
+            "counts": {
+              "behavioralUsedOriginals": 1,
+              "nonBehavioralUsedOriginals": 2
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/reviews/core",
+              "file": "interfaces/port.ts",
+              "binding": "InspectionPort"
+            },
+            "originalOwner": "collection-review/workspace/reviews/core",
+            "importedModule": "collection-review/workspace/reviews/core",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/src/mcp.ts",
+              "subs/workspace/subs/reviews/src/router.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/interfaces/port.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/interfaces/port.ts"
+            ],
+            "accessIds": [
+              "access/1:62b7ba2b564869adc3c31e4e0498b7bf32d48ffb815547a4863d6d9bfc43c4b3",
+              "access/1:a2fa147409cd7bfd0b16438de1af95ce656a20fc9d40e1ab7ebecd2c6ef02a4b"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/reviews/core",
+              "file": "runtime.ts",
+              "binding": "ReviewOutcome"
+            },
+            "originalOwner": "collection-review/workspace/reviews/core",
+            "importedModule": "collection-review/workspace/reviews/core",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/src/router.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/runtime.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/runtime.ts"
+            ],
+            "accessIds": [
+              "access/1:974e9cd2728142732c51ab7f72a2d0356ab593146b9f4423afc02ad3c0aec5c6"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/reviews/core",
+              "file": "runtime.ts",
+              "binding": "createReviewRuntime"
+            },
+            "originalOwner": "collection-review/workspace/reviews/core",
+            "importedModule": "collection-review/workspace/reviews/core",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/src/mcp.ts",
+              "subs/workspace/subs/reviews/src/router.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/runtime.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/runtime.ts"
+            ],
+            "accessIds": [
+              "access/1:5a6f251b59e5d5053f5d2ceeafd2e5d3849558909ef8c939b2dd5054b8ca7c76",
+              "access/1:6878122a0930c820f841b1de978566cf3d7ef1982a50f290554ea7963caf31cc"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:original-owner:b793aeaa54eb9b1c5ba1bd6218d62e7aa9700cf9c26d88f2143d108ee24d461a",
+        "projection": "original-owner",
+        "consumer": "collection-review/workspace/reviews/core",
+        "provider": "collection-review/workspace/contracts",
+        "counts": {
+          "behavioral": 0,
+          "nonBehavioral": 7
+        },
+        "importedThrough": [
+          {
+            "module": "collection-review/workspace/contracts",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 7
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "Finding"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/runtime.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:09f9eef7004c238a4c5d6e08714027938db655e11c69e7061257cb348d61c8be"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "InspectionReport"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/interfaces/port.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:2814ec0e6b67eee848b5dc2c3d625401daad43ef0348c45301cb0a9558132882"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "Observation"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/runtime.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:3c9f99234e20797ce2bb3718de4597ca7604928d585ff386419bc886dcd11e1c"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "ObservationCallback"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/interfaces/port.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:a163d237a827969773addc376958904af10faaf8dc3ab466d6261e1e35bc0e48"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "RecordId"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/interfaces/port.ts",
+              "subs/workspace/subs/reviews/subs/core/src/runtime.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:3ab7e79a4f46cfbacaa172afc805b753f6da96688a9a4e727dcc1c8299bd3665",
+              "access/1:556da060bb62bdd5adaddf7e7a139f5f1da15c5ddc2c3f88cdc294ce7fc64f86"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "ReviewStatus"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/runtime.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:21be5f79321ec1bf25ea8b49db022d3c0fc627361a54de454f15bc41052648ad"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "RevisionScope"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/interfaces/port.ts",
+              "subs/workspace/subs/reviews/subs/core/src/runtime.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:35e91c1a637790cf792cfd6268a8924ea88caedc648fdb806b60ff34c1854698",
+              "access/1:65db2b85fc3a58f9236743245ab2f836c885a121ae28b7c9c260a54b9a464c61"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:original-owner:20f3801fbfcece964110d4b343fe29e5472bbe13276b36b792dc9447bd45b39b",
+        "projection": "original-owner",
+        "consumer": "collection-review/workspace/reviews/core",
+        "provider": "collection-review/workspace/reviews/core/controller",
+        "counts": {
+          "behavioral": 1,
+          "nonBehavioral": 0
+        },
+        "importedThrough": [
+          {
+            "module": "collection-review/workspace/reviews/core/controller",
+            "counts": {
+              "behavioralUsedOriginals": 1,
+              "nonBehavioralUsedOriginals": 0
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/reviews/core/controller",
+              "file": "controller.ts",
+              "binding": "tick"
+            },
+            "originalOwner": "collection-review/workspace/reviews/core/controller",
+            "importedModule": "collection-review/workspace/reviews/core/controller",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/runtime.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/reviews/subs/core/subs/controller/src/controller.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/reviews/subs/core/subs/controller/src/controller.ts"
+            ],
+            "accessIds": [
+              "access/1:bf2b1332d39a3b8aba515723ee5e13487523fd426182d49b40eef4e79ec0c756"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:original-owner:9b306389961fb6461e7b150d52edaca61ec8f036dddadb169c8fe2cf1364fd9c",
+        "projection": "original-owner",
+        "consumer": "collection-review/workspace/reviews/core",
+        "provider": "collection-review/workspace/reviews/validation",
+        "counts": {
+          "behavioral": 1,
+          "nonBehavioral": 0
+        },
+        "importedThrough": [
+          {
+            "module": "collection-review/workspace/reviews/validation",
+            "counts": {
+              "behavioralUsedOriginals": 1,
+              "nonBehavioralUsedOriginals": 0
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/reviews/validation",
+              "file": "validate.ts",
+              "binding": "validateRevisionChain"
+            },
+            "originalOwner": "collection-review/workspace/reviews/validation",
+            "importedModule": "collection-review/workspace/reviews/validation",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/runtime.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/reviews/subs/validation/src/validate.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/reviews/subs/validation/src/validate.ts"
+            ],
+            "accessIds": [
+              "access/1:c28baf02e058bad76ecddcbd13861a589f7e11d7b99ecd2d49ba78e9db6f3617"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:original-owner:2e0cc60e9839133cfaaa030fe55213b1e4e97e7684e95d2ba167f142afaae54c",
+        "projection": "original-owner",
+        "consumer": "collection-review/workspace/reviews/core/controller",
+        "provider": "collection-review/workspace/reviews/core/tasks",
+        "counts": {
+          "behavioral": 2,
+          "nonBehavioral": 0
+        },
+        "importedThrough": [
+          {
+            "module": "collection-review/workspace/reviews/core/tasks",
+            "counts": {
+              "behavioralUsedOriginals": 2,
+              "nonBehavioralUsedOriginals": 0
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/reviews/core/tasks",
+              "file": "inspection-task.ts",
+              "binding": "runInspectionTask"
+            },
+            "originalOwner": "collection-review/workspace/reviews/core/tasks",
+            "importedModule": "collection-review/workspace/reviews/core/tasks",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/subs/controller/src/controller.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/reviews/subs/core/subs/tasks/src/inspection-task.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/reviews/subs/core/subs/tasks/src/inspection-task.ts"
+            ],
+            "accessIds": [
+              "access/1:47706aa5337f8501fc9cef39b5cd449ed3888de61f11a38a298373e2c28aa174"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/reviews/core/tasks",
+              "file": "result.ts",
+              "binding": "summarizeTaskResult"
+            },
+            "originalOwner": "collection-review/workspace/reviews/core/tasks",
+            "importedModule": "collection-review/workspace/reviews/core/tasks",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/subs/controller/src/controller.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/reviews/subs/core/subs/tasks/src/result.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/reviews/subs/core/subs/tasks/src/result.ts"
+            ],
+            "accessIds": [
+              "access/1:b0f710177b189b60b8a36b81da11624b0f560faef3fb2f248e7cbf7d18113ad2"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:original-owner:89e4a7b514bc539bc2c9c441348580d0b9d9532177c8356c768372dd067c621c",
+        "projection": "original-owner",
+        "consumer": "collection-review/workspace/reviews/core/tasks",
+        "provider": "collection-review/workspace/contracts",
+        "counts": {
+          "behavioral": 0,
+          "nonBehavioral": 7
+        },
+        "importedThrough": [
+          {
+            "module": "collection-review/workspace/contracts",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 7
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "Finding"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/subs/tasks/src/inspection-task.ts",
+              "subs/workspace/subs/reviews/subs/core/subs/tasks/src/result.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:03d3350207ace20162c9610e134f77ee573ea02687eb8709dca9ef6aaa278132",
+              "access/1:89fdba281964ee390badfbf21a19f432c4a05c9231ab17902a8b37e80a7bbf71"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "InspectionReport"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/subs/tasks/src/inspection-task.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:eb3821a38518bb787325489b70bba02451aabf26701a31930955d953ef05401b"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "Observation"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/subs/tasks/src/inspection-task.ts",
+              "subs/workspace/subs/reviews/subs/core/subs/tasks/src/result.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:5b3f78c3352600ece28879a0f19923b5d029108f9e0a06fd051307eac1e586c8",
+              "access/1:81a5372353805f8b940d86ad1c13dc2d2e53037a6847cf75ed64523fda2eba24"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "ObservationCallback"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/subs/tasks/src/inspection-task.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:a39fffb662305081018d2c85e1355e2c44fe6cefaa0628fdce1a614e9aab5606"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "RecordId"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/subs/tasks/src/inspection-task.ts",
+              "subs/workspace/subs/reviews/subs/core/subs/tasks/src/result.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:105b2ff91b147b3dd919065e29d127db4b845695a12bbf941c0f2dde159f6138",
+              "access/1:57c705494f4bdbbd496b570dc8427d4f95a2f30a012fd7c043c5d8a7e4632f08"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "ReviewStatus"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/subs/tasks/src/result.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:d81c7d9ae1f414c7a195c37c65f4c5913a1eac327d01a0f102967f705feb63ed"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "RevisionScope"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/subs/tasks/src/inspection-task.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:fd82484c749a43c46d9206e5ae419f27b6a9e840755bb18f9bd71a40c8979b7a"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:original-owner:e8f768853a72068fa7c4980f3e0c659ea273a81af59e036d40e052f91c22603a",
+        "projection": "original-owner",
+        "consumer": "collection-review/workspace/reviews/core/tasks",
+        "provider": "collection-review/workspace/reviews/core",
+        "counts": {
+          "behavioral": 0,
+          "nonBehavioral": 1
+        },
+        "importedThrough": [
+          {
+            "module": "collection-review/workspace/reviews/core",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 1
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/reviews/core",
+              "file": "interfaces/port.ts",
+              "binding": "InspectionPort"
+            },
+            "originalOwner": "collection-review/workspace/reviews/core",
+            "importedModule": "collection-review/workspace/reviews/core",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/core/subs/tasks/src/inspection-task.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/interfaces/port.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/reviews/subs/core/src/interfaces/port.ts"
+            ],
+            "accessIds": [
+              "access/1:130d47daba8d74012f2f247237ad10ddf667ca2a2bc793651f4b240dbde8c3d0"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:original-owner:b65616e7b7d5c9833aa5cfec22f033ac44592f5c8878b4b2ea02120525c4b313",
+        "projection": "original-owner",
+        "consumer": "collection-review/workspace/reviews/ui",
+        "provider": "collection-review",
+        "counts": {
+          "behavioral": 0,
+          "nonBehavioral": 1
+        },
+        "importedThrough": [
+          {
+            "module": "collection-review",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 1
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review",
+              "file": "assembly.ts",
+              "binding": "AppRouter"
+            },
+            "originalOwner": "collection-review",
+            "importedModule": "collection-review",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/ui/src/review-panel.tsx"
+            ],
+            "importedFiles": [
+              "src/interfaces/protocol.ts"
+            ],
+            "originalFiles": [
+              "src/assembly.ts"
+            ],
+            "accessIds": [
+              "access/1:8d669d47091e88ab4758124116ead30c3905a2d9966fab690d0ad4a72664e813"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:original-owner:20055daea0d515b8c75d6bbab9d51f74f57cc65ed40912acd7cc7209d80b0f25",
+        "projection": "original-owner",
+        "consumer": "collection-review/workspace/reviews/ui",
+        "provider": "collection-review/workspace/reviews/ui/pure-ui",
+        "counts": {
+          "behavioral": 1,
+          "nonBehavioral": 1
+        },
+        "importedThrough": [
+          {
+            "module": "collection-review/workspace/reviews/ui/pure-ui",
+            "counts": {
+              "behavioralUsedOriginals": 1,
+              "nonBehavioralUsedOriginals": 1
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/reviews/ui/pure-ui",
+              "file": "review-result.tsx",
+              "binding": "ReviewResult"
+            },
+            "originalOwner": "collection-review/workspace/reviews/ui/pure-ui",
+            "importedModule": "collection-review/workspace/reviews/ui/pure-ui",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/ui/src/review-panel.tsx"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.tsx"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.tsx"
+            ],
+            "accessIds": [
+              "access/1:153156981e54b11d8bfa121544462f05a6c4cf7cb293af78edb0a1b1b8137d87"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/reviews/ui/pure-ui",
+              "file": "review-result.tsx",
+              "binding": "ReviewResultProps"
+            },
+            "originalOwner": "collection-review/workspace/reviews/ui/pure-ui",
+            "importedModule": "collection-review/workspace/reviews/ui/pure-ui",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/ui/src/review-panel.tsx"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.tsx"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.tsx"
+            ],
+            "accessIds": [
+              "access/1:71fa30a205f037da495689ed51a5563afb4481d29da2f90d5e0b15dd3bdb8f7a"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:original-owner:70d64172c2e4d912b252f9fab5c0b833cccafaaa6a193949fd7cf4fad6406f56",
+        "projection": "original-owner",
+        "consumer": "collection-review/workspace/reviews/ui/pure-ui",
+        "provider": "collection-review/workspace/contracts",
+        "counts": {
+          "behavioral": 0,
+          "nonBehavioral": 4
+        },
+        "importedThrough": [
+          {
+            "module": "collection-review/workspace/contracts",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 4
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "Finding"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/format.ts",
+              "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.tsx"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:39cf954dc27c3b419967737cfb157a1061ac01ee676040cc18a4388102da3696",
+              "access/1:c3ff750eaa7fa2a44838f6e2e1432682915adad8372d292805b066a8314d5fd9"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "Observation"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.tsx"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:6efa70e5b89d2611dd3449c925992ccf8b4eb44c86bac3a9881c49d896d48704"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "RecordId"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.tsx"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:2e15d750bfa79bde4ddf27dc217f1391382fc58f63294eac5bf54025ce375f3b"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "ReviewStatus"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.tsx"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:cec46940d7a3e4351052334a09b949a975479e310eaa438617e473033c8ebc60"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:original-owner:a619f109e612b155318ff78c357997fb37008eeb1a82ab994dd914f063f9422f",
+        "projection": "original-owner",
+        "consumer": "collection-review/workspace/reviews/ui/pure-ui",
+        "provider": "collection-review/workspace/shared-ui",
+        "counts": {
+          "behavioral": 1,
+          "nonBehavioral": 0
+        },
+        "importedThrough": [
+          {
+            "module": "collection-review/workspace/shared-ui",
+            "counts": {
+              "behavioralUsedOriginals": 1,
+              "nonBehavioralUsedOriginals": 0
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/shared-ui",
+              "file": "status-badge.tsx",
+              "binding": "StatusBadge"
+            },
+            "originalOwner": "collection-review/workspace/shared-ui",
+            "importedModule": "collection-review/workspace/shared-ui",
+            "classification": "behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.tsx"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/shared-ui/src/status-badge.tsx"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/shared-ui/src/status-badge.tsx"
+            ],
+            "accessIds": [
+              "access/1:a03a0b8b16465a54f0407c715d536c65e6ba5cf76108e74f592c0ad75856e8f4"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:original-owner:00065890cbe26db8aec397d39574edb0092ffa64e1851e414cc159bccfa5463c",
+        "projection": "original-owner",
+        "consumer": "collection-review/workspace/reviews/validation",
+        "provider": "collection-review/workspace/contracts",
+        "counts": {
+          "behavioral": 0,
+          "nonBehavioral": 2
+        },
+        "importedThrough": [
+          {
+            "module": "collection-review/workspace/contracts",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 2
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "Finding"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/validation/src/validate.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:5e756fac18097e20bbb4fd5ae729557c8877c00670ef6fcbc2650c10162c5af1"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          },
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "InspectionReport"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/reviews/subs/validation/src/validate.ts"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:a4a25f073ba245650a02a997ac2eebe5f5407635f487d9ca1c9a882cf3d2d368"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      },
+      {
+        "id": "dependency-edge/1:original-owner:58d63064df108e7d4f8a1fe834cde097c277078edd31bdc6fd7b8109804414c0",
+        "projection": "original-owner",
+        "consumer": "collection-review/workspace/shared-ui",
+        "provider": "collection-review/workspace/contracts",
+        "counts": {
+          "behavioral": 0,
+          "nonBehavioral": 1
+        },
+        "importedThrough": [
+          {
+            "module": "collection-review/workspace/contracts",
+            "counts": {
+              "behavioralUsedOriginals": 0,
+              "nonBehavioralUsedOriginals": 1
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "original": {
+              "kind": "code",
+              "owner": "collection-review/workspace/contracts",
+              "file": "interfaces/vocabulary.ts",
+              "binding": "ReviewStatus"
+            },
+            "originalOwner": "collection-review/workspace/contracts",
+            "importedModule": "collection-review/workspace/contracts",
+            "classification": "non-behavioral",
+            "consumerFiles": [
+              "subs/workspace/subs/shared-ui/src/status-badge.tsx"
+            ],
+            "importedFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "originalFiles": [
+              "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts"
+            ],
+            "accessIds": [
+              "access/1:420814fe424abfeaa1c109e2afb0e47a426795c21f1fbb2095c511b81eb1c7f9"
+            ],
+            "status": "allowed",
+            "reasons": [
+              "exposed"
+            ],
+            "coverageIds": []
+          }
+        ]
+      }
+    ],
+    "coverage": {
+      "unknownDependencies": 0,
+      "limitIds": []
+    }
+  }
+}
