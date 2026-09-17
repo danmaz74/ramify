@@ -143,6 +143,12 @@ async function main(): Promise<void> {
     commit: before.commit, clean: before.clean, revision,
     check: report.outcome.check, coverage: modularity.report.coverage.state,
     production: production.summary.all, behavior: production.behavior,
+    dependencyDiagram: production.dependencyDiagram.state === 'unavailable' ? production.dependencyDiagram : (() => {
+      const diagram = production.dependencyDiagram.state === 'measured' ? production.dependencyDiagram.value : production.dependencyDiagram.observed;
+      return { state: production.dependencyDiagram.state, inputId: diagram.inputId, modules: diagram.modules.length,
+        headline: diagram.headline, boundaries: diagram.boundaries.length, coverage: diagram.coverage,
+        encodedBytes: Buffer.byteLength(JSON.stringify(diagram), 'utf8') };
+    })(),
     changeAffinity: affinity.report.commits,
     candidates: evaluations.map(evaluation => ({ id: evaluation.modularity.provenance.candidateId,
       production: evaluation.modularity.views[0]!.summary.all, boundaryChanges: evaluation.modularity.boundaryChanges!.total })),

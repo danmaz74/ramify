@@ -12,6 +12,7 @@ import type {
   BoundaryMetrics,
   ChangeAffinityReport,
   CycleComponent,
+  DependencyDiagramFacts,
   EdgeMetrics,
   LoadVariants,
   Metric,
@@ -231,6 +232,36 @@ function renderEvaluation(evaluation: ModularityEvaluation): string {
       ['**Total**', cell(view.behavior, v => integer(v.behavioralDependencies)), cell(view.behavior, v => integer(v.nonBehavioralDependencies)),
         coverageText(view.behavior)]], [1, 2])));
 
+  // 4b. Dependency-diagram facts behind both endpoint projections.
+  section('## Dependency diagram facts',
+    'Boundary facts are distinct (consumer, imported module, original) triples; original-owner links regroup them by (consumer, original) with the precedence behavioral, unknown, non-behavioral.'
+      + ' Unknown facts add no count, and imported-module links omit consumer-owned import targets.\n',
+    table(['View', 'Coverage', 'Modules', 'Headline behavioral', 'Headline non-behavioral', 'Boundary facts (behavioral/non-behavioral/unknown)',
+      'Imported-module links (behavioral/any known)', 'Original-owner links (behavioral/any known)', 'Denied/limited facts', 'Encoded bytes'],
+    views.map(view => {
+      const diagram = valueOf(view.dependencyDiagram);
+      if (!diagram) return [view.filter, coverageText(view.dependencyDiagram), ...Array<string>(8).fill('unavailable')];
+      const by = (classification: string) => diagram.boundaries.filter(fact => fact.classification === classification).length;
+      const imported = diagramLinks(diagram, 'imported-module');
+      const owners = diagramLinks(diagram, 'original-owner');
+      const linkCount = (links: readonly DiagramLink[]) => `${links.filter(link => link.behavioral > 0).length}/${links.length}`;
+      return [view.filter, coverageText(view.dependencyDiagram), integer(diagram.modules.length),
+        integer(diagram.headline.behavioralDependencies), integer(diagram.headline.nonBehavioralDependencies),
+        `${by('behavioral')}/${by('non-behavioral')}/${by('unknown')}`, linkCount(imported), linkCount(owners),
+        `${diagram.boundaries.filter(fact => fact.status === 'denied').length}/${diagram.boundaries.filter(fact => fact.status === 'limited').length}`,
+        integer(Buffer.byteLength(JSON.stringify(diagram), 'utf8'))];
+    }), numeric(2, 9)));
+  const productionDiagram = valueOf(production.dependencyDiagram);
+  if (productionDiagram) {
+    for (const projection of ['imported-module', 'original-owner'] as const) {
+      section(`### Production ${projection} links`,
+        `Counts are ${projection === 'imported-module' ? 'used originals via the boundary' : 'distinct (consumer, original) dependencies'}; status precedence is denied, limited, allowed.\n`,
+        table(['Consumer', projection === 'imported-module' ? 'Imported module' : 'Original owner', 'Behavioral', 'Non-behavioral', 'Status'],
+          diagramLinks(productionDiagram, projection).map(link => [code(link.consumer), code(link.provider), integer(link.behavioral),
+            integer(link.nonBehavioral), link.status]), [2, 3]));
+    }
+  }
+
   // 5. Contract breadth and repository interface use.
   for (const view of views) {
     section(`## Contract breadth: ${view.filter}`,
@@ -291,6 +322,40 @@ function renderEvaluation(evaluation: ModularityEvaluation): string {
 function directionText(direction: StabilityDirection): string {
   return direction === 'undefined' ? 'undefined' : direction.replace(/-/g, ' ');
 }
+interface DiagramLink {
+  readonly consumer: string;
+  readonly provider: string;
+  readonly behavioral: number;
+  readonly nonBehavioral: number;
+  readonly status: 'allowed' | 'limited' | 'denied';
+}
+/** Known links of one endpoint projection, by consumer then provider; unknown units and self-links are omitted. */
+function diagramLinks(diagram: DependencyDiagramFacts, projection: 'imported-module' | 'original-owner'): DiagramLink[] {
+  const rank = { allowed: 0, limited: 1, denied: 2 } as const;
+  const order = ['behavioral', 'unknown', 'non-behavioral'];
+  const units = new Map<string, { consumer: string; provider: string; classification: string; status: DiagramLink['status'] }>();
+  for (const fact of diagram.boundaries) {
+    const provider = projection === 'imported-module' ? fact.importedModule : fact.originalOwner;
+    if (provider === fact.consumer) continue;
+    const key = JSON.stringify([fact.consumer, provider, fact.original.kind, fact.originalFiles, fact.original.binding]);
+    const unit = units.get(key) ?? { consumer: fact.consumer, provider, classification: fact.classification, status: fact.status };
+    if (order.indexOf(fact.classification) < order.indexOf(unit.classification)) unit.classification = fact.classification;
+    if (rank[fact.status] > rank[unit.status]) unit.status = fact.status;
+    units.set(key, unit);
+  }
+  const links = new Map<string, { consumer: string; provider: string; behavioral: number; nonBehavioral: number; status: DiagramLink['status'] }>();
+  for (const unit of units.values()) {
+    if (unit.classification === 'unknown') continue;
+    const key = JSON.stringify([unit.consumer, unit.provider]);
+    const link = links.get(key) ?? { consumer: unit.consumer, provider: unit.provider, behavioral: 0, nonBehavioral: 0, status: 'allowed' };
+    if (unit.classification === 'behavioral') link.behavioral++;
+    else link.nonBehavioral++;
+    if (rank[unit.status] > rank[link.status]) link.status = unit.status;
+    links.set(key, link);
+  }
+  return [...links.values()].sort((left, right) => utf8Order(left.consumer, right.consumer) || utf8Order(left.provider, right.provider));
+}
+
 function coverageText(metric: Metric<unknown>): string {
   if (metric.state === 'measured') return 'measured';
   if (metric.state === 'unavailable') return `unavailable (${metric.reason})`;

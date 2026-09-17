@@ -1,5 +1,6 @@
 import type { ModuleId, TagName } from '../../subs/model/src/interfaces/model.js';
 import type { AnalysisReport, Capability } from './analysis.js';
+import type { DependencyDiagramFacts } from './dependency-diagram.js';
 
 /**
  * Plain contract of the modularity projection. The units, filters, formulas,
@@ -195,6 +196,8 @@ export interface ModularityView {
   readonly owners: readonly OwnerMetrics[];
   readonly edges: readonly EdgeMetrics[];
   readonly cycles: Metric<readonly CycleComponent[]>;
+  /** The view's dependency-diagram facts; same availability and coverage as `behavior`. */
+  readonly dependencyDiagram: Metric<DependencyDiagramFacts>;
 }
 
 // Counterfactual ownership (execution step 5).
@@ -254,7 +257,7 @@ export interface ModularityProvenance {
   readonly candidateId: string | null;
 }
 export interface ModularityReport {
-  readonly schemaVersion: 'ramify.modularity/1';
+  readonly schemaVersion: 'ramify.modularity/2';
   readonly provenance: ModularityProvenance;
   readonly coverage: { readonly state: 'complete' | 'partial'; readonly detail: MetricCoverage };
   /** The ownership tree in use, ordered by id. */

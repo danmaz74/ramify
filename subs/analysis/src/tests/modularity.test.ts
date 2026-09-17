@@ -44,7 +44,7 @@ describe('modularity projection: declared ownership', () => {
   const test = view(report, 'test');
 
   it('records provenance, the ownership tree and views in contract order', () => {
-    expect(report.schemaVersion).toBe('ramify.modularity/1');
+    expect(report.schemaVersion).toBe('ramify.modularity/2');
     expect(report.provenance).toEqual({
       revision: 'batch:input-1', analysisSchema: 'ramify.analysis/1', inputId: 'input-1',
       registryId: buildReport(graphSpec).registry!.id, check: 'passed', analysisCoverage: 'complete',
@@ -232,6 +232,10 @@ describe('modularity projection: declared ownership', () => {
 });
 
 describe('modularity projection: behavioral dependencies', () => {
+  // Each behavior fact is supported by an access from its consumer file.
+  const accesses: FixtureSpec['accesses'] = [...graphSpec.accesses,
+    { id: 'b01', importer: paths.service, target: paths.view, runtime: false, selections: [{ file: paths.view, binding: 'render' }] },
+    { id: 'b02', importer: paths.styles, target: paths.model, runtime: false, selections: [{ file: paths.model, binding: 'Model' }] }];
   const facts = [
     { consumer: paths.main, file: paths.model, binding: 'makeModel', classification: 'behavioral' as const },
     { consumer: paths.main, file: paths.view, binding: 'render', classification: 'behavioral' as const },
@@ -251,7 +255,7 @@ describe('modularity projection: behavioral dependencies', () => {
   });
 
   it('deduplicates per consumer module and original with behavioral precedence, excluding same-owner and unused', () => {
-    const report = projected(buildReport({ ...graphSpec, behavior: { facts } }));
+    const report = projected(buildReport({ ...graphSpec, accesses, behavior: { facts } }));
     const production = view(report, 'production');
     expect(report.provenance.capabilities).toEqual(['coverage', 'dependency-behavior', 'registry', 'static-access']);
     expect(production.owners.map(item => [item.owner, measured(item.behavior)])).toEqual([
@@ -268,7 +272,7 @@ describe('modularity projection: behavioral dependencies', () => {
     const unknown = [...facts,
       { consumer: paths.view, file: paths.model, binding: 'Model', classification: 'unknown' as const, limitIds: ['behavior-limit/b'] },
       { consumer: paths.styles, file: paths.model, binding: 'Model', classification: 'non-behavioral' as const }];
-    const report = projected(buildReport({ ...graphSpec, behavior: { facts: unknown } }));
+    const report = projected(buildReport({ ...graphSpec, accesses, behavior: { facts: unknown } }));
     const production = view(report, 'production');
     expect(partial(owner(production, 'app/ui').behavior)).toEqual({ state: 'partial',
       observed: { behavioralDependencies: 0, nonBehavioralDependencies: 0 },

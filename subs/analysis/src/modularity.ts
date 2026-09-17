@@ -9,6 +9,7 @@ import type {
   OwnerMetrics,
 } from './interfaces/modularity.js';
 import type { SourceAccess } from '../subs/typescript/src/interfaces/source.js';
+import { viewDependencyDiagram } from './dependency-diagram.js';
 import { boundaryChanges, resolveOwnership } from './modularity-candidate.js';
 import {
   byteOrder,
@@ -67,7 +68,7 @@ function project(revision: string, report: CompleteReport, ownership: OwnershipR
     unknownDependencies: views.reduce((sum, view) => sum + (metricCoverage(view.behavior)?.unknownDependencies ?? 0), 0),
   };
   return {
-    schemaVersion: 'ramify.modularity/1',
+    schemaVersion: 'ramify.modularity/2',
     provenance: provenance(revision, report, ownership),
     coverage: { state: partial ? 'partial' : 'complete', detail },
     modules: ownership.modules,
@@ -124,14 +125,17 @@ function projectView(report: CompleteReport, view: ViewFacts, ownership: Ownersh
     };
   });
   const summary = viewSummary(view, edges, coverage);
+  const behaviorMetric = behaviorTotal(behavior, coverage);
   return {
     filter,
     summary,
-    behavior: behaviorTotal(behavior, coverage),
+    behavior: behaviorMetric,
     owners,
     edges: edgeMetrics(edges, tree, coverage),
     // Cycle scope equals the view summary's `all` scope.
     cycles: withCoverage(summary.all, cycleComponents(edges)),
+    // The same facts `projectDependencyDiagram` returns for the production view.
+    dependencyDiagram: viewDependencyDiagram(report, view, ownership, originals, behaviorMetric),
   };
 }
 
@@ -143,7 +147,7 @@ function withCoverage<T>(scope: Metric<unknown>, value: T): Metric<T> {
 /** Coverage of every partial metric in a view. */
 function viewCoverage(view: ModularityView): MetricCoverage[] {
   const metrics: Metric<unknown>[] = [
-    ...loadVariants.map(variant => view.summary[variant]), view.behavior, view.cycles,
+    ...loadVariants.map(variant => view.summary[variant]), view.behavior, view.cycles, view.dependencyDiagram,
     ...view.edges.flatMap(edge => loadVariants.map(variant => edge.breadth[variant])),
     ...view.owners.flatMap(owner => [
       ...loadVariants.flatMap(variant => [owner.exact[variant], owner.subtree[variant], owner.stability[variant]]),

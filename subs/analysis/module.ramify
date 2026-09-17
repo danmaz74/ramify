@@ -34,3 +34,8 @@ expose-src openRetainedSession from "retained-session.ts" to parent
 // retention access. planApiViewRequests names the detail requests a query
 // needs; projectApiView folds their results into the frozen projection.
 expose-src planApiViewRequests, projectApiView from "api-view.ts" to parent
+
+// A14: dependency-diagram result vocabulary, declarations only; the
+// projection function stays internal to analysis.
+expose-src DependencyBoundaryFact, DependencyDiagramFacts, DependencyDiagramOutcome from "interfaces/dependency-diagram.ts" to parent
+expose-src BehavioralDependencyMetrics from "interfaces/modularity.ts" to parent

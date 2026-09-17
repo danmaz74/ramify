@@ -9,7 +9,9 @@ the
 [project modularity analysis](../analysis/2026-09-17-project-modularity-analysis.md#proposed-execution-path)
 names as execution step 1. Thresholds, rankings that combine measures and
 module moves are out of scope. The TypeScript contract is
-[`interfaces/modularity.ts`](../../subs/analysis/src/interfaces/modularity.ts);
+[`interfaces/modularity.ts`](../../subs/analysis/src/interfaces/modularity.ts),
+with the dependency-diagram facts of Plan 6D in
+[`interfaces/dependency-diagram.ts`](../../subs/analysis/src/interfaces/dependency-diagram.ts);
 the opt-in evidence contract is
 [`interfaces/dependency-behavior.ts`](../../subs/analysis/subs/typescript/src/interfaces/dependency-behavior.ts).
 Where this document and those types disagree, this document wins and the
@@ -36,6 +38,7 @@ remain authoritative for those rules. Dependency vocabulary follows the
 | Reference discovery and behavior-capability classification while the compiler is alive; frozen `DependencyBehaviorFacts` | `analysis/typescript` | `src/interfaces/dependency-behavior.ts` (contract), implementation in iteration 2 |
 | The opt-in `dependency-behavior` capability in batch analysis; attaching its facts to the snapshot | `analysis` | existing batch pipeline |
 | Contract types; pure projection of `{revision, report}`; deduplication, coverage and aggregates; candidate ownership validation and boundary changes; pure change-affinity projection | `analysis` | `src/interfaces/modularity.ts`, `src/modularity*.ts`, `src/change-affinity.ts` |
+| Pure dependency-diagram projection shared by `projectModularity` and the resident operation | `analysis` | `src/interfaces/dependency-diagram.ts`, `src/dependency-diagram.ts` |
 | Git history adapter producing `ChangeHistory` | modularity probe | `scripts/probes/modularity/git-history.ts` |
 | Probe that runs the analysis, the projections and writes JSON and Markdown | modularity probe | `scripts/probes/modularity/baseline.ts`, rendering in `markdown.ts` |
 
@@ -79,6 +82,12 @@ supported command would move the adapter into `cli`, still outside `analysis`.
   to the same entry. A later owner consumer requires
   `expose-src` of the interface file and projection to `parent`, and root
   re-exposure to descendants.
+- Plan 6D exposes the declarations `DependencyBoundaryFact`,
+  `DependencyDiagramFacts`, `DependencyDiagramOutcome` and
+  `BehavioralDependencyMetrics` from `analysis` to its parent, and root
+  re-exposes them to descendants for `daemon` and `service-api`. No projection
+  function is exposed; `projectDependencyDiagram` is exported only from the
+  `ramify.ts/analysis` package entry.
 
 ## Units
 
@@ -121,6 +130,16 @@ are in the subtree.
 
 **Symbol dependency.** The glossary's unit: one distinct `(consumer module,
 original identity)` pair.
+
+**Imported module.** The owner of an application access's target file in the
+ownership in use: the module named by the consumer's import, not every module
+of a forwarding or exposure chain.
+
+**Boundary dependency.** One distinct `(consumer module, imported module,
+original identity)` triple of the
+[dependency-diagram facts](#10-dependency-diagram-facts). The same original
+used through two imported modules is two boundary dependencies and one symbol
+dependency.
 
 ## Filters
 
@@ -391,9 +410,75 @@ For exact owner `O` or its subtree, in a source filter:
 
 Subtree values are sums over owners; every unit is disjoint by owner.
 
+### 10. Dependency diagram facts
+
+`ModularityView.dependencyDiagram` holds the facts behind both endpoint
+projections of the behavioral dependency diagram.
+`projectDependencyDiagram({ revision, report, ownership?, limits })` returns the
+same facts for the production view; `projectModularity` calls the same view
+function for each view. Both read only the behavior facts, accesses, access
+results and ownership of the report.
+
+- **Scope.** The facts of a view are the behavior facts whose consumer file is
+  in the view's subset, with the section 4 ownership: the consumer is the owner
+  of the consumer file, the imported module the owner of each contributing
+  access's target file and the original owner the owner of the original's
+  defining file, all under the ownership in use. The declared `OriginalId.owner`
+  is never candidate ownership. Facts whose consumer owns the original are
+  absent.
+- **Boundary facts.** Each access fact of a behavior fact contributes to the
+  boundary dependency of its access's imported module. Unused access facts
+  contribute nothing, so a path imported but not referenced adds no file,
+  access or status to another path. A boundary's classification applies the
+  section 4 precedence over its contributing access facts; boundaries with no
+  contributing access fact do not exist. `consumerFiles`, `importedFiles` and
+  `accessIds` are the contributing values; `originalFiles` is the defining file.
+  `limitIds` is the union of the contributing limit ids when the boundary is
+  `unknown` and otherwise empty.
+- **Unknown.** An `unknown` boundary fact is present only to carry coverage and
+  to keep the original-owner projection from treating a partially classified
+  original as known. It never contributes a displayed count. A known boundary
+  beside an unknown one for the same original is a lower bound.
+- **Self-links.** A consumer that reaches a foreign original through its own
+  module has a boundary fact whose imported module equals the consumer. It
+  supports the headline and original-owner dependency, and downstream mappings
+  draw no imported-module link from it. Neither projection serializes a
+  self-loop.
+- **Status.** `status` and `reasons` come only from the `ImportDecision` entries
+  whose original has the fact's original identity, in the `AccessResult` of
+  each contributing access. Per access: `denied` when such a decision is denied;
+  otherwise `limited` when the result is missing, has no such decision, carries
+  coverage ids or has outcome `unverifiable` or `mixed`; otherwise `allowed`.
+  The boundary takes the strongest of denied, limited and allowed. `reasons`
+  lists the distinct decision reasons in byte order. Decisions for other
+  originals selected by the same access never affect the fact.
+- **Headline.** Regrouping the boundary facts by `(consumer, original)` with the
+  same precedence gives the view's `behavior` counts and unknown dependency
+  count. `headline` is that metric's value; the projection asserts the equality
+  and fails as a defect rather than publishing a second answer.
+- **Modules and coverage.** `modules` lists every module of the ownership tree
+  in use, including modules without files in the view or without dependency.
+  `coverage` is the `behavior` metric's coverage: `partial` exactly when that
+  metric is partial, with its unknown dependency count and limit ids.
+- **Availability.** The metric has the `behavior` metric's state:
+  `unavailable` with the same reason, `partial` with the same coverage, or
+  `measured`. A completed classification with no dependency is a measured zero.
+  `projectDependencyDiagram` refuses with `analysis-incomplete` for an incomplete
+  report, `not-requested` or `capability-failed` for unavailable behavior, and
+  `resource-limit` with `observedBytes` and `maximumBytes` when the UTF-8 JSON
+  of the facts exceeds `maxResultBytes`; it never truncates. A failed
+  classification projects no boundary with partial coverage, as the `behavior`
+  metric does. An invalid candidate ownership is a caller error.
+- **Freezing.** The facts are deeply frozen plain data that share no object
+  with the report.
+
 ## Coverage and availability
 
 ### Whole projection
+
+The report schema is `ramify.modularity/2`; version 2 added the required
+`ModularityView.dependencyDiagram`. Documents recorded under
+`ramify.modularity/1` remain historical evidence and are not rewritten.
 
 `projectModularity` returns `unavailable` with reason `analysis-incomplete`
 unless `report.outcome.execution` is `completed` and `inputId`, `registry`,
@@ -612,6 +697,8 @@ contract. Byte order means UTF-8 code unit order.
   section 6;
 - isolates and file lists: by path;
 - `limitIds`: byte order;
+- dependency-diagram boundary facts: by consumer, imported module, then
+  original identity; their file, access, reason and limit lists in byte order;
 - boundary changes: by access id, then filter;
 - change-affinity owners by id and pairs by `(first, second)`;
 - candidate evaluations in a document: by candidate id.
@@ -624,7 +711,8 @@ candidates. Change affinity uses the production filter. The Markdown of one
 evaluation contains, in order: summary and coverage; boundary changes under
 candidate ownership; exact-owner and subtree tables;
 runtime and type-only edge and cycle tables; behavioral and non-behavioral
-dependency counts; contract breadth and repository interface use; connectedness
+dependency counts; dependency-diagram facts with both endpoint projections'
+production links; contract breadth and repository interface use; connectedness
 and context size; change affinity; and ranked evidence. Each ranked table orders by exactly one
 named measure, descending, ties by id; explanations are role-aware, and no
 measures are combined into a score. Partial and unavailable values are labelled

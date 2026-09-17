@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { analyzeProject, projectModularity } from '../index.js';
+import { analyzeProject, projectDependencyDiagram, projectModularity } from '../index.js';
 import type { AnalysisReport, Capability, Metric, ModularityReport, SessionInputs } from '../index.js';
 import { fixture, paths, timeout } from './session-test-fixture.js';
 
@@ -58,6 +58,19 @@ describe('modularity projection of a real batch analysis', () => {
       ['fixture/sibling', { behavioralDependencies: 0, nonBehavioralDependencies: 1 }],
     ]);
     expect(measured(production!.behavior)).toEqual({ behavioralDependencies: 1, nonBehavioralDependencies: 4 });
+    // The diagram facts come from the same per-access facts and equal the headline.
+    const diagram = measured(production!.dependencyDiagram);
+    expect(modularity.schemaVersion).toBe('ramify.modularity/2');
+    expect(diagram.headline).toEqual(measured(production!.behavior));
+    expect(diagram.inputId).toBe(report.inputId);
+    expect(diagram.modules).toEqual(modularity.modules.map(module => module.id));
+    expect(diagram.boundaries.filter(fact => fact.classification === 'behavioral').map(fact =>
+      [fact.consumer, fact.importedModule, fact.originalOwner, fact.original.binding, fact.status])).toEqual([
+      ['fixture', 'fixture/branch', 'fixture/branch', 'compute', 'allowed'],
+    ]);
+    expect(diagram.boundaries.every(fact => fact.status === 'allowed' && fact.accessIds.length > 0)).toBe(true);
+    const direct = projectDependencyDiagram({ revision: `batch:${report.inputId}`, report, limits: { maxResultBytes: 16 * 1024 * 1024 } });
+    expect(direct).toEqual({ status: 'projected', diagram });
     const anyRow = (id: string) => measured(production!.owners.find(owner => owner.owner === id)!.interfaceUse).rows.at(-1);
     expect(anyRow('fixture')).toMatchObject({ exposedOriginals: 2, selectedOriginals: 1 });
     expect(anyRow('fixture/branch')).toMatchObject({ exposedOriginals: 2, selectedOriginals: 2 });
@@ -69,6 +82,7 @@ describe('modularity projection of a real batch analysis', () => {
     expect(JSON.stringify(project({ ...report, runId: 'other' }))).toBe(JSON.stringify(modularity));
     const ordinary = project(await batch(inputs, inputs.capabilities));
     expect(ordinary.views[0]!.behavior).toEqual({ state: 'unavailable', reason: 'not-requested' });
+    expect(ordinary.views[0]!.dependencyDiagram).toEqual({ state: 'unavailable', reason: 'not-requested' });
     expect(ordinary.views[0]!.edges).toEqual(production!.edges);
   }, behaviorFiles), timeout);
 });
