@@ -665,6 +665,10 @@ source ownership with the affected owners. Use Candidate C only if the first
 report shows that its type-only component materially harms contract breadth or
 independent change.
 
+The [candidate evaluation](2026-09-17-modularity-candidate-evaluation.md)
+records this step at `d9aa856`: its results, required exposure changes,
+recommendations and why Candidate C is not warranted.
+
 ### 7. Move one boundary at a time
 
 For an accepted candidate, update declarations and source together, run the
