@@ -23,6 +23,8 @@ export interface ExplorerClient {
 
 export interface PublishedProjectView {
   readonly data: ProjectExplorerModel | null;
+  /** The published revision of the displayed model; a new object on every successful load. */
+  readonly revision: ContextRevision | null;
   readonly isLoading: boolean;
   readonly error: Error | null;
   readonly unavailableReason: string | null;
@@ -38,6 +40,7 @@ export function usePublishedProjectView(client: ExplorerClient,
   options: { readonly pollIntervalMs?: number } = {}): PublishedProjectView {
   const pollIntervalMs = options.pollIntervalMs ?? 3000;
   const [data, setData] = useState<ProjectExplorerModel | null>(null);
+  const [revision, setRevision] = useState<ContextRevision | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [unavailableReason, setUnavailableReason] = useState<string | null>(null);
@@ -62,12 +65,15 @@ export function usePublishedProjectView(client: ExplorerClient,
         if (result.view.revision !== result.revision.revision) {
           dataRef.current = null;
           setData(null);
+          setRevision(null);
           setUnavailableReason('Project view response mixed revision identities');
           return;
         }
         displayedRevision.current = result.revision;
         dataRef.current = result.view;
         setData(result.view);
+        // A new object even for an equal revision, so a refresh can request dependencies again.
+        setRevision({ ...result.revision });
         setUnavailableReason(null);
         setIsStale(false);
         setNewestRevision(null);
@@ -120,7 +126,7 @@ export function usePublishedProjectView(client: ExplorerClient,
 
   const refresh = useCallback(() => { void load(newestRevision ?? undefined); }, [load, newestRevision]);
 
-  return { data, isLoading, error, unavailableReason, isStale, bindingNotice, refresh };
+  return { data, revision, isLoading, error, unavailableReason, isStale, bindingNotice, refresh };
 }
 
 const bindingLabels: Readonly<Record<ServerStatusResult['binding'], string>> = {

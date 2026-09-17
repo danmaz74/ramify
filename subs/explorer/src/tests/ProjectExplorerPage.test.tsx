@@ -12,6 +12,7 @@ import type { ProjectExplorerModel } from '../../../presentation/subs/project-vi
 import type { ModuleGraphProps } from '../../../presentation/subs/project-view/src/moduleGraphShared.js';
 import type { ContextRevision, ContextToken } from '../../../daemon/subs/contexts/src/interfaces/contexts.js';
 import type { ServerStatusResult } from '../../../service-api/src/interfaces/explorer-service.js';
+import type { ExplorerDependencyModel } from '../../../service-api/src/interfaces/explorer-dependencies.js';
 import { ProjectExplorerPage } from '../ProjectExplorerPage.js';
 import type { ExplorerClient } from '../published-project-view.js';
 
@@ -30,11 +31,12 @@ const generationA = '00000000-0000-0000-0000-000000000001';
 const generationB = '00000000-0000-0000-0000-000000000002';
 const token: ContextToken = { context: `ctx/1:${'a'.repeat(64)}`, generation: `gen/1:${generationA}` };
 const revisionId = (sequence: number, generation = generationA) => `rev/1:${generation}:${sequence}`;
+const inputOf = (sequence: number, generation = generationA) => `input/1:${generation}:${sequence}`;
 const deferred = <T,>() => { let resolve!: (value: T) => void; const promise = new Promise<T>(accept => { resolve = accept; }); return { promise, resolve }; };
 
 function revision(sequence: number, generation = generationA): ContextRevision {
   return { token: { ...token, generation: `gen/1:${generation}` }, revision: revisionId(sequence, generation), sequence, publishedAt: sequence, cause: 'watch',
-    fingerprints: {}, changed: [], checked: {}, delta: { added: 0, removed: 0, positionOnly: 0 }, timings: {}, capture: {},
+    fingerprints: { inputId: inputOf(sequence, generation) }, changed: [], checked: {}, delta: { added: 0, removed: 0, positionOnly: 0 }, timings: {}, capture: {},
     outcome: { execution: 'completed', check: 'passed', coverage: 'complete' }, summary: {} } as unknown as ContextRevision;
 }
 
@@ -87,7 +89,7 @@ describe('connected project explorer revision state', () => {
       const client: ExplorerClient = {
         async projectView() { return result.view; },
         async explorerDetails() { return { status: 'unavailable', reason: 'unused' }; },
-        async dependencyView() { throw new Error('No page requests dependency views before Plan 6D iteration 7'); },
+        async dependencyView() { return { status: 'unavailable', reason: 'not under test' }; },
         async serverStatus() { return result.status; },
       };
       render(<ProjectExplorerPage client={client} pollIntervalMs={60_000} />);
@@ -111,7 +113,7 @@ describe('connected project explorer revision state', () => {
       },
       async serverStatus() { return status(2); },
       async explorerDetails() { return { status: 'unavailable', reason: 'unused' }; },
-      async dependencyView() { throw new Error('No page requests dependency views before Plan 6D iteration 7'); },
+      async dependencyView() { return { status: 'unavailable', reason: 'not under test' }; },
     };
     render(<ProjectExplorerPage client={client} pollIntervalMs={10} />);
     await screen.findByText(`Revision ${revisionId(1)}`);
@@ -128,19 +130,19 @@ describe('connected project explorer revision state', () => {
     expect(screen.queryByText('Late Module')).not.toBeInTheDocument();
   });
 
-  it('draws no occurrence edge and keeps occurrences as module evidence until dependency data is connected', async () => {
-    // Plan 6D iteration 6: links come only from a dependency result, which iteration 7 connects.
+  it('draws no occurrence edge and keeps occurrences as module evidence without a dependency result', async () => {
+    // Plan 6D: links come only from a dependency result.
     const client: ExplorerClient = {
       async projectView() { return { status: 'ready', revision: revision(1), view: model(1, { edgeAccessCount: 2 }) }; },
       async serverStatus() { return status(1); },
       async explorerDetails() { return { status: 'unavailable', reason: 'unused' }; },
-      async dependencyView() { throw new Error('No page requests dependency views before Plan 6D iteration 7'); },
+      async dependencyView() { return { status: 'unavailable', reason: 'not under test' }; },
     };
     render(<ProjectExplorerPage client={client} pollIntervalMs={60_000} />);
     await screen.findByText(`Revision ${revisionId(1)}`);
     const moduleA = await screen.findByRole('button', { name: 'Module A' });
     expect(screen.queryByRole('button', { name: 'a to root' })).not.toBeInTheDocument();
-    expect(screen.getAllByText('Behavioral dependencies have not been requested').length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('Dependency diagram unavailable: not under test.')).length).toBeGreaterThan(0);
     fireEvent.click(moduleA);
     fireEvent.click(screen.getByRole('button', { name: /Source evidence: import occurrences/ }));
     expect(screen.getByText('Occurrences this module imports')).toBeInTheDocument();
@@ -154,7 +156,7 @@ describe('connected project explorer revision state', () => {
     const client: ExplorerClient = {
       async projectView(input) { sequence = input.revision ? 2 : sequence; return { status: 'ready', revision: revision(sequence), view: model(sequence, { exportItem: true }) }; },
       async serverStatus() { return status(2); },
-      async dependencyView() { throw new Error('No page requests dependency views before Plan 6D iteration 7'); },
+      async dependencyView() { return { status: 'unavailable', reason: 'not under test' }; },
       async explorerDetails() {
         details++;
         if (details === 1) return oldDetail.promise;
@@ -187,7 +189,7 @@ describe('connected project explorer revision state', () => {
       },
       async serverStatus() { return published; },
       async explorerDetails() { return { status: 'unavailable', reason: 'unused' }; },
-      async dependencyView() { throw new Error('No page requests dependency views before Plan 6D iteration 7'); },
+      async dependencyView() { return { status: 'unavailable', reason: 'not under test' }; },
     };
     render(<ProjectExplorerPage client={client} pollIntervalMs={10} />);
     await screen.findByText(`Revision ${revisionId(5)}`);
@@ -210,7 +212,7 @@ describe('connected project explorer revision state', () => {
       async projectView() { const current = published.published!; return { status: 'ready', revision: current, view: model(current.sequence) }; },
       async serverStatus() { return published; },
       async explorerDetails() { return { status: 'unavailable', reason: 'unused' }; },
-      async dependencyView() { throw new Error('No page requests dependency views before Plan 6D iteration 7'); },
+      async dependencyView() { return { status: 'unavailable', reason: 'not under test' }; },
     };
     render(<ProjectExplorerPage client={client} pollIntervalMs={10} />);
     await screen.findByText(`Revision ${revisionId(1)}`);
@@ -225,7 +227,7 @@ describe('connected project explorer revision state', () => {
       async projectView() { return viewResult; },
       async serverStatus() { return published; },
       async explorerDetails() { return { status: 'unavailable', reason: 'unused' }; },
-      async dependencyView() { throw new Error('No page requests dependency views before Plan 6D iteration 7'); },
+      async dependencyView() { return { status: 'unavailable', reason: 'not under test' }; },
     };
     render(<ProjectExplorerPage client={client} pollIntervalMs={10} />);
     await screen.findByText(`Revision ${revisionId(3)}`);
@@ -247,4 +249,224 @@ describe('connected project explorer revision state', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Refresh (stale)' }));
     await screen.findByText(`Revision ${revisionId(1, generationB)}`);
   });
+});
+
+describe('connected dependency view (C7)', () => {
+  type DependencyResult = Awaited<ReturnType<ExplorerClient['dependencyView']>>;
+  const moduleIds = ['root', 'root/a', 'root/b'] as const;
+
+  function project(sequence: number): ProjectExplorerModel {
+    const metrics = { ownedFiles: 1, subtreeFiles: 1, dependencies: 0, dependents: 0,
+      accessOccurrences: 0, selectedSymbols: 0, deniedAccesses: 0, limitedAccesses: 0, approximateIcs: 0 };
+    const module = (id: string, parent: string | null, children: string[]) => ({ id, name: id === 'root' ? 'Root' : `Module ${id.slice(5).toUpperCase()}`,
+      directory: id, parent, children, tags: [], presentationClass: 'untagged',
+      purpose: { state: 'present', paragraph: id, readme: `${id}/README.md` }, files: [], exports: [], metrics });
+    return { revision: revisionId(sequence), rootModuleId: 'root', state: 'complete',
+      registry: { definitions: [] } as unknown as ProjectExplorerModel['registry'],
+      modules: [module('root', null, ['root/a', 'root/b']), module('root/a', 'root', []), module('root/b', 'root', [])],
+      edges: [], coverage: [], summary: { owners: 3, ownedFiles: 3, edges: 0, accessOccurrences: 0, selectedSymbols: 0,
+        deniedAccesses: 0, limitedAccesses: 0, coverageNotes: 0 } } as unknown as ProjectExplorerModel;
+  }
+
+  /** One behavioral link a>b and, with `nonBehavioral`, one non-behavioral-only link b>a; inputs follow the revision. */
+  function dependencies(sequence: number, options: { behavioral?: number; inputId?: string } = {}): ExplorerDependencyModel {
+    const behavioral = options.behavioral ?? 1;
+    const evidence = (consumer: string, provider: string, classification: 'behavioral' | 'non-behavioral', binding: string) => ({
+      original: { kind: 'code', owner: provider, file: 'src/index.ts', binding }, originalOwner: provider, importedModule: provider,
+      classification, consumerFiles: [`${consumer}/src/use.ts`], importedFiles: [`${provider}/src/index.ts`],
+      originalFiles: [`${provider}/src/index.ts`], accessIds: ['access-1'], status: 'allowed', reasons: ['exposed'], coverageIds: [] });
+    const behavioralEvidence = Array.from({ length: behavioral }, (_, index) => evidence('root/a', 'root/b', 'behavioral', `act${index}`));
+    const imported = (id: string, consumer: string, provider: string, b: number, nb: number, rows: unknown[]) => ({
+      id: `dependency-edge/1:imported-module:${id}`, projection: 'imported-module', consumer, provider,
+      counts: { behavioralUsedOriginals: b, nonBehavioralUsedOriginals: nb },
+      originalOwners: [{ owner: provider, counts: { behavioralUsedOriginals: b, nonBehavioralUsedOriginals: nb } }], evidence: rows });
+    const owner = (id: string, consumer: string, provider: string, b: number, nb: number, rows: unknown[]) => ({
+      id: `dependency-edge/1:original-owner:${id}`, projection: 'original-owner', consumer, provider,
+      counts: { behavioral: b, nonBehavioral: nb },
+      importedThrough: [{ module: provider, counts: { behavioralUsedOriginals: b, nonBehavioralUsedOriginals: nb } }], evidence: rows });
+    const zero = { behavioral: 0, nonBehavioral: 0 }, zeroImported = { behavioralUsedOriginals: 0, nonBehavioralUsedOriginals: 0 };
+    return { schemaVersion: 'ramify.explorer-dependencies/1', inputId: options.inputId ?? inputOf(sequence), state: 'complete',
+      project: { behavioral, nonBehavioral: 1 },
+      modules: [
+        { id: 'root', uses: zero, usedThrough: zeroImported, ownedUsedByOthers: zero },
+        { id: 'root/a', uses: { behavioral, nonBehavioral: 0 }, usedThrough: { behavioralUsedOriginals: 0, nonBehavioralUsedOriginals: 1 },
+          ownedUsedByOthers: { behavioral: 0, nonBehavioral: 1 } },
+        { id: 'root/b', uses: { behavioral: 0, nonBehavioral: 1 }, usedThrough: { behavioralUsedOriginals: behavioral, nonBehavioralUsedOriginals: 0 },
+          ownedUsedByOthers: { behavioral, nonBehavioral: 0 } },
+      ],
+      importedModuleEdges: [imported('ab', 'root/a', 'root/b', behavioral, 0, behavioralEvidence),
+        imported('ba', 'root/b', 'root/a', 0, 1, [evidence('root/b', 'root/a', 'non-behavioral', 'Shape')])],
+      originalOwnerEdges: [owner('ab', 'root/a', 'root/b', behavioral, 0, behavioralEvidence),
+        owner('ba', 'root/b', 'root/a', 0, 1, [evidence('root/b', 'root/a', 'non-behavioral', 'Shape')])],
+      coverage: { unknownDependencies: 0, limitIds: [] } } as unknown as ExplorerDependencyModel;
+  }
+
+  const ready = (sequence: number, options?: Parameters<typeof dependencies>[1]): DependencyResult =>
+    ({ status: 'ready', revision: revision(sequence), view: dependencies(sequence, options) });
+  const pending = (sequence: number, phase: 'waiting' | 'analyzing' = 'analyzing'): DependencyResult =>
+    ({ status: 'pending', revision: revision(sequence), phase });
+  const state = () => document.querySelector('.module-arch__dependency-status')?.getAttribute('data-dependency-state');
+  const links = () => screen.queryAllByRole('button', { name: /^root\/[ab] to root\/[ab]$/ }).map(button => button.textContent);
+
+  interface Recorder { readonly calls: { readonly kind: 'project' | 'dependency'; readonly revision?: string; readonly at: number }[] }
+  function recording(respond: {
+    project(input: { revision?: string }): Promise<Awaited<ReturnType<ExplorerClient['projectView']>>>;
+    dependency(input: { revision: string }, index: number): Promise<DependencyResult>;
+    status(): ServerStatusResult;
+  }): ExplorerClient & Recorder {
+    const calls: Recorder['calls'][number][] = [];
+    let dependencyCalls = 0;
+    return {
+      calls,
+      async projectView(input) { calls.push({ kind: 'project', revision: input.revision, at: performance.now() }); return respond.project(input); },
+      async dependencyView(input) { calls.push({ kind: 'dependency', revision: input.revision, at: performance.now() }); return respond.dependency(input, dependencyCalls++); },
+      async serverStatus() { return respond.status(); },
+      async explorerDetails() { return { status: 'unavailable', reason: 'unused' }; },
+    };
+  }
+  const dependencyCalls = (client: Recorder) => client.calls.filter(call => call.kind === 'dependency');
+
+  it('requests the displayed revision after the project view, polls pending one second apart, stops on ready and never requests for settings', async () => {
+    const client = recording({
+      project: async () => ({ status: 'ready', revision: revision(1), view: project(1) }),
+      dependency: async (_input, index) => index < 2 ? pending(1, index === 0 ? 'analyzing' : 'waiting') : ready(1),
+      status: () => status(1),
+    });
+    render(<ProjectExplorerPage client={client} pollIntervalMs={60_000} />);
+    await screen.findByText(`Revision ${revisionId(1)}`);
+    await waitFor(() => expect(state()).toBe('complete'), { timeout: 5000 });
+    const requests = dependencyCalls(client);
+    expect(requests.map(call => call.revision)).toEqual([revisionId(1), revisionId(1), revisionId(1)]);
+    expect(client.calls.findIndex(call => call.kind === 'project')).toBeLessThan(client.calls.findIndex(call => call.kind === 'dependency'));
+    for (let index = 1; index < requests.length; index++) expect(requests[index]!.at - requests[index - 1]!.at).toBeGreaterThanOrEqual(950);
+    expect(links()).toEqual(['root/a to root/b']);
+    expect(screen.getByText(/Showing 2 of 3 modules, 1 displayed link$/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Show non-behavioral dependencies' }));
+    expect(links()).toEqual(['root/a to root/b', 'root/b to root/a']);
+    fireEvent.click(screen.getByRole('radio', { name: 'Original owners' }));
+    expect(screen.getByRole('radio', { name: 'Original owners' })).toHaveAttribute('aria-checked', 'true');
+    expect(links()).toEqual(['root/a to root/b', 'root/b to root/a']);
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    expect(dependencyCalls(client)).toHaveLength(3);
+  }, 15_000);
+
+  it('issues no dependency request while the page is hidden and resumes when it becomes visible', async () => {
+    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    try {
+      const client = recording({
+        project: async () => ({ status: 'ready', revision: revision(1), view: project(1) }),
+        dependency: async (_input, index) => index === 0 ? pending(1) : ready(1),
+        status: () => status(1),
+      });
+      render(<ProjectExplorerPage client={client} pollIntervalMs={60_000} />);
+      await screen.findByText(`Revision ${revisionId(1)}`);
+      await new Promise(resolve => setTimeout(resolve, 1200));
+      expect(dependencyCalls(client)).toHaveLength(0);
+      expect(state()).toBe('idle');
+
+      visibility.mockReturnValue('visible');
+      document.dispatchEvent(new Event('visibilitychange'));
+      await waitFor(() => expect(state()).toBe('analyzing'));
+      // Hidden again before the next poll: the pending request is not polled.
+      visibility.mockReturnValue('hidden');
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      expect(dependencyCalls(client)).toHaveLength(1);
+      visibility.mockReturnValue('visible');
+      document.dispatchEvent(new Event('visibilitychange'));
+      await waitFor(() => expect(state()).toBe('complete'));
+      expect(dependencyCalls(client)).toHaveLength(2);
+    } finally { visibility.mockRestore(); }
+  }, 15_000);
+
+  it('keeps a ready graph stale after a newer publication; refresh loads the project first and never mixes it with old counts', async () => {
+    let published = status(1);
+    const next = deferred<DependencyResult>();
+    const client = recording({
+      project: async () => { const current = published.published!; return { status: 'ready', revision: current, view: project(current.sequence) }; },
+      dependency: async input => input.revision === revisionId(1) ? ready(1) : next.promise,
+      status: () => published,
+    });
+    render(<ProjectExplorerPage client={client} pollIntervalMs={20} />);
+    await waitFor(() => expect(state()).toBe('complete'));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Show non-behavioral dependencies' }));
+
+    published = status(2);
+    const refresh = await screen.findByRole('button', { name: 'Refresh (stale)' });
+    expect(state()).toBe('stale');
+    expect(screen.getByText(`Stale dependency diagram for input ${inputOf(1)}. Refresh to update.`)).toBeInTheDocument();
+    expect(links()).toEqual(['root/a to root/b', 'root/b to root/a']);
+    expect(screen.getByText(`Revision ${revisionId(1)}`)).toBeInTheDocument();
+    expect(dependencyCalls(client)).toHaveLength(1);
+
+    const before = client.calls.length;
+    fireEvent.click(refresh);
+    await screen.findByText(`Revision ${revisionId(2)}`);
+    // The new project model is displayed without the earlier revision's links or counts.
+    await waitFor(() => expect(state()).toBe('analyzing'));
+    expect(links()).toEqual([]);
+    expect(screen.queryByText(inputOf(1))).not.toBeInTheDocument();
+    expect(client.calls.slice(before).map(call => [call.kind, call.revision])).toEqual([['project', revisionId(2)], ['dependency', revisionId(2)]]);
+
+    next.resolve(ready(2, { behavioral: 2 }));
+    await waitFor(() => expect(state()).toBe('complete'));
+    // Settings persist across refresh of the mounted page.
+    expect(screen.getByRole('checkbox', { name: 'Show non-behavioral dependencies' })).toBeChecked();
+    expect(links()).toEqual(['root/a to root/b', 'root/b to root/a']);
+    expect(screen.getByText(inputOf(2))).toBeInTheDocument();
+  }, 15_000);
+
+  it('discards a late response to the earlier revision and refuses a ready result for another input', async () => {
+    let published = status(1);
+    const late = deferred<DependencyResult>();
+    const client = recording({
+      project: async () => { const current = published.published!; return { status: 'ready', revision: current, view: project(current.sequence) }; },
+      dependency: async input => input.revision === revisionId(1) ? late.promise : ready(2, { behavioral: 3 }),
+      status: () => published,
+    });
+    render(<ProjectExplorerPage client={client} pollIntervalMs={20} />);
+    await waitFor(() => expect(dependencyCalls(client)).toHaveLength(1));
+    published = status(2);
+    fireEvent.click(await screen.findByRole('button', { name: 'Refresh (stale)' }));
+    await waitFor(() => expect(state()).toBe('complete'));
+    expect(screen.getByText(inputOf(2))).toBeInTheDocument();
+
+    late.resolve(ready(1, { behavioral: 1 }));
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(screen.getByText(`Revision ${revisionId(2)}`)).toBeInTheDocument();
+    expect(screen.getByText(inputOf(2))).toBeInTheDocument();
+    expect(screen.queryByText(inputOf(1))).not.toBeInTheDocument();
+    expect(state()).toBe('complete');
+    cleanup();
+
+    const mismatched = recording({
+      project: async () => ({ status: 'ready', revision: revision(1), view: project(1) }),
+      dependency: async () => ready(1, { inputId: 'input/1:other' }),
+      status: () => status(1),
+    });
+    render(<ProjectExplorerPage client={mismatched} pollIntervalMs={60_000} />);
+    await waitFor(() => expect(state()).toBe('unavailable'));
+    expect(links()).toEqual([]);
+    expect(screen.getAllByText(/does not match the displayed revision and input/).length).toBeGreaterThan(0);
+  }, 15_000);
+
+  it('stops polling on superseded and on unavailable', async () => {
+    for (const answer of [
+      { status: 'superseded', current: revisionId(2), reason: 'The requested revision is no longer the published revision' },
+      { status: 'unavailable', reason: 'analysis-failed: helper exited' },
+    ] as const) {
+      const client = recording({
+        project: async () => ({ status: 'ready', revision: revision(1), view: project(1) }),
+        dependency: async () => answer,
+        status: () => status(1),
+      });
+      render(<ProjectExplorerPage client={client} pollIntervalMs={60_000} />);
+      await waitFor(() => expect(state()).toBe(answer.status));
+      await new Promise(resolve => setTimeout(resolve, 1300));
+      expect(dependencyCalls(client)).toHaveLength(1);
+      expect(screen.getAllByText(new RegExp(answer.reason)).length).toBeGreaterThan(0);
+      expect(screen.getByRole('button', { name: 'Module A' })).toBeInTheDocument();
+      cleanup();
+    }
+  }, 15_000);
 });

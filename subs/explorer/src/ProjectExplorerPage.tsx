@@ -8,6 +8,9 @@ import type { ExportDetailState } from '../../presentation/subs/project-view/src
 import type { GraphSelection } from '../../presentation/subs/project-view/src/moduleGraphShared.js';
 import { ModuleGraphRadial } from '../../presentation/subs/project-view/src/ModuleGraphRadial.js';
 import { ProjectExplorerView, type ExplorerDiscussionProps } from '../../presentation/subs/project-view/src/ProjectExplorerView.js';
+import { defaultDependencySettings } from '../../presentation/subs/project-view/src/dependency-graph.js';
+import type { DependencySettings } from '../../presentation/subs/project-view/src/interfaces/dependency-view.js';
+import { usePublishedDependencyView } from './published-dependency-view.js';
 import { usePublishedProjectView, type ExplorerClient } from './published-project-view.js';
 
 export interface ProjectExplorerPageProps {
@@ -22,8 +25,15 @@ export interface ProjectExplorerPageProps {
 
 export function ProjectExplorerPage({ client, pollIntervalMs = 3000,
   DiscussionComponent, initialModuleId = null, openModuleTree = openInModuleTree }: ProjectExplorerPageProps): React.ReactElement {
-  const { data, isLoading, error, unavailableReason, isStale, bindingNotice, refresh } =
+  const { data, revision, isLoading, error, unavailableReason, isStale, bindingNotice, refresh } =
     usePublishedProjectView(client, { pollIntervalMs });
+  // Requested only for the displayed project revision; refresh reloads the project view first.
+  const dependencyView = usePublishedDependencyView(client, { revision, isStale });
+  const dependencies = useMemo(() => ({ data: dependencyView.data, phase: dependencyView.phase,
+    reason: dependencyView.reason, isStale: dependencyView.isStale }),
+  [dependencyView.data, dependencyView.phase, dependencyView.reason, dependencyView.isStale]);
+  // Local to this mounted page: defaults on every load and kept across refresh.
+  const [dependencySettings, setDependencySettings] = useState<DependencySettings>(defaultDependencySettings);
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<GraphSelection | null>(null);
   const [expandedExportId, setExpandedExportId] = useState<string | null>(null);
@@ -156,7 +166,9 @@ export function ProjectExplorerPage({ client, pollIntervalMs = 3000,
       setScopeModuleId(id); setSelectedModuleId(null); setSelectedEdge(null);
     } }}
     onNavigateToScope={id => { setScopeModuleId(id); setSelectedModuleId(null); setSelectedEdge(null); }}
-    onOpenModuleTree={openModuleTree} />;
+    onOpenModuleTree={openModuleTree}
+    dependencies={dependencies} dependencySettings={dependencySettings}
+    onDependencySettingsChange={setDependencySettings} />;
   const notice = [bindingNotice, focusNotice].filter(Boolean).join(' · ');
   // The notice takes its line and the view fills the remaining height.
   return <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>

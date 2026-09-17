@@ -73,7 +73,7 @@ function client(views: () => { sequence: number; view: ProjectExplorerModel }, s
     async projectView() { const current = views(); return { status: 'ready', revision: revision(current.sequence), view: current.view }; },
     async serverStatus() { return serverStatus(); },
     async explorerDetails() { return { status: 'unavailable', reason: 'unused' }; },
-    async dependencyView() { throw new Error('No page requests dependency views before Plan 6D iteration 7'); },
+    async dependencyView() { throw new Error('The module tree never requests dependency views'); },
   };
 }
 

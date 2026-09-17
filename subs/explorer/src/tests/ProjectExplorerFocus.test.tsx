@@ -40,15 +40,15 @@ function model(): ProjectExplorerModel {
 
 const client: ExplorerClient = {
   async projectView() {
-    return { status: 'ready', revision: { revision: revisionId, sequence: 1,
+    return { status: 'ready', revision: { revision: revisionId, sequence: 1, fingerprints: { inputId: 'input/1:focus' },
       token: { context: 'ctx', generation: 'gen' } } as unknown as ContextRevision, view: model() };
   },
   async serverStatus() {
     return { root: '/p', binding: 'ready', message: null, daemonPid: 1,
-      published: { revision: revisionId, sequence: 1, token: { context: 'ctx', generation: 'gen' } } as unknown as ContextRevision };
+      published: { revision: revisionId, sequence: 1, fingerprints: { inputId: 'input/1:focus' }, token: { context: 'ctx', generation: 'gen' } } as unknown as ContextRevision };
   },
   async explorerDetails() { return { status: 'unavailable', reason: 'unused' }; },
-  async dependencyView() { throw new Error('No page requests dependency views before Plan 6D iteration 7'); },
+  async dependencyView() { return { status: 'unavailable', reason: 'not under test' }; },
 };
 
 describe('MT12: import explorer focus from ?module=', () => {
