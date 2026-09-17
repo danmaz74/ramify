@@ -13,7 +13,11 @@ const capabilityStages: Record<Capability, StageId> = {
   registry: 'registry', layout: 'acquisition', metadata: 'acquisition', descriptions: 'parse', 'source-catalog': 'catalog',
   'exposure-linking': 'link', 'static-access': 'decide', 'tags-origin': 'decide', 'namespace-access': 'decide',
   'lazy-access': 'decide', 'symbol-free-access': 'decide', 'resource-access': 'decide', coverage: 'access', 'browser-verification': 'decide',
+  'dependency-behavior': 'access',
 };
+/** Capabilities disposable batch analysis executes. The opt-in `dependency-behavior` is
+ * listed only in a report that requests it, so other reports are unchanged. */
+export const batchCapabilities: readonly Capability[] = [...availableCapabilities, 'dependency-behavior'];
 /**
  * UTF-8 byte order without encoding either string, as `Buffer.compare` over
  * `Buffer.from` orders. The project owner's comparator is not exposed, so this
@@ -141,6 +145,8 @@ export class ReportDraft {
   readonly coverage: SourceLimit[] = [];
   readonly stages: StageExecution[] = stageOrder.map(stage => ({ stage, status: 'blocked', blockedBy: [], diagnosticIds: [] }));
   current: StageId = 'registry';
+  /** True only for a disposable batch run, which can execute `dependency-behavior`. */
+  batch = false;
   private echo: AnalysisInputs;
   constructor(readonly request: AnalysisInputs, readonly runId = randomUUID()) { this.echo = request; }
   stage(stage: StageId, status: StageExecution['status'], diagnostics: readonly AnalysisDiagnostic[] = []): void {
@@ -219,7 +225,9 @@ export class ReportDraft {
       scope: this.scope, registry: this.registry,
       capabilities: [...availableCapabilities, 'browser-verification' as const].map(capability => ({ capability,
         available: availableCapabilities.includes(capability), requested: this.request.capabilities.includes(capability),
-        executed: availableCapabilities.includes(capability) && this.stages.find(stage => stage.stage === capabilityStages[capability])!.status === 'completed' })),
+        executed: availableCapabilities.includes(capability) && this.stages.find(stage => stage.stage === capabilityStages[capability])!.status === 'completed' }))
+        .concat(this.request.capabilities.includes('dependency-behavior') ? [{ capability: 'dependency-behavior', available: this.batch,
+          requested: true, executed: this.batch && this.snapshot?.dependencyBehavior !== undefined }] : []),
       stages: this.stages.map(stage => ({ ...stage,
         diagnosticIds: stage.diagnosticIds.filter(id => diagnosticIds.has(id)),
       })),
@@ -307,7 +315,7 @@ export class ReportDraft {
             this.echo = { ...this.echo, project: { ...this.echo.project, cwd: prefix(this.echo.project.cwd),
               ...(this.echo.project.root === undefined ? {} : { root: prefix(this.echo.project.root) }) },
             registry: { ...this.echo.registry, id: prefix(this.echo.registry.id), definitions: [] },
-            capabilities: [...new Set(this.echo.capabilities)].slice(0, 14) };
+            capabilities: [...new Set(this.echo.capabilities)].slice(0, 15) };
             if (this.scope) this.scope = { ...this.scope, root: prefix(this.scope.root), invokedFrom: prefix(this.scope.invokedFrom),
               configuration: prefix(this.scope.configuration), walkedAreas: [], independentScopes: [] };
             // For a caller-supplied limit smaller than the mandatory JSON

@@ -6,6 +6,7 @@ import { CHUNK_BYTES, DISPOSAL_MS, FILE_BYTES, FRAME_BYTES, INPUT_BYTES, READ_RE
   RESULT_BYTES, SourceFailure, decodeChunk, encode, freezeData } from './wire.js';
 import type { Operation } from './wire.js';
 import type { AccessInterpreter, FileDescription, SourceAnalysis, SourceAnalysisInputs, SourceCatalog } from './interfaces/source.js';
+import type { DependencyBehaviorFacts } from './interfaces/dependency-behavior.js';
 
 interface PendingOperation {
   name: Operation;
@@ -86,6 +87,11 @@ export class CompilerBridge {
     return this.#query('accesses', signal) as ReturnType<SourceAnalysis['accesses']>;
   }
 
+  /** Classify the accesses this lifetime interpreted; only an explicit capability request calls it. */
+  dependencyBehavior(signal?: AbortSignal): Promise<DependencyBehaviorFacts> {
+    return this.#query('behavior', signal) as Promise<DependencyBehaviorFacts>;
+  }
+
   async describe(files: readonly string[], signal?: AbortSignal): Promise<readonly FileDescription[]> {
     this.#check();
     if (this.#operation) throw new SourceFailure('concurrent-operation', 'A source operation is already running');
@@ -115,7 +121,7 @@ export class CompilerBridge {
     } finally { this.#interpretationInputs = undefined; this.#replacements = []; }
   }
 
-  async #query(name: 'catalog' | 'describe' | 'accesses' | 'interpreter' | 'interpret', signal?: AbortSignal): Promise<unknown> {
+  async #query(name: 'catalog' | 'describe' | 'accesses' | 'interpreter' | 'interpret' | 'behavior', signal?: AbortSignal): Promise<unknown> {
     if (this.#terminal) await this.#cleanup();
     this.#check();
     if (this.#operation) throw new SourceFailure('concurrent-operation', 'A source operation is already running');
@@ -274,7 +280,7 @@ export class CompilerBridge {
       if (frame.operation !== operation.name || typeof frame.more !== 'boolean') throw new SourceFailure('protocol-error', 'Unexpected source result');
       // Subset calls account new reads as they arrive. Re-materializing the
       // captured input list here would rehash and sort the entire project.
-      if (!operation.size && operation.name !== 'interpret' && operation.name !== 'describe') this.#capturedBytes = this.#inputs!.view.inputs.reduce((total, input) => total + input.bytes, 0);
+      if (!operation.size && operation.name !== 'interpret' && operation.name !== 'describe' && operation.name !== 'behavior') this.#capturedBytes = this.#inputs!.view.inputs.reduce((total, input) => total + input.bytes, 0);
       const bytes = decodeChunk(frame.chunk);
       if (operation.size + bytes.length > RESULT_BYTES) throw new SourceFailure('resource-limit', 'Source result byte limit exceeded');
       operation.size += bytes.length; operation.chunks.push(bytes);

@@ -78,6 +78,9 @@ describe('validated daemon service', () => {
     const invalid = await environment.service.openContext({ ...params, hidden: true } as never);
     expect(invalid).toMatchObject({ ok: false, error: { code: 'invalid-request' } });
     expect(await environment.service.openContext({ ...params, setup: { ...params.setup, registry: 'custom' } } as never)).toMatchObject({ ok: true, value: { status: 'unavailable', reason: 'unsupported-setup' } });
+    // Batch-only opt-in evidence never configures or queues resident work.
+    expect(await environment.service.openContext({ ...params, setup: { ...params.setup, capabilities: [...params.setup.capabilities, 'dependency-behavior'] } } as never))
+      .toMatchObject({ ok: true, value: { status: 'unavailable', reason: 'unsupported-setup' } });
     const status = await environment.service.daemonStatus(); expect(status.ok && status.value.contexts).toEqual([]);
     expect(await dispatchServiceRequest(environment.service, 'unknown', {})).toMatchObject({ ok: false, error: { code: 'unsupported-operation' } });
   });

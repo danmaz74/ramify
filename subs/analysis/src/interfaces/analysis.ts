@@ -3,11 +3,12 @@ import type { DescriptionIssue } from '../../subs/descriptions/src/interfaces/sy
 import type { LinkedDescriptions, LinkIssue } from '../../subs/descriptions/src/interfaces/linking.js';
 import type { AcquisitionLimits, CapturedInput, ProjectInventory, ProjectIssue, ProjectRequest, ProjectScope, OutsideSourceWarning } from '../../subs/project/src/interfaces/project.js';
 import type { SourceAccess, SourceCatalog, SourceLimit, SourceWorkLimits } from '../../subs/typescript/src/interfaces/source.js';
+import type { DependencyBehaviorFacts } from '../../subs/typescript/src/interfaces/dependency-behavior.js';
 
 export type Capability = 'registry' | 'layout' | 'metadata' | 'descriptions'
   | 'source-catalog' | 'exposure-linking' | 'static-access' | 'tags-origin'
   | 'namespace-access' | 'lazy-access' | 'symbol-free-access' | 'resource-access'
-  | 'coverage' | 'browser-verification';
+  | 'coverage' | 'browser-verification' | 'dependency-behavior';
 export type StageId = 'registry' | 'acquisition' | 'parse' | 'catalog'
   | 'link' | 'access' | 'decide' | 'report';
 export interface RunControl { readonly signal?: AbortSignal }
@@ -99,6 +100,8 @@ export interface AnalysisSnapshot {
   readonly model: Model | null;
   readonly accesses: readonly SourceAccess[];
   readonly results: readonly AccessResult[];
+  /** Present only when a disposable batch analysis requested `dependency-behavior`. */
+  readonly dependencyBehavior?: DependencyBehaviorFacts;
 }
 export interface AnalysisSummary {
   readonly complete: boolean;

@@ -12,3 +12,5 @@ expose-src describeFiles, assembleCatalog from "descriptions.ts" to parent
 expose-src createRetainedSourceAnalysis from "retained-source-analysis.ts" to parent
 // Plan 2A iteration 4: bounded, body-free symbol-detail extraction.
 expose-src describeSymbolDetails from "symbol-details.ts" to parent
+// Opt-in dependency-behavior facts attached by batch analysis.
+expose-src * from "interfaces/dependency-behavior.ts" to parent

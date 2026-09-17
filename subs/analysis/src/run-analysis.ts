@@ -10,14 +10,32 @@ import { readProject } from '../subs/project/src/read-project.js';
 import type { ProjectInputView } from '../subs/project/src/interfaces/project.js';
 import { createSourceAnalysis } from '../subs/typescript/src/source-analysis.js';
 import type { SourceAnalysis } from '../subs/typescript/src/interfaces/source.js';
+import type { DependencyBehaviorFacts } from '../subs/typescript/src/interfaces/dependency-behavior.js';
 import type { AccessResult, AnalysisInputs, AnalysisRun } from './interfaces/analysis.js';
 import { evaluateAccessesAsync } from './evaluate-accesses.js';
-import { availableCapabilities, byteOrder, ReportDraft, WorkLimit } from './report.js';
+import { batchCapabilities, byteOrder, ReportDraft, WorkLimit } from './report.js';
 import { diagnostic, projectDiagnostics } from './report-data.js';
+
+/**
+ * Opt-in behavior facts over the accesses of the live compiler. A classifier or
+ * transport failure is recorded in the facts; it never becomes an analysis finding.
+ */
+async function behaviorFacts(source: SourceAnalysis, signal: AbortSignal): Promise<DependencyBehaviorFacts> {
+  try { return await source.dependencyBehavior(signal); }
+  catch (error) {
+    const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
+    if (signal.aborted || code === 'cancelled') throw error;
+    const value = { code: code === 'resource-limit' ? 'resource-limit' as const : 'compiler-failure' as const, location: null,
+      message: `Dependency behavior classification failed: ${error instanceof Error ? error.message : String(error)}` };
+    return { status: 'failed', facts: [],
+      limits: [{ id: `behavior-limit/1:${createHash('sha256').update(JSON.stringify(value)).digest('hex')}`, ...value }] };
+  }
+}
 
 /** The session owns composition and disposal; children keep compiler/filesystem mechanics. */
 export async function runAnalysis(inputs: AnalysisInputs, cancellation: AbortSignal): Promise<AnalysisRun> {
   let draft = new ReportDraft(inputs);
+  draft.batch = true;
   if (cancellation.aborted) return { status: 'cancelled' };
   const abort = new AbortController();
   const cancel = (): void => abort.abort();
@@ -46,7 +64,7 @@ export async function runAnalysis(inputs: AnalysisInputs, cancellation: AbortSig
         draft.stage('registry', 'invalid', draft.diagnostics); draft.execution = 'invalid';
       } else {
         draft.registry = registry.value; draft.stage('registry', 'completed');
-        const unsupported = inputs.capabilities.filter(capability => !availableCapabilities.includes(capability));
+        const unsupported = inputs.capabilities.filter(capability => !batchCapabilities.includes(capability));
         if (unsupported.length) {
           draft.record([diagnostic('unavailable-capability', `Analysis cannot execute: ${unsupported.join(', ')}`, 'unavailable')]);
           draft.stage('access', 'unavailable', draft.diagnostics); draft.execution = 'unavailable';
@@ -55,7 +73,7 @@ export async function runAnalysis(inputs: AnalysisInputs, cancellation: AbortSig
             if (attempt) {
               // No facts or diagnostics from discarded bytes enter a subsequent attempt.
               const next = new ReportDraft(inputs, draft.runId);
-              draft = next; draft.registry = registry.value; draft.stage('registry', 'completed');
+              draft = next; draft.batch = true; draft.registry = registry.value; draft.stage('registry', 'completed');
             }
             let view: ProjectInputView | undefined;
             let source: SourceAnalysis | undefined;
@@ -133,6 +151,7 @@ export async function runAnalysis(inputs: AnalysisInputs, cancellation: AbortSig
                     } else {
                       draft.patch({ model: model.value }); draft.stage('link', 'completed'); draft.current = 'access';
                       const accesses = await source.accesses(abort.signal);
+                      const behavior = inputs.capabilities.includes('dependency-behavior') ? await behaviorFacts(source, abort.signal) : undefined;
                       // Facts are detached at the adapter boundary. The compiler
                       // is no longer needed during decisions or input sealing.
                       const releaseStart = performance.now();
@@ -140,6 +159,7 @@ export async function runAnalysis(inputs: AnalysisInputs, cancellation: AbortSig
                       sourceDisposalMs = performance.now() - releaseStart;
                       if (sourceDisposalMs > inputs.limits.disposeTimeoutMs) throw new WorkLimit('disposeTimeoutMs', inputs.limits.disposeTimeoutMs, Math.ceil(sourceDisposalMs));
                       check(); draft.patch({ accesses: accesses.accesses }); draft.cover(accesses.coverage); draft.stage('access', 'completed');
+                      if (behavior) draft.patch({ dependencyBehavior: behavior });
                       draft.current = 'decide';
                       const results: AccessResult[] = [];
                       draft.patch({ results });

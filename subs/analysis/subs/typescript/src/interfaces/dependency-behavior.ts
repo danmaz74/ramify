@@ -45,8 +45,8 @@ export interface BehaviorLimit {
 
 /**
  * The capability's result for one analysis. `completed` classified every
- * resolved selection, possibly as `unknown`; `failed` retains the facts
- * collected before the failure and at least one limit explaining it.
+ * resolved selection, possibly as `unknown`; `failed` means the classification
+ * operation failed as a whole, with no facts and at least one limit explaining it.
  */
 export interface DependencyBehaviorFacts {
   readonly status: 'completed' | 'failed';

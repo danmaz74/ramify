@@ -1,4 +1,5 @@
 import type { OriginalId, SourceOrigin, SourceLocation, SourceArea, BindingRequest } from '../../../model/src/interfaces/model.js';
+import type { DependencyBehaviorFacts } from './dependency-behavior.js';
 import type { ObservationSink, ProjectInputView, ProjectInventory } from '../../../project/src/interfaces/project.js';
 
 export interface CatalogOriginal {
@@ -134,6 +135,8 @@ export interface SourceAnalysis {
   catalog(signal?: AbortSignal): Promise<SourceCatalog>;
   accesses(signal?: AbortSignal): Promise<{ readonly accesses: readonly SourceAccess[];
     readonly coverage: readonly SourceLimit[] }>;
+  /** The opt-in `dependency-behavior` facts over the accesses of this lifetime. */
+  dependencyBehavior(signal?: AbortSignal): Promise<DependencyBehaviorFacts>;
   dispose(): Promise<void>;
 }
 

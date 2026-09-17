@@ -146,6 +146,15 @@ class Session implements RetainedSession {
       const timed = (update: SessionUpdate): SessionUpdate => update.status === 'cancelled' ? update
         : { ...update, timings: { invocationCheck, promotion: update.timings?.promotion ?? 0 } };
       if (invocation) {
+        // A retained session neither reconfigures nor queues work for a batch-only capability.
+        const unsupported = invocation.capabilities.filter(capability => !availableCapabilities.includes(capability));
+        if (unsupported.length) {
+          const draft = new ReportDraft({ ...state.request, capabilities: invocation.capabilities });
+          const item = diagnostic('unavailable-capability', `Retained analysis cannot execute: ${unsupported.join(', ')}`, 'unavailable');
+          draft.registry = state.registry; draft.stage('registry', 'completed');
+          draft.diagnostics.push(item); draft.stage('access', 'unavailable', [item]); draft.execution = 'unavailable';
+          return timed({ status: 'reported', report: draft.finish() });
+        }
         const checking = performance.now();
         const problem = await this.#invocationProblem(invocation, signal);
         invocationCheck = performance.now() - checking;

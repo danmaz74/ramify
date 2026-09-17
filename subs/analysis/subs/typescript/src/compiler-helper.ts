@@ -4,6 +4,7 @@ import { API } from 'typescript/unstable/sync';
 import { buildCatalog } from './catalog.js';
 import { createDescriptionSet } from './descriptions.js';
 import { AccessInterpretation } from './accesses.js';
+import { classifyDependencyBehavior } from './behavior-classifier.js';
 import type { AccessInterpreter, CatalogExport, SourceCatalog } from './interfaces/source.js';
 import { referencesOnly, syntheticCandidate, syntheticInputs } from './synthetic.js';
 import { CHUNK_BYTES, FRAME_BYTES, READ_RESPONSE_BYTES, RESULT_BYTES, SourceFailure, decodeChunk, encode } from './wire.js';
@@ -124,10 +125,12 @@ try {
   let interpreter: AccessInterpretation | undefined;
   const currentInterpreter = (): AccessInterpretation => interpreter ??= new AccessInterpretation(
     project, inputs, host, currentCatalog(), runtime);
+  // The last whole-project accesses, which an explicit behavior request classifies.
+  let collected: Pick<ReturnType<AccessInterpretation['interpret']>, 'accesses' | 'coverage'> | undefined;
   const collectAccesses = () => {
     const current = currentInterpreter();
     const { accesses, coverage } = current.interpret(current.ordered);
-    return { accesses, coverage };
+    return collected = { accesses, coverage };
   };
   result('ready', null);
   for (;;) {
@@ -141,6 +144,8 @@ try {
       result('describe', createDescriptionSet().describe(project, inputs, host, new Map<CatalogExport, boolean>(), data.files).descriptions);
     } else if (command.command === 'accesses') {
       result('accesses', collectAccesses());
+    } else if (command.command === 'behavior') {
+      result('behavior', classifyDependencyBehavior(project, inputs, (collected ?? collectAccesses()).accesses));
     } else if (command.command === 'interpreter') {
       currentInterpreter(); result('interpreter', null);
     } else if (command.command === 'interpret') {
@@ -154,7 +159,7 @@ try {
       interpreter?.dispose(); interpreter = undefined;
       snapshot.dispose(); snapshot = undefined;
       api.close(); api = undefined;
-      virtual.clear(); runtime.clear(); catalog = undefined;
+      virtual.clear(); runtime.clear(); catalog = undefined; collected = undefined;
       result('dispose', null); break;
     } else throw new SourceFailure('unavailable', `Source capability ${String(command.command)} is unavailable`);
   }

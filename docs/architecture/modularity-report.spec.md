@@ -446,14 +446,16 @@ Iteration 2 implements this contract.
   modularity probe or a later explicit modularity command. The shared CLI
   capability list used by `ramify check`, `--changed`, watch, materialization
   and the explorer does not include it.
-- Only disposable batch analysis accepts it. Retained sessions and resident
-  contexts reject it with `unavailable-capability`; they neither reconfigure nor
-  queue work for it.
+- Only disposable batch analysis accepts it. Retained sessions reject it with
+  `unavailable-capability` when opened or updated with it; resident contexts
+  refuse the setup as `unsupported-setup`. Neither reconfigures nor queues work
+  for it.
 - `AnalysisSnapshot` gains the optional field
   `dependencyBehavior?: DependencyBehaviorFacts`, present only when requested.
   The report's `capabilities` list contains a `dependency-behavior` row only
-  when requested. Report documents without the request are byte-identical to
-  those produced before the capability existed.
+  when requested; the row is `available` only in batch analysis and `executed`
+  when the facts are present. Report documents without the request are
+  byte-identical to those produced before the capability existed.
 - The facts never add diagnostics, change `outcome.check`, `outcome.coverage`,
   `summary` or `report.coverage`, or alter exit codes. Classifier limits stay in
   `DependencyBehaviorFacts.limits`.
@@ -469,8 +471,24 @@ Iteration 2 implements this contract.
   identified reference outside their import declaration and are not forwarded;
   `unknown` when reference discovery, symbol resolution or capability
   interpretation is incomplete. Glossary definitions apply to every term.
+- References are identifiers bound to the selected local binding outside its
+  import declaration, or the selecting member or destructuring expression.
+  Export forms and references in export specifiers or `export default` are
+  forwarding; references beneath a type node, JSDoc (JavaScript source only),
+  an `implements` clause or an interface heritage clause are type positions.
+  A value reference invoked by a call, tagged template, decorator or JSX tag,
+  or whose first-level member is so invoked, is `call`; `new` is
+  `construction`; any other value reference is `callable-reference` for a
+  behavior-capable value and `data` otherwise.
+- Capability reads the reference's type: a union is behavior-capable when a
+  non-nullish constituent is. A first-level member counts only when declared
+  outside default and external library files, so array, string and promise
+  methods do not make a value behavior-capable. `any`, `unknown` and
+  unconstrained types are `unclassified-capability` limits.
 - `evidence` lists the distinct evidence kinds observed, in the declaration
   order of `BehaviorEvidence`. Evidence strength or confidence is not public.
+  `limits` lists only limits named by `unknown` facts. `failed` means the
+  classification operation failed as a whole; its facts are then empty.
 - Facts are ordered by consumer file, then original file, binding and kind;
   limits by id; both in byte order.
 - Acceptance shows the classifier executes zero times in ordinary and

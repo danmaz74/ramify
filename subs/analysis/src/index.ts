@@ -8,6 +8,7 @@ export type * from '../subs/descriptions/src/interfaces/syntax.js';
 export type * from '../subs/descriptions/src/interfaces/linking.js';
 export type * from '../subs/project/src/interfaces/project.js';
 export type * from '../subs/typescript/src/interfaces/source.js';
+export type * from '../subs/typescript/src/interfaces/dependency-behavior.js';
 
 export { resolveProject } from './resolve-project.js';
 export { openRetainedSession } from './retained-session.js';
