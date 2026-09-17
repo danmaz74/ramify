@@ -1,14 +1,14 @@
 # Plan 6D: Behavioral dependency diagram
 
-**Date:** 2026-09-17. **Status:** iterations 1-8 are implemented on branch
-`feat/plan6d-behavioral-dependency-diagram`; BD01-BD52 pass. Iterations 1-7
-are recorded in their [gate report](iterations/iteration7-results.md), and the
-accepted iteration 8 revision, the scope-aware roll-up of the drawn links, is
-implemented and recorded in its
-[completion report](iterations/iteration8-results.md). The accepted iteration 9
-revision, an optional node for the scope module's own source, is specified here
-and in [C11](contracts.md#c11-the-scope-modules-own-source-as-a-node) and is not
-implemented; BD53-BD61 are open. This is a focused successor to the implemented
+**Date:** 2026-09-17. **Status:** iterations 1-9 are implemented on branch
+`feat/plan6d-behavioral-dependency-diagram`; BD01-BD61 pass. Iterations 1-7
+are recorded in their [gate report](iterations/iteration7-results.md), the
+accepted iteration 8 revision, the scope-aware roll-up of the drawn links, in its
+[completion report](iterations/iteration8-results.md), and the accepted
+iteration 9 revision, an optional node for the scope module's own source,
+specified here and in
+[C11](contracts.md#c11-the-scope-modules-own-source-as-a-node), in its
+[own-source report](iterations/iteration9-results.md). This is a focused successor to the implemented
 [Plan 6B](../iteration-6b-resident-explorer-server/main-plan.md) and
 [Plan 6C](../iteration-6c-module-tree-view/main-plan.md). It uses the behavioral
 classification and modularity projection already implemented at `70d7f46`.
@@ -536,6 +536,7 @@ filtering, historical trends, confidence estimates, alternative layouts, an MCP
 or CLI client of the same operation, or module-move suggestions. None may
 reinterpret the two headline counts delivered here.
 
-Iteration 8's deferred own-source control is no longer deferred. It is accepted
-work, specified in the iteration 9 revision above and in C11, and planned as
-iteration 9; it changes no analysis, only the scope mapping and the drawn links.
+Iteration 8's deferred own-source control is no longer deferred. It is
+specified in the iteration 9 revision above and in C11 and implemented in
+iteration 9, as its [own-source report](iterations/iteration9-results.md)
+records; it changed no analysis, only the scope mapping and the drawn links.

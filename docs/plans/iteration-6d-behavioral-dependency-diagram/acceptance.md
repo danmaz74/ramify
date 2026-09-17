@@ -16,7 +16,9 @@ own source, accepted in the [plan's iteration 9 revision](main-plan.md#review-de
 and specified in [C11](contracts.md#c11-the-scope-modules-own-source-as-a-node),
 adds BD53-BD61. BD44, BD47 and BD51 are qualified in place with the control's
 default value, which is off; iteration 8's evidence was recorded at that default
-and still establishes them. No other row changes, and BD53-BD61 are open.
+and still establishes them. No other row changes. Every row through BD61 passes,
+as the [iteration 9 completion report](iterations/iteration9-results.md)
+records.
 
 ## Fixtures
 
