@@ -16,6 +16,7 @@ import type { ExplorerModule } from '../interfaces/project-view.js';
 import {
   dependencyScope,
   linkWidth,
+  ownSourceNodeId,
   maximumLinkWidth,
   minimumLinkWidth,
   scopeDependencyLinks,
@@ -246,6 +247,67 @@ describe('ModuleGraphRadial', () => {
     expect(Math.max(...Object.values(size))).toBe(170);
   });
 
+  it('BD58 draws the own-source node as a distinct node with no sub-module count or drill-down', () => {
+    const project = nestedLevelsProject();
+    const dependencies = nestedLevelsDependencies();
+    const tree = indexModuleTree(project.modules, project.rootModuleId);
+    const frame = project.modules.find((module) => module.id === 'app/a')!;
+    const children = project.modules.filter((module) => module.parent === 'app/a');
+    const scope = dependencyScope(project, 'app/a', true);
+    const edges = scopeDependencyLinks({ model: dependencies, scope, displayed: new Set(scope.nodes), tree,
+      settings: { showNonBehavioral: true, depthMode: 'level', showOutsideScope: true, showOwnSourceNode: true } });
+    const node = { id: ownSourceNodeId('app/a'), module: frame };
+    const onDrillDown = vi.fn();
+    const onSelectModule = vi.fn();
+    const render = (own: typeof node | null) => (
+      <ModuleGraphRadial modules={children} edges={own ? edges : edges
+        .filter((edge) => edge.consumer !== node.id && edge.provider !== node.id)}
+        ownSourceNode={own} selectedModuleId={null} selectedEdgeId={null}
+        onSelectModule={onSelectModule} onSelectEdge={vi.fn()} onDrillDown={onDrillDown} />
+    );
+    const rendered = renderComponent(render(node));
+    const nodes = getLastReactFlowProps().nodes as Array<Record<string, any>>;
+    const drawn = nodes.find((item) => item.id === node.id)!;
+    expect(drawn.data.name).toBe('a \u00b7 own source');
+    expect(drawn.data.ownSourceModule).toBe('app/a');
+    expect(drawn.data.isOwnSource).toBe(true);
+    expect(drawn.data.subModuleCount).toBe(0);
+    expect(nodes.filter((item) => item.data.isOwnSource === true)).toHaveLength(1);
+    // Its link onto a child is drawn, because its node ID is among the graph's nodes.
+    const graphEdges = getLastReactFlowProps().edges as Array<Record<string, any>>;
+    expect(graphEdges.map((edge) => [edge.source, edge.target]))
+      .toContainEqual([node.id, 'app/a/left']);
+
+    // The node view renders the label, the identity attribute and a rounded square.
+    const NodeView = getLastReactFlowProps().nodeTypes.moduleCircle as React.ComponentType<any>;
+    const view = renderComponent(<NodeView id={node.id} data={drawn.data} />);
+    const element = view.container.querySelector('[data-own-source]')!;
+    expect(element.getAttribute('data-own-source')).toBe('app/a');
+    expect(element.getAttribute('aria-label')).toBe('a \u00b7 own source');
+    expect((element as HTMLElement).style.borderRadius).toBe('16px');
+    expect(element.className).toContain('module-arch__radial-node--own-source');
+    expect(element.textContent).toContain('a \u00b7 own source');
+    const moduleData = nodes.find((item) => item.id === 'app/a/left')!.data;
+    const moduleView = renderComponent(<NodeView id="app/a/left" data={moduleData} />);
+    const moduleElement = moduleView.container.querySelector('.module-arch__radial-node')!;
+    expect(moduleElement.getAttribute('data-own-source')).toBeNull();
+    expect((moduleElement as HTMLElement).style.borderRadius).toBe('50%');
+
+    // Activating it selects it; it is no drill-down target.
+    fireEvent.click(screen.getByTestId(`mock-node-${node.id}`));
+    expect(onSelectModule).toHaveBeenCalledWith(node.id);
+    expect(onDrillDown).not.toHaveBeenCalled();
+
+    // The displayed modules keep their diameters when the control is toggled.
+    const diameters = (items: Array<Record<string, any>>) => Object.fromEntries(items
+      .filter((item) => item.data.isOwnSource !== true).map((item) => [item.id, item.data.diameter]));
+    const withNode = diameters(nodes);
+    rendered.rerender(render(null));
+    const withoutNodes = getLastReactFlowProps().nodes as Array<Record<string, any>>;
+    expect(diameters(withoutNodes)).toEqual(withNode);
+    expect(withoutNodes.some((item) => item.data.isOwnSource === true)).toBe(false);
+  });
+
   it('labels the link unit of the drawn links', () => {
     const { forwarding } = mappedDependencyModels();
     const project = forwardingProject();
@@ -395,7 +457,8 @@ function scopedLinks(project: ProjectExplorerModel, model: DependencyGraphModel,
     scope,
     displayed: new Set(scope.nodes),
     tree: indexModuleTree(project.modules, project.rootModuleId),
-    settings: { showNonBehavioral: true, depthMode, showOutsideScope: true, ...overrides },
+    settings: { showNonBehavioral: true, depthMode, showOutsideScope: true, showOwnSourceNode: false,
+      ...overrides },
   });
 }
 

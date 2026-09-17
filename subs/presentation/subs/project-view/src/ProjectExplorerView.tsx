@@ -25,6 +25,10 @@ import {
   dependencyScope,
   idleDependencyGraph,
   originalIdentity,
+  ownSourceLabel,
+  ownSourceNodeId,
+  ownSourceNodeModule,
+  ownedSourceFiles,
   scopeCoversProject,
   scopeDependencyLinks,
   scopeLinkCounts,
@@ -187,10 +191,13 @@ export function ProjectExplorerView({
     [selectedPresentationClasses],
   );
   const tree = useMemo(() => indexModuleTree(modules, data?.rootModuleId), [data?.rootModuleId, modules]);
-  // The scope's frame and candidate nodes, before the class filter and independent of the settings.
+  // The scope's frame and candidate nodes, before the class filter and independent of the other
+  // settings. `Exact module` already draws the scope module itself, so the own-source node is
+  // drawn only in `level` mode, where the control is enabled.
+  const drawsOwnSource = settings.showOwnSourceNode && settings.depthMode === 'level';
   const scope = useMemo(
-    () => data ? dependencyScope(data, scopeModuleId) : null,
-    [data, scopeModuleId],
+    () => data ? dependencyScope(data, scopeModuleId, drawsOwnSource) : null,
+    [data, drawsOwnSource, scopeModuleId],
   );
   const modulesInScope = useMemo(() => (scope?.nodes ?? [])
     .map((id) => modulesById.get(id))
@@ -223,22 +230,35 @@ export function ProjectExplorerView({
   );
   const dependencyData = dependencies.data;
   const { showNonBehavioral, depthMode, showOutsideScope } = settings;
+  /** The scope module's own source as its own node, drawn beside the displayed modules. */
+  const ownSourceNode = useMemo(() => {
+    const module = scope?.ownSourceNode != null ? modulesById.get(scope.ownSourceNode) : undefined;
+    return module ? { id: ownSourceNodeId(module.id), module } : null;
+  }, [modulesById, scope]);
+  /** Every drawn node, including the own-source node, which is no module's node. */
+  const displayedNodeIds = useMemo(
+    () => new Set<string>([...visibleModuleIds, ...(ownSourceNode ? [ownSourceNode.id] : [])]),
+    [ownSourceNode, visibleModuleIds],
+  );
   // Keyed by setting values, so an equal recreated settings object keeps the same links.
   // The scope's links before the non-behavioral display filter: the panels count these.
   const scopeLinks = useMemo(
     () => dependencyData && scope
       ? scopeDependencyLinks({ model: dependencyData, scope, displayed: visibleModuleIds, tree,
-        settings: { showNonBehavioral: true, depthMode, showOutsideScope } })
+        settings: { showNonBehavioral: true, depthMode, showOutsideScope,
+          showOwnSourceNode: drawsOwnSource } })
       : [],
-    [dependencyData, depthMode, scope, showOutsideScope, tree, visibleModuleIds],
+    [dependencyData, depthMode, drawsOwnSource, scope, showOutsideScope, tree, visibleModuleIds],
   );
   // The links actually drawn: the same set after the non-behavioral display filter.
   const graphEdges = useMemo(
     () => dependencyData && scope
       ? scopeDependencyLinks({ model: dependencyData, scope, displayed: visibleModuleIds, tree,
-        settings: { showNonBehavioral, depthMode, showOutsideScope } })
+        settings: { showNonBehavioral, depthMode, showOutsideScope,
+          showOwnSourceNode: drawsOwnSource } })
       : [],
-    [dependencyData, depthMode, scope, showNonBehavioral, showOutsideScope, tree, visibleModuleIds],
+    [dependencyData, depthMode, drawsOwnSource, scope, showNonBehavioral, showOutsideScope, tree,
+      visibleModuleIds],
   );
   const dependencyRows = useMemo(
     () => new Map((dependencyData?.modules ?? []).map((row) => [row.id, row])),
@@ -248,13 +268,14 @@ export function ProjectExplorerView({
   const outOfViewModules = useMemo(() => {
     const related = new Set<string>();
     for (const edge of graphEdges) {
-      if (!visibleModuleIds.has(edge.provider)) related.add(edge.provider);
-      if (!visibleModuleIds.has(edge.consumer)) related.add(edge.consumer);
+      for (const node of [edge.consumer, edge.provider]) {
+        if (!displayedNodeIds.has(node) && ownSourceNodeModule(node) === null) related.add(node);
+      }
     }
     return [...related]
       .map((id) => modulesById.get(id))
       .filter((module): module is ExplorerModule => module != null);
-  }, [graphEdges, modulesById, visibleModuleIds]);
+  }, [displayedNodeIds, graphEdges, modulesById]);
   const outOfViewLevelById = useMemo(() => {
     const result: Record<string, number> = {};
     const visibleDepth = scope?.depth ?? 0;
@@ -269,8 +290,8 @@ export function ProjectExplorerView({
   );
 
   useEffect(() => {
-    if (selectedModuleId && !visibleModuleIds.has(selectedModuleId)) onSelectModule(null);
-  }, [onSelectModule, selectedModuleId, visibleModuleIds]);
+    if (selectedModuleId && !displayedNodeIds.has(selectedModuleId)) onSelectModule(null);
+  }, [displayedNodeIds, onSelectModule, selectedModuleId]);
 
   // A selection survives a settings, scope or data change only as the same link ID. A rolled-up ID
   // names its scope and depth mode, so changing either clears it; an exact ID can survive.
@@ -288,6 +309,9 @@ export function ProjectExplorerView({
 
   const selectedModule = selectedModuleId
     ? modulesForGraph.find((module) => module.id === selectedModuleId) ?? null
+    : null;
+  const selectedOwnSource = ownSourceNode !== null && selectedModuleId === ownSourceNode.id
+    ? ownSourceNode
     : null;
   const selectedLink = selectedEdge ? graphEdgesById.get(selectedEdge.id) ?? null : null;
   const displayedLinks = graphEdges.length;
@@ -392,6 +416,7 @@ export function ProjectExplorerView({
             <GraphComponent
               modules={modulesForGraph}
               edges={graphEdges}
+              ownSourceNode={ownSourceNode}
               outOfViewModules={outOfViewModules}
               outOfViewLevelById={outOfViewLevelById}
               selectedModuleId={selectedModuleId}
@@ -413,9 +438,11 @@ export function ProjectExplorerView({
           <div className="module-arch__sidebar" style={{ width: sidebarWidth }}>
             {selectedLink
               ? renderLinkDetail(selectedLink)
-              : selectedModule
-                ? renderModuleDetail(selectedModule)
-                : renderProjectDetail()}
+              : selectedOwnSource
+                ? renderOwnSourceDetail(selectedOwnSource.id, selectedOwnSource.module)
+                : selectedModule
+                  ? renderModuleDetail(selectedModule)
+                  : renderProjectDetail()}
           </div>
         </div>
       </div>
@@ -497,6 +524,19 @@ export function ProjectExplorerView({
               <span className="module-arch__filter-label">Show dependencies that leave this module</span>
             </label>
           )}
+          {/* Only a drilled-in scope has an own source to draw; `Exact module` already draws it. */}
+          {scopeModuleId !== null && (
+            <label className={`module-arch__filter-item${
+              unavailable || settings.depthMode === 'exact' ? ' module-arch__filter-item--disabled' : ''}`}>
+              <input
+                type="checkbox"
+                checked={settings.showOwnSourceNode}
+                disabled={unavailable || settings.depthMode === 'exact'}
+                onChange={(event) => changeSettings({ ...settings, showOwnSourceNode: event.target.checked })}
+              />
+              <span className="module-arch__filter-label">Show this module&apos;s own source as a node</span>
+            </label>
+          )}
           <div className="module-arch__segmented">
             <span className="module-arch__segmented-label" id="module-arch-link-depth">Link depth</span>
             <div role="radiogroup" aria-labelledby="module-arch-link-depth" className="module-arch__segmented-options">
@@ -559,8 +599,10 @@ export function ProjectExplorerView({
               <p className="module-arch__not-drawn"
                 data-not-drawn={`${notDrawn.behavioral}/${notDrawn.nonBehavioral}`}>
                 Not drawn at this level: {notDrawn.behavioral} behavioral and {notDrawn.nonBehavioral} non-behavioral.
-                They are internal to a displayed node, folded into the scope&apos;s own source, or outside the scope
-                while leaving links are hidden.
+                {ownSourceNode
+                  ? ' They are internal to a displayed node, or outside the scope while leaving links are hidden.'
+                  : " They are internal to a displayed node, folded into the scope's own source, or outside"
+                    + ' the scope while leaving links are hidden.'}
               </p>
             </>
           ) : dependencyPlaceholder()}
@@ -585,12 +627,89 @@ export function ProjectExplorerView({
             {cardPair('Owned originals used by others', frameRow.ownedUsedByOthers,
               'Behavioral dependencies', 'Non-behavioral dependencies')}
             <p className="module-arch__sidebar-hint">
-              {moduleName(scopeModuleId)}&apos;s own source is folded into the frame, so its links are not drawn
-              at this scope.
+              {ownSourceNode
+                ? `${moduleName(scopeModuleId)}'s own source is drawn as its own node here.`
+                : `${moduleName(scopeModuleId)}'s own source is folded into the frame, so its links are not`
+                  + ' drawn at this scope.'}
             </p>
           </section>
         )}
         <p className="module-arch__sidebar-hint">Select a module or link to inspect details</p>
+      </div>
+    );
+  }
+
+  /**
+   * The scope module's own source at this scope: its drawn links against its measured own row,
+   * which excludes its descendants. It never stands for the module's subtree.
+   */
+  function renderOwnSourceDetail(nodeId: string, module: ExplorerModule): React.ReactNode {
+    const row = dependencyRows.get(module.id) ?? null;
+    const coverage = model.coverage.filter((item) => item.moduleIds.includes(module.id));
+    const atLevelUses = scopeLinkCounts(scopeLinks.filter((link) => link.consumer === nodeId));
+    const atLevelOwned = scopeLinkCounts(scopeLinks.filter((link) => link.provider === nodeId));
+    const linksDisplayed = graphEdges
+      .filter((link) => link.consumer === nodeId || link.provider === nodeId).length;
+    return (
+      <div className="module-arch__detail">
+        <div className="module-arch__detail-header">
+          <h3 className="module-arch__detail-name">{ownSourceLabel(module)}</h3>
+          <span className="module-arch__detail-path">{module.directory}</span>
+          <span className="module-arch__dependency-badge module-arch__dependency-badge--class">
+            {getPresentationClassLabel(module.presentationClass)}
+          </span>
+          <p className="module-arch__detail-description">
+            This node is {module.name}&apos;s own source, not its subtree.
+          </p>
+        </div>
+        {row ? (
+          <>
+            <section className="module-arch__role" aria-label="Uses">
+              <h4 className="module-arch__role-title">Uses</h4>
+              {cardPair('At this level', atLevelUses, 'Behavioral dependencies', 'Non-behavioral dependencies')}
+              {cardPair('Excluding internals', row.uses, 'Behavioral dependencies', 'Non-behavioral dependencies')}
+            </section>
+            <section className="module-arch__role" aria-label="Owned originals used by others">
+              <h4 className="module-arch__role-title">Owned originals used by others</h4>
+              {cardPair('At this level', atLevelOwned, 'Behavioral dependencies', 'Non-behavioral dependencies')}
+              {cardPair('Excluding internals', row.ownedUsedByOthers,
+                'Behavioral dependencies', 'Non-behavioral dependencies')}
+            </section>
+            <details className="module-arch__alternate-role">
+              <summary>Used through this module</summary>
+              <section className="module-arch__role" aria-label="Used through this module">
+                {cardPair('Excluding internals',
+                  { behavioral: row.usedThrough.behavioralUsedOriginals,
+                    nonBehavioral: row.usedThrough.nonBehavioralUsedOriginals },
+                  'Behavioral used originals via this module', 'Non-behavioral used originals via this module')}
+                <p className="module-arch__sidebar-hint">
+                  An imported boundary is a panel unit: no drawn link uses it.
+                </p>
+              </section>
+            </details>
+          </>
+        ) : (
+          <section className="module-arch__role" aria-label="Uses">
+            <h4 className="module-arch__role-title">Uses</h4>
+            {dependencyData
+              ? <p className="module-arch__no-exports">No dependency row for this module</p>
+              : dependencyPlaceholder()}
+          </section>
+        )}
+        <div className="module-arch__role">
+          <div className="module-arch__detail-metrics">
+            {dependencyData && metric(linksDisplayed, 'Links displayed')}
+            {metric(ownedSourceFiles(module), 'Owned source files')}
+            {dependencyData && metric(coverageText(dependencyData), 'Dependency coverage')}
+          </div>
+        </div>
+        {coverage.length > 0 && collapsible('own-coverage', 'Coverage limits',
+          renderCoverage(coverage), coverage.length)}
+        <p className="module-arch__sidebar-hint">
+          Excluding internals counts {module.name}&apos;s own source across the whole project. Its
+          Including internals numbers, which add its descendants, appear on its own node in the
+          enclosing scope.
+        </p>
       </div>
     );
   }

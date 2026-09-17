@@ -15,7 +15,7 @@ import {
 import type { EdgeProps, Node, NodeProps } from '@xyflow/react';
 import { useAutoFit } from './auto-fit.js';
 import type { ExplorerModule } from './interfaces/project-view.js';
-import type { ActiveDependencyEdge } from './dependency-graph.js';
+import { ownSourceLabel, ownedSourceFiles, type ActiveDependencyEdge } from './dependency-graph.js';
 import ModuleGraphLegend from './ModuleGraphLegend.js';
 import {
   buildGraphEdges,
@@ -53,6 +53,10 @@ interface ModuleCircleData extends Record<string, unknown> {
   readonly subModuleCount: number;
   readonly isOutOfView?: boolean;
   readonly outOfViewLevel?: number;
+  /** Set on the scope module's own-source node, which is no module's node. */
+  readonly isOwnSource?: boolean;
+  /** The module whose own source the node stands for. */
+  readonly ownSourceModule?: string;
 }
 
 type ModuleCircleNode = Node<ModuleCircleData, 'moduleCircle'>;
@@ -74,11 +78,13 @@ function ModuleCircleNodeView({ data }: NodeProps<ModuleCircleNode>): React.Reac
 
   return (
     <div
-      className="module-arch__radial-node"
+      className={`module-arch__radial-node${data.isOwnSource ? ' module-arch__radial-node--own-source' : ''}`}
+      {...(data.isOwnSource ? { 'aria-label': data.name } : {})}
+      data-own-source={data.ownSourceModule}
       style={{
         width: data.diameter,
         height: data.diameter,
-        borderRadius: '50%',
+        borderRadius: data.isOwnSource ? '16px' : '50%',
         borderWidth: '3px',
         borderStyle: data.isOutOfView ? 'dashed' : 'solid',
         borderColor: data.isSelected ? '#1d4ed8' : borderColor,
@@ -196,6 +202,7 @@ export function ModuleGraphRadial({
   edges: moduleEdges,
   outOfViewModules = [],
   outOfViewLevelById = {},
+  ownSourceNode = null,
   selectedModuleId,
   selectedEdgeId,
   onSelectModule,
@@ -207,13 +214,14 @@ export function ModuleGraphRadial({
     [modules, outOfViewModules],
   );
   const allNodeIds = useMemo(
-    () => new Set(modulesById.keys()),
-    [modulesById],
+    () => new Set([...modulesById.keys(), ...(ownSourceNode ? [ownSourceNode.id] : [])]),
+    [modulesById, ownSourceNode],
   );
 
   const allRingNodes = useMemo<ModuleCircleNode[]>(() => {
-    const totalCount = modules.length + outOfViewModules.length;
+    const totalCount = modules.length + outOfViewModules.length + (ownSourceNode ? 1 : 0);
     const baseRadius = getRingRadius(totalCount);
+    // Only the displayed child modules scale the node sizes, so a toggled control resizes none.
     const diameters = nodeDiameters(modules);
     const result: ModuleCircleNode[] = [];
 
@@ -222,13 +230,19 @@ export function ModuleGraphRadial({
       result.push(moduleNode(module, index, totalCount, baseRadius, diameters.get(module.id) ?? MIN_DIAMETER,
         module.id === selectedModuleId, linkHealth(module.id, moduleEdges)));
     }
+    if (ownSourceNode) {
+      result.push(ownSourceCircle(ownSourceNode, modules.length, totalCount, baseRadius,
+        ownSourceDiameter(modules, ownSourceNode.module), ownSourceNode.id === selectedModuleId,
+        linkHealth(ownSourceNode.id, moduleEdges)));
+    }
+    const drawn = modules.length + (ownSourceNode ? 1 : 0);
     for (let index = 0; index < outOfViewModules.length; index += 1) {
       const module = outOfViewModules[index];
-      result.push(moduleNode(module, modules.length + index, totalCount, baseRadius, MIN_DIAMETER,
+      result.push(moduleNode(module, drawn + index, totalCount, baseRadius, MIN_DIAMETER,
         false, linkHealth(module.id, moduleEdges), true, outOfViewLevelById[module.id]));
     }
     return result;
-  }, [modules, moduleEdges, outOfViewModules, outOfViewLevelById, selectedModuleId]);
+  }, [modules, moduleEdges, outOfViewModules, outOfViewLevelById, ownSourceNode, selectedModuleId]);
 
   const graphEdges = useMemo(() => buildGraphEdges({
     edges: moduleEdges,
@@ -300,16 +314,23 @@ function linkHealth(id: string, edges: readonly ActiveDependencyEdge[]): LinkHea
  * independent of dependency settings, so the controls never resize nodes.
  */
 export function nodeDiameters(modules: readonly ExplorerModule[]): Map<string, number> {
+  const scale = diameterScale(modules);
+  return new Map(modules.map((module) => [module.id, scale(ownedSourceFiles(module))]));
+}
+
+/** The displayed modules' size scale, applied to the own-source node's owned source files. */
+export function ownSourceDiameter(modules: readonly ExplorerModule[], module: ExplorerModule): number {
+  return diameterScale(modules)(ownedSourceFiles(module));
+}
+
+function diameterScale(modules: readonly ExplorerModule[]): (files: number) => number {
   const sizes = modules.map((module) => Math.sqrt(ownedSourceFiles(module)));
   const minimum = sizes.length > 0 ? Math.min(...sizes) : 0;
   const range = sizes.length > 0 ? Math.max(...sizes) - minimum : 0;
-  return new Map(modules.map((module, index) => [module.id, range === 0
+  return (files) => range === 0
     ? MIN_DIAMETER
-    : MIN_DIAMETER + ((sizes[index]! - minimum) / range) * (MAX_DIAMETER - MIN_DIAMETER)]));
-}
-
-export function ownedSourceFiles(module: ExplorerModule): number {
-  return module.files.filter((file) => file.kind === 'source').length;
+    : Math.min(MAX_DIAMETER, Math.max(MIN_DIAMETER,
+      MIN_DIAMETER + ((Math.sqrt(files) - minimum) / range) * (MAX_DIAMETER - MIN_DIAMETER)));
 }
 
 function linkTitle(link: ActiveDependencyEdge): string {
@@ -348,6 +369,41 @@ function moduleNode(module: ExplorerModule, slot: number, total: number, radius:
       subModuleCount: module.children.length,
       isOutOfView: outOfView,
       outOfViewLevel,
+    },
+  };
+}
+
+/**
+ * The scope module's own source as its own node: the module's tag-class colour, no sub-module
+ * count and no drill-down, because drilling into the frame module is the current scope.
+ */
+function ownSourceCircle(node: { readonly id: string; readonly module: ExplorerModule },
+  slot: number, total: number, radius: number, diameter: number, selected: boolean,
+  health: LinkHealth): ModuleCircleNode {
+  const angle = slotAngle(slot, total);
+  const presentationClass = getPresentationClass(node.module);
+  return {
+    id: node.id,
+    type: 'moduleCircle',
+    position: circlePosition(angle, radius, diameter),
+    initialWidth: diameter,
+    initialHeight: diameter,
+    data: {
+      name: ownSourceLabel(node.module),
+      path: node.module.directory,
+      presentationClass,
+      presentationClassLabel: getPresentationClassLabel(presentationClass),
+      presentationClassColor: getPresentationClassColor(presentationClass),
+      fileCount: ownedSourceFiles(node.module),
+      linkCount: health.links,
+      limitedCount: health.limited,
+      deniedCount: health.denied,
+      isSelected: selected,
+      diameter,
+      angle,
+      subModuleCount: 0,
+      isOwnSource: true,
+      ownSourceModule: node.module.id,
     },
   };
 }

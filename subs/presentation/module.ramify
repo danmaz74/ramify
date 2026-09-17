@@ -35,6 +35,6 @@ expose-sub ModuleTreeViewProps from project-view to parent
 expose-sub indexModuleTree, collapsibleAtDepth, ancestorsOf from project-view to parent
 
 // P5: behavioral dependency view vocabulary, active link shape and default settings.
-expose-sub DependencyGraphCount, DependencyGraphImportedCount, DependencyGraphModule, DependencyGraphEvidence, DependencyGraphImportedEdge, DependencyGraphOriginalEdge, DependencyGraphEdge, DependencyGraphModel, DependencyDepthMode, DependencySettings, DependencyPhase, DependencyGraphState, ActiveDependencyEdge from project-view to parent
-expose-sub defaultDependencySettings from project-view to parent
+expose-sub DependencyGraphCount, DependencyGraphImportedCount, DependencyGraphModule, DependencyGraphEvidence, DependencyGraphImportedEdge, DependencyGraphOriginalEdge, DependencyGraphEdge, DependencyGraphModel, DependencyDepthMode, DependencySettings, DependencyPhase, DependencyGraphState, ActiveDependencyEdge, ScopeNodeId from project-view to parent
+expose-sub defaultDependencySettings, ownSourceNodeId, ownSourceNodeModule from project-view to parent
 expose-sub placeTree, Point from layout to descendants

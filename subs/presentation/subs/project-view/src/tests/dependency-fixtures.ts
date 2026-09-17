@@ -316,29 +316,39 @@ export interface ExpectedScope {
   readonly frameModule: string | null;
   readonly nodes: readonly string[];
   readonly depth: number;
+  readonly ownSourceNode: string | null;
 }
 
+/** The own-source node's ID, calculated independently of the view. */
+export const expectedOwnSourceNodeId = (module: string): string => `own-source/1:${module}`;
+
 export interface ExpectedScopeLink {
+  /** The link's ID at this scope, spelled independently of the view. */
+  readonly id: string;
   readonly consumer: string;
   readonly provider: string;
   readonly behavioral: number;
   readonly nonBehavioral: number;
+  readonly status: DependencyGraphEvidence['status'];
   readonly leavesScope: boolean;
   readonly sources: readonly string[];
 }
 
-export function expectedScope(project: ProjectExplorerModel, scopeModuleId: string | null): ExpectedScope {
+export function expectedScope(project: ProjectExplorerModel, scopeModuleId: string | null,
+  showOwnSourceNode = false): ExpectedScope {
   const byId = new Map(project.modules.map((module) => [module.id, module]));
   if (scopeModuleId !== null) {
     return { frameModule: scopeModuleId, depth: expectedDepth(project, scopeModuleId) + 1,
-      nodes: project.modules.filter((module) => module.parent === scopeModuleId).map((module) => module.id) };
+      nodes: project.modules.filter((module) => module.parent === scopeModuleId).map((module) => module.id),
+      ownSourceNode: showOwnSourceNode ? scopeModuleId : null };
   }
   const topLevel = project.modules.filter((module) => module.parent === null);
   const root = byId.get(project.rootModuleId);
   if (topLevel.length === 1 && root && root.children.length > 0) {
-    return { frameModule: root.id, nodes: [...root.children], depth: expectedDepth(project, root.id) + 1 };
+    return { frameModule: root.id, nodes: [...root.children], depth: expectedDepth(project, root.id) + 1,
+      ownSourceNode: null };
   }
-  return { frameModule: null, nodes: topLevel.map((module) => module.id), depth: 0 };
+  return { frameModule: null, nodes: topLevel.map((module) => module.id), depth: 0, ownSourceNode: null };
 }
 
 /** Ancestors of a module, root first. */
@@ -358,6 +368,7 @@ export function expectedDepth(project: ProjectExplorerModel, id: string): number
 }
 
 export type ExpectedEnd = { readonly kind: 'frame' }
+  | { readonly kind: 'own-source'; readonly module: string }
   | { readonly kind: 'node'; readonly module: string; readonly inScope: boolean };
 
 /** Where one exact module lands, calculated from the project structure alone. */
@@ -369,7 +380,9 @@ export function expectedEnd(project: ProjectExplorerModel, scope: ExpectedScope,
     return { kind: 'node', module, inScope: scope.frameModule === null || under(module, scope.frameModule) };
   }
   for (const node of scope.nodes) if (under(module, node)) return { kind: 'node', module: node, inScope: true };
-  if (scope.frameModule !== null && module === scope.frameModule) return { kind: 'frame' };
+  if (scope.frameModule !== null && module === scope.frameModule) {
+    return scope.ownSourceNode !== null ? { kind: 'own-source', module } : { kind: 'frame' };
+  }
   const outside = scope.depth - 1;
   if (expectedDepth(project, module) <= outside) return { kind: 'node', module, inScope: false };
   const chain = [...expectedAncestors(project, module), module];
@@ -398,25 +411,34 @@ export function expectedScopeLinks(input: {
   readonly displayed?: readonly string[];
   readonly showNonBehavioral?: boolean;
   readonly showOutsideScope?: boolean;
+  readonly showOwnSourceNode?: boolean;
 }): ExpectedScopeLink[] {
   const { project, dependencies } = input;
   const depthMode = input.depthMode ?? 'level';
   const showNonBehavioral = input.showNonBehavioral ?? false;
-  const scope = expectedScope(project, input.scopeModuleId ?? null);
+  const scope = expectedScope(project, input.scopeModuleId ?? null,
+    depthMode === 'level' && (input.showOwnSourceNode ?? false));
   const displayed = new Set(input.displayed ?? scope.nodes);
   const covers = expectedCoversProject(project, scope);
   const groups = new Map<string, { consumer: string; provider: string; leavesScope: boolean;
     sources: DependencyGraphOriginalEdge[] }>();
+  // An own-source end takes the own-source node's ID, is drawn and is always in scope.
+  const nodeIdOf = (end: Exclude<ExpectedEnd, { kind: 'frame' }>) =>
+    end.kind === 'own-source' ? expectedOwnSourceNodeId(end.module) : end.module;
   for (const edge of dependencies.originalOwnerEdges) {
     const consumer = expectedEnd(project, scope, edge.consumer, depthMode);
     const provider = expectedEnd(project, scope, edge.provider, depthMode);
     if (consumer.kind === 'frame' || provider.kind === 'frame') continue;
-    if (consumer.module === provider.module) continue;
-    if (!displayed.has(consumer.module) && !displayed.has(provider.module)) continue;
-    const key = `${consumer.module}|${provider.module}`;
+    const consumerNode = nodeIdOf(consumer);
+    const providerNode = nodeIdOf(provider);
+    if (consumerNode === providerNode) continue;
+    if (consumer.kind !== 'own-source' && provider.kind !== 'own-source'
+      && !displayed.has(consumerNode) && !displayed.has(providerNode)) continue;
+    const key = `${consumerNode}|${providerNode}`;
     const group = groups.get(key)
-      ?? { consumer: consumer.module, provider: provider.module, leavesScope: false, sources: [] };
-    group.leavesScope = group.leavesScope || (!covers && (!consumer.inScope || !provider.inScope));
+      ?? { consumer: consumerNode, provider: providerNode, leavesScope: false, sources: [] };
+    group.leavesScope = group.leavesScope || (!covers
+      && ((consumer.kind === 'node' && !consumer.inScope) || (provider.kind === 'node' && !provider.inScope)));
     group.sources.push(edge);
     groups.set(key, group);
   }
@@ -436,9 +458,15 @@ export function expectedScopeLinks(input: {
     const counts = tally([...pairs.values()]
       .map((settled): Classification => settled ? 'behavioral' : 'non-behavioral'));
     if (counts.behavioral + (showNonBehavioral ? counts.nonBehavioral : 0) === 0) continue;
-    result.push({ consumer: group.consumer, provider: group.provider, ...counts,
+    const sources = [...group.sources].sort(byPair);
+    const rows = sources.flatMap((edge) => edge.evidence.map((item) => item.status));
+    result.push({
+      id: depthMode === 'exact' ? sources[0]!.id
+        : `scoped-link/1:level:${scope.frameModule ?? '-'}:${JSON.stringify([group.consumer, group.provider])}`,
+      consumer: group.consumer, provider: group.provider, ...counts,
+      status: rows.includes('denied') ? 'denied' : rows.includes('limited') ? 'limited' : 'allowed',
       leavesScope: group.leavesScope,
-      sources: [...group.sources].sort(byPair).map((edge) => edge.id) });
+      sources: sources.map((edge) => edge.id) });
   }
   return result.sort(byPair);
 }

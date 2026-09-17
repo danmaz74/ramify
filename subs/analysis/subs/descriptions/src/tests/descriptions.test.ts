@@ -98,7 +98,8 @@ const presentationStatements = [
   sub(projectViewProps, 'project-view'),
   sub(['ModuleTreeView'], 'project-view'), sub(['ModuleTreeViewProps'], 'project-view'),
   sub(['indexModuleTree', 'collapsibleAtDepth', 'ancestorsOf'], 'project-view'),
-  sub([...dependencyViewNames, 'ActiveDependencyEdge'], 'project-view'), sub(['defaultDependencySettings'], 'project-view'),
+  sub([...dependencyViewNames, 'ActiveDependencyEdge', 'ScopeNodeId'], 'project-view'),
+  sub(['defaultDependencySettings', 'ownSourceNodeId', 'ownSourceNodeModule'], 'project-view'),
   sub(['placeTree', 'Point'], 'layout', descendants),
 ];
 const layoutStatements = [
@@ -131,7 +132,8 @@ const toolkit: readonly Fixture[] = [
     sub(['ModuleGraphRadial'], 'presentation', descendants), sub(projectViewProps, 'presentation', descendants),
     sub(['ProjectExplorerView'], 'presentation', descendants),
     sub(['ModuleTreeView', 'ModuleTreeViewProps', 'indexModuleTree', 'collapsibleAtDepth', 'ancestorsOf'], 'presentation', descendants),
-    sub([...dependencyViewNames, 'ActiveDependencyEdge', 'defaultDependencySettings'], 'presentation', descendants),
+    sub([...dependencyViewNames, 'ActiveDependencyEdge', 'ScopeNodeId', 'defaultDependencySettings',
+      'ownSourceNodeId', 'ownSourceNodeModule'], 'presentation', descendants),
     sub(explorerServiceNames, 'service-api', descendants), sub(['createProjectExplorerModel'], 'service-api', descendants),
     sub(explorerDependencyNames, 'service-api', descendants),
     sub(['createExplorerRouter', 'ExplorerRouter', 'startExplorerWebProcess'], 'service-api', descendants),
@@ -186,7 +188,9 @@ const toolkit: readonly Fixture[] = [
   { path: 'subs/presentation/subs/layout/', name: 'layout', tags: browser, statements: layoutStatements },
   { path: 'subs/presentation/subs/project-view/', name: 'project-view', tags: uiBrowser, statements: [
     src('*', 'interfaces/project-view.ts'), src('*', 'interfaces/dependency-view.ts'),
-    src(['ActiveDependencyEdge'], 'dependency-graph.ts'), src(['defaultDependencySettings'], 'dependency-graph.ts', uiBrowser),
+    src(['ActiveDependencyEdge', 'ScopeNodeId'], 'dependency-graph.ts'),
+    src(['ownSourceNodeId', 'ownSourceNodeModule'], 'dependency-graph.ts', uiBrowser),
+    src(['defaultDependencySettings'], 'dependency-graph.ts', uiBrowser),
     src(['ModuleGraphRadial'], 'ModuleGraphRadial.tsx', uiBrowser),
     src(['ModuleGraphProps', 'GraphSelection'], 'moduleGraphShared.ts'),
     src(['ProjectExplorerView'], 'ProjectExplorerView.tsx', uiBrowser),

@@ -339,6 +339,12 @@
   letter-spacing: 0.03em;
 }
 
+/* The scope module's own source: a rounded square, not a module circle. */
+.module-arch__radial-node--own-source {
+  outline: 2px dotted rgba(100, 116, 139, 0.55);
+  outline-offset: 4px;
+}
+
 .module-arch__card-pair {
   margin-bottom: 8px;
 }

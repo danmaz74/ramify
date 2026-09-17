@@ -9,13 +9,14 @@ import type {
   DependencyGraphState,
   DependencySettings,
 } from './interfaces/dependency-view.js';
-import type { ProjectExplorerModel } from './interfaces/project-view.js';
+import type { ExplorerModule, ProjectExplorerModel } from './interfaces/project-view.js';
 import type { ModuleTreeIndex } from './module-tree.js';
 
 export const defaultDependencySettings: DependencySettings = Object.freeze({
   showNonBehavioral: false,
   depthMode: 'level',
   showOutsideScope: true,
+  showOwnSourceNode: false,
 });
 
 export const idleDependencyGraph: DependencyGraphState = Object.freeze({
@@ -25,6 +26,9 @@ export const idleDependencyGraph: DependencyGraphState = Object.freeze({
   isStale: false,
 });
 
+/** A drawn node: a module ID, or an own-source node ID. */
+export type ScopeNodeId = string;
+
 /** The region the graph shows. */
 export interface DependencyScope {
   /** The module whose own source the frame represents; null when there is none. */
@@ -33,12 +37,33 @@ export interface DependencyScope {
   readonly nodes: readonly ModuleId[];
   /** The depth of `nodes`; an outside end maps to depth `depth - 1`. */
   readonly depth: number;
+  /** The scope module whose own source is drawn as a node; null when it is folded. */
+  readonly ownSourceNode: ModuleId | null;
 }
 
 /** Where one end of an exact edge lands at a scope. */
 export type ScopeEnd =
   | { readonly kind: 'node'; readonly module: ModuleId; readonly inScope: boolean }
+  | { readonly kind: 'own-source'; readonly module: ModuleId }
   | { readonly kind: 'frame' };
+
+/** The drawn node's ID for a scope module's own source; never equal to a module ID. */
+export function ownSourceNodeId(module: ModuleId): ScopeNodeId {
+  return `own-source/1:${module}`;
+}
+
+/** The module of an own-source node ID, or null for any other node ID. */
+export function ownSourceNodeModule(nodeId: ScopeNodeId): ModuleId | null {
+  return nodeId.startsWith('own-source/1:') ? nodeId.slice('own-source/1:'.length) : null;
+}
+
+/** An end that is drawn at this scope: every end except the folded frame. */
+type DrawnScopeEnd = Exclude<ScopeEnd, { readonly kind: 'frame' }>;
+
+/** The node an end is drawn at: the own-source node ID, or the end's own module. */
+function endNodeId(end: DrawnScopeEnd): ScopeNodeId {
+  return end.kind === 'own-source' ? ownSourceNodeId(end.module) : end.module;
+}
 
 /** One link drawn at the current scope, rolled up to that scope's nodes. */
 export interface ActiveDependencyEdge {
@@ -46,9 +71,9 @@ export interface ActiveDependencyEdge {
   readonly id: string;
   readonly depthMode: DependencyDepthMode;
   /** The consuming node at this scope. */
-  readonly consumer: ModuleId;
+  readonly consumer: ScopeNodeId;
   /** The providing node at this scope. */
-  readonly provider: ModuleId;
+  readonly provider: ScopeNodeId;
   /** Distinct behavioral `(consumer module, original)` pairs between the two subtrees. */
   readonly behavioral: number;
   /** Distinct non-behavioral pairs, drawn or not. */
@@ -69,6 +94,16 @@ export interface ActiveDependencyEdge {
 export const minimumLinkWidth = 1.5;
 export const maximumLinkWidth = 6;
 
+/** The own-source node's label and accessible name. */
+export function ownSourceLabel(module: ExplorerModule): string {
+  return `${module.name} \u00b7 own source`;
+}
+
+/** A module's own source files, which size its node and count in its own-source panel. */
+export function ownedSourceFiles(module: ExplorerModule): number {
+  return module.files.filter((file) => file.kind === 'source').length;
+}
+
 /** The identity of one original, as the view keys its evidence rows. */
 export function originalIdentity(original: OriginalId): string {
   return JSON.stringify([original.kind, original.owner, original.file, original.binding]);
@@ -77,9 +112,12 @@ export function originalIdentity(original: OriginalId): string {
 /**
  * The scope's frame and candidate nodes: the children of `scopeModuleId`; otherwise the root
  * module's children when exactly one top-level module has children; otherwise the top-level
- * modules. Independent of the class filter and of the settings.
+ * modules. `ownSourceNode` is the scope module while `showOwnSourceNode` is true, and null at the
+ * project scope, whose frame may be the root module but which renders no control. Independent of
+ * the class filter and of the other settings.
  */
-export function dependencyScope(model: ProjectExplorerModel, scopeModuleId: ModuleId | null): DependencyScope {
+export function dependencyScope(model: ProjectExplorerModel, scopeModuleId: ModuleId | null,
+  showOwnSourceNode = false): DependencyScope {
   const modulesById = new Map(model.modules.map((module) => [module.id, module]));
   const present = (ids: readonly ModuleId[]): ModuleId[] => ids.filter((id) => modulesById.has(id));
   if (scopeModuleId !== null && modulesById.has(scopeModuleId)) {
@@ -87,25 +125,29 @@ export function dependencyScope(model: ProjectExplorerModel, scopeModuleId: Modu
       frameModule: scopeModuleId,
       nodes: model.modules.filter((module) => module.parent === scopeModuleId).map((module) => module.id),
       depth: parentDepth(modulesById, scopeModuleId) + 1,
+      ownSourceNode: showOwnSourceNode ? scopeModuleId : null,
     };
   }
   const topLevel = model.modules.filter((module) => module.parent === null);
   const root = modulesById.get(model.rootModuleId);
   if (topLevel.length === 1 && root && root.children.length > 0) {
-    return { frameModule: root.id, nodes: present(root.children), depth: parentDepth(modulesById, root.id) + 1 };
+    return { frameModule: root.id, nodes: present(root.children),
+      depth: parentDepth(modulesById, root.id) + 1, ownSourceNode: null };
   }
   return {
     frameModule: null,
     nodes: topLevel.map((module) => module.id),
     depth: topLevel.length > 0 ? parentDepth(modulesById, topLevel[0]!.id) : 0,
+    ownSourceNode: null,
   };
 }
 
 /**
  * Where an exact module lands at this scope. In `level` mode an end inside the scope becomes the
- * node containing it, the scope module's own source becomes the frame, and any other end becomes
- * its ancestor at depth `scope.depth - 1`, or itself when it is already at most that deep. In
- * `exact` mode every end is its own module and there is no frame.
+ * node containing it, the scope module's own source becomes its own-source node while that node is
+ * drawn and the frame otherwise, and any other end becomes its ancestor at depth `scope.depth - 1`,
+ * or itself when it is already at most that deep. In `exact` mode every end is its own module and
+ * there is no frame.
  */
 export function scopeEnd(module: ModuleId, scope: DependencyScope,
   depthMode: DependencyDepthMode, tree: ModuleTreeIndex): ScopeEnd {
@@ -116,7 +158,9 @@ export function scopeEnd(module: ModuleId, scope: DependencyScope,
   for (const node of scope.nodes) {
     if (containedBy(tree, module, node)) return { kind: 'node', module: node, inScope: true };
   }
-  if (scope.frameModule !== null && module === scope.frameModule) return { kind: 'frame' };
+  if (scope.frameModule !== null && module === scope.frameModule) {
+    return scope.ownSourceNode !== null ? { kind: 'own-source', module } : { kind: 'frame' };
+  }
   const outside = scope.depth - 1;
   return { kind: 'node', inScope: false,
     module: treeDepth(tree, module) <= outside ? module : ancestorAtDepth(tree, module, outside) };
@@ -132,8 +176,9 @@ export function scopeCoversProject(scope: DependencyScope,
 /**
  * The links of one scope, read from `originalOwnerEdges` only. An edge with a frame end or with
  * both ends on one node is internal at this scope and is drawn nowhere; an edge with no end among
- * the displayed nodes is dropped. The remaining edges group by their ordered node pair, and each
- * group's counts are its distinct `(exact consumer module, original)` pairs, never a sum.
+ * the displayed nodes is dropped, and the own-source node counts as displayed while it is drawn.
+ * The remaining edges group by their ordered node pair, and each group's counts are its distinct
+ * `(exact consumer module, original)` pairs, never a sum.
  */
 export function scopeDependencyLinks(input: {
   readonly model: DependencyGraphModel;
@@ -145,18 +190,25 @@ export function scopeDependencyLinks(input: {
 }): ActiveDependencyEdge[] {
   const { model, scope, displayed, tree, settings } = input;
   const covers = scopeCoversProject(scope, [...tree.modulesById.keys()], tree);
-  const groups = new Map<string, { consumer: ModuleId; provider: ModuleId; leavesScope: boolean;
+  // An own-source end is drawn and in scope; any other end is drawn only while its node is.
+  const isDisplayed = (end: DrawnScopeEnd): boolean =>
+    end.kind === 'own-source' || displayed.has(end.module);
+  const isInScope = (end: DrawnScopeEnd): boolean =>
+    end.kind === 'own-source' || end.inScope;
+  const groups = new Map<string, { consumer: ScopeNodeId; provider: ScopeNodeId; leavesScope: boolean;
     sources: DependencyGraphOriginalEdge[] }>();
   for (const edge of model.originalOwnerEdges) {
     const consumer = scopeEnd(edge.consumer, scope, settings.depthMode, tree);
     const provider = scopeEnd(edge.provider, scope, settings.depthMode, tree);
     if (consumer.kind === 'frame' || provider.kind === 'frame') continue;
-    if (consumer.module === provider.module) continue;
-    if (!displayed.has(consumer.module) && !displayed.has(provider.module)) continue;
-    const key = JSON.stringify([consumer.module, provider.module]);
+    const consumerNode = endNodeId(consumer);
+    const providerNode = endNodeId(provider);
+    if (consumerNode === providerNode) continue;
+    if (!isDisplayed(consumer) && !isDisplayed(provider)) continue;
+    const key = JSON.stringify([consumerNode, providerNode]);
     const group = groups.get(key)
-      ?? { consumer: consumer.module, provider: provider.module, leavesScope: false, sources: [] };
-    group.leavesScope = group.leavesScope || (!covers && (!consumer.inScope || !provider.inScope));
+      ?? { consumer: consumerNode, provider: providerNode, leavesScope: false, sources: [] };
+    group.leavesScope = group.leavesScope || (!covers && (!isInScope(consumer) || !isInScope(provider)));
     group.sources.push(edge);
     groups.set(key, group);
   }

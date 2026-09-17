@@ -8,7 +8,7 @@ import type { ExportDetailState } from '../../presentation/subs/project-view/src
 import type { GraphSelection } from '../../presentation/subs/project-view/src/moduleGraphShared.js';
 import { ModuleGraphRadial } from '../../presentation/subs/project-view/src/ModuleGraphRadial.js';
 import { ProjectExplorerView, type ExplorerDiscussionProps } from '../../presentation/subs/project-view/src/ProjectExplorerView.js';
-import { defaultDependencySettings } from '../../presentation/subs/project-view/src/dependency-graph.js';
+import { defaultDependencySettings, ownSourceNodeModule } from '../../presentation/subs/project-view/src/dependency-graph.js';
 import type { DependencySettings } from '../../presentation/subs/project-view/src/interfaces/dependency-view.js';
 import { usePublishedDependencyView } from './published-dependency-view.js';
 import { usePublishedProjectView, type ExplorerClient } from './published-project-view.js';
@@ -66,7 +66,9 @@ export function ProjectExplorerPage({ client, pollIntervalMs = 3000,
   useEffect(() => {
     if (!data) return;
     const modules = new Map(data.modules.map(module => [module.id, module]));
-    if (selectedModuleId && !modules.has(selectedModuleId)) setSelectedModuleId(null);
+    // An own-source node selection names no module of the model; the view reconciles it.
+    if (selectedModuleId && !modules.has(selectedModuleId)
+      && ownSourceNodeModule(selectedModuleId) === null) setSelectedModuleId(null);
     if (scopeModuleId && !modules.has(scopeModuleId)) setScopeModuleId(null);
     if (expandedDependencyId && !data.edges.some(edge => edge.id === expandedDependencyId)) setExpandedDependencyId(null);
     if (expandedExportId && !data.modules.some(module => module.exports.some(item => item.id === expandedExportId))) {

@@ -23,6 +23,8 @@ import type { DependencyGraphModel, DependencyGraphState, DependencySettings } f
 import {
   defaultDependencySettings,
   dependencyScope,
+  ownSourceNodeId,
+  ownSourceNodeModule,
   scopeCoversProject,
   scopeDependencyLinks,
   scopeEnd,
@@ -38,6 +40,7 @@ import {
   expectedDepth,
   expectedEnd,
   expectedModule,
+  expectedOwnSourceNodeId,
   expectedProject,
   expectedScope,
   expectedScopeLinks,
@@ -795,7 +798,8 @@ describe('Plan 6D scope-aware roll-up', () => {
     const project = nestedLevelsProject();
     const tree = indexModuleTree(project.modules, project.rootModuleId);
     const inside = dependencyScope(project, 'app/a');
-    expect(inside).toEqual({ frameModule: 'app/a', nodes: ['app/a/left', 'app/a/right'], depth: 2 });
+    expect(inside).toEqual({ frameModule: 'app/a', nodes: ['app/a/left', 'app/a/right'], depth: 2,
+      ownSourceNode: null });
     expect(inside).toEqual(expectedScope(project, 'app/a'));
     // Inside the scope: the child that contains the end.
     expect(scopeEnd('app/a/left', inside, 'level', tree))
@@ -841,7 +845,7 @@ describe('Plan 6D scope-aware roll-up', () => {
       const scope = dependencyScope(project, scopeModuleId);
       for (const depthMode of ['level', 'exact'] as const) {
         const links = scopeDependencyLinks({ model: dependencies, scope, displayed: new Set(scope.nodes), tree,
-          settings: { showNonBehavioral: true, depthMode, showOutsideScope: true } });
+          settings: { showNonBehavioral: true, depthMode, showOutsideScope: true, showOwnSourceNode: false } });
         for (const link of links) expect(link.consumer).not.toBe(link.provider);
         expect(drawnOf(links)).toEqual(drawnOf(expectedScopeLinks({ project, dependencies, scopeModuleId,
           depthMode, showNonBehavioral: true })));
@@ -881,7 +885,8 @@ describe('Plan 6D scope-aware roll-up', () => {
     const tree = indexModuleTree(project.modules, project.rootModuleId);
     const scope = dependencyScope(project, 'app/a');
     const links = scopeDependencyLinks({ model: dependencies, scope, displayed: new Set(scope.nodes), tree,
-      settings: { showNonBehavioral: true, depthMode: 'level', showOutsideScope: true } });
+      settings: { showNonBehavioral: true, depthMode: 'level', showOutsideScope: true,
+        showOwnSourceNode: false } });
     expect(drawnOf(links)).toEqual(drawnOf(expectedScopeLinks({ project, dependencies, scopeModuleId: 'app/a',
       showNonBehavioral: true })));
     // Two exact edges onto the `app/b` subtree collapse into one link with one out-of-view node.
@@ -912,13 +917,15 @@ describe('Plan 6D scope-aware roll-up', () => {
     for (const scopeModuleId of [null, ...project.modules.map((module) => module.id)]) {
       const scope = dependencyScope(project, scopeModuleId);
       const links = scopeDependencyLinks({ model: forwarding, scope, displayed: new Set(scope.nodes), tree,
-        settings: { showNonBehavioral: true, depthMode: 'level', showOutsideScope: true } });
+        settings: { showNonBehavioral: true, depthMode: 'level', showOutsideScope: true,
+        showOwnSourceNode: false } });
       expect(links.some((link) => link.sources.includes(edge))).toBe(false);
     }
     // `Exact module` keeps iteration 6's ends: inside `app/b` it is drawn with `app/b` out of view.
     const exactInsideB = scopeDependencyLinks({ model: forwarding, scope: dependencyScope(project, 'app/b'),
       displayed: new Set(['app/b/core']), tree,
-      settings: { showNonBehavioral: true, depthMode: 'exact', showOutsideScope: true } });
+      settings: { showNonBehavioral: true, depthMode: 'exact', showOutsideScope: true,
+        showOwnSourceNode: false } });
     expect(exactInsideB.map((link) => [link.consumer, link.provider]))
       .toEqual([['app/a', 'app/b/core'], ['app/b/core', 'app/b']]);
     const projectScope = dependencyScope(project, null);
@@ -949,7 +956,8 @@ describe('Plan 6D scope-aware roll-up', () => {
     for (const scopeModuleId of [null, ...project.modules.map((module) => module.id)]) {
       const scope = dependencyScope(project, scopeModuleId);
       const links = scopeDependencyLinks({ model: dependencies, scope, displayed: new Set(scope.nodes), tree,
-        settings: { showNonBehavioral: true, depthMode: 'level', showOutsideScope: true } });
+        settings: { showNonBehavioral: true, depthMode: 'level', showOutsideScope: true,
+        showOwnSourceNode: false } });
       const expected = expectedScopeLinks({ project, dependencies, scopeModuleId, showNonBehavioral: true });
       expect(links.map((link) => [link.consumer, link.provider, link.behavioral, link.nonBehavioral, link.sources.map((edge) => edge.id)]))
         .toEqual(expected.map((link) => [link.consumer, link.provider, link.behavioral, link.nonBehavioral, link.sources]));
@@ -1120,6 +1128,392 @@ describe('Plan 6D scope-aware roll-up', () => {
     expect([...region('Rolled-up modules').querySelectorAll('.module-arch__breakdown-item')]
       .map((row) => [row.getAttribute('data-consumer'), row.getAttribute('data-provider')]))
       .toEqual(link.sources.map((edge) => [edge.consumer, edge.provider]));
+  });
+});
+
+describe("Plan 6D the scope module's own source as a node", () => {
+  const graphProps: ModuleGraphProps[] = [];
+  function RecordingGraph(props: ModuleGraphProps): React.ReactElement {
+    graphProps.push(props);
+    return <MockGraph {...props} />;
+  }
+  const lastGraph = () => graphProps.at(-1)!;
+  afterEach(() => { graphProps.length = 0; });
+
+  /** Data callbacks fail: no control or selection change may request data. */
+  const failing = (name: string) => vi.fn(() => { throw new Error(`${name} requested data`); });
+
+  function viewProps(project: ProjectExplorerModel, model: DependencyGraphModel,
+    overrides: Overrides = {}): ProjectExplorerViewProps {
+    return createProps({
+      data: project,
+      dependencies: readyDependencies(model),
+      selectedPresentationClasses: [...new Set(project.modules.map((module) => module.presentationClass))],
+      GraphComponent: RecordingGraph,
+      DiscussionComponent: undefined,
+      onRefresh: failing('refresh'),
+      onToggleExport: failing('export detail'),
+      onToggleDependency: failing('occurrence detail'),
+      onNavigateToScope: failing('scope'),
+      ...overrides,
+    });
+  }
+
+  const settings = (overrides: Partial<DependencySettings> = {}): DependencySettings =>
+    ({ ...defaultDependencySettings, ...overrides });
+  const drawn = () => lastGraph().edges
+    .map((edge) => `${edge.consumer}>${edge.provider}:${edge.behavioral}/${edge.nonBehavioral}`);
+  const drawnOf = (links: readonly { consumer: string; provider: string;
+    behavioral: number; nonBehavioral: number }[]) => links
+    .map((link) => `${link.consumer}>${link.provider}:${link.behavioral}/${link.nonBehavioral}`);
+  const pair = (host: HTMLElement, label: string) => {
+    const group = within(host).getByRole('group', { name: label, hidden: true });
+    return {
+      behavioral: Number(group.querySelector('[data-headline="behavioral"] .module-arch__headline-value')!.textContent),
+      nonBehavioral: Number(group.querySelector('[data-headline="non-behavioral"] .module-arch__headline-value')!.textContent),
+    };
+  };
+  const region = (name: string) => screen.getByRole('region', { name, hidden: true });
+  const ownSourceToggle = () => screen.getByRole('checkbox', { name: "Show this module's own source as a node" });
+  const notDrawn = () => document.querySelector('.module-arch__not-drawn')!;
+  const workspace = 'collection-review/workspace';
+
+  /** Links calculated by the implementation for one scope, with the own-source control applied. */
+  function links(project: ProjectExplorerModel, model: DependencyGraphModel,
+    scopeModuleId: string | null, overrides: Partial<DependencySettings> = {}): ActiveDependencyEdge[] {
+    const applied = { ...defaultDependencySettings, showNonBehavioral: true, ...overrides };
+    const scope = dependencyScope(project, scopeModuleId,
+      applied.showOwnSourceNode && applied.depthMode === 'level');
+    return scopeDependencyLinks({
+      model,
+      scope,
+      displayed: new Set(scope.nodes),
+      tree: indexModuleTree(project.modules, project.rootModuleId),
+      settings: applied,
+    });
+  }
+
+  it('BD53 adds the own-source node to the scope and maps the frame module to it', () => {
+    const project = nestedLevelsProject();
+    const tree = indexModuleTree(project.modules, project.rootModuleId);
+    const inside = dependencyScope(project, 'app/a', true);
+    expect(inside).toEqual({ frameModule: 'app/a', nodes: ['app/a/left', 'app/a/right'], depth: 2,
+      ownSourceNode: 'app/a' });
+    expect(inside).toEqual(expectedScope(project, 'app/a', true));
+    expect(ownSourceNodeId('app/a')).toBe(expectedOwnSourceNodeId('app/a'));
+    expect(ownSourceNodeModule(ownSourceNodeId('app/a'))).toBe('app/a');
+    // The node ID is no module ID, and no module ID is an own-source node ID.
+    for (const module of project.modules) {
+      expect(module.id).not.toBe(ownSourceNodeId('app/a'));
+      expect(ownSourceNodeModule(module.id)).toBeNull();
+    }
+    // Clause 2: the scope module's own source is the own-source node, in scope.
+    expect(scopeEnd('app/a', inside, 'level', tree)).toEqual({ kind: 'own-source', module: 'app/a' });
+    // Clauses 1 and 3 give the ends BD44 records.
+    expect(scopeEnd('app/a/left', inside, 'level', tree))
+      .toEqual({ kind: 'node', module: 'app/a/left', inScope: true });
+    expect(scopeEnd('app/b/core', inside, 'level', tree))
+      .toEqual({ kind: 'node', module: 'app/b', inScope: false });
+    expect(scopeEnd('app/c', inside, 'level', tree)).toEqual({ kind: 'node', module: 'app/c', inScope: false });
+    expect(scopeEnd('app', inside, 'level', tree)).toEqual({ kind: 'node', module: 'app', inScope: false });
+
+    // The project scope has no own-source node, although its frame is the root module.
+    const projectScope = dependencyScope(project, null, true);
+    expect(projectScope.frameModule).toBe('app');
+    expect(projectScope.ownSourceNode).toBeNull();
+    expect(projectScope).toEqual(expectedScope(project, null, true));
+    expect(scopeEnd('app', projectScope, 'level', tree)).toEqual({ kind: 'frame' });
+
+    // Every scope and both modes agree with the independent mapping, with the control on.
+    for (const scopeModuleId of [null, ...project.modules.map((module) => module.id)]) {
+      for (const showOwnSourceNode of [false, true]) {
+        const scope = dependencyScope(project, scopeModuleId, showOwnSourceNode);
+        const expected = expectedScope(project, scopeModuleId, showOwnSourceNode);
+        expect(scope).toEqual(expected);
+        for (const depthMode of ['level', 'exact'] as const) {
+          for (const id of project.modules.map((module) => module.id)) {
+            expect(scopeEnd(id, scope, depthMode, tree)).toEqual(expectedEnd(project, expected, id, depthMode));
+          }
+        }
+      }
+    }
+    // `exact` returns before clause 2, so the control changes no end there.
+    for (const id of project.modules.map((module) => module.id)) {
+      expect(scopeEnd(id, inside, 'exact', tree))
+        .toEqual(scopeEnd(id, dependencyScope(project, 'app/a'), 'exact', tree));
+    }
+    // An end still depends on neither the class filter nor the other settings: it takes neither.
+    const ends = project.modules.map((module) => scopeEnd(module.id, inside, 'level', tree));
+    expect(project.modules.map((module) => scopeEnd(module.id, inside, 'level', tree))).toEqual(ends);
+  });
+
+  it('BD54 draws the own-source node onto a child and a child onto it', () => {
+    const project = nestedLevelsProject();
+    const dependencies = nestedLevelsDependencies();
+    const node = ownSourceNodeId('app/a');
+    // The parent's own source onto its child: `app/a -> app/a/left`.
+    const parentEdge = dependencies.originalOwnerEdges
+      .find((edge) => edge.consumer === 'app/a' && edge.provider === 'app/a/left')!;
+    const folded = links(project, dependencies, 'app/a');
+    expect(folded.some((link) => link.sources.includes(parentEdge))).toBe(false);
+    const withNode = links(project, dependencies, 'app/a', { showOwnSourceNode: true });
+    const expected = expectedScopeLinks({ project, dependencies, scopeModuleId: 'app/a',
+      showNonBehavioral: true, showOwnSourceNode: true });
+    expect(withNode.map((link) => [link.id, link.consumer, link.provider, link.behavioral,
+      link.nonBehavioral, link.status]))
+      .toEqual(expected.map((link) => [link.id, link.consumer, link.provider, link.behavioral,
+        link.nonBehavioral, link.status]));
+    const onto = withNode.find((link) => link.consumer === node)!;
+    expect([onto.provider, onto.behavioral, onto.nonBehavioral, onto.status])
+      .toEqual(['app/a/left', 1, 0, 'allowed']);
+    expect(onto.sources).toEqual([parentEdge]);
+    expect(onto.id).toBe(`scoped-link/1:level:app/a:${JSON.stringify([node, 'app/a/left'])}`);
+    expect(onto.leavesScope).toBe(false);
+    // Switching the control off folds it again, and no other link changes.
+    expect(drawnOf(folded)).toEqual(drawnOf(withNode.filter((link) =>
+      link.consumer !== node && link.provider !== node)));
+
+    // The child onto its parent's own source: `forwarding`'s `app/b/core -> app/b`, BD47's edge.
+    const { forwarding } = mappedDependencyModels();
+    const forwardingModel = forwardingProject();
+    const coreEdge = forwarding.originalOwnerEdges
+      .find((edge) => edge.consumer === 'app/b/core' && edge.provider === 'app/b')!;
+    const insideB = links(forwardingModel, forwarding, 'app/b', { showOwnSourceNode: true });
+    const expectedB = expectedScopeLinks({ project: forwardingModel, dependencies: forwarding,
+      scopeModuleId: 'app/b', showNonBehavioral: true, showOwnSourceNode: true });
+    expect(insideB.map((link) => [link.id, link.consumer, link.provider, link.behavioral, link.nonBehavioral]))
+      .toEqual(expectedB.map((link) => [link.id, link.consumer, link.provider, link.behavioral, link.nonBehavioral]));
+    const back = insideB.find((link) => link.provider === ownSourceNodeId('app/b'))!;
+    expect([back.consumer, back.behavioral, back.nonBehavioral]).toEqual(['app/b/core', 0, 1]);
+    expect(back.sources).toEqual([coreEdge]);
+    expect(links(forwardingModel, forwarding, 'app/b').some((link) => link.sources.includes(coreEdge))).toBe(false);
+
+    // The component draws both nodes and both directions, and drops them again.
+    const rendered = render(<ProjectExplorerView {...viewProps(project, dependencies,
+      { scopeModuleId: 'app/a',
+        dependencySettings: settings({ showNonBehavioral: true, showOwnSourceNode: true }) })} />);
+    expect(lastGraph().ownSourceNode).toEqual({ id: node,
+      module: project.modules.find((module) => module.id === 'app/a') });
+    expect(drawn()).toEqual(drawnOf(expected));
+    expect(drawn()).toContain(`${node}>app/a/left:1/0`);
+    rendered.rerender(<ProjectExplorerView {...viewProps(project, dependencies, { scopeModuleId: 'app/a',
+      dependencySettings: settings({ showNonBehavioral: true }) })} />);
+    expect(lastGraph().ownSourceNode).toBeNull();
+    expect(drawn()).toEqual(drawnOf(folded));
+    rendered.unmount();
+
+    render(<ProjectExplorerView {...viewProps(forwardingModel, forwarding, { scopeModuleId: 'app/b',
+      dependencySettings: settings({ showNonBehavioral: true, showOwnSourceNode: true }) })} />);
+    expect(drawn()).toContain(`app/b/core>${ownSourceNodeId('app/b')}:0/1`);
+  });
+
+  it('BD55 draws exactly the formerly folded edges of the reference scope', () => {
+    const { project, dependencies } = collectionReview();
+    const tree = indexModuleTree(project.modules, project.rootModuleId);
+    const node = ownSourceNodeId(workspace);
+    const foldedInside = dependencies.originalOwnerEdges.filter((edge) => {
+      const scope = dependencyScope(project, workspace);
+      return [edge.consumer, edge.provider]
+        .some((id) => scopeEnd(id, scope, 'level', tree).kind === 'frame');
+    });
+    expect(foldedInside).toHaveLength(3);
+    const before = links(project, dependencies, workspace);
+    const after = links(project, dependencies, workspace, { showOwnSourceNode: true });
+    const expected = expectedScopeLinks({ project, dependencies, scopeModuleId: workspace,
+      showNonBehavioral: true, showOwnSourceNode: true });
+    expect(after.map((link) => [link.id, link.consumer, link.provider, link.behavioral, link.nonBehavioral,
+      link.status, link.sources.map((edge) => edge.id)]))
+      .toEqual(expected.map((link) => [link.id, link.consumer, link.provider, link.behavioral,
+        link.nonBehavioral, link.status, link.sources]));
+    // Exactly the folded edges are added, grouped by their mapped node pairs.
+    const added = after.filter((link) => link.consumer === node || link.provider === node);
+    expect(added.flatMap((link) => link.sources).sort((left, right) => left.id < right.id ? -1 : 1))
+      .toEqual([...foldedInside].sort((left, right) => left.id < right.id ? -1 : 1));
+    expect(added.length).toBeGreaterThan(0);
+    // Every other link keeps its endpoints, counts, status, sources and ID.
+    const key = (link: ActiveDependencyEdge) => JSON.stringify([link.id, link.consumer, link.provider,
+      link.behavioral, link.nonBehavioral, link.status, link.sources.map((edge) => edge.id)]);
+    expect(after.filter((link) => link.consumer !== node && link.provider !== node).map(key))
+      .toEqual(before.map(key));
+
+    // The control is not rendered at the project scope, so its 8 folded edges stay folded.
+    const projectScope = dependencyScope(project, null, true);
+    expect(projectScope.ownSourceNode).toBeNull();
+    expect(links(project, dependencies, null, { showOwnSourceNode: true })).toHaveLength(0);
+    expect(dependencies.originalOwnerEdges.filter((edge) => [edge.consumer, edge.provider]
+      .some((id) => scopeEnd(id, dependencyScope(project, null), 'level', tree).kind === 'frame')))
+      .toHaveLength(8);
+  });
+
+  it('BD56 moves the own-source pairs from the numbers not drawn into this view', () => {
+    const { project, dependencies } = collectionReview();
+    const node = ownSourceNodeId(workspace);
+    const measured = expectedProject(dependencies);
+    expect(measured).toEqual({ behavioral: 17, nonBehavioral: 48 });
+    const before = scopeLinkCounts(links(project, dependencies, workspace));
+    const after = links(project, dependencies, workspace, { showOwnSourceNode: true });
+    const ownLinks = after.filter((link) => link.consumer === node || link.provider === node);
+    const own = scopeLinkCounts(ownLinks);
+    expect(own.behavioral + own.nonBehavioral).toBeGreaterThan(0);
+
+    const { rerender } = render(<ProjectExplorerView {...viewProps(project, dependencies,
+      { scopeModuleId: workspace })} />);
+    const projectRegion = () => screen.getByRole('region', { name: 'Project dependencies' });
+    expect(pair(projectRegion(), 'This view')).toEqual(before);
+    expect(notDrawn().getAttribute('data-not-drawn'))
+      .toBe(`${measured.behavioral - before.behavioral}/${measured.nonBehavioral - before.nonBehavioral}`);
+    expect(notDrawn().textContent).toContain("folded into the scope's own source");
+
+    fireEvent.click(ownSourceToggle());
+    rerender(<ProjectExplorerView {...viewProps(project, dependencies, { scopeModuleId: workspace,
+      dependencySettings: settings({ showOwnSourceNode: true }) })} />);
+    const thisView = pair(projectRegion(), 'This view');
+    expect(thisView).toEqual({ behavioral: before.behavioral + own.behavioral,
+      nonBehavioral: before.nonBehavioral + own.nonBehavioral });
+    expect(pair(projectRegion(), 'Whole project')).toEqual(measured);
+    const remaining = notDrawn().getAttribute('data-not-drawn')!.split('/').map(Number);
+    expect(remaining).toEqual([measured.behavioral - thisView.behavioral,
+      measured.nonBehavioral - thisView.nonBehavioral]);
+    expect(thisView.behavioral + remaining[0]!).toBe(measured.behavioral);
+    expect(thisView.nonBehavioral + remaining[1]!).toBe(measured.nonBehavioral);
+    // The remaining causes are the internal and the outside ones only.
+    expect(notDrawn().textContent).toContain('internal to a displayed node');
+    expect(notDrawn().textContent).toContain('outside the scope');
+    expect(notDrawn().textContent).not.toContain('folded');
+    // The scope's own source is now drawn as its own node.
+    expect(within(region("Scope's own source")).getByText(/own source is drawn as its own node here/))
+      .toBeInTheDocument();
+  });
+
+  it('BD57 renders the control only in a drilled-in scope and disables it in Exact module', () => {
+    const { project, dependencies } = collectionReview();
+    const onSettings = vi.fn();
+    const { rerender } = render(<ProjectExplorerView {...viewProps(project, dependencies,
+      { onDependencySettingsChange: onSettings, onDrillDown: failing('drill-down') })} />);
+    // Absent at the project scope, whose frame is the root module.
+    expect(dependencyScope(project, null).frameModule).not.toBeNull();
+    expect(screen.queryByRole('checkbox', { name: "Show this module's own source as a node" }))
+      .not.toBeInTheDocument();
+
+    rerender(<ProjectExplorerView {...viewProps(project, dependencies, { scopeModuleId: workspace,
+      onDependencySettingsChange: onSettings, onDrillDown: failing('drill-down') })} />);
+    const toggle = ownSourceToggle();
+    expect(toggle).not.toBeChecked();
+    expect(toggle).toBeEnabled();
+    expect(toggle.tagName).toBe('INPUT');
+    expect(toggle.getAttribute('type')).toBe('checkbox');
+    expect(toggle.closest('label')).not.toBeNull();
+    fireEvent.click(toggle);
+    expect(onSettings).toHaveBeenCalledTimes(1);
+    expect(onSettings).toHaveBeenLastCalledWith(settings({ showOwnSourceNode: true }));
+
+    // `Exact module` disables it and keeps its value; no own-source node is drawn.
+    rerender(<ProjectExplorerView {...viewProps(project, dependencies, { scopeModuleId: workspace,
+      onDependencySettingsChange: onSettings, onDrillDown: failing('drill-down'),
+      dependencySettings: settings({ showOwnSourceNode: true, depthMode: 'exact' }) })} />);
+    expect(ownSourceToggle()).toBeChecked();
+    expect(ownSourceToggle()).toBeDisabled();
+    expect(lastGraph().ownSourceNode).toBeNull();
+    expect(lastGraph().edges.some((edge) => edge.consumer.startsWith('own-source/1:')
+      || edge.provider.startsWith('own-source/1:'))).toBe(false);
+  });
+
+  it('BD59 shows the own-source panel against the module row excluding internals', () => {
+    const { project, dependencies } = collectionReview();
+    const node = ownSourceNodeId(workspace);
+    const row = dependencies.modules.find((item) => item.id === workspace)!;
+    const scoped = links(project, dependencies, workspace, { showOwnSourceNode: true });
+    const counts = (select: (link: ActiveDependencyEdge) => boolean) =>
+      scopeLinkCounts(scoped.filter(select));
+    render(<ProjectExplorerView {...viewProps(project, dependencies, { scopeModuleId: workspace,
+      selectedModuleId: node,
+      dependencySettings: settings({ showNonBehavioral: true, showOwnSourceNode: true }) })} />);
+    expect(screen.getByRole('heading', { name: 'workspace · own source' })).toBeInTheDocument();
+    expect(pair(region('Uses'), 'At this level')).toEqual(counts((link) => link.consumer === node));
+    expect(pair(region('Uses'), 'Excluding internals')).toEqual(row.uses);
+    expect(pair(region('Owned originals used by others'), 'At this level'))
+      .toEqual(counts((link) => link.provider === node));
+    expect(pair(region('Owned originals used by others'), 'Excluding internals'))
+      .toEqual(row.ownedUsedByOthers);
+    // The measured imported unit stays in a disclosure.
+    const through = region('Used through this module');
+    expect(through.closest('details')).not.toBeNull();
+    expect(pair(through, 'Excluding internals'))
+      .toEqual({ behavioral: row.usedThrough.behavioralUsedOriginals,
+        nonBehavioral: row.usedThrough.nonBehavioralUsedOriginals });
+    // Its displayed links and owned source files.
+    const displayed = scoped.filter((link) => link.consumer === node || link.provider === node).length;
+    const metrics = [...document.querySelectorAll('.module-arch__metric')]
+      .map((item) => [item.querySelector('.module-arch__metric-label')!.textContent,
+        item.querySelector('.module-arch__metric-value')!.textContent]);
+    expect(metrics).toContainEqual(['Links displayed', String(displayed)]);
+    const workspaceModule = project.modules.find((module) => module.id === workspace)!;
+    expect(metrics).toContainEqual(['Owned source files',
+      String(workspaceModule.files.filter((file) => file.kind === 'source').length)]);
+    expect(screen.getByText(/appear on its own node in the\s+enclosing scope/)).toBeInTheDocument();
+  });
+
+  it('BD60 clears an own-source selection when the node leaves the drawn set', () => {
+    const { project, dependencies } = collectionReview();
+    const node = ownSourceNodeId(workspace);
+    const onSelectModule = vi.fn();
+    const onSelectEdge = vi.fn();
+    const own = settings({ showNonBehavioral: true, showOwnSourceNode: true });
+    const base = (overrides: Overrides) => viewProps(project, dependencies,
+      { scopeModuleId: workspace, onSelectModule, onSelectEdge, onDrillDown: failing('drill-down'),
+        dependencySettings: own, ...overrides });
+    const child = project.modules.find((module) => module.parent === workspace)!.id;
+
+    // A selected own-source node survives while the node is drawn.
+    const rendered = render(<ProjectExplorerView {...base({ selectedModuleId: node })} />);
+    expect(onSelectModule).not.toHaveBeenCalled();
+    expect(screen.getByRole('heading', { name: 'workspace · own source' })).toBeInTheDocument();
+    // Switching the control off clears it.
+    rendered.rerender(<ProjectExplorerView {...base({ selectedModuleId: node,
+      dependencySettings: settings({ showNonBehavioral: true }) })} />);
+    expect(onSelectModule).toHaveBeenCalledWith(null);
+    onSelectModule.mockClear();
+    // A scope change clears it.
+    rendered.rerender(<ProjectExplorerView {...base({ selectedModuleId: node, scopeModuleId: child })} />);
+    expect(onSelectModule).toHaveBeenCalledWith(null);
+    onSelectModule.mockClear();
+    // `Exact module` clears it.
+    rendered.rerender(<ProjectExplorerView {...base({ selectedModuleId: node,
+      dependencySettings: settings({ showNonBehavioral: true, showOwnSourceNode: true, depthMode: 'exact' }) })} />);
+    expect(onSelectModule).toHaveBeenCalledWith(null);
+    onSelectModule.mockClear();
+
+    // A selected own-source link is cleared by the same three changes.
+    const ownLink = links(project, dependencies, workspace, { showOwnSourceNode: true })
+      .find((link) => link.consumer === node || link.provider === node)!;
+    const selection: GraphSelection = { kind: 'edge', id: ownLink.id, edge: ownLink };
+    rendered.rerender(<ProjectExplorerView {...base({ selectedEdge: selection })} />);
+    expect(onSelectEdge).not.toHaveBeenCalled();
+    for (const overrides of [
+      { dependencySettings: settings({ showNonBehavioral: true }) },
+      { scopeModuleId: child },
+      { dependencySettings: settings({ showNonBehavioral: true, showOwnSourceNode: true, depthMode: 'exact' }) },
+    ] as Overrides[]) {
+      onSelectEdge.mockClear();
+      rendered.rerender(<ProjectExplorerView {...base({ selectedEdge: selection })} />);
+      rendered.rerender(<ProjectExplorerView {...base({ selectedEdge: selection, ...overrides })} />);
+      expect(onSelectEdge).toHaveBeenCalledWith(null);
+    }
+
+    // A child-to-child link selection and a module selection survive the toggle.
+    const childLink = links(project, dependencies, workspace)
+      .find((link) => link.consumer !== node && link.provider !== node)!;
+    const childSelection: GraphSelection = { kind: 'edge', id: childLink.id, edge: childLink };
+    onSelectEdge.mockClear();
+    onSelectModule.mockClear();
+    rendered.rerender(<ProjectExplorerView {...base({ selectedEdge: childSelection,
+      dependencySettings: settings({ showNonBehavioral: true }) })} />);
+    rendered.rerender(<ProjectExplorerView {...base({ selectedEdge: childSelection })} />);
+    expect(onSelectEdge).not.toHaveBeenCalled();
+    rendered.rerender(<ProjectExplorerView {...base({ selectedModuleId: child,
+      dependencySettings: settings({ showNonBehavioral: true }) })} />);
+    rendered.rerender(<ProjectExplorerView {...base({ selectedModuleId: child })} />);
+    expect(onSelectModule).not.toHaveBeenCalled();
   });
 });
 

@@ -213,14 +213,21 @@ interface LinkSettings {
   readonly showNonBehavioral: boolean;
   readonly depthMode: 'level' | 'exact';
   readonly showOutsideScope: boolean;
+  readonly showOwnSourceNode: boolean;
 }
-const defaultLinks: LinkSettings = { showNonBehavioral: false, depthMode: 'level', showOutsideScope: true };
+const defaultLinks: LinkSettings = { showNonBehavioral: false, depthMode: 'level', showOutsideScope: true,
+  showOwnSourceNode: false };
 
 interface ScopeShape {
   readonly frameModule: string | null;
   readonly nodes: readonly string[];
   readonly depth: number;
+  /** The scope module whose own source is drawn as a node; null while it is folded. */
+  readonly ownSourceNode: string | null;
 }
+
+/** The own-source node's ID, spelled independently of the view. */
+const ownSourceNode = (module: string): string => `own-source/1:${module}`;
 
 /** Ancestors of a module, root first, from the project model alone. */
 function ancestorsOfModule(model: ProjectExplorerModel, id: string): string[] {
@@ -235,20 +242,24 @@ const containedBy = (model: ProjectExplorerModel, id: string, ancestor: string):
   id === ancestor || ancestorsOfModule(model, id).includes(ancestor);
 
 /** The frame and candidate nodes of one scope, reproducing the view's scope selection. */
-function scopeOf(model: ProjectExplorerModel, scopeModuleId: string | null): ScopeShape {
+function scopeOf(model: ProjectExplorerModel, scopeModuleId: string | null,
+  showOwnSourceNode = false): ScopeShape {
   if (scopeModuleId !== null) {
     return { frameModule: scopeModuleId, depth: ancestorsOfModule(model, scopeModuleId).length + 1,
-      nodes: model.modules.filter(module => module.parent === scopeModuleId).map(module => module.id) };
+      nodes: model.modules.filter(module => module.parent === scopeModuleId).map(module => module.id),
+      ownSourceNode: showOwnSourceNode ? scopeModuleId : null };
   }
   const topLevel = model.modules.filter(module => module.parent === null);
   const root = model.modules.find(module => module.id === model.rootModuleId);
   if (topLevel.length === 1 && root && root.children.length > 0) {
-    return { frameModule: root.id, nodes: [...root.children], depth: ancestorsOfModule(model, root.id).length + 1 };
+    return { frameModule: root.id, nodes: [...root.children],
+      depth: ancestorsOfModule(model, root.id).length + 1, ownSourceNode: null };
   }
-  return { frameModule: null, nodes: topLevel.map(module => module.id), depth: 0 };
+  return { frameModule: null, nodes: topLevel.map(module => module.id), depth: 0, ownSourceNode: null };
 }
 
 type ScopeEndShape = { readonly kind: 'frame' }
+  | { readonly kind: 'own-source'; readonly module: string }
   | { readonly kind: 'node'; readonly module: string; readonly inScope: boolean };
 
 /** Where one exact module lands at a scope, calculated from the project structure. */
@@ -259,7 +270,9 @@ function endOf(model: ProjectExplorerModel, scope: ScopeShape, id: string,
       inScope: scope.frameModule === null || containedBy(model, id, scope.frameModule) };
   }
   for (const node of scope.nodes) if (containedBy(model, id, node)) return { kind: 'node', module: node, inScope: true };
-  if (scope.frameModule !== null && id === scope.frameModule) return { kind: 'frame' };
+  if (scope.frameModule !== null && id === scope.frameModule) {
+    return scope.ownSourceNode !== null ? { kind: 'own-source', module: id } : { kind: 'frame' };
+  }
   const outside = scope.depth - 1;
   const chain = [...ancestorsOfModule(model, id), id];
   return { kind: 'node', inScope: false,
@@ -273,6 +286,13 @@ const coversProject = (model: ProjectExplorerModel, scope: ScopeShape): boolean 
 /** The modules a scope displays: its candidate nodes, before any class filter. */
 const visibleAt = (model: ProjectExplorerModel, scopeModuleId: string | null): readonly string[] =>
   scopeOf(model, scopeModuleId).nodes;
+
+/** Every node a scope draws: its displayed modules and, while the control is on, its own source. */
+function drawnNodesAt(model: ProjectExplorerModel, scopeModuleId: string | null,
+  settings: LinkSettings, displayedNodes?: readonly string[]): readonly string[] {
+  const modules = displayedNodes ?? visibleAt(model, scopeModuleId);
+  const scope = scopeOf(model, scopeModuleId, settings.depthMode === 'level' && settings.showOwnSourceNode);
+  return scope.ownSourceNode !== null ? [...modules, ownSourceNode(scope.ownSourceNode)] : modules;}
 
 function initialVisible(model: ProjectExplorerModel): readonly string[] {
   return visibleAt(model, null);
@@ -296,21 +316,28 @@ interface ScopeLink {
 function scopeLinks(model: ProjectExplorerModel, deps: ExplorerDependencyModel,
   scopeModuleId: string | null, settings: LinkSettings = defaultLinks,
   displayedNodes?: readonly string[]): ScopeLink[] {
-  const scope = scopeOf(model, scopeModuleId);
+  const scope = scopeOf(model, scopeModuleId, settings.depthMode === 'level' && settings.showOwnSourceNode);
   const displayed = new Set(displayedNodes ?? scope.nodes);
   const covers = coversProject(model, scope);
+  // An own-source end takes its node ID, is drawn and is always in scope.
+  const nodeIdOf = (end: Exclude<ScopeEndShape, { kind: 'frame' }>) =>
+    end.kind === 'own-source' ? ownSourceNode(end.module) : end.module;
   const groups = new Map<string, { consumer: string; provider: string; leavesScope: boolean;
     sources: ExplorerDependencyModel['originalOwnerEdges'][number][] }>();
   for (const edge of deps.originalOwnerEdges) {
     const consumer = endOf(model, scope, edge.consumer, settings.depthMode);
     const provider = endOf(model, scope, edge.provider, settings.depthMode);
     if (consumer.kind === 'frame' || provider.kind === 'frame') continue;
-    if (consumer.module === provider.module) continue;
-    if (!displayed.has(consumer.module) && !displayed.has(provider.module)) continue;
-    const key = JSON.stringify([consumer.module, provider.module]);
+    const consumerNode = nodeIdOf(consumer);
+    const providerNode = nodeIdOf(provider);
+    if (consumerNode === providerNode) continue;
+    if (consumer.kind !== 'own-source' && provider.kind !== 'own-source'
+      && !displayed.has(consumerNode) && !displayed.has(providerNode)) continue;
+    const key = JSON.stringify([consumerNode, providerNode]);
     const group = groups.get(key)
-      ?? { consumer: consumer.module, provider: provider.module, leavesScope: false, sources: [] };
-    group.leavesScope = group.leavesScope || (!covers && (!consumer.inScope || !provider.inScope));
+      ?? { consumer: consumerNode, provider: providerNode, leavesScope: false, sources: [] };
+    group.leavesScope = group.leavesScope || (!covers
+      && ((consumer.kind === 'node' && !consumer.inScope) || (provider.kind === 'node' && !provider.inScope)));
     group.sources.push(edge);
     groups.set(key, group);
   }
@@ -352,7 +379,7 @@ function expectedLinks(model: ProjectExplorerModel, deps: ExplorerDependencyMode
 function expectedOutOfView(model: ProjectExplorerModel, deps: ExplorerDependencyModel,
   scopeModuleId: string | null, settings: LinkSettings = defaultLinks,
   displayedNodes?: readonly string[]): string[] {
-  const displayed = new Set(displayedNodes ?? visibleAt(model, scopeModuleId));
+  const displayed = new Set(drawnNodesAt(model, scopeModuleId, settings, displayedNodes));
   const related = new Set<string>();
   for (const link of scopeLinks(model, deps, scopeModuleId, settings, displayedNodes)) {
     if (!displayed.has(link.consumer)) related.add(link.consumer);
@@ -566,10 +593,27 @@ async function setShowOutsideScope(page: Page, value: boolean): Promise<void> {
   if (await box.isChecked() !== value) await box.click();
 }
 
+/** The own-source toggle; it is absent at a scope with no scope module. */
+async function setShowOwnSourceNode(page: Page, value: boolean): Promise<void> {
+  const box = page.getByRole('checkbox', { name: "Show this module's own source as a node" });
+  if (await box.count() === 0) {
+    assert.ok(!value, 'The own-source toggle is absent, so it cannot be turned on');
+    return;
+  }
+  if (await box.isChecked() !== value) await box.click();
+}
+
 /** Every control at once, in the order the page applies them. */
 async function applyLinkSettings(page: Page, settings: LinkSettings): Promise<void> {
   await setShowNonBehavioral(page, settings.showNonBehavioral);
-  await setLinkDepth(page, settings.depthMode);
+  // The own-source control is disabled in `Exact module`, so it is set before the depth changes.
+  if (settings.depthMode === 'level') {
+    await setLinkDepth(page, settings.depthMode);
+    await setShowOwnSourceNode(page, settings.showOwnSourceNode);
+  } else {
+    await setShowOwnSourceNode(page, false);
+    await setLinkDepth(page, settings.depthMode);
+  }
   await setShowOutsideScope(page, settings.showOutsideScope);
 }
 
@@ -774,17 +818,20 @@ async function exerciseReference(page: Page, model: ProjectExplorerModel, deps: 
 
   const combinations: Record<string, unknown>[] = [];
   for (const settings of [
-    { showNonBehavioral: true, depthMode: 'level', showOutsideScope: true },
-    { showNonBehavioral: true, depthMode: 'level', showOutsideScope: false },
-    { showNonBehavioral: true, depthMode: 'exact', showOutsideScope: true },
-    { showNonBehavioral: false, depthMode: 'exact', showOutsideScope: true },
+    { showNonBehavioral: true, depthMode: 'level', showOutsideScope: true, showOwnSourceNode: false },
+    { showNonBehavioral: true, depthMode: 'level', showOutsideScope: false, showOwnSourceNode: false },
+    { showNonBehavioral: true, depthMode: 'level', showOutsideScope: true, showOwnSourceNode: true },
+    { showNonBehavioral: true, depthMode: 'level', showOutsideScope: false, showOwnSourceNode: true },
+    { showNonBehavioral: true, depthMode: 'exact', showOutsideScope: true, showOwnSourceNode: false },
+    { showNonBehavioral: false, depthMode: 'exact', showOutsideScope: true, showOwnSourceNode: false },
     defaultLinks,
   ] as const satisfies readonly LinkSettings[]) {
     await applyLinkSettings(page, settings);
     const expected = expectedLinks(model, deps, scoped.id, settings);
     const rendered = await waitForLinks(page, expected, `Links for ${JSON.stringify(settings)} inside ${scoped.id}`);
     const outOfView = expectedOutOfView(model, deps, scoped.id, settings);
-    assert.deepEqual(await renderedNodeIds(page), [...scopeChildren, ...outOfView].sort());
+    assert.deepEqual(await renderedNodeIds(page),
+      [...drawnNodesAt(model, scoped.id, settings), ...outOfView].sort());
     const counts = scopeCounts(model, deps, scoped.id, settings);
     const cards = await labelledCards(projectPanelRegion(), 'This view');
     assert.deepEqual(cards, { ...counts, note: settings.showNonBehavioral ? 'shown' : 'not drawn' });
@@ -800,6 +847,7 @@ async function exerciseReference(page: Page, model: ProjectExplorerModel, deps: 
   assert.deepEqual(await labelledCards(ownSource, 'Uses'), { ...ownRow.uses, note: 'not drawn' });
   assert.deepEqual(await labelledCards(ownSource, 'Owned originals used by others'),
     { ...ownRow.ownedUsedByOthers, note: 'not drawn' });
+  const ownSourcePanel = await exerciseOwnSourceNode(page, model, deps, scoped.id, ownRow);
 
   // Module panel at this scope: the filtered numbers against the measured subtree totals.
   await setShowNonBehavioral(page, true);
@@ -954,7 +1002,7 @@ async function exerciseReference(page: Page, model: ProjectExplorerModel, deps: 
 
   // BD52: no control, selection or scope change requested dependency data again.
   assert.equal(requests.dependencyViews(), requestsBefore, 'A control or scope change requested the dependency view');
-  return { projectPanel, combinations, modulePanel,
+  return { projectPanel, combinations, modulePanel, ownSourceNode: ownSourcePanel,
     rolledUpLinkPanel: { id: rolled.id, consumer: rolled.consumer, provider: rolled.provider,
       behavioral: rolled.behavioral, nonBehavioral: rolled.nonBehavioral, sources: rolled.sources,
       rolledModules, importedThrough: importedThrough.size, referencedOriginals: rolledOriginals },
@@ -963,6 +1011,107 @@ async function exerciseReference(page: Page, model: ProjectExplorerModel, deps: 
       importedThrough: exactEdge.importedThrough.length },
     scopes, dependencyViewRequests: { beforeControls: requestsBefore, afterControls: requests.dependencyViews() },
     sidebar: { beforeWidth, afterWidth }, viewport: { before: transformBefore, zoom: transformZoom, pan: transformPan } };
+}
+
+/**
+ * BD61: the own-source control inside a drilled-in scope. The drawn links, the node and the panel
+ * numbers are compared with the independent calculation; the control requests nothing.
+ */
+async function exerciseOwnSourceNode(page: Page, model: ProjectExplorerModel, deps: ExplorerDependencyModel,
+  scopeModuleId: string, row: ExplorerDependencyModel['modules'][number]): Promise<Record<string, unknown>> {
+  const sidebar = page.locator('.module-arch__sidebar');
+  const projectPanelRegion = () => sidebar.getByRole('region', { name: 'Project dependencies' });
+  const measured = { showNonBehavioral: true, depthMode: 'level', showOutsideScope: true } as const;
+  const folded: LinkSettings = { ...measured, showOwnSourceNode: false };
+  const withNode: LinkSettings = { ...measured, showOwnSourceNode: true };
+  const node = ownSourceNode(scopeModuleId);
+  const scopeName = model.modules.find(item => item.id === scopeModuleId)!.name;
+
+  // The control is off by default and named like the other checkboxes.
+  const toggle = page.getByRole('checkbox', { name: "Show this module's own source as a node" });
+  assert.equal(await toggle.count(), 1, 'The drilled-in scope renders no own-source control');
+  await applyLinkSettings(page, folded);
+  assert.equal(await toggle.isChecked(), false);
+  const before = scopeLinks(model, deps, scopeModuleId, folded);
+  const beforeCounts = scopeCounts(model, deps, scopeModuleId, folded);
+  await waitForLinks(page, expectedLinks(model, deps, scopeModuleId, folded), 'Folded links before the control');
+  assert.equal(await page.locator(`[data-own-source="${scopeModuleId}"]`).count(), 0);
+
+  // On: exactly the calculated links appear, in both directions where the model has them.
+  await applyLinkSettings(page, withNode);
+  const after = scopeLinks(model, deps, scopeModuleId, withNode);
+  const ownLinks = after.filter(link => link.consumer === node || link.provider === node);
+  assert.ok(ownLinks.length > 0, `The scope has no own-source link: ${scopeModuleId}`);
+  await waitForLinks(page, expectedLinks(model, deps, scopeModuleId, withNode), 'Links with the own-source node');
+  assert.deepEqual(await renderedNodeIds(page),
+    [...drawnNodesAt(model, scopeModuleId, withNode), ...expectedOutOfView(model, deps, scopeModuleId, withNode)].sort());
+  const drawnNode = page.locator(`[data-own-source="${scopeModuleId}"]`);
+  assert.equal(await drawnNode.count(), 1, 'The own-source node is not drawn');
+  assert.equal(await drawnNode.getAttribute('aria-label'), `${scopeName} · own source`);
+  const nodeShape = await drawnNode.evaluate(element => ({
+    borderRadius: getComputedStyle(element).borderRadius,
+    subModuleBadge: element.textContent?.includes(' sub') ?? false,
+  }));
+  assert.ok(!nodeShape.subModuleBadge, 'The own-source node shows a sub-module count');
+
+  // Its pairs move from the numbers not drawn into this view.
+  const afterCounts = scopeCounts(model, deps, scopeModuleId, withNode);
+  const ownCounts = ownLinks.reduce((sum, link) => ({ behavioral: sum.behavioral + link.behavioral,
+    nonBehavioral: sum.nonBehavioral + link.nonBehavioral }), { behavioral: 0, nonBehavioral: 0 });
+  assert.deepEqual(afterCounts, { behavioral: beforeCounts.behavioral + ownCounts.behavioral,
+    nonBehavioral: beforeCounts.nonBehavioral + ownCounts.nonBehavioral });
+  assert.deepEqual(await labelledCards(projectPanelRegion(), 'This view'), { ...afterCounts, note: 'shown' });
+  const whole = { behavioral: deps.project.behavioral, nonBehavioral: deps.project.nonBehavioral };
+  assert.deepEqual(await labelledCards(projectPanelRegion(), 'Whole project'), { ...whole, note: 'shown' });
+  const notDrawn = await sidebar.locator('.module-arch__not-drawn').getAttribute('data-not-drawn');
+  assert.equal(notDrawn,
+    `${whole.behavioral - afterCounts.behavioral}/${whole.nonBehavioral - afterCounts.nonBehavioral}`);
+  const notDrawnText = await sidebar.locator('.module-arch__not-drawn').textContent() ?? '';
+  assert.ok(!notDrawnText.includes('folded'), `The not-drawn causes still name folding: ${notDrawnText}`);
+  const ownStatement = await sidebar.getByRole('region', { name: "Scope's own source" })
+    .locator('.module-arch__sidebar-hint').textContent();
+  assert.ok(ownStatement?.includes('drawn as its own node'), ownStatement ?? '');
+
+  // The node's panel: its drawn links against the scope module's own served row.
+  await clickGraphNode(page, node);
+  await page.getByRole('heading', { name: `${scopeName} · own source` }).waitFor();
+  const atLevel = (select: (link: ScopeLink) => boolean) => ownLinks.filter(select)
+    .reduce((sum, link) => ({ behavioral: sum.behavioral + link.behavioral,
+      nonBehavioral: sum.nonBehavioral + link.nonBehavioral }), { behavioral: 0, nonBehavioral: 0 });
+  const usesRegion = sidebar.getByRole('region', { name: 'Uses' });
+  assert.deepEqual(await labelledCards(usesRegion, 'At this level'),
+    { ...atLevel(link => link.consumer === node), note: 'shown' });
+  assert.deepEqual(await labelledCards(usesRegion, 'Excluding internals'), { ...row.uses, note: 'shown' });
+  const ownedRegion = sidebar.getByRole('region', { name: 'Owned originals used by others' });
+  assert.deepEqual(await labelledCards(ownedRegion, 'At this level'),
+    { ...atLevel(link => link.provider === node), note: 'shown' });
+  assert.deepEqual(await labelledCards(ownedRegion, 'Excluding internals'),
+    { ...row.ownedUsedByOthers, note: 'shown' });
+  await openDisclosure(page, 'Used through this module');
+  assert.deepEqual(await labelledCards(sidebar.getByRole('region', { name: 'Used through this module' }),
+    'Excluding internals'), { behavioral: row.usedThrough.behavioralUsedOriginals,
+    nonBehavioral: row.usedThrough.nonBehavioralUsedOriginals, note: 'shown' });
+  assert.equal(await metricValue(page, 'Links displayed'), String(ownLinks.length));
+
+  // A selected own-source link keeps its calculated identity and counts.
+  const link = ownLinks[0]!;
+  await clickGraphEdge(page, link.id);
+  await page.getByRole('heading', { name: 'Rolled-up link' }).waitFor();
+  assert.deepEqual(await labelledCards(sidebar.getByRole('region', { name: 'Dependencies' }), 'At this level'),
+    { behavioral: link.behavioral, nonBehavioral: link.nonBehavioral, note: 'shown' });
+
+  // Off again: the folded default returns and the selection is cleared.
+  await applyLinkSettings(page, folded);
+  await waitForLinks(page, expectedLinks(model, deps, scopeModuleId, folded), 'Folded links after the control');
+  assert.equal(await page.locator(`[data-own-source="${scopeModuleId}"]`).count(), 0);
+  await page.locator('.module-arch__detail-name').filter({ hasText: 'Project dependencies' }).waitFor();
+  assert.deepEqual(await labelledCards(projectPanelRegion(), 'This view'), { ...beforeCounts, note: 'shown' });
+  return { scope: scopeModuleId, node, label: `${scopeName} · own source`, nodeShape,
+    foldedLinks: before.length, linksWithNode: after.length,
+    ownLinks: ownLinks.map(item => ({ id: item.id, consumer: item.consumer, provider: item.provider,
+      behavioral: item.behavioral, nonBehavioral: item.nonBehavioral, leavesScope: item.leavesScope,
+      sources: item.sources })),
+    ownCounts, beforeCounts, afterCounts, notDrawn, measuredRow: row };
 }
 
 const version = '0.0.0';

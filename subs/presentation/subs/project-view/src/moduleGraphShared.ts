@@ -7,7 +7,7 @@ import type { MouseEvent as ReactMouseEvent } from 'react';
 import { MarkerType } from '@xyflow/react';
 import type { Edge, Node } from '@xyflow/react';
 import type { ExplorerModule } from './interfaces/project-view.js';
-import { linkWidth, type ActiveDependencyEdge } from './dependency-graph.js';
+import { linkWidth, type ActiveDependencyEdge, type ScopeNodeId } from './dependency-graph.js';
 
 /** A selected link, identified by its scoped or exact link ID. */
 export type GraphSelection = {
@@ -22,6 +22,8 @@ export interface ModuleGraphProps {
   readonly edges: readonly ActiveDependencyEdge[];
   readonly outOfViewModules?: readonly ExplorerModule[];
   readonly outOfViewLevelById?: Readonly<Record<string, number>>;
+  /** The scope module's own source, drawn beside the displayed modules; null when it is folded. */
+  readonly ownSourceNode?: { readonly id: ScopeNodeId; readonly module: ExplorerModule } | null;
   readonly selectedModuleId: string | null;
   readonly selectedEdgeId: string | null;
   readonly onSelectModule: (id: string | null) => void;
@@ -103,7 +105,7 @@ export function useModuleGraphInteractions({
   }, [onSelectEdge, onSelectModule]);
 
   const onNodeDoubleClick = useCallback((_event: ReactMouseEvent, node: Node) => {
-    if (node.data.isOutOfView !== true) onDrillDown?.(node.id);
+    if (node.data.isOutOfView !== true && node.data.isOwnSource !== true) onDrillDown?.(node.id);
   }, [onDrillDown]);
 
   return { onNodeClick, onEdgeClick, onPaneClick, onNodeDoubleClick };

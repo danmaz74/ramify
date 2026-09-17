@@ -100,6 +100,8 @@ export interface DependencySettings {
   readonly depthMode: DependencyDepthMode;
   /** Whether links with an end outside the scope's subtree are drawn. */
   readonly showOutsideScope: boolean;
+  /** Whether a drilled-in scope draws its own source as a node beside its children. */
+  readonly showOwnSourceNode: boolean;
 }
 
 export type DependencyPhase =
