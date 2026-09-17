@@ -1378,13 +1378,20 @@ async function runMutations(project: { root: string }, other: { root: string }, 
     assert.ok(sourceEdge && sourceEdge.accessCount === 2, JSON.stringify(sourceEdge));
     // The consumer's data use of the provider is a non-behavioral link; its evidence counts both occurrences.
     const sourceDeps = await readyDependencies(discovered.origin, source.revision);
-    const sourceLink = sourceDeps.importedModuleEdges.find(item => item.consumer === 'fixture/consumer' && item.provider === 'fixture/provider');
-    assert.ok(sourceLink && sourceLink.counts.behavioralUsedOriginals === 0 && sourceLink.counts.nonBehavioralUsedOriginals === 1, JSON.stringify(sourceLink));
+    const sourceBoundary = sourceDeps.importedModuleEdges.find(item => item.consumer === 'fixture/consumer' && item.provider === 'fixture/provider');
+    assert.ok(sourceBoundary && sourceBoundary.counts.behavioralUsedOriginals === 0 && sourceBoundary.counts.nonBehavioralUsedOriginals === 1, JSON.stringify(sourceBoundary));
+    const sourceOwner = sourceDeps.originalOwnerEdges.find(item => item.consumer === 'fixture/consumer' && item.provider === 'fixture/provider');
+    assert.ok(sourceOwner && sourceOwner.counts.behavioral === 0 && sourceOwner.counts.nonBehavioral === 1, JSON.stringify(sourceOwner));
     assert.deepEqual(await renderedEdgeIds(page), []);
     await setShowNonBehavioral(page, true);
-    await waitForLinks(page, [sourceLink.id], 'Non-behavioral source link');
+    const nonBehavioralLinks = { ...defaultLinks, showNonBehavioral: true };
+    const sourceLink = scopeLinks(sourceModel, sourceDeps, null, nonBehavioralLinks)
+      .find(link => link.consumer === 'fixture/consumer' && link.provider === 'fixture/provider');
+    assert.ok(sourceLink && sourceLink.sources.length === 1 && sourceLink.sources[0] === sourceOwner.id,
+      JSON.stringify(sourceLink));
+    await waitForLinks(page, expectedLinks(sourceModel, sourceDeps, null, nonBehavioralLinks), 'Non-behavioral source link');
     await clickGraphEdge(page, sourceLink.id);
-    await page.getByRole('heading', { name: 'Imported-module link' }).waitFor();
+    await page.getByRole('heading', { name: 'Rolled-up link' }).waitFor();
     await expandSection(page, 'Referenced originals');
     assert.equal(await page.locator('.module-arch__evidence-occurrences').textContent(), 'Supporting occurrences: 2');
     await setShowNonBehavioral(page, false);
@@ -1411,7 +1418,8 @@ async function runMutations(project: { root: string }, other: { root: string }, 
         topology: topology(npmModel), visibleImportMetrics: visibleImportMetrics(npmModel), dom: npmDom },
       readme: { revision: readme.revision, visiblePurpose: 'Provides the changed browser purpose.' },
       source: { revision: source.revision, edge: sourceEdge.id, accessCount: sourceEdge.accessCount, link: sourceLink.id,
-        linkCounts: sourceLink.counts, supportingOccurrences: 2 },
+        linkCounts: { behavioral: sourceLink.behavioral, nonBehavioral: sourceLink.nonBehavioral },
+        sources: sourceLink.sources, supportingOccurrences: 2 },
       exposure: { revision: exposure.revision, export: extra.name, destinations: extra.exposures.flatMap(item => item.destinations) } };
 
     // RS14 memory: server and daemon RSS before and after ten edits, each refreshed in the page.

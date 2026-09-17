@@ -8,6 +8,8 @@
 control, so BD30-BD32 and BD34-BD40 are edited in place and re-executed in
 iteration 8; the iteration 6 and 7 results keep their earlier wording as those
 rows' history. BD44-BD52 are new. BD01-BD29, BD33 and BD41-BD43 are unchanged.
+Every row passes, as the
+[iteration 8 completion report](iterations/iteration8-results.md) records.
 
 ## Fixtures
 

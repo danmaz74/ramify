@@ -186,7 +186,7 @@ retained session and executes before the separately reviewed Plan 3 successor.
 | [6A. Show only Ramify-module imports](#plan-6a-module-only-project-explorer) | Draft: narrow the explorer to Ramify modules and cross-module imports while retaining external facts in analysis. | Completed Plan 6. | [Detailed Plan 6A](plans/iteration-6a-module-only-project-explorer/main-plan.md), draft for contract review. |
 | [6B. Serve the explorer continuously](#plan-6b-resident-explorer-server) | Implemented: a PM2-manageable explorer server that owns and subscribes to one project context, with a home page and a stable `/analysis/latest` URL. | Completed Plans 6 and 6A. | [Detailed Plan 6B](plans/iteration-6b-resident-explorer-server/main-plan.md) and [completion report](plans/iteration-6b-resident-explorer-server/iterations/iteration4-results.md). |
 | [6C. Browse the module tree](#plan-6c-module-tree-view) | Implemented: a collapsible top-down module tree page at `/modules/latest` with a detail panel, linked both ways with the import explorer. | Completed Plan 6B. | [Detailed Plan 6C](plans/iteration-6c-module-tree-view/main-plan.md) and [completion report](plans/iteration-6c-module-tree-view/iterations/iteration3-results.md). |
-| [6D. Show behavioral dependencies](#plan-6d-behavioral-dependency-diagram) | Implemented: the analysis graph defaults to used behavioral symbols through imported-module boundaries, with non-behavioral and original-owner alternatives, classified on request by a lean analyzer the daemon starts. | Completed Plans 6B–6C and the implemented opt-in modularity analysis. | [Detailed Plan 6D](plans/iteration-6d-behavioral-dependency-diagram/main-plan.md) and [completion report](plans/iteration-6d-behavioral-dependency-diagram/iterations/iteration7-results.md). |
+| [6D. Show behavioral dependencies](#plan-6d-behavioral-dependency-diagram) | Implemented: the analysis graph draws used behavioral symbols against the module that defines them, rolled up to the current scope, with non-behavioral and exact-module alternatives, classified on request by a lean analyzer the daemon starts. | Completed Plans 6B–6C and the implemented opt-in modularity analysis. | [Detailed Plan 6D](plans/iteration-6d-behavioral-dependency-diagram/main-plan.md), its [gate report](plans/iteration-6d-behavioral-dependency-diagram/iterations/iteration7-results.md) and the [scope roll-up report](plans/iteration-6d-behavioral-dependency-diagram/iterations/iteration8-results.md). |
 
 The table order is the proposed implementation order; Plan 5 keeps the
 number the withdrawn change-previews deliverable released and Plan 2A is an
@@ -933,8 +933,10 @@ back. The page reuses the existing project view procedure and model.
 **Detailed artifact:** [Plan 6D](plans/iteration-6d-behavioral-dependency-diagram/main-plan.md),
 implemented with its [contracts](plans/iteration-6d-behavioral-dependency-diagram/contracts.md)
 and [acceptance matrix](plans/iteration-6d-behavioral-dependency-diagram/acceptance.md); the
-[completion report](plans/iteration-6d-behavioral-dependency-diagram/iterations/iteration7-results.md)
-records the browser gate, memory evidence and remaining limits.
+[gate report](plans/iteration-6d-behavioral-dependency-diagram/iterations/iteration7-results.md)
+records the browser gate, memory evidence and remaining limits, and the
+[scope roll-up report](plans/iteration-6d-behavioral-dependency-diagram/iterations/iteration8-results.md)
+records the accepted revision of the drawn links.
 **Prerequisites:** the completed resident explorer and module-tree work, plus
 the implemented batch-only dependency-behavior capability and modularity
 projection. MCP and the candidate module restructures are not prerequisites.
@@ -942,13 +944,15 @@ projection. MCP and the candidate module restructures are not prerequisites.
 **Working outcome.** `/analysis/latest` explicitly requests dependency behavior.
 The daemon starts a separate lean analyzer that classifies the published
 revision's recorded imports over verified inputs, leaving checks and the
-retained session unchanged. Its graph defaults to
-referenced behavioral symbols linked through the module named by each import.
-A local setting adds referenced type/data dependencies, and an alternative
-projection links the same analysis to original owners. Project, module and edge
-panels display the distinct headline and imported-boundary units with exact
-revision and coverage state. The module tree remains on its ordinary published
-project view.
+retained session unchanged. Its graph draws
+referenced behavioral symbols against the module that defines them, rolled up
+to the current scope: a node stands for its module's whole subtree, and a
+dependency internal to one node appears after drilling into it. Local settings
+add referenced type/data dependencies, switch to the exact defining module, and
+show or hide the dependencies that leave a drilled-in scope. Project, module and
+link panels display the filtered and the measured headline and imported-boundary
+units beside each other, with exact revision and coverage state. The module tree
+remains on its ordinary published project view.
 
 
 ## Plan 7: Affected modules

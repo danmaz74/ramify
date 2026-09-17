@@ -1,11 +1,11 @@
 # Plan 6D: Behavioral dependency diagram
 
 **Date:** 2026-09-17. **Status:** implemented on branch
-`feat/plan6d-behavioral-dependency-diagram`; every BD row passes, as the
-[completion report](iterations/iteration7-results.md) records. Iteration 8 is an
-accepted revision authored on top of it: its scope-aware roll-up of the drawn
-links is specified here, in the contracts and in the matrix, and is not yet
-implemented. This is a focused successor to the implemented
+`feat/plan6d-behavioral-dependency-diagram`; every BD row passes. Iterations 1-7
+are recorded in their [gate report](iterations/iteration7-results.md), and the
+accepted iteration 8 revision, the scope-aware roll-up of the drawn links, is
+implemented and recorded in its
+[completion report](iterations/iteration8-results.md). This is a focused successor to the implemented
 [Plan 6B](../iteration-6b-resident-explorer-server/main-plan.md) and
 [Plan 6C](../iteration-6c-module-tree-view/main-plan.md). It uses the behavioral
 classification and modularity projection already implemented at `70d7f46`.
