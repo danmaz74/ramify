@@ -5,7 +5,7 @@ import { buildCatalog } from './catalog.js';
 import { createDescriptionSet } from './descriptions.js';
 import { AccessInterpretation } from './accesses.js';
 import { behaviorRuns, classifyDependencyBehavior } from './behavior-classifier.js';
-import type { AccessInterpreter, CatalogExport, SourceCatalog } from './interfaces/source.js';
+import type { AccessInterpreter, CatalogExport, SourceAccess, SourceCatalog } from './interfaces/source.js';
 import { referencesOnly, syntheticCandidate, syntheticInputs } from './synthetic.js';
 import { CHUNK_BYTES, FRAME_BYTES, READ_RESPONSE_BYTES, RESULT_BYTES, SourceFailure, decodeChunk, encode } from './wire.js';
 import type { HelperInputs, Operation } from './wire.js';
@@ -69,8 +69,8 @@ function request(method: string, path: string, data?: unknown): unknown {
 }
 
 /** Every result reports this helper's classifier runs, so a lifetime that never classified shows zero. */
-function result(operation: Operation, value: unknown): void {
-  const bytes = encode(value, RESULT_BYTES);
+function result(operation: Operation, value: unknown, budget = RESULT_BYTES): void {
+  const bytes = encode(value, Math.min(budget, RESULT_BYTES));
   for (let offset = 0; offset < bytes.length; offset += CHUNK_BYTES) {
     const id = ++sequence;
     send({ kind: 'result', operation, id, chunk: bytes.subarray(offset, offset + CHUNK_BYTES).toString('base64'),
@@ -146,6 +146,14 @@ try {
       result('describe', createDescriptionSet().describe(project, inputs, host, new Map<CatalogExport, boolean>(), data.files).descriptions);
     } else if (command.command === 'accesses') {
       result('accesses', collectAccesses());
+    } else if (command.command === 'behavior' && command.supplied === true) {
+      // Supplied accesses are classified without the catalog or interpretation;
+      // the parent serves them as this command's inputs.
+      const data = request('behavior-inputs', root) as { accesses: SourceAccess[]; maxFactBytes: number } | null;
+      if (!data || !Array.isArray(data.accesses) || !Number.isSafeInteger(data.maxFactBytes) || data.maxFactBytes <= 0) {
+        throw new SourceFailure('protocol-error', 'Invalid supplied behavior inputs');
+      }
+      result('behavior', classifyDependencyBehavior(project, inputs, data.accesses), data.maxFactBytes);
     } else if (command.command === 'behavior') {
       result('behavior', classifyDependencyBehavior(project, inputs, (collected ?? collectAccesses()).accesses));
     } else if (command.command === 'interpreter') {

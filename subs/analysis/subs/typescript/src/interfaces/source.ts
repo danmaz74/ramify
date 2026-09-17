@@ -131,12 +131,22 @@ export interface SourceAnalysisInputs {
   readonly areas: readonly SourceArea[];
   readonly limits: SourceWorkLimits;
 }
+/** Recorded accesses a lean classifier run receives instead of interpreting source again. */
+export interface SuppliedAccesses {
+  readonly accesses: readonly SourceAccess[];
+  /** Maximum encoded bytes of the returned facts; a larger result is a `resource-limit` failure. */
+  readonly limits: { readonly maxFactBytes: number };
+}
 export interface SourceAnalysis {
   catalog(signal?: AbortSignal): Promise<SourceCatalog>;
   accesses(signal?: AbortSignal): Promise<{ readonly accesses: readonly SourceAccess[];
     readonly coverage: readonly SourceLimit[] }>;
-  /** The opt-in `dependency-behavior` facts over the accesses of this lifetime. */
-  dependencyBehavior(signal?: AbortSignal): Promise<DependencyBehaviorFacts>;
+  /**
+   * The opt-in `dependency-behavior` facts over the accesses of this lifetime or,
+   * when `supplied`, over those accesses without building the export catalog or
+   * interpreting imports. Cancellation returns no partial facts.
+   */
+  dependencyBehavior(signal?: AbortSignal, supplied?: SuppliedAccesses): Promise<DependencyBehaviorFacts>;
   /** Classifier runs this lifetime's compiler helper has reported; readable after disposal. */
   behaviorRuns(): number;
   dispose(): Promise<void>;

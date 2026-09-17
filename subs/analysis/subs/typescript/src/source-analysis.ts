@@ -1,6 +1,6 @@
 import { CompilerBridge } from './bridge.js';
 import { SourceFailure } from './wire.js';
-import type { SourceAnalysis, SourceAnalysisInputs } from './interfaces/source.js';
+import type { SourceAnalysis, SourceAnalysisInputs, SuppliedAccesses } from './interfaces/source.js';
 
 /** Own one compiler lifetime; the supplied captured view remains caller-owned. */
 export async function createSourceAnalysis(inputs: SourceAnalysisInputs): Promise<SourceAnalysis> {
@@ -14,7 +14,7 @@ export async function createSourceAnalysis(inputs: SourceAnalysisInputs): Promis
     return Object.freeze({
       catalog: (signal?: AbortSignal) => bridge.catalog(signal),
       accesses: (signal?: AbortSignal) => bridge.accesses(signal),
-      dependencyBehavior: (signal?: AbortSignal) => bridge.dependencyBehavior(signal),
+      dependencyBehavior: (signal?: AbortSignal, supplied?: SuppliedAccesses) => bridge.dependencyBehavior(signal, supplied),
       behaviorRuns: () => bridge.behaviorRuns,
       dispose: () => bridge.dispose(),
     });

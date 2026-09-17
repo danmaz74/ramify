@@ -5,7 +5,7 @@ import { createDefaultTagRegistry } from '../subs/analysis/subs/model/src/regist
 import type { BatchInvocation, BatchResult } from './interfaces/batch.js';
 
 /** Shared batch/resident dispatch limits, including the reviewed large-report capacity. */
-const limits: AnalysisLimits = {
+export const limits: AnalysisLimits = {
   acquisition: { attempts: 3, maxFiles: 50_000, maxApplicationFiles: 20_000,
     maxFileBytes: 8 * 1024 ** 2, maxInputBytes: 256 * 1024 ** 2,
     maxApplicationBytes: 64 * 1024 ** 2, maxOwners: 1000, maxDepth: 128, deadlineMs: 30_000 },

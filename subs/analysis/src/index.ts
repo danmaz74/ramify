@@ -20,3 +20,5 @@ export { projectChangeAffinity } from './change-affinity.js';
 export type * from './interfaces/modularity.js';
 export { projectDependencyDiagram } from './dependency-diagram.js';
 export type * from './interfaces/dependency-diagram.js';
+export { analyzeDependencyDiagram } from './dependency-analyzer.js';
+export type * from './interfaces/dependency-analyzer.js';

@@ -1,8 +1,63 @@
 import { rm } from 'node:fs/promises';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { DependencyBehaviorFact, DependencyBehaviorFacts } from '../interfaces/dependency-behavior.js';
-import type { SourceAccess } from '../interfaces/source.js';
-import { analyze, fixture, withCatalog } from './fixtures.js';
+import type { SourceAccess, SourceAnalysis } from '../interfaces/source.js';
+import { createSourceAnalysis } from '../source-analysis.js';
+import { acquire, analyze, areasFor, fixture, sourceLimits, withCatalog } from './fixtures.js';
+
+/**
+ * The command frames each compiler helper received on its standard input, one list per
+ * helper lifetime in spawn order. A supplied command is recorded as `behavior(supplied)`.
+ */
+const helpers = vi.hoisted(() => ({ lifetimes: [] as string[][] }));
+vi.mock('node:child_process', async importOriginal => {
+  const actual = await importOriginal<typeof import('node:child_process')>();
+  const spawn = ((...args: Parameters<typeof actual.spawn>) => {
+    const child = actual.spawn(...args);
+    if (JSON.stringify(args).includes('compiler-helper.') && child.stdin) {
+      const commands: string[] = [];
+      helpers.lifetimes.push(commands);
+      const write = child.stdin.write.bind(child.stdin) as (...values: unknown[]) => boolean;
+      child.stdin.write = ((...values: unknown[]) => {
+        for (const line of String(values[0]).split('\n')) {
+          if (!line.includes('"kind":"command"')) continue;
+          const frame = JSON.parse(line) as { command: string; supplied?: boolean };
+          commands.push(frame.supplied ? `${frame.command}(supplied)` : frame.command);
+        }
+        return write(...values);
+      }) as typeof child.stdin.write;
+    }
+    return child;
+  }) as typeof actual.spawn;
+  return { ...actual, spawn, default: { ...actual, spawn } };
+});
+
+const factLimits = { maxFactBytes: 32 * 1024 * 1024 };
+
+/**
+ * BD14/BD15: classify one fixture's accesses twice over identical inputs, once through the batch
+ * path (catalog, interpretation, behavior) and once in a fresh lifetime that receives the recorded
+ * accesses. Returns both results and the helper commands of the supplied lifetime.
+ */
+async function suppliedAndBatch(root: string): Promise<{ readonly batch: DependencyBehaviorFacts; readonly supplied: DependencyBehaviorFacts;
+  readonly accesses: readonly SourceAccess[]; readonly commands: readonly (readonly string[])[]; readonly runs: number }> {
+  let result: Awaited<ReturnType<typeof analyze>> | undefined;
+  let lean: SourceAnalysis | undefined;
+  try {
+    result = await analyze(root);
+    const { accesses } = await result.source.accesses();
+    const batch = await result.source.dependencyBehavior();
+    const view = await acquire(root);
+    const first = helpers.lifetimes.length;
+    try {
+      lean = await createSourceAnalysis({ view, inventory: view.inventory, areas: areasFor(view), limits: sourceLimits });
+      const supplied = await lean.dependencyBehavior(undefined, { accesses, limits: factLimits });
+      const runs = lean.behaviorRuns();
+      await lean.dispose();
+      return { batch, supplied, accesses, commands: helpers.lifetimes.slice(first), runs };
+    } finally { await lean?.dispose(); await view.dispose(); }
+  } finally { await result?.dispose(); await rm(root, { recursive: true, force: true }); }
+}
 
 const api = `export function run(): number { return 1; }
 export class Service { start(): void {} }
@@ -191,6 +246,20 @@ export { act as forwardedAct } from ${B};
     const evidenceOrder = ['call', 'construction', 'callable-reference', 'data', 'type', 'forwarding'];
     const order = (a: string, b: string): number => Buffer.compare(Buffer.from(a), Buffer.from(b));
 
+    it('classifies supplied imports equal to the batch path without catalog or interpretation commands (BD14, BD15)', async () => {
+      const root = await fixture({
+        'subs/core/src/index.ts': core, 'subs/b/src/index.ts': forwarder, 'subs/c/src/index.ts': forwarder, ...consumers,
+      }, owners);
+      const { batch, supplied, commands, runs } = await suppliedAndBatch(root);
+      expect(batch.status).toBe('completed');
+      expect(batch.facts.length).toBeGreaterThan(10);
+      expect(supplied).toEqual(batch);
+      expect(JSON.stringify(supplied)).toBe(JSON.stringify(batch));
+      expect(Object.isFrozen(supplied.facts[0]!.accesses)).toBe(true);
+      expect(runs).toBe(1);
+      expect(commands).toEqual([['behavior(supplied)', 'dispose']]);
+    }, 60_000);
+
     it('keeps every import path of one original separately classified and reproduces each aggregate from them', () => pathFacts((facts, accesses) => {
       expect(facts.status).toBe('completed');
       // BD01: only the B path is used; the C path stays unused while the headline fact is behavioral.
@@ -272,5 +341,59 @@ export { act as forwardedAct } from ${B};
       expect(Object.isFrozen(settled.accesses) && Object.isFrozen(settled.accesses[0]) && Object.isFrozen(facts.limits)).toBe(true);
       expect(JSON.parse(JSON.stringify(facts))).toEqual(facts);
     }), 60_000);
+  });
+
+  describe('forwarding: B forwards originals owned by B/A', () => {
+    const files = {
+      'subs/b/subs/a/src/index.ts': 'export function act(): void {}\nexport const secret = { level: 1 };\nexport interface Settings { size: number }\n',
+      'subs/b/src/index.ts': "export { act, secret, type Settings } from '../subs/a/src/index.js';\n",
+      'src/use.ts': "import { act, secret } from '../subs/b/src/index.js';\nimport type { Settings } from '../subs/b/src/index.js';\nact();\nexport const settings: Settings = { size: 1 };\n",
+      'src/reexport.ts': "export * from '../subs/b/src/index.js';\n",
+    };
+    const owners = [{ name: 'b', directory: 'subs/b', tags: [] }, { name: 'a', directory: 'subs/b/subs/a', tags: [] }];
+
+    it('classifies supplied forwarded imports equal to the batch path (BD14, BD15)', async () => {
+      const { batch, supplied, accesses, commands, runs } = await suppliedAndBatch(await fixture(files, owners));
+      const rows = (facts: DependencyBehaviorFacts) => facts.facts.filter(fact => fact.consumer.area.owner === 'fixture')
+        .map(fact => [fact.consumer.file, fact.original.binding, fact.classification, fact.evidence.join()]);
+      expect(rows(batch)).toEqual([
+        ['src/reexport.ts', 'Settings', 'non-behavioral', 'forwarding'],
+        ['src/reexport.ts', 'act', 'non-behavioral', 'forwarding'],
+        ['src/reexport.ts', 'secret', 'non-behavioral', 'forwarding'],
+        ['src/use.ts', 'Settings', 'non-behavioral', 'type'],
+        ['src/use.ts', 'act', 'behavioral', 'call'],
+        ['src/use.ts', 'secret', 'unused', ''],
+      ]);
+      // The interpreter records one selection per access, so one declaration or star re-export selecting
+      // several originals is one access per original.
+      const star = accesses.filter(access => access.importer.file === 'src/reexport.ts');
+      expect(star.map(access => access.selections.map(selection => selection.original?.binding))).toEqual([['act'], ['secret'], ['Settings']]);
+      expect(supplied).toEqual(batch);
+      expect(JSON.stringify(supplied)).toBe(JSON.stringify(batch));
+      expect(runs).toBe(1);
+      expect(commands).toEqual([['behavior(supplied)', 'dispose']]);
+    }, 60_000);
+
+    it('bounds supplied facts and returns no facts after cancellation', async () => {
+      const root = await fixture(files, owners);
+      let result: Awaited<ReturnType<typeof analyze>> | undefined;
+      try {
+        result = await analyze(root);
+        const { accesses } = await result.source.accesses();
+        // Each fixture view's disposal releases the fixture definition, so acquire every view first.
+        const views = [await acquire(root), await acquire(root), await acquire(root)];
+        for (const [index, [signal, limits, code]] of ([
+          [undefined, { maxFactBytes: 64 }, 'resource-limit'],
+          [AbortSignal.abort(), factLimits, 'cancelled'],
+          [undefined, { maxFactBytes: 0 }, 'resource-limit'],
+        ] as const).entries()) {
+          const view = views[index]!;
+          const lean = await createSourceAnalysis({ view, inventory: view.inventory, areas: areasFor(view), limits: sourceLimits });
+          try {
+            await expect(lean.dependencyBehavior(signal, { accesses, limits })).rejects.toMatchObject({ code });
+          } finally { await lean.dispose(); await view.dispose(); }
+        }
+      } finally { await result?.dispose(); await rm(root, { recursive: true, force: true }); }
+    }, 60_000);
   });
 });

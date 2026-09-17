@@ -39,3 +39,9 @@ expose-src planApiViewRequests, projectApiView from "api-view.ts" to parent
 // projection function stays internal to analysis.
 expose-src DependencyBoundaryFact, DependencyDiagramFacts, DependencyDiagramOutcome from "interfaces/dependency-diagram.ts" to parent
 expose-src BehavioralDependencyMetrics from "interfaces/modularity.ts" to parent
+
+// A15: the lean dependency analyzer and its runner contract, called only by
+// root's analyzer process entry; the runner port type is shared with the
+// process runner that root implements.
+expose-src analyzeDependencyDiagram from "dependency-analyzer.ts" to parent
+expose-src * from "interfaces/dependency-analyzer.ts" to parent

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { CHUNK_BYTES, DISPOSAL_MS, FILE_BYTES, FRAME_BYTES, INPUT_BYTES, READ_RESPONSE_BYTES,
   RESULT_BYTES, SourceFailure, decodeChunk, encode, freezeData } from './wire.js';
 import type { Operation } from './wire.js';
-import type { AccessInterpreter, FileDescription, SourceAnalysis, SourceAnalysisInputs, SourceCatalog } from './interfaces/source.js';
+import type { AccessInterpreter, FileDescription, SourceAnalysis, SourceAnalysisInputs, SourceCatalog, SuppliedAccesses } from './interfaces/source.js';
 import type { DependencyBehaviorFacts } from './interfaces/dependency-behavior.js';
 
 interface PendingOperation {
@@ -37,6 +37,7 @@ export class CompilerBridge {
   #stderr = '';
   #interpretationInputs: unknown;
   #descriptionInputs: unknown;
+  #behaviorInputs: SuppliedAccesses | undefined;
   #replacements: { descriptions: Parameters<AccessInterpreter['replaceDescriptions']>[0]; removed: readonly string[] }[] = [];
   #behaviorRuns = 0;
   #derivedBytes = 0;
@@ -91,9 +92,18 @@ export class CompilerBridge {
     return this.#query('accesses', signal) as ReturnType<SourceAnalysis['accesses']>;
   }
 
-  /** Classify the accesses this lifetime interpreted; only an explicit capability request calls it. */
-  dependencyBehavior(signal?: AbortSignal): Promise<DependencyBehaviorFacts> {
-    return this.#query('behavior', signal) as Promise<DependencyBehaviorFacts>;
+  /** Classify the accesses this lifetime interpreted, or the supplied ones, which the helper
+   * requests as its inputs; only an explicit capability or analyzer request calls it. */
+  async dependencyBehavior(signal?: AbortSignal, supplied?: SuppliedAccesses): Promise<DependencyBehaviorFacts> {
+    if (!supplied) return this.#query('behavior', signal) as Promise<DependencyBehaviorFacts>;
+    this.#check();
+    if (this.#operation) throw new SourceFailure('concurrent-operation', 'A source operation is already running');
+    if (!Number.isSafeInteger(supplied.limits.maxFactBytes) || supplied.limits.maxFactBytes <= 0) {
+      throw new SourceFailure('resource-limit', 'Supplied behavior fact limit must be a positive safe integer');
+    }
+    this.#behaviorInputs = supplied;
+    try { return await this.#query('behavior', signal, true) as DependencyBehaviorFacts; }
+    finally { this.#behaviorInputs = undefined; }
   }
 
   async describe(files: readonly string[], signal?: AbortSignal): Promise<readonly FileDescription[]> {
@@ -125,7 +135,8 @@ export class CompilerBridge {
     } finally { this.#interpretationInputs = undefined; this.#replacements = []; }
   }
 
-  async #query(name: 'catalog' | 'describe' | 'accesses' | 'interpreter' | 'interpret' | 'behavior', signal?: AbortSignal): Promise<unknown> {
+  async #query(name: 'catalog' | 'describe' | 'accesses' | 'interpreter' | 'interpret' | 'behavior', signal?: AbortSignal,
+    supplied = false): Promise<unknown> {
     if (this.#terminal) await this.#cleanup();
     this.#check();
     if (this.#operation) throw new SourceFailure('concurrent-operation', 'A source operation is already running');
@@ -134,7 +145,7 @@ export class CompilerBridge {
       this.#fail(error); await this.#cleanup(); throw error;
     }
     const result = this.#begin(name, this.#inputs!.limits.deadlineMs, signal);
-    try { this.#write({ kind: 'command', command: name }); }
+    try { this.#write(supplied ? { kind: 'command', command: name, supplied } : { kind: 'command', command: name }); }
     catch (error) { this.#fail(error); }
     try { return freezeData(await result); }
     catch (error) { await this.dispose(); throw error; }
@@ -223,7 +234,7 @@ export class CompilerBridge {
       this.#child.stdin.destroy(); this.#child.stdout.destroy(); this.#child.stderr.destroy();
       this.#lifetime?.removeEventListener('abort', this.#abortLifetime);
       this.#lifetime = undefined; this.#inputs = undefined;
-      this.#interpretationInputs = undefined; this.#descriptionInputs = undefined; this.#replacements = [];
+      this.#interpretationInputs = undefined; this.#descriptionInputs = undefined; this.#behaviorInputs = undefined; this.#replacements = [];
       this.#pending = undefined; this.#buffer = Buffer.alloc(0); this.#stderr = '';
       this.#readPaths.clear(); this.#capturedBytes = 0;
     }
@@ -329,6 +340,10 @@ export class CompilerBridge {
       }
       case 'interpret-inputs': return this.#interpretationInputs;
       case 'describe-inputs': return this.#descriptionInputs;
+      case 'behavior-inputs': {
+        const supplied = this.#behaviorInputs;
+        return supplied ? { accesses: supplied.accesses, maxFactBytes: supplied.limits.maxFactBytes } : null;
+      }
       case 'inputs': return { inventory: inputs.inventory, areas: inputs.areas, limits: inputs.limits };
       case 'readFile': {
         const text = await view.readFile(path) ?? null;
