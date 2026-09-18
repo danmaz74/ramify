@@ -308,6 +308,24 @@ workerSuite('retained analysis session', import.meta.url, () => {
     } finally { await handle.dispose(); }
   }, { ...fixtureFiles, 'subs/consumer/module.ramify': 'ramify 1\nmodule consumer\nexpose-src nothing from\n' }), timeout);
 
+  it('opens beside generated views without recording any of their paths, with the input identity of a batch check (AV41)', () => fixture(async (root, inputs) => {
+    const hex = (digit: string) => digit.repeat(32);
+    const generated = ['.ramify-architect/_meta.json', '.ramify-architect/consumer/module.json', `.ramify-architect.tmp-${hex('a')}/_meta.json`,
+      `.ramify-architect.old-${hex('b')}.marker.json`, 'src/.ramify/_meta.json', 'src/.ramify/external.md', 'subs/consumer/src/.ramify/_meta.json',
+      `subs/consumer/src/.ramify.tmp-${hex('c')}/_meta.json`, `subs/consumer/src/.ramify.old-${hex('d')}.marker.json`];
+    const without = await batch(inputs);
+    for (const path of generated) await put(root, path, '{"generated":true}\n');
+    const { session: handle, revision } = await opened(inputs);
+    try {
+      const report = await expectEqualToBatch(handle, inputs);
+      expect([revision.inputId, report.inputId]).toEqual([without.inputId, without.inputId]);
+      // An independent statement of the reserved forms and their marker files, at any segment.
+      const reserved = /(?:^|\/)\.ramify(?:-architect)?(?:\.(?:tmp|old)-[^/]+)?(?:\/|$)/;
+      expect(revision.inputs.filter(input => reserved.test(input.path))).toEqual([]);
+      expect(report.snapshot!.inputs).toEqual(without.snapshot!.inputs);
+    } finally { await handle.dispose(); }
+  }), timeout);
+
   it('reports an unavailable cold result without opening a session', async () => {
     const root = join(tmpdir(), 'ramify-retained-session-missing-root');
     const result = await openRetainedSession({ ...analysisInputs(root), session });

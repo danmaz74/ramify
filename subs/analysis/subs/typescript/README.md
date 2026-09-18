@@ -45,7 +45,9 @@ current descriptions, and `interpreter` is the maintained access interpreter
 following the current snapshot. Every filesystem callback reads the disk
 directly and reports the read, existence probe, directory listing, realpath or
 absence to project's `ObservationSink`, so an observer merging those reports
-carries the input identity a batch capture of the same state carries.
+carries the input identity a batch capture of the same state carries. Directory
+listings omit Ramify's reserved generated names, as capture does, so neither a
+listing nor a member probe reports a generated view.
 `releaseCompiler` closes the server and keeps the retained descriptions; the
 next `update` reopens and the next `describe` reads every owned file again.
 A server that exits on its own rejects the next call with `read-failure`, and

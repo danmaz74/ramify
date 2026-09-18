@@ -1,5 +1,5 @@
-import { readFile, rm } from 'node:fs/promises';
-import { basename, join, resolve } from 'node:path';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { basename, dirname, join, resolve } from 'node:path';
 import { API } from 'typescript/unstable/sync';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { ObservationSink } from '../../../project/src/interfaces/project.js';
@@ -268,6 +268,36 @@ describe('retained source analysis', () => {
     await analysis.describe(['src/consumer.ts']);
     const reread = events.slice(before).find(event => event.shape === 'file' && event.path === join(root, 'src/consumer.ts'));
     expect(reread).toMatchObject({ role: 'source', bytes: Buffer.byteLength((await readFile(join(root, 'src/consumer.ts'))).toString()) });
+  }, 60_000);
+
+  it('omits reserved generated names from its listings and member probes, keeping near misses', async () => {
+    const hex = (digit: string) => digit.repeat(32);
+    const generated = {
+      '.ramify-architect/_meta.json': '{"schema":"ramify.architect-view/1"}\n', '.ramify-architect/behavior.jsonl': '\n',
+      [`.ramify-architect.tmp-${hex('a')}/_meta.json`]: '{}\n', [`.ramify-architect.old-${hex('b')}.marker.json`]: '{}\n',
+      'src/.ramify/_meta.json': '{"schema":"ramify.api-view/1"}\n', 'src/.ramify/external.md': '# api\n',
+      [`src/.ramify.tmp-${hex('c')}/_meta.json`]: '{}\n', [`src/.ramify.old-${hex('d')}.marker.json`]: '{}\n',
+    };
+    // On disk only, not through `put`: the fixture's inventory, like acquisition's, holds none of them.
+    const root = await start(project);
+    for (const [path, text] of Object.entries({ ...generated, '.ramify-architects/near.json': '{}\n' })) {
+      await mkdir(dirname(join(root, path)), { recursive: true });
+      await writeFile(join(root, path), text);
+    }
+    const { sink, events } = recording();
+    const analysis = await open(root, sink);
+    await analysis.describe([]);
+    await state(analysis);
+    // An independent statement of the six reserved forms and their marker files, at any segment.
+    const reserved = /(?:^|\/)\.ramify(?:-architect)?(?:\.(?:tmp|old)-[^/]+)?(?:\/|$)/;
+    const paths = events.flatMap(event => [event.path, ...event.entries ?? []]).map(path => path.slice(root.length));
+    expect(paths.filter(path => reserved.test(path))).toEqual([]);
+    const listing = (directory: string) => events.find(event => event.shape === 'directory' && event.path === directory)?.entries;
+    expect(listing(root)).toEqual(expect.arrayContaining([join(root, '.ramify-architects'), join(root, 'src'), join(root, 'tsconfig.json')]));
+    expect(listing(join(root, 'src'))).toEqual(Object.keys(project).map(file => join(root, file)).sort());
+    const retained = await state(analysis), helper = await batch(root);
+    expect(retained.catalog).toBe(helper.catalog);
+    expect(JSON.parse(retained.accesses).accesses).toEqual(JSON.parse(helper.accesses).accesses);
   }, 60_000);
 
   it('rejects the next call with read-failure when the server is lost, then rebuilds on a later update', async () => {

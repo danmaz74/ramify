@@ -5,6 +5,7 @@ import { basename, isAbsolute, relative, resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { API, type Project } from 'typescript/unstable/sync';
 import { isStringLiteral } from 'typescript/unstable/ast';
+import { isRamifyGeneratedPath } from '../../project/src/generated-path.js';
 import type { ObservationSink, ProjectInventory } from '../../project/src/interfaces/project.js';
 import type { SourceArea } from '../../model/src/interfaces/model.js';
 import { AccessInterpretation } from './accesses.js';
@@ -545,11 +546,16 @@ class RetainedSourceState implements RetainedSourceAnalysis {
     }
   }
 
-  /** Enumerate a directory and report it with its members' full paths. */
+  /**
+   * Enumerate a directory and report it with its members' full paths. A reserved generated
+   * name is omitted, as the capture's listings and the configuration host omit it: the
+   * compiler never sees a generated view, and neither the listing nor a member probe makes
+   * one an input.
+   */
   #listing(path: string): Set<string> {
     if (this.#observe(path, 'directoryExists') !== 'directory') return new Set();
     let names: string[];
-    try { names = readdirSync(path); }
+    try { names = readdirSync(path).filter(name => !isRamifyGeneratedPath(name)); }
     catch (error) {
       if (missing(error)) return new Set();
       return this.#fail(new SourceFailure('read-failure', `Cannot enumerate ${path}: ${String(error)}`, path));

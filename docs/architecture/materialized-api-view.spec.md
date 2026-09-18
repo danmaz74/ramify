@@ -304,16 +304,15 @@ even when a project uses no Git repository or has a different ignore file.
 
 The architect view's `.ramify-architect` and its staging siblings
 `.ramify-architect.tmp-<suffix>` and `.ramify-architect.old-<suffix>` are
-reserved the same way, at any depth.
+reserved the same way, at any depth. The publisher's sibling marker files,
+`<sibling>.marker.json`, match the same forms; the toolkit's and the reference
+project's ignore files list them beside the directories.
 
-**Known gap (Plan 2B iteration 8, 2026-09-18).** The retained session's
-compiler lists directories without omitting reserved names, and reports what
-it lists to the observer. A resident session opened while generated views
-exist therefore records each `.ramify` and `.ramify-architect` directory it
-lists as an observed input, so its input identity differs from a batch check
-of the same project. Publishing or replacing a view still starts no revision,
-and a session opened before the views existed is unaffected. The
-[iteration 8 results](../plans/iteration-2b-generated-views/iterations/iteration8-results.md)
+The retained session's compiler omits reserved names from its directory
+listings, as capture and the configuration host do, so a resident session
+opened while generated views exist records none of them as inputs and has the
+input identity of a batch check of the same project. Plan 2B's
+[iteration 9 results](../plans/iteration-2b-generated-views/iterations/iteration9-results.md)
 record the witness.
 
 ## Agent instructions
