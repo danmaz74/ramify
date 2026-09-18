@@ -1,24 +1,33 @@
 /**
  * The one canonical predicate for Ramify's reserved generated-output path
- * segments: the final `.ramify` catalog directory and its two reserved
- * transient publisher siblings, `.ramify.tmp-<suffix>` (staging) and
- * `.ramify.old-<suffix>` (rollback). It is a closed enumeration, not a
- * prefix match: `.ramify-other`, `.ramify2`, `.ramify.tmp` (no trailing
- * `-<suffix>`) and `.ramifyx` are ordinary segments and never match.
+ * segments. It reserves two generated views, each with its two transient
+ * publisher siblings:
+ *
+ * - the API view's `.ramify` catalog, `.ramify.tmp-<suffix>` (staging) and
+ *   `.ramify.old-<suffix>` (rollback);
+ * - the architect view's `.ramify-architect` directory,
+ *   `.ramify-architect.tmp-<suffix>` and `.ramify-architect.old-<suffix>`.
+ *
+ * It is a closed enumeration, not a prefix match: `.ramify-other`,
+ * `.ramify-architects`, `.ramify2`, `.ramify.tmp` and `.ramify-architect.tmp`
+ * (no trailing `-<suffix>`) and `.ramifyx` are ordinary segments and never
+ * match. A publisher's marker file, `<sibling>.marker.json`, matches its
+ * sibling's form.
  *
  * The predicate applies at any segment position of a project-relative (or
  * absolute) path, not only directly beneath a module's `src/` or
- * `src/tests/`, so a single check covers both the final catalog and its
- * transient siblings wherever the publisher places them. Callers apply it
- * before a path can become application source, an outside-module input, a
- * declared exposure target, a captured/observed input or a watched event.
+ * `src/tests/` or at the project root, so a single check covers both views
+ * and their transient siblings wherever the publisher places them. Callers
+ * apply it before a path can become application source, an outside-module
+ * input, a declared exposure target, a captured/observed input or a watched
+ * event.
  */
-const transientStagePattern = /^\.ramify\.tmp-.+$/;
-const transientRollbackPattern = /^\.ramify\.old-.+$/;
+const reservedNames = new Set(['.ramify', '.ramify-architect']);
+const transientPattern = /^\.ramify(?:-architect)?\.(?:tmp|old)-.+$/;
 
-/** True when `segment` alone (no separators) is one of the three reserved forms. */
+/** True when `segment` alone (no separators) is one of the six reserved forms. */
 export function isRamifyGeneratedSegment(segment: string): boolean {
-  return segment === '.ramify' || transientStagePattern.test(segment) || transientRollbackPattern.test(segment);
+  return reservedNames.has(segment) || transientPattern.test(segment);
 }
 
 /**

@@ -10,7 +10,7 @@ import type { AnalysisLimits, RunControl } from '../subs/analysis/src/interfaces
 import type { RetainedSession, SessionLimits } from '../subs/analysis/src/interfaces/session.js';
 import { createDefaultTagRegistry } from '../subs/analysis/subs/model/src/registry.js';
 import type { AnalysisDriver, WatcherPort, ClockPort, ContextBudgets } from '../subs/daemon/src/context-types.js';
-import type { ApiViewPublisher, DaemonInstance, LogEntry, DaemonService } from '../subs/daemon/src/interfaces/daemon.js';
+import type { ApiViewPublisher, ApiViewPublishLimits, DaemonInstance, LogEntry, DaemonService } from '../subs/daemon/src/interfaces/daemon.js';
 import { createDaemonService } from '../subs/daemon/src/service.js';
 import { createFilesystemApiViewPublisher } from '../subs/daemon/src/api-view-publisher.js';
 
@@ -21,8 +21,8 @@ export interface ResidentAssemblyOptions {
   readonly instance: DaemonInstance;
   readonly log: (entry: LogEntry) => void;
   /** Injected transactional filesystem publisher for `materialize`; defaults to
-   * `createFilesystemApiViewPublisher` at contracts.md's frozen iteration-1
-   * limits. Tests inject a controlled publisher. */
+   * `createFilesystemApiViewPublisher` at `residentPublishLimits`. Tests inject
+   * a controlled publisher. */
   readonly publisher?: ApiViewPublisher;
   /** Injected dependency diagram runner; defaults to one analyzer process per job running the built
    * `dependency-analyzer-entry.js` with this Node runtime. */
@@ -33,8 +33,9 @@ export interface ResidentAssemblyOptions {
 export const dependencyAnalyzerEntry = fileURLToPath(new URL(import.meta.url.endsWith('.ts')
   ? '../dist/src/dependency-analyzer-entry.js' : './dependency-analyzer-entry.js', import.meta.url));
 
-// Frozen (iteration 1): see contracts.md's "Renderer and publisher" section.
-const publishLimits = { maxAreaBytes: 32 * 1024 ** 2, maxInvocationBytes: 256 * 1024 ** 2, maxStagedBytes: 256 * 1024 ** 2 };
+/** Frozen: Plan 2A's contracts.md "Renderer and publisher" section, and Plan 2B's C6 for `maxArchitectBytes`. */
+export const residentPublishLimits: ApiViewPublishLimits = { maxAreaBytes: 32 * 1024 ** 2, maxArchitectBytes: 64 * 1024 ** 2,
+  maxInvocationBytes: 256 * 1024 ** 2, maxStagedBytes: 256 * 1024 ** 2 };
 
 // Preserve the batch dispatch limits; equality is exercised at the public flow.
 const limits: AnalysisLimits = {
@@ -122,7 +123,7 @@ function sessionDriver(capacity: SessionLimits): AnalysisDriver {
 }
 
 export function assembleResidentService(options: ResidentAssemblyOptions): DaemonService {
-  return createDaemonService({ ...options, publisher: options.publisher ?? createFilesystemApiViewPublisher(publishLimits),
+  return createDaemonService({ ...options, publisher: options.publisher ?? createFilesystemApiViewPublisher(residentPublishLimits),
     dependencyDiagrams: options.dependencyDiagrams ?? createProcessDependencyAnalyzer(process.execPath, dependencyAnalyzerEntry),
     driver: sessionDriver({ ...sessionLimits,
       maxRetainedFactBytes: Math.min(sessionLimits.maxRetainedFactBytes, options.budgets.maxRetainedBytesPerContext),

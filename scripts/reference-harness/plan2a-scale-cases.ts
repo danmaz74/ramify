@@ -150,7 +150,7 @@ export const plan2aScaleHandlers: ReadonlyMap<string, InstanceHandler> = new Map
     const root = await mkdtemp(join(tmpdir(), 'plan2a-limit-preservation-'));
     try {
       await writeMaterializeFixture(root);
-      const generousLimits: ApiViewPublishLimits = { maxAreaBytes: 32 * 1024 * 1024, maxInvocationBytes: 256 * 1024 * 1024, maxStagedBytes: 256 * 1024 * 1024 };
+      const generousLimits: ApiViewPublishLimits = { maxAreaBytes: 32 * 1024 * 1024, maxArchitectBytes: 64 * 1024 * 1024, maxInvocationBytes: 256 * 1024 * 1024, maxStagedBytes: 256 * 1024 * 1024 };
 
       async function materializeOnce(limits: ApiViewPublishLimits) {
         const quick = await createQuickEnvironment({}, { publisher: createFilesystemApiViewPublisher(limits) });
@@ -168,7 +168,7 @@ export const plan2aScaleHandlers: ReadonlyMap<string, InstanceHandler> = new Map
 
       const baseline = await materializeOnce(generousLimits);
       if (baseline.status !== 'materialized') throw new Error(`Expected a baseline materialization: ${JSON.stringify(baseline)}`);
-      const appTarget = baseline.targets.find(target => target.module.endsWith('/app') && target.area === 'ordinary');
+      const appTarget = baseline.targets.find(target => target.module?.endsWith('/app') && target.area === 'ordinary');
       if (!appTarget) throw new Error('Expected app\'s ordinary target in the baseline outcome');
       const targetFile = join(root, appTarget.path, 'external/subs/lib/src/api.ts.md');
       const baselineBytes = await readFile(targetFile);

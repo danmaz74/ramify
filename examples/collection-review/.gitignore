@@ -2,8 +2,12 @@ node_modules/
 dist/
 .reference-work/
 
-# Materialized API-view catalogs and the publisher's reserved transient
-# staging/rollback siblings. See /ramify/.gitignore for the matching rule.
+# Materialized API-view catalogs, the materialized architect view and the
+# publisher's reserved transient staging/rollback siblings of each. See
+# /ramify/.gitignore for the matching rule.
 .ramify/
 .ramify.tmp-*/
 .ramify.old-*/
+.ramify-architect/
+.ramify-architect.tmp-*/
+.ramify-architect.old-*/

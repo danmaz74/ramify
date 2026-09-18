@@ -179,7 +179,9 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
       // both of its literal values remove it from what a later branch sees),
       // so every branch here is an explicit positive check, never a fallthrough.
       if (outcome.status === 'projected') {
-        const published = await options.publisher.publish(root, outcome.revision.revision, outcome.projection, params.requestId, control);
+        // The API view alone: no materialize request names the architect view yet.
+        const published = await options.publisher.publish(root, outcome.revision.revision, { api: outcome.projection, architect: null },
+          params.requestId, control);
         if (published.status === 'cancelled') return { status: 'cancelled', requestId: outcome.requestId };
         if (published.status === 'unavailable') {
           // The publisher's own reason vocabulary ('invalid-path'/'resource-limit') is

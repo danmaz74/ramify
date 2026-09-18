@@ -67,6 +67,24 @@ describe('one captured filesystem view', () => {
     await put(root, 'src/.ramify/_meta.json', '{}');
     expect(await capture.seal()).toEqual({ status: 'coherent', inputs: before });
   });
+  it('excludes the architect view, its transient siblings and their markers from a tracked root listing', async () => {
+    const suffix = '0123456789abcdef0123456789abcdef';
+    await put(root, 'a.ts', 'a');
+    expect(await capture.readDirectory('.')).toEqual([join(root, 'a.ts')]);
+    const before = capture.inputs;
+    await put(root, '.ramify-architect/_meta.json', '{}');
+    await put(root, `.ramify-architect.tmp-${suffix}/_meta.json`, '{}');
+    await put(root, `.ramify-architect.tmp-${suffix}.marker.json`, '{}');
+    await put(root, `.ramify-architect.old-${suffix}/_meta.json`, '{}');
+    await put(root, `.ramify-architect.old-${suffix}.marker.json`, '{}');
+    expect(await capture.seal()).toEqual({ status: 'coherent', inputs: before });
+  });
+  it('still reports a near miss of the architect view in a tracked root listing as a change', async () => {
+    await put(root, 'a.ts', 'a');
+    expect(await capture.readDirectory('.')).toEqual([join(root, 'a.ts')]);
+    await put(root, '.ramify-architects/_meta.json', '{}');
+    expect((await capture.seal()).status).toBe('changed');
+  });
   it('still detects replacement of an unenumerated directory by a file', async () => {
     await put(root, '.reference-work/existing.txt', 'existing');
     expect(await capture.directoryExists('.reference-work')).toBe(true);

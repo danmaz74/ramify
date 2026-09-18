@@ -144,6 +144,26 @@ describe('project observer updates', () => {
     expect(JSON.stringify(observer.inputs)).not.toBe(acquired);
   });
 
+  it('ignores the architect view and its transient siblings at the root and beneath modules, while a near miss stays owned', async () => {
+    const suffix = '0123456789abcdef0123456789abcdef';
+    const observer = await observe();
+    const inputs = JSON.stringify(observer.inputs), inventory = observer.inventory;
+    const generated = ['.ramify-architect/_meta.json', '.ramify-architect/child/behavior.jsonl',
+      `.ramify-architect.tmp-${suffix}/_meta.json`, `.ramify-architect.tmp-${suffix}.marker.json`,
+      `.ramify-architect.old-${suffix}/_meta.json`, `.ramify-architect.old-${suffix}.marker.json`,
+      'src/.ramify-architect/owned.ts', 'subs/child/.ramify-architect/structural.ts', 'subs/child/src/.ramify-architect.tmp-abc/staged.ts'];
+    for (const path of generated) await put(root, path, 'export const generated = 1;\n');
+    const changes = [...generated, '.ramify-architect', `.ramify-architect.tmp-${suffix}`]
+      .flatMap(path => (['created', 'changed'] as const).map(kind => ({ path, kind })));
+    expect(await observer.apply(changes)).toEqual({ kind: 'unchanged' });
+    expect(observer.inventory).toBe(inventory);
+    expect(JSON.stringify(observer.inputs)).toBe(inputs);
+
+    await put(root, 'subs/child/src/.ramify-architects/near.ts', 'export const nearMiss = 1;\n');
+    const near = local(await observer.apply([{ path: 'subs/child/src/.ramify-architects/near.ts', kind: 'created' }]));
+    expect(near.created).toEqual(['subs/child/src/.ramify-architects/near.ts']);
+  });
+
   it('records a created owned test file and its area presence', async () => {
     const observer = await observe();
     expect(observer.inventory.modules[1]!.areas.map(area => area.present)).toEqual([true, false]);

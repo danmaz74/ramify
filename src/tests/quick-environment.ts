@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { assembleResidentService } from '../resident-assembly.js';
+import { assembleResidentService, residentPublishLimits } from '../resident-assembly.js';
 import { contextBudgets, daemonBudgets } from '../resident-budgets.js';
 import { runBatch } from '../batch.js';
 import type { BatchOperation } from '../interfaces/batch.js';
@@ -14,9 +14,6 @@ import type { ApiViewPublisher, DaemonInstance, DaemonService, ServiceConnector,
   DisconnectReason, StopDisposition } from '../../subs/daemon/src/interfaces/daemon.js';
 import { createFilesystemApiViewPublisher } from '../../subs/daemon/src/api-view-publisher.js';
 import { encodeMessage, decodeMessage } from '../../subs/daemon/src/codec.js';
-
-// Frozen (iteration 1): see contracts.md's "Renderer and publisher" section.
-const publishLimits = { maxAreaBytes: 32 * 1024 ** 2, maxInvocationBytes: 256 * 1024 ** 2, maxStagedBytes: 256 * 1024 ** 2 };
 
 export interface QuickEnvironment {
   readonly service: DaemonService;
@@ -36,7 +33,7 @@ export async function createQuickEnvironment(options: Partial<ContextBudgets> = 
   const instance = fixture.instance ?? { instanceId: randomUUID(), pid: process.pid, version: '0.0.0',
     engine: 'ramify.ts@0.0.0+typescript@7.0.2', buildKey: '0000000000000000' };
   const startedAt = clock.now();
-  const publisher = fixture.publisher ?? createFilesystemApiViewPublisher(publishLimits);
+  const publisher = fixture.publisher ?? createFilesystemApiViewPublisher(residentPublishLimits);
   const assembly = { watcher, clock, budgets: { ...contextBudgets, ...options }, instance, log() {}, publisher,
     ...(fixture.dependencyDiagrams ? { dependencyDiagrams: fixture.dependencyDiagrams } : {}) };
   const service = fixture.driver ? createDaemonService({ ...assembly, driver: fixture.driver }) : assembleResidentService(assembly);
