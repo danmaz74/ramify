@@ -15,26 +15,29 @@ import type { SessionInputs } from '../interfaces/session.js';
  * - `fixture/core` exposes `run` to parent and descendants and `settings` to
  *   descendants, relays `Engine`, `launch` and `loose` from `engine` to parent,
  *   has an internal `helper` and `Mode`, forwards `Engine` from `index.ts`,
- *   lists `src/docs/` files, and has `src/tests/` with a test file and an
- *   exported testing helper.
+ *   lists `src/docs/` files, and has `src/tests/` with a test file that calls
+ *   its own `run` and `helper`, and an exported testing helper.
  * - `fixture/core/engine` has no README. It exposes `Engine`, `EngineOptions`,
  *   `loose` and `start` (as `launch`) to parent. `start` is also exported as
- *   `begin`; `boot` is its `default`. Its `src/tests/` holds a JavaScript test
- *   the compiler options leave out.
+ *   `begin`; `boot` is its `default`. Its `src/tests/` holds a test that only
+ *   imports types and a JavaScript test the compiler options leave out.
  * - `fixture/alpha` constructs `Engine` from `engine` and names its type
  *   through `core`'s forwarding file: mixed use through two imported
- *   modules. Its ordinary `src/` holds a test-named file, a `.feature` file and
- *   a stylesheet resource, none of them test sources.
+ *   modules. Its ordinary `src/` holds a test-named file that calls `build`,
+ *   a `.feature` file and a stylesheet resource, none of them test sources.
  * - `fixture/beta` (tagged `ui`) names `Engine` as a type only and calls `run`.
  * - `fixture/gamma` reads `loose`, whose `any` type leaves the use unknown.
  * - `fixture/checks` is a testing module whose ordinary `src/` imports
- *   production originals and holds a test file and a `.feature` file.
+ *   production originals and holds a test file and a `.feature` file. The
+ *   test file constructs `Engine` and names its type, calls `run` and reads
+ *   `loose`.
  */
 export const architectPaths = {
   config: 'src/interfaces/config.ts', main: 'src/main.ts',
   core: 'subs/core/src/core.ts', coreIndex: 'subs/core/src/index.ts', coreTest: 'subs/core/src/tests/core.test.ts',
   coreSupport: 'subs/core/src/tests/support.ts', guide: 'subs/core/src/docs/guide.md', usage: 'subs/core/src/docs/notes/usage.md',
   engine: 'subs/core/subs/engine/src/engine.ts', legacy: 'subs/core/subs/engine/src/tests/legacy.test.js',
+  engineTest: 'subs/core/subs/engine/src/tests/options.test.ts',
   alpha: 'subs/alpha/src/alpha.ts', alphaTest: 'subs/alpha/src/alpha.test.ts', alphaFeature: 'subs/alpha/src/notes.feature',
   style: 'subs/alpha/src/style.css', styleTypes: 'subs/alpha/src/style.d.ts', view: 'subs/alpha/src/view.ts',
   beta: 'subs/beta/src/beta.ts', gamma: 'subs/gamma/src/gamma.ts',
@@ -67,7 +70,8 @@ export const architectFixture: Readonly<Record<string, string>> = {
   [paths.coreIndex]: "export { Engine } from '../subs/engine/src/engine.js';\n",
   [paths.guide]: '# Guide\n\nHow core runs the engine.\n',
   [paths.usage]: '# Usage\n\nCall run.\n',
-  [paths.coreTest]: "describe('run', () => {\n  it('starts the engine', () => {});\n  it('returns the engine', () => {});\n});\n",
+  [paths.coreTest]: "import { helper, run } from '../core.js';\n\n"
+    + "describe('run', () => {\n  it('starts the engine', () => {\n    run();\n  });\n  it('returns the engine', () => {\n    helper();\n  });\n});\n",
   [paths.coreSupport]: 'export const sample = 1;\n',
 
   'subs/core/subs/engine/module.ramify': 'ramify 1\nmodule engine\n'
@@ -81,13 +85,16 @@ export const architectFixture: Readonly<Record<string, string>> = {
     + 'export const loose: any = 1;\n'
     + 'export default function boot(): void {}\n',
   [paths.legacy]: "describe('legacy', () => {\n  it('is outside the program', () => {});\n});\n",
+  [paths.engineTest]: "import type { Engine, EngineOptions } from '../engine.js';\n\n"
+    + "describe('options', () => {\n  it('names the engine and its options as types', () => {\n"
+    + "    const engine: Engine | null = null;\n    const options: EngineOptions = { size: 1 };\n    void engine;\n    void options;\n  });\n});\n",
 
   'subs/alpha/module.ramify': 'ramify 1\nmodule alpha\n',
   'subs/alpha/README.md': '# Alpha\n\nAlpha builds engines.\n',
   [paths.alpha]: "import { Engine } from '../../core/subs/engine/src/engine.js';\n"
     + "import type { Engine as Forwarded } from '../../core/src/index.js';\n\n"
     + 'export function build(): Forwarded {\n  return new Engine();\n}\n',
-  [paths.alphaTest]: "describe('ignored', () => {\n  it('is ordinary source', () => {});\n});\n",
+  [paths.alphaTest]: "import { build } from './alpha.js';\n\ndescribe('ignored', () => {\n  it('is ordinary source', () => {\n    build();\n  });\n});\n",
   [paths.alphaFeature]: 'Feature: Ignored\n  Scenario: Not a test source\n',
   [paths.style]: '.view {}\n',
   [paths.styleTypes]: 'declare module "*.css" { const styles: Record<string, string>; export default styles; }\n',
@@ -104,9 +111,10 @@ export const architectFixture: Readonly<Record<string, string>> = {
 
   'subs/checks/module.ramify': 'ramify 1\nmodule checks tagged [testing]\n',
   'subs/checks/README.md': '# Checks\n\nChecks exercise the engine.\n',
-  [paths.checks]: "import { Engine } from '../../core/subs/engine/src/engine.js';\nimport { run } from '../../core/src/core.js';\n\n"
-    + "describe('engine', () => {\n  it('constructs', () => {\n    void new Engine();\n  });\n  it('runs', () => {\n    run();\n  });\n});\n"
-    + "test('outside any suite', () => {});\n",
+  [paths.checks]: "import { Engine, loose } from '../../core/subs/engine/src/engine.js';\nimport { run } from '../../core/src/core.js';\n\n"
+    + "describe('engine', () => {\n  it('constructs', () => {\n    const engine: Engine = new Engine();\n    void engine;\n  });\n"
+    + "  it('runs', () => {\n    run();\n  });\n});\n"
+    + "test('outside any suite', () => {\n  void (loose + 1);\n});\n",
   [paths.checksSupport]: "import { Engine } from '../../core/subs/engine/src/engine.js';\n\nexport function makeEngine(): Engine {\n  return new Engine();\n}\n",
   [paths.feature]: 'Feature: Review\n\n  Scenario: A reviewer starts the engine\n    Given an engine\n\n'
     + '  Scenario Outline: A reviewer runs <count> times\n    Examples:\n      | count |\n      | 1     |\n',

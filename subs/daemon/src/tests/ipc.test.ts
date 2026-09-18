@@ -174,7 +174,8 @@ import type { RunControl } from '../../../analysis/src/interfaces/analysis.js';
       const encoded = Buffer.byteLength(JSON.stringify(diagram));
       expect(encoded).toBeGreaterThan(12 * 1024 ** 2);
       expect(encoded).toBeLessThan(fixture.budgets.maxResponseBytes);
-      next = async () => ({ status: 'ready', diagram, behaviorRuns: 1, timings: { acquireMs: 1, classifyMs: 1, projectMs: 1, totalMs: 3 } });
+      next = async () => ({ status: 'ready', diagram, testReferences: null, behaviorRuns: 1,
+        timings: { acquireMs: 1, classifyMs: 1, projectMs: 1, totalMs: 3 } });
       const ready = await client.dependencyDiagram(request('ready'));
       expect(ready.ok && ready.value.status === 'ready' && ready.value.diagram.modules.length).toBe(modules.length);
       expect(ready).toMatchObject({ ok: true, value: { status: 'ready', requestId: 'ready', revision } });

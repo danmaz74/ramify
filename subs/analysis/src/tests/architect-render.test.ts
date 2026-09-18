@@ -10,7 +10,7 @@ import { planArchitectView, projectArchitectView } from '../architect-view.js';
 import { analyzeDependencyDiagram } from '../dependency-analyzer.js';
 import type { ArchitectDependencies, ArchitectModuleFacts, ArchitectSymbol, ArchitectTestRecord, ArchitectViewProjection,
   RenderedArchitectView } from '../interfaces/architect-view.js';
-import type { DependencyBoundaryFact, DependencyDiagramFacts } from '../interfaces/dependency-diagram.js';
+import type { DependencyBoundaryFact, DependencyDiagramFacts, TestReferenceFacts } from '../interfaces/dependency-diagram.js';
 import { architectLimits, architectProject } from './architect-fixture.js';
 import { opened, timeout } from './session-test-fixture.js';
 
@@ -20,13 +20,14 @@ const inputId = 'input/1:architect';
 const revision = 'rev/1:architect';
 
 /**
- * The `architect` fixture's real projection and real dependency facts: the
- * projection from an in-process session's compiler, the facts from the lean
- * dependency analyzer over the same revision's report. Both carry the fixed
- * `inputId`, because the fixture's own input identity depends on its temporary
- * root.
+ * The `architect` fixture's real projection, dependency facts and test
+ * references: the projection from an in-process session's compiler, the facts
+ * and references from one run of the lean dependency analyzer over the same
+ * revision's report. All carry the fixed `inputId`, because the fixture's own
+ * input identity depends on its temporary root.
  */
-const real = { projection: null as unknown as ArchitectViewProjection, facts: null as unknown as DependencyDiagramFacts, root: '' };
+const real = { projection: null as unknown as ArchitectViewProjection, facts: null as unknown as DependencyDiagramFacts,
+  references: null as unknown as TestReferenceFacts, root: '' };
 beforeAll(() => architectProject(async (root, inputs) => {
   const { handle, revision: opening, state } = await opened(inputs);
   try {
@@ -47,13 +48,17 @@ beforeAll(() => architectProject(async (root, inputs) => {
       limits: { source: inputs.limits.source, maxResultBytes: 16 * 1024 ** 2, deadlineMs: 120_000 } });
     if (analyzed.status !== 'ready') throw new Error(JSON.stringify(analyzed));
     expect(analyzed.diagram.inputId).toBe(opening.inputId);
+    expect(analyzed.testReferences?.inputId).toBe(opening.inputId);
     real.projection = projected.projection;
     real.facts = { ...analyzed.diagram, inputId };
+    real.references = { ...analyzed.testReferences!, inputId };
     real.root = root;
   } finally { await handle.dispose(); }
 }), timeout);
 
-const measured = (): ArchitectDependencies => ({ state: 'measured', facts: real.facts });
+const measured = (): ArchitectDependencies => ({ state: 'measured', facts: real.facts, testReferences: real.references });
+/** Measured dependency facts whose test references alone were refused. */
+const unreferenced = (): ArchitectDependencies => ({ state: 'measured', facts: real.facts, testReferences: null });
 const unavailable: ArchitectDependencies = { state: 'unavailable', reason: 'wait-limit' };
 const render = (dependencies: ArchitectDependencies, projection = real.projection): RenderedArchitectView =>
   renderArchitectView({ revision, projection, dependencies });
@@ -106,6 +111,8 @@ describe('renderArchitectView: the architect fixture (golden)', () => {
   });
 
   it('renders the exact golden files with measured dependencies', () => golden('architect-view-measured.txt', serialized(render(measured()))));
+  it('renders the exact golden files with measured dependencies and no test references',
+    () => golden('architect-view-measured-unreferenced.txt', serialized(render(unreferenced()))));
   it('renders the exact golden files with unavailable dependencies', () => golden('architect-view-unavailable.txt', serialized(render(unavailable))));
 });
 
@@ -168,7 +175,7 @@ describe('renderArchitectView: records (AV13)', () => {
       ...consumers.slice(0, 13).map(consumer => boundary(`${consumer}x`, many.original, 'unknown')),
     ]);
     const view = renderArchitectView({ revision, projection: projection([many, data], [...consumers, ...consumers.slice(0, 13).map(c => `${c}x`)]),
-      dependencies: { state: 'measured', facts } });
+      dependencies: { state: 'measured', facts, testReferences: null } });
     const [record] = lines(view, 'lib/behavior.jsonl');
     expect(record).toMatchObject({ as: ['a', 'b', 'c', 'd'], asMore: 2, behavioral: consumers.slice(0, 12), behavioralMore: 3,
       nonBehavioral: [], unclassified: consumers.slice(0, 12).map(c => `${c}x`), unclassifiedMore: 1 });
@@ -179,7 +186,7 @@ describe('renderArchitectView: records (AV13)', () => {
     expect(supporting).not.toHaveProperty('unclassified');
     // Twelve fit without a count.
     const twelve = renderArchitectView({ revision, projection: projection([many], consumers), dependencies: { state: 'measured',
-      facts: diagram(consumers.slice(0, 12).map(consumer => boundary(consumer, many.original, 'behavioral'))) } });
+      facts: diagram(consumers.slice(0, 12).map(consumer => boundary(consumer, many.original, 'behavioral'))), testReferences: null } });
     expect(Object.keys(lines(twelve, 'lib/behavior.jsonl')[0]!)).not.toContain('behavioralMore');
   });
 
@@ -264,7 +271,7 @@ describe('renderArchitectView: dependencies (AV14)', () => {
       boundary('app/a', data.original, 'non-behavioral', 'app/lib'), boundary('app/a', data.original, 'unknown', 'app/relay'),
     ]);
     const view = renderArchitectView({ revision, projection: projection([one, data], ['app/a', 'app/b', 'app/c', 'app/relay']),
-      dependencies: { state: 'measured', facts } });
+      dependencies: { state: 'measured', facts, testReferences: null } });
     expect(lines(view, 'lib/behavior.jsonl')[0]).toMatchObject({ behavioral: ['app/a'], nonBehavioral: ['app/c'], unclassified: ['app/b'] });
     expect(lines(view, 'lib/supporting.jsonl')[0]).toMatchObject({ nonBehavioral: [], unclassified: ['app/a'] });
     // Units count once per module pair, whichever module they were imported through.
@@ -275,7 +282,8 @@ describe('renderArchitectView: dependencies (AV14)', () => {
   it('gives a supporting original a behavioral list only when a consumer uses it behaviorally', () => {
     const data = symbol('app/lib', 'data', { kind: 'value', behavior: null });
     const view = renderArchitectView({ revision, projection: projection([data], ['app/a', 'app/b']),
-      dependencies: { state: 'measured', facts: diagram([boundary('app/a', data.original, 'behavioral'), boundary('app/b', data.original, 'non-behavioral')]) } });
+      dependencies: { state: 'measured', facts: diagram([boundary('app/a', data.original, 'behavioral'), boundary('app/b', data.original, 'non-behavioral')]),
+        testReferences: null } });
     expect(lines(view, 'lib/supporting.jsonl')).toEqual([{ module: 'app/lib', name: 'data', role: 'internal', kind: 'value', value: true,
       behavioral: ['app/a'], nonBehavioral: ['app/b'], sig: 'function data(): void;', file: 'subs/lib/src/data.ts' }]);
   });
@@ -327,7 +335,7 @@ describe('renderArchitectView: ordering (AV15)', () => {
       boundary('app/a', symbols[5]!.original, 'non-behavioral'), boundary('app/c', symbols[5]!.original, 'behavioral'),
     ]);
     const shuffled = [...symbols].reverse();
-    const view = renderArchitectView({ revision, projection: projection(shuffled, ['app/a', 'app/b', 'app/c']), dependencies: { state: 'measured', facts } });
+    const view = renderArchitectView({ revision, projection: projection(shuffled, ['app/a', 'app/b', 'app/c']), dependencies: { state: 'measured', facts, testReferences: null } });
     expect(names(view, 'lib/behavior.jsonl')).toEqual(['exposed:gamma', 'exposed:beta', 'exposed:alpha', 'internal:epsilon', 'internal:delta']);
     expect(names(view, 'lib/supporting.jsonl')).toEqual(['exposed:eta', 'exposed:Zeta', 'internal:theta']);
     const plain = renderArchitectView({ revision, projection: projection(shuffled, ['app/a', 'app/b', 'app/c']), dependencies: unavailable });
@@ -349,7 +357,7 @@ describe('renderArchitectView: ordering (AV15)', () => {
       boundary('app/d', one.original, 'non-behavioral'),
     ]);
     const view = renderArchitectView({ revision, projection: projection([one, two, three], ['app/a', 'app/b', 'app/c', 'app/d', 'app/z']),
-      dependencies: { state: 'measured', facts } });
+      dependencies: { state: 'measured', facts, testReferences: null } });
     expect(text(view, 'lib/module.json')).toContain('  "usedBy": [\n'
       + '    { "module": "app/z", "behavioral": 1, "nonBehavioral": 0 },\n'
       + '    { "module": "app/b", "behavioral": 0, "nonBehavioral": 2 },\n'
@@ -368,6 +376,132 @@ describe('renderArchitectView: ordering (AV15)', () => {
       'subs/lib/src/tests/a.test.ts:z', 'subs/lib/src/tests/a.test.ts:a', 'subs/lib/src/tests/b.test.ts:second', 'subs/lib/src/tests/b.test.ts:first']);
     // The fixture's records follow the projection: checks' `[]` suite, then `engine`, then the feature.
     expect(lines(render(measured()), 'checks/tests.jsonl').map(record => record.suite ?? record.feature)).toEqual([[], ['engine'], 'Review']);
+  });
+});
+
+describe('renderArchitectView: test references (AV39)', () => {
+  const suites = (view: RenderedArchitectView) => view.files.filter(file => file.path.endsWith('tests.jsonl'))
+    .flatMap(file => file.text.split('\n').filter(Boolean).map(line => JSON.parse(line) as Record<string, unknown>));
+
+  it('gives every suite record of a file the same exercises, as <owner>#<name> of the originals\' own records', () => {
+    const view = render(measured());
+    expect(real.references.files.map(entry => [entry.file, entry.exercises.map(original => `${original.owner}#${original.binding}`), entry.unclassified]))
+      .toEqual([
+        ['subs/checks/src/engine.test.ts', ['fixture/core#run', 'fixture/core/engine#Engine'], 1],
+        ['subs/checks/src/support.ts', ['fixture/core/engine#Engine'], 0],
+        ['subs/core/src/tests/core.test.ts', ['fixture/core#helper', 'fixture/core#run'], 0],
+      ]);
+    expect(text(view, 'checks/tests.jsonl')).toBe(
+      '{"module":"fixture/checks","file":"subs/checks/src/engine.test.ts","suite":[],"tests":["outside any suite"],'
+      + '"exercises":["fixture/core#run","fixture/core/engine#Engine"]}\n'
+      + '{"module":"fixture/checks","file":"subs/checks/src/engine.test.ts","suite":["engine"],"tests":["constructs","runs"],'
+      + '"exercises":["fixture/core#run","fixture/core/engine#Engine"]}\n'
+      + '{"module":"fixture/checks","file":"subs/checks/src/features/review.feature","feature":"Review",'
+      + '"scenarios":["A reviewer starts the engine","A reviewer runs <count> times"]}\n');
+    // Same-owner originals, internal ones included; a file that only names types has `[]`.
+    expect(lines(view, 'core/tests.jsonl').map(record => record.exercises)).toEqual([['fixture/core#helper', 'fixture/core#run']]);
+    expect(lines(view, 'core/engine/tests.jsonl')).toEqual([{ module: 'fixture/core/engine', file: 'subs/core/subs/engine/src/tests/options.test.ts',
+      suite: ['options'], tests: ['names the engine and its options as types'], exercises: [] }]);
+    for (const record of suites(view)) {
+      expect(Object.keys(record)).toEqual(record.feature !== undefined || record.scenarios !== undefined
+        ? ['module', 'file', ...record.feature !== undefined ? ['feature'] : [], 'scenarios'] : ['module', 'file', 'suite', 'tests', 'exercises']);
+      // One search for the name finds the symbol's own record in its owner's directory.
+      for (const label of (record.exercises as string[] | undefined) ?? []) {
+        const [owner, name] = label.split('#') as [string, string];
+        const directory = owner === 'fixture' ? '' : `${owner.slice('fixture/'.length)}/`;
+        expect([...lines(view, `${directory}behavior.jsonl`), ...lines(view, `${directory}supporting.jsonl`)]
+          .filter(entry => entry.name === name && entry.module === owner)).toHaveLength(1);
+      }
+    }
+  });
+
+  it('bounds exercises at twelve in byte order, names each original by its record and leaves out originals without one', () => {
+    const many = Array.from({ length: 13 }, (_, index) => symbol('app/lib', `f${String(index).padStart(2, '0')}`));
+    // `begin` is the record's name for the binding `start`; `default` stays `default`; two defaults give one label.
+    const begin = symbol('app/lib', 'begin', { original: original('app/lib', 'start') });
+    const defaults = ['a', 'b'].map(file => symbol('app/lib', 'default', { original: { ...original('app/lib', file), binding: 'default' },
+      binding: null, file: `subs/lib/src/${file}.ts` }));
+    const other = symbol('app/a', 'zeta');
+    const missing = original('app/lib', 'gone');
+    const records: ArchitectTestRecord[] = [
+      { kind: 'suite', module: 'app/lib', file: 'subs/lib/src/tests/a.test.ts', suite: ['a'], tests: ['one'] },
+      { kind: 'suite', module: 'app/lib', file: 'subs/lib/src/tests/a.test.ts', suite: ['a', 'inner'], tests: ['two'] },
+      { kind: 'suite', module: 'app/lib', file: 'subs/lib/src/tests/b.test.ts', suite: [], tests: ['three'] },
+      { kind: 'feature', module: 'app/lib', file: 'subs/lib/src/tests/c.feature', feature: 'C', scenarios: ['four'] },
+    ];
+    const references: TestReferenceFacts = { inputId, files: [
+      { file: 'subs/lib/src/tests/a.test.ts', unclassified: 0,
+        exercises: [...[...many].reverse(), begin, ...defaults, other, missing].map(entry => 'original' in entry ? entry.original : entry) },
+      { file: 'subs/lib/src/tests/c.feature', exercises: [many[0]!.original], unclassified: 0 },
+    ] };
+    const view = renderArchitectView({ revision, projection: projection([...many, begin, ...defaults, other], ['app/a'], records),
+      dependencies: { state: 'measured', facts: diagram([]), testReferences: references } });
+    const [first, second, third, feature] = lines(view, 'lib/tests.jsonl');
+    const labels = byteOrdered(['app/a#zeta', 'app/lib#begin', 'app/lib#default', ...many.map(entry => `app/lib#${entry.name}`)]);
+    expect(labels).toHaveLength(16);
+    expect(first).toEqual({ module: 'app/lib', file: 'subs/lib/src/tests/a.test.ts', suite: ['a'], tests: ['one'],
+      exercises: labels.slice(0, 12), exercisesMore: 4 });
+    expect(second).toMatchObject({ suite: ['a', 'inner'], exercises: labels.slice(0, 12), exercisesMore: 4 });
+    expect(Object.keys(second!)).toEqual(['module', 'file', 'suite', 'tests', 'exercises', 'exercisesMore']);
+    expect(third).toMatchObject({ file: 'subs/lib/src/tests/b.test.ts', exercises: [] });
+    expect(third).not.toHaveProperty('exercisesMore');
+    expect(feature).toEqual({ module: 'app/lib', file: 'subs/lib/src/tests/c.feature', feature: 'C', scenarios: ['four'] });
+    // Twelve fit without a count.
+    const twelve = renderArchitectView({ revision, projection: projection(many, [], records.slice(0, 1)), dependencies: { state: 'measured',
+      facts: diagram([]), testReferences: { inputId, files: [{ file: records[0]!.file, exercises: many.slice(0, 12).map(entry => entry.original), unclassified: 0 }] } } });
+    expect(lines(twelve, 'lib/tests.jsonl')).toEqual([{ module: 'app/lib', file: 'subs/lib/src/tests/a.test.ts', suite: ['a'], tests: ['one'],
+      exercises: many.slice(0, 12).map(entry => `app/lib#${entry.name}`) }]);
+  });
+
+  it('writes no exercises without test references or without dependencies, and records the state after dependencyScope', () => {
+    for (const dependencies of [unreferenced(), unavailable]) {
+      const view = render(dependencies);
+      for (const record of suites(view)) {
+        expect(record).not.toHaveProperty('exercises');
+        expect(record).not.toHaveProperty('exercisesMore');
+      }
+      const meta = JSON.parse(text(view, '_meta.json')) as Record<string, unknown>;
+      expect(meta.testReferences).toBe('unavailable');
+      expect(meta).not.toHaveProperty('unclassifiedExercises');
+      const keys = Object.keys(meta);
+      expect(keys.indexOf('testReferences')).toBe(keys.indexOf('dependencyScope') + 1);
+    }
+    const meta = JSON.parse(text(render(measured()), '_meta.json')) as Record<string, unknown>;
+    expect(Object.keys(meta).slice(5, 8)).toEqual(['dependencyScope', 'testReferences', 'metrics']);
+    expect(meta).toMatchObject({ testReferences: 'measured', unclassifiedExercises: 1 });
+  });
+
+  it('sums unclassifiedExercises over files with a suite record, before coverage, and omits a zero sum', () => {
+    const records: ArchitectTestRecord[] = [
+      { kind: 'suite', module: 'app/lib', file: 'subs/lib/src/tests/a.test.ts', suite: ['a'], tests: ['one'] },
+      { kind: 'suite', module: 'app/lib', file: 'subs/lib/src/tests/a.test.ts', suite: ['b'], tests: ['two'] },
+      { kind: 'suite', module: 'app/lib', file: 'subs/lib/src/tests/b.test.ts', suite: [], tests: ['three'] },
+    ];
+    const counts = { coverage: 1, detailsUnavailable: 0, unknownShapes: 0, dynamicTitles: 0, testsUnavailable: 2, cut: 0 };
+    const rendered = (files: TestReferenceFacts['files']) => text(renderArchitectView({ revision,
+      projection: { ...projection([], [], records), counts }, dependencies: { state: 'measured', facts: diagram([]), testReferences: { inputId, files } } }),
+    '_meta.json');
+    // a.test.ts counts once whatever its record count; support.ts has no suite record.
+    expect(rendered([{ file: 'subs/lib/src/tests/a.test.ts', exercises: [], unclassified: 2 },
+      { file: 'subs/lib/src/tests/b.test.ts', exercises: [], unclassified: 3 },
+      { file: 'subs/lib/src/tests/support.ts', exercises: [], unclassified: 5 }]))
+      .toContain('"testsUnavailable":2,"unclassifiedExercises":5,"coverage":1}\n');
+    expect(rendered([{ file: 'subs/lib/src/tests/support.ts', exercises: [], unclassified: 5 }])).toContain('"testsUnavailable":2,"coverage":1}\n');
+  });
+
+  it('leaves consumer lists, uses and usedBy unchanged: only tests.jsonl and _meta.json differ', () => {
+    const referenced = render(measured()), plain = render(unreferenced());
+    expect(referenced.files.map(file => file.path)).toEqual(plain.files.map(file => file.path));
+    expect(referenced.records).toBe(plain.records);
+    for (const [index, file] of referenced.files.entries()) {
+      if (file.path.endsWith('tests.jsonl')) {
+        const stripped = file.text.split('\n').map(line => line && JSON.stringify((({ exercises: _e, exercisesMore: _m, ...rest }) => rest)(
+          JSON.parse(line) as Record<string, unknown>))).join('\n');
+        expect(stripped).toBe(plain.files[index]!.text);
+      } else if (file.path !== '_meta.json') {
+        expect(file.text).toBe(plain.files[index]!.text);
+      }
+    }
   });
 });
 
@@ -392,7 +526,7 @@ describe('renderArchitectView: README.md (AV16)', () => {
       '    exposed 1 · internal 1 · supporting 3 · tests 2 · uses 1 · used by 2',
       '    headline: run',
       '    - **fixture/core/engine** — (no README purpose)',
-      '      exposed 3 · internal 1 · supporting 1 · tests 0 · uses 1 · used by 4',
+      '      exposed 3 · internal 1 · supporting 1 · tests 1 · uses 1 · used by 4',
       '      headline: Engine, begin, loose',
       '  - **fixture/gamma** — Gamma reads a loose value.',
       '    exposed 0 · internal 0 · supporting 1 · tests 0 · uses 1 · used by 0',
@@ -427,7 +561,7 @@ describe('renderArchitectView: README.md (AV16)', () => {
     const symbols = [...exposedNames.map(name => symbol('app/lib', name, { role: 'exposed', destinations: ['parent'] })),
       symbol('app/lib', 'internal'), symbol('app/lib', 'Shape', { role: 'exposed', destinations: ['parent'], kind: 'interface', behavior: null, hasValue: false })];
     const facts = diagram([boundary('app/a', symbols[9]!.original, 'behavioral')]);
-    const view = renderArchitectView({ revision, projection: projection(symbols, ['app/a']), dependencies: { state: 'measured', facts } });
+    const view = renderArchitectView({ revision, projection: projection(symbols, ['app/a']), dependencies: { state: 'measured', facts, testReferences: null } });
     expect(text(view, 'README.md')).toContain('\n    headline: i, a, b, c, d, e, f, g, … +2\n');
     const eight = renderArchitectView({ revision, projection: projection(symbols.slice(2)), dependencies: unavailable });
     expect(text(eight, 'README.md')).toContain('\n    headline: a, b, c, d, e, f, i, j\n');
@@ -437,16 +571,19 @@ describe('renderArchitectView: README.md (AV16)', () => {
 describe('renderArchitectView: metadata (AV17)', () => {
   it('writes the fixed fields and only the nonzero exceptional counts, and repeats the revision in every module.json', () => {
     expect(text(render(measured()), '_meta.json')).toBe('{"schema":"ramify.architect-view/1","revision":"rev/1:architect","input":"input/1:architect",'
-      + '"modules":7,"dependencies":"measured","dependencyScope":"production","metrics":"unavailable",'
+      + '"modules":7,"dependencies":"measured","dependencyScope":"production","testReferences":"measured","metrics":"unavailable",'
+      + '"unknownShapes":1,"detailsUnavailable":1,"testsUnavailable":1,"unclassifiedExercises":1,"coverage":1}\n');
+    expect(text(render(unreferenced()), '_meta.json')).toBe('{"schema":"ramify.architect-view/1","revision":"rev/1:architect","input":"input/1:architect",'
+      + '"modules":7,"dependencies":"measured","dependencyScope":"production","testReferences":"unavailable","metrics":"unavailable",'
       + '"unknownShapes":1,"detailsUnavailable":1,"testsUnavailable":1,"coverage":1}\n');
     expect(text(render(unavailable), '_meta.json')).toBe('{"schema":"ramify.architect-view/1","revision":"rev/1:architect","input":"input/1:architect",'
-      + '"modules":7,"dependencies":"unavailable","dependencyReason":"wait-limit","dependencyScope":"production","metrics":"unavailable",'
-      + '"unknownShapes":1,"detailsUnavailable":1,"testsUnavailable":1,"coverage":1}\n');
+      + '"modules":7,"dependencies":"unavailable","dependencyReason":"wait-limit","dependencyScope":"production","testReferences":"unavailable",'
+      + '"metrics":"unavailable","unknownShapes":1,"detailsUnavailable":1,"testsUnavailable":1,"coverage":1}\n');
     const counts = { coverage: 2, detailsUnavailable: 3, unknownShapes: 4, dynamicTitles: 5, testsUnavailable: 6, cut: 7 };
     expect(JSON.parse(text(render(unavailable, { ...real.projection, counts }), '_meta.json'))).toMatchObject(counts);
     const none = { coverage: 0, detailsUnavailable: 0, unknownShapes: 0, dynamicTitles: 0, testsUnavailable: 0, cut: 0 };
-    expect(Object.keys(JSON.parse(text(render(measured(), { ...real.projection, counts: none }), '_meta.json'))))
-      .toEqual(['schema', 'revision', 'input', 'modules', 'dependencies', 'dependencyScope', 'metrics']);
+    expect(Object.keys(JSON.parse(text(render(unreferenced(), { ...real.projection, counts: none }), '_meta.json'))))
+      .toEqual(['schema', 'revision', 'input', 'modules', 'dependencies', 'dependencyScope', 'testReferences', 'metrics']);
     for (const directory of modules) {
       const document = JSON.parse(text(render(measured()), `${directory}module.json`)) as Record<string, unknown>;
       expect(document.revision).toBe(revision);
@@ -459,7 +596,7 @@ describe('renderArchitectView: metadata (AV17)', () => {
     expect(JSON.parse(text(render(unavailable), 'core/module.json'))).toEqual({ schema: 'ramify.architect-module/1', module: 'fixture/core',
       dir: 'subs/core', parent: 'fixture', children: ['fixture/core/engine'], tags: [], areas: ['src', 'src/tests'],
       purpose: { state: 'present', path: 'subs/core/README.md', text: 'Core runs the engine for the rest of the project.' },
-      docs: ['subs/core/src/docs/guide.md', 'subs/core/src/docs/notes/usage.md'], files: { own: 4, subtree: 6 },
+      docs: ['subs/core/src/docs/guide.md', 'subs/core/src/docs/notes/usage.md'], files: { own: 4, subtree: 7 },
       symbols: { exposed: 1, internal: 1, supporting: 3, unknown: 0 }, tests: { suites: 1, titles: 2 }, metrics: { state: 'unavailable' }, revision });
     expect(JSON.parse(text(render(unavailable), 'core/engine/module.json'))).toMatchObject({ parent: 'fixture/core', purpose: { state: 'missing' },
       symbols: { exposed: 3, internal: 1, supporting: 1, unknown: 1 } });
@@ -469,7 +606,7 @@ describe('renderArchitectView: metadata (AV17)', () => {
 
 describe('renderArchitectView: determinism (AV18)', () => {
   it('renders the same bytes for the same input and holds no timestamp, absolute path or process value', () => {
-    for (const dependencies of [measured(), unavailable]) {
+    for (const dependencies of [measured(), unreferenced(), unavailable]) {
       const first = render(dependencies);
       const again = renderArchitectView(structuredClone({ revision, projection: real.projection, dependencies }));
       expect(serialized(again)).toBe(serialized(first));
@@ -482,8 +619,10 @@ describe('renderArchitectView: determinism (AV18)', () => {
   });
 
   it('throws for measured facts of another input', () => {
-    expect(() => render({ state: 'measured', facts: { ...real.facts, inputId: 'input/1:other' } }))
-      .toThrow(/input\/1:other.*input\/1:architect/);
+    expect(() => render({ state: 'measured', facts: { ...real.facts, inputId: 'input/1:other' }, testReferences: real.references }))
+      .toThrow(/Dependency facts for input input\/1:other.*input\/1:architect/);
+    expect(() => render({ state: 'measured', facts: real.facts, testReferences: { ...real.references, inputId: 'input/1:other' } }))
+      .toThrow(/Test references for input input\/1:other.*input\/1:architect/);
   });
 
   it('imports no compiler, filesystem or session module', async () => {

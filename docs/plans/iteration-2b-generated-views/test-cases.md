@@ -149,8 +149,11 @@ update" in `covering.test.ts`. `spanBatches` in the same module, role
 `internal`, paragraph "The earliest receipt and latest flush of two batch
 spans.", is a supporting detail.
 
-When `testReferences` is measured, both title records' `exercises` name
-`ramify/daemon/contexts#createContextManager`.
+When `testReferences` is measured, the `context-manager.test.ts` record's
+`exercises` names `ramify/daemon/contexts#createContextManager`. The
+`covering.test.ts` record names `ramify/daemon/contexts#sessionEnvironment`
+instead: that file creates the manager through the test helper in
+`session-fixture.ts`, and `exercises` lists a file's own references only.
 
 **Pass.** Names `createContextManager` and the module, with the test title
 as evidence. **Fail.** Answers that no such behavior exists. Record whether

@@ -314,9 +314,9 @@ record beneath it; that is the price of a self-contained hit:
   unknown are counted in `_meta.json` as `unclassifiedExercises`, never
   listed. Type and data references are omitted.
 - `exercises` is attributed per file: every record of one file carries the
-  same list. It holds at most twelve entries in byte order, with
+  same list. It holds at most twelve distinct entries in byte order, with
   `exercisesMore` counting the rest, and is `[]` when the file references no
-  original behaviorally. It is absent from Gherkin records, and absent from
+  original behaviorally. An original with no record in the view is left out. It is absent from Gherkin records, and absent from
   every record when `_meta.json` records `"testReferences":"unavailable"`.
   Attribution per suite would need reference locations mapped to suite
   spans and is a later refinement.

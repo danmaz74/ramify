@@ -1,6 +1,6 @@
 import type { Destination, ModuleId, OriginalId, TagName } from '../../subs/model/src/interfaces/model.js';
 import type { ExportBehavior, ExportKind, SymbolDetail, SymbolDetailLimits, TestTitleLimits } from '../../subs/typescript/src/interfaces/source.js';
-import type { DependencyDiagramFacts } from './dependency-diagram.js';
+import type { DependencyDiagramFacts, TestReferenceFacts } from './dependency-diagram.js';
 
 /** One declared module of the architect projection. */
 export interface ArchitectModuleFacts {
@@ -109,9 +109,14 @@ export type ArchitectViewQueryOutcome =
 export type ArchitectDependencyReason = 'analysis-failed' | 'resource-limit'
   | 'resource-unavailable' | 'invalid-current' | 'wait-limit';
 
-/** The dependency facts of the view's revision under the production source filter, or why there are none. */
+/**
+ * The dependency facts of the view's revision under the production source
+ * filter, with the test references of the same analyzer run, or why there are
+ * none. `testReferences` is null when only the references were refused.
+ */
 export type ArchitectDependencies =
-  | { readonly state: 'measured'; readonly facts: DependencyDiagramFacts }
+  | { readonly state: 'measured'; readonly facts: DependencyDiagramFacts;
+      readonly testReferences: TestReferenceFacts | null }
   | { readonly state: 'unavailable'; readonly reason: ArchitectDependencyReason };
 
 /** One rendered file: its path relative to the view root and its complete UTF-8 text. */

@@ -1,7 +1,7 @@
 import type { Destination, ModuleId, OriginalId } from '../subs/model/src/interfaces/model.js';
 import type { ArchitectDependencies, ArchitectModuleFacts, ArchitectSymbol, ArchitectTestRecord, ArchitectViewFile,
   ArchitectViewProjection, RenderedArchitectView } from './interfaces/architect-view.js';
-import type { DependencyBoundaryFact, DependencyDiagramFacts } from './interfaces/dependency-diagram.js';
+import type { DependencyBoundaryFact, DependencyDiagramFacts, TestReferenceFacts } from './interfaces/dependency-diagram.js';
 import { byteOrder } from './modularity-context.js';
 
 /**
@@ -13,7 +13,7 @@ import { byteOrder } from './modularity-context.js';
  * limits, so a record's length does not grow with the project.
  */
 
-const bounds = { purposeBytes: 600, consumers: 12, names: 4, headline: 8 } as const;
+const bounds = { purposeBytes: 600, consumers: 12, names: 4, headline: 8, exercises: 12 } as const;
 
 /** The instruction block the view's `README.md` opens with, from the specification's agent instructions. */
 export const architectInstructions = [
@@ -23,6 +23,7 @@ export const architectInstructions = [
   'Architecture questions are searched here, not in the source:',
   "  rg -n -i '<terms>' .ramify-architect/",
   'Every hit names its module and role: exposed, internal, or a test title.',
+  "A test record's exercises names the symbols its test file calls.",
   'For one module, read <module>/module.json, behavior.jsonl and tests.jsonl.',
   'The map below lists every module with its purpose and headline symbols.',
   '',
@@ -168,9 +169,38 @@ const behaviorOrder = (a: SymbolRecord, b: SymbolRecord): number => roleRank(a.s
 const supportingOrder = (a: SymbolRecord, b: SymbolRecord): number => roleRank(a.symbol) - roleRank(b.symbol)
   || b.nonBehavioral - a.nonBehavioral || byName(a, b);
 
-/** One `tests.jsonl` line; a feature record without a `Feature:` title omits `feature`. */
-function testRecord(record: ArchitectTestRecord): string {
-  if (record.kind === 'suite') return JSON.stringify({ module: record.module, file: record.file, suite: record.suite, tests: record.tests });
+/**
+ * Each test file's `exercises` labels, `<owner>#<name>` with the name of the
+ * original's own record, distinct and in byte order; an original with no
+ * record is left out. `unclassified` is the file's count of unknown pairs.
+ */
+interface Exercises {
+  readonly byFile: ReadonlyMap<string, readonly string[]>;
+  readonly unclassified: ReadonlyMap<string, number>;
+}
+
+function exercisesOf(references: TestReferenceFacts, projection: ArchitectViewProjection): Exercises {
+  const labels = new Map(projection.symbols.map(symbol => [identity(symbol.original), `${symbol.module}#${symbol.name}`]));
+  const byFile = new Map<string, readonly string[]>(), unclassified = new Map<string, number>();
+  for (const entry of references.files) {
+    const found = entry.exercises.map(original => labels.get(identity(original))).filter(label => label !== undefined);
+    byFile.set(entry.file, sorted(new Set(found)));
+    unclassified.set(entry.file, entry.unclassified);
+  }
+  return { byFile, unclassified };
+}
+
+/**
+ * One `tests.jsonl` line; a feature record without a `Feature:` title omits
+ * `feature`. A suite record carries its file's `exercises` when test
+ * references are measured, `[]` for a file without an entry.
+ */
+function testRecord(record: ArchitectTestRecord, exercises: Exercises | null): string {
+  if (record.kind === 'suite') {
+    const line: Record<string, unknown> = { module: record.module, file: record.file, suite: record.suite, tests: record.tests };
+    if (exercises) bounded(line, 'exercises', exercises.byFile.get(record.file) ?? [], bounds.exercises);
+    return JSON.stringify(line);
+  }
   const line: Record<string, unknown> = { module: record.module, file: record.file };
   if (record.feature !== null) line.feature = record.feature;
   line.scenarios = record.scenarios;
@@ -273,26 +303,35 @@ function readme(revision: string, projection: ArchitectViewProjection, summaries
   return `${lines.join('\n')}\n`;
 }
 
-/** `_meta.json`: one line, the fixed fields, then each exceptional count only when nonzero. */
-function metadata(revision: string, projection: ArchitectViewProjection, dependencies: ArchitectDependencies, purposesCut: number): string {
+/**
+ * `_meta.json`: one line, the fixed fields, then each exceptional count only
+ * when nonzero. `unclassifiedExercises` sums the unknown pairs of the files
+ * that have a suite record.
+ */
+function metadata(revision: string, projection: ArchitectViewProjection, dependencies: ArchitectDependencies,
+  exercises: Exercises | null, purposesCut: number): string {
   const meta: Record<string, unknown> = { schema: 'ramify.architect-view/1', revision, input: projection.inputId,
     modules: projection.modules.length, dependencies: dependencies.state };
   if (dependencies.state === 'unavailable') meta.dependencyReason = dependencies.reason;
   meta.dependencyScope = 'production';
+  meta.testReferences = exercises ? 'measured' : 'unavailable';
   meta.metrics = 'unavailable';
   const { counts } = projection;
+  const suiteFiles = new Set(projection.tests.filter(record => record.kind === 'suite').map(record => record.file));
+  const unclassifiedExercises = [...exercises?.unclassified ?? []]
+    .reduce((total, [file, count]) => total + (suiteFiles.has(file) ? count : 0), 0);
   const exceptional: readonly (readonly [string, number])[] = [['unknownShapes', counts.unknownShapes],
     ['cut', counts.cut + purposesCut], ['detailsUnavailable', counts.detailsUnavailable], ['dynamicTitles', counts.dynamicTitles],
-    ['testsUnavailable', counts.testsUnavailable], ['coverage', counts.coverage]];
+    ['testsUnavailable', counts.testsUnavailable], ['unclassifiedExercises', unclassifiedExercises], ['coverage', counts.coverage]];
   for (const [key, value] of exceptional) if (value !== 0) meta[key] = value;
   return `${JSON.stringify(meta)}\n`;
 }
 
 /**
  * The complete architect view of `projection` at `revision`. Measured
- * dependency facts must be those of the projection's input; facts naming
- * another `inputId`, or a record naming a module the projection does not
- * list, throw.
+ * dependency facts and test references must be those of the projection's
+ * input; facts or references naming another `inputId`, or a record naming a
+ * module the projection does not list, throw.
  */
 export function renderArchitectView(input: {
   readonly revision: string;
@@ -303,7 +342,12 @@ export function renderArchitectView(input: {
   if (dependencies.state === 'measured' && dependencies.facts.inputId !== projection.inputId) {
     throw new Error(`Dependency facts for input ${dependencies.facts.inputId} cannot render the architect view of input ${projection.inputId}`);
   }
+  const references = dependencies.state === 'measured' ? dependencies.testReferences : null;
+  if (references && references.inputId !== projection.inputId) {
+    throw new Error(`Test references for input ${references.inputId} cannot render the architect view of input ${projection.inputId}`);
+  }
   const use = dependencies.state === 'measured' ? useOf(dependencies.facts) : null;
+  const exercises = references ? exercisesOf(references, projection) : null;
   const records = new Map<ModuleId, { behavior: SymbolRecord[]; supporting: SymbolRecord[]; tests: ArchitectTestRecord[] }>(
     projection.modules.map(module => [module.module, { behavior: [], supporting: [], tests: [] }]));
   const of = (module: ModuleId) => {
@@ -334,7 +378,7 @@ export function renderArchitectView(input: {
   });
 
   const files: ArchitectViewFile[] = [
-    { path: '_meta.json', text: metadata(revision, projection, dependencies, purposesCut) },
+    { path: '_meta.json', text: metadata(revision, projection, dependencies, exercises, purposesCut) },
     { path: 'README.md', text: readme(revision, projection, summaries) },
   ];
   let recordCount = 0;
@@ -344,7 +388,7 @@ export function renderArchitectView(input: {
     files.push({ path: at('module.json'), text: moduleDocument(summary, revision) },
       { path: at('behavior.jsonl'), text: jsonl(summary.behavior.map(record => record.line)) },
       { path: at('supporting.jsonl'), text: jsonl(summary.supporting.map(record => record.line)) },
-      { path: at('tests.jsonl'), text: jsonl(summary.tests.map(testRecord)) });
+      { path: at('tests.jsonl'), text: jsonl(summary.tests.map(record => testRecord(record, exercises))) });
     recordCount += summary.behavior.length + summary.supporting.length + summary.tests.length;
   }
   files.sort((a, b) => byteOrder(a.path, b.path));

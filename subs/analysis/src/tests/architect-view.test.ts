@@ -117,7 +117,7 @@ describe('projectArchitectView: modules (AV09)', () => {
     expect(result.root).toBe('fixture');
     expect(result.modules).toEqual([
       { module: 'fixture', dir: '', parent: null, children: ['fixture/alpha', 'fixture/beta', 'fixture/checks', 'fixture/core', 'fixture/gamma'],
-        tags: [], areas: ['src'], purpose: present('README.md', 'A three-level project for the architect view.'), docs: [], files: { own: 2, subtree: 16 } },
+        tags: [], areas: ['src'], purpose: present('README.md', 'A three-level project for the architect view.'), docs: [], files: { own: 2, subtree: 17 } },
       { module: 'fixture/alpha', dir: 'subs/alpha', parent: 'fixture', children: [], tags: [], areas: ['src'],
         purpose: present('subs/alpha/README.md', 'Alpha builds engines.'), docs: [], files: { own: 4, subtree: 4 } },
       { module: 'fixture/beta', dir: 'subs/beta', parent: 'fixture', children: [], tags: ['ui'], areas: ['src'],
@@ -126,9 +126,9 @@ describe('projectArchitectView: modules (AV09)', () => {
         purpose: present('subs/checks/README.md', 'Checks exercise the engine.'), docs: [], files: { own: 2, subtree: 2 } },
       { module: 'fixture/core', dir: 'subs/core', parent: 'fixture', children: ['fixture/core/engine'], tags: [], areas: ['src', 'src/tests'],
         purpose: present('subs/core/README.md', 'Core runs the engine for the rest of the project.'),
-        docs: [paths.guide, paths.usage], files: { own: 4, subtree: 6 } },
+        docs: [paths.guide, paths.usage], files: { own: 4, subtree: 7 } },
       { module: 'fixture/core/engine', dir: 'subs/core/subs/engine', parent: 'fixture/core', children: [], tags: [], areas: ['src', 'src/tests'],
-        purpose: { state: 'missing' }, docs: [], files: { own: 2, subtree: 2 } },
+        purpose: { state: 'missing' }, docs: [], files: { own: 3, subtree: 3 } },
       { module: 'fixture/gamma', dir: 'subs/gamma', parent: 'fixture', children: [], tags: [], areas: ['src'],
         purpose: present('subs/gamma/README.md', 'Gamma reads a loose value.'), docs: [], files: { own: 1, subtree: 1 } },
     ]);
@@ -155,7 +155,7 @@ describe('projectArchitectView: modules (AV09)', () => {
 describe('projectArchitectView: tests (AV10)', () => {
   it('reads test titles only from testing-profile areas, and counts files the compiler leaves out', () => withFacts(async (facts, state, root) => {
     const plan = planned(facts);
-    expect(plan.testFiles).toEqual([paths.checks, paths.checksSupport, paths.coreSupport, paths.coreTest, paths.legacy].sort());
+    expect(plan.testFiles).toEqual([paths.checks, paths.checksSupport, paths.coreSupport, paths.coreTest, paths.engineTest, paths.legacy].sort());
     expect(plan.features).toEqual([paths.feature]);
     const result = await project(facts, state, root);
     expect(result.tests).toEqual([
@@ -164,6 +164,8 @@ describe('projectArchitectView: tests (AV10)', () => {
       { kind: 'feature', module: 'fixture/checks', file: paths.feature, feature: 'Review',
         scenarios: ['A reviewer starts the engine', 'A reviewer runs <count> times'] },
       { kind: 'suite', module: 'fixture/core', file: paths.coreTest, suite: ['run'], tests: ['starts the engine', 'returns the engine'] },
+      { kind: 'suite', module: 'fixture/core/engine', file: paths.engineTest, suite: ['options'],
+        tests: ['names the engine and its options as types'] },
     ]);
     // alpha's test-named file and `.feature` file are ordinary source; engine's JavaScript test is outside the program.
     const files = new Set(result.tests.map(record => record.file));
@@ -182,9 +184,10 @@ describe('projectArchitectView: tests (AV10)', () => {
       { kind: 'feature', module: 'fixture/checks', file: paths.feature, feature: 'Review', scenarios: ['A reviewer…'] },
       { kind: 'suite', module: 'fixture/core', file: paths.coreTest, suite: ['run'], tests: ['starts the…'] },
       { kind: 'suite', module: 'fixture/core', file: paths.coreTest, suite: ['run'], tests: ['returns th…'] },
+      { kind: 'suite', module: 'fixture/core/engine', file: paths.engineTest, suite: ['options'], tests: ['names the …'] },
     ]);
-    // Three test titles and two scenarios exceed 10 bytes.
-    expect(result.counts.cut).toBe(5);
+    // Four test titles and two scenarios exceed 10 bytes.
+    expect(result.counts.cut).toBe(6);
   }), timeout);
 
   it('records a feature without scenarios once, and none for a file with neither feature nor scenario', () => withFacts(async (facts, state, root) => {

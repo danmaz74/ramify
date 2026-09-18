@@ -115,7 +115,10 @@ describe('validated daemon service', () => {
     const revision = checked.value.revision;
     const diagram = { inputId: revision.fingerprints.inputId, modules: ['fixture'], boundaries: [],
       headline: { behavioralDependencies: 0, nonBehavioralDependencies: 0 }, coverage: { state: 'complete' as const, unknownDependencies: 0, limitIds: [] } };
-    next = () => ({ status: 'ready', diagram, behaviorRuns: 1, timings: { acquireMs: 1, classifyMs: 1, projectMs: 1, totalMs: 3 } });
+    // The analyzer's test references never reach the public answer, which carries the diagram alone.
+    const testReferences = { inputId: diagram.inputId, files: [{ file: 'src/tests/a.test.ts',
+      exercises: [{ kind: 'code' as const, owner: 'fixture', file: 'a.ts', binding: 'a' }], unclassified: 1 }] };
+    next = () => ({ status: 'ready', diagram, testReferences, behaviorRuns: 1, timings: { acquireMs: 1, classifyMs: 1, projectMs: 1, totalMs: 3 } });
     const before = await environment.service.daemonStatus();
     if (!before.ok) throw new Error('Expected daemon status');
     expect(before.value.counters).toMatchObject({ behaviorRuns: 0, dependencyDiagrams: 0, dependencyDiagramInputChanges: 0 });

@@ -34,8 +34,11 @@ function facts(inputId: string, padding = 0): DependencyDiagramFacts {
     headline: { behavioralDependencies: 1, nonBehavioralDependencies: 2 }, boundaries: [],
     coverage: { state: 'complete', unknownDependencies: 0, limitIds: [] } };
 }
+/** The analyzer's test references ride beside the diagram; no answer below carries them. */
 const ready = (diagram: DependencyDiagramFacts): DependencyAnalyzerOutcome =>
-  ({ status: 'ready', diagram, behaviorRuns: 1, timings: { acquireMs: 1, classifyMs: 1, projectMs: 1, totalMs: 3 } });
+  ({ status: 'ready', diagram, testReferences: { inputId: diagram.inputId, files: [{ file: 'src/tests/a.test.ts',
+    exercises: [{ kind: 'code', owner: 'fixture', file: 'a.ts', binding: 'a' }], unclassified: 1 }] },
+  behaviorRuns: 1, timings: { acquireMs: 1, classifyMs: 1, projectMs: 1, totalMs: 3 } });
 const bytes = (diagram: DependencyDiagramFacts) => Buffer.byteLength(JSON.stringify(diagram), 'utf8');
 
 function environment(budgets: Partial<ContextBudgets> = {}, cancelOnAbort = false) {

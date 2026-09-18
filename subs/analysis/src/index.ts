@@ -21,6 +21,7 @@ export { projectModularity } from './modularity.js';
 export { projectChangeAffinity } from './change-affinity.js';
 export type * from './interfaces/modularity.js';
 export { projectDependencyDiagram } from './dependency-diagram.js';
+export { projectTestReferences } from './test-references.js';
 export type * from './interfaces/dependency-diagram.js';
 export { analyzeDependencyDiagram } from './dependency-analyzer.js';
 export type * from './interfaces/dependency-analyzer.js';

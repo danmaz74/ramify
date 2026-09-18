@@ -439,8 +439,8 @@ export function projectTestReferences(input: DependencyDiagramInput):
   `RamifyService.dependencyDiagram` answer and the explorer's wire stay
   unchanged.
 - The renderer writes `exercises` on each suite record whose `file` has an
-  entry, as `<owner>#<name>` using the `name` of the original's own record, in
-  byte order, at most twelve with `exercisesMore`; `[]` for a suite record
+  entry, as `<owner>#<name>` using the `name` of the original's own record,
+  distinct and in byte order, at most twelve with `exercisesMore`; `[]` for a suite record
   whose file has no entry; nothing on feature records; and no `exercises` on
   any record when `testReferences` is `null` or dependencies are unavailable.
   An original with no record in the projection is left out.

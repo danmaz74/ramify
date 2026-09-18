@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
-import { access } from 'node:fs/promises';
+import { access, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -77,7 +78,42 @@ describe('dependency analyzer process runner', () => {
       limits: { source: limits.source, maxResultBytes: dependencyAnalyzerCapacity.maxResultBytes, deadlineMs: dependencyAnalyzerCapacity.deadlineMs } });
     expect(direct.status).toBe('ready');
     expect(JSON.stringify(outcome.diagram)).toBe(JSON.stringify((direct as Extract<DependencyAnalyzerOutcome, { status: 'ready' }>).diagram));
+    // The test references of the same run arrive beside the diagram, byte for byte as the analyzer projected them.
+    expect(outcome.testReferences).not.toBeNull();
+    expect(outcome.testReferences!.inputId).toBe(report.inputId);
+    expect(JSON.stringify(outcome.testReferences))
+      .toBe(JSON.stringify((direct as Extract<DependencyAnalyzerOutcome, { status: 'ready' }>).testReferences));
   }, 120_000);
+
+  it('accepts a ready outcome only with null references or references of the diagram\'s input (AV38)', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'ramify-analyzer-outcome-'));
+    try {
+      const diagram = { inputId: 'input/1:a', modules: ['fixture'], headline: { behavioralDependencies: 0, nonBehavioralDependencies: 0 },
+        boundaries: [], coverage: { state: 'complete', unknownDependencies: 0, limitIds: [] } };
+      const references = { inputId: 'input/1:a', files: [{ file: 'src/tests/a.test.ts',
+        exercises: [{ kind: 'code', owner: 'fixture', file: 'a.ts', binding: 'a' }], unclassified: 1 }] };
+      const ready = (testReferences: unknown): Record<string, unknown> => ({ status: 'ready', diagram, ...testReferences === undefined ? {} : { testReferences },
+        behaviorRuns: 1, timings: { acquireMs: 1, classifyMs: 1, projectMs: 1, totalMs: 3 } });
+      /** A child entry that prints `outcome` as its one JSON line. */
+      const child = async (name: string, outcome: unknown) => {
+        const entry = join(directory, `${name}.mjs`);
+        await writeFile(entry, `process.stdin.resume();\nprocess.stdin.on('end', () => process.stdout.write(${JSON.stringify(`${JSON.stringify(outcome)}\n`)}));\n`);
+        return createProcessDependencyAnalyzer(process.execPath, entry).run({ project, report });
+      };
+      expect(await child('null', ready(null))).toEqual(ready(null));
+      expect(await child('references', ready(references))).toEqual(ready(references));
+      const invalid = { status: 'unavailable', reason: 'analysis-failed', message: 'The dependency analyzer returned an invalid outcome' };
+      const file = references.files[0]!;
+      for (const [name, testReferences] of [
+        ['absent', undefined], ['other-input', { ...references, inputId: 'input/1:b' }], ['no-files', { inputId: 'input/1:a' }],
+        ['exercise', { ...references, files: [{ ...file, exercises: [{ kind: 'code', owner: 'fixture', file: 'a.ts' }] }] }],
+        ['kind', { ...references, files: [{ ...file, exercises: [{ ...file.exercises[0], kind: 'type' }] }] }],
+        ['negative', { ...references, files: [{ ...file, unclassified: -1 }] }],
+        ['fraction', { ...references, files: [{ ...file, unclassified: 0.5 }] }],
+        ['file', { ...references, files: [{ ...file, file: 1 }] }],
+      ] as const) expect(await child(name, ready(testReferences)), name).toEqual(invalid);
+    } finally { await rm(directory, { recursive: true, force: true }); }
+  }, 60_000);
 
   it('terminates the child and its helper on cancellation, the deadline and an oversized response (BD17)', async () => {
     // Cancellation while the helper runs.
@@ -115,7 +151,8 @@ describe('dependency analyzer process runner', () => {
       const outcome = await runner.run({ project, report: { ...report, outcome: { ...report.outcome, execution } } });
       expect(outcome).toMatchObject({ status: 'unavailable', reason: 'invalid-report' });
     }
-    expect((await rows()).filter(row => row.args.includes(entry))).toEqual([]);
+    // Only this process's children: a built daemon in a parallel test file may run the same entry.
+    expect((await rows()).filter(row => row.ppid === process.pid && row.args.includes(entry))).toEqual([]);
     expect(await runner.run({ project, report }, { signal: AbortSignal.abort() })).toEqual({ status: 'cancelled' });
   }, 60_000);
 });

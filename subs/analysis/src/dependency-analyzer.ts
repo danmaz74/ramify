@@ -9,8 +9,10 @@ import { createSourceAnalysis } from '../subs/typescript/src/source-analysis.js'
 import type { SourceAnalysis } from '../subs/typescript/src/interfaces/source.js';
 import type { AnalysisReport, RunControl } from './interfaces/analysis.js';
 import type { DependencyAnalyzerInput, DependencyAnalyzerOutcome } from './interfaces/dependency-analyzer.js';
+import type { TestReferenceFacts } from './interfaces/dependency-diagram.js';
 import { projectDependencyDiagram } from './dependency-diagram.js';
 import { completeReport, sorted } from './modularity-context.js';
+import { projectTestReferences } from './test-references.js';
 
 /** Supplied behavior facts share the compiler helper's result bound. */
 const maxFactBytes = 32 * 1024 * 1024 - 64 * 1024;
@@ -70,9 +72,10 @@ function areasOf(report: AnalysisReport, inventory: ProjectInventory): readonly 
  * The dependency diagram of one completed report. Acquires the project again and
  * verifies it against the report, classifies the report's recorded accesses in a
  * compiler helper without the export catalog or import interpretation, verifies
- * every input that run read, and projects the diagram. Performs no description
- * linking or evaluation and opens no retained session. Only a ready outcome
- * carries a diagram.
+ * every input that run read, and projects the diagram and, from the same facts,
+ * the test references. Performs no description linking or evaluation and opens
+ * no retained session. Only a ready outcome carries a diagram; its test
+ * references are null when only they were refused.
  */
 export async function analyzeDependencyDiagram(input: DependencyAnalyzerInput, control: RunControl = {}): Promise<DependencyAnalyzerOutcome> {
   const started = performance.now();
@@ -149,19 +152,26 @@ export async function analyzeDependencyDiagram(input: DependencyAnalyzerInput, c
     const projectStart = performance.now();
     const capabilities = report.request.capabilities.includes('dependency-behavior') ? report.request.capabilities
       : [...report.request.capabilities, 'dependency-behavior' as const];
+    const projection = { revision: report.inputId, limits: { maxResultBytes: limits.maxResultBytes },
+      report: { ...report, request: { ...report.request, capabilities }, snapshot: { ...report.snapshot, dependencyBehavior: facts } } };
     let outcome: ReturnType<typeof projectDependencyDiagram>;
-    try {
-      outcome = projectDependencyDiagram({ revision: report.inputId, limits: { maxResultBytes: limits.maxResultBytes },
-        report: { ...report, request: { ...report.request, capabilities }, snapshot: { ...report.snapshot, dependencyBehavior: facts } } });
-    } catch (error) { throw new Unavailable('analysis-failed', `Dependency diagram projection failed: ${errorMessage(error)}`); }
+    try { outcome = projectDependencyDiagram(projection); }
+    catch (error) { throw new Unavailable('analysis-failed', `Dependency diagram projection failed: ${errorMessage(error)}`); }
     check();
     if (outcome.status !== 'projected') {
       throw outcome.reason === 'resource-limit'
         ? new Unavailable('resource-limit', `The dependency diagram has ${outcome.observedBytes} encoded bytes; the maximum is ${outcome.maximumBytes}`)
         : new Unavailable('analysis-failed', `The dependency diagram projection was refused: ${outcome.reason}`);
     }
+    // The references never withhold the diagram: a refused or failed projection of them alone gives null.
+    let testReferences: TestReferenceFacts | null;
+    try {
+      const references = projectTestReferences(projection);
+      testReferences = references.status === 'projected' ? references.references : null;
+    } catch { testReferences = null; }
+    check();
     const projectMs = performance.now() - projectStart;
-    return { status: 'ready', diagram: outcome.diagram, behaviorRuns,
+    return { status: 'ready', diagram: outcome.diagram, testReferences, behaviorRuns,
       timings: { acquireMs, classifyMs, projectMs, totalMs: performance.now() - started } };
   } catch (error) {
     if (control.signal?.aborted) return { status: 'cancelled' };
