@@ -294,13 +294,32 @@ the titles beside it. A suite title is repeated in the `suite` chain of every
 record beneath it; that is the price of a self-contained hit:
 
 ```json
-{"module":"ramify/service-api","file":"subs/service-api/src/tests/project-binding.test.ts","suite":["createProjectBinding","when the daemon restarts"],"tests":["resubscribes to the context","reports the eviction"]}
+{"module":"ramify/service-api","file":"subs/service-api/src/tests/project-binding.test.ts","suite":["createProjectBinding","when the daemon restarts"],"tests":["resubscribes to the context","reports the eviction"],"exercises":["ramify/daemon#connectDaemon","ramify/service-api#createProjectBinding"]}
 {"module":"ramify/integration-tests","file":"subs/integration-tests/src/features/collection-review.viz.feature","feature":"Collection review","scenarios":["A reviewer approves a collection","A reviewer requests changes"]}
 ```
 
-- A record's keys are `module`, `file`, then `suite` and `tests`, or `feature`
-  and `scenarios`; `feature` is omitted when the file has scenarios but no
-  `Feature:` title.
+- A record's keys are `module`, `file`, then `suite`, `tests`, `exercises`
+  and `exercisesMore`, or `feature` and `scenarios`; `feature` is omitted
+  when the file has scenarios but no `Feature:` title.
+- `exercises` lists the originals the test file references behaviorally, as
+  `<owner>#<name>` with the `name` of the original's own record, so that a
+  title hit leads to a symbol and one search for the name finds both. It is
+  the view's one testing-scope fact. It comes from the same per-file
+  behavior facts as the consumer lists, under the testing source filter, and
+  includes same-owner originals, since a module's own tests exercise its own
+  symbols. Each (test file, original) pair takes the class behavioral if any
+  of its references is behavioral, else unknown if any is unknown, else
+  non-behavioral; only behavioral pairs are listed, so a file that calls an
+  original and also names its type lists it once. Pairs whose class is
+  unknown are counted in `_meta.json` as `unclassifiedExercises`, never
+  listed. Type and data references are omitted.
+- `exercises` is attributed per file: every record of one file carries the
+  same list. It holds at most twelve entries in byte order, with
+  `exercisesMore` counting the rest, and is `[]` when the file references no
+  original behaviorally. It is absent from Gherkin records, and absent from
+  every record when `_meta.json` records `"testReferences":"unavailable"`.
+  Attribution per suite would need reference locations mapped to suite
+  spans and is a later refinement.
 - Vitest-style suites are `describe` chains; `it` and `test` are titles.
   Tests outside any suite have `"suite": []`. A suite whose tests all sit in
   nested suites yields no record of its own; a suite with direct tests and a
@@ -400,16 +419,18 @@ the coverage counts say how much the rule could not decide.
 `_meta.json` is a deterministic single-line JSON document:
 
 ```json
-{"schema":"ramify.architect-view/1","revision":"rev/1:…","input":"input/1:…","modules":15,"dependencies":"measured","dependencyScope":"production","metrics":"unavailable"}
+{"schema":"ramify.architect-view/1","revision":"rev/1:…","input":"input/1:…","modules":15,"dependencies":"measured","dependencyScope":"production","testReferences":"measured","metrics":"unavailable"}
 ```
 
 `dependencies` is `measured` or `unavailable`, and `dependencyScope` names
-the source filter of the measured facts, `production` in the first release;
-`metrics` is `measured` or `unavailable`. When dependencies are unavailable,
-`dependencyReason` names why: `analysis-failed`, `resource-limit`,
-`resource-unavailable`, `invalid-current` or `wait-limit`. Exceptional counts
-appear only when nonzero: `unknownShapes`, `cut`, `detailsUnavailable`,
-`dynamicTitles`, `testsUnavailable` and `coverage`. `coverage` means
+the source filter of the consumer lists, `production` in the first release;
+`testReferences` is `measured` or `unavailable` and says whether test records
+carry `exercises`; `metrics` is `measured` or `unavailable`. When dependencies
+are unavailable, `dependencyReason` names why: `analysis-failed`,
+`resource-limit`, `resource-unavailable`, `invalid-current` or `wait-limit`,
+and `testReferences` is `unavailable`. Exceptional counts appear only when
+nonzero: `unknownShapes`, `cut`, `detailsUnavailable`, `dynamicTitles`,
+`testsUnavailable`, `unclassifiedExercises` and `coverage`. `coverage` means
 source-analysis limits may have omitted originals. `cut` counts each symbol
 with a cut detail once, each cut test, feature or scenario title, and each
 cut purpose. Keys appear in the order of the example, with
@@ -440,9 +461,11 @@ directory whose `_meta.json` names the `ramify.architect-view` schema.
 Dependency facts come from the analysis-owned facts behind the dependency
 diagram, at the same revision and under the same production source filter
 the first-release diagram uses: references from `src/tests/` and from
-modules tagged `testing` are not recorded anywhere in the view. A testing
-scope, if a later release adds one, is a separate projection with its own
-fields, never a union with the production lists. Materialization requests
+modules tagged `testing` never enter a consumer list, `uses` or `usedBy`.
+The testing scope is a separate projection with its own field, `exercises`
+in `tests.jsonl`, and is never a union with the production lists. Both come
+from the same run of the dependency analyzer over the same per-file behavior
+facts, at the same revision. Materialization requests
 the facts for the revision it materialized and waits while the analyzer is
 busy, up to the analyzer's own deadline. When the context publishes a newer
 revision first, the invocation is superseded and publishes nothing. When the
@@ -477,6 +500,7 @@ It is gitignored and never edited or imported.
 Architecture questions are searched here, not in the source:
   rg -n -i '<terms>' .ramify-architect/
 Every hit names its module and role: exposed, internal, or a test title.
+A test record's exercises names the symbols its test file calls.
 For one module, read <module>/module.json, behavior.jsonl and tests.jsonl.
 The map below lists every module with its purpose and headline symbols.
 
@@ -527,8 +551,12 @@ one. No limit silently omits a record.
   present.
 - Consumer lists and `uses`/`usedBy` counts agree with the explorer's
   dependency diagram for the same revision under the production filter; a
-  reference from a module tagged `testing` or from `src/tests/` appears
-  nowhere in the view.
+  reference from a module tagged `testing` or from `src/tests/` enters no
+  consumer list, `uses` or `usedBy`.
+- A test file that calls an original lists it in `exercises`, including a
+  same-owner original; a test that only imports a type does not; a file that
+  calls an original and names its type lists it once; the original's own
+  consumer lists are unchanged by the test.
 - A module without a README purpose paragraph records `"state":"missing"`.
 - Test and scenario titles each appear exactly once; a suite with direct
   tests and a nested suite yields one record for each, the nested record
@@ -588,12 +616,14 @@ trial transcript is evidence for the plan's contract review.
 7. **Waiting for dependency facts** during materialization rather than
    publishing without them and refreshing later.
 8. **Production-only consumer lists** in the first release, matching the
-   diagram's source filter, with a testing scope as a later separate
-   projection.
+   diagram's source filter; test references appear only as the separate
+   `exercises` field.
 9. **List and purpose bounds**: twelve module identifiers per consumer list,
    four exposure names, 600 characters of purpose.
 10. **Trial thresholds** of 200 lines and 64 KB per term, and 300 lines and
     64 KB per task.
+11. **Test references per file**, behavioral only, twelve entries, rather
+    than per suite or including type references.
 
 ## Relation to the roadmap
 

@@ -125,8 +125,12 @@ the paragraph "Retry delays after a connection failure; the last one
 repeats." The behavior record's paragraph is "Own one project's daemon
 connection, context and subscription, and keep them valid."
 
+When `testReferences` is measured, the title record's `exercises` names
+`ramify/service-api#createProjectBinding` directly.
+
 **Pass.** Names `createProjectBinding` and the module. **Bonus.** Names
-`bindingBackoffMs` as the delay table.
+`bindingBackoffMs` as the delay table. Record whether the agent reached the
+symbol through `exercises` or through the suite name.
 
 ### D4: test title only, no word in the source
 
@@ -145,8 +149,12 @@ update" in `covering.test.ts`. `spanBatches` in the same module, role
 `internal`, paragraph "The earliest receipt and latest flush of two batch
 spans.", is a supporting detail.
 
+When `testReferences` is measured, both title records' `exercises` name
+`ramify/daemon/contexts#createContextManager`.
+
 **Pass.** Names `createContextManager` and the module, with the test title
-as evidence. **Fail.** Answers that no such behavior exists.
+as evidence. **Fail.** Answers that no such behavior exists. Record whether
+the agent reached the symbol through `exercises` or through the suite name.
 
 ### P1: placement in an existing module
 

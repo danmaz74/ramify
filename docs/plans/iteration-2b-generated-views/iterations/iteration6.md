@@ -1,74 +1,85 @@
-# Iteration 6: Materialize the architect view
+# Iteration 6: Test references
 
 **Plan:** [Plan 2B: Generated architect view](../main-plan.md).
-**Prerequisites:** iterations 4 and 5.
-**Owners:** `daemon/contexts`, `daemon`, root `ramify` service vocabulary and
-assembly, `cli`.
+**Prerequisites:** iteration 4.
+**Owners:** `analysis`, root `ramify` (the dependency analyzer process runner).
 
 ## Goal
 
-Make `ramify materialize --view architect` synchronize one revision, project
-the view, wait for the dependency facts of that revision, render and publish,
-with every outcome mapped and the API view unchanged.
+Give every Vitest record in `tests.jsonl` the originals its test file
+references behaviorally, projected from the dependency analyzer's existing
+per-file behavior facts in the same run as the diagram facts, without
+changing those facts.
 
 ## Read first
 
-- [Contracts C7](../contracts.md#c7-materialize) and
-  [C8](../contracts.md#c8-failure-and-preservation), AV24–AV28, and the main
-  plan's [lifecycle](../main-plan.md#lifecycle-and-consistency).
-- `src/interfaces/service.ts`, `src/resident-assembly.ts` and `module.ramify`.
-- `subs/daemon/subs/contexts/src/interfaces/contexts.ts`,
-  `context-manager.ts` (`apiView`, `deliverApiView`, `dependencyDiagram`),
-  `queue.ts` and `context.ts`.
-- `subs/daemon/src/service.ts` (`materialize`, `runMaterialize`,
-  `dependencyDiagram`), `validation.ts`, `codec.ts`, `host.ts`,
-  `connection.ts`, `connect-daemon.ts` and `interfaces/daemon.ts`.
-- `subs/cli/src/arguments.ts`, `materialize-command.ts` and `run-cli.ts`.
-- `subs/daemon/subs/contexts/src/tests/api-view.test.ts`,
-  `dependency-diagram.test.ts` and `scripted-driver.ts`;
-  `subs/daemon/src/tests/service.test.ts` and `validation.test.ts`;
-  `subs/cli/src/tests/materialize-command.test.ts`;
-  `src/tests/quick-environment.ts` and `resident-cli.test.ts`.
+- [Contracts C9](../contracts.md#c9-test-references) and
+  [C4](../contracts.md#c4-rendering), and AV38–AV39.
+- The specification's [`tests.jsonl`](../../../architecture/architect-view.spec.md#testsjsonl),
+  [metadata](../../../architecture/architect-view.spec.md#metadata) and
+  [materialization](../../../architecture/architect-view.spec.md#materialization)
+  sections.
+- `subs/analysis/subs/typescript/src/interfaces/dependency-behavior.ts`
+  (`DependencyBehaviorFact`: one per consumer file and original, precedence
+  already applied).
+- `subs/analysis/src/dependency-diagram.ts` (`projectDependencyDiagram`),
+  `modularity-context.ts` (`viewFacts` and the source filters) and
+  `interfaces/modularity.ts` (`SourceFilter`).
+- `subs/analysis/src/dependency-analyzer.ts`,
+  `interfaces/dependency-analyzer.ts`, `src/dependency-analyzer-process.ts`
+  and `src/dependency-analyzer-entry.ts`.
+- `subs/analysis/src/architect-render.ts`, `interfaces/architect-view.ts`,
+  `src/tests/architect-render.test.ts` with its golden files, and
+  `src/tests/architect-fixture.ts`.
+- Iteration 4's results: the golden-file update procedure and the toolkit
+  render measurements.
 
 ## Deliverables
 
-1. Add `MaterializeViewId`, `views` and the `architect` outcome summary to
-   the root service vocabulary, and `materialize-views` to its capabilities.
-2. Contexts: carry `views`, call the session only for requested views at the
-   pinned sequence, return both projections, and map supersession.
-3. Daemon: validate `views`; advertise the capability; wait for dependency
-   facts with a clock the tests control; render; publish through
-   `PublishInput`; map every outcome.
-4. Client: send `views` unchanged; CLI: parse `--view`, check the capability,
-   print the architect line.
-5. Update the scripted driver and the quick environment to serve
-   `architectView`.
-6. Tests for AV24–AV28, including a controllable dependency runner for each
-   wait outcome.
+1. Add C9's types and `projectTestReferences` in `analysis`, pure and reading
+   only the report, under the modularity projection's `test` source filter,
+   with same-owner originals included.
+2. Add `testReferences` to the analyzer's `ready` outcome, projected from the
+   same report in the same run, and validate and carry it in the process
+   runner. The diagram facts stay byte-identical.
+3. Add `testReferences` to `ArchitectDependencies` and render `exercises`,
+   `exercisesMore`, `testReferences` and `unclassifiedExercises` as C9 and
+   the specification state. Regenerate the golden files in both dependency
+   states and add a measured state without test references; review every
+   changed line.
+4. Extend the `architect` fixture with the test files AV38 names.
+5. Expose the new names as the existing dependency-diagram names are exposed,
+   and relay what the daemon needs from the root.
+6. Measure on the toolkit: the analyzer's time before and after, the
+   references' bytes, the view's bytes, and the mean and maximum `exercises`
+   length.
 
 ## Matrix rows executed here
 
-AV24–AV28.
+AV38–AV39, and AV12–AV18 again after the golden files change.
 
 ## Verification
 
 ```sh
-npx vitest run subs/cli/src/tests/materialize-command.test.ts
-npx vitest run subs/daemon/subs/contexts/src/tests/api-view.test.ts subs/daemon/subs/contexts/src/tests/dependency-diagram.test.ts
-npx vitest run subs/daemon/src/tests/service.test.ts subs/daemon/src/tests/validation.test.ts subs/daemon/src/tests/codec.test.ts
-npx vitest run subs/daemon/src/tests/session-counters.test.ts src/tests/resident-assembly.test.ts src/tests/resident-cli.test.ts
+npx vitest run subs/analysis/src/tests/architect-render.test.ts
+npx vitest run subs/analysis/src/tests/dependency-diagram.test.ts subs/analysis/src/tests/dependency-analyzer.test.ts
+npx vitest run subs/analysis/src/tests/dependency-behavior-capability.test.ts subs/analysis/src/tests/modularity.test.ts
+npx vitest run src/tests/dependency-analyzer-process.test.ts src/tests/dependency-diagram-daemon.test.ts
+npx vitest run subs/daemon/subs/contexts/src/tests/dependency-diagram.test.ts
 npm run type-check
 npm run build
 npm run check:self
-npx vitest run -c scripts/reference-harness/vitest.config.ts scripts/reference-harness/plan2a.test.ts
 ```
+
+The new test file for `projectTestReferences` runs with the first commands.
 
 ## Exit criteria
 
-AV24–AV28 pass; `ramify materialize` without `--view` behaves exactly as
-before; the Plan 2A harness passes.
+AV38–AV39 pass; the diagram facts and the explorer's dependency answers are
+unchanged; the toolkit view stays within its size budget.
 
 ## Handoff
 
-A working `ramify materialize --view architect` in the built CLI, and the
-list of every changed wire type.
+`TestReferenceFacts` in the analyzer's `ready` outcome, the renderer's
+`testReferences` input, the regenerated golden files and the toolkit
+measurements.

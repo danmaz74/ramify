@@ -9,8 +9,8 @@ directory and identity.
 
 Plan 2B delivers the view the specification describes: one generated,
 gitignored directory, `.ramify-architect/`, that gives an architect agent the
-project's modules, their behavior-capable symbols, their tests and their
-observed use, with no semantic elaboration. It then tests hypothesis H1 with
+project's modules, their behavior-capable symbols, their tests with the
+symbols they exercise, and their observed use, with no semantic elaboration. It then tests hypothesis H1 with
 real agents. The [contracts](contracts.md), the
 [acceptance matrix](acceptance.md) and the [agent test cases](test-cases.md)
 beside this file complete the plan. The specification's review decisions are
@@ -48,7 +48,7 @@ to `Read` and `rg` then answers the [test cases](test-cases.md) from the view.
 
 ## Completion boundary
 
-Plan 2B is complete when iteration 8 records all of the following on one
+Plan 2B is complete when iteration 9 records all of the following on one
 coherent build:
 
 1. Every row of the [acceptance matrix](acceptance.md) passes, or is recorded
@@ -128,6 +128,7 @@ ramify materialize --view architect
                  -> compiler: symbol details, export shapes, test titles
                  -> analysis: projectArchitectView (pure)
        -> contexts: dependencyDiagram at R, waiting while busy
+            -> analyzer child: diagram facts and test references, one run
        -> analysis: renderArchitectView(projection, dependencies) (pure)
        -> daemon publisher: one transaction for API and architect targets
   -> <root>/.ramify-architect/
@@ -139,10 +140,10 @@ ramify materialize --view architect
 | --- | --- |
 | `analysis/typescript` | The five-valued behavior shape shared with the consumer classifier; `describeExportShapes`; `describeTestTitles`; `RetainedSourceAnalysis.shapes` and `.testTitles`. |
 | `analysis/project` | `.ramify-architect` and its staging siblings as reserved names. |
-| `analysis` | Gherkin title reading; `planArchitectView` and `projectArchitectView`; `RetainedSession.architectView` through the worker; `renderArchitectView`. |
+| `analysis` | Gherkin title reading; `planArchitectView` and `projectArchitectView`; `RetainedSession.architectView` through the worker; `projectTestReferences` and the analyzer's `testReferences`; `renderArchitectView`. |
 | `daemon/contexts` | `views` on the API-view request; the architect projection at the pinned sequence. |
 | `daemon` | The architect target in the publisher; the dependency wait and rendering in `materialize`; validation, capability and client fields. |
-| root `ramify` | `MaterializeViewId` and the `views` field in the service vocabulary; relays of the new analysis names; publisher limits. |
+| root `ramify` | `MaterializeViewId` and the `views` field in the service vocabulary; relays of the new analysis names; publisher limits; `testReferences` in the analyzer process runner. |
 | `cli` | `--view` and its output lines. |
 
 No owner is added. The architect projection lives in `analysis` beside the API
@@ -175,7 +176,8 @@ facts.
    session answer of `superseded` makes the whole outcome `superseded`.
 3. For `architect`, the service asks `dependencyDiagram` for revision R. While
    the answer is `busy`, it waits 250 ms and asks again, up to 125 s in total.
-   `ready` gives measured dependencies. `superseded` ends the invocation as
+   `ready` gives measured dependencies and the test references from the same
+   analyzer run. `superseded` ends the invocation as
    `superseded` and publishes nothing. `unavailable`, or reaching the wait
    limit, gives unavailable dependencies with that reason; the view is still
    published.
@@ -190,7 +192,7 @@ Checks, watch updates and changed-file hooks never call `architectView`,
 
 ## Resource budgets
 
-These are the plan's budgets. Iteration 7 records the measured values; a
+These are the plan's budgets. Iteration 8 records the measured values; a
 measured value above its budget stops the plan for a user decision.
 
 | Budget | Value |
@@ -214,12 +216,18 @@ measured value above its budget stops the plan for a user decision.
 | 3 | [Project the architect view in the session](iterations/iteration3.md) | `analysis` | 2 |
 | 4 | [Render the architect view](iterations/iteration4.md) | `analysis` | 3 |
 | 5 | [Reserve and publish the architect target](iterations/iteration5.md) | `analysis/project`, `daemon` | — |
-| 6 | [Materialize the architect view](iterations/iteration6.md) | `daemon/contexts`, `daemon`, root, `cli` | 4, 5 |
-| 7 | [Real runs, invariance and hit cost](iterations/iteration7.md) | integration, documentation | 6 |
-| 8 | [Agent trials and completion](iterations/iteration8.md) | evaluation, documentation | 7 |
+| 6 | [Test references](iterations/iteration6.md) | `analysis`, root | 4 |
+| 7 | [Materialize the architect view](iterations/iteration7.md) | `daemon/contexts`, `daemon`, root, `cli` | 5, 6 |
+| 8 | [Real runs, invariance and hit cost](iterations/iteration8.md) | integration, documentation | 7 |
+| 9 | [Agent trials and completion](iterations/iteration9.md) | evaluation, documentation | 8 |
 
 Iteration 5 shares no files with iterations 1–4 and may run beside them.
-Iteration 6 integrates both lines.
+Iteration 7 integrates both lines.
+
+Iteration 6 was inserted on 2026-09-18, after iteration 4, when test records
+gained `exercises` ([C9](contracts.md#c9-test-references)). The results of
+iterations 1–5 name the later iterations by their earlier numbers: their 6, 7
+and 8 are now 7, 8 and 9.
 
 ## Review decisions
 
@@ -235,17 +243,21 @@ Accepted at their proposed defaults on 2026-09-18, with the refinements the
 6. Modularity metrics are `unavailable` in this delivery.
 7. Materialization waits for the dependency facts and publishes without them
    only when they are unavailable.
-8. Consumer lists are production-only.
+8. Consumer lists are production-only; test references appear only as
+   `exercises` on test records.
 9. Consumer lists hold twelve modules, `as` four names, purposes 600 bytes,
    test records 40 titles.
 10. The trial thresholds are 200 lines and 64 KB per term, 300 lines and
     64 KB per task.
 11. `ramify materialize` without `--view` materializes the API view alone.
+12. Test records carry `exercises`: per file, behavioral pairs only, twelve
+    entries, same-owner originals included, unknown pairs counted in
+    `_meta.json` (decided 2026-09-18).
 
 ## Deferrals
 
-- Modularity metrics in `module.json`, a testing dependency scope, and
-  `src/docs/` contents.
+- Modularity metrics in `module.json`, a testing scope for consumer lists,
+  per-suite attribution of test references, and `src/docs/` contents.
 - Automatic publication after revisions.
 - The earlier draft's view registry, the API view's re-hosting and its
   restorations of Plan 2A's analysis changes.

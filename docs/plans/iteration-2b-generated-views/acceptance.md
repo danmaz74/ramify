@@ -25,7 +25,9 @@ with its reason.
   internal export, a testing module that imports production originals, a
   module without a README, a module with `src/docs/`, and consumers with
   behavioral, non-behavioral, unknown and mixed use of one original through
-  two imported modules.
+  two imported modules. From iteration 6 it also has test files that call a
+  same-owner original, only import a type, call an original and name its
+  type, and reference an original the classifier cannot settle.
 - `reference`: `examples/collection-review`.
 - `toolkit`: this repository.
 
@@ -77,17 +79,24 @@ with its reason.
 | AV22 | An existing `.ramify-architect` that is a file, lacks `_meta.json`, names another schema or contains a symbolic link refuses the invocation and is left untouched; leftover `.tmp-*` and `.old-*` siblings are recovered. |
 | AV23 | The toolkit's and the reference project's `.gitignore` list the three patterns; `rg` from the root returns no line from a materialized view, and `rg <term> .ramify-architect/` returns them. |
 
-## Materialize (iteration 6)
+## Test references (iteration 6)
+
+| ID | Case |
+| --- | --- |
+| AV38 | On `architect`, `projectTestReferences` lists per test file the originals it references behaviorally, including a same-owner original; a type-only reference is absent; a file that calls an original and names its type lists it once; a pair classified unknown is counted in `unclassified`, not listed; a production file appears in no entry; the analyzer's `ready` outcome carries the references through the process runner; the diagram facts for `architect`, `toolkit` and `reference` are byte-identical to those at commit `06ccfca`. |
+| AV39 | Rendered with measured references, every suite record of one file carries the same `exercises` as `<owner>#<name>` in byte order, twelve with `exercisesMore`, `[]` for a file without behavioral references; feature records carry none; with `testReferences: null` or unavailable dependencies no record carries it; `_meta.json` records `testReferences` after `dependencyScope` and `unclassifiedExercises` only when nonzero; consumer lists and `uses`/`usedBy` are unchanged by the test files; references with another `inputId` throw; AV12–AV18 still pass with the golden files regenerated and reviewed. |
+
+## Materialize (iteration 7)
 
 | ID | Case |
 | --- | --- |
 | AV24 | CLI grammar: repeated `--view`, unknown and duplicate values, and `--from` or `--all` without `api` exit 2 before connecting; without `--view` the request has no `views` field and output is Plan 2A's. |
 | AV25 | Wire: validation of `views`; the daemon advertises `materialize-views`; a client facing a daemon without it exits 2 with `incompatible-service`. |
 | AV26 | Contexts: one synchronized revision; the session is called only for requested views, both at the pinned sequence; either `superseded` makes the outcome `superseded`. |
-| AV27 | Dependency wait with a controllable runner: `ready` gives measured; `busy` waits and then succeeds; `superseded` publishes nothing; `unavailable` publishes with its reason; the wait limit publishes with `wait-limit`; cancellation during the wait publishes nothing. |
+| AV27 | Dependency wait with a controllable runner: `ready` gives measured dependencies and test references, and the renderer receives both; `busy` waits and then succeeds; `superseded` publishes nothing; `unavailable` publishes with its reason; the wait limit publishes with `wait-limit`; cancellation during the wait publishes nothing. |
 | AV28 | Quick end-to-end: `materialize --view api --view architect --all` through the quick environment publishes both targets in one transaction and prints the architect line. |
 
-## Real runs and evidence (iteration 7)
+## Real runs and evidence (iteration 8)
 
 | ID | Case |
 | --- | --- |
@@ -98,7 +107,7 @@ with its reason.
 | AV33 | Measurements against the [budgets](main-plan.md#resource-budgets): session query and whole-command latency with and without dependency facts, files, bytes, unchanged-repeat writes and peak daemon memory on `toolkit`, `reference` and S100. |
 | AV34 | Regressions: the Plan 2A harness passes and `ramify materialize` without `--view` is byte-identical; build, type-check, `check:self`, `check:reference` and `reference:cases` pass; the `./cli` and `./client` closures still exclude analysis, the worker and TypeScript; the eight package entries are unchanged. |
 
-## Agent trials and completion (iteration 8)
+## Agent trials and completion (iteration 9)
 
 | ID | Case |
 | --- | --- |

@@ -442,7 +442,8 @@ agent, with a module map in its `README.md` and, per module, `module.json`,
 behavior-capable and supporting originals with their role, exposure,
 re-exposing ancestors, bounded signature and documentation, and the
 production modules that use them behaviorally or non-behaviorally, from
-Plan 6D's facts at the same revision. `ramify materialize` without `--view`
+Plan 6D's facts at the same revision; test records name the symbols their
+test file calls. `ramify materialize` without `--view`
 is unchanged. Human consumption remains in the explorer.
 
 **Ownership and implementation.** `analysis/typescript` classifies export
@@ -452,9 +453,10 @@ view; `analysis/project` reserves `.ramify-architect`; the daemon waits for
 dependency facts and publishes the view in one transaction with the API
 view's targets. No owner is added.
 
-**Acceptance and handoff.** Execute the plan's 37 AV rows: classification and
-consumer equivalence, rendering, publication, invariance, hit cost, and agent
-trials on Claude Code and Codex CLI that decide hypothesis H1. Hand off the
+**Acceptance and handoff.** Execute the plan's 39 AV rows: classification and
+consumer equivalence, rendering, test references, publication, invariance,
+hit cost, and agent trials on Claude Code and Codex CLI that decide
+hypothesis H1. Hand off the
 view format, its measured limits and the H1 verdict to Plans 4 and 7.
 
 ## Plan 3: Project inspection

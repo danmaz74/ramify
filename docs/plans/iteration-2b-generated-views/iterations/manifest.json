@@ -36,17 +36,23 @@
       "file": "iteration6.md",
       "index": 6,
       "parallelGroup": null,
-      "title": "Materialize the architect view"
+      "title": "Test references"
     },
     {
       "file": "iteration7.md",
       "index": 7,
       "parallelGroup": null,
-      "title": "Real runs, invariance and hit cost"
+      "title": "Materialize the architect view"
     },
     {
       "file": "iteration8.md",
       "index": 8,
+      "parallelGroup": null,
+      "title": "Real runs, invariance and hit cost"
+    },
+    {
+      "file": "iteration9.md",
+      "index": 9,
       "parallelGroup": null,
       "title": "Agent trials and completion"
     }

@@ -1,63 +1,72 @@
-# Iteration 8: Agent trials and completion
+# Iteration 8: Real runs, invariance and hit cost
 
 **Plan:** [Plan 2B: Generated architect view](../main-plan.md).
 **Prerequisites:** iteration 7.
-**Owners:** evaluation evidence and documentation.
+**Owners:** integration evidence under `scripts/`, `AGENTS.md`, `CLAUDE.md`
+and the architecture documents.
 
 ## Goal
 
-Run the agent test cases on the materialized toolkit view with Claude Code and
-Codex CLI, score them against their keys, decide H1, and record the plan's
-completion.
+Establish, with the compiled CLI and daemon, that the view is correct on real
+projects, leaves analysis unchanged, meets its hit-cost thresholds and
+budgets, and is described to agents.
 
 ## Read first
 
-- AV35–AV37 and the [agent test cases](../test-cases.md), all of it.
-- The specification's [hypothesis](../../../architecture/architect-view.spec.md#hypothesis)
-  and [agent trials](../../../architecture/architect-view.spec.md#agent-trials).
-- Iteration 7's results: the view's revision and the hit-cost table.
+- AV29–AV34 and the main plan's [budgets](../main-plan.md#resource-budgets)
+  and [completion boundary](../main-plan.md#completion-boundary).
+- The specification's [hit cost](../../../architecture/architect-view.spec.md#hit-cost),
+  [determinism and bounds](../../../architecture/architect-view.spec.md#determinism-and-bounds)
+  and [agent instructions](../../../architecture/architect-view.spec.md#agent-instructions).
+- `scripts/reference-harness/plan2a-isolation-cases.ts`,
+  `plan2a-cli-cases.ts`, `plan2a-materialize-fixture.ts` and
+  `plan2a-completion-cases.ts` for the real-daemon, owned endpoint and
+  invariance patterns; `scripts/measurements/plan2a.mjs`.
+- `AGENTS.md` and `docs/architecture/materialized-api-view.spec.md`.
 
 ## Deliverables
 
-1. Re-derive every key from the materialized view, as the test cases'
-   maintenance section requires, and record any changed key with its reason.
-2. Run each core and extended task in a fresh session per harness:
-   - Claude Code: `claude -p` with the preamble and task, tools limited to
-     `Read`, `Grep` and `Bash(rg:*)`, JSON streaming output saved as the
-     transcript.
-   - Codex CLI: `codex exec` with a read-only sandbox and JSON output saved as
-     the transcript.
-   Both run from the worktree root with the view present. Neither receives
-   this plan or the test cases.
-3. Score every task from its transcript: tool calls, searches and narrowing
-   searches, hit lines and bytes, README opened, source read, verdict. Save
-   transcripts and the scoring table under `evidence/trials/`.
-4. Decide H1 by the specification's criteria.
-5. Write the completion report, `iterations/iteration8-results.md`, with the
-   gate items of the main plan, and update the roadmap's Plan 2B row and
-   section.
+1. A harness file, `scripts/reference-harness/plan2b-cases.ts` with its test,
+   that runs the compiled CLI and daemon with an owned endpoint directory on
+   isolated copies of the reference project and the toolkit, and establishes
+   AV29–AV31 and AV34's closure and package-entry cases. The daemon is stopped
+   in `finally`.
+2. A measurement script, `scripts/measurements/plan2b.mjs` with an
+   `npm run measure:plan2b` entry, for AV32 and AV33, writing its raw results
+   under `docs/plans/iteration-2b-generated-views/evidence/`.
+3. The instruction block of the specification in `AGENTS.md` and in a short
+   `CLAUDE.md` section, since each trial harness loads one of them.
+4. Update `docs/architecture/architect-view.spec.md` to implemented status
+   with the measured values, `docs/architecture/materialized-api-view.spec.md`
+   for `--view`, and the CLI section of the development guides that lists
+   `materialize`.
+5. Materialize the view at the worktree root for iteration 9, and record its
+   revision.
 
 ## Matrix rows executed here
 
-AV35–AV37.
+AV29–AV34.
 
 ## Verification
 
-The transcripts and scoring table are the evidence. Before the report,
-re-run:
-
 ```sh
+npm run build
 npm run type-check
 npm run check:self
+npm run check:reference
+npm run reference:cases
+npx vitest run -c scripts/reference-harness/vitest.config.ts scripts/reference-harness/plan2b.test.ts
+npm run measure:plan2b
 ```
+
+The full Vitest suite runs through the cucumber-viz audit, not by hand.
 
 ## Exit criteria
 
-Every core and extended task has a transcript and a verdict on both
-harnesses, the H1 decision is recorded with its evidence, and the documents
-describe the result.
+AV29–AV34 pass, or a budget is exceeded and the plan stops for a user
+decision with the measurement recorded.
 
 ## Handoff
 
-The H1 verdict and, if it is falsified, the evidence for the split view or a
-query interface for Plans 4 and 7.
+The materialized view at the worktree root and its revision, the evidence
+files, and the hit-cost table for iteration 9's report.

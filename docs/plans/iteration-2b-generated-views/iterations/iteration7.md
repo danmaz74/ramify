@@ -1,72 +1,79 @@
-# Iteration 7: Real runs, invariance and hit cost
+# Iteration 7: Materialize the architect view
 
 **Plan:** [Plan 2B: Generated architect view](../main-plan.md).
-**Prerequisites:** iteration 6.
-**Owners:** integration evidence under `scripts/`, `AGENTS.md`, `CLAUDE.md`
-and the architecture documents.
+**Prerequisites:** iterations 5 and 6.
+**Owners:** `daemon/contexts`, `daemon`, root `ramify` service vocabulary and
+assembly, `cli`.
 
 ## Goal
 
-Establish, with the compiled CLI and daemon, that the view is correct on real
-projects, leaves analysis unchanged, meets its hit-cost thresholds and
-budgets, and is described to agents.
+Make `ramify materialize --view architect` synchronize one revision, project
+the view, wait for the dependency facts of that revision, render and publish,
+with every outcome mapped and the API view unchanged.
 
 ## Read first
 
-- AV29–AV34 and the main plan's [budgets](../main-plan.md#resource-budgets)
-  and [completion boundary](../main-plan.md#completion-boundary).
-- The specification's [hit cost](../../../architecture/architect-view.spec.md#hit-cost),
-  [determinism and bounds](../../../architecture/architect-view.spec.md#determinism-and-bounds)
-  and [agent instructions](../../../architecture/architect-view.spec.md#agent-instructions).
-- `scripts/reference-harness/plan2a-isolation-cases.ts`,
-  `plan2a-cli-cases.ts`, `plan2a-materialize-fixture.ts` and
-  `plan2a-completion-cases.ts` for the real-daemon, owned endpoint and
-  invariance patterns; `scripts/measurements/plan2a.mjs`.
-- `AGENTS.md` and `docs/architecture/materialized-api-view.spec.md`.
+- [Contracts C7](../contracts.md#c7-materialize),
+  [C8](../contracts.md#c8-failure-and-preservation) and
+  [C9](../contracts.md#c9-test-references), AV24–AV28, and the main
+  plan's [lifecycle](../main-plan.md#lifecycle-and-consistency).
+- Iteration 6's results: where `testReferences` arrives in the analyzer's
+  `ready` outcome.
+- `src/interfaces/service.ts`, `src/resident-assembly.ts` and `module.ramify`.
+- `subs/daemon/subs/contexts/src/interfaces/contexts.ts`,
+  `context-manager.ts` (`apiView`, `deliverApiView`, `dependencyDiagram`),
+  `queue.ts` and `context.ts`.
+- `subs/daemon/src/service.ts` (`materialize`, `runMaterialize`,
+  `dependencyDiagram`), `validation.ts`, `codec.ts`, `host.ts`,
+  `connection.ts`, `connect-daemon.ts` and `interfaces/daemon.ts`.
+- `subs/cli/src/arguments.ts`, `materialize-command.ts` and `run-cli.ts`.
+- `subs/daemon/subs/contexts/src/tests/api-view.test.ts`,
+  `dependency-diagram.test.ts` and `scripted-driver.ts`;
+  `subs/daemon/src/tests/service.test.ts` and `validation.test.ts`;
+  `subs/cli/src/tests/materialize-command.test.ts`;
+  `src/tests/quick-environment.ts` and `resident-cli.test.ts`.
 
 ## Deliverables
 
-1. A harness file, `scripts/reference-harness/plan2b-cases.ts` with its test,
-   that runs the compiled CLI and daemon with an owned endpoint directory on
-   isolated copies of the reference project and the toolkit, and establishes
-   AV29–AV31 and AV34's closure and package-entry cases. The daemon is stopped
-   in `finally`.
-2. A measurement script, `scripts/measurements/plan2b.mjs` with an
-   `npm run measure:plan2b` entry, for AV32 and AV33, writing its raw results
-   under `docs/plans/iteration-2b-generated-views/evidence/`.
-3. The instruction block of the specification in `AGENTS.md` and in a short
-   `CLAUDE.md` section, since each trial harness loads one of them.
-4. Update `docs/architecture/architect-view.spec.md` to implemented status
-   with the measured values, `docs/architecture/materialized-api-view.spec.md`
-   for `--view`, and the CLI section of the development guides that lists
-   `materialize`.
-5. Materialize the view at the worktree root for iteration 8, and record its
-   revision.
+1. Add `MaterializeViewId`, `views` and the `architect` outcome summary to
+   the root service vocabulary, and `materialize-views` to its capabilities.
+2. Contexts: carry `views`, call the session only for requested views at the
+   pinned sequence, return both projections, and map supersession.
+3. Daemon: validate `views`; advertise the capability; wait for dependency
+   facts with a clock the tests control; carry the analyzer's
+   `testReferences` from the context manager's ready result to the renderer,
+   leaving the public `dependencyDiagram` answer unchanged; render; publish
+   through `PublishInput`; map every outcome.
+4. Client: send `views` unchanged; CLI: parse `--view`, check the capability,
+   print the architect line.
+5. Update the scripted driver and the quick environment to serve
+   `architectView`.
+6. Tests for AV24–AV28, including a controllable dependency runner for each
+   wait outcome.
 
 ## Matrix rows executed here
 
-AV29–AV34.
+AV24–AV28.
 
 ## Verification
 
 ```sh
-npm run build
+npx vitest run subs/cli/src/tests/materialize-command.test.ts
+npx vitest run subs/daemon/subs/contexts/src/tests/api-view.test.ts subs/daemon/subs/contexts/src/tests/dependency-diagram.test.ts
+npx vitest run subs/daemon/src/tests/service.test.ts subs/daemon/src/tests/validation.test.ts subs/daemon/src/tests/codec.test.ts
+npx vitest run subs/daemon/src/tests/session-counters.test.ts src/tests/resident-assembly.test.ts src/tests/resident-cli.test.ts
 npm run type-check
+npm run build
 npm run check:self
-npm run check:reference
-npm run reference:cases
-npx vitest run -c scripts/reference-harness/vitest.config.ts scripts/reference-harness/plan2b.test.ts
-npm run measure:plan2b
+npx vitest run -c scripts/reference-harness/vitest.config.ts scripts/reference-harness/plan2a.test.ts
 ```
-
-The full Vitest suite runs through the cucumber-viz audit, not by hand.
 
 ## Exit criteria
 
-AV29–AV34 pass, or a budget is exceeded and the plan stops for a user
-decision with the measurement recorded.
+AV24–AV28 pass; `ramify materialize` without `--view` behaves exactly as
+before; the Plan 2A harness passes.
 
 ## Handoff
 
-The materialized view at the worktree root and its revision, the evidence
-files, and the hit-cost table for iteration 8's report.
+A working `ramify materialize --view architect` in the built CLI, and the
+list of every changed wire type.

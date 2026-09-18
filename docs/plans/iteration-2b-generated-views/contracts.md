@@ -238,7 +238,8 @@ In `analysis`:
 export type ArchitectDependencyReason = 'analysis-failed' | 'resource-limit'
   | 'resource-unavailable' | 'invalid-current' | 'wait-limit';
 export type ArchitectDependencies =
-  | { readonly state: 'measured'; readonly facts: DependencyDiagramFacts }
+  | { readonly state: 'measured'; readonly facts: DependencyDiagramFacts;
+      readonly testReferences: TestReferenceFacts | null }   // C9; added by iteration 6
   | { readonly state: 'unavailable'; readonly reason: ArchitectDependencyReason };
 
 export interface ArchitectViewFile { readonly path: string; readonly text: string }  // relative to the view root
@@ -258,7 +259,9 @@ export function renderArchitectView(input: {
 ```
 
 The renderer imports no compiler, filesystem or session module. It throws
-when measured facts name an `inputId` other than the projection's.
+when measured facts or test references name an `inputId` other than the
+projection's. Iteration 4 implemented C4 without `testReferences`; iteration 6
+adds it as C9 states.
 
 - A module's view directory is its identifier without the root module's
   identifier and the slash after it; the root module's is the view root.
@@ -388,3 +391,59 @@ CLI: `ramify materialize [--view <api|architect>]... [--from <path> | --all] [--
 | Cancellation before switching | `cancelled` | Preserved |
 | Failure during switching | Rolled back; never success | Restored or explicit rollback failure |
 | Identical bytes | Published, zero bytes written | Untouched |
+| Test references refused by their byte limit alone | Published with `testReferences: unavailable` | Replaced |
+
+## C9. Test references
+
+Added on 2026-09-18, after iteration 4, when `tests.jsonl` records gained
+`exercises`. It is a projection of facts the dependency analyzer already
+produces: `DependencyBehaviorFacts` holds one `DependencyBehaviorFact` per
+(consumer file, original) pair whatever the ownership of either file, with the
+precedence behavioral, unknown, non-behavioral, unused already applied. The
+classifier is unchanged.
+
+In `analysis`, `src/interfaces/dependency-diagram.ts`:
+
+```ts
+export interface TestFileReferences {
+  readonly file: string;                        // project-relative consumer file
+  readonly exercises: readonly OriginalId[];    // pairs classified behavioral, by (owner, file, binding, kind)
+  readonly unclassified: number;                // pairs classified unknown
+}
+
+export interface TestReferenceFacts {
+  readonly inputId: string;
+  readonly files: readonly TestFileReferences[];  // byte order by file
+}
+
+export function projectTestReferences(input: DependencyDiagramInput):
+  | { readonly status: 'projected'; readonly references: TestReferenceFacts }
+  | { readonly status: 'refused'; readonly reason: 'analysis-incomplete' | 'not-requested'
+      | 'capability-failed' | 'resource-limit';
+      readonly observedBytes?: number; readonly maximumBytes?: number };
+```
+
+- The consumer files are those the modularity projection's `test` source
+  filter selects: files in areas whose profile includes `testing`. Same-owner
+  originals are included. A file with neither a behavioral nor an unknown
+  pair is omitted. `DependencyDiagramInput.limits.maxResultBytes` bounds the
+  references' JSON separately from the diagram's.
+- `DependencyAnalyzerOutcome`'s `ready` variant gains
+  `testReferences: TestReferenceFacts | null`, projected from the same report
+  in the same run as `diagram`; `null` means only the references were refused.
+  The diagram facts are byte-identical to those before this change. The
+  process runner in `src/dependency-analyzer-process.ts` validates and carries
+  the field.
+- Iteration 7 carries `testReferences` from the context manager's ready
+  dependency result to `renderArchitectView`. The public
+  `RamifyService.dependencyDiagram` answer and the explorer's wire stay
+  unchanged.
+- The renderer writes `exercises` on each suite record whose `file` has an
+  entry, as `<owner>#<name>` using the `name` of the original's own record, in
+  byte order, at most twelve with `exercisesMore`; `[]` for a suite record
+  whose file has no entry; nothing on feature records; and no `exercises` on
+  any record when `testReferences` is `null` or dependencies are unavailable.
+  An original with no record in the projection is left out.
+  `unclassifiedExercises` in `_meta.json` sums `unclassified` over files that
+  have a suite record. `_meta.json` records `testReferences` after
+  `dependencyScope`.
