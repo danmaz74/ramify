@@ -48,7 +48,7 @@ to `Read` and `rg` then answers the [test cases](test-cases.md) from the view.
 
 ## Completion boundary
 
-Plan 2B is complete when iteration 9 records all of the following on one
+Plan 2B is complete when iteration 10 records all of the following on one
 coherent build:
 
 1. Every row of the [acceptance matrix](acceptance.md) passes, or is recorded
@@ -195,6 +195,12 @@ Checks, watch updates and changed-file hooks never call `architectView`,
 These are the plan's budgets. Iteration 8 records the measured values; a
 measured value above its budget stops the plan for a user decision.
 
+Iteration 8 measured the hit cost above its thresholds on the toolkit for five
+of six terms. On 2026-09-18 the user decided to finish the plan: fix the clear
+defects (iteration 9), run the agent trials, and treat hit cost and record
+length as later performance work. The completion report records the
+measurement beside the trial results.
+
 | Budget | Value |
 | --- | --- |
 | Architect session query, warm, toolkit | ≤ 15 s |
@@ -219,7 +225,8 @@ measured value above its budget stops the plan for a user decision.
 | 6 | [Test references](iterations/iteration6.md) | `analysis`, root | 4 |
 | 7 | [Materialize the architect view](iterations/iteration7.md) | `daemon/contexts`, `daemon`, root, `cli` | 5, 6 |
 | 8 | [Real runs, invariance and hit cost](iterations/iteration8.md) | integration, documentation | 7 |
-| 9 | [Agent trials and completion](iterations/iteration9.md) | evaluation, documentation | 8 |
+| 9 | [Fix the defects the real runs found](iterations/iteration9.md) | `daemon/contexts`, `analysis`, `analysis/typescript`, `daemon`, harness | 8 |
+| 10 | [Agent trials and completion](iterations/iteration10.md) | evaluation, documentation | 9 |
 
 Iteration 5 shares no files with iterations 1–4 and may run beside them.
 Iteration 7 integrates both lines.
@@ -228,6 +235,10 @@ Iteration 6 was inserted on 2026-09-18, after iteration 4, when test records
 gained `exercises` ([C9](contracts.md#c9-test-references)). The results of
 iterations 1–5 name the later iterations by their earlier numbers: their 6, 7
 and 8 are now 7, 8 and 9.
+
+Iteration 9 was inserted on 2026-09-18, after iteration 8, to fix the defects
+its real runs found. Iteration 8's results call the agent trials iteration 9;
+they are now iteration 10.
 
 ## Review decisions
 

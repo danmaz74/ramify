@@ -54,6 +54,12 @@
       "file": "iteration9.md",
       "index": 9,
       "parallelGroup": null,
+      "title": "Fix the defects the real runs found"
+    },
+    {
+      "file": "iteration10.md",
+      "index": 10,
+      "parallelGroup": null,
       "title": "Agent trials and completion"
     }
   ]

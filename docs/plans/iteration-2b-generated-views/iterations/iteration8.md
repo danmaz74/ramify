@@ -40,7 +40,7 @@ budgets, and is described to agents.
    with the measured values, `docs/architecture/materialized-api-view.spec.md`
    for `--view`, and the CLI section of the development guides that lists
    `materialize`.
-5. Materialize the view at the worktree root for iteration 9, and record its
+5. Materialize the view at the worktree root for the trials, and record its
    revision.
 
 ## Matrix rows executed here
@@ -69,4 +69,4 @@ decision with the measurement recorded.
 ## Handoff
 
 The materialized view at the worktree root and its revision, the evidence
-files, and the hit-cost table for iteration 9's report.
+files, and the hit-cost table for the completion report.

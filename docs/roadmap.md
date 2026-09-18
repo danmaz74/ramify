@@ -453,9 +453,9 @@ view; `analysis/project` reserves `.ramify-architect`; the daemon waits for
 dependency facts and publishes the view in one transaction with the API
 view's targets. No owner is added.
 
-**Acceptance and handoff.** Execute the plan's 39 AV rows: classification and
+**Acceptance and handoff.** Execute the plan's 43 AV rows: classification and
 consumer equivalence, rendering, test references, publication, invariance,
-hit cost, and agent trials on Claude Code and Codex CLI that decide
+defect fixes, hit cost, and agent trials on Claude Code and Codex CLI that decide
 hypothesis H1. Hand off the
 view format, its measured limits and the H1 verdict to Plans 4 and 7.
 

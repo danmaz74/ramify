@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-18. **Status:** accepted strict gate for [Plan 2B](main-plan.md),
 with its [contracts](contracts.md) and [agent test cases](test-cases.md).
-Every row is required. Only AV28's macOS half may be recorded as unexecuted,
+Every row is required. Only AV31's macOS half may be recorded as unexecuted,
 with its reason.
 
 ## Fixtures
@@ -107,7 +107,16 @@ with its reason.
 | AV33 | Measurements against the [budgets](main-plan.md#resource-budgets): session query and whole-command latency with and without dependency facts, files, bytes, unchanged-repeat writes and peak daemon memory on `toolkit`, `reference` and S100. |
 | AV34 | Regressions: the Plan 2A harness passes and `ramify materialize` without `--view` is byte-identical; build, type-check, `check:self`, `check:reference` and `reference:cases` pass; the `./cli` and `./client` closures still exclude analysis, the worker and TypeScript; the eight package entries are unchanged. |
 
-## Agent trials and completion (iteration 9)
+## Defect fixes (iteration 9)
+
+| ID | Case |
+| --- | --- |
+| AV40 | After a context opened by one invocation form is reached by another (`check` from the root, then `materialize --view architect --root <root>` from another directory; `check --root .`, then a command without `--root`), the dependency analyzer answers `ready` for unchanged inputs, `materialize --view architect` publishes measured dependencies within the whole-command budget, and a real input change still answers `inputs-changed` or supersedes the wait. |
+| AV41 | A resident session opened while `.ramify` and `.ramify-architect` directories exist records none of their paths as inputs, and its input identity equals a batch check's of the same project. |
+| AV42 | When removing a failed stage fails, its marker remains and sibling recovery later removes the stage, for both targets; with a leftover marker file at the project root of the toolkit and the reference project, `git status` shows nothing from it. |
+| AV43 | `npm run reference:cases` passes: the five predecessor tests describe the fifteen-owner toolkit and the documents' current explorer status, and no Plan 2A or Plan 2B case changes. |
+
+## Agent trials and completion (iteration 10)
 
 | ID | Case |
 | --- | --- |
