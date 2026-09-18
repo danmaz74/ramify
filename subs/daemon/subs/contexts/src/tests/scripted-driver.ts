@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type { ApiViewQueryLimits, AnalysisDriver, ContextBudgets, ContextSetup } from '../interfaces/contexts.js';
 import type { AnalysisInputs, AnalysisReport, RunControl } from '../../../../../analysis/src/interfaces/analysis.js';
 import type { ApiViewQuery, ApiViewQueryOutcome, OperationTimings, RetainedSession, SessionChange, SessionRevision, SessionStatus, SessionUpdate, VerifyOutcome } from '../../../../../analysis/src/interfaces/session.js';
+import type { ArchitectViewQuery, ArchitectViewQueryOutcome } from '../../../../../analysis/src/interfaces/architect-view.js';
 import type { SymbolDetailRequest } from '../../../../../analysis/subs/typescript/src/interfaces/source.js';
 import type { CapturedInput, ProjectRequest, ProjectResolution } from '../../../../../analysis/subs/project/src/interfaces/project.js';
 import { historyReport } from './history-fixture.js';
@@ -16,6 +17,8 @@ export const testBudgets: ContextBudgets = {
 export const testApiViewLimits: ApiViewQueryLimits = {
   details: { maxSignatureBytes: 2048, maxDocumentationBytes: 512, maxOverloads: 8, maxResultBytes: 32 * 1024 ** 2 },
   maxAreaBytes: 32 * 1024 ** 2, maxInvocationBytes: 256 * 1024 ** 2,
+  architect: { details: { maxSignatureBytes: 240, maxDocumentationBytes: 280, maxOverloads: 4, maxResultBytes: 32 * 1024 ** 2 },
+    tests: { maxTitleBytes: 240, maxTitlesPerRecord: 40, maxResultBytes: 16 * 1024 ** 2 }, maxProjectionBytes: 64 * 1024 ** 2 },
 };
 export function hash(content: string): string { return createHash('sha256').update(content).digest('hex'); }
 
@@ -66,6 +69,7 @@ export interface ScriptedSession {
   readonly reportCalls: number[];
   readonly releasedRevisions: number[];
   readonly apiViewCalls: ApiViewQuery[];
+  readonly architectViewCalls: ArchitectViewQuery[];
   readonly explorerDetailsCalls: readonly { readonly sequence: number; readonly requests: readonly SymbolDetailRequest[] }[];
   releaseCompilerCalls: number;
   disposeCalls: number;
@@ -83,6 +87,10 @@ export function createScriptedDriver() {
   /** Scripted `apiView` answers, consumed in order; the default projects an
    * empty, deterministic projection from the session's current revision. */
   const apiViewPending: ((session: RetainedSession, query: ApiViewQuery) => Promise<ApiViewQueryOutcome> | ApiViewQueryOutcome)[] = [];
+  /** Scripted `architectView` answers, consumed in order, each with the query's signal; the
+   * default projects an empty, deterministic projection from the session's current revision. */
+  const architectViewPending: ((session: RetainedSession, query: ArchitectViewQuery, signal: AbortSignal | undefined)
+    => Promise<ArchitectViewQueryOutcome> | ArchitectViewQueryOutcome)[] = [];
   const missingReports = new Set<number>();
   let fallback = capture(1);
   let factBytes = 100;
@@ -191,6 +199,19 @@ export function createScriptedDriver() {
           return { status: 'projected', projection: { schema: 'ramify.api-view-projection/1', sequence: query.sequence,
             inputId: current.inputId, modules: [], bytes: 0 } };
         },
+        async architectView(query, runControl) {
+          entry.architectViewCalls.push(query);
+          if (runControl?.signal?.aborted) return { status: 'cancelled' };
+          const next = architectViewPending.shift();
+          if (next) return await next(session, query, runControl?.signal);
+          if (!current || query.sequence !== current.sequence) {
+            return { status: 'unavailable', reason: 'invalid-revision', message: `Sequence ${query.sequence} is not current` };
+          }
+          return { status: 'projected', sequence: query.sequence, inputId: current.inputId, projection: {
+            schema: 'ramify.architect-projection/1', sequence: query.sequence, inputId: current.inputId, root: 'fixture',
+            modules: [], symbols: [], tests: [],
+            counts: { coverage: 0, detailsUnavailable: 0, unknownShapes: 0, dynamicTitles: 0, testsUnavailable: 0, cut: 0 }, bytes: 0 } };
+        },
         async explorerDetails(sequence, requests, runControl) {
           explorerDetailsCalls.push({ sequence, requests });
           if (runControl?.signal?.aborted) return { status: 'cancelled' };
@@ -203,13 +224,14 @@ export function createScriptedDriver() {
         },
         async dispose() { if (sessionDisposed) return; entry.disposeCalls++; sessionDisposed = true; current = null; currentReport = null; reports.clear(); retainedBytes = 0; },
       };
-      const entry: ScriptedSession = { session, project, reportCalls: [], releasedRevisions: [], apiViewCalls: [], explorerDetailsCalls, releaseCompilerCalls: 0, disposeCalls: 0 };
+      const entry: ScriptedSession = { session, project, reportCalls: [], releasedRevisions: [], apiViewCalls: [], architectViewCalls: [], explorerDetailsCalls,
+        releaseCompilerCalls: 0, disposeCalls: 0 };
       sessions.push(entry);
       return { status: 'opened', session, revision: initial.revision };
     },
     async dispose() { disposed = true; },
   };
-  return { driver, calls, pending, sessions, reportCalls, verifyCalls, verifyPending, releasePending, apiViewPending, missingReports, resolveCalls,
+  return { driver, calls, pending, sessions, reportCalls, verifyCalls, verifyPending, releasePending, apiViewPending, architectViewPending, missingReports, resolveCalls,
     /** Resolutions actually performed: calls that returned no known resolution. */
     get resolutions() { return resolveCalls.filter(call => !call.reused).length; },
     /** Change the discovery answers: every earlier resolution is invalid, optionally with a moved root. */

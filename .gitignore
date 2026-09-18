@@ -21,16 +21,28 @@ examples/collection-review/.reference-work/
 # Unique production-build staging directories.
 .reference-work/
 
-# Materialized API-view catalogs and the publisher's reserved transient
-# staging/rollback siblings (defense against commits; the generated-path
-# predicate that isolates them at every runtime boundary is authoritative,
-# not this file). Matches the closed enumeration only: `.ramify`,
-# `.ramify.tmp-<suffix>`, `.ramify.old-<suffix>`, at any depth. Near-miss
-# names such as `.ramify-other` or `.ramify.tmp` (no suffix) are ordinary
-# and intentionally left tracked.
+# Materialized API-view catalogs, the materialized architect view and the
+# publisher's reserved transient staging/rollback siblings of each, with the
+# sibling marker file, `<sibling>.marker.json`, that a failed or interrupted
+# publication can leave beside a sibling (defense against commits and
+# project-wide searches; the generated-path predicate that isolates them at
+# every runtime boundary is authoritative, not this file). Matches the closed
+# enumeration only, at any depth: `.ramify`, `.ramify.tmp-<suffix>`,
+# `.ramify.old-<suffix>`, `.ramify-architect`, `.ramify-architect.tmp-<suffix>`
+# and `.ramify-architect.old-<suffix>`, and the four marker forms. Near-miss
+# names such as `.ramify-other`, `.ramify-architects`, `.ramify.tmp` or
+# `.ramify-architect.tmp` (no suffix) are ordinary and intentionally left
+# tracked.
 .ramify/
 .ramify.tmp-*/
 .ramify.old-*/
+.ramify.tmp-*.marker.json
+.ramify.old-*.marker.json
+.ramify-architect/
+.ramify-architect.tmp-*/
+.ramify-architect.old-*/
+.ramify-architect.tmp-*.marker.json
+.ramify-architect.old-*.marker.json
 
 # Host-specific compose interpolation, e.g. RESTART_POLICY on the server.
 .devcontainer/.env

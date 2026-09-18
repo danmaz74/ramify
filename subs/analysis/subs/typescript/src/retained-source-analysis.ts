@@ -5,16 +5,19 @@ import { basename, isAbsolute, relative, resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { API, type Project } from 'typescript/unstable/sync';
 import { isStringLiteral } from 'typescript/unstable/ast';
+import { isRamifyGeneratedPath } from '../../project/src/generated-path.js';
 import type { ObservationSink, ProjectInventory } from '../../project/src/interfaces/project.js';
 import type { SourceArea } from '../../model/src/interfaces/model.js';
 import { AccessInterpretation } from './accesses.js';
 import { createDescriptionSet, type DescriptionSet } from './descriptions.js';
-import type { AccessInterpreter, CatalogDelta, CatalogExport, FileDescription, MembershipReach, RetainedSourceAnalysis,
-  RetainedSourceInputs, SourceCatalog, SourceChangeSet, SourceWorkLimits, SymbolDetail, SymbolDetailLimits,
-  SymbolDetailRequest } from './interfaces/source.js';
+import { describeExportShapes } from './export-shapes.js';
+import type { AccessInterpreter, CatalogDelta, CatalogExport, ExportShape, ExportShapeRequest, FileDescription, MembershipReach,
+  RetainedSourceAnalysis, RetainedSourceInputs, SourceCatalog, SourceChangeSet, SourceWorkLimits, SymbolDetail, SymbolDetailLimits,
+  SymbolDetailRequest, TestFileTitles, TestTitleLimits } from './interfaces/source.js';
 import type { CatalogHost } from './resolution.js';
 import { describeSymbolDetails } from './symbol-details.js';
 import { referencesOnly, syntheticCandidate, syntheticInputs } from './synthetic.js';
+import { describeTestTitles } from './test-titles.js';
 import { FILE_BYTES, SourceFailure, freezeData, type HelperInputs } from './wire.js';
 
 type Snapshot = ReturnType<API['updateSnapshot']>;
@@ -240,6 +243,18 @@ class RetainedSourceState implements RetainedSourceAnalysis {
     this.#check(signal);
     const project = this.#requireProject();
     return this.#guarded(() => describeSymbolDetails(project, { inventory: this.#inventory, areas: this.#areas }, requests, limits, signal));
+  }
+
+  async shapes(requests: readonly ExportShapeRequest[], signal?: AbortSignal): Promise<readonly ExportShape[]> {
+    this.#check(signal);
+    const project = this.#requireProject();
+    return this.#guarded(() => describeExportShapes(project, { inventory: this.#inventory, areas: this.#areas }, requests, signal));
+  }
+
+  async testTitles(files: readonly string[], limits: TestTitleLimits, signal?: AbortSignal): Promise<readonly TestFileTitles[]> {
+    this.#check(signal);
+    const project = this.#requireProject();
+    return this.#guarded(() => describeTestTitles(project, this.#root, files, limits, signal));
   }
 
   interpreter(): AccessInterpreter {
@@ -531,11 +546,16 @@ class RetainedSourceState implements RetainedSourceAnalysis {
     }
   }
 
-  /** Enumerate a directory and report it with its members' full paths. */
+  /**
+   * Enumerate a directory and report it with its members' full paths. A reserved generated
+   * name is omitted, as the capture's listings and the configuration host omit it: the
+   * compiler never sees a generated view, and neither the listing nor a member probe makes
+   * one an input.
+   */
   #listing(path: string): Set<string> {
     if (this.#observe(path, 'directoryExists') !== 'directory') return new Set();
     let names: string[];
-    try { names = readdirSync(path); }
+    try { names = readdirSync(path).filter(name => !isRamifyGeneratedPath(name)); }
     catch (error) {
       if (missing(error)) return new Set();
       return this.#fail(new SourceFailure('read-failure', `Cannot enumerate ${path}: ${String(error)}`, path));

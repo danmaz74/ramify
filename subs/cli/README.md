@@ -50,3 +50,12 @@ command exception boundary renders those failures while cancellation and
 output failures retain precedence. Root serializes publication writes and
 bounds queued stdout bytes so streamed documents cannot interleave or grow
 without a limit.
+
+`materialize [--view <api|architect>]... [--from <path> | --all] [--root <dir>]`
+refreshes generated views through the daemon and never falls back to batch.
+Without `--view` it is Plan 2A's API-view request and output. `--view` may
+repeat, once per view; unknown or duplicate values, and `--from` or `--all`
+without `api`, exit 2 before connecting. With `--view`, a daemon whose welcome
+lacks `materialize-views` gives `incompatible-service`, exit 2. A published
+architect view adds the line
+`Architect view: .ramify-architect, <modules> modules, <records> records, dependencies <measured|unavailable (<reason>)>`.

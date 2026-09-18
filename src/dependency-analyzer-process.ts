@@ -4,7 +4,7 @@ import { reportCapacity } from './report-capacity.js';
 
 /** Bounds of one dependency analyzer process (Plan 6D resource budgets). */
 export const dependencyAnalyzerCapacity = Object.freeze({
-  /** The encoded diagram limit; a larger diagram is refused. */
+  /** The encoded diagram limit, and separately the test references' limit; a larger diagram is refused. */
   maxResultBytes: 16 * 1024 ** 2,
   /** One job, including process exit. */
   deadlineMs: 120_000,
@@ -25,6 +25,17 @@ export interface DependencyAnalyzerProcessOptions {
 const errorBytes = 64 * 1024;
 const unavailableReasons = new Set(['invalid-report', 'analysis-failed', 'resource-limit']);
 const strings = (value: unknown): boolean => Array.isArray(value) && value.every(item => typeof item === 'string');
+const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
+const originalId = (value: unknown): boolean => record(value) && (value.kind === 'code' || value.kind === 'resource')
+  && typeof value.owner === 'string' && typeof value.file === 'string' && typeof value.binding === 'string';
+
+/** Null, or references of the diagram's input: one entry per file with originals and an unknown-pair count. */
+function testReferences(value: unknown, inputId: unknown): boolean {
+  if (value === null) return true;
+  return record(value) && value.inputId === inputId && Array.isArray(value.files) && value.files.every(entry => record(entry)
+    && typeof entry.file === 'string' && Array.isArray(entry.exercises) && entry.exercises.every(originalId)
+    && Number.isSafeInteger(entry.unclassified) && (entry.unclassified as number) >= 0);
+}
 
 function analyzerOutcome(value: unknown): value is DependencyAnalyzerOutcome {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -34,7 +45,8 @@ function analyzerOutcome(value: unknown): value is DependencyAnalyzerOutcome {
       const diagram = outcome.diagram as Record<string, unknown> | null;
       const timings = outcome.timings as Record<string, unknown> | null;
       return !!diagram && typeof diagram === 'object' && typeof diagram.inputId === 'string' && strings(diagram.modules)
-        && Array.isArray(diagram.boundaries) && Number.isSafeInteger(outcome.behaviorRuns) && !!timings && typeof timings === 'object'
+        && Array.isArray(diagram.boundaries) && testReferences(outcome.testReferences, diagram.inputId)
+        && Number.isSafeInteger(outcome.behaviorRuns) && !!timings && typeof timings === 'object'
         && ['acquireMs', 'projectMs', 'classifyMs', 'totalMs'].every(key => typeof timings[key] === 'number');
     }
     case 'inputs-changed': return strings(outcome.paths) && (outcome.paths as unknown[]).length > 0;
@@ -46,10 +58,11 @@ function analyzerOutcome(value: unknown): value is DependencyAnalyzerOutcome {
 
 /**
  * Dependency diagram runner with one Node child per run: the request on standard input and one
- * JSON outcome on standard output within the response capacity. Cancellation, the deadline or an
- * oversized response terminate the child, which disposes its compiler helper; a child that has not
- * exited within the disposal limit is killed. Every run settles once the child has exited and never
- * returns a partial outcome.
+ * JSON outcome on standard output within the response capacity. A ready outcome carries the
+ * diagram and the test references of the same input, or null references. Cancellation, the
+ * deadline or an oversized response terminate the child, which disposes its compiler helper; a
+ * child that has not exited within the disposal limit is killed. Every run settles once the child
+ * has exited and never returns a partial outcome.
  */
 export function createProcessDependencyAnalyzer(runtime: string, entry: string, options: DependencyAnalyzerProcessOptions = {}): DependencyDiagramRunner {
   const deadlineMs = options.deadlineMs ?? dependencyAnalyzerCapacity.deadlineMs;

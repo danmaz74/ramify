@@ -1,11 +1,16 @@
-import { readFile, rm } from 'node:fs/promises';
-import { basename, join, resolve } from 'node:path';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { basename, dirname, join, resolve } from 'node:path';
+import { API } from 'typescript/unstable/sync';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { ObservationSink } from '../../../project/src/interfaces/project.js';
+import { describeExportShapes } from '../export-shapes.js';
 import { createRetainedSourceAnalysis, retainedCompilerEvidence } from '../retained-source-analysis.js';
 import { createSourceAnalysis } from '../source-analysis.js';
-import type { RetainedSourceAnalysis, RetainedSourceInputs, SourceChangeSet, SymbolDetailLimits } from '../interfaces/source.js';
-import { acquire, areasFor, code, configuration, drop, fixture, put, sourceLimits } from './fixtures.js';
+import { describeTestTitles } from '../test-titles.js';
+import type { ExportShapeRequest, RetainedSourceAnalysis, RetainedSourceInputs, SourceChangeSet, SymbolDetailLimits,
+  TestTitleLimits } from '../interfaces/source.js';
+import { acquire, areasFor, code, configuration, definingExports, drop, fixture, put, shapesFixture, sourceLimits,
+  titlesFixture } from './fixtures.js';
 import { retainedMembershipWitness } from './retained-membership.js';
 
 const roots: string[] = [];
@@ -265,6 +270,36 @@ describe('retained source analysis', () => {
     expect(reread).toMatchObject({ role: 'source', bytes: Buffer.byteLength((await readFile(join(root, 'src/consumer.ts'))).toString()) });
   }, 60_000);
 
+  it('omits reserved generated names from its listings and member probes, keeping near misses', async () => {
+    const hex = (digit: string) => digit.repeat(32);
+    const generated = {
+      '.ramify-architect/_meta.json': '{"schema":"ramify.architect-view/1"}\n', '.ramify-architect/behavior.jsonl': '\n',
+      [`.ramify-architect.tmp-${hex('a')}/_meta.json`]: '{}\n', [`.ramify-architect.old-${hex('b')}.marker.json`]: '{}\n',
+      'src/.ramify/_meta.json': '{"schema":"ramify.api-view/1"}\n', 'src/.ramify/external.md': '# api\n',
+      [`src/.ramify.tmp-${hex('c')}/_meta.json`]: '{}\n', [`src/.ramify.old-${hex('d')}.marker.json`]: '{}\n',
+    };
+    // On disk only, not through `put`: the fixture's inventory, like acquisition's, holds none of them.
+    const root = await start(project);
+    for (const [path, text] of Object.entries({ ...generated, '.ramify-architects/near.json': '{}\n' })) {
+      await mkdir(dirname(join(root, path)), { recursive: true });
+      await writeFile(join(root, path), text);
+    }
+    const { sink, events } = recording();
+    const analysis = await open(root, sink);
+    await analysis.describe([]);
+    await state(analysis);
+    // An independent statement of the six reserved forms and their marker files, at any segment.
+    const reserved = /(?:^|\/)\.ramify(?:-architect)?(?:\.(?:tmp|old)-[^/]+)?(?:\/|$)/;
+    const paths = events.flatMap(event => [event.path, ...event.entries ?? []]).map(path => path.slice(root.length));
+    expect(paths.filter(path => reserved.test(path))).toEqual([]);
+    const listing = (directory: string) => events.find(event => event.shape === 'directory' && event.path === directory)?.entries;
+    expect(listing(root)).toEqual(expect.arrayContaining([join(root, '.ramify-architects'), join(root, 'src'), join(root, 'tsconfig.json')]));
+    expect(listing(join(root, 'src'))).toEqual(Object.keys(project).map(file => join(root, file)).sort());
+    const retained = await state(analysis), helper = await batch(root);
+    expect(retained.catalog).toBe(helper.catalog);
+    expect(JSON.parse(retained.accesses).accesses).toEqual(JSON.parse(helper.accesses).accesses);
+  }, 60_000);
+
   it('rejects the next call with read-failure when the server is lost, then rebuilds on a later update', async () => {
     const root = await start(project);
     const analysis = await open(root);
@@ -403,6 +438,124 @@ describe('retained source analysis', () => {
       controller.abort();
       await expect(analysis.details([{ original: code('api.ts', 'value'), exportName: 'value' }], limits, controller.signal))
         .rejects.toMatchObject({ code: 'cancelled' });
+    }, 60_000);
+  });
+
+  describe('export shapes (AV03)', () => {
+    const limit: ExportShapeRequest = { original: code('supporting.ts', 'limit'), exportName: 'limit' };
+
+    it('returns what describeExportShapes returns on the same project, in request order', async () => {
+      const root = await start(shapesFixture);
+      const inputs = await inputsOf(root);
+      const analysis = await open(root);
+      await analysis.describe([]);
+      const exports = definingExports(analysis.catalog());
+      expect(exports.length).toBeGreaterThan(15);
+      // Reversed, with a repeated request, which is answered again in its place.
+      const requests = [...exports].reverse().concat(exports[0]!);
+      const retained = await analysis.shapes(requests);
+      const api = new API({ cwd: root });
+      try {
+        const snapshot = api.updateSnapshot({ openProjects: [inputs.configuration] });
+        const batch = describeExportShapes(snapshot.getProject(inputs.configuration)!, inputs, requests);
+        expect(retained).toEqual(batch);
+      } finally { api.close(); }
+      expect(retained.map(shape => [shape.original, shape.exportName])).toEqual(requests.map(request => [request.original, request.exportName]));
+      expect(retained.filter(shape => shape.behavior !== null).length).toBeGreaterThan(5);
+      expect(Object.isFrozen(retained) && Object.isFrozen(retained[0])).toBe(true);
+    }, 60_000);
+
+    it('needs no description, rejects with unavailable once the compiler is released, and answers again after the next update', async () => {
+      const root = await start(shapesFixture);
+      const analysis = await open(root);
+      expect(await analysis.shapes([limit])).toEqual([{ ...limit, kind: 'value', behavior: null }]);
+      await analysis.describe([]);
+      await analysis.releaseCompiler();
+      await expect(analysis.shapes([limit])).rejects.toMatchObject({ code: 'unavailable' });
+      await analysis.update(none);
+      expect(await analysis.shapes([limit])).toEqual([{ ...limit, kind: 'value', behavior: null }]);
+    }, 60_000);
+
+    it('rejects the in-flight call with read-failure and discards the compiler when the server is lost', async () => {
+      const root = await start(shapesFixture);
+      const analysis = await open(root);
+      await analysis.describe([]);
+      const pid = retainedCompilerEvidence(analysis).serverPid!;
+      process.kill(pid, 'SIGKILL');
+      expect(await gone(pid)).toBe(true);
+      await expect(analysis.shapes([limit])).rejects.toMatchObject({ code: 'read-failure' });
+      expect(analysis.hot).toBe(false);
+    }, 60_000);
+
+    it('rejects an invalid, an already-cancelled or a disposed call with no result', async () => {
+      const root = await start(shapesFixture);
+      const analysis = await open(root);
+      await analysis.describe([]);
+      await expect(analysis.shapes([{ ...limit, exportName: '' }])).rejects.toMatchObject({ code: 'protocol-error' });
+      await expect(analysis.shapes([limit], AbortSignal.abort())).rejects.toMatchObject({ code: 'cancelled' });
+      expect(analysis.hot).toBe(true);
+      await analysis.dispose();
+      await expect(analysis.shapes([limit])).rejects.toMatchObject({ code: 'disposed' });
+    }, 60_000);
+  });
+
+  describe('test titles (AV07)', () => {
+    const limits: TestTitleLimits = { maxTitleBytes: 240, maxTitlesPerRecord: 40, maxResultBytes: 16 * 1024 * 1024 };
+    const suites = 'src/tests/suites.test.ts';
+
+    it('returns what describeTestTitles returns on the same project, in request order', async () => {
+      const root = await start(titlesFixture);
+      const inputs = await inputsOf(root);
+      const analysis = await open(root);
+      const files = ['src/tests/tables.test.ts', 'tests/outside.test.ts', suites, 'src/tests/limits.test.ts',
+        'src/tests/own-bindings.test.ts', 'src/tests/plain.test.js', 'src/tests/absent.test.ts', 'src/tests/local-bindings.test.ts',
+        'src/tests/no-tests.test.ts', 'src/tests/tables.test.ts'];
+      const retained = await analysis.testTitles(files, limits);
+      const api = new API({ cwd: root });
+      try {
+        const snapshot = api.updateSnapshot({ openProjects: [inputs.configuration] });
+        expect(retained).toEqual(describeTestTitles(snapshot.getProject(inputs.configuration)!, root, files, limits));
+      } finally { api.close(); }
+      expect(retained.map(entry => entry.file)).toEqual(files);
+      expect(retained.map(entry => entry.state)).toEqual(['described', 'unavailable', 'described', 'described', 'described',
+        'unavailable', 'unavailable', 'described', 'described', 'described']);
+      expect(retained[2]).toMatchObject({ state: 'described', suites: expect.arrayContaining([{ suite: ['empty suite'], tests: [] }]) });
+      expect(Object.isFrozen(retained) && Object.isFrozen(retained[0])).toBe(true);
+    }, 60_000);
+
+    it('needs no description, rejects with unavailable once the compiler is released, and answers again after the next update', async () => {
+      const root = await start(titlesFixture);
+      const analysis = await open(root);
+      const [first] = await analysis.testTitles([suites], limits);
+      expect(first).toMatchObject({ file: suites, state: 'described', dynamic: 0, cut: 0 });
+      await analysis.describe([]);
+      await analysis.releaseCompiler();
+      await expect(analysis.testTitles([suites], limits)).rejects.toMatchObject({ code: 'unavailable' });
+      await analysis.update(none);
+      expect(await analysis.testTitles([suites], limits)).toEqual([first]);
+    }, 60_000);
+
+    it('rejects the in-flight call with read-failure and discards the compiler when the server is lost', async () => {
+      const root = await start(titlesFixture);
+      const analysis = await open(root);
+      await analysis.describe([]);
+      const pid = retainedCompilerEvidence(analysis).serverPid!;
+      process.kill(pid, 'SIGKILL');
+      expect(await gone(pid)).toBe(true);
+      await expect(analysis.testTitles([suites], limits)).rejects.toMatchObject({ code: 'read-failure' });
+      expect(analysis.hot).toBe(false);
+    }, 60_000);
+
+    it('rejects an invalid, an over-limit, an already-cancelled or a disposed call with no result', async () => {
+      const root = await start(titlesFixture);
+      const analysis = await open(root);
+      await analysis.describe([]);
+      await expect(analysis.testTitles(['/abs/suites.test.ts'], limits)).rejects.toMatchObject({ code: 'protocol-error' });
+      await expect(analysis.testTitles([suites], { ...limits, maxResultBytes: 64 })).rejects.toMatchObject({ code: 'resource-limit' });
+      await expect(analysis.testTitles([suites], limits, AbortSignal.abort())).rejects.toMatchObject({ code: 'cancelled' });
+      expect(analysis.hot).toBe(true);
+      await analysis.dispose();
+      await expect(analysis.testTitles([suites], limits)).rejects.toMatchObject({ code: 'disposed' });
     }, 60_000);
   });
 });

@@ -29,15 +29,27 @@ expose-src resolveProject from "resolve-project.ts" to parent
 expose-src * from "interfaces/session.ts" to parent
 expose-src openRetainedSession from "retained-session.ts" to parent
 
+// A16: the architect projection and its session query, declarations only;
+// the planning and projection functions stay internal to analysis. Analysis
+// re-exposes the export kinds, behaviors and title limits they name, which it
+// receives from typescript.
+expose-src * from "interfaces/architect-view.ts" to parent
+expose-sub ExportKind, ExportBehavior, TestTitleLimits from typescript to parent
+
+// A17: the pure architect-view renderer, which turns a projection and the
+// dependency facts of its revision into the view's files; its result and
+// dependency types are declared with the projection in A16.
+expose-src renderArchitectView from "architect-render.ts" to parent
+
 // A13: pure API-view projection, joining availability, catalog and detail
 // results into complete, bounded area projections; no filesystem or
 // retention access. planApiViewRequests names the detail requests a query
 // needs; projectApiView folds their results into the frozen projection.
 expose-src planApiViewRequests, projectApiView from "api-view.ts" to parent
 
-// A14: dependency-diagram result vocabulary, declarations only; the
-// projection function stays internal to analysis.
-expose-src DependencyBoundaryFact, DependencyDiagramFacts, DependencyDiagramOutcome from "interfaces/dependency-diagram.ts" to parent
+// A14: dependency-diagram and test-reference result vocabulary, declarations
+// only; the projection functions stay internal to analysis.
+expose-src DependencyBoundaryFact, DependencyDiagramFacts, DependencyDiagramOutcome, TestFileReferences, TestReferenceFacts, TestReferenceOutcome from "interfaces/dependency-diagram.ts" to parent
 expose-src BehavioralDependencyMetrics from "interfaces/modularity.ts" to parent
 
 // A15: the lean dependency analyzer and its runner contract, called only by

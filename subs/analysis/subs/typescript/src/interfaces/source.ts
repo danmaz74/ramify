@@ -117,6 +117,42 @@ export type SymbolDetail =
   | { readonly state: 'unavailable'; readonly original: OriginalId; readonly exportName: string;
       readonly reason: 'missing-file' | 'missing-export' | 'identity-mismatch'
         | 'unsupported-declaration' | 'compiler-failure' };
+/** The behavior of an exported runtime value, by the behavior-capable rule's precedence. */
+export type ExportBehavior = 'constructable' | 'callable' | 'member' | 'unknown';
+/** An exported original's kind, from its primary declaration; `resource` for a non-code original. */
+export type ExportKind = 'class' | 'function' | 'interface' | 'type' | 'enum'
+  | 'namespace' | 'value' | 'resource';
+export interface ExportShapeRequest { readonly original: OriginalId; readonly exportName: string }
+export interface ExportShape {
+  readonly original: OriginalId;
+  readonly exportName: string;
+  readonly kind: ExportKind;
+  /** null: a supporting original. */
+  readonly behavior: ExportBehavior | null;
+}
+/** Bounds of one test-title read: a title's UTF-8 bytes before its `…`, the
+ * titles of one suite entry, and the encoded bytes of the whole result. */
+export interface TestTitleLimits {
+  readonly maxTitleBytes: number;
+  readonly maxTitlesPerRecord: number;
+  readonly maxResultBytes: number;
+}
+/** One suite's direct tests, or one continuation of a longer list. */
+export interface TestSuiteTitles {
+  /** Suite titles, outermost first; `[]` outside any suite. */
+  readonly suite: readonly string[];
+  /** The suite's direct tests only, in source order. */
+  readonly tests: readonly string[];
+}
+/** One project-relative test file's titles, read statically from the compiler's
+ * syntax tree. `dynamic` and `cut` count the titles recorded as `(dynamic)` and
+ * the titles cut to the byte limit. */
+export type TestFileTitles =
+  | { readonly file: string; readonly state: 'described';
+      readonly suites: readonly TestSuiteTitles[];
+      readonly dynamic: number; readonly cut: number }
+  | { readonly file: string; readonly state: 'unavailable';
+      readonly reason: 'not-in-program' | 'compiler-failure' };
 export interface SourceWorkLimits {
   readonly maxExports: number;
   readonly maxAccesses: number;
@@ -215,6 +251,18 @@ export interface RetainedSourceAnalysis {
    * `limits.maxResultBytes` rejects with `SourceFailure`. An isolated
    * valid-request failure is an `unavailable` entry, never a rejection. */
   details(requests: readonly SymbolDetailRequest[], limits: SymbolDetailLimits, signal?: AbortSignal): Promise<readonly SymbolDetail[]>;
+  /** The kind and behavior of each requested defining-file export, one per
+   * request in request order, with the same hot-compiler precondition as
+   * `details`. An invalid request rejects with `SourceFailure`; an export the
+   * compiler cannot resolve is a `value` of `unknown` behavior. */
+  shapes(requests: readonly ExportShapeRequest[], signal?: AbortSignal): Promise<readonly ExportShape[]>;
+  /** The suite and test titles of each requested project-relative TypeScript or
+   * JavaScript file, one per request in request order, with the same
+   * hot-compiler precondition as `details`. An invalid request, invalid limits
+   * or a total encoded result above `limits.maxResultBytes` rejects with
+   * `SourceFailure`; a file outside the compiler program is an `unavailable`
+   * entry. */
+  testTitles(files: readonly string[], limits: TestTitleLimits, signal?: AbortSignal): Promise<readonly TestFileTitles[]>;
   catalog(): SourceCatalog;
   interpreter(): AccessInterpreter;
   releaseCompiler(): Promise<void>;

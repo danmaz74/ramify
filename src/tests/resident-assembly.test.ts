@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { createSessionDriver } from '../resident-assembly.js';
+import { createSessionDriver, residentPublishLimits } from '../resident-assembly.js';
 import { fixture } from './fixture.js';
 import { analyzeProject } from '../../subs/analysis/src/index.js';
 import { createQuickEnvironment } from './quick-environment.js';
 
 const setup = { registry: 'default' as const, capabilities: ['static-access', 'coverage'] as const };
+
+describe('resident publisher limits', () => {
+  it('keeps the API view limits and bounds the architect view at 64 MiB', () => {
+    expect(residentPublishLimits).toEqual({ maxAreaBytes: 32 * 1024 ** 2, maxArchitectBytes: 64 * 1024 ** 2,
+      maxInvocationBytes: 256 * 1024 ** 2, maxStagedBytes: 256 * 1024 ** 2 });
+  });
+});
 
 describe('resident analysis driver resolution lifetime', () => {
   it.each(['caller', 'driver'] as const)('cancels pending resolution when the %s ends it', mode => fixture(async root => {

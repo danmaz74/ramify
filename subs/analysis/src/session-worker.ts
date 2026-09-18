@@ -48,6 +48,7 @@ async function execute(request: Exclude<WorkerRequest, { operation: 'cancel' }>,
         case 'releaseRevision': await session.releaseRevision(request.sequence); break;
         case 'releaseCompiler': await session.releaseCompiler(); await children.release(inputs.limits.disposeTimeoutMs); break;
         case 'apiView': result = await session.apiView(request.query, { signal: control.signal }); break;
+        case 'architectView': result = await session.architectView(request.query, { signal: control.signal }); break;
         case 'explorerDetails': result = await session.explorerDetails(request.sequence, request.requests, { signal: control.signal }); break;
       }
     }

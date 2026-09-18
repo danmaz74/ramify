@@ -1,62 +1,90 @@
-# Iteration 9: Evidence, regressions and completion gate
+# Iteration 9: Fix the defects the real runs found
 
-**Plan:** [Plan 2B: Generated project views](../main-plan.md).
-**Prerequisites:** Iterations 7 and 8, with every earlier binding leaf passing.
-**Owners:** harness process cases, measurement scripts and artifacts, ignore
-rules, agent guidance, declarations validation and documentation.
+**Plan:** [Plan 2B: Generated architect view](../main-plan.md).
+**Prerequisites:** iteration 8.
+**Owners:** `daemon/contexts` or `analysis` (the dependency analyzer's
+request), `analysis/typescript` (the retained compiler's listing), `daemon`
+(publisher cleanup), the toolkit's and the reference project's `.gitignore`,
+and `scripts/reference-harness` (predecessor expectations).
 
 ## Goal
 
-Prove all three views on real projects and processes, confirm no predecessor
-regression and close the plan with a completion report.
+Fix the clear defects that iterations 5 and 8 recorded, so the plan's
+completion gate can pass on a correct build before the agent trials. Hit cost,
+record length and lock hold time are performance work outside this plan.
 
 ## Read first
 
-- [Completion gate](../main-plan.md#completion-gate) and the full
-  [instance inventory](../subcases.md).
-- Every Plan 2B results file; Plan 2A's completion report and measurement
-  recipes.
-- Root and reference `.gitignore`, `AGENTS.md`, the architecture index, roadmap
-  and testing guide.
+- AV40–AV43 and the main plan's
+  [completion boundary](../main-plan.md#completion-boundary).
+- Iteration 8's results: Findings 2 and 3, the `mixed-invocation` and
+  `open-with-view` witnesses in `scripts/measurements/plan2b.mjs`, and the
+  `reference:cases` failures under Verification.
+- Iteration 5's results: the stage cleanup and marker file limitations.
+- `subs/analysis/src/dependency-analyzer.ts` (re-acquisition from
+  `report.request.project`), `interfaces/dependency-analyzer.ts`
+  (`DependencyDiagramRunner`), and the context manager's dependency jobs and
+  republication with cause `request` in
+  `subs/daemon/subs/contexts/src/context-manager.ts`.
+- `subs/analysis/subs/typescript/src/retained-source-analysis.ts`
+  (`#listing`, `#readDirectory`) and, for the existing rule,
+  `subs/analysis/subs/project/src/configuration.ts` and `generated-path.ts`.
+- `subs/daemon/src/api-view-publisher.ts` (`cleanupTmp`, sibling recovery)
+  and its crash-recovery test.
+- `scripts/reference-harness/linking.test.ts`, `self.test.ts`,
+  `self-cases.ts`, `verify.test.ts`, `verify.ts`, `plan5-completion.test.ts`
+  and `plan5-completion-cases.ts`.
 
 ## Deliverables
 
-1. Add ignore rules for `.exported_symbols/`, `docs/modules/` and transient
-   forms to the toolkit and reference project; add the short `AGENTS.md`
-   section.
-2. Run compiled R and T materializations with independent expected trees,
-   unchanged repeats, Git status checks and `check:self` input identity.
-3. Record R, T, S100 and S1000 smoke measurements and just-over/just-under
-   limit cases. Record S500 as not required.
-4. Produce the Linux platform manifest and the macOS command; the platform row
-   fails without a macOS artifact.
-5. Run the Plan 1, 2, 5 and 2A gates, one at a time, and compare with their
-   recorded baselines. The full Vitest suite runs through the cucumber-viz audit.
-6. Validate twelve declarations, eight package entries and lightweight
-   CLI/client closures; remove unused `ApiView*` relays.
-7. Update the architecture index, a new generated-views specification or a
-   revision section beside the API view specification, roadmap, CLI and testing
-   guides.
-8. Write `iteration9-results.md` as the completion report.
+1. **The analyzer after a change of invocation form.** Make the dependency
+   analyzer verify a revision's inputs against the request those inputs were
+   captured with, so a republication with cause `request` does not make every
+   job answer `inputs-changed`. Prefer passing the captured request from the
+   context manager; if the code shows the analyzer side is the right place,
+   record why. A real input change must still answer `inputs-changed`, and a
+   newer revision must still supersede the wait.
+2. **Generated directories at session open.** Make the retained compiler's
+   directory listing and reads omit reserved segments, as the configuration
+   host does, so a session opened while `.ramify` or `.ramify-architect`
+   directories exist records none of them as inputs.
+3. **Stage cleanup.** Keep a stage's marker when removing the stage fails, so
+   sibling recovery reclaims it later, for the API and architect targets.
+4. **Marker files and Git.** Make the `.gitignore` patterns of the toolkit and
+   the reference project match leftover marker files as well as directories.
+5. **Predecessor expectations.** Update the five `reference:cases` tests that
+   fail at `577b980` to the fifteen-owner toolkit and the documents' current
+   explorer status, changing no assertion's intent.
+6. Turn iteration 8's `mixed-invocation` and `open-with-view` witnesses into
+   passing evidence, re-run `measure:plan2b` and record the whole-command time
+   of the mixed-invocation case against the 90 s budget.
 
 ## Matrix rows executed here
 
-I2B-10: all seven leaves. I2B-11: all four leaves, plus the unfiltered
-requirement for every earlier leaf.
+AV40–AV43, and AV29–AV34 again on the fixed build.
 
 ## Verification
 
-Run the commands in the completion gate on one build with owned endpoint
-directories. Run long gates detached and poll them in the foreground until they
-exit. Run `git diff --check` and link checks on changed files.
+```sh
+npm run build
+npm run type-check
+npm run check:self
+npm run check:reference
+npm run reference:cases
+npm run measure:plan2b
+```
+
+Also the focused files for each changed owner: the analyzer, the contexts
+dependency tests, the retained source analysis, the publisher and its crash
+recovery. The full Vitest suite runs through the cucumber-viz audit, not by
+hand.
 
 ## Exit criteria
 
-Every binding Plan 2B leaf passes, predecessor gates show no regression, the
-views and command are documented with measured limits, and resources are
-cleaned.
+AV40–AV43 pass, `reference:cases` passes, and every budget except hit cost
+holds.
 
 ## Handoff
 
-The completion report lists the registry contract for future views, measured
-limits, waivers, unexecuted rows and remaining gaps.
+The fixed build's commit, the rebuilt evidence, and any command form the
+trials must still avoid.

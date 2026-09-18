@@ -4,12 +4,13 @@ import { isAbsolute, relative, resolve, sep } from 'node:path';
 import type { RunControl } from '../../analysis/src/interfaces/analysis.js';
 import type { ApiViewSelection } from '../../analysis/src/interfaces/session.js';
 import type { ContextToken } from '../../daemon/src/context-types.js';
-import type { MaterializeOutcome } from '../../../src/interfaces/service.js';
+import type { MaterializeOutcome, MaterializeViewId } from '../../../src/interfaces/service.js';
 import type { CliEnvironment, CliExitCode } from './interfaces/cli.js';
 import { capabilities } from './command-support.js';
 import { CliFailure, disconnectFailure, serviceFailure } from './errors.js';
 
-interface MaterializeArguments { readonly root?: string; readonly from?: string; readonly all: boolean }
+interface MaterializeArguments { readonly root?: string; readonly from?: string; readonly all: boolean;
+  readonly views?: readonly MaterializeViewId[] }
 
 const missing = (error: unknown): boolean => error instanceof Error && 'code' in error
   && (error.code === 'ENOENT' || error.code === 'ENOTDIR');
@@ -23,9 +24,12 @@ function entryCount(outcome: Extract<MaterializeOutcome, { status: 'materialized
  * revision, target count, entry count, bytes written and unchanged-target count. */
 function success(root: string, outcome: Extract<MaterializeOutcome, { status: 'materialized' }>): string {
   const unchanged = outcome.targets.filter(target => !target.changed).length;
+  const architect = outcome.architect;
   return `Root: ${root}\n`
     + `Materialized: revision ${outcome.revision.sequence}; ${outcome.targets.length} target(s), ${entryCount(outcome)} entries, `
-    + `${outcome.bytesWritten} bytes written, ${unchanged} unchanged\n`;
+    + `${outcome.bytesWritten} bytes written, ${unchanged} unchanged\n`
+    + (architect ? `Architect view: .ramify-architect, ${architect.modules} modules, ${architect.records} records, dependencies `
+      + `${architect.dependencies === 'measured' ? 'measured' : `unavailable (${architect.dependencies.unavailable})`}\n` : '');
 }
 
 /** Compact failure line: names the stable reason and states that no complete
@@ -43,9 +47,11 @@ function outcomeReason(value: Exclude<MaterializeOutcome, { status: 'materialize
 }
 
 export async function materializeCommand(args: MaterializeArguments, environment: CliEnvironment, control: RunControl): Promise<CliExitCode> {
+  // The API view's module selection; without it any selection is sent and ignored.
+  const api = !args.views || args.views.includes('api');
   // Resolved and validated to exist before connecting; `--all` never resolves a path.
   let absoluteFrom: string | undefined;
-  if (!args.all) {
+  if (api && !args.all) {
     const requested = resolve(environment.cwd, args.from ?? '.');
     try { absoluteFrom = await realpath(requested); }
     catch (error) {
@@ -63,6 +69,9 @@ export async function materializeCommand(args: MaterializeArguments, environment
   const connection = connected.connection;
   let token: ContextToken | undefined, reopened = false, recovered = false;
   try {
+    if (args.views && !connection.daemon.capabilities.includes('materialize-views')) {
+      throw new CliFailure('incompatible-service', 'The daemon does not offer materialize-views, which --view needs', connection.daemon);
+    }
     while (true) {
       try {
         const opened = await connection.openContext({ project: { cwd: environment.cwd,
@@ -85,7 +94,7 @@ export async function materializeCommand(args: MaterializeArguments, environment
         token = opened.value.token;
         const root = opened.value.current.selection.root;
         let selection: ApiViewSelection;
-        if (args.all) selection = { scope: 'all' };
+        if (args.all || !api) selection = { scope: 'all' };
         else {
           const relativePath = relative(root, absoluteFrom!);
           if (relativePath === '..' || relativePath.startsWith(`..${sep}`) || isAbsolute(relativePath)) {
@@ -95,8 +104,9 @@ export async function materializeCommand(args: MaterializeArguments, environment
           const canonical = relativePath.split(sep).join('/');
           selection = { scope: 'module', from: canonical === '' ? '.' : canonical };
         }
+        // Without --view the request carries no `views` field: Plan 2A's request exactly.
         const response = await connection.materialize({ token, requestId: randomUUID(),
-          freshness: { mode: 'synchronized', expect: [] }, selection }, control);
+          freshness: { mode: 'synchronized', expect: [] }, selection, ...(args.views ? { views: args.views } : {}) }, control);
         control.signal?.throwIfAborted();
         if (!response.ok) throw serviceFailure(response.error);
         const value = response.value;

@@ -133,6 +133,36 @@ describe('filesystem watcher', () => {
     });
   });
 
+  it('never attaches to or reports events for the architect view and its transient siblings, while near misses stay visible', async () => {
+    await fixture(async (root, state) => {
+      const suffix = '0123456789abcdef0123456789abcdef';
+      const reserved = ['.ramify-architect', `.ramify-architect.tmp-${suffix}`, `.ramify-architect.old-${suffix}`];
+      const markers = reserved.slice(1).map(name => `${name}.marker.json`);
+      const nearMisses = ['.ramify-architects', '.ramify-architect.tmp', '.ramify-architectx'];
+      for (const parent of [root, join(root, 'src', 'nested')]) {
+        for (const name of [...reserved, ...nearMisses]) {
+          await mkdir(join(parent, name, 'child'), { recursive: true });
+          await writeFile(join(parent, name, 'child', 'inside.ts'), 'before');
+        }
+      }
+      await state.open();
+      expect(state.paths.some(path => relative(root, path).split(sep).some(part => reserved.includes(part)))).toBe(false);
+      for (const name of nearMisses) expect(state.paths.some(path => relative(root, path).split(sep).includes(name))).toBe(true);
+      for (const parent of [root, join(root, 'src', 'nested')]) {
+        for (const name of [...reserved, ...nearMisses]) await writeFile(join(parent, name, 'child', 'inside.ts'), 'after');
+        for (const name of markers) await writeFile(join(parent, name), '{}');
+      }
+      // A publish's final switch: the stage is renamed onto the live view at the root.
+      await rename(join(root, reserved[0]!), join(root, `.ramify-architect.old-${'f'.repeat(32)}`));
+      await rename(join(root, reserved[1]!), join(root, reserved[0]!));
+      await writeFile(join(root, 'src', 'nested', 'value.ts'), 'positive control');
+      await until(() => state.batches.flat().some(event => event.path.endsWith('value.ts')));
+      const events = state.batches.flat();
+      expect(events.filter(event => event.path.split(sep).some(part => [...reserved, ...markers, `.ramify-architect.old-${'f'.repeat(32)}`].includes(part)))).toEqual([]);
+      for (const name of nearMisses) expect(events.some(event => event.path.endsWith(join(name, 'child', 'inside.ts')))).toBe(true);
+    });
+  });
+
   it('attaches new directories and observes their later edits', async () => {
     await fixture(async (root, state) => {
       await state.open();

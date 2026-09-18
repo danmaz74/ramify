@@ -540,3 +540,28 @@ alone does not establish I5-10's full Plan 2 gate. The process witnesses preserv
 failed outputs and archive full nested reports separately to keep the enclosing
 report within its byte limit. Measurement reuse expectations remain iteration
 12's responsibility; missing or stale workload evidence still fails acceptance.
+
+## Plan 2B architect view (iteration 8)
+
+`plan2b.test.ts` runs `plan2b-cases.ts` against the built CLI and daemon; run
+`npm run build` first. Every case copies the reference project or the toolkit
+(tracked and untracked unignored files, `node_modules` linked), owns its
+endpoint directory below `/tmp`, stops its daemon in `finally`, confirms the
+recorded processes exited and removes the directory. The cases are:
+
+- AV29: `materialize --view architect` on both projects, an unchanged repeat that
+  touches no file, and two expectations computed without the daemon: the file
+  set, module facts, exposures and relays read from the declarations, and the
+  reference project's view rendered from an in-process session, the in-process
+  analyzer and the renderer, compared byte for byte.
+- AV31: a deleted view rewritten at the same revision, a second daemon on the
+  same copies (identical apart from the revision) and on copies at other paths
+  (identical apart from the revision and the input identity).
+- AV30: one check sequence on the same copy twice, alone and with
+  materializations interleaved, comparing reports, sequences and counters.
+- AV34: the API view without `--view` against a build of commit `577b980` on the
+  same copies, the eight package entries, and the `./cli` and `./client`
+  closures under the process probe.
+- The instruction block in `AGENTS.md` and `CLAUDE.md` equals the rendered one.
+
+`RAMIFY_PLAN2B_EVIDENCE=<file>` writes the collected evidence as JSON.

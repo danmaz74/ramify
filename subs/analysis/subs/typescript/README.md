@@ -45,7 +45,9 @@ current descriptions, and `interpreter` is the maintained access interpreter
 following the current snapshot. Every filesystem callback reads the disk
 directly and reports the read, existence probe, directory listing, realpath or
 absence to project's `ObservationSink`, so an observer merging those reports
-carries the input identity a batch capture of the same state carries.
+carries the input identity a batch capture of the same state carries. Directory
+listings omit Ramify's reserved generated names, as capture does, so neither a
+listing nor a member probe reports a generated view.
 `releaseCompiler` closes the server and keeps the retained descriptions; the
 next `update` reopens and the next `describe` reads every owned file again.
 A server that exits on its own rejects the next call with `read-failure`, and
@@ -129,3 +131,24 @@ imports use extension substitution directly; a `.jsx` spelling prefers JSX to
 an adjacent `.js` script when no TypeScript counterpart exists. Compiler-trace
 controls cover exact targets, absent targets with ordinary substitutions before
 testing candidates, and that relative JSX priority.
+
+Plan 2B adds two read-only compiler queries for the architect view, both on
+`RetainedSourceAnalysis` over the current snapshot and as batch functions.
+`shapes(requests)`, and `describeExportShapes` in `export-shapes.ts`, classify
+each requested defining-file export: its `kind` from the original's primary
+declaration (`class`, `function`, `interface`, `type`, `enum`, `namespace`,
+`value` or `resource`) and, for a runtime value, its behavior. The behavior is
+`BehaviorShapes.shape` in `behavior-shapes.ts`, which the consumer classifier
+shares through `collapse`: a construct signature gives `constructable`, else a
+call signature `callable`, else a declared first-level callable or
+constructable member `member`; data gives no behavior and `any`, `unknown` or an
+unresolved declaration gives `unknown`. `testTitles(files, limits)`, and
+`describeTestTitles` in `test-titles.ts`, read `describe`, `it` and `test` calls
+from the program's syntax trees, including modifier and table forms, and return
+one entry per suite with direct tests, per empty suite and for tests outside any
+suite. A computed title is `(dynamic)`, a title above `maxTitleBytes` is cut
+with `…`, a file that binds its own `describe`, `it` or `test` contributes no
+calls of that name, and a file outside the program is `not-in-program`. Both
+queries need a hot compiler, as `details` does, and count their calls in
+`shapeRuns()` and `testTitleRuns()` in the process that runs them; checks never
+call them.

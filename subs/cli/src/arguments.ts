@@ -1,7 +1,10 @@
+import type { MaterializeViewId } from '../../../src/interfaces/service.js';
+
 export const help = `Usage: ramify check [--root <dir>] [--format json] [--batch]
                     [--changed <path>...] [--since <revision>] [--deadline <ms>]
        ramify watch [--root <dir>] [--format json]
        ramify materialize [--from <path>] [--all] [--root <dir>]
+       ramify materialize --view <api|architect>... [--from <path> | --all] [--root <dir>]
        ramify explore [--root <dir>]
        ramify daemon status|stop [--format json]
        ramify --help
@@ -32,6 +35,12 @@ names the module to refresh, resolved relative to the working directory;
 absence uses that directory. --all refreshes every module; --all and --from
 are mutually exclusive. There is no --batch, --changed or --format for
 materialize, and it never falls back to batch.
+--view selects the generated views, each at most once: api, the .ramify
+catalogs, and architect, the whole project's .ramify-architect view with its
+dependency facts. Without --view, materialize refreshes the API view alone.
+--from and --all apply to the API view only and require --view api when
+--view is given. Every requested view comes from one revision and is published
+in one transaction.
 
 explore selects one project through the resident daemon, starts or reuses that
 project's resident explorer server, prints its /analysis/latest URL, opens it in
@@ -45,7 +54,8 @@ Changed checks: 0 checked with no findings, 1 findings or invalid revision,
 2 not checked (including cold, deadline, unobserved or superseded content, and a
 named configuration file).
 materialize: 0 every requested target complete, 1 the project is invalid,
-2 unavailable, partial/rollback failure, deadline or supersession, 130 interrupted.
+2 unavailable, partial/rollback failure, deadline, supersession or incompatible
+service, 130 interrupted.
 `;
 
 type Arguments = { readonly command: 'help' | 'version' }
@@ -53,7 +63,9 @@ type Arguments = { readonly command: 'help' | 'version' }
       readonly changed?: readonly string[]; readonly since?: string; readonly deadlineMs?: number }
   | { readonly command: 'watch'; readonly root?: string; readonly format: 'human' | 'json' }
   | { readonly command: 'daemon'; readonly action: 'status' | 'stop'; readonly format: 'human' | 'json' }
-  | { readonly command: 'materialize'; readonly root?: string; readonly from?: string; readonly all: boolean }
+  | { readonly command: 'materialize'; readonly root?: string; readonly from?: string; readonly all: boolean;
+      /** Present only when `--view` was given, in the order given. */
+      readonly views?: readonly MaterializeViewId[] }
   | { readonly command: 'explore'; readonly root?: string };
 
 /** Validate the entire invocation before dispatch, including duplicate flags. */
@@ -70,14 +82,24 @@ export function parseArguments(argv: readonly string[]): Arguments {
   let format: 'human' | 'json' = 'human';
   let batch = false;
   let changed: string[] | undefined, since: string | undefined, deadlineMs: number | undefined;
-  let from: string | undefined, all = false;
+  let from: string | undefined, all = false, views: MaterializeViewId[] | undefined;
   const flags = command === 'check' ? ['--root', '--format', '--batch', '--changed', '--since', '--deadline']
-    : command === 'watch' ? ['--root', '--format'] : command === 'materialize' ? ['--root', '--from', '--all']
+    : command === 'watch' ? ['--root', '--format'] : command === 'materialize' ? ['--root', '--from', '--all', '--view']
     : command === 'explore' ? ['--root'] : ['--format'];
   const seen = new Set<string>();
   for (let index = command === 'daemon' ? 2 : 1; index < argv.length; index++) {
     const flag = argv[index];
     if (!flags.includes(flag)) throw new Error(`Unsupported argument: ${flag}`);
+    // --view repeats, once per view.
+    if (flag === '--view') {
+      const value = argv[++index];
+      if (!value || value.startsWith('--')) throw new Error('Missing value for --view');
+      if (value !== 'api' && value !== 'architect') throw new Error(`Unsupported view: ${value}. Use --view api or --view architect.`);
+      views ??= [];
+      if (views.includes(value)) throw new Error(`Duplicate view: ${value}`);
+      views.push(value);
+      continue;
+    }
     if (seen.has(flag)) throw new Error(`Duplicate option: ${flag}`);
     seen.add(flag);
     if (flag === '--batch') { batch = true; continue; }
@@ -123,7 +145,8 @@ export function parseArguments(argv: readonly string[]): Arguments {
   if (command === 'watch') return { command, ...project };
   if (command === 'materialize') {
     if (all && from !== undefined) throw new Error('--all cannot be combined with --from');
-    return { command, ...(root === undefined ? {} : { root }), ...(from === undefined ? {} : { from }), all };
+    if (views && !views.includes('api') && (all || from !== undefined)) throw new Error('--from and --all select the API view; add --view api');
+    return { command, ...(root === undefined ? {} : { root }), ...(from === undefined ? {} : { from }), all, ...(views ? { views } : {}) };
   }
   if (command === 'explore') return { command, ...(root === undefined ? {} : { root }) };
   if (action === 'status' || action === 'stop') return { command, action, format };

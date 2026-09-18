@@ -150,6 +150,26 @@ describe('service request structure', () => {
     ]) expect(validateServiceRequest('dependencyDiagram', invalid)?.code).toBe('invalid-request');
   });
 
+  it('AV25: accepts materialize views as a non-empty list of distinct known identifiers, and their absence', () => {
+    const params = { token, requestId: 'materialize-1', freshness: { mode: 'synchronized', expect: [] }, selection: { scope: 'all' } };
+    for (const views of [undefined, ['api'], ['architect'], ['api', 'architect'], ['architect', 'api']]) {
+      const request = views ? { ...params, views } : params;
+      const before = JSON.stringify(request);
+      expect(validateServiceRequest('materialize', request), JSON.stringify(views)).toBeNull();
+      expect(JSON.stringify(request)).toBe(before);
+    }
+    const sparse: unknown[] = ['api']; sparse.length = 2;
+    for (const views of [[], ['api', 'api'], ['architect', 'api', 'architect'], ['other'], ['API'], [''], [null], ['api', 1], 'api', null, {},
+      { 0: 'api', length: 1 }, sparse, Object.assign(['api'], { extra: true })]) {
+      expect(validateServiceRequest('materialize', { ...params, views })?.code, JSON.stringify(views)).toBe('invalid-request');
+    }
+    // The selection stays required and the freshness synchronized with any views.
+    const { selection: _selection, ...unselected } = params;
+    expect(validateServiceRequest('materialize', { ...unselected, views: ['architect'] })?.code).toBe('invalid-request');
+    expect(validateServiceRequest('materialize', { ...params, views: ['architect'], freshness: { mode: 'published', wait: false } })?.code)
+      .toBe('invalid-request');
+  });
+
   it('accepts 10,000 expectations and rejects 10,001 before processing them', () => {
     const expectList = Array.from({ length: 10_000 }, (_, index) => ({ path: `src/${index}.ts`, sha256: null }));
     const request = { ...synchronized, freshness: { mode: 'synchronized', expect: expectList } };

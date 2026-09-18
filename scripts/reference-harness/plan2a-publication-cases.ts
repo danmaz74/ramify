@@ -10,7 +10,7 @@ import {
 } from '../../subs/daemon/src/api-view-publisher.js';
 import { renderApiView, renderCodeFence, renderCodeSpan, renderDocument, renderEntry, renderMeta } from '../../subs/daemon/src/api-view-documents.js';
 import type { ApiViewPublishLimits } from '../../subs/daemon/src/interfaces/daemon.js';
-import { area, described, entry, file, moduleProjection, projection, truncated, unavailable } from '../../subs/daemon/src/tests/api-view-fixtures.js';
+import { apiInput, area, described, entry, file, moduleProjection, projection, truncated, unavailable } from '../../subs/daemon/src/tests/api-view-fixtures.js';
 import type { Assertions, InstanceHandler } from './runner.js';
 
 /**
@@ -27,7 +27,7 @@ import type { Assertions, InstanceHandler } from './runner.js';
  * only that one PID.
  */
 
-const limits: ApiViewPublishLimits = { maxAreaBytes: 32 * 1024 * 1024, maxInvocationBytes: 256 * 1024 * 1024, maxStagedBytes: 256 * 1024 * 1024 };
+const limits: ApiViewPublishLimits = { maxAreaBytes: 32 * 1024 * 1024, maxArchitectBytes: 64 * 1024 * 1024, maxInvocationBytes: 256 * 1024 * 1024, maxStagedBytes: 256 * 1024 * 1024 };
 
 async function tempRoot(): Promise<{ root: string; dispose: () => Promise<void> }> {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'plan2a-publication-')));
@@ -136,10 +136,10 @@ export const plan2aPublicationHandlers: ReadonlyMap<string, InstanceHandler> = n
     try {
       await mkdir(join(root, 'mod/src'), { recursive: true });
       const { fs, publisher } = controlledPublisher();
-      const outcome = await publisher.publish(root, 'rev-1', oneModuleProjection('mod', [
+      const outcome = await publisher.publish(root, 'rev-1', apiInput(oneModuleProjection('mod', [
         entry('greet', 'value', described('greet', 'function greet(): void;')),
         entry('Shape', 'type-only', truncated('Shape', 'interface Shape {\n}')),
-      ]), 'req-1');
+      ])), 'req-1');
       if (outcome.status !== 'published') throw new Error(`Expected published, got ${JSON.stringify(outcome)}`);
       assertions.equal('a missing target is staged completely and switched, with exact outcome counts',
         { module: outcome.targets[0]!.module, area: outcome.targets[0]!.area, path: outcome.targets[0]!.path,
@@ -158,9 +158,9 @@ export const plan2aPublicationHandlers: ReadonlyMap<string, InstanceHandler> = n
     try {
       await mkdir(join(root, 'mod/src'), { recursive: true });
       const { publisher } = controlledPublisher();
-      await publisher.publish(root, 'rev-1', oneModuleProjection('mod', [entry('greet', 'value', described('greet', 'function greet(): void;'))]), 'req-1');
+      await publisher.publish(root, 'rev-1', apiInput(oneModuleProjection('mod', [entry('greet', 'value', described('greet', 'function greet(): void;'))])), 'req-1');
       const smaller = projection([moduleProjection('mod', 'mod', area('ordinary', 'mod/src', []))]);
-      const outcome = await publisher.publish(root, 'rev-2', smaller, 'req-2');
+      const outcome = await publisher.publish(root, 'rev-2', apiInput(smaller), 'req-2');
       if (outcome.status !== 'published') throw new Error(`Expected published, got ${JSON.stringify(outcome)}`);
       assertions.equal('removing an available API leaves only _meta.json, through complete directory replacement',
         await listAll(join(root, 'mod/src/.ramify')), ['_meta.json']);
@@ -173,11 +173,11 @@ export const plan2aPublicationHandlers: ReadonlyMap<string, InstanceHandler> = n
       await mkdir(join(root, 'mod/src'), { recursive: true });
       const { fs, publisher } = controlledPublisher();
       const data = oneModuleProjection('mod', [entry('greet', 'value', described('greet', 'function greet(): void;'))]);
-      const first = await publisher.publish(root, 'rev-1', data, 'req-1');
+      const first = await publisher.publish(root, 'rev-1', apiInput(data), 'req-1');
       if (first.status !== 'published') throw new Error(`Expected published, got ${JSON.stringify(first)}`);
       const before = await import('node:fs/promises').then(fsp => fsp.stat(join(root, 'mod/src/.ramify')));
       const callsBefore = fs.calls.length;
-      const second = await publisher.publish(root, 'rev-1', data, 'req-2');
+      const second = await publisher.publish(root, 'rev-1', apiInput(data), 'req-2');
       if (second.status !== 'published') throw new Error(`Expected published, got ${JSON.stringify(second)}`);
       assertions.equal('an identical rerun reports the target unchanged and writes zero bytes', { changed: second.targets[0]!.changed, bytesWritten: second.bytesWritten }, { changed: false, bytesWritten: 0 });
       const rerunCalls = fs.calls.slice(callsBefore);
@@ -192,10 +192,10 @@ export const plan2aPublicationHandlers: ReadonlyMap<string, InstanceHandler> = n
     try {
       await mkdir(join(root, 'mod/src'), { recursive: true });
       const { fs, publisher } = controlledPublisher();
-      await publisher.publish(root, 'rev-1', oneModuleProjection('mod', [entry('greet', 'value', described('greet', 'function greet(): void;'))]), 'req-1');
+      await publisher.publish(root, 'rev-1', apiInput(oneModuleProjection('mod', [entry('greet', 'value', described('greet', 'function greet(): void;'))])), 'req-1');
       const before = await readFile(join(root, 'mod/src/.ramify/external/other/src/thing.ts.md'));
       fs.failNext('writeFile', p => p.endsWith('thing.ts.md'));
-      const outcome = await publisher.publish(root, 'rev-2', oneModuleProjection('mod', [entry('changed', 'value', described('changed', 'function changed(): void;'))]), 'req-2');
+      const outcome = await publisher.publish(root, 'rev-2', apiInput(oneModuleProjection('mod', [entry('changed', 'value', described('changed', 'function changed(): void;'))])), 'req-2');
       assertions.equal('a staged-write failure reports output-failure', outcome.status === 'unavailable' && outcome.reason, 'output-failure');
       const after = await readFile(join(root, 'mod/src/.ramify/external/other/src/thing.ts.md'));
       assertions.ok('the previous target is preserved byte-for-byte', after.equals(before));
@@ -214,7 +214,7 @@ export const plan2aPublicationHandlers: ReadonlyMap<string, InstanceHandler> = n
         moduleProjection('a', 'a', area('ordinary', 'a/src', [file('external', 'x/src/f.ts', [entry('g1', 'value', described('g1', 'function g1(): void;'))])])),
         moduleProjection('b', 'b', area('ordinary', 'b/src', [file('external', 'x/src/f.ts', [entry('g2', 'value', described('g2', 'function g2(): void;'))])])),
       ]);
-      await publisher.publish(root, 'rev-1', first, 'req-1');
+      await publisher.publish(root, 'rev-1', apiInput(first), 'req-1');
       const aBefore = await readFile(join(root, 'a/src/.ramify/external/x/src/f.ts.md'));
       const bBefore = await readFile(join(root, 'b/src/.ramify/external/x/src/f.ts.md'));
       const second = projection([
@@ -222,7 +222,7 @@ export const plan2aPublicationHandlers: ReadonlyMap<string, InstanceHandler> = n
         moduleProjection('b', 'b', area('ordinary', 'b/src', [file('external', 'x/src/f.ts', [entry('g2x', 'value', described('g2x', 'function g2x(): void;'))])])),
       ]);
       fs.failNext('rename', (from, to) => Boolean(to) && to!.endsWith('b/src/.ramify'));
-      const outcome = await publisher.publish(root, 'rev-2', second, 'req-2');
+      const outcome = await publisher.publish(root, 'rev-2', apiInput(second), 'req-2');
       assertions.equal('the later switch failure reports output-failure', outcome.status === 'unavailable' && outcome.reason, 'output-failure');
       const aAfter = await readFile(join(root, 'a/src/.ramify/external/x/src/f.ts.md'));
       const bAfter = await readFile(join(root, 'b/src/.ramify/external/x/src/f.ts.md'));
@@ -243,14 +243,14 @@ export const plan2aPublicationHandlers: ReadonlyMap<string, InstanceHandler> = n
         moduleProjection('a', 'a', area('ordinary', 'a/src', [file('external', 'x/src/f.ts', [entry('g1', 'value', described('g1', 'function g1(): void;'))])])),
         moduleProjection('b', 'b', area('ordinary', 'b/src', [file('external', 'x/src/f.ts', [entry('g2', 'value', described('g2', 'function g2(): void;'))])])),
       ]);
-      await publisher.publish(root, 'rev-1', first, 'req-1');
+      await publisher.publish(root, 'rev-1', apiInput(first), 'req-1');
       const second = projection([
         moduleProjection('a', 'a', area('ordinary', 'a/src', [file('external', 'x/src/f.ts', [entry('g1x', 'value', described('g1x', 'function g1x(): void;'))])])),
         moduleProjection('b', 'b', area('ordinary', 'b/src', [file('external', 'x/src/f.ts', [entry('g2x', 'value', described('g2x', 'function g2x(): void;'))])])),
       ]);
       fs.failNext('rename', (from, to) => Boolean(to) && to!.endsWith('b/src/.ramify'));
       fs.failNext('rename', (from, to) => Boolean(from) && from!.includes('.ramify.old-') && Boolean(to) && to!.endsWith('a/src/.ramify'));
-      const outcome = await publisher.publish(root, 'rev-2', second, 'req-2');
+      const outcome = await publisher.publish(root, 'rev-2', apiInput(second), 'req-2');
       assertions.equal('a failure during rollback itself reports rollback-failure, never success', outcome.status === 'unavailable' && outcome.reason, 'rollback-failure');
       const remaining = await listAll(root);
       assertions.ok('the recovery artifact from the failed rollback is retained, not silently discarded', remaining.some(p => p.includes('.ramify.old-')));
@@ -269,7 +269,7 @@ export const plan2aPublicationHandlers: ReadonlyMap<string, InstanceHandler> = n
         if (path.endsWith('_meta.json') && path.includes('.ramify.tmp-')) controller.abort();
       };
       const data = oneModuleProjection('mod', [entry('greet', 'value', described('greet', 'function greet(): void;'))]);
-      const outcome = await publisher.publish(before.root, 'rev-1', data, 'req-1', { signal: controller.signal });
+      const outcome = await publisher.publish(before.root, 'rev-1', apiInput(data), 'req-1', { signal: controller.signal });
       assertions.equal('cancellation before switching starts preserves every target', outcome, { status: 'cancelled' });
       const remaining = await listAll(before.root).catch(() => []);
       assertions.ok('no generated output remains after a pre-switch cancellation', !remaining.some(p => p.includes('.ramify')));
@@ -285,7 +285,7 @@ export const plan2aPublicationHandlers: ReadonlyMap<string, InstanceHandler> = n
         moduleProjection('a', 'a', area('ordinary', 'a/src', [file('external', 'x/src/f.ts', [entry('g1', 'value', described('g1', 'function g1(): void;'))])])),
         moduleProjection('b', 'b', area('ordinary', 'b/src', [file('external', 'x/src/f.ts', [entry('g2', 'value', described('g2', 'function g2(): void;'))])])),
       ]);
-      await publisher.publish(mid.root, 'rev-1', first, 'req-1');
+      await publisher.publish(mid.root, 'rev-1', apiInput(first), 'req-1');
       const aBefore = await readFile(join(mid.root, 'a/src/.ramify/external/x/src/f.ts.md'));
       const bBefore = await readFile(join(mid.root, 'b/src/.ramify/external/x/src/f.ts.md'));
       const second = projection([
@@ -297,7 +297,7 @@ export const plan2aPublicationHandlers: ReadonlyMap<string, InstanceHandler> = n
         await originalRename(from, to);
         if (to.endsWith('a/src/.ramify') && !to.includes('.ramify.old-')) controller.abort();
       };
-      const outcome = await publisher.publish(mid.root, 'rev-2', second, 'req-2', { signal: controller.signal });
+      const outcome = await publisher.publish(mid.root, 'rev-2', apiInput(second), 'req-2', { signal: controller.signal });
       assertions.equal('cancellation mid-switch finishes rolling back the already-switched target', outcome, { status: 'cancelled' });
       const aAfter = await readFile(join(mid.root, 'a/src/.ramify/external/x/src/f.ts.md'));
       const bAfter = await readFile(join(mid.root, 'b/src/.ramify/external/x/src/f.ts.md'));
@@ -313,7 +313,7 @@ export const plan2aPublicationHandlers: ReadonlyMap<string, InstanceHandler> = n
       await symlink(join(ancestor.root, 'real-src'), join(ancestor.root, 'mod'));
       const { publisher } = controlledPublisher();
       const data = projection([moduleProjection('mod', 'mod', area('ordinary', 'mod/src', [file('external', 'x/src/f.ts', [entry('g', 'value', described('g', 'function g(): void;'))])]))]);
-      const outcome = await publisher.publish(ancestor.root, 'rev-1', data, 'req-1');
+      const outcome = await publisher.publish(ancestor.root, 'rev-1', apiInput(data), 'req-1');
       assertions.equal('a symlinked ancestor path component refuses the publish', outcome.status === 'unavailable' && outcome.reason, 'symlink');
       const stat = await import('node:fs/promises').then(fsp => fsp.lstat(join(ancestor.root, 'mod')));
       assertions.ok('the ancestor symlink is neither followed nor deleted', stat.isSymbolicLink());
@@ -326,7 +326,7 @@ export const plan2aPublicationHandlers: ReadonlyMap<string, InstanceHandler> = n
       await symlink(join(target.root, 'elsewhere'), join(target.root, 'mod/src/.ramify'));
       const { publisher } = controlledPublisher();
       const data = oneModuleProjection('mod', [entry('g', 'value', described('g', 'function g(): void;'))]);
-      const outcome = await publisher.publish(target.root, 'rev-1', data, 'req-1');
+      const outcome = await publisher.publish(target.root, 'rev-1', apiInput(data), 'req-1');
       assertions.equal('a symlinked target itself refuses the publish', outcome.status === 'unavailable' && outcome.reason, 'symlink');
       const stat = await import('node:fs/promises').then(fsp => fsp.lstat(join(target.root, 'mod/src/.ramify')));
       assertions.ok('the target symlink is neither followed nor deleted', stat.isSymbolicLink());
@@ -340,7 +340,7 @@ export const plan2aPublicationHandlers: ReadonlyMap<string, InstanceHandler> = n
       await symlink(join(contents.root, 'outside-file'), join(contents.root, 'mod/src/.ramify/external/link'));
       const { publisher } = controlledPublisher();
       const data = oneModuleProjection('mod', [entry('g', 'value', described('g', 'function g(): void;'))]);
-      const outcome = await publisher.publish(contents.root, 'rev-1', data, 'req-1');
+      const outcome = await publisher.publish(contents.root, 'rev-1', apiInput(data), 'req-1');
       assertions.equal('a symlinked entry inside an existing target refuses the publish', outcome.status === 'unavailable' && outcome.reason, 'symlink');
       const stat = await import('node:fs/promises').then(fsp => fsp.lstat(join(contents.root, 'mod/src/.ramify/external/link')));
       assertions.ok('the contained symlink is neither followed nor deleted', stat.isSymbolicLink());
@@ -360,7 +360,7 @@ export const plan2aPublicationHandlers: ReadonlyMap<string, InstanceHandler> = n
         projection([moduleProjection('mod', 'mod', area('ordinary', 'mod\\src', []))]),
       ];
       for (const [index, data] of cases.entries()) {
-        const outcome = await publisher.publish(root, `rev-${index}`, data, `req-${index}`);
+        const outcome = await publisher.publish(root, `rev-${index}`, apiInput(data), `req-${index}`);
         assertions.equal(`escaping/absolute/separator-confused case ${index} is rejected before any write`, outcome.status === 'unavailable' && outcome.reason, 'invalid-path');
       }
       assertions.ok('no mkdir, writeFile, rename or rm call was ever made', !fs.calls.some(call => ['mkdir', 'writeFile', 'rename', 'rm'].includes(call.op)));
@@ -374,7 +374,7 @@ export const plan2aPublicationHandlers: ReadonlyMap<string, InstanceHandler> = n
       await mkdir(join(root, 'mod/src'), { recursive: true });
       const publisher = createFilesystemApiViewPublisher(limits);
       const original = projection([moduleProjection('mod', 'mod', area('ordinary', 'mod/src', [file('external', 'other/src/thing.ts', [entry('greet', 'value', described('greet', 'function greet(): void;'))])]))]);
-      const first = await publisher.publish(root, 'rev-1', original, 'req-1');
+      const first = await publisher.publish(root, 'rev-1', apiInput(original), 'req-1');
       if (first.status !== 'published') throw new Error(`Expected published, got ${JSON.stringify(first)}`);
       const originalBytes = await readFile(join(root, 'mod/src/.ramify/external/other/src/thing.ts.md'));
 
@@ -406,7 +406,7 @@ export const plan2aPublicationHandlers: ReadonlyMap<string, InstanceHandler> = n
       assertions.ok('the mid-crash state has a marked, still-present stage', midCrash.some(name => /^\.ramify\.tmp-[0-9a-f]+\.marker\.json$/.test(name)));
       assertions.ok('the unmarked lookalike directory this test created is present, untouched, before recovery', midCrash.includes('.ramify.tmp-deadbeefdeadbeefdeadbeefdeadbeef'));
 
-      const recovered = await publisher.publish(root, 'rev-1', original, 'req-2');
+      const recovered = await publisher.publish(root, 'rev-1', apiInput(original), 'req-2');
       if (recovered.status !== 'published') throw new Error(`Expected recovery publish to succeed, got ${JSON.stringify(recovered)}`);
       assertions.ok('the recovered target matches the pre-crash original exactly, so the next publish reports it unchanged', recovered.targets[0]!.changed === false);
       const restoredBytes = await readFile(join(root, 'mod/src/.ramify/external/other/src/thing.ts.md'));

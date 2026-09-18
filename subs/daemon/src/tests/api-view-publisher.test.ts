@@ -7,10 +7,10 @@ import {
   createNodeApiViewFilesystem, type ApiViewFilesystemPort, type ControlledApiViewFilesystem,
 } from '../api-view-publisher.js';
 import type { ApiViewPublishLimits, MaterializedTarget } from '../interfaces/daemon.js';
-import { area, entry, described, file, moduleProjection, projection, truncated } from './api-view-fixtures.js';
+import { apiInput, area, entry, described, file, moduleProjection, projection, truncated } from './api-view-fixtures.js';
 import type { ApiViewProjection } from '../../../analysis/src/interfaces/session.js';
 
-const limits: ApiViewPublishLimits = { maxAreaBytes: 32 * 1024 * 1024, maxInvocationBytes: 256 * 1024 * 1024, maxStagedBytes: 256 * 1024 * 1024 };
+const limits: ApiViewPublishLimits = { maxAreaBytes: 32 * 1024 * 1024, maxArchitectBytes: 64 * 1024 * 1024, maxInvocationBytes: 256 * 1024 * 1024, maxStagedBytes: 256 * 1024 * 1024 };
 
 const roots: string[] = [];
 afterEach(async () => { for (const dir of roots.splice(0)) await rm(dir, { recursive: true, force: true }); });
@@ -60,10 +60,10 @@ describe('I2A-07:first-publication', () => {
     await mkdir(join(root, 'mod/src'), { recursive: true });
     const { fs } = controlled();
     const publisher = onePublisher(fs);
-    const outcome = await publisher.publish(root, 'rev-1', oneModuleProjection('mod', [
+    const outcome = await publisher.publish(root, 'rev-1', apiInput(oneModuleProjection('mod', [
       entry('greet', 'value', described('greet', 'function greet(): void;')),
       entry('Shape', 'type-only', truncated('Shape', 'interface Shape {\n}')),
-    ]), 'req-1');
+    ])), 'req-1');
     expect(outcome.status).toBe('published');
     if (outcome.status !== 'published') throw new Error('unreachable');
     const target: MaterializedTarget = outcome.targets[0];
@@ -84,13 +84,13 @@ describe('I2A-07:stale-removal', () => {
     await mkdir(join(root, 'mod/src'), { recursive: true });
     const { fs } = controlled();
     const publisher = onePublisher(fs);
-    await publisher.publish(root, 'rev-1', oneModuleProjection('mod', [
+    await publisher.publish(root, 'rev-1', apiInput(oneModuleProjection('mod', [
       entry('greet', 'value', described('greet', 'function greet(): void;')),
-    ]), 'req-1');
+    ])), 'req-1');
     const before = await listAll(join(root, 'mod/src/.ramify'));
     expect(before).toContain('external/other/src/thing.ts.md');
     const smaller = projection([moduleProjection('mod', 'mod', area('ordinary', 'mod/src', []))]);
-    const outcome = await publisher.publish(root, 'rev-2', smaller, 'req-2');
+    const outcome = await publisher.publish(root, 'rev-2', apiInput(smaller), 'req-2');
     expect(outcome.status).toBe('published');
     const after = await listAll(join(root, 'mod/src/.ramify'));
     expect(after).toEqual(['_meta.json']);
@@ -106,12 +106,12 @@ describe('I2A-07:unchanged-noop', () => {
     const { fs } = controlled();
     const publisher = onePublisher(fs);
     const data = oneModuleProjection('mod', [entry('greet', 'value', described('greet', 'function greet(): void;'))]);
-    const first = await publisher.publish(root, 'rev-1', data, 'req-1');
+    const first = await publisher.publish(root, 'rev-1', apiInput(data), 'req-1');
     expect(first.status).toBe('published');
     const before = await stat(join(root, 'mod/src/.ramify'));
     const beforeDoc = await stat(join(root, 'mod/src/.ramify/external/other/src/thing.ts.md'));
     const callsBeforeRerun = fs.calls.length;
-    const second = await publisher.publish(root, 'rev-1', data, 'req-2');
+    const second = await publisher.publish(root, 'rev-1', apiInput(data), 'req-2');
     expect(second.status).toBe('published');
     if (second.status !== 'published') throw new Error('unreachable');
     expect(second.targets[0].changed).toBe(false);
@@ -132,12 +132,12 @@ describe('I2A-07:prestage-failure', () => {
     const { fs } = controlled();
     const publisher = onePublisher(fs);
     const first = oneModuleProjection('mod', [entry('greet', 'value', described('greet', 'function greet(): void;'))]);
-    await publisher.publish(root, 'rev-1', first, 'req-1');
+    await publisher.publish(root, 'rev-1', apiInput(first), 'req-1');
     const before = await readFile(join(root, 'mod/src/.ramify/external/other/src/thing.ts.md'));
 
     const second = oneModuleProjection('mod', [entry('changed', 'value', described('changed', 'function changed(): void;'))]);
     fs.failNext('writeFile', p => p.endsWith('thing.ts.md'));
-    const outcome = await publisher.publish(root, 'rev-2', second, 'req-2');
+    const outcome = await publisher.publish(root, 'rev-2', apiInput(second), 'req-2');
     expect(outcome).toMatchObject({ status: 'unavailable', reason: 'output-failure' });
     const after = await readFile(join(root, 'mod/src/.ramify/external/other/src/thing.ts.md'));
     expect(after.equals(before)).toBe(true);
@@ -152,10 +152,53 @@ describe('I2A-07:prestage-failure', () => {
     const publisher = onePublisher(fs);
     const data = oneModuleProjection('mod', [entry('greet', 'value', described('greet', 'function greet(): void;'))]);
     fs.failNext('mkdir', p => p.includes('.ramify.tmp-'));
-    const outcome = await publisher.publish(root, 'rev-1', data, 'req-1');
+    const outcome = await publisher.publish(root, 'rev-1', apiInput(data), 'req-1');
     expect(outcome).toMatchObject({ status: 'unavailable', reason: 'output-failure' });
     const remaining = await listAll(root).catch(() => []);
     expect(remaining.some(p => p.includes('.ramify'))).toBe(false);
+  });
+});
+
+describe('stage cleanup (AV42)', () => {
+  it('keeps the marker of a failed stage whose removal failed, and the next publication reclaims the stage', async () => {
+    const root = await tempRoot();
+    await mkdir(join(root, 'mod/src'), { recursive: true });
+    const { fs } = controlled();
+    const publisher = onePublisher(fs);
+    const first = oneModuleProjection('mod', [entry('greet', 'value', described('greet', 'function greet(): void;'))]);
+    await publisher.publish(root, 'rev-1', apiInput(first), 'req-1');
+    const before = await listAll(join(root, 'mod/src'));
+    fs.failNext('writeFile', p => p.endsWith('thing.ts.md'));
+    // Only the stage's removal fails; removing its marker would succeed.
+    fs.failNext('rm', p => /\/\.ramify\.tmp-[0-9a-f]+$/.test(p));
+    const second = oneModuleProjection('mod', [entry('changed', 'value', described('changed', 'function changed(): void;'))]);
+    expect(await publisher.publish(root, 'rev-2', apiInput(second), 'req-2')).toMatchObject({ status: 'unavailable', reason: 'output-failure' });
+    const stage = `.ramify.tmp-${'2'.padStart(32, '0')}`;
+    expect((await readdir(join(root, 'mod/src'))).sort()).toEqual(['.ramify', stage, `${stage}.marker.json`]);
+    // Recovery at the start of the next publication removes the marked stage and its marker.
+    expect(await publisher.publish(root, 'rev-1', apiInput(first), 'req-3')).toMatchObject({ status: 'published', bytesWritten: 0 });
+    expect((await readdir(join(root, 'mod/src'))).sort()).toEqual(['.ramify']);
+    expect(await listAll(join(root, 'mod/src'))).toEqual(before);
+  });
+
+  it('keeps the marker when recovery cannot remove the stage either, and a later publication reclaims it', async () => {
+    const root = await tempRoot();
+    await mkdir(join(root, 'mod/src'), { recursive: true });
+    const { fs } = controlled();
+    const publisher = onePublisher(fs);
+    const first = oneModuleProjection('mod', [entry('greet', 'value', described('greet', 'function greet(): void;'))]);
+    await publisher.publish(root, 'rev-1', apiInput(first), 'req-1');
+    fs.failNext('writeFile', p => p.endsWith('thing.ts.md'));
+    // The failed publication's cleanup and the next publication's recovery both fail to remove the stage.
+    fs.failNext('rm', p => /\/\.ramify\.tmp-[0-9a-f]+$/.test(p));
+    fs.failNext('rm', p => /\/\.ramify\.tmp-[0-9a-f]+$/.test(p));
+    const second = oneModuleProjection('mod', [entry('changed', 'value', described('changed', 'function changed(): void;'))]);
+    expect(await publisher.publish(root, 'rev-2', apiInput(second), 'req-2')).toMatchObject({ status: 'unavailable', reason: 'output-failure' });
+    const stage = `.ramify.tmp-${'2'.padStart(32, '0')}`;
+    expect(await publisher.publish(root, 'rev-1', apiInput(first), 'req-3')).toMatchObject({ status: 'published', bytesWritten: 0 });
+    expect((await readdir(join(root, 'mod/src'))).sort()).toEqual(['.ramify', stage, `${stage}.marker.json`]);
+    expect(await publisher.publish(root, 'rev-1', apiInput(first), 'req-4')).toMatchObject({ status: 'published', bytesWritten: 0 });
+    expect((await readdir(join(root, 'mod/src'))).sort()).toEqual(['.ramify']);
   });
 });
 
@@ -170,7 +213,7 @@ describe('I2A-07:switch-rollback', () => {
       moduleProjection('a', 'a', area('ordinary', 'a/src', [file('external', 'x/src/f.ts', [entry('g1', 'value', described('g1', 'function g1(): void;'))])])),
       moduleProjection('b', 'b', area('ordinary', 'b/src', [file('external', 'x/src/f.ts', [entry('g2', 'value', described('g2', 'function g2(): void;'))])])),
     ]);
-    await publisher.publish(root, 'rev-1', first, 'req-1');
+    await publisher.publish(root, 'rev-1', apiInput(first), 'req-1');
     const aBefore = await readFile(join(root, 'a/src/.ramify/external/x/src/f.ts.md'));
     const bBefore = await readFile(join(root, 'b/src/.ramify/external/x/src/f.ts.md'));
 
@@ -179,7 +222,7 @@ describe('I2A-07:switch-rollback', () => {
       moduleProjection('b', 'b', area('ordinary', 'b/src', [file('external', 'x/src/f.ts', [entry('g2x', 'value', described('g2x', 'function g2x(): void;'))])])),
     ]);
     fs.failNext('rename', (from, to) => Boolean(to) && to.endsWith('b/src/.ramify'));
-    const outcome = await publisher.publish(root, 'rev-2', second, 'req-2');
+    const outcome = await publisher.publish(root, 'rev-2', apiInput(second), 'req-2');
     expect(outcome).toMatchObject({ status: 'unavailable', reason: 'output-failure' });
 
     const aAfter = await readFile(join(root, 'a/src/.ramify/external/x/src/f.ts.md'));
@@ -202,7 +245,7 @@ describe('I2A-07:rollback-failure-explicit', () => {
       moduleProjection('a', 'a', area('ordinary', 'a/src', [file('external', 'x/src/f.ts', [entry('g1', 'value', described('g1', 'function g1(): void;'))])])),
       moduleProjection('b', 'b', area('ordinary', 'b/src', [file('external', 'x/src/f.ts', [entry('g2', 'value', described('g2', 'function g2(): void;'))])])),
     ]);
-    await publisher.publish(root, 'rev-1', first, 'req-1');
+    await publisher.publish(root, 'rev-1', apiInput(first), 'req-1');
 
     const second = projection([
       moduleProjection('a', 'a', area('ordinary', 'a/src', [file('external', 'x/src/f.ts', [entry('g1x', 'value', described('g1x', 'function g1x(): void;'))])])),
@@ -212,7 +255,7 @@ describe('I2A-07:rollback-failure-explicit', () => {
     // The rollback of target "a" renames its `.old-` backup back over the live directory;
     // fail exactly that rename so the rollback itself cannot complete.
     fs.failNext('rename', (from, to) => Boolean(from) && from.includes('.ramify.old-') && Boolean(to) && to.endsWith('a/src/.ramify'));
-    const outcome = await publisher.publish(root, 'rev-2', second, 'req-2');
+    const outcome = await publisher.publish(root, 'rev-2', apiInput(second), 'req-2');
     expect(outcome.status).toBe('unavailable');
     if (outcome.status !== 'unavailable') throw new Error('unreachable');
     expect(outcome.reason).toBe('rollback-failure');
@@ -234,7 +277,7 @@ describe('I2A-07:cancel-boundaries', () => {
       if (path.endsWith('_meta.json') && path.includes('.ramify.tmp-')) controller.abort();
     };
     const data = oneModuleProjection('mod', [entry('greet', 'value', described('greet', 'function greet(): void;'))]);
-    const outcome = await publisher.publish(root, 'rev-1', data, 'req-1', { signal: controller.signal });
+    const outcome = await publisher.publish(root, 'rev-1', apiInput(data), 'req-1', { signal: controller.signal });
     expect(outcome).toEqual({ status: 'cancelled' });
     const remaining = await listAll(root).catch(() => []);
     expect(remaining.some(p => p.includes('.ramify'))).toBe(false);
@@ -251,7 +294,7 @@ describe('I2A-07:cancel-boundaries', () => {
       moduleProjection('a', 'a', area('ordinary', 'a/src', [file('external', 'x/src/f.ts', [entry('g1', 'value', described('g1', 'function g1(): void;'))])])),
       moduleProjection('b', 'b', area('ordinary', 'b/src', [file('external', 'x/src/f.ts', [entry('g2', 'value', described('g2', 'function g2(): void;'))])])),
     ]);
-    await publisher.publish(root, 'rev-1', first, 'req-1');
+    await publisher.publish(root, 'rev-1', apiInput(first), 'req-1');
     const aBefore = await readFile(join(root, 'a/src/.ramify/external/x/src/f.ts.md'));
     const bBefore = await readFile(join(root, 'b/src/.ramify/external/x/src/f.ts.md'));
 
@@ -264,7 +307,7 @@ describe('I2A-07:cancel-boundaries', () => {
       await originalRename(from, to);
       if (to.endsWith('a/src/.ramify') && !to.includes('.ramify.old-')) controller.abort();
     };
-    const outcome = await publisher.publish(root, 'rev-2', second, 'req-2', { signal: controller.signal });
+    const outcome = await publisher.publish(root, 'rev-2', apiInput(second), 'req-2', { signal: controller.signal });
     expect(outcome).toEqual({ status: 'cancelled' });
     const aAfter = await readFile(join(root, 'a/src/.ramify/external/x/src/f.ts.md'));
     const bAfter = await readFile(join(root, 'b/src/.ramify/external/x/src/f.ts.md'));
@@ -283,7 +326,7 @@ describe('I2A-07:symlink-traversal', () => {
     const { fs } = controlled();
     const publisher = onePublisher(fs);
     const data = projection([moduleProjection('mod', 'mod', area('ordinary', 'mod/src', [file('external', 'x/src/f.ts', [entry('g', 'value', described('g', 'function g(): void;'))])]))]);
-    const outcome = await publisher.publish(root, 'rev-1', data, 'req-1');
+    const outcome = await publisher.publish(root, 'rev-1', apiInput(data), 'req-1');
     expect(outcome).toMatchObject({ status: 'unavailable', reason: 'symlink' });
     expect((await lstat(join(root, 'mod'))).isSymbolicLink()).toBe(true);
   });
@@ -296,7 +339,7 @@ describe('I2A-07:symlink-traversal', () => {
     const { fs } = controlled();
     const publisher = onePublisher(fs);
     const data = oneModuleProjection('mod', [entry('g', 'value', described('g', 'function g(): void;'))]);
-    const outcome = await publisher.publish(root, 'rev-1', data, 'req-1');
+    const outcome = await publisher.publish(root, 'rev-1', apiInput(data), 'req-1');
     expect(outcome).toMatchObject({ status: 'unavailable', reason: 'symlink' });
     expect((await lstat(join(root, 'mod/src/.ramify'))).isSymbolicLink()).toBe(true);
   });
@@ -310,7 +353,7 @@ describe('I2A-07:symlink-traversal', () => {
     const { fs } = controlled();
     const publisher = onePublisher(fs);
     const data = oneModuleProjection('mod', [entry('g', 'value', described('g', 'function g(): void;'))]);
-    const outcome = await publisher.publish(root, 'rev-1', data, 'req-1');
+    const outcome = await publisher.publish(root, 'rev-1', apiInput(data), 'req-1');
     expect(outcome).toMatchObject({ status: 'unavailable', reason: 'symlink' });
     expect((await lstat(join(root, 'mod/src/.ramify/external/link'))).isSymbolicLink()).toBe(true);
   });
@@ -322,7 +365,7 @@ describe('missing source area', () => {
     const { fs } = controlled();
     const publisher = onePublisher(fs);
     const data = oneModuleProjection('mod', [entry('g', 'value', described('g', 'function g(): void;'))]);
-    const outcome = await publisher.publish(root, 'rev-1', data, 'req-1');
+    const outcome = await publisher.publish(root, 'rev-1', apiInput(data), 'req-1');
     expect(outcome).toMatchObject({ status: 'unavailable', reason: 'invalid-path' });
     expect(fs.calls.some(call => ['mkdir', 'writeFile', 'rename'].includes(call.op))).toBe(false);
     await expect(lstat(join(root, 'mod'))).rejects.toThrow();
@@ -335,7 +378,7 @@ describe('missing source area', () => {
     const publisher = onePublisher(fs);
     const data = projection([moduleProjection('mod', 'mod', area('ordinary', 'mod/src', []),
       area('tests', 'mod/src/tests', [file('external', 'other/src/thing.ts', [entry('g', 'value', described('g', 'function g(): void;'))])]))]);
-    const outcome = await publisher.publish(root, 'rev-1', data, 'req-1');
+    const outcome = await publisher.publish(root, 'rev-1', apiInput(data), 'req-1');
     expect(outcome).toMatchObject({ status: 'unavailable', reason: 'invalid-path' });
     expect(fs.calls.some(call => ['mkdir', 'writeFile', 'rename'].includes(call.op))).toBe(false);
     await expect(lstat(join(root, 'mod/src/tests'))).rejects.toThrow();
@@ -356,7 +399,7 @@ describe('I2A-07:path-escape', () => {
       projection([moduleProjection('mod', 'mod', area('ordinary', 'mod\\src', []))]),
     ];
     for (const [index, data] of cases.entries()) {
-      const outcome = await publisher.publish(root, `rev-${index}`, data, `req-${index}`);
+      const outcome = await publisher.publish(root, `rev-${index}`, apiInput(data), `req-${index}`);
       expect(outcome).toMatchObject({ status: 'unavailable', reason: 'invalid-path' });
     }
     expect(fs.calls.some(call => ['mkdir', 'writeFile', 'rename', 'rm'].includes(call.op))).toBe(false);
@@ -371,7 +414,7 @@ describe('resource limits', () => {
     const { fs } = controlled();
     const publisher = onePublisher(fs, { maxAreaBytes: 10 });
     const data = oneModuleProjection('mod', [entry('greet', 'value', described('greet', 'function greet(): void;'))]);
-    const outcome = await publisher.publish(root, 'rev-1', data, 'req-1');
+    const outcome = await publisher.publish(root, 'rev-1', apiInput(data), 'req-1');
     expect(outcome).toMatchObject({ status: 'unavailable', reason: 'resource-limit' });
     expect(fs.calls.some(call => ['mkdir', 'writeFile', 'rename'].includes(call.op))).toBe(false);
   });
@@ -391,7 +434,7 @@ describe('cancellation before any work', () => {
     const controller = new AbortController();
     controller.abort();
     const data = oneModuleProjection('mod', [entry('greet', 'value', described('greet', 'function greet(): void;'))]);
-    const outcome = await publisher.publish(root, 'rev-1', data, 'req-1', { signal: controller.signal });
+    const outcome = await publisher.publish(root, 'rev-1', apiInput(data), 'req-1', { signal: controller.signal });
     expect(outcome).toEqual({ status: 'cancelled' });
     expect(fs.calls).toHaveLength(0);
   });

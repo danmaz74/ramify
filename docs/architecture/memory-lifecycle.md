@@ -6,7 +6,7 @@ sessions with the defaults below. Hook latency on the reference and 100-owner
 projects is measured against its acceptable-time budget; memory plateaus, the
 many-context workload and entry footprints of the retained session are not yet
 measured, as the [Plan 5 completion report](../plans/iteration-5-fast-incremental-checks/iterations/iteration13-results.md)
-records. The MCP adapter, unsaved-content overlays and the explorer are not implemented.
+records. The MCP adapter and unsaved-content overlays are not implemented.
 
 The resident daemon should keep only the dependencies and state needed for
 active analysis. Its [client adapters](processes-and-clients.md) have independent

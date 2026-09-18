@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, realpath, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { describe, expect, it } from 'vitest';
@@ -10,6 +11,13 @@ import { runCli } from '../../subs/cli/src/run-cli.js';
 import type { CheckDocument, WatchLine } from '../../subs/cli/src/interfaces/cli.js';
 import type { CheckOutcome, ContextEvent } from '../../subs/daemon/src/context-types.js';
 import type { CheckParams } from '../interfaces/service.js';
+import { analyzeDependencyDiagram } from '../../subs/analysis/src/index.js';
+import type { AnalysisReport, DependencyAnalyzerOutcome, DependencyDiagramRunner, ProjectRequest } from '../../subs/analysis/src/index.js';
+import { createFilesystemApiViewPublisher } from '../../subs/daemon/src/api-view-publisher.js';
+import type { ApiViewPublisher, PublishApiViewOutcome, PublishInput } from '../../subs/daemon/src/interfaces/daemon.js';
+import { limits } from '../batch.js';
+import { dependencyAnalyzerCapacity } from '../dependency-analyzer-process.js';
+import { residentPublishLimits } from '../resident-assembly.js';
 
 async function until(predicate: () => boolean): Promise<void> {
   const deadline = performance.now() + 15_000;
@@ -226,4 +234,106 @@ describe('resident CLI status and eviction stream', () => {
       } finally { controller.abort(); await running; await quick.dispose(); }
     });
   }, 30_000);
+});
+
+describe('resident materialize with views (AV28)', () => {
+  it('publishes the API and architect views in one transaction from one revision and prints the architect line', () => fixture(async root => {
+    // A function the consumer calls in production and in its test, so dependencies and test references are both measured.
+    await put(root, 'module.ramify', 'ramify 1\nmodule fixture\nexpose-src value, run from "interfaces/api.ts" to descendants\n');
+    await put(root, 'src/interfaces/api.ts', 'export const value = 1; export const privateValue = 2;\nexport function run(): number { return value; }\n');
+    await put(root, 'subs/consumer/src/use.ts', "import { run } from '../../../src/interfaces/api.js'; run();\n");
+    await put(root, 'subs/consumer/src/tests/use.test.ts',
+      "import { run } from '../../../../src/interfaces/api.js';\ndescribe('use', () => { it('runs', () => { run(); }); });\n");
+    const runs: DependencyAnalyzerOutcome[] = [];
+    // The analyzer in process, over the same report the process runner would receive.
+    const dependencyDiagrams: DependencyDiagramRunner = { async run(input, control) {
+      const outcome = await analyzeDependencyDiagram({ ...input, limits: { source: limits.source,
+        maxResultBytes: dependencyAnalyzerCapacity.maxResultBytes, deadlineMs: dependencyAnalyzerCapacity.analysisDeadlineMs } }, control);
+      runs.push(outcome); return outcome;
+    } };
+    const publishes: { readonly revision: string; readonly input: PublishInput; readonly outcome: PublishApiViewOutcome }[] = [];
+    const filesystem = createFilesystemApiViewPublisher(residentPublishLimits);
+    const publisher: ApiViewPublisher = { async publish(target, revision, input, requestId, control) {
+      const outcome = await filesystem.publish(target, revision, input, requestId, control);
+      publishes.push({ revision, input, outcome }); return outcome;
+    } };
+    const quick = await createQuickEnvironment({}, { dependencyDiagrams, publisher });
+    try {
+      const stdout: string[] = [], stderr: string[] = [];
+      const exitCode = await runCli(['materialize', '--view', 'api', '--view', 'architect', '--all'], { cwd: root, version: '0.0.0',
+        stdout: text => { stdout.push(text); }, stderr: text => { stderr.push(text); }, connect: quick.connect,
+        batch: async () => { throw new Error('Resident command unexpectedly invoked batch'); } });
+      expect([exitCode, stderr.join('')]).toEqual([0, '']);
+      // One publish call carried both views, and published every target of both: the API areas, then the architect view.
+      expect(publishes).toHaveLength(1);
+      const [publish] = publishes;
+      expect(publish!.input.api).not.toBeNull();
+      expect(publish!.input.architect).toMatchObject({ modules: 2, dependencies: 'measured' });
+      if (publish!.outcome.status !== 'published') throw new Error(JSON.stringify(publish!.outcome));
+      expect(publish!.outcome.targets.map(target => [target.view, target.path])).toEqual([['api', 'src/.ramify'],
+        ['api', 'subs/consumer/src/.ramify'], ['api', 'subs/consumer/src/tests/.ramify'], ['architect', '.ramify-architect']]);
+      const lines = stdout.join('').split('\n');
+      expect(lines).toHaveLength(4);
+      expect(lines[0]).toBe(`Root: ${root}`);
+      expect(lines[1]).toMatch(/^Materialized: revision 1; 4 target\(s\), \d+ entries, \d+ bytes written, 0 unchanged$/);
+      expect(lines.slice(2)).toEqual([`Architect view: .ramify-architect, 2 modules, ${publish!.input.architect!.records} records, dependencies measured`, '']);
+      expect(runs.map(outcome => outcome.status)).toEqual(['ready']);
+
+      const meta = JSON.parse(await readFile(join(root, '.ramify-architect/_meta.json'), 'utf8')) as Record<string, unknown>;
+      const apiMeta = JSON.parse(await readFile(join(root, 'src/.ramify/_meta.json'), 'utf8')) as Record<string, unknown>;
+      expect(meta).toMatchObject({ schema: 'ramify.architect-view/1', revision: publish!.revision, modules: 2, dependencies: 'measured',
+        testReferences: 'measured' });
+      expect(apiMeta).toMatchObject({ schema: 'ramify.api-view/1', revision: publish!.revision });
+      // The consumer's production call and its test's call, from the same analyzer run.
+      expect(await readFile(join(root, '.ramify-architect/behavior.jsonl'), 'utf8')).toContain('"behavioral":["fixture/consumer"]');
+      expect(await readFile(join(root, '.ramify-architect/consumer/tests.jsonl'), 'utf8')).toContain('"exercises":["fixture#run"]');
+      await expectReleased(quick);
+    } finally { await quick.dispose(); }
+  }), 60_000);
+});
+
+describe('resident materialize after another invocation form reached the context (AV40)', () => {
+  const analyzerLimits = { source: limits.source, maxResultBytes: dependencyAnalyzerCapacity.maxResultBytes,
+    deadlineMs: dependencyAnalyzerCapacity.analysisDeadlineMs };
+  it.each([
+    ['check from the root, then materialize naming the root from another directory', false, true],
+    ['check --root ., then materialize from the root without --root', true, false],
+  ] as const)('%s: the analyzer verifies the captured request and the view has measured dependencies', (_name, given, elsewhere) => fixture(async root => {
+    await put(root, 'module.ramify', 'ramify 1\nmodule fixture\nexpose-src value, run from "interfaces/api.ts" to descendants\n');
+    await put(root, 'src/interfaces/api.ts', 'export const value = 1; export const privateValue = 2;\nexport function run(): number { return value; }\n');
+    await put(root, 'subs/consumer/src/use.ts', "import { run } from '../../../src/interfaces/api.js'; run();\n");
+    const runs: { readonly project: ProjectRequest; readonly report: AnalysisReport; readonly outcome: DependencyAnalyzerOutcome }[] = [];
+    const dependencyDiagrams: DependencyDiagramRunner = { async run(input, control) {
+      const outcome = await analyzeDependencyDiagram({ ...input, limits: analyzerLimits }, control);
+      runs.push({ ...input, outcome }); return outcome;
+    } };
+    const other = await realpath(await mkdtemp(join(tmpdir(), 'ramify-cli-elsewhere-')));
+    const quick = await createQuickEnvironment({}, { dependencyDiagrams });
+    try {
+      const opened = await invokeResident(quick, root, given ? ['check', '--root', '.'] : ['check']);
+      expect([opened.exitCode, opened.stderr]).toEqual([0, '']);
+      const stdout: string[] = [], stderr: string[] = [];
+      const exitCode = await runCli(['materialize', '--view', 'architect', ...(elsewhere ? ['--root', root] : [])], { cwd: elsewhere ? other : root,
+        version: '0.0.0', stdout: text => { stdout.push(text); }, stderr: text => { stderr.push(text); }, connect: quick.connect,
+        batch: async () => { throw new Error('Resident command unexpectedly invoked batch'); } });
+      expect([exitCode, stderr.join('')]).toEqual([0, '']);
+      expect(stdout.join('').split('\n')[2]).toMatch(/^Architect view: \.ramify-architect, 2 modules, \d+ records, dependencies measured$/);
+      // The context republished its inputs for the materializing invocation; the analyzer ran once, with the opening request.
+      const status = await quick.service.daemonStatus();
+      if (!status.ok) throw new Error('Expected daemon status');
+      expect(status.value.contexts.map(context => [context.published?.sequence, context.published?.cause])).toEqual([[2, 'request']]);
+      expect(runs.map(run => run.outcome.status)).toEqual(['ready']);
+      const [run] = runs;
+      const opening: ProjectRequest = { cwd: root, ...(given ? { root: '.' } : {}), scope: 'whole-project', configuration: 'discover' };
+      expect(run!.project).toEqual(opening);
+      expect(run!.report.request.project).toEqual({ cwd: elsewhere ? other : root, ...(elsewhere ? { root } : {}),
+        scope: 'whole-project', configuration: 'discover' });
+      expect(await readFile(join(root, '.ramify-architect/behavior.jsonl'), 'utf8')).toContain('"behavioral":["fixture/consumer"]');
+      // A real input change still answers inputs-changed for the same request and report.
+      await put(root, 'subs/consumer/src/use.ts', "import { run } from '../../../src/interfaces/api.js'; run(); run();\n");
+      expect(await analyzeDependencyDiagram({ project: run!.project, report: run!.report, limits: analyzerLimits }))
+        .toEqual({ status: 'inputs-changed', paths: ['subs/consumer/src/use.ts'] });
+      await expectReleased(quick);
+    } finally { await quick.dispose(); await rm(other, { recursive: true, force: true }); }
+  }), 60_000);
 });

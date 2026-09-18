@@ -7,7 +7,7 @@ import { deriveSourceAreas } from '../../../model/src/profiles.js';
 import type { OriginalId, SourceArea } from '../../../model/src/interfaces/model.js';
 import type { CapturedInput, InventoryModule, ProjectInputView, ProjectInventory } from '../../../project/src/interfaces/project.js';
 import { createSourceAnalysis } from '../source-analysis.js';
-import type { CatalogExport, CatalogOriginal, FileExports, SourceAnalysis, SourceCatalog, SourceWorkLimits } from '../interfaces/source.js';
+import type { CatalogExport, CatalogOriginal, ExportShapeRequest, FileExports, SourceAnalysis, SourceCatalog, SourceWorkLimits } from '../interfaces/source.js';
 
 export const sourceLimits: SourceWorkLimits = {
   maxExports: 250_000, maxAccesses: 250_000, maxSelections: 1_000_000,
@@ -210,3 +210,138 @@ export function code(file: string, binding: string, owner = 'fixture'): Original
 export function resource(file: string, binding = 'default', owner = 'fixture'): OriginalId {
   return { kind: 'resource', owner, file, binding };
 }
+
+/**
+ * AV01's `shapes` project: defining files whose exports cover every export
+ * kind and behavior shape, and an imported stylesheet resource.
+ */
+export const shapesFixture: Readonly<Record<string, string>> = {
+  'src/behaviors.ts': `export function run(): number { return 1; }
+export const arrow = (value: number): number => value;
+export class Service { start(): void {} }
+export abstract class Base { abstract area(): number; }
+export declare const hybrid: { new (): object; (): void };
+export const handlers = { save(): void {} };
+export namespace Tools { export function tool(): void {} export const version = 1; }
+export default function greet(name: string): string { return name; }
+export function twice(): void {}
+export { twice as again };
+`,
+  'src/supporting.ts': `export const data = { list: [1, 2, 3], pending: Promise.resolve(1), name: 'data' };
+export const list = [1, 2, 3];
+export enum Mode { A, B }
+export interface Shape { size: number }
+export type Label = string;
+export const limit = 10;
+export const title = 'title';
+export const loose: any = 1;
+`,
+  'src/style.css': '.value {}\n',
+  'src/style.d.ts': 'declare module "*.css" { const styles: Record<string, string>; export default styles; }\n',
+  'src/theme.ts': 'import styles from "./style.css";\nexport const theme = styles;\n',
+};
+
+/** One request per top-level export of a root-owner file that defines its original. */
+export function definingExports(catalog: SourceCatalog): ExportShapeRequest[] {
+  return catalog.files.flatMap(file => file.exports.flatMap(entry => entry.original && file.file === `src/${entry.original.file}`
+    ? [{ original: entry.original, exportName: entry.name }] : []));
+}
+
+const longTitle = 'a'.repeat(300);
+/** 300 bytes whose 240-byte cut falls inside a two-byte character. */
+const longSuite = `x${'é'.repeat(149)}y`;
+/**
+ * AV04–AV07's `titles` project: Vitest files with nested suites, a suite
+ * with no tests, tests outside any suite, modifier and table forms, verbatim,
+ * dynamic and over-long titles, a suite of 45 tests, a file with its own
+ * `describe` and `test`, a file whose parameters, loop, catch and block
+ * bindings hide those names in their scopes, a file without tests, a
+ * JavaScript file the compiler options leave out, and a test file outside
+ * every module's source.
+ */
+export const titlesFixture: Readonly<Record<string, string>> = {
+  'src/tests/suites.test.ts': `import { describe, it, test } from 'vitest';
+
+it('runs outside any suite', () => {});
+
+describe('outer', () => {
+  it('outer first', () => {});
+  describe('inner', () => {
+    it('inner first', () => {});
+    test('inner second', () => {});
+  });
+  it('outer after inner', () => {});
+});
+
+describe('only nested', () => {
+  describe('leaf', () => { it('leaf test', () => {}); });
+});
+
+describe('empty suite', () => {});
+
+describe.skip('skipped suite', () => {
+  it.only('focused test', () => {});
+  it.skip.each([1])('skipped table %i', () => {});
+});
+
+test('second outside', () => {});
+`,
+  'src/tests/tables.test.ts': `import { describe, it, test } from 'vitest';
+
+const name = 'computed';
+describe.each([['a'], ['b']])('table suite %s', () => {
+  test.each([[1, 2], [3, 4]])('adds %i and %i', () => {});
+  it.each\`value
+  \${1}\`('tagged table $value', () => {});
+});
+test.each(['one', 'two'])('case %s', () => {});
+describe.only.each([1])(\`template suite %i\`, () => {
+  test(\`template without substitution\`, () => {});
+  test(\`template with \${name}\`, () => {});
+  it(name, () => {});
+  it('computed ' + name, () => {});
+});
+`,
+  'src/tests/limits.test.ts': `import { describe, it } from 'vitest';
+
+describe('limits', () => {
+  it('${longTitle}', () => {});
+});
+
+describe('${longSuite}', () => {
+  it('under a cut suite', () => {});
+});
+
+describe('forty-five', () => {
+${Array.from({ length: 45 }, (_, index) => `  it('test ${index + 1}', () => {});`).join('\n')}
+});
+`,
+  'src/tests/own-bindings.test.ts': `import { it } from 'vitest';
+
+function describe(label: string, body: () => void): void { void label; body(); }
+const [test] = [(label: string): string => label];
+
+describe('not a suite', () => {
+  it('kept test', () => {});
+  test('not a test');
+});
+`,
+  'src/tests/local-bindings.test.ts': `import { describe, it } from 'vitest';
+
+function until(describe: () => string): string { return describe(); }
+
+describe('scoped', () => {
+  for (const it of [(label: string): string => label]) it('a loop variable, not a test');
+  try { void until; } catch (test: any) { test('a catch variable, not a test'); }
+  it('after the loop', () => {});
+  {
+    const describe = (label: string): string => label;
+    describe('a block constant, not a suite');
+  }
+  describe('still a suite', () => { it('nested', () => {}); });
+});
+`,
+  'src/tests/no-tests.test.ts': `export const shared = { title: 'not a test' };\n`,
+  'src/tests/plain.test.js': `import { it } from 'vitest';\nit('left out by the compiler options', () => {});\n`,
+  'tests/outside.test.ts': `import { it } from 'vitest';\nit('outside every module', () => {});\n`,
+};

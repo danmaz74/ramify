@@ -1,53 +1,79 @@
-# Iteration 7: Exported-symbols view
+# Iteration 7: Materialize the architect view
 
-**Plan:** [Plan 2B: Generated project views](../main-plan.md).
-**Prerequisites:** Iterations 4 and 6.
-**Owners:** `analysis/views` exported-symbols view and its tests, and the
-reserved table entry already added in iteration 3. Independent of iteration 8.
+**Plan:** [Plan 2B: Generated architect view](../main-plan.md).
+**Prerequisites:** iterations 5 and 6.
+**Owners:** `daemon/contexts`, `daemon`, root `ramify` service vocabulary and
+assembly, `cli`.
 
 ## Goal
 
-Generate `.exported_symbols/` with each module's exposed symbols, internal
-exports and test inventory, as defined in the scope.
+Make `ramify materialize --view architect` synchronize one revision, project
+the view, wait for the dependency facts of that revision, render and publish,
+with every outcome mapped and the API view unchanged.
 
 ## Read first
 
-- [Exported-symbols view](../scope.md#exported-symbols-view) and the review
-  decisions recorded by iteration 1.
-- Iteration 4 and 6 results; Plan 2A symbol-detail rendering rules.
-- The model's `Exposure` and `Original` records and the catalog's
-  `FileExports`.
+- [Contracts C7](../contracts.md#c7-materialize),
+  [C8](../contracts.md#c8-failure-and-preservation) and
+  [C9](../contracts.md#c9-test-references), AV24–AV28, and the main
+  plan's [lifecycle](../main-plan.md#lifecycle-and-consistency).
+- Iteration 6's results: where `testReferences` arrives in the analyzer's
+  `ready` outcome.
+- `src/interfaces/service.ts`, `src/resident-assembly.ts` and `module.ramify`.
+- `subs/daemon/subs/contexts/src/interfaces/contexts.ts`,
+  `context-manager.ts` (`apiView`, `deliverApiView`, `dependencyDiagram`),
+  `queue.ts` and `context.ts`.
+- `subs/daemon/src/service.ts` (`materialize`, `runMaterialize`,
+  `dependencyDiagram`), `validation.ts`, `codec.ts`, `host.ts`,
+  `connection.ts`, `connect-daemon.ts` and `interfaces/daemon.ts`.
+- `subs/cli/src/arguments.ts`, `materialize-command.ts` and `run-cli.ts`.
+- `subs/daemon/subs/contexts/src/tests/api-view.test.ts`,
+  `dependency-diagram.test.ts` and `scripted-driver.ts`;
+  `subs/daemon/src/tests/service.test.ts` and `validation.test.ts`;
+  `subs/cli/src/tests/materialize-command.test.ts`;
+  `src/tests/quick-environment.ts` and `resident-cli.test.ts`.
 
 ## Deliverables
 
-1. Implement the view: module-identifier layout, `_meta.json`, and the
-   common text layout.
-2. `exposed-symbols.txt`: owned effective exposures with destinations, tags,
-   aliases and signatures; `relayed` and `ineffective` sections; `[testing]`
-   file markers.
-3. `internal-exports.txt`: owned exports without an owned exposure, excluding
-   foreign forwards and namespace exports.
-4. `tests.txt`: testing-classified files per owner, rendering the provider's
-   hierarchy, descriptions, lines and exceptional states.
-5. Register the view and its recognizable-target shape.
-6. Write hand-made expected files for three reference modules and compare them
-   byte for byte.
+1. Add `MaterializeViewId`, `views` and the `architect` outcome summary to
+   the root service vocabulary, and `materialize-views` to its capabilities.
+2. Contexts: carry `views`, call the session only for requested views at the
+   pinned sequence, return both projections, and map supersession.
+3. Daemon: validate `views`; advertise the capability; wait for dependency
+   facts with a clock the tests control; carry the analyzer's
+   `testReferences` from the context manager's ready result to the renderer,
+   leaving the public `dependencyDiagram` answer unchanged; render; publish
+   through `PublishInput`; map every outcome.
+4. Client: send `views` unchanged; CLI: parse `--view`, check the capability,
+   print the architect line.
+5. Update the scripted driver and the quick environment to serve
+   `architectView`.
+6. Tests for AV24–AV28, including a controllable dependency runner for each
+   wait outcome.
 
 ## Matrix rows executed here
 
-I2B-08: all ten leaves.
+AV24–AV28.
 
 ## Verification
 
-Focused views tests over F and R fixtures with independent expectations,
-shuffled-input determinism, and `npm run type-check`. No build while iteration
-8 runs; the coordinator builds after the group.
+```sh
+npx vitest run subs/cli/src/tests/materialize-command.test.ts
+npx vitest run subs/daemon/subs/contexts/src/tests/api-view.test.ts subs/daemon/subs/contexts/src/tests/dependency-diagram.test.ts
+npx vitest run subs/daemon/src/tests/service.test.ts subs/daemon/src/tests/validation.test.ts subs/daemon/src/tests/codec.test.ts
+npx vitest run subs/daemon/src/tests/session-counters.test.ts src/tests/resident-assembly.test.ts src/tests/resident-cli.test.ts
+npm run type-check
+npm run build
+npm run check:self
+npx vitest run -c scripts/reference-harness/vitest.config.ts scripts/reference-harness/plan2a.test.ts
+```
 
 ## Exit criteria
 
-The view renders complete, deterministic files for every module, matching the
-independent reference expectations.
+AV24–AV28 pass; `ramify materialize` without `--view` behaves exactly as
+before; the Plan 2A harness passes.
 
 ## Handoff
 
-The view and its expected reference files go to iteration 9.
+A working `ramify materialize --view architect` in the built CLI, and the
+list of every changed wire type.

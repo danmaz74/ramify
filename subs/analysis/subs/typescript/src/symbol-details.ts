@@ -7,18 +7,19 @@ import type { ProjectInventory } from '../../project/src/interfaces/project.js';
 import type { SymbolDetail, SymbolDetailLimits, SymbolDetailRequest } from './interfaces/source.js';
 import { SourceFailure, encode, freezeData } from './wire.js';
 
-interface Inputs { readonly inventory: ProjectInventory; readonly areas: readonly SourceArea[] }
+/** The inventory and source areas a defining-file export is resolved against. */
+export interface DeclarationInputs { readonly inventory: ProjectInventory; readonly areas: readonly SourceArea[] }
 
 const order = (a: string, b: string): number => Buffer.compare(Buffer.from(a), Buffer.from(b));
 const decoder = new TextDecoder('utf-8', { fatal: true });
 
 /**
  * Back off one byte at a time until the slice decodes cleanly, so a truncated
- * signature or documentation string never splits a multi-byte code point or
- * emits a replacement character. No byte-safe UTF-8 truncation helper existed
- * anywhere in `subs/` before this file (confirmed by the iteration 1 probe).
+ * signature, documentation string or test title never splits a multi-byte code
+ * point or emits a replacement character. No byte-safe UTF-8 truncation helper
+ * existed anywhere in `subs/` before this file (confirmed by the iteration 1 probe).
  */
-function truncateUtf8(text: string, maxBytes: number): { readonly text: string; readonly truncated: boolean } {
+export function truncateUtf8(text: string, maxBytes: number): { readonly text: string; readonly truncated: boolean } {
   const full = Buffer.from(text, 'utf8');
   if (full.length <= maxBytes) return { text, truncated: false };
   for (let end = maxBytes; end >= 0; end--) {
@@ -276,15 +277,40 @@ function renderDirect(project: Project, node: Node, exportName: string): string 
   return declaredName && declaredName !== exportName ? stripped.replace(declaredName, exportName) : stripped;
 }
 
-function describeOne(project: Project, root: string, ordinaryRoots: ReadonlyMap<string, string>,
-  pathOwners: ReadonlyMap<string, { readonly owner: string; readonly kind: 'source' | 'resource' }>,
-  limits: SymbolDetailLimits, request: SymbolDetailRequest): SymbolDetail {
-  const { checker } = project;
-  const { original, exportName } = request;
-  const unavailable = (reason: Extract<SymbolDetail, { readonly state: 'unavailable' }>['reason']): SymbolDetail =>
-    ({ state: 'unavailable', original, exportName, reason });
+/** The lookups `resolveDeclaration` needs, built once per call from its inputs. */
+export interface DeclarationContext {
+  readonly root: string;
+  /** Each owner's ordinary source root, project-relative. */
+  readonly ordinaryRoots: ReadonlyMap<string, string>;
+  readonly pathOwners: ReadonlyMap<string, { readonly owner: string; readonly kind: 'source' | 'resource' }>;
+}
 
-  if (original.kind !== 'code') return unavailable('unsupported-declaration');
+export function declarationContext(inputs: DeclarationInputs): DeclarationContext {
+  const ordinaryRoots = new Map<string, string>();
+  for (const area of inputs.areas) if (area.kind === 'ordinary') ordinaryRoots.set(area.owner, area.root);
+  return { root: inputs.inventory.scope.root, ordinaryRoots,
+    pathOwners: new Map(inputs.inventory.files.map(file => [file.path, { owner: file.owner, kind: file.kind }])) };
+}
+
+/** A requested code original's compiler symbol and primary declaration, or why the compiler gave none. */
+export type ResolvedDeclaration =
+  | { readonly status: 'resolved'; readonly target: CompilerSymbol; readonly primary: Node }
+  | { readonly status: 'unavailable';
+      readonly reason: 'missing-file' | 'missing-export' | 'identity-mismatch' | 'compiler-failure' };
+
+/**
+ * Resolve a code original's defining-file export to its compiler symbol and
+ * primary declaration: the first declaration in byte order of file, then by
+ * position. The primary must bind the same canonical original the catalog
+ * computes, so a Ramify alias or an in-file forwarding re-export cannot
+ * substitute a different declaration.
+ */
+export function resolveDeclaration(project: Project, context: DeclarationContext, request: SymbolDetailRequest): ResolvedDeclaration {
+  const { checker } = project;
+  const { root, ordinaryRoots, pathOwners } = context;
+  const { original, exportName } = request;
+  const unavailable = (reason: Extract<ResolvedDeclaration, { readonly status: 'unavailable' }>['reason']): ResolvedDeclaration =>
+    ({ status: 'unavailable', reason });
   const ordinaryRoot = ordinaryRoots.get(original.owner);
   if (!ordinaryRoot) return unavailable('missing-file');
   const definingFile = resolve(root, ordinaryRoot, original.file);
@@ -302,9 +328,6 @@ function describeOne(project: Project, root: string, ordinaryRoots: ReadonlyMap<
     order(relative(root, a.getSourceFile().fileName), relative(root, b.getSourceFile().fileName)) || a.getStart() - b.getStart());
   const primary = sortedDeclarations[0]!;
 
-  // Resolve the requested defining-file export to the same canonical original
-  // the catalog computes, so a Ramify alias or an in-file forwarding re-export
-  // cannot substitute a different declaration's signature.
   const primaryPath = resolve(primary.getSourceFile().fileName);
   const owner = pathOwners.get(relative(root, primaryPath));
   if (!owner || owner.kind !== 'source') return unavailable('identity-mismatch');
@@ -313,6 +336,19 @@ function describeOne(project: Project, root: string, ordinaryRoots: ReadonlyMap<
   const candidate: OriginalId = { kind: 'code', owner: owner.owner,
     file: relative(resolve(root, primaryOrdinaryRoot), primaryPath), binding: binding(primary, target) };
   if (originalKey(candidate) !== originalKey(original)) return unavailable('identity-mismatch');
+  return { status: 'resolved', target, primary };
+}
+
+function describeOne(project: Project, context: DeclarationContext, limits: SymbolDetailLimits, request: SymbolDetailRequest): SymbolDetail {
+  const { checker } = project;
+  const { original, exportName } = request;
+  const unavailable = (reason: Extract<SymbolDetail, { readonly state: 'unavailable' }>['reason']): SymbolDetail =>
+    ({ state: 'unavailable', original, exportName, reason });
+
+  if (original.kind !== 'code') return unavailable('unsupported-declaration');
+  const resolved = resolveDeclaration(project, context, request);
+  if (resolved.status === 'unavailable') return unavailable(resolved.reason);
+  const { target, primary } = resolved;
 
   let signatureText: string;
   let overloadsAvailable = 1, overloadsRetained = 1;
@@ -351,7 +387,7 @@ function describeOne(project: Project, root: string, ordinaryRoots: ReadonlyMap<
 }
 
 /** `originalKey` rejects a non-canonical identity; export names are nonempty control-free text. */
-function validRequest(request: SymbolDetailRequest): boolean {
+export function validRequest(request: SymbolDetailRequest): boolean {
   if (typeof request.exportName !== 'string' || request.exportName === ''
     || /[\u0000-\u001f\u007f]/u.test(request.exportName) || /[\uD800-\uDFFF]/u.test(request.exportName)) return false;
   try {
@@ -372,7 +408,7 @@ function validRequest(request: SymbolDetailRequest): boolean {
  * throws `SourceFailure`; an isolated valid-request failure is instead one
  * `unavailable` entry with a stable `reason`, never a thrown error.
  */
-export function describeSymbolDetails(project: Project, inputs: Inputs, requests: readonly SymbolDetailRequest[],
+export function describeSymbolDetails(project: Project, inputs: DeclarationInputs, requests: readonly SymbolDetailRequest[],
   limits: SymbolDetailLimits, signal?: AbortSignal): readonly SymbolDetail[] {
   if (signal?.aborted) throw new SourceFailure('cancelled', 'Symbol details were cancelled before execution');
   if (![limits.maxSignatureBytes, limits.maxDocumentationBytes, limits.maxOverloads, limits.maxResultBytes]
@@ -383,11 +419,7 @@ export function describeSymbolDetails(project: Project, inputs: Inputs, requests
     if (!validRequest(request)) throw new SourceFailure('protocol-error', 'Invalid symbol detail request');
   }
 
-  const root = inputs.inventory.scope.root;
-  const ordinaryRoots = new Map<string, string>();
-  for (const area of inputs.areas) if (area.kind === 'ordinary') ordinaryRoots.set(area.owner, area.root);
-  const pathOwners = new Map(inputs.inventory.files.map(file => [file.path, { owner: file.owner, kind: file.kind }]));
-
+  const context = declarationContext(inputs);
   const results = new Map<string, SymbolDetail>();
   const keys: string[] = [];
   let processed = 0;
@@ -396,7 +428,7 @@ export function describeSymbolDetails(project: Project, inputs: Inputs, requests
     if (results.has(key)) continue;
     if (++processed % 25 === 0 && signal?.aborted) throw new SourceFailure('cancelled', 'Symbol details were cancelled');
     keys.push(key);
-    results.set(key, describeOne(project, root, ordinaryRoots, pathOwners, limits, request));
+    results.set(key, describeOne(project, context, limits, request));
   }
   if (signal?.aborted) throw new SourceFailure('cancelled', 'Symbol details were cancelled');
 

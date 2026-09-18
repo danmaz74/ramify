@@ -53,3 +53,12 @@ aliases, extension substitution or symlink traversal. Inventory records wildcard
 interface eligibility; export expansion, tag assignment and linking arrive in
 iteration 7. README purpose is the first top-level prose paragraph with inline
 formatting rendered as text, or an explicit missing-file/no-paragraph state.
+
+`isRamifyGeneratedSegment` reserves the generated view names at any depth:
+`.ramify` and `.ramify-architect`, and their publisher siblings
+`.ramify.tmp-<suffix>`, `.ramify.old-<suffix>`, `.ramify-architect.tmp-<suffix>`
+and `.ramify-architect.old-<suffix>`. Inventory, the configuration host,
+capture and the observer skip a path with such a segment, so publishing a view
+starts no revision. Near misses such as `.ramify-other` stay ordinary. The
+retained compiler's own directory listings do not omit these names yet; see
+the [known gap](../../../../docs/architecture/materialized-api-view.spec.md#generated-output-isolation).

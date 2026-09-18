@@ -2,6 +2,7 @@ import type {
   ApiViewAreaProjection, ApiViewEntry, ApiViewFile, ApiViewModuleProjection, ApiViewProjection,
 } from '../../../analysis/src/interfaces/session.js';
 import type { SymbolDetail } from '../../../analysis/subs/typescript/src/interfaces/source.js';
+import type { PublishInput } from '../interfaces/daemon.js';
 
 /** Small, independently readable builders for `ApiViewProjection` test data,
  * shared by the renderer tests, the publisher tests, the crash-recovery
@@ -36,4 +37,8 @@ export function moduleProjection(id: string, directory: string, ordinary: ApiVie
 }
 export function projection(modules: readonly ApiViewModuleProjection[], sequence = 1, inputId = 'input-1'): ApiViewProjection {
   return { schema: 'ramify.api-view-projection/1', sequence, inputId, modules, bytes: 0 };
+}
+/** A publish input that writes the API view alone. */
+export function apiInput(api: ApiViewProjection): PublishInput {
+  return { api, architect: null };
 }

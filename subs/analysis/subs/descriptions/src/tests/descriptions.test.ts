@@ -35,6 +35,10 @@ const availabilityNames = ['AvailableForm', 'AvailableOriginal', 'listAvailableO
 const symbolDetailNames = ['SymbolDetailLimits', 'SymbolDetailRequest', 'SymbolDetail'];
 const apiViewNames = ['ApiViewCategory', 'ApiViewEntry', 'ApiViewFile', 'ApiViewAreaProjection', 'ApiViewModuleProjection',
   'ApiViewProjection', 'ApiViewSelection', 'ApiViewQuery', 'ApiViewQueryOutcome'];
+// Plan 2B C3/C4: the architect projection, its session query and its rendering.
+const architectNames = ['ArchitectModuleFacts', 'ArchitectSymbol', 'ArchitectTestRecord', 'ArchitectViewCounts',
+  'ArchitectViewProjection', 'ArchitectViewQuery', 'ArchitectViewQueryOutcome', 'ArchitectDependencyReason',
+  'ArchitectDependencies', 'ArchitectViewFile', 'RenderedArchitectView', 'renderArchitectView'];
 const linkingNames = ['LinkInputs', 'ExpandedSelection', 'LinkIssue', 'LinkedDescriptions'];
 const analysisNames = ['Capability', 'StageId', 'RunControl', 'AnalysisLimits', 'AnalysisInputs',
   'InventoryInputs', 'InventorySnapshot', 'InventoryRun', 'ValidationRun', 'CapabilityExecution',
@@ -126,8 +130,11 @@ const toolkit: readonly Fixture[] = [
     sub([...projectNames, ...observerNames.slice(1), 'isRamifyGeneratedPath'], 'analysis', descendants),
     sub([...sourceNames, ...symbolDetailNames], 'analysis', descendants),
     sub([...analysisNames, ...apiViewNames], 'analysis', descendants),
-    sub(['DependencyBoundaryFact', 'DependencyDiagramFacts', 'DependencyDiagramOutcome', 'BehavioralDependencyMetrics'], 'analysis', descendants),
-    sub(['DependencyDiagramRunner', 'DependencyAnalyzerOutcome'], 'analysis', descendants), sub(presentationNames, 'presentation', descendants),
+    sub(['DependencyBoundaryFact', 'DependencyDiagramFacts', 'DependencyDiagramOutcome', 'BehavioralDependencyMetrics', 'TestFileReferences',
+      'TestReferenceFacts'], 'analysis', descendants),
+    sub(['DependencyDiagramRunner', 'DependencyAnalyzerOutcome'], 'analysis', descendants),
+    sub([...architectNames, 'ExportKind', 'ExportBehavior', 'TestTitleLimits'], 'analysis', descendants),
+    sub(presentationNames, 'presentation', descendants),
     sub([...projectViewModelNames, 'ModuleGraphProps', 'GraphSelection'], 'presentation', descendants),
     sub(['ModuleGraphRadial'], 'presentation', descendants), sub(projectViewProps, 'presentation', descendants),
     sub(['ProjectExplorerView'], 'presentation', descendants),
@@ -145,8 +152,12 @@ const toolkit: readonly Fixture[] = [
     sub([...contextNames, ...residentNames, ...controlledNames, 'MaterializedTarget'], 'daemon', descendants),
     sub(['connectDaemon', 'selectEndpoint', 'readDaemonRecord'], 'daemon', descendants),
   ] },
-  { path: 'subs/analysis/', name: 'analysis', tags: [], statements: [sub('*', 'model', both), sub([...syntaxNames, ...linkingNames], 'descriptions', both), sub([...projectNames, ...observerNames, 'isRamifyGeneratedPath'], 'project', both), sub([...sourceNames, ...symbolDetailNames], 'typescript', both), src(['validateProject'], 'validation.ts'), src('*', 'interfaces/analysis.ts'), src(['acquireInventory'], 'inventory.ts'), src(['createAnalysisSession'], 'session.ts'), src(['analyzeProject'], 'analyze-project.ts'), src(['resolveProject'], 'resolve-project.ts'), src('*', 'interfaces/session.ts'), src(['openRetainedSession'], 'retained-session.ts'), src(['planApiViewRequests', 'projectApiView'], 'api-view.ts'),
-    src(['DependencyBoundaryFact', 'DependencyDiagramFacts', 'DependencyDiagramOutcome'], 'interfaces/dependency-diagram.ts'),
+  { path: 'subs/analysis/', name: 'analysis', tags: [], statements: [sub('*', 'model', both), sub([...syntaxNames, ...linkingNames], 'descriptions', both), sub([...projectNames, ...observerNames, 'isRamifyGeneratedPath'], 'project', both), sub([...sourceNames, ...symbolDetailNames], 'typescript', both), src(['validateProject'], 'validation.ts'), src('*', 'interfaces/analysis.ts'), src(['acquireInventory'], 'inventory.ts'), src(['createAnalysisSession'], 'session.ts'), src(['analyzeProject'], 'analyze-project.ts'), src(['resolveProject'], 'resolve-project.ts'), src('*', 'interfaces/session.ts'), src(['openRetainedSession'], 'retained-session.ts'),
+    src('*', 'interfaces/architect-view.ts'), sub(['ExportKind', 'ExportBehavior', 'TestTitleLimits'], 'typescript'),
+    src(['renderArchitectView'], 'architect-render.ts'),
+    src(['planApiViewRequests', 'projectApiView'], 'api-view.ts'),
+    src(['DependencyBoundaryFact', 'DependencyDiagramFacts', 'DependencyDiagramOutcome', 'TestFileReferences', 'TestReferenceFacts',
+      'TestReferenceOutcome'], 'interfaces/dependency-diagram.ts'),
     src(['BehavioralDependencyMetrics'], 'interfaces/modularity.ts'),
     src(['analyzeDependencyDiagram'], 'dependency-analyzer.ts'), src('*', 'interfaces/dependency-analyzer.ts')] },
   { path: 'subs/analysis/subs/descriptions/', name: 'descriptions', tags: browser, statements: [src(['parseDescription'], 'parse.ts', browser), src('*', 'interfaces/syntax.ts'), src(['linkDescriptions'], 'link.ts', browser), src('*', 'interfaces/linking.ts')] },

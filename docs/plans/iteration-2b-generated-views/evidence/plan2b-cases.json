@@ -1,0 +1,1283 @@
+{
+  "realRuns": {
+    "primary": [
+      {
+        "kind": "reference",
+        "first": {
+          "code": 0,
+          "stderr": "",
+          "durationMs": 11165.223,
+          "revision": 1,
+          "targets": 1,
+          "entries": 123,
+          "bytesWritten": 85337,
+          "unchanged": 0,
+          "modules": 15,
+          "records": 123,
+          "dependencies": "measured"
+        },
+        "repeat": {
+          "code": 0,
+          "stderr": "",
+          "durationMs": 699.421,
+          "revision": 1,
+          "targets": 1,
+          "entries": 123,
+          "bytesWritten": 0,
+          "unchanged": 1,
+          "modules": 15,
+          "records": 123,
+          "dependencies": "measured"
+        },
+        "rewrite": {
+          "code": 0,
+          "stderr": "",
+          "durationMs": 686.733,
+          "revision": 1,
+          "targets": 1,
+          "entries": 123,
+          "bytesWritten": 85337,
+          "unchanged": 0,
+          "modules": 15,
+          "records": 123,
+          "dependencies": "measured"
+        },
+        "revision": "rev/1:14e64b33-7e04-4e84-bec2-8deb0c7e976c:1",
+        "inputId": "input/1:c678f4850b0c2f28c7a70fecf086ef160675c8824a49e19006a02b438b09b9de",
+        "sequenceBefore": 1,
+        "sequenceAfter": 1,
+        "revisionsCounter": {
+          "before": 1,
+          "after": 1
+        },
+        "meta": {
+          "schema": "ramify.architect-view/1",
+          "revision": "rev/1:14e64b33-7e04-4e84-bec2-8deb0c7e976c:1",
+          "input": "input/1:c678f4850b0c2f28c7a70fecf086ef160675c8824a49e19006a02b438b09b9de",
+          "modules": 15,
+          "dependencies": "measured",
+          "dependencyScope": "production",
+          "testReferences": "measured",
+          "metrics": "unavailable",
+          "cut": 9,
+          "detailsUnavailable": 2
+        },
+        "files": 62,
+        "bytes": 85337,
+        "structural": {
+          "modules": 15,
+          "checkedExposures": 44,
+          "checkedWildcardFiles": 1,
+          "checkedRelays": 35,
+          "mismatches": []
+        },
+        "feature": {
+          "path": "subs/integration-tests/src/features/collection-review.viz.feature",
+          "expected": [
+            {
+              "feature": "Collection review",
+              "scenarios": [
+                "A reviewer inspects the catalog and reviews both records through both surfaces"
+              ]
+            }
+          ],
+          "actual": [
+            {
+              "feature": "Collection review",
+              "scenarios": [
+                "A reviewer inspects the catalog and reviews both records through both surfaces"
+              ]
+            }
+          ]
+        },
+        "repeatTouched": [],
+        "rewriteDifference": null,
+        "inProcess": {
+          "inputId": "input/1:c678f4850b0c2f28c7a70fecf086ef160675c8824a49e19006a02b438b09b9de",
+          "difference": null,
+          "records": 123,
+          "bytes": 85337,
+          "projectionBytes": 96226,
+          "timings": {
+            "openMs": 4816.037869,
+            "queryMs": 258.02034100000037,
+            "analyzerMs": 8613.513315000002
+          }
+        }
+      },
+      {
+        "kind": "toolkit",
+        "first": {
+          "code": 0,
+          "stderr": "",
+          "durationMs": 27945.946,
+          "revision": 1,
+          "targets": 1,
+          "entries": 1595,
+          "bytesWritten": 812267,
+          "unchanged": 0,
+          "modules": 15,
+          "records": 1595,
+          "dependencies": "measured"
+        },
+        "repeat": {
+          "code": 0,
+          "stderr": "",
+          "durationMs": 2588.407,
+          "revision": 1,
+          "targets": 1,
+          "entries": 1595,
+          "bytesWritten": 0,
+          "unchanged": 1,
+          "modules": 15,
+          "records": 1595,
+          "dependencies": "measured"
+        },
+        "rewrite": {
+          "code": 0,
+          "stderr": "",
+          "durationMs": 2822.248,
+          "revision": 1,
+          "targets": 1,
+          "entries": 1595,
+          "bytesWritten": 812267,
+          "unchanged": 0,
+          "modules": 15,
+          "records": 1595,
+          "dependencies": "measured"
+        },
+        "revision": "rev/1:20fca4a5-1160-4d35-bab7-52c0f061249c:1",
+        "inputId": "input/1:42c463b81ddad2eb9286538226a321597efe76d97d8e368c05f7a938f2e32321",
+        "sequenceBefore": 1,
+        "sequenceAfter": 1,
+        "revisionsCounter": {
+          "before": 2,
+          "after": 2
+        },
+        "meta": {
+          "schema": "ramify.architect-view/1",
+          "revision": "rev/1:20fca4a5-1160-4d35-bab7-52c0f061249c:1",
+          "input": "input/1:42c463b81ddad2eb9286538226a321597efe76d97d8e368c05f7a938f2e32321",
+          "modules": 15,
+          "dependencies": "measured",
+          "dependencyScope": "production",
+          "testReferences": "measured",
+          "metrics": "unavailable",
+          "cut": 351,
+          "detailsUnavailable": 1,
+          "dynamicTitles": 21
+        },
+        "files": 62,
+        "bytes": 812267,
+        "structural": {
+          "modules": 15,
+          "checkedExposures": 0,
+          "checkedWildcardFiles": 0,
+          "checkedRelays": 0,
+          "mismatches": []
+        },
+        "feature": null,
+        "repeatTouched": [],
+        "rewriteDifference": null,
+        "inProcess": null
+      }
+    ],
+    "secondary": [
+      {
+        "kind": "reference",
+        "placement": "same-path",
+        "first": {
+          "code": 0,
+          "stderr": "",
+          "durationMs": 9878.282,
+          "revision": 1,
+          "targets": 1,
+          "entries": 123,
+          "bytesWritten": 85337,
+          "unchanged": 0,
+          "modules": 15,
+          "records": 123,
+          "dependencies": "measured"
+        },
+        "inputId": "input/1:c678f4850b0c2f28c7a70fecf086ef160675c8824a49e19006a02b438b09b9de",
+        "revision": "rev/1:d0a136f9-857a-4097-985c-7af031ef4a09:1",
+        "revisionOccurrences": {
+          "README.md": 1,
+          "_meta.json": 1,
+          "integration-tests/module.json": 1,
+          "module.json": 1,
+          "workspace/catalog/core/module.json": 1,
+          "workspace/catalog/module.json": 1,
+          "workspace/catalog/ui/module.json": 1,
+          "workspace/contracts/module.json": 1,
+          "workspace/module.json": 1,
+          "workspace/reviews/core/controller/module.json": 1,
+          "workspace/reviews/core/module.json": 1,
+          "workspace/reviews/core/tasks/module.json": 1,
+          "workspace/reviews/module.json": 1,
+          "workspace/reviews/ui/module.json": 1,
+          "workspace/reviews/ui/pure-ui/module.json": 1,
+          "workspace/reviews/validation/module.json": 1,
+          "workspace/shared-ui/module.json": 1
+        },
+        "roots": [
+          "/tmp/rp2b-copies-DSnDxi/r1",
+          "/tmp/rp2b-copies-DSnDxi/r1"
+        ],
+        "difference": null
+      },
+      {
+        "kind": "toolkit",
+        "placement": "same-path",
+        "first": {
+          "code": 0,
+          "stderr": "",
+          "durationMs": 26969.747,
+          "revision": 1,
+          "targets": 1,
+          "entries": 1595,
+          "bytesWritten": 812267,
+          "unchanged": 0,
+          "modules": 15,
+          "records": 1595,
+          "dependencies": "measured"
+        },
+        "inputId": "input/1:42c463b81ddad2eb9286538226a321597efe76d97d8e368c05f7a938f2e32321",
+        "revision": "rev/1:94258de3-1c44-41bc-bf6c-b928ff52e40f:1",
+        "revisionOccurrences": {
+          "README.md": 1,
+          "_meta.json": 1,
+          "analysis/descriptions/module.json": 1,
+          "analysis/model/module.json": 1,
+          "analysis/module.json": 1,
+          "analysis/project/module.json": 1,
+          "analysis/typescript/module.json": 1,
+          "cli/module.json": 1,
+          "daemon/contexts/module.json": 1,
+          "daemon/module.json": 1,
+          "explorer/module.json": 1,
+          "integration-tests/module.json": 1,
+          "module.json": 1,
+          "presentation/layout/module.json": 1,
+          "presentation/module.json": 1,
+          "presentation/project-view/module.json": 1,
+          "service-api/module.json": 1
+        },
+        "roots": [
+          "/tmp/rp2b-copies-DSnDxi/t1",
+          "/tmp/rp2b-copies-DSnDxi/t1"
+        ],
+        "difference": null
+      },
+      {
+        "kind": "reference",
+        "placement": "other-path",
+        "first": {
+          "code": 0,
+          "stderr": "",
+          "durationMs": 8609.264,
+          "revision": 1,
+          "targets": 1,
+          "entries": 123,
+          "bytesWritten": 85337,
+          "unchanged": 0,
+          "modules": 15,
+          "records": 123,
+          "dependencies": "measured"
+        },
+        "inputId": "input/1:9716fa1ae154578f7e6527818038d311627cc72acf41090c8375528959eb6bbf",
+        "revision": "rev/1:6c75ffa4-a9d8-488b-9723-ecdd9bc3d735:1",
+        "revisionOccurrences": {
+          "README.md": 1,
+          "_meta.json": 1,
+          "integration-tests/module.json": 1,
+          "module.json": 1,
+          "workspace/catalog/core/module.json": 1,
+          "workspace/catalog/module.json": 1,
+          "workspace/catalog/ui/module.json": 1,
+          "workspace/contracts/module.json": 1,
+          "workspace/module.json": 1,
+          "workspace/reviews/core/controller/module.json": 1,
+          "workspace/reviews/core/module.json": 1,
+          "workspace/reviews/core/tasks/module.json": 1,
+          "workspace/reviews/module.json": 1,
+          "workspace/reviews/ui/module.json": 1,
+          "workspace/reviews/ui/pure-ui/module.json": 1,
+          "workspace/reviews/validation/module.json": 1,
+          "workspace/shared-ui/module.json": 1
+        },
+        "roots": [
+          "/tmp/rp2b-copies-DSnDxi/r1",
+          "/tmp/rp2b-copies-DSnDxi/second-r"
+        ],
+        "difference": null
+      },
+      {
+        "kind": "toolkit",
+        "placement": "other-path",
+        "first": {
+          "code": 0,
+          "stderr": "",
+          "durationMs": 23559.594,
+          "revision": 1,
+          "targets": 1,
+          "entries": 1595,
+          "bytesWritten": 812267,
+          "unchanged": 0,
+          "modules": 15,
+          "records": 1595,
+          "dependencies": "measured"
+        },
+        "inputId": "input/1:f3a2efaa05ac4d60dd76dc3114647a9fa1643bc56026163f594383f2738f105d",
+        "revision": "rev/1:71940dca-845a-493e-b4f8-ad054319d2a1:1",
+        "revisionOccurrences": {
+          "README.md": 1,
+          "_meta.json": 1,
+          "analysis/descriptions/module.json": 1,
+          "analysis/model/module.json": 1,
+          "analysis/module.json": 1,
+          "analysis/project/module.json": 1,
+          "analysis/typescript/module.json": 1,
+          "cli/module.json": 1,
+          "daemon/contexts/module.json": 1,
+          "daemon/module.json": 1,
+          "explorer/module.json": 1,
+          "integration-tests/module.json": 1,
+          "module.json": 1,
+          "presentation/layout/module.json": 1,
+          "presentation/module.json": 1,
+          "presentation/project-view/module.json": 1,
+          "service-api/module.json": 1
+        },
+        "roots": [
+          "/tmp/rp2b-copies-DSnDxi/t1",
+          "/tmp/rp2b-copies-DSnDxi/second-t"
+        ],
+        "difference": null
+      }
+    ],
+    "stops": [
+      {
+        "endpoint": "/tmp/rp2b-GukGck/ep",
+        "stopCode": 0,
+        "statusAfterStop": "not running",
+        "recordedPids": [
+          584270,
+          584449,
+          586097
+        ],
+        "survivingPids": [],
+        "signalledPids": [],
+        "removed": true
+      },
+      {
+        "endpoint": "/tmp/rp2b-km1Tak/ep",
+        "stopCode": 0,
+        "statusAfterStop": "not running",
+        "recordedPids": [
+          588754,
+          588861,
+          589464,
+          591226,
+          591894
+        ],
+        "survivingPids": [],
+        "signalledPids": [],
+        "removed": true
+      }
+    ]
+  },
+  "invariance": {
+    "root": "/tmp/rp2b-inv-Oa26HG/project",
+    "edits": [
+      {
+        "path": "subs/workspace/subs/catalog/subs/core/src/catalog.ts",
+        "appended": "\nexport function plan2bInvarianceProbe(): number { return 1; }\n"
+      },
+      {
+        "path": "subs/workspace/subs/catalog/subs/core/src/tests/catalog.test.ts",
+        "appended": "\ndescribe('plan2b invariance probe', () => { it('keeps checks unchanged', () => {}); });\n"
+      }
+    ],
+    "control": [
+      {
+        "step": "open",
+        "code": 0,
+        "report": {
+          "inputId": "input/1:fbdcd44aadf4e5c84a935c1181cc770d8c087ec697bd1b98d12d2f4368f41c98",
+          "summary": {
+            "complete": true,
+            "owners": 15,
+            "sourceFiles": 54,
+            "resources": 5,
+            "originals": 89,
+            "accesses": 294,
+            "allowed": 166,
+            "denied": 0,
+            "errors": 0,
+            "warnings": 2,
+            "coverageNotes": 0,
+            "external": 128
+          }
+        },
+        "sequence": 1,
+        "cause": "open",
+        "counters": {
+          "revisions": 1,
+          "analyses": 2,
+          "cancelledAnalyses": 0,
+          "reusedRevisions": 1,
+          "coalescedEvents": 0,
+          "evictions": 0,
+          "rejectedRequests": 0,
+          "disconnectedSlowConsumers": 0,
+          "sweeps": 1,
+          "audits": 0,
+          "auditMismatches": 0,
+          "coveredRequests": 0,
+          "coldOutcomes": 0,
+          "deadlineOutcomes": 0,
+          "behaviorRuns": 0,
+          "dependencyDiagrams": 0,
+          "dependencyDiagramInputChanges": 0
+        },
+        "session": {
+          "sequence": 1,
+          "observedInputs": 3610,
+          "factBytes": 1309921,
+          "compilerPid": 593229
+        },
+        "history": 1,
+        "watcherPublished": null
+      },
+      {
+        "step": "edit-source",
+        "code": 0,
+        "report": {
+          "inputId": "input/1:434bb2bc47045ff74ecd6c0eb2da7879ce4fa08048c41135c85c5ab689d9cbf8",
+          "summary": {
+            "complete": true,
+            "owners": 15,
+            "sourceFiles": 54,
+            "resources": 5,
+            "originals": 90,
+            "accesses": 294,
+            "allowed": 166,
+            "denied": 0,
+            "errors": 0,
+            "warnings": 2,
+            "coverageNotes": 0,
+            "external": 128
+          }
+        },
+        "sequence": 2,
+        "cause": "watch",
+        "counters": {
+          "revisions": 2,
+          "analyses": 4,
+          "cancelledAnalyses": 0,
+          "reusedRevisions": 2,
+          "coalescedEvents": 0,
+          "evictions": 0,
+          "rejectedRequests": 0,
+          "disconnectedSlowConsumers": 0,
+          "sweeps": 2,
+          "audits": 0,
+          "auditMismatches": 0,
+          "coveredRequests": 0,
+          "coldOutcomes": 0,
+          "deadlineOutcomes": 0,
+          "behaviorRuns": 0,
+          "dependencyDiagrams": 0,
+          "dependencyDiagramInputChanges": 0
+        },
+        "session": {
+          "sequence": 2,
+          "observedInputs": 3610,
+          "factBytes": 2622300,
+          "compilerPid": 593229
+        },
+        "history": 2,
+        "watcherPublished": true
+      },
+      {
+        "step": "edit-test",
+        "code": 0,
+        "report": {
+          "inputId": "input/1:30ae5f336fbb11a42a2739e0d43d70a78b17db975be21e2d2ad2bbb2146d7121",
+          "summary": {
+            "complete": true,
+            "owners": 15,
+            "sourceFiles": 54,
+            "resources": 5,
+            "originals": 90,
+            "accesses": 294,
+            "allowed": 166,
+            "denied": 0,
+            "errors": 0,
+            "warnings": 2,
+            "coverageNotes": 0,
+            "external": 128
+          }
+        },
+        "sequence": 3,
+        "cause": "watch",
+        "counters": {
+          "revisions": 3,
+          "analyses": 6,
+          "cancelledAnalyses": 0,
+          "reusedRevisions": 3,
+          "coalescedEvents": 0,
+          "evictions": 0,
+          "rejectedRequests": 0,
+          "disconnectedSlowConsumers": 0,
+          "sweeps": 3,
+          "audits": 0,
+          "auditMismatches": 0,
+          "coveredRequests": 0,
+          "coldOutcomes": 0,
+          "deadlineOutcomes": 0,
+          "behaviorRuns": 0,
+          "dependencyDiagrams": 0,
+          "dependencyDiagramInputChanges": 0
+        },
+        "session": {
+          "sequence": 3,
+          "observedInputs": 3610,
+          "factBytes": 3934679,
+          "compilerPid": 593229
+        },
+        "history": 3,
+        "watcherPublished": true
+      },
+      {
+        "step": "unchanged",
+        "code": 0,
+        "report": {
+          "inputId": "input/1:30ae5f336fbb11a42a2739e0d43d70a78b17db975be21e2d2ad2bbb2146d7121",
+          "summary": {
+            "complete": true,
+            "owners": 15,
+            "sourceFiles": 54,
+            "resources": 5,
+            "originals": 90,
+            "accesses": 294,
+            "allowed": 166,
+            "denied": 0,
+            "errors": 0,
+            "warnings": 2,
+            "coverageNotes": 0,
+            "external": 128
+          }
+        },
+        "sequence": 3,
+        "cause": "watch",
+        "counters": {
+          "revisions": 3,
+          "analyses": 7,
+          "cancelledAnalyses": 0,
+          "reusedRevisions": 4,
+          "coalescedEvents": 0,
+          "evictions": 0,
+          "rejectedRequests": 0,
+          "disconnectedSlowConsumers": 0,
+          "sweeps": 4,
+          "audits": 0,
+          "auditMismatches": 0,
+          "coveredRequests": 0,
+          "coldOutcomes": 0,
+          "deadlineOutcomes": 0,
+          "behaviorRuns": 0,
+          "dependencyDiagrams": 0,
+          "dependencyDiagramInputChanges": 0
+        },
+        "session": {
+          "sequence": 3,
+          "observedInputs": 3610,
+          "factBytes": 3934679,
+          "compilerPid": 593229
+        },
+        "history": 3,
+        "watcherPublished": null
+      }
+    ],
+    "interleaved": [
+      {
+        "step": "open",
+        "code": 0,
+        "report": {
+          "inputId": "input/1:fbdcd44aadf4e5c84a935c1181cc770d8c087ec697bd1b98d12d2f4368f41c98",
+          "summary": {
+            "complete": true,
+            "owners": 15,
+            "sourceFiles": 54,
+            "resources": 5,
+            "originals": 89,
+            "accesses": 294,
+            "allowed": 166,
+            "denied": 0,
+            "errors": 0,
+            "warnings": 2,
+            "coverageNotes": 0,
+            "external": 128
+          }
+        },
+        "sequence": 1,
+        "cause": "open",
+        "counters": {
+          "revisions": 1,
+          "analyses": 2,
+          "cancelledAnalyses": 0,
+          "reusedRevisions": 1,
+          "coalescedEvents": 0,
+          "evictions": 0,
+          "rejectedRequests": 0,
+          "disconnectedSlowConsumers": 0,
+          "sweeps": 1,
+          "audits": 0,
+          "auditMismatches": 0,
+          "coveredRequests": 0,
+          "coldOutcomes": 0,
+          "deadlineOutcomes": 0,
+          "behaviorRuns": 0,
+          "dependencyDiagrams": 0,
+          "dependencyDiagramInputChanges": 0
+        },
+        "session": {
+          "sequence": 1,
+          "observedInputs": 3610,
+          "factBytes": 1309921,
+          "compilerPid": 594053
+        },
+        "history": 1,
+        "watcherPublished": null
+      },
+      {
+        "step": "edit-source",
+        "code": 0,
+        "report": {
+          "inputId": "input/1:434bb2bc47045ff74ecd6c0eb2da7879ce4fa08048c41135c85c5ab689d9cbf8",
+          "summary": {
+            "complete": true,
+            "owners": 15,
+            "sourceFiles": 54,
+            "resources": 5,
+            "originals": 90,
+            "accesses": 294,
+            "allowed": 166,
+            "denied": 0,
+            "errors": 0,
+            "warnings": 2,
+            "coverageNotes": 0,
+            "external": 128
+          }
+        },
+        "sequence": 2,
+        "cause": "watch",
+        "counters": {
+          "revisions": 2,
+          "analyses": 5,
+          "cancelledAnalyses": 0,
+          "reusedRevisions": 2,
+          "coalescedEvents": 0,
+          "evictions": 0,
+          "rejectedRequests": 0,
+          "disconnectedSlowConsumers": 0,
+          "sweeps": 3,
+          "audits": 0,
+          "auditMismatches": 0,
+          "coveredRequests": 0,
+          "coldOutcomes": 0,
+          "deadlineOutcomes": 0,
+          "behaviorRuns": 1,
+          "dependencyDiagrams": 1,
+          "dependencyDiagramInputChanges": 0
+        },
+        "session": {
+          "sequence": 2,
+          "observedInputs": 3610,
+          "factBytes": 2622300,
+          "compilerPid": 594053
+        },
+        "history": 2,
+        "watcherPublished": true
+      },
+      {
+        "step": "edit-test",
+        "code": 0,
+        "report": {
+          "inputId": "input/1:30ae5f336fbb11a42a2739e0d43d70a78b17db975be21e2d2ad2bbb2146d7121",
+          "summary": {
+            "complete": true,
+            "owners": 15,
+            "sourceFiles": 54,
+            "resources": 5,
+            "originals": 90,
+            "accesses": 294,
+            "allowed": 166,
+            "denied": 0,
+            "errors": 0,
+            "warnings": 2,
+            "coverageNotes": 0,
+            "external": 128
+          }
+        },
+        "sequence": 3,
+        "cause": "watch",
+        "counters": {
+          "revisions": 3,
+          "analyses": 8,
+          "cancelledAnalyses": 0,
+          "reusedRevisions": 3,
+          "coalescedEvents": 0,
+          "evictions": 0,
+          "rejectedRequests": 0,
+          "disconnectedSlowConsumers": 0,
+          "sweeps": 5,
+          "audits": 0,
+          "auditMismatches": 0,
+          "coveredRequests": 0,
+          "coldOutcomes": 0,
+          "deadlineOutcomes": 0,
+          "behaviorRuns": 2,
+          "dependencyDiagrams": 2,
+          "dependencyDiagramInputChanges": 0
+        },
+        "session": {
+          "sequence": 3,
+          "observedInputs": 3610,
+          "factBytes": 3934679,
+          "compilerPid": 594053
+        },
+        "history": 3,
+        "watcherPublished": true
+      },
+      {
+        "step": "unchanged",
+        "code": 0,
+        "report": {
+          "inputId": "input/1:30ae5f336fbb11a42a2739e0d43d70a78b17db975be21e2d2ad2bbb2146d7121",
+          "summary": {
+            "complete": true,
+            "owners": 15,
+            "sourceFiles": 54,
+            "resources": 5,
+            "originals": 90,
+            "accesses": 294,
+            "allowed": 166,
+            "denied": 0,
+            "errors": 0,
+            "warnings": 2,
+            "coverageNotes": 0,
+            "external": 128
+          }
+        },
+        "sequence": 3,
+        "cause": "watch",
+        "counters": {
+          "revisions": 3,
+          "analyses": 10,
+          "cancelledAnalyses": 0,
+          "reusedRevisions": 4,
+          "coalescedEvents": 0,
+          "evictions": 0,
+          "rejectedRequests": 0,
+          "disconnectedSlowConsumers": 0,
+          "sweeps": 7,
+          "audits": 0,
+          "auditMismatches": 0,
+          "coveredRequests": 0,
+          "coldOutcomes": 0,
+          "deadlineOutcomes": 0,
+          "behaviorRuns": 3,
+          "dependencyDiagrams": 3,
+          "dependencyDiagramInputChanges": 0
+        },
+        "session": {
+          "sequence": 3,
+          "observedInputs": 3610,
+          "factBytes": 3934679,
+          "compilerPid": 594053
+        },
+        "history": 3,
+        "watcherPublished": null
+      }
+    ],
+    "materializations": [
+      {
+        "after": "open",
+        "args": [
+          "--view",
+          "architect"
+        ],
+        "run": {
+          "code": 0,
+          "stderr": "",
+          "durationMs": 4399.046,
+          "revision": 1,
+          "targets": 1,
+          "entries": 123,
+          "bytesWritten": 85337,
+          "unchanged": 0,
+          "modules": 15,
+          "records": 123,
+          "dependencies": "measured"
+        },
+        "before": {
+          "sequence": 1,
+          "counters": {
+            "revisions": 1,
+            "analyses": 2,
+            "cancelledAnalyses": 0,
+            "reusedRevisions": 1,
+            "coalescedEvents": 0,
+            "evictions": 0,
+            "rejectedRequests": 0,
+            "disconnectedSlowConsumers": 0,
+            "sweeps": 1,
+            "audits": 0,
+            "auditMismatches": 0,
+            "coveredRequests": 0,
+            "coldOutcomes": 0,
+            "deadlineOutcomes": 0,
+            "behaviorRuns": 0,
+            "dependencyDiagrams": 0,
+            "dependencyDiagramInputChanges": 0
+          }
+        },
+        "afterRun": {
+          "sequence": 1,
+          "counters": {
+            "revisions": 1,
+            "analyses": 3,
+            "cancelledAnalyses": 0,
+            "reusedRevisions": 1,
+            "coalescedEvents": 0,
+            "evictions": 0,
+            "rejectedRequests": 0,
+            "disconnectedSlowConsumers": 0,
+            "sweeps": 2,
+            "audits": 0,
+            "auditMismatches": 0,
+            "coveredRequests": 0,
+            "coldOutcomes": 0,
+            "deadlineOutcomes": 0,
+            "behaviorRuns": 1,
+            "dependencyDiagrams": 1,
+            "dependencyDiagramInputChanges": 0
+          }
+        },
+        "settled": {
+          "sequence": 1,
+          "counters": {
+            "revisions": 1,
+            "analyses": 3,
+            "cancelledAnalyses": 0,
+            "reusedRevisions": 1,
+            "coalescedEvents": 0,
+            "evictions": 0,
+            "rejectedRequests": 0,
+            "disconnectedSlowConsumers": 0,
+            "sweeps": 2,
+            "audits": 0,
+            "auditMismatches": 0,
+            "coveredRequests": 0,
+            "coldOutcomes": 0,
+            "deadlineOutcomes": 0,
+            "behaviorRuns": 1,
+            "dependencyDiagrams": 1,
+            "dependencyDiagramInputChanges": 0
+          }
+        }
+      },
+      {
+        "after": "edit-source",
+        "args": [
+          "--view",
+          "api",
+          "--view",
+          "architect",
+          "--all"
+        ],
+        "run": {
+          "code": 0,
+          "stderr": "",
+          "durationMs": 4258.631,
+          "revision": 2,
+          "targets": 30,
+          "entries": 675,
+          "bytesWritten": 210066,
+          "unchanged": 0,
+          "modules": 15,
+          "records": 124,
+          "dependencies": "measured"
+        },
+        "before": {
+          "sequence": 2,
+          "counters": {
+            "revisions": 2,
+            "analyses": 5,
+            "cancelledAnalyses": 0,
+            "reusedRevisions": 2,
+            "coalescedEvents": 0,
+            "evictions": 0,
+            "rejectedRequests": 0,
+            "disconnectedSlowConsumers": 0,
+            "sweeps": 3,
+            "audits": 0,
+            "auditMismatches": 0,
+            "coveredRequests": 0,
+            "coldOutcomes": 0,
+            "deadlineOutcomes": 0,
+            "behaviorRuns": 1,
+            "dependencyDiagrams": 1,
+            "dependencyDiagramInputChanges": 0
+          }
+        },
+        "afterRun": {
+          "sequence": 2,
+          "counters": {
+            "revisions": 2,
+            "analyses": 6,
+            "cancelledAnalyses": 0,
+            "reusedRevisions": 2,
+            "coalescedEvents": 0,
+            "evictions": 0,
+            "rejectedRequests": 0,
+            "disconnectedSlowConsumers": 0,
+            "sweeps": 4,
+            "audits": 0,
+            "auditMismatches": 0,
+            "coveredRequests": 0,
+            "coldOutcomes": 0,
+            "deadlineOutcomes": 0,
+            "behaviorRuns": 2,
+            "dependencyDiagrams": 2,
+            "dependencyDiagramInputChanges": 0
+          }
+        },
+        "settled": {
+          "sequence": 2,
+          "counters": {
+            "revisions": 2,
+            "analyses": 6,
+            "cancelledAnalyses": 0,
+            "reusedRevisions": 2,
+            "coalescedEvents": 0,
+            "evictions": 0,
+            "rejectedRequests": 0,
+            "disconnectedSlowConsumers": 0,
+            "sweeps": 4,
+            "audits": 0,
+            "auditMismatches": 0,
+            "coveredRequests": 0,
+            "coldOutcomes": 0,
+            "deadlineOutcomes": 0,
+            "behaviorRuns": 2,
+            "dependencyDiagrams": 2,
+            "dependencyDiagramInputChanges": 0
+          }
+        }
+      },
+      {
+        "after": "edit-test",
+        "args": [
+          "--view",
+          "architect"
+        ],
+        "run": {
+          "code": 0,
+          "stderr": "",
+          "durationMs": 3971.512,
+          "revision": 3,
+          "targets": 1,
+          "entries": 125,
+          "bytesWritten": 86049,
+          "unchanged": 0,
+          "modules": 15,
+          "records": 125,
+          "dependencies": "measured"
+        },
+        "before": {
+          "sequence": 3,
+          "counters": {
+            "revisions": 3,
+            "analyses": 8,
+            "cancelledAnalyses": 0,
+            "reusedRevisions": 3,
+            "coalescedEvents": 0,
+            "evictions": 0,
+            "rejectedRequests": 0,
+            "disconnectedSlowConsumers": 0,
+            "sweeps": 5,
+            "audits": 0,
+            "auditMismatches": 0,
+            "coveredRequests": 0,
+            "coldOutcomes": 0,
+            "deadlineOutcomes": 0,
+            "behaviorRuns": 2,
+            "dependencyDiagrams": 2,
+            "dependencyDiagramInputChanges": 0
+          }
+        },
+        "afterRun": {
+          "sequence": 3,
+          "counters": {
+            "revisions": 3,
+            "analyses": 9,
+            "cancelledAnalyses": 0,
+            "reusedRevisions": 3,
+            "coalescedEvents": 0,
+            "evictions": 0,
+            "rejectedRequests": 0,
+            "disconnectedSlowConsumers": 0,
+            "sweeps": 6,
+            "audits": 0,
+            "auditMismatches": 0,
+            "coveredRequests": 0,
+            "coldOutcomes": 0,
+            "deadlineOutcomes": 0,
+            "behaviorRuns": 3,
+            "dependencyDiagrams": 3,
+            "dependencyDiagramInputChanges": 0
+          }
+        },
+        "settled": {
+          "sequence": 3,
+          "counters": {
+            "revisions": 3,
+            "analyses": 9,
+            "cancelledAnalyses": 0,
+            "reusedRevisions": 3,
+            "coalescedEvents": 0,
+            "evictions": 0,
+            "rejectedRequests": 0,
+            "disconnectedSlowConsumers": 0,
+            "sweeps": 6,
+            "audits": 0,
+            "auditMismatches": 0,
+            "coveredRequests": 0,
+            "coldOutcomes": 0,
+            "deadlineOutcomes": 0,
+            "behaviorRuns": 3,
+            "dependencyDiagrams": 3,
+            "dependencyDiagramInputChanges": 0
+          }
+        }
+      }
+    ],
+    "stops": [
+      {
+        "endpoint": "/tmp/rp2b-xCPP39/ep",
+        "stopCode": 0,
+        "statusAfterStop": "not running",
+        "recordedPids": [
+          593103,
+          593229
+        ],
+        "survivingPids": [],
+        "signalledPids": [],
+        "removed": true
+      },
+      {
+        "endpoint": "/tmp/rp2b-Qq3Uhn/ep",
+        "stopCode": 0,
+        "statusAfterStop": "not running",
+        "recordedPids": [
+          593994,
+          594053
+        ],
+        "survivingPids": [],
+        "signalledPids": [],
+        "removed": true
+      }
+    ]
+  },
+  "apiViewIdentity": {
+    "baseline": {
+      "commit": "577b980",
+      "buildCode": 0,
+      "buildMs": 3361.889
+    },
+    "projects": [
+      {
+        "kind": "reference",
+        "baseline": {
+          "code": 0,
+          "stderr": "",
+          "durationMs": 2837.188,
+          "revision": 1,
+          "targets": 29,
+          "entries": 551,
+          "bytesWritten": 124460,
+          "unchanged": 0,
+          "modules": null,
+          "records": null,
+          "dependencies": null
+        },
+        "current": {
+          "code": 0,
+          "stderr": "",
+          "durationMs": 3050.146,
+          "revision": 1,
+          "targets": 29,
+          "entries": 551,
+          "bytesWritten": 124460,
+          "unchanged": 0,
+          "modules": null,
+          "records": null,
+          "dependencies": null
+        },
+        "files": 153,
+        "bytes": 124460,
+        "difference": null,
+        "currentStdoutLines": [
+          "Root: <root>",
+          "Materialized: revision 1; 29 target(s), 551 entries, 124460 bytes written, 0 unchanged"
+        ]
+      },
+      {
+        "kind": "toolkit",
+        "baseline": {
+          "code": 0,
+          "stderr": "",
+          "durationMs": 9518.164,
+          "revision": 1,
+          "targets": 29,
+          "entries": 6359,
+          "bytesWritten": 2104253,
+          "unchanged": 0,
+          "modules": null,
+          "records": null,
+          "dependencies": null
+        },
+        "current": {
+          "code": 0,
+          "stderr": "",
+          "durationMs": 8085.574,
+          "revision": 1,
+          "targets": 29,
+          "entries": 6359,
+          "bytesWritten": 2104253,
+          "unchanged": 0,
+          "modules": null,
+          "records": null,
+          "dependencies": null
+        },
+        "files": 890,
+        "bytes": 2104253,
+        "difference": null,
+        "currentStdoutLines": [
+          "Root: <root>",
+          "Materialized: revision 1; 29 target(s), 6359 entries, 2104253 bytes written, 0 unchanged"
+        ]
+      }
+    ],
+    "stops": [
+      {
+        "endpoint": "/tmp/rp2b-0R2wuv/ep",
+        "stopCode": 0,
+        "statusAfterStop": "not running",
+        "recordedPids": [
+          595815
+        ],
+        "survivingPids": [],
+        "signalledPids": [],
+        "removed": true
+      },
+      {
+        "endpoint": "/tmp/rp2b-Iwgg3t/ep",
+        "stopCode": 0,
+        "statusAfterStop": "not running",
+        "recordedPids": [
+          596026
+        ],
+        "survivingPids": [],
+        "signalledPids": [],
+        "removed": true
+      },
+      {
+        "endpoint": "/tmp/rp2b-L4Hb7k/ep",
+        "stopCode": 0,
+        "statusAfterStop": "not running",
+        "recordedPids": [
+          596240
+        ],
+        "survivingPids": [],
+        "signalledPids": [],
+        "removed": true
+      },
+      {
+        "endpoint": "/tmp/rp2b-kH25pw/ep",
+        "stopCode": 0,
+        "statusAfterStop": "not running",
+        "recordedPids": [
+          596623
+        ],
+        "survivingPids": [],
+        "signalledPids": [],
+        "removed": true
+      }
+    ]
+  },
+  "entries": {
+    "packageEntries": 8,
+    "manifest": {
+      "exports": [
+        ".",
+        "./analysis",
+        "./analysis/inventory",
+        "./model",
+        "./presentation",
+        "./cli",
+        "./layout",
+        "./client"
+      ],
+      "baselineExports": [
+        ".",
+        "./analysis",
+        "./analysis/inventory",
+        "./model",
+        "./presentation",
+        "./cli",
+        "./layout",
+        "./client"
+      ],
+      "equalToBaseline": true
+    },
+    "client": {
+      "code": 0,
+      "closure": [
+        "subs/daemon/src/client-entry.js",
+        "subs/daemon/src/codec.js",
+        "subs/daemon/src/connect-daemon.js",
+        "subs/daemon/src/connection.js",
+        "subs/daemon/src/discovery.js",
+        "subs/daemon/src/launcher.js",
+        "subs/daemon/src/records.js",
+        "subs/daemon/src/start-coordination.js"
+      ],
+      "assertions": 4
+    },
+    "cli": {
+      "code": 0,
+      "closure": [
+        "dist/subs/cli/src/arguments.js",
+        "dist/subs/cli/src/changed-command.js",
+        "dist/subs/cli/src/check-command.js",
+        "dist/subs/cli/src/command-support.js",
+        "dist/subs/cli/src/daemon-command.js",
+        "dist/subs/cli/src/errors.js",
+        "dist/subs/cli/src/explore-command.js",
+        "dist/subs/cli/src/format.js",
+        "dist/subs/cli/src/index.js",
+        "dist/subs/cli/src/materialize-command.js",
+        "dist/subs/cli/src/run-cli.js",
+        "dist/subs/cli/src/watch-command.js",
+        "dist/subs/service-api/src/web-discovery.js"
+      ],
+      "forbidden": [],
+      "activity": 0
+    }
+  }
+}

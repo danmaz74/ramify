@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import type { AnalysisReport, RunControl } from '../../../../analysis/src/interfaces/analysis.js';
-import type { ApiViewQueryOutcome, RetainedSession, SessionChange, SessionRevision } from '../../../../analysis/src/interfaces/session.js';
+import type { ApiViewProjection, ApiViewQueryOutcome, RetainedSession, SessionChange, SessionRevision } from '../../../../analysis/src/interfaces/session.js';
+import type { ArchitectViewProjection, ArchitectViewQueryOutcome } from '../../../../analysis/src/interfaces/architect-view.js';
 import type { ProjectRequest, ProjectResolution } from '../../../../analysis/subs/project/src/interfaces/project.js';
 import type { DependencyAnalyzerOutcome } from '../../../../analysis/src/interfaces/dependency-analyzer.js';
-import type { ApiViewQueryLimits, ApiViewRequest, CaptureTimings, CaptureWork, CheckOutcome, CheckRequest, ContextApiViewOutcome, ContextDependencyDiagramOutcome, ContextEvent, ContextExplorerDetailsOutcome, ContextManager, ContextManagerOptions, ContextRevision, ContextSetup, ContextStatus, ContextToken, DependencyDiagramRequest, ExplorerDetailsRequest, FreshnessRecord, OpenOutcome, ReplyTimings, RevisionCause, Unavailable, WatchBatch, WatchEvent } from './interfaces/contexts.js';
+import type { ApiViewQueryLimits, ApiViewRequest, CaptureTimings, CaptureWork, CheckOutcome, CheckRequest, ContextApiViewOutcome, ContextDependencyDiagramOutcome, ContextDependencyFactsOutcome, ContextEvent, ContextExplorerDetailsOutcome, ContextManager, ContextManagerOptions, ContextRevision, ContextSetup, ContextStatus, ContextToken, DependencyDiagramRequest, ExplorerDetailsRequest, FreshnessRecord, OpenOutcome, ReplyTimings, RevisionCause, Unavailable, WatchBatch, WatchEvent } from './interfaces/contexts.js';
 import type { ExplorerDetailDelivery, LiveContext } from './context.js';
 import { createHistory } from './history.js';
 import type { HistoryEntry } from './history.js';
@@ -11,11 +12,13 @@ import { createContextId, createFingerprints, createRevisionId } from './tokens.
 import { complete, completeApiView, completeEntry, invocationKey, projectKey, spanBatches } from './queue.js';
 import type { Invocation, PendingApiView, PendingCheck, PendingEntry } from './queue.js';
 
-/** `contracts.md`'s iteration-1 frozen `RetainedSession.apiView` bounds, used
- * when `ContextManagerOptions.apiViewLimits` supplies none. */
+/** `contracts.md`'s iteration-1 frozen `RetainedSession.apiView` bounds, and Plan 2B's
+ * `architectView` bounds, used when `ContextManagerOptions.apiViewLimits` supplies none. */
 const defaultApiViewLimits: ApiViewQueryLimits = {
   details: { maxSignatureBytes: 2048, maxDocumentationBytes: 512, maxOverloads: 8, maxResultBytes: 32 * 1024 ** 2 },
   maxAreaBytes: 32 * 1024 ** 2, maxInvocationBytes: 256 * 1024 ** 2,
+  architect: { details: { maxSignatureBytes: 240, maxDocumentationBytes: 280, maxOverloads: 4, maxResultBytes: 32 * 1024 ** 2 },
+    tests: { maxTitleBytes: 240, maxTitlesPerRecord: 40, maxResultBytes: 16 * 1024 ** 2 }, maxProjectionBytes: 64 * 1024 ** 2 },
 };
 
 const implemented = new Set(['registry', 'layout', 'metadata', 'descriptions', 'source-catalog', 'exposure-linking', 'static-access', 'tags-origin', 'namespace-access', 'lazy-access', 'symbol-free-access', 'resource-access', 'coverage']);
@@ -32,7 +35,8 @@ const configurationPath = /(?:^|\/)(?:tsconfig[^/]*\.json|package\.json|package-
 /** What an update or sweep returns; an update never returns unchanged. */
 type SweepResult = Awaited<ReturnType<RetainedSession['sweep']>>;
 const noWork = (): { -readonly [K in keyof CaptureWork]: number } => ({ invocationCheck: 0, promotion: 0, workerStatus: 0, workerRoundTrip: 0, sweep: 0 });
-type DiagramAnswer = ContextDependencyDiagramOutcome | (Unavailable & { readonly requestId: string });
+/** Every caller of a job receives the facts answer; `dependencyDiagram` drops its test references. */
+type DiagramAnswer = ContextDependencyFactsOutcome | (Unavailable & { readonly requestId: string });
 /** One caller waiting for the daemon's dependency diagram job. */
 interface DiagramCaller {
   readonly requestId: string;
@@ -102,7 +106,8 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     context.debounce = context.sweepTimer = context.auditTimer = context.idle = null;
   }
   function releaseSession(context: LiveContext): Promise<void> {
-    const session = context.session; context.session = null; context.publishedSession = null; context.versions.clear(); context.observedSequence = 0;
+    const session = context.session; context.session = null; context.publishedSession = null; context.sessionProject = null;
+    context.versions.clear(); context.observedSequence = 0;
     // An unavailable session resolves again: known resolutions leave with it.
     context.resolutions.clear();
     return session ? cleanup(session.dispose()) : Promise.resolve();
@@ -401,33 +406,54 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
   /**
    * Deliver one queued API-view request from `data`, the session revision this
    * same capture just published (or, for a covered request, its already-current
-   * revision): call `RetainedSession.apiView` while `publication`'s history slot
-   * is pinned, translate its outcome, and release the ephemeral projection by
-   * simply letting it go out of scope once this async function returns.
+   * revision): call `RetainedSession.apiView` and `architectView`, each only
+   * when its view is requested, both at that sequence while `publication`'s
+   * history slot is pinned, translate their outcomes, and release the ephemeral
+   * projections by simply letting them go out of scope once this async function
+   * returns. Settling the request aborts a session query still running.
    */
   async function deliverApiView(context: LiveContext, entry: PendingApiView, publication: HistoryEntry<ContextRevision>, data: SessionRevision,
     started: number | null, reused = false, timings: ReplyTimings = { ...noWork(), publication: 0 }): Promise<void> {
     if (entry.settled) return;
     const unpin = context.history.pin(publication.revision.revision);
+    const views = new Set(entry.request.views ?? ['api']);
+    const controller = new AbortController();
+    const release = entry.cleanup;
+    entry.cleanup = () => { controller.abort(); release(); };
+    const control = { signal: controller.signal };
+    const requestId = entry.request.requestId;
     context.deliveries.add(entry);
-    try {
-      const session = context.session;
-      if (!session) { completeApiView(entry, { ...unavailable('analysis-failed', 'Session lost its published revision'), requestId: entry.request.requestId }); return; }
-      const outcome = await session.apiView({ sequence: data.sequence, selection: entry.request.selection,
-        details: apiViewLimits.details, maxAreaBytes: apiViewLimits.maxAreaBytes, maxInvocationBytes: apiViewLimits.maxInvocationBytes });
-      if (outcome.status === 'projected') {
-        completeApiView(entry, { status: 'projected', requestId: entry.request.requestId, revision: publication.revision,
-          freshness: fresh(entry, started, true, reused), projection: outcome.projection, timings: freeze({ ...timings }) });
-      } else if (outcome.status === 'superseded') {
+    /** Either query's answer other than `projected` settles the whole request. */
+    const settle = (outcome: Exclude<ApiViewQueryOutcome | ArchitectViewQueryOutcome, { readonly status: 'projected' }>): void => {
+      if (outcome.status === 'superseded') {
         context.synchronization = 'reconciling'; context.sweepRequired = true;
-        completeApiView(entry, { status: 'superseded', requestId: entry.request.requestId, revision: publication.revision });
+        completeApiView(entry, { status: 'superseded', requestId, revision: publication.revision });
       } else if (outcome.status === 'cancelled') {
-        completeApiView(entry, { status: 'cancelled', requestId: entry.request.requestId });
+        completeApiView(entry, { status: 'cancelled', requestId });
       } else {
         completeApiView(entry, { ...unavailable(outcome.reason === 'resource-limit' ? 'resource-unavailable' : 'analysis-failed',
-          `${outcome.reason}: ${outcome.message}`), requestId: entry.request.requestId });
+          `${outcome.reason}: ${outcome.message}`), requestId });
       }
-    } catch (error) { completeApiView(entry, { ...unavailable('analysis-failed', String(error)), requestId: entry.request.requestId }); }
+    };
+    try {
+      const session = context.session;
+      if (!session) { completeApiView(entry, { ...unavailable('analysis-failed', 'Session lost its published revision'), requestId }); return; }
+      let projection: ApiViewProjection | null = null, architect: ArchitectViewProjection | null = null;
+      if (views.has('api')) {
+        const outcome = await session.apiView({ sequence: data.sequence, selection: entry.request.selection,
+          details: apiViewLimits.details, maxAreaBytes: apiViewLimits.maxAreaBytes, maxInvocationBytes: apiViewLimits.maxInvocationBytes }, control);
+        if (outcome.status !== 'projected') { settle(outcome); return; }
+        projection = outcome.projection;
+      }
+      if (views.has('architect')) {
+        if (entry.settled) return;
+        const outcome = await session.architectView({ sequence: data.sequence, ...apiViewLimits.architect }, control);
+        if (outcome.status !== 'projected') { settle(outcome); return; }
+        architect = outcome.projection;
+      }
+      completeApiView(entry, { status: 'projected', requestId, revision: publication.revision,
+        freshness: fresh(entry, started, true, reused), projection, architect, timings: freeze({ ...timings }) });
+    } catch (error) { completeApiView(entry, { ...unavailable('analysis-failed', String(error)), requestId }); }
     finally { unpin(); context.deliveries.delete(entry); scheduleIdle(context); }
   }
   /** A named path the daemon already knows as configuration: one the configuration path
@@ -484,7 +510,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     if (!await trim(context, candidateBytes)) return false;
     if (!context.history.append(revision, data)) return false;
     await Promise.all([...releaseWork]);
-    context.sequence++; context.publishedSession = context.session;
+    context.sequence++; context.publishedSession = context.session; context.publishedProject = context.sessionProject;
     if (data.outcome.execution === 'completed') context.lastValid = revision;
     supersedeDiagram(context, revision);
     emit(context, { type: 'revision-published', token: context.token, revision, coalesced: 0 });
@@ -495,7 +521,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     const report = publication && (publication.report ?? await context.session?.report(undefined, publication.sequence));
     if (!publication || !report || !context.history.retainPublished(freeze(report))
       || totalBytes() - (context.session?.status().factBytes ?? 0) > budgets.maxRetainedBytesGlobal) {
-      context.history.dispose(); context.lastValid = null;
+      context.history.dispose(); context.lastValid = null; context.publishedProject = null;
       context.history = createHistory(budgets.maxHistoryRevisions, budgets.maxHistoryBytes, entry => releaseVersion(context, entry));
       supersedeDiagram(context, null);
     }
@@ -539,7 +565,8 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         const opened = await driver.open(invocation.project, invocation.setup, control);
         if (opened.status === 'opened') {
           if (controller.signal.aborted || disposed || context.state === 'evicted') { await opened.session.dispose(); return; }
-          context.session = opened.session; context.publishedSession = null; context.invocation = invocation; context.lastSweepAt = started;
+          context.session = opened.session; context.publishedSession = null; context.sessionProject = invocation.project;
+          context.invocation = invocation; context.lastSweepAt = started;
           context.observedSequence = 0; context.versions.clear(); observeVersion(context);
           run = { status: 'revised', revision: opened.revision, identical: false, reacquired: false };
         } else run = opened;
@@ -910,6 +937,9 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         if (outcome.diagram.inputId !== revision.fingerprints.inputId) {
           return failed('analysis-failed', `The dependency diagram input ${outcome.diagram.inputId} is not the revision's ${revision.fingerprints.inputId}`);
         }
+        if (outcome.testReferences && outcome.testReferences.inputId !== outcome.diagram.inputId) {
+          return failed('analysis-failed', `The test references input ${outcome.testReferences.inputId} is not the diagram's ${outcome.diagram.inputId}`);
+        }
         const bytes = Buffer.byteLength(JSON.stringify(outcome.diagram), 'utf8');
         const context = job.context;
         const contextBytes = (context.session?.status().factBytes ?? 0) + bytes;
@@ -920,9 +950,15 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         if (globalBytes > budgets.maxRetainedBytesGlobal) {
           return failed('resource-limit', `Retaining the dependency diagram needs ${globalBytes} bytes in the daemon; the maximum is ${budgets.maxRetainedBytesGlobal}`);
         }
-        const retained = freeze({ revision: revision.revision, diagram: freeze(outcome.diagram), bytes });
+        // The references are retained beside the diagram while both fit the budgets; the
+        // diagram's answer never depends on them, so a diagram that fits alone is kept without them.
+        const referenceBytes = outcome.testReferences ? Buffer.byteLength(JSON.stringify(outcome.testReferences), 'utf8') : 0;
+        const testReferences = outcome.testReferences && contextBytes + referenceBytes <= budgets.maxRetainedBytesPerContext
+          && globalBytes + referenceBytes <= budgets.maxRetainedBytesGlobal ? freeze(outcome.testReferences) : null;
+        const retained = freeze({ revision: revision.revision, diagram: freeze(outcome.diagram), testReferences,
+          bytes: bytes + (testReferences ? referenceBytes : 0) });
         context.diagram = retained;
-        return caller => ({ status: 'ready', requestId: caller.requestId, revision, diagram: retained.diagram });
+        return caller => ({ status: 'ready', requestId: caller.requestId, revision, diagram: retained.diagram, testReferences: retained.testReferences });
       }
       case 'inputs-changed':
         return caller => ({ status: 'busy', requestId: caller.requestId, revision, reason: 'inputs-changed' });
@@ -935,7 +971,10 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
   }
   /** One job: read the pinned revision's published report, run the injected analyzer in its own
    * process and answer every caller still attached. Nothing enters the context queue, and the
-   * retained session is asked only for the report it already published. */
+   * retained session is asked only for the report it already published. The analyzer acquires
+   * with the request the revision's inputs were captured with: after another invocation form
+   * reached the context, the report's own request names that invocation, whose root discovery
+   * reads inputs the session never captured. */
   async function runDiagram(job: DiagramJob): Promise<void> {
     const { context, controller } = job;
     const answerAll = (answer: (caller: DiagramCaller) => DiagramAnswer): void => {
@@ -949,6 +988,8 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       if (!publication || publication.revision.revision !== job.revision.revision) {
         answerAll(caller => ({ status: 'superseded', requestId: caller.requestId, revision: publication?.revision ?? null })); return;
       }
+      const project = context.publishedProject;
+      if (!project) throw new Error('The published revision has no captured project request');
       const unpin = context.history.pin(publication.revision.revision);
       let report: AnalysisReport | null;
       try { report = publication.report ?? await context.session?.report(undefined, publication.sequence) ?? null; }
@@ -958,7 +999,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         answerAll(caller => ({ status: 'unavailable', requestId: caller.requestId, reason: 'resource-unavailable',
           message: 'The published revision no longer retains its report' })); return;
       }
-      const outcome = await options.dependencyDiagrams!.run({ project: report.request.project, report }, { signal: controller.signal });
+      const outcome = await options.dependencyDiagrams!.run({ project, report }, { signal: controller.signal });
       report = null;
       if (!current()) return;
       answerAll(mapDiagram(job, outcome));
@@ -969,7 +1010,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       if (!disposed && context.state !== 'evicted') { scheduleIdle(context); changed(context); }
     }
   }
-  function dependencyDiagram(request: DependencyDiagramRequest, lease: string, control?: RunControl): Promise<DiagramAnswer> {
+  function dependencyFacts(request: DependencyDiagramRequest, lease: string, control?: RunControl): Promise<DiagramAnswer> {
     const found = lookup(request.token);
     if ('status' in found) return Promise.resolve({ ...found, requestId: request.requestId });
     const context = found;
@@ -987,7 +1028,9 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     if (!options.dependencyDiagrams) {
       return Promise.resolve({ status: 'unavailable', requestId, reason: 'resource-unavailable', message: 'No dependency analyzer is configured' });
     }
-    if (context.diagram?.revision === revision.revision) return Promise.resolve({ status: 'ready', requestId, revision, diagram: context.diagram.diagram });
+    if (context.diagram?.revision === revision.revision) {
+      return Promise.resolve({ status: 'ready', requestId, revision, diagram: context.diagram.diagram, testReferences: context.diagram.testReferences });
+    }
     const running = diagramJob;
     const joins = !!running && running.context === context && running.revision.revision === revision.revision && !running.controller.signal.aborted;
     if (running && !joins) return Promise.resolve({ status: 'busy', requestId, revision, reason: 'analysis-running' });
@@ -1007,6 +1050,13 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       scheduleIdle(context);
       if (!running) { diagramJob = job; track(runDiagram(job)); changed(context); }
     });
+  }
+  /** The diagram's own answer: the facts answer without the test references. */
+  async function dependencyDiagram(request: DependencyDiagramRequest, lease: string,
+    control?: RunControl): Promise<ContextDependencyDiagramOutcome | (Unavailable & { readonly requestId: string })> {
+    const answer = await dependencyFacts(request, lease, control);
+    if (answer.status !== 'ready') return answer;
+    return { status: 'ready', requestId: answer.requestId, revision: answer.revision, diagram: answer.diagram };
   }
   /** Resolutions of an equal request held by contexts with a live session. */
   function knownFor(key: string): { readonly context: LiveContext; readonly resolution: ProjectResolution }[] {
@@ -1055,7 +1105,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         openedAt: now, lastActivityAt: now, hadLease: false, invocations: new Map([[lease, { project, setup: requestedSetup }]]), resolutions: new Map([[key, resolution]]), subscriptions: new Map(),
         history: createHistory(budgets.maxHistoryRevisions, budgets.maxHistoryBytes, entry => releaseVersion(context, entry)),
         queue: [], deliveries: new Set(), explorerDeliveries: new Set(), diagram: null, paths: new Map(), requested: new Map(), watched: null, scope: null, state: 'opening', synchronization: 'initializing', lastValid: null,
-        session: null, publishedSession: null, versions: new Set(), observedSequence: 0, sequence: 0, sweepRequired: true, periodicSweepDue: false, lastSweepAt: now, auditedSequence: 0, auditRequired: false, demoting: null, unresponsiveSince: null, cooling: false,
+        session: null, publishedSession: null, sessionProject: null, publishedProject: null, versions: new Set(), observedSequence: 0, sequence: 0, sweepRequired: true, periodicSweepDue: false, lastSweepAt: now, auditedSequence: 0, auditRequired: false, demoting: null, unresponsiveSince: null, cooling: false,
         watcher: null, watcherState: 'disposed', attaching: false, conservative: true, background: 'open', running: null,
         debounce: null, sweepTimer: null, auditTimer: null, idle: null,
       };
@@ -1065,7 +1115,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     finally { resolving.delete(controller); control?.signal?.removeEventListener('abort', abort); }
   }
   return {
-    open: (request, setup, lease, control) => track(open(request, setup, lease, control)), check, apiView, explorerDetails, dependencyDiagram,
+    open: (request, setup, lease, control) => track(open(request, setup, lease, control)), check, apiView, explorerDetails, dependencyDiagram, dependencyFacts,
     status(token) { const found = lookup(token); if ('status' in found) return found; touch(found); return snapshot(found); },
     list: () => [...contexts.values()].map(snapshot),
     subscribe(token, lease, listener) {

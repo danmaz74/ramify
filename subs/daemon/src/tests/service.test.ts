@@ -1,12 +1,17 @@
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { cp, mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
+import { setTimeout as delay } from 'node:timers/promises';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createQuickEnvironment } from '../../../../src/tests/quick-environment.js';
-import { dispatchServiceRequest } from '../service.js';
+import type { MaterializeViewId } from '../../../../src/interfaces/service.js';
+import { dependencyWait, dispatchServiceRequest } from '../service.js';
+import { createFilesystemApiViewPublisher } from '../api-view-publisher.js';
+import type { ApiViewPublisher, PublishInput } from '../interfaces/daemon.js';
+import type { ContextRevision } from '../context-types.js';
 import type { QuickEnvironment } from '../../../../src/tests/quick-environment.js';
-import type { AnalysisReport } from '../../../analysis/src/interfaces/analysis.js';
+import type { AnalysisReport, RunControl } from '../../../analysis/src/interfaces/analysis.js';
 import type { DependencyAnalyzerOutcome, DependencyDiagramRunner } from '../../../analysis/src/interfaces/dependency-analyzer.js';
 import type { ProjectRequest } from '../../../analysis/subs/project/src/interfaces/project.js';
 
@@ -115,7 +120,10 @@ describe('validated daemon service', () => {
     const revision = checked.value.revision;
     const diagram = { inputId: revision.fingerprints.inputId, modules: ['fixture'], boundaries: [],
       headline: { behavioralDependencies: 0, nonBehavioralDependencies: 0 }, coverage: { state: 'complete' as const, unknownDependencies: 0, limitIds: [] } };
-    next = () => ({ status: 'ready', diagram, behaviorRuns: 1, timings: { acquireMs: 1, classifyMs: 1, projectMs: 1, totalMs: 3 } });
+    // The analyzer's test references never reach the public answer, which carries the diagram alone.
+    const testReferences = { inputId: diagram.inputId, files: [{ file: 'src/tests/a.test.ts',
+      exercises: [{ kind: 'code' as const, owner: 'fixture', file: 'a.ts', binding: 'a' }], unclassified: 1 }] };
+    next = () => ({ status: 'ready', diagram, testReferences, behaviorRuns: 1, timings: { acquireMs: 1, classifyMs: 1, projectMs: 1, totalMs: 3 } });
     const before = await environment.service.daemonStatus();
     if (!before.ok) throw new Error('Expected daemon status');
     expect(before.value.counters).toMatchObject({ behaviorRuns: 0, dependencyDiagrams: 0, dependencyDiagramInputChanges: 0 });
@@ -144,7 +152,8 @@ describe('validated daemon service', () => {
       rejectedRequests: before.value.counters.rejectedRequests + 3 });
     const context = status.value.contexts.find(item => item.token.context === token.context)!;
     const factBytes = context.session?.factBytes ?? 0;
-    expect(context.retainedBytes).toBe(factBytes + Buffer.byteLength(JSON.stringify(diagram)));
+    // The references are retained beside the diagram for the architect view, and counted with it.
+    expect(context.retainedBytes).toBe(factBytes + Buffer.byteLength(JSON.stringify(diagram)) + Buffer.byteLength(JSON.stringify(testReferences)));
 
     // A newer revision releases the result; an analyzer that sees changed inputs answers busy and is counted.
     await writeFile(join(root, 'src/index.ts'), 'export const value = 2;\n');
@@ -188,5 +197,226 @@ describe('validated daemon service', () => {
     expect(await first.service.stopDaemon({ instanceId: environment.service.instance.instanceId })).toMatchObject({ ok: true, value: { stopping: true } });
     expect(stops).toEqual([{ reason: 'explicit', requestId: null, at: environment.clock.now() }]);
     first.release(); second.release();
+  });
+});
+
+/** The CLI's context capabilities: the architect projection needs the catalog and exposures. */
+const cliCapabilities = ['registry', 'layout', 'metadata', 'descriptions', 'source-catalog', 'exposure-linking', 'static-access',
+  'tags-origin', 'namespace-access', 'lazy-access', 'symbol-free-access', 'resource-access', 'coverage'] as const;
+
+interface ControlledRun {
+  readonly input: { readonly project: ProjectRequest; readonly report: AnalysisReport };
+  readonly signal: AbortSignal;
+  settle(outcome: DependencyAnalyzerOutcome): void;
+}
+
+/** A dependency runner whose runs wait for the test; an aborted run settles as cancelled, as the process runner does. */
+function controlledRunner() {
+  const runs: ControlledRun[] = [];
+  const runner: DependencyDiagramRunner = {
+    run(input, control) {
+      return new Promise(resolve => {
+        const signal = control!.signal!;
+        runs.push({ input, signal, settle: resolve });
+        signal.addEventListener('abort', () => resolve({ status: 'cancelled' }), { once: true });
+      });
+    },
+  };
+  return { runner, runs };
+}
+
+async function until(condition: () => boolean, what: string): Promise<void> {
+  const deadline = performance.now() + 20_000;
+  while (!condition()) {
+    if (performance.now() > deadline) throw new Error(`Timed out waiting for ${what}`);
+    await delay(5);
+  }
+}
+
+/** A root module with one exported function and one test file that calls it, a controlled runner
+ * and a publisher that records every input before publishing it for real. */
+async function architectFixture() {
+  const root = await mkdtemp(join(tmpdir(), 'ramify-materialize-views-')); roots.push(root);
+  await mkdir(join(root, 'src/tests'), { recursive: true });
+  await writeFile(join(root, 'module.ramify'), 'ramify 1\nmodule fixture\n');
+  await writeFile(join(root, 'README.md'), '# Fixture\n\nThe fixture project.\n');
+  await writeFile(join(root, 'tsconfig.json'), '{"compilerOptions":{"types":[],"module":"ESNext","moduleResolution":"bundler"},"include":["src"]}');
+  await writeFile(join(root, 'src/index.ts'), 'export function run(input: string): string { return input; }\nexport const value = 1;\n');
+  await writeFile(join(root, 'src/tests/index.test.ts'),
+    "import { run } from '../index.js';\ndescribe('run', () => { it('returns its input', () => { run('a'); }); });\n");
+  const controlled = controlledRunner();
+  const inputs: PublishInput[] = [];
+  const filesystem = createFilesystemApiViewPublisher({ maxAreaBytes: 32 * 1024 ** 2, maxArchitectBytes: 64 * 1024 ** 2,
+    maxInvocationBytes: 256 * 1024 ** 2, maxStagedBytes: 256 * 1024 ** 2 });
+  const publisher: ApiViewPublisher = { publish(target, revision, input, requestId, control) {
+    inputs.push(input); return filesystem.publish(target, revision, input, requestId, control);
+  } };
+  const environment = await createQuickEnvironment({}, { dependencyDiagrams: controlled.runner, publisher }); environments.push(environment);
+  // Every delay the service and its contexts schedule on the controlled clock, to find the dependency wait's pauses.
+  const delays: number[] = [];
+  const schedule = environment.clock.schedule.bind(environment.clock);
+  Object.assign(environment.clock, { schedule: (delayMs: number, run: () => void) => { delays.push(delayMs); return schedule(delayMs, run); } });
+  const pauses = () => delays.filter(delayMs => delayMs === dependencyWait.intervalMs).length;
+  const project = { cwd: root, root, scope: 'whole-project' as const, configuration: 'discover' as const };
+  const opened = await environment.service.openContext({ project, setup: { registry: 'default', capabilities: cliCapabilities } });
+  if (!opened.ok || opened.value.status !== 'opened') throw new Error('Expected opened context');
+  const token = opened.value.token;
+  let sequence = 0;
+  const materialize = (views: readonly MaterializeViewId[] | undefined, control?: RunControl) => environment.service.materialize({
+    token, requestId: `materialize-${++sequence}`, freshness: { mode: 'synchronized', expect: [] }, selection: { scope: 'all' },
+    ...(views ? { views } : {}) }, control);
+  const ready = (revision: ContextRevision): DependencyAnalyzerOutcome => {
+    const inputId = revision.fingerprints.inputId;
+    return { status: 'ready', diagram: { inputId, modules: ['fixture'], boundaries: [],
+      headline: { behavioralDependencies: 0, nonBehavioralDependencies: 0 }, coverage: { state: 'complete', unknownDependencies: 0, limitIds: [] } },
+    testReferences: { inputId, files: [{ file: 'src/tests/index.test.ts', exercises: [{ kind: 'code', owner: 'fixture', file: 'index.ts', binding: 'run' }],
+      unclassified: 0 }] }, behaviorRuns: 1, timings: { acquireMs: 1, classifyMs: 1, projectMs: 1, totalMs: 3 } };
+  };
+  const view = async (path: string) => readFile(join(root, '.ramify-architect', path), 'utf8');
+  const meta = async () => JSON.parse(await view('_meta.json')) as Record<string, unknown>;
+  const published = async (): Promise<ContextRevision> => {
+    const status = await environment.service.contextStatus({ token });
+    if (!status.ok || !status.value.published) throw new Error('Expected a published revision');
+    return status.value.published;
+  };
+  return { root, environment, token, project, runs: controlled.runs, inputs, delays, pauses, materialize, ready, view, meta, published };
+}
+
+describe('materialize views (AV25-AV27)', { timeout: 60_000 }, () => {
+  it('AV27 ready: renders measured dependencies with the test references of the same run, alone when only the architect view is requested', async () => {
+    const f = await architectFixture();
+    const pending = f.materialize(['architect']);
+    await until(() => f.runs.length === 1, 'the dependency run');
+    const revision = await f.published();
+    expect([f.runs[0]!.input.report.inputId, f.runs[0]!.input.report.outcome.execution]).toEqual([revision.fingerprints.inputId, 'completed']);
+    f.runs[0]!.settle(f.ready(revision));
+    const result = await pending;
+    if (!result.ok || result.value.status !== 'materialized') throw new Error(JSON.stringify(result));
+    expect(result.value.architect).toEqual({ modules: 1, records: result.value.targets[0]!.entries, dependencies: 'measured' });
+    expect(result.value.targets).toEqual([expect.objectContaining({ view: 'architect', module: null, area: null, path: '.ramify-architect', changed: true })]);
+    expect(f.inputs).toHaveLength(1);
+    expect(f.inputs[0]!.api).toBeNull();
+    expect(f.inputs[0]!.architect).toMatchObject({ modules: 1, dependencies: 'measured' });
+    expect(await f.meta()).toMatchObject({ schema: 'ramify.architect-view/1', revision: revision.revision, input: revision.fingerprints.inputId,
+      dependencies: 'measured', dependencyScope: 'production', testReferences: 'measured' });
+    // The renderer received the references: the suite record names the function its file calls.
+    expect((await f.view('tests.jsonl')).trim().split('\n').map(line => JSON.parse(line) as unknown)).toEqual([
+      { module: 'fixture', file: 'src/tests/index.test.ts', suite: ['run'], tests: ['returns its input'], exercises: ['fixture#run'] }]);
+    expect(await f.view('behavior.jsonl')).toContain('"name":"run"');
+    await expect(readFile(join(f.root, 'src/.ramify/_meta.json'))).rejects.toMatchObject({ code: 'ENOENT' });
+
+    // Unchanged: the retained facts answer at once, with no new run, and nothing is written.
+    const repeat = await f.materialize(['architect']);
+    expect(repeat).toMatchObject({ ok: true, value: { status: 'materialized', bytesWritten: 0, architect: { dependencies: 'measured' } } });
+    expect(f.runs).toHaveLength(1);
+    // Without views, nothing asks for dependency facts and nothing reports the architect view.
+    const api = await f.materialize(undefined);
+    if (!api.ok || api.value.status !== 'materialized') throw new Error(JSON.stringify(api));
+    expect(api.value).not.toHaveProperty('architect');
+    expect(api.value.targets.map(target => target.view)).toEqual(['api', 'api']);
+    expect(f.inputs.at(-1)!.architect).toBeNull();
+    expect(f.runs).toHaveLength(1);
+  });
+
+  it('AV27 busy: waits the interval on the service clock while another job runs, then succeeds', async () => {
+    const f = await architectFixture();
+    // Another context's job holds the daemon's single analyzer slot.
+    const other = await mkdtemp(join(tmpdir(), 'ramify-materialize-other-')); roots.push(other);
+    await cp(f.root, other, { recursive: true });
+    const opened = await f.environment.service.openContext({ project: { ...f.project, cwd: other, root: other },
+      setup: { registry: 'default', capabilities: cliCapabilities } });
+    if (!opened.ok || opened.value.status !== 'opened') throw new Error('Expected the other context');
+    const otherToken = opened.value.token;
+    const checked = await f.environment.service.check({ token: otherToken, requestId: 'other', freshness: { mode: 'synchronized', expect: [] } });
+    if (!checked.ok || checked.value.status !== 'reported' || !checked.value.published) throw new Error('Expected publication');
+    const otherDiagram = f.environment.service.dependencyDiagram({ token: otherToken, requestId: 'other-diagram', revision: checked.value.revision.revision });
+    await until(() => f.runs.length === 1, 'the other context\'s run');
+
+    const pending = f.materialize(['api', 'architect']);
+    await until(() => f.pauses() === 1, 'the busy pause');
+    // Nothing asks again before the interval ends, and the busy answer started no work.
+    f.environment.clock.advance(dependencyWait.intervalMs - 1); await delay(20);
+    expect([f.runs.length, f.pauses(), f.inputs.length]).toEqual([1, 1, 0]);
+    f.runs[0]!.settle(f.ready(checked.value.revision));
+    await otherDiagram;
+    f.environment.clock.advance(1);
+    await until(() => f.runs.length === 2, 'the second request');
+    expect(f.pauses()).toBe(1);
+    f.runs[1]!.settle(f.ready(await f.published()));
+    const result = await pending;
+    if (!result.ok || result.value.status !== 'materialized') throw new Error(JSON.stringify(result));
+    expect(result.value.architect?.dependencies).toBe('measured');
+    // One transaction: the API targets and the architect target, which switches last.
+    expect(f.inputs).toHaveLength(1);
+    expect(result.value.targets.map(target => target.view)).toEqual(['api', 'api', 'architect']);
+    expect(await f.meta()).toMatchObject({ dependencies: 'measured', testReferences: 'measured' });
+  });
+
+  it('AV27 wait limit: publishes without dependencies when the facts are not ready within the limit, a running job included', async () => {
+    const f = await architectFixture();
+    const pending = f.materialize(['architect']);
+    await until(() => f.runs.length === 1, 'the first run');
+    // The limit is scheduled once, from the first request.
+    expect(f.delays.filter(delayMs => delayMs === dependencyWait.limitMs)).toHaveLength(1);
+    f.runs[0]!.settle({ status: 'inputs-changed', paths: ['src/index.ts'] });
+    await until(() => f.pauses() === 1, 'the busy pause');
+    f.environment.clock.advance(dependencyWait.intervalMs);
+    await until(() => f.runs.length === 2, 'the second run');
+    f.environment.clock.advance(dependencyWait.limitMs - dependencyWait.intervalMs - 1); await delay(20);
+    expect(f.runs[1]!.signal.aborted).toBe(false);
+    f.environment.clock.advance(1);
+    const result = await pending;
+    if (!result.ok || result.value.status !== 'materialized') throw new Error(JSON.stringify(result));
+    expect(result.value.architect).toMatchObject({ dependencies: { unavailable: 'wait-limit' } });
+    expect(f.runs[1]!.signal.aborted).toBe(true);
+    expect(await f.meta()).toMatchObject({ dependencies: 'unavailable', dependencyReason: 'wait-limit', testReferences: 'unavailable' });
+    expect(await f.view('tests.jsonl')).not.toContain('exercises');
+  });
+
+  it('AV27 unavailable: publishes the view with the reason of unavailable facts', async () => {
+    const f = await architectFixture();
+    for (const [outcome, reason] of [
+      [{ status: 'unavailable', reason: 'analysis-failed', message: 'crashed' }, 'analysis-failed'],
+      [{ status: 'unavailable', reason: 'resource-limit', message: 'too large' }, 'resource-limit'],
+    ] as const) {
+      const pending = f.materialize(['architect']);
+      await until(() => f.runs.length === f.inputs.length + 1, 'the dependency run');
+      f.runs.at(-1)!.settle(outcome);
+      const result = await pending;
+      expect(result, reason).toMatchObject({ ok: true, value: { status: 'materialized', architect: { dependencies: { unavailable: reason } } } });
+      expect(await f.meta(), reason).toMatchObject({ dependencies: 'unavailable', dependencyReason: reason });
+    }
+  });
+
+  it('AV27 superseded and cancelled: a newer revision or a cancellation during the wait publishes nothing', async () => {
+    const f = await architectFixture();
+    const pending = f.materialize(['api', 'architect']);
+    await until(() => f.runs.length === 1, 'the dependency run');
+    await writeFile(join(f.root, 'src/index.ts'), 'export function run(input: string): string { return input; }\nexport const value = 2;\n');
+    const edited = await f.environment.service.check({ token: f.token, requestId: 'edit', freshness: { mode: 'synchronized', expect: [] } });
+    if (!edited.ok || edited.value.status !== 'reported' || !edited.value.published) throw new Error('Expected publication');
+    expect(await pending).toEqual({ ok: true, value: { status: 'superseded', requestId: 'materialize-1', revision: edited.value.revision } });
+    expect(f.runs[0]!.signal.aborted).toBe(true);
+    expect(f.inputs).toEqual([]);
+
+    const controller = new AbortController();
+    const cancelled = f.materialize(['architect'], { signal: controller.signal });
+    await until(() => f.runs.length === 2, 'the second run');
+    controller.abort();
+    expect(await cancelled).toEqual({ ok: true, value: { status: 'cancelled', requestId: 'materialize-2' } });
+    expect(f.runs[1]!.signal.aborted).toBe(true);
+    expect(f.inputs).toEqual([]);
+    await expect(readFile(join(f.root, '.ramify-architect/_meta.json'))).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(readFile(join(f.root, 'src/.ramify/_meta.json'))).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('AV25: validates views before any context work', async () => {
+    const f = await architectFixture();
+    const base = { token: f.token, requestId: 'invalid', freshness: { mode: 'synchronized', expect: [] }, selection: { scope: 'all' } };
+    for (const views of [[], ['api', 'api'], ['other'], 'architect', [null]]) {
+      expect(await f.environment.request('materialize', { ...base, views }), JSON.stringify(views)).toMatchObject({ ok: false, error: { code: 'invalid-request' } });
+    }
+    expect(f.runs).toEqual([]);
+    expect(f.inputs).toEqual([]);
   });
 });

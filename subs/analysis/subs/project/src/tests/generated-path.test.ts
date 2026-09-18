@@ -30,6 +30,41 @@ describe('isRamifyGeneratedSegment / isRamifyGeneratedPath', () => {
   });
 });
 
+describe('the architect view\'s reserved names (AV19)', () => {
+  const marker = (sibling: string) => `${sibling}.marker.json`;
+  it('reserves .ramify-architect, its two transient siblings and their marker files', () => {
+    const suffix = '0123456789abcdef0123456789abcdef';
+    for (const segment of ['.ramify-architect', '.ramify-architect.tmp-a', `.ramify-architect.tmp-${suffix}`,
+      '.ramify-architect.old-a', `.ramify-architect.old-${suffix}`,
+      marker(`.ramify-architect.tmp-${suffix}`), marker(`.ramify-architect.old-${suffix}`)]) {
+      expect(isRamifyGeneratedSegment(segment), segment).toBe(true);
+    }
+  });
+  it('keeps every near miss ordinary', () => {
+    for (const segment of ['.ramify-architects', '.ramify-other', '.ramify-architect.tmp', '.ramify-architect.old',
+      '.ramify-architect.tmp-', '.ramify-architect.old-', '.ramify-architect-x', '.ramify-architectx', '.ramify-architect.new-a',
+      '.ramify-other.tmp-a', 'ramify-architect', '.RAMIFY-ARCHITECT', 'x.ramify-architect']) {
+      expect(isRamifyGeneratedSegment(segment), segment).toBe(false);
+    }
+  });
+  it('matches at any depth, at the project root as well as beneath a module', () => {
+    expect(isRamifyGeneratedPath('.ramify-architect')).toBe(true);
+    expect(isRamifyGeneratedPath('.ramify-architect/README.md')).toBe(true);
+    expect(isRamifyGeneratedPath('.ramify-architect/core/engine/behavior.jsonl')).toBe(true);
+    expect(isRamifyGeneratedPath('subs/child/src/.ramify-architect/x.ts')).toBe(true);
+    expect(isRamifyGeneratedPath('.ramify-architect.tmp-abc/_meta.json')).toBe(true);
+    expect(isRamifyGeneratedPath('subs/child/.ramify-architect.old-abc/module.json')).toBe(true);
+    expect(isRamifyGeneratedPath(marker('.ramify-architect.tmp-abc'))).toBe(true);
+    expect(isRamifyGeneratedPath('.ramify-architects/real.ts')).toBe(false);
+    expect(isRamifyGeneratedPath('src/.ramify-architect.tmp/real.ts')).toBe(false);
+  });
+});
+
+/** Independent of the predicate under test: a segment naming the architect view or one of its transient siblings. */
+function architectPath(path: string): boolean {
+  return path.split('/').some(segment => /^\.ramify-architect(?:\.(?:tmp|old)-.+)?$/.test(segment));
+}
+
 describe('generated-output isolation at the project acquisition boundary', () => {
   let work: string, root: string;
   const views: ProjectInputView[] = [];
@@ -59,6 +94,42 @@ describe('generated-output isolation at the project acquisition boundary', () =>
     await put(root, 'src/.ramify-other/real.ts', 'export const nearMiss = 1;\n');
     const view = await read();
     expect(view.inventory.files.map(file => file.path)).toContain('src/.ramify-other/real.ts');
+  });
+
+  it('excludes the architect view and its transient siblings from inventory at the root and at any depth', async () => {
+    const suffix = '0123456789abcdef0123456789abcdef';
+    await put(root, '.ramify-architect/_meta.json', '{"schema":"ramify.architect-view/1"}\n');
+    await put(root, '.ramify-architect/core/engine/behavior.jsonl', '{"name":"run"}\n');
+    await put(root, '.ramify-architect/stray.ts', 'export const stray = 1;\n');
+    await put(root, `.ramify-architect.tmp-${suffix}/_meta.json`, '{}\n');
+    await put(root, `.ramify-architect.tmp-${suffix}.marker.json`, '{}\n');
+    await put(root, `.ramify-architect.old-${suffix}/staged.ts`, 'export const staged = 1;\n');
+    await put(root, `.ramify-architect.old-${suffix}.marker.json`, '{}\n');
+    await put(root, 'src/.ramify-architect/owned.ts', 'export const generated = 1;\n');
+    await put(root, 'src/.ramify-architect.tmp-abc/staged.ts', 'export const staged = 1;\n');
+    await put(root, 'src/.ramify-architects/real.ts', 'export const nearMiss = 1;\n');
+    const view = await read();
+    expect(view.inventory.files.map(file => file.path)).toEqual(['src/.ramify-architects/real.ts', 'src/value.ts']);
+    expect(view.inventory.outsideModuleFiles).toEqual([]);
+    expect(view.inputs.filter(input => architectPath(input.path))).toEqual([]);
+  });
+
+  it('keeps the architect view out of the configuration host\'s directory listings and explicit compiler selection', async () => {
+    // A dot-prefixed include makes the compiler walk the root for `.ramify-*`
+    // directories. The listings the configuration host serves never show the
+    // reserved one (the capture omits it before the host's own filter), and an
+    // explicit `files` entry naming it is dropped from the selection, while
+    // the near miss is selected as ordinary outside-module source.
+    await put(root, 'tsconfig.json', JSON.stringify({ compilerOptions: { types: [], module: 'ESNext', moduleResolution: 'bundler' },
+      include: ['src', '.ramify-*/**/*'], files: ['.ramify-architect/explicit.ts'] }) + '\n');
+    await put(root, '.ramify-architect/generated.ts', 'export const generated = 1;\n');
+    await put(root, '.ramify-architect/explicit.ts', 'export const explicit = 1;\n');
+    await put(root, '.ramify-architects/near.ts', 'export const nearMiss = 1;\n');
+    const view = await read();
+    expect(view.inventory.outsideModuleFiles).toEqual(['.ramify-architects/near.ts']);
+    expect(view.inputs.filter(input => architectPath(input.path))).toEqual([]);
+    expect(view.inputs.some(input => input.path.startsWith('.ramify-architects'))).toBe(true);
+    expect(view.inventory.files.map(file => file.path)).toContain('src/value.ts');
   });
 
   // Restored pre-Plan-2A rule (user decision): `src/tests` presence is exactly

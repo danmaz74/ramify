@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { parseDescription } from '../subs/descriptions/src/parse.js';
 import type { ParsedDescription } from '../subs/descriptions/src/interfaces/syntax.js';
@@ -6,9 +8,11 @@ import { originalKey, resolveTagRegistry } from '../subs/model/src/index.js';
 import type { CapturedInput, ProjectObserver, ProjectResolution } from '../subs/project/src/interfaces/project.js';
 import { observeProject } from '../subs/project/src/observer.js';
 import { resolveProjectRoot } from '../subs/project/src/resolve-root.js';
-import type { SymbolDetail, SymbolDetailRequest } from '../subs/typescript/src/interfaces/source.js';
+import type { ExportShape, SymbolDetail, SymbolDetailRequest, TestFileTitles } from '../subs/typescript/src/interfaces/source.js';
 import { planApiViewRequests, projectApiView } from './api-view.js';
+import { architectLimitIssue, planArchitectView, projectArchitectView } from './architect-view.js';
 import type { AnalysisDiagnostic, AnalysisInputs, AnalysisReport, RunControl } from './interfaces/analysis.js';
+import type { ArchitectViewQuery, ArchitectViewQueryOutcome } from './interfaces/architect-view.js';
 import type { ApiViewQuery, ApiViewQueryOutcome, FindingDelta, OperationTimings, RetainedSession, SessionChange, SessionInputs, SessionOpen,
   SessionExplorerDetailsOutcome, SessionRevision, SessionStatus, SessionUpdate, VerifyOutcome } from './interfaces/session.js';
 import { detached, diagnostic } from './report-data.js';
@@ -61,6 +65,56 @@ export function findingDelta(previous: readonly AnalysisDiagnostic[], current: r
   return { added, removed: sortedPaths(removed), positionOnly: sortedPaths(positionOnly) };
 }
 
+/** What a rehydrating query answers instead of its projection. */
+type RehydrationOutcome =
+  | { readonly status: 'superseded'; readonly sequence: number; readonly observedInputId: string }
+  | { readonly status: 'unavailable'; readonly reason: 'analysis-failed'; readonly message: string }
+  | { readonly status: 'cancelled' };
+type FeatureRead =
+  | { readonly status: 'read'; readonly features: readonly { readonly file: string; readonly text: string }[] }
+  | { readonly status: 'changed' }
+  | { readonly status: 'unavailable'; readonly reason: 'analysis-failed'; readonly message: string }
+  | { readonly status: 'cancelled' };
+
+/**
+ * Read each `.feature` file from disk and keep it only while its bytes equal
+ * the revision's captured input. A changed, removed or replaced file means the
+ * revision no longer describes the project; a file the revision did not capture,
+ * or one that cannot be read for another reason, fails the query.
+ */
+async function readCapturedFeatures(root: string, files: readonly string[], inputs: readonly CapturedInput[],
+  signal?: AbortSignal): Promise<FeatureRead> {
+  const captured = new Map(inputs.map(input => [input.path, input]));
+  const features: { file: string; text: string }[] = [];
+  for (const file of files) {
+    if (signal?.aborted) return { status: 'cancelled' };
+    const expected = captured.get(file);
+    if (!expected) return { status: 'unavailable', reason: 'analysis-failed', message: `The revision captured no input for ${file}` };
+    let bytes: Buffer;
+    try { bytes = await readFile(join(root, file), signal ? { signal } : {}); }
+    catch (error) {
+      if (isCancellation(error, signal)) return { status: 'cancelled' };
+      const code = error instanceof Object && 'code' in error ? (error as { code?: unknown }).code : undefined;
+      if (code === 'ENOENT' || code === 'ENOTDIR' || code === 'EISDIR') return { status: 'changed' };
+      return { status: 'unavailable', reason: 'analysis-failed',
+        message: `Cannot read ${file}: ${error instanceof Error ? error.message : String(error)}` };
+    }
+    if (bytes.length !== expected.bytes || createHash('sha256').update(bytes).digest('hex') !== expected.sha256) return { status: 'changed' };
+    features.push({ file, text: bytes.toString('utf8') });
+  }
+  return { status: 'read', features };
+}
+
+/** A failed compiler request of a query: cancellation, a byte bound, or any other failure. */
+function queryFailure(error: unknown, signal?: AbortSignal): { readonly status: 'cancelled' }
+  | { readonly status: 'unavailable'; readonly reason: 'resource-limit' | 'analysis-failed'; readonly message: string } {
+  if (isCancellation(error, signal)) return { status: 'cancelled' };
+  const message = error instanceof Error ? error.message : String(error);
+  const reason = error instanceof Object && 'code' in error && (error as { code?: unknown }).code === 'resource-limit'
+    ? 'resource-limit' : 'analysis-failed';
+  return { status: 'unavailable', reason, message };
+}
+
 /** Session identity of an invalid acquisition; the projected report keeps its null. */
 const sealedIdentity = (inputs: readonly CapturedInput[] | null): string =>
   `invalid/1:${createHash('sha256').update(JSON.stringify(inputs ?? [])).digest('hex')}`;
@@ -93,7 +147,7 @@ class Session implements RetainedSession {
     const started = performance.now();
     const timings = zeroTimings();
     let start = performance.now();
-    const observed = await observeProject({ request: state.request.project, parse: this.#parse, limits: this.#acquisition,
+    const observed = await observeProject({ request: state.project, parse: this.#parse, limits: this.#acquisition,
       registry: state.registry.id, ...(signal ? { signal } : {}) });
     timings.inventory = performance.now() - start;
     if (observed.status === 'cancelled') return { status: 'cancelled' };
@@ -322,6 +376,59 @@ class Session implements RetainedSession {
     });
   }
 
+  /**
+   * Project the architect view's facts from the current valid revision, as
+   * `apiView` projects its own: serialized with every other operation, only
+   * for the current sequence, from the retained facts and the live or
+   * rehydrated compiler, without publishing a revision. The compiler gives
+   * each selected original's detail and shape and each TypeScript or
+   * JavaScript test file's titles. `.feature` files are read from disk and
+   * used only while their bytes equal the revision's captured input; a changed
+   * one answers `superseded` with no observed input identity.
+   */
+  architectView(query: ArchitectViewQuery, control: RunControl = {}): Promise<ArchitectViewQueryOutcome> {
+    return this.#serialize(async () => {
+      if (this.#disposed) return { status: 'unavailable', reason: 'invalid-revision', message: 'Retained session is disposed' };
+      const signal = control.signal;
+      if (signal?.aborted) return { status: 'cancelled' };
+      const state = this.#state;
+      const current = this.#current;
+      if (!current || query.sequence !== this.#sequence) {
+        return { status: 'unavailable', reason: 'invalid-revision',
+          message: `Sequence ${query.sequence} is not the session's current revision (${this.#sequence})` };
+      }
+      const facts = state.facts;
+      if (!facts) return { status: 'unavailable', reason: 'analysis-failed', message: 'Session facts are not retained' };
+      const limitIssue = architectLimitIssue(query);
+      if (limitIssue) return { status: 'unavailable', reason: 'resource-limit', message: limitIssue };
+      const planned = planArchitectView(facts);
+      if (planned.status === 'unavailable') return planned;
+      const read = await readCapturedFeatures(facts.inventory!.scope.root, planned.features, current.inputs, signal);
+      if (read.status === 'changed') return { status: 'superseded', sequence: this.#sequence, observedInputId: null };
+      if (read.status !== 'read') return read;
+      const compiled = planned.requests.length > 0 || planned.testFiles.length > 0;
+      if (compiled) {
+        if (!state.adapter) return { status: 'unavailable', reason: 'analysis-failed', message: 'No retained compiler is available for this session' };
+        if (!state.adapter.hot) {
+          const rehydration = await this.#rehydrate(signal);
+          if (rehydration) return rehydration;
+        }
+      }
+      let details: readonly SymbolDetail[] = [], shapes: readonly ExportShape[] = [], tests: readonly TestFileTitles[] = [];
+      try {
+        if (planned.requests.length) {
+          details = await state.adapter!.details(planned.requests, query.details, signal);
+          shapes = await state.adapter!.shapes(planned.requests, signal);
+        }
+        if (planned.testFiles.length) tests = await state.adapter!.testTitles(planned.testFiles, query.tests, signal);
+      } catch (error) {
+        return queryFailure(error, signal);
+      }
+      if (signal?.aborted) return { status: 'cancelled' };
+      return projectArchitectView(facts, query.sequence, current.inputId, { details, shapes, tests, features: read.features }, query);
+    });
+  }
+
   explorerDetails(sequence: number, requests: readonly SymbolDetailRequest[],
     control: RunControl = {}): Promise<SessionExplorerDetailsOutcome> {
     return this.#serialize(async () => {
@@ -365,7 +472,7 @@ class Session implements RetainedSession {
    * reports the query as superseded rather than answering from drifted state.
    * Returns null when rehydration observed nothing new.
    */
-  async #rehydrate(signal?: AbortSignal): Promise<ApiViewQueryOutcome | null> {
+  async #rehydrate(signal?: AbortSignal): Promise<RehydrationOutcome | null> {
     const state = this.#state;
     if (!state.observer) return { status: 'unavailable', reason: 'analysis-failed', message: 'Session has no observer to rehydrate a compiler from' };
     try {
@@ -507,13 +614,14 @@ class Session implements RetainedSession {
     this.#resolutions = [resolution, ...this.#resolutions.filter(item => item !== resolution)].slice(0, knownResolutions);
   }
 
-  /** Retry observation for a session opened over a coherent invalid capture. Its acquisition is a
-   * cold open, not a structural update, so it reports no reacquisition and a required sweep still runs. */
+  /** Retry observation for a session opened over a coherent invalid capture, with the request it was
+   * opened with, as every acquisition of the session does. Its acquisition is a cold open, not a
+   * structural update, so it reports no reacquisition and a required sweep still runs. */
   async #reopen(changes: readonly SessionChange[], started: number, signal?: AbortSignal): Promise<SessionUpdate> {
     const state = this.#state;
     const timings = zeroTimings();
     let start = performance.now();
-    const observed = await observeProject({ request: state.request.project, parse: this.#parse, limits: this.#acquisition,
+    const observed = await observeProject({ request: state.project, parse: this.#parse, limits: this.#acquisition,
       registry: state.registry.id, ...(signal ? { signal } : {}) });
     timings.inventory = performance.now() - start;
     if (observed.status === 'cancelled') return { status: 'cancelled' };
@@ -644,8 +752,8 @@ export async function openSessionEngine(inputs: SessionInputs, control: RunContr
   if (unsupported.length) {
     return reject(diagnostic('unavailable-capability', `Analysis cannot execute: ${unsupported.join(', ')}`, 'unavailable'), 'access', 'unavailable');
   }
-  const state: SessionState = { request, limits, registry: registry.value, observer: null, adapter: null, adapterAreas: null,
-    facts: null, stale: false, parsed: new Map() };
+  const state: SessionState = { request, project: request.project, limits, registry: registry.value, observer: null, adapter: null,
+    adapterAreas: null, facts: null, stale: false, parsed: new Map() };
   const session = new Session(state, request.limits.acquisition);
   return session.open(control.signal);
 }

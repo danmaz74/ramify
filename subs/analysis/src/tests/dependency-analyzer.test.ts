@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promi
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { analyzeDependencyDiagram, analyzeProject, projectDependencyDiagram } from '../index.js';
+import { analyzeDependencyDiagram, analyzeProject, projectDependencyDiagram, projectTestReferences } from '../index.js';
 import type { AnalysisLimits, AnalysisReport, Capability, DependencyAnalyzerLimits, DependencyAnalyzerOutcome,
   DependencyDiagramFacts, ProjectRequest } from '../index.js';
 import { createDefaultTagRegistry } from '../../subs/model/src/index.js';
@@ -96,6 +96,12 @@ export const loose: any = 1;
 new Service();\n[0].forEach(act);\nexport const shape: Shape = settings;\nexport { settingsC };\n`,
   'src/limited.ts': `import { loose } from ${B};\nimport { loose as looseC } from ${C};\nvoid (loose + 1);\n`,
 });
+/** tests-only: only the root's test file uses `core`, so the production diagram has no boundary. */
+const testsOnly = project({
+  ...within('subs/core', { ...module('core', 'expose-src act, run, start, stop from "index.ts" to parent\n'),
+    'src/index.ts': 'export function act(): void {}\nexport function run(): void {}\nexport function start(): void {}\nexport function stop(): void {}\n' }),
+  'src/tests/core.test.ts': "import { act, run, start, stop } from '../../subs/core/src/index.js';\n\nact();\nrun();\nstart();\nstop();\n",
+});
 /** forwarding: `fixture/b` forwards originals owned by `fixture/b/a`; only `act` is exposed. */
 const forwarding = project({
   ...within('subs/b', { ...module('b', 'expose-sub act from a to parent\n'),
@@ -147,6 +153,9 @@ async function equalsBatch(files: Record<string, string>): Promise<DependencyDia
     expect(outcome.behaviorRuns).toBe(1);
     expect(outcome.diagram).toEqual(projected(requested));
     expect(JSON.stringify(outcome.diagram)).toBe(JSON.stringify(projected(requested)));
+    // The same run projects the test references of the same facts.
+    const references = projectTestReferences({ revision: requested.inputId!, report: requested, limits: { maxResultBytes: analyzerLimits.maxResultBytes } });
+    expect(references.status === 'projected' && JSON.stringify(references.references)).toBe(JSON.stringify(outcome.testReferences));
     expect(Object.isFrozen(outcome.diagram.boundaries)).toBe(true);
     const { acquireMs, classifyMs, projectMs, totalMs } = outcome.timings;
     expect([acquireMs, classifyMs, projectMs].every(value => value >= 0 && value <= totalMs)).toBe(true);
@@ -186,6 +195,21 @@ describe('lean dependency analyzer', () => {
       ['fixture/b', 'fixture/b/a', 'fixture/b/a', 'secret', 'non-behavioral', 'denied'],
     ]);
     expect(observed.retained).toEqual([]);
+  }, timeout);
+
+  it('projects the test references beside the diagram, and gives null references when only they exceed the bound (AV38)', async () => {
+    await withProject(testsOnly, async (_root, request) => {
+      const report = await batch(request, checkCapabilities);
+      const full = ready(await analyzeDependencyDiagram({ project: request, report, limits: analyzerLimits }));
+      expect(full.diagram.boundaries).toEqual([]);
+      expect(full.testReferences).toEqual({ inputId: report.inputId, files: [{ file: 'src/tests/core.test.ts', unclassified: 0,
+        exercises: ['act', 'run', 'start', 'stop'].map(binding => ({ kind: 'code', owner: 'fixture/core', file: 'index.ts', binding })) }] });
+      const diagramBytes = Buffer.byteLength(JSON.stringify(full.diagram), 'utf8');
+      expect(Buffer.byteLength(JSON.stringify(full.testReferences), 'utf8')).toBeGreaterThan(diagramBytes);
+      const bounded = ready(await analyzeDependencyDiagram({ project: request, report, limits: { ...analyzerLimits, maxResultBytes: diagramBytes } }));
+      expect(JSON.stringify(bounded.diagram)).toBe(JSON.stringify(full.diagram));
+      expect(bounded.testReferences).toBeNull();
+    });
   }, timeout);
 
   it('returns inputs-changed with the differing paths and no diagram after an edit (BD16)', async () => {

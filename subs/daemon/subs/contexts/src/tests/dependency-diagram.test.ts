@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AnalysisReport, RunControl } from '../../../../../analysis/src/interfaces/analysis.js';
 import type { DependencyAnalyzerOutcome, DependencyDiagramRunner } from '../../../../../analysis/src/interfaces/dependency-analyzer.js';
-import type { DependencyDiagramFacts } from '../../../../../analysis/src/interfaces/dependency-diagram.js';
+import type { DependencyDiagramFacts, TestReferenceFacts } from '../../../../../analysis/src/interfaces/dependency-diagram.js';
 import type { ProjectRequest } from '../../../../../analysis/subs/project/src/interfaces/project.js';
 import type { ContextBudgets, ContextToken } from '../interfaces/contexts.js';
 import { capture, flush, testBudgets } from './scripted-driver.js';
@@ -34,9 +34,14 @@ function facts(inputId: string, padding = 0): DependencyDiagramFacts {
     headline: { behavioralDependencies: 1, nonBehavioralDependencies: 2 }, boundaries: [],
     coverage: { state: 'complete', unknownDependencies: 0, limitIds: [] } };
 }
-const ready = (diagram: DependencyDiagramFacts): DependencyAnalyzerOutcome =>
-  ({ status: 'ready', diagram, behaviorRuns: 1, timings: { acquireMs: 1, classifyMs: 1, projectMs: 1, totalMs: 3 } });
-const bytes = (diagram: DependencyDiagramFacts) => Buffer.byteLength(JSON.stringify(diagram), 'utf8');
+const references = (inputId: string, files = 1): TestReferenceFacts => ({ inputId, files: Array.from({ length: files }, (_, index) => ({
+  file: `src/tests/${String(index).padStart(6, '0')}.test.ts`, exercises: [{ kind: 'code', owner: 'fixture', file: 'a.ts', binding: 'a' }], unclassified: 1 })) });
+/** The analyzer's test references ride beside the diagram; no `dependencyDiagram` answer below carries them. */
+const ready = (diagram: DependencyDiagramFacts, testReferences: TestReferenceFacts | null = references(diagram.inputId)): DependencyAnalyzerOutcome =>
+  ({ status: 'ready', diagram, testReferences, behaviorRuns: 1, timings: { acquireMs: 1, classifyMs: 1, projectMs: 1, totalMs: 3 } });
+const bytes = (value: DependencyDiagramFacts | TestReferenceFacts) => Buffer.byteLength(JSON.stringify(value), 'utf8');
+/** The retained bytes of a diagram and its default references. */
+const retained = (diagram: DependencyDiagramFacts) => bytes(diagram) + bytes(references(diagram.inputId));
 
 function environment(budgets: Partial<ContextBudgets> = {}, cancelOnAbort = false) {
   const controlled = controlledRunner(cancelOnAbort);
@@ -105,12 +110,58 @@ describe('ContextManager.dependencyDiagram', () => {
     } finally { await e.dispose(); }
   });
 
+  it('AV40: the runner acquires with the request the published inputs were captured with, not the invocation the report echoes', async () => {
+    const e = environment();
+    try {
+      const given: ProjectRequest = { cwd: '/fixture', root: '/fixture', scope: 'whole-project', configuration: 'discover' };
+      const found: ProjectRequest = { cwd: '/fixture/subs/workspace', scope: 'whole-project', configuration: 'discover' };
+      const { token, revision: opening } = await e.published();
+      // Another invocation form reaches the context: the session republishes the same inputs with cause request.
+      expect(await e.manager.open(found, { registry: 'default', capabilities: [] }, 'found')).toMatchObject({ status: 'opened', token, created: false });
+      await e.check(token, { mode: 'synchronized', expect: [] }, {}, 'found');
+      const republished = e.status(token).published!;
+      expect([republished.sequence, republished.cause, republished.fingerprints.inputId]).toEqual([2, 'request', opening.fingerprints.inputId]);
+      const report = await e.script.sessions[0]!.session.report(undefined, 2);
+      expect(report!.request.project).toEqual(found);
+
+      // The analyzer receives the report and the opening request its inputs were captured with.
+      const first = e.diagram(token, republished.revision); await flush();
+      expect(e.runs[0]!.input.report).toBe(report);
+      expect(e.runs[0]!.input.project).toEqual(given);
+      // A real input change still answers busy, and nothing is retained.
+      e.runs[0]!.settle({ status: 'inputs-changed', paths: ['src/index.ts'] });
+      expect(await first).toMatchObject({ status: 'busy', reason: 'inputs-changed' });
+
+      // Cold: the session is released, and the retained report keeps its captured request.
+      e.clock.advance(100); await flush(); e.clock.advance(200); await flush();
+      expect(e.status(token)).toMatchObject({ level: 'cold', session: null, published: { sequence: 2 } });
+      const cold = e.diagram(token, republished.revision); await flush();
+      expect(e.runs[1]!.input.project).toEqual(given);
+      const diagram = facts(republished.fingerprints.inputId);
+      e.runs[1]!.settle(ready(diagram));
+      expect(await cold).toMatchObject({ status: 'ready', diagram });
+
+      // A session opened by the other form captures with that form's request.
+      await e.check(token, { mode: 'synchronized', expect: [] }, {}, 'found');
+      expect(e.script.sessions).toHaveLength(2);
+      expect(e.script.sessions[1]!.project).toEqual(found);
+      const reopened = e.status(token).published!;
+      expect([reopened.sequence, reopened.cause]).toEqual([3, 'open']);
+      const again = e.diagram(token, reopened.revision); await flush();
+      expect(e.runs[2]!.input.project).toEqual(found);
+      e.runs[2]!.settle(ready(facts(reopened.fingerprints.inputId)));
+      expect(await again).toMatchObject({ status: 'ready' });
+    } finally { await e.dispose(); }
+  });
+
   it('BD19: an unknown context, an earlier generation and a manager without a runner start no work', async () => {
     const e = environment();
     const bare = sessionEnvironment();
     try {
       const { token, revision } = await e.published();
-      expect(await e.diagram({ ...token, generation: `${token.generation.slice(0, -1)}0` }, revision.revision))
+      // Another generation: its last digit changed, never to the one it has.
+      const earlier = `${token.generation.slice(0, -1)}${token.generation.endsWith('0') ? '1' : '0'}`;
+      expect(await e.diagram({ ...token, generation: earlier }, revision.revision))
         .toMatchObject({ status: 'unavailable', reason: 'expired-generation' });
       expect(await e.diagram({ context: `ctx/1:${'0'.repeat(64)}`, generation: token.generation }, revision.revision))
         .toMatchObject({ status: 'unavailable', reason: 'unknown-context' });
@@ -208,13 +259,13 @@ describe('ContextManager.dependencyDiagram', () => {
       const diagram = facts(revision.fingerprints.inputId, 20);
       const pending = e.diagram(token, revision.revision); await flush();
       e.runs[0]!.settle(ready(diagram)); await pending;
-      expect(e.status(token)).toMatchObject({ level: 'hot', retainedBytes: 100 + bytes(diagram) });
+      expect(e.status(token)).toMatchObject({ level: 'hot', retainedBytes: 100 + retained(diagram) });
 
       e.clock.advance(100); await flush();
-      expect(e.status(token)).toMatchObject({ level: 'warm', retainedBytes: 100 + bytes(diagram) });
+      expect(e.status(token)).toMatchObject({ level: 'warm', retainedBytes: 100 + retained(diagram) });
       expect(await e.diagram(token, revision.revision)).toMatchObject({ status: 'ready', diagram });
       e.clock.advance(200); await flush();
-      expect(e.status(token)).toMatchObject({ level: 'cold', session: null, retainedBytes: bytes(diagram) });
+      expect(e.status(token)).toMatchObject({ level: 'cold', session: null, retainedBytes: retained(diagram) });
       expect(await e.diagram(token, revision.revision)).toMatchObject({ status: 'ready', diagram });
       expect(e.runs).toHaveLength(1);
       e.clock.advance(200); await flush();
@@ -225,7 +276,7 @@ describe('ContextManager.dependencyDiagram', () => {
       const second = facts(reopened.revision.fingerprints.inputId, 20);
       const again = e.diagram(reopened.token, reopened.revision.revision); await flush();
       e.runs[1]!.settle(ready(second)); await again;
-      expect(e.status(reopened.token).retainedBytes).toBe(100 + bytes(second));
+      expect(e.status(reopened.token).retainedBytes).toBe(100 + retained(second));
       e.script.version = 3;
       await e.check(reopened.token, { mode: 'synchronized', expect: [] });
       expect(e.status(reopened.token)).toMatchObject({ published: { sequence: 2 }, retainedBytes: 100 });
@@ -270,3 +321,78 @@ describe('ContextManager.dependencyDiagram', () => {
   });
 });
 
+
+describe('ContextManager.dependencyFacts (C9)', () => {
+  it('answers the diagram with the test references of the same run, retains both and serves them without another run', async () => {
+    const e = environment();
+    try {
+      const { token, revision } = await e.published();
+      const facts_ = (requestId: string) => e.manager.dependencyFacts({ token, requestId, revision: revision.revision }, 'lease');
+      const diagram = facts(revision.fingerprints.inputId);
+      const testReferences = references(diagram.inputId);
+      // A facts caller and a diagram caller join one job; each receives its own answer.
+      const first = facts_('facts-1'), joined = e.diagram(token, revision.revision); await flush();
+      expect(e.runs).toHaveLength(1);
+      e.runs[0]!.settle(ready(diagram, testReferences));
+      expect(await first).toEqual({ status: 'ready', requestId: 'facts-1', revision, diagram, testReferences });
+      expect(await joined).toEqual({ status: 'ready', requestId: 'diagram-1', revision, diagram });
+      const retainedAnswer = await facts_('facts-2');
+      expect(retainedAnswer).toEqual({ status: 'ready', requestId: 'facts-2', revision, diagram, testReferences });
+      expect(Object.isFrozen(retainedAnswer.status === 'ready' && retainedAnswer.testReferences)).toBe(true);
+      expect(await e.diagram(token, revision.revision)).toEqual({ status: 'ready', requestId: 'diagram-2', revision, diagram });
+      expect(e.runs).toHaveLength(1);
+      expect(e.status(token).retainedBytes).toBe(100 + bytes(diagram) + bytes(testReferences));
+      // Every other answer is the diagram's: a newer revision supersedes the facts caller too.
+      e.script.version = 2;
+      await e.check(token, { mode: 'synchronized', expect: [] });
+      expect(await facts_('facts-3')).toMatchObject({ status: 'superseded', revision: { sequence: 2 } });
+    } finally { await e.dispose(); }
+  });
+
+  it('keeps null references from the analyzer, and retains a diagram without references that alone exceed a budget', async () => {
+    const e = environment();
+    try {
+      const { token, revision } = await e.published();
+      const diagram = facts(revision.fingerprints.inputId);
+      const pending = e.manager.dependencyFacts({ token, requestId: 'null', revision: revision.revision }, 'lease'); await flush();
+      e.runs[0]!.settle(ready(diagram, null));
+      expect(await pending).toMatchObject({ status: 'ready', diagram, testReferences: null });
+      expect(e.status(token).retainedBytes).toBe(100 + bytes(diagram));
+    } finally { await e.dispose(); }
+
+    for (const budget of ['maxRetainedBytesPerContext', 'maxRetainedBytesGlobal'] as const) {
+      const probe = environment();
+      let limit: number;
+      try {
+        const { token, revision } = await probe.published();
+        const diagram = facts(revision.fingerprints.inputId);
+        // The budget admits the diagram alone and one byte less than the diagram with its references.
+        limit = (budget === 'maxRetainedBytesPerContext' ? 100 : probe.status(token).history.bytes + 100) + bytes(diagram)
+          + bytes(references(diagram.inputId, 20)) - 1;
+      } finally { await probe.dispose(); }
+      const bounded = environment({ [budget]: limit });
+      try {
+        const { token, revision } = await bounded.published();
+        const diagram = facts(revision.fingerprints.inputId);
+        const pending = bounded.manager.dependencyFacts({ token, requestId: budget, revision: revision.revision }, 'lease'); await flush();
+        bounded.runs[0]!.settle(ready(diagram, references(diagram.inputId, 20)));
+        expect(await pending, budget).toEqual({ status: 'ready', requestId: budget, revision, diagram, testReferences: null });
+        expect(bounded.status(token).retainedBytes, budget).toBe(100 + bytes(diagram));
+        expect(await bounded.diagram(token, revision.revision), budget).toMatchObject({ status: 'ready', diagram });
+      } finally { await bounded.dispose(); }
+    }
+  });
+
+  it('refuses references of another input as an invalid outcome and retains nothing', async () => {
+    const e = environment();
+    try {
+      const { token, revision } = await e.published();
+      const diagram = facts(revision.fingerprints.inputId);
+      const pending = e.manager.dependencyFacts({ token, requestId: 'other', revision: revision.revision }, 'lease'); await flush();
+      e.runs[0]!.settle(ready(diagram, references('input/1:other')));
+      expect(await pending).toMatchObject({ status: 'unavailable', reason: 'analysis-failed',
+        message: `The test references input input/1:other is not the diagram's ${diagram.inputId}` });
+      expect(e.status(token).retainedBytes).toBe(100);
+    } finally { await e.dispose(); }
+  });
+});

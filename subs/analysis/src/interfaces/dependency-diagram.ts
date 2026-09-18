@@ -56,7 +56,10 @@ export interface DependencyDiagramFacts {
 }
 
 export interface DependencyDiagramLimits {
-  /** Maximum UTF-8 bytes of the diagram's JSON; a larger diagram is refused, never truncated. */
+  /**
+   * Maximum UTF-8 bytes of the diagram's JSON; a larger diagram is refused,
+   * never truncated. It bounds the test references' JSON separately.
+   */
   readonly maxResultBytes: number;
 }
 
@@ -71,6 +74,36 @@ export interface DependencyDiagramInput {
 
 export type DependencyDiagramOutcome =
   | { readonly status: 'projected'; readonly diagram: DependencyDiagramFacts }
+  | { readonly status: 'refused';
+      readonly reason: 'analysis-incomplete' | 'not-requested'
+        | 'capability-failed' | 'resource-limit';
+      readonly observedBytes?: number; readonly maximumBytes?: number };
+
+/**
+ * The originals one testing-classified consumer file references, from the
+ * per-file behavior facts under the `test` source filter. Same-owner originals
+ * are included; each (file, original) pair keeps the precedence the behavior
+ * facts already applied.
+ */
+export interface TestFileReferences {
+  /** Project-relative consumer file. */
+  readonly file: string;
+  /** Originals of the pairs classified behavioral, ordered by owner, file, binding and kind in byte order. */
+  readonly exercises: readonly OriginalId[];
+  /** Pairs classified unknown; they are never listed. */
+  readonly unclassified: number;
+}
+
+/** The test references of one completed analysis. */
+export interface TestReferenceFacts {
+  readonly inputId: string;
+  /** Files with at least one behavioral or unknown pair, in byte order by file. */
+  readonly files: readonly TestFileReferences[];
+}
+
+/** `resource-limit` bounds the references' JSON by `DependencyDiagramInput.limits.maxResultBytes`, separately from the diagram's. */
+export type TestReferenceOutcome =
+  | { readonly status: 'projected'; readonly references: TestReferenceFacts }
   | { readonly status: 'refused';
       readonly reason: 'analysis-incomplete' | 'not-requested'
         | 'capability-failed' | 'resource-limit';

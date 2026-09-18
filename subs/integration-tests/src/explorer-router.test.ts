@@ -220,7 +220,7 @@ describe('RS07-RS08: token-free explorer router over a real project binding', ()
         runs.push(input);
         await gate;
         const report = input.report;
-        return { status: 'ready', behaviorRuns: 1, timings: { acquireMs: 1, classifyMs: 1, projectMs: 1, totalMs: 3 },
+        return { status: 'ready', behaviorRuns: 1, testReferences: null, timings: { acquireMs: 1, classifyMs: 1, projectMs: 1, totalMs: 3 },
           diagram: { inputId: report.inputId!, modules: report.snapshot!.inventory.modules.map(module => module.id),
             headline: { behavioralDependencies: 1, nonBehavioralDependencies: 0 },
             boundaries: [{ consumer: 'fixture/consumer', importedModule: 'fixture', originalOwner: 'fixture',

@@ -1,6 +1,7 @@
 import type { RamifyService, ServiceOperation, ServiceCapability, ServiceResult, ServiceError, ServiceErrorCode } from '../../../../src/interfaces/service.js';
 import type { AnalysisDriver, WatcherPort, ClockPort, ContextBudgets, ContextEvent, RevisionId } from '../../subs/contexts/src/interfaces/contexts.js';
 import type { ApiViewProjection } from '../../../analysis/src/interfaces/session.js';
+import type { RenderedArchitectView } from '../../../analysis/src/interfaces/architect-view.js';
 import type { RunControl } from '../../../analysis/src/interfaces/analysis.js';
 import type { DependencyDiagramRunner } from '../../../analysis/src/interfaces/dependency-analyzer.js';
 
@@ -184,22 +185,37 @@ export type WireMessage =
   | { readonly type: 'pong' }
   | { readonly type: 'goodbye'; readonly reason: DisconnectReason };
 
+/** The generated views one `publish` call can write. */
+export type MaterializedViewId = 'api' | 'architect';
+/** What one `publish` call writes, in one transaction: the API view's
+ * `.ramify` directories of a projection, and the rendered architect view at
+ * `<root>/.ramify-architect`. `null` leaves that view untouched. */
+export interface PublishInput {
+  readonly api: ApiViewProjection | null;
+  readonly architect: RenderedArchitectView | null;
+}
 /** Positive, finite byte ceilings the filesystem publisher enforces before
- * writing anything for one `publish` call. Frozen (iteration 1):
+ * writing anything for one `publish` call. Frozen (Plan 2A iteration 1):
  * `maxAreaBytes: 32 * 1024 * 1024`, `maxInvocationBytes: 256 * 1024 * 1024`,
- * `maxStagedBytes: 256 * 1024 * 1024`. */
+ * `maxStagedBytes: 256 * 1024 * 1024`; frozen (Plan 2B C6):
+ * `maxArchitectBytes: 64 * 1024 * 1024`. The architect target also counts
+ * against `maxInvocationBytes` and, when it changes, `maxStagedBytes`. */
 export interface ApiViewPublishLimits {
   readonly maxAreaBytes: number;
+  readonly maxArchitectBytes: number;
   readonly maxInvocationBytes: number;
   readonly maxStagedBytes: number;
 }
-/** One published or unchanged generated `.ramify` directory. `path` is the
- * canonical project-relative directory (`<area.root>/.ramify`); `files` and
- * `entries` count the rendered documents plus `_meta.json`; `bytes` is the
- * area's current total rendered size regardless of `changed`. */
+/** One published or unchanged generated directory. For the API view, `path`
+ * is the canonical project-relative directory (`<area.root>/.ramify`) and
+ * `entries` counts the rendered entries. For the architect view, `module` and
+ * `area` are `null`, `path` is `.ramify-architect` and `entries` counts its
+ * records. `files` counts every file, `_meta.json` included; `bytes` is the
+ * target's current total rendered size regardless of `changed`. */
 export interface MaterializedTarget {
-  readonly module: string;
-  readonly area: 'ordinary' | 'tests';
+  readonly view: MaterializedViewId;
+  readonly module: string | null;
+  readonly area: 'ordinary' | 'tests' | null;
   readonly path: string;
   readonly files: number;
   readonly entries: number;
@@ -215,14 +231,14 @@ export type PublishApiViewOutcome =
       readonly message: string };
 
 /** The daemon-owned transactional filesystem publisher: renders and safely
- * replaces every module's generated `.ramify` directory for one projection at
- * one revision, staging and switching every requested target before any
- * previous complete view is discarded. */
+ * replaces every requested module's generated `.ramify` directory and the
+ * project's `.ramify-architect` directory for one revision, staging and
+ * switching every target before any previous complete view is discarded. */
 export interface ApiViewPublisher {
   publish(
     root: string,
     revision: RevisionId,
-    projection: ApiViewProjection,
+    input: PublishInput,
     requestId: string,
     control?: RunControl,
   ): Promise<PublishApiViewOutcome>;

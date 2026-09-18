@@ -1,7 +1,7 @@
 # Architect view: agent test cases
 
 **Date:** 2026-09-18. **Status:** companion to the
-[architect view specification](architect-view.spec.md). These are the tasks
+[architect view specification](../../architecture/architect-view.spec.md). These are the tasks
 that test hypothesis H1: that one denoised, searchable directory is enough for
 an architect agent using only `Read` and `rg`. The cases run on the Ramify
 toolkit itself. Every key below was derived from the toolkit source at commit
@@ -125,8 +125,12 @@ the paragraph "Retry delays after a connection failure; the last one
 repeats." The behavior record's paragraph is "Own one project's daemon
 connection, context and subscription, and keep them valid."
 
+When `testReferences` is measured, the title record's `exercises` names
+`ramify/service-api#createProjectBinding` directly.
+
 **Pass.** Names `createProjectBinding` and the module. **Bonus.** Names
-`bindingBackoffMs` as the delay table.
+`bindingBackoffMs` as the delay table. Record whether the agent reached the
+symbol through `exercises` or through the suite name.
 
 ### D4: test title only, no word in the source
 
@@ -145,8 +149,15 @@ update" in `covering.test.ts`. `spanBatches` in the same module, role
 `internal`, paragraph "The earliest receipt and latest flush of two batch
 spans.", is a supporting detail.
 
+When `testReferences` is measured, the `context-manager.test.ts` record's
+`exercises` names `ramify/daemon/contexts#createContextManager`. The
+`covering.test.ts` record names `ramify/daemon/contexts#sessionEnvironment`
+instead: that file creates the manager through the test helper in
+`session-fixture.ts`, and `exercises` lists a file's own references only.
+
 **Pass.** Names `createContextManager` and the module, with the test title
-as evidence. **Fail.** Answers that no such behavior exists.
+as evidence. **Fail.** Answers that no such behavior exists. Record whether
+the agent reached the symbol through `exercises` or through the suite name.
 
 ### P1: placement in an existing module
 

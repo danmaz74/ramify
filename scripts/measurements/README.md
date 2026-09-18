@@ -401,3 +401,37 @@ beside the existing `plan2a-platform-linux.json`. Until both exist, the
 `I2A-12:linux-macos-bytes` reference-harness leaf fails honestly (a real,
 current Linux report with no macOS counterpart), rather than passing on Linux
 evidence alone.
+
+## Plan 2B architect view measurements
+
+```sh
+npm run build
+npm run measure:plan2b
+```
+
+The command runs the installed `ramify` against isolated copies of the
+reference example and the toolkit and the S100 fixture, each under its own
+owned `RAMIFY_ENDPOINT_DIR` below `/tmp`, with every command run from the
+project root. For each it records `materialize --view architect` cold, as an
+unchanged repeat, with retained dependency facts after deleting the view, and
+warm with a new revision whose facts the analyzer computes; the view's files,
+bytes and record lengths per file kind; `README.md` and the largest
+`behavior.jsonl`; and the daemon's peak combined RSS and heap from polled
+`daemon status`. On the reference project and the toolkit it measures hit cost:
+`rg -n -i <term> .ramify-architect/` for `revision`, `project`, `session`,
+`publish`, `watch` and `create`, with lines and bytes per file kind. The
+`session-query` workload times the architect session query in process, hot and
+after releasing the compiler. Two witnesses record the fixes of Plan 2B's
+iteration 9. `mixed-invocation` reaches a context with another invocation form,
+materializing with `--root` from another directory after a check from the root,
+and without `--root` after `check --root .`, and requires measured dependencies
+within the whole-command budget. `open-with-view` opens a resident session
+while views exist and requires no generated input and a batch check's input
+identity.
+
+The raw report is written to
+`docs/plans/iteration-2b-generated-views/evidence/plan2b-measurements.json`
+(`-- --workload <name>` writes `plan2b-measurements-<name>.json`, `-- --output
+FILE` another path). Its `budgets` list sets each of Plan 2B's budgets beside
+its measured value; an exceeded budget is recorded, never retried. The command
+exits 1 only when a workload fails to produce its evidence.

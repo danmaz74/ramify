@@ -1,0 +1,124 @@
+{
+  "claude-code/D1": {
+    "verdict": "pass",
+    "notes": "createPublicationQueue in ramify, internal; other modules need an exposure to descendants first. Found by the doc paragraph and the test titles."
+  },
+  "claude-code/D2": {
+    "verdict": "pass",
+    "notes": "Both symbols in ramify/service-api, difference stated; root re-exposes to descendants carrying dispatch. Its list of eligible callers includes ramify/explorer, whose browser source may not value-import these untagged functions. A 'service-api' search returned 123 lines and 63 KB (persisted by the harness; the model saw 2 KB)."
+  },
+  "claude-code/D3": {
+    "verdict": "pass",
+    "reachedBy": "The bindingBackoffMs record and the module purpose, then the file name project-binding.ts; exercises not cited.",
+    "notes": "createProjectBinding in ramify/service-api; bonus: bindingBackoffMs and RS03's 1, 2, 5, 10, 30 s. Four searches repeat the first search's terms on narrower paths."
+  },
+  "claude-code/D4": {
+    "verdict": "pass",
+    "reachedBy": "The test titles in context-manager.test.ts and covering.test.ts, then the module's behavior.jsonl; exercises not cited.",
+    "notes": "createContextManager in ramify/daemon/contexts as the owner of one update per burst; also names createFilesystemWatcher's own burst deduplication and spanBatches. Searched docs/ once."
+  },
+  "claude-code/P1": {
+    "verdict": "pass",
+    "notes": "ramify/analysis/project, citing its purpose, readPurpose, ModulePurpose and ProjectIssue, and rejecting analysis/model, descriptions, analysis and cli with evidence."
+  },
+  "claude-code/P2": {
+    "verdict": "pass",
+    "notes": "Rendering in ramify/presentation/project-view beside ModuleGraphRadial, following presentation's ModelDiagramSvg pattern and layout's placement; command in ramify/cli. Also proposes a new [dispatch, ui] owner to emit the file, since cli cannot import ui symbols. Read eight whole record files (134 KB of reads in all)."
+  },
+  "claude-code/R1": {
+    "verdict": "pass",
+    "notes": "All eight usedBy modules with the view's counts and split; the conclusion (the split exists at file level, presentation needs both halves) follows from them."
+  },
+  "claude-code/R2": {
+    "verdict": "pass",
+    "notes": "The five symbols with empty consumer lists; notes the root's re-exposure; bonus: production scope and the test use by ramify/integration-tests and ramify's tests. Recommends keeping two and making three internal. Searched and read docs/plans."
+  },
+  "claude-code/D5": {
+    "verdict": "pass",
+    "notes": "readPurpose in ramify/analysis/project, internal, not usable by explorer; explorer already receives purposes through the explorer model. 19 searches, 7 of them repeating purpose/readme on narrower paths."
+  },
+  "claude-code/D6": {
+    "verdict": "pass",
+    "narrowingCorrections": [
+      { "call": 6, "narrows": false, "reason": "'common' alone after 'common ancestor|lowestCommon|lca' broadens the phrase; the word rule counts it." }
+    ],
+    "notes": "Says no; names ancestorsOf and OwnershipTree.relation as building blocks, not the capability. 28 tool calls, 22 searches."
+  },
+  "claude-code/D7": {
+    "verdict": "partial",
+    "notes": "Says no correctly, but after 18 searches, not within two. Says the publisher writes a .gitignore, which the AV23 test title does not say (the test checks the project's ignore file). Ran rg on package.json."
+  },
+  "claude-code/D8": {
+    "verdict": "pass",
+    "notes": "createOutboundWriter in ramify/daemon, internal, with the backpressure test title."
+  },
+  "claude-code/P3": {
+    "verdict": "pass",
+    "notes": "A new root child mcp [dispatch] reusing connectDaemon, which the root re-exposes to descendants; rejects cli, daemon and service-api by purpose. Miscounts the map as eleven owners. 171 lines from one docs search; 417 hit lines in all."
+  },
+  "claude-code/R3": {
+    "verdict": "pass",
+    "notes": "uses: analysis 0/21, analysis/project 0/5, analysis/typescript 0/5, quoted from module.json; zero behavioral."
+  },
+  "codex/D1": {
+    "verdict": "pass",
+    "notes": "createPublicationQueue in ramify, internal; reuse needs an exposure first. One view search. Tried to search the absent specification."
+  },
+  "codex/D2": {
+    "verdict": "pass",
+    "notes": "Both symbols, difference stated, root re-exposure to descendants, dispatch required and browser source excluded (from the importability principles). Declines to list modules. 212 of its 349 hit lines come from one search of the principles."
+  },
+  "codex/D3": {
+    "verdict": "pass",
+    "reachedBy": "Read all of service-api's records after the first search; the answer cites the RS03 title and the doc paragraph, not exercises.",
+    "notes": "createProjectBinding; bonus: bindingBackoffMs."
+  },
+  "codex/D4": {
+    "verdict": "pass",
+    "reachedBy": "The test title in context-manager.test.ts from the first search, then the module's behavior.jsonl; exercises not cited.",
+    "notes": "createContextManager as the owner, with the watcher's burst deduplication as a second layer."
+  },
+  "codex/P1": {
+    "verdict": "pass",
+    "notes": "ramify/analysis/project with readPurpose, ModulePurpose, ProjectIssue and the observer's README updates; reporting through analysis's projectDiagnostics."
+  },
+  "codex/P2": {
+    "verdict": "pass",
+    "notes": "Rendering in ramify/presentation/project-view beside ModuleGraphRadial, citing its purpose; command in ramify/cli via parseArguments and runCli."
+  },
+  "codex/R1": {
+    "verdict": "pass",
+    "notes": "All eight modules with counts and split; conclusion follows. Its first search, 'ramify/analysis/model' over the view, returned 114 lines and 67 KB: the module's own 63 records (every record names its module), 40 test records and 10 module.json lines."
+  },
+  "codex/R2": {
+    "verdict": "pass",
+    "notes": "Names all five with empty production consumer lists; separates three with no use at all from two used by other modules' tests (bonus); recommends making the three internal."
+  },
+  "codex/D5": {
+    "verdict": "pass",
+    "notes": "readPurpose, internal, not established as importable by explorer; points to the explorer model instead."
+  },
+  "codex/D6": {
+    "verdict": "partial",
+    "narrowingCorrections": [
+      { "call": 4, "narrows": false, "reason": "'ancestor|common|lca' after 'lowest|common ancestor|lca' drops the phrase and broadens the search; the word rule counts it." }
+    ],
+    "notes": "Does not say no: 'cannot rule one out', leaving OwnershipTree unresolved because its signature is cut in the view. Does not present ancestorsOf as the answer. OwnershipTree has subtree and relation only."
+  },
+  "codex/D7": {
+    "verdict": "partial",
+    "notes": "Says none was found, with a caveat, after three searches rather than two; the third returned 64 lines and 46 KB."
+  },
+  "codex/D8": {
+    "verdict": "pass",
+    "notes": "createOutboundWriter in ramify/daemon, internal, with the backpressure test title."
+  },
+  "codex/P3": {
+    "verdict": "pass",
+    "notes": "A new ramify/mcp [dispatch] root child reusing connectDaemon, citing the purposes of cli, daemon and service-api and the architecture documents. One search for 'mcp|stdio|connectDaemon|DaemonService|check|status' over four record files and two documents returned 241 lines; 551 hit lines in all."
+  },
+  "codex/R3": {
+    "verdict": "pass",
+    "notes": "uses with the view's counts, zero behavioral. Its first search returned 158 lines and 89 KB."
+  }
+}
