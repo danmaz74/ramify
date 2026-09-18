@@ -1,6 +1,6 @@
 {
   "schemaVersion": "ramify.plan2b-measurements/1",
-  "measuredAt": "2026-09-18T12:26:11.409Z",
+  "measuredAt": "2026-09-18T14:53:46.279Z",
   "command": [
     "node",
     "--import",
@@ -15,11 +15,11 @@
     "logicalCpus": 12,
     "cpuModel": "Intel(R) Xeon(R) E-2176G CPU @ 3.70GHz",
     "totalMemoryBytes": 67274752000,
-    "concurrentActivity": "No other work of this session ran; another session's plan6d worktree daemon and two /ramify explorer servers were running and idle."
+    "concurrentActivity": "Idle daemon and explorer of the ramify-plan6d-behavioral-diagram worktree and two idle /ramify explorers belong to other sessions; no other measurement or test run."
   },
   "source": {
-    "commit": "af79737ec57d07c0bab09690d99b760c7e803be8",
-    "trackedChanges": 1
+    "commit": "27f661ed788cfd22ab1de83da27a86274478dac3",
+    "trackedChanges": 2
   },
   "dependencies": {
     "typescript": "7.0.2",
@@ -82,7 +82,7 @@
       "steps": {
         "cold": {
           "code": 0,
-          "durationMs": 5647.2,
+          "durationMs": 5533,
           "stderr": "",
           "revision": 1,
           "targets": 1,
@@ -95,7 +95,7 @@
         },
         "repeat": {
           "code": 0,
-          "durationMs": 427.2,
+          "durationMs": 394.8,
           "stderr": "",
           "revision": 1,
           "targets": 1,
@@ -108,7 +108,7 @@
         },
         "retainedFacts": {
           "code": 0,
-          "durationMs": 401.8,
+          "durationMs": 408,
           "stderr": "",
           "revision": 1,
           "targets": 1,
@@ -124,7 +124,7 @@
             "sample": 1,
             "watcherPublished": true,
             "code": 0,
-            "durationMs": 3407.9,
+            "durationMs": 3452,
             "stderr": "",
             "revision": 2,
             "targets": 1,
@@ -139,7 +139,7 @@
             "sample": 2,
             "watcherPublished": true,
             "code": 0,
-            "durationMs": 3414.4,
+            "durationMs": 3503.2,
             "stderr": "",
             "revision": 3,
             "targets": 1,
@@ -154,7 +154,7 @@
             "sample": 3,
             "watcherPublished": true,
             "code": 0,
-            "durationMs": 3405.2,
+            "durationMs": 3415.3,
             "stderr": "",
             "revision": 4,
             "targets": 1,
@@ -168,7 +168,7 @@
         ],
         "apiOnly": {
           "code": 0,
-          "durationMs": 383.4,
+          "durationMs": 421.7,
           "stderr": "",
           "revision": 5,
           "targets": 2,
@@ -178,7 +178,7 @@
         },
         "bothViews": {
           "code": 0,
-          "durationMs": 3623.7,
+          "durationMs": 3706.3,
           "stderr": "",
           "revision": 5,
           "targets": 30,
@@ -192,8 +192,8 @@
       },
       "context": {
         "sequence": 1,
-        "revision": "rev/1:4be4f162-7cea-4495-bd13-4c37bcdf511a:1",
-        "inputId": "input/1:31090c155a29b474547f805fdda7517d26b4c2584b14553bbb543e1b37625e89",
+        "revision": "rev/1:c452bebb-3e74-4e66-860f-a724d3e8d177:1",
+        "inputId": "input/1:c86d774872b330bcdf529843b680161bbf1a910fcfa83dec4bfb7231152c4ce5",
         "cause": "open"
       },
       "view": {
@@ -251,8 +251,8 @@
       },
       "meta": {
         "schema": "ramify.architect-view/1",
-        "revision": "rev/1:4be4f162-7cea-4495-bd13-4c37bcdf511a:1",
-        "input": "input/1:31090c155a29b474547f805fdda7517d26b4c2584b14553bbb543e1b37625e89",
+        "revision": "rev/1:c452bebb-3e74-4e66-860f-a724d3e8d177:1",
+        "input": "input/1:c86d774872b330bcdf529843b680161bbf1a910fcfa83dec4bfb7231152c4ce5",
         "modules": 15,
         "dependencies": "measured",
         "dependencyScope": "production",
@@ -262,8 +262,8 @@
         "detailsUnavailable": 2
       },
       "manifest": {
-        "README.md": "0332fe76b5f7acd580165d2e2a3733d7026a64ee0ce66734f87728155af7df85",
-        "_meta.json": "75e0bd5800cbaf3fb11a1f64ca3b5d5cc3d73d17b632a1fcecd2cb3c3305d28d",
+        "README.md": "4d41cb237b12ca70cf8be71f6be325a8b2787c0ed67d8ffc8b6375eb52273a3d",
+        "_meta.json": "7ac5aaecabc0cda11d4e7fc6e134c022821ef7f0cefa51b64bcbd5304f0d72bb",
         "behavior.jsonl": "db84320f2c332c51317d35e9941689389206921fa0a4290916f24173f3a4199d",
         "integration-tests/behavior.jsonl": "20ff2c21f6cc5b4c3c3428b621fa74c4e4f71368311f9c1cccd8d78692c43c74",
         "integration-tests/module.json": "6b91054e542aecf39a3b74b658a9076b554b6fc61cefea38bd4550388f7b6c72",
@@ -325,7 +325,7 @@
         "workspace/supporting.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
         "workspace/tests.jsonl": "782f9f22de1d76bddc1dddb1383d2ad4e4ef1061b1f4486d54d6e5d0874cf7cc"
       },
-      "manifestSha256": "d0357c9d2c34584aae6454ce4bfeb76e3edbceab53f0e1fa1fd7a865c53683d0",
+      "manifestSha256": "a02f108b8fccf983175fa8b6973f973914ec2a904a3d6a1b82de4f86ac6ed913",
       "hitCost": {
         "revision": {
           "lines": 54,
@@ -364,35 +364,35 @@
           "byFile": {
             "workspace/module.json": 1,
             "workspace/reviews/validation/behavior.jsonl": 1,
-            "workspace/reviews/validation/tests.jsonl": 1,
             "workspace/reviews/validation/module.json": 2,
+            "workspace/reviews/validation/tests.jsonl": 1,
             "workspace/reviews/core/module.json": 1,
-            "workspace/reviews/core/tasks/module.json": 1,
-            "workspace/reviews/core/tasks/supporting.jsonl": 1,
             "workspace/reviews/core/supporting.jsonl": 2,
             "workspace/reviews/core/controller/module.json": 1,
-            "workspace/catalog/module.json": 1,
-            "workspace/catalog/core/tests.jsonl": 3,
-            "workspace/catalog/core/behavior.jsonl": 1,
-            "workspace/catalog/core/module.json": 2,
+            "workspace/reviews/core/tasks/module.json": 1,
             "workspace/reviews/module.json": 1,
-            "workspace/catalog/core/supporting.jsonl": 4,
             "workspace/reviews/supporting.jsonl": 2,
-            "workspace/catalog/ui/tests.jsonl": 1,
-            "workspace/catalog/ui/module.json": 1,
+            "workspace/reviews/core/tasks/supporting.jsonl": 1,
+            "workspace/catalog/module.json": 1,
             "workspace/reviews/ui/module.json": 1,
-            "workspace/contracts/tests.jsonl": 1,
-            "workspace/contracts/supporting.jsonl": 8,
+            "workspace/catalog/core/behavior.jsonl": 1,
+            "workspace/catalog/core/tests.jsonl": 3,
+            "workspace/catalog/core/module.json": 2,
+            "workspace/catalog/core/supporting.jsonl": 4,
+            "workspace/reviews/ui/pure-ui/behavior.jsonl": 1,
+            "workspace/catalog/ui/tests.jsonl": 1,
             "workspace/shared-ui/module.json": 1,
             "workspace/reviews/ui/pure-ui/tests.jsonl": 1,
-            "workspace/reviews/ui/pure-ui/behavior.jsonl": 1,
-            "workspace/reviews/ui/pure-ui/module.json": 1,
+            "workspace/contracts/tests.jsonl": 1,
             "workspace/contracts/module.json": 2,
-            "module.json": 2,
+            "workspace/catalog/ui/module.json": 1,
+            "workspace/reviews/ui/pure-ui/module.json": 1,
+            "workspace/contracts/supporting.jsonl": 8,
             "_meta.json": 1,
+            "module.json": 2,
             "README.md": 6,
-            "integration-tests/supporting.jsonl": 1,
-            "integration-tests/module.json": 1
+            "integration-tests/module.json": 1,
+            "integration-tests/supporting.jsonl": 1
           }
         },
         "project": {
@@ -419,17 +419,17 @@
               "lines": 6,
               "bytes": 2467
             },
-            "behavior.jsonl": {
-              "lines": 1,
-              "bytes": 517
+            "supporting.jsonl": {
+              "lines": 9,
+              "bytes": 4158
             },
             "module.json": {
               "lines": 3,
               "bytes": 1138
             },
-            "supporting.jsonl": {
-              "lines": 9,
-              "bytes": 4158
+            "behavior.jsonl": {
+              "lines": 1,
+              "bytes": 517
             },
             "README.md": {
               "lines": 3,
@@ -438,13 +438,13 @@
           },
           "byFile": {
             "tests.jsonl": 2,
+            "integration-tests/supporting.jsonl": 2,
+            "integration-tests/module.json": 1,
             "workspace/reviews/tests.jsonl": 4,
             "workspace/reviews/behavior.jsonl": 1,
-            "workspace/reviews/core/tasks/module.json": 1,
             "workspace/reviews/module.json": 1,
             "workspace/reviews/supporting.jsonl": 3,
-            "integration-tests/module.json": 1,
-            "integration-tests/supporting.jsonl": 2,
+            "workspace/reviews/core/tasks/module.json": 1,
             "supporting.jsonl": 4,
             "README.md": 3
           }
@@ -506,6 +506,7 @@
           },
           "byFile": {
             "tests.jsonl": 4,
+            "behavior.jsonl": 3,
             "workspace/tests.jsonl": 2,
             "workspace/behavior.jsonl": 2,
             "workspace/reviews/tests.jsonl": 6,
@@ -515,11 +516,10 @@
             "workspace/reviews/core/tests.jsonl": 1,
             "workspace/reviews/core/behavior.jsonl": 1,
             "workspace/reviews/ui/tests.jsonl": 2,
-            "behavior.jsonl": 3,
             "workspace/reviews/ui/behavior.jsonl": 1,
             "supporting.jsonl": 3,
-            "README.md": 4,
-            "integration-tests/behavior.jsonl": 1
+            "integration-tests/behavior.jsonl": 1,
+            "README.md": 4
           }
         }
       },
@@ -543,15 +543,15 @@
         "dependencyDiagramInputChanges": 0
       },
       "memory": {
-        "pid": 533188,
-        "samples": 172,
-        "peakDaemonRssBytes": 94072832,
-        "peakDaemonHeapUsedBytes": 21123864,
-        "peakCombinedRssBytes": 472805376,
-        "peakCombinedHeapBytes": 50429320
+        "pid": 600195,
+        "samples": 173,
+        "peakDaemonRssBytes": 93835264,
+        "peakDaemonHeapUsedBytes": 21262544,
+        "peakCombinedRssBytes": 481165312,
+        "peakCombinedHeapBytes": 48926768
       },
       "daemonStop": {
-        "pid": 533188,
+        "pid": 600195,
         "stopCode": 0,
         "running": false,
         "pidAlive": false
@@ -563,41 +563,41 @@
       "steps": {
         "cold": {
           "code": 0,
-          "durationMs": 14891.8,
+          "durationMs": 14718.3,
           "stderr": "",
           "revision": 1,
           "targets": 1,
-          "entries": 1591,
-          "bytesWritten": 809330,
+          "entries": 1595,
+          "bytesWritten": 812267,
           "unchanged": 0,
           "modules": 15,
-          "records": 1591,
+          "records": 1595,
           "dependencies": "measured"
         },
         "repeat": {
           "code": 0,
-          "durationMs": 1120.3,
+          "durationMs": 1113.2,
           "stderr": "",
           "revision": 1,
           "targets": 1,
-          "entries": 1591,
+          "entries": 1595,
           "bytesWritten": 0,
           "unchanged": 1,
           "modules": 15,
-          "records": 1591,
+          "records": 1595,
           "dependencies": "measured"
         },
         "retainedFacts": {
           "code": 0,
-          "durationMs": 1105.8,
+          "durationMs": 1134.1,
           "stderr": "",
           "revision": 1,
           "targets": 1,
-          "entries": 1591,
-          "bytesWritten": 809330,
+          "entries": 1595,
+          "bytesWritten": 812267,
           "unchanged": 0,
           "modules": 15,
-          "records": 1591,
+          "records": 1595,
           "dependencies": "measured"
         },
         "warmAnalyzer": [
@@ -605,81 +605,81 @@
             "sample": 1,
             "watcherPublished": true,
             "code": 0,
-            "durationMs": 8760.8,
+            "durationMs": 8639,
             "stderr": "",
             "revision": 2,
             "targets": 1,
-            "entries": 1591,
-            "bytesWritten": 809330,
+            "entries": 1595,
+            "bytesWritten": 812267,
             "unchanged": 0,
             "modules": 15,
-            "records": 1591,
+            "records": 1595,
             "dependencies": "measured"
           },
           {
             "sample": 2,
             "watcherPublished": true,
             "code": 0,
-            "durationMs": 8652.8,
+            "durationMs": 8927.9,
             "stderr": "",
             "revision": 3,
             "targets": 1,
-            "entries": 1591,
-            "bytesWritten": 809330,
+            "entries": 1595,
+            "bytesWritten": 812267,
             "unchanged": 0,
             "modules": 15,
-            "records": 1591,
+            "records": 1595,
             "dependencies": "measured"
           },
           {
             "sample": 3,
             "watcherPublished": true,
             "code": 0,
-            "durationMs": 8706.5,
+            "durationMs": 8705,
             "stderr": "",
             "revision": 4,
             "targets": 1,
-            "entries": 1591,
-            "bytesWritten": 809330,
+            "entries": 1595,
+            "bytesWritten": 812267,
             "unchanged": 0,
             "modules": 15,
-            "records": 1591,
+            "records": 1595,
             "dependencies": "measured"
           }
         ],
         "apiOnly": {
           "code": 0,
-          "durationMs": 1278.4,
+          "durationMs": 1228.7,
           "stderr": "",
           "revision": 4,
           "targets": 2,
           "entries": 582,
-          "bytesWritten": 194029,
+          "bytesWritten": 194233,
           "unchanged": 0
         },
         "bothViews": {
           "code": 0,
-          "durationMs": 15464.4,
+          "durationMs": 14715.1,
           "stderr": "",
           "revision": 5,
           "targets": 30,
-          "entries": 7950,
-          "bytesWritten": 2910829,
+          "entries": 7954,
+          "bytesWritten": 2916520,
           "unchanged": 0,
           "modules": 15,
-          "records": 1591,
+          "records": 1595,
           "dependencies": "measured"
         }
       },
       "context": {
         "sequence": 1,
-        "revision": "rev/1:d5c41549-d090-433c-a950-a16e6e3e0752:1",
-        "inputId": "input/1:0721b0443ac46576a9a72cbc0f8574c80515137054f0e28b34e12f0cb5c71af7",
+        "revision": "rev/1:55c14e34-e0ec-492e-afed-faa5ed08319b:1",
+        "inputId": "input/1:ad939bc94b1e5a705c8a42a019b4f1b26c67fb1262b8291e27a79f7ac9ce0bc0",
         "cause": "open"
       },
       "view": {
         "files": 62,
-        "bytes": 809330,
+        "bytes": 812267,
         "readmeBytes": 9295,
         "largestBehavior": {
           "path": "analysis/behavior.jsonl",
@@ -702,10 +702,10 @@
           },
           "behavior.jsonl": {
             "files": 15,
-            "bytes": 220463,
+            "bytes": 220492,
             "records": 547,
             "maxRecordCharacters": 793,
-            "meanRecordCharacters": 402
+            "meanRecordCharacters": 402.1
           },
           "module.json": {
             "files": 15,
@@ -716,24 +716,24 @@
           },
           "supporting.jsonl": {
             "files": 15,
-            "bytes": 330070,
+            "bytes": 330172,
             "records": 747,
             "maxRecordCharacters": 815,
-            "meanRecordCharacters": 440.5
+            "meanRecordCharacters": 440.6
           },
           "tests.jsonl": {
             "files": 15,
-            "bytes": 226671,
-            "records": 297,
+            "bytes": 229477,
+            "records": 301,
             "maxRecordCharacters": 2763,
-            "meanRecordCharacters": 762
+            "meanRecordCharacters": 761.2
           }
         }
       },
       "meta": {
         "schema": "ramify.architect-view/1",
-        "revision": "rev/1:d5c41549-d090-433c-a950-a16e6e3e0752:1",
-        "input": "input/1:0721b0443ac46576a9a72cbc0f8574c80515137054f0e28b34e12f0cb5c71af7",
+        "revision": "rev/1:55c14e34-e0ec-492e-afed-faa5ed08319b:1",
+        "input": "input/1:ad939bc94b1e5a705c8a42a019b4f1b26c67fb1262b8291e27a79f7ac9ce0bc0",
         "modules": 15,
         "dependencies": "measured",
         "dependencyScope": "production",
@@ -741,11 +741,11 @@
         "metrics": "unavailable",
         "cut": 351,
         "detailsUnavailable": 1,
-        "dynamicTitles": 20
+        "dynamicTitles": 21
       },
       "manifest": {
-        "README.md": "9268a50ce0f9dbba713c9cf14da1c86310e3e431389687d919a3f60ba2da046f",
-        "_meta.json": "c5c0f774db554ffc3669038e6f0668a5bcf4af63aa8641a15983e8e91a1891cd",
+        "README.md": "20a5211cdc7de3465098c568fcb63fe6e753d932fc2f58db9e6f68385e0bce9d",
+        "_meta.json": "f003a9b2ac4743a123c59f5261c3a20e71b7b858a7f2c8fd3c81618f62a6bf2e",
         "analysis/behavior.jsonl": "0339423fe73beedcf33db2771460ccefec9b9513b06b2fff021a2564a085315a",
         "analysis/descriptions/behavior.jsonl": "2bd64c580d917c2ddd50f8c881879d73386fd1e358c8c64345747ed2e8c76a68",
         "analysis/descriptions/module.json": "e32a1b89860d6b12b5deee7b7a39b8584c0095da0e2d358c7b4f43d319ff59b7",
@@ -755,17 +755,17 @@
         "analysis/model/module.json": "8a1d99dfd7a67b2fc9e0d5c9479fe762ad3a1e3850bf62a46d48d074ed4dced2",
         "analysis/model/supporting.jsonl": "0d633f7e9c110755db80bac40642770871ac190674b26c43f6ecf81b802dcc8b",
         "analysis/model/tests.jsonl": "42b51ba50013831a0c0cb3d8dc41275e7ca5f2f897d9b7daa00a8b5f7664dbc2",
-        "analysis/module.json": "4dfd3babaefe7562c71d67edebd6fd02ca5f6f6ef0d220c8ef44a805932ccd32",
-        "analysis/project/behavior.jsonl": "9d32a9c173495a7c1d395446bbe2ceb60db187fde1dae79ba8b13ba2f7cb43f0",
-        "analysis/project/module.json": "6f8ad0f6c04afa8b29f3cec49091bf40a4793308645ad2ce101c6fc05f19a3f3",
+        "analysis/module.json": "c704048a982f3578c06094db38d8558c517be4eaa59007bf37fc46a7be26dfb8",
+        "analysis/project/behavior.jsonl": "ff66e7278017cc8358eba8cc553e027beabd930fe37bec1543cf061ed1810fa0",
+        "analysis/project/module.json": "a5de5d55717a20e077fe66e863d5725799adb9f0041f08bedae5904330e12609",
         "analysis/project/supporting.jsonl": "ee1f7fa7471e02c0c7cc706dc7b6624eba3881b7460c42d7ddb87934e2adca4a",
         "analysis/project/tests.jsonl": "3cc39ac686d076224c5e28f9af63882c0d0cdc1a361703c6268ec066e5bd022d",
-        "analysis/supporting.jsonl": "ce22467784275e76c7aad0724a635ce2e901a2736634358005934a90d25df6bc",
-        "analysis/tests.jsonl": "abd7f643cbcaefe99c56654398164fd6ec8bcab61d6b46daf1731c94e8772daa",
+        "analysis/supporting.jsonl": "7b52eb1571b0dcdf661ce6335ab48f4ed87de03f166eea19d1488a4ace2f6631",
+        "analysis/tests.jsonl": "9e12635baadeb59b36cca6256af1ac2e4c5db654ced45574d866bf6d8a19e18c",
         "analysis/typescript/behavior.jsonl": "08efe412c286c599c69a701762920b7e408f477c23ccacaa2d7c22ecc592aab3",
-        "analysis/typescript/module.json": "2582dfe59ec26f92dd6edb228424de3108832096de0991af5b51d8b1a9d3fd04",
+        "analysis/typescript/module.json": "491ffdc0fac3cd44b580f5bdc7ad88330e823c6865127a738c1badf66a6864fa",
         "analysis/typescript/supporting.jsonl": "9531ef949c52c6f368ca434502fc411d1974c5963b717ed52427fb347a103b64",
-        "analysis/typescript/tests.jsonl": "89eb778520d751ba40e88494bdc0c11f20d649fac2788634747a2965992b12a7",
+        "analysis/typescript/tests.jsonl": "2be81c713694221b2c2b228f25f499c7c521213b36b08065cee2cd050848783f",
         "behavior.jsonl": "5bbd25a3051791d710f5eaf50fb1fd58a4c27d7134f4cd624a81af43dfbae3a4",
         "cli/behavior.jsonl": "b4d2204a016b33ae39dc3b9d14fb069590787ad411f56e2b166c1d86f1a53d3e",
         "cli/module.json": "fee663c78de5f14b71f41aeb114ba33e80ac3877f9960f45adeab28e465d1f32",
@@ -773,12 +773,12 @@
         "cli/tests.jsonl": "0c167f3fda9b513f3ea09a3a4c3ada3a9ec000e27f87bb8aa03b86f761f61f97",
         "daemon/behavior.jsonl": "9c1ea4a1e281c77cf94c60dde6e74a689c0ba4dc74471d61961a10d9c5580645",
         "daemon/contexts/behavior.jsonl": "79d8e8082985131e29046d466a26b9b276136d5474b98f22403cb2e35d57bf43",
-        "daemon/contexts/module.json": "7a0dee91e4976e0969c3daa109d300ae2a6f6747a6702012f694125038945e7a",
+        "daemon/contexts/module.json": "21ea175c56bce4f9f8af3556f8d8a1be608b5b467a6d60e0a7abab85744feaa2",
         "daemon/contexts/supporting.jsonl": "bd8b998b67a64db4c9638c1b925e26d696cf3ab4084ab99dcd70988364d282fa",
-        "daemon/contexts/tests.jsonl": "1e00d1da5e7cfc77555a3eb8f4ad48f415e99f2fa6536584bed6a6f33d5ba01a",
-        "daemon/module.json": "501ccbbd3445c2f6e0a5b91a30dcf0ad889767f414b6bb560b1b512a80a5b4f7",
+        "daemon/contexts/tests.jsonl": "a98b0b41bf3799813c40169f1b696c99890966d1e15508f0493f2de79fb4dad8",
+        "daemon/module.json": "60da8cf109a1f6ba8f7c265e2f298e1cba6f07f0b97240827ccc178958b80a35",
         "daemon/supporting.jsonl": "04759c53e4c0d4d368903f308ead4eddd7a9c092f7d4c2b239da95dee918c4ce",
-        "daemon/tests.jsonl": "ef1138f290931d1f9f5b7868bfd3ca46c4d83061429028d4c25da59443ebfc9c",
+        "daemon/tests.jsonl": "0cd803e81fe948019afc69eb9fbe912f354d65f669b59f781311ad84b74b3f8d",
         "explorer/behavior.jsonl": "2a4217072c8fc821fac1da1f71a2aad87cf29c2905d88cffb668ea37c56f9100",
         "explorer/module.json": "8c62a343ac7b8016c724701c4f202b27bdbe69163824ebe6f4c53b47d86b61eb",
         "explorer/supporting.jsonl": "60be60894c0c903e0b6ed67e92b9706f2e3b4fb2b046967ea83e4b514d4a667a",
@@ -787,7 +787,7 @@
         "integration-tests/module.json": "a0e479adb0fed318b59ea6f9f33008394543f3c1e912d67f3e39482562ec943d",
         "integration-tests/supporting.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
         "integration-tests/tests.jsonl": "924c2d302db07a03887c34f6a8232b245de7d85f12b935e9837a3c13e3decd08",
-        "module.json": "c111580d45611469ebf20b7e8cc5c959ee27216423cda0f0ba1102e31513efd0",
+        "module.json": "2659a76549d65166f56d3d114d80e06d4826c294e5b790b5b809e59b8e6e0af9",
         "presentation/behavior.jsonl": "f36f3b9a26f2ad38e5a318eb7baa49837baee854cc849fa6c4b473945f3e160e",
         "presentation/layout/behavior.jsonl": "8ebf131531f292726ada3a95a5097689945b923a554ba024a677483c1512e926",
         "presentation/layout/module.json": "1b011fc89dd9ed67b31ab7188e44ef640f4575af47a1a80458d77aa0aff9a9c4",
@@ -805,22 +805,22 @@
         "service-api/supporting.jsonl": "550d2144415a5dd628633e1276a2f3db6824e9eb924c574ed6a42324ada2ce49",
         "service-api/tests.jsonl": "0396d0aee1e7ba2a569d6a0fe0cedc1a1649f12d6c11a34e54dc954e720d5108",
         "supporting.jsonl": "886789f300b3df2abea5a09a6d7a0fcf5b3349c6e432b1a5a59e74818b4e83d8",
-        "tests.jsonl": "18d1085bc34e4fce0ba0df25c2b23bf575148706582e7002a307fa11df55cf80"
+        "tests.jsonl": "8e5924e2a4a52925102dac770811eae007e0567e08d38576772a2d6fbb908af9"
       },
-      "manifestSha256": "a4b2006aa02592630922d42b421acc9ecae026c0c5cfb16f1ef1208b19aa0b68",
+      "manifestSha256": "c44c7054a8144fda48b58c1834b98b6506a2950b0c6a912095f86f9972b9b1b1",
       "hitCost": {
         "revision": {
           "lines": 187,
-          "bytes": 114072,
+          "bytes": 114298,
           "withinLines": true,
           "withinBytes": false,
-          "meanLineBytes": 610,
+          "meanLineBytes": 611.2,
           "maxLineBytes": 2370,
-          "meanHitCharacters": 562.7,
+          "meanHitCharacters": 563.9,
           "byKind": {
             "tests.jsonl": {
               "lines": 56,
-              "bytes": 51158
+              "bytes": 51384
             },
             "module.json": {
               "lines": 19,
@@ -845,59 +845,59 @@
           },
           "byFile": {
             "tests.jsonl": 2,
+            "presentation/module.json": 1,
+            "presentation/project-view/tests.jsonl": 1,
+            "presentation/project-view/supporting.jsonl": 1,
+            "presentation/project-view/behavior.jsonl": 2,
+            "service-api/tests.jsonl": 2,
+            "presentation/project-view/module.json": 2,
+            "service-api/behavior.jsonl": 2,
+            "service-api/module.json": 1,
+            "service-api/supporting.jsonl": 9,
+            "presentation/layout/module.json": 1,
+            "explorer/module.json": 1,
+            "explorer/tests.jsonl": 4,
+            "explorer/behavior.jsonl": 2,
+            "module.json": 1,
+            "explorer/supporting.jsonl": 4,
+            "integration-tests/module.json": 1,
+            "_meta.json": 1,
+            "supporting.jsonl": 3,
+            "README.md": 5,
             "cli/tests.jsonl": 1,
             "cli/module.json": 2,
             "cli/supporting.jsonl": 3,
-            "service-api/behavior.jsonl": 2,
-            "service-api/tests.jsonl": 2,
-            "service-api/module.json": 1,
-            "service-api/supporting.jsonl": 9,
-            "explorer/tests.jsonl": 4,
-            "explorer/module.json": 1,
-            "explorer/supporting.jsonl": 4,
-            "explorer/behavior.jsonl": 2,
-            "presentation/module.json": 1,
-            "presentation/project-view/tests.jsonl": 1,
-            "presentation/project-view/behavior.jsonl": 2,
-            "presentation/layout/module.json": 1,
-            "presentation/project-view/module.json": 2,
-            "presentation/project-view/supporting.jsonl": 1,
-            "module.json": 1,
-            "supporting.jsonl": 3,
-            "integration-tests/module.json": 1,
-            "_meta.json": 1,
-            "analysis/module.json": 2,
-            "analysis/behavior.jsonl": 23,
-            "daemon/tests.jsonl": 6,
             "analysis/tests.jsonl": 24,
+            "analysis/behavior.jsonl": 23,
+            "analysis/module.json": 2,
+            "analysis/supporting.jsonl": 23,
             "analysis/project/module.json": 1,
             "analysis/project/behavior.jsonl": 1,
-            "daemon/behavior.jsonl": 3,
+            "analysis/descriptions/module.json": 1,
+            "analysis/model/module.json": 1,
+            "daemon/tests.jsonl": 6,
+            "daemon/contexts/behavior.jsonl": 2,
+            "daemon/contexts/module.json": 2,
+            "daemon/contexts/tests.jsonl": 16,
+            "daemon/contexts/supporting.jsonl": 26,
+            "analysis/typescript/module.json": 1,
             "daemon/module.json": 1,
             "daemon/supporting.jsonl": 2,
-            "analysis/supporting.jsonl": 23,
-            "daemon/contexts/tests.jsonl": 16,
-            "analysis/model/module.json": 1,
-            "analysis/descriptions/module.json": 1,
-            "daemon/contexts/module.json": 2,
-            "daemon/contexts/behavior.jsonl": 2,
-            "README.md": 5,
-            "daemon/contexts/supporting.jsonl": 26,
-            "analysis/typescript/module.json": 1
+            "daemon/behavior.jsonl": 3
           }
         },
         "project": {
-          "lines": 546,
-          "bytes": 322888,
+          "lines": 549,
+          "bytes": 325296,
           "withinLines": false,
           "withinBytes": false,
-          "meanLineBytes": 591.4,
+          "meanLineBytes": 592.5,
           "maxLineBytes": 2370,
-          "meanHitCharacters": 539.3,
+          "meanHitCharacters": 540.6,
           "byKind": {
             "tests.jsonl": {
-              "lines": 131,
-              "bytes": 113053
+              "lines": 134,
+              "bytes": 115330
             },
             "module.json": {
               "lines": 30,
@@ -905,11 +905,11 @@
             },
             "behavior.jsonl": {
               "lines": 166,
-              "bytes": 86472
+              "bytes": 86501
             },
             "supporting.jsonl": {
               "lines": 208,
-              "bytes": 113878
+              "bytes": 113980
             },
             "README.md": {
               "lines": 11,
@@ -918,70 +918,70 @@
           },
           "byFile": {
             "tests.jsonl": 5,
-            "service-api/tests.jsonl": 7,
             "service-api/module.json": 2,
+            "service-api/tests.jsonl": 7,
             "service-api/behavior.jsonl": 14,
             "service-api/supporting.jsonl": 26,
             "presentation/project-view/tests.jsonl": 9,
             "presentation/project-view/module.json": 5,
             "presentation/project-view/supporting.jsonl": 61,
-            "presentation/module.json": 1,
             "presentation/project-view/behavior.jsonl": 51,
+            "presentation/module.json": 1,
             "behavior.jsonl": 1,
+            "explorer/tests.jsonl": 5,
+            "integration-tests/tests.jsonl": 2,
             "presentation/layout/behavior.jsonl": 1,
             "presentation/layout/supporting.jsonl": 1,
-            "explorer/tests.jsonl": 5,
-            "explorer/module.json": 2,
-            "explorer/behavior.jsonl": 7,
             "presentation/layout/module.json": 1,
-            "explorer/supporting.jsonl": 6,
+            "explorer/behavior.jsonl": 7,
+            "explorer/module.json": 2,
             "module.json": 1,
             "supporting.jsonl": 2,
-            "integration-tests/tests.jsonl": 2,
-            "daemon/module.json": 1,
-            "daemon/supporting.jsonl": 3,
-            "daemon/behavior.jsonl": 8,
-            "daemon/tests.jsonl": 21,
-            "analysis/module.json": 3,
-            "daemon/contexts/behavior.jsonl": 2,
-            "daemon/contexts/tests.jsonl": 8,
-            "analysis/tests.jsonl": 53,
-            "daemon/contexts/supporting.jsonl": 12,
-            "analysis/behavior.jsonl": 27,
-            "daemon/contexts/module.json": 3,
-            "analysis/supporting.jsonl": 34,
-            "analysis/model/module.json": 1,
-            "analysis/project/behavior.jsonl": 36,
-            "analysis/descriptions/tests.jsonl": 1,
-            "analysis/model/supporting.jsonl": 9,
-            "analysis/project/tests.jsonl": 13,
-            "analysis/descriptions/supporting.jsonl": 3,
-            "analysis/project/module.json": 5,
-            "analysis/descriptions/module.json": 2,
-            "analysis/project/supporting.jsonl": 35,
+            "explorer/supporting.jsonl": 6,
             "README.md": 11,
+            "daemon/tests.jsonl": 24,
             "cli/tests.jsonl": 2,
-            "analysis/typescript/behavior.jsonl": 18,
-            "analysis/typescript/tests.jsonl": 5,
-            "analysis/typescript/supporting.jsonl": 15,
-            "analysis/typescript/module.json": 2,
             "cli/behavior.jsonl": 1,
             "cli/module.json": 1,
-            "cli/supporting.jsonl": 1
+            "cli/supporting.jsonl": 1,
+            "analysis/tests.jsonl": 53,
+            "daemon/behavior.jsonl": 8,
+            "daemon/module.json": 1,
+            "daemon/supporting.jsonl": 3,
+            "daemon/contexts/module.json": 3,
+            "daemon/contexts/behavior.jsonl": 2,
+            "analysis/behavior.jsonl": 27,
+            "daemon/contexts/tests.jsonl": 8,
+            "daemon/contexts/supporting.jsonl": 12,
+            "analysis/module.json": 3,
+            "analysis/project/tests.jsonl": 13,
+            "analysis/project/module.json": 5,
+            "analysis/supporting.jsonl": 34,
+            "analysis/model/module.json": 1,
+            "analysis/descriptions/tests.jsonl": 1,
+            "analysis/descriptions/module.json": 2,
+            "analysis/model/supporting.jsonl": 9,
+            "analysis/descriptions/supporting.jsonl": 3,
+            "analysis/project/supporting.jsonl": 35,
+            "analysis/project/behavior.jsonl": 36,
+            "analysis/typescript/tests.jsonl": 5,
+            "analysis/typescript/module.json": 2,
+            "analysis/typescript/behavior.jsonl": 18,
+            "analysis/typescript/supporting.jsonl": 15
           }
         },
         "session": {
           "lines": 214,
-          "bytes": 125498,
+          "bytes": 125847,
           "withinLines": false,
           "withinBytes": false,
-          "meanLineBytes": 586.4,
+          "meanLineBytes": 588.1,
           "maxLineBytes": 2370,
-          "meanHitCharacters": 540.4,
+          "meanHitCharacters": 542,
           "byKind": {
             "tests.jsonl": {
               "lines": 64,
-              "bytes": 53616
+              "bytes": 53965
             },
             "behavior.jsonl": {
               "lines": 76,
@@ -991,13 +991,13 @@
               "lines": 65,
               "bytes": 33204
             },
-            "module.json": {
-              "lines": 4,
-              "bytes": 2154
-            },
             "README.md": {
               "lines": 5,
               "bytes": 2386
+            },
+            "module.json": {
+              "lines": 4,
+              "bytes": 2154
             }
           },
           "byFile": {
@@ -1005,32 +1005,32 @@
             "service-api/behavior.jsonl": 1,
             "behavior.jsonl": 2,
             "supporting.jsonl": 1,
-            "analysis/supporting.jsonl": 57,
-            "analysis/tests.jsonl": 34,
-            "analysis/module.json": 1,
-            "analysis/behavior.jsonl": 72,
-            "analysis/typescript/module.json": 1,
             "README.md": 5,
-            "daemon/tests.jsonl": 5,
-            "analysis/project/module.json": 1,
+            "analysis/behavior.jsonl": 72,
+            "analysis/tests.jsonl": 34,
             "daemon/contexts/module.json": 1,
-            "daemon/contexts/behavior.jsonl": 1,
             "daemon/contexts/tests.jsonl": 19,
-            "daemon/contexts/supporting.jsonl": 7
+            "daemon/contexts/behavior.jsonl": 1,
+            "daemon/contexts/supporting.jsonl": 7,
+            "daemon/tests.jsonl": 5,
+            "analysis/module.json": 1,
+            "analysis/supporting.jsonl": 57,
+            "analysis/project/module.json": 1,
+            "analysis/typescript/module.json": 1
           }
         },
         "publish": {
-          "lines": 113,
-          "bytes": 81161,
+          "lines": 118,
+          "bytes": 85058,
           "withinLines": true,
           "withinBytes": false,
-          "meanLineBytes": 718.2,
+          "meanLineBytes": 720.8,
           "maxLineBytes": 2370,
-          "meanHitCharacters": 673.5,
+          "meanHitCharacters": 676.3,
           "byKind": {
             "tests.jsonl": {
-              "lines": 55,
-              "bytes": 50342
+              "lines": 60,
+              "bytes": 54137
             },
             "behavior.jsonl": {
               "lines": 16,
@@ -1038,7 +1038,7 @@
             },
             "supporting.jsonl": {
               "lines": 39,
-              "bytes": 20906
+              "bytes": 21008
             },
             "README.md": {
               "lines": 2,
@@ -1050,29 +1050,29 @@
             }
           },
           "byFile": {
-            "tests.jsonl": 5,
+            "tests.jsonl": 6,
             "service-api/behavior.jsonl": 1,
-            "explorer/supporting.jsonl": 6,
-            "explorer/tests.jsonl": 1,
-            "explorer/behavior.jsonl": 4,
             "service-api/supporting.jsonl": 1,
             "behavior.jsonl": 2,
+            "explorer/behavior.jsonl": 4,
+            "explorer/tests.jsonl": 1,
+            "explorer/supporting.jsonl": 6,
             "supporting.jsonl": 3,
-            "analysis/descriptions/tests.jsonl": 1,
-            "analysis/tests.jsonl": 10,
-            "analysis/behavior.jsonl": 2,
-            "analysis/project/tests.jsonl": 1,
-            "analysis/model/tests.jsonl": 1,
-            "analysis/model/behavior.jsonl": 1,
-            "analysis/supporting.jsonl": 6,
             "README.md": 2,
-            "cli/tests.jsonl": 3,
-            "daemon/tests.jsonl": 23,
             "daemon/behavior.jsonl": 6,
+            "cli/tests.jsonl": 3,
+            "daemon/tests.jsonl": 26,
+            "analysis/tests.jsonl": 10,
+            "analysis/project/tests.jsonl": 1,
+            "analysis/supporting.jsonl": 6,
+            "analysis/behavior.jsonl": 2,
+            "analysis/model/tests.jsonl": 1,
+            "analysis/descriptions/tests.jsonl": 1,
+            "analysis/model/behavior.jsonl": 1,
+            "daemon/supporting.jsonl": 13,
+            "daemon/contexts/tests.jsonl": 11,
             "daemon/contexts/module.json": 1,
-            "daemon/contexts/tests.jsonl": 10,
-            "daemon/contexts/supporting.jsonl": 10,
-            "daemon/supporting.jsonl": 13
+            "daemon/contexts/supporting.jsonl": 10
           }
         },
         "watch": {
@@ -1110,32 +1110,32 @@
             "presentation/supporting.jsonl": 1,
             "behavior.jsonl": 1,
             "supporting.jsonl": 2,
-            "analysis/tests.jsonl": 1,
             "analysis/project/tests.jsonl": 1,
+            "analysis/tests.jsonl": 1,
             "README.md": 3,
-            "daemon/module.json": 1,
+            "cli/behavior.jsonl": 1,
+            "cli/supporting.jsonl": 2,
             "daemon/tests.jsonl": 5,
             "daemon/behavior.jsonl": 1,
+            "daemon/module.json": 1,
             "daemon/supporting.jsonl": 1,
             "daemon/contexts/behavior.jsonl": 2,
             "daemon/contexts/tests.jsonl": 7,
-            "daemon/contexts/supporting.jsonl": 9,
-            "cli/behavior.jsonl": 1,
-            "cli/supporting.jsonl": 2
+            "daemon/contexts/supporting.jsonl": 9
           }
         },
         "create": {
-          "lines": 198,
-          "bytes": 145175,
-          "withinLines": true,
+          "lines": 202,
+          "bytes": 148011,
+          "withinLines": false,
           "withinBytes": false,
-          "meanLineBytes": 733.2,
+          "meanLineBytes": 732.7,
           "maxLineBytes": 2370,
-          "meanHitCharacters": 687.3,
+          "meanHitCharacters": 687,
           "byKind": {
             "tests.jsonl": {
-              "lines": 125,
-              "bytes": 110367
+              "lines": 129,
+              "bytes": 113203
             },
             "behavior.jsonl": {
               "lines": 54,
@@ -1151,36 +1151,36 @@
             }
           },
           "byFile": {
-            "tests.jsonl": 9,
-            "presentation/project-view/tests.jsonl": 2,
+            "tests.jsonl": 10,
             "presentation/tests.jsonl": 13,
-            "presentation/project-view/behavior.jsonl": 1,
             "presentation/behavior.jsonl": 1,
-            "service-api/behavior.jsonl": 6,
+            "presentation/project-view/behavior.jsonl": 1,
+            "presentation/project-view/tests.jsonl": 2,
             "service-api/tests.jsonl": 7,
+            "service-api/behavior.jsonl": 6,
             "service-api/supporting.jsonl": 1,
             "behavior.jsonl": 7,
-            "integration-tests/tests.jsonl": 1,
             "explorer/behavior.jsonl": 1,
+            "integration-tests/tests.jsonl": 1,
             "README.md": 8,
+            "daemon/behavior.jsonl": 11,
+            "daemon/tests.jsonl": 36,
+            "daemon/contexts/behavior.jsonl": 9,
+            "daemon/contexts/tests.jsonl": 10,
+            "cli/tests.jsonl": 2,
+            "daemon/supporting.jsonl": 1,
+            "daemon/contexts/supporting.jsonl": 2,
             "analysis/tests.jsonl": 21,
             "analysis/behavior.jsonl": 10,
-            "daemon/contexts/supporting.jsonl": 2,
-            "daemon/tests.jsonl": 33,
-            "daemon/contexts/behavior.jsonl": 9,
-            "daemon/behavior.jsonl": 11,
-            "daemon/contexts/tests.jsonl": 10,
-            "daemon/supporting.jsonl": 1,
-            "analysis/supporting.jsonl": 1,
             "analysis/project/tests.jsonl": 3,
-            "analysis/model/behavior.jsonl": 1,
-            "analysis/descriptions/tests.jsonl": 1,
             "analysis/model/tests.jsonl": 8,
-            "analysis/project/supporting.jsonl": 2,
-            "analysis/typescript/supporting.jsonl": 4,
-            "analysis/typescript/tests.jsonl": 15,
+            "analysis/descriptions/tests.jsonl": 1,
             "analysis/typescript/behavior.jsonl": 7,
-            "cli/tests.jsonl": 2
+            "analysis/typescript/supporting.jsonl": 4,
+            "analysis/model/behavior.jsonl": 1,
+            "analysis/typescript/tests.jsonl": 15,
+            "analysis/project/supporting.jsonl": 2,
+            "analysis/supporting.jsonl": 1
           }
         }
       },
@@ -1204,15 +1204,15 @@
         "dependencyDiagramInputChanges": 0
       },
       "memory": {
-        "pid": 537279,
-        "samples": 477,
-        "peakDaemonRssBytes": 192126976,
-        "peakDaemonHeapUsedBytes": 71491008,
-        "peakCombinedRssBytes": 1182625792,
-        "peakCombinedHeapBytes": 256232112
+        "pid": 604280,
+        "samples": 472,
+        "peakDaemonRssBytes": 192180224,
+        "peakDaemonHeapUsedBytes": 71503536,
+        "peakCombinedRssBytes": 1147412480,
+        "peakCombinedHeapBytes": 254938352
       },
       "daemonStop": {
-        "pid": 537279,
+        "pid": 604280,
         "stopCode": 0,
         "running": false,
         "pidAlive": false
@@ -1232,7 +1232,7 @@
       "steps": {
         "cold": {
           "code": 0,
-          "durationMs": 8424.5,
+          "durationMs": 8040.4,
           "stderr": "",
           "revision": 1,
           "targets": 1,
@@ -1245,7 +1245,7 @@
         },
         "repeat": {
           "code": 0,
-          "durationMs": 801.5,
+          "durationMs": 811.2,
           "stderr": "",
           "revision": 1,
           "targets": 1,
@@ -1258,7 +1258,7 @@
         },
         "retainedFacts": {
           "code": 0,
-          "durationMs": 849.5,
+          "durationMs": 904.5,
           "stderr": "",
           "revision": 1,
           "targets": 1,
@@ -1274,7 +1274,7 @@
             "sample": 1,
             "watcherPublished": true,
             "code": 0,
-            "durationMs": 4868.3,
+            "durationMs": 4802.5,
             "stderr": "",
             "revision": 2,
             "targets": 1,
@@ -1289,7 +1289,7 @@
             "sample": 2,
             "watcherPublished": true,
             "code": 0,
-            "durationMs": 4571.2,
+            "durationMs": 4602.2,
             "stderr": "",
             "revision": 3,
             "targets": 1,
@@ -1304,7 +1304,7 @@
             "sample": 3,
             "watcherPublished": true,
             "code": 0,
-            "durationMs": 4619,
+            "durationMs": 4567.9,
             "stderr": "",
             "revision": 4,
             "targets": 1,
@@ -1318,7 +1318,7 @@
         ],
         "apiOnly": {
           "code": 0,
-          "durationMs": 430.6,
+          "durationMs": 429.7,
           "stderr": "",
           "revision": 5,
           "targets": 2,
@@ -1328,7 +1328,7 @@
         },
         "bothViews": {
           "code": 0,
-          "durationMs": 6795.7,
+          "durationMs": 6850.3,
           "stderr": "",
           "revision": 5,
           "targets": 201,
@@ -1342,8 +1342,8 @@
       },
       "context": {
         "sequence": 1,
-        "revision": "rev/1:e44f25ad-2b59-4533-af0b-f293b10ce894:1",
-        "inputId": "input/1:24d8d35f5d0938afa0a37c4ba69b776aacab6c2b1de3d84cd201bfb195e18038",
+        "revision": "rev/1:cafa3ac5-0abf-43a4-aece-a6c075facb62:1",
+        "inputId": "input/1:aee4d6f351fcc04c56902324c0931e7f29a3141ad1d86e32ae1470a439fb2b99",
         "cause": "open"
       },
       "view": {
@@ -1401,8 +1401,8 @@
       },
       "meta": {
         "schema": "ramify.architect-view/1",
-        "revision": "rev/1:e44f25ad-2b59-4533-af0b-f293b10ce894:1",
-        "input": "input/1:24d8d35f5d0938afa0a37c4ba69b776aacab6c2b1de3d84cd201bfb195e18038",
+        "revision": "rev/1:cafa3ac5-0abf-43a4-aece-a6c075facb62:1",
+        "input": "input/1:aee4d6f351fcc04c56902324c0931e7f29a3141ad1d86e32ae1470a439fb2b99",
         "modules": 100,
         "dependencies": "measured",
         "dependencyScope": "production",
@@ -1410,8 +1410,8 @@
         "metrics": "unavailable"
       },
       "manifest": {
-        "README.md": "a918b3116bb178dee3e8a8f72e74486d7af593bba629332836e4253c627f8ed9",
-        "_meta.json": "cf28b06dd01030b5009dfbdfbd4f0bc003cbc716d1fcaa7bfaad96794749fad3",
+        "README.md": "433fa63e235aeac1c88f2a26e973e91c267a7f3def931ce45f78c2c1850ff648",
+        "_meta.json": "32374bd2736b09d291d844d6ac9c097669f7bf55802a758812cbcb9ee41f3729",
         "behavior.jsonl": "c49792b27665d86d3ca9bcce6c1b81b3997258a303c41bc6970a7085eb73ce63",
         "m001/behavior.jsonl": "933a4941087f8571bdb2bda01b9fb37eef5ffcea0045f62f2cefa90ea79cd9ec",
         "m001/module.json": "fe65fa6a9834e0bb694efc0f66413ef56da694fcdc4d628b541cbbf03611940f",
@@ -1813,7 +1813,7 @@
         "supporting.jsonl": "682d6a335bbab2bacfd0559ae105a7f3090c58c5a734f7347b697ed7cbed3d35",
         "tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
       },
-      "manifestSha256": "72c4643713a74b51a2531cf177f146200d0affdbd1c3be98ee8cdc8667067da8",
+      "manifestSha256": "4571af0022b89473253575bf39592634df30be03f1ac4488f2dfcb6080efbbf1",
       "counters": {
         "revisions": 5,
         "analyses": 13,
@@ -1834,15 +1834,15 @@
         "dependencyDiagramInputChanges": 0
       },
       "memory": {
-        "pid": 547081,
-        "samples": 254,
-        "peakDaemonRssBytes": 148070400,
-        "peakDaemonHeapUsedBytes": 45833056,
-        "peakCombinedRssBytes": 484859904,
-        "peakCombinedHeapBytes": 105845320
+        "pid": 613956,
+        "samples": 253,
+        "peakDaemonRssBytes": 148316160,
+        "peakDaemonHeapUsedBytes": 45867144,
+        "peakCombinedRssBytes": 484691968,
+        "peakCombinedHeapBytes": 106022256
       },
       "daemonStop": {
-        "pid": 547081,
+        "pid": 613956,
         "stopCode": 0,
         "running": false,
         "pidAlive": false
@@ -1850,189 +1850,234 @@
     },
     "session-query": {
       "reference": {
-        "openMs": 1864.4,
+        "openMs": 1856,
         "hot": [
           {
-            "durationMs": 118.5,
+            "durationMs": 114.5,
             "projectionBytes": 96226,
             "symbols": 89,
             "tests": 34,
             "modules": 15,
-            "workerRss": 177127424,
-            "compilerRss": 185335808
+            "workerRss": 178577408,
+            "compilerRss": 190709760
           },
           {
-            "durationMs": 82.6,
+            "durationMs": 61.7,
             "projectionBytes": 96226,
             "symbols": 89,
             "tests": 34,
             "modules": 15,
-            "workerRss": 177229824,
-            "compilerRss": 189792256
+            "workerRss": 178507776,
+            "compilerRss": 195166208
           },
           {
-            "durationMs": 75.6,
+            "durationMs": 59.4,
             "projectionBytes": 96226,
             "symbols": 89,
             "tests": 34,
             "modules": 15,
-            "workerRss": 177426432,
-            "compilerRss": 194379776
+            "workerRss": 178720768,
+            "compilerRss": 199622656
           }
         ],
         "levelAfterRelease": "warm",
         "warm": {
-          "durationMs": 702.2,
+          "durationMs": 642.9,
           "projectionBytes": 96226,
           "symbols": 89,
           "tests": 34,
           "modules": 15,
-          "workerRss": 182571008,
+          "workerRss": 183123968,
           "compilerRss": 167116800
         }
       },
       "toolkit": {
-        "openMs": 5715.5,
+        "openMs": 5578.7,
         "hot": [
           {
-            "durationMs": 846.3,
-            "projectionBytes": 1205296,
+            "durationMs": 808.3,
+            "projectionBytes": 1206867,
             "symbols": 1294,
-            "tests": 297,
+            "tests": 301,
             "modules": 15,
-            "workerRss": 358981632,
-            "compilerRss": 420741120
+            "workerRss": 362405888,
+            "compilerRss": 413736960
           },
           {
-            "durationMs": 669.3,
-            "projectionBytes": 1205296,
+            "durationMs": 717,
+            "projectionBytes": 1206867,
             "symbols": 1294,
-            "tests": 297,
+            "tests": 301,
             "modules": 15,
-            "workerRss": 361992192,
-            "compilerRss": 424890368
+            "workerRss": 365412352,
+            "compilerRss": 442310656
           },
           {
-            "durationMs": 678.5,
-            "projectionBytes": 1205296,
+            "durationMs": 637.4,
+            "projectionBytes": 1206867,
             "symbols": 1294,
-            "tests": 297,
+            "tests": 301,
             "modules": 15,
-            "workerRss": 365408256,
-            "compilerRss": 462770176
+            "workerRss": 368963584,
+            "compilerRss": 442834944
           }
         ],
         "levelAfterRelease": "warm",
         "warm": {
-          "durationMs": 1721.5,
-          "projectionBytes": 1205296,
+          "durationMs": 1696.8,
+          "projectionBytes": 1206867,
           "symbols": 1294,
-          "tests": 297,
+          "tests": 301,
           "modules": 15,
-          "workerRss": 406208512,
-          "compilerRss": 409337856
+          "workerRss": 409370624,
+          "compilerRss": 414842880
         }
       }
     },
     "mixed-invocation": {
       "name": "mixed-invocation",
-      "steps": {
-        "check": {
-          "code": 0,
-          "durationMs": 2329.4
+      "sequences": {
+        "check-then-root-elsewhere": {
+          "check": {
+            "args": [
+              "check",
+              "--format",
+              "json"
+            ],
+            "code": 0,
+            "durationMs": 2468.3
+          },
+          "steps": {
+            "materializeWithRoot": {
+              "args": [
+                "materialize",
+                "--view",
+                "architect",
+                "--root",
+                "/tmp/rp2b-ms-3Wjpt8/mixed"
+              ],
+              "from": "elsewhere",
+              "code": 0,
+              "durationMs": 3620.2,
+              "stderr": "",
+              "revision": 2,
+              "targets": 1,
+              "entries": 123,
+              "bytesWritten": 85337,
+              "unchanged": 0,
+              "modules": 15,
+              "records": 123,
+              "dependencies": "measured",
+              "context": {
+                "sequence": 2,
+                "revision": "rev/1:39d02522-2b4a-4b6a-9212-8bd213ab8d91:2",
+                "inputId": "input/1:25ceeb1252d03c11bac3574460fbf7518194a9398af495e82dd93eb07386494c",
+                "cause": "request"
+              },
+              "counters": {
+                "dependencyDiagrams": 1,
+                "dependencyDiagramInputChanges": 0
+              }
+            },
+            "materializeFromRoot": {
+              "args": [
+                "materialize",
+                "--view",
+                "architect"
+              ],
+              "from": "root",
+              "code": 0,
+              "durationMs": 3319.1,
+              "stderr": "",
+              "revision": 3,
+              "targets": 1,
+              "entries": 123,
+              "bytesWritten": 85337,
+              "unchanged": 0,
+              "modules": 15,
+              "records": 123,
+              "dependencies": "measured",
+              "context": {
+                "sequence": 3,
+                "revision": "rev/1:39d02522-2b4a-4b6a-9212-8bd213ab8d91:3",
+                "inputId": "input/1:25ceeb1252d03c11bac3574460fbf7518194a9398af495e82dd93eb07386494c",
+                "cause": "request"
+              },
+              "counters": {
+                "dependencyDiagrams": 2,
+                "dependencyDiagramInputChanges": 0
+              }
+            }
+          },
+          "afterCheck": {
+            "sequence": 1,
+            "revision": "rev/1:39d02522-2b4a-4b6a-9212-8bd213ab8d91:1",
+            "inputId": "input/1:25ceeb1252d03c11bac3574460fbf7518194a9398af495e82dd93eb07386494c",
+            "cause": "open"
+          },
+          "daemonStop": {
+            "pid": 619579,
+            "stopCode": 0,
+            "running": false,
+            "pidAlive": false
+          }
         },
-        "materializeWithRoot": {
-          "code": 0,
-          "durationMs": 125704.7,
-          "stderr": "",
-          "revision": 2,
-          "targets": 1,
-          "entries": 123,
-          "bytesWritten": 71046,
-          "unchanged": 0,
-          "modules": 15,
-          "records": 123,
-          "dependencies": "unavailable (wait-limit)"
-        },
-        "materializeFromRoot": {
-          "code": 0,
-          "durationMs": 3437.4,
-          "stderr": "",
-          "revision": 3,
-          "targets": 1,
-          "entries": 123,
-          "bytesWritten": 85337,
-          "unchanged": 0,
-          "modules": 15,
-          "records": 123,
-          "dependencies": "measured"
+        "check-root-dot-then-plain": {
+          "check": {
+            "args": [
+              "check",
+              "--root",
+              ".",
+              "--format",
+              "json"
+            ],
+            "code": 0,
+            "durationMs": 2403.9
+          },
+          "steps": {
+            "materializeWithoutRoot": {
+              "args": [
+                "materialize",
+                "--view",
+                "architect"
+              ],
+              "from": "root",
+              "code": 0,
+              "durationMs": 3842.7,
+              "stderr": "",
+              "revision": 2,
+              "targets": 1,
+              "entries": 123,
+              "bytesWritten": 85337,
+              "unchanged": 0,
+              "modules": 15,
+              "records": 123,
+              "dependencies": "measured",
+              "context": {
+                "sequence": 2,
+                "revision": "rev/1:6fd353f2-3624-47ed-a04e-d048ac2f23bd:2",
+                "inputId": "input/1:16c291b851c55ac599dfe13faa608983c8da97fd658dd22a754c55e8e52aead2",
+                "cause": "request"
+              },
+              "counters": {
+                "dependencyDiagrams": 1,
+                "dependencyDiagramInputChanges": 0
+              }
+            }
+          },
+          "afterCheck": {
+            "sequence": 1,
+            "revision": "rev/1:6fd353f2-3624-47ed-a04e-d048ac2f23bd:1",
+            "inputId": "input/1:16c291b851c55ac599dfe13faa608983c8da97fd658dd22a754c55e8e52aead2",
+            "cause": "open"
+          },
+          "daemonStop": {
+            "pid": 619974,
+            "stopCode": 0,
+            "running": false,
+            "pidAlive": false
+          }
         }
-      },
-      "afterCheck": {
-        "sequence": 1,
-        "revision": "rev/1:b74ca4c6-ccbf-44e3-bb15-a31031a67af1:1",
-        "inputId": "input/1:dbd48c5d3ef3ff0a2813be8122ed80886a595306ec62d94b1cd4f4c12d7045a3",
-        "cause": "open"
-      },
-      "afterMaterializeWithRoot": {
-        "context": {
-          "sequence": 2,
-          "revision": "rev/1:b74ca4c6-ccbf-44e3-bb15-a31031a67af1:2",
-          "inputId": "input/1:dbd48c5d3ef3ff0a2813be8122ed80886a595306ec62d94b1cd4f4c12d7045a3",
-          "cause": "request"
-        },
-        "counters": {
-          "revisions": 2,
-          "analyses": 9,
-          "cancelledAnalyses": 0,
-          "reusedRevisions": 1,
-          "coalescedEvents": 0,
-          "evictions": 0,
-          "rejectedRequests": 0,
-          "disconnectedSlowConsumers": 0,
-          "sweeps": 6,
-          "audits": 1,
-          "auditMismatches": 0,
-          "coveredRequests": 0,
-          "coldOutcomes": 0,
-          "deadlineOutcomes": 0,
-          "behaviorRuns": 0,
-          "dependencyDiagrams": 39,
-          "dependencyDiagramInputChanges": 38
-        }
-      },
-      "afterMaterializeFromRoot": {
-        "context": {
-          "sequence": 3,
-          "revision": "rev/1:b74ca4c6-ccbf-44e3-bb15-a31031a67af1:3",
-          "inputId": "input/1:dbd48c5d3ef3ff0a2813be8122ed80886a595306ec62d94b1cd4f4c12d7045a3",
-          "cause": "request"
-        },
-        "counters": {
-          "revisions": 3,
-          "analyses": 11,
-          "cancelledAnalyses": 0,
-          "reusedRevisions": 1,
-          "coalescedEvents": 0,
-          "evictions": 0,
-          "rejectedRequests": 0,
-          "disconnectedSlowConsumers": 0,
-          "sweeps": 7,
-          "audits": 1,
-          "auditMismatches": 0,
-          "coveredRequests": 0,
-          "coldOutcomes": 0,
-          "deadlineOutcomes": 0,
-          "behaviorRuns": 1,
-          "dependencyDiagrams": 40,
-          "dependencyDiagramInputChanges": 38
-        }
-      },
-      "daemonStop": {
-        "pid": 552718,
-        "stopCode": 0,
-        "running": false,
-        "pidAlive": false
       }
     },
     "open-with-view": {
@@ -2040,19 +2085,19 @@
       "steps": {
         "residentWithoutViews": {
           "code": 0,
-          "inputId": "input/1:4618177847f13759a062f7041eb926d3b7c14609bfe3b9e184be55c62eef8129",
+          "inputId": "input/1:d0d9a3316be3a803ffe1160a0b2ed967e0c9463d54c4682c145a8637029678de",
           "inputs": 3610,
           "generatedInputs": []
         },
         "batchWithoutViews": {
           "code": 0,
-          "inputId": "input/1:4618177847f13759a062f7041eb926d3b7c14609bfe3b9e184be55c62eef8129",
+          "inputId": "input/1:d0d9a3316be3a803ffe1160a0b2ed967e0c9463d54c4682c145a8637029678de",
           "inputs": 3610,
           "generatedInputs": []
         },
         "materialize": {
           "code": 0,
-          "durationMs": 3593.5,
+          "durationMs": 3668.5,
           "stderr": "",
           "revision": 1,
           "targets": 30,
@@ -2065,57 +2110,26 @@
         },
         "residentAfterPublishing": {
           "code": 0,
-          "inputId": "input/1:4618177847f13759a062f7041eb926d3b7c14609bfe3b9e184be55c62eef8129",
+          "inputId": "input/1:d0d9a3316be3a803ffe1160a0b2ed967e0c9463d54c4682c145a8637029678de",
           "inputs": 3610,
           "generatedInputs": []
         },
         "residentOpenedWithViews": {
           "code": 0,
-          "inputId": "input/1:a1868aeb7559a4da780ec352a8c9a999bf5113eca959649c8091dc54ecd34174",
-          "inputs": 3640,
-          "generatedInputs": [
-            ".ramify-architect",
-            "src/.ramify",
-            "src/tests/.ramify",
-            "subs/integration-tests/src/.ramify",
-            "subs/workspace/src/.ramify",
-            "subs/workspace/src/tests/.ramify",
-            "subs/workspace/subs/catalog/src/.ramify",
-            "subs/workspace/subs/catalog/src/tests/.ramify",
-            "subs/workspace/subs/catalog/subs/core/src/.ramify",
-            "subs/workspace/subs/catalog/subs/core/src/tests/.ramify",
-            "subs/workspace/subs/catalog/subs/ui/src/.ramify",
-            "subs/workspace/subs/catalog/subs/ui/src/tests/.ramify",
-            "subs/workspace/subs/contracts/src/.ramify",
-            "subs/workspace/subs/contracts/src/tests/.ramify",
-            "subs/workspace/subs/reviews/src/.ramify",
-            "subs/workspace/subs/reviews/src/tests/.ramify",
-            "subs/workspace/subs/reviews/subs/core/src/.ramify",
-            "subs/workspace/subs/reviews/subs/core/src/tests/.ramify",
-            "subs/workspace/subs/reviews/subs/core/subs/controller/src/.ramify",
-            "subs/workspace/subs/reviews/subs/core/subs/controller/src/tests/.ramify",
-            "subs/workspace/subs/reviews/subs/core/subs/tasks/src/.ramify",
-            "subs/workspace/subs/reviews/subs/core/subs/tasks/src/tests/.ramify",
-            "subs/workspace/subs/reviews/subs/ui/src/.ramify",
-            "subs/workspace/subs/reviews/subs/ui/src/tests/.ramify",
-            "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/.ramify",
-            "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/tests/.ramify",
-            "subs/workspace/subs/reviews/subs/validation/src/.ramify",
-            "subs/workspace/subs/reviews/subs/validation/src/tests/.ramify",
-            "subs/workspace/subs/shared-ui/src/.ramify",
-            "subs/workspace/subs/shared-ui/src/tests/.ramify"
-          ]
+          "inputId": "input/1:d0d9a3316be3a803ffe1160a0b2ed967e0c9463d54c4682c145a8637029678de",
+          "inputs": 3610,
+          "generatedInputs": []
         },
         "batchWithViews": {
           "code": 0,
-          "inputId": "input/1:4618177847f13759a062f7041eb926d3b7c14609bfe3b9e184be55c62eef8129",
+          "inputId": "input/1:d0d9a3316be3a803ffe1160a0b2ed967e0c9463d54c4682c145a8637029678de",
           "inputs": 3610,
           "generatedInputs": []
         },
         "editPublished": 2,
         "changedView": {
           "code": 0,
-          "durationMs": 3418.8,
+          "durationMs": 3291.9,
           "stderr": "",
           "revision": 2,
           "targets": 1,
@@ -2129,8 +2143,8 @@
         "afterChangedView": {
           "publish": {
             "sequence": 2,
-            "revision": "rev/1:f6638f71-2679-4449-af0f-08a4337d4fe3:2",
-            "inputId": "input/1:ebdf65e57497a06a3cde42f4210f31b1046c30821e4c46da410d8353e1dfe275",
+            "revision": "rev/1:c554998f-ae4a-4a0f-b8fe-8af5d752dd53:2",
+            "inputId": "input/1:84469a18e267d0d1c33d4d6463b2fc171fb47e5e4bc0a1d348f69f5d5654760a",
             "cause": "watch"
           },
           "check": {
@@ -2138,20 +2152,20 @@
           },
           "settled": {
             "sequence": 2,
-            "revision": "rev/1:f6638f71-2679-4449-af0f-08a4337d4fe3:2",
-            "inputId": "input/1:ebdf65e57497a06a3cde42f4210f31b1046c30821e4c46da410d8353e1dfe275",
+            "revision": "rev/1:c554998f-ae4a-4a0f-b8fe-8af5d752dd53:2",
+            "inputId": "input/1:84469a18e267d0d1c33d4d6463b2fc171fb47e5e4bc0a1d348f69f5d5654760a",
             "cause": "watch"
           }
         }
       },
       "firstDaemonStop": {
-        "pid": 555256,
+        "pid": 620270,
         "stopCode": 0,
         "running": false,
         "pidAlive": false
       },
       "secondDaemonStop": {
-        "pid": 555613,
+        "pid": 620602,
         "stopCode": 0,
         "running": false,
         "pidAlive": false
@@ -2162,19 +2176,19 @@
     {
       "name": "Architect session query, warm, toolkit",
       "limit": "15000 ms",
-      "measured": "1721.5 ms (max of three hot queries and one after releasing the compiler)",
+      "measured": "1696.8 ms (max of three hot queries and one after releasing the compiler)",
       "within": true
     },
     {
       "name": "Whole materialize --view architect, warm, toolkit, dependency analyzer included",
       "limit": "90000 ms",
-      "measured": "8760.8 ms (max of 3, median 8706.5 ms; new daemon and context: 14891.8 ms)",
+      "measured": "8927.9 ms (max of 3, median 8705 ms; new daemon and context: 14718.3 ms)",
       "within": true
     },
     {
       "name": "View size, toolkit",
       "limit": "8388608 bytes",
-      "measured": "809330 bytes",
+      "measured": "812267 bytes",
       "within": true
     },
     {
@@ -2186,25 +2200,25 @@
     {
       "name": "maxProjectionBytes (session projection)",
       "limit": "67108864 bytes",
-      "measured": "configured 67108864; largest measured projection 1205296 bytes",
+      "measured": "configured 67108864; largest measured projection 1206867 bytes",
       "within": true
     },
     {
       "name": "maxArchitectBytes (publisher, rendered view)",
       "limit": "67108864 bytes",
-      "measured": "configured 67108864; largest measured view 809330 bytes",
+      "measured": "configured 67108864; largest measured view 812267 bytes",
       "within": true
     },
     {
       "name": "Dependency wait",
       "limit": "250 ms interval, 125000 ms total",
-      "measured": "configured 250 ms, 125000 ms; the mixed-invocation run reached the limit and took 125704.7 ms",
+      "measured": "configured 250 ms, 125000 ms",
       "within": true
     },
     {
       "name": "Hit cost per term, toolkit",
       "limit": "200 lines and 65536 bytes",
-      "measured": "revision: 187 lines, 114072 bytes; project: 546 lines, 322888 bytes; session: 214 lines, 125498 bytes; publish: 113 lines, 81161 bytes; watch: 40 lines, 23517 bytes; create: 198 lines, 145175 bytes",
+      "measured": "revision: 187 lines, 114298 bytes; project: 549 lines, 325296 bytes; session: 214 lines, 125847 bytes; publish: 118 lines, 85058 bytes; watch: 40 lines, 23517 bytes; create: 202 lines, 148011 bytes",
       "within": false,
       "note": "exceeded by revision, project, session, publish, create"
     },
@@ -2217,18 +2231,24 @@
     {
       "name": "Mean behavior record, toolkit (evidence)",
       "limit": "300 characters",
-      "measured": "402 characters, longest 793",
+      "measured": "402.1 characters, longest 793",
       "within": false,
       "note": "recorded as evidence, not enforced"
     },
     {
-      "name": "Whole materialize --view architect after a check from another invocation (defect witness)",
+      "name": "Whole materialize --view architect after another invocation form reached the context (AV40)",
       "limit": "90000 ms",
-      "measured": "125704.7 ms, dependencies unavailable (wait-limit)",
-      "within": false,
-      "note": "the analyzer re-acquires with the republished report's request, whose discovery inputs differ from the retained ones"
+      "measured": "check-then-root-elsewhere/materializeWithRoot: 3620.2 ms, dependencies measured; check-then-root-elsewhere/materializeFromRoot: 3319.1 ms, dependencies measured; check-root-dot-then-plain/materializeWithoutRoot: 3842.7 ms, dependencies measured",
+      "within": true,
+      "note": "the analyzer acquires with the request the republished revision's inputs were captured with"
+    },
+    {
+      "name": "Resident session opened beside generated views (AV41 witness)",
+      "limit": "no generated input; the batch check's input identity",
+      "measured": "3610 inputs, 0 generated; resident input/1:d0d9a3316be3a803ffe1160a0b2ed967e0c9463d54c4682c145a8637029678de, batch input/1:d0d9a3316be3a803ffe1160a0b2ed967e0c9463d54c4682c145a8637029678de, without views input/1:d0d9a3316be3a803ffe1160a0b2ed967e0c9463d54c4682c145a8637029678de",
+      "within": true
     }
   ],
   "failures": [],
-  "completedAt": "2026-09-18T12:30:56.567Z"
+  "completedAt": "2026-09-18T14:56:34.036Z"
 }
