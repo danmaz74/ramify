@@ -94,3 +94,19 @@ marked prefix and omits the validated registry. The fixed 64 KiB control reserve
 bounds that envelope, including when a supplied byte limit cannot hold the
 mandatory schema. Decision evaluation yields between batches of 64 selections,
 including selections within one large namespace occurrence.
+
+Plan 2B's architect view is projected here and rendered here. `planArchitectView`
+lists the symbol details, export shapes, test files and `.feature` files a
+revision needs, and `projectArchitectView` builds the `ArchitectViewProjection`:
+module facts in tree order, every owned exported original once with its role,
+destinations, tags and the ancestors that re-expose it, and the test records of
+every area whose profile includes `testing`. `RetainedSession.architectView`
+answers it for the current sequence only, through the worker like `apiView`,
+and reads a `.feature` file only while its bytes equal the revision's captured
+input (`readFeatureTitles`, English keywords). `renderArchitectView` is pure: it
+combines a projection with the daemon's dependency facts, or their unavailable
+reason, into the view's files, bounded records and `_meta.json`, and throws when
+the facts name another input. `projectTestReferences` projects, from the same
+dependency analyzer run as the diagram, the originals each testing-profile file
+references behaviorally; the analyzer's `ready` outcome carries them as
+`testReferences`, `null` when only they were refused.

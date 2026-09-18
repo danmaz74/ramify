@@ -10,6 +10,9 @@ are evidence-backed, not candidates. The one open item is platform evidence:
 Linux and macOS byte-identical output is measured on Linux only, since this
 implementation ran with no macOS runner available; the completion report names
 the exact command and archive path a macOS host still needs to run.
+[Plan 2B](../plans/iteration-2b-generated-views/main-plan.md) adds `--view`,
+which selects this view, the [architect view](architect-view.spec.md) or both;
+without it the command, its request and this view's bytes are unchanged.
 
 ## Purpose
 
@@ -223,10 +226,11 @@ not repeat zero-valued fields.
 
 ## Materialization
 
-The proposed terminating command is:
+The terminating command is:
 
 ```sh
 ramify materialize [--from <path>] [--all] [--root <dir>]
+ramify materialize --view <api|architect>... [--from <path> | --all] [--root <dir>]
 ```
 
 Without `--all`, the working directory or `--from` resolves to one module and
@@ -235,6 +239,18 @@ ordinary view, and, when the testing source area exists, its complete testing
 view. A module with neither area present refreshes zero targets, successfully.
 `--all` refreshes every module in the selected project the same way. Project
 selection follows the existing CLI invocation contract.
+
+`--view` names the generated views of one invocation: `api`, this view, and
+`architect`, the project's [architect view](architect-view.spec.md). It may
+repeat, once per view. Without `--view` the command materializes this view
+alone, and its request and output are exactly those without Plan 2B. `--from`
+and `--all` select this view's modules, so they are invalid invocations
+(exit 2) when `--view` omits `api`. Every requested view comes from the same
+synchronized revision and is published in one transaction: a failure while
+switching restores every target. The request carries `views` only when
+`--view` is given; a daemon whose welcome lacks the `materialize-views`
+capability answers `incompatible-service`, exit 2. The success output keeps
+its two lines and adds one line for the architect view.
 
 Materialization has these guarantees:
 
@@ -285,6 +301,20 @@ name everywhere:
 
 Git ignoring is not the runtime exclusion: Ramify applies the isolation above
 even when a project uses no Git repository or has a different ignore file.
+
+The architect view's `.ramify-architect` and its staging siblings
+`.ramify-architect.tmp-<suffix>` and `.ramify-architect.old-<suffix>` are
+reserved the same way, at any depth.
+
+**Known gap (Plan 2B iteration 8, 2026-09-18).** The retained session's
+compiler lists directories without omitting reserved names, and reports what
+it lists to the observer. A resident session opened while generated views
+exist therefore records each `.ramify` and `.ramify-architect` directory it
+lists as an observed input, so its input identity differs from a batch check
+of the same project. Publishing or replacing a view still starts no revision,
+and a session opened before the views existed is unaffected. The
+[iteration 8 results](../plans/iteration-2b-generated-views/iterations/iteration8-results.md)
+record the witness.
 
 ## Agent instructions
 

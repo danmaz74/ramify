@@ -32,3 +32,12 @@ operations separately. The controlled watcher delivers supplied batches to
 matching roots and supports a one-shot attachment failure. Neither control
 opens an OS timer or file watcher; both expose live resource counts for cleanup
 assertions.
+
+An API-view request names the views it needs; without `views` it is the API
+view alone. At the pinned sequence the manager calls the session's `apiView`
+and `architectView` only for requested views, and either one's supersession
+makes the whole outcome superseded. `dependencyFacts` answers from the same
+analyzer jobs and retained result as `dependencyDiagram` and adds the test
+references retained with the diagram; `dependencyDiagram` is that answer
+without them. The references count against the retention budgets; when only
+they exceed one, the diagram is retained without them.
