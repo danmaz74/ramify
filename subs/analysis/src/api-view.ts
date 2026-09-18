@@ -55,8 +55,9 @@ function invalid(reason: 'analysis-failed', message: string): { readonly status:
 
 /** Facts must represent one completed, model-bearing analysis: an access
  * decision or import-check failure never blocks a view, but an invalid
- * acquisition, area derivation or link stage does. */
-function validFacts(facts: SessionFacts): ReturnType<typeof invalid> | null {
+ * acquisition, area derivation or link stage does. The architect view
+ * applies the same rule. */
+export function validFacts(facts: SessionFacts): ReturnType<typeof invalid> | null {
   if (facts.invalid) return invalid('analysis-failed', 'Session facts record an invalid acquisition');
   if (!facts.inventory) return invalid('analysis-failed', 'Session facts have no inventory');
   if (facts.areaIssues.length) return invalid('analysis-failed', 'Session facts have unresolved source-area issues');

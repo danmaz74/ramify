@@ -2,6 +2,7 @@ import type { AvailableForm } from '../../subs/model/src/interfaces/model.js';
 import type { CapturedInput, ObservedChange, OutsideSourceWarning } from '../../subs/project/src/interfaces/project.js';
 import type { SourceLimit, SymbolDetail, SymbolDetailLimits, SymbolDetailRequest } from '../../subs/typescript/src/interfaces/source.js';
 import type { AnalysisDiagnostic, AnalysisInputs, AnalysisReport, AnalysisSummary, RunControl } from './analysis.js';
+import type { ArchitectViewQuery, ArchitectViewQueryOutcome } from './architect-view.js';
 
 /** Limits of one retained session; contexts owns request deadlines and sweep scheduling. */
 export interface SessionLimits {
@@ -118,6 +119,12 @@ export interface RetainedSession {
    * publishing a revision or walking the project inventory again. `report()`
    * and a second model/store are never used. */
   apiView(query: ApiViewQuery, control?: RunControl): Promise<ApiViewQueryOutcome>;
+  /** Project the architect view's facts from the current valid revision, as
+   * `apiView` does: only the current sequence is accepted, a warm session
+   * recreates its compiler without publishing a revision, and `.feature` files
+   * are read from disk only while their bytes equal the revision's captured
+   * input; a changed one answers `superseded`. */
+  architectView(query: ArchitectViewQuery, control?: RunControl): Promise<ArchitectViewQueryOutcome>;
   /** Read bounded symbol details only from the current valid revision and its
    * still-live compiler. This never rehydrates or substitutes a revision. */
   explorerDetails(sequence: number, requests: readonly SymbolDetailRequest[],

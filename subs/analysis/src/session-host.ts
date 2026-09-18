@@ -2,6 +2,7 @@ import { SessionWorker as Worker } from './session-supervisor.js';
 import type { AnalysisInputs, AnalysisReport, RunControl } from './interfaces/analysis.js';
 import type { ApiViewQuery, ApiViewQueryOutcome, OperationTimings, RetainedSession, SessionChange, SessionInputs, SessionOpen, SessionRevision, SessionStatus, SessionUpdate, VerifyOutcome } from './interfaces/session.js';
 import type { SessionExplorerDetailsOutcome } from './interfaces/session.js';
+import type { ArchitectViewQuery, ArchitectViewQueryOutcome } from './interfaces/architect-view.js';
 import type { SymbolDetailRequest } from '../subs/typescript/src/interfaces/source.js';
 import type { SessionCommand, WorkerMessage, WorkerOpen, WorkerResult } from './session-messages.js';
 import { timedResult } from './session-messages.js';
@@ -171,6 +172,17 @@ class SessionHost implements RetainedSession {
       // A disposed session (the immediate rejection this host raises without a
       // round trip, or one discovered mid-flight) reports the same stable
       // reason the direct engine gives a query after its own disposal.
+      const disposed = error instanceof Error && 'code' in error && (error as { code?: unknown }).code === 'session-disposed';
+      if (disposed) return { status: 'unavailable', reason: 'invalid-revision', message: 'Retained session is disposed' };
+      const reported = await this.#reportedFailure(error as Error);
+      return { status: 'unavailable', reason: 'analysis-failed', message: reported.report.diagnostics[0]?.message ?? String(error) };
+    }
+  }
+  async architectView(query: ArchitectViewQuery, control: RunControl = {}): Promise<ArchitectViewQueryOutcome> {
+    if (control.signal?.aborted) return { status: 'cancelled' };
+    try { return await this.#request({ operation: 'architectView', query }, control) as ArchitectViewQueryOutcome; }
+    catch (error) {
+      // Mapped as apiView maps it: a disposed session is an invalid revision.
       const disposed = error instanceof Error && 'code' in error && (error as { code?: unknown }).code === 'session-disposed';
       if (disposed) return { status: 'unavailable', reason: 'invalid-revision', message: 'Retained session is disposed' };
       const reported = await this.#reportedFailure(error as Error);

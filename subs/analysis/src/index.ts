@@ -13,6 +13,7 @@ export type * from '../subs/typescript/src/interfaces/dependency-behavior.js';
 export { resolveProject } from './resolve-project.js';
 export { openRetainedSession } from './retained-session.js';
 export type * from './interfaces/session.js';
+export type * from './interfaces/architect-view.js';
 export { planApiViewRequests, projectApiView } from './api-view.js';
 export type { ApiViewProjectOutcome } from './api-view.js';
 export { projectModularity } from './modularity.js';

@@ -191,6 +191,9 @@ export function createScriptedDriver() {
           return { status: 'projected', projection: { schema: 'ramify.api-view-projection/1', sequence: query.sequence,
             inputId: current.inputId, modules: [], bytes: 0 } };
         },
+        async architectView() {
+          return { status: 'unavailable', reason: 'analysis-failed', message: 'The scripted driver does not project the architect view' };
+        },
         async explorerDetails(sequence, requests, runControl) {
           explorerDetailsCalls.push({ sequence, requests });
           if (runControl?.signal?.aborted) return { status: 'cancelled' };

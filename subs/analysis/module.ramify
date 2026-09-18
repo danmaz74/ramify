@@ -29,6 +29,13 @@ expose-src resolveProject from "resolve-project.ts" to parent
 expose-src * from "interfaces/session.ts" to parent
 expose-src openRetainedSession from "retained-session.ts" to parent
 
+// A16: the architect projection and its session query, declarations only;
+// the planning and projection functions stay internal to analysis. Analysis
+// re-exposes the export kinds, behaviors and title limits they name, which it
+// receives from typescript.
+expose-src * from "interfaces/architect-view.ts" to parent
+expose-sub ExportKind, ExportBehavior, TestTitleLimits from typescript to parent
+
 // A13: pure API-view projection, joining availability, catalog and detail
 // results into complete, bounded area projections; no filesystem or
 // retention access. planApiViewRequests names the detail requests a query
