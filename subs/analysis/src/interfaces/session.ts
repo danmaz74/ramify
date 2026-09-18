@@ -103,6 +103,9 @@ export interface SessionStatus {
 }
 export interface RetainedSession {
   readonly current: SessionRevision | null;
+  /** A session captures every input with the project request it was opened with. An
+   * `invocation` that resolves to the same root changes only the request its reports echo;
+   * when that request changes, an update with identical facts still publishes a revision. */
   update(changes: readonly SessionChange[], control?: RunControl,
     invocation?: Pick<AnalysisInputs, 'project' | 'capabilities'>): Promise<SessionUpdate>;
   /** An unchanged sweep may carry the timings its hosting layers measured. */

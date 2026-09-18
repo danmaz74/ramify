@@ -147,7 +147,7 @@ class Session implements RetainedSession {
     const started = performance.now();
     const timings = zeroTimings();
     let start = performance.now();
-    const observed = await observeProject({ request: state.request.project, parse: this.#parse, limits: this.#acquisition,
+    const observed = await observeProject({ request: state.project, parse: this.#parse, limits: this.#acquisition,
       registry: state.registry.id, ...(signal ? { signal } : {}) });
     timings.inventory = performance.now() - start;
     if (observed.status === 'cancelled') return { status: 'cancelled' };
@@ -614,13 +614,14 @@ class Session implements RetainedSession {
     this.#resolutions = [resolution, ...this.#resolutions.filter(item => item !== resolution)].slice(0, knownResolutions);
   }
 
-  /** Retry observation for a session opened over a coherent invalid capture. Its acquisition is a
-   * cold open, not a structural update, so it reports no reacquisition and a required sweep still runs. */
+  /** Retry observation for a session opened over a coherent invalid capture, with the request it was
+   * opened with, as every acquisition of the session does. Its acquisition is a cold open, not a
+   * structural update, so it reports no reacquisition and a required sweep still runs. */
   async #reopen(changes: readonly SessionChange[], started: number, signal?: AbortSignal): Promise<SessionUpdate> {
     const state = this.#state;
     const timings = zeroTimings();
     let start = performance.now();
-    const observed = await observeProject({ request: state.request.project, parse: this.#parse, limits: this.#acquisition,
+    const observed = await observeProject({ request: state.project, parse: this.#parse, limits: this.#acquisition,
       registry: state.registry.id, ...(signal ? { signal } : {}) });
     timings.inventory = performance.now() - start;
     if (observed.status === 'cancelled') return { status: 'cancelled' };
@@ -751,8 +752,8 @@ export async function openSessionEngine(inputs: SessionInputs, control: RunContr
   if (unsupported.length) {
     return reject(diagnostic('unavailable-capability', `Analysis cannot execute: ${unsupported.join(', ')}`, 'unavailable'), 'access', 'unavailable');
   }
-  const state: SessionState = { request, limits, registry: registry.value, observer: null, adapter: null, adapterAreas: null,
-    facts: null, stale: false, parsed: new Map() };
+  const state: SessionState = { request, project: request.project, limits, registry: registry.value, observer: null, adapter: null,
+    adapterAreas: null, facts: null, stale: false, parsed: new Map() };
   const session = new Session(state, request.limits.acquisition);
   return session.open(control.signal);
 }

@@ -40,4 +40,7 @@ makes the whole outcome superseded. `dependencyFacts` answers from the same
 analyzer jobs and retained result as `dependencyDiagram` and adds the test
 references retained with the diagram; `dependencyDiagram` is that answer
 without them. The references count against the retention budgets; when only
-they exceed one, the diagram is retained without them.
+they exceed one, the diagram is retained without them. A job passes the
+analyzer the request the published revision's inputs were captured with, which
+is the request its session was opened with; the revision's report echoes the
+latest invocation instead, whose root discovery can read other inputs.

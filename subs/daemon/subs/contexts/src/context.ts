@@ -55,6 +55,12 @@ export interface LiveContext {
   lastValid: ContextRevision | null;
   session: RetainedSession | null;
   publishedSession: RetainedSession | null;
+  /** The project request the live session was opened with. A session captures every input with
+   * it; a later invocation changes only the request its reports echo. */
+  sessionProject: ProjectRequest | null;
+  /** The request the published revision's inputs were captured with: its session's
+   * `sessionProject` when it was published. The dependency analyzer acquires with it. */
+  publishedProject: ProjectRequest | null;
   readonly versions: Set<number>;
   observedSequence: number;
   invocation: Invocation;

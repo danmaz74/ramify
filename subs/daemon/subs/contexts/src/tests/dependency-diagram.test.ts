@@ -110,6 +110,50 @@ describe('ContextManager.dependencyDiagram', () => {
     } finally { await e.dispose(); }
   });
 
+  it('AV40: the runner acquires with the request the published inputs were captured with, not the invocation the report echoes', async () => {
+    const e = environment();
+    try {
+      const given: ProjectRequest = { cwd: '/fixture', root: '/fixture', scope: 'whole-project', configuration: 'discover' };
+      const found: ProjectRequest = { cwd: '/fixture/subs/workspace', scope: 'whole-project', configuration: 'discover' };
+      const { token, revision: opening } = await e.published();
+      // Another invocation form reaches the context: the session republishes the same inputs with cause request.
+      expect(await e.manager.open(found, { registry: 'default', capabilities: [] }, 'found')).toMatchObject({ status: 'opened', token, created: false });
+      await e.check(token, { mode: 'synchronized', expect: [] }, {}, 'found');
+      const republished = e.status(token).published!;
+      expect([republished.sequence, republished.cause, republished.fingerprints.inputId]).toEqual([2, 'request', opening.fingerprints.inputId]);
+      const report = await e.script.sessions[0]!.session.report(undefined, 2);
+      expect(report!.request.project).toEqual(found);
+
+      // The analyzer receives the report and the opening request its inputs were captured with.
+      const first = e.diagram(token, republished.revision); await flush();
+      expect(e.runs[0]!.input.report).toBe(report);
+      expect(e.runs[0]!.input.project).toEqual(given);
+      // A real input change still answers busy, and nothing is retained.
+      e.runs[0]!.settle({ status: 'inputs-changed', paths: ['src/index.ts'] });
+      expect(await first).toMatchObject({ status: 'busy', reason: 'inputs-changed' });
+
+      // Cold: the session is released, and the retained report keeps its captured request.
+      e.clock.advance(100); await flush(); e.clock.advance(200); await flush();
+      expect(e.status(token)).toMatchObject({ level: 'cold', session: null, published: { sequence: 2 } });
+      const cold = e.diagram(token, republished.revision); await flush();
+      expect(e.runs[1]!.input.project).toEqual(given);
+      const diagram = facts(republished.fingerprints.inputId);
+      e.runs[1]!.settle(ready(diagram));
+      expect(await cold).toMatchObject({ status: 'ready', diagram });
+
+      // A session opened by the other form captures with that form's request.
+      await e.check(token, { mode: 'synchronized', expect: [] }, {}, 'found');
+      expect(e.script.sessions).toHaveLength(2);
+      expect(e.script.sessions[1]!.project).toEqual(found);
+      const reopened = e.status(token).published!;
+      expect([reopened.sequence, reopened.cause]).toEqual([3, 'open']);
+      const again = e.diagram(token, reopened.revision); await flush();
+      expect(e.runs[2]!.input.project).toEqual(found);
+      e.runs[2]!.settle(ready(facts(reopened.fingerprints.inputId)));
+      expect(await again).toMatchObject({ status: 'ready' });
+    } finally { await e.dispose(); }
+  });
+
   it('BD19: an unknown context, an earlier generation and a manager without a runner start no work', async () => {
     const e = environment();
     const bare = sessionEnvironment();

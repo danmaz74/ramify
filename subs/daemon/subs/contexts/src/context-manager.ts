@@ -106,7 +106,8 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     context.debounce = context.sweepTimer = context.auditTimer = context.idle = null;
   }
   function releaseSession(context: LiveContext): Promise<void> {
-    const session = context.session; context.session = null; context.publishedSession = null; context.versions.clear(); context.observedSequence = 0;
+    const session = context.session; context.session = null; context.publishedSession = null; context.sessionProject = null;
+    context.versions.clear(); context.observedSequence = 0;
     // An unavailable session resolves again: known resolutions leave with it.
     context.resolutions.clear();
     return session ? cleanup(session.dispose()) : Promise.resolve();
@@ -509,7 +510,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     if (!await trim(context, candidateBytes)) return false;
     if (!context.history.append(revision, data)) return false;
     await Promise.all([...releaseWork]);
-    context.sequence++; context.publishedSession = context.session;
+    context.sequence++; context.publishedSession = context.session; context.publishedProject = context.sessionProject;
     if (data.outcome.execution === 'completed') context.lastValid = revision;
     supersedeDiagram(context, revision);
     emit(context, { type: 'revision-published', token: context.token, revision, coalesced: 0 });
@@ -520,7 +521,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     const report = publication && (publication.report ?? await context.session?.report(undefined, publication.sequence));
     if (!publication || !report || !context.history.retainPublished(freeze(report))
       || totalBytes() - (context.session?.status().factBytes ?? 0) > budgets.maxRetainedBytesGlobal) {
-      context.history.dispose(); context.lastValid = null;
+      context.history.dispose(); context.lastValid = null; context.publishedProject = null;
       context.history = createHistory(budgets.maxHistoryRevisions, budgets.maxHistoryBytes, entry => releaseVersion(context, entry));
       supersedeDiagram(context, null);
     }
@@ -564,7 +565,8 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         const opened = await driver.open(invocation.project, invocation.setup, control);
         if (opened.status === 'opened') {
           if (controller.signal.aborted || disposed || context.state === 'evicted') { await opened.session.dispose(); return; }
-          context.session = opened.session; context.publishedSession = null; context.invocation = invocation; context.lastSweepAt = started;
+          context.session = opened.session; context.publishedSession = null; context.sessionProject = invocation.project;
+          context.invocation = invocation; context.lastSweepAt = started;
           context.observedSequence = 0; context.versions.clear(); observeVersion(context);
           run = { status: 'revised', revision: opened.revision, identical: false, reacquired: false };
         } else run = opened;
@@ -969,7 +971,10 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
   }
   /** One job: read the pinned revision's published report, run the injected analyzer in its own
    * process and answer every caller still attached. Nothing enters the context queue, and the
-   * retained session is asked only for the report it already published. */
+   * retained session is asked only for the report it already published. The analyzer acquires
+   * with the request the revision's inputs were captured with: after another invocation form
+   * reached the context, the report's own request names that invocation, whose root discovery
+   * reads inputs the session never captured. */
   async function runDiagram(job: DiagramJob): Promise<void> {
     const { context, controller } = job;
     const answerAll = (answer: (caller: DiagramCaller) => DiagramAnswer): void => {
@@ -983,6 +988,8 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       if (!publication || publication.revision.revision !== job.revision.revision) {
         answerAll(caller => ({ status: 'superseded', requestId: caller.requestId, revision: publication?.revision ?? null })); return;
       }
+      const project = context.publishedProject;
+      if (!project) throw new Error('The published revision has no captured project request');
       const unpin = context.history.pin(publication.revision.revision);
       let report: AnalysisReport | null;
       try { report = publication.report ?? await context.session?.report(undefined, publication.sequence) ?? null; }
@@ -992,7 +999,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         answerAll(caller => ({ status: 'unavailable', requestId: caller.requestId, reason: 'resource-unavailable',
           message: 'The published revision no longer retains its report' })); return;
       }
-      const outcome = await options.dependencyDiagrams!.run({ project: report.request.project, report }, { signal: controller.signal });
+      const outcome = await options.dependencyDiagrams!.run({ project, report }, { signal: controller.signal });
       report = null;
       if (!current()) return;
       answerAll(mapDiagram(job, outcome));
@@ -1098,7 +1105,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         openedAt: now, lastActivityAt: now, hadLease: false, invocations: new Map([[lease, { project, setup: requestedSetup }]]), resolutions: new Map([[key, resolution]]), subscriptions: new Map(),
         history: createHistory(budgets.maxHistoryRevisions, budgets.maxHistoryBytes, entry => releaseVersion(context, entry)),
         queue: [], deliveries: new Set(), explorerDeliveries: new Set(), diagram: null, paths: new Map(), requested: new Map(), watched: null, scope: null, state: 'opening', synchronization: 'initializing', lastValid: null,
-        session: null, publishedSession: null, versions: new Set(), observedSequence: 0, sequence: 0, sweepRequired: true, periodicSweepDue: false, lastSweepAt: now, auditedSequence: 0, auditRequired: false, demoting: null, unresponsiveSince: null, cooling: false,
+        session: null, publishedSession: null, sessionProject: null, publishedProject: null, versions: new Set(), observedSequence: 0, sequence: 0, sweepRequired: true, periodicSweepDue: false, lastSweepAt: now, auditedSequence: 0, auditRequired: false, demoting: null, unresponsiveSince: null, cooling: false,
         watcher: null, watcherState: 'disposed', attaching: false, conservative: true, background: 'open', running: null,
         debounce: null, sweepTimer: null, auditTimer: null, idle: null,
       };

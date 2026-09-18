@@ -20,7 +20,12 @@ export interface DependencyAnalyzerLimits {
 }
 
 export interface DependencyAnalyzerInput {
-  /** The resolved request of the project that produced `report`. */
+  /**
+   * The request `report`'s inputs were captured with; the analyzer acquires with it and
+   * verifies what it reads against those inputs. A retained session's report echoes the latest
+   * invocation instead, whose root discovery can read inputs the session never captured, so
+   * its caller passes the request the session was opened with.
+   */
   readonly project: ProjectRequest;
   /** A completed analysis report; its recorded accesses are classified. */
   readonly report: AnalysisReport;
@@ -52,7 +57,8 @@ export type DependencyAnalyzerOutcome =
       readonly reason: 'invalid-report' | 'analysis-failed' | 'resource-limit';
       readonly message: string };
 
-/** Runs the analyzer for one published report, such as in a separate process. */
+/** Runs the analyzer for one published report, such as in a separate process; `project` is
+ * the request the report's inputs were captured with, as `DependencyAnalyzerInput` states. */
 export interface DependencyDiagramRunner {
   run(input: { readonly project: ProjectRequest; readonly report: AnalysisReport },
     control?: RunControl): Promise<DependencyAnalyzerOutcome>;

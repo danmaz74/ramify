@@ -288,6 +288,26 @@ workerSuite('retained analysis session', import.meta.url, () => {
     } finally { await handle.dispose(); }
   }, { ...fixtureFiles, 'subs/consumer/module.ramify': 'ramify 1\nmodule consumer\nexpose-src nothing from\n' }), timeout);
 
+  it('captures its inputs with the opening request when another invocation form reopens it after an invalid open', () => fixture(async (root, inputs) => {
+    const { session: handle, revision } = await opened(inputs);
+    try {
+      expect(revision.outcome.execution).toBe('invalid');
+      await put(root, 'subs/consumer/module.ramify', 'ramify 1\nmodule consumer\n');
+      // The same root, found from a module directory: its discovery probes directories the opening request never probed.
+      const found = { cwd: join(root, 'subs/consumer'), scope: 'whole-project', configuration: 'discover' } as const;
+      const retried = await handle.update([{ path: 'subs/consumer/module.ramify', kind: 'changed' }], {}, { project: found, capabilities: inputs.capabilities });
+      expect(retried).toMatchObject({ status: 'revised', identical: false });
+      if (retried.status !== 'revised') throw new Error('Expected a revised update');
+      expect(retried.revision.outcome.execution).toBe('completed');
+      const opening = await batch(inputs), invoked = await batch({ ...inputs, project: found });
+      expect(invoked.inputId).not.toBe(opening.inputId);
+      const report = await handle.report();
+      expect(report!.request.project).toEqual(found);
+      expect([retried.revision.inputId, report!.inputId]).toEqual([opening.inputId, opening.inputId]);
+      expect(report!.snapshot!.inputs).toEqual(opening.snapshot!.inputs);
+    } finally { await handle.dispose(); }
+  }, { ...fixtureFiles, 'subs/consumer/module.ramify': 'ramify 1\nmodule consumer\nexpose-src nothing from\n' }), timeout);
+
   it('reports an unavailable cold result without opening a session', async () => {
     const root = join(tmpdir(), 'ramify-retained-session-missing-root');
     const result = await openRetainedSession({ ...analysisInputs(root), session });

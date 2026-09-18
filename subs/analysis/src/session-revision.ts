@@ -6,7 +6,7 @@ import type { ParsedDescription } from '../subs/descriptions/src/interfaces/synt
 import { parseDescription } from '../subs/descriptions/src/parse.js';
 import { buildModel, deriveSourceAreas, originalKey } from '../subs/model/src/index.js';
 import type { Model, ResolvedTagRegistry, SourceArea } from '../subs/model/src/interfaces/model.js';
-import type { CapturedInput, InventoryUpdate, ObservedChange, ProjectInventory, ProjectIssue, ProjectObserver } from '../subs/project/src/interfaces/project.js';
+import type { CapturedInput, InventoryUpdate, ObservedChange, ProjectInventory, ProjectIssue, ProjectObserver, ProjectRequest } from '../subs/project/src/interfaces/project.js';
 import { readProject } from '../subs/project/src/read-project.js';
 import type { AccessInterpreter, CatalogDelta, CatalogOriginal, MembershipReach, RetainedSourceAnalysis, SourceAccess, SourceCatalog,
   SourceLimit } from '../subs/typescript/src/interfaces/source.js';
@@ -23,6 +23,10 @@ import { accessSurface, assembleAccesses, buildIndexes, canonicalLocations, deep
 export interface SessionState {
   /** The request echoed by every projected report; session limits are not part of it. */
   request: AnalysisInputs;
+  /** The project request the session was opened with. Every acquisition observes with it, so the
+   * session's inputs are always captured with its opening request; an invocation passed to
+   * `update` changes only `request`. */
+  readonly project: ProjectRequest;
   readonly limits: SessionLimits;
   readonly registry: ResolvedTagRegistry;
   observer: ProjectObserver | null;
@@ -103,7 +107,7 @@ export function invalidFacts(state: SessionState, issues: readonly AnalysisDiagn
  * envelope through the acquisition port, without running any source stage. */
 export async function captureInvalidFacts(state: SessionState, signal?: AbortSignal): Promise<SessionFacts> {
   const parsed = new Map<string, ParsedDescription>();
-  const acquired = await readProject({ request: state.request.project, limits: state.request.limits.acquisition,
+  const acquired = await readProject({ request: state.project, limits: state.request.limits.acquisition,
     registry: state.registry.id, parse: (file, text) => {
       const result = parseDescription(file, text); parsed.set(file, result); return result;
     }, ...(signal ? { signal } : {}) });
