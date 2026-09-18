@@ -1,63 +1,70 @@
-# Iteration 3: Reserved outputs and generic publisher
+# Iteration 3: Project the architect view in the session
 
-**Plan:** [Plan 2B: Generated project views](../main-plan.md).
-**Prerequisites:** Iteration 1.
-**Owners:** `analysis/project` reserved-output table and its call sites, the
-daemon watcher filter, and the daemon publisher with its tests. Independent of
-iterations 2 and 4.
+**Plan:** [Plan 2B: Generated architect view](../main-plan.md).
+**Prerequisites:** iterations 1 and 2.
+**Owners:** `analysis`.
 
 ## Goal
 
-Reserve every generated location before any view writes it, and turn the
-API-view publisher into one transactional publisher for file and symlink
-targets from any view.
+Build the revision-bound architect projection from the retained session's
+facts and compiler, and serve it as `RetainedSession.architectView` through
+the session worker, exactly as `apiView` is served.
 
 ## Read first
 
-- [Reserved outputs](../scope.md#reserved-outputs),
-  [replacing an existing target](../scope.md#replacing-an-existing-target),
-  [publication](../scope.md#publication) and the
-  [publisher contract](../contracts.md#publisher).
-- `generated-path.ts`, `inventory.ts`, `configuration.ts`, `capture.ts`,
-  `observer.ts`, `filesystem-watcher.ts` and their tests.
-- `api-view-publisher.ts`, its tests, crash-recovery child and harness cases.
+- [Contracts C3](../contracts.md#c3-architect-projection-and-session-query)
+  and AV08–AV11.
+- The specification's [scope](../../../architecture/architect-view.spec.md#scope),
+  [`module.json`](../../../architecture/architect-view.spec.md#modulejson),
+  [`behavior.jsonl`](../../../architecture/architect-view.spec.md#behaviorjsonl)
+  and [`tests.jsonl`](../../../architecture/architect-view.spec.md#testsjsonl).
+- `subs/analysis/src/api-view.ts` (`planApiViewRequests`, `projectApiView`)
+  as the template for planning and projection.
+- `subs/analysis/src/session-engine.ts` (`apiView`, `#rehydrate`),
+  `session-facts.ts` (`SessionFacts`), `session-messages.ts`,
+  `session-worker.ts`, `session-host.ts` and `interfaces/session.ts`.
+- `subs/analysis/subs/model/src/interfaces/model.ts` (`Exposure`, `Original`,
+  `ModuleRecord`) and `subs/analysis/subs/project/src/interfaces/project.ts`
+  (`InventoryModule`, `ModulePurpose`, `InventoryFile`).
+- `subs/analysis/src/tests/api-view.test.ts`, `api-view-session.test.ts`,
+  `session-worker.test.ts` and `session-test-fixture.ts`.
 
 ## Deliverables
 
-1. Add `ViewId`, `ReservedOutput` and `reservedOutputs`; extend
-   `isRamifyGeneratedPath` to root paths and transient forms, with near-miss
-   controls.
-2. Apply it at every existing call site, including configuration globbing that
-   could reach module source through a `docs/modules` symlink.
-3. Create `output-publisher.ts` from the API-view publisher: `GeneratedTarget`
-   input, symlink entries created with exact relative text and compared with
-   `readlink`, escape and undeclared-symlink refusal, recognizable-target
-   checks per view, and one transaction across every target.
-4. Keep sibling staging and marker recovery, including markers left by a Plan
-   2A publisher.
-5. Keep `createFilesystemApiViewPublisher` as a thin adapter that converts a
-   Plan 2A projection into `GeneratedTarget` values for the generic publisher,
-   so `service.ts`, which iteration 2 edits, needs no change. Iteration 5
-   removes the adapter.
-6. Port every I2A-07 test to the generic publisher.
+1. Add C3's types and `planArchitectView` and `projectArchitectView` in
+   `analysis` (`src/architect-view.ts`).
+2. Add `RetainedSession.architectView` in the engine, the worker protocol and
+   the host, following `apiView`'s serialization, sequence check, rehydration
+   and outcome mapping. The worker reads `.feature` files from disk and
+   compares their SHA-256 with the revision's captured input.
+3. Expose the new names from `analysis` to its parent in
+   `subs/analysis/module.ramify`.
+4. Add the `architect` fixture and tests for AV08–AV11, including a real
+   worker test and the counter witness that checks, watch updates and
+   changed-file checks never classify shapes or read titles.
 
 ## Matrix rows executed here
 
-I2B-03: all six leaves. I2B-04: all eight leaves.
+AV08–AV11.
 
 ## Verification
 
-Focused project, watcher and publisher tests, including failure injection at
-every write, fsync, symlink, rename and rollback boundary and the killed-process
-recovery test. `npm run type-check`. No build while iterations 2 or 4 run.
+```sh
+npx vitest run subs/analysis/src/tests/architect-view.test.ts
+npx vitest run subs/analysis/src/tests/architect-view-session.test.ts
+npx vitest run subs/analysis/src/tests/api-view.test.ts subs/analysis/src/tests/api-view-session.test.ts
+npx vitest run subs/analysis/src/tests/session-worker.test.ts subs/analysis/src/tests/retained-session.test.ts
+npm run type-check
+npm run build
+npm run check:self
+```
 
 ## Exit criteria
 
-Both root paths and their transient forms never become inputs or events;
-the publisher handles files and symlinks across views transactionally; Plan 2A
-publication behavior is unchanged.
+AV08–AV11 pass; the API view's session tests pass unchanged.
 
 ## Handoff
 
-The table, `ViewId`, `GeneratedTarget` publisher port and the temporary adapter
-go to iteration 5, which removes the adapter.
+`ArchitectViewProjection`, `RetainedSession.architectView`, the `architect`
+fixture, and the projection's size and latency on the toolkit measured
+in-process.

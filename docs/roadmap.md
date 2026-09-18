@@ -178,7 +178,7 @@ retained session and executes before the separately reviewed Plan 3 successor.
 | [2. Keep verification current](#plan-2-resident-verification) | A resident daemon watches, reconciles and checks projects through local CLI commands. | Plan 1. | Complete: merged on 2026-09-11. [Detailed Plan 2](plans/done/iteration-2-resident-verification/main-plan.md); [completion report](plans/done/iteration-2-resident-verification/iterations/iteration14-results.md). |
 | [5. Check fast after a write](#plan-5-fast-incremental-checks) | A retained analysis session inside the daemon answers an agent's post-write hook for the written file in tens of milliseconds, exactly as a batch check would. | Plan 2. | Brief below; [Detailed Plan 5](plans/iteration-5-fast-incremental-checks/main-plan.md), complete on 2026-09-14 on branch `close/plan5-completion`, not merged to `main`; its [completion report](plans/iteration-5-fast-incremental-checks/iterations/iteration13-results.md) records the delivered scope, the gates and the remaining gaps. |
 | [2A. Materialize API discovery](#plan-2a-materialized-api-discovery) | Complete: `ramify materialize` generates ordinary and testing foreign-API documentation beneath each module for explicit `rg` search. | Plan 5's retained session and contexts. | [Detailed Plan 2A](plans/iteration-2a-materialized-api-view/main-plan.md); [completion report](plans/iteration-2a-materialized-api-view/iterations/iteration10-results.md). |
-| [2B. Generated project views](#plan-2b-generated-project-views) | Draft: generic generated views with `ramify materialize --view`, adding `.exported_symbols/` and `docs/modules/`. | Plan 2A. | [Detailed Plan 2B](plans/iteration-2b-generated-views/main-plan.md), draft for review. |
+| [2B. Generated architect view](#plan-2b-generated-architect-view) | In progress: `ramify materialize --view architect` publishes `.ramify-architect/`, an agent-only view of modules, behavior-capable symbols, tests and observed use, and tests hypothesis H1 with agent trials. | Plans 2A and 6D. | [Detailed Plan 2B](plans/iteration-2b-generated-views/main-plan.md), accepted 2026-09-18. |
 | [3. Understand a project](#plan-3-project-inspection) | Remaining project explanations, module summaries and usage queries are selected in a successor review after filesystem discovery exists. | Plan 2A. | The existing [Detailed Plan 3](plans/iteration-3-project-inspection/main-plan.md) is preserved but must be revised and reviewed before execution. |
 | [4. Use Ramify through MCP](#plan-4-mcp-access) | A host-launched stdio adapter exposes the daemon's checks and inspection. | Plan 2's service and Plan 3's queries for this deliverable's full scope. | Brief below; detailed plan not yet written. |
 | [7. Find modules affected by changes](#plan-7-affected-modules) | An on-demand reverse dependency query uses retained facts to select modules for testing through API, CLI and MCP. | Plan 5's retained session and contexts; Plan 4's stdio provider for MCP. | [Detailed Plan 7](plans/iteration-7-affected-modules/main-plan.md), draft awaiting contract review. |
@@ -422,31 +422,40 @@ scale is an explicit bounded outcome. Hand off availability/detail/projection
 contracts and the generated schema to Plan 3. Preserve the existing Plan 3
 directory unchanged; its remaining scope receives a separate review.
 
-## Plan 2B: Generated project views
+## Plan 2B: Generated architect view
 
-**Detailed plan:** [Plan 2B: Generated project views](plans/iteration-2b-generated-views/main-plan.md),
-draft for review. **Prerequisite:** Plan 2A's completion gate is recorded; Plan
-2B changes no Plan 2A document.
+**Detailed plan:** [Plan 2B: Generated architect view](plans/iteration-2b-generated-views/main-plan.md),
+accepted 2026-09-18 and in progress. **Prerequisites:** Plan 2A's
+materialize path and Plan 6D's dependency facts, both implemented.
 
-**Working outcome.** `ramify materialize [--view <id>]...` publishes any
-registered view from one revision through one transactional publisher. The
-current detailed draft proposes `.exported_symbols/` text inventories and
-`docs/modules/`; its required successor review must replace the symbol
-inventories with the deterministic, agent-only `module.json`, `behavior.jsonl`
-and `supporting.jsonl` contract in the
-[capability-architecture analysis](analysis/2026-09-17-code-derived-capability-architecture.md).
-Dependency records join that view after Plan 6D's daemon-side projection. Human
-consumption remains in the explorer. The API view's output stays byte-identical.
+**Revision, 2026-09-18:** the 2026-09-15 draft, which proposed
+`.exported_symbols/` text inventories and `docs/modules/` links over a general
+view registry, is superseded by the
+[architect view specification](architecture/architect-view.spec.md), written
+from the [capabilities-based architecture](architecture/capabilities-based-architecture.md)
+note. The draft remains in the Git history.
 
-**Ownership and implementation.** A new `analysis/views` owner, pending review,
-holds pure view definitions. Materialization only produces output: Plan 2B
-restores Plan 2A's decision-engine, context-queue and session-query changes to
-read-only forms, and a reserved-output table in `analysis/project` is the only
-analysis-side effect of any view.
+**Working outcome.** `ramify materialize --view architect` publishes
+`.ramify-architect/`: a gitignored, deterministic directory for an architect
+agent, with a module map in its `README.md` and, per module, `module.json`,
+`behavior.jsonl`, `supporting.jsonl` and `tests.jsonl`. Records carry
+behavior-capable and supporting originals with their role, exposure,
+re-exposing ancestors, bounded signature and documentation, and the
+production modules that use them behaviorally or non-behaviorally, from
+Plan 6D's facts at the same revision. `ramify materialize` without `--view`
+is unchanged. Human consumption remains in the explorer.
 
-**Acceptance and handoff.** Execute the plan's 73 I2B leaves, prove check
-invariance with and without materialization and the unchanged Plan 1, 2, 5 and
-2A gates, and hand off the view registry contract for later views.
+**Ownership and implementation.** `analysis/typescript` classifies export
+shapes with the rule it shares with the dependency classifier and reads test
+titles from the compiler's syntax trees; `analysis` projects and renders the
+view; `analysis/project` reserves `.ramify-architect`; the daemon waits for
+dependency facts and publishes the view in one transaction with the API
+view's targets. No owner is added.
+
+**Acceptance and handoff.** Execute the plan's 37 AV rows: classification and
+consumer equivalence, rendering, publication, invariance, hit cost, and agent
+trials on Claude Code and Codex CLI that decide hypothesis H1. Hand off the
+view format, its measured limits and the H1 verdict to Plans 4 and 7.
 
 ## Plan 3: Project inspection
 
@@ -1094,7 +1103,7 @@ writing future plans; they do not block the current Plan 1 gate.
 | Browser-promise verification | Matching the declared browser tag is part of ordinary checking. Proving the promise is a separate verifier with its own capability, coverage and owner findings. | A separately scoped plan if verification is requested. Until then, requesting it returns unavailable. |
 | MCP Streamable HTTP | Optional hosting of the same MCP module in the web process; no MCP-to-tRPC forwarding layer. | Only when HTTP hosting is needed; specify MCP sessions, cancellation/reconnect, local access policy and shared web lifetime. |
 | Discussion and host/editor integrations | Injected UI integration points can be reused. Agent launching, write authority and host workflow lifecycle remain separate responsibilities. | Concrete consumer needs justify their own adapters and cases, including remaining H04 portions. |
-| Code-derived capability discovery, advanced search, metrics and placement suggestions | The [capability-architecture analysis](analysis/2026-09-17-code-derived-capability-architecture.md) proposes a deterministic, agent-only materialized symbol tree paired with Plan 2A's consumer availability view and Plan 6D's observed dependency facts; humans use the explorer. Plan 2A already delivers literal `rg` search over available names, signatures and documentation. Structured query search, ranking, complexity formulas, source-text search across modules and barrel spellings remain additional features, and a proposed exposure is never an existing permission. | Revise Plan 2B around JSON/JSONL behavior-capable provider records after reconciling its prerequisite, then add dependency records and summaries after Plan 6D's analysis/daemon provider exists; neither requires an MCP search command or generated prose. |
+| Code-derived capability discovery, advanced search, metrics and placement suggestions | The [capability-architecture analysis](analysis/2026-09-17-code-derived-capability-architecture.md) proposes a deterministic, agent-only materialized symbol tree paired with Plan 2A's consumer availability view and Plan 6D's observed dependency facts; humans use the explorer. Plan 2A already delivers literal `rg` search over available names, signatures and documentation. Structured query search, ranking, complexity formulas, source-text search across modules and barrel spellings remain additional features, and a proposed exposure is never an existing permission. | [Plan 2B](plans/iteration-2b-generated-views/main-plan.md) delivers the provider records, with Plan 6D's dependency facts, as the architect view; ranked search and access explanations wait for its trial verdict. |
 | Persistent caches, worker pools and process recycling | No requirement to add them speculatively. They must preserve context generations, input identity and explicit unavailable/recovery results. | Only after measurements identify a problem and demonstrate a useful improvement. |
 | Live module audits and selective verification | [Analysis proposal](analysis/live-module-audits.md): retain applicable test evidence per task, derive live module status, invalidate from source and shared inputs, and run required audits on request with Git provenance. | Possible follow-up to Plans 5 and 7; resolve task mapping, execution input consistency, persistence and reuse policy before assigning a delivery plan. |
 | Design probes P01–P06 and independent policies X01–X02 | Probes are not adopted rules. Naming/API quality, cycles and build/bundling policies are not importability checks. | Separate explicit design or policy work; do not turn them into baseline acceptance failures. |

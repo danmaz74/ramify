@@ -1,7 +1,7 @@
 # Architect view: agent test cases
 
 **Date:** 2026-09-18. **Status:** companion to the
-[architect view specification](architect-view.spec.md). These are the tasks
+[architect view specification](../../architecture/architect-view.spec.md). These are the tasks
 that test hypothesis H1: that one denoised, searchable directory is enough for
 an architect agent using only `Read` and `rg`. The cases run on the Ramify
 toolkit itself. Every key below was derived from the toolkit source at commit

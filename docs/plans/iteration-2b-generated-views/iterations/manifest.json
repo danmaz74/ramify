@@ -1,67 +1,54 @@
 {
-  "_cucumberViz": {
-    "editMode": "mcp-only",
-    "generatedBy": "cucumber-viz",
-    "mcpTool": "planning.write_iteration_manifest",
-    "message": "Do not edit directly. Use the planning MCP tool.",
-    "warning": "This file is managed by cucumber-viz. Use the MCP tool to make changes."
-  },
-  "createdAt": "2026-09-15T00:00:00.000Z",
+  "createdAt": "2026-09-18T00:00:00.000Z",
+  "updatedAt": "2026-09-18T00:00:00.000Z",
   "iterations": [
     {
       "file": "iteration1.md",
       "index": 1,
       "parallelGroup": null,
-      "title": "Contract review and probes"
+      "title": "Classify export shapes"
     },
     {
       "file": "iteration2.md",
       "index": 2,
-      "parallelGroup": "foundations",
-      "title": "Analysis invariance"
+      "parallelGroup": null,
+      "title": "Read test titles"
     },
     {
       "file": "iteration3.md",
       "index": 3,
-      "parallelGroup": "foundations",
-      "title": "Reserved outputs and generic publisher"
+      "parallelGroup": null,
+      "title": "Project the architect view in the session"
     },
     {
       "file": "iteration4.md",
       "index": 4,
-      "parallelGroup": "foundations",
-      "title": "Test-hierarchy provider"
+      "parallelGroup": null,
+      "title": "Render the architect view"
     },
     {
       "file": "iteration5.md",
       "index": 5,
-      "parallelGroup": null,
-      "title": "View registry and re-hosted API view"
+      "parallelGroup": "publisher",
+      "title": "Reserve and publish the architect target"
     },
     {
       "file": "iteration6.md",
       "index": 6,
       "parallelGroup": null,
-      "title": "Generic materialize operation and CLI"
+      "title": "Materialize the architect view"
     },
     {
       "file": "iteration7.md",
       "index": 7,
-      "parallelGroup": "views",
-      "title": "Exported-symbols view"
+      "parallelGroup": null,
+      "title": "Real runs, invariance and hit cost"
     },
     {
       "file": "iteration8.md",
       "index": 8,
-      "parallelGroup": "views",
-      "title": "Module-docs view"
-    },
-    {
-      "file": "iteration9.md",
-      "index": 9,
       "parallelGroup": null,
-      "title": "Evidence, regressions and completion gate"
+      "title": "Agent trials and completion"
     }
-  ],
-  "planPath": "main-plan.md"
+  ]
 }

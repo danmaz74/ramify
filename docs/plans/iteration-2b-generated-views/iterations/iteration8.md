@@ -1,48 +1,63 @@
-# Iteration 8: Module-docs view
+# Iteration 8: Agent trials and completion
 
-**Plan:** [Plan 2B: Generated project views](../main-plan.md).
-**Prerequisites:** Iteration 6.
-**Owners:** `analysis/views` module-docs view and its tests. Independent of
-iteration 7.
+**Plan:** [Plan 2B: Generated architect view](../main-plan.md).
+**Prerequisites:** iteration 7.
+**Owners:** evaluation evidence and documentation.
 
 ## Goal
 
-Generate `docs/modules/`, mirroring the module tree with one relative `docs`
-symlink to each module's `src/docs` directory.
+Run the agent test cases on the materialized toolkit view with Claude Code and
+Codex CLI, score them against their keys, decide H1, and record the plan's
+completion.
 
 ## Read first
 
-- [Module-docs view](../scope.md#module-docs-view),
-  [replacing an existing target](../scope.md#replacing-an-existing-target) and
-  the review decisions recorded by iteration 1.
-- Iteration 3 publisher results and iteration 6 results.
-- Inventory module directories and area presence.
+- AV35–AV37 and the [agent test cases](../test-cases.md), all of it.
+- The specification's [hypothesis](../../../architecture/architect-view.spec.md#hypothesis)
+  and [agent trials](../../../architecture/architect-view.spec.md#agent-trials).
+- Iteration 7's results: the view's revision and the hit-cost table.
 
 ## Deliverables
 
-1. Implement the view from the inventory only: identifier-derived directories,
-   symlinks for modules whose `src/docs` is a real directory and relative
-   targets.
-2. Register the view and its recognizable-target shape.
-3. Prove resolution after publication, absence for modules without `src/docs`
-   and the root-module case.
-4. Prove that source under a linked `src/docs` is analyzed only at its real
-   path.
+1. Re-derive every key from the materialized view, as the test cases'
+   maintenance section requires, and record any changed key with its reason.
+2. Run each core and extended task in a fresh session per harness:
+   - Claude Code: `claude -p` with the preamble and task, tools limited to
+     `Read`, `Grep` and `Bash(rg:*)`, JSON streaming output saved as the
+     transcript.
+   - Codex CLI: `codex exec` with a read-only sandbox and JSON output saved as
+     the transcript.
+   Both run from the worktree root with the view present. Neither receives
+   this plan or the test cases.
+3. Score every task from its transcript: tool calls, searches and narrowing
+   searches, hit lines and bytes, README opened, source read, verdict. Save
+   transcripts and the scoring table under `evidence/trials/`.
+4. Decide H1 by the specification's criteria.
+5. Write the completion report, `iterations/iteration8-results.md`, with the
+   gate items of the main plan, and update the roadmap's Plan 2B row and
+   section.
 
 ## Matrix rows executed here
 
-I2B-09: all six leaves.
+AV35–AV37.
 
 ## Verification
 
-Focused views tests, publisher tests over real temporary roots and one retained
-session case. `npm run type-check`. No build while iteration 7 runs.
+The transcripts and scoring table are the evidence. Before the report,
+re-run:
+
+```sh
+npm run type-check
+npm run check:self
+```
 
 ## Exit criteria
 
-The view produces the exact link tree, resolves every link and adds no analysis
-input.
+Every core and extended task has a transcript and a verdict on both
+harnesses, the H1 decision is recorded with its evidence, and the documents
+describe the result.
 
 ## Handoff
 
-The view and its fixtures go to iteration 9.
+The H1 verdict and, if it is falsified, the evidence for the split view or a
+query interface for Plans 4 and 7.

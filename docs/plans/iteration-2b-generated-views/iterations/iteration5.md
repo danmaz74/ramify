@@ -1,56 +1,73 @@
-# Iteration 5: View registry and re-hosted API view
+# Iteration 5: Reserve and publish the architect target
 
-**Plan:** [Plan 2B: Generated project views](../main-plan.md).
-**Prerequisites:** Iterations 2 and 3.
-**Owners:** new `analysis/views` owner, `analysis` session query and
-composition, and the declaration and owner-count updates that a twelfth owner
-requires.
+**Plan:** [Plan 2B: Generated architect view](../main-plan.md).
+**Prerequisites:** none. It shares no files with iterations 1–4.
+**Owners:** `analysis/project` (reserved names), `daemon` (publisher).
 
 ## Goal
 
-Create the views owner and registry, move the API view into it with identical
-bytes, and replace the session's API query with one view-generic
-`materialize` query.
+Make `.ramify-architect` generated output everywhere Ramify reads inputs, and
+let the publisher publish a rendered architect view at the project root in
+the same transaction as the API view's targets.
 
 ## Read first
 
-- [Views and targets](../scope.md#views-and-targets),
-  [views contract](../contracts.md#views) and
-  [session query](../contracts.md#session-query).
-- Iteration 2 and 3 results.
-- Plan 2A `api-view.ts`, `api-view-documents.ts`, their tests and fixture B.
-- [Module description principles](../../../model/module-description.principles.md)
-  for the new owner's declarations and relays.
+- [Contracts C5](../contracts.md#c5-reserved-names),
+  [C6](../contracts.md#c6-publisher) and [C8](../contracts.md#c8-failure-and-preservation),
+  and AV19–AV23.
+- The specification's [materialization](../../../architecture/architect-view.spec.md#materialization)
+  and [generated-output isolation](../../../architecture/architect-view.spec.md#generated-output-isolation).
+- `subs/analysis/subs/project/src/generated-path.ts` and its call sites:
+  `inventory.ts`, `configuration.ts`, `capture.ts`, `observer.ts` and
+  `subs/daemon/src/filesystem-watcher.ts`.
+- `subs/daemon/src/api-view-publisher.ts`, `api-view-documents.ts` and
+  `interfaces/daemon.ts`.
+- `subs/daemon/src/tests/api-view-publisher.test.ts`,
+  `api-view-publisher-crash-recovery.test.ts` and `api-view-fixtures.ts`;
+  `subs/analysis/subs/project/src/tests/generated-path.test.ts`.
+- The toolkit's and `examples/collection-review`'s `.gitignore`.
 
 ## Deliverables
 
-1. Create `subs/analysis/subs/views/` with `module.ramify`, `README.md`,
-   interfaces, registry, target validation and tests.
-2. Move the API projection and renderer into the owner as the `api` view.
-   Prove byte identity against fixture B for R and T.
-3. Replace `RetainedSession.apiView` with `materialize`, building `ViewFacts`
-   and `ViewProviders` from one sequence, and remove iteration 3's temporary
-   adapter.
-4. Update `analysis` relays, root relays and every eleven-owner assertion.
-5. Keep `ramify materialize` behavior identical; the service maps its request
-   to `views: ['api']`.
+1. Extend `isRamifyGeneratedSegment` as C5 states, with tests at every call
+   site that already has one for `.ramify`.
+2. Add the `.gitignore` patterns to the toolkit and the reference project,
+   and update the comment that names near misses.
+3. Change the publisher's input to `PublishInput`, add the architect target,
+   its recognition rule, its limit and its place in the transaction, and add
+   `view` and nullable `module` and `area` to `MaterializedTarget`. The
+   daemon service keeps compiling by passing `{ api: projection, architect: null }`.
+4. Add `maxArchitectBytes` to the publisher limits in `src/resident-assembly.ts`.
+5. Tests for AV19–AV23 with the controlled filesystem, including a switch
+   failure on the architect target after an API target switched, and a crash
+   recovery of leftover architect siblings.
+6. The `rg` visibility case (AV23) as a test that creates a Git repository in
+   a temporary directory.
 
 ## Matrix rows executed here
 
-I2B-06: all six leaves.
+AV19–AV23.
 
 ## Verification
 
-Focused views, session and harness tests; `npm run type-check`; build;
-`dist/src/ramify check --batch --root .` with twelve owners and zero errors;
-`npm run reference:verify -- --plan 2a`; `npx tsx
-scripts/validate-final-contracts.ts`.
+```sh
+npx vitest run subs/analysis/subs/project/src/tests/generated-path.test.ts
+npx vitest run subs/analysis/subs/project/src/tests/observer.test.ts subs/analysis/subs/project/src/tests/capture.test.ts
+npx vitest run subs/daemon/src/tests/watcher.test.ts
+npx vitest run subs/daemon/src/tests/api-view-publisher.test.ts subs/daemon/src/tests/api-view-publisher-crash-recovery.test.ts
+npx vitest run subs/daemon/src/tests/service.test.ts src/tests/resident-assembly.test.ts
+npm run type-check
+npm run build
+npm run check:self
+npx vitest run -c scripts/reference-harness/vitest.config.ts scripts/reference-harness/plan2a.test.ts
+```
 
 ## Exit criteria
 
-Twelve owners validate, the API view is byte-identical through the registry,
-and the session exposes one view-generic read-only query.
+AV19–AV23 pass; the API view publisher's existing tests and the Plan 2A
+harness pass unchanged.
 
 ## Handoff
 
-The registry, `materialize` query and `GeneratedTarget` flow go to iteration 6.
+`PublishInput`, the architect target, `maxArchitectBytes` and the reserved
+names.

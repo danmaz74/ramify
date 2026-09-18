@@ -1,6 +1,10 @@
 # Materialized architect view
 
-**Date:** 2026-09-18. **Status:** proposal for review. This specification
+**Date:** 2026-09-18. **Status:** accepted for implementation by
+[Plan 2B](../plans/iteration-2b-generated-views/main-plan.md), whose
+contracts refine this specification where it was not yet concrete; the
+[review decisions](#review-decisions) are accepted at their proposed
+defaults. This specification
 describes hypothesis H1 of the
 [capabilities-based architecture](capabilities-based-architecture.md): one
 generated, searchable directory that gives an architect agent the project's
@@ -10,9 +14,8 @@ with no semantic elaboration. It replaces the `.exported_symbols/` and
 [Plan 2B draft](../plans/iteration-2b-generated-views/main-plan.md) and takes
 over the record shapes proposed in the
 [capability-architecture analysis](../analysis/2026-09-17-code-derived-capability-architecture.md).
-Nothing here is implemented. The hypothesis is tested by the
-[acceptance evidence](#acceptance-evidence) before a successor plan freezes
-its bounds.
+The hypothesis is tested by the [acceptance evidence](#acceptance-evidence)
+and the plan's [agent test cases](../plans/iteration-2b-generated-views/test-cases.md).
 
 ## Purpose
 
@@ -191,12 +194,12 @@ order:
 
 - `purpose` is `{ "state": "missing" }` when the module has no `README.md`
   first top-level prose paragraph. There is no fallback to another owner's
-  prose. `text` is cut at 600 characters, with `"cut": true` beside it when
-  cut; the map shows the same text.
+  prose. `text` is cut at 600 UTF-8 bytes on a character boundary, with
+  `"cut": true` beside it when cut; the map shows the same text.
 - `docs` lists the module's `src/docs/**` files, project-relative, sorted.
   Their contents are not rendered.
-- `files` counts compiler-selected source files the module owns, and the same
-  for its subtree.
+- `files` counts the inventory's source files, TypeScript and JavaScript, in
+  the module's own areas, and the same for its subtree.
 - `uses` and `usedBy` count distinct originals per module pair, from the
   dependency facts under the production source filter. Unused imports are
   absent. An `unknown` count is present only when nonzero. Both arrays are
@@ -223,7 +226,8 @@ Fields, in this fixed order:
 | Field | Presence | Meaning |
 | --- | --- | --- |
 | `module` | always | Owning module identifier. |
-| `name` | always | Defining-file export name. |
+| `name` | always | Defining-file export name; the byte-least one when the defining file exports the original under several names. |
+| `binding` | when `name` is `default` | The original's local binding, when it has one. |
 | `as` | when it differs | Exposure names, when the owner exposes the original under other names. At most four; `asMore` counts the rest. |
 | `role` | always | `exposed`: the owner exposes it to its parent or descendants. `internal`: exported by a source file, exposed by no module declaration. |
 | `shape` | always | `constructable`, `callable`, `member` or `unknown`, by the [classification](#classification) precedence. |
@@ -233,9 +237,10 @@ Fields, in this fixed order:
 | `behavioral` | when dependencies are measured | Production modules whose dependency on this original is behavioral: a call, a construction or a callable reference. At most twelve, sorted; `behavioralMore` counts the rest. |
 | `nonBehavioral` | when dependencies are measured | Production modules whose dependency is non-behavioral only: type, data or forwarding use. Same bound, `nonBehavioralMore`. |
 | `unclassified` | when nonempty | Production modules whose dependency is unknown. Same bound, `unclassifiedMore`. |
-| `sig` | always | Bounded, body-free signature from the compiler. |
+| `sig` | when described | Bounded, body-free signature from the compiler. |
 | `doc` | when present | First source documentation paragraph, bounded. |
-| `cut` | when nonempty | The bounded fields that were cut: `["sig"]`, `["doc"]` or both. |
+| `cut` | when nonempty | The bounded fields that were cut: `["sig"]`, `["doc"]` or both. A cut overload list counts as `sig`. |
+| `detail` | when no signature | Why the compiler gave no signature: `missing-file`, `missing-export`, `identity-mismatch`, `unsupported-declaration` or `compiler-failure`. Counted in `_meta.json`. |
 | `file` | always | Project-relative defining file. |
 
 Each consumer module appears in exactly one of the three lists, by the
@@ -254,7 +259,7 @@ fields except that `shape` is replaced by:
 
 | Field | Meaning |
 | --- | --- |
-| `kind` | `interface`, `type`, `enum`, `value` or `namespace`. |
+| `kind` | `interface`, `type`, `enum`, `namespace`, `value` or `resource`. A `resource` is a non-code original, such as an imported stylesheet or data file. |
 | `value` | `true` when the original has a runtime value. |
 
 A class is one record, in `behavior.jsonl`. `behavioral` is never present
@@ -277,13 +282,27 @@ record beneath it; that is the price of a self-contained hit:
   Tests outside any suite have `"suite": []`. A suite whose tests all sit in
   nested suites yields no record of its own; a suite with direct tests and a
   nested suite yields one record for each; a suite with neither yields a
-  record with `"tests": []`.
-- Gherkin features carry their scenario and scenario-outline titles.
-- A title that is not a string literal is recorded as `(dynamic)` and counted
-  in `_meta.json`.
-- Test sources are the owner's `src/tests/` and the ordinary `src/` of a
-  module tagged `testing`, following the existing test discovery rules.
-  Extraction is static and runs nothing.
+  record with `"tests": []`. A record holds at most 40 titles; a longer
+  list continues in further records with the same `suite` chain.
+- A suite is a call to `describe`, and a test a call to `it` or `test`,
+  including their modifier and table forms such as `describe.skip`,
+  `it.only` and `test.each(table)`. A file that declares its own binding
+  named `describe`, `it` or `test` contributes no calls of that name.
+- Gherkin features carry their `Scenario`, `Example` and `Scenario Outline`
+  titles, in English keywords only.
+- A title that is not a string literal or a template literal without
+  substitutions is recorded as `(dynamic)` and counted in `_meta.json`. A
+  table title's placeholders, such as `%s`, are kept verbatim. A title
+  longer than 240 UTF-8 bytes is cut on a character boundary with a trailing
+  `…` and counted in `cut`.
+- Test sources are the TypeScript and JavaScript files and `.feature` files
+  of every source area whose profile includes `testing`: each module's
+  `src/tests/` and the ordinary `src/` of a module tagged `testing`.
+  TypeScript and JavaScript titles are read from the revision's compiler
+  syntax trees; a file outside the compiler program is counted as
+  `testsUnavailable`. A `.feature` file is read only when its bytes still
+  match the revision's captured input. Extraction is static and runs
+  nothing.
 
 ## Ordering
 
@@ -310,13 +329,13 @@ An `rg` hit returns the whole line. The record shape is chosen so that a
 hundred hits cost a few thousand tokens:
 
 - keys are short and fixed; optional fields are omitted, never `null`;
-- `sig` is cut at 240 characters and `doc` at 280, on a UTF-8 character
-  boundary, with the cut recorded in `cut`; full signatures remain in the
-  consumer's API view and in the source;
+- `sig` is cut at 240 UTF-8 bytes and at four overloads, and `doc` at 280
+  bytes, on a character boundary, with the cut recorded in `cut`; full
+  signatures remain in the consumer's API view and in the source;
 - every list in a record is bounded: consumer lists hold at most twelve
   module identifiers and `as` at most four, each with a `…More` count for
-  the rest; `reexposed` is bounded by the module's depth; a test list is
-  bounded by its suite, which the source keeps small;
+  the rest; `reexposed` is bounded by the module's depth; a test record
+  holds at most 40 titles of at most 240 bytes each;
 - `file` is last, so a display that truncates long lines loses the least
   searchable text.
 
@@ -363,10 +382,13 @@ the coverage counts say how much the rule could not decide.
 
 `dependencies` is `measured` or `unavailable`, and `dependencyScope` names
 the source filter of the measured facts, `production` in the first release;
-`metrics` is `measured` or `unavailable`. Exceptional
-counts appear only when nonzero: `unknownShapes`, `cut`, `dynamicTitles` and
-`coverage`. `coverage` means source-analysis limits may have omitted originals.
-Every `module.json` repeats the `revision`.
+`metrics` is `measured` or `unavailable`. When dependencies are unavailable,
+`dependencyReason` names why: `analysis-failed`, `resource-limit`,
+`resource-unavailable`, `invalid-current` or `wait-limit`. Exceptional counts
+appear only when nonzero: `unknownShapes`, `cut`, `detailsUnavailable`,
+`dynamicTitles`, `testsUnavailable` and `coverage`. `coverage` means
+source-analysis limits may have omitted originals. Every `module.json`
+repeats the `revision`.
 
 An agent combines this view with a module's API view only when both name the
 same revision. A stale view remains readable and must be described as stale.
@@ -375,15 +397,19 @@ same revision. A stale view remains readable and must be described as stale.
 
 ```sh
 ramify materialize --view architect [--root <dir>]
+ramify materialize --view api --view architect [--from <path> | --all] [--root <dir>]
 ```
 
-The view is always whole-project; `--from` and `--all` apply to the API view
-only. Publication goes through the view registry and transactional publisher
-that the Plan 2B successor delivers, with the guarantees the API view already
-has: one synchronized valid revision per invocation, staged complete
-replacement, byte comparison before writing, `_meta.json` published last,
-refusal of symbolic links in the target, and success only when the whole view
-is published.
+`--view` may repeat and accepts `api` and `architect`. Without `--view`, the
+command materializes the API view alone, exactly as before. The architect
+view is always whole-project; `--from` and `--all` apply to the API view
+only. Every target of one invocation is published through one transactional
+publisher, with the guarantees the API view already has: one synchronized
+valid revision per invocation, staged complete replacement, byte comparison
+before writing, `_meta.json` published last, refusal of symbolic links in
+the target, and success only when every target is published. An existing
+`.ramify-architect` is replaced only when it is recognizably this view: a
+directory whose `_meta.json` names the `ramify.architect-view` schema.
 
 Dependency facts come from the analysis-owned facts behind the dependency
 diagram, at the same revision and under the same production source filter
@@ -391,9 +417,12 @@ the first-release diagram uses: references from `src/tests/` and from
 modules tagged `testing` are not recorded anywhere in the view. A testing
 scope, if a later release adds one, is a separate projection with its own
 fields, never a union with the production lists. Materialization requests
-the facts and waits within that operation's existing limits. When they are
-unavailable, the view is published with `"dependencies":"unavailable"`, no
-consumer fields and no `uses`/`usedBy`; it is not refused.
+the facts for the revision it materialized and waits while the analyzer is
+busy, up to the analyzer's own deadline. When the context publishes a newer
+revision first, the invocation is superseded and publishes nothing. When the
+facts are unavailable, or the wait reaches its limit, the view is published
+with `"dependencies":"unavailable"`, its reason, no consumer fields and no
+`uses`/`usedBy`; it is not refused.
 
 Ordinary `check`, watch updates and changed-file hooks never classify exports,
 describe symbols or write this view. Automatic publication is not part of the
@@ -401,9 +430,11 @@ first release.
 
 ## Generated-output isolation
 
-`.ramify-architect` and its staging siblings are entries in the reserved-output
-table. Inventory, compiler selection, capture, observation and watching skip
-them. The project's `.gitignore` lists `.ramify-architect/`; the reserved
+`.ramify-architect` and its staging siblings `.ramify-architect.tmp-<suffix>`
+and `.ramify-architect.old-<suffix>` are reserved names, like `.ramify`: a
+path with such a segment anywhere is generated output. Inventory, compiler
+selection, capture, observation and watching skip them, so publishing the
+view never starts a new revision. The project's `.gitignore` lists `.ramify-architect/`; the reserved
 entry protects analysis regardless, and the ignore entry is what keeps the
 view out of a project-wide `rg`.
 
@@ -515,7 +546,7 @@ or refactoring answer matches its key, and whether `README.md` was opened.
 H1 stands only if every core task passes its key, no task needs more than
 three narrowing searches, no task reads the source to answer, and no task
 returns more than 300 hit lines or 64 KB in total. The
-[test cases](architect-view.test-cases.md) fix the tasks and their keys. The
+[test cases](../plans/iteration-2b-generated-views/test-cases.md) fix the tasks and their keys. The
 trial transcript is evidence for the plan's contract review.
 
 ## Review decisions
@@ -540,13 +571,16 @@ trial transcript is evidence for the plan's contract review.
 
 ## Relation to the roadmap
 
-This view replaces the `.exported_symbols/` and `docs/modules/` views of the
-Plan 2B draft. The successor plan retains the draft's foundations: the three
-analysis-invariance restorations, the reserved-output table, the generic
-transactional publisher, the view registry, the re-hosted API view, the
-generic `materialize --view` command and the static test-hierarchy provider.
-It consumes Plan 6D's analysis-owned dependency facts and the compiler's
-behavior rule. Access explanations for a consumer/original pair and ranked
-search over large projects are not part of this view; they belong to the
-Plan 4 MCP adapter and the Plan 7 query work, and only if the trials show the
-view alone is insufficient.
+[Plan 2B](../plans/iteration-2b-generated-views/main-plan.md) delivers this
+view. It replaces the `.exported_symbols/` and `docs/modules/` views of the
+earlier Plan 2B draft and takes only what the architect view needs from that
+draft's foundations: a reserved name, a publisher that accepts a project-root
+target beside the API view's targets, a `--view` selection and a static
+test-title reader. The draft's restorations of Plan 2A's analysis changes,
+its general view registry and its re-hosting of the API view are not part of
+this delivery; this view's own invariance is verified directly. It consumes
+Plan 6D's dependency facts and the compiler's behavior rule. Access
+explanations for a consumer/original pair and ranked search over large
+projects are not part of this view; they belong to the Plan 4 MCP adapter and
+the Plan 7 query work, and only if the trials show the view alone is
+insufficient.
