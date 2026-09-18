@@ -1,9 +1,11 @@
 # Daemon and analysis architecture
 
-**Date:** 2026-09-11; revised 2026-09-17. **Status:** Implemented across eleven
-owners: the batch engine, the resident daemon with its context manager, service
-and lightweight client, and the retained analysis session that answers the
-bounded hook check. [Implemented retained session](#implemented-retained-session)
+**Date:** 2026-09-11; revised 2026-09-18. **Status:** Implemented across the
+eleven owners of the batch engine, the resident daemon with its context manager,
+service and lightweight client, and the retained analysis session that answers
+the bounded hook check. Plans 6B–6D added four explorer owners, `service-api`,
+`explorer`, `presentation/project-view` and `integration-tests`, so the toolkit
+declares fifteen. [Implemented retained session](#implemented-retained-session)
 states what Plan 5 delivered. The process/client split and memory/testing
 requirements are decided in the [architecture overview](README.md). The
 [Plan 1 handoff](../plans/done/iteration-1-project-verifier/iterations/iteration15-results.md)
@@ -118,8 +120,9 @@ structure.
 
 ## Ramify's ownership tree
 
-These eleven owners are declared within one toolkit package. The nine batch
-owners are joined by `daemon` and its `contexts` child. Every declared owner
+The eleven owners of this design are declared within one toolkit package, beside
+the four explorer owners described below. The nine batch owners are joined by
+`daemon` and its `contexts` child. Every declared owner
 has `module.ramify`, a purpose `README.md` and its own `src/`, with optional
 `src/interfaces/` and `src/tests/`. Each edge below corresponds to placement under
 the parent's `subs/`. Brackets show module-header tags, not additional syntax.
@@ -140,15 +143,17 @@ ramify [dispatch]                       CLI, daemon and batch entries; service v
 └── cli [dispatch]                      commands, output and client behavior
 ```
 
-Later root children include `mcp [dispatch]`, containing MCP definitions and the
-stdio adapter over the daemon client; `service-api [dispatch]`, containing the
+Plans 6B–6D added the root children `service-api [dispatch]`, containing the
 separate Express/tRPC web host and event adapter; `explorer [ui, browser, dispatch]`,
 containing the connected browser application; and
 `integration-tests [testing, ui, dispatch]`, containing tests that combine UI
-and transport contracts. Reusable project views belong to a later
-`presentation/subs/project-view [ui, browser]` child. Additional integration
-adapters can follow the same service boundary. These owners need not exist as
-empty modules before their capabilities are implemented. The daemon's local
+and transport contracts. They also added the
+`presentation/subs/project-view [ui, browser]` child for reusable project
+views. A later root child `mcp [dispatch]` will
+contain MCP definitions and the stdio adapter over the daemon client.
+Additional integration adapters can follow the same service boundary. Such
+owners need not exist as empty modules before their capabilities are
+implemented. The daemon's local
 protocol remains part of the initial architecture. MCP delivery can precede
 visualization; optional MCP HTTP hosting mounts the same adapter module in the
 web process. Its SDK and protocol state stay outside the resident daemon.
@@ -750,7 +755,7 @@ checking and requested optional verifiers retain their separate status in both.
 
 Each iteration reviews the declarations and purpose READMEs of the owners it
 implements before their code is moved or written. `npm run check:self` checks
-the descriptions and owned source of all eleven toolkit owners through the
+the descriptions and owned source of all fifteen toolkit owners through the
 resident CLI. Self-checking supplements independent fixtures and the reference
 project's reviewed mutation expectations; the explicit Plan 1 gate remains
 `npm run reference:verify -- --plan 1`.
@@ -823,8 +828,8 @@ in the [architecture overview](README.md). Detailed implementation review still
 needs the following without reopening those decisions or the model rules:
 
 1. TypeScript contracts, `module.ramify` manifests and package entries for the
-   later owners. The eleven resident owners, their final declarations and the
-   eight package entries are implemented and validated.
+   later owners. The eleven resident owners, the four explorer owners, their
+   declarations and the eight package entries are implemented and validated.
 2. Narrower invalidation where Plan 5 kept whole-project work: a proportional
    relink of the model, and a syntactic pre-filter before re-extraction. The
    retained adapter contract and per-file dependencies are implemented.

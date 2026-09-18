@@ -1,6 +1,8 @@
 # Plan 2B: Generated architect view
 
-**Date:** 2026-09-18. **Status:** accepted for implementation, 2026-09-18.
+**Date:** 2026-09-18. **Status:** accepted for implementation, 2026-09-18;
+complete, 2026-09-18, with hypothesis H1 falsified on cost, as the
+[completion report](iterations/iteration10-results.md) records.
 This plan replaces the 2026-09-15 draft of Plan 2B, "Generated project views",
 whose `.exported_symbols/` and `docs/modules/` views are superseded by the
 [architect view specification](../../architecture/architect-view.spec.md). The

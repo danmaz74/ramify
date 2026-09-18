@@ -1,16 +1,18 @@
 # Materialized architect view
 
 **Date:** 2026-09-18. **Status:** implemented by
-[Plan 2B](../plans/iteration-2b-generated-views/main-plan.md) iterations 1–8,
-whose contracts refine this specification where it was not yet concrete; the
-[review decisions](#review-decisions) are accepted at their proposed
-defaults. `ramify materialize --view architect` publishes the view described
-below, and the [implementation status](#implementation-status) records its
-measured values. Every budget but hit cost holds. The toolkit's hit-cost
-measurement exceeds the trial thresholds for five of the six terms, `project`
-and `session` by lines as well as bytes, which the [hypothesis](#hypothesis)
-names as falsifying H1; the plan stops before its agent trials for the user's
-decision. This specification
+[Plan 2B](../plans/iteration-2b-generated-views/main-plan.md), complete on
+2026-09-18, whose contracts refine this specification where it was not yet
+concrete; the [review decisions](#review-decisions) are accepted at their
+proposed defaults. `ramify materialize --view architect` publishes the view
+described below, and the [implementation status](#implementation-status)
+records its measured values and the agent trials. Every budget but hit cost
+holds. **H1 is falsified on cost:** the toolkit's hit-cost measurement exceeds
+the trial thresholds for five of the six terms, and in the trials every core
+task was answered correctly from the view on both Claude Code and Codex CLI,
+but three core tasks exceeded the per-task hit-cost limit and two the
+narrowing limit. The user decided on 2026-09-18 to run the trials despite the
+hit cost and to treat it as later performance work. This specification
 describes hypothesis H1 of the
 [capabilities-based architecture](capabilities-based-architecture.md): one
 generated, searchable directory that gives an architect agent the project's
@@ -685,6 +687,42 @@ Known gap:
 - **Platforms.** Byte identity is measured on Linux only; no macOS host was
   available.
 
+### Trial results
+
+Plan 2B iteration 10 ran the [test cases](../plans/iteration-2b-generated-views/test-cases.md)
+on 2026-09-18 against the toolkit's view at one revision, in a copy of the
+repository without the plan and this specification, once per task and harness:
+Claude Code with `claude-opus-5`, restricted to `Read`, `Grep` and single `rg`
+commands, and Codex CLI with `gpt-6-astra` in a read-only sandbox. The
+[iteration 10 results](../plans/iteration-2b-generated-views/iterations/iteration10-results.md)
+record the method, the keys and the evidence; the transcripts and
+[scores](../plans/iteration-2b-generated-views/evidence/trials/scoring.md) are
+beside the plan.
+
+| Core criterion | Claude Code | Codex CLI |
+| --- | --- | --- |
+| Every core task passes its key | 8 of 8 | 8 of 8 |
+| At most three narrowing searches | failed: D3 and P1, 4 each | held: at most 1 |
+| No source read | held | held |
+| At most 300 hit lines and 64 KB per task | failed: D2, 306 lines and 100,542 bytes | failed: D2, 349 lines; R1, 78,162 bytes |
+
+The extended set gave Claude Code 5 pass and 1 partial, and Codex CLI 4 pass
+and 2 partial, with no source read. H1 is therefore falsified by cost, not by
+answers. Three findings bear on the record design:
+
+- **Module-identifier searches.** Searching for a module's identifier returns
+  every record of that module, because each line names its module, and every
+  consumer list and `exercises` entry naming it: up to 158 lines and 89,431
+  bytes in one search. The same answers are in the module's `module.json`.
+- **Long lines.** Claude Code's Grep replaces a matching line over 500
+  characters with a placeholder: 288 of 611 matched lines in the trials. 593 of
+  the toolkit's 1,595 records are longer, 78% of test records among them.
+- **Cut signatures.** A cut class signature can hide members, so one agent
+  would not answer a negative question.
+
+Hit cost, record length and a query interface or split view are later work:
+the user's performance work, and Plans 4 and 7.
+
 ## Review decisions
 
 1. **Name.** `.ramify-architect/`, or another audience-named directory.
@@ -720,5 +758,6 @@ this delivery; this view's own invariance is verified directly. It consumes
 Plan 6D's dependency facts and the compiler's behavior rule. Access
 explanations for a consumer/original pair and ranked search over large
 projects are not part of this view; they belong to the Plan 4 MCP adapter and
-the Plan 7 query work, and only if the trials show the view alone is
-insufficient.
+the Plan 7 query work. The [trials](#trial-results) found the view sufficient
+for every core answer and insufficient on cost, so their evidence is handed to
+those plans.
