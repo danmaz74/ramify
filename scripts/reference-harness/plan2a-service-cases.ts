@@ -171,7 +171,7 @@ export const plan2aServiceHandlers: ReadonlyMap<string, InstanceHandler> = new M
         }
         for (const target of outcome.targets) {
           a.equal(`target for ${target.module}/${target.area} carries only summary fields`,
-            Object.keys(target).sort(), ['area', 'bytes', 'changed', 'entries', 'files', 'module', 'path'].sort());
+            Object.keys(target).sort(), ['area', 'bytes', 'changed', 'entries', 'files', 'module', 'path', 'view'].sort());
         }
       } finally { await quick.dispose(); }
     });
