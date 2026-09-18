@@ -159,6 +159,49 @@ describe('I2A-07:prestage-failure', () => {
   });
 });
 
+describe('stage cleanup (AV42)', () => {
+  it('keeps the marker of a failed stage whose removal failed, and the next publication reclaims the stage', async () => {
+    const root = await tempRoot();
+    await mkdir(join(root, 'mod/src'), { recursive: true });
+    const { fs } = controlled();
+    const publisher = onePublisher(fs);
+    const first = oneModuleProjection('mod', [entry('greet', 'value', described('greet', 'function greet(): void;'))]);
+    await publisher.publish(root, 'rev-1', apiInput(first), 'req-1');
+    const before = await listAll(join(root, 'mod/src'));
+    fs.failNext('writeFile', p => p.endsWith('thing.ts.md'));
+    // Only the stage's removal fails; removing its marker would succeed.
+    fs.failNext('rm', p => /\/\.ramify\.tmp-[0-9a-f]+$/.test(p));
+    const second = oneModuleProjection('mod', [entry('changed', 'value', described('changed', 'function changed(): void;'))]);
+    expect(await publisher.publish(root, 'rev-2', apiInput(second), 'req-2')).toMatchObject({ status: 'unavailable', reason: 'output-failure' });
+    const stage = `.ramify.tmp-${'2'.padStart(32, '0')}`;
+    expect((await readdir(join(root, 'mod/src'))).sort()).toEqual(['.ramify', stage, `${stage}.marker.json`]);
+    // Recovery at the start of the next publication removes the marked stage and its marker.
+    expect(await publisher.publish(root, 'rev-1', apiInput(first), 'req-3')).toMatchObject({ status: 'published', bytesWritten: 0 });
+    expect((await readdir(join(root, 'mod/src'))).sort()).toEqual(['.ramify']);
+    expect(await listAll(join(root, 'mod/src'))).toEqual(before);
+  });
+
+  it('keeps the marker when recovery cannot remove the stage either, and a later publication reclaims it', async () => {
+    const root = await tempRoot();
+    await mkdir(join(root, 'mod/src'), { recursive: true });
+    const { fs } = controlled();
+    const publisher = onePublisher(fs);
+    const first = oneModuleProjection('mod', [entry('greet', 'value', described('greet', 'function greet(): void;'))]);
+    await publisher.publish(root, 'rev-1', apiInput(first), 'req-1');
+    fs.failNext('writeFile', p => p.endsWith('thing.ts.md'));
+    // The failed publication's cleanup and the next publication's recovery both fail to remove the stage.
+    fs.failNext('rm', p => /\/\.ramify\.tmp-[0-9a-f]+$/.test(p));
+    fs.failNext('rm', p => /\/\.ramify\.tmp-[0-9a-f]+$/.test(p));
+    const second = oneModuleProjection('mod', [entry('changed', 'value', described('changed', 'function changed(): void;'))]);
+    expect(await publisher.publish(root, 'rev-2', apiInput(second), 'req-2')).toMatchObject({ status: 'unavailable', reason: 'output-failure' });
+    const stage = `.ramify.tmp-${'2'.padStart(32, '0')}`;
+    expect(await publisher.publish(root, 'rev-1', apiInput(first), 'req-3')).toMatchObject({ status: 'published', bytesWritten: 0 });
+    expect((await readdir(join(root, 'mod/src'))).sort()).toEqual(['.ramify', stage, `${stage}.marker.json`]);
+    expect(await publisher.publish(root, 'rev-1', apiInput(first), 'req-4')).toMatchObject({ status: 'published', bytesWritten: 0 });
+    expect((await readdir(join(root, 'mod/src'))).sort()).toEqual(['.ramify']);
+  });
+});
+
 describe('I2A-07:switch-rollback', () => {
   it('restores every earlier switched target byte-for-byte in reverse order on a later switch failure', async () => {
     const root = await tempRoot();

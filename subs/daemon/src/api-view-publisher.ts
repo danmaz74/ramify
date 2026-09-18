@@ -435,6 +435,16 @@ async function readMarkerAt(fs: ApiViewFilesystemPort, path: string): Promise<Ma
   } catch { return null; }
 }
 
+/** Removes a marked sibling directory; true when it is gone, whether removed now or never
+ * created. A directory whose removal failed keeps its marker, so a later publication retries:
+ * an unmarked sibling is never reclaimed. */
+async function removeMarked(fs: ApiViewFilesystemPort, dirAbs: string): Promise<boolean> {
+  try { await fs.rm(dirAbs); return true; }
+  catch {
+    try { return await fs.lstat(dirAbs) === null; } catch { return false; }
+  }
+}
+
 /** Recovers only this publisher's own, exact-form, correctly marked stage or
  * rollback siblings of the target `name` in `parentDir` — never an unmarked or
  * foreign-version lookalike (a marker file that fails to parse or match
@@ -462,8 +472,8 @@ async function recoverSiblings(fs: ApiViewFilesystemPort, parentDir: string, nam
     const marker = await readMarkerAt(fs, markerFilePath);
     if (!marker || marker.version !== PUBLISHER_VERSION || marker.kind !== (isTmp ? 'tmp' : 'old')) continue;
     if (isTmp) {
-      try { await fs.rm(dirPath); } catch { /* the stage may not have been created before the crash */ }
-      await fs.rm(markerFilePath);
+      // The stage may not have been created before the crash.
+      if (await removeMarked(fs, dirPath)) await fs.rm(markerFilePath);
       continue;
     }
     const targetStat = await fs.lstat(targetPath);
@@ -472,8 +482,7 @@ async function recoverSiblings(fs: ApiViewFilesystemPort, parentDir: string, nam
       // describes never happened (crash right after the marker write), or
       // it already fully committed and this is a stale backup pending
       // cleanup. Either way the `.old-` directory, if present, is discarded.
-      try { await fs.rm(dirPath); } catch { /* the rename may never have happened */ }
-      await fs.rm(markerFilePath);
+      if (await removeMarked(fs, dirPath)) await fs.rm(markerFilePath);
       continue;
     }
     await fs.rename(dirPath, targetPath);
@@ -568,10 +577,12 @@ async function rollbackTarget(fs: ApiViewFilesystemPort, target: Prepared): Prom
   await fs.fsyncDir(target.parentAbs);
 }
 
+/** Removes each stage, then its marker. A stage whose removal failed keeps its marker, so a
+ * future publish's recovery step reclaims it. A stage that was never created (its `mkdir`
+ * failed) loses only the marker. */
 async function cleanupTmp(fs: ApiViewFilesystemPort, targets: readonly Prepared[]): Promise<void> {
   for (const target of targets) {
-    try { await fs.rm(target.tmpAbs); } catch { /* a future publish's recovery step reclaims it via the marker */ }
-    await removeMarker(fs, target.tmpAbs);
+    if (await removeMarked(fs, target.tmpAbs)) await removeMarker(fs, target.tmpAbs);
   }
 }
 

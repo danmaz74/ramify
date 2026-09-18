@@ -389,7 +389,8 @@ describe('leftover architect siblings (AV22)', () => {
     const first = architectView();
     await publisher.publish(root, 'rev-1', architectOnly(first), 'req-1');
     fs.failNext('writeFile', path => /\/\.ramify-architect\.tmp-[0-9a-f]+\/_meta\.json$/.test(path));
-    // Both removals fail, so the stage and its marker remain for the next invocation to recover.
+    // Two removals of the stage fail: the failed publication's cleanup and the next publication's
+    // recovery. The marker stays with the stage each time, so a later publication recovers it.
     fs.failNext('rm', path => path.includes('/.ramify-architect.tmp-'));
     fs.failNext('rm', path => path.includes('/.ramify-architect.tmp-'));
     const failed = await publisher.publish(root, 'rev-2', architectOnly(architectView({ revision: 'rev/2:fixture' })), 'req-2');
@@ -398,7 +399,31 @@ describe('leftover architect siblings (AV22)', () => {
     expect(await transient(root)).toEqual([stage, `${stage}.marker.json`]);
     const repeat = await publisher.publish(root, 'rev-1', architectOnly(first), 'req-3');
     expect(repeat).toMatchObject({ status: 'published', bytesWritten: 0, targets: [{ changed: false }] });
+    expect(await transient(root)).toEqual([stage, `${stage}.marker.json`]);
+    const later = await publisher.publish(root, 'rev-1', architectOnly(first), 'req-4');
+    expect(later).toMatchObject({ status: 'published', bytesWritten: 0, targets: [{ changed: false }] });
     expect(await transient(root)).toEqual([]);
+  });
+});
+
+describe('stage cleanup (AV42)', () => {
+  it('keeps the marker of a failed stage whose removal failed, and the next publication reclaims the stage', async () => {
+    const root = await tempRoot();
+    const fs = controlled();
+    const publisher = onePublisher(fs);
+    const first = architectView();
+    await publisher.publish(root, 'rev-1', architectOnly(first), 'req-1');
+    fs.failNext('writeFile', path => /\/\.ramify-architect\.tmp-[0-9a-f]+\/_meta\.json$/.test(path));
+    // Only the stage's removal fails; removing its marker would succeed.
+    fs.failNext('rm', path => /\/\.ramify-architect\.tmp-[0-9a-f]+$/.test(path));
+    const failed = await publisher.publish(root, 'rev-2', architectOnly(architectView({ revision: 'rev/2:fixture' })), 'req-2');
+    expect(failed).toMatchObject({ status: 'unavailable', reason: 'output-failure' });
+    const stage = `.ramify-architect.tmp-${'2'.padStart(32, '0')}`;
+    expect(await transient(root)).toEqual([stage, `${stage}.marker.json`]);
+    const repeat = await publisher.publish(root, 'rev-1', architectOnly(first), 'req-3');
+    expect(repeat).toMatchObject({ status: 'published', bytesWritten: 0, targets: [{ changed: false }] });
+    expect(await transient(root)).toEqual([]);
+    expect(await tree(join(root, '.ramify-architect'))).toEqual(expectedTree(first));
   });
 });
 
@@ -448,5 +473,29 @@ describe('visibility to rg (AV23)', () => {
     // The control: without the ignore file, a hidden search reaches the view.
     expect(run('rg', [...search, '--hidden', '--no-ignore-vcs', 'debounce']).some(line => line.startsWith('.ramify-architect/'))).toBe(true);
     expect(run('git', ['status', '--porcelain', '--untracked-files=all']).filter(line => line.includes('.ramify-architect'))).toEqual([]);
+  });
+});
+
+describe('marker files and Git (AV42)', () => {
+  it.skipIf(!tools).each(ignoreFiles)('with the %s .gitignore, Git shows no leftover marker file and still shows the near misses', async (_label, url) => {
+    const root = await tempRoot();
+    const env = { ...process.env };
+    for (const name of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE']) delete env[name];
+    const git = (...args: string[]) => {
+      const result = spawnSync('git', args, { cwd: root, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+      if (result.status !== 0) throw new Error(`git ${args.join(' ')}: ${result.stderr}`);
+      return result.stdout.split('\n').filter(Boolean);
+    };
+    git('init', '-q');
+    await writeFile(join(root, '.gitignore'), await readFile(url));
+    const hex = 'e'.repeat(32);
+    const markers = ['.ramify.tmp', '.ramify.old', '.ramify-architect.tmp', '.ramify-architect.old']
+      .flatMap(sibling => ['', 'mod/src/'].map(at => `${at}${sibling}-${hex}.marker.json`));
+    const nearMisses = ['.ramify.tmp.marker.json', '.ramify-architect.tmp.marker.json', `.ramify-other.tmp-${hex}.marker.json`,
+      `.ramify-architects.old-${hex}.marker.json`];
+    for (const path of [...markers, ...nearMisses]) await writeFile(join(root, path), '{"schema":"ramify.api-view-publisher-marker/1"}\n');
+    expect(git('status', '--porcelain', '--untracked-files=all').map(line => line.slice(3)).sort())
+      .toEqual(['.gitignore', ...nearMisses].sort());
+    expect(git('check-ignore', ...markers)).toEqual(markers);
   });
 });
