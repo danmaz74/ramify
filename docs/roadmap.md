@@ -435,7 +435,7 @@ Plan 6D's dependency facts, both implemented.
 `.exported_symbols/` text inventories and `docs/modules/` links over a general
 view registry, is superseded by the
 [architect view specification](architecture/architect-view.spec.md), written
-from the [capabilities-based architecture](architecture/capabilities-based-architecture.md)
+from the [agentic module architect analysis](analysis/2026-09-18-agentic-module-architect.md)
 note. The draft remains in the Git history.
 
 **Working outcome.** `ramify materialize --view architect` publishes
