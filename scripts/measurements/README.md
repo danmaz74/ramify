@@ -421,10 +421,13 @@ bytes and record lengths per file kind; `README.md` and the largest
 `rg -n -i <term> .ramify-architect/` for `revision`, `project`, `session`,
 `publish`, `watch` and `create`, with lines and bytes per file kind. The
 `session-query` workload times the architect session query in process, hot and
-after releasing the compiler. Two witnesses record known gaps:
-`mixed-invocation` materializes with `--root` from another directory after a
-check from the root opened the context, and `open-with-view` opens a resident
-session while views exist and compares its input identity with a batch check.
+after releasing the compiler. Two witnesses record the fixes of Plan 2B's
+iteration 9. `mixed-invocation` reaches a context with another invocation form,
+materializing with `--root` from another directory after a check from the root,
+and without `--root` after `check --root .`, and requires measured dependencies
+within the whole-command budget. `open-with-view` opens a resident session
+while views exist and requires no generated input and a batch check's input
+identity.
 
 The raw report is written to
 `docs/plans/iteration-2b-generated-views/evidence/plan2b-measurements.json`

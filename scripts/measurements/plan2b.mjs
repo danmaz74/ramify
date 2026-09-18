@@ -267,39 +267,56 @@ async function sessionQuery(root) {
 }
 
 /**
- * The defect witness: the context is opened by a check from the project root,
- * and the materialization names the same root from another directory. The
- * republished revision's report records the second invocation while its inputs
- * are the first invocation's, so the analyzer finds changed inputs on every
- * try until the wait limit. A materialization in the opening form follows.
+ * The invocation witness (AV40): a context opened by one invocation form is
+ * reached by another, and the republished revision's report names the second
+ * invocation while its inputs were captured for the first. Two sequences, each
+ * with its own daemon on the same copy, views removed between them: a check from
+ * the project root, then `materialize --root <root>` from another directory and
+ * a materialization in the opening form; and `check --root .`, then a
+ * materialization without `--root`. Every materialization must measure its
+ * dependencies within the whole-command budget.
  */
 async function mixedInvocation(executable, root, elsewhere) {
-  const daemon = await ownedDaemon(executable, root);
-  const record = { name: 'mixed-invocation', steps: {} };
-  try {
-    const check = await daemon.run(['check', '--format', 'json']);
-    record.steps.check = { code: check.code, durationMs: round(check.durationMs) };
-    record.afterCheck = contextSummary(await daemon.status());
-    record.steps.materializeWithRoot = parsed(await daemon.run(['materialize', '--view', 'architect', '--root', root], elsewhere));
-    const afterRoot = await daemon.status();
-    record.afterMaterializeWithRoot = { context: contextSummary(afterRoot), counters: afterRoot?.counters ?? null };
-    record.steps.materializeFromRoot = parsed(await daemon.run(['materialize', '--view', 'architect']));
-    const afterOwn = await daemon.status();
-    record.afterMaterializeFromRoot = { context: contextSummary(afterOwn), counters: afterOwn?.counters ?? null };
-  } finally { record.daemonStop = await daemon.stop(); }
+  const record = { name: 'mixed-invocation', sequences: {} };
+  const sequence = async (name, check, materialize) => {
+    const daemon = await ownedDaemon(executable, root);
+    const entry = { check: null, steps: {} };
+    try {
+      const opened = await daemon.run(check);
+      entry.check = { args: check, code: opened.code, durationMs: round(opened.durationMs) };
+      entry.afterCheck = contextSummary(await daemon.status());
+      for (const [step, args, cwd] of materialize) {
+        entry.steps[step] = { args, from: cwd === root ? 'root' : 'elsewhere', ...parsed(await daemon.run(args, cwd)) };
+        const status = await daemon.status();
+        entry.steps[step].context = contextSummary(status);
+        entry.steps[step].counters = status?.counters ? { dependencyDiagrams: status.counters.dependencyDiagrams,
+          dependencyDiagramInputChanges: status.counters.dependencyDiagramInputChanges } : null;
+      }
+    } finally { entry.daemonStop = await daemon.stop(); }
+    await rm(join(root, viewName), { recursive: true, force: true });
+    record.sequences[name] = entry;
+  };
+  await sequence('check-then-root-elsewhere', ['check', '--format', 'json'], [
+    ['materializeWithRoot', ['materialize', '--view', 'architect', '--root', root], elsewhere],
+    ['materializeFromRoot', ['materialize', '--view', 'architect'], root]]);
+  await sequence('check-root-dot-then-plain', ['check', '--root', '.', '--format', 'json'], [
+    ['materializeWithoutRoot', ['materialize', '--view', 'architect'], root]]);
   return record;
 }
 
 /**
- * The isolation witness: a resident session opened while generated views
+ * The isolation witness (AV41): a resident session opened while generated views
  * exist. The same copy is checked resident and batch, first without views and
- * then after a daemon restart with the architect and API views present; then a
- * changed view is published and the next check shows whether a revision started.
+ * then after a daemon restart with the architect and API views present; the
+ * session must record no generated path and have the batch check's input
+ * identity. Then a changed view is published and the next check shows whether a
+ * revision started.
  */
 async function openWithView(executable, root) {
   const record = { name: 'open-with-view', steps: {} };
   const reportOf = result => { const value = JSON.parse(result.stdout); return { code: result.code, inputId: value.inputId,
-    inputs: value.snapshot.inputs.length, generatedInputs: value.snapshot.inputs.filter(input => /(?:^|\/)\.ramify(?:-architect)?(?:$|\/)/.test(input.path)).map(input => input.path) }; };
+    inputs: value.snapshot.inputs.length,
+    generatedInputs: value.snapshot.inputs.filter(input => /(?:^|\/)\.ramify(?:-architect)?(?:\.(?:tmp|old)-[^/]+)?(?:$|\/)/.test(input.path)).map(input => input.path) }; };
   const first = await ownedDaemon(executable, root);
   try {
     record.steps.residentWithoutViews = reportOf(await first.run(['check', '--format', 'json']));
@@ -356,8 +373,7 @@ function evaluateBudgets() {
     report.configured.maxArchitectBytes === budget.maxArchitectBytes && largestView <= budget.maxArchitectBytes);
   const mixed = report.workloads['mixed-invocation'];
   addBudget('Dependency wait', `${budget.waitIntervalMs} ms interval, ${budget.waitLimitMs} ms total`,
-    `configured ${report.configured.dependencyWait.intervalMs} ms, ${report.configured.dependencyWait.limitMs} ms`
-      + (mixed?.steps?.materializeWithRoot ? `; the mixed-invocation run reached the limit and took ${mixed.steps.materializeWithRoot.durationMs} ms` : ''),
+    `configured ${report.configured.dependencyWait.intervalMs} ms, ${report.configured.dependencyWait.limitMs} ms`,
     report.configured.dependencyWait.intervalMs === budget.waitIntervalMs && report.configured.dependencyWait.limitMs === budget.waitLimitMs);
   for (const [name, item] of [['toolkit', toolkit], ['reference', reference]]) {
     if (!item?.hitCost) continue;
@@ -372,11 +388,19 @@ function evaluateBudgets() {
       `${mean} characters, longest ${toolkit.view.kinds['behavior.jsonl'].maxRecordCharacters}`, mean <= budget.meanBehaviorCharacters,
       'recorded as evidence, not enforced');
   }
-  if (mixed?.steps) {
-    const run = mixed.steps.materializeWithRoot;
-    addBudget('Whole materialize --view architect after a check from another invocation (defect witness)', `${budget.wholeCommandMs} ms`,
-      `${run.durationMs} ms, dependencies ${run.dependencies}`, run.durationMs <= budget.wholeCommandMs && run.dependencies === 'measured',
-      'the analyzer re-acquires with the republished report\'s request, whose discovery inputs differ from the retained ones');
+  if (mixed?.sequences) {
+    const runs = Object.entries(mixed.sequences).flatMap(([name, entry]) => Object.entries(entry.steps).map(([step, run]) => ({ name: `${name}/${step}`, run })));
+    addBudget('Whole materialize --view architect after another invocation form reached the context (AV40)', `${budget.wholeCommandMs} ms`,
+      runs.map(({ name, run }) => `${name}: ${run.durationMs} ms, dependencies ${run.dependencies}`).join('; '),
+      runs.length > 0 && runs.every(({ run }) => run.code === 0 && run.durationMs <= budget.wholeCommandMs && run.dependencies === 'measured'),
+      'the analyzer acquires with the request the republished revision\'s inputs were captured with');
+  }
+  const isolation = report.workloads['open-with-view'];
+  if (isolation?.steps) {
+    const opened = isolation.steps.residentOpenedWithViews, batch = isolation.steps.batchWithViews, without = isolation.steps.residentWithoutViews;
+    addBudget('Resident session opened beside generated views (AV41 witness)', 'no generated input; the batch check\'s input identity',
+      `${opened.inputs} inputs, ${opened.generatedInputs.length} generated; resident ${opened.inputId}, batch ${batch.inputId}, without views ${without.inputId}`,
+      opened.generatedInputs.length === 0 && opened.inputId === batch.inputId && opened.inputs === batch.inputs);
   }
 }
 
