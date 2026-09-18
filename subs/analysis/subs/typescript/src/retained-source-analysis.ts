@@ -12,10 +12,11 @@ import { createDescriptionSet, type DescriptionSet } from './descriptions.js';
 import { describeExportShapes } from './export-shapes.js';
 import type { AccessInterpreter, CatalogDelta, CatalogExport, ExportShape, ExportShapeRequest, FileDescription, MembershipReach,
   RetainedSourceAnalysis, RetainedSourceInputs, SourceCatalog, SourceChangeSet, SourceWorkLimits, SymbolDetail, SymbolDetailLimits,
-  SymbolDetailRequest } from './interfaces/source.js';
+  SymbolDetailRequest, TestFileTitles, TestTitleLimits } from './interfaces/source.js';
 import type { CatalogHost } from './resolution.js';
 import { describeSymbolDetails } from './symbol-details.js';
 import { referencesOnly, syntheticCandidate, syntheticInputs } from './synthetic.js';
+import { describeTestTitles } from './test-titles.js';
 import { FILE_BYTES, SourceFailure, freezeData, type HelperInputs } from './wire.js';
 
 type Snapshot = ReturnType<API['updateSnapshot']>;
@@ -247,6 +248,12 @@ class RetainedSourceState implements RetainedSourceAnalysis {
     this.#check(signal);
     const project = this.#requireProject();
     return this.#guarded(() => describeExportShapes(project, { inventory: this.#inventory, areas: this.#areas }, requests, signal));
+  }
+
+  async testTitles(files: readonly string[], limits: TestTitleLimits, signal?: AbortSignal): Promise<readonly TestFileTitles[]> {
+    this.#check(signal);
+    const project = this.#requireProject();
+    return this.#guarded(() => describeTestTitles(project, this.#root, files, limits, signal));
   }
 
   interpreter(): AccessInterpreter {

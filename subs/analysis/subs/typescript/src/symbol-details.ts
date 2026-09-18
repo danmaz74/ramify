@@ -15,11 +15,11 @@ const decoder = new TextDecoder('utf-8', { fatal: true });
 
 /**
  * Back off one byte at a time until the slice decodes cleanly, so a truncated
- * signature or documentation string never splits a multi-byte code point or
- * emits a replacement character. No byte-safe UTF-8 truncation helper existed
- * anywhere in `subs/` before this file (confirmed by the iteration 1 probe).
+ * signature, documentation string or test title never splits a multi-byte code
+ * point or emits a replacement character. No byte-safe UTF-8 truncation helper
+ * existed anywhere in `subs/` before this file (confirmed by the iteration 1 probe).
  */
-function truncateUtf8(text: string, maxBytes: number): { readonly text: string; readonly truncated: boolean } {
+export function truncateUtf8(text: string, maxBytes: number): { readonly text: string; readonly truncated: boolean } {
   const full = Buffer.from(text, 'utf8');
   if (full.length <= maxBytes) return { text, truncated: false };
   for (let end = maxBytes; end >= 0; end--) {

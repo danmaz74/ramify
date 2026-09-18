@@ -6,8 +6,11 @@ import type { ObservationSink } from '../../../project/src/interfaces/project.js
 import { describeExportShapes } from '../export-shapes.js';
 import { createRetainedSourceAnalysis, retainedCompilerEvidence } from '../retained-source-analysis.js';
 import { createSourceAnalysis } from '../source-analysis.js';
-import type { ExportShapeRequest, RetainedSourceAnalysis, RetainedSourceInputs, SourceChangeSet, SymbolDetailLimits } from '../interfaces/source.js';
-import { acquire, areasFor, code, configuration, definingExports, drop, fixture, put, shapesFixture, sourceLimits } from './fixtures.js';
+import { describeTestTitles } from '../test-titles.js';
+import type { ExportShapeRequest, RetainedSourceAnalysis, RetainedSourceInputs, SourceChangeSet, SymbolDetailLimits,
+  TestTitleLimits } from '../interfaces/source.js';
+import { acquire, areasFor, code, configuration, definingExports, drop, fixture, put, shapesFixture, sourceLimits,
+  titlesFixture } from './fixtures.js';
 import { retainedMembershipWitness } from './retained-membership.js';
 
 const roots: string[] = [];
@@ -463,6 +466,66 @@ describe('retained source analysis', () => {
       expect(analysis.hot).toBe(true);
       await analysis.dispose();
       await expect(analysis.shapes([limit])).rejects.toMatchObject({ code: 'disposed' });
+    }, 60_000);
+  });
+
+  describe('test titles (AV07)', () => {
+    const limits: TestTitleLimits = { maxTitleBytes: 240, maxTitlesPerRecord: 40, maxResultBytes: 16 * 1024 * 1024 };
+    const suites = 'src/tests/suites.test.ts';
+
+    it('returns what describeTestTitles returns on the same project, in request order', async () => {
+      const root = await start(titlesFixture);
+      const inputs = await inputsOf(root);
+      const analysis = await open(root);
+      const files = ['src/tests/tables.test.ts', 'tests/outside.test.ts', suites, 'src/tests/limits.test.ts',
+        'src/tests/own-bindings.test.ts', 'src/tests/plain.test.js', 'src/tests/absent.test.ts', 'src/tests/local-bindings.test.ts',
+        'src/tests/no-tests.test.ts', 'src/tests/tables.test.ts'];
+      const retained = await analysis.testTitles(files, limits);
+      const api = new API({ cwd: root });
+      try {
+        const snapshot = api.updateSnapshot({ openProjects: [inputs.configuration] });
+        expect(retained).toEqual(describeTestTitles(snapshot.getProject(inputs.configuration)!, root, files, limits));
+      } finally { api.close(); }
+      expect(retained.map(entry => entry.file)).toEqual(files);
+      expect(retained.map(entry => entry.state)).toEqual(['described', 'unavailable', 'described', 'described', 'described',
+        'unavailable', 'unavailable', 'described', 'described', 'described']);
+      expect(retained[2]).toMatchObject({ state: 'described', suites: expect.arrayContaining([{ suite: ['empty suite'], tests: [] }]) });
+      expect(Object.isFrozen(retained) && Object.isFrozen(retained[0])).toBe(true);
+    }, 60_000);
+
+    it('needs no description, rejects with unavailable once the compiler is released, and answers again after the next update', async () => {
+      const root = await start(titlesFixture);
+      const analysis = await open(root);
+      const [first] = await analysis.testTitles([suites], limits);
+      expect(first).toMatchObject({ file: suites, state: 'described', dynamic: 0, cut: 0 });
+      await analysis.describe([]);
+      await analysis.releaseCompiler();
+      await expect(analysis.testTitles([suites], limits)).rejects.toMatchObject({ code: 'unavailable' });
+      await analysis.update(none);
+      expect(await analysis.testTitles([suites], limits)).toEqual([first]);
+    }, 60_000);
+
+    it('rejects the in-flight call with read-failure and discards the compiler when the server is lost', async () => {
+      const root = await start(titlesFixture);
+      const analysis = await open(root);
+      await analysis.describe([]);
+      const pid = retainedCompilerEvidence(analysis).serverPid!;
+      process.kill(pid, 'SIGKILL');
+      expect(await gone(pid)).toBe(true);
+      await expect(analysis.testTitles([suites], limits)).rejects.toMatchObject({ code: 'read-failure' });
+      expect(analysis.hot).toBe(false);
+    }, 60_000);
+
+    it('rejects an invalid, an over-limit, an already-cancelled or a disposed call with no result', async () => {
+      const root = await start(titlesFixture);
+      const analysis = await open(root);
+      await analysis.describe([]);
+      await expect(analysis.testTitles(['/abs/suites.test.ts'], limits)).rejects.toMatchObject({ code: 'protocol-error' });
+      await expect(analysis.testTitles([suites], { ...limits, maxResultBytes: 64 })).rejects.toMatchObject({ code: 'resource-limit' });
+      await expect(analysis.testTitles([suites], limits, AbortSignal.abort())).rejects.toMatchObject({ code: 'cancelled' });
+      expect(analysis.hot).toBe(true);
+      await analysis.dispose();
+      await expect(analysis.testTitles([suites], limits)).rejects.toMatchObject({ code: 'disposed' });
     }, 60_000);
   });
 });

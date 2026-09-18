@@ -246,3 +246,102 @@ export function definingExports(catalog: SourceCatalog): ExportShapeRequest[] {
   return catalog.files.flatMap(file => file.exports.flatMap(entry => entry.original && file.file === `src/${entry.original.file}`
     ? [{ original: entry.original, exportName: entry.name }] : []));
 }
+
+const longTitle = 'a'.repeat(300);
+/** 300 bytes whose 240-byte cut falls inside a two-byte character. */
+const longSuite = `x${'é'.repeat(149)}y`;
+/**
+ * AV04–AV07's `titles` project: Vitest files with nested suites, a suite
+ * with no tests, tests outside any suite, modifier and table forms, verbatim,
+ * dynamic and over-long titles, a suite of 45 tests, a file with its own
+ * `describe` and `test`, a file whose parameters, loop, catch and block
+ * bindings hide those names in their scopes, a file without tests, a
+ * JavaScript file the compiler options leave out, and a test file outside
+ * every module's source.
+ */
+export const titlesFixture: Readonly<Record<string, string>> = {
+  'src/tests/suites.test.ts': `import { describe, it, test } from 'vitest';
+
+it('runs outside any suite', () => {});
+
+describe('outer', () => {
+  it('outer first', () => {});
+  describe('inner', () => {
+    it('inner first', () => {});
+    test('inner second', () => {});
+  });
+  it('outer after inner', () => {});
+});
+
+describe('only nested', () => {
+  describe('leaf', () => { it('leaf test', () => {}); });
+});
+
+describe('empty suite', () => {});
+
+describe.skip('skipped suite', () => {
+  it.only('focused test', () => {});
+  it.skip.each([1])('skipped table %i', () => {});
+});
+
+test('second outside', () => {});
+`,
+  'src/tests/tables.test.ts': `import { describe, it, test } from 'vitest';
+
+const name = 'computed';
+describe.each([['a'], ['b']])('table suite %s', () => {
+  test.each([[1, 2], [3, 4]])('adds %i and %i', () => {});
+  it.each\`value
+  \${1}\`('tagged table $value', () => {});
+});
+test.each(['one', 'two'])('case %s', () => {});
+describe.only.each([1])(\`template suite %i\`, () => {
+  test(\`template without substitution\`, () => {});
+  test(\`template with \${name}\`, () => {});
+  it(name, () => {});
+  it('computed ' + name, () => {});
+});
+`,
+  'src/tests/limits.test.ts': `import { describe, it } from 'vitest';
+
+describe('limits', () => {
+  it('${longTitle}', () => {});
+});
+
+describe('${longSuite}', () => {
+  it('under a cut suite', () => {});
+});
+
+describe('forty-five', () => {
+${Array.from({ length: 45 }, (_, index) => `  it('test ${index + 1}', () => {});`).join('\n')}
+});
+`,
+  'src/tests/own-bindings.test.ts': `import { it } from 'vitest';
+
+function describe(label: string, body: () => void): void { void label; body(); }
+const [test] = [(label: string): string => label];
+
+describe('not a suite', () => {
+  it('kept test', () => {});
+  test('not a test');
+});
+`,
+  'src/tests/local-bindings.test.ts': `import { describe, it } from 'vitest';
+
+function until(describe: () => string): string { return describe(); }
+
+describe('scoped', () => {
+  for (const it of [(label: string): string => label]) it('a loop variable, not a test');
+  try { void until; } catch (test: any) { test('a catch variable, not a test'); }
+  it('after the loop', () => {});
+  {
+    const describe = (label: string): string => label;
+    describe('a block constant, not a suite');
+  }
+  describe('still a suite', () => { it('nested', () => {}); });
+});
+`,
+  'src/tests/no-tests.test.ts': `export const shared = { title: 'not a test' };\n`,
+  'src/tests/plain.test.js': `import { it } from 'vitest';\nit('left out by the compiler options', () => {});\n`,
+  'tests/outside.test.ts': `import { it } from 'vitest';\nit('outside every module', () => {});\n`,
+};
