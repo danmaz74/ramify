@@ -4,52 +4,83 @@
 
 ## Purpose
 
-Define what Ramify gives an agent that reasons about a project's whole
-module architecture, and what it leaves to that agent. These principles
-hold whatever surface delivers the information: a generated view, a query
-interface, or both.
+Define what Ramify provides to an agent reasoning about a project's whole
+module architecture, and what remains the agent's responsibility.
+
+These principles apply regardless of the architect surface: generated views,
+query interfaces, or other representations.
 
 The [importability principles](../model/cross-module-importability.principles.md)
 remain authoritative for what may be imported. The accompanying
-[glossary](glossary.md) defines the terms used here; behavior terms are
+[glossary](glossary.md) defines the terms used here; behavioral terms are
 defined in the [dependency glossary](../architecture/dependency-glossary.md).
-This document adds nothing about the model.
+
+This document does not redefine the Ramify model.
 
 ## Principles
 
-### Two Agents, Two Scopes
+### Local Engineering, Global Architecture
 
-An engineering agent works from local data: everything about its own module,
-much about its children, and only the foreign APIs its module receives. It
-does not need the project's architecture.
+Engineering agents should work from local architectural context: their own
+module, its children, and the foreign APIs visible to it. They should not
+need to understand the project's global architecture.
 
-The module architect is the one agent with a global view. It answers four
-questions: whether a capability already exists, whether a given module may
-use it and through what path, where a missing capability belongs, and
-whether responsibilities should move.
+The module architect has global architectural scope. It reasons about
+whether a required capability appears to exist, whether it is accessible to
+a module and through what path, where a missing capability belongs, and whether
+responsibilities should move.
 
-### Ramify Supplies Evidence, The Architect Supplies Meaning
+When an existing capability is not accessible where needed, the architect
+decides whether the architecture should change to make it accessible.
 
-Ramify gives the architect the module tree, each module's purpose and tags,
-its exported originals with their roles, shapes, bounded signatures and
-first documentation paragraphs, its test titles, its exposures and their
-re-exposures, and its observed dependencies. All of it is derived from
-source, declarations and documentation that people wrote.
+### Ramify Supplies Evidence, the Architect Supplies Meaning
 
-Ramify adds no summary, keyword, ranking score, capability name or
-recommendation. Mapping a capability to symbols, judging whether an
-existing symbol satisfies a need, and choosing where new behavior belongs
-are the architect's work.
+Ramify exposes deterministic architectural evidence: module topology,
+purposes and tags, owned symbols, source-derived behavioral evidence,
+documentation and tests, exposure relationships, and statically observed
+dependencies.
 
-### Outputs Speak Of Behavior, Not Capability
+Ramify does not infer application capabilities, rank architectural choices,
+or recommend where responsibilities belong.
 
-Ramify's outputs use behavior terms only. Capability appears in
-architect-facing narrative and instructions, never as a file, field or
-count.
+Mapping capabilities to symbols, deciding whether existing behavior
+satisfies a need, and choosing architectural placement are the architect's
+work.
 
-### Discovery Is Best Effort, Access Is Definitive
+### Behavioral Evidence Is Derived; Capability Is Interpreted
 
-Finding an existing capability may fail even when it exists, and absence
-from any surface is not proof. Whether a module may use a symbol is
-decided by the importability model alone; a symbol's presence in an
-architect surface creates no availability.
+Ramify describes concrete symbols, references and dependencies in behavioral
+terms derived from source.
+
+Application capabilities are semantic concepts identified and attributed by
+people or agents. They are not facts derived by Ramify.
+
+Analysis capabilities refer only to parts of Ramify's own analysis pipeline
+and are unrelated to application capabilities.
+
+### Global Discoverability, Progressive Detail
+
+The architect has global discoverability without loading all implementation
+detail at once.
+
+Ramify provides compact project-wide evidence first, ordered by facts such
+as exposure and observed use, and deterministic drill-down into more
+detailed evidence. Source inspection is a fallback when that evidence is
+insufficient.
+
+### One Revision Per Project State
+
+Evidence combined to represent one project state comes from one analysis
+revision.
+
+Historical comparisons identify the revision of each compared state
+separately.
+
+### Discovery Is Best Effort; Access Is Definitive
+
+Finding an existing capability is a best-effort semantic task. Failure to
+find one is not proof that it does not exist.
+
+Whether a module may use a symbol is determined by the importability model.
+A symbol's presence in an architect surface does not make it available to
+that module.

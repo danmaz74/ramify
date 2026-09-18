@@ -1,3 +1,11 @@
+# Agentic module architect: first-principles analysis
+
+**Date:** 2026-09-18. **Status:** analysis. Its conclusions are recorded as the
+[Module Architect Principles](../agents/module-architect.principles.md); the
+surface it proposes is specified in the
+[architect view](../architecture/architect-view.spec.md). This document keeps
+the reasoning and is not maintained as a reference.
+
 Our goal is to give an architect agent the best possible tools to do its job.
 
 Ramify modularization is built so that normal engineering agents should be able to do their jobs only with local data: they should know everything about the module they're working on, a lot about the module's children, and only the necessary information about the APIs that other modules expose to them. They shouldn't be concerned about the global application architecture.
@@ -39,12 +47,12 @@ The main use cases for the architect agent are:
 
 We can expose some of the required information through MCP, but our working hypothesis is that having a materialized greppable view could be the best practical way for today's agents to do this.
 
-## Vocabulary: capability and behavior
+## Vocabulary: capability and behavioral evidence
 
-Ramify uses both words, each with one meaning.
+Ramify keeps the two ideas apart. The [agents glossary](../agents/glossary.md) holds the definitions; this section records the reasoning.
 
-A **behavior** is a property Ramify derives from code. A *behavior-capable symbol* is an exported value whose static shape can run: it is callable, constructable, or declares a callable or constructable member. A *behavioral dependency* is a reference that calls, constructs or passes such a symbol. Both are decided per symbol or per reference, deterministically, and say nothing about what the code is for. The [dependency glossary](dependency-glossary.md) defines them.
+**Behavioral** evidence is what Ramify derives from code; the noun "behavior" keeps its ordinary meaning of what the software does. A *behavior-capable symbol* is an exported value whose static shape can run: it is callable, constructable, or declares a callable or constructable member. A *behavioral reference* calls, constructs or passes such a symbol, and a *behavioral dependency* has at least one. Both are decided per symbol or per reference, deterministically, and say nothing about what the code is for. The [dependency glossary](../architecture/dependency-glossary.md) defines them.
 
 A **capability** is a purpose that a person or agent ascribes to one or more symbols: something a module does for others, in the terms the architect thinks in. Capabilities are stated by people, in README purposes, test titles and plans; Ramify never derives, names or counts them. A capability's entry points are behavior-capable symbols and its vocabulary is supporting types and data. One class may hold several capabilities, and one capability may span modules.
 
-The rule that follows: Ramify's outputs, meaning the glossary, the classifier, the diagram, the generated views and their fields and counts, use behavior terms only. "Capability" appears only in architect-facing narrative such as this document and agent instructions, and always as something the agent maps onto symbols, never as a file, a field or a count. The one exception is the code's `Capability` type for the optional parts of the analysis pipeline; prose calls those *analysis capabilities*.
+The rule that follows: Ramify's outputs, meaning the glossary, the classifier, the diagram, the generated views and their fields and counts, use behavioral terms only. "Capability" appears only in architect-facing narrative such as this document and agent instructions, and always as something the agent maps onto symbols, never as a file, a field or a count. The one exception is the code's `Capability` type for the optional parts of the analysis pipeline; prose calls those *analysis capabilities*.

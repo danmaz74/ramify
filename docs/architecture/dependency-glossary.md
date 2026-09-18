@@ -14,6 +14,10 @@ not a runtime call graph. The two headline counts include only referenced,
 classified symbol dependencies. They exclude unused imported symbols,
 symbol-free module loads, and dependencies whose classification is unknown.
 
+A *capability*, the purpose an architect ascribes to symbols, is not a
+dependency term; the [agents glossary](../agents/glossary.md) defines it
+against the behavioral terms below.
+
 **Call dependency** names the narrower case with direct invocation evidence.
 The terms **functional dependency** and **non-functional dependency** are not
 used because they have established, unrelated meanings in database design and
@@ -49,8 +53,8 @@ call, construction, or module load supporting a dependency classification.
 ## Behavioral dependency
 
 A **behavioral dependency** is a symbol dependency with at least one
-value-position reference to a behavior-capable symbol; behavioral evidence
-takes precedence when the same dependency also has non-behavioral evidence.
+behavioral reference; behavioral evidence takes precedence when the same
+dependency also has non-behavioral evidence.
 
 ## Call dependency
 
@@ -132,6 +136,11 @@ least one call signature.
 
 A **constructable symbol** is a resolved runtime value whose TypeScript type has
 at least one construct signature.
+
+## Behavioral reference
+
+A **behavioral reference** is a value-position reference to a
+behavior-capable symbol: a call, a construction or a callable reference.
 
 ## Value-position reference
 

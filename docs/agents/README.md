@@ -8,7 +8,7 @@ the [development guides](../development/README.md).
   gives the one agent with a global view of a project's architecture, and
   what it leaves to that agent.
 - [Glossary](glossary.md): the principles' vocabulary, including the
-  distinction between a capability and a behavior.
+  distinction between a capability and behavioral evidence.
 
 Surfaces that implement these principles are specified under
 [architecture](../architecture/README.md):

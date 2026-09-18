@@ -41,6 +41,7 @@ exit and reclaim its memory without discarding warm analysis.
 | [Optimization](optimization.md) | Process-level optimization decisions, starting with the Bun-compiled per-invocation client that avoids Node startup on every hook. |
 | [Materialized API discovery](materialized-api-view.spec.md) | Implemented generated, gitignored API documentation for agent discovery with `rg`, including ordinary and testing-area projections; `ramify materialize`. |
 | [Modularity report](modularity-report.spec.md) | Proposed units, filters, formulas, coverage and ownership of the opt-in structural modularity projection, its behavioral dependency evidence, change affinity and candidate ownership. Not implemented. |
+| [Architect view](architect-view.spec.md) | Proposed generated, gitignored project-wide view for the module architect agent: behavior-capable and supporting originals, test titles and production consumers per module, with its [agent test cases](architect-view.test-cases.md). Governed by the [module architect principles](../agents/module-architect.principles.md). Not implemented. |
 
 The [tooling roadmap](../roadmap.md) owns migration and
 delivery order. Its first detailed plan is

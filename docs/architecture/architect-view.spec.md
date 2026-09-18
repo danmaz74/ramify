@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-18. **Status:** proposal for review. This specification
 describes hypothesis H1 of the
-[capabilities-based architecture](capabilities-based-architecture.md): one
+[agentic module architect analysis](../analysis/2026-09-18-agentic-module-architect.md): one
 generated, searchable directory that gives an architect agent the project's
 modules, their behavior-capable symbols, their tests and their observed use,
 with no semantic elaboration. It replaces the `.exported_symbols/` and
