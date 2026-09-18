@@ -113,8 +113,8 @@ non-behavioral evidence; it is classified as behavioral.
 ## Unknown dependency
 
 An **unknown dependency** has cross-module symbol evidence but cannot be
-classified because symbol resolution, reference discovery, or capability
-interpretation is incomplete; it is excluded from both counts and reported as
+classified because symbol resolution, reference discovery, or behavior
+classification is incomplete; it is excluded from both counts and reported as
 a coverage limit.
 
 ## Behavior-capable symbol

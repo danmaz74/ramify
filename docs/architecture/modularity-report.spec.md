@@ -35,7 +35,7 @@ remain authoritative for those rules. Dependency vocabulary follows the
 
 | Responsibility | Owner | Location |
 | --- | --- | --- |
-| Reference discovery and behavior-capability classification while the compiler is alive; frozen `DependencyBehaviorFacts` | `analysis/typescript` | `src/interfaces/dependency-behavior.ts` (contract), implementation in iteration 2 |
+| Reference discovery and behavior classification while the compiler is alive; frozen `DependencyBehaviorFacts` | `analysis/typescript` | `src/interfaces/dependency-behavior.ts` (contract), implementation in iteration 2 |
 | The opt-in `dependency-behavior` capability in batch analysis; attaching its facts to the snapshot | `analysis` | existing batch pipeline |
 | Contract types; pure projection of `{revision, report}`; deduplication, coverage and aggregates; candidate ownership validation and boundary changes; pure change-affinity projection | `analysis` | `src/interfaces/modularity.ts`, `src/modularity*.ts`, `src/change-affinity.ts` |
 | Pure dependency-diagram projection shared by `projectModularity` and the resident operation | `analysis` | `src/interfaces/dependency-diagram.ts`, `src/dependency-diagram.ts` |
@@ -228,15 +228,17 @@ its breadth per load variant.
 Defined per exact owner `O` and source filter. An original is an **exposed
 owned original** of `O` when its defining file is in `O`'s subset files and the
 model has an `effective` exposure of it declared by `O` itself. Its
-destinations are the union over those exposures; its capability is `value` when
-the catalog original `hasValue`, otherwise `type-only`.
+destinations are the union over those exposures; its form, recorded in the
+row's `capability` field, is `value` when the catalog original `hasValue`,
+otherwise `type-only`.
 
 An exposed owned original is **selected** when an occurrence passing the filter,
 with a consumer other than `O`, has a selection of that original. Selection is
 not attributed to an exposure path, and the load filter does not apply.
 
 `InterfaceUse` has nine rows in the fixed order destinations `parent`,
-`descendants`, `any` × capabilities `value`, `type-only`, `any`. An original
+`descendants`, `any` × forms `value`, `type-only`, `any` in the `capability`
+field. An original
 exposed to both destinations counts once in each destination row and once in
 `any`.
 
@@ -576,8 +578,8 @@ Iteration 2 implements this contract.
   uses a behavior-capable symbol; `non-behavioral` when referenced only through
   type, data or forwarding evidence; `unused` when the selected bindings have no
   identified reference outside their import declaration and are not forwarded;
-  `unknown` when reference discovery, symbol resolution or capability
-  interpretation is incomplete. Glossary definitions apply to every term.
+  `unknown` when reference discovery, symbol resolution or behavior
+  classification is incomplete. Glossary definitions apply to every term.
 - References are identifiers bound to the selected local binding outside its
   import declaration, or the selecting member or destructuring expression.
   Export forms and references in export specifiers or `export default` are
@@ -587,7 +589,7 @@ Iteration 2 implements this contract.
   or whose first-level member is so invoked, is `call`; `new` is
   `construction`; any other value reference is `callable-reference` for a
   behavior-capable value and `data` otherwise.
-- Capability reads the reference's type: a union is behavior-capable when a
+- The behavior shape reads the reference's type: a union is behavior-capable when a
   non-nullish constituent is. A first-level member counts only when declared
   outside default and external library files, so array, string and promise
   methods do not make a value behavior-capable. `any`, `unknown` and

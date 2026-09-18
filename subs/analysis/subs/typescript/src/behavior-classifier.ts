@@ -30,7 +30,7 @@ let runs = 0;
 export function behaviorRuns(): number { return runs; }
 
 type Use = 'call' | 'construction' | 'read';
-type Capability = 'capable' | 'data' | 'unknown';
+type BehaviorShape = 'capable' | 'data' | 'unknown';
 /** Mutable evidence of one original through one access: one import path. */
 interface PathDraft {
   readonly evidence: Set<BehaviorEvidence>;
@@ -45,14 +45,14 @@ interface Item { readonly access: SourceAccess; readonly selection: AccessSelect
 
 /** Whether a value's type, or a declared first-level member, is callable or constructable. Members
  * declared only by a default or external library (array, string or promise methods) do not count. */
-class Capabilities {
-  readonly #types = new Map<number, Capability>();
+class BehaviorShapes {
+  readonly #types = new Map<number, BehaviorShape>();
   constructor(private readonly project: Project) {}
 
-  of(type: Type, depth = 0): Capability {
+  of(type: Type, depth = 0): BehaviorShape {
     const cached = this.#types.get(type.id);
     if (cached) return cached;
-    let result: Capability;
+    let result: BehaviorShape;
     if (depth > 8 || type.flags & TypeFlags.AnyOrUnknown) result = 'unknown';
     else if (type.flags & TypeFlags.UnionOrIntersection) {
       const parts = (type as UnionOrIntersectionType).getTypes().filter(part => !(part.flags & emptyConstituents))
@@ -73,7 +73,7 @@ class Capabilities {
       || checker.getSignaturesOfType(type, SignatureKind.Construct).length > 0;
   }
 
-  #structured(type: Type): Capability {
+  #structured(type: Type): BehaviorShape {
     if (this.#signatures(type)) return 'capable';
     const { checker, program } = this.project;
     const declared = (symbol: CompilerSymbol): boolean => symbol.declarations.some(handle => {
@@ -212,10 +212,10 @@ export function classifyDependencyBehavior(project: Project, inputs: HelperInput
     limits.set(id, { id, ...value });
     return id;
   };
-  const capabilities = new Capabilities(project);
+  const shapes = new BehaviorShapes(project);
   for (const [file, items] of [...files].sort(([a], [b]) => order(a, b))) {
     try {
-      classifyFile(project, root, file, items, capabilities, limit);
+      classifyFile(project, root, file, items, shapes, limit);
     } catch (error) {
       if (error instanceof SourceFailure && (error.code === 'resource-limit' || error.code === 'cancelled')) throw error;
       const id = limit('compiler-failure', { file, start: 0, end: 0, line: 1, column: 1 },
@@ -233,7 +233,7 @@ export function classifyDependencyBehavior(project: Project, inputs: HelperInput
     limits: [...limits.values()].filter(item => named.has(item.id)).sort((a, b) => order(a.id, b.id)) });
 }
 
-function classifyFile(project: Project, root: string, file: string, items: readonly Item[], capabilities: Capabilities,
+function classifyFile(project: Project, root: string, file: string, items: readonly Item[], shapes: BehaviorShapes,
   limit: (code: BehaviorLimit['code'], location: SourceLocation | null, message: string) => string): void {
   const { checker } = project;
   const source = project.program.getSourceFile(resolve(root, file));
@@ -335,12 +335,12 @@ function classifyFile(project: Project, root: string, file: string, items: reado
     const types = checker.getTypeAtLocation(values.map(value => value.node));
     values.forEach((value, index) => {
       const type = types[index];
-      const capability = type ? capabilities.of(type) : undefined;
-      if (!capability) {
+      const shape = type ? shapes.of(type) : undefined;
+      if (!shape) {
         value.path.limitIds.add(limit('unresolved-symbol', location(value.node), 'The compiler did not resolve the type of this reference'));
-      } else if (capability === 'unknown') {
+      } else if (shape === 'unknown') {
         value.path.limitIds.add(limit('unclassified-capability', location(value.node), 'The referenced value has no classifiable type'));
-      } else if (capability === 'data') value.path.evidence.add('data');
+      } else if (shape === 'data') value.path.evidence.add('data');
       else value.path.evidence.add(value.use === 'read' ? 'callable-reference' : value.use);
     });
   }

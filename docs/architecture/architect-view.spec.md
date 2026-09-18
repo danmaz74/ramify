@@ -1,0 +1,552 @@
+# Materialized architect view
+
+**Date:** 2026-09-18. **Status:** proposal for review. This specification
+describes hypothesis H1 of the
+[capabilities-based architecture](capabilities-based-architecture.md): one
+generated, searchable directory that gives an architect agent the project's
+modules, their behavior-capable symbols, their tests and their observed use,
+with no semantic elaboration. It replaces the `.exported_symbols/` and
+`docs/modules/` views proposed by the
+[Plan 2B draft](../plans/iteration-2b-generated-views/main-plan.md) and takes
+over the record shapes proposed in the
+[capability-architecture analysis](../analysis/2026-09-17-code-derived-capability-architecture.md).
+Nothing here is implemented. The hypothesis is tested by the
+[acceptance evidence](#acceptance-evidence) before a successor plan freezes
+its bounds.
+
+## Purpose
+
+An engineering agent works from local data: its own module, its children and
+the foreign APIs its module receives. The
+[API discovery view](materialized-api-view.spec.md) serves that agent. The
+architect agent is the one agent that needs the whole project: which
+capabilities exist, who implements them, who may use them, who does use them,
+and where a new one belongs. This view serves that agent.
+
+The view is derived documentation. It creates no visibility, availability,
+ownership, exposure or dependency. The
+[importability principles](../model/cross-module-importability.principles.md)
+remain authoritative for those rules, and the
+[TypeScript interpretation](../model/typescript-source-interpretation.principles.md)
+remains authoritative for original bindings, export names and behavior
+classification.
+
+## Hypothesis
+
+**H1.** One directory, stripped of everything that is not an exported
+original, a test title or a module description, is enough for an architect
+agent using only `Read` and `rg`, provided that:
+
+1. every line `rg` can return from a record file or the map is a
+   self-contained record that names its module and its role, so a search
+   result is already ranked by what it says, not by which file it came from;
+   a line from a `module.json` is identified by its path, which names the
+   module;
+2. the directory is gitignored, so a project-wide `rg` never sees it and an
+   explicit `rg <terms> .ramify-architect/` sees all of it (verified: ripgrep
+   skips an ignored directory when walking from the root and searches it when
+   the directory is named); and
+3. the cost of a hit is bounded by record design, with every text field and
+   every list in a record bounded, not by instructions the agent might not
+   follow.
+
+H1 does not rely on the agent reading files in a prescribed order. A map file
+exists for the questions `rg` cannot answer: placement, and searches whose
+terms appear in no name or title.
+
+H1 is falsified, and the split view or a query interface reconsidered, if any
+core case of the [trials](#agent-trials) on the toolkit fails, or if the
+[hit-cost measurement](#hit-cost) on the reference project or the toolkit
+exceeds the trial thresholds because common terms return too many lines.
+
+## Scope
+
+The view contains, for every declared module of one revision:
+
+- the module's identity, tags, source areas, first purpose paragraph and
+  documentation paths;
+- every exported original the module owns, classified as behavior-capable or
+  supporting, with its role, exposure, bounded signature and first
+  documentation paragraph;
+- the ancestors that re-expose each exposed original, and where to;
+- the production modules that reference each original, split by behavioral
+  and non-behavioral use, from the same analysis-owned facts and the same
+  production source filter as the dependency diagram;
+- per-module outgoing and incoming dependency counts; and
+- statically extracted test suite, test, feature and scenario titles.
+
+It excludes:
+
+- non-exported code, import statements, call sites and line numbers;
+- symbols outside the Ramify application source set;
+- same-owner references, which are not dependencies;
+- availability to a particular consumer, which the consumer's API view
+  answers;
+- explanations of how a consumer could be given access, proposed exposure
+  declarations and placement suggestions; and
+- any synthesized summary, keyword, ranking score or recommendation.
+
+## Location and layout
+
+The view is one directory at the project root:
+
+```text
+<root>/.ramify-architect/
+├── _meta.json
+├── README.md                 # instructions and the module map
+├── module.json               # root module
+├── behavior.jsonl
+├── supporting.jsonl
+├── tests.jsonl
+├── analysis/
+│   ├── module.json
+│   ├── behavior.jsonl
+│   ├── supporting.jsonl
+│   ├── tests.jsonl
+│   └── typescript/
+│       └── ...
+└── service-api/
+    └── ...
+```
+
+Module directories mirror the declared module tree without the `subs/`
+segments, as the Plan 2B draft mapped them. The root module's files live
+directly in the view root. Module names match
+`^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$` and contain no dot, so no module directory
+collides with a view file. A module with no records of one kind still has that
+file, containing nothing but a terminating newline: an empty file is a complete
+empty set, and the file's absence is a publication error.
+
+The name `.ramify-architect` is named after the audience, not after a claim:
+the view holds behavior-capable symbols, not declared capabilities. The name is
+a [review decision](#review-decisions).
+
+## `README.md`
+
+The map is the one file an agent may read before searching. It is named
+`README.md` because agents open a directory's README without being told to.
+It contains, in this order:
+
+1. a fixed instruction block (the text under
+   [agent instructions](#agent-instructions));
+2. the revision and input identity of the view; and
+3. the module map: one entry per module in tree order, at the module's depth.
+
+A map entry has two or three lines:
+
+```markdown
+- **ramify/service-api** [dispatch] — Projects retained analysis reports into the bounded project-explorer service model and hosts a resident, token-free local web server for one project: …
+  exposed 5 · internal 9 · supporting 21 · tests 31 · uses 7 · used by 3
+  headline: createProjectBinding, createProjectExplorerModel, createExplorerServer, … +2
+```
+
+- The first line is the module identifier, its required tags in brackets when
+  any, and its purpose paragraph verbatim, or `(no README purpose)`.
+- The counts line gives the module's own numbers: exposed and internal
+  behavior-capable originals, supporting originals, test titles, modules it
+  uses and modules that use it. When dependency facts are unavailable the last
+  two read `uses ? · used by ?`.
+- The headline line lists up to eight exposed behavior-capable originals by
+  export name, in [significance order](#ordering), followed by `+N` for the
+  rest. It is omitted when the module exposes no behavior.
+
+The map renders the same facts as the records and adds nothing. A term found
+in the map is also found in a record; the duplicate hit is bounded to one
+line per module and is labelled by the path `README.md`.
+
+## `module.json`
+
+One pretty-printed JSON document per module, two-space indentation, fixed key
+order:
+
+```json
+{
+  "schema": "ramify.architect-module/1",
+  "module": "ramify/service-api",
+  "dir": "subs/service-api",
+  "parent": "ramify",
+  "children": [],
+  "tags": ["dispatch"],
+  "areas": ["src", "src/tests"],
+  "purpose": {
+    "state": "present",
+    "path": "subs/service-api/README.md",
+    "text": "Projects retained analysis reports into …"
+  },
+  "docs": [],
+  "files": { "own": 7, "subtree": 7 },
+  "symbols": { "exposed": 5, "internal": 9, "supporting": 21, "unknown": 0 },
+  "tests": { "suites": 4, "titles": 31 },
+  "uses": [
+    { "module": "ramify/daemon", "behavioral": 3, "nonBehavioral": 11 },
+    { "module": "ramify/analysis/model", "behavioral": 0, "nonBehavioral": 6 }
+  ],
+  "usedBy": [
+    { "module": "ramify/cli", "behavioral": 2, "nonBehavioral": 0 }
+  ],
+  "metrics": { "state": "unavailable" },
+  "revision": "rev/1:…"
+}
+```
+
+- `purpose` is `{ "state": "missing" }` when the module has no `README.md`
+  first top-level prose paragraph. There is no fallback to another owner's
+  prose. `text` is cut at 600 characters, with `"cut": true` beside it when
+  cut; the map shows the same text.
+- `docs` lists the module's `src/docs/**` files, project-relative, sorted.
+  Their contents are not rendered.
+- `files` counts compiler-selected source files the module owns, and the same
+  for its subtree.
+- `uses` and `usedBy` count distinct originals per module pair, from the
+  dependency facts under the production source filter. Unused imports are
+  absent. An `unknown` count is present only when nonzero. Both arrays are
+  absent, not empty, when `_meta.json` records dependencies as unavailable.
+  They are unbounded: `module.json` is read whole, one entry per line, and
+  is not a search target.
+- `metrics` carries the modularity projection's per-module figures with
+  `"state": "measured"` when a delivery includes them, with each ratio as
+  numerator, denominator and value. The first delivery may publish
+  `"state": "unavailable"` everywhere.
+
+## `behavior.jsonl`
+
+One line per behavior-capable original the module owns. There is no record for
+a relayed original: an original appears once in the project, in its owner's
+file, and its record names the ancestors that re-expose it.
+
+```json
+{"module":"ramify/service-api","name":"createProjectBinding","role":"exposed","shape":"callable","to":["parent"],"tags":["dispatch"],"reexposed":[{"by":"ramify","to":["descendants"]}],"behavioral":["ramify"],"nonBehavioral":[],"sig":"function createProjectBinding(options: ProjectBindingOptions): ProjectBinding;","doc":"Own one project's daemon connection, context and subscription, and keep them valid.","file":"subs/service-api/src/project-binding.ts"}
+```
+
+Fields, in this fixed order:
+
+| Field | Presence | Meaning |
+| --- | --- | --- |
+| `module` | always | Owning module identifier. |
+| `name` | always | Defining-file export name. |
+| `as` | when it differs | Exposure names, when the owner exposes the original under other names. At most four; `asMore` counts the rest. |
+| `role` | always | `exposed`: the owner exposes it to its parent or descendants. `internal`: exported by a source file, exposed by no module declaration. |
+| `shape` | always | `constructable`, `callable`, `member` or `unknown`, by the [classification](#classification) precedence. |
+| `to` | `exposed` only | `["parent"]`, `["descendants"]` or both. |
+| `tags` | when nonempty | Required tags the importer needs, from the source area's classification. |
+| `reexposed` | when nonempty | Each ancestor that re-exposes what it received, and where to, nearest first. |
+| `behavioral` | when dependencies are measured | Production modules whose dependency on this original is behavioral: a call, a construction or a callable reference. At most twelve, sorted; `behavioralMore` counts the rest. |
+| `nonBehavioral` | when dependencies are measured | Production modules whose dependency is non-behavioral only: type, data or forwarding use. Same bound, `nonBehavioralMore`. |
+| `unclassified` | when nonempty | Production modules whose dependency is unknown. Same bound, `unclassifiedMore`. |
+| `sig` | always | Bounded, body-free signature from the compiler. |
+| `doc` | when present | First source documentation paragraph, bounded. |
+| `cut` | when nonempty | The bounded fields that were cut: `["sig"]`, `["doc"]` or both. |
+| `file` | always | Project-relative defining file. |
+
+Each consumer module appears in exactly one of the three lists, by the
+dependency diagram's classification of the (consumer module, original) unit:
+behavioral evidence settles it, otherwise any unknown constituent makes it
+unclassified, otherwise it is non-behavioral.
+
+Testing-classified originals carry `testing` in `tags` and are otherwise
+recorded like ordinary ones; the API view's testing/ordinary separation is a
+consumer concern.
+
+## `supporting.jsonl`
+
+One line per remaining exported original the module owns, with the same
+fields except that `shape` is replaced by:
+
+| Field | Meaning |
+| --- | --- |
+| `kind` | `interface`, `type`, `enum`, `value` or `namespace`. |
+| `value` | `true` when the original has a runtime value. |
+
+A class is one record, in `behavior.jsonl`. `behavioral` is never present
+here; a supporting original has `nonBehavioral` and, when nonempty,
+`unclassified`.
+
+## `tests.jsonl`
+
+One line per suite or feature that has direct tests, holding only those
+direct tests, so that every test title appears exactly once and a hit shows
+the titles beside it. A suite title is repeated in the `suite` chain of every
+record beneath it; that is the price of a self-contained hit:
+
+```json
+{"module":"ramify/service-api","file":"subs/service-api/src/tests/project-binding.test.ts","suite":["createProjectBinding","when the daemon restarts"],"tests":["resubscribes to the context","reports the eviction"]}
+{"module":"ramify/integration-tests","file":"subs/integration-tests/src/features/collection-review.viz.feature","feature":"Collection review","scenarios":["A reviewer approves a collection","A reviewer requests changes"]}
+```
+
+- Vitest-style suites are `describe` chains; `it` and `test` are titles.
+  Tests outside any suite have `"suite": []`. A suite whose tests all sit in
+  nested suites yields no record of its own; a suite with direct tests and a
+  nested suite yields one record for each; a suite with neither yields a
+  record with `"tests": []`.
+- Gherkin features carry their scenario and scenario-outline titles.
+- A title that is not a string literal is recorded as `(dynamic)` and counted
+  in `_meta.json`.
+- Test sources are the owner's `src/tests/` and the ordinary `src/` of a
+  module tagged `testing`, following the existing test discovery rules.
+  Extraction is static and runs nothing.
+
+## Ordering
+
+Within a file, records are in this order, each key sorted by UTF-8 byte order:
+
+1. `behavior.jsonl`: `exposed` before `internal`; within a role, by the number
+   of `behavioral` modules, including `behavioralMore`, descending, then
+   `nonBehavioral` descending, then `name`. When dependencies are
+   unavailable, by `name`.
+2. `supporting.jsonl`: `exposed` before `internal`; then `nonBehavioral`
+   descending, then `name`.
+3. `tests.jsonl`: by `file`, then source order of the suite.
+4. Arrays inside a record: module identifiers and names sorted; `reexposed`
+   nearest ancestor first; `suite` outermost first; `tests` and `scenarios`
+   in source order.
+
+Significance is therefore a property of the record, expressed by `role` and
+the consumer lists, and only secondarily of position. Ordering by use means a
+change in consumers reorders lines; that is acceptable for a gitignored view.
+
+## Record design for hit cost
+
+An `rg` hit returns the whole line. The record shape is chosen so that a
+hundred hits cost a few thousand tokens:
+
+- keys are short and fixed; optional fields are omitted, never `null`;
+- `sig` is cut at 240 characters and `doc` at 280, on a UTF-8 character
+  boundary, with the cut recorded in `cut`; full signatures remain in the
+  consumer's API view and in the source;
+- every list in a record is bounded: consumer lists hold at most twelve
+  module identifiers and `as` at most four, each with a `…More` count for
+  the rest; `reexposed` is bounded by the module's depth; a test list is
+  bounded by its suite, which the source keeps small;
+- `file` is last, so a display that truncates long lines loses the least
+  searchable text.
+
+A record's length is therefore bounded by a constant independent of project
+size, and a map entry by the purpose cut and the headline bound.
+`module.json` is the exception: it is pretty-printed for reading, its `uses`
+and `usedBy` grow with the project, and a search hit in it is one short line
+identified by its path.
+
+The hand-made prototype under `.exported_symbols/` averages 641 characters per
+record. The target for this view is a measured mean of at most 300 characters
+per behavior record on the toolkit, recorded as evidence, not enforced as a
+bound.
+
+## Classification
+
+An exported original is behavior-capable by the compiler's static rule already
+used for dependency classification, extracted behind a compiler-owned
+operation that classifies defining-file exports directly:
+
+| Original's value type, first matching row | `shape` |
+| --- | --- |
+| Type with a construct signature, including every class | `constructable` |
+| Type with a call signature | `callable` |
+| Class, object or namespace value with a declared first-level callable or constructable member | `member` |
+| `any`, `unknown`, unsupported resource or compiler failure | `unknown`, in `behavior.jsonl`, counted in `_meta.json` |
+
+The rows are in precedence order: a value with both construct and call
+signatures is `constructable`. The three shapes together are exactly the
+[behavior-capable symbol](dependency-glossary.md#behavior-capable-symbol) of
+the dependency glossary. Everything else exported is supporting. Library-provided members never qualify
+a value. Recursion and member inspection follow the existing classifier
+exactly so provider and consumer classifications do not drift. Absence from
+`behavior.jsonl` is not proof that no behavior exists: `unknown` records and
+the coverage counts say how much the rule could not decide.
+
+## Metadata
+
+`_meta.json` is a deterministic single-line JSON document:
+
+```json
+{"schema":"ramify.architect-view/1","revision":"rev/1:…","input":"input/1:…","modules":15,"dependencies":"measured","dependencyScope":"production","metrics":"unavailable"}
+```
+
+`dependencies` is `measured` or `unavailable`, and `dependencyScope` names
+the source filter of the measured facts, `production` in the first release;
+`metrics` is `measured` or `unavailable`. Exceptional
+counts appear only when nonzero: `unknownShapes`, `cut`, `dynamicTitles` and
+`coverage`. `coverage` means source-analysis limits may have omitted originals.
+Every `module.json` repeats the `revision`.
+
+An agent combines this view with a module's API view only when both name the
+same revision. A stale view remains readable and must be described as stale.
+
+## Materialization
+
+```sh
+ramify materialize --view architect [--root <dir>]
+```
+
+The view is always whole-project; `--from` and `--all` apply to the API view
+only. Publication goes through the view registry and transactional publisher
+that the Plan 2B successor delivers, with the guarantees the API view already
+has: one synchronized valid revision per invocation, staged complete
+replacement, byte comparison before writing, `_meta.json` published last,
+refusal of symbolic links in the target, and success only when the whole view
+is published.
+
+Dependency facts come from the analysis-owned facts behind the dependency
+diagram, at the same revision and under the same production source filter
+the first-release diagram uses: references from `src/tests/` and from
+modules tagged `testing` are not recorded anywhere in the view. A testing
+scope, if a later release adds one, is a separate projection with its own
+fields, never a union with the production lists. Materialization requests
+the facts and waits within that operation's existing limits. When they are
+unavailable, the view is published with `"dependencies":"unavailable"`, no
+consumer fields and no `uses`/`usedBy`; it is not refused.
+
+Ordinary `check`, watch updates and changed-file hooks never classify exports,
+describe symbols or write this view. Automatic publication is not part of the
+first release.
+
+## Generated-output isolation
+
+`.ramify-architect` and its staging siblings are entries in the reserved-output
+table. Inventory, compiler selection, capture, observation and watching skip
+them. The project's `.gitignore` lists `.ramify-architect/`; the reserved
+entry protects analysis regardless, and the ignore entry is what keeps the
+view out of a project-wide `rg`.
+
+## Agent instructions
+
+The project's `AGENTS.md` must tell the architect agent that the view exists,
+is generated, is hidden from ordinary recursive searches and is searched by
+naming its path. The view's `README.md` opens with the same block:
+
+```text
+This directory is generated by `ramify materialize --view architect`.
+It is gitignored and never edited or imported.
+
+Architecture questions are searched here, not in the source:
+  rg -n -i '<terms>' .ramify-architect/
+Every hit names its module and role: exposed, internal, or a test title.
+For one module, read <module>/module.json, behavior.jsonl and tests.jsonl.
+The map below lists every module with its purpose and headline symbols.
+
+Whether module X may import a symbol is answered by X's own
+src/.ramify/ view, not by this directory.
+If _meta.json records coverage or unknownShapes, absence is not proof.
+Refresh a stale view with `ramify materialize --view architect`.
+```
+
+No other procedure is prescribed. The block fits in one screen so that it is
+read.
+
+## Determinism and bounds
+
+Identical project inputs, registry, compiler configuration, dependency facts
+and Ramify version produce byte-identical view contents on every supported
+platform. Files use UTF-8, LF and a terminating newline; JSONL has exactly one
+record per line; there are no timestamps, host paths or process identifiers.
+
+Bounds a successor plan must measure before freezing, on the reference
+project, the toolkit and the S100/S500/S1000 fixtures:
+
+- files, bytes and mean record length per file kind;
+- `README.md` bytes, and the largest single `behavior.jsonl`;
+- warm materialization latency, with and without dependency facts;
+- bytes written for an unchanged repeat; and
+- peak retained memory while classifying every export.
+
+A resource limit refuses the whole view and preserves the previous complete
+one. No limit silently omits a record.
+
+## Acceptance evidence
+
+### Classification and content
+
+- A function, a constructable class and an object with a callable
+  application-declared member appear only in `behavior.jsonl`; a number, a
+  string, an enum, an interface and a type alias appear only in
+  `supporting.jsonl`; an array's or promise's library methods do not make data
+  behavioral.
+- An internal behavior-capable export has `"role":"internal"` here and is
+  absent from every foreign consumer's API view.
+- After a valid exposure change, the same original changes role in place, its
+  ownership unchanged, and appears in the consumer's API view.
+- An original re-exposed by two ancestors has two `reexposed` entries and one
+  record.
+- An imported but unreferenced original has empty consumer lists and is still
+  present.
+- Consumer lists and `uses`/`usedBy` counts agree with the explorer's
+  dependency diagram for the same revision under the production filter; a
+  reference from a module tagged `testing` or from `src/tests/` appears
+  nowhere in the view.
+- A module without a README purpose paragraph records `"state":"missing"`.
+- Test and scenario titles each appear exactly once; a suite with direct
+  tests and a nested suite yields one record for each, the nested record
+  repeating the outer title in its chain; a dynamic title is `(dynamic)` and
+  counted.
+
+### Isolation and determinism
+
+- Identical inputs produce identical check reports, revision sequences and
+  session counters with and without interleaved materialization.
+- `rg <term>` from the project root returns no line from the view;
+  `rg <term> .ramify-architect/` returns every matching line.
+- Two materializations from equal facts are byte-identical; Linux and macOS
+  agree.
+
+### Hit cost
+
+For a fixed list of terms including `revision`, `project`, `session`,
+`publish`, `watch` and `create`, on the reference project and the toolkit,
+record the hit count per file kind, the mean and maximum hit line length and
+the total bytes returned. The trial thresholds are 200 lines and 64 KB per
+term on either corpus; a term over either threshold falsifies H1 as stated
+in the [hypothesis](#hypothesis). The measurement from the toolkit source on
+2026-09-18 is the baseline: `project` matches 1,077 source lines, 95 export
+declarations and 65 test titles.
+
+### Agent trials
+
+Before the successor plan freezes bounds, run eight architect tasks on the
+toolkit with an agent restricted to `Read` and `rg`, with the view materialized
+and the instruction block in place:
+
+1. four discovery tasks, two whose terms appear in a symbol name and two whose
+   terms appear only in a test title or documentation paragraph;
+2. two placement tasks for a described capability that does not exist; and
+3. two refactoring questions about a module's incoming and outgoing use.
+
+Record, per task: tool calls, hit lines and bytes returned, whether the
+correct module and original were found when they exist, whether a placement
+or refactoring answer matches its key, and whether `README.md` was opened.
+H1 stands only if every core task passes its key, no task needs more than
+three narrowing searches, no task reads the source to answer, and no task
+returns more than 300 hit lines or 64 KB in total. The
+[test cases](architect-view.test-cases.md) fix the tasks and their keys. The
+trial transcript is evidence for the plan's contract review.
+
+## Review decisions
+
+1. **Name.** `.ramify-architect/`, or another audience-named directory.
+2. **Internal originals in the same file** as exposed ones, labelled by
+   `role`, rather than a separate `internal.jsonl` that path-filtering could
+   exclude.
+3. **No relayed records**; `reexposed` on the owner's record instead.
+4. **Headline bound** of eight names per module in the map.
+5. **Cut lengths** of 240 characters for `sig` and 280 for `doc`.
+6. **Metrics** optional in the first delivery.
+7. **Waiting for dependency facts** during materialization rather than
+   publishing without them and refreshing later.
+8. **Production-only consumer lists** in the first release, matching the
+   diagram's source filter, with a testing scope as a later separate
+   projection.
+9. **List and purpose bounds**: twelve module identifiers per consumer list,
+   four exposure names, 600 characters of purpose.
+10. **Trial thresholds** of 200 lines and 64 KB per term, and 300 lines and
+    64 KB per task.
+
+## Relation to the roadmap
+
+This view replaces the `.exported_symbols/` and `docs/modules/` views of the
+Plan 2B draft. The successor plan retains the draft's foundations: the three
+analysis-invariance restorations, the reserved-output table, the generic
+transactional publisher, the view registry, the re-hosted API view, the
+generic `materialize --view` command and the static test-hierarchy provider.
+It consumes Plan 6D's analysis-owned dependency facts and the compiler's
+behavior rule. Access explanations for a consumer/original pair and ranked
+search over large projects are not part of this view; they belong to the
+Plan 4 MCP adapter and the Plan 7 query work, and only if the trials show the
+view alone is insufficient.
