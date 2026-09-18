@@ -191,4 +191,25 @@ import type { RunControl } from '../../../analysis/src/interfaces/analysis.js';
         .toMatchObject({ ok: true, value: { status: 'reported', published: true, revision: { revision: revision.revision } } });
     } finally { await fixture.dispose(); }
   }, 60_000);
+
+  it('AV25: advertises materialize-views and carries views through the public client unchanged', async () => {
+    const runner: DependencyDiagramRunner = { run: async () => ({ status: 'unavailable', reason: 'analysis-failed', message: 'scripted' }) };
+    const fixture = await ipcFixture({}, true, undefined, runner);
+    try {
+      const client = await fixture.connect();
+      expect(client.daemon.capabilities).toContain('materialize-views');
+      const opened = await client.openContext({ ...fixture.params, setup: { registry: 'default', capabilities: ['registry', 'layout', 'metadata',
+        'descriptions', 'source-catalog', 'exposure-linking', 'static-access', 'tags-origin', 'namespace-access', 'lazy-access',
+        'symbol-free-access', 'resource-access', 'coverage'] } });
+      if (!opened.ok || opened.value.status !== 'opened') throw new Error('Open failed');
+      const request = { token: opened.value.token, requestId: 'views', freshness: { mode: 'synchronized' as const, expect: [] },
+        selection: { scope: 'all' as const }, views: ['architect' as const] };
+      const materialized = await client.materialize(request);
+      expect(materialized).toMatchObject({ ok: true, value: { status: 'materialized', requestId: 'views',
+        targets: [{ view: 'architect', path: '.ramify-architect' }],
+        architect: { modules: 1, dependencies: { unavailable: 'analysis-failed' } } } });
+      expect(await client.materialize({ ...request, requestId: 'invalid', views: ['architect', 'architect'] as never }))
+        .toMatchObject({ ok: false, error: { code: 'invalid-request' } });
+    } finally { await fixture.dispose(); }
+  }, 60_000);
 });

@@ -5,20 +5,43 @@ import { performance } from 'node:perf_hooks';
 import type { RetainedSession } from '../../analysis/src/interfaces/session.js';
 import type { RunControl } from '../../analysis/src/interfaces/analysis.js';
 import type { DependencyDiagramRunner } from '../../analysis/src/interfaces/dependency-analyzer.js';
-import type { ApiViewQueryLimits, CheckOutcome, ContextEvent, ContextStatus, ContextToken, OpenOutcome, SubscriptionHandle, Unavailable } from '../subs/contexts/src/interfaces/contexts.js';
+import type { ArchitectDependencies, RenderedArchitectView } from '../../analysis/src/interfaces/architect-view.js';
+import { renderArchitectView } from '../../analysis/src/architect-render.js';
+import type { ApiViewQueryLimits, CheckOutcome, ContextEvent, ContextRevision, ContextStatus, ContextToken, OpenOutcome, SubscriptionHandle, Unavailable,
+  UnavailableReason } from '../subs/contexts/src/interfaces/contexts.js';
 import { createContextManager } from '../subs/contexts/src/context-manager.js';
-import type { DaemonCounters, MaterializeOutcome, MaterializeParams, RamifyService, ServiceErrorCode, ServiceResult } from '../../../src/interfaces/service.js';
+import type { DaemonCounters, MaterializedArchitectSummary, MaterializeOutcome, MaterializeParams, RamifyService, ServiceErrorCode,
+  ServiceResult } from '../../../src/interfaces/service.js';
 import type { DaemonService, DaemonServiceOptions, ServiceLease, StopDisposition } from './interfaces/daemon.js';
 import { validateServiceRequest } from './validation.js';
 import { transportCounters } from './host-counters.js';
 
-/** `contracts.md`'s iteration-1 frozen `RetainedSession.apiView` bounds. Passed
- * explicitly to `createContextManager`, rather than relying on its own equal
- * default, so the production wiring self-documents the frozen numbers. */
+/** `contracts.md`'s iteration-1 frozen `RetainedSession.apiView` bounds, and Plan 2B's
+ * `architectView` bounds. Passed explicitly to `createContextManager`, rather than relying
+ * on its own equal default, so the production wiring self-documents the frozen numbers. */
 const apiViewLimits: ApiViewQueryLimits = {
   details: { maxSignatureBytes: 2048, maxDocumentationBytes: 512, maxOverloads: 8, maxResultBytes: 32 * 1024 ** 2 },
   maxAreaBytes: 32 * 1024 ** 2, maxInvocationBytes: 256 * 1024 ** 2,
+  architect: { details: { maxSignatureBytes: 240, maxDocumentationBytes: 280, maxOverloads: 4, maxResultBytes: 32 * 1024 ** 2 },
+    tests: { maxTitleBytes: 240, maxTitlesPerRecord: 40, maxResultBytes: 16 * 1024 ** 2 }, maxProjectionBytes: 64 * 1024 ** 2 },
 };
+
+/** Plan 2B's dependency wait for the architect view, on the service clock: the pause after
+ * each busy answer, and the limit of the whole wait from its first request. */
+export const dependencyWait = Object.freeze({ intervalMs: 250, limitMs: 125_000 });
+
+/** How the dependency wait ended: facts to render with, or no publication at all. */
+type DependencyWait =
+  | { readonly status: 'dependencies'; readonly dependencies: ArchitectDependencies }
+  | { readonly status: 'superseded'; readonly revision: ContextRevision | null }
+  | { readonly status: 'cancelled' }
+  | { readonly status: 'unavailable'; readonly reason: UnavailableReason; readonly message: string };
+
+/** What the materialize outcome reports of a rendered architect view. */
+function architectSummary(view: RenderedArchitectView, dependencies: ArchitectDependencies): MaterializedArchitectSummary {
+  return { modules: view.modules, records: view.records,
+    dependencies: dependencies.state === 'measured' ? 'measured' : { unavailable: dependencies.reason } };
+}
 
 const serviceDiagnostics = channel('ramify.daemon.service');
 const stopRequests = new AsyncLocalStorage<string>();
@@ -114,6 +137,51 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
     void tail.finally(() => { if (publicationLocks.get(root) === tail) publicationLocks.delete(root); });
     return result;
   }
+  /** Resolves after `delayMs` on the service clock, or at once when `signal` aborts. */
+  function pause(delayMs: number, signal: AbortSignal): Promise<void> {
+    return new Promise(resolve => {
+      if (signal.aborted) { resolve(); return; }
+      let stop = (): void => {};
+      const done = (): void => { stop(); signal.removeEventListener('abort', done); resolve(); };
+      stop = options.clock.schedule(delayMs, done);
+      signal.addEventListener('abort', done, { once: true });
+    });
+  }
+  /** Ask for the dependency facts of `revision` through the context's diagram jobs until they
+   * are ready, unavailable or superseded, pausing `dependencyWait.intervalMs` after each busy
+   * answer. Reaching `dependencyWait.limitMs`, also while a job runs for this caller, detaches
+   * the caller and gives unavailable dependencies with `wait-limit`. */
+  async function waitForDependencies(token: ContextToken, requestId: string, revision: ContextRevision, lease: string,
+    control?: RunControl): Promise<DependencyWait> {
+    const controller = new AbortController();
+    let limited = false;
+    const abort = (): void => controller.abort();
+    control?.signal?.addEventListener('abort', abort, { once: true });
+    if (control?.signal?.aborted) abort();
+    const stopLimit = options.clock.schedule(dependencyWait.limitMs, () => { limited = true; controller.abort(); });
+    const stopped = (): DependencyWait => limited && !control?.signal?.aborted
+      ? { status: 'dependencies', dependencies: { state: 'unavailable', reason: 'wait-limit' } } : { status: 'cancelled' };
+    try {
+      while (!controller.signal.aborted) {
+        const answer = await manager.dependencyFacts({ token, requestId, revision: revision.revision }, lease, { signal: controller.signal });
+        switch (answer.status) {
+          case 'ready':
+            return { status: 'dependencies', dependencies: { state: 'measured', facts: answer.diagram, testReferences: answer.testReferences } };
+          case 'superseded': return { status: 'superseded', revision: answer.revision };
+          case 'cancelled': return stopped();
+          case 'busy': await pause(dependencyWait.intervalMs, controller.signal); break;
+          case 'unavailable':
+            switch (answer.reason) {
+              case 'resource-unavailable': case 'invalid-current': case 'analysis-failed': case 'resource-limit':
+                return { status: 'dependencies', dependencies: { state: 'unavailable', reason: answer.reason } };
+              // The context itself is gone or the daemon is stopping: nothing is published.
+              default: return { status: 'unavailable', reason: answer.reason, message: answer.message };
+            }
+        }
+      }
+      return stopped();
+    } finally { stopLimit(); control?.signal?.removeEventListener('abort', abort); }
+  }
   function observe(): readonly ContextStatus[] {
     const list = manager.list();
     const live = new Set<string>();
@@ -163,14 +231,18 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
         value.handle.close(); state.subscriptions.delete(subscription);
       }
     }
-    /** Query the revision-bound projection, then publish it while the per-root
-     * lock is held; maps every context and publisher outcome without ever
+    /** Query the revision-bound projections of the requested views, wait for the
+     * architect view's dependency facts of that revision and render it, then
+     * publish every target in one transaction while the per-root lock is held;
+     * maps every context, dependency and publisher outcome without ever
      * converting a domain failure to success. Runs entirely inside
      * `withPublicationLock`, so a queued sibling invocation for the same root
      * cannot start until this one's publish (or non-projected outcome) settles. */
     async function runMaterialize(params: MaterializeParams, root: string, control?: RunControl): Promise<MaterializeOutcome> {
+      const lease = pair(params.token);
       const outcome = await manager.apiView({ token: params.token, requestId: params.requestId, freshness: params.freshness,
-        selection: params.selection, ...(params.deadlineMs === undefined ? {} : { deadlineMs: params.deadlineMs }) }, pair(params.token), control);
+        selection: params.selection, ...(params.deadlineMs === undefined ? {} : { deadlineMs: params.deadlineMs }),
+        ...(params.views === undefined ? {} : { views: params.views }) }, lease, control);
       // `outcome.status === 'projected'` is checked first (a positive equality
       // narrow, which TS handles correctly) so every other branch below never
       // needs to touch `.revision`/`.projection`: TS does not narrow away the
@@ -179,9 +251,24 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
       // both of its literal values remove it from what a later branch sees),
       // so every branch here is an explicit positive check, never a fallthrough.
       if (outcome.status === 'projected') {
-        // The API view alone: no materialize request names the architect view yet.
-        const published = await options.publisher.publish(root, outcome.revision.revision, { api: outcome.projection, architect: null },
-          params.requestId, control);
+        // The architect view waits for the dependency facts of the same revision, then renders;
+        // either view's projection is null when it was not requested.
+        let architect: { readonly view: RenderedArchitectView; readonly summary: MaterializedArchitectSummary } | null = null;
+        if (outcome.architect) {
+          const waited = await waitForDependencies(params.token, params.requestId, outcome.revision, lease, control);
+          if (waited.status === 'superseded') return { status: 'superseded', requestId: outcome.requestId, revision: waited.revision };
+          if (waited.status === 'cancelled') return { status: 'cancelled', requestId: outcome.requestId };
+          if (waited.status === 'unavailable') return { status: 'unavailable', requestId: outcome.requestId, reason: waited.reason, message: waited.message };
+          let view: RenderedArchitectView;
+          try {
+            view = renderArchitectView({ revision: outcome.revision.revision, projection: outcome.architect, dependencies: waited.dependencies });
+          } catch (error) {
+            return { status: 'unavailable', requestId: outcome.requestId, reason: 'analysis-failed', message: `Rendering the architect view failed: ${String(error)}` };
+          }
+          architect = { view, summary: architectSummary(view, waited.dependencies) };
+        }
+        const published = await options.publisher.publish(root, outcome.revision.revision,
+          { api: outcome.projection, architect: architect?.view ?? null }, params.requestId, control);
         if (published.status === 'cancelled') return { status: 'cancelled', requestId: outcome.requestId };
         if (published.status === 'unavailable') {
           // The publisher's own reason vocabulary ('invalid-path'/'resource-limit') is
@@ -194,7 +281,8 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
           return { status: 'unavailable', requestId: outcome.requestId, reason, message: published.message };
         }
         return { status: 'materialized', requestId: outcome.requestId, revision: outcome.revision, freshness: outcome.freshness,
-          targets: published.targets, bytesWritten: published.bytesWritten, ...(outcome.timings ? { timings: outcome.timings } : {}) };
+          targets: published.targets, bytesWritten: published.bytesWritten, ...(outcome.timings ? { timings: outcome.timings } : {}),
+          ...(architect ? { architect: architect.summary } : {}) };
       }
       if (outcome.status === 'pending') return { status: 'pending', requestId: outcome.requestId, current: outcome.current };
       if (outcome.status === 'cold') return { status: 'cold', requestId: outcome.requestId, current: outcome.current };

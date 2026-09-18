@@ -1,5 +1,5 @@
 import type { RetainedSession } from '../../../../analysis/src/interfaces/session.js';
-import type { DependencyDiagramFacts } from '../../../../analysis/src/interfaces/dependency-diagram.js';
+import type { DependencyDiagramFacts, TestReferenceFacts } from '../../../../analysis/src/interfaces/dependency-diagram.js';
 import type { ProjectRequest, ProjectResolution, ProjectScope } from '../../../../analysis/subs/project/src/interfaces/project.js';
 import type { ContextEvent, ContextExplorerDetailsOutcome, ContextRevision, ContextSelection, ContextState, ContextToken, ExplorerDetailsRequest, RevisionId, SynchronizationState, WatchBatch, WatcherHandle } from './interfaces/contexts.js';
 import type { RevisionHistory } from './history.js';
@@ -14,11 +14,14 @@ export interface ExplorerDetailDelivery {
   settled: boolean;
 }
 
-/** The context's single retained dependency diagram, for its published revision only. */
+/** The context's single retained dependency diagram, for its published revision only,
+ * with the test references of the same analyzer run. */
 export interface RetainedDiagram {
   readonly revision: RevisionId;
   readonly diagram: DependencyDiagramFacts;
-  /** UTF-8 bytes of the diagram's JSON, counted in the context's retained bytes. */
+  /** Null when the analyzer refused them, or when retaining them would exceed a budget the diagram alone meets. */
+  readonly testReferences: TestReferenceFacts | null;
+  /** UTF-8 bytes of the diagram's and the references' JSON, counted in the context's retained bytes. */
   readonly bytes: number;
 }
 

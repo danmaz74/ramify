@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { capture, flush, hash } from './scripted-driver.js';
+import type { ApiViewRequest, ContextToken } from '../interfaces/contexts.js';
+import { capture, flush, hash, testApiViewLimits } from './scripted-driver.js';
 import { sessionEnvironment } from './session-fixture.js';
 
 describe('ContextManager.apiView: revision-bound projection', () => {
@@ -11,7 +12,7 @@ describe('ContextManager.apiView: revision-bound projection', () => {
       expect(result.status).toBe('projected');
       if (result.status !== 'projected') throw new Error(result.status);
       expect(result.revision.sequence).toBe(1);
-      expect(result.projection.sequence).toBe(1);
+      expect(result.projection?.sequence).toBe(1);
       expect(e.status(opened.token).published?.sequence).toBe(1);
       expect(e.script.sessions).toHaveLength(1);
       expect(e.script.sessions[0]!.apiViewCalls).toHaveLength(1);
@@ -144,6 +145,110 @@ describe('ContextManager.apiView: revision-bound projection', () => {
         selection: { scope: 'all' } }, 'lease', { signal: controller.signal });
       await flush(); controller.abort();
       expect(await pendingView).toEqual({ status: 'cancelled', requestId: 'cancel-apiview' });
+    } finally { await e.dispose(); }
+  });
+});
+
+describe('ContextManager.apiView: requested views (AV26)', () => {
+  const request = (token: ContextToken, requestId: string, views?: ApiViewRequest['views']) =>
+    ({ token, requestId, freshness: { mode: 'synchronized' as const, expect: [] }, selection: { scope: 'all' as const }, ...(views ? { views } : {}) });
+
+  it('answers only the API projection without views, and calls no architect query', async () => {
+    const e = sessionEnvironment();
+    try {
+      const opened = await e.open();
+      const result = await e.manager.apiView(request(opened.token, 'default'), 'lease');
+      expect(result).toMatchObject({ status: 'projected', architect: null, projection: { sequence: 1 } });
+      expect([e.script.sessions[0]!.apiViewCalls.length, e.script.sessions[0]!.architectViewCalls.length]).toEqual([1, 0]);
+    } finally { await e.dispose(); }
+  });
+
+  it('calls only the architect query for the architect view, at the pinned sequence, with the architect limits', async () => {
+    // Limits other than the defaults, so the query shows it received the manager's own.
+    const limits = { ...testApiViewLimits, architect: { ...testApiViewLimits.architect, maxProjectionBytes: 4096,
+      tests: { ...testApiViewLimits.architect.tests, maxTitlesPerRecord: 7 } } };
+    const e = sessionEnvironment({}, limits);
+    try {
+      const opened = await e.open(); await flush();
+      e.script.version = 2;
+      const result = await e.manager.apiView(request(opened.token, 'architect', ['architect']), 'lease');
+      if (result.status !== 'projected') throw new Error(result.status);
+      expect([result.revision.sequence, result.projection, result.architect?.sequence]).toEqual([2, null, 2]);
+      const session = e.script.sessions[0]!;
+      expect(session.apiViewCalls).toEqual([]);
+      expect(session.architectViewCalls).toEqual([{ sequence: 2, ...limits.architect }]);
+    } finally { await e.dispose(); }
+  });
+
+  it('answers both projections from one synchronized revision, joined with a check in the same capture', async () => {
+    const e = sessionEnvironment();
+    try {
+      const opened = await e.open(); await flush();
+      e.script.version = 2;
+      const updates = e.script.updateCalls.length + e.script.sweepCalls.length;
+      const [checked, viewed] = await Promise.all([
+        e.check(opened.token, { mode: 'synchronized', expect: [] }),
+        e.manager.apiView(request(opened.token, 'both', ['api', 'architect']), 'lease'),
+      ]);
+      if (checked.status !== 'reported' || viewed.status !== 'projected') throw new Error('Expected both to succeed');
+      expect([checked.revision?.sequence, viewed.revision.sequence, viewed.projection?.sequence, viewed.architect?.sequence]).toEqual([2, 2, 2, 2]);
+      const session = e.script.sessions[0]!;
+      expect([session.apiViewCalls.map(call => call.sequence), session.architectViewCalls.map(call => call.sequence)]).toEqual([[2], [2]]);
+      // One capture, whose required sweep found the new inputs, answered both requests.
+      expect(e.script.updateCalls.length + e.script.sweepCalls.length - updates).toBe(1);
+    } finally { await e.dispose(); }
+  });
+
+  it('makes the whole outcome superseded when either query is superseded, and marks the context for reconciliation', async () => {
+    const e = sessionEnvironment();
+    try {
+      const opened = await e.open(); await flush();
+      e.script.architectViewPending.push((_session, query) => ({ status: 'superseded', sequence: query.sequence, observedInputId: null }));
+      const architect = await e.manager.apiView(request(opened.token, 'architect-superseded', ['api', 'architect']), 'lease');
+      expect(architect).toEqual({ status: 'superseded', requestId: 'architect-superseded', revision: e.status(opened.token).published });
+      expect(e.status(opened.token).synchronization).not.toBe('synchronized');
+
+      e.script.apiViewPending.push((_session, query) => ({ status: 'superseded', sequence: query.sequence, observedInputId: 'input/1:newer' }));
+      const calls = e.script.sessions[0]!.architectViewCalls.length;
+      const api = await e.manager.apiView(request(opened.token, 'api-superseded', ['api', 'architect']), 'lease');
+      expect(api).toMatchObject({ status: 'superseded', requestId: 'api-superseded' });
+      // The API view is queried first; its supersession ends the request before the architect query.
+      expect(e.script.sessions[0]!.architectViewCalls.length).toBe(calls);
+    } finally { await e.dispose(); }
+  });
+
+  it('maps an architect resource limit to resource-unavailable and its other refusals to analysis-failed', async () => {
+    const e = sessionEnvironment();
+    try {
+      const opened = await e.open(); await flush();
+      e.script.architectViewPending.push(() => ({ status: 'unavailable', reason: 'resource-limit', message: 'projection is too large' }));
+      expect(await e.manager.apiView(request(opened.token, 'limit', ['architect']), 'lease')).toEqual({ status: 'unavailable', requestId: 'limit',
+        reason: 'resource-unavailable', message: 'resource-limit: projection is too large' });
+      e.script.architectViewPending.push(() => ({ status: 'unavailable', reason: 'invalid-revision', message: 'Sequence 9 is not current' }));
+      expect(await e.manager.apiView(request(opened.token, 'revision', ['architect']), 'lease')).toEqual({ status: 'unavailable', requestId: 'revision',
+        reason: 'analysis-failed', message: 'invalid-revision: Sequence 9 is not current' });
+      e.script.architectViewPending.push(() => { throw new Error('worker lost'); });
+      expect(await e.manager.apiView(request(opened.token, 'thrown', ['architect']), 'lease'))
+        .toMatchObject({ status: 'unavailable', reason: 'analysis-failed', message: expect.stringContaining('worker lost') });
+    } finally { await e.dispose(); }
+  });
+
+  it('cancels a running architect query when the request is cancelled', async () => {
+    const e = sessionEnvironment();
+    try {
+      const opened = await e.open(); await flush();
+      let signal: AbortSignal | undefined;
+      e.script.architectViewPending.push((_session, _query, querySignal) => new Promise(resolve => {
+        signal = querySignal;
+        querySignal!.addEventListener('abort', () => resolve({ status: 'cancelled' }), { once: true });
+      }));
+      const controller = new AbortController();
+      const pending = e.manager.apiView(request(opened.token, 'cancel-architect', ['architect']), 'lease', { signal: controller.signal });
+      for (let attempt = 0; attempt < 20 && !signal; attempt++) await flush();
+      expect(signal?.aborted).toBe(false);
+      controller.abort();
+      expect(await pending).toEqual({ status: 'cancelled', requestId: 'cancel-architect' });
+      expect(signal?.aborted).toBe(true);
     } finally { await e.dispose(); }
   });
 });

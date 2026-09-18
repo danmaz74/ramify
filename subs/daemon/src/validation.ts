@@ -1,5 +1,5 @@
 import { posix } from 'node:path';
-import type { ServiceError, ServiceOperation } from '../../../src/interfaces/service.js';
+import type { MaterializeViewId, ServiceError, ServiceOperation } from '../../../src/interfaces/service.js';
 
 const operations: ReadonlySet<string> = new Set<ServiceOperation>([
   'openContext', 'contextStatus', 'check', 'subscribe', 'unsubscribe', 'closeContext', 'daemonStatus', 'stopDaemon', 'materialize',
@@ -108,6 +108,13 @@ function detailRequest(value: unknown): boolean {
     && canonicalText(value.exportName);
 }
 
+const viewIds: ReadonlySet<string> = new Set<MaterializeViewId>(['api', 'architect']);
+/** `MaterializeParams.views`: a non-empty list of distinct known view identifiers. */
+function views(value: unknown): boolean {
+  return array(value, item => text(item) && viewIds.has(item), viewIds.size) && value.length > 0
+    && new Set(value).size === value.length;
+}
+
 /** `MaterializeParams.freshness` is always synchronized: a materialize
  * request never uses `published` freshness or a `since` baseline. */
 function synchronizedFreshness(value: unknown): boolean {
@@ -132,8 +139,9 @@ export function validateServiceRequest(operation: unknown, params: unknown): Ser
         && (!Object.hasOwn(params, 'since') || matches(params.since, revisionId))
         && (!Object.hasOwn(params, 'deadlineMs') || (typeof params.deadlineMs === 'number'
           && Number.isSafeInteger(params.deadlineMs) && params.deadlineMs > 0 && params.deadlineMs <= 600_000)); break;
-      case 'materialize': valid = record(params, ['token', 'requestId', 'freshness', 'selection'], ['deadlineMs']) && token(params.token)
+      case 'materialize': valid = record(params, ['token', 'requestId', 'freshness', 'selection'], ['deadlineMs', 'views']) && token(params.token)
         && matches(params.requestId, requestId) && synchronizedFreshness(params.freshness) && selection(params.selection)
+        && (!Object.hasOwn(params, 'views') || views(params.views))
         && (!Object.hasOwn(params, 'deadlineMs') || (typeof params.deadlineMs === 'number'
           && Number.isSafeInteger(params.deadlineMs) && params.deadlineMs > 0 && params.deadlineMs <= 600_000)); break;
       case 'explorerDetails': {

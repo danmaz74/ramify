@@ -351,15 +351,21 @@ export interface MaterializeParams {
 Validation accepts `views` as a non-empty array of distinct known identifiers.
 `selection` stays required and is ignored when `api` is not requested.
 
-Contexts: `ApiViewRequest` gains `views?: readonly MaterializeViewId[]`;
+Contexts: `ApiViewRequest` gains `views?: readonly ('api' | 'architect')[]`,
+the root's `MaterializeViewId` declared in place, since the untagged contexts
+owner cannot import the root's `dispatch` source (corrected by iteration 7);
 `ApiViewQueryLimits` gains `architect: { details; tests; maxProjectionBytes }`;
 the `projected` outcome's `projection` becomes `ApiViewProjection | null` and
 gains `architect: ArchitectViewProjection | null`. The session is called only
 for requested views, both at the pinned sequence.
+`ContextManager.dependencyFacts` answers as `dependencyDiagram`, through the
+same jobs and retained result, and its `ready` answer adds the test
+references retained with the diagram; `dependencyDiagram` is that answer
+without them.
 
 Daemon service: after a `projected` outcome with `architect`, it waits for
 dependency facts as the [lifecycle](main-plan.md#lifecycle-and-consistency)
-describes, using the service's own `dependencyDiagram` path and lease, then
+describes, through `dependencyFacts` with the client's context lease, then
 renders and publishes. A `superseded` dependency answer returns
 `superseded`. Cancellation during the wait returns `cancelled`.
 

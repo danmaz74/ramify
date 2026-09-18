@@ -153,12 +153,50 @@ describe('materialize command grammar', () => {
     expect(() => parseArguments(argv)).toThrow();
   });
 
+  it.each([
+    { argv: ['materialize', '--view', 'architect'], expected: { command: 'materialize', all: false, views: ['architect'] } },
+    { argv: ['materialize', '--view', 'api', '--view', 'architect', '--all'], expected: { command: 'materialize', all: true, views: ['api', 'architect'] } },
+    { argv: ['materialize', '--view', 'architect', '--from', 'subs/app', '--view', 'api'],
+      expected: { command: 'materialize', all: false, from: 'subs/app', views: ['architect', 'api'] } },
+    { argv: ['materialize', '--root', 'a root', '--view', 'api'], expected: { command: 'materialize', all: false, root: 'a root', views: ['api'] } },
+  ])('AV24: accepts repeated --view values in the order given for $argv', ({ argv, expected }) => {
+    expect(parseArguments(argv)).toEqual(expected);
+  });
+
+  it.each([
+    { argv: ['materialize', '--view'], message: 'Missing value for --view' },
+    { argv: ['materialize', '--view', '--all'], message: 'Missing value for --view' },
+    { argv: ['materialize', '--view', ''], message: 'Missing value for --view' },
+    { argv: ['materialize', '--view', 'other'], message: 'Unsupported view: other' },
+    { argv: ['materialize', '--view', 'API'], message: 'Unsupported view: API' },
+    { argv: ['materialize', '--view', 'api', '--view', 'api'], message: 'Duplicate view: api' },
+    { argv: ['materialize', '--view', 'architect', '--view', 'api', '--view', 'architect'], message: 'Duplicate view: architect' },
+    { argv: ['materialize', '--view', 'architect', '--all'], message: '--from and --all select the API view' },
+    { argv: ['materialize', '--from', 'subs/app', '--view', 'architect'], message: '--from and --all select the API view' },
+    { argv: ['check', '--view', 'api'], message: 'Unsupported argument: --view' },
+  ])('AV24: rejects $argv', ({ argv, message }) => {
+    expect(() => parseArguments(argv)).toThrow(message);
+  });
+
+  it('AV24: rejects invalid --view grammar before connecting, with exit 2', async () => {
+    for (const argv of [['materialize', '--view', 'other'], ['materialize', '--view', 'api', '--view', 'api'], ['materialize', '--view', 'architect', '--all']]) {
+      let calls = 0;
+      const stderr: string[] = [];
+      const exit = await runCli(argv, { cwd: '/project', version: '1',
+        connect: async () => { calls++; throw new Error('Unexpected daemon connection'); }, stdout: () => {}, stderr: text => { stderr.push(text); },
+        batch: async () => { calls++; throw new Error('Unexpected batch'); } });
+      expect([exit, calls], argv.join(' ')).toEqual([2, 0]);
+      expect(stderr.join(''), argv.join(' ')).toMatch(/^Error \[invalid-invocation\]: /);
+    }
+  });
+
   it('lists the materialize grammar and exit codes in --help without dispatching', async () => {
     const stdout: string[] = [];
     const exit = await runCli(['--help'], { cwd: '/project', version: '1', connect: async () => { throw new Error('Unexpected daemon connection'); },
       stdout: text => { stdout.push(text); }, stderr: text => { throw new Error(text); }, batch: async () => { throw new Error('Unexpected batch'); } });
     expect(exit).toBe(0);
     expect(stdout.join('')).toContain('ramify materialize [--from <path>] [--all] [--root <dir>]');
+    expect(stdout.join('')).toContain('ramify materialize --view <api|architect>... [--from <path> | --all] [--root <dir>]');
     expect(stdout.join('')).toContain('ramify explore [--root <dir>]');
   });
 

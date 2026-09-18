@@ -2,7 +2,9 @@ import type { ServiceError, ServiceErrorCode } from '../../../src/interfaces/ser
 import type { DisconnectReason } from '../../daemon/src/interfaces/daemon.js';
 
 type CliFailureCode = Exclude<ServiceErrorCode, 'stopping'> | 'stopped' | 'unavailable'
-  | 'analysis-failed' | 'unsupported-setup' | 'evicted-revision' | 'unobserved-input';
+  | 'analysis-failed' | 'unsupported-setup' | 'evicted-revision' | 'unobserved-input'
+  /** The connected daemon does not advertise a capability the invocation needs. */
+  | 'incompatible-service';
 
 /** An explicitly translated command failure, distinct from an unexpected throw. */
 export class CliFailure extends Error {

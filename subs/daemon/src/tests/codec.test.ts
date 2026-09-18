@@ -188,4 +188,9 @@ describe('BD23: service capability negotiation', () => {
     expect(decodeMessage(encodeMessage(message as never))).toEqual(message);
     expect(() => encodeMessage(welcome(['dependencyDiagrams']) as never)).toThrow('Invalid IPC message schema');
   });
+  it('AV25: accepts the materialize-views capability and still rejects near names', () => {
+    const message = welcome(['contexts', 'check', 'subscribe', 'daemon-control', 'materialize', 'explorerDetails', 'dependencyDiagram', 'materialize-views']);
+    expect(decodeMessage(encodeMessage(message as never))).toEqual(message);
+    for (const name of ['materialize-view', 'materializeViews']) expect(() => encodeMessage(welcome([name]) as never)).toThrow('Invalid IPC message schema');
+  });
 });

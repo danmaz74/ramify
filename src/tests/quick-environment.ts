@@ -56,7 +56,7 @@ export async function createQuickEnvironment(options: Partial<ContextBudgets> = 
       client: { name: 'quick', version: instance.version }, buildKey: instance.buildKey, engine: instance.engine } });
     if (hello.type !== 'hello') throw new Error('Unexpected quick handshake');
     const welcome = through({ type: 'welcome', welcome: { protocol: 'ramify.ipc/1', instance,
-      capabilities: ['contexts', 'check', 'subscribe', 'daemon-control', 'materialize', 'explorerDetails', 'dependencyDiagram'],
+      capabilities: ['contexts', 'check', 'subscribe', 'daemon-control', 'materialize', 'explorerDetails', 'dependencyDiagram', 'materialize-views'],
       limits: { maxRequestBytes: daemonBudgets.maxRequestBytes, maxResponseBytes: daemonBudgets.maxResponseBytes,
         leaseMs: daemonBudgets.leaseMs, pingMs: daemonBudgets.pingMs } } });
     if (welcome.type !== 'welcome') throw new Error('Unexpected quick welcome');

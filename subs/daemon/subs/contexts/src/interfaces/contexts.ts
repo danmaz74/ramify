@@ -1,9 +1,10 @@
 import type { AnalysisReport, AnalysisSummary, Capability, RunControl, AnalysisDiagnostic } from '../../../../../analysis/src/interfaces/analysis.js';
 import type { ApiViewProjection, ApiViewSelection, CheckedSet, RevisionTimings, SessionStatus, SessionOpen } from '../../../../../analysis/src/interfaces/session.js';
-import type { SourceLimit, SymbolDetail, SymbolDetailLimits, SymbolDetailRequest } from '../../../../../analysis/subs/typescript/src/interfaces/source.js';
+import type { SourceLimit, SymbolDetail, SymbolDetailLimits, SymbolDetailRequest, TestTitleLimits } from '../../../../../analysis/subs/typescript/src/interfaces/source.js';
 import type { ProjectRequest, ProjectScope, ProjectResolution, OutsideSourceWarning } from '../../../../../analysis/subs/project/src/interfaces/project.js';
-import type { DependencyDiagramFacts } from '../../../../../analysis/src/interfaces/dependency-diagram.js';
+import type { DependencyDiagramFacts, TestReferenceFacts } from '../../../../../analysis/src/interfaces/dependency-diagram.js';
 import type { DependencyDiagramRunner } from '../../../../../analysis/src/interfaces/dependency-analyzer.js';
+import type { ArchitectViewProjection } from '../../../../../analysis/src/interfaces/architect-view.js';
 
 export type ContextId = string;
 export type GenerationId = string;
@@ -167,13 +168,19 @@ export interface ApiViewRequest {
   readonly token: ContextToken;
   readonly requestId: string;
   readonly freshness: Extract<Freshness, { readonly mode: 'synchronized' }>;
+  /** Ignored when `views` omits `api`. */
   readonly selection: ApiViewSelection;
   readonly deadlineMs?: number;
+  /** The projections to answer with, all from one revision; absent means `['api']`. The
+   * root's `MaterializeViewId`, which this untagged owner cannot import from dispatch source. */
+  readonly views?: readonly ('api' | 'architect')[];
 }
 export type ContextApiViewOutcome =
+  /** A projection is null exactly when its view was not requested. */
   | { readonly status: 'projected'; readonly requestId: string;
       readonly revision: ContextRevision; readonly freshness: FreshnessRecord;
-      readonly projection: ApiViewProjection; readonly timings?: ReplyTimings }
+      readonly projection: ApiViewProjection | null; readonly architect: ArchitectViewProjection | null;
+      readonly timings?: ReplyTimings }
   | { readonly status: 'pending' | 'cold'; readonly requestId: string;
       readonly current: ContextStatus }
   | { readonly status: 'deadline-exceeded'; readonly requestId: string;
@@ -219,8 +226,17 @@ export type ContextDependencyDiagramOutcome =
       readonly reason: 'resource-unavailable' | 'invalid-current'
         | 'analysis-failed' | 'resource-limit';
       readonly message: string };
+/** The dependency diagram answer whose ready variant also carries the test references of
+ * the same analyzer run: null when only the references were refused or not retained. */
+export type ContextDependencyFactsOutcome =
+  | { readonly status: 'ready'; readonly requestId: string;
+      readonly revision: ContextRevision;
+      readonly diagram: DependencyDiagramFacts;
+      readonly testReferences: TestReferenceFacts | null }
+  | Exclude<ContextDependencyDiagramOutcome, { readonly status: 'ready' }>;
 /** The frozen symbol-detail and area/invocation byte bounds `ContextManager.apiView`
- * passes to `RetainedSession.apiView`; not part of `ApiViewRequest` since a caller
+ * passes to `RetainedSession.apiView`, and those it passes to `architectView`; not
+ * part of `ApiViewRequest` since a caller
  * cannot loosen them per request. `ContextManagerOptions.apiViewLimits` defaults to
  * the values contracts.md froze in iteration 1 when a caller supplies none, so a
  * controlled test may tune them without every production caller needing an edit. */
@@ -228,6 +244,12 @@ export interface ApiViewQueryLimits {
   readonly details: SymbolDetailLimits;
   readonly maxAreaBytes: number;
   readonly maxInvocationBytes: number;
+  /** The `RetainedSession.architectView` bounds, which Plan 2B froze. */
+  readonly architect: {
+    readonly details: SymbolDetailLimits;
+    readonly tests: TestTitleLimits;
+    readonly maxProjectionBytes: number;
+  };
 }
 export type OpenOutcome =
   | { readonly status: 'opened'; readonly token: ContextToken; readonly created: boolean;
@@ -320,6 +342,10 @@ export interface ContextManager {
    * context, an earlier generation or disposal answers as `Unavailable`. */
   dependencyDiagram(request: DependencyDiagramRequest, lease: LeaseId,
     control?: RunControl): Promise<ContextDependencyDiagramOutcome | (Unavailable & { readonly requestId: string })>;
+  /** `dependencyDiagram` through the same jobs, retained result and order, whose ready
+   * answer adds the test references retained with the diagram: the architect view's facts. */
+  dependencyFacts(request: DependencyDiagramRequest, lease: LeaseId,
+    control?: RunControl): Promise<ContextDependencyFactsOutcome | (Unavailable & { readonly requestId: string })>;
   subscribe(token: ContextToken, lease: LeaseId,
     listener: (event: ContextEvent) => void): SubscriptionHandle | Unavailable;
   release(lease: LeaseId): void;

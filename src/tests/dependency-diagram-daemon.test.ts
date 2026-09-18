@@ -10,6 +10,7 @@ import type { ContextDependencyDiagramOutcome, ContextToken } from '../../subs/d
 import type { DaemonStatus, ServiceResult } from '../interfaces/service.js';
 import type { TraceEvent } from './process.js';
 import { repositoryRoot } from './process.js';
+import { dependencyAnalyzerCapacity } from '../dependency-analyzer-process.js';
 import { processAlive, waitForProcessCondition, withProcessScope } from './lifecycle-process.js';
 
 const version = '0.0.0';
@@ -118,7 +119,12 @@ describe('dependency diagram in the built daemon', () => {
           const afterReady = await status();
           expect(afterReady.counters).toMatchObject({ dependencyDiagrams: 1, behaviorRuns: 1, dependencyDiagramInputChanges: 0 });
           const context = afterReady.contexts.find(item => item.token.context === token.context)!;
-          expect(context.retainedBytes).toBe((context.session?.factBytes ?? 0) + diagramBytes);
+          // The test references of the same run are retained beside the diagram, within their own bound; the
+          // public answer carries the diagram alone. The contexts and service tests fix their exact bytes.
+          const referenceBytes = context.retainedBytes - (context.session?.factBytes ?? 0) - diagramBytes;
+          expect(referenceBytes).toBeGreaterThan(0);
+          expect(referenceBytes).toBeLessThanOrEqual(dependencyAnalyzerCapacity.maxResultBytes);
+          expect(Object.keys(ready).sort()).toEqual(['diagram', 'requestId', 'revision', 'status']);
           // Ten same-revision requests are answered from the retained result.
           for (let index = 0; index < 10; index++) {
             expect(unwrap(await connection.dependencyDiagram({ token, requestId: `bd24-again-${index}`, revision: revision.revision })))
