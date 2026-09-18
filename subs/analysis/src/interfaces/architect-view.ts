@@ -1,5 +1,6 @@
 import type { Destination, ModuleId, OriginalId, TagName } from '../../subs/model/src/interfaces/model.js';
 import type { ExportBehavior, ExportKind, SymbolDetail, SymbolDetailLimits, TestTitleLimits } from '../../subs/typescript/src/interfaces/source.js';
+import type { DependencyDiagramFacts } from './dependency-diagram.js';
 
 /** One declared module of the architect projection. */
 export interface ArchitectModuleFacts {
@@ -103,3 +104,27 @@ export type ArchitectViewQueryOutcome =
   | { readonly status: 'unavailable'; readonly reason: 'invalid-revision' | 'resource-limit'
       | 'analysis-failed'; readonly message: string }
   | { readonly status: 'cancelled' };
+
+/** Why the architect view is published without dependency facts. */
+export type ArchitectDependencyReason = 'analysis-failed' | 'resource-limit'
+  | 'resource-unavailable' | 'invalid-current' | 'wait-limit';
+
+/** The dependency facts of the view's revision under the production source filter, or why there are none. */
+export type ArchitectDependencies =
+  | { readonly state: 'measured'; readonly facts: DependencyDiagramFacts }
+  | { readonly state: 'unavailable'; readonly reason: ArchitectDependencyReason };
+
+/** One rendered file: its path relative to the view root and its complete UTF-8 text. */
+export interface ArchitectViewFile { readonly path: string; readonly text: string }
+
+/** The complete architect view of one revision, ready to publish. */
+export interface RenderedArchitectView {
+  /** Byte order by path, `_meta.json` included. */
+  readonly files: readonly ArchitectViewFile[];
+  readonly modules: number;
+  /** `behavior.jsonl`, `supporting.jsonl` and `tests.jsonl` lines. */
+  readonly records: number;
+  /** UTF-8 bytes of every file. */
+  readonly bytes: number;
+  readonly dependencies: ArchitectDependencies['state'];
+}

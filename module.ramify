@@ -28,6 +28,10 @@ expose-sub DependencyBoundaryFact, DependencyDiagramFacts, DependencyDiagramOutc
 // R10: dependency diagram runner port relayed to daemon, which receives the runner root injects.
 expose-sub DependencyDiagramRunner, DependencyAnalyzerOutcome from analysis to descendants
 
+// R11: architect projection, session query and renderer relayed to daemon and its contexts, which query the
+// session for the projection and render it with the dependency facts of the same revision.
+expose-sub ArchitectModuleFacts, ArchitectSymbol, ArchitectTestRecord, ArchitectViewCounts, ArchitectViewProjection, ArchitectViewQuery, ArchitectViewQueryOutcome, ArchitectDependencyReason, ArchitectDependencies, ArchitectViewFile, RenderedArchitectView, renderArchitectView, ExportKind, ExportBehavior, TestTitleLimits from analysis to descendants
+
 // R5: declaration-only UI relay; root source imports none of these.
 expose-sub DiagramDefinition, TreeDiagramDefinition, FocusDiagramDefinition, ModelDiagramProps, ModelDiagramInteractiveProps, TreeDiagramProps, FocusDiagramProps, ModelDiagram, ModelDiagramSvg, TreeDiagram, TreeDiagramSvg, FocusDiagram, FocusDiagramSvg, shopDiagram, example1Diagram, example1aDiagram, example1bDiagram, example2Diagram, example3Diagram, example4Diagram, shopTreeDiagram, shopFocusDiagram from presentation to descendants
 

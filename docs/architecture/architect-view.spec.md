@@ -143,15 +143,22 @@ A map entry has two or three lines:
   headline: createProjectBinding, createProjectExplorerModel, createExplorerServer, … +2
 ```
 
-- The first line is the module identifier, its required tags in brackets when
-  any, and its purpose paragraph verbatim, or `(no README purpose)`.
-- The counts line gives the module's own numbers: exposed and internal
-  behavior-capable originals, supporting originals, test titles, modules it
-  uses and modules that use it. When dependency facts are unavailable the last
-  two read `uses ? · used by ?`.
-- The headline line lists up to eight exposed behavior-capable originals by
-  export name, in [significance order](#ordering), followed by `+N` for the
+- The first line is the module identifier, its required tags in brackets
+  separated by `, ` when any, and its purpose paragraph as `module.json`
+  gives it, followed by `…` when cut, or `(no README purpose)`.
+- The counts line gives the module's own numbers: its `behavior.jsonl`
+  records by role (exposed and internal, `unknown` shapes included), its
+  `supporting.jsonl` records, test titles, modules it uses and modules that use
+  it. When dependency facts are unavailable the last two read
+  `uses ? · used by ?`.
+- The headline line lists the first eight exposed `behavior.jsonl` records by
+  `name`, in [significance order](#ordering), followed by `, … +N` for the
   rest. It is omitted when the module exposes no behavior.
+
+The instruction block is written as a `text` code fence, and the revision
+line reads `Revision <revision> · input <input>`; one blank line follows each.
+Map entries are Markdown list items indented two spaces per level below the
+root module, whose entry starts at the first column.
 
 The map renders the same facts as the records and adds nothing. A term found
 in the map is also found in a record; the duplicate hit is bounded to one
@@ -210,6 +217,17 @@ order:
   `"state": "measured"` when a delivery includes them, with each ratio as
   numerator, denominator and value. The first delivery may publish
   `"state": "unavailable"` everywhere.
+- `symbols` counts the module's `behavior.jsonl` records by role, its
+  `supporting.jsonl` records, and, in `unknown`, the behavior records whose
+  shape is `unknown`, which the role counts include. `tests` counts its
+  `tests.jsonl` records as `suites` and their test and scenario titles as
+  `titles`.
+- `uses` and `usedBy` entries are ordered by behavioral, then non-behavioral,
+  then unknown count, each descending, then by module identifier.
+- The root module has `"dir": ""` and `"parent": null`. A present `purpose`
+  and each nonempty `uses` or `usedBy` span lines as shown, one entry per
+  line; every other array and object is written on one line, with `, `
+  between items and a space inside braces.
 
 ## `behavior.jsonl`
 
@@ -260,11 +278,13 @@ fields except that `shape` is replaced by:
 | Field | Meaning |
 | --- | --- |
 | `kind` | `interface`, `type`, `enum`, `namespace`, `value` or `resource`. A `resource` is a non-code original, such as an imported stylesheet or data file. |
-| `value` | `true` when the original has a runtime value. |
+| `value` | `true` when the original has a runtime value; omitted otherwise. |
 
-A class is one record, in `behavior.jsonl`. `behavioral` is never present
-here; a supporting original has `nonBehavioral` and, when nonempty,
-`unclassified`.
+A class is one record, in `behavior.jsonl`. A supporting original has
+`nonBehavioral` and, when nonempty, `unclassified`. `behavioral` is present
+here only when the dependency facts classify a consumer's use of it as
+behavioral, which the shared classification rule does not produce, so that
+such a consumer still appears in exactly one list.
 
 ## `tests.jsonl`
 
@@ -278,6 +298,9 @@ record beneath it; that is the price of a self-contained hit:
 {"module":"ramify/integration-tests","file":"subs/integration-tests/src/features/collection-review.viz.feature","feature":"Collection review","scenarios":["A reviewer approves a collection","A reviewer requests changes"]}
 ```
 
+- A record's keys are `module`, `file`, then `suite` and `tests`, or `feature`
+  and `scenarios`; `feature` is omitted when the file has scenarios but no
+  `Feature:` title.
 - Vitest-style suites are `describe` chains; `it` and `test` are titles.
   Tests outside any suite have `"suite": []`. A suite whose tests all sit in
   nested suites yields no record of its own; a suite with direct tests and a
@@ -310,10 +333,10 @@ Within a file, records are in this order, each key sorted by UTF-8 byte order:
 
 1. `behavior.jsonl`: `exposed` before `internal`; within a role, by the number
    of `behavioral` modules, including `behavioralMore`, descending, then
-   `nonBehavioral` descending, then `name`. When dependencies are
-   unavailable, by `name`.
+   `nonBehavioral` descending, then `name`, then `file`. When dependencies are
+   unavailable, by `name`, then `file`.
 2. `supporting.jsonl`: `exposed` before `internal`; then `nonBehavioral`
-   descending, then `name`.
+   descending, then `name`, then `file`.
 3. `tests.jsonl`: by `file`, then source order of the suite.
 4. Arrays inside a record: module identifiers and names sorted; `reexposed`
    nearest ancestor first; `suite` outermost first; `tests` and `scenarios`
@@ -387,8 +410,11 @@ the source filter of the measured facts, `production` in the first release;
 `resource-unavailable`, `invalid-current` or `wait-limit`. Exceptional counts
 appear only when nonzero: `unknownShapes`, `cut`, `detailsUnavailable`,
 `dynamicTitles`, `testsUnavailable` and `coverage`. `coverage` means
-source-analysis limits may have omitted originals. Every `module.json`
-repeats the `revision`.
+source-analysis limits may have omitted originals. `cut` counts each symbol
+with a cut detail once, each cut test, feature or scenario title, and each
+cut purpose. Keys appear in the order of the example, with
+`dependencyReason` after `dependencies` and `dependencyScope` in both states,
+then the exceptional counts in the order listed. Every `module.json` repeats the `revision`.
 
 An agent combines this view with a module's API view only when both name the
 same revision. A stale view remains readable and must be described as stale.

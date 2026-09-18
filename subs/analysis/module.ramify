@@ -36,6 +36,11 @@ expose-src openRetainedSession from "retained-session.ts" to parent
 expose-src * from "interfaces/architect-view.ts" to parent
 expose-sub ExportKind, ExportBehavior, TestTitleLimits from typescript to parent
 
+// A17: the pure architect-view renderer, which turns a projection and the
+// dependency facts of its revision into the view's files; its result and
+// dependency types are declared with the projection in A16.
+expose-src renderArchitectView from "architect-render.ts" to parent
+
 // A13: pure API-view projection, joining availability, catalog and detail
 // results into complete, bounded area projections; no filesystem or
 // retention access. planApiViewRequests names the detail requests a query
