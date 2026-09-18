@@ -1,7 +1,6 @@
 import { createHash } from 'node:crypto';
 import { relative, resolve } from 'node:path';
-import { SignatureKind, SymbolFlags, TypeFlags, type Project, type Symbol as CompilerSymbol, type Type,
-  type UnionOrIntersectionType } from 'typescript/unstable/sync';
+import type { Project, Symbol as CompilerSymbol } from 'typescript/unstable/sync';
 import { SyntaxKind, isAsExpression, isBindingElement, isCallExpression, isDecorator, isElementAccessExpression,
   isExportAssignment, isExportDeclaration, isExportSpecifier, isHeritageClause, isIdentifier, isImportClause,
   isImportDeclaration, isImportSpecifier, isInterfaceDeclaration, isJsxOpeningElement, isJsxSelfClosingElement,
@@ -10,6 +9,7 @@ import { SyntaxKind, isAsExpression, isBindingElement, isCallExpression, isDecor
   type Identifier, type Node, type SourceFile } from 'typescript/unstable/ast';
 import { originalKey } from '../../model/src/identity.js';
 import type { OriginalId, SourceLocation, SourceOrigin } from '../../model/src/interfaces/model.js';
+import { BehaviorShapes } from './behavior-shapes.js';
 import type { BehaviorClassification, BehaviorEvidence, BehaviorLimit, DependencyBehaviorAccessFact, DependencyBehaviorFact,
   DependencyBehaviorFacts } from './interfaces/dependency-behavior.js';
 import type { AccessSelection, SourceAccess, WrittenForm } from './interfaces/source.js';
@@ -20,8 +20,6 @@ const evidenceOrder: readonly BehaviorEvidence[] = ['call', 'construction', 'cal
 const forwardingForms: ReadonlySet<WrittenForm> = new Set(['named-export', 'type-export', 'inline-type-export',
   'star-export', 'type-star-export', 'namespace-export', 'type-namespace-export']);
 const typeForms: ReadonlySet<WrittenForm> = new Set(['import-type-query', 'jsdoc-import-type']);
-const behaviorSymbols = SymbolFlags.Function | SymbolFlags.Method | SymbolFlags.Class | SymbolFlags.Constructor;
-const emptyConstituents = TypeFlags.Nullable | TypeFlags.Void | TypeFlags.Never;
 /** Aggregation precedence: behavioral evidence settles a unit, then any unknown constituent. */
 const precedence: readonly BehaviorClassification[] = ['behavioral', 'unknown', 'non-behavioral', 'unused'];
 
@@ -30,7 +28,6 @@ let runs = 0;
 export function behaviorRuns(): number { return runs; }
 
 type Use = 'call' | 'construction' | 'read';
-type BehaviorShape = 'capable' | 'data' | 'unknown';
 /** Mutable evidence of one original through one access: one import path. */
 interface PathDraft {
   readonly evidence: Set<BehaviorEvidence>;
@@ -42,56 +39,6 @@ interface FactDraft {
   readonly paths: Map<string, PathDraft>;
 }
 interface Item { readonly access: SourceAccess; readonly selection: AccessSelection; readonly path: PathDraft }
-
-/** Whether a value's type, or a declared first-level member, is callable or constructable. Members
- * declared only by a default or external library (array, string or promise methods) do not count. */
-class BehaviorShapes {
-  readonly #types = new Map<number, BehaviorShape>();
-  constructor(private readonly project: Project) {}
-
-  of(type: Type, depth = 0): BehaviorShape {
-    const cached = this.#types.get(type.id);
-    if (cached) return cached;
-    let result: BehaviorShape;
-    if (depth > 8 || type.flags & TypeFlags.AnyOrUnknown) result = 'unknown';
-    else if (type.flags & TypeFlags.UnionOrIntersection) {
-      const parts = (type as UnionOrIntersectionType).getTypes().filter(part => !(part.flags & emptyConstituents))
-        .map(part => this.of(part, depth + 1));
-      result = parts.includes('capable') ? 'capable' : parts.includes('unknown') ? 'unknown' : 'data';
-    } else if (type.flags & TypeFlags.InstantiableNonPrimitive) {
-      const constraint = this.project.checker.getBaseConstraintOfType(type);
-      result = constraint && constraint.id !== type.id ? this.of(constraint, depth + 1) : 'unknown';
-    } else if (type.flags & TypeFlags.Object) result = this.#structured(type);
-    else result = 'data';
-    this.#types.set(type.id, result);
-    return result;
-  }
-
-  #signatures(type: Type): boolean {
-    const { checker } = this.project;
-    return checker.getSignaturesOfType(type, SignatureKind.Call).length > 0
-      || checker.getSignaturesOfType(type, SignatureKind.Construct).length > 0;
-  }
-
-  #structured(type: Type): BehaviorShape {
-    if (this.#signatures(type)) return 'capable';
-    const { checker, program } = this.project;
-    const declared = (symbol: CompilerSymbol): boolean => symbol.declarations.some(handle => {
-      const metadata = program.getSourceFileMetadataByPath(handle.path);
-      return !!metadata && !metadata.isDefaultLibrary && !metadata.isFromExternalLibrary;
-    });
-    const members = checker.getPropertiesOfType(type).filter(declared);
-    if (members.some(member => member.flags & behaviorSymbols)) return 'capable';
-    if (!members.length) return 'data';
-    for (const member of checker.getTypeOfSymbol(members)) {
-      if (!member) continue;
-      const parts = member.flags & TypeFlags.Union
-        ? (member as UnionOrIntersectionType).getTypes().filter(part => !(part.flags & emptyConstituents)) : [member];
-      if (parts.some(part => part.flags & TypeFlags.Object && this.#signatures(part))) return 'capable';
-    }
-    return 'data';
-  }
-}
 
 /** Skip wrappers that do not change which value an expression denotes. */
 function outer(node: Node): Node {
@@ -335,12 +282,12 @@ function classifyFile(project: Project, root: string, file: string, items: reado
     const types = checker.getTypeAtLocation(values.map(value => value.node));
     values.forEach((value, index) => {
       const type = types[index];
-      const shape = type ? shapes.of(type) : undefined;
-      if (!shape) {
+      const capability = type ? shapes.of(type) : undefined;
+      if (!capability) {
         value.path.limitIds.add(limit('unresolved-symbol', location(value.node), 'The compiler did not resolve the type of this reference'));
-      } else if (shape === 'unknown') {
+      } else if (capability === 'unknown') {
         value.path.limitIds.add(limit('unclassified-capability', location(value.node), 'The referenced value has no classifiable type'));
-      } else if (shape === 'data') value.path.evidence.add('data');
+      } else if (capability === 'data') value.path.evidence.add('data');
       else value.path.evidence.add(value.use === 'read' ? 'callable-reference' : value.use);
     });
   }

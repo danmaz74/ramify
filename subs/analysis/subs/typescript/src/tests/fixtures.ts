@@ -7,7 +7,7 @@ import { deriveSourceAreas } from '../../../model/src/profiles.js';
 import type { OriginalId, SourceArea } from '../../../model/src/interfaces/model.js';
 import type { CapturedInput, InventoryModule, ProjectInputView, ProjectInventory } from '../../../project/src/interfaces/project.js';
 import { createSourceAnalysis } from '../source-analysis.js';
-import type { CatalogExport, CatalogOriginal, FileExports, SourceAnalysis, SourceCatalog, SourceWorkLimits } from '../interfaces/source.js';
+import type { CatalogExport, CatalogOriginal, ExportShapeRequest, FileExports, SourceAnalysis, SourceCatalog, SourceWorkLimits } from '../interfaces/source.js';
 
 export const sourceLimits: SourceWorkLimits = {
   maxExports: 250_000, maxAccesses: 250_000, maxSelections: 1_000_000,
@@ -209,4 +209,40 @@ export function code(file: string, binding: string, owner = 'fixture'): Original
 }
 export function resource(file: string, binding = 'default', owner = 'fixture'): OriginalId {
   return { kind: 'resource', owner, file, binding };
+}
+
+/**
+ * AV01's `shapes` project: defining files whose exports cover every export
+ * kind and behavior shape, and an imported stylesheet resource.
+ */
+export const shapesFixture: Readonly<Record<string, string>> = {
+  'src/behaviors.ts': `export function run(): number { return 1; }
+export const arrow = (value: number): number => value;
+export class Service { start(): void {} }
+export abstract class Base { abstract area(): number; }
+export declare const hybrid: { new (): object; (): void };
+export const handlers = { save(): void {} };
+export namespace Tools { export function tool(): void {} export const version = 1; }
+export default function greet(name: string): string { return name; }
+export function twice(): void {}
+export { twice as again };
+`,
+  'src/supporting.ts': `export const data = { list: [1, 2, 3], pending: Promise.resolve(1), name: 'data' };
+export const list = [1, 2, 3];
+export enum Mode { A, B }
+export interface Shape { size: number }
+export type Label = string;
+export const limit = 10;
+export const title = 'title';
+export const loose: any = 1;
+`,
+  'src/style.css': '.value {}\n',
+  'src/style.d.ts': 'declare module "*.css" { const styles: Record<string, string>; export default styles; }\n',
+  'src/theme.ts': 'import styles from "./style.css";\nexport const theme = styles;\n',
+};
+
+/** One request per top-level export of a root-owner file that defines its original. */
+export function definingExports(catalog: SourceCatalog): ExportShapeRequest[] {
+  return catalog.files.flatMap(file => file.exports.flatMap(entry => entry.original && file.file === `src/${entry.original.file}`
+    ? [{ original: entry.original, exportName: entry.name }] : []));
 }

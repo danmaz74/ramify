@@ -9,8 +9,9 @@ import type { ObservationSink, ProjectInventory } from '../../project/src/interf
 import type { SourceArea } from '../../model/src/interfaces/model.js';
 import { AccessInterpretation } from './accesses.js';
 import { createDescriptionSet, type DescriptionSet } from './descriptions.js';
-import type { AccessInterpreter, CatalogDelta, CatalogExport, FileDescription, MembershipReach, RetainedSourceAnalysis,
-  RetainedSourceInputs, SourceCatalog, SourceChangeSet, SourceWorkLimits, SymbolDetail, SymbolDetailLimits,
+import { describeExportShapes } from './export-shapes.js';
+import type { AccessInterpreter, CatalogDelta, CatalogExport, ExportShape, ExportShapeRequest, FileDescription, MembershipReach,
+  RetainedSourceAnalysis, RetainedSourceInputs, SourceCatalog, SourceChangeSet, SourceWorkLimits, SymbolDetail, SymbolDetailLimits,
   SymbolDetailRequest } from './interfaces/source.js';
 import type { CatalogHost } from './resolution.js';
 import { describeSymbolDetails } from './symbol-details.js';
@@ -240,6 +241,12 @@ class RetainedSourceState implements RetainedSourceAnalysis {
     this.#check(signal);
     const project = this.#requireProject();
     return this.#guarded(() => describeSymbolDetails(project, { inventory: this.#inventory, areas: this.#areas }, requests, limits, signal));
+  }
+
+  async shapes(requests: readonly ExportShapeRequest[], signal?: AbortSignal): Promise<readonly ExportShape[]> {
+    this.#check(signal);
+    const project = this.#requireProject();
+    return this.#guarded(() => describeExportShapes(project, { inventory: this.#inventory, areas: this.#areas }, requests, signal));
   }
 
   interpreter(): AccessInterpreter {

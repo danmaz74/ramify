@@ -117,6 +117,19 @@ export type SymbolDetail =
   | { readonly state: 'unavailable'; readonly original: OriginalId; readonly exportName: string;
       readonly reason: 'missing-file' | 'missing-export' | 'identity-mismatch'
         | 'unsupported-declaration' | 'compiler-failure' };
+/** The behavior of an exported runtime value, by the behavior-capable rule's precedence. */
+export type ExportBehavior = 'constructable' | 'callable' | 'member' | 'unknown';
+/** An exported original's kind, from its primary declaration; `resource` for a non-code original. */
+export type ExportKind = 'class' | 'function' | 'interface' | 'type' | 'enum'
+  | 'namespace' | 'value' | 'resource';
+export interface ExportShapeRequest { readonly original: OriginalId; readonly exportName: string }
+export interface ExportShape {
+  readonly original: OriginalId;
+  readonly exportName: string;
+  readonly kind: ExportKind;
+  /** null: a supporting original. */
+  readonly behavior: ExportBehavior | null;
+}
 export interface SourceWorkLimits {
   readonly maxExports: number;
   readonly maxAccesses: number;
@@ -215,6 +228,11 @@ export interface RetainedSourceAnalysis {
    * `limits.maxResultBytes` rejects with `SourceFailure`. An isolated
    * valid-request failure is an `unavailable` entry, never a rejection. */
   details(requests: readonly SymbolDetailRequest[], limits: SymbolDetailLimits, signal?: AbortSignal): Promise<readonly SymbolDetail[]>;
+  /** The kind and behavior of each requested defining-file export, one per
+   * request in request order, with the same hot-compiler precondition as
+   * `details`. An invalid request rejects with `SourceFailure`; an export the
+   * compiler cannot resolve is a `value` of `unknown` behavior. */
+  shapes(requests: readonly ExportShapeRequest[], signal?: AbortSignal): Promise<readonly ExportShape[]>;
   catalog(): SourceCatalog;
   interpreter(): AccessInterpreter;
   releaseCompiler(): Promise<void>;

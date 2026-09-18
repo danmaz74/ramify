@@ -1,11 +1,13 @@
 import { readFile, rm } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
+import { API } from 'typescript/unstable/sync';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { ObservationSink } from '../../../project/src/interfaces/project.js';
+import { describeExportShapes } from '../export-shapes.js';
 import { createRetainedSourceAnalysis, retainedCompilerEvidence } from '../retained-source-analysis.js';
 import { createSourceAnalysis } from '../source-analysis.js';
-import type { RetainedSourceAnalysis, RetainedSourceInputs, SourceChangeSet, SymbolDetailLimits } from '../interfaces/source.js';
-import { acquire, areasFor, code, configuration, drop, fixture, put, sourceLimits } from './fixtures.js';
+import type { ExportShapeRequest, RetainedSourceAnalysis, RetainedSourceInputs, SourceChangeSet, SymbolDetailLimits } from '../interfaces/source.js';
+import { acquire, areasFor, code, configuration, definingExports, drop, fixture, put, shapesFixture, sourceLimits } from './fixtures.js';
 import { retainedMembershipWitness } from './retained-membership.js';
 
 const roots: string[] = [];
@@ -403,6 +405,64 @@ describe('retained source analysis', () => {
       controller.abort();
       await expect(analysis.details([{ original: code('api.ts', 'value'), exportName: 'value' }], limits, controller.signal))
         .rejects.toMatchObject({ code: 'cancelled' });
+    }, 60_000);
+  });
+
+  describe('export shapes (AV03)', () => {
+    const limit: ExportShapeRequest = { original: code('supporting.ts', 'limit'), exportName: 'limit' };
+
+    it('returns what describeExportShapes returns on the same project, in request order', async () => {
+      const root = await start(shapesFixture);
+      const inputs = await inputsOf(root);
+      const analysis = await open(root);
+      await analysis.describe([]);
+      const exports = definingExports(analysis.catalog());
+      expect(exports.length).toBeGreaterThan(15);
+      // Reversed, with a repeated request, which is answered again in its place.
+      const requests = [...exports].reverse().concat(exports[0]!);
+      const retained = await analysis.shapes(requests);
+      const api = new API({ cwd: root });
+      try {
+        const snapshot = api.updateSnapshot({ openProjects: [inputs.configuration] });
+        const batch = describeExportShapes(snapshot.getProject(inputs.configuration)!, inputs, requests);
+        expect(retained).toEqual(batch);
+      } finally { api.close(); }
+      expect(retained.map(shape => [shape.original, shape.exportName])).toEqual(requests.map(request => [request.original, request.exportName]));
+      expect(retained.filter(shape => shape.behavior !== null).length).toBeGreaterThan(5);
+      expect(Object.isFrozen(retained) && Object.isFrozen(retained[0])).toBe(true);
+    }, 60_000);
+
+    it('needs no description, rejects with unavailable once the compiler is released, and answers again after the next update', async () => {
+      const root = await start(shapesFixture);
+      const analysis = await open(root);
+      expect(await analysis.shapes([limit])).toEqual([{ ...limit, kind: 'value', behavior: null }]);
+      await analysis.describe([]);
+      await analysis.releaseCompiler();
+      await expect(analysis.shapes([limit])).rejects.toMatchObject({ code: 'unavailable' });
+      await analysis.update(none);
+      expect(await analysis.shapes([limit])).toEqual([{ ...limit, kind: 'value', behavior: null }]);
+    }, 60_000);
+
+    it('rejects the in-flight call with read-failure and discards the compiler when the server is lost', async () => {
+      const root = await start(shapesFixture);
+      const analysis = await open(root);
+      await analysis.describe([]);
+      const pid = retainedCompilerEvidence(analysis).serverPid!;
+      process.kill(pid, 'SIGKILL');
+      expect(await gone(pid)).toBe(true);
+      await expect(analysis.shapes([limit])).rejects.toMatchObject({ code: 'read-failure' });
+      expect(analysis.hot).toBe(false);
+    }, 60_000);
+
+    it('rejects an invalid, an already-cancelled or a disposed call with no result', async () => {
+      const root = await start(shapesFixture);
+      const analysis = await open(root);
+      await analysis.describe([]);
+      await expect(analysis.shapes([{ ...limit, exportName: '' }])).rejects.toMatchObject({ code: 'protocol-error' });
+      await expect(analysis.shapes([limit], AbortSignal.abort())).rejects.toMatchObject({ code: 'cancelled' });
+      expect(analysis.hot).toBe(true);
+      await analysis.dispose();
+      await expect(analysis.shapes([limit])).rejects.toMatchObject({ code: 'disposed' });
     }, 60_000);
   });
 });
