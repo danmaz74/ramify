@@ -161,5 +161,6 @@ describe('Plan 2B regressions (AV34)', () => {
     expect(entries.cli.code).toBe(0);
     expect(entries.cli.closure).toContain('dist/subs/cli/src/index.js');
     expect(entries.cli.forbidden).toEqual([]);
+    expect(entries.cli.activity).toBe(0);
   }, 300_000);
 });

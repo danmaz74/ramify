@@ -941,7 +941,9 @@ export interface EntryEvidence {
   readonly packageEntries: number;
   readonly manifest: { readonly exports: readonly string[]; readonly baselineExports: readonly string[]; readonly equalToBaseline: boolean };
   readonly client: { readonly code: number | null; readonly closure: readonly string[]; readonly assertions: number };
-  readonly cli: { readonly code: number | null; readonly closure: readonly string[]; readonly forbidden: readonly string[] };
+  readonly cli: { readonly code: number | null; readonly closure: readonly string[]; readonly forbidden: readonly string[];
+    /** Process or socket activity of the import: spawns, launches, connections, listeners and binds. */
+    readonly activity: number };
 }
 
 /** Any analysis source, the retained session and its worker, or the compiler package. */
@@ -984,7 +986,8 @@ export async function entryClosures(): Promise<EntryEvidence> {
       manifest: { exports: Object.keys(current.exports as object), baselineExports: Object.keys(baseline.exports as object), equalToBaseline },
       client: { code: client.result.code, closure: [...closure].sort(), assertions: assertions.finish().length },
       cli: { code: cli.result.code, closure: [...cliFiles].sort(),
-        forbidden: cliFiles.filter(path => excludedFromEntries.test(path) || sessionModulePattern.test(path)) },
+        forbidden: cliFiles.filter(path => excludedFromEntries.test(path) || sessionModulePattern.test(path)),
+        activity: cli.events.filter(event => ['spawn', 'other-launch', 'connect', 'listen', 'bind'].includes(event.event)).length },
     };
   });
 }
