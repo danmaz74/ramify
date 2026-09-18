@@ -1,10 +1,16 @@
 # Materialized architect view
 
-**Date:** 2026-09-18. **Status:** accepted for implementation by
-[Plan 2B](../plans/iteration-2b-generated-views/main-plan.md), whose
-contracts refine this specification where it was not yet concrete; the
+**Date:** 2026-09-18. **Status:** implemented by
+[Plan 2B](../plans/iteration-2b-generated-views/main-plan.md) iterations 1–8,
+whose contracts refine this specification where it was not yet concrete; the
 [review decisions](#review-decisions) are accepted at their proposed
-defaults. This specification
+defaults. `ramify materialize --view architect` publishes the view described
+below, and the [implementation status](#implementation-status) records its
+measured values. Every budget but hit cost holds. The toolkit's hit-cost
+measurement exceeds the trial thresholds for five of the six terms, `project`
+and `session` by lines as well as bytes, which the [hypothesis](#hypothesis)
+names as falsifying H1; the plan stops before its agent trials for the user's
+decision. This specification
 describes hypothesis H1 of the
 [capabilities-based architecture](capabilities-based-architecture.md): one
 generated, searchable directory that gives an architect agent the project's
@@ -519,6 +525,11 @@ Identical project inputs, registry, compiler configuration, dependency facts
 and Ramify version produce byte-identical view contents on every supported
 platform. Files use UTF-8, LF and a terminating newline; JSONL has exactly one
 record per line; there are no timestamps, host paths or process identifiers.
+Two identifiers are the analysis's own, not the view's: the `revision` names
+the daemon context's generation, so two daemons' views of the same inputs
+differ in that identifier alone, and the `input` identity records the absent
+`module.ramify` of each ancestor directory, so copies of one project at
+different paths also differ in it. Every other byte is equal.
 
 Bounds a successor plan must measure before freezing, on the reference
 project, the toolkit and the S100/S500/S1000 fixtures:
@@ -602,6 +613,73 @@ three narrowing searches, no task reads the source to answer, and no task
 returns more than 300 hit lines or 64 KB in total. The
 [test cases](../plans/iteration-2b-generated-views/test-cases.md) fix the tasks and their keys. The
 trial transcript is evidence for the plan's contract review.
+
+## Implementation status
+
+Plan 2B iteration 8 measured the implementation on 2026-09-18 with the installed
+CLI and the real daemon, on isolated copies of the reference project and the
+toolkit and on the S100 fixture, each from the project root. The raw values are
+in [`plan2b-measurements.json`](../plans/iteration-2b-generated-views/evidence/plan2b-measurements.json);
+the [iteration 8 results](../plans/iteration-2b-generated-views/iterations/iteration8-results.md)
+record the method.
+
+| Budget | Limit | Measured |
+| --- | --- | --- |
+| Architect session query, toolkit | 15 s | 0.67–0.85 s hot; 1.72 s after the compiler was released |
+| Whole `materialize --view architect`, warm, toolkit, analyzer included | 90 s | 8.65–8.76 s; 14.9 s with a new daemon and context |
+| Unchanged repeat | 0 bytes | 0 bytes on all three projects |
+| View size, toolkit | 8 MiB | 809,330 bytes, 62 files |
+| `maxProjectionBytes` | 64 MiB | 1,205,296 bytes, toolkit |
+| `maxArchitectBytes` | 64 MiB | 809,330 bytes, toolkit |
+| Dependency wait | 250 ms, 125 s | as configured |
+| Hit cost per term | 200 lines, 64 KB | exceeded on the toolkit; see below |
+| Mean behavior record, toolkit (evidence) | 300 characters | 402 characters, longest 793 |
+
+Hit cost of `rg -n -i <term> .ramify-architect/`, lines and bytes of output:
+
+| Term | Toolkit lines | Toolkit bytes | Reference lines | Reference bytes |
+| --- | ---: | ---: | ---: | ---: |
+| `revision` | 187 | 114,072 | 54 | 21,860 |
+| `project` | 546 | 322,888 | 0 | 0 |
+| `session` | 214 | 125,498 | 22 | 9,499 |
+| `publish` | 113 | 81,161 | 1 | 682 |
+| `watch` | 40 | 23,517 | 0 | 0 |
+| `create` | 198 | 145,175 | 37 | 16,469 |
+
+On the toolkit a hit line averages 586–733 bytes, because a record carries its
+bounded signature, documentation paragraph and consumer lists; a `tests.jsonl`
+record reaches 2,763 characters with forty titles and its `exercises`. Test
+records return the most bytes for every term except `project`, where
+`supporting.jsonl` leads narrowly; by lines, `supporting.jsonl` or
+`behavior.jsonl` lead for `revision`, `project` and `session`. The reference
+project stays within both thresholds for every term.
+
+| Project | Files | Bytes | Records | Mean record, behavior / supporting / tests |
+| --- | ---: | ---: | ---: | --- |
+| Reference | 62 | 85,337 | 123 | 486.7 / 483.7 / 388.0 characters |
+| Toolkit | 62 | 809,330 | 1,591 | 402.0 / 440.5 / 762.0 characters |
+| S100 | 402 | 292,872 | 1,100 | 187.8 / 181.8 / no test titles |
+
+The largest toolkit `behavior.jsonl` is `analysis/behavior.jsonl`, 50,571
+bytes; the toolkit's `README.md` is 9,295 bytes. Peak combined RSS of the
+daemon, its worker and its compiler was 1.10 GiB on the toolkit, 451 MiB on the
+reference project and 462 MiB on S100.
+
+Known gaps:
+
+- **Invocation changes.** When a context republishes its revision for another
+  invocation, such as a check from the project root followed by
+  `materialize --root <root>` from another directory, the dependency analyzer
+  re-acquires with the new invocation's request and finds its discovery inputs
+  changed on every try. The materialization waits the full 125 s and publishes
+  with `"dependencies":"unavailable"` and `wait-limit`; a later invocation in
+  the opening form measures them again.
+- **Generated directories at session open.** A resident session opened while
+  views exist records the generated directories its compiler lists as inputs,
+  as the [API view specification](materialized-api-view.spec.md#generated-output-isolation)
+  records; its input identity then differs from a batch check's.
+- **Platforms.** Byte identity is measured on Linux only; no macOS host was
+  available.
 
 ## Review decisions
 

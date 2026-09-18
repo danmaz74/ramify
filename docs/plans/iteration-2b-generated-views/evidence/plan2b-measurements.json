@@ -1,0 +1,2234 @@
+{
+  "schemaVersion": "ramify.plan2b-measurements/1",
+  "measuredAt": "2026-09-18T12:26:11.409Z",
+  "command": [
+    "node",
+    "--import",
+    "tsx",
+    "scripts/measurements/plan2b.mjs"
+  ],
+  "environment": {
+    "node": "v22.23.2",
+    "platform": "linux",
+    "release": "6.8.0-85-generic",
+    "arch": "x64",
+    "logicalCpus": 12,
+    "cpuModel": "Intel(R) Xeon(R) E-2176G CPU @ 3.70GHz",
+    "totalMemoryBytes": 67274752000,
+    "concurrentActivity": "No other work of this session ran; another session's plan6d worktree daemon and two /ramify explorer servers were running and idle."
+  },
+  "source": {
+    "commit": "af79737ec57d07c0bab09690d99b760c7e803be8",
+    "trackedChanges": 1
+  },
+  "dependencies": {
+    "typescript": "7.0.2",
+    "tsx": "4.23.13"
+  },
+  "client": {
+    "bin": "node_modules/.bin/ramify",
+    "launcher": "dist/src/ramify",
+    "executes": "dist/src/ramify-client-Linux-x86_64",
+    "runtime": "bun-compiled",
+    "children": "Daemon and batch analysis run as node from PATH."
+  },
+  "sampling": {
+    "intervalMs": 100,
+    "source": "`ramify daemon status --format json` polled while the workload runs; combined RSS sums the daemon, its worker and its compiler; sampled peaks can miss spikes shorter than the interval"
+  },
+  "hitCost": {
+    "command": "rg -n -i <term> .ramify-architect/ from the project root, RIPGREP_CONFIG_PATH unset",
+    "terms": [
+      "revision",
+      "project",
+      "session",
+      "publish",
+      "watch",
+      "create"
+    ],
+    "thresholds": {
+      "lines": 200,
+      "bytes": 65536,
+      "bytesNote": "64 KB read as 65,536 bytes; every exceeded value also exceeds 64,000"
+    }
+  },
+  "configured": {
+    "dependencyWait": {
+      "intervalMs": 250,
+      "limitMs": 125000
+    },
+    "maxArchitectBytes": 67108864,
+    "maxProjectionBytes": 67108864,
+    "limits": {
+      "details": {
+        "maxSignatureBytes": 240,
+        "maxDocumentationBytes": 280,
+        "maxOverloads": 4,
+        "maxResultBytes": 33554432
+      },
+      "tests": {
+        "maxTitleBytes": 240,
+        "maxTitlesPerRecord": 40,
+        "maxResultBytes": 16777216
+      },
+      "maxProjectionBytes": 67108864
+    },
+    "note": "The daemon passes these architect limits explicitly (subs/daemon/src/service.ts); the harness verifies the same values byte for byte through the in-process expectation."
+  },
+  "workloads": {
+    "reference": {
+      "name": "reference",
+      "root": "<isolated copy>",
+      "steps": {
+        "cold": {
+          "code": 0,
+          "durationMs": 5647.2,
+          "stderr": "",
+          "revision": 1,
+          "targets": 1,
+          "entries": 123,
+          "bytesWritten": 85337,
+          "unchanged": 0,
+          "modules": 15,
+          "records": 123,
+          "dependencies": "measured"
+        },
+        "repeat": {
+          "code": 0,
+          "durationMs": 427.2,
+          "stderr": "",
+          "revision": 1,
+          "targets": 1,
+          "entries": 123,
+          "bytesWritten": 0,
+          "unchanged": 1,
+          "modules": 15,
+          "records": 123,
+          "dependencies": "measured"
+        },
+        "retainedFacts": {
+          "code": 0,
+          "durationMs": 401.8,
+          "stderr": "",
+          "revision": 1,
+          "targets": 1,
+          "entries": 123,
+          "bytesWritten": 85337,
+          "unchanged": 0,
+          "modules": 15,
+          "records": 123,
+          "dependencies": "measured"
+        },
+        "warmAnalyzer": [
+          {
+            "sample": 1,
+            "watcherPublished": true,
+            "code": 0,
+            "durationMs": 3407.9,
+            "stderr": "",
+            "revision": 2,
+            "targets": 1,
+            "entries": 123,
+            "bytesWritten": 85337,
+            "unchanged": 0,
+            "modules": 15,
+            "records": 123,
+            "dependencies": "measured"
+          },
+          {
+            "sample": 2,
+            "watcherPublished": true,
+            "code": 0,
+            "durationMs": 3414.4,
+            "stderr": "",
+            "revision": 3,
+            "targets": 1,
+            "entries": 123,
+            "bytesWritten": 85337,
+            "unchanged": 0,
+            "modules": 15,
+            "records": 123,
+            "dependencies": "measured"
+          },
+          {
+            "sample": 3,
+            "watcherPublished": true,
+            "code": 0,
+            "durationMs": 3405.2,
+            "stderr": "",
+            "revision": 4,
+            "targets": 1,
+            "entries": 123,
+            "bytesWritten": 85337,
+            "unchanged": 0,
+            "modules": 15,
+            "records": 123,
+            "dependencies": "measured"
+          }
+        ],
+        "apiOnly": {
+          "code": 0,
+          "durationMs": 383.4,
+          "stderr": "",
+          "revision": 5,
+          "targets": 2,
+          "entries": 12,
+          "bytesWritten": 3621,
+          "unchanged": 0
+        },
+        "bothViews": {
+          "code": 0,
+          "durationMs": 3623.7,
+          "stderr": "",
+          "revision": 5,
+          "targets": 30,
+          "entries": 674,
+          "bytesWritten": 206176,
+          "unchanged": 2,
+          "modules": 15,
+          "records": 123,
+          "dependencies": "measured"
+        }
+      },
+      "context": {
+        "sequence": 1,
+        "revision": "rev/1:4be4f162-7cea-4495-bd13-4c37bcdf511a:1",
+        "inputId": "input/1:31090c155a29b474547f805fdda7517d26b4c2584b14553bbb543e1b37625e89",
+        "cause": "open"
+      },
+      "view": {
+        "files": 62,
+        "bytes": 85337,
+        "readmeBytes": 7926,
+        "largestBehavior": {
+          "path": "workspace/catalog/core/behavior.jsonl",
+          "bytes": 2944
+        },
+        "kinds": {
+          "README.md": {
+            "files": 1,
+            "bytes": 7926,
+            "records": 0,
+            "maxRecordCharacters": 0,
+            "meanRecordCharacters": null
+          },
+          "_meta.json": {
+            "files": 1,
+            "bytes": 331,
+            "records": 0,
+            "maxRecordCharacters": 0,
+            "meanRecordCharacters": null
+          },
+          "behavior.jsonl": {
+            "files": 15,
+            "bytes": 20002,
+            "records": 41,
+            "maxRecordCharacters": 817,
+            "meanRecordCharacters": 486.7
+          },
+          "module.json": {
+            "files": 15,
+            "bytes": 20584,
+            "records": 0,
+            "maxRecordCharacters": 0,
+            "meanRecordCharacters": null
+          },
+          "supporting.jsonl": {
+            "files": 15,
+            "bytes": 23269,
+            "records": 48,
+            "maxRecordCharacters": 886,
+            "meanRecordCharacters": 483.7
+          },
+          "tests.jsonl": {
+            "files": 15,
+            "bytes": 13225,
+            "records": 34,
+            "maxRecordCharacters": 648,
+            "meanRecordCharacters": 388
+          }
+        }
+      },
+      "meta": {
+        "schema": "ramify.architect-view/1",
+        "revision": "rev/1:4be4f162-7cea-4495-bd13-4c37bcdf511a:1",
+        "input": "input/1:31090c155a29b474547f805fdda7517d26b4c2584b14553bbb543e1b37625e89",
+        "modules": 15,
+        "dependencies": "measured",
+        "dependencyScope": "production",
+        "testReferences": "measured",
+        "metrics": "unavailable",
+        "cut": 9,
+        "detailsUnavailable": 2
+      },
+      "manifest": {
+        "README.md": "0332fe76b5f7acd580165d2e2a3733d7026a64ee0ce66734f87728155af7df85",
+        "_meta.json": "75e0bd5800cbaf3fb11a1f64ca3b5d5cc3d73d17b632a1fcecd2cb3c3305d28d",
+        "behavior.jsonl": "db84320f2c332c51317d35e9941689389206921fa0a4290916f24173f3a4199d",
+        "integration-tests/behavior.jsonl": "20ff2c21f6cc5b4c3c3428b621fa74c4e4f71368311f9c1cccd8d78692c43c74",
+        "integration-tests/module.json": "6b91054e542aecf39a3b74b658a9076b554b6fc61cefea38bd4550388f7b6c72",
+        "integration-tests/supporting.jsonl": "db22c65a9040b4cef6d1b1e2b0c9862ce0baf573abf5c84276b5bb820ad2f2e9",
+        "integration-tests/tests.jsonl": "ea763b59929b6818e8d316e4abc3d854e4aa341001a993d070e74e05e902b72f",
+        "module.json": "39c218551d5230a9b621a7967848f60634de8632979d4d673003d39b7e3d721a",
+        "supporting.jsonl": "320cbdbc77863922307a5e33684213c59ac2f4170e00d69e37a501ab066951a8",
+        "tests.jsonl": "028b02f7bf05489394ae85016bcfd5a8abc7764d5a6b1c201833dafd6444afaa",
+        "workspace/behavior.jsonl": "7bc693df0237e045bdf1ea08a4a913a065993df675c07f47c37937f9da08c85d",
+        "workspace/catalog/behavior.jsonl": "9f0759172c2b5dcd208d1d0bf42d96274eb034484562896c85ca4f420c631f9c",
+        "workspace/catalog/core/behavior.jsonl": "e7ec85603ba09245b20b0a1650aba49693d3e5abd0e2ff28e94d76b8b8ca3760",
+        "workspace/catalog/core/module.json": "94471da446854a7f0b2a16e0dc34a4395b22426c496d432f3f39a50486b145ee",
+        "workspace/catalog/core/supporting.jsonl": "c8209ba234479b3169ea0829b3acfc18ffd57950770ab5063cd4df95828b2551",
+        "workspace/catalog/core/tests.jsonl": "c1b5124e49e17941fde35f730bd6a101e23ad833a24148fa96000ef7d6ec9438",
+        "workspace/catalog/module.json": "1b813a9461db7cfc6e2bdff64b482732b77c903895355221aed1170bce082643",
+        "workspace/catalog/supporting.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "workspace/catalog/tests.jsonl": "0ac641c3114a0fb0f71b081463a9899c4bb080fe3afcbcf7c9a2bcebee30a4e0",
+        "workspace/catalog/ui/behavior.jsonl": "7be91fab8f3da095437dd84253e5240475dd4e14c1102bee60414b70aa2e856d",
+        "workspace/catalog/ui/module.json": "f0229991407c14fee24569ac09685b038bb8a5eac5f4c1eaa0387ac2614b8280",
+        "workspace/catalog/ui/supporting.jsonl": "6bd1d941516fdbfd8d532cfc1d5f67a5e21fa289b3478d20f1ac3da1f8a19627",
+        "workspace/catalog/ui/tests.jsonl": "6c984a75b7ad6d0a3538daed1a32a06d7a0831e21a25ce74b1d0f78d64f14672",
+        "workspace/contracts/behavior.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "workspace/contracts/module.json": "42135898235525e7cccd6af600533e4908957557e469c981aee8d300d31558b9",
+        "workspace/contracts/supporting.jsonl": "f6622eaa82bd76e62a8ed2852ccae0aba40a99c3bfd74c88fee97038dfd28307",
+        "workspace/contracts/tests.jsonl": "8e48a4d1c4f196f5f24e2b488c4dc3e3f80c35e6a824d520696d9f5da16f42bd",
+        "workspace/module.json": "65e1920531cb6eaa8111af4a725a9fd76e79fc090d61b50123b41a4f924f853b",
+        "workspace/reviews/behavior.jsonl": "42908289a9f3cea09414416a368d4933eca728f560a73818c96409336a07abcb",
+        "workspace/reviews/core/behavior.jsonl": "c7e690ff6fbf54bc4fb750eda6c60827a0a300b196449bcde094e41e0b22271d",
+        "workspace/reviews/core/controller/behavior.jsonl": "bbc263076b059962d37d8d420985ee9c2de5e0ae70eb0864c461c419b396a363",
+        "workspace/reviews/core/controller/module.json": "702baf3d7c080db2cb8d5ecd2f520da1e351daeae44d1a29f8335fa03d52938c",
+        "workspace/reviews/core/controller/supporting.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "workspace/reviews/core/controller/tests.jsonl": "1d1d99b3dd4265538dc7e0793ed71558721b5d09906f70101759dd3d70ec0b8c",
+        "workspace/reviews/core/module.json": "a282e77b6397860d1bf50c088c838dd0ee41ac13ef166265a0b012751967c7f7",
+        "workspace/reviews/core/supporting.jsonl": "eafb59cc3f75756e04cc7e589caf7d748e7ea711b9a3d76c643690dade5e8b4d",
+        "workspace/reviews/core/tasks/behavior.jsonl": "b4bc525609d085efb52a5f4ddb07414467dbed275e3f25f4d815ddff66d9b138",
+        "workspace/reviews/core/tasks/module.json": "f73358c1c64fb8eec4bed66ccb27722416a53772aee6c79b44653b7109498c8d",
+        "workspace/reviews/core/tasks/supporting.jsonl": "c28c3f4eff7ce174c0e465d8a6efa6994364745ed64a1c8234b3b3d94daafbb6",
+        "workspace/reviews/core/tasks/tests.jsonl": "d559a7ee54bf6ca56101c9bb183f40df95798f600781c04d55e19fe05cfe839a",
+        "workspace/reviews/core/tests.jsonl": "a1d889d303b0b4bb2f41588b8a03ffd6afc39d18ad37e947437b4b88f7509421",
+        "workspace/reviews/module.json": "0fd74df0a88fad6771a0a4e0b64eb3ecee6976bdc6849294a6018db6480621e2",
+        "workspace/reviews/supporting.jsonl": "05ed71eebd99e397c96420a5f8ec66cea6fbf90763ec9faa708cb0f6b9946e9c",
+        "workspace/reviews/tests.jsonl": "96dc3a39186da70f1e7f7ad989cc1401286e35806746e9289b3e873b7e506e21",
+        "workspace/reviews/ui/behavior.jsonl": "91f53ff9341d3046c7a4facd1dc6e7b958268783a276bbd43c18bafaab8d2e7e",
+        "workspace/reviews/ui/module.json": "ce3159c77271586a12a089733f50346f9745651c5eb18b47049a77d6dc0b9c19",
+        "workspace/reviews/ui/pure-ui/behavior.jsonl": "38b010b1ce59e1830160d4ce239101eb36abfbd0d83b7ced0e14963ace6b43f4",
+        "workspace/reviews/ui/pure-ui/module.json": "2e86b6f129144dc20440722127b71ed75a43054232f52c72ec73f55e04f93ff7",
+        "workspace/reviews/ui/pure-ui/supporting.jsonl": "3e93ded5b3711e8e67406bdd930bca0af2fc6ec309ab07b4fe43f9de1e7a5f78",
+        "workspace/reviews/ui/pure-ui/tests.jsonl": "7aa5e26f4e2d16ea905dc52d965d7dfc773c02b70c39092f78a10c6001347b7b",
+        "workspace/reviews/ui/supporting.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "workspace/reviews/ui/tests.jsonl": "601bdedda7be34bd90400e04d0a1efa13863ca7aa626c95c20d6d44727e19529",
+        "workspace/reviews/validation/behavior.jsonl": "449519f15bd1169eeee8e4160da6a63d780c5296ac261d33c5951c2298131bdf",
+        "workspace/reviews/validation/module.json": "25996339811bca76dd9fab6feb7a6f2312ff46a72027a6fe3362816d94042fb4",
+        "workspace/reviews/validation/supporting.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "workspace/reviews/validation/tests.jsonl": "5a1e7ce36f92976dcc58a016b0f4c1afc9012b3140787304f7ce3a0ff93d95ba",
+        "workspace/shared-ui/behavior.jsonl": "3e9e2db8d604946c531a42cb6b1c7e8c947f8110e95ce9461ba71d8fa836e113",
+        "workspace/shared-ui/module.json": "59a54b1da06e4fec54bd7836090f95bf52e553a4526ef87b50ff1a271b7509da",
+        "workspace/shared-ui/supporting.jsonl": "5de2d344b215262e7e5e8cdc270598a02ac21e9636ad636f185111dc97bdf3be",
+        "workspace/shared-ui/tests.jsonl": "ccfa6ea8a6ddcc55b24abc8d8a63be52a23b66857a0a2bc60eb588d02cbbadcd",
+        "workspace/supporting.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "workspace/tests.jsonl": "782f9f22de1d76bddc1dddb1383d2ad4e4ef1061b1f4486d54d6e5d0874cf7cc"
+      },
+      "manifestSha256": "d0357c9d2c34584aae6454ce4bfeb76e3edbceab53f0e1fa1fd7a865c53683d0",
+      "hitCost": {
+        "revision": {
+          "lines": 54,
+          "bytes": 21860,
+          "withinLines": true,
+          "withinBytes": true,
+          "meanLineBytes": 404.8,
+          "maxLineBytes": 945,
+          "meanHitCharacters": 350.5,
+          "byKind": {
+            "module.json": {
+              "lines": 19,
+              "bytes": 3396
+            },
+            "behavior.jsonl": {
+              "lines": 3,
+              "bytes": 2046
+            },
+            "tests.jsonl": {
+              "lines": 7,
+              "bytes": 3686
+            },
+            "supporting.jsonl": {
+              "lines": 18,
+              "bytes": 10384
+            },
+            "_meta.json": {
+              "lines": 1,
+              "bytes": 362
+            },
+            "README.md": {
+              "lines": 6,
+              "bytes": 1986
+            }
+          },
+          "byFile": {
+            "workspace/module.json": 1,
+            "workspace/reviews/validation/behavior.jsonl": 1,
+            "workspace/reviews/validation/tests.jsonl": 1,
+            "workspace/reviews/validation/module.json": 2,
+            "workspace/reviews/core/module.json": 1,
+            "workspace/reviews/core/tasks/module.json": 1,
+            "workspace/reviews/core/tasks/supporting.jsonl": 1,
+            "workspace/reviews/core/supporting.jsonl": 2,
+            "workspace/reviews/core/controller/module.json": 1,
+            "workspace/catalog/module.json": 1,
+            "workspace/catalog/core/tests.jsonl": 3,
+            "workspace/catalog/core/behavior.jsonl": 1,
+            "workspace/catalog/core/module.json": 2,
+            "workspace/reviews/module.json": 1,
+            "workspace/catalog/core/supporting.jsonl": 4,
+            "workspace/reviews/supporting.jsonl": 2,
+            "workspace/catalog/ui/tests.jsonl": 1,
+            "workspace/catalog/ui/module.json": 1,
+            "workspace/reviews/ui/module.json": 1,
+            "workspace/contracts/tests.jsonl": 1,
+            "workspace/contracts/supporting.jsonl": 8,
+            "workspace/shared-ui/module.json": 1,
+            "workspace/reviews/ui/pure-ui/tests.jsonl": 1,
+            "workspace/reviews/ui/pure-ui/behavior.jsonl": 1,
+            "workspace/reviews/ui/pure-ui/module.json": 1,
+            "workspace/contracts/module.json": 2,
+            "module.json": 2,
+            "_meta.json": 1,
+            "README.md": 6,
+            "integration-tests/supporting.jsonl": 1,
+            "integration-tests/module.json": 1
+          }
+        },
+        "project": {
+          "lines": 0,
+          "bytes": 0,
+          "withinLines": true,
+          "withinBytes": true,
+          "meanLineBytes": null,
+          "maxLineBytes": 0,
+          "meanHitCharacters": null,
+          "byKind": {},
+          "byFile": {}
+        },
+        "session": {
+          "lines": 22,
+          "bytes": 9499,
+          "withinLines": true,
+          "withinBytes": true,
+          "meanLineBytes": 431.8,
+          "maxLineBytes": 624,
+          "meanHitCharacters": 384.8,
+          "byKind": {
+            "tests.jsonl": {
+              "lines": 6,
+              "bytes": 2467
+            },
+            "behavior.jsonl": {
+              "lines": 1,
+              "bytes": 517
+            },
+            "module.json": {
+              "lines": 3,
+              "bytes": 1138
+            },
+            "supporting.jsonl": {
+              "lines": 9,
+              "bytes": 4158
+            },
+            "README.md": {
+              "lines": 3,
+              "bytes": 1219
+            }
+          },
+          "byFile": {
+            "tests.jsonl": 2,
+            "workspace/reviews/tests.jsonl": 4,
+            "workspace/reviews/behavior.jsonl": 1,
+            "workspace/reviews/core/tasks/module.json": 1,
+            "workspace/reviews/module.json": 1,
+            "workspace/reviews/supporting.jsonl": 3,
+            "integration-tests/module.json": 1,
+            "integration-tests/supporting.jsonl": 2,
+            "supporting.jsonl": 4,
+            "README.md": 3
+          }
+        },
+        "publish": {
+          "lines": 1,
+          "bytes": 682,
+          "withinLines": true,
+          "withinBytes": true,
+          "meanLineBytes": 682,
+          "maxLineBytes": 682,
+          "meanHitCharacters": 621,
+          "byKind": {
+            "supporting.jsonl": {
+              "lines": 1,
+              "bytes": 682
+            }
+          },
+          "byFile": {
+            "workspace/reviews/core/supporting.jsonl": 1
+          }
+        },
+        "watch": {
+          "lines": 0,
+          "bytes": 0,
+          "withinLines": true,
+          "withinBytes": true,
+          "meanLineBytes": null,
+          "maxLineBytes": 0,
+          "meanHitCharacters": null,
+          "byKind": {},
+          "byFile": {}
+        },
+        "create": {
+          "lines": 37,
+          "bytes": 16469,
+          "withinLines": true,
+          "withinBytes": true,
+          "meanLineBytes": 445.1,
+          "maxLineBytes": 687,
+          "meanHitCharacters": 399.8,
+          "byKind": {
+            "tests.jsonl": {
+              "lines": 17,
+              "bytes": 6907
+            },
+            "behavior.jsonl": {
+              "lines": 13,
+              "bytes": 7555
+            },
+            "supporting.jsonl": {
+              "lines": 3,
+              "bytes": 1704
+            },
+            "README.md": {
+              "lines": 4,
+              "bytes": 303
+            }
+          },
+          "byFile": {
+            "tests.jsonl": 4,
+            "workspace/tests.jsonl": 2,
+            "workspace/behavior.jsonl": 2,
+            "workspace/reviews/tests.jsonl": 6,
+            "workspace/catalog/tests.jsonl": 2,
+            "workspace/catalog/behavior.jsonl": 2,
+            "workspace/reviews/behavior.jsonl": 3,
+            "workspace/reviews/core/tests.jsonl": 1,
+            "workspace/reviews/core/behavior.jsonl": 1,
+            "workspace/reviews/ui/tests.jsonl": 2,
+            "behavior.jsonl": 3,
+            "workspace/reviews/ui/behavior.jsonl": 1,
+            "supporting.jsonl": 3,
+            "README.md": 4,
+            "integration-tests/behavior.jsonl": 1
+          }
+        }
+      },
+      "counters": {
+        "revisions": 5,
+        "analyses": 13,
+        "cancelledAnalyses": 0,
+        "reusedRevisions": 0,
+        "coalescedEvents": 0,
+        "evictions": 0,
+        "rejectedRequests": 0,
+        "disconnectedSlowConsumers": 0,
+        "sweeps": 8,
+        "audits": 0,
+        "auditMismatches": 0,
+        "coveredRequests": 0,
+        "coldOutcomes": 0,
+        "deadlineOutcomes": 0,
+        "behaviorRuns": 5,
+        "dependencyDiagrams": 5,
+        "dependencyDiagramInputChanges": 0
+      },
+      "memory": {
+        "pid": 533188,
+        "samples": 172,
+        "peakDaemonRssBytes": 94072832,
+        "peakDaemonHeapUsedBytes": 21123864,
+        "peakCombinedRssBytes": 472805376,
+        "peakCombinedHeapBytes": 50429320
+      },
+      "daemonStop": {
+        "pid": 533188,
+        "stopCode": 0,
+        "running": false,
+        "pidAlive": false
+      }
+    },
+    "toolkit": {
+      "name": "toolkit",
+      "root": "<isolated copy>",
+      "steps": {
+        "cold": {
+          "code": 0,
+          "durationMs": 14891.8,
+          "stderr": "",
+          "revision": 1,
+          "targets": 1,
+          "entries": 1591,
+          "bytesWritten": 809330,
+          "unchanged": 0,
+          "modules": 15,
+          "records": 1591,
+          "dependencies": "measured"
+        },
+        "repeat": {
+          "code": 0,
+          "durationMs": 1120.3,
+          "stderr": "",
+          "revision": 1,
+          "targets": 1,
+          "entries": 1591,
+          "bytesWritten": 0,
+          "unchanged": 1,
+          "modules": 15,
+          "records": 1591,
+          "dependencies": "measured"
+        },
+        "retainedFacts": {
+          "code": 0,
+          "durationMs": 1105.8,
+          "stderr": "",
+          "revision": 1,
+          "targets": 1,
+          "entries": 1591,
+          "bytesWritten": 809330,
+          "unchanged": 0,
+          "modules": 15,
+          "records": 1591,
+          "dependencies": "measured"
+        },
+        "warmAnalyzer": [
+          {
+            "sample": 1,
+            "watcherPublished": true,
+            "code": 0,
+            "durationMs": 8760.8,
+            "stderr": "",
+            "revision": 2,
+            "targets": 1,
+            "entries": 1591,
+            "bytesWritten": 809330,
+            "unchanged": 0,
+            "modules": 15,
+            "records": 1591,
+            "dependencies": "measured"
+          },
+          {
+            "sample": 2,
+            "watcherPublished": true,
+            "code": 0,
+            "durationMs": 8652.8,
+            "stderr": "",
+            "revision": 3,
+            "targets": 1,
+            "entries": 1591,
+            "bytesWritten": 809330,
+            "unchanged": 0,
+            "modules": 15,
+            "records": 1591,
+            "dependencies": "measured"
+          },
+          {
+            "sample": 3,
+            "watcherPublished": true,
+            "code": 0,
+            "durationMs": 8706.5,
+            "stderr": "",
+            "revision": 4,
+            "targets": 1,
+            "entries": 1591,
+            "bytesWritten": 809330,
+            "unchanged": 0,
+            "modules": 15,
+            "records": 1591,
+            "dependencies": "measured"
+          }
+        ],
+        "apiOnly": {
+          "code": 0,
+          "durationMs": 1278.4,
+          "stderr": "",
+          "revision": 4,
+          "targets": 2,
+          "entries": 582,
+          "bytesWritten": 194029,
+          "unchanged": 0
+        },
+        "bothViews": {
+          "code": 0,
+          "durationMs": 15464.4,
+          "stderr": "",
+          "revision": 5,
+          "targets": 30,
+          "entries": 7950,
+          "bytesWritten": 2910829,
+          "unchanged": 0,
+          "modules": 15,
+          "records": 1591,
+          "dependencies": "measured"
+        }
+      },
+      "context": {
+        "sequence": 1,
+        "revision": "rev/1:d5c41549-d090-433c-a950-a16e6e3e0752:1",
+        "inputId": "input/1:0721b0443ac46576a9a72cbc0f8574c80515137054f0e28b34e12f0cb5c71af7",
+        "cause": "open"
+      },
+      "view": {
+        "files": 62,
+        "bytes": 809330,
+        "readmeBytes": 9295,
+        "largestBehavior": {
+          "path": "analysis/behavior.jsonl",
+          "bytes": 50571
+        },
+        "kinds": {
+          "README.md": {
+            "files": 1,
+            "bytes": 9295,
+            "records": 0,
+            "maxRecordCharacters": 0,
+            "meanRecordCharacters": null
+          },
+          "_meta.json": {
+            "files": 1,
+            "bytes": 352,
+            "records": 0,
+            "maxRecordCharacters": 0,
+            "meanRecordCharacters": null
+          },
+          "behavior.jsonl": {
+            "files": 15,
+            "bytes": 220463,
+            "records": 547,
+            "maxRecordCharacters": 793,
+            "meanRecordCharacters": 402
+          },
+          "module.json": {
+            "files": 15,
+            "bytes": 22479,
+            "records": 0,
+            "maxRecordCharacters": 0,
+            "meanRecordCharacters": null
+          },
+          "supporting.jsonl": {
+            "files": 15,
+            "bytes": 330070,
+            "records": 747,
+            "maxRecordCharacters": 815,
+            "meanRecordCharacters": 440.5
+          },
+          "tests.jsonl": {
+            "files": 15,
+            "bytes": 226671,
+            "records": 297,
+            "maxRecordCharacters": 2763,
+            "meanRecordCharacters": 762
+          }
+        }
+      },
+      "meta": {
+        "schema": "ramify.architect-view/1",
+        "revision": "rev/1:d5c41549-d090-433c-a950-a16e6e3e0752:1",
+        "input": "input/1:0721b0443ac46576a9a72cbc0f8574c80515137054f0e28b34e12f0cb5c71af7",
+        "modules": 15,
+        "dependencies": "measured",
+        "dependencyScope": "production",
+        "testReferences": "measured",
+        "metrics": "unavailable",
+        "cut": 351,
+        "detailsUnavailable": 1,
+        "dynamicTitles": 20
+      },
+      "manifest": {
+        "README.md": "9268a50ce0f9dbba713c9cf14da1c86310e3e431389687d919a3f60ba2da046f",
+        "_meta.json": "c5c0f774db554ffc3669038e6f0668a5bcf4af63aa8641a15983e8e91a1891cd",
+        "analysis/behavior.jsonl": "0339423fe73beedcf33db2771460ccefec9b9513b06b2fff021a2564a085315a",
+        "analysis/descriptions/behavior.jsonl": "2bd64c580d917c2ddd50f8c881879d73386fd1e358c8c64345747ed2e8c76a68",
+        "analysis/descriptions/module.json": "e32a1b89860d6b12b5deee7b7a39b8584c0095da0e2d358c7b4f43d319ff59b7",
+        "analysis/descriptions/supporting.jsonl": "ea941c439179c2c3e5ab5391f7f0b2db9fafdaa6cb3bb2f0cc4206dd412e86b7",
+        "analysis/descriptions/tests.jsonl": "18123f187f551716a8f0658356d254450aeed85a4317fa7b81f44cb1b5ee916d",
+        "analysis/model/behavior.jsonl": "fceb88873559907c2d327641c62409ef23afbff48c80ae7c57e6115f7ffb5097",
+        "analysis/model/module.json": "8a1d99dfd7a67b2fc9e0d5c9479fe762ad3a1e3850bf62a46d48d074ed4dced2",
+        "analysis/model/supporting.jsonl": "0d633f7e9c110755db80bac40642770871ac190674b26c43f6ecf81b802dcc8b",
+        "analysis/model/tests.jsonl": "42b51ba50013831a0c0cb3d8dc41275e7ca5f2f897d9b7daa00a8b5f7664dbc2",
+        "analysis/module.json": "4dfd3babaefe7562c71d67edebd6fd02ca5f6f6ef0d220c8ef44a805932ccd32",
+        "analysis/project/behavior.jsonl": "9d32a9c173495a7c1d395446bbe2ceb60db187fde1dae79ba8b13ba2f7cb43f0",
+        "analysis/project/module.json": "6f8ad0f6c04afa8b29f3cec49091bf40a4793308645ad2ce101c6fc05f19a3f3",
+        "analysis/project/supporting.jsonl": "ee1f7fa7471e02c0c7cc706dc7b6624eba3881b7460c42d7ddb87934e2adca4a",
+        "analysis/project/tests.jsonl": "3cc39ac686d076224c5e28f9af63882c0d0cdc1a361703c6268ec066e5bd022d",
+        "analysis/supporting.jsonl": "ce22467784275e76c7aad0724a635ce2e901a2736634358005934a90d25df6bc",
+        "analysis/tests.jsonl": "abd7f643cbcaefe99c56654398164fd6ec8bcab61d6b46daf1731c94e8772daa",
+        "analysis/typescript/behavior.jsonl": "08efe412c286c599c69a701762920b7e408f477c23ccacaa2d7c22ecc592aab3",
+        "analysis/typescript/module.json": "2582dfe59ec26f92dd6edb228424de3108832096de0991af5b51d8b1a9d3fd04",
+        "analysis/typescript/supporting.jsonl": "9531ef949c52c6f368ca434502fc411d1974c5963b717ed52427fb347a103b64",
+        "analysis/typescript/tests.jsonl": "89eb778520d751ba40e88494bdc0c11f20d649fac2788634747a2965992b12a7",
+        "behavior.jsonl": "5bbd25a3051791d710f5eaf50fb1fd58a4c27d7134f4cd624a81af43dfbae3a4",
+        "cli/behavior.jsonl": "b4d2204a016b33ae39dc3b9d14fb069590787ad411f56e2b166c1d86f1a53d3e",
+        "cli/module.json": "fee663c78de5f14b71f41aeb114ba33e80ac3877f9960f45adeab28e465d1f32",
+        "cli/supporting.jsonl": "922a6ca7985a472ca509eb91013547fc0223e45e348809ee0113be366080d2a6",
+        "cli/tests.jsonl": "0c167f3fda9b513f3ea09a3a4c3ada3a9ec000e27f87bb8aa03b86f761f61f97",
+        "daemon/behavior.jsonl": "9c1ea4a1e281c77cf94c60dde6e74a689c0ba4dc74471d61961a10d9c5580645",
+        "daemon/contexts/behavior.jsonl": "79d8e8082985131e29046d466a26b9b276136d5474b98f22403cb2e35d57bf43",
+        "daemon/contexts/module.json": "7a0dee91e4976e0969c3daa109d300ae2a6f6747a6702012f694125038945e7a",
+        "daemon/contexts/supporting.jsonl": "bd8b998b67a64db4c9638c1b925e26d696cf3ab4084ab99dcd70988364d282fa",
+        "daemon/contexts/tests.jsonl": "1e00d1da5e7cfc77555a3eb8f4ad48f415e99f2fa6536584bed6a6f33d5ba01a",
+        "daemon/module.json": "501ccbbd3445c2f6e0a5b91a30dcf0ad889767f414b6bb560b1b512a80a5b4f7",
+        "daemon/supporting.jsonl": "04759c53e4c0d4d368903f308ead4eddd7a9c092f7d4c2b239da95dee918c4ce",
+        "daemon/tests.jsonl": "ef1138f290931d1f9f5b7868bfd3ca46c4d83061429028d4c25da59443ebfc9c",
+        "explorer/behavior.jsonl": "2a4217072c8fc821fac1da1f71a2aad87cf29c2905d88cffb668ea37c56f9100",
+        "explorer/module.json": "8c62a343ac7b8016c724701c4f202b27bdbe69163824ebe6f4c53b47d86b61eb",
+        "explorer/supporting.jsonl": "60be60894c0c903e0b6ed67e92b9706f2e3b4fb2b046967ea83e4b514d4a667a",
+        "explorer/tests.jsonl": "2785cc77b3e166d17cf8e0e9c9d0cf051715cd25307c34c03454920afaf9742a",
+        "integration-tests/behavior.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "integration-tests/module.json": "a0e479adb0fed318b59ea6f9f33008394543f3c1e912d67f3e39482562ec943d",
+        "integration-tests/supporting.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "integration-tests/tests.jsonl": "924c2d302db07a03887c34f6a8232b245de7d85f12b935e9837a3c13e3decd08",
+        "module.json": "c111580d45611469ebf20b7e8cc5c959ee27216423cda0f0ba1102e31513efd0",
+        "presentation/behavior.jsonl": "f36f3b9a26f2ad38e5a318eb7baa49837baee854cc849fa6c4b473945f3e160e",
+        "presentation/layout/behavior.jsonl": "8ebf131531f292726ada3a95a5097689945b923a554ba024a677483c1512e926",
+        "presentation/layout/module.json": "1b011fc89dd9ed67b31ab7188e44ef640f4575af47a1a80458d77aa0aff9a9c4",
+        "presentation/layout/supporting.jsonl": "3ee581200aa9fa324f71b75d055cdef3c09172a4dba4296938e68250ae8babd1",
+        "presentation/layout/tests.jsonl": "f9f1a18a6abfc1084c4610e56355a09d08919180088c5bc3633ca6aae161bea5",
+        "presentation/module.json": "0ec6dd48f1702b3415e7ace9d9731fe7c24dc073940ada546c778e1840e844d2",
+        "presentation/project-view/behavior.jsonl": "5a2dd2f6c89915fd9d861050350ab331892ac49470ec560b93b946d7eea5799f",
+        "presentation/project-view/module.json": "4277bbdc33b5269528b32a2e4b37e73aac15ff14192e92a7ab7ea07f93d378fc",
+        "presentation/project-view/supporting.jsonl": "e6f8cbc3e71b714decd2c598ef531063ad608ee436710bcade5ac1964146c04c",
+        "presentation/project-view/tests.jsonl": "f40bf9882879217bcd3727c99547a19324bf381a75830a8668af3480fae4f137",
+        "presentation/supporting.jsonl": "988410ae693f663c44b3b14d6f87c1b9c97c515ba5680fedddad904d3d032349",
+        "presentation/tests.jsonl": "111b063ca79632f079542df40ff95da2e0e16995ed4388bd07466ae2517ec89a",
+        "service-api/behavior.jsonl": "aa3f64e48c34343a09bef34f3f32b0bb0a89d33647e9678b9e7028a6c2c93524",
+        "service-api/module.json": "c8e4e128de3494741817ffb22fae606b299c84b8241f86ae4663c7296d09cce0",
+        "service-api/supporting.jsonl": "550d2144415a5dd628633e1276a2f3db6824e9eb924c574ed6a42324ada2ce49",
+        "service-api/tests.jsonl": "0396d0aee1e7ba2a569d6a0fe0cedc1a1649f12d6c11a34e54dc954e720d5108",
+        "supporting.jsonl": "886789f300b3df2abea5a09a6d7a0fcf5b3349c6e432b1a5a59e74818b4e83d8",
+        "tests.jsonl": "18d1085bc34e4fce0ba0df25c2b23bf575148706582e7002a307fa11df55cf80"
+      },
+      "manifestSha256": "a4b2006aa02592630922d42b421acc9ecae026c0c5cfb16f1ef1208b19aa0b68",
+      "hitCost": {
+        "revision": {
+          "lines": 187,
+          "bytes": 114072,
+          "withinLines": true,
+          "withinBytes": false,
+          "meanLineBytes": 610,
+          "maxLineBytes": 2370,
+          "meanHitCharacters": 562.7,
+          "byKind": {
+            "tests.jsonl": {
+              "lines": 56,
+              "bytes": 51158
+            },
+            "module.json": {
+              "lines": 19,
+              "bytes": 3288
+            },
+            "supporting.jsonl": {
+              "lines": 71,
+              "bytes": 39280
+            },
+            "behavior.jsonl": {
+              "lines": 35,
+              "bytes": 18085
+            },
+            "_meta.json": {
+              "lines": 1,
+              "bytes": 383
+            },
+            "README.md": {
+              "lines": 5,
+              "bytes": 1878
+            }
+          },
+          "byFile": {
+            "tests.jsonl": 2,
+            "cli/tests.jsonl": 1,
+            "cli/module.json": 2,
+            "cli/supporting.jsonl": 3,
+            "service-api/behavior.jsonl": 2,
+            "service-api/tests.jsonl": 2,
+            "service-api/module.json": 1,
+            "service-api/supporting.jsonl": 9,
+            "explorer/tests.jsonl": 4,
+            "explorer/module.json": 1,
+            "explorer/supporting.jsonl": 4,
+            "explorer/behavior.jsonl": 2,
+            "presentation/module.json": 1,
+            "presentation/project-view/tests.jsonl": 1,
+            "presentation/project-view/behavior.jsonl": 2,
+            "presentation/layout/module.json": 1,
+            "presentation/project-view/module.json": 2,
+            "presentation/project-view/supporting.jsonl": 1,
+            "module.json": 1,
+            "supporting.jsonl": 3,
+            "integration-tests/module.json": 1,
+            "_meta.json": 1,
+            "analysis/module.json": 2,
+            "analysis/behavior.jsonl": 23,
+            "daemon/tests.jsonl": 6,
+            "analysis/tests.jsonl": 24,
+            "analysis/project/module.json": 1,
+            "analysis/project/behavior.jsonl": 1,
+            "daemon/behavior.jsonl": 3,
+            "daemon/module.json": 1,
+            "daemon/supporting.jsonl": 2,
+            "analysis/supporting.jsonl": 23,
+            "daemon/contexts/tests.jsonl": 16,
+            "analysis/model/module.json": 1,
+            "analysis/descriptions/module.json": 1,
+            "daemon/contexts/module.json": 2,
+            "daemon/contexts/behavior.jsonl": 2,
+            "README.md": 5,
+            "daemon/contexts/supporting.jsonl": 26,
+            "analysis/typescript/module.json": 1
+          }
+        },
+        "project": {
+          "lines": 546,
+          "bytes": 322888,
+          "withinLines": false,
+          "withinBytes": false,
+          "meanLineBytes": 591.4,
+          "maxLineBytes": 2370,
+          "meanHitCharacters": 539.3,
+          "byKind": {
+            "tests.jsonl": {
+              "lines": 131,
+              "bytes": 113053
+            },
+            "module.json": {
+              "lines": 30,
+              "bytes": 5792
+            },
+            "behavior.jsonl": {
+              "lines": 166,
+              "bytes": 86472
+            },
+            "supporting.jsonl": {
+              "lines": 208,
+              "bytes": 113878
+            },
+            "README.md": {
+              "lines": 11,
+              "bytes": 3693
+            }
+          },
+          "byFile": {
+            "tests.jsonl": 5,
+            "service-api/tests.jsonl": 7,
+            "service-api/module.json": 2,
+            "service-api/behavior.jsonl": 14,
+            "service-api/supporting.jsonl": 26,
+            "presentation/project-view/tests.jsonl": 9,
+            "presentation/project-view/module.json": 5,
+            "presentation/project-view/supporting.jsonl": 61,
+            "presentation/module.json": 1,
+            "presentation/project-view/behavior.jsonl": 51,
+            "behavior.jsonl": 1,
+            "presentation/layout/behavior.jsonl": 1,
+            "presentation/layout/supporting.jsonl": 1,
+            "explorer/tests.jsonl": 5,
+            "explorer/module.json": 2,
+            "explorer/behavior.jsonl": 7,
+            "presentation/layout/module.json": 1,
+            "explorer/supporting.jsonl": 6,
+            "module.json": 1,
+            "supporting.jsonl": 2,
+            "integration-tests/tests.jsonl": 2,
+            "daemon/module.json": 1,
+            "daemon/supporting.jsonl": 3,
+            "daemon/behavior.jsonl": 8,
+            "daemon/tests.jsonl": 21,
+            "analysis/module.json": 3,
+            "daemon/contexts/behavior.jsonl": 2,
+            "daemon/contexts/tests.jsonl": 8,
+            "analysis/tests.jsonl": 53,
+            "daemon/contexts/supporting.jsonl": 12,
+            "analysis/behavior.jsonl": 27,
+            "daemon/contexts/module.json": 3,
+            "analysis/supporting.jsonl": 34,
+            "analysis/model/module.json": 1,
+            "analysis/project/behavior.jsonl": 36,
+            "analysis/descriptions/tests.jsonl": 1,
+            "analysis/model/supporting.jsonl": 9,
+            "analysis/project/tests.jsonl": 13,
+            "analysis/descriptions/supporting.jsonl": 3,
+            "analysis/project/module.json": 5,
+            "analysis/descriptions/module.json": 2,
+            "analysis/project/supporting.jsonl": 35,
+            "README.md": 11,
+            "cli/tests.jsonl": 2,
+            "analysis/typescript/behavior.jsonl": 18,
+            "analysis/typescript/tests.jsonl": 5,
+            "analysis/typescript/supporting.jsonl": 15,
+            "analysis/typescript/module.json": 2,
+            "cli/behavior.jsonl": 1,
+            "cli/module.json": 1,
+            "cli/supporting.jsonl": 1
+          }
+        },
+        "session": {
+          "lines": 214,
+          "bytes": 125498,
+          "withinLines": false,
+          "withinBytes": false,
+          "meanLineBytes": 586.4,
+          "maxLineBytes": 2370,
+          "meanHitCharacters": 540.4,
+          "byKind": {
+            "tests.jsonl": {
+              "lines": 64,
+              "bytes": 53616
+            },
+            "behavior.jsonl": {
+              "lines": 76,
+              "bytes": 34138
+            },
+            "supporting.jsonl": {
+              "lines": 65,
+              "bytes": 33204
+            },
+            "module.json": {
+              "lines": 4,
+              "bytes": 2154
+            },
+            "README.md": {
+              "lines": 5,
+              "bytes": 2386
+            }
+          },
+          "byFile": {
+            "tests.jsonl": 6,
+            "service-api/behavior.jsonl": 1,
+            "behavior.jsonl": 2,
+            "supporting.jsonl": 1,
+            "analysis/supporting.jsonl": 57,
+            "analysis/tests.jsonl": 34,
+            "analysis/module.json": 1,
+            "analysis/behavior.jsonl": 72,
+            "analysis/typescript/module.json": 1,
+            "README.md": 5,
+            "daemon/tests.jsonl": 5,
+            "analysis/project/module.json": 1,
+            "daemon/contexts/module.json": 1,
+            "daemon/contexts/behavior.jsonl": 1,
+            "daemon/contexts/tests.jsonl": 19,
+            "daemon/contexts/supporting.jsonl": 7
+          }
+        },
+        "publish": {
+          "lines": 113,
+          "bytes": 81161,
+          "withinLines": true,
+          "withinBytes": false,
+          "meanLineBytes": 718.2,
+          "maxLineBytes": 2370,
+          "meanHitCharacters": 673.5,
+          "byKind": {
+            "tests.jsonl": {
+              "lines": 55,
+              "bytes": 50342
+            },
+            "behavior.jsonl": {
+              "lines": 16,
+              "bytes": 8630
+            },
+            "supporting.jsonl": {
+              "lines": 39,
+              "bytes": 20906
+            },
+            "README.md": {
+              "lines": 2,
+              "bytes": 749
+            },
+            "module.json": {
+              "lines": 1,
+              "bytes": 534
+            }
+          },
+          "byFile": {
+            "tests.jsonl": 5,
+            "service-api/behavior.jsonl": 1,
+            "explorer/supporting.jsonl": 6,
+            "explorer/tests.jsonl": 1,
+            "explorer/behavior.jsonl": 4,
+            "service-api/supporting.jsonl": 1,
+            "behavior.jsonl": 2,
+            "supporting.jsonl": 3,
+            "analysis/descriptions/tests.jsonl": 1,
+            "analysis/tests.jsonl": 10,
+            "analysis/behavior.jsonl": 2,
+            "analysis/project/tests.jsonl": 1,
+            "analysis/model/tests.jsonl": 1,
+            "analysis/model/behavior.jsonl": 1,
+            "analysis/supporting.jsonl": 6,
+            "README.md": 2,
+            "cli/tests.jsonl": 3,
+            "daemon/tests.jsonl": 23,
+            "daemon/behavior.jsonl": 6,
+            "daemon/contexts/module.json": 1,
+            "daemon/contexts/tests.jsonl": 10,
+            "daemon/contexts/supporting.jsonl": 10,
+            "daemon/supporting.jsonl": 13
+          }
+        },
+        "watch": {
+          "lines": 40,
+          "bytes": 23517,
+          "withinLines": true,
+          "withinBytes": true,
+          "meanLineBytes": 587.9,
+          "maxLineBytes": 1849,
+          "meanHitCharacters": 542.1,
+          "byKind": {
+            "tests.jsonl": {
+              "lines": 16,
+              "bytes": 12545
+            },
+            "supporting.jsonl": {
+              "lines": 15,
+              "bytes": 7443
+            },
+            "behavior.jsonl": {
+              "lines": 5,
+              "bytes": 2457
+            },
+            "README.md": {
+              "lines": 3,
+              "bytes": 706
+            },
+            "module.json": {
+              "lines": 1,
+              "bytes": 366
+            }
+          },
+          "byFile": {
+            "tests.jsonl": 2,
+            "presentation/supporting.jsonl": 1,
+            "behavior.jsonl": 1,
+            "supporting.jsonl": 2,
+            "analysis/tests.jsonl": 1,
+            "analysis/project/tests.jsonl": 1,
+            "README.md": 3,
+            "daemon/module.json": 1,
+            "daemon/tests.jsonl": 5,
+            "daemon/behavior.jsonl": 1,
+            "daemon/supporting.jsonl": 1,
+            "daemon/contexts/behavior.jsonl": 2,
+            "daemon/contexts/tests.jsonl": 7,
+            "daemon/contexts/supporting.jsonl": 9,
+            "cli/behavior.jsonl": 1,
+            "cli/supporting.jsonl": 2
+          }
+        },
+        "create": {
+          "lines": 198,
+          "bytes": 145175,
+          "withinLines": true,
+          "withinBytes": false,
+          "meanLineBytes": 733.2,
+          "maxLineBytes": 2370,
+          "meanHitCharacters": 687.3,
+          "byKind": {
+            "tests.jsonl": {
+              "lines": 125,
+              "bytes": 110367
+            },
+            "behavior.jsonl": {
+              "lines": 54,
+              "bytes": 27507
+            },
+            "supporting.jsonl": {
+              "lines": 11,
+              "bytes": 5978
+            },
+            "README.md": {
+              "lines": 8,
+              "bytes": 1323
+            }
+          },
+          "byFile": {
+            "tests.jsonl": 9,
+            "presentation/project-view/tests.jsonl": 2,
+            "presentation/tests.jsonl": 13,
+            "presentation/project-view/behavior.jsonl": 1,
+            "presentation/behavior.jsonl": 1,
+            "service-api/behavior.jsonl": 6,
+            "service-api/tests.jsonl": 7,
+            "service-api/supporting.jsonl": 1,
+            "behavior.jsonl": 7,
+            "integration-tests/tests.jsonl": 1,
+            "explorer/behavior.jsonl": 1,
+            "README.md": 8,
+            "analysis/tests.jsonl": 21,
+            "analysis/behavior.jsonl": 10,
+            "daemon/contexts/supporting.jsonl": 2,
+            "daemon/tests.jsonl": 33,
+            "daemon/contexts/behavior.jsonl": 9,
+            "daemon/behavior.jsonl": 11,
+            "daemon/contexts/tests.jsonl": 10,
+            "daemon/supporting.jsonl": 1,
+            "analysis/supporting.jsonl": 1,
+            "analysis/project/tests.jsonl": 3,
+            "analysis/model/behavior.jsonl": 1,
+            "analysis/descriptions/tests.jsonl": 1,
+            "analysis/model/tests.jsonl": 8,
+            "analysis/project/supporting.jsonl": 2,
+            "analysis/typescript/supporting.jsonl": 4,
+            "analysis/typescript/tests.jsonl": 15,
+            "analysis/typescript/behavior.jsonl": 7,
+            "cli/tests.jsonl": 2
+          }
+        }
+      },
+      "counters": {
+        "revisions": 5,
+        "analyses": 14,
+        "cancelledAnalyses": 0,
+        "reusedRevisions": 0,
+        "coalescedEvents": 0,
+        "evictions": 0,
+        "rejectedRequests": 0,
+        "disconnectedSlowConsumers": 0,
+        "sweeps": 9,
+        "audits": 0,
+        "auditMismatches": 0,
+        "coveredRequests": 0,
+        "coldOutcomes": 0,
+        "deadlineOutcomes": 0,
+        "behaviorRuns": 5,
+        "dependencyDiagrams": 5,
+        "dependencyDiagramInputChanges": 0
+      },
+      "memory": {
+        "pid": 537279,
+        "samples": 477,
+        "peakDaemonRssBytes": 192126976,
+        "peakDaemonHeapUsedBytes": 71491008,
+        "peakCombinedRssBytes": 1182625792,
+        "peakCombinedHeapBytes": 256232112
+      },
+      "daemonStop": {
+        "pid": 537279,
+        "stopCode": 0,
+        "running": false,
+        "pidAlive": false
+      }
+    },
+    "synthetic-100": {
+      "fixture": {
+        "generator": "scripts/probes/fixtures/synthetic-owners.ts",
+        "fixture": "S100",
+        "owners": 100,
+        "contentMapSha256": "d5b77b9ff57c443b35f386f40598506ff20c51c4ec75b800371f0cec089c0897",
+        "files": 1402,
+        "bytes": 1164385
+      },
+      "name": "synthetic-100",
+      "root": "<isolated copy>",
+      "steps": {
+        "cold": {
+          "code": 0,
+          "durationMs": 8424.5,
+          "stderr": "",
+          "revision": 1,
+          "targets": 1,
+          "entries": 1100,
+          "bytesWritten": 292872,
+          "unchanged": 0,
+          "modules": 100,
+          "records": 1100,
+          "dependencies": "measured"
+        },
+        "repeat": {
+          "code": 0,
+          "durationMs": 801.5,
+          "stderr": "",
+          "revision": 1,
+          "targets": 1,
+          "entries": 1100,
+          "bytesWritten": 0,
+          "unchanged": 1,
+          "modules": 100,
+          "records": 1100,
+          "dependencies": "measured"
+        },
+        "retainedFacts": {
+          "code": 0,
+          "durationMs": 849.5,
+          "stderr": "",
+          "revision": 1,
+          "targets": 1,
+          "entries": 1100,
+          "bytesWritten": 292872,
+          "unchanged": 0,
+          "modules": 100,
+          "records": 1100,
+          "dependencies": "measured"
+        },
+        "warmAnalyzer": [
+          {
+            "sample": 1,
+            "watcherPublished": true,
+            "code": 0,
+            "durationMs": 4868.3,
+            "stderr": "",
+            "revision": 2,
+            "targets": 1,
+            "entries": 1100,
+            "bytesWritten": 292872,
+            "unchanged": 0,
+            "modules": 100,
+            "records": 1100,
+            "dependencies": "measured"
+          },
+          {
+            "sample": 2,
+            "watcherPublished": true,
+            "code": 0,
+            "durationMs": 4571.2,
+            "stderr": "",
+            "revision": 3,
+            "targets": 1,
+            "entries": 1100,
+            "bytesWritten": 292872,
+            "unchanged": 0,
+            "modules": 100,
+            "records": 1100,
+            "dependencies": "measured"
+          },
+          {
+            "sample": 3,
+            "watcherPublished": true,
+            "code": 0,
+            "durationMs": 4619,
+            "stderr": "",
+            "revision": 4,
+            "targets": 1,
+            "entries": 1100,
+            "bytesWritten": 292872,
+            "unchanged": 0,
+            "modules": 100,
+            "records": 1100,
+            "dependencies": "measured"
+          }
+        ],
+        "apiOnly": {
+          "code": 0,
+          "durationMs": 430.6,
+          "stderr": "",
+          "revision": 5,
+          "targets": 2,
+          "entries": 0,
+          "bytesWritten": 273,
+          "unchanged": 0
+        },
+        "bothViews": {
+          "code": 0,
+          "durationMs": 6795.7,
+          "stderr": "",
+          "revision": 5,
+          "targets": 201,
+          "entries": 1100,
+          "bytesWritten": 320889,
+          "unchanged": 2,
+          "modules": 100,
+          "records": 1100,
+          "dependencies": "measured"
+        }
+      },
+      "context": {
+        "sequence": 1,
+        "revision": "rev/1:e44f25ad-2b59-4533-af0b-f293b10ce894:1",
+        "inputId": "input/1:24d8d35f5d0938afa0a37c4ba69b776aacab6c2b1de3d84cd201bfb195e18038",
+        "cause": "open"
+      },
+      "view": {
+        "files": 402,
+        "bytes": 292872,
+        "readmeBytes": 18985,
+        "largestBehavior": {
+          "path": "m010/behavior.jsonl",
+          "bytes": 1854
+        },
+        "kinds": {
+          "README.md": {
+            "files": 1,
+            "bytes": 18985,
+            "records": 0,
+            "maxRecordCharacters": 0,
+            "meanRecordCharacters": null
+          },
+          "_meta.json": {
+            "files": 1,
+            "bytes": 301,
+            "records": 0,
+            "maxRecordCharacters": 0,
+            "meanRecordCharacters": null
+          },
+          "behavior.jsonl": {
+            "files": 100,
+            "bytes": 169884,
+            "records": 900,
+            "maxRecordCharacters": 205,
+            "meanRecordCharacters": 187.8
+          },
+          "module.json": {
+            "files": 100,
+            "bytes": 67050,
+            "records": 0,
+            "maxRecordCharacters": 0,
+            "meanRecordCharacters": null
+          },
+          "supporting.jsonl": {
+            "files": 100,
+            "bytes": 36552,
+            "records": 200,
+            "maxRecordCharacters": 212,
+            "meanRecordCharacters": 181.8
+          },
+          "tests.jsonl": {
+            "files": 100,
+            "bytes": 100,
+            "records": 0,
+            "maxRecordCharacters": 0,
+            "meanRecordCharacters": null
+          }
+        }
+      },
+      "meta": {
+        "schema": "ramify.architect-view/1",
+        "revision": "rev/1:e44f25ad-2b59-4533-af0b-f293b10ce894:1",
+        "input": "input/1:24d8d35f5d0938afa0a37c4ba69b776aacab6c2b1de3d84cd201bfb195e18038",
+        "modules": 100,
+        "dependencies": "measured",
+        "dependencyScope": "production",
+        "testReferences": "measured",
+        "metrics": "unavailable"
+      },
+      "manifest": {
+        "README.md": "a918b3116bb178dee3e8a8f72e74486d7af593bba629332836e4253c627f8ed9",
+        "_meta.json": "cf28b06dd01030b5009dfbdfbd4f0bc003cbc716d1fcaa7bfaad96794749fad3",
+        "behavior.jsonl": "c49792b27665d86d3ca9bcce6c1b81b3997258a303c41bc6970a7085eb73ce63",
+        "m001/behavior.jsonl": "933a4941087f8571bdb2bda01b9fb37eef5ffcea0045f62f2cefa90ea79cd9ec",
+        "m001/module.json": "fe65fa6a9834e0bb694efc0f66413ef56da694fcdc4d628b541cbbf03611940f",
+        "m001/supporting.jsonl": "06bb3e008ec546155c79c29ce50e821af9edbb427a5a3c3cb9773f4fd3a941ae",
+        "m001/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m002/behavior.jsonl": "fdc1352060d14f2848ec91154d8dc69220e48dfb3944a12671826556c273993d",
+        "m002/module.json": "96456bc075f87e41bb6f10df0532efddece2d6562e51048a8d01a1d2f9b5714c",
+        "m002/supporting.jsonl": "168bcb6cd6e6b37d1f0230ca83d539b2cf2c5dda66a509f2339036b306a74296",
+        "m002/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m003/behavior.jsonl": "82eeb0e6ad55177f87d367604c56cbb62e3a487881c692d6817d01fc5dddb122",
+        "m003/module.json": "ef166fe6bc9d34fa516623749db091a1e1d276ddb93dbfcebd5515f1993a550e",
+        "m003/supporting.jsonl": "b4aa7743122f741abc94a3036851f98f3ac24914c92c097b7cc6b00f8fe7eed1",
+        "m003/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m004/behavior.jsonl": "478da00c594779c2ac90a2a47ed1533775e77aaeee112289abb0d2a1a2499ac7",
+        "m004/module.json": "d4f70f6ce97c03b2c9042a33cfd881ebb75ec8b707711ed8aa1ac35e7f5a6d56",
+        "m004/supporting.jsonl": "a2a0a309a0438c25150506104a08b1a6cca057c1f8938f03dbb5e679d4eb6f84",
+        "m004/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m005/behavior.jsonl": "6a07b1db12a3f129ad7bba6d635490bb30f608dbdfe304da9c937632c4b76854",
+        "m005/module.json": "cb1fa8b8e764e66d4272bbe04d10ef6782ef3e2e7908e38175262e2af2d984f2",
+        "m005/supporting.jsonl": "86b05113673d3030eff01c31359cac4972bdb61616219e9a871a5b8a08f3bf3d",
+        "m005/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m006/behavior.jsonl": "22489c6fff5027e29529d45421ce7f60f324712bf1a7be519affd0bed6d0f7d2",
+        "m006/module.json": "3048b3fd5295c51e869fe504e82f387f70f8cebbfc766334951f676bd56753a6",
+        "m006/supporting.jsonl": "5edf7b84e1e01f8643b0231266d245ac5147ffe13c468f44c49bb1fa8403d09d",
+        "m006/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m007/behavior.jsonl": "73196f067e74170e24ac33c8409e7da5b7720beb405c0ab0ce29cb35b23657b6",
+        "m007/module.json": "b5918825267ed4d2d738ad57251167c47ecb28845c2f1ed1334db16061cf0977",
+        "m007/supporting.jsonl": "a36287fd2007f300f84653130891ff66a063d2135bfb1972f44750538c958343",
+        "m007/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m008/behavior.jsonl": "4bc624f637e191fa64f4ed2468108156fc77d0b0bdbffff4d784983cb6859b9d",
+        "m008/module.json": "0115c3a108769899c67ca71f1c0b901ddd23f80271759e7dcdb0ead46f84e393",
+        "m008/supporting.jsonl": "02c3c39d3c9c239016c7852bc454939042cf62638f2b7bb7c0343a0ca3263ea2",
+        "m008/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m009/behavior.jsonl": "1e48740c1185b173c4f7c6faca235b21323eaee4c018a3f7233c77aef23d3da1",
+        "m009/module.json": "0514b4076712b8a3f9c0d1de66e63571aeee4b0550675aecddac608d495c8a40",
+        "m009/supporting.jsonl": "2ebe4b2238920a71bd9ff791aac59245226fa04dc60dcae17b22b0f3c4cd1b69",
+        "m009/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m010/behavior.jsonl": "0a93763e8916c9f75498c4212e5423319039dab4e57c0bc5a5b65987049d2751",
+        "m010/module.json": "f15e9f7edd99e492fb5cedfe406a98dce890c4deedda0ebf850bfa09b6a459e1",
+        "m010/supporting.jsonl": "267f7b4c66ed0d941920f3cc40c3d28a6e63efffb4c8c7a30bef1ec0d94db684",
+        "m010/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m011/behavior.jsonl": "878dddab5fae7357c8f94bac2320646442736c51a155ef7a9549c0c098547836",
+        "m011/module.json": "ec5d5affa40583e68fa2ed9ddb68fbfce5c2df70303d9fad6971c091dc84f33b",
+        "m011/supporting.jsonl": "e2e90b153a600db77e5977e339577c732194af3ad99e895f9734f6f7b412a75d",
+        "m011/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m012/behavior.jsonl": "eecfab37bd1c6b37272437e701574f4639e40993a7d85b07f01219555f5e4aae",
+        "m012/module.json": "0e06ff27ab5f67391fc6fb79bc7f193414d47c2d8351f654c99b4eef830d4d83",
+        "m012/supporting.jsonl": "ae0283852aaca1c4a565fc72efd4a9e8de62469d4d276972127f77adfab66ecc",
+        "m012/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m013/behavior.jsonl": "5700e750cada41027d6a0aec466321dbe2d4dcaf560240114cf0ee44401a2bc6",
+        "m013/module.json": "01d0091605e2100b5d758020b4af89f90141e98e280325c901841cbbc677bb0e",
+        "m013/supporting.jsonl": "1699086debb30b748ea203e37df9ad64911b108dea3e75467f1a6f27ec4cc660",
+        "m013/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m014/behavior.jsonl": "348e98f850cf806ce65815c3beca84124f3ac76617dafe39375ecffee0766716",
+        "m014/module.json": "8b02bfae3c7d129074ec95a51716da7db6cdda06d4c138fa02ebf3dac74a1712",
+        "m014/supporting.jsonl": "77adcafbea313539e4d9d833c07cb70c5da0e2e1e0f4c35e65823ce367b65552",
+        "m014/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m015/behavior.jsonl": "f4e7b2399754c1645ee3ec347560dcbadc95056e88f581a24a9490426368b194",
+        "m015/module.json": "199cd9794b16cf24234b54a2d6cbb69ec59f5f90d565da00583e502e19f7d3a0",
+        "m015/supporting.jsonl": "f49440c71c51e504c8bf9eee38d6e89c769545b619b90c41c41fc769dcc80214",
+        "m015/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m016/behavior.jsonl": "b8ba6af92e2907242940b68f3f0aa47674170cbdde5541f01477183d9d83be7f",
+        "m016/module.json": "1333c6058b5617e0e24b526961d01eaf23442cf8ee5c8c9e81d9ec9c85e1506a",
+        "m016/supporting.jsonl": "6a70e0a9e60e48109532ab46fdae31c02767820557a020bda3b3457f48e7ab18",
+        "m016/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m017/behavior.jsonl": "a1daaba9336a7984175efda65f33e848ef6a9d18c20c7621f4fbd29082e32d8e",
+        "m017/module.json": "64634329dc0ff9f9fddb95f37f11ea7c7b9e1806365873f726bc0805fb2f10fb",
+        "m017/supporting.jsonl": "efd6a13e0db6af30d118ff7285efd87395c79de08f173e1930986e2b054e9500",
+        "m017/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m018/behavior.jsonl": "c2d158b8726462721d3de742d435008882cc38bd2895e3bd4cfab1f6646206e9",
+        "m018/module.json": "d19a02ccdaa9b73a666dfd81d1a79e4c8349dd7cfd8158db16f0f4776120957e",
+        "m018/supporting.jsonl": "64d6f16362796b8f8f5e646b6853a72ef299a442e124bf364ff7c8270cd8fb21",
+        "m018/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m019/behavior.jsonl": "465c46d1d427a82dc410ee6d846351a974f0fcb10bc5cd90af63384c7cf8e82d",
+        "m019/module.json": "60d84bc605241d43b34b9433a1300c895e488a974d19ecd28e7bf5164ae977dc",
+        "m019/supporting.jsonl": "59dcf180ac8186dbff660f28dbb93fd153f53661f550be24588aa3b54b6faf91",
+        "m019/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m020/behavior.jsonl": "0cce172032b47a50864ce12d67734f9fcf3bcb1f98fc74df275fbd1e005f3aa5",
+        "m020/module.json": "edf63a0c27e6b3cc17db7cf79186dd20f99d7b10deefd1eefbe8ccdece6779e4",
+        "m020/supporting.jsonl": "a1bf4a5ac3eec1a0dc943d2e875997213b91fd87e7a912aefc78eb4a3fab7d82",
+        "m020/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m021/behavior.jsonl": "e80ed185fc7ff1cfde03f75238c25aa8af4c29f48db38898b453e83a2c24f417",
+        "m021/module.json": "4b3ba8bb4c1a5dc12fd15e79d00103ab3c2352437d1e5b87d89d3ca6a510bb7d",
+        "m021/supporting.jsonl": "cde5b28f6d85747a4d6242ffe609176c66d2f2667e6ac98f294eaf76336688b3",
+        "m021/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m022/behavior.jsonl": "d80552e1ac7ba47aaeb88c290d1ff655b52283bca34c413200b0e53fa2691857",
+        "m022/module.json": "7119721b4e62bf37d83d0be886559754fa0f7fb5887ebdfe8bdaaa7c4dd76c1c",
+        "m022/supporting.jsonl": "e35d00fc3c18e06976e4ab8b156e081a4be453594612538ed4b690760f2d266a",
+        "m022/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m023/behavior.jsonl": "4b2e1aaa0ea1e4a0f112b69af2ba94387d9e8bb866ba0241e0be8c9172a1dced",
+        "m023/module.json": "5adde5cc76607ed2fbac42373f963c10f949139764ef3b0ad68c7465a9845dd4",
+        "m023/supporting.jsonl": "5eb99be756e9431bddde59f60b0e3e7fe90a5b4dc1b8305bd413e595506847b0",
+        "m023/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m024/behavior.jsonl": "6bdb8053c441054a064e9f9c2f3438e2fb66697c5ab58691bbca42c663537793",
+        "m024/module.json": "6bb9a03741e86ca31fbdc0140b213e99f2a1572b16afed722a87e58a6d8f74eb",
+        "m024/supporting.jsonl": "2bdc009db6b0fe96bd98159867257d1b82bbb79b9442a711fdfeeb607b360442",
+        "m024/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m025/behavior.jsonl": "8dae0c6b48f80d3f5c7e5d21f4fff585fb473812d5c9c3d59304d2975cdfcbc4",
+        "m025/module.json": "8834398f9b38fbab06c1cfbbd8b4e7a49a4ef43388036d3f198f97b0616a0d5a",
+        "m025/supporting.jsonl": "d0ee8b5ab8531b3a4e9d60c5b98f1df377c5ded29765d7f335d696276b1a8c16",
+        "m025/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m026/behavior.jsonl": "870b6b5a6706bf518e5264ae2e14b7f39e0cc027da4f5e72c6a17e9cc9d23748",
+        "m026/module.json": "2b2cd26984ed34971e3f185efb46bdd545078714144ec1a4968196f0d55d411a",
+        "m026/supporting.jsonl": "de51135b213932ae86c4550da5567f292432401daec2c0c55106b7781d509634",
+        "m026/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m027/behavior.jsonl": "f6582ec292787449715e892754a580807fc72bebffda215dbec5a1452e0f8591",
+        "m027/module.json": "5a5f94b199379023ddbc0676e6c0720eba95fa9134eb72c50feb54e3782a2a24",
+        "m027/supporting.jsonl": "7549f7103d5cc832586a01f766dbe5f2a020fe98be2180b1ac4b78db5db7ba1b",
+        "m027/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m028/behavior.jsonl": "cc6e07ce0e57360a80c99e6f61f802492682c560c85aa84263f45d03a06ea69a",
+        "m028/module.json": "0f8bb3b9637bf1936e9549daa7091cf8c9066008b7214333e28a8ab31cdeaac7",
+        "m028/supporting.jsonl": "4a97e1387cf368752e2e140203cae07c10471231a165034ecd0b7a7f759da49d",
+        "m028/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m029/behavior.jsonl": "a1f7ad2a6230b48dade0ae8d8dea028498e4724850a9b037d223721f85206eb7",
+        "m029/module.json": "fc8c95e5d07e6416f3648106e54b7b54cfd238d4a39b81f94be16f73f41f749e",
+        "m029/supporting.jsonl": "4842e91be47c01606cf4b6d9cae87ae573af739371b99243b556472337ceb67f",
+        "m029/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m030/behavior.jsonl": "c9f3207334cdf15c1a965a0655a2c6697e19556de907592d7d603d366fb05c7c",
+        "m030/module.json": "3954e80eebbe6adf09b5345efc9028c146e05b8b61451199063b5cac4b416dea",
+        "m030/supporting.jsonl": "7ad02499a7bb71317ba9523a1f501741d67746c66ed3dd5a8b81d8c4d6a6e3db",
+        "m030/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m031/behavior.jsonl": "3c710706e5fe692ee749d16592da18e5e0e50971aca48a989ec2742568261e06",
+        "m031/module.json": "5c9a1444ffa7e7c4991153d28834c19d56dafdd9b202e868aaf077d69619b29b",
+        "m031/supporting.jsonl": "40d0e38521aa48aa526bd5d93e8ff158bce9ff0904c71696e1cdf193ff819c9c",
+        "m031/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m032/behavior.jsonl": "0aaaf73984d3d401b712d46cc390539fd7d5e8cb1e6fa05c5d45df6d3a5bada8",
+        "m032/module.json": "2d63ace9c0dc9c0389e1b19e852c6ae93752b095abee9446af967008312bda49",
+        "m032/supporting.jsonl": "db00fce845dc0c8dcf53fe9ed588e97f53b1e40f0d7e7269389f2fdaa0debc17",
+        "m032/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m033/behavior.jsonl": "2da75ce9f900748f215ae5c065890ed7717658ed235fe865c9fdbf4188a5cd07",
+        "m033/module.json": "2c49a514396198674257b17f4f6ba7840281e837a73ecb5578adc67035246ddb",
+        "m033/supporting.jsonl": "3f3a8c5eefe20b5c66e86ecf49e4519b6dca4e1642ef8b851854003f69e5659e",
+        "m033/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m034/behavior.jsonl": "cac7bbe8aa4111304e5a6178ead3ee5136fb532b6573be9da91e1643ac44a5d1",
+        "m034/module.json": "230742698d39d2c703602f5f1e7c9201f64e9497332bf322186ed5eceb00e762",
+        "m034/supporting.jsonl": "44eb973c82d383e399f6c9f5352d643f93830a3114cb4f207dcdb2d0f4708428",
+        "m034/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m035/behavior.jsonl": "43a6565f79ae63c904c79dd8f0ee191842ba3bfac53c105bd63d4e6254322346",
+        "m035/module.json": "947d6e97cf7d762aec1f82823ffb6605d6650db16ead68469f9de6a456d13ca9",
+        "m035/supporting.jsonl": "5138d8dd9c541faa6628d4d11b1259035a82ea45afdbec8d038a942bf1a4db2c",
+        "m035/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m036/behavior.jsonl": "8db9d54765719f03568d6005b0f51cc2b99130d21a5edb36bc543a5f5596ae8b",
+        "m036/module.json": "59ea720712705485f9999f3cf39c87666cb09b72fd3b8054c35b0dae52287f4a",
+        "m036/supporting.jsonl": "4be82f50a25192c7e95fdd3160b2aa854d9e405fea6ce0370fabaf7f26e90d09",
+        "m036/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m037/behavior.jsonl": "ee5b114324bac4ad1cf25c1ed5d4a99b5d4005df81d2b069e9087a8f292065cb",
+        "m037/module.json": "85069d0b7fb157e2900644cbb0b9d9b656ea621ba6bced86b70304df73cf496e",
+        "m037/supporting.jsonl": "aba1c63c1b75a45fa9f622c8f61c29bd0f1e767a0d3c727a26cf02b2df4013bb",
+        "m037/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m038/behavior.jsonl": "8cfb4a03bcae0f27df47699decd288c57ae519cadf02d72bb2f4b6e315305152",
+        "m038/module.json": "19ca53c3b8e9df826eec91b966d8bff457a35d28a51540b609018228e0e23ea3",
+        "m038/supporting.jsonl": "7c3ea583d3b64358bdfc3e905656b4fbfdc07eb2f8a1e7788cefd4acf4aca264",
+        "m038/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m039/behavior.jsonl": "ae9da909b0e4993091007e4363040feb6593322adeee2f9438ac36195baf3b4f",
+        "m039/module.json": "c52a45445da402e614fb99e5b1c5dc50993b8bf85554c83ccc6c627063203c17",
+        "m039/supporting.jsonl": "5088cc51cd703d5a905d21dcdb0f01ebc160262be691d614a80126c012109193",
+        "m039/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m040/behavior.jsonl": "0f4a5b101194089a99d2236dc4ecd322ef9f63ca11ed2b766e6fc1986123208d",
+        "m040/module.json": "93d7a5e05fa4fdb9a3b6a62c6c315c3856eb9e94dbe1ea66bfb9609f8243e920",
+        "m040/supporting.jsonl": "bd51f0c8e58acd1e057389709794f1df3950ba9416a3d11318bae2eb8193fe24",
+        "m040/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m041/behavior.jsonl": "6d494d5a6e32ed6e968d2325b7e75deece5fd7ac2a6a5f384dc77ec1ca48d472",
+        "m041/module.json": "90025730a703a551bbc8bf8530bfc93383b79fc8c9dfc4c123b951269a45df1a",
+        "m041/supporting.jsonl": "5b6c5614ee65de01141b048e60ff4a2cfb5f70a859ae44209c78cf78b0bd47c3",
+        "m041/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m042/behavior.jsonl": "e9bc31ed6b9bf401110e7d4b4e1889471baed12b0604857154e8bdbfac1743a2",
+        "m042/module.json": "96edcee5d1f19555530f770d34338b8b00e286c4b3d6e3dc849052f5476edbe8",
+        "m042/supporting.jsonl": "cc4f8737ce60acc862a02250757346644b224ad11b04843270b66cbbd1794cf1",
+        "m042/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m043/behavior.jsonl": "529ace165f5be67f091818e85f6f7452645bc7f3a5f33e2530e197762dfd3440",
+        "m043/module.json": "6e31b8a7ca57315081119f86e4c1d4117ceb1aad3e85a97c9fc138ba4f44081a",
+        "m043/supporting.jsonl": "811b315d552f6a207f776ccaaceaeaffc539a37bcc0c02b6e097433a80b62756",
+        "m043/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m044/behavior.jsonl": "d80d9cac93f96b04d1fbe77642bee6f86aa892c4fdf8882a913c6a6bda368a64",
+        "m044/module.json": "c38629d1adb3f3513cc00388276dabe0786eba0e8c15c8fc85607b34f6e9fc80",
+        "m044/supporting.jsonl": "916c62e234121b98b7f59af483b075e74d363c7936ca180a786f7b11ee5a84ee",
+        "m044/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m045/behavior.jsonl": "fd260604138fec3353a96f329152e7d656bb25ac59ef7c34e50caa4a6acf6210",
+        "m045/module.json": "47da325960387c9795dbce96ccfadcdced63e28a0e272e653b6d611af1d7662a",
+        "m045/supporting.jsonl": "0c01526031f4330e81e25cc3743f8eb3fb595af8398639a7d44b647e519aa9a3",
+        "m045/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m046/behavior.jsonl": "d0e91a32d53a7b21349b12c5cb3f72c07ff1a9fe2169629eb691f546b8710b21",
+        "m046/module.json": "74bb9809018f1fb55b8d7592f98ee3bb96742a08d55ea01030d61c6b92497846",
+        "m046/supporting.jsonl": "cf5e57803050b9f2b3f1eedc344f2b8e10210400523bf2b874a4b8a929646706",
+        "m046/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m047/behavior.jsonl": "e2f3be8aa43f82d1a8476e693d4b27bb5fd24dd404cd86303ceaaefa0b88de14",
+        "m047/module.json": "aac5aec5f9db217b161aa9ffc32863197c6d871ec721f66cd71c873524e1334d",
+        "m047/supporting.jsonl": "201f1049cd0e525f04335a4270cf84008bb80839a01b560c3d462773fb59eb19",
+        "m047/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m048/behavior.jsonl": "bb28d9696f2a7e110b09417b083c6e4fa11592797104e0b3a515b1b9658495ff",
+        "m048/module.json": "552838aeb82b0455cf8fd433183314aa7a7b05c28ab0a8f8ec8fabca97354423",
+        "m048/supporting.jsonl": "12000a806450f56b5d1d68e7cf90cc0317f025f3725017e570f05cd2f4570f5e",
+        "m048/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m049/behavior.jsonl": "3ecaead93ae540bfe24463b47aa49edc834e1135f6eb6fcb917ff6bc84583842",
+        "m049/module.json": "aa0104e38e24d9025d46d202de808d6d52bf2ffbdf68f5601adccb3c434f4da3",
+        "m049/supporting.jsonl": "5dd5acbbe0d0c3cd7fd1293c4f424b2c30a92a4f11432e191761480a243ba435",
+        "m049/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m050/behavior.jsonl": "b5666c9e04f4b88c235642f579ea37e2056d513e21df895e2f2cd7e8445090a7",
+        "m050/module.json": "eb8aacbebbc529fa3cfaade528c17040767a2b4e5d9b66e8bc1f3fa8b93a5c42",
+        "m050/supporting.jsonl": "05fa9607d88ebe039409f3d7c82777ad58d1b8f779565d072c81a38a933e06e7",
+        "m050/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m051/behavior.jsonl": "af99b4608658884734207a0d2790ef213ab9fbd5897b8712b390dc3be65c4adf",
+        "m051/module.json": "993859a5015655b3912948a02bcb0f0185c4db4bf0f8eb4fa14d2311f2dd6136",
+        "m051/supporting.jsonl": "d531abbadd79c3d9f817326327f7d038ddd716e9d6ee5e737ca4d341b16364aa",
+        "m051/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m052/behavior.jsonl": "615f7009a56d374e045d2f10478b7169e73978a4c46bd61c12f89a84c8308171",
+        "m052/module.json": "be5052c2ba01113960ce0cb181658dc67d7cf1d6634946b64983bc7b25265bce",
+        "m052/supporting.jsonl": "bcb05c6a0085c95b113956b039a09c5b04405b506f89c48076a4bc0a25e137ed",
+        "m052/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m053/behavior.jsonl": "e131a57697cc072bf8649be16c8eb284a213f37edf3c88bc7a47b952bfdc2e48",
+        "m053/module.json": "2de1188c3dfe2e431bc343b6a763b77b00009fdade1c59707a23308638e52a22",
+        "m053/supporting.jsonl": "5ecf15368ad950d2d2920ad7297256c37a32cd4a2c63678681c9ed925d8aeea3",
+        "m053/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m054/behavior.jsonl": "f2c9a65a029eae78d57a964e12b68383b3a6f77b998ab184cb1c4d512141ac71",
+        "m054/module.json": "2e86b81407a46ee3deed4dca3b3ac84587e9143b2b7da9804382622a1e1a2629",
+        "m054/supporting.jsonl": "36e48938b5d4f81cbf9cd14c24570827061af720a90b48387e0be898d4712701",
+        "m054/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m055/behavior.jsonl": "d9ceb79494c5849be808e20a0f7f4e7ceeaea586885b7313d3515f6e07a9991b",
+        "m055/module.json": "631d657099f89d3e6f7a37736ac8895f863d3b3640b56195423cd54a53bc06e1",
+        "m055/supporting.jsonl": "cabf07ef1c84bb89fe95d2ea99f69b26e9fd6cad4042ce56d052cc17ee979044",
+        "m055/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m056/behavior.jsonl": "31c834971e4b284226f555c8f71e0908693e832a4b402cb4385006e1ca142102",
+        "m056/module.json": "c63f111e6d3eb2930afc50c556d232daaf529c6c48d15c6648db6bcf12802cdc",
+        "m056/supporting.jsonl": "5ebe43f6e37ca902c9b12b2e287b2628cf6192619ab078e5cf0807def33ef1b4",
+        "m056/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m057/behavior.jsonl": "e39e157f65ff2c2450bcb3e5eab323c0ed1445726026b2c44ce4e8a113e275d5",
+        "m057/module.json": "08352131eef65103b898fde5a2801d3b3a2da58e74d22a061250f85ddf8e41ba",
+        "m057/supporting.jsonl": "8a4629145aceec5aa906b95d8e59fc94be4b37bf2495ee3dccf133a097f9cdfe",
+        "m057/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m058/behavior.jsonl": "34531a2b6f6f78c3a5a2cb763bc74ff60e0b934191395b6278aee728f270a7df",
+        "m058/module.json": "d71343863a683e5ff31e764817b0d0d55ebd273018bdcf45d8056672f73594e3",
+        "m058/supporting.jsonl": "576d464bfc252e2abfdb0d73526f96c107e87bb2cfd3da2335f9b73374225505",
+        "m058/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m059/behavior.jsonl": "4e10aaa258fbff104cc5fa1e73b83a78db7ffe25bd508cdd5436bcff7e4ce461",
+        "m059/module.json": "f5a4985f0187b526e5e6f21b4713228963c28c5e37c01083601b86ebadf4af5f",
+        "m059/supporting.jsonl": "3c9f09d22e7ff0a91f3a91c485f1d0c926cc0e81f1ae7ae5459b9d2f588540af",
+        "m059/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m060/behavior.jsonl": "7a95313c21f3e4250c7325ab5ec592f934bc27d9e9f5429b829b511079cd3919",
+        "m060/module.json": "033cfe62ae3652e2e38acbd281934afdba2e3200e7b66ea5bb9b9005b2468466",
+        "m060/supporting.jsonl": "f770899c7bd875723f143c5eac00752e1c6d9b00f1a2de758997d3402e766500",
+        "m060/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m061/behavior.jsonl": "214af8c6f65f4394e3e07307dcc78ce7a7e0e75fc90704ff6e07284b232ecc82",
+        "m061/module.json": "91ae0e189a975106b92a704de8671ebf0a6f2108ac3f0424c4874da999bea31a",
+        "m061/supporting.jsonl": "d028ca5b0b0626835b6aab24a56efa7c32d53020fb2c385f895643082de76af0",
+        "m061/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m062/behavior.jsonl": "40b265c9af1ebabcd593ef2c1d6eb414dfa7fb8c4ad9fbd023ae218520a62ca6",
+        "m062/module.json": "58c36a64f4d4ac8c04a7179ee29f582a8dbb7a53c1de611dbe6a2edd3d5c595a",
+        "m062/supporting.jsonl": "f030c041145f5f24ea5e33a82b9d710cfce6ddafe9e72acd52d97e61675fe2c2",
+        "m062/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m063/behavior.jsonl": "1d8cfc5584a508c01dafd26348fba7a28a1ca90d17e9649718bb14af87a0b1b9",
+        "m063/module.json": "894714baa50f1c689aeb489636e3bfc3ea660ccac7df63c51d92749956206948",
+        "m063/supporting.jsonl": "a5e8e969a1355bc36a6ac519641328375cefa5d41a36c4bf7e387bc99a1f37dc",
+        "m063/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m064/behavior.jsonl": "d6700bb729f116c6d610cf44662f03a4114f601fe615407340c704aac8849923",
+        "m064/module.json": "9dfa5c7d9abfcdaf0eec3a54069fb455360338aa66d9fe58a485727dafd2c06d",
+        "m064/supporting.jsonl": "9fd13f3c56f06ff683a25f19d8126ccfce88d6fea36a5d218edbad980bc27298",
+        "m064/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m065/behavior.jsonl": "c0f775fe2d76e35dc4606259ee95b5621b5a1e34c9c4db9c72f3cac5933ede79",
+        "m065/module.json": "4e23b36036dd557196bdc67bccf75b1796b62bda2aca2f9949a36a9fbc439dea",
+        "m065/supporting.jsonl": "c9f51cc99583cd3bfdc6699975f5006d3ee7042c894a17b4c10ac222a956c40a",
+        "m065/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m066/behavior.jsonl": "26c6303e59648a7536665544e3dee18b7c32b0d07df0ec574850fea03d636c95",
+        "m066/module.json": "c102bbf632829dae22475244c205cb33f52804f49f8782ed07da039c3ce26b56",
+        "m066/supporting.jsonl": "c212511fa110c0d69736cd04a566d0a1175a48b7b4556c1819e05e292248d530",
+        "m066/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m067/behavior.jsonl": "4d809e475f3abf4151fba97c66902b2b78bb17d40e7272ae6946592ae55d917f",
+        "m067/module.json": "1505968963fb28fab662b239b40d9de856a42296909adaeecd7a62008a0dd37c",
+        "m067/supporting.jsonl": "f6153f8857203cb39f86efefbf0d8566108978320be3c876aaed06b451c06778",
+        "m067/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m068/behavior.jsonl": "f42e9b21e3854a783af9734d14a4b691c753a1210bc73c8414090c887a2bc658",
+        "m068/module.json": "00c36839df1705d9acb7d82ab713c044519f9dd3995cc2800b924e6c75bc2bd2",
+        "m068/supporting.jsonl": "d06a8446b9a6b130272f2a2b3e73591c39297c082f198d1ba5c832a2dc0a0b31",
+        "m068/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m069/behavior.jsonl": "5c63c10d10f8009cfe83d821e5faa88df9534843c130c34b0214e16fc7a67202",
+        "m069/module.json": "8e829e631f79f93c3ed4cdf57d398ddc3ecb55d6d5fbaee0d830cd65bd52a8bd",
+        "m069/supporting.jsonl": "492a1705d0d31e7b36a3f7adfe071312ff95bff85429ab4e7d5cd75dde3d2b1b",
+        "m069/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m070/behavior.jsonl": "18c1b73c73f4a2fac9ef15c4b5ca5b6047b7c8174ffedf77fe5ece959b01f78d",
+        "m070/module.json": "24025f0e7efda0c95c4323de4e33a629ea45d972652b8656a574438e342fc4f6",
+        "m070/supporting.jsonl": "d3fd8f00b2ca179e6ce752dc344a70dda102e52dc43004522d722f74ee8a8f86",
+        "m070/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m071/behavior.jsonl": "5a6a0e608e7185c98c384d48bcaf194ed415f1460e3f7808a76d32eee0ee7d84",
+        "m071/module.json": "65a13ad9e0ed94edc3888a68632242a3d347158c2cd9b35a197f7d91fe1bb40b",
+        "m071/supporting.jsonl": "69234c35bbd52a0a10605d80a9f08ebe030b27226ea62c136e3b4adb6a1b096a",
+        "m071/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m072/behavior.jsonl": "6f008153c8100d4b21e98458cb30945c878a60e73fdfbc9b8d52d42b1e4e5dd1",
+        "m072/module.json": "0b452fccf90ce8a6d3925d58fdb6adef8280be534b6eeb244d4463d0647fe610",
+        "m072/supporting.jsonl": "b365d30d6042c01191273459ce79a35c6adec47197e2359dc060bb9c7a9c4d19",
+        "m072/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m073/behavior.jsonl": "7bb4b4a15730a7a96ffa0b00e64a6ec9049cee5d8ad20771e8079f762011e2bc",
+        "m073/module.json": "ea45375c3e1051d58c6d40a924265df2ad2baed7bb15317c8ff8ad06fb5ac9f6",
+        "m073/supporting.jsonl": "b2522e25200df4405ecff1a1cd775cff79f4de88ee57cbaf53e836a02a382f49",
+        "m073/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m074/behavior.jsonl": "b4003cdf5581b1464d4448c29b928be9a7992334f13787802c122b45448bf7b9",
+        "m074/module.json": "ea475abd92817ce87390395244165fa3f6bd4f62ad21577f2eae993d7f391a2d",
+        "m074/supporting.jsonl": "8e6118db56d19dccaf6c35c6110f488ede722bd50f75e9324932587ad2527e91",
+        "m074/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m075/behavior.jsonl": "e410ab1aadbd83d2889bfafc3aaedd27a5886e428edde3f31396527cedaf25cf",
+        "m075/module.json": "4b5415226bddd124a3ae8abfffc9110d3ccda6fba51119e0e399733c75f89ff2",
+        "m075/supporting.jsonl": "ca6b33e6afb7f47a91e563893970e114aac3a9bd0273030361b726c14752bd79",
+        "m075/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m076/behavior.jsonl": "6699c1d77ecf0ea48643c002f56c1d588899f713945149e4bff39fb9a161ff21",
+        "m076/module.json": "5fd9c76c25a79379bfc6d6444871795c4c18e29585eb66fee4e99d3a2b6ea893",
+        "m076/supporting.jsonl": "f49ec3a399baf64949eb72de36f274ec330ef84657958f09302e8edeb039b0fd",
+        "m076/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m077/behavior.jsonl": "3b5c3fe3b4ec6d153da4d2177fbeb5ce5c2d1b28da8154bbeb183cbe03a87a2b",
+        "m077/module.json": "35c2153868a9c273d6a3327909db37fc3cc4fd089f2db36c5b534205c6309193",
+        "m077/supporting.jsonl": "8b3cfcfe530125ed1a4d2408a2b6e1bbd51286995ae69974bffaef0eafa1c960",
+        "m077/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m078/behavior.jsonl": "f72b92477ebaf80a39a154c092e8c9fb3d6fa02433f10f448abd3ba7cc9ec415",
+        "m078/module.json": "2ff0190d003683a16fdbf7a79b5439065d4f31d8af45116c9e50bbbe8003520b",
+        "m078/supporting.jsonl": "9c23736121e7ac1014fdcebb3dde41553a3b399d4065c509fb38bca81dc89121",
+        "m078/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m079/behavior.jsonl": "ab2a4da5db6d6b4278a543f9e1e62e7b26b76990e975cc00ec46e6f3f1ef8b6a",
+        "m079/module.json": "b980d7bdf0e09781cf952bbc387718d29bf42ca63e43d63f9f1c246c70d1850c",
+        "m079/supporting.jsonl": "1592356255ede49a38256caec8afb353a479b9bb3cfb04004091457d69041942",
+        "m079/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m080/behavior.jsonl": "31929799b7ad614a33cc0e3ce94296f4f1c58759f0261afc27b67a9c91f8999d",
+        "m080/module.json": "d9366cec7c1c6f5e01feda748cb842a48748aa3347ba9754748b2bf7d43d050f",
+        "m080/supporting.jsonl": "525f7daed456d383897cca02e8e0fee834c896ceaff62917fa8dc2d9c34dd041",
+        "m080/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m081/behavior.jsonl": "3ea5c01a8cbd69dbf27a970a642f94385b821375e797b182cee813942aab2376",
+        "m081/module.json": "8904fed0803d6e0f11d7c434d1efdb36a3fdcdad30ebd29bc72e92327073f22e",
+        "m081/supporting.jsonl": "d83080520ebac8393d8b3ecf120623914aafa54b5a0895ac44743149c21b39e8",
+        "m081/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m082/behavior.jsonl": "14e16b77525af419e8d888bb68f3eea10d562f9b9f9aabb82a45fe93ddacf22b",
+        "m082/module.json": "45de4246873bedabd1480729caa1abe6c4d2458ef6cb396f873d5ba240b3bf73",
+        "m082/supporting.jsonl": "d958bdcd946605fe7750cdb0b7cd484060938917d376b9634ff5ed9b4f379e25",
+        "m082/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m083/behavior.jsonl": "b1d7e497ec3ab64be07ea073a843d9b2fae5c8efc62192ba2469379225cff911",
+        "m083/module.json": "4799c4050126dfa3e5f170b33da90230433f8752c1bc04247b51af19353225d7",
+        "m083/supporting.jsonl": "bbae9c51b2aaded46affa3bd657e67442b973dfa6f8766f9f59748cdedd166fd",
+        "m083/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m084/behavior.jsonl": "fd2c736e354289ef62d076732ed981c245c007ec9f8cc841ca5a629e515d3e7c",
+        "m084/module.json": "feceed74e427cb5dceb2e85c43004259c9e7261c72214f483e88702505734b55",
+        "m084/supporting.jsonl": "4a105da9766ee973c24fd43980702cab59ca91404fbe1aaaf8f9b17f3a628ed6",
+        "m084/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m085/behavior.jsonl": "99da7856fa9b720fab874ec9a1ccdc55d1dcac192219b93e307e747e1d06f0e8",
+        "m085/module.json": "6773e33f7c9cf435c123344d35b0ae66065c534f69b17979d9bed9300517cec7",
+        "m085/supporting.jsonl": "b8a815458520279b5fdb19e2d772042c5b848f056ff3306247608adfaaa35b7c",
+        "m085/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m086/behavior.jsonl": "b8faf2f27b726246c06adca16a440de67f28dcf2b078ba106ff15bb151ac2163",
+        "m086/module.json": "2f0b1f7d96d6ba0af12f0cb58fc6b6da51424ff9ad533f1bdcbe6ee3dedc525d",
+        "m086/supporting.jsonl": "1cf6d845c7e3ac0a193c31befe842a9d0c5d013ada2e0dd82bee47d5c06e3ba5",
+        "m086/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m087/behavior.jsonl": "3601aafd8ca98ebdd823b1ae82dca25f5eadeed2c85bbc2e18fcfb2f24b5018a",
+        "m087/module.json": "1ae30516e2fa210347dd0663d6e6ea3d54de604c5d90d81af3d4a4d421015ec9",
+        "m087/supporting.jsonl": "d369ae81ae3d7d270b304ff04b45e6663340fcbeef1568cce1651c2e81141e43",
+        "m087/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m088/behavior.jsonl": "25500d9efd0983826f09b7b04ec20baf958444d1d306f8fe2423aebc5d610a61",
+        "m088/module.json": "b086b1b756b396fc2ea2dca76cfd954b338da2fef4c7f8f455f2ee0ca95b1785",
+        "m088/supporting.jsonl": "6a2ba81b73553695a39b36391292731ae1bbddf81977d6e45958a8f2d7f2e533",
+        "m088/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m089/behavior.jsonl": "a42d0829f8d5cd128eee7dc98344ee50d2f939a61bc436b65a7e8be24fe07555",
+        "m089/module.json": "661ba22dd9c41d3a81a46a41abd8d674e1fad56d3683259ebf7247909b3f3f38",
+        "m089/supporting.jsonl": "83c7beffffa5186e4b8d39464c9f281b1119014837f775a3c039206b471e8f7c",
+        "m089/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m090/behavior.jsonl": "c991092465b219b9a081e474d2b162742f47fd60d9c743969edebf93fba5025f",
+        "m090/module.json": "7d612365c6d84cc7f86eb026cb9f58846d1927f14e52f057b7367fa9fb60f6ba",
+        "m090/supporting.jsonl": "ef9f9858522b42c0b146a80b0d533bb047467ba40e703c9b9a2ca28a44682e7d",
+        "m090/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m091/behavior.jsonl": "a51532ec53a1c0b4e21705cf9b8b06065de37ada00df1c0ffb8f33678bea462f",
+        "m091/module.json": "39922544711e7fa450b56ea0f9ddf43bef43787a8be2a26e8e55863b24232c9e",
+        "m091/supporting.jsonl": "8aad1118a799974209442d22db4e8268071ca60974fdcccd05ddb7b49ab76bc1",
+        "m091/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m092/behavior.jsonl": "4fe53943d479e18eb14ceb9b318f4cd81c963c4697cb9ccb4c3c48f5c6333711",
+        "m092/module.json": "4678079e67536cbafb0c2f80c322e43656e54898f4067017de389978eb6091ff",
+        "m092/supporting.jsonl": "9673ac5f6beca1a8aec52848339fed6a589e561416a07183eafc8df46f86f050",
+        "m092/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m093/behavior.jsonl": "5c13f810ed640b75e6a29e165fe39ba9a49d696ed5a941a4406bc3d513967b86",
+        "m093/module.json": "91cd5ab72d24870371aec5fa7f05385fd5fe51be8adae6445592c18137bd30b4",
+        "m093/supporting.jsonl": "75f8686711588ce1c4faf9c704c049c2400eff18fa3bf5363357df0433bde1c3",
+        "m093/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m094/behavior.jsonl": "da723a2a0bd18c1a0f45cb90a4505aea8a746e7c6faa2eabeba28ee6cf6e9c7e",
+        "m094/module.json": "5e6459b1b72d91393ef7cff1f8a64dfeba39ec66aa6cacd88c05de2bb2fe9b12",
+        "m094/supporting.jsonl": "7c9078243a026499161ccfbd04be9c53ce280dcd128179dff7ad84e849034a57",
+        "m094/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m095/behavior.jsonl": "c92a275593110ac11b713b7d7917b04c25af5d8b81b25712a413844696e4ae18",
+        "m095/module.json": "a474cef1872f4bbffadbc60dee6f5d4172d3af294a897c36539c7569f443dff1",
+        "m095/supporting.jsonl": "171f93e7c16a6842001cf1aecf86e60e4ae861ac0243104d3926720e5c88f53b",
+        "m095/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m096/behavior.jsonl": "4268ba816a062e8855a98be3e29144e6b80da30adc82cb862af805f6507c4941",
+        "m096/module.json": "d685c560739eecf459c4a156c27a698855285d6592a1b0d404f67dd79cfd1182",
+        "m096/supporting.jsonl": "558cddaacc46527e51ff24bdc6e59256c90898910f7f34387e267d407995e910",
+        "m096/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m097/behavior.jsonl": "ecf2f59ecbd0601a9885609dca5ba432fccfe33cf4a1f82ca9f6b58f7fb25e24",
+        "m097/module.json": "ba24d57ee285631496bacacdd99bb24cc5e7a1bf220d02e5b9d3dab4eedc91cf",
+        "m097/supporting.jsonl": "5d1de71f09d9f419ba2a311d0fe17fc62dca2841a3c4569f2226532b46207486",
+        "m097/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m098/behavior.jsonl": "e3e3c1a03ccf54cc4d510fa546b5bb1abd5aad753dea428e12de776b3184100a",
+        "m098/module.json": "f2beedadb815f6dae48ecf9de665ab3ba120bf14a315f9524098bd6ae03bb96b",
+        "m098/supporting.jsonl": "097f137afc802b008576467f4002fe88a86c3a00ae0cf9fd2e9d3afe60f4c753",
+        "m098/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "m099/behavior.jsonl": "febccf870e38916dd8438d246f7e2d28f49c4c9c3abeb33d0158abb135dcbfe0",
+        "m099/module.json": "17d374ef3fbd55157adae4e9c9ff3b66da6ddc161bb23b50cc03d33e1040e0a7",
+        "m099/supporting.jsonl": "801370926a574f3179044693bf378bdb55f31846c71366c0a4f8c5242ec3b959",
+        "m099/tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "module.json": "a1c07942d7ee9f4babea6a18f61a74447a4216c2e52c790fff550330fb1564ac",
+        "supporting.jsonl": "682d6a335bbab2bacfd0559ae105a7f3090c58c5a734f7347b697ed7cbed3d35",
+        "tests.jsonl": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      "manifestSha256": "72c4643713a74b51a2531cf177f146200d0affdbd1c3be98ee8cdc8667067da8",
+      "counters": {
+        "revisions": 5,
+        "analyses": 13,
+        "cancelledAnalyses": 0,
+        "reusedRevisions": 0,
+        "coalescedEvents": 0,
+        "evictions": 0,
+        "rejectedRequests": 0,
+        "disconnectedSlowConsumers": 0,
+        "sweeps": 8,
+        "audits": 0,
+        "auditMismatches": 0,
+        "coveredRequests": 0,
+        "coldOutcomes": 0,
+        "deadlineOutcomes": 0,
+        "behaviorRuns": 5,
+        "dependencyDiagrams": 5,
+        "dependencyDiagramInputChanges": 0
+      },
+      "memory": {
+        "pid": 547081,
+        "samples": 254,
+        "peakDaemonRssBytes": 148070400,
+        "peakDaemonHeapUsedBytes": 45833056,
+        "peakCombinedRssBytes": 484859904,
+        "peakCombinedHeapBytes": 105845320
+      },
+      "daemonStop": {
+        "pid": 547081,
+        "stopCode": 0,
+        "running": false,
+        "pidAlive": false
+      }
+    },
+    "session-query": {
+      "reference": {
+        "openMs": 1864.4,
+        "hot": [
+          {
+            "durationMs": 118.5,
+            "projectionBytes": 96226,
+            "symbols": 89,
+            "tests": 34,
+            "modules": 15,
+            "workerRss": 177127424,
+            "compilerRss": 185335808
+          },
+          {
+            "durationMs": 82.6,
+            "projectionBytes": 96226,
+            "symbols": 89,
+            "tests": 34,
+            "modules": 15,
+            "workerRss": 177229824,
+            "compilerRss": 189792256
+          },
+          {
+            "durationMs": 75.6,
+            "projectionBytes": 96226,
+            "symbols": 89,
+            "tests": 34,
+            "modules": 15,
+            "workerRss": 177426432,
+            "compilerRss": 194379776
+          }
+        ],
+        "levelAfterRelease": "warm",
+        "warm": {
+          "durationMs": 702.2,
+          "projectionBytes": 96226,
+          "symbols": 89,
+          "tests": 34,
+          "modules": 15,
+          "workerRss": 182571008,
+          "compilerRss": 167116800
+        }
+      },
+      "toolkit": {
+        "openMs": 5715.5,
+        "hot": [
+          {
+            "durationMs": 846.3,
+            "projectionBytes": 1205296,
+            "symbols": 1294,
+            "tests": 297,
+            "modules": 15,
+            "workerRss": 358981632,
+            "compilerRss": 420741120
+          },
+          {
+            "durationMs": 669.3,
+            "projectionBytes": 1205296,
+            "symbols": 1294,
+            "tests": 297,
+            "modules": 15,
+            "workerRss": 361992192,
+            "compilerRss": 424890368
+          },
+          {
+            "durationMs": 678.5,
+            "projectionBytes": 1205296,
+            "symbols": 1294,
+            "tests": 297,
+            "modules": 15,
+            "workerRss": 365408256,
+            "compilerRss": 462770176
+          }
+        ],
+        "levelAfterRelease": "warm",
+        "warm": {
+          "durationMs": 1721.5,
+          "projectionBytes": 1205296,
+          "symbols": 1294,
+          "tests": 297,
+          "modules": 15,
+          "workerRss": 406208512,
+          "compilerRss": 409337856
+        }
+      }
+    },
+    "mixed-invocation": {
+      "name": "mixed-invocation",
+      "steps": {
+        "check": {
+          "code": 0,
+          "durationMs": 2329.4
+        },
+        "materializeWithRoot": {
+          "code": 0,
+          "durationMs": 125704.7,
+          "stderr": "",
+          "revision": 2,
+          "targets": 1,
+          "entries": 123,
+          "bytesWritten": 71046,
+          "unchanged": 0,
+          "modules": 15,
+          "records": 123,
+          "dependencies": "unavailable (wait-limit)"
+        },
+        "materializeFromRoot": {
+          "code": 0,
+          "durationMs": 3437.4,
+          "stderr": "",
+          "revision": 3,
+          "targets": 1,
+          "entries": 123,
+          "bytesWritten": 85337,
+          "unchanged": 0,
+          "modules": 15,
+          "records": 123,
+          "dependencies": "measured"
+        }
+      },
+      "afterCheck": {
+        "sequence": 1,
+        "revision": "rev/1:b74ca4c6-ccbf-44e3-bb15-a31031a67af1:1",
+        "inputId": "input/1:dbd48c5d3ef3ff0a2813be8122ed80886a595306ec62d94b1cd4f4c12d7045a3",
+        "cause": "open"
+      },
+      "afterMaterializeWithRoot": {
+        "context": {
+          "sequence": 2,
+          "revision": "rev/1:b74ca4c6-ccbf-44e3-bb15-a31031a67af1:2",
+          "inputId": "input/1:dbd48c5d3ef3ff0a2813be8122ed80886a595306ec62d94b1cd4f4c12d7045a3",
+          "cause": "request"
+        },
+        "counters": {
+          "revisions": 2,
+          "analyses": 9,
+          "cancelledAnalyses": 0,
+          "reusedRevisions": 1,
+          "coalescedEvents": 0,
+          "evictions": 0,
+          "rejectedRequests": 0,
+          "disconnectedSlowConsumers": 0,
+          "sweeps": 6,
+          "audits": 1,
+          "auditMismatches": 0,
+          "coveredRequests": 0,
+          "coldOutcomes": 0,
+          "deadlineOutcomes": 0,
+          "behaviorRuns": 0,
+          "dependencyDiagrams": 39,
+          "dependencyDiagramInputChanges": 38
+        }
+      },
+      "afterMaterializeFromRoot": {
+        "context": {
+          "sequence": 3,
+          "revision": "rev/1:b74ca4c6-ccbf-44e3-bb15-a31031a67af1:3",
+          "inputId": "input/1:dbd48c5d3ef3ff0a2813be8122ed80886a595306ec62d94b1cd4f4c12d7045a3",
+          "cause": "request"
+        },
+        "counters": {
+          "revisions": 3,
+          "analyses": 11,
+          "cancelledAnalyses": 0,
+          "reusedRevisions": 1,
+          "coalescedEvents": 0,
+          "evictions": 0,
+          "rejectedRequests": 0,
+          "disconnectedSlowConsumers": 0,
+          "sweeps": 7,
+          "audits": 1,
+          "auditMismatches": 0,
+          "coveredRequests": 0,
+          "coldOutcomes": 0,
+          "deadlineOutcomes": 0,
+          "behaviorRuns": 1,
+          "dependencyDiagrams": 40,
+          "dependencyDiagramInputChanges": 38
+        }
+      },
+      "daemonStop": {
+        "pid": 552718,
+        "stopCode": 0,
+        "running": false,
+        "pidAlive": false
+      }
+    },
+    "open-with-view": {
+      "name": "open-with-view",
+      "steps": {
+        "residentWithoutViews": {
+          "code": 0,
+          "inputId": "input/1:4618177847f13759a062f7041eb926d3b7c14609bfe3b9e184be55c62eef8129",
+          "inputs": 3610,
+          "generatedInputs": []
+        },
+        "batchWithoutViews": {
+          "code": 0,
+          "inputId": "input/1:4618177847f13759a062f7041eb926d3b7c14609bfe3b9e184be55c62eef8129",
+          "inputs": 3610,
+          "generatedInputs": []
+        },
+        "materialize": {
+          "code": 0,
+          "durationMs": 3593.5,
+          "stderr": "",
+          "revision": 1,
+          "targets": 30,
+          "entries": 674,
+          "bytesWritten": 209797,
+          "unchanged": 0,
+          "modules": 15,
+          "records": 123,
+          "dependencies": "measured"
+        },
+        "residentAfterPublishing": {
+          "code": 0,
+          "inputId": "input/1:4618177847f13759a062f7041eb926d3b7c14609bfe3b9e184be55c62eef8129",
+          "inputs": 3610,
+          "generatedInputs": []
+        },
+        "residentOpenedWithViews": {
+          "code": 0,
+          "inputId": "input/1:a1868aeb7559a4da780ec352a8c9a999bf5113eca959649c8091dc54ecd34174",
+          "inputs": 3640,
+          "generatedInputs": [
+            ".ramify-architect",
+            "src/.ramify",
+            "src/tests/.ramify",
+            "subs/integration-tests/src/.ramify",
+            "subs/workspace/src/.ramify",
+            "subs/workspace/src/tests/.ramify",
+            "subs/workspace/subs/catalog/src/.ramify",
+            "subs/workspace/subs/catalog/src/tests/.ramify",
+            "subs/workspace/subs/catalog/subs/core/src/.ramify",
+            "subs/workspace/subs/catalog/subs/core/src/tests/.ramify",
+            "subs/workspace/subs/catalog/subs/ui/src/.ramify",
+            "subs/workspace/subs/catalog/subs/ui/src/tests/.ramify",
+            "subs/workspace/subs/contracts/src/.ramify",
+            "subs/workspace/subs/contracts/src/tests/.ramify",
+            "subs/workspace/subs/reviews/src/.ramify",
+            "subs/workspace/subs/reviews/src/tests/.ramify",
+            "subs/workspace/subs/reviews/subs/core/src/.ramify",
+            "subs/workspace/subs/reviews/subs/core/src/tests/.ramify",
+            "subs/workspace/subs/reviews/subs/core/subs/controller/src/.ramify",
+            "subs/workspace/subs/reviews/subs/core/subs/controller/src/tests/.ramify",
+            "subs/workspace/subs/reviews/subs/core/subs/tasks/src/.ramify",
+            "subs/workspace/subs/reviews/subs/core/subs/tasks/src/tests/.ramify",
+            "subs/workspace/subs/reviews/subs/ui/src/.ramify",
+            "subs/workspace/subs/reviews/subs/ui/src/tests/.ramify",
+            "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/.ramify",
+            "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/tests/.ramify",
+            "subs/workspace/subs/reviews/subs/validation/src/.ramify",
+            "subs/workspace/subs/reviews/subs/validation/src/tests/.ramify",
+            "subs/workspace/subs/shared-ui/src/.ramify",
+            "subs/workspace/subs/shared-ui/src/tests/.ramify"
+          ]
+        },
+        "batchWithViews": {
+          "code": 0,
+          "inputId": "input/1:4618177847f13759a062f7041eb926d3b7c14609bfe3b9e184be55c62eef8129",
+          "inputs": 3610,
+          "generatedInputs": []
+        },
+        "editPublished": 2,
+        "changedView": {
+          "code": 0,
+          "durationMs": 3418.8,
+          "stderr": "",
+          "revision": 2,
+          "targets": 1,
+          "entries": 124,
+          "bytesWritten": 85604,
+          "unchanged": 0,
+          "modules": 15,
+          "records": 124,
+          "dependencies": "measured"
+        },
+        "afterChangedView": {
+          "publish": {
+            "sequence": 2,
+            "revision": "rev/1:f6638f71-2679-4449-af0f-08a4337d4fe3:2",
+            "inputId": "input/1:ebdf65e57497a06a3cde42f4210f31b1046c30821e4c46da410d8353e1dfe275",
+            "cause": "watch"
+          },
+          "check": {
+            "code": 0
+          },
+          "settled": {
+            "sequence": 2,
+            "revision": "rev/1:f6638f71-2679-4449-af0f-08a4337d4fe3:2",
+            "inputId": "input/1:ebdf65e57497a06a3cde42f4210f31b1046c30821e4c46da410d8353e1dfe275",
+            "cause": "watch"
+          }
+        }
+      },
+      "firstDaemonStop": {
+        "pid": 555256,
+        "stopCode": 0,
+        "running": false,
+        "pidAlive": false
+      },
+      "secondDaemonStop": {
+        "pid": 555613,
+        "stopCode": 0,
+        "running": false,
+        "pidAlive": false
+      }
+    }
+  },
+  "budgets": [
+    {
+      "name": "Architect session query, warm, toolkit",
+      "limit": "15000 ms",
+      "measured": "1721.5 ms (max of three hot queries and one after releasing the compiler)",
+      "within": true
+    },
+    {
+      "name": "Whole materialize --view architect, warm, toolkit, dependency analyzer included",
+      "limit": "90000 ms",
+      "measured": "8760.8 ms (max of 3, median 8706.5 ms; new daemon and context: 14891.8 ms)",
+      "within": true
+    },
+    {
+      "name": "View size, toolkit",
+      "limit": "8388608 bytes",
+      "measured": "809330 bytes",
+      "within": true
+    },
+    {
+      "name": "Unchanged repeat",
+      "limit": "0 bytes written",
+      "measured": "reference: 0, toolkit: 0, synthetic-100: 0",
+      "within": true
+    },
+    {
+      "name": "maxProjectionBytes (session projection)",
+      "limit": "67108864 bytes",
+      "measured": "configured 67108864; largest measured projection 1205296 bytes",
+      "within": true
+    },
+    {
+      "name": "maxArchitectBytes (publisher, rendered view)",
+      "limit": "67108864 bytes",
+      "measured": "configured 67108864; largest measured view 809330 bytes",
+      "within": true
+    },
+    {
+      "name": "Dependency wait",
+      "limit": "250 ms interval, 125000 ms total",
+      "measured": "configured 250 ms, 125000 ms; the mixed-invocation run reached the limit and took 125704.7 ms",
+      "within": true
+    },
+    {
+      "name": "Hit cost per term, toolkit",
+      "limit": "200 lines and 65536 bytes",
+      "measured": "revision: 187 lines, 114072 bytes; project: 546 lines, 322888 bytes; session: 214 lines, 125498 bytes; publish: 113 lines, 81161 bytes; watch: 40 lines, 23517 bytes; create: 198 lines, 145175 bytes",
+      "within": false,
+      "note": "exceeded by revision, project, session, publish, create"
+    },
+    {
+      "name": "Hit cost per term, reference",
+      "limit": "200 lines and 65536 bytes",
+      "measured": "revision: 54 lines, 21860 bytes; project: 0 lines, 0 bytes; session: 22 lines, 9499 bytes; publish: 1 lines, 682 bytes; watch: 0 lines, 0 bytes; create: 37 lines, 16469 bytes",
+      "within": true
+    },
+    {
+      "name": "Mean behavior record, toolkit (evidence)",
+      "limit": "300 characters",
+      "measured": "402 characters, longest 793",
+      "within": false,
+      "note": "recorded as evidence, not enforced"
+    },
+    {
+      "name": "Whole materialize --view architect after a check from another invocation (defect witness)",
+      "limit": "90000 ms",
+      "measured": "125704.7 ms, dependencies unavailable (wait-limit)",
+      "within": false,
+      "note": "the analyzer re-acquires with the republished report's request, whose discovery inputs differ from the retained ones"
+    }
+  ],
+  "failures": [],
+  "completedAt": "2026-09-18T12:30:56.567Z"
+}
