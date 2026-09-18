@@ -41,8 +41,8 @@ export interface DocumentCheck { readonly document: string; readonly name: strin
 /** Statements scope.md's document revisions require of each architecture document. */
 export const documentChecks: readonly DocumentCheck[] = [
   ...['docs/architecture/daemon.md', 'docs/architecture/memory-lifecycle.md', 'docs/architecture/processes-and-clients.md'].map(document => ({
-    document, name: 'status states that MCP, overlays and the explorer are not implemented',
-    pattern: /MCP adapter, unsaved-content overlays and the explorer are not implemented/ })),
+    document, name: 'status states that MCP and overlays are not implemented',
+    pattern: /The MCP adapter and unsaved-content overlays are not implemented/ })),
   { document: 'docs/architecture/daemon.md', name: 'the session runs in a worker thread', pattern: /retained analysis session[^.]*worker thread/ },
   { document: 'docs/architecture/daemon.md', name: 'facts are retained per file', pattern: /per-file export descriptions[^.]*per-file access facts/ },
   { document: 'docs/architecture/daemon.md', name: 'the covering rule', pattern: /\*\*Covering rule\.\*\*/ },
