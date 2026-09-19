@@ -19,5 +19,5 @@
     "forceConsistentCasingInFileNames": true
   },
   "include": ["src/**/*", "subs/**/src/**/*"],
-  "exclude": ["node_modules", "dist", "site", "examples", "scripts", "**/.reference-work"]
+  "exclude": ["node_modules", "dist", "site", "examples", "scripts", "ramify-agent", "**/.reference-work"]
 }

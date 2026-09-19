@@ -42,7 +42,6 @@ exit and reclaim its memory without discarding warm analysis.
 | [Materialized API discovery](materialized-api-view.spec.md) | Implemented generated, gitignored API documentation for agent discovery with `rg`, including ordinary and testing-area projections; `ramify materialize`. |
 | [Architect view](architect-view.spec.md) | The generated, gitignored `.ramify-architect/` view of every module, its behavior-capable and supporting symbols, its test titles and its observed use, for an architect agent searching with `rg`; `ramify materialize --view architect`. Implemented by Plan 2B; its measured hit cost and budgets, the agent trials and the verdict on hypothesis H1, falsified on cost, are recorded there. |
 | [Modularity report](modularity-report.spec.md) | Proposed units, filters, formulas, coverage and ownership of the opt-in structural modularity projection, its behavioral dependency evidence, change affinity and candidate ownership. Not implemented. |
-| [Architect view](architect-view.spec.md) | Proposed generated, gitignored project-wide view for the module architect agent: behavior-capable and supporting originals, test titles and production consumers per module, with its [agent test cases](architect-view.test-cases.md). Governed by the [module architect principles](../agents/module-architect.principles.md). Not implemented. |
 
 The [tooling roadmap](../roadmap.md) owns migration and
 delivery order. Its first detailed plan is

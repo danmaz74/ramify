@@ -74,8 +74,8 @@ worktree, run this from its root:
 npm run worktree:prepare
 ```
 
-This runs `npm ci` for the reference example and the site using that checkout's
-lockfiles. Repeat after either package's manifest or lockfile changes. The
+This runs `npm ci` for the reference example, the site and the separate
+`ramify-agent/` project using that checkout's lockfiles. Repeat after either package's manifest or lockfile changes. The
 command replaces those packages' local dependency directories each time; run it
 before their tests or development servers. It leaves Studio's root
 `node_modules` link intact and keeps first-party source tied to the tested

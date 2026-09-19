@@ -21,7 +21,10 @@ Surfaces that implement these principles are specified under
 The reasoning behind the architect role is recorded in the
 [agentic module architect analysis](../analysis/2026-09-18-agentic-module-architect.md).
 
-[Module architect skill design](module-architect-skill-design/README.md)
-collects alternative approaches for a skill or collection of skills that
-helps the architect make justified architectural choices. The alternatives
-are working material for decision procedures and practical trials.
+The [module architect skill plan](../plans/module-architect-skill/main-plan.md)
+delivers the first harness for the role and lists the Ramify features its
+trials may justify.
+
+[ramify-agent](../../ramify-agent/README.md) is a separate consumer project,
+an agent harness that plans and implements features on Ramify projects. Its
+design documents live in its own [docs](../../ramify-agent/docs/README.md).

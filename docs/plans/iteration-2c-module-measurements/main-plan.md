@@ -7,8 +7,9 @@ much text a module and its subtree hold and which files belong to it. It
 publishes one computation through two surfaces: a summary in the
 [architect view](../../architecture/architect-view.spec.md) for an agent
 reasoning about the architecture, and a `measure` query with JSON output for a
-program. Ramify interprets neither. The motivating consumers were recorded
-during plan review; nothing in this plan names or depends on them.
+program. Ramify interprets neither. The motivating consumers are recorded in
+ramify-agent's [measurements and KPIs](../../../ramify-agent/docs/measurements-and-kpis.md);
+nothing in this plan names or depends on them.
 
 ## Runnable outcome
 
@@ -105,7 +106,7 @@ Verified against source on 2026-09-19:
    `ramify.measure/1`.
 9. **Other modularity metrics stay out.** Locality, connectedness, stability
    and the other indices of the
-   [cohesion and coupling proposal](../../agents/module-architect-skill-design/2026-09-18-cohesion-coupling-indices.md)
+   [cohesion and coupling proposal](../../../ramify-agent/docs/architect-skill-design/2026-09-18-cohesion-coupling-indices.md)
    need a complete report in the daemon and the `dependency-behavior`
    capability. They remain that proposal's subject.
 

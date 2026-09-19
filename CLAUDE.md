@@ -93,6 +93,13 @@ top-level prose paragraph as a plain-text purpose summary and retains its path.
 Missing documentation is explicit, with no fallback to another owner's prose.
 README completeness is separate from module-description validity.
 
+[Module Architect Principles](docs/agents/module-architect.principles.md)
+define what Ramify gives an agent with a global view of a project's
+architecture and what it leaves to that agent; their
+[glossary](docs/agents/glossary.md) distinguishes a capability, which an
+agent ascribes, from behavioral evidence, which Ramify derives. Ramify's
+outputs use behavioral terms only. Read both before designing agent-facing surfaces.
+
 The evaluator, teaching diagrams and toolkit source have migrated to the resolved
 tag registry and module-owned `src/tests/`. `npm run check:self` checks all eleven
 toolkit owners, including owned tests. The independent scripts, site and example
@@ -138,6 +145,16 @@ the briefs for authoring later plans. Visualization implementation remains later
 The first detailed plan is [batch project verification](docs/plans/done/iteration-1-project-verifier/main-plan.md).
 It includes the reference checker and toolkit self-check; it does not implement
 the daemon or other runtime clients.
+
+## ramify-agent is a separate project
+
+`ramify-agent/` holds ramify-agent, an agent harness that consumes Ramify. It lives
+here during initial development and will move to its own repository. It has
+its own [instructions](ramify-agent/AGENTS.md), package, lockfile and compiler scope,
+and is its own Ramify project. The dependency points one way: nothing outside
+`ramify-agent/` imports from it, names its roles or reads its files, and the toolkit's
+`tsconfig.json` excludes it. The toolkit's roadmap, plans and cucumber-viz
+workflow do not govern it.
 
 ## Conventions that DO apply
 
@@ -202,7 +219,7 @@ implementation, testing and cucumber-viz operations. The index lists the shared
 Claude and Codex skills; select the one relevant to the task.
 
 Before implementing in a new Studio execution worktree, run
-`npm run worktree:prepare` from that checkout's root to install the example and
-site dependencies. Repeat after either package's manifest or lockfile changes.
+`npm run worktree:prepare` from that checkout's root to install the example,
+site and agent dependencies. Repeat after either package's manifest or lockfile changes.
 Studio links only the toolkit's root dependencies; see the
 [worktree guide](docs/development/cucumber-viz.md#execute-in-a-worktree).

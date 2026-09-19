@@ -42,7 +42,7 @@
     }
   },
   "scripts": {
-    "worktree:prepare": "npm --prefix examples/collection-review ci && npm --prefix site ci",
+    "worktree:prepare": "npm --prefix examples/collection-review ci && npm --prefix site ci && npm --prefix ramify-agent ci",
     "build": "tsx scripts/build-production.ts && npm run explorer:build",
     "explorer:build": "vite build --config vite.explorer.config.ts",
     "explorer:dev": "vite --config vite.explorer.config.ts",
