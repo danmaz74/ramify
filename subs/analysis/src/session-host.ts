@@ -131,6 +131,7 @@ class SessionHost implements RetainedSession {
       await this.#ready;
       if (control.signal?.aborted) { await this.dispose(); return { status: 'cancelled' }; }
       const result = await this.#request({ operation: 'open' }, control) as WorkerOpen;
+      if (control.signal?.aborted) { await this.dispose(); return { status: 'cancelled' }; }
       if (result.status === 'opened') return { ...result, session: this };
       await this.dispose(); return result;
     } catch (error) {
@@ -141,19 +142,28 @@ class SessionHost implements RetainedSession {
   async update(changes: readonly SessionChange[], control: RunControl = {},
     invocation?: Pick<AnalysisInputs, 'project' | 'capabilities'>): Promise<SessionUpdate> {
     if (control.signal?.aborted) return { status: 'cancelled' };
-    try { return await this.#request({ operation: 'update', changes, ...(invocation ? { invocation } : {}) }, control) as SessionUpdate; }
+    try {
+      const result = await this.#request({ operation: 'update', changes, ...(invocation ? { invocation } : {}) }, control) as SessionUpdate;
+      return control.signal?.aborted ? { status: 'cancelled' } : result;
+    }
     catch (error) { return this.#reportedFailure(error as Error); }
   }
   async sweep(control: RunControl = {}): Promise<SessionUpdate | { readonly status: 'unchanged'; readonly timings?: OperationTimings }> {
     if (control.signal?.aborted) return { status: 'cancelled' };
-    try { return await this.#request({ operation: 'sweep' }, control) as SessionUpdate | { status: 'unchanged'; timings?: OperationTimings }; }
+    try {
+      const result = await this.#request({ operation: 'sweep' }, control) as SessionUpdate | { status: 'unchanged'; timings?: OperationTimings };
+      return control.signal?.aborted ? { status: 'cancelled' } : result;
+    }
     catch (error) { return this.#reportedFailure(error as Error); }
   }
   async verify(control: RunControl = {}): Promise<VerifyOutcome> {
     if (control.signal?.aborted) return { status: 'cancelled' };
     // A failed audit is reported like an update or a sweep: the caller records
     // the outcome for this revision instead of receiving a rejection.
-    try { return await this.#request({ operation: 'verify' }, control) as VerifyOutcome; }
+    try {
+      const result = await this.#request({ operation: 'verify' }, control) as VerifyOutcome;
+      return control.signal?.aborted ? { status: 'cancelled' } : result;
+    }
     catch (error) {
       const reported = await this.#reportedFailure(error as Error);
       return { status: 'unavailable', reason: 'failed',
@@ -162,13 +172,17 @@ class SessionHost implements RetainedSession {
   }
   async report(control: RunControl = {}, sequence?: number): Promise<AnalysisReport | null> {
     if (this.#closing || control.signal?.aborted) return null;
-    return await this.#request({ operation: 'report', ...(sequence !== undefined ? { sequence } : {}) }, control) as AnalysisReport | null;
+    const result = await this.#request({ operation: 'report', ...(sequence !== undefined ? { sequence } : {}) }, control) as AnalysisReport | null;
+    return control.signal?.aborted ? null : result;
   }
   async releaseRevision(sequence: number): Promise<void> { await this.#request({ operation: 'releaseRevision', sequence }); }
   async releaseCompiler(): Promise<void> { await this.#request({ operation: 'releaseCompiler' }); }
   async apiView(query: ApiViewQuery, control: RunControl = {}): Promise<ApiViewQueryOutcome> {
     if (control.signal?.aborted) return { status: 'cancelled' };
-    try { return await this.#request({ operation: 'apiView', query }, control) as ApiViewQueryOutcome; }
+    try {
+      const result = await this.#request({ operation: 'apiView', query }, control) as ApiViewQueryOutcome;
+      return control.signal?.aborted ? { status: 'cancelled' } : result;
+    }
     catch (error) {
       // A disposed session (the immediate rejection this host raises without a
       // round trip, or one discovered mid-flight) reports the same stable
@@ -181,7 +195,10 @@ class SessionHost implements RetainedSession {
   }
   async architectView(query: ArchitectViewQuery, control: RunControl = {}): Promise<ArchitectViewQueryOutcome> {
     if (control.signal?.aborted) return { status: 'cancelled' };
-    try { return await this.#request({ operation: 'architectView', query }, control) as ArchitectViewQueryOutcome; }
+    try {
+      const result = await this.#request({ operation: 'architectView', query }, control) as ArchitectViewQueryOutcome;
+      return control.signal?.aborted ? { status: 'cancelled' } : result;
+    }
     catch (error) {
       // Mapped as apiView maps it: a disposed session is an invalid revision.
       const disposed = error instanceof Error && 'code' in error && (error as { code?: unknown }).code === 'session-disposed';
@@ -192,7 +209,10 @@ class SessionHost implements RetainedSession {
   }
   async measurements(sequence: number, control: RunControl = {}): Promise<SessionMeasurementsOutcome> {
     if (control.signal?.aborted) return { status: 'cancelled' };
-    try { return await this.#request({ operation: 'measurements', sequence }, control) as SessionMeasurementsOutcome; }
+    try {
+      const result = await this.#request({ operation: 'measurements', sequence }, control) as SessionMeasurementsOutcome;
+      return control.signal?.aborted ? { status: 'cancelled' } : result;
+    }
     catch (error) {
       const disposed = error instanceof Error && 'code' in error
         && (error as { code?: unknown }).code === 'session-disposed';
@@ -205,7 +225,10 @@ class SessionHost implements RetainedSession {
   async explorerDetails(sequence: number, requests: readonly SymbolDetailRequest[],
     control: RunControl = {}): Promise<SessionExplorerDetailsOutcome> {
     if (control.signal?.aborted) return { status: 'cancelled' };
-    try { return await this.#request({ operation: 'explorerDetails', sequence, requests }, control) as SessionExplorerDetailsOutcome; }
+    try {
+      const result = await this.#request({ operation: 'explorerDetails', sequence, requests }, control) as SessionExplorerDetailsOutcome;
+      return control.signal?.aborted ? { status: 'cancelled' } : result;
+    }
     catch (error) {
       const disposed = error instanceof Error && 'code' in error
         && (error as { code?: unknown }).code === 'session-disposed';
