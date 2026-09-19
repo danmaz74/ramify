@@ -1,0 +1,22 @@
+{
+  "name": "ramify-agent",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Agent harness for Ramify projects: architectural planning and module-scoped implementation sessions. A separate consumer of ramify.ts; ramify.ts never depends on it.",
+  "type": "module",
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "check:self": "ramify check --batch --root ."
+  },
+  "dependencies": {
+    "ramify.ts": "file:.."
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.0",
+    "tsx": "^4.23.13",
+    "typescript": "7.0.2",
+    "vite": "^8.3.0",
+    "vitest": "^4.1.11"
+  }
+}

@@ -1,0 +1,4 @@
+ramify 1
+module harness
+
+expose-src harnessFormats from "index.ts" to parent

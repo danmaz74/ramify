@@ -1,0 +1,6 @@
+ramify 1
+module "ramify-agent"
+
+// The artifact and event-log formats are the only vocabulary the harness and
+// the web projection share.
+expose-sub artifactSchemaVersion, eventSchemaVersion from contracts to descendants

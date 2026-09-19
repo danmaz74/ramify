@@ -1,0 +1,4 @@
+ramify 1
+module web
+
+expose-src projectedFormats from "index.ts" to parent
