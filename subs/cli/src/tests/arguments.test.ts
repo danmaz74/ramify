@@ -210,3 +210,33 @@ describe('materialize command grammar', () => {
     expect(stderr.join('')).toContain('invalid-invocation');
   });
 });
+
+describe('measure command grammar', () => {
+  it.each([
+    { argv: ['measure'], expected: { command: 'measure', format: 'human' } },
+    { argv: ['measure', '--format', 'json'], expected: { command: 'measure', format: 'json' } },
+    { argv: ['measure', '--root', '../project'], expected: { command: 'measure', root: '../project', format: 'human' } },
+    { argv: ['measure', '--format', 'json', '--root', 'a project'], expected: { command: 'measure', root: 'a project', format: 'json' } },
+  ])('MM10: preserves the complete selection for $argv', ({ argv, expected }) => {
+    expect(parseArguments(argv)).toEqual(expected);
+  });
+
+  it.each([
+    ['measure', '--root'], ['measure', '--root', ''], ['measure', '--root', 'a', '--root', 'b'],
+    ['measure', '--format'], ['measure', '--format', 'human'], ['measure', '--format', 'json', '--format', 'json'],
+    ['measure', '--batch'], ['measure', '--changed', 'a.ts'], ['measure', '--deadline', '1'],
+    ['measure', '--all'], ['measure', '--from', '.'], ['measure', '--view', 'api'], ['measure', '--help'], ['measure', 'file.ts'],
+  ])('MM10: rejects unsupported or ambiguous grammar %j', (...argv) => {
+    expect(() => parseArguments(argv)).toThrow();
+  });
+
+  it('MM10: lists measure grammar, behavior and exits in --help without dispatching', async () => {
+    const stdout: string[] = [];
+    const exit = await runCli(['--help'], { cwd: '/project', version: '1', connect: async () => { throw new Error('Unexpected daemon connection'); },
+      stdout: text => { stdout.push(text); }, stderr: text => { throw new Error(text); }, batch: async () => { throw new Error('Unexpected batch'); } });
+    expect(exit).toBe(0);
+    expect(stdout.join('')).toContain('ramify measure [--root <dir>] [--format json]');
+    expect(stdout.join('')).toContain('whole-project daemon query');
+    expect(stdout.join('')).toContain('measure: 0 one complete document');
+  });
+});

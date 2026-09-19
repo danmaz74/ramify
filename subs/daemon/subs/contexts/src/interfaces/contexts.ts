@@ -5,6 +5,7 @@ import type { ProjectRequest, ProjectScope, ProjectResolution, OutsideSourceWarn
 import type { DependencyDiagramFacts, TestReferenceFacts } from '../../../../../analysis/src/interfaces/dependency-diagram.js';
 import type { DependencyDiagramRunner } from '../../../../../analysis/src/interfaces/dependency-analyzer.js';
 import type { ArchitectViewProjection } from '../../../../../analysis/src/interfaces/architect-view.js';
+import type { MeasurementViewUnavailableReason, SessionMeasurements } from '../../../../../analysis/src/interfaces/measurements.js';
 
 export type ContextId = string;
 export type GenerationId = string;
@@ -174,12 +175,20 @@ export interface ApiViewRequest {
   /** The projections to answer with, all from one revision; absent means `['api']`. The
    * root's `MaterializeViewId`, which this untagged owner cannot import from dispatch source. */
   readonly views?: readonly ('api' | 'architect')[];
+  /** False only for the daemon's fixed architect-metrics omit policy. */
+  readonly measureViews?: boolean;
+  /** True only for the daemon's read-only measurement operation, which needs
+   * inventory and the all-module API projection without either published view. */
+  readonly measurementOnly?: boolean;
 }
 export type ContextApiViewOutcome =
   /** A projection is null exactly when its view was not requested. */
   | { readonly status: 'projected'; readonly requestId: string;
       readonly revision: ContextRevision; readonly freshness: FreshnessRecord;
       readonly projection: ApiViewProjection | null; readonly architect: ArchitectViewProjection | null;
+      /** Whole-project API projection and inventory measurements used for architect metrics or `measure`. */
+      readonly measurementProjection: ApiViewProjection | null; readonly measurements: SessionMeasurements | null;
+      readonly measurementFailure: Exclude<MeasurementViewUnavailableReason, 'not-requested'> | null;
       readonly timings?: ReplyTimings }
   | { readonly status: 'pending' | 'cold'; readonly requestId: string;
       readonly current: ContextStatus }

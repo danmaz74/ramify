@@ -3,6 +3,7 @@ import type { AnalysisInputs, AnalysisReport, RunControl } from './interfaces/an
 import type { ApiViewQuery, ApiViewQueryOutcome, OperationTimings, RetainedSession, SessionChange, SessionInputs, SessionOpen, SessionRevision, SessionStatus, SessionUpdate, VerifyOutcome } from './interfaces/session.js';
 import type { SessionExplorerDetailsOutcome } from './interfaces/session.js';
 import type { ArchitectViewQuery, ArchitectViewQueryOutcome } from './interfaces/architect-view.js';
+import type { SessionMeasurementsOutcome } from './interfaces/measurements.js';
 import type { SymbolDetailRequest } from '../subs/typescript/src/interfaces/source.js';
 import type { SessionCommand, WorkerMessage, WorkerOpen, WorkerResult } from './session-messages.js';
 import { timedResult } from './session-messages.js';
@@ -187,6 +188,18 @@ class SessionHost implements RetainedSession {
       if (disposed) return { status: 'unavailable', reason: 'invalid-revision', message: 'Retained session is disposed' };
       const reported = await this.#reportedFailure(error as Error);
       return { status: 'unavailable', reason: 'analysis-failed', message: reported.report.diagnostics[0]?.message ?? String(error) };
+    }
+  }
+  async measurements(sequence: number, control: RunControl = {}): Promise<SessionMeasurementsOutcome> {
+    if (control.signal?.aborted) return { status: 'cancelled' };
+    try { return await this.#request({ operation: 'measurements', sequence }, control) as SessionMeasurementsOutcome; }
+    catch (error) {
+      const disposed = error instanceof Error && 'code' in error
+        && (error as { code?: unknown }).code === 'session-disposed';
+      if (disposed) return { status: 'unavailable', reason: 'invalid-revision', message: 'Retained session is disposed' };
+      const reported = await this.#reportedFailure(error as Error);
+      return { status: 'unavailable', reason: 'analysis-failed',
+        message: reported.report.diagnostics[0]?.message ?? String(error) };
     }
   }
   async explorerDetails(sequence: number, requests: readonly SymbolDetailRequest[],

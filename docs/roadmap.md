@@ -477,6 +477,31 @@ and the evidence for a query interface or a split view keyed by module go to
 Plans 4 and 7; choosing between them, or record-length work on this view, is
 the user's decision.
 
+## Plan 2C: Module measurements
+
+**Detailed plan:** [Plan 2C: Module measurements](plans/iteration-2c-module-measurements/main-plan.md),
+implemented on 2026-09-19; its
+[completion report](plans/iteration-2c-module-measurements/iterations/iteration4-results.md)
+records all MM01–MM18 evidence. **Prerequisites:** the Plan 2B architect view
+and Plan 2's retained revision/service contracts, both implemented.
+
+**Working outcome.** `ramify measure [--root <dir>] [--format json]` returns one
+bounded, synchronized `ramify.measure/1` document with exact/subtree production,
+test, documentation and API-view byte buckets plus the authoritative owned-file
+inventory. The architect view publishes the same module summaries under its
+fixed `measure` policy. Neither surface interprets the numbers, substitutes zero
+for unavailable evidence, or treats a provisional unlisted path as inventoried.
+
+**Acceptance and handoff.** Shared arithmetic, candidate ownership, retained
+sessions, bounded API rendering, direct and IPC response ceilings, cancellation,
+surface equality, CLI attribution and the toolkit consistency witness pass. On
+the measured Linux host, the toolkit command took 8.73 s after daemon startup
+and 1.71 s warm; architect publication took 17.15 s, produced 844,838 bytes and
+wrote zero bytes on repeat. The fixed architect policy is `measure`. The full
+document, per-owner values, memory samples and refreshed hit costs go to Plans 4
+and 7; Plan 2B's hit-cost overages remain deferred evidence rather than passing
+thresholds.
+
 ## Plan 3: Project inspection
 
 **Detailed plan:** [Plan 3: Project inspection](plans/iteration-3-project-inspection/main-plan.md),
@@ -1038,6 +1063,7 @@ source/architecture document; do not depend on conversation history.
 | Plan 1 | Implemented package/session/report contracts; canonical source/export facts and exposure evidence; reference instance map; scope/configuration/compiler decisions; self-check and batch resource results. | All later plans. |
 | Plan 2 | Context/generation/revision and freshness contracts; local codecs/client; event ordering and distinct idle-exit/crash/explicit-stop rules; restricted fallback policy; daemon-owned direct-service harness; measured limits and per-platform transport details. | Plan 2A and Plans 3–6. |
 | Plan 2A | Availability enumeration and enforcement agreement; bounded symbol details; complete ordinary/testing projections; deterministic `.ramify` schema and transactional publisher; `ramify materialize` and agent `rg` workflow; scale/resource/platform evidence. | Plan 3 and agent hosts; Plan 4 does not duplicate its search surface. |
+| Plan 2C | Revision-bound per-owner/subtree context-size buckets, authoritative file inventory, path-attribution limits, bounded `measure` query/CLI, architect metrics policy and toolkit latency/memory/hit-cost evidence. | Plans 4 and 7 and agent consumers of module sizing. |
 | Plan 3 | The reviewed remaining inspection/explanation schemas, owned-usage definitions and consumer fixtures after Plan 2A's providers and discovery surface are removed from its scope. | Plans 4–6. |
 | Plan 4 | MCP tool/resource schemas and host launch setup; protocol/session lifecycle; actual and in-memory protocol clients; capability and error mapping. | Plan 7; optional later MCP hosting. |
 | Plan 5 | The compact check reply and revision delta; the hook command and host adapter contract; the session and revision vocabulary; retained per-file targets, originals, forwarding paths, owned shim dependencies, inventory and coverage; the observed-input identity; hook latency budgets and hot/warm memory bounds; the Plan 2 supersession record. | Plan 2A; Plans 3, 4, 6 and 7; agent hook hosts. |

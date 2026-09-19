@@ -301,14 +301,19 @@ function renderEvaluation(evaluation: ModularityEvaluation): string {
         ].filter(Boolean).join(', ')})`).join('; ') || 'none')]), numeric(1, 4)));
   for (const view of views) {
     section(`## Context size: ${view.filter}`,
-      'Owned source files and bytes, resources of the same classification, defined and exposed originals, and accesses from the counted files.\n',
-      table(['Owner', 'Scope', 'Source files', 'Source bytes', 'Resources', 'Resource bytes', 'Originals', 'Exposed originals', 'Access occurrences'],
+      'Owned source files and bytes, resources of the same classification, revision-bound module documentation, defined and exposed originals, and accesses from the counted files. Documentation is independent of the source filter.\n',
+      table(['Owner', 'Scope', 'Source files', 'Source bytes', 'Resources', 'Resource bytes', 'Documentation files', 'Documentation bytes',
+        'Originals', 'Exposed originals', 'Access occurrences'],
         view.owners.flatMap(owner => (['exact', 'subtree'] as const).map(scope => {
           const metric = owner.context[scope];
+          const documentation = (field: 'files' | 'bytes') => cell(metric, value => 'state' in value.documentation
+            ? `unavailable (${value.documentation.reason})`
+            : field === 'files' ? integer(value.documentation.files) : bytes(value.documentation.bytes));
           return [code(owner.owner), scope, cell(metric, v => integer(v.sourceFiles)), cell(metric, v => bytes(v.sourceBytes)),
-            cell(metric, v => integer(v.resourceFiles)), cell(metric, v => bytes(v.resourceBytes)), cell(metric, v => integer(v.originals)),
+            cell(metric, v => integer(v.resourceFiles)), cell(metric, v => bytes(v.resourceBytes)), documentation('files'), documentation('bytes'),
+            cell(metric, v => integer(v.originals)),
             cell(metric, v => v.exposedOriginals === null ? 'n/a' : integer(v.exposedOriginals)), cell(metric, v => integer(v.accessOccurrences))];
-        })), numeric(2, 8)));
+        })), numeric(2, 10)));
   }
 
   // 7. Change affinity.

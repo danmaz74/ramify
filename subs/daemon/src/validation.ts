@@ -3,7 +3,7 @@ import type { MaterializeViewId, ServiceError, ServiceOperation } from '../../..
 
 const operations: ReadonlySet<string> = new Set<ServiceOperation>([
   'openContext', 'contextStatus', 'check', 'subscribe', 'unsubscribe', 'closeContext', 'daemonStatus', 'stopDaemon', 'materialize',
-  'explorerDetails', 'dependencyDiagram',
+  'measure', 'explorerDetails', 'dependencyDiagram',
 ]);
 const uuid = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 const contextId = /^ctx\/1:[0-9a-f]{64}$/;
@@ -142,6 +142,10 @@ export function validateServiceRequest(operation: unknown, params: unknown): Ser
       case 'materialize': valid = record(params, ['token', 'requestId', 'freshness', 'selection'], ['deadlineMs', 'views']) && token(params.token)
         && matches(params.requestId, requestId) && synchronizedFreshness(params.freshness) && selection(params.selection)
         && (!Object.hasOwn(params, 'views') || views(params.views))
+        && (!Object.hasOwn(params, 'deadlineMs') || (typeof params.deadlineMs === 'number'
+          && Number.isSafeInteger(params.deadlineMs) && params.deadlineMs > 0 && params.deadlineMs <= 600_000)); break;
+      case 'measure': valid = record(params, ['token', 'requestId', 'freshness'], ['deadlineMs']) && token(params.token)
+        && matches(params.requestId, requestId) && synchronizedFreshness(params.freshness)
         && (!Object.hasOwn(params, 'deadlineMs') || (typeof params.deadlineMs === 'number'
           && Number.isSafeInteger(params.deadlineMs) && params.deadlineMs > 0 && params.deadlineMs <= 600_000)); break;
       case 'explorerDetails': {

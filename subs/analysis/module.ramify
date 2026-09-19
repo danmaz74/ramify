@@ -29,6 +29,9 @@ expose-src resolveProject from "resolve-project.ts" to parent
 expose-src * from "interfaces/session.ts" to parent
 expose-src openRetainedSession from "retained-session.ts" to parent
 
+// A18: module measurement vocabulary shared with the daemon and its clients.
+expose-src * from "interfaces/measurements.ts" to parent
+
 // A16: the architect projection and its session query, declarations only;
 // the planning and projection functions stay internal to analysis. Analysis
 // re-exposes the export kinds, behaviors and title limits they name, which it

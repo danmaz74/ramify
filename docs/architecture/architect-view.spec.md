@@ -202,7 +202,24 @@ order:
   "usedBy": [
     { "module": "ramify/cli", "behavioral": 2, "nonBehavioral": 0 }
   ],
-  "metrics": { "state": "unavailable" },
+  "metrics": {
+    "state": "measured",
+    "views": "measured",
+    "contextSize": {
+      "exact": {
+        "production": { "sourceFiles": 7, "sourceBytes": 19420, "resourceFiles": 1, "resourceBytes": 812 },
+        "tests": { "sourceFiles": 4, "sourceBytes": 9321, "resourceFiles": 0, "resourceBytes": 0 },
+        "documentation": { "files": 2, "bytes": 1384 },
+        "views": { "ordinaryBytes": 7120, "testsBytes": 2240 }
+      },
+      "subtree": {
+        "production": { "sourceFiles": 7, "sourceBytes": 19420, "resourceFiles": 1, "resourceBytes": 812 },
+        "tests": { "sourceFiles": 4, "sourceBytes": 9321, "resourceFiles": 0, "resourceBytes": 0 },
+        "documentation": { "files": 2, "bytes": 1384 },
+        "views": { "ordinaryBytes": 7120, "testsBytes": 2240 }
+      }
+    }
+  },
   "revision": "rev/1:…"
 }
 ```
@@ -221,10 +238,25 @@ order:
   absent, not empty, when `_meta.json` records dependencies as unavailable.
   They are unbounded: `module.json` is read whole, one entry per line, and
   is not a search target.
-- `metrics` carries the modularity projection's per-module figures with
-  `"state": "measured"` when a delivery includes them, with each ratio as
-  numerator, denominator and value. The first delivery may publish
-  `"state": "unavailable"` everywhere.
+- `metrics` is measured from the same revision-bound inventory as the view.
+  `contextSize.exact` counts only this owner and `subtree` counts it and every
+  descendant. `production` and `tests` each carry `sourceFiles`, `sourceBytes`,
+  `resourceFiles` and `resourceBytes`; `documentation` counts the owner's root
+  `README.md` when present and `module.ramify`. `views` carries encoded API-view
+  bytes for ordinary and test areas. A missing area is a measured zero.
+- All modules in one view have the same view-byte availability. When API-view
+  bytes cannot be measured, the `views` member of every exact/subtree bucket is
+  absent and the metrics-level `views` value is `{ "state": "unavailable",
+  "reason": "resource-unavailable" | "analysis-failed" | "not-requested" }`.
+  Inventory and documentation buckets remain measured. When no valid current
+  inventory exists, the whole block is `{ "state": "unavailable", "reason":
+  ... }`; unavailable evidence is never encoded as zero.
+- The architect metrics policy is fixed for a build as `measure` or `omit`, not
+  selected from one invocation's elapsed time. Under `omit`, view bytes are
+  always `not-requested`; inventory and documentation buckets remain measured.
+  The delivered policy is **`measure`**. Plan 2C's acceptance measurement kept
+  the architect query, whole command, view size and unchanged repeat within
+  their agreed budgets; an invocation never changes this policy dynamically.
 - `symbols` counts the module's `behavior.jsonl` records by role, its
   `supporting.jsonl` records, and, in `unknown`, the behavior records whose
   shape is `unknown`, which the role counts include. `tests` counts its
@@ -427,7 +459,7 @@ the coverage counts say how much the rule could not decide.
 `_meta.json` is a deterministic single-line JSON document:
 
 ```json
-{"schema":"ramify.architect-view/1","revision":"rev/1:…","input":"input/1:…","modules":15,"dependencies":"measured","dependencyScope":"production","testReferences":"measured","metrics":"unavailable"}
+{"schema":"ramify.architect-view/1","revision":"rev/1:…","input":"input/1:…","modules":15,"dependencies":"measured","dependencyScope":"production","testReferences":"measured","metrics":"measured"}
 ```
 
 `dependencies` is `measured` or `unavailable`, and `dependencyScope` names
@@ -447,6 +479,63 @@ then the exceptional counts in the order listed. Every `module.json` repeats the
 
 An agent combines this view with a module's API view only when both name the
 same revision. A stale view remains readable and must be described as stale.
+
+## Measurement query companion contract
+
+The resident `measure` operation returns the same inventory and documentation
+buckets without writing files. Its JSON form is:
+
+```json
+{
+  "schema": "ramify.measure/1",
+  "revision": "rev/1:…",
+  "root": "…",
+  "ownershipRule": "the ordered rule below",
+  "views": "measured",
+  "modules": [
+    { "id": "ramify/analysis", "dir": "subs/analysis", "parent": "ramify",
+      "exact": {}, "subtree": {} }
+  ],
+  "files": [
+    { "path": "subs/analysis/src/architect-view.ts", "owner": "ramify/analysis",
+      "area": "ordinary", "kind": "source", "bytes": 12345 }
+  ],
+  "outsideModuleFiles": []
+}
+```
+
+`modules` is ordered by module identifier and `files` by project-relative
+path. Source and resource records retain physical area `ordinary` or `tests`.
+Documentation records use `area` and `kind` `documentation` and name only the
+owner's root `README.md` or `module.ramify`. The root module has an empty `dir`
+and null `parent`. The complete-record source-classification derivation is the
+one in the modularity report's context-size section. It is invalid for partial
+or unavailable buckets.
+
+Path attribution applies in this order after normalization within the reported
+root; malformed paths and escapes are not attributable:
+
+1. A segment reserved by the existing generated-path predicate means
+   `generated`: `.ramify`, `.ramify-architect`, and their `.tmp-<suffix>` or
+   `.old-<suffix>` siblings at any depth, including sibling marker files.
+   Similar names such as `.ramify-other` are not reserved.
+2. A `files` record is `inventoried` with exactly its recorded owner, area,
+   kind and bytes. An `outsideModuleFiles` record is known outside the owned
+   inventory and receives no owner, even when its spelling resembles source.
+3. An unlisted path beneath `.git`, `node_modules`, `bower_components` or
+   `jspm_packages` is `excluded`.
+4. Every other unlisted path is `unobserved`. Its nearest listed module may
+   supply a provisional owner/area only beneath that module's `src/`, with
+   `src/tests/` taking precedence, or at its root documentation paths. Other
+   locations receive no provisional owner. Attribution never climbs to an
+   ancestor's source area when the nearest module does not own the location.
+
+Configured output exclusions, independent compiler scopes, invalid boundaries
+and symlink observations are not completely represented. Consequently an
+uninventoried path cannot be asserted present, owned, ordinary, empty or outside
+the project from spelling alone, and no symlink following is implied. A later
+inventory refresh may establish the file. This is a deliberate evidence limit,
+not a zero measurement.
 
 ## Materialization
 
@@ -637,6 +726,22 @@ record the method.
 | Dependency wait | 250 ms, 125 s | as configured |
 | Hit cost per term | 200 lines, 64 KB | exceeded on the toolkit; see below |
 | Mean behavior record, toolkit (evidence) | 300 characters | 402.1 characters, longest 793 |
+
+Plan 2C re-measured the toolkit after adding module metrics and selected the
+fixed architect policy. Its raw values are in
+[`plan2c-measurements.json`](../plans/iteration-2c-module-measurements/evidence/plan2c-measurements.json).
+
+| Plan 2C measurement | Limit | Measured | Result |
+| --- | ---: | ---: | --- |
+| Architect session query, toolkit | 15 s | 0.68–0.83 s hot; 1.72 s after compiler release | holds |
+| Whole `materialize --view architect`, toolkit | 90 s | 17.15 s | holds |
+| Unchanged repeat | 0 bytes written | 0 bytes | holds |
+| View size, toolkit | 8 MiB | 844,838 bytes, 62 files | holds |
+| Fixed architect metrics policy | `measure` unless an agreed budget fails | `measure` | selected |
+
+The Plan 2C hit-cost refresh remains evidence, not a newly passing gate: five
+of six terms still exceed Plan 2B's deferred thresholds. The module metrics do
+not change that disposition.
 
 Hit cost of `rg -n -i <term> .ramify-architect/`, lines and bytes of output:
 

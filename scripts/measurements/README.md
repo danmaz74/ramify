@@ -435,3 +435,21 @@ The raw report is written to
 FILE` another path). Its `budgets` list sets each of Plan 2B's budgets beside
 its measured value; an exceeded budget is recorded, never retried. The command
 exits 1 only when a workload fails to produce its evidence.
+
+## Plan 2C module measurement acceptance
+
+```sh
+npm run build
+RAMIFY_MEASUREMENT_ACTIVITY='Idle host; no other builds or measurements' npm run measure:plan2c
+```
+
+The command uses the built CLI and one owned endpoint. It records a measure
+after daemon startup and a warm repeat, verifies the sum of exact owner buckets
+against the root subtree and every listed byte count against disk, and writes
+the complete `ramify.measure/1` toolkit document. It then measures the architect
+session query, materialization, unchanged repeat, generated size, Plan 2B search
+terms and sampled daemon/worker/compiler memory. The report chooses the fixed
+architect metrics policy only from the agreed budgets and preserves Plan 2B's
+hit thresholds as deferred evidence. Outputs are under
+`docs/plans/iteration-2c-module-measurements/evidence/`; the owned daemon is
+stopped and its endpoint removed after the run.

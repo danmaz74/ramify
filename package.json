@@ -73,6 +73,7 @@
     "measure:plan2a": "node --import tsx scripts/measurements/plan2a.mjs",
     "measure:plan2a-platform": "node --import tsx scripts/measurements/plan2a-platform.mjs",
     "measure:plan2b": "node --import tsx scripts/measurements/plan2b.mjs",
+    "measure:plan2c": "node --import tsx scripts/measurements/plan2c.mjs",
     "measure:project-explorer": "tsx subs/integration-tests/src/browser-acceptance.ts",
     "reference:verify": "tsx scripts/reference-harness/verify.ts"
   },

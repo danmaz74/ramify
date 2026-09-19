@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ipcFixture } from './ipc-fixture.js';
 import { eventually } from './socket-fixture.js';
@@ -8,6 +8,7 @@ import { encodeJsonFrame } from '../codec.js';
 import type { ContextEvent } from '../context-types.js';
 import type { DependencyAnalyzerOutcome, DependencyDiagramRunner } from '../../../analysis/src/interfaces/dependency-analyzer.js';
 import type { RunControl } from '../../../analysis/src/interfaces/analysis.js';
+import { createMeasureDriver } from './measure-driver.js';
 
  describe('IPC framing and shared service dispatch', () => {
   it('preserves validation errors and tokens while releasing subscription leases on close', async () => {
@@ -211,5 +212,142 @@ import type { RunControl } from '../../../analysis/src/interfaces/analysis.js';
       expect(await client.materialize({ ...request, requestId: 'invalid', views: ['architect', 'architect'] as never }))
         .toMatchObject({ ok: false, error: { code: 'invalid-request' } });
     } finally { await fixture.dispose(); }
+  }, 60_000);
+
+  it('MM09: refuses measure locally when an older daemon does not advertise the capability', async () => {
+    const fixture = await ipcFixture({}, true, undefined, undefined, ['contexts', 'check']);
+    try {
+      const client = await fixture.connect();
+      expect(client.daemon.capabilities).not.toContain('measure');
+      expect(await client.measure({ token: { context: `ctx/1:${'0'.repeat(64)}`,
+        generation: 'gen/1:d5f257c2-2058-499f-9098-045de98690a2' }, requestId: 'old-client',
+      freshness: { mode: 'synchronized', expect: [] } })).toEqual({ ok: false, error: {
+        code: 'unsupported-operation', message: 'The daemon does not support measure', details: {},
+      } });
+    } finally { await fixture.dispose(); }
+  });
+
+  it('MM08/MM16: joins one revision with architect inventory over transport and synchronizes a pending edit without writing', async () => {
+    const runner: DependencyDiagramRunner = { run: async input => ({ status: 'ready', diagram: { inputId: input.report.inputId!,
+      modules: ['example'], boundaries: [], headline: { behavioralDependencies: 0, nonBehavioralDependencies: 0 },
+      coverage: { state: 'complete', unknownDependencies: 0, limitIds: [] } }, testReferences: null, behaviorRuns: 1,
+    timings: { acquireMs: 1, classifyMs: 1, projectMs: 1, totalMs: 3 } }) };
+    const fixture = await ipcFixture({}, true, undefined, runner);
+    try {
+      const client = await fixture.connect();
+      expect(client.daemon.capabilities).toContain('measure');
+      const setup = { registry: 'default' as const, capabilities: ['registry', 'layout', 'metadata', 'descriptions', 'source-catalog',
+        'exposure-linking', 'static-access', 'tags-origin', 'namespace-access', 'lazy-access', 'symbol-free-access', 'resource-access', 'coverage'] as const };
+      const opened = await client.openContext({ ...fixture.params, setup });
+      if (!opened.ok || opened.value.status !== 'opened') throw new Error('Open failed');
+      const token = opened.value.token;
+      const materialized = await client.materialize({ token, requestId: 'measure-equality-view',
+        freshness: { mode: 'synchronized', expect: [] }, selection: { scope: 'all' }, views: ['architect'] });
+      if (!materialized.ok || materialized.value.status !== 'materialized') throw new Error(JSON.stringify(materialized));
+      const before = await readFile(join(fixture.project, '.ramify-architect/module.json'), 'utf8');
+      const architect = JSON.parse(before) as { metrics: { views: unknown; contextSize: { exact: unknown; subtree: unknown } } };
+      const measured = await client.measure({ token, requestId: 'measure-equality-query', freshness: { mode: 'synchronized', expect: [] } });
+      if (!measured.ok || measured.value.status !== 'measured') throw new Error(JSON.stringify(measured));
+      expect(measured.value.document.revision).toBe(materialized.value.revision.revision);
+      expect(measured.value.document.views).toEqual(architect.metrics.views);
+      expect(measured.value.document.modules[0]).toMatchObject({ exact: architect.metrics.contextSize.exact,
+        subtree: architect.metrics.contextSize.subtree });
+      expect(await readFile(join(fixture.project, '.ramify-architect/module.json'), 'utf8')).toBe(before);
+
+      const text = 'export const value = "更新";\n';
+      await writeFile(join(fixture.project, 'src/index.ts'), text);
+      const sha256 = createHash('sha256').update(text).digest('hex');
+      const edited = await client.measure({ token, requestId: 'measure-pending-edit',
+        freshness: { mode: 'synchronized', expect: [{ path: 'src/index.ts', sha256 }] } });
+      if (!edited.ok || edited.value.status !== 'measured') throw new Error(JSON.stringify(edited));
+      expect(edited.value.document.revision).not.toBe(measured.value.document.revision);
+      expect(edited.value.document.files.find(file => file.path === 'src/index.ts')).toMatchObject({ bytes: Buffer.byteLength(text),
+        owner: 'example', area: 'ordinary', kind: 'source' });
+      expect(await readFile(join(fixture.project, '.ramify-architect/module.json'), 'utf8')).toBe(before);
+    } finally { await fixture.dispose(); }
+  }, 60_000);
+
+  it('MM17: enforces the exact escaped UTF-8 response envelope over actual transport', async () => {
+    const driver = () => {
+      const count = 500;
+      const files = Array.from({ length: count }, (_, index) => ({
+        path: `src/多字节-\"quote\"-\\slash-${String(index).padStart(4, '0')}-${'x'.repeat(96)}.ts`, owner: 'example',
+        area: 'ordinary' as const, kind: 'source' as const, bytes: index + 1,
+      }));
+      const bucket = { production: { sourceFiles: count, sourceBytes: count * (count + 1) / 2,
+        resourceFiles: 0, resourceBytes: 0 }, tests: { sourceFiles: 0, sourceBytes: 0, resourceFiles: 0, resourceBytes: 0 },
+      documentation: { files: 0, bytes: 0 } };
+      return createMeasureDriver({ modules: [{ id: 'example', dir: '', parent: null, exact: bucket, subtree: bucket }],
+        files, outsideModuleFiles: ['outside/外-"quote"-\\slash.ts'] });
+    };
+    const run = async (maximum: number) => {
+      const fixture = await ipcFixture({ maxResponseBytes: maximum }, true, driver());
+      const client = await fixture.connect();
+      const opened = await client.openContext(fixture.params);
+      if (!opened.ok || opened.value.status !== 'opened') throw new Error('Open failed');
+      const result = await client.measure({ token: opened.value.token, requestId: 'transport-boundary',
+        freshness: { mode: 'synchronized', expect: [] } });
+      return { fixture, result };
+    };
+    const generous = await run(32 * 1024 ** 2);
+    try {
+      if (!generous.result.ok || generous.result.value.status !== 'measured') throw new Error(JSON.stringify(generous.result));
+      const encoded = Buffer.byteLength(JSON.stringify({ type: 'response', id: '2', result: generous.result }), 'utf8');
+      expect(encoded).toBeGreaterThan(50_000);
+      const atLimit = await run(encoded);
+      try { expect(atLimit.result).toMatchObject({ ok: true, value: { status: 'measured', document: { files: expect.any(Array) } } }); }
+      finally { await atLimit.fixture.dispose(); }
+      const over = await run(encoded - 1);
+      try { expect(over.result).toEqual({ ok: true, value: { status: 'unavailable', requestId: 'transport-boundary',
+        reason: 'resource-unavailable', message: `Measure response exceeds maxResponseBytes (${encoded - 1})` } }); }
+      finally { await over.fixture.dispose(); }
+    } finally { await generous.fixture.dispose(); }
+  }, 60_000);
+
+  it('MM17: interrupts transport response assembly for cancellation and deadline, then recovers', async () => {
+    const run = async (requestId: string, deadlineMs?: number) => {
+      let projectionReady!: () => void;
+      const projected = new Promise<void>(resolve => { projectionReady = resolve; });
+      const count = 5_000;
+      const files = Array.from({ length: count }, (_, index) => ({
+        path: `src/long-${String(index).padStart(5, '0')}-${'x'.repeat(128)}.ts`, owner: 'example',
+        area: 'ordinary' as const, kind: 'source' as const, bytes: index + 1,
+      }));
+      const bucket = { production: { sourceFiles: count, sourceBytes: count * (count + 1) / 2,
+        resourceFiles: 0, resourceBytes: 0 }, tests: { sourceFiles: 0, sourceBytes: 0, resourceFiles: 0, resourceBytes: 0 },
+      documentation: { files: 0, bytes: 0 } };
+      const driver = createMeasureDriver({ modules: [{ id: 'example', dir: '', parent: null, exact: bucket, subtree: bucket }],
+        files, outsideModuleFiles: [] }, false, { apiView: projectionReady });
+      const fixture = await ipcFixture({}, true, driver);
+      const client = await fixture.connect();
+      const opened = await client.openContext(fixture.params);
+      if (!opened.ok || opened.value.status !== 'opened') throw new Error('Open failed');
+      const params = { token: opened.value.token, requestId, freshness: { mode: 'synchronized' as const, expect: [] },
+        ...(deadlineMs === undefined ? {} : { deadlineMs }) };
+      return { fixture, client, params, projected };
+    };
+
+    const cancelled = await run('transport-cancel');
+    try {
+      const controller = new AbortController();
+      const pending = cancelled.client.measure(cancelled.params, { signal: controller.signal });
+      await cancelled.projected;
+      await new Promise<void>(resolve => setImmediate(resolve));
+      controller.abort();
+      expect(await pending).toEqual({ ok: true, value: { status: 'cancelled', requestId: 'transport-cancel' } });
+      expect(await cancelled.client.measure({ ...cancelled.params, requestId: 'transport-cancel-recovery' }))
+        .toMatchObject({ ok: true, value: { status: 'measured', document: { files: expect.any(Array) } } });
+    } finally { await cancelled.fixture.dispose(); }
+
+    const deadline = await run('transport-deadline', 1);
+    try {
+      const pending = deadline.client.measure(deadline.params);
+      await deadline.projected;
+      await new Promise<void>(resolve => setImmediate(resolve));
+      deadline.fixture.environment.clock.advance(1);
+      expect(await pending).toMatchObject({ ok: true, value: { status: 'deadline-exceeded', requestId: 'transport-deadline' } });
+      expect(await deadline.client.measure({ ...deadline.params, requestId: 'transport-deadline-recovery', deadlineMs: 10_000 }))
+        .toMatchObject({ ok: true, value: { status: 'measured', document: { files: expect.any(Array) } } });
+    } finally { await deadline.fixture.dispose(); }
   }, 60_000);
 });

@@ -1,0 +1,4030 @@
+{
+  "schema": "ramify.measure/1",
+  "revision": "rev/1:b7abfc8d-ffcd-4edd-97b0-b51fdf45df27:1",
+  "root": "/ramify",
+  "ownershipRule": "Normalize the path within root; malformed paths and escapes are not attributable.\n1. A reserved generated segment is generated before area or owner lookup: .ramify, .ramify-architect, and their .tmp-<suffix>/.old-<suffix> siblings at any depth, including sibling marker files. Similar names are not reserved.\n2. A path in files is inventoried with exactly its recorded owner, area, kind, and bytes. A path in outsideModuleFiles is outside the owned inventory and has no owner.\n3. An unlisted path beneath .git, node_modules, bower_components, or jspm_packages is excluded.\n4. Every other unlisted path is unobserved. Its nearest listed module supplies only a provisional owner/area beneath that module's src/ (src/tests/ first) or at its root README.md/module.ramify; never climb to an ancestor source area when the nearest module does not own the location.\nConfigured output exclusions, independent compiler scopes, invalid boundaries, and symlink observations are not fully encoded. Unobserved spelling proves neither inventory membership, ownership, area, emptiness, nor project exclusion; no symlink following is implied. Refreshing the inventory can establish a new file.",
+  "views": "measured",
+  "modules": [
+    {
+      "id": "ramify",
+      "dir": "",
+      "parent": null,
+      "exact": {
+        "production": {
+          "sourceFiles": 18,
+          "sourceBytes": 57636,
+          "resourceFiles": 1,
+          "resourceBytes": 648
+        },
+        "tests": {
+          "sourceFiles": 26,
+          "sourceBytes": 178599,
+          "resourceFiles": 1,
+          "resourceBytes": 0
+        },
+        "documentation": {
+          "files": 2,
+          "bytes": 21254
+        },
+        "views": {
+          "ordinaryBytes": 101554,
+          "testsBytes": 102271
+        }
+      },
+      "subtree": {
+        "production": {
+          "sourceFiles": 225,
+          "sourceBytes": 1955966,
+          "resourceFiles": 4,
+          "resourceBytes": 23492
+        },
+        "tests": {
+          "sourceFiles": 199,
+          "sourceBytes": 2565586,
+          "resourceFiles": 11,
+          "resourceBytes": 74595
+        },
+        "documentation": {
+          "files": 30,
+          "bytes": 82845
+        },
+        "views": {
+          "ordinaryBytes": 1163188,
+          "testsBytes": 1067344
+        }
+      }
+    },
+    {
+      "id": "ramify/analysis",
+      "dir": "subs/analysis",
+      "parent": "ramify",
+      "exact": {
+        "production": {
+          "sourceFiles": 47,
+          "sourceBytes": 442322,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "tests": {
+          "sourceFiles": 37,
+          "sourceBytes": 598662,
+          "resourceFiles": 3,
+          "resourceBytes": 47695
+        },
+        "documentation": {
+          "files": 2,
+          "bytes": 11512
+        },
+        "views": {
+          "ordinaryBytes": 48886,
+          "testsBytes": 49590
+        }
+      },
+      "subtree": {
+        "production": {
+          "sourceFiles": 95,
+          "sourceBytes": 894565,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "tests": {
+          "sourceFiles": 83,
+          "sourceBytes": 1132549,
+          "resourceFiles": 6,
+          "resourceBytes": 47695
+        },
+        "documentation": {
+          "files": 10,
+          "bytes": 35068
+        },
+        "views": {
+          "ordinaryBytes": 285941,
+          "testsBytes": 291165
+        }
+      }
+    },
+    {
+      "id": "ramify/analysis/descriptions",
+      "dir": "subs/analysis/subs/descriptions",
+      "parent": "ramify/analysis",
+      "exact": {
+        "production": {
+          "sourceFiles": 5,
+          "sourceBytes": 33285,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "tests": {
+          "sourceFiles": 4,
+          "sourceBytes": 53636,
+          "resourceFiles": 1,
+          "resourceBytes": 0
+        },
+        "documentation": {
+          "files": 2,
+          "bytes": 2888
+        },
+        "views": {
+          "ordinaryBytes": 61074,
+          "testsBytes": 62629
+        }
+      },
+      "subtree": {
+        "production": {
+          "sourceFiles": 5,
+          "sourceBytes": 33285,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "tests": {
+          "sourceFiles": 4,
+          "sourceBytes": 53636,
+          "resourceFiles": 1,
+          "resourceBytes": 0
+        },
+        "documentation": {
+          "files": 2,
+          "bytes": 2888
+        },
+        "views": {
+          "ordinaryBytes": 61074,
+          "testsBytes": 62629
+        }
+      }
+    },
+    {
+      "id": "ramify/analysis/model",
+      "dir": "subs/analysis/subs/model",
+      "parent": "ramify/analysis",
+      "exact": {
+        "production": {
+          "sourceFiles": 9,
+          "sourceBytes": 41913,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "tests": {
+          "sourceFiles": 11,
+          "sourceBytes": 93362,
+          "resourceFiles": 1,
+          "resourceBytes": 0
+        },
+        "documentation": {
+          "files": 2,
+          "bytes": 3803
+        },
+        "views": {
+          "ordinaryBytes": 58548,
+          "testsBytes": 60103
+        }
+      },
+      "subtree": {
+        "production": {
+          "sourceFiles": 9,
+          "sourceBytes": 41913,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "tests": {
+          "sourceFiles": 11,
+          "sourceBytes": 93362,
+          "resourceFiles": 1,
+          "resourceBytes": 0
+        },
+        "documentation": {
+          "files": 2,
+          "bytes": 3803
+        },
+        "views": {
+          "ordinaryBytes": 58548,
+          "testsBytes": 60103
+        }
+      }
+    },
+    {
+      "id": "ramify/analysis/project",
+      "dir": "subs/analysis/subs/project",
+      "parent": "ramify/analysis",
+      "exact": {
+        "production": {
+          "sourceFiles": 15,
+          "sourceBytes": 112654,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "tests": {
+          "sourceFiles": 11,
+          "sourceBytes": 113464,
+          "resourceFiles": 1,
+          "resourceBytes": 0
+        },
+        "documentation": {
+          "files": 2,
+          "bytes": 5266
+        },
+        "views": {
+          "ordinaryBytes": 57722,
+          "testsBytes": 58427
+        }
+      },
+      "subtree": {
+        "production": {
+          "sourceFiles": 15,
+          "sourceBytes": 112654,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "tests": {
+          "sourceFiles": 11,
+          "sourceBytes": 113464,
+          "resourceFiles": 1,
+          "resourceBytes": 0
+        },
+        "documentation": {
+          "files": 2,
+          "bytes": 5266
+        },
+        "views": {
+          "ordinaryBytes": 57722,
+          "testsBytes": 58427
+        }
+      }
+    },
+    {
+      "id": "ramify/analysis/typescript",
+      "dir": "subs/analysis/subs/typescript",
+      "parent": "ramify/analysis",
+      "exact": {
+        "production": {
+          "sourceFiles": 19,
+          "sourceBytes": 264391,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "tests": {
+          "sourceFiles": 20,
+          "sourceBytes": 273425,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "documentation": {
+          "files": 2,
+          "bytes": 11599
+        },
+        "views": {
+          "ordinaryBytes": 59711,
+          "testsBytes": 60416
+        }
+      },
+      "subtree": {
+        "production": {
+          "sourceFiles": 19,
+          "sourceBytes": 264391,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "tests": {
+          "sourceFiles": 20,
+          "sourceBytes": 273425,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "documentation": {
+          "files": 2,
+          "bytes": 11599
+        },
+        "views": {
+          "ordinaryBytes": 59711,
+          "testsBytes": 60416
+        }
+      }
+    },
+    {
+      "id": "ramify/cli",
+      "dir": "subs/cli",
+      "parent": "ramify",
+      "exact": {
+        "production": {
+          "sourceFiles": 14,
+          "sourceBytes": 76282,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "tests": {
+          "sourceFiles": 9,
+          "sourceBytes": 85773,
+          "resourceFiles": 1,
+          "resourceBytes": 0
+        },
+        "documentation": {
+          "files": 2,
+          "bytes": 4968
+        },
+        "views": {
+          "ordinaryBytes": 93569,
+          "testsBytes": 95249
+        }
+      },
+      "subtree": {
+        "production": {
+          "sourceFiles": 14,
+          "sourceBytes": 76282,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "tests": {
+          "sourceFiles": 9,
+          "sourceBytes": 85773,
+          "resourceFiles": 1,
+          "resourceBytes": 0
+        },
+        "documentation": {
+          "files": 2,
+          "bytes": 4968
+        },
+        "views": {
+          "ordinaryBytes": 93569,
+          "testsBytes": 95249
+        }
+      }
+    },
+    {
+      "id": "ramify/daemon",
+      "dir": "subs/daemon",
+      "parent": "ramify",
+      "exact": {
+        "production": {
+          "sourceFiles": 24,
+          "sourceBytes": 230227,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "tests": {
+          "sourceFiles": 27,
+          "sourceBytes": 296176,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "documentation": {
+          "files": 2,
+          "bytes": 6285
+        },
+        "views": {
+          "ordinaryBytes": 92061,
+          "testsBytes": 93741
+        }
+      },
+      "subtree": {
+        "production": {
+          "sourceFiles": 30,
+          "sourceBytes": 352077,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "tests": {
+          "sourceFiles": 43,
+          "sourceBytes": 509016,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "documentation": {
+          "files": 4,
+          "bytes": 9995
+        },
+        "views": {
+          "ordinaryBytes": 146816,
+          "testsBytes": 148494
+        }
+      }
+    },
+    {
+      "id": "ramify/daemon/contexts",
+      "dir": "subs/daemon/subs/contexts",
+      "parent": "ramify/daemon",
+      "exact": {
+        "production": {
+          "sourceFiles": 6,
+          "sourceBytes": 121850,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "tests": {
+          "sourceFiles": 16,
+          "sourceBytes": 212840,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "documentation": {
+          "files": 2,
+          "bytes": 3710
+        },
+        "views": {
+          "ordinaryBytes": 54755,
+          "testsBytes": 54753
+        }
+      },
+      "subtree": {
+        "production": {
+          "sourceFiles": 6,
+          "sourceBytes": 121850,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "tests": {
+          "sourceFiles": 16,
+          "sourceBytes": 212840,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "documentation": {
+          "files": 2,
+          "bytes": 3710
+        },
+        "views": {
+          "ordinaryBytes": 54755,
+          "testsBytes": 54753
+        }
+      }
+    },
+    {
+      "id": "ramify/explorer",
+      "dir": "subs/explorer",
+      "parent": "ramify",
+      "exact": {
+        "production": {
+          "sourceFiles": 8,
+          "sourceBytes": 35074,
+          "resourceFiles": 1,
+          "resourceBytes": 149
+        },
+        "tests": {
+          "sourceFiles": 6,
+          "sourceBytes": 55110,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "documentation": {
+          "files": 2,
+          "bytes": 978
+        },
+        "views": {
+          "ordinaryBytes": 111012,
+          "testsBytes": 117173
+        }
+      },
+      "subtree": {
+        "production": {
+          "sourceFiles": 8,
+          "sourceBytes": 35074,
+          "resourceFiles": 1,
+          "resourceBytes": 149
+        },
+        "tests": {
+          "sourceFiles": 6,
+          "sourceBytes": 55110,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "documentation": {
+          "files": 2,
+          "bytes": 978
+        },
+        "views": {
+          "ordinaryBytes": 111012,
+          "testsBytes": 117173
+        }
+      }
+    },
+    {
+      "id": "ramify/integration-tests",
+      "dir": "subs/integration-tests",
+      "parent": "ramify",
+      "exact": {
+        "production": {
+          "sourceFiles": 0,
+          "sourceBytes": 0,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "tests": {
+          "sourceFiles": 3,
+          "sourceBytes": 194504,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "documentation": {
+          "files": 2,
+          "bytes": 159
+        },
+        "views": {
+          "ordinaryBytes": 117649,
+          "testsBytes": 0
+        }
+      },
+      "subtree": {
+        "production": {
+          "sourceFiles": 0,
+          "sourceBytes": 0,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "tests": {
+          "sourceFiles": 3,
+          "sourceBytes": 194504,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "documentation": {
+          "files": 2,
+          "bytes": 159
+        },
+        "views": {
+          "ordinaryBytes": 117649,
+          "testsBytes": 0
+        }
+      }
+    },
+    {
+      "id": "ramify/presentation",
+      "dir": "subs/presentation",
+      "parent": "ramify",
+      "exact": {
+        "production": {
+          "sourceFiles": 26,
+          "sourceBytes": 267764,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "tests": {
+          "sourceFiles": 12,
+          "sourceBytes": 129776,
+          "resourceFiles": 1,
+          "resourceBytes": 0
+        },
+        "documentation": {
+          "files": 2,
+          "bytes": 4342
+        },
+        "views": {
+          "ordinaryBytes": 88948,
+          "testsBytes": 90503
+        }
+      },
+      "subtree": {
+        "production": {
+          "sourceFiles": 50,
+          "sourceBytes": 454560,
+          "resourceFiles": 2,
+          "resourceBytes": 22695
+        },
+        "tests": {
+          "sourceFiles": 21,
+          "sourceBytes": 313934,
+          "resourceFiles": 3,
+          "resourceBytes": 26900
+        },
+        "documentation": {
+          "files": 6,
+          "bytes": 8977
+        },
+        "views": {
+          "ordinaryBytes": 224137,
+          "testsBytes": 228802
+        }
+      }
+    },
+    {
+      "id": "ramify/presentation/layout",
+      "dir": "subs/presentation/subs/layout",
+      "parent": "ramify/presentation",
+      "exact": {
+        "production": {
+          "sourceFiles": 11,
+          "sourceBytes": 37835,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "tests": {
+          "sourceFiles": 2,
+          "sourceBytes": 11398,
+          "resourceFiles": 1,
+          "resourceBytes": 0
+        },
+        "documentation": {
+          "files": 2,
+          "bytes": 2124
+        },
+        "views": {
+          "ordinaryBytes": 64909,
+          "testsBytes": 66464
+        }
+      },
+      "subtree": {
+        "production": {
+          "sourceFiles": 11,
+          "sourceBytes": 37835,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "tests": {
+          "sourceFiles": 2,
+          "sourceBytes": 11398,
+          "resourceFiles": 1,
+          "resourceBytes": 0
+        },
+        "documentation": {
+          "files": 2,
+          "bytes": 2124
+        },
+        "views": {
+          "ordinaryBytes": 64909,
+          "testsBytes": 66464
+        }
+      }
+    },
+    {
+      "id": "ramify/presentation/project-view",
+      "dir": "subs/presentation/subs/project-view",
+      "parent": "ramify/presentation",
+      "exact": {
+        "production": {
+          "sourceFiles": 13,
+          "sourceBytes": 148961,
+          "resourceFiles": 2,
+          "resourceBytes": 22695
+        },
+        "tests": {
+          "sourceFiles": 7,
+          "sourceBytes": 172760,
+          "resourceFiles": 1,
+          "resourceBytes": 26900
+        },
+        "documentation": {
+          "files": 2,
+          "bytes": 2511
+        },
+        "views": {
+          "ordinaryBytes": 70280,
+          "testsBytes": 71835
+        }
+      },
+      "subtree": {
+        "production": {
+          "sourceFiles": 13,
+          "sourceBytes": 148961,
+          "resourceFiles": 2,
+          "resourceBytes": 22695
+        },
+        "tests": {
+          "sourceFiles": 7,
+          "sourceBytes": 172760,
+          "resourceFiles": 1,
+          "resourceBytes": 26900
+        },
+        "documentation": {
+          "files": 2,
+          "bytes": 2511
+        },
+        "views": {
+          "ordinaryBytes": 70280,
+          "testsBytes": 71835
+        }
+      }
+    },
+    {
+      "id": "ramify/service-api",
+      "dir": "subs/service-api",
+      "parent": "ramify",
+      "exact": {
+        "production": {
+          "sourceFiles": 10,
+          "sourceBytes": 85772,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "tests": {
+          "sourceFiles": 8,
+          "sourceBytes": 96101,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "documentation": {
+          "files": 2,
+          "bytes": 1446
+        },
+        "views": {
+          "ordinaryBytes": 82510,
+          "testsBytes": 84190
+        }
+      },
+      "subtree": {
+        "production": {
+          "sourceFiles": 10,
+          "sourceBytes": 85772,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "tests": {
+          "sourceFiles": 8,
+          "sourceBytes": 96101,
+          "resourceFiles": 0,
+          "resourceBytes": 0
+        },
+        "documentation": {
+          "files": 2,
+          "bytes": 1446
+        },
+        "views": {
+          "ordinaryBytes": 82510,
+          "testsBytes": 84190
+        }
+      }
+    }
+  ],
+  "files": [
+    {
+      "path": "README.md",
+      "owner": "ramify",
+      "area": "documentation",
+      "kind": "documentation",
+      "bytes": 12292
+    },
+    {
+      "path": "module.ramify",
+      "owner": "ramify",
+      "area": "documentation",
+      "kind": "documentation",
+      "bytes": 8962
+    },
+    {
+      "path": "src/batch-entry.ts",
+      "owner": "ramify",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 968
+    },
+    {
+      "path": "src/batch-process.ts",
+      "owner": "ramify",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 2856
+    },
+    {
+      "path": "src/batch.ts",
+      "owner": "ramify",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 2662
+    },
+    {
+      "path": "src/cli-entry.ts",
+      "owner": "ramify",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 435
+    },
+    {
+      "path": "src/cli-process.ts",
+      "owner": "ramify",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 5464
+    },
+    {
+      "path": "src/client.ts",
+      "owner": "ramify",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 2039
+    },
+    {
+      "path": "src/compiled-entry.ts",
+      "owner": "ramify",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 1180
+    },
+    {
+      "path": "src/daemon-entry.ts",
+      "owner": "ramify",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 4162
+    },
+    {
+      "path": "src/dependency-analyzer-entry.ts",
+      "owner": "ramify",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 2426
+    },
+    {
+      "path": "src/dependency-analyzer-process.ts",
+      "owner": "ramify",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 7761
+    },
+    {
+      "path": "src/explore-launcher.ts",
+      "owner": "ramify",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 3342
+    },
+    {
+      "path": "src/explorer-entry.ts",
+      "owner": "ramify",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 4543
+    },
+    {
+      "path": "src/interfaces/batch.ts",
+      "owner": "ramify",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 539
+    },
+    {
+      "path": "src/interfaces/service.ts",
+      "owner": "ramify",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 8948
+    },
+    {
+      "path": "src/publication-queue.ts",
+      "owner": "ramify",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 829
+    },
+    {
+      "path": "src/ramify",
+      "owner": "ramify",
+      "area": "ordinary",
+      "kind": "resource",
+      "bytes": 648
+    },
+    {
+      "path": "src/report-capacity.ts",
+      "owner": "ramify",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 405
+    },
+    {
+      "path": "src/resident-assembly.ts",
+      "owner": "ramify",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 7580
+    },
+    {
+      "path": "src/resident-budgets.ts",
+      "owner": "ramify",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 1497
+    },
+    {
+      "path": "src/tests/.gitkeep",
+      "owner": "ramify",
+      "area": "tests",
+      "kind": "resource",
+      "bytes": 0
+    },
+    {
+      "path": "src/tests/batch-cli.test.ts",
+      "owner": "ramify",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 12084
+    },
+    {
+      "path": "src/tests/cli-process.test.ts",
+      "owner": "ramify",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 8422
+    },
+    {
+      "path": "src/tests/compiled-client.test.ts",
+      "owner": "ramify",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 12522
+    },
+    {
+      "path": "src/tests/daemon-identity.test.ts",
+      "owner": "ramify",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 1288
+    },
+    {
+      "path": "src/tests/daemon-suspended-shutdown.test.ts",
+      "owner": "ramify",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 2436
+    },
+    {
+      "path": "src/tests/dependency-analyzer-process.test.ts",
+      "owner": "ramify",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 10184
+    },
+    {
+      "path": "src/tests/dependency-diagram-daemon.test.ts",
+      "owner": "ramify",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 14715
+    },
+    {
+      "path": "src/tests/dependency-view-server.test.ts",
+      "owner": "ramify",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 10684
+    },
+    {
+      "path": "src/tests/entry-boundaries.test.ts",
+      "owner": "ramify",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 864
+    },
+    {
+      "path": "src/tests/entry-boundary-cases.ts",
+      "owner": "ramify",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 6780
+    },
+    {
+      "path": "src/tests/explorer-process.test.ts",
+      "owner": "ramify",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 7669
+    },
+    {
+      "path": "src/tests/fixture.ts",
+      "owner": "ramify",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 2113
+    },
+    {
+      "path": "src/tests/launcher-script.test.ts",
+      "owner": "ramify",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 2306
+    },
+    {
+      "path": "src/tests/lifecycle-process-cases.ts",
+      "owner": "ramify",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 8674
+    },
+    {
+      "path": "src/tests/lifecycle-process-fixture.mjs",
+      "owner": "ramify",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 1697
+    },
+    {
+      "path": "src/tests/lifecycle-process.test.ts",
+      "owner": "ramify",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 175
+    },
+    {
+      "path": "src/tests/lifecycle-process.ts",
+      "owner": "ramify",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 10817
+    },
+    {
+      "path": "src/tests/process-probe.mjs",
+      "owner": "ramify",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 7158
+    },
+    {
+      "path": "src/tests/process-tracing.test.ts",
+      "owner": "ramify",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 2835
+    },
+    {
+      "path": "src/tests/process.ts",
+      "owner": "ramify",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 7804
+    },
+    {
+      "path": "src/tests/project-view-reports.test.ts",
+      "owner": "ramify",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 1975
+    },
+    {
+      "path": "src/tests/publication-queue.test.ts",
+      "owner": "ramify",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 1988
+    },
+    {
+      "path": "src/tests/quick-environment.test.ts",
+      "owner": "ramify",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 4829
+    },
+    {
+      "path": "src/tests/quick-environment.ts",
+      "owner": "ramify",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 10167
+    },
+    {
+      "path": "src/tests/resident-assembly.test.ts",
+      "owner": "ramify",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 5319
+    },
+    {
+      "path": "src/tests/resident-cli.test.ts",
+      "owner": "ramify",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 23094
+    },
+    {
+      "path": "subs/analysis/README.md",
+      "owner": "ramify/analysis",
+      "area": "documentation",
+      "kind": "documentation",
+      "bytes": 7560
+    },
+    {
+      "path": "subs/analysis/module.ramify",
+      "owner": "ramify/analysis",
+      "area": "documentation",
+      "kind": "documentation",
+      "bytes": 3952
+    },
+    {
+      "path": "subs/analysis/src/analyze-project.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 479
+    },
+    {
+      "path": "subs/analysis/src/api-view.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 17898
+    },
+    {
+      "path": "subs/analysis/src/architect-render.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 24565
+    },
+    {
+      "path": "subs/analysis/src/architect-view.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 17563
+    },
+    {
+      "path": "subs/analysis/src/change-affinity.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 4370
+    },
+    {
+      "path": "subs/analysis/src/dependency-analyzer.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 12048
+    },
+    {
+      "path": "subs/analysis/src/dependency-diagram.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 10181
+    },
+    {
+      "path": "subs/analysis/src/evaluate-accesses.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 7070
+    },
+    {
+      "path": "subs/analysis/src/feature-titles.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 2881
+    },
+    {
+      "path": "subs/analysis/src/index.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 1548
+    },
+    {
+      "path": "subs/analysis/src/interfaces/analysis.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 6392
+    },
+    {
+      "path": "subs/analysis/src/interfaces/architect-view.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 6474
+    },
+    {
+      "path": "subs/analysis/src/interfaces/dependency-analyzer.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 3045
+    },
+    {
+      "path": "subs/analysis/src/interfaces/dependency-diagram.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 4989
+    },
+    {
+      "path": "subs/analysis/src/interfaces/measurements.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 3317
+    },
+    {
+      "path": "subs/analysis/src/interfaces/modularity.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 15259
+    },
+    {
+      "path": "subs/analysis/src/interfaces/session.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 11714
+    },
+    {
+      "path": "subs/analysis/src/inventory-entry.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 437
+    },
+    {
+      "path": "subs/analysis/src/inventory.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 7417
+    },
+    {
+      "path": "subs/analysis/src/modularity-candidate.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 10233
+    },
+    {
+      "path": "subs/analysis/src/modularity-context.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 15356
+    },
+    {
+      "path": "subs/analysis/src/modularity-graph.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 13212
+    },
+    {
+      "path": "subs/analysis/src/modularity-owner.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 11693
+    },
+    {
+      "path": "subs/analysis/src/modularity.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 8477
+    },
+    {
+      "path": "subs/analysis/src/module-measurements.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 6454
+    },
+    {
+      "path": "subs/analysis/src/report-copy.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 4352
+    },
+    {
+      "path": "subs/analysis/src/report-data.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 2873
+    },
+    {
+      "path": "subs/analysis/src/report.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 20379
+    },
+    {
+      "path": "subs/analysis/src/resolve-project.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 617
+    },
+    {
+      "path": "subs/analysis/src/retained-session.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 413
+    },
+    {
+      "path": "subs/analysis/src/run-analysis.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 16534
+    },
+    {
+      "path": "subs/analysis/src/session-audit.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 3662
+    },
+    {
+      "path": "subs/analysis/src/session-engine.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 47480
+    },
+    {
+      "path": "subs/analysis/src/session-facts.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 16004
+    },
+    {
+      "path": "subs/analysis/src/session-host.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 18041
+    },
+    {
+      "path": "subs/analysis/src/session-messages.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 3122
+    },
+    {
+      "path": "subs/analysis/src/session-processes.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 5626
+    },
+    {
+      "path": "subs/analysis/src/session-revision.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 45492
+    },
+    {
+      "path": "subs/analysis/src/session-source-loader.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 785
+    },
+    {
+      "path": "subs/analysis/src/session-supervisor-entry.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 3606
+    },
+    {
+      "path": "subs/analysis/src/session-supervisor-messages.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 1450
+    },
+    {
+      "path": "subs/analysis/src/session-supervisor.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 7499
+    },
+    {
+      "path": "subs/analysis/src/session-worker.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 4718
+    },
+    {
+      "path": "subs/analysis/src/session.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 2077
+    },
+    {
+      "path": "subs/analysis/src/test-references.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 4431
+    },
+    {
+      "path": "subs/analysis/src/tests/api-view-session.test.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 12265
+    },
+    {
+      "path": "subs/analysis/src/tests/api-view.test.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 26081
+    },
+    {
+      "path": "subs/analysis/src/tests/architect-fixture.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 10526
+    },
+    {
+      "path": "subs/analysis/src/tests/architect-render.test.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 52002
+    },
+    {
+      "path": "subs/analysis/src/tests/architect-view-session.test.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 15760
+    },
+    {
+      "path": "subs/analysis/src/tests/architect-view.test.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 19744
+    },
+    {
+      "path": "subs/analysis/src/tests/change-affinity.test.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 5997
+    },
+    {
+      "path": "subs/analysis/src/tests/dependency-analyzer.test.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 18444
+    },
+    {
+      "path": "subs/analysis/src/tests/dependency-behavior-capability.test.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 8409
+    },
+    {
+      "path": "subs/analysis/src/tests/dependency-diagram.test.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 14800
+    },
+    {
+      "path": "subs/analysis/src/tests/evaluate-accesses.test.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 38455
+    },
+    {
+      "path": "subs/analysis/src/tests/explorer-details.test.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 3556
+    },
+    {
+      "path": "subs/analysis/src/tests/feature-titles.test.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 3647
+    },
+    {
+      "path": "subs/analysis/src/tests/fixtures/architect-view-measured-unreferenced.txt",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "resource",
+      "bytes": 16448
+    },
+    {
+      "path": "subs/analysis/src/tests/fixtures/architect-view-measured.txt",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "resource",
+      "bytes": 16665
+    },
+    {
+      "path": "subs/analysis/src/tests/fixtures/architect-view-unavailable.txt",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "resource",
+      "bytes": 14582
+    },
+    {
+      "path": "subs/analysis/src/tests/inventory.test.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 7425
+    },
+    {
+      "path": "subs/analysis/src/tests/membership-differential.test.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 16835
+    },
+    {
+      "path": "subs/analysis/src/tests/modularity-batch.test.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 5959
+    },
+    {
+      "path": "subs/analysis/src/tests/modularity-candidate.test.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 18582
+    },
+    {
+      "path": "subs/analysis/src/tests/modularity-fixture.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 24647
+    },
+    {
+      "path": "subs/analysis/src/tests/modularity.test.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 25825
+    },
+    {
+      "path": "subs/analysis/src/tests/module-measurements-session.test.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 4010
+    },
+    {
+      "path": "subs/analysis/src/tests/module-measurements.test.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 4731
+    },
+    {
+      "path": "subs/analysis/src/tests/report-capacity.test.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 2418
+    },
+    {
+      "path": "subs/analysis/src/tests/report-copy.test.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 7497
+    },
+    {
+      "path": "subs/analysis/src/tests/report-publication.test.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 9028
+    },
+    {
+      "path": "subs/analysis/src/tests/retained-session.test.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 22722
+    },
+    {
+      "path": "subs/analysis/src/tests/root-resolution.test.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 12353
+    },
+    {
+      "path": "subs/analysis/src/tests/rss-sampling.test.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 7536
+    },
+    {
+      "path": "subs/analysis/src/tests/session-audit.test.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 10717
+    },
+    {
+      "path": "subs/analysis/src/tests/session-input-witness.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 6852
+    },
+    {
+      "path": "subs/analysis/src/tests/session-revision.test.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 73040
+    },
+    {
+      "path": "subs/analysis/src/tests/session-test-fixture.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 9312
+    },
+    {
+      "path": "subs/analysis/src/tests/session-worker-fixture.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 5499
+    },
+    {
+      "path": "subs/analysis/src/tests/session-worker.test.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 26584
+    },
+    {
+      "path": "subs/analysis/src/tests/session.test.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 42834
+    },
+    {
+      "path": "subs/analysis/src/tests/shared-globals.test.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 3631
+    },
+    {
+      "path": "subs/analysis/src/tests/test-references.test.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 12440
+    },
+    {
+      "path": "subs/analysis/src/tests/validation.test.ts",
+      "owner": "ramify/analysis",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 8499
+    },
+    {
+      "path": "subs/analysis/src/validation-entry.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 619
+    },
+    {
+      "path": "subs/analysis/src/validation.ts",
+      "owner": "ramify/analysis",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 9470
+    },
+    {
+      "path": "subs/analysis/subs/descriptions/README.md",
+      "owner": "ramify/analysis/descriptions",
+      "area": "documentation",
+      "kind": "documentation",
+      "bytes": 2488
+    },
+    {
+      "path": "subs/analysis/subs/descriptions/module.ramify",
+      "owner": "ramify/analysis/descriptions",
+      "area": "documentation",
+      "kind": "documentation",
+      "bytes": 400
+    },
+    {
+      "path": "subs/analysis/subs/descriptions/src/interfaces/linking.ts",
+      "owner": "ramify/analysis/descriptions",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 1499
+    },
+    {
+      "path": "subs/analysis/subs/descriptions/src/interfaces/syntax.ts",
+      "owner": "ramify/analysis/descriptions",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 2372
+    },
+    {
+      "path": "subs/analysis/subs/descriptions/src/link.ts",
+      "owner": "ramify/analysis/descriptions",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 12534
+    },
+    {
+      "path": "subs/analysis/subs/descriptions/src/parse.ts",
+      "owner": "ramify/analysis/descriptions",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 10743
+    },
+    {
+      "path": "subs/analysis/subs/descriptions/src/tests/.gitkeep",
+      "owner": "ramify/analysis/descriptions",
+      "area": "tests",
+      "kind": "resource",
+      "bytes": 0
+    },
+    {
+      "path": "subs/analysis/subs/descriptions/src/tests/descriptions.test.ts",
+      "owner": "ramify/analysis/descriptions",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 25607
+    },
+    {
+      "path": "subs/analysis/subs/descriptions/src/tests/grammar.test.ts",
+      "owner": "ramify/analysis/descriptions",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 13272
+    },
+    {
+      "path": "subs/analysis/subs/descriptions/src/tests/linking.test.ts",
+      "owner": "ramify/analysis/descriptions",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 9309
+    },
+    {
+      "path": "subs/analysis/subs/descriptions/src/tests/locations.test.ts",
+      "owner": "ramify/analysis/descriptions",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 5448
+    },
+    {
+      "path": "subs/analysis/subs/descriptions/src/tokenize.ts",
+      "owner": "ramify/analysis/descriptions",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 6137
+    },
+    {
+      "path": "subs/analysis/subs/model/README.md",
+      "owner": "ramify/analysis/model",
+      "area": "documentation",
+      "kind": "documentation",
+      "bytes": 3016
+    },
+    {
+      "path": "subs/analysis/subs/model/module.ramify",
+      "owner": "ramify/analysis/model",
+      "area": "documentation",
+      "kind": "documentation",
+      "bytes": 787
+    },
+    {
+      "path": "subs/analysis/subs/model/src/availability.ts",
+      "owner": "ramify/analysis/model",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 2758
+    },
+    {
+      "path": "subs/analysis/subs/model/src/data.ts",
+      "owner": "ramify/analysis/model",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 3352
+    },
+    {
+      "path": "subs/analysis/subs/model/src/decisions.ts",
+      "owner": "ramify/analysis/model",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 8869
+    },
+    {
+      "path": "subs/analysis/subs/model/src/identity.ts",
+      "owner": "ramify/analysis/model",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 725
+    },
+    {
+      "path": "subs/analysis/subs/model/src/index.ts",
+      "owner": "ramify/analysis/model",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 406
+    },
+    {
+      "path": "subs/analysis/subs/model/src/interfaces/model.ts",
+      "owner": "ramify/analysis/model",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 4325
+    },
+    {
+      "path": "subs/analysis/subs/model/src/model.ts",
+      "owner": "ramify/analysis/model",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 13882
+    },
+    {
+      "path": "subs/analysis/subs/model/src/profiles.ts",
+      "owner": "ramify/analysis/model",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 4238
+    },
+    {
+      "path": "subs/analysis/subs/model/src/registry.ts",
+      "owner": "ramify/analysis/model",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 3358
+    },
+    {
+      "path": "subs/analysis/subs/model/src/tests/.gitkeep",
+      "owner": "ramify/analysis/model",
+      "area": "tests",
+      "kind": "resource",
+      "bytes": 0
+    },
+    {
+      "path": "subs/analysis/subs/model/src/tests/availability.test.ts",
+      "owner": "ramify/analysis/model",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 7240
+    },
+    {
+      "path": "subs/analysis/subs/model/src/tests/available-originals.test.ts",
+      "owner": "ramify/analysis/model",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 14933
+    },
+    {
+      "path": "subs/analysis/subs/model/src/tests/decision-lookups.test.ts",
+      "owner": "ramify/analysis/model",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 3111
+    },
+    {
+      "path": "subs/analysis/subs/model/src/tests/decisions.test.ts",
+      "owner": "ramify/analysis/model",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 10236
+    },
+    {
+      "path": "subs/analysis/subs/model/src/tests/dependency-locations.test.ts",
+      "owner": "ramify/analysis/model",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 1856
+    },
+    {
+      "path": "subs/analysis/subs/model/src/tests/fixtures.ts",
+      "owner": "ramify/analysis/model",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 3349
+    },
+    {
+      "path": "subs/analysis/subs/model/src/tests/identity-model.test.ts",
+      "owner": "ramify/analysis/model",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 11569
+    },
+    {
+      "path": "subs/analysis/subs/model/src/tests/recorded-decisions.ts",
+      "owner": "ramify/analysis/model",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 22872
+    },
+    {
+      "path": "subs/analysis/subs/model/src/tests/registry-profiles.test.ts",
+      "owner": "ramify/analysis/model",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 7863
+    },
+    {
+      "path": "subs/analysis/subs/model/src/tests/tags.test.ts",
+      "owner": "ramify/analysis/model",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 7826
+    },
+    {
+      "path": "subs/analysis/subs/model/src/tests/tree.test.ts",
+      "owner": "ramify/analysis/model",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 2507
+    },
+    {
+      "path": "subs/analysis/subs/project/README.md",
+      "owner": "ramify/analysis/project",
+      "area": "documentation",
+      "kind": "documentation",
+      "bytes": 4696
+    },
+    {
+      "path": "subs/analysis/subs/project/module.ramify",
+      "owner": "ramify/analysis/project",
+      "area": "documentation",
+      "kind": "documentation",
+      "bytes": 570
+    },
+    {
+      "path": "subs/analysis/subs/project/src/capture.ts",
+      "owner": "ramify/analysis/project",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 24709
+    },
+    {
+      "path": "subs/analysis/subs/project/src/configuration-data.ts",
+      "owner": "ramify/analysis/project",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 334
+    },
+    {
+      "path": "subs/analysis/subs/project/src/configuration-helper.ts",
+      "owner": "ramify/analysis/project",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 5149
+    },
+    {
+      "path": "subs/analysis/subs/project/src/configuration.ts",
+      "owner": "ramify/analysis/project",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 9265
+    },
+    {
+      "path": "subs/analysis/subs/project/src/data.ts",
+      "owner": "ramify/analysis/project",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 2290
+    },
+    {
+      "path": "subs/analysis/subs/project/src/generated-path.ts",
+      "owner": "ramify/analysis/project",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 1929
+    },
+    {
+      "path": "subs/analysis/subs/project/src/interfaces/project.ts",
+      "owner": "ramify/analysis/project",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 7877
+    },
+    {
+      "path": "subs/analysis/subs/project/src/inventory.ts",
+      "owner": "ramify/analysis/project",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 11697
+    },
+    {
+      "path": "subs/analysis/subs/project/src/observations.ts",
+      "owner": "ramify/analysis/project",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 4297
+    },
+    {
+      "path": "subs/analysis/subs/project/src/observer.ts",
+      "owner": "ramify/analysis/project",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 22988
+    },
+    {
+      "path": "subs/analysis/subs/project/src/purpose.ts",
+      "owner": "ramify/analysis/project",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 2725
+    },
+    {
+      "path": "subs/analysis/subs/project/src/read-project.ts",
+      "owner": "ramify/analysis/project",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 6819
+    },
+    {
+      "path": "subs/analysis/subs/project/src/references.ts",
+      "owner": "ramify/analysis/project",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 2907
+    },
+    {
+      "path": "subs/analysis/subs/project/src/resolve-root.ts",
+      "owner": "ramify/analysis/project",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 6760
+    },
+    {
+      "path": "subs/analysis/subs/project/src/selection.ts",
+      "owner": "ramify/analysis/project",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 2908
+    },
+    {
+      "path": "subs/analysis/subs/project/src/tests/.gitkeep",
+      "owner": "ramify/analysis/project",
+      "area": "tests",
+      "kind": "resource",
+      "bytes": 0
+    },
+    {
+      "path": "subs/analysis/subs/project/src/tests/capture-retirement.ts",
+      "owner": "ramify/analysis/project",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 2001
+    },
+    {
+      "path": "subs/analysis/subs/project/src/tests/capture.test.ts",
+      "owner": "ramify/analysis/project",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 9797
+    },
+    {
+      "path": "subs/analysis/subs/project/src/tests/fixtures.ts",
+      "owner": "ramify/analysis/project",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 2836
+    },
+    {
+      "path": "subs/analysis/subs/project/src/tests/generated-path.test.ts",
+      "owner": "ramify/analysis/project",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 9930
+    },
+    {
+      "path": "subs/analysis/subs/project/src/tests/input-list.test.ts",
+      "owner": "ramify/analysis/project",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 15372
+    },
+    {
+      "path": "subs/analysis/subs/project/src/tests/observer.test.ts",
+      "owner": "ramify/analysis/project",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 18193
+    },
+    {
+      "path": "subs/analysis/subs/project/src/tests/project.test.ts",
+      "owner": "ramify/analysis/project",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 18038
+    },
+    {
+      "path": "subs/analysis/subs/project/src/tests/purpose.test.ts",
+      "owner": "ramify/analysis/project",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 1860
+    },
+    {
+      "path": "subs/analysis/subs/project/src/tests/references.test.ts",
+      "owner": "ramify/analysis/project",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 6339
+    },
+    {
+      "path": "subs/analysis/subs/project/src/tests/resolve-root.test.ts",
+      "owner": "ramify/analysis/project",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 21636
+    },
+    {
+      "path": "subs/analysis/subs/project/src/tests/sweep.test.ts",
+      "owner": "ramify/analysis/project",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 7462
+    },
+    {
+      "path": "subs/analysis/subs/typescript/README.md",
+      "owner": "ramify/analysis/typescript",
+      "area": "documentation",
+      "kind": "documentation",
+      "bytes": 10737
+    },
+    {
+      "path": "subs/analysis/subs/typescript/module.ramify",
+      "owner": "ramify/analysis/typescript",
+      "area": "documentation",
+      "kind": "documentation",
+      "bytes": 862
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/access-interpreter.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 1234
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/accesses.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 34002
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/behavior-classifier.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 16637
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/behavior-shapes.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 4505
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/bridge.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 18993
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/catalog.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 53405
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/compiler-helper.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 10183
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/descriptions.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 11093
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/export-shapes.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 3584
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/interfaces/dependency-behavior.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 3756
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/interfaces/source.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 12955
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/namespace-uses.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 6550
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/resolution.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 13001
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/retained-source-analysis.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 29985
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/source-analysis.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 1210
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/symbol-details.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 25696
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/synthetic.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 3568
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/test-titles.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 9926
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/tests/access-interpreter.test.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 8612
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/tests/accesses.test.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 14999
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/tests/catalog.test.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 27509
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/tests/compiler-paths.test.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 2054
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/tests/coverage.test.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 13558
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/tests/cyclic-stars.test.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 6470
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/tests/dependency-behavior.test.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 23905
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/tests/descriptions.test.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 13997
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/tests/export-shapes.test.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 20146
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/tests/fixtures.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 16639
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/tests/lifetime.test.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 10071
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/tests/resource-bindings.test.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 6688
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/tests/resource-suffixes.test.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 9247
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/tests/resources.test.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 12155
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/tests/retained-membership.test.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 6774
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/tests/retained-membership.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 14516
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/tests/retained-source-analysis.test.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 33132
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/tests/retention.test.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 4193
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/tests/symbol-details.test.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 19022
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/tests/test-titles.test.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 9738
+    },
+    {
+      "path": "subs/analysis/subs/typescript/src/wire.ts",
+      "owner": "ramify/analysis/typescript",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 4108
+    },
+    {
+      "path": "subs/cli/README.md",
+      "owner": "ramify/cli",
+      "area": "documentation",
+      "kind": "documentation",
+      "bytes": 4693
+    },
+    {
+      "path": "subs/cli/module.ramify",
+      "owner": "ramify/cli",
+      "area": "documentation",
+      "kind": "documentation",
+      "bytes": 275
+    },
+    {
+      "path": "subs/cli/src/arguments.ts",
+      "owner": "ramify/cli",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 9826
+    },
+    {
+      "path": "subs/cli/src/changed-command.ts",
+      "owner": "ramify/cli",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 10537
+    },
+    {
+      "path": "subs/cli/src/check-command.ts",
+      "owner": "ramify/cli",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 6315
+    },
+    {
+      "path": "subs/cli/src/command-support.ts",
+      "owner": "ramify/cli",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 2664
+    },
+    {
+      "path": "subs/cli/src/daemon-command.ts",
+      "owner": "ramify/cli",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 2694
+    },
+    {
+      "path": "subs/cli/src/errors.ts",
+      "owner": "ramify/cli",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 1979
+    },
+    {
+      "path": "subs/cli/src/explore-command.ts",
+      "owner": "ramify/cli",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 3306
+    },
+    {
+      "path": "subs/cli/src/format.ts",
+      "owner": "ramify/cli",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 6356
+    },
+    {
+      "path": "subs/cli/src/index.ts",
+      "owner": "ramify/cli",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 81
+    },
+    {
+      "path": "subs/cli/src/interfaces/cli.ts",
+      "owner": "ramify/cli",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 4396
+    },
+    {
+      "path": "subs/cli/src/materialize-command.ts",
+      "owner": "ramify/cli",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 9035
+    },
+    {
+      "path": "subs/cli/src/measure-command.ts",
+      "owner": "ramify/cli",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 7920
+    },
+    {
+      "path": "subs/cli/src/run-cli.ts",
+      "owner": "ramify/cli",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 3306
+    },
+    {
+      "path": "subs/cli/src/tests/.gitkeep",
+      "owner": "ramify/cli",
+      "area": "tests",
+      "kind": "resource",
+      "bytes": 0
+    },
+    {
+      "path": "subs/cli/src/tests/arguments.test.ts",
+      "owner": "ramify/cli",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 16550
+    },
+    {
+      "path": "subs/cli/src/tests/capabilities.test.ts",
+      "owner": "ramify/cli",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 661
+    },
+    {
+      "path": "subs/cli/src/tests/changed-cleanup.ts",
+      "owner": "ramify/cli",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 9305
+    },
+    {
+      "path": "subs/cli/src/tests/changed-command.test.ts",
+      "owner": "ramify/cli",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 18629
+    },
+    {
+      "path": "subs/cli/src/tests/errors.test.ts",
+      "owner": "ramify/cli",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 5735
+    },
+    {
+      "path": "subs/cli/src/tests/exhausted-recovery.ts",
+      "owner": "ramify/cli",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 8192
+    },
+    {
+      "path": "subs/cli/src/tests/explore-command.test.ts",
+      "owner": "ramify/cli",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 4786
+    },
+    {
+      "path": "subs/cli/src/tests/materialize-command.test.ts",
+      "owner": "ramify/cli",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 10416
+    },
+    {
+      "path": "subs/cli/src/tests/measure-command.test.ts",
+      "owner": "ramify/cli",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 11499
+    },
+    {
+      "path": "subs/cli/src/watch-command.ts",
+      "owner": "ramify/cli",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 7867
+    },
+    {
+      "path": "subs/daemon/README.md",
+      "owner": "ramify/daemon",
+      "area": "documentation",
+      "kind": "documentation",
+      "bytes": 4633
+    },
+    {
+      "path": "subs/daemon/module.ramify",
+      "owner": "ramify/daemon",
+      "area": "documentation",
+      "kind": "documentation",
+      "bytes": 1652
+    },
+    {
+      "path": "subs/daemon/src/api-view-documents.ts",
+      "owner": "ramify/daemon",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 11911
+    },
+    {
+      "path": "subs/daemon/src/api-view-publisher.ts",
+      "owner": "ramify/daemon",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 38789
+    },
+    {
+      "path": "subs/daemon/src/client-entry.ts",
+      "owner": "ramify/daemon",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 322
+    },
+    {
+      "path": "subs/daemon/src/codec.ts",
+      "owner": "ramify/daemon",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 16401
+    },
+    {
+      "path": "subs/daemon/src/connect-daemon.ts",
+      "owner": "ramify/daemon",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 11132
+    },
+    {
+      "path": "subs/daemon/src/connection.ts",
+      "owner": "ramify/daemon",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 9964
+    },
+    {
+      "path": "subs/daemon/src/context-types.ts",
+      "owner": "ramify/daemon",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 66
+    },
+    {
+      "path": "subs/daemon/src/daemon-log.ts",
+      "owner": "ramify/daemon",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 2050
+    },
+    {
+      "path": "subs/daemon/src/discovery.ts",
+      "owner": "ramify/daemon",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 10421
+    },
+    {
+      "path": "subs/daemon/src/filesystem-watcher.ts",
+      "owner": "ramify/daemon",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 9421
+    },
+    {
+      "path": "subs/daemon/src/host-counters.ts",
+      "owner": "ramify/daemon",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 519
+    },
+    {
+      "path": "subs/daemon/src/host.ts",
+      "owner": "ramify/daemon",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 11926
+    },
+    {
+      "path": "subs/daemon/src/interfaces/daemon.ts",
+      "owner": "ramify/daemon",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 11845
+    },
+    {
+      "path": "subs/daemon/src/launcher.ts",
+      "owner": "ramify/daemon",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 11575
+    },
+    {
+      "path": "subs/daemon/src/measure-response.ts",
+      "owner": "ramify/daemon",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 4322
+    },
+    {
+      "path": "subs/daemon/src/measurements.ts",
+      "owner": "ramify/daemon",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 2352
+    },
+    {
+      "path": "subs/daemon/src/outbound.ts",
+      "owner": "ramify/daemon",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 6558
+    },
+    {
+      "path": "subs/daemon/src/records.ts",
+      "owner": "ramify/daemon",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 6123
+    },
+    {
+      "path": "subs/daemon/src/request-identities.ts",
+      "owner": "ramify/daemon",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 624
+    },
+    {
+      "path": "subs/daemon/src/service.ts",
+      "owner": "ramify/daemon",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 44004
+    },
+    {
+      "path": "subs/daemon/src/start-coordination.ts",
+      "owner": "ramify/daemon",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 3088
+    },
+    {
+      "path": "subs/daemon/src/start-daemon.ts",
+      "owner": "ramify/daemon",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 5667
+    },
+    {
+      "path": "subs/daemon/src/system-clock.ts",
+      "owner": "ramify/daemon",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 1032
+    },
+    {
+      "path": "subs/daemon/src/tests/api-view-documents.test.ts",
+      "owner": "ramify/daemon",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 15224
+    },
+    {
+      "path": "subs/daemon/src/tests/api-view-fixtures.ts",
+      "owner": "ramify/daemon",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 2666
+    },
+    {
+      "path": "subs/daemon/src/tests/api-view-publisher-crash-recovery.test.ts",
+      "owner": "ramify/daemon",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 7871
+    },
+    {
+      "path": "subs/daemon/src/tests/api-view-publisher.test.ts",
+      "owner": "ramify/daemon",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 26324
+    },
+    {
+      "path": "subs/daemon/src/tests/architect-view-fixtures.ts",
+      "owner": "ramify/daemon",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 3559
+    },
+    {
+      "path": "subs/daemon/src/tests/architect-view-publisher.test.ts",
+      "owner": "ramify/daemon",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 30638
+    },
+    {
+      "path": "subs/daemon/src/tests/codec.test.ts",
+      "owner": "ramify/daemon",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 12144
+    },
+    {
+      "path": "subs/daemon/src/tests/connect.test.ts",
+      "owner": "ramify/daemon",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 5979
+    },
+    {
+      "path": "subs/daemon/src/tests/crash-recovery-child.ts",
+      "owner": "ramify/daemon",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 3163
+    },
+    {
+      "path": "subs/daemon/src/tests/daemon-log.test.ts",
+      "owner": "ramify/daemon",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 4594
+    },
+    {
+      "path": "subs/daemon/src/tests/discovery-fixture.ts",
+      "owner": "ramify/daemon",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 4598
+    },
+    {
+      "path": "subs/daemon/src/tests/discovery.test.ts",
+      "owner": "ramify/daemon",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 17244
+    },
+    {
+      "path": "subs/daemon/src/tests/host.test.ts",
+      "owner": "ramify/daemon",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 3080
+    },
+    {
+      "path": "subs/daemon/src/tests/ipc-fixture.ts",
+      "owner": "ramify/daemon",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 5833
+    },
+    {
+      "path": "subs/daemon/src/tests/ipc.test.ts",
+      "owner": "ramify/daemon",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 25874
+    },
+    {
+      "path": "subs/daemon/src/tests/launcher.test.ts",
+      "owner": "ramify/daemon",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 9640
+    },
+    {
+      "path": "subs/daemon/src/tests/measure-driver.ts",
+      "owner": "ramify/daemon",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 4166
+    },
+    {
+      "path": "subs/daemon/src/tests/measure-service.test.ts",
+      "owner": "ramify/daemon",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 7709
+    },
+    {
+      "path": "subs/daemon/src/tests/measurements.test.ts",
+      "owner": "ramify/daemon",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 4514
+    },
+    {
+      "path": "subs/daemon/src/tests/outbound.test.ts",
+      "owner": "ramify/daemon",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 12556
+    },
+    {
+      "path": "subs/daemon/src/tests/request-identities.test.ts",
+      "owner": "ramify/daemon",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 742
+    },
+    {
+      "path": "subs/daemon/src/tests/service.test.ts",
+      "owner": "ramify/daemon",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 39185
+    },
+    {
+      "path": "subs/daemon/src/tests/session-counters.test.ts",
+      "owner": "ramify/daemon",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 14609
+    },
+    {
+      "path": "subs/daemon/src/tests/socket-fixture.ts",
+      "owner": "ramify/daemon",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 2034
+    },
+    {
+      "path": "subs/daemon/src/tests/system-clock.test.ts",
+      "owner": "ramify/daemon",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 2805
+    },
+    {
+      "path": "subs/daemon/src/tests/validation.test.ts",
+      "owner": "ramify/daemon",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 14016
+    },
+    {
+      "path": "subs/daemon/src/tests/watcher.test.ts",
+      "owner": "ramify/daemon",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 15409
+    },
+    {
+      "path": "subs/daemon/src/validation.ts",
+      "owner": "ramify/daemon",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 10115
+    },
+    {
+      "path": "subs/daemon/subs/contexts/README.md",
+      "owner": "ramify/daemon/contexts",
+      "area": "documentation",
+      "kind": "documentation",
+      "bytes": 3319
+    },
+    {
+      "path": "subs/daemon/subs/contexts/module.ramify",
+      "owner": "ramify/daemon/contexts",
+      "area": "documentation",
+      "kind": "documentation",
+      "bytes": 391
+    },
+    {
+      "path": "subs/daemon/subs/contexts/src/context-manager.ts",
+      "owner": "ramify/daemon/contexts",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 84298
+    },
+    {
+      "path": "subs/daemon/subs/contexts/src/context.ts",
+      "owner": "ramify/daemon/contexts",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 5086
+    },
+    {
+      "path": "subs/daemon/subs/contexts/src/history.ts",
+      "owner": "ramify/daemon/contexts",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 5366
+    },
+    {
+      "path": "subs/daemon/subs/contexts/src/interfaces/contexts.ts",
+      "owner": "ramify/daemon/contexts",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 19037
+    },
+    {
+      "path": "subs/daemon/subs/contexts/src/queue.ts",
+      "owner": "ramify/daemon/contexts",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 3669
+    },
+    {
+      "path": "subs/daemon/subs/contexts/src/tests/api-view.test.ts",
+      "owner": "ramify/daemon/contexts",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 16179
+    },
+    {
+      "path": "subs/daemon/subs/contexts/src/tests/context-manager.test.ts",
+      "owner": "ramify/daemon/contexts",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 25523
+    },
+    {
+      "path": "subs/daemon/subs/contexts/src/tests/controlled-ports.test.ts",
+      "owner": "ramify/daemon/contexts",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 7072
+    },
+    {
+      "path": "subs/daemon/subs/contexts/src/tests/controlled-ports.ts",
+      "owner": "ramify/daemon/contexts",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 4048
+    },
+    {
+      "path": "subs/daemon/subs/contexts/src/tests/covering.test.ts",
+      "owner": "ramify/daemon/contexts",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 49308
+    },
+    {
+      "path": "subs/daemon/subs/contexts/src/tests/deadlines.test.ts",
+      "owner": "ramify/daemon/contexts",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 5668
+    },
+    {
+      "path": "subs/daemon/subs/contexts/src/tests/dependency-diagram.test.ts",
+      "owner": "ramify/daemon/contexts",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 24459
+    },
+    {
+      "path": "subs/daemon/subs/contexts/src/tests/explorer-details.test.ts",
+      "owner": "ramify/daemon/contexts",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 2516
+    },
+    {
+      "path": "subs/daemon/subs/contexts/src/tests/history-fixture.ts",
+      "owner": "ramify/daemon/contexts",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 1473
+    },
+    {
+      "path": "subs/daemon/subs/contexts/src/tests/history.test.ts",
+      "owner": "ramify/daemon/contexts",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 9139
+    },
+    {
+      "path": "subs/daemon/subs/contexts/src/tests/hot-budget.test.ts",
+      "owner": "ramify/daemon/contexts",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 13803
+    },
+    {
+      "path": "subs/daemon/subs/contexts/src/tests/root-resolution.test.ts",
+      "owner": "ramify/daemon/contexts",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 10452
+    },
+    {
+      "path": "subs/daemon/subs/contexts/src/tests/scripted-driver.ts",
+      "owner": "ramify/daemon/contexts",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 17347
+    },
+    {
+      "path": "subs/daemon/subs/contexts/src/tests/session-driver.test.ts",
+      "owner": "ramify/daemon/contexts",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 13465
+    },
+    {
+      "path": "subs/daemon/subs/contexts/src/tests/session-fixture.ts",
+      "owner": "ramify/daemon/contexts",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 2789
+    },
+    {
+      "path": "subs/daemon/subs/contexts/src/tests/tokens.test.ts",
+      "owner": "ramify/daemon/contexts",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 9599
+    },
+    {
+      "path": "subs/daemon/subs/contexts/src/tokens.ts",
+      "owner": "ramify/daemon/contexts",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 4394
+    },
+    {
+      "path": "subs/explorer/README.md",
+      "owner": "ramify/explorer",
+      "area": "documentation",
+      "kind": "documentation",
+      "bytes": 711
+    },
+    {
+      "path": "subs/explorer/module.ramify",
+      "owner": "ramify/explorer",
+      "area": "documentation",
+      "kind": "documentation",
+      "bytes": 267
+    },
+    {
+      "path": "subs/explorer/src/HomePage.tsx",
+      "owner": "ramify/explorer",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 2304
+    },
+    {
+      "path": "subs/explorer/src/ModuleTreePage.tsx",
+      "owner": "ramify/explorer",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 4212
+    },
+    {
+      "path": "subs/explorer/src/ProjectExplorerPage.tsx",
+      "owner": "ramify/explorer",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 11527
+    },
+    {
+      "path": "subs/explorer/src/app-shell.css",
+      "owner": "ramify/explorer",
+      "area": "ordinary",
+      "kind": "resource",
+      "bytes": 149
+    },
+    {
+      "path": "subs/explorer/src/browser-app.tsx",
+      "owner": "ramify/explorer",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 2176
+    },
+    {
+      "path": "subs/explorer/src/browser-entry.tsx",
+      "owner": "ramify/explorer",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 407
+    },
+    {
+      "path": "subs/explorer/src/published-dependency-view.ts",
+      "owner": "ramify/explorer",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 6746
+    },
+    {
+      "path": "subs/explorer/src/published-project-view.ts",
+      "owner": "ramify/explorer",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 6842
+    },
+    {
+      "path": "subs/explorer/src/revision-freshness.ts",
+      "owner": "ramify/explorer",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 860
+    },
+    {
+      "path": "subs/explorer/src/tests/HomePage.test.tsx",
+      "owner": "ramify/explorer",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 2963
+    },
+    {
+      "path": "subs/explorer/src/tests/ModuleTreePage.test.tsx",
+      "owner": "ramify/explorer",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 11713
+    },
+    {
+      "path": "subs/explorer/src/tests/ProjectExplorerFocus.test.tsx",
+      "owner": "ramify/explorer",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 6489
+    },
+    {
+      "path": "subs/explorer/src/tests/ProjectExplorerPage.test.tsx",
+      "owner": "ramify/explorer",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 31046
+    },
+    {
+      "path": "subs/explorer/src/tests/real-router-model.ts",
+      "owner": "ramify/explorer",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 1733
+    },
+    {
+      "path": "subs/explorer/src/tests/revision-freshness.test.ts",
+      "owner": "ramify/explorer",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 1166
+    },
+    {
+      "path": "subs/integration-tests/README.md",
+      "owner": "ramify/integration-tests",
+      "area": "documentation",
+      "kind": "documentation",
+      "bytes": 94
+    },
+    {
+      "path": "subs/integration-tests/module.ramify",
+      "owner": "ramify/integration-tests",
+      "area": "documentation",
+      "kind": "documentation",
+      "bytes": 65
+    },
+    {
+      "path": "subs/integration-tests/src/browser-acceptance.ts",
+      "owner": "ramify/integration-tests",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 173589
+    },
+    {
+      "path": "subs/integration-tests/src/explorer-router.test.ts",
+      "owner": "ramify/integration-tests",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 19844
+    },
+    {
+      "path": "subs/integration-tests/src/project-view-projection.test.ts",
+      "owner": "ramify/integration-tests",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 1071
+    },
+    {
+      "path": "subs/presentation/README.md",
+      "owner": "ramify/presentation",
+      "area": "documentation",
+      "kind": "documentation",
+      "bytes": 1194
+    },
+    {
+      "path": "subs/presentation/module.ramify",
+      "owner": "ramify/presentation",
+      "area": "documentation",
+      "kind": "documentation",
+      "bytes": 3148
+    },
+    {
+      "path": "subs/presentation/src/FocusDiagram.tsx",
+      "owner": "ramify/presentation",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 6132
+    },
+    {
+      "path": "subs/presentation/src/ModelDiagram.tsx",
+      "owner": "ramify/presentation",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 60429
+    },
+    {
+      "path": "subs/presentation/src/TreeDiagram.tsx",
+      "owner": "ramify/presentation",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 3344
+    },
+    {
+      "path": "subs/presentation/src/diagram-definition.ts",
+      "owner": "ramify/presentation",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 9515
+    },
+    {
+      "path": "subs/presentation/src/diagrams/example1.ts",
+      "owner": "ramify/presentation",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 8329
+    },
+    {
+      "path": "subs/presentation/src/diagrams/example1a.ts",
+      "owner": "ramify/presentation",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 3516
+    },
+    {
+      "path": "subs/presentation/src/diagrams/example1b.ts",
+      "owner": "ramify/presentation",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 3809
+    },
+    {
+      "path": "subs/presentation/src/diagrams/example2.ts",
+      "owner": "ramify/presentation",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 4412
+    },
+    {
+      "path": "subs/presentation/src/diagrams/example3.ts",
+      "owner": "ramify/presentation",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 6168
+    },
+    {
+      "path": "subs/presentation/src/diagrams/example4.ts",
+      "owner": "ramify/presentation",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 6033
+    },
+    {
+      "path": "subs/presentation/src/diagrams/fixture-model.ts",
+      "owner": "ramify/presentation",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 3359
+    },
+    {
+      "path": "subs/presentation/src/diagrams/series.ts",
+      "owner": "ramify/presentation",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 5740
+    },
+    {
+      "path": "subs/presentation/src/diagrams/shop-tree.ts",
+      "owner": "ramify/presentation",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 4753
+    },
+    {
+      "path": "subs/presentation/src/diagrams/shop.ts",
+      "owner": "ramify/presentation",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 10632
+    },
+    {
+      "path": "subs/presentation/src/focus-diagram.ts",
+      "owner": "ramify/presentation",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 11777
+    },
+    {
+      "path": "subs/presentation/src/index.ts",
+      "owner": "ramify/presentation",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 1654
+    },
+    {
+      "path": "subs/presentation/src/layout-chords.ts",
+      "owner": "ramify/presentation",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 7050
+    },
+    {
+      "path": "subs/presentation/src/layout-lanes.ts",
+      "owner": "ramify/presentation",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 18382
+    },
+    {
+      "path": "subs/presentation/src/layout-legend.ts",
+      "owner": "ramify/presentation",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 4218
+    },
+    {
+      "path": "subs/presentation/src/layout-nodes.ts",
+      "owner": "ramify/presentation",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 27771
+    },
+    {
+      "path": "subs/presentation/src/layout.ts",
+      "owner": "ramify/presentation",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 8325
+    },
+    {
+      "path": "subs/presentation/src/model-access.ts",
+      "owner": "ramify/presentation",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 7629
+    },
+    {
+      "path": "subs/presentation/src/tests/.gitkeep",
+      "owner": "ramify/presentation",
+      "area": "tests",
+      "kind": "resource",
+      "bytes": 0
+    },
+    {
+      "path": "subs/presentation/src/tests/emitted-diagrams.test.ts",
+      "owner": "ramify/presentation",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 6373
+    },
+    {
+      "path": "subs/presentation/src/tests/example1-stages.test.ts",
+      "owner": "ramify/presentation",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 4175
+    },
+    {
+      "path": "subs/presentation/src/tests/example2.test.ts",
+      "owner": "ramify/presentation",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 4195
+    },
+    {
+      "path": "subs/presentation/src/tests/example3.test.ts",
+      "owner": "ramify/presentation",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 8594
+    },
+    {
+      "path": "subs/presentation/src/tests/example4.test.ts",
+      "owner": "ramify/presentation",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 7353
+    },
+    {
+      "path": "subs/presentation/src/tests/focus-diagram.test.ts",
+      "owner": "ramify/presentation",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 10204
+    },
+    {
+      "path": "subs/presentation/src/tests/interaction.test.ts",
+      "owner": "ramify/presentation",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 25717
+    },
+    {
+      "path": "subs/presentation/src/tests/layout.test.ts",
+      "owner": "ramify/presentation",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 23588
+    },
+    {
+      "path": "subs/presentation/src/tests/model-access.test.ts",
+      "owner": "ramify/presentation",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 3482
+    },
+    {
+      "path": "subs/presentation/src/tests/render.test.ts",
+      "owner": "ramify/presentation",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 13076
+    },
+    {
+      "path": "subs/presentation/src/tests/tree-diagram.test.ts",
+      "owner": "ramify/presentation",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 10202
+    },
+    {
+      "path": "subs/presentation/src/tests/validate.test.ts",
+      "owner": "ramify/presentation",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 12817
+    },
+    {
+      "path": "subs/presentation/src/theme.ts",
+      "owner": "ramify/presentation",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 5422
+    },
+    {
+      "path": "subs/presentation/src/tree-diagram.ts",
+      "owner": "ramify/presentation",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 17696
+    },
+    {
+      "path": "subs/presentation/src/tree-render.tsx",
+      "owner": "ramify/presentation",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 5720
+    },
+    {
+      "path": "subs/presentation/src/validate.ts",
+      "owner": "ramify/presentation",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 15949
+    },
+    {
+      "path": "subs/presentation/subs/layout/README.md",
+      "owner": "ramify/presentation/layout",
+      "area": "documentation",
+      "kind": "documentation",
+      "bytes": 1019
+    },
+    {
+      "path": "subs/presentation/subs/layout/module.ramify",
+      "owner": "ramify/presentation/layout",
+      "area": "documentation",
+      "kind": "documentation",
+      "bytes": 1105
+    },
+    {
+      "path": "subs/presentation/subs/layout/src/bounds.ts",
+      "owner": "ramify/presentation/layout",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 510
+    },
+    {
+      "path": "subs/presentation/subs/layout/src/chord-placement.ts",
+      "owner": "ramify/presentation/layout",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 7026
+    },
+    {
+      "path": "subs/presentation/subs/layout/src/focus-placement.ts",
+      "owner": "ramify/presentation/layout",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 2057
+    },
+    {
+      "path": "subs/presentation/subs/layout/src/geometry.ts",
+      "owner": "ramify/presentation/layout",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 8208
+    },
+    {
+      "path": "subs/presentation/subs/layout/src/index.ts",
+      "owner": "ramify/presentation/layout",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 654
+    },
+    {
+      "path": "subs/presentation/subs/layout/src/interfaces/layout.ts",
+      "owner": "ramify/presentation/layout",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 1660
+    },
+    {
+      "path": "subs/presentation/subs/layout/src/lane-placement.ts",
+      "owner": "ramify/presentation/layout",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 2068
+    },
+    {
+      "path": "subs/presentation/subs/layout/src/legend-placement.ts",
+      "owner": "ramify/presentation/layout",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 1432
+    },
+    {
+      "path": "subs/presentation/subs/layout/src/node-placement.ts",
+      "owner": "ramify/presentation/layout",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 5407
+    },
+    {
+      "path": "subs/presentation/subs/layout/src/tests/.gitkeep",
+      "owner": "ramify/presentation/layout",
+      "area": "tests",
+      "kind": "resource",
+      "bytes": 0
+    },
+    {
+      "path": "subs/presentation/subs/layout/src/tests/placement.test.ts",
+      "owner": "ramify/presentation/layout",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 7565
+    },
+    {
+      "path": "subs/presentation/subs/layout/src/tests/viewport.test.ts",
+      "owner": "ramify/presentation/layout",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 3833
+    },
+    {
+      "path": "subs/presentation/subs/layout/src/tree-placement.ts",
+      "owner": "ramify/presentation/layout",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 4327
+    },
+    {
+      "path": "subs/presentation/subs/layout/src/viewport.ts",
+      "owner": "ramify/presentation/layout",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 4486
+    },
+    {
+      "path": "subs/presentation/subs/project-view/README.md",
+      "owner": "ramify/presentation/project-view",
+      "area": "documentation",
+      "kind": "documentation",
+      "bytes": 1341
+    },
+    {
+      "path": "subs/presentation/subs/project-view/module.ramify",
+      "owner": "ramify/presentation/project-view",
+      "area": "documentation",
+      "kind": "documentation",
+      "bytes": 1170
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/ExportList.tsx",
+      "owner": "ramify/presentation/project-view",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 7428
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/ModuleGraphLegend.tsx",
+      "owner": "ramify/presentation/project-view",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 3065
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/ModuleGraphRadial.tsx",
+      "owner": "ramify/presentation/project-view",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 15944
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/ModuleTreeView.tsx",
+      "owner": "ramify/presentation/project-view",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 24216
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/ProjectExplorerView.tsx",
+      "owner": "ramify/presentation/project-view",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 57742
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/auto-fit.ts",
+      "owner": "ramify/presentation/project-view",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 2297
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/dependency-graph.ts",
+      "owner": "ramify/presentation/project-view",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 15958
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/interfaces/dependency-view.ts",
+      "owner": "ramify/presentation/project-view",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 4334
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/interfaces/project-view.ts",
+      "owner": "ramify/presentation/project-view",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 4577
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/module-tree.css",
+      "owner": "ramify/presentation/project-view",
+      "area": "ordinary",
+      "kind": "resource",
+      "bytes": 3570
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/module-tree.ts",
+      "owner": "ramify/presentation/project-view",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 5793
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/moduleGraphShared.ts",
+      "owner": "ramify/presentation/project-view",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 5386
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/moduleTypePresentation.ts",
+      "owner": "ramify/presentation/project-view",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 2197
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/project-view.css",
+      "owner": "ramify/presentation/project-view",
+      "area": "ordinary",
+      "kind": "resource",
+      "bytes": 19125
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/styles.d.ts",
+      "owner": "ramify/presentation/project-view",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 24
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/tests/ModuleGraph.test.tsx",
+      "owner": "ramify/presentation/project-view",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 22767
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/tests/ModuleTreeView.test.tsx",
+      "owner": "ramify/presentation/project-view",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 11248
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/tests/ProjectExplorerView.test.tsx",
+      "owner": "ramify/presentation/project-view",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 104378
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/tests/auto-fit.test.tsx",
+      "owner": "ramify/presentation/project-view",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 3026
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/tests/dependency-fixtures.ts",
+      "owner": "ramify/presentation/project-view",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 23069
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/tests/fixtures/dependency-models.json",
+      "owner": "ramify/presentation/project-view",
+      "area": "tests",
+      "kind": "resource",
+      "bytes": 26900
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/tests/module-tree-fixture.ts",
+      "owner": "ramify/presentation/project-view",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 4470
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/tests/module-tree.test.ts",
+      "owner": "ramify/presentation/project-view",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 3802
+    },
+    {
+      "path": "subs/service-api/README.md",
+      "owner": "ramify/service-api",
+      "area": "documentation",
+      "kind": "documentation",
+      "bytes": 615
+    },
+    {
+      "path": "subs/service-api/module.ramify",
+      "owner": "ramify/service-api",
+      "area": "documentation",
+      "kind": "documentation",
+      "bytes": 831
+    },
+    {
+      "path": "subs/service-api/src/dependency-model.ts",
+      "owner": "ramify/service-api",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 10058
+    },
+    {
+      "path": "subs/service-api/src/dependency-view.ts",
+      "owner": "ramify/service-api",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 9639
+    },
+    {
+      "path": "subs/service-api/src/interfaces/explorer-dependencies.ts",
+      "owner": "ramify/service-api",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 4783
+    },
+    {
+      "path": "subs/service-api/src/interfaces/explorer-service.ts",
+      "owner": "ramify/service-api",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 2338
+    },
+    {
+      "path": "subs/service-api/src/project-binding.ts",
+      "owner": "ramify/service-api",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 11324
+    },
+    {
+      "path": "subs/service-api/src/project-view.ts",
+      "owner": "ramify/service-api",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 17658
+    },
+    {
+      "path": "subs/service-api/src/router.ts",
+      "owner": "ramify/service-api",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 6571
+    },
+    {
+      "path": "subs/service-api/src/tests/dependency-model.test.ts",
+      "owner": "ramify/service-api",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 15776
+    },
+    {
+      "path": "subs/service-api/src/tests/dependency-view.test.ts",
+      "owner": "ramify/service-api",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 14364
+    },
+    {
+      "path": "subs/service-api/src/tests/project-binding-fakes.ts",
+      "owner": "ramify/service-api",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 11462
+    },
+    {
+      "path": "subs/service-api/src/tests/project-binding.test.ts",
+      "owner": "ramify/service-api",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 19132
+    },
+    {
+      "path": "subs/service-api/src/tests/project-view.test.ts",
+      "owner": "ramify/service-api",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 17664
+    },
+    {
+      "path": "subs/service-api/src/tests/web-launcher-fixture.mjs",
+      "owner": "ramify/service-api",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 2178
+    },
+    {
+      "path": "subs/service-api/src/tests/web-launcher.test.ts",
+      "owner": "ramify/service-api",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 4348
+    },
+    {
+      "path": "subs/service-api/src/tests/web-process.test.ts",
+      "owner": "ramify/service-api",
+      "area": "tests",
+      "kind": "source",
+      "bytes": 11177
+    },
+    {
+      "path": "subs/service-api/src/web-discovery.ts",
+      "owner": "ramify/service-api",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 6831
+    },
+    {
+      "path": "subs/service-api/src/web-launcher.ts",
+      "owner": "ramify/service-api",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 7859
+    },
+    {
+      "path": "subs/service-api/src/web-process.ts",
+      "owner": "ramify/service-api",
+      "area": "ordinary",
+      "kind": "source",
+      "bytes": 8711
+    }
+  ],
+  "outsideModuleFiles": []
+}

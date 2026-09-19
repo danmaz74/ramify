@@ -212,6 +212,14 @@ export function createScriptedDriver() {
             modules: [], symbols: [], tests: [],
             counts: { coverage: 0, detailsUnavailable: 0, unknownShapes: 0, dynamicTitles: 0, testsUnavailable: 0, cut: 0 }, bytes: 0 } };
         },
+        async measurements(sequence, runControl) {
+          if (runControl?.signal?.aborted) return { status: 'cancelled' };
+          if (!current || sequence !== current.sequence) {
+            return { status: 'unavailable', reason: 'invalid-revision', message: `Sequence ${sequence} is not current` };
+          }
+          return { status: 'measured', measurements: { sequence, inputId: current.inputId,
+            modules: [], files: [], outsideModuleFiles: [] } };
+        },
         async explorerDetails(sequence, requests, runControl) {
           explorerDetailsCalls.push({ sequence, requests });
           if (runControl?.signal?.aborted) return { status: 'cancelled' };

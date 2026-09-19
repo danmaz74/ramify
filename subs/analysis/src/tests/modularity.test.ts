@@ -223,11 +223,15 @@ describe('modularity projection: declared ownership', () => {
 
   it('sums context size for exact owners and subtrees, including resources of the filter classification', () => {
     expect(measured(owner(production, 'app/ui').context.subtree)).toEqual({
-      sourceFiles: 3, sourceBytes: 465, resourceFiles: 1, resourceBytes: 7, originals: 4, exposedOriginals: 3, accessOccurrences: 4 });
+      sourceFiles: 3, sourceBytes: 465, resourceFiles: 1, resourceBytes: 7, documentation: { files: 4, bytes: 60 },
+      originals: 4, exposedOriginals: 3, accessOccurrences: 4 });
     expect(measured(owner(production, 'app/core').context.exact)).toEqual({
-      sourceFiles: 2, sourceBytes: 220, resourceFiles: 0, resourceBytes: 0, originals: 4, exposedOriginals: 4, accessOccurrences: 2 });
+      sourceFiles: 2, sourceBytes: 220, resourceFiles: 0, resourceBytes: 0, documentation: { files: 2, bytes: 30 },
+      originals: 4, exposedOriginals: 4, accessOccurrences: 2 });
     expect(measured(owner(test, 'app/core').context.exact)).toEqual({
-      sourceFiles: 2, sourceBytes: 330, resourceFiles: 0, resourceBytes: 0, originals: 1, exposedOriginals: 1, accessOccurrences: 1 });
+      sourceFiles: 2, sourceBytes: 330, resourceFiles: 0, resourceBytes: 0, documentation: { files: 2, bytes: 30 },
+      originals: 1, exposedOriginals: 1, accessOccurrences: 1 });
+    expect(measured(owner(test, 'app/tools').context.exact).documentation).toEqual({ files: 1, bytes: 10 });
   });
 });
 
@@ -362,6 +366,8 @@ describe('modularity projection: availability and determinism', () => {
     ]) {
       expect(projectModularity({ revision: 'r', report: incomplete, limits })).toMatchObject({ status: 'unavailable', reason: 'analysis-incomplete' });
     }
+    expect(projectModularity({ revision: 'r', report: { ...report, snapshot: { ...report.snapshot!, inputs: [] } }, limits }))
+      .toMatchObject({ status: 'unavailable', reason: 'analysis-incomplete', message: expect.stringContaining('description input') });
     const failedCheck = projectModularity({ revision: 'r', report: { ...report, outcome: { ...report.outcome, check: 'failed' } }, limits });
     expect(failedCheck.status === 'projected' && failedCheck.report.provenance.check).toBe('failed');
     expect(projectModularity({ revision: 'r', report, limits: { ...limits, maxReportBytes: 100 } }))

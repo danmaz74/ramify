@@ -28,14 +28,17 @@ export interface QuickEnvironment {
 /** Real service and analysis, with only time, watching and transport controlled. */
 export async function createQuickEnvironment(options: Partial<ContextBudgets> = {},
   fixture: { readonly instance?: DaemonInstance; readonly driver?: AnalysisDriver; readonly publisher?: ApiViewPublisher;
-    readonly dependencyDiagrams?: DependencyDiagramRunner } = {}): Promise<QuickEnvironment> {
+    readonly dependencyDiagrams?: DependencyDiagramRunner; readonly architectMetricsPolicy?: 'measure' | 'omit';
+    readonly maxResponseBytes?: number } = {}): Promise<QuickEnvironment> {
   const watcher = createControlledWatcher(), clock = createControlledClock(Date.now());
   const instance = fixture.instance ?? { instanceId: randomUUID(), pid: process.pid, version: '0.0.0',
     engine: 'ramify.ts@0.0.0+typescript@7.0.2', buildKey: '0000000000000000' };
   const startedAt = clock.now();
   const publisher = fixture.publisher ?? createFilesystemApiViewPublisher(residentPublishLimits);
   const assembly = { watcher, clock, budgets: { ...contextBudgets, ...options }, instance, log() {}, publisher,
-    ...(fixture.dependencyDiagrams ? { dependencyDiagrams: fixture.dependencyDiagrams } : {}) };
+    maxResponseBytes: fixture.maxResponseBytes ?? daemonBudgets.maxResponseBytes,
+    ...(fixture.dependencyDiagrams ? { dependencyDiagrams: fixture.dependencyDiagrams } : {}),
+    ...(fixture.architectMetricsPolicy ? { architectMetricsPolicy: fixture.architectMetricsPolicy } : {}) };
   const service = fixture.driver ? createDaemonService({ ...assembly, driver: fixture.driver }) : assembleResidentService(assembly);
   const connections = new Set<ServiceConnection>();
   let disposed = false, stopped: StopDisposition | null = null;
@@ -56,7 +59,7 @@ export async function createQuickEnvironment(options: Partial<ContextBudgets> = 
       client: { name: 'quick', version: instance.version }, buildKey: instance.buildKey, engine: instance.engine } });
     if (hello.type !== 'hello') throw new Error('Unexpected quick handshake');
     const welcome = through({ type: 'welcome', welcome: { protocol: 'ramify.ipc/1', instance,
-      capabilities: ['contexts', 'check', 'subscribe', 'daemon-control', 'materialize', 'explorerDetails', 'dependencyDiagram', 'materialize-views'],
+      capabilities: ['contexts', 'check', 'subscribe', 'daemon-control', 'materialize', 'measure', 'explorerDetails', 'dependencyDiagram', 'materialize-views'],
       limits: { maxRequestBytes: daemonBudgets.maxRequestBytes, maxResponseBytes: daemonBudgets.maxResponseBytes,
         leaseMs: daemonBudgets.leaseMs, pingMs: daemonBudgets.pingMs } } });
     if (welcome.type !== 'welcome') throw new Error('Unexpected quick welcome');
@@ -76,7 +79,7 @@ export async function createQuickEnvironment(options: Partial<ContextBudgets> = 
       control?.signal?.addEventListener('abort', abort, { once: true });
       try {
         const result = await dispatchServiceRequest(lease.service, request.op, request.params,
-          { signal: controller.signal }, listener, request.id);
+          { signal: controller.signal }, listener, request.id, daemonBudgets.maxResponseBytes);
         if (closed || controller.signal.aborted) return cancelled();
         const response = through({ type: 'response', id: request.id, result });
         if (response.type !== 'response') throw new Error('Unexpected quick response');
@@ -97,6 +100,7 @@ export async function createQuickEnvironment(options: Partial<ContextBudgets> = 
       explorerDetails: (params, control) => call('explorerDetails', params, control),
       dependencyDiagram: (params, control) => call('dependencyDiagram', params, control),
       materialize: (params, control) => call('materialize', params, control),
+      measure: (params, control) => call('measure', params, control),
       async subscribe(params, listener) {
         let subscriptionId: string | undefined;
         const initial: ContextEvent[] = [];
@@ -133,7 +137,8 @@ export async function createQuickEnvironment(options: Partial<ContextBudgets> = 
       const message = through({ type: 'request', id: randomUUID(), op: operation, params });
       if (message.type !== 'request') throw new Error('Unexpected quick request');
       const response = through({ type: 'response', id: message.id,
-        result: await dispatchServiceRequest(service, message.op, message.params, control, undefined, message.id) });
+        result: await dispatchServiceRequest(service, message.op, message.params, control, undefined, message.id,
+          fixture.maxResponseBytes ?? daemonBudgets.maxResponseBytes) });
       if (response.type !== 'response') throw new Error('Unexpected quick response');
       return response.result;
     },

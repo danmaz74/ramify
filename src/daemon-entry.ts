@@ -56,7 +56,7 @@ try {
   };
   const clock = createSystemClock();
   service = assembleResidentService({ watcher: createFilesystemWatcher(clock), clock,
-    budgets: contexts, log, instance: { instanceId: randomUUID(), pid: process.pid,
+    budgets: contexts, maxResponseBytes: daemon.maxResponseBytes, log, instance: { instanceId: randomUUID(), pid: process.pid,
       version: fields.get('--version')!, engine: fields.get('--engine')!, buildKey } });
   const started = await startDaemon({ service, endpoint, budgets: daemon, clock, log });
   if (started.status === 'already-running') process.exitCode = 3;

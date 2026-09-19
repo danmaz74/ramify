@@ -1,0 +1,3152 @@
+{
+  "schemaVersion": "ramify.plan2c-measurements/1",
+  "measuredAt": "2026-09-19T11:57:47.904Z",
+  "source": {
+    "root": "/ramify",
+    "gitHead": "21f597528e88935ee02a57de8677cd22cc3c2b5e",
+    "trackedChanges": 71
+  },
+  "environment": {
+    "node": "v22.23.2",
+    "platform": "linux",
+    "release": "6.8.0-85-generic",
+    "arch": "x64",
+    "logicalCpus": 12,
+    "cpuModel": "Intel(R) Xeon(R) E-2176G CPU @ 3.70GHz",
+    "totalMemoryBytes": 67274752000,
+    "concurrentActivity": "Iteration 4 final acceptance; no intentional benchmark workload in this checkout"
+  },
+  "limits": {
+    "architectSessionQueryMs": 15000,
+    "architectCommandMs": 90000,
+    "architectBytes": 8388608,
+    "unchangedRepeatBytes": 0,
+    "hitLines": 200,
+    "hitBytes": 65536
+  },
+  "commands": {
+    "measureAfterNewDaemon": {
+      "exitCode": 0,
+      "durationMs": 8730.3,
+      "stderr": ""
+    },
+    "measureWarm": {
+      "exitCode": 0,
+      "durationMs": 1711.4,
+      "stderr": ""
+    },
+    "architectSessionQuery": {
+      "openMs": 10085.4,
+      "hot": [
+        {
+          "durationMs": 834.4,
+          "projectionBytes": 1244372,
+          "modules": 15,
+          "symbols": 1333,
+          "tests": 309
+        },
+        {
+          "durationMs": 684.7,
+          "projectionBytes": 1244372,
+          "modules": 15,
+          "symbols": 1333,
+          "tests": 309
+        },
+        {
+          "durationMs": 705.5,
+          "projectionBytes": 1244372,
+          "modules": 15,
+          "symbols": 1333,
+          "tests": 309
+        }
+      ],
+      "afterRelease": {
+        "durationMs": 1715.4,
+        "projectionBytes": 1244372,
+        "modules": 15,
+        "symbols": 1333,
+        "tests": 309
+      }
+    },
+    "architect": {
+      "exitCode": 0,
+      "durationMs": 17145.1,
+      "revisionSequence": 2,
+      "targets": 1,
+      "entries": 1642,
+      "bytesWritten": 844838,
+      "unchanged": 0,
+      "modules": 15,
+      "records": 1642,
+      "dependencies": "measured",
+      "stderr": ""
+    },
+    "architectRepeat": {
+      "exitCode": 0,
+      "durationMs": 2508.1,
+      "revisionSequence": 2,
+      "targets": 1,
+      "entries": 1642,
+      "bytesWritten": 0,
+      "unchanged": 1,
+      "modules": 15,
+      "records": 1642,
+      "dependencies": "measured",
+      "stderr": ""
+    }
+  },
+  "memory": {
+    "measure": {
+      "pid": 863415,
+      "samples": [
+        {
+          "at": 440.479001,
+          "daemonRss": 63434752,
+          "daemonHeapUsed": 8450624,
+          "external": 2409008,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 63434752,
+          "combinedHeap": 8450624
+        },
+        {
+          "at": 567.906,
+          "daemonRss": 66187264,
+          "daemonHeapUsed": 9080144,
+          "external": 2268353,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 66187264,
+          "combinedHeap": 9080144
+        },
+        {
+          "at": 693.822575,
+          "daemonRss": 71901184,
+          "daemonHeapUsed": 12272656,
+          "external": 2293355,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 71901184,
+          "combinedHeap": 12272656
+        },
+        {
+          "at": 819.421109,
+          "daemonRss": 73474048,
+          "daemonHeapUsed": 10993096,
+          "external": 2283020,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73474048,
+          "combinedHeap": 10993096
+        },
+        {
+          "at": 945.357865,
+          "daemonRss": 73474048,
+          "daemonHeapUsed": 11058424,
+          "external": 2286031,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73474048,
+          "combinedHeap": 11058424
+        },
+        {
+          "at": 1071.628415,
+          "daemonRss": 73474048,
+          "daemonHeapUsed": 11112256,
+          "external": 2297169,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73474048,
+          "combinedHeap": 11112256
+        },
+        {
+          "at": 1196.909139,
+          "daemonRss": 73474048,
+          "daemonHeapUsed": 11216280,
+          "external": 2300115,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73474048,
+          "combinedHeap": 11216280
+        },
+        {
+          "at": 1321.360023,
+          "daemonRss": 73474048,
+          "daemonHeapUsed": 11270832,
+          "external": 2303061,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73474048,
+          "combinedHeap": 11270832
+        },
+        {
+          "at": 1448.984437,
+          "daemonRss": 73605120,
+          "daemonHeapUsed": 11339712,
+          "external": 2314199,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73605120,
+          "combinedHeap": 11339712
+        },
+        {
+          "at": 1575.74312,
+          "daemonRss": 73605120,
+          "daemonHeapUsed": 11406080,
+          "external": 2317145,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73605120,
+          "combinedHeap": 11406080
+        },
+        {
+          "at": 1701.676602,
+          "daemonRss": 73605120,
+          "daemonHeapUsed": 11451624,
+          "external": 2320091,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73605120,
+          "combinedHeap": 11451624
+        },
+        {
+          "at": 1827.965585,
+          "daemonRss": 73605120,
+          "daemonHeapUsed": 11497560,
+          "external": 2331229,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73605120,
+          "combinedHeap": 11497560
+        },
+        {
+          "at": 1958.919962,
+          "daemonRss": 73605120,
+          "daemonHeapUsed": 11543040,
+          "external": 2334175,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73605120,
+          "combinedHeap": 11543040
+        },
+        {
+          "at": 2089.215346,
+          "daemonRss": 73605120,
+          "daemonHeapUsed": 11587904,
+          "external": 2337121,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73605120,
+          "combinedHeap": 11587904
+        },
+        {
+          "at": 2220.4897,
+          "daemonRss": 73605120,
+          "daemonHeapUsed": 11632936,
+          "external": 2348259,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73605120,
+          "combinedHeap": 11632936
+        },
+        {
+          "at": 2348.959551,
+          "daemonRss": 73605120,
+          "daemonHeapUsed": 11683448,
+          "external": 2351205,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73605120,
+          "combinedHeap": 11683448
+        },
+        {
+          "at": 2476.783385,
+          "daemonRss": 73605120,
+          "daemonHeapUsed": 11728400,
+          "external": 2354151,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73605120,
+          "combinedHeap": 11728400
+        },
+        {
+          "at": 2605.212333,
+          "daemonRss": 73605120,
+          "daemonHeapUsed": 11776880,
+          "external": 2365354,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73605120,
+          "combinedHeap": 11776880
+        },
+        {
+          "at": 2731.681498,
+          "daemonRss": 73605120,
+          "daemonHeapUsed": 11821840,
+          "external": 2368300,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73605120,
+          "combinedHeap": 11821840
+        },
+        {
+          "at": 2856.289508,
+          "daemonRss": 73605120,
+          "daemonHeapUsed": 11866584,
+          "external": 2371246,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73605120,
+          "combinedHeap": 11866584
+        },
+        {
+          "at": 2985.557133,
+          "daemonRss": 73605120,
+          "daemonHeapUsed": 11911648,
+          "external": 2382384,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73605120,
+          "combinedHeap": 11911648
+        },
+        {
+          "at": 3110.818168,
+          "daemonRss": 73605120,
+          "daemonHeapUsed": 11956456,
+          "external": 2385330,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73605120,
+          "combinedHeap": 11956456
+        },
+        {
+          "at": 3238.558217,
+          "daemonRss": 73605120,
+          "daemonHeapUsed": 12002360,
+          "external": 2388276,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73605120,
+          "combinedHeap": 12002360
+        },
+        {
+          "at": 3366.212857,
+          "daemonRss": 73605120,
+          "daemonHeapUsed": 12047272,
+          "external": 2399414,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73605120,
+          "combinedHeap": 12047272
+        },
+        {
+          "at": 3491.870763,
+          "daemonRss": 73605120,
+          "daemonHeapUsed": 12092232,
+          "external": 2402360,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73605120,
+          "combinedHeap": 12092232
+        },
+        {
+          "at": 3617.277636,
+          "daemonRss": 73605120,
+          "daemonHeapUsed": 12136968,
+          "external": 2405306,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73605120,
+          "combinedHeap": 12136968
+        },
+        {
+          "at": 3743.63748,
+          "daemonRss": 73605120,
+          "daemonHeapUsed": 12182032,
+          "external": 2416444,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73605120,
+          "combinedHeap": 12182032
+        },
+        {
+          "at": 3868.974762,
+          "daemonRss": 73605120,
+          "daemonHeapUsed": 12226840,
+          "external": 2419390,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73605120,
+          "combinedHeap": 12226840
+        },
+        {
+          "at": 3996.304065,
+          "daemonRss": 73736192,
+          "daemonHeapUsed": 12277224,
+          "external": 2422336,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73736192,
+          "combinedHeap": 12277224
+        },
+        {
+          "at": 4122.327948,
+          "daemonRss": 73736192,
+          "daemonHeapUsed": 12322168,
+          "external": 2433474,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73736192,
+          "combinedHeap": 12322168
+        },
+        {
+          "at": 4247.249113,
+          "daemonRss": 73736192,
+          "daemonHeapUsed": 12367128,
+          "external": 2436420,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73736192,
+          "combinedHeap": 12367128
+        },
+        {
+          "at": 4374.353887,
+          "daemonRss": 73736192,
+          "daemonHeapUsed": 12412992,
+          "external": 2439366,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73736192,
+          "combinedHeap": 12412992
+        },
+        {
+          "at": 4500.056803,
+          "daemonRss": 73736192,
+          "daemonHeapUsed": 12458056,
+          "external": 2450504,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73736192,
+          "combinedHeap": 12458056
+        },
+        {
+          "at": 4625.737282,
+          "daemonRss": 73736192,
+          "daemonHeapUsed": 12503624,
+          "external": 2453450,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73736192,
+          "combinedHeap": 12503624
+        },
+        {
+          "at": 4752.844293,
+          "daemonRss": 73736192,
+          "daemonHeapUsed": 12548464,
+          "external": 2456396,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73736192,
+          "combinedHeap": 12548464
+        },
+        {
+          "at": 4881.201268,
+          "daemonRss": 73736192,
+          "daemonHeapUsed": 12593376,
+          "external": 2467534,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73736192,
+          "combinedHeap": 12593376
+        },
+        {
+          "at": 5008.965997,
+          "daemonRss": 73736192,
+          "daemonHeapUsed": 12638336,
+          "external": 2470480,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73736192,
+          "combinedHeap": 12638336
+        },
+        {
+          "at": 5135.487872,
+          "daemonRss": 73736192,
+          "daemonHeapUsed": 12683024,
+          "external": 2473426,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73736192,
+          "combinedHeap": 12683024
+        },
+        {
+          "at": 5260.532387,
+          "daemonRss": 73736192,
+          "daemonHeapUsed": 12728088,
+          "external": 2484564,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73736192,
+          "combinedHeap": 12728088
+        },
+        {
+          "at": 5386.813995,
+          "daemonRss": 73736192,
+          "daemonHeapUsed": 12773096,
+          "external": 2487510,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73736192,
+          "combinedHeap": 12773096
+        },
+        {
+          "at": 5510.98566,
+          "daemonRss": 73867264,
+          "daemonHeapUsed": 12817936,
+          "external": 2490456,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73867264,
+          "combinedHeap": 12817936
+        },
+        {
+          "at": 5636.461859,
+          "daemonRss": 73867264,
+          "daemonHeapUsed": 12862848,
+          "external": 2501594,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73867264,
+          "combinedHeap": 12862848
+        },
+        {
+          "at": 5764.866099,
+          "daemonRss": 73867264,
+          "daemonHeapUsed": 12907944,
+          "external": 2504540,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73867264,
+          "combinedHeap": 12907944
+        },
+        {
+          "at": 5890.727233,
+          "daemonRss": 73867264,
+          "daemonHeapUsed": 12952632,
+          "external": 2507486,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73867264,
+          "combinedHeap": 12952632
+        },
+        {
+          "at": 6015.592236,
+          "daemonRss": 73867264,
+          "daemonHeapUsed": 12999784,
+          "external": 2518624,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73867264,
+          "combinedHeap": 12999784
+        },
+        {
+          "at": 6141.018948,
+          "daemonRss": 73867264,
+          "daemonHeapUsed": 13044592,
+          "external": 2521570,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73867264,
+          "combinedHeap": 13044592
+        },
+        {
+          "at": 6267.156454,
+          "daemonRss": 73867264,
+          "daemonHeapUsed": 13089432,
+          "external": 2524516,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73867264,
+          "combinedHeap": 13089432
+        },
+        {
+          "at": 6392.855316,
+          "daemonRss": 73867264,
+          "daemonHeapUsed": 13134344,
+          "external": 2535654,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73867264,
+          "combinedHeap": 13134344
+        },
+        {
+          "at": 6519.638736,
+          "daemonRss": 73998336,
+          "daemonHeapUsed": 13179336,
+          "external": 2538600,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73998336,
+          "combinedHeap": 13179336
+        },
+        {
+          "at": 6646.543663,
+          "daemonRss": 73998336,
+          "daemonHeapUsed": 13224024,
+          "external": 2541546,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73998336,
+          "combinedHeap": 13224024
+        },
+        {
+          "at": 6776.175499,
+          "daemonRss": 73998336,
+          "daemonHeapUsed": 13269088,
+          "external": 2552684,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73998336,
+          "combinedHeap": 13269088
+        },
+        {
+          "at": 6901.982861,
+          "daemonRss": 73998336,
+          "daemonHeapUsed": 13314752,
+          "external": 2555630,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73998336,
+          "combinedHeap": 13314752
+        },
+        {
+          "at": 7026.524644,
+          "daemonRss": 73998336,
+          "daemonHeapUsed": 13359592,
+          "external": 2558576,
+          "workerRss": 0,
+          "workerHeap": 0,
+          "compilerRss": 0,
+          "combinedRss": 73998336,
+          "combinedHeap": 13359592
+        },
+        {
+          "at": 7152.518019,
+          "daemonRss": 76574720,
+          "daemonHeapUsed": 11023312,
+          "external": 2243487,
+          "workerRss": 342163456,
+          "workerHeap": 155867168,
+          "compilerRss": 404488192,
+          "combinedRss": 823226368,
+          "combinedHeap": 166890480
+        },
+        {
+          "at": 7281.561091,
+          "daemonRss": 76574720,
+          "daemonHeapUsed": 11118528,
+          "external": 2336595,
+          "workerRss": 342163456,
+          "workerHeap": 155867168,
+          "compilerRss": 404488192,
+          "combinedRss": 823226368,
+          "combinedHeap": 166985696
+        },
+        {
+          "at": 7408.817891,
+          "daemonRss": 76574720,
+          "daemonHeapUsed": 11208720,
+          "external": 2429703,
+          "workerRss": 342163456,
+          "workerHeap": 155867168,
+          "compilerRss": 404488192,
+          "combinedRss": 823226368,
+          "combinedHeap": 167075888
+        },
+        {
+          "at": 7535.106005,
+          "daemonRss": 76574720,
+          "daemonHeapUsed": 11322272,
+          "external": 2522811,
+          "workerRss": 342163456,
+          "workerHeap": 155867168,
+          "compilerRss": 404488192,
+          "combinedRss": 823226368,
+          "combinedHeap": 167189440
+        },
+        {
+          "at": 7666.657354,
+          "daemonRss": 76574720,
+          "daemonHeapUsed": 11793160,
+          "external": 2880566,
+          "workerRss": 331046912,
+          "workerHeap": 135279808,
+          "compilerRss": 404488192,
+          "combinedRss": 812109824,
+          "combinedHeap": 147072968
+        },
+        {
+          "at": 7791.558239,
+          "daemonRss": 76574720,
+          "daemonHeapUsed": 11883480,
+          "external": 2973694,
+          "workerRss": 331046912,
+          "workerHeap": 135279808,
+          "compilerRss": 404488192,
+          "combinedRss": 812109824,
+          "combinedHeap": 147163288
+        },
+        {
+          "at": 7920.427628,
+          "daemonRss": 76574720,
+          "daemonHeapUsed": 11973648,
+          "external": 3066822,
+          "workerRss": 331046912,
+          "workerHeap": 135279808,
+          "compilerRss": 404488192,
+          "combinedRss": 812109824,
+          "combinedHeap": 147253456
+        },
+        {
+          "at": 8049.441665,
+          "daemonRss": 76574720,
+          "daemonHeapUsed": 12064232,
+          "external": 3159950,
+          "workerRss": 331046912,
+          "workerHeap": 135279808,
+          "compilerRss": 404488192,
+          "combinedRss": 812109824,
+          "combinedHeap": 147344040
+        },
+        {
+          "at": 8180.469264,
+          "daemonRss": 76574720,
+          "daemonHeapUsed": 12154400,
+          "external": 3253078,
+          "workerRss": 331046912,
+          "workerHeap": 135279808,
+          "compilerRss": 404488192,
+          "combinedRss": 812109824,
+          "combinedHeap": 147434208
+        },
+        {
+          "at": 8305.491409,
+          "daemonRss": 76574720,
+          "daemonHeapUsed": 12244944,
+          "external": 3354398,
+          "workerRss": 331046912,
+          "workerHeap": 135279808,
+          "compilerRss": 404488192,
+          "combinedRss": 812109824,
+          "combinedHeap": 147524752
+        },
+        {
+          "at": 8432.180452,
+          "daemonRss": 76574720,
+          "daemonHeapUsed": 12335240,
+          "external": 3447526,
+          "workerRss": 331046912,
+          "workerHeap": 135279808,
+          "compilerRss": 404488192,
+          "combinedRss": 812109824,
+          "combinedHeap": 147615048
+        },
+        {
+          "at": 8558.673096,
+          "daemonRss": 76574720,
+          "daemonHeapUsed": 12425728,
+          "external": 3540654,
+          "workerRss": 331046912,
+          "workerHeap": 135279808,
+          "compilerRss": 404488192,
+          "combinedRss": 812109824,
+          "combinedHeap": 147705536
+        },
+        {
+          "at": 8684.765768,
+          "daemonRss": 76574720,
+          "daemonHeapUsed": 12515896,
+          "external": 3633782,
+          "workerRss": 331046912,
+          "workerHeap": 135279808,
+          "compilerRss": 404488192,
+          "combinedRss": 812109824,
+          "combinedHeap": 147795704
+        },
+        {
+          "at": 8809.205212,
+          "daemonRss": 76574720,
+          "daemonHeapUsed": 12650568,
+          "external": 3726910,
+          "workerRss": 331046912,
+          "workerHeap": 135279808,
+          "compilerRss": 404488192,
+          "combinedRss": 812109824,
+          "combinedHeap": 147930376
+        },
+        {
+          "at": 8958.692425,
+          "daemonRss": 89944064,
+          "daemonHeapUsed": 20249648,
+          "external": 2579723,
+          "workerRss": 344899584,
+          "workerHeap": 151008832,
+          "compilerRss": 407240704,
+          "combinedRss": 842084352,
+          "combinedHeap": 171258480
+        },
+        {
+          "at": 9090.881686,
+          "daemonRss": 92827648,
+          "daemonHeapUsed": 16393928,
+          "external": 2499759,
+          "workerRss": 344899584,
+          "workerHeap": 151008832,
+          "compilerRss": 407240704,
+          "combinedRss": 844967936,
+          "combinedHeap": 167402760
+        },
+        {
+          "at": 9216.145288,
+          "daemonRss": 92827648,
+          "daemonHeapUsed": 16481608,
+          "external": 2592885,
+          "workerRss": 344899584,
+          "workerHeap": 151008832,
+          "compilerRss": 407240704,
+          "combinedRss": 844967936,
+          "combinedHeap": 167490440
+        },
+        {
+          "at": 9341.972888,
+          "daemonRss": 92827648,
+          "daemonHeapUsed": 16571384,
+          "external": 2686011,
+          "workerRss": 344899584,
+          "workerHeap": 151008832,
+          "compilerRss": 407240704,
+          "combinedRss": 844967936,
+          "combinedHeap": 167580216
+        },
+        {
+          "at": 9465.581598,
+          "daemonRss": 92827648,
+          "daemonHeapUsed": 16659232,
+          "external": 2779137,
+          "workerRss": 344899584,
+          "workerHeap": 151008832,
+          "compilerRss": 407240704,
+          "combinedRss": 844967936,
+          "combinedHeap": 167668064
+        },
+        {
+          "at": 9595.359486,
+          "daemonRss": 92958720,
+          "daemonHeapUsed": 11682384,
+          "external": 2441683,
+          "workerRss": 340398080,
+          "workerHeap": 147378176,
+          "compilerRss": 407240704,
+          "combinedRss": 840597504,
+          "combinedHeap": 159060560
+        },
+        {
+          "at": 9720.468242,
+          "daemonRss": 92958720,
+          "daemonHeapUsed": 11774696,
+          "external": 2534811,
+          "workerRss": 340398080,
+          "workerHeap": 147378176,
+          "compilerRss": 407240704,
+          "combinedRss": 840597504,
+          "combinedHeap": 159152872
+        },
+        {
+          "at": 9846.414253,
+          "daemonRss": 92958720,
+          "daemonHeapUsed": 11863440,
+          "external": 2627939,
+          "workerRss": 340398080,
+          "workerHeap": 147378176,
+          "compilerRss": 407240704,
+          "combinedRss": 840597504,
+          "combinedHeap": 159241616
+        },
+        {
+          "at": 9971.3792,
+          "daemonRss": 92958720,
+          "daemonHeapUsed": 11951456,
+          "external": 2721067,
+          "workerRss": 340398080,
+          "workerHeap": 147378176,
+          "compilerRss": 407240704,
+          "combinedRss": 840597504,
+          "combinedHeap": 159329632
+        },
+        {
+          "at": 10097.162925,
+          "daemonRss": 92958720,
+          "daemonHeapUsed": 12039336,
+          "external": 2814195,
+          "workerRss": 340398080,
+          "workerHeap": 147378176,
+          "compilerRss": 407240704,
+          "combinedRss": 840597504,
+          "combinedHeap": 159417512
+        },
+        {
+          "at": 10222.029647,
+          "daemonRss": 92958720,
+          "daemonHeapUsed": 12127888,
+          "external": 2907323,
+          "workerRss": 340398080,
+          "workerHeap": 147378176,
+          "compilerRss": 407240704,
+          "combinedRss": 840597504,
+          "combinedHeap": 159506064
+        },
+        {
+          "at": 10346.871973,
+          "daemonRss": 92958720,
+          "daemonHeapUsed": 12215768,
+          "external": 3000451,
+          "workerRss": 340398080,
+          "workerHeap": 147378176,
+          "compilerRss": 407240704,
+          "combinedRss": 840597504,
+          "combinedHeap": 159593944
+        },
+        {
+          "at": 10472.32299,
+          "daemonRss": 92958720,
+          "daemonHeapUsed": 12303496,
+          "external": 3093579,
+          "workerRss": 340398080,
+          "workerHeap": 147378176,
+          "compilerRss": 407240704,
+          "combinedRss": 840597504,
+          "combinedHeap": 159681672
+        },
+        {
+          "at": 10597.507627,
+          "daemonRss": 92958720,
+          "daemonHeapUsed": 12391584,
+          "external": 3186707,
+          "workerRss": 340398080,
+          "workerHeap": 147378176,
+          "compilerRss": 407240704,
+          "combinedRss": 840597504,
+          "combinedHeap": 159769760
+        },
+        {
+          "at": 10748.060314,
+          "daemonRss": 99119104,
+          "daemonHeapUsed": 20471336,
+          "external": 2462259,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 856485888,
+          "combinedHeap": 183300744
+        }
+      ],
+      "sampleCount": 82,
+      "peakDaemonRssBytes": 99119104,
+      "peakDaemonHeapUsedBytes": 20471336,
+      "peakCombinedRssBytes": 856485888,
+      "peakCombinedHeapBytes": 183300744
+    },
+    "architect": {
+      "pid": 863415,
+      "samples": [
+        {
+          "at": 10778.157963,
+          "daemonRss": 99119104,
+          "daemonHeapUsed": 20631088,
+          "external": 2564958,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 856485888,
+          "combinedHeap": 183460496
+        },
+        {
+          "at": 10902.974614,
+          "daemonRss": 101740544,
+          "daemonHeapUsed": 20992888,
+          "external": 2751735,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859107328,
+          "combinedHeap": 183822296
+        },
+        {
+          "at": 11044.411504,
+          "daemonRss": 101740544,
+          "daemonHeapUsed": 21082216,
+          "external": 2844863,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859107328,
+          "combinedHeap": 183911624
+        },
+        {
+          "at": 11195.752613,
+          "daemonRss": 101740544,
+          "daemonHeapUsed": 21170096,
+          "external": 2937991,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859107328,
+          "combinedHeap": 183999504
+        },
+        {
+          "at": 11327.240611,
+          "daemonRss": 101740544,
+          "daemonHeapUsed": 21302240,
+          "external": 3031119,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859107328,
+          "combinedHeap": 184131648
+        },
+        {
+          "at": 11457.71843,
+          "daemonRss": 101740544,
+          "daemonHeapUsed": 14689264,
+          "external": 2325924,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859107328,
+          "combinedHeap": 177518672
+        },
+        {
+          "at": 11589.733233,
+          "daemonRss": 101740544,
+          "daemonHeapUsed": 14777296,
+          "external": 2419052,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859107328,
+          "combinedHeap": 177606704
+        },
+        {
+          "at": 11721.76425,
+          "daemonRss": 101740544,
+          "daemonHeapUsed": 14865056,
+          "external": 2512180,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859107328,
+          "combinedHeap": 177694464
+        },
+        {
+          "at": 11863.561329,
+          "daemonRss": 101740544,
+          "daemonHeapUsed": 14952968,
+          "external": 2605308,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859107328,
+          "combinedHeap": 177782376
+        },
+        {
+          "at": 11994.04009,
+          "daemonRss": 101740544,
+          "daemonHeapUsed": 15040856,
+          "external": 2698436,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859107328,
+          "combinedHeap": 177870264
+        },
+        {
+          "at": 12146.606704,
+          "daemonRss": 101740544,
+          "daemonHeapUsed": 15128768,
+          "external": 2791564,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859107328,
+          "combinedHeap": 177958176
+        },
+        {
+          "at": 12278.849593,
+          "daemonRss": 101740544,
+          "daemonHeapUsed": 15216528,
+          "external": 2884692,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859107328,
+          "combinedHeap": 178045936
+        },
+        {
+          "at": 12413.292839,
+          "daemonRss": 101740544,
+          "daemonHeapUsed": 15304784,
+          "external": 2986012,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859107328,
+          "combinedHeap": 178134192
+        },
+        {
+          "at": 12542.739082,
+          "daemonRss": 101740544,
+          "daemonHeapUsed": 15392544,
+          "external": 3079140,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859107328,
+          "combinedHeap": 178221952
+        },
+        {
+          "at": 12671.972069,
+          "daemonRss": 101740544,
+          "daemonHeapUsed": 15480456,
+          "external": 3172268,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859107328,
+          "combinedHeap": 178309864
+        },
+        {
+          "at": 12806.621812,
+          "daemonRss": 101740544,
+          "daemonHeapUsed": 15568352,
+          "external": 3265396,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859107328,
+          "combinedHeap": 178397760
+        },
+        {
+          "at": 12933.960386,
+          "daemonRss": 101740544,
+          "daemonHeapUsed": 15656264,
+          "external": 3358524,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859107328,
+          "combinedHeap": 178485672
+        },
+        {
+          "at": 13065.320363,
+          "daemonRss": 101740544,
+          "daemonHeapUsed": 15744024,
+          "external": 3451652,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859107328,
+          "combinedHeap": 178573432
+        },
+        {
+          "at": 13196.785626,
+          "daemonRss": 101740544,
+          "daemonHeapUsed": 15832080,
+          "external": 3544780,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859107328,
+          "combinedHeap": 178661488
+        },
+        {
+          "at": 13326.246147,
+          "daemonRss": 101740544,
+          "daemonHeapUsed": 15919840,
+          "external": 3637908,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859107328,
+          "combinedHeap": 178749248
+        },
+        {
+          "at": 13477.670929,
+          "daemonRss": 101740544,
+          "daemonHeapUsed": 16007752,
+          "external": 3731036,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859107328,
+          "combinedHeap": 178837160
+        },
+        {
+          "at": 13605.732602,
+          "daemonRss": 101740544,
+          "daemonHeapUsed": 16095712,
+          "external": 3824164,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859107328,
+          "combinedHeap": 178925120
+        },
+        {
+          "at": 13734.721649,
+          "daemonRss": 101740544,
+          "daemonHeapUsed": 16183624,
+          "external": 3917292,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859107328,
+          "combinedHeap": 179013032
+        },
+        {
+          "at": 13868.771696,
+          "daemonRss": 101740544,
+          "daemonHeapUsed": 16271384,
+          "external": 4010420,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859107328,
+          "combinedHeap": 179100792
+        },
+        {
+          "at": 14001.896595,
+          "daemonRss": 101740544,
+          "daemonHeapUsed": 16360424,
+          "external": 4111740,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859107328,
+          "combinedHeap": 179189832
+        },
+        {
+          "at": 14130.662189,
+          "daemonRss": 101740544,
+          "daemonHeapUsed": 16448184,
+          "external": 4204868,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859107328,
+          "combinedHeap": 179277592
+        },
+        {
+          "at": 14258.684298,
+          "daemonRss": 101740544,
+          "daemonHeapUsed": 16536096,
+          "external": 4297996,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859107328,
+          "combinedHeap": 179365504
+        },
+        {
+          "at": 14390.500748,
+          "daemonRss": 101740544,
+          "daemonHeapUsed": 16624024,
+          "external": 4391124,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859107328,
+          "combinedHeap": 179453432
+        },
+        {
+          "at": 14518.949963,
+          "daemonRss": 101740544,
+          "daemonHeapUsed": 16711936,
+          "external": 4484252,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859107328,
+          "combinedHeap": 179541344
+        },
+        {
+          "at": 14649.337049,
+          "daemonRss": 101740544,
+          "daemonHeapUsed": 16799696,
+          "external": 4577380,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859107328,
+          "combinedHeap": 179629104
+        },
+        {
+          "at": 14781.810581,
+          "daemonRss": 101740544,
+          "daemonHeapUsed": 16930656,
+          "external": 4670508,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859107328,
+          "combinedHeap": 179760064
+        },
+        {
+          "at": 14909.57092,
+          "daemonRss": 101740544,
+          "daemonHeapUsed": 17018416,
+          "external": 4763636,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859107328,
+          "combinedHeap": 179847824
+        },
+        {
+          "at": 15038.035786,
+          "daemonRss": 101740544,
+          "daemonHeapUsed": 17106352,
+          "external": 4856764,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859107328,
+          "combinedHeap": 179935760
+        },
+        {
+          "at": 15164.408431,
+          "daemonRss": 101740544,
+          "daemonHeapUsed": 17194232,
+          "external": 4949892,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859107328,
+          "combinedHeap": 180023640
+        },
+        {
+          "at": 15292.160177,
+          "daemonRss": 101871616,
+          "daemonHeapUsed": 17282856,
+          "external": 5043020,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859238400,
+          "combinedHeap": 180112264
+        },
+        {
+          "at": 15421.047031,
+          "daemonRss": 101871616,
+          "daemonHeapUsed": 17370624,
+          "external": 5136148,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859238400,
+          "combinedHeap": 180200032
+        },
+        {
+          "at": 15548.021969,
+          "daemonRss": 102002688,
+          "daemonHeapUsed": 17458656,
+          "external": 5229276,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859369472,
+          "combinedHeap": 180288064
+        },
+        {
+          "at": 15675.585812,
+          "daemonRss": 102133760,
+          "daemonHeapUsed": 17546640,
+          "external": 5330596,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859500544,
+          "combinedHeap": 180376048
+        },
+        {
+          "at": 15803.707367,
+          "daemonRss": 102264832,
+          "daemonHeapUsed": 17634576,
+          "external": 5423724,
+          "workerRss": 349732864,
+          "workerHeap": 162829408,
+          "compilerRss": 407633920,
+          "combinedRss": 859631616,
+          "combinedHeap": 180463984
+        },
+        {
+          "at": 15929.873753,
+          "daemonRss": 106831872,
+          "daemonHeapUsed": 14578640,
+          "external": 2441483,
+          "workerRss": 401707008,
+          "workerHeap": 194009688,
+          "compilerRss": 442322944,
+          "combinedRss": 950861824,
+          "combinedHeap": 208588328
+        },
+        {
+          "at": 16058.094678,
+          "daemonRss": 106831872,
+          "daemonHeapUsed": 14671792,
+          "external": 2535603,
+          "workerRss": 401707008,
+          "workerHeap": 194009688,
+          "compilerRss": 442322944,
+          "combinedRss": 950861824,
+          "combinedHeap": 208681480
+        },
+        {
+          "at": 16186.531241,
+          "daemonRss": 106831872,
+          "daemonHeapUsed": 14760232,
+          "external": 2629723,
+          "workerRss": 401707008,
+          "workerHeap": 194009688,
+          "compilerRss": 442322944,
+          "combinedRss": 950861824,
+          "combinedHeap": 208769920
+        },
+        {
+          "at": 16314.564386,
+          "daemonRss": 106831872,
+          "daemonHeapUsed": 14848920,
+          "external": 2723843,
+          "workerRss": 401707008,
+          "workerHeap": 194009688,
+          "compilerRss": 442322944,
+          "combinedRss": 950861824,
+          "combinedHeap": 208858608
+        },
+        {
+          "at": 16443.244865,
+          "daemonRss": 106831872,
+          "daemonHeapUsed": 14937336,
+          "external": 2817963,
+          "workerRss": 401707008,
+          "workerHeap": 194009688,
+          "compilerRss": 442322944,
+          "combinedRss": 950861824,
+          "combinedHeap": 208947024
+        },
+        {
+          "at": 16577.501657,
+          "daemonRss": 106831872,
+          "daemonHeapUsed": 15025936,
+          "external": 2912083,
+          "workerRss": 401707008,
+          "workerHeap": 194009688,
+          "compilerRss": 442322944,
+          "combinedRss": 950861824,
+          "combinedHeap": 209035624
+        },
+        {
+          "at": 16705.192731,
+          "daemonRss": 106831872,
+          "daemonHeapUsed": 15114472,
+          "external": 3006203,
+          "workerRss": 401707008,
+          "workerHeap": 194009688,
+          "compilerRss": 442322944,
+          "combinedRss": 950861824,
+          "combinedHeap": 209124160
+        },
+        {
+          "at": 16836.311217,
+          "daemonRss": 106831872,
+          "daemonHeapUsed": 15203040,
+          "external": 3100323,
+          "workerRss": 401707008,
+          "workerHeap": 194009688,
+          "compilerRss": 442322944,
+          "combinedRss": 950861824,
+          "combinedHeap": 209212728
+        },
+        {
+          "at": 16968.141706,
+          "daemonRss": 106831872,
+          "daemonHeapUsed": 15291496,
+          "external": 3194443,
+          "workerRss": 401707008,
+          "workerHeap": 194009688,
+          "compilerRss": 442322944,
+          "combinedRss": 950861824,
+          "combinedHeap": 209301184
+        },
+        {
+          "at": 17099.877694,
+          "daemonRss": 106831872,
+          "daemonHeapUsed": 15382808,
+          "external": 3288563,
+          "workerRss": 401707008,
+          "workerHeap": 194009688,
+          "compilerRss": 442322944,
+          "combinedRss": 950861824,
+          "combinedHeap": 209392496
+        },
+        {
+          "at": 17230.858647,
+          "daemonRss": 106831872,
+          "daemonHeapUsed": 15471448,
+          "external": 3390875,
+          "workerRss": 401707008,
+          "workerHeap": 194009688,
+          "compilerRss": 442322944,
+          "combinedRss": 950861824,
+          "combinedHeap": 209481136
+        },
+        {
+          "at": 17361.563618,
+          "daemonRss": 106831872,
+          "daemonHeapUsed": 15560024,
+          "external": 3484995,
+          "workerRss": 401707008,
+          "workerHeap": 194009688,
+          "compilerRss": 442322944,
+          "combinedRss": 950861824,
+          "combinedHeap": 209569712
+        },
+        {
+          "at": 17493.68739,
+          "daemonRss": 106831872,
+          "daemonHeapUsed": 15648560,
+          "external": 3579115,
+          "workerRss": 401707008,
+          "workerHeap": 194009688,
+          "compilerRss": 442322944,
+          "combinedRss": 950861824,
+          "combinedHeap": 209658248
+        },
+        {
+          "at": 17640.907274,
+          "daemonRss": 106831872,
+          "daemonHeapUsed": 19190096,
+          "external": 5127002,
+          "workerRss": 415780864,
+          "workerHeap": 209494056,
+          "compilerRss": 442585088,
+          "combinedRss": 965197824,
+          "combinedHeap": 228684152
+        },
+        {
+          "at": 17767.089103,
+          "daemonRss": 106831872,
+          "daemonHeapUsed": 19278512,
+          "external": 5221122,
+          "workerRss": 415780864,
+          "workerHeap": 209494056,
+          "compilerRss": 442585088,
+          "combinedRss": 965197824,
+          "combinedHeap": 228772568
+        },
+        {
+          "at": 17896.293323,
+          "daemonRss": 106831872,
+          "daemonHeapUsed": 19375552,
+          "external": 5315242,
+          "workerRss": 415780864,
+          "workerHeap": 209494056,
+          "compilerRss": 442585088,
+          "combinedRss": 965197824,
+          "combinedHeap": 228869608
+        },
+        {
+          "at": 18023.412579,
+          "daemonRss": 106831872,
+          "daemonHeapUsed": 19493048,
+          "external": 5409362,
+          "workerRss": 415780864,
+          "workerHeap": 209494056,
+          "compilerRss": 442585088,
+          "combinedRss": 965197824,
+          "combinedHeap": 228987104
+        },
+        {
+          "at": 18152.162654,
+          "daemonRss": 106831872,
+          "daemonHeapUsed": 19581456,
+          "external": 5503482,
+          "workerRss": 415780864,
+          "workerHeap": 209494056,
+          "compilerRss": 442585088,
+          "combinedRss": 965197824,
+          "combinedHeap": 229075512
+        },
+        {
+          "at": 18281.915099,
+          "daemonRss": 106831872,
+          "daemonHeapUsed": 19670008,
+          "external": 5597602,
+          "workerRss": 415780864,
+          "workerHeap": 209494056,
+          "compilerRss": 442585088,
+          "combinedRss": 965197824,
+          "combinedHeap": 229164064
+        },
+        {
+          "at": 18410.971533,
+          "daemonRss": 106831872,
+          "daemonHeapUsed": 19758416,
+          "external": 5691722,
+          "workerRss": 415780864,
+          "workerHeap": 209494056,
+          "compilerRss": 442585088,
+          "combinedRss": 965197824,
+          "combinedHeap": 229252472
+        },
+        {
+          "at": 18540.679999,
+          "daemonRss": 106831872,
+          "daemonHeapUsed": 19846672,
+          "external": 5785842,
+          "workerRss": 415780864,
+          "workerHeap": 209494056,
+          "compilerRss": 442585088,
+          "combinedRss": 965197824,
+          "combinedHeap": 229340728
+        },
+        {
+          "at": 18713.183573,
+          "daemonRss": 111681536,
+          "daemonHeapUsed": 27006928,
+          "external": 2842713,
+          "workerRss": 409468928,
+          "workerHeap": 169477368,
+          "compilerRss": 443633664,
+          "combinedRss": 964784128,
+          "combinedHeap": 196484296
+        },
+        {
+          "at": 18842.154405,
+          "daemonRss": 126230528,
+          "daemonHeapUsed": 24873800,
+          "external": 4084229,
+          "workerRss": 412450816,
+          "workerHeap": 171092792,
+          "compilerRss": 443633664,
+          "combinedRss": 982315008,
+          "combinedHeap": 195966592
+        },
+        {
+          "at": 18968.175998,
+          "daemonRss": 126230528,
+          "daemonHeapUsed": 24961424,
+          "external": 4186545,
+          "workerRss": 412450816,
+          "workerHeap": 171092792,
+          "compilerRss": 443633664,
+          "combinedRss": 982315008,
+          "combinedHeap": 196054216
+        },
+        {
+          "at": 19094.167173,
+          "daemonRss": 126230528,
+          "daemonHeapUsed": 25048792,
+          "external": 4280669,
+          "workerRss": 412450816,
+          "workerHeap": 171092792,
+          "compilerRss": 443633664,
+          "combinedRss": 982315008,
+          "combinedHeap": 196141584
+        },
+        {
+          "at": 19222.103801,
+          "daemonRss": 126230528,
+          "daemonHeapUsed": 25136192,
+          "external": 4374793,
+          "workerRss": 412450816,
+          "workerHeap": 171092792,
+          "compilerRss": 443633664,
+          "combinedRss": 982315008,
+          "combinedHeap": 196228984
+        },
+        {
+          "at": 19350.705541,
+          "daemonRss": 126230528,
+          "daemonHeapUsed": 25223440,
+          "external": 4468917,
+          "workerRss": 412450816,
+          "workerHeap": 171092792,
+          "compilerRss": 443633664,
+          "combinedRss": 982315008,
+          "combinedHeap": 196316232
+        },
+        {
+          "at": 19478.33743,
+          "daemonRss": 126230528,
+          "daemonHeapUsed": 25310960,
+          "external": 4563041,
+          "workerRss": 412450816,
+          "workerHeap": 171092792,
+          "compilerRss": 443633664,
+          "combinedRss": 982315008,
+          "combinedHeap": 196403752
+        },
+        {
+          "at": 19605.185329,
+          "daemonRss": 126230528,
+          "daemonHeapUsed": 25398208,
+          "external": 4657165,
+          "workerRss": 412450816,
+          "workerHeap": 171092792,
+          "compilerRss": 443633664,
+          "combinedRss": 982315008,
+          "combinedHeap": 196491000
+        },
+        {
+          "at": 19736.057264,
+          "daemonRss": 126230528,
+          "daemonHeapUsed": 25485608,
+          "external": 4751289,
+          "workerRss": 412450816,
+          "workerHeap": 171092792,
+          "compilerRss": 443633664,
+          "combinedRss": 982315008,
+          "combinedHeap": 196578400
+        },
+        {
+          "at": 19863.616092,
+          "daemonRss": 126230528,
+          "daemonHeapUsed": 25572976,
+          "external": 4845413,
+          "workerRss": 412450816,
+          "workerHeap": 171092792,
+          "compilerRss": 443633664,
+          "combinedRss": 982315008,
+          "combinedHeap": 196665768
+        },
+        {
+          "at": 19989.51646,
+          "daemonRss": 126230528,
+          "daemonHeapUsed": 25660376,
+          "external": 4939537,
+          "workerRss": 412450816,
+          "workerHeap": 171092792,
+          "compilerRss": 443633664,
+          "combinedRss": 982315008,
+          "combinedHeap": 196753168
+        },
+        {
+          "at": 20117.86124,
+          "daemonRss": 126230528,
+          "daemonHeapUsed": 25747624,
+          "external": 5033661,
+          "workerRss": 412450816,
+          "workerHeap": 171092792,
+          "compilerRss": 443633664,
+          "combinedRss": 982315008,
+          "combinedHeap": 196840416
+        },
+        {
+          "at": 20244.805185,
+          "daemonRss": 126230528,
+          "daemonHeapUsed": 25835144,
+          "external": 5127785,
+          "workerRss": 412450816,
+          "workerHeap": 171092792,
+          "compilerRss": 443633664,
+          "combinedRss": 982315008,
+          "combinedHeap": 196927936
+        },
+        {
+          "at": 20372.153507,
+          "daemonRss": 126230528,
+          "daemonHeapUsed": 25922472,
+          "external": 5221909,
+          "workerRss": 412450816,
+          "workerHeap": 171092792,
+          "compilerRss": 443633664,
+          "combinedRss": 982315008,
+          "combinedHeap": 197015264
+        },
+        {
+          "at": 20498.468674,
+          "daemonRss": 126230528,
+          "daemonHeapUsed": 26009872,
+          "external": 5316033,
+          "workerRss": 412450816,
+          "workerHeap": 171092792,
+          "compilerRss": 443633664,
+          "combinedRss": 982315008,
+          "combinedHeap": 197102664
+        },
+        {
+          "at": 20625.440727,
+          "daemonRss": 126230528,
+          "daemonHeapUsed": 26098384,
+          "external": 5418349,
+          "workerRss": 412450816,
+          "workerHeap": 171092792,
+          "compilerRss": 443633664,
+          "combinedRss": 982315008,
+          "combinedHeap": 197191176
+        },
+        {
+          "at": 20753.361,
+          "daemonRss": 126230528,
+          "daemonHeapUsed": 26228304,
+          "external": 5512473,
+          "workerRss": 412450816,
+          "workerHeap": 171092792,
+          "compilerRss": 443633664,
+          "combinedRss": 982315008,
+          "combinedHeap": 197321096
+        },
+        {
+          "at": 20880.803843,
+          "daemonRss": 126230528,
+          "daemonHeapUsed": 26315552,
+          "external": 5606597,
+          "workerRss": 412450816,
+          "workerHeap": 171092792,
+          "compilerRss": 443633664,
+          "combinedRss": 982315008,
+          "combinedHeap": 197408344
+        },
+        {
+          "at": 21146.259145,
+          "daemonRss": 186978304,
+          "daemonHeapUsed": 52374088,
+          "external": 2243487,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1070448640,
+          "combinedHeap": 270883000
+        },
+        {
+          "at": 21275.505577,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 52483912,
+          "external": 2337611,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 270992824
+        },
+        {
+          "at": 21400.178173,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 52571312,
+          "external": 2431735,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 271080224
+        },
+        {
+          "at": 21527.822324,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 52690144,
+          "external": 2525859,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 271199056
+        },
+        {
+          "at": 21657.775887,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 52777544,
+          "external": 2619983,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 271286456
+        },
+        {
+          "at": 21785.008724,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 52864792,
+          "external": 2714107,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 271373704
+        },
+        {
+          "at": 21914.37012,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 52952344,
+          "external": 2808231,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 271461256
+        },
+        {
+          "at": 22041.673378,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 53039592,
+          "external": 2902355,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 271548504
+        },
+        {
+          "at": 22167.852007,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 53127016,
+          "external": 2996479,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 271635928
+        },
+        {
+          "at": 22295.42139,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 53228648,
+          "external": 3098795,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 271737560
+        },
+        {
+          "at": 22422.179799,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 53316048,
+          "external": 3192919,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 271824960
+        },
+        {
+          "at": 22549.669672,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 53403360,
+          "external": 3287043,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 271912272
+        },
+        {
+          "at": 22676.331089,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 53490880,
+          "external": 3381167,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 271999792
+        },
+        {
+          "at": 22803.658474,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 53578128,
+          "external": 3475291,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 272087040
+        },
+        {
+          "at": 22930.285756,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 53665616,
+          "external": 3569415,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 272174528
+        },
+        {
+          "at": 23061.239702,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 53752984,
+          "external": 3663539,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 272261896
+        },
+        {
+          "at": 23190.436776,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 53840384,
+          "external": 3757663,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 272349296
+        },
+        {
+          "at": 23317.897256,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 53927992,
+          "external": 3851787,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 272436904
+        },
+        {
+          "at": 23444.69116,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 54015512,
+          "external": 3945911,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 272524424
+        },
+        {
+          "at": 23576.047654,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 54102760,
+          "external": 4040035,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 272611672
+        },
+        {
+          "at": 23703.946627,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 54190912,
+          "external": 4134159,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 272699824
+        },
+        {
+          "at": 23834.453172,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 54278280,
+          "external": 4228283,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 272787192
+        },
+        {
+          "at": 23960.454089,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 54365904,
+          "external": 4330599,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 272874816
+        },
+        {
+          "at": 24088.774563,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 54453208,
+          "external": 4424723,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 272962120
+        },
+        {
+          "at": 24212.441589,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 54540728,
+          "external": 4518847,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 273049640
+        },
+        {
+          "at": 24340.140146,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 54627976,
+          "external": 4612971,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 273136888
+        },
+        {
+          "at": 24466.287415,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 54715392,
+          "external": 4707095,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 273224304
+        },
+        {
+          "at": 24595.925213,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 54802760,
+          "external": 4801219,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 273311672
+        },
+        {
+          "at": 24723.583915,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 54890160,
+          "external": 4895343,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 273399072
+        },
+        {
+          "at": 24848.855902,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 54977432,
+          "external": 4989467,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 273486344
+        },
+        {
+          "at": 24974.440808,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 55064952,
+          "external": 5083591,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 273573864
+        },
+        {
+          "at": 25102.490578,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 55152200,
+          "external": 5177715,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 273661112
+        },
+        {
+          "at": 25229.265313,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 55285968,
+          "external": 5271839,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 273794880
+        },
+        {
+          "at": 25354.615443,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 55373336,
+          "external": 5365963,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 273882248
+        },
+        {
+          "at": 25480.247379,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 55460976,
+          "external": 5468279,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 273969888
+        },
+        {
+          "at": 25604.830151,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 55548224,
+          "external": 5562403,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 274057136
+        },
+        {
+          "at": 25730.181891,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 55635744,
+          "external": 5656527,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 274144656
+        },
+        {
+          "at": 25854.803462,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 55728112,
+          "external": 5750689,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 274237024
+        },
+        {
+          "at": 25980.887302,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 55815512,
+          "external": 5844813,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 274324424
+        },
+        {
+          "at": 26123.498471,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 55902880,
+          "external": 5938937,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 274411792
+        },
+        {
+          "at": 26249.184851,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 55990288,
+          "external": 6033061,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 274499200
+        },
+        {
+          "at": 26376.092932,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 56077536,
+          "external": 6127185,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 274586448
+        },
+        {
+          "at": 26501.458859,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 56165056,
+          "external": 6221309,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 274673968
+        },
+        {
+          "at": 26626.598997,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 56252336,
+          "external": 6315433,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 274761248
+        },
+        {
+          "at": 26752.986503,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 56339736,
+          "external": 6409557,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 274848648
+        },
+        {
+          "at": 26876.312658,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 56427104,
+          "external": 6503681,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 274936016
+        },
+        {
+          "at": 27002.190179,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 56514536,
+          "external": 6597805,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 275023448
+        },
+        {
+          "at": 27128.991495,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 56602008,
+          "external": 6700121,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 275110920
+        },
+        {
+          "at": 27254.71901,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 56689528,
+          "external": 6794245,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 275198440
+        },
+        {
+          "at": 27380.385438,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 56776784,
+          "external": 6888369,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 275285696
+        },
+        {
+          "at": 27506.376056,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 56864184,
+          "external": 6982493,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 275373096
+        },
+        {
+          "at": 27631.950293,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 56951552,
+          "external": 7076617,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 275460464
+        },
+        {
+          "at": 27756.624439,
+          "daemonRss": 166129664,
+          "daemonHeapUsed": 57041976,
+          "external": 7170741,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049600000,
+          "combinedHeap": 275550888
+        },
+        {
+          "at": 27888.218624,
+          "daemonRss": 166383616,
+          "daemonHeapUsed": 57674704,
+          "external": 3170796,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049853952,
+          "combinedHeap": 276183616
+        },
+        {
+          "at": 28013.288441,
+          "daemonRss": 166383616,
+          "daemonHeapUsed": 58563720,
+          "external": 3439730,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049853952,
+          "combinedHeap": 277072632
+        },
+        {
+          "at": 28140.625736,
+          "daemonRss": 166383616,
+          "daemonHeapUsed": 58674472,
+          "external": 3533850,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049853952,
+          "combinedHeap": 277183384
+        },
+        {
+          "at": 28265.569699,
+          "daemonRss": 166383616,
+          "daemonHeapUsed": 58762144,
+          "external": 3627970,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049853952,
+          "combinedHeap": 277271056
+        },
+        {
+          "at": 28392.413527,
+          "daemonRss": 166383616,
+          "daemonHeapUsed": 58849800,
+          "external": 3722090,
+          "workerRss": 439836672,
+          "workerHeap": 218508912,
+          "compilerRss": 443633664,
+          "combinedRss": 1049853952,
+          "combinedHeap": 277358712
+        },
+        {
+          "at": 28517.869077,
+          "daemonRss": 166383616,
+          "daemonHeapUsed": 59276704,
+          "external": 4080857,
+          "workerRss": 443232256,
+          "workerHeap": 166552856,
+          "compilerRss": 443633664,
+          "combinedRss": 1053249536,
+          "combinedHeap": 225829560
+        },
+        {
+          "at": 28643.246366,
+          "daemonRss": 166383616,
+          "daemonHeapUsed": 59364224,
+          "external": 4174979,
+          "workerRss": 443232256,
+          "workerHeap": 166552856,
+          "compilerRss": 443633664,
+          "combinedRss": 1053249536,
+          "combinedHeap": 225917080
+        },
+        {
+          "at": 28769.278381,
+          "daemonRss": 166383616,
+          "daemonHeapUsed": 59453432,
+          "external": 4269101,
+          "workerRss": 443232256,
+          "workerHeap": 166552856,
+          "compilerRss": 443633664,
+          "combinedRss": 1053249536,
+          "combinedHeap": 226006288
+        },
+        {
+          "at": 28894.331812,
+          "daemonRss": 166383616,
+          "daemonHeapUsed": 59540952,
+          "external": 4363223,
+          "workerRss": 443232256,
+          "workerHeap": 166552856,
+          "compilerRss": 443633664,
+          "combinedRss": 1053249536,
+          "combinedHeap": 226093808
+        },
+        {
+          "at": 29021.998967,
+          "daemonRss": 166383616,
+          "daemonHeapUsed": 59628640,
+          "external": 4457345,
+          "workerRss": 443232256,
+          "workerHeap": 166552856,
+          "compilerRss": 443633664,
+          "combinedRss": 1053249536,
+          "combinedHeap": 226181496
+        },
+        {
+          "at": 29149.371164,
+          "daemonRss": 166383616,
+          "daemonHeapUsed": 59716280,
+          "external": 4551467,
+          "workerRss": 443232256,
+          "workerHeap": 166552856,
+          "compilerRss": 443633664,
+          "combinedRss": 1053249536,
+          "combinedHeap": 226269136
+        },
+        {
+          "at": 29275.640399,
+          "daemonRss": 166383616,
+          "daemonHeapUsed": 59803952,
+          "external": 4645589,
+          "workerRss": 443232256,
+          "workerHeap": 166552856,
+          "compilerRss": 443633664,
+          "combinedRss": 1053249536,
+          "combinedHeap": 226356808
+        },
+        {
+          "at": 29400.514533,
+          "daemonRss": 166383616,
+          "daemonHeapUsed": 59891728,
+          "external": 4747903,
+          "workerRss": 443232256,
+          "workerHeap": 166552856,
+          "compilerRss": 443633664,
+          "combinedRss": 1053249536,
+          "combinedHeap": 226444584
+        },
+        {
+          "at": 29525.571467,
+          "daemonRss": 166383616,
+          "daemonHeapUsed": 59979520,
+          "external": 4842025,
+          "workerRss": 443232256,
+          "workerHeap": 166552856,
+          "compilerRss": 443633664,
+          "combinedRss": 1053249536,
+          "combinedHeap": 226532376
+        },
+        {
+          "at": 29652.607396,
+          "daemonRss": 166383616,
+          "daemonHeapUsed": 63524736,
+          "external": 6389914,
+          "workerRss": 421220352,
+          "workerHeap": 181272304,
+          "compilerRss": 452022272,
+          "combinedRss": 1039626240,
+          "combinedHeap": 244797040
+        },
+        {
+          "at": 29778.938646,
+          "daemonRss": 166383616,
+          "daemonHeapUsed": 63612408,
+          "external": 6484036,
+          "workerRss": 421220352,
+          "workerHeap": 181272304,
+          "compilerRss": 452022272,
+          "combinedRss": 1039626240,
+          "combinedHeap": 244884712
+        },
+        {
+          "at": 29905.129841,
+          "daemonRss": 166383616,
+          "daemonHeapUsed": 63700048,
+          "external": 6578158,
+          "workerRss": 421220352,
+          "workerHeap": 181272304,
+          "compilerRss": 452022272,
+          "combinedRss": 1039626240,
+          "combinedHeap": 244972352
+        },
+        {
+          "at": 30030.837928,
+          "daemonRss": 166383616,
+          "daemonHeapUsed": 63787736,
+          "external": 6672280,
+          "workerRss": 421220352,
+          "workerHeap": 181272304,
+          "compilerRss": 452022272,
+          "combinedRss": 1039626240,
+          "combinedHeap": 245060040
+        },
+        {
+          "at": 30156.883008,
+          "daemonRss": 166383616,
+          "daemonHeapUsed": 63875256,
+          "external": 6766402,
+          "workerRss": 421220352,
+          "workerHeap": 181272304,
+          "compilerRss": 452022272,
+          "combinedRss": 1039626240,
+          "combinedHeap": 245147560
+        },
+        {
+          "at": 30282.024461,
+          "daemonRss": 166383616,
+          "daemonHeapUsed": 63964216,
+          "external": 6860524,
+          "workerRss": 421220352,
+          "workerHeap": 181272304,
+          "compilerRss": 452022272,
+          "combinedRss": 1039626240,
+          "combinedHeap": 245236520
+        },
+        {
+          "at": 30408.458098,
+          "daemonRss": 150798336,
+          "daemonHeapUsed": 23831008,
+          "external": 4251577,
+          "workerRss": 417951744,
+          "workerHeap": 182973296,
+          "compilerRss": 494227456,
+          "combinedRss": 1062977536,
+          "combinedHeap": 206804304
+        }
+      ],
+      "sampleCount": 152,
+      "peakDaemonRssBytes": 186978304,
+      "peakDaemonHeapUsedBytes": 63964216,
+      "peakCombinedRssBytes": 1070448640,
+      "peakCombinedHeapBytes": 277358712
+    },
+    "note": "100 ms daemon-status samples; combined values sum daemon, retained-session worker and compiler RSS/heap and may miss shorter spikes."
+  },
+  "toolkit": {
+    "revision": "rev/1:b7abfc8d-ffcd-4edd-97b0-b51fdf45df27:1",
+    "modules": 15,
+    "files": 469,
+    "outsideModuleFiles": 0,
+    "views": "measured",
+    "architectView": {
+      "files": 62,
+      "bytes": 844838
+    },
+    "measureDocument": "docs/plans/iteration-2c-module-measurements/evidence/toolkit-measure.json",
+    "consistency": "docs/plans/iteration-2c-module-measurements/evidence/toolkit-consistency.json"
+  },
+  "hitCost": {
+    "revision": {
+      "lines": 197,
+      "bytes": 121230,
+      "withinDeferredThresholds": false
+    },
+    "project": {
+      "lines": 559,
+      "bytes": 331756,
+      "withinDeferredThresholds": false
+    },
+    "session": {
+      "lines": 222,
+      "bytes": 130964,
+      "withinDeferredThresholds": false
+    },
+    "publish": {
+      "lines": 118,
+      "bytes": 85496,
+      "withinDeferredThresholds": false
+    },
+    "watch": {
+      "lines": 40,
+      "bytes": 23517,
+      "withinDeferredThresholds": true
+    },
+    "create": {
+      "lines": 207,
+      "bytes": 152329,
+      "withinDeferredThresholds": false
+    }
+  },
+  "priorPlan2b": {
+    "note": "Plan 2B thresholds were deferred evidence and were not passing gates.",
+    "toolkit": {
+      "revision": {
+        "lines": 187,
+        "bytes": 114298,
+        "withinLines": true,
+        "withinBytes": false,
+        "meanLineBytes": 611.2,
+        "maxLineBytes": 2370,
+        "meanHitCharacters": 563.9,
+        "byKind": {
+          "tests.jsonl": {
+            "lines": 56,
+            "bytes": 51384
+          },
+          "module.json": {
+            "lines": 19,
+            "bytes": 3288
+          },
+          "supporting.jsonl": {
+            "lines": 71,
+            "bytes": 39280
+          },
+          "behavior.jsonl": {
+            "lines": 35,
+            "bytes": 18085
+          },
+          "_meta.json": {
+            "lines": 1,
+            "bytes": 383
+          },
+          "README.md": {
+            "lines": 5,
+            "bytes": 1878
+          }
+        },
+        "byFile": {
+          "tests.jsonl": 2,
+          "presentation/module.json": 1,
+          "presentation/project-view/tests.jsonl": 1,
+          "presentation/project-view/supporting.jsonl": 1,
+          "presentation/project-view/behavior.jsonl": 2,
+          "service-api/tests.jsonl": 2,
+          "presentation/project-view/module.json": 2,
+          "service-api/behavior.jsonl": 2,
+          "service-api/module.json": 1,
+          "service-api/supporting.jsonl": 9,
+          "presentation/layout/module.json": 1,
+          "explorer/module.json": 1,
+          "explorer/tests.jsonl": 4,
+          "explorer/behavior.jsonl": 2,
+          "module.json": 1,
+          "explorer/supporting.jsonl": 4,
+          "integration-tests/module.json": 1,
+          "_meta.json": 1,
+          "supporting.jsonl": 3,
+          "README.md": 5,
+          "cli/tests.jsonl": 1,
+          "cli/module.json": 2,
+          "cli/supporting.jsonl": 3,
+          "analysis/tests.jsonl": 24,
+          "analysis/behavior.jsonl": 23,
+          "analysis/module.json": 2,
+          "analysis/supporting.jsonl": 23,
+          "analysis/project/module.json": 1,
+          "analysis/project/behavior.jsonl": 1,
+          "analysis/descriptions/module.json": 1,
+          "analysis/model/module.json": 1,
+          "daemon/tests.jsonl": 6,
+          "daemon/contexts/behavior.jsonl": 2,
+          "daemon/contexts/module.json": 2,
+          "daemon/contexts/tests.jsonl": 16,
+          "daemon/contexts/supporting.jsonl": 26,
+          "analysis/typescript/module.json": 1,
+          "daemon/module.json": 1,
+          "daemon/supporting.jsonl": 2,
+          "daemon/behavior.jsonl": 3
+        }
+      },
+      "project": {
+        "lines": 549,
+        "bytes": 325296,
+        "withinLines": false,
+        "withinBytes": false,
+        "meanLineBytes": 592.5,
+        "maxLineBytes": 2370,
+        "meanHitCharacters": 540.6,
+        "byKind": {
+          "tests.jsonl": {
+            "lines": 134,
+            "bytes": 115330
+          },
+          "module.json": {
+            "lines": 30,
+            "bytes": 5792
+          },
+          "behavior.jsonl": {
+            "lines": 166,
+            "bytes": 86501
+          },
+          "supporting.jsonl": {
+            "lines": 208,
+            "bytes": 113980
+          },
+          "README.md": {
+            "lines": 11,
+            "bytes": 3693
+          }
+        },
+        "byFile": {
+          "tests.jsonl": 5,
+          "service-api/module.json": 2,
+          "service-api/tests.jsonl": 7,
+          "service-api/behavior.jsonl": 14,
+          "service-api/supporting.jsonl": 26,
+          "presentation/project-view/tests.jsonl": 9,
+          "presentation/project-view/module.json": 5,
+          "presentation/project-view/supporting.jsonl": 61,
+          "presentation/project-view/behavior.jsonl": 51,
+          "presentation/module.json": 1,
+          "behavior.jsonl": 1,
+          "explorer/tests.jsonl": 5,
+          "integration-tests/tests.jsonl": 2,
+          "presentation/layout/behavior.jsonl": 1,
+          "presentation/layout/supporting.jsonl": 1,
+          "presentation/layout/module.json": 1,
+          "explorer/behavior.jsonl": 7,
+          "explorer/module.json": 2,
+          "module.json": 1,
+          "supporting.jsonl": 2,
+          "explorer/supporting.jsonl": 6,
+          "README.md": 11,
+          "daemon/tests.jsonl": 24,
+          "cli/tests.jsonl": 2,
+          "cli/behavior.jsonl": 1,
+          "cli/module.json": 1,
+          "cli/supporting.jsonl": 1,
+          "analysis/tests.jsonl": 53,
+          "daemon/behavior.jsonl": 8,
+          "daemon/module.json": 1,
+          "daemon/supporting.jsonl": 3,
+          "daemon/contexts/module.json": 3,
+          "daemon/contexts/behavior.jsonl": 2,
+          "analysis/behavior.jsonl": 27,
+          "daemon/contexts/tests.jsonl": 8,
+          "daemon/contexts/supporting.jsonl": 12,
+          "analysis/module.json": 3,
+          "analysis/project/tests.jsonl": 13,
+          "analysis/project/module.json": 5,
+          "analysis/supporting.jsonl": 34,
+          "analysis/model/module.json": 1,
+          "analysis/descriptions/tests.jsonl": 1,
+          "analysis/descriptions/module.json": 2,
+          "analysis/model/supporting.jsonl": 9,
+          "analysis/descriptions/supporting.jsonl": 3,
+          "analysis/project/supporting.jsonl": 35,
+          "analysis/project/behavior.jsonl": 36,
+          "analysis/typescript/tests.jsonl": 5,
+          "analysis/typescript/module.json": 2,
+          "analysis/typescript/behavior.jsonl": 18,
+          "analysis/typescript/supporting.jsonl": 15
+        }
+      },
+      "session": {
+        "lines": 214,
+        "bytes": 125847,
+        "withinLines": false,
+        "withinBytes": false,
+        "meanLineBytes": 588.1,
+        "maxLineBytes": 2370,
+        "meanHitCharacters": 542,
+        "byKind": {
+          "tests.jsonl": {
+            "lines": 64,
+            "bytes": 53965
+          },
+          "behavior.jsonl": {
+            "lines": 76,
+            "bytes": 34138
+          },
+          "supporting.jsonl": {
+            "lines": 65,
+            "bytes": 33204
+          },
+          "README.md": {
+            "lines": 5,
+            "bytes": 2386
+          },
+          "module.json": {
+            "lines": 4,
+            "bytes": 2154
+          }
+        },
+        "byFile": {
+          "tests.jsonl": 6,
+          "service-api/behavior.jsonl": 1,
+          "behavior.jsonl": 2,
+          "supporting.jsonl": 1,
+          "README.md": 5,
+          "analysis/behavior.jsonl": 72,
+          "analysis/tests.jsonl": 34,
+          "daemon/contexts/module.json": 1,
+          "daemon/contexts/tests.jsonl": 19,
+          "daemon/contexts/behavior.jsonl": 1,
+          "daemon/contexts/supporting.jsonl": 7,
+          "daemon/tests.jsonl": 5,
+          "analysis/module.json": 1,
+          "analysis/supporting.jsonl": 57,
+          "analysis/project/module.json": 1,
+          "analysis/typescript/module.json": 1
+        }
+      },
+      "publish": {
+        "lines": 118,
+        "bytes": 85058,
+        "withinLines": true,
+        "withinBytes": false,
+        "meanLineBytes": 720.8,
+        "maxLineBytes": 2370,
+        "meanHitCharacters": 676.3,
+        "byKind": {
+          "tests.jsonl": {
+            "lines": 60,
+            "bytes": 54137
+          },
+          "behavior.jsonl": {
+            "lines": 16,
+            "bytes": 8630
+          },
+          "supporting.jsonl": {
+            "lines": 39,
+            "bytes": 21008
+          },
+          "README.md": {
+            "lines": 2,
+            "bytes": 749
+          },
+          "module.json": {
+            "lines": 1,
+            "bytes": 534
+          }
+        },
+        "byFile": {
+          "tests.jsonl": 6,
+          "service-api/behavior.jsonl": 1,
+          "service-api/supporting.jsonl": 1,
+          "behavior.jsonl": 2,
+          "explorer/behavior.jsonl": 4,
+          "explorer/tests.jsonl": 1,
+          "explorer/supporting.jsonl": 6,
+          "supporting.jsonl": 3,
+          "README.md": 2,
+          "daemon/behavior.jsonl": 6,
+          "cli/tests.jsonl": 3,
+          "daemon/tests.jsonl": 26,
+          "analysis/tests.jsonl": 10,
+          "analysis/project/tests.jsonl": 1,
+          "analysis/supporting.jsonl": 6,
+          "analysis/behavior.jsonl": 2,
+          "analysis/model/tests.jsonl": 1,
+          "analysis/descriptions/tests.jsonl": 1,
+          "analysis/model/behavior.jsonl": 1,
+          "daemon/supporting.jsonl": 13,
+          "daemon/contexts/tests.jsonl": 11,
+          "daemon/contexts/module.json": 1,
+          "daemon/contexts/supporting.jsonl": 10
+        }
+      },
+      "watch": {
+        "lines": 40,
+        "bytes": 23517,
+        "withinLines": true,
+        "withinBytes": true,
+        "meanLineBytes": 587.9,
+        "maxLineBytes": 1849,
+        "meanHitCharacters": 542.1,
+        "byKind": {
+          "tests.jsonl": {
+            "lines": 16,
+            "bytes": 12545
+          },
+          "supporting.jsonl": {
+            "lines": 15,
+            "bytes": 7443
+          },
+          "behavior.jsonl": {
+            "lines": 5,
+            "bytes": 2457
+          },
+          "README.md": {
+            "lines": 3,
+            "bytes": 706
+          },
+          "module.json": {
+            "lines": 1,
+            "bytes": 366
+          }
+        },
+        "byFile": {
+          "tests.jsonl": 2,
+          "presentation/supporting.jsonl": 1,
+          "behavior.jsonl": 1,
+          "supporting.jsonl": 2,
+          "analysis/project/tests.jsonl": 1,
+          "analysis/tests.jsonl": 1,
+          "README.md": 3,
+          "cli/behavior.jsonl": 1,
+          "cli/supporting.jsonl": 2,
+          "daemon/tests.jsonl": 5,
+          "daemon/behavior.jsonl": 1,
+          "daemon/module.json": 1,
+          "daemon/supporting.jsonl": 1,
+          "daemon/contexts/behavior.jsonl": 2,
+          "daemon/contexts/tests.jsonl": 7,
+          "daemon/contexts/supporting.jsonl": 9
+        }
+      },
+      "create": {
+        "lines": 202,
+        "bytes": 148011,
+        "withinLines": false,
+        "withinBytes": false,
+        "meanLineBytes": 732.7,
+        "maxLineBytes": 2370,
+        "meanHitCharacters": 687,
+        "byKind": {
+          "tests.jsonl": {
+            "lines": 129,
+            "bytes": 113203
+          },
+          "behavior.jsonl": {
+            "lines": 54,
+            "bytes": 27507
+          },
+          "supporting.jsonl": {
+            "lines": 11,
+            "bytes": 5978
+          },
+          "README.md": {
+            "lines": 8,
+            "bytes": 1323
+          }
+        },
+        "byFile": {
+          "tests.jsonl": 10,
+          "presentation/tests.jsonl": 13,
+          "presentation/behavior.jsonl": 1,
+          "presentation/project-view/behavior.jsonl": 1,
+          "presentation/project-view/tests.jsonl": 2,
+          "service-api/tests.jsonl": 7,
+          "service-api/behavior.jsonl": 6,
+          "service-api/supporting.jsonl": 1,
+          "behavior.jsonl": 7,
+          "explorer/behavior.jsonl": 1,
+          "integration-tests/tests.jsonl": 1,
+          "README.md": 8,
+          "daemon/behavior.jsonl": 11,
+          "daemon/tests.jsonl": 36,
+          "daemon/contexts/behavior.jsonl": 9,
+          "daemon/contexts/tests.jsonl": 10,
+          "cli/tests.jsonl": 2,
+          "daemon/supporting.jsonl": 1,
+          "daemon/contexts/supporting.jsonl": 2,
+          "analysis/tests.jsonl": 21,
+          "analysis/behavior.jsonl": 10,
+          "analysis/project/tests.jsonl": 3,
+          "analysis/model/tests.jsonl": 8,
+          "analysis/descriptions/tests.jsonl": 1,
+          "analysis/typescript/behavior.jsonl": 7,
+          "analysis/typescript/supporting.jsonl": 4,
+          "analysis/model/behavior.jsonl": 1,
+          "analysis/typescript/tests.jsonl": 15,
+          "analysis/project/supporting.jsonl": 2,
+          "analysis/supporting.jsonl": 1
+        }
+      }
+    }
+  },
+  "policy": {
+    "selected": "measure",
+    "fixed": true,
+    "reason": "The measured architect session query, whole command, published size, and unchanged repeat remain within every agreed MM12 budget.",
+    "budgets": {
+      "architectSessionQuery": {
+        "measured": 1715.4,
+        "limit": 15000,
+        "holds": true
+      },
+      "architectCommand": {
+        "measured": 17145.1,
+        "limit": 90000,
+        "holds": true
+      },
+      "architectSize": {
+        "measured": 844838,
+        "limit": 8388608,
+        "holds": true
+      },
+      "unchangedRepeat": {
+        "measured": 0,
+        "limit": 0,
+        "holds": true
+      }
+    }
+  },
+  "failures": [],
+  "daemonStop": {
+    "stopExitCode": 0,
+    "runningAfterStop": false
+  },
+  "completedAt": "2026-09-19T11:58:28.479Z"
+}

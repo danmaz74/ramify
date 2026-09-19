@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  renderApiView, renderCodeFence, renderCodeSpan, renderDocument, renderEntry, renderMeta,
+  renderApiView, renderApiViewBounded, renderCodeFence, renderCodeSpan, renderDocument, renderEntry, renderMeta,
 } from '../api-view-documents.js';
 import type {
   ApiViewAreaProjection, ApiViewEntry, ApiViewFile, ApiViewModuleProjection, ApiViewProjection,
@@ -175,5 +175,67 @@ describe('renderApiView area/target shape', () => {
   it('omits both targets when the module has no ordinary source area (no src/, so no src/tests/ either)', () => {
     const targets = renderApiView(projection([moduleProjection('x', 'subs/x', null, null)]), 'rev-1');
     expect(targets).toHaveLength(0);
+  });
+});
+
+describe('bounded API-view measurement (MM07, MM15)', () => {
+  it('accepts exact area and aggregate byte limits and refuses one byte less without partial totals', async () => {
+    const ordinary = area('ordinary', 'src', [file('external', 'quoted-😀.ts', [
+      entry('say"\\😀', 'value', described('say', 'function say(input: "😀"): void;', 'Escaped \\ text 😀.')),
+    ])]);
+    const tests = area('tests', 'src/tests', [file('external', 'test.ts', [entry('test', 'value', described('test', 'function test(): void;'))])]);
+    const value = projection([moduleProjection('root', '', ordinary, tests)]);
+    const expected = renderApiView(value, 'rev-1');
+    const sizes = expected.map(target => target.files.reduce((sum, item) => sum + item.bytes.byteLength, 0));
+    const total = sizes.reduce((sum, size) => sum + size, 0);
+    const exact = await renderApiViewBounded(value, 'rev-1', { maxAreaBytes: Math.max(...sizes), maxInvocationBytes: total,
+      keep: () => true });
+    expect(exact).toEqual({ status: 'rendered', views: { root: { ordinaryBytes: sizes[0], testsBytes: sizes[1] } }, areas: expected });
+    expect(await renderApiViewBounded(value, 'rev-1', { maxAreaBytes: sizes[0]! - 1, maxInvocationBytes: total }))
+      .toMatchObject({ status: 'unavailable', reason: 'resource-unavailable' });
+    const aggregate = await renderApiViewBounded(value, 'rev-1', { maxAreaBytes: Math.max(...sizes), maxInvocationBytes: total - 1 });
+    expect(aggregate).toMatchObject({ status: 'unavailable', reason: 'resource-unavailable' });
+    expect(aggregate).not.toHaveProperty('views');
+  });
+
+  it('checks many records and large chunks for cancellation/revision change, then releases state for recovery', async () => {
+    const many = Array.from({ length: 300 }, (_, index) => file('external', `file-${String(index).padStart(3, '0')}.ts`, [
+      entry(`name-${index}`, 'value', described(`name-${index}`, `const value${index}: "😀";`)),
+    ]));
+    const value = projection([moduleProjection('root', '', area('ordinary', 'src', many))]);
+    const controller = new AbortController();
+    let checks = 0;
+    const cancelled = await renderApiViewBounded(value, 'rev-1', { maxAreaBytes: 32 * 1024 ** 2,
+      maxInvocationBytes: 256 * 1024 ** 2, signal: controller.signal,
+      current: () => { if (++checks === 40) controller.abort(); return true; } });
+    expect(cancelled).toEqual({ status: 'cancelled' });
+    let currentChecks = 0;
+    expect(await renderApiViewBounded(value, 'rev-1', { maxAreaBytes: 32 * 1024 ** 2,
+      maxInvocationBytes: 256 * 1024 ** 2, current: () => ++currentChecks < 40 }))
+      .toEqual({ status: 'superseded' });
+    const large = projection([moduleProjection('root', '', area('ordinary', 'src', [
+      file('external', 'large.ts', [entry('large', 'value', described('large', `const large: "${'😀'.repeat(300_000)}";`))]),
+    ]))]);
+    const bytes = renderApiView(large, 'rev-2')[0]!.files.reduce((sum, item) => sum + item.bytes.byteLength, 0);
+    expect(await renderApiViewBounded(large, 'rev-2', { maxAreaBytes: bytes, maxInvocationBytes: bytes }))
+      .toMatchObject({ status: 'rendered', views: { root: { ordinaryBytes: bytes, testsBytes: 0 } } });
+    expect(await renderApiViewBounded(value, 'rev-1', { maxAreaBytes: 32 * 1024 ** 2,
+      maxInvocationBytes: 256 * 1024 ** 2 })).toMatchObject({ status: 'rendered' });
+  });
+
+  it('keeps many owners uniform without retaining measurement-only buffers', async () => {
+    const value = projection(Array.from({ length: 300 }, (_, index) => moduleProjection(
+      `root/module-${String(index).padStart(3, '0')}`, `subs/module-${index}`,
+      area('ordinary', `subs/module-${index}/src`, []),
+    )));
+    const rendered = await renderApiViewBounded(value, 'rev-many', {
+      maxAreaBytes: 32 * 1024 ** 2, maxInvocationBytes: 256 * 1024 ** 2,
+    });
+    expect(rendered.status).toBe('rendered');
+    if (rendered.status === 'rendered') {
+      expect(Object.keys(rendered.views)).toHaveLength(300);
+      expect(rendered.areas).toEqual([]);
+      expect(Object.values(rendered.views).every(view => view.ordinaryBytes > 0 && view.testsBytes === 0)).toBe(true);
+    }
   });
 });

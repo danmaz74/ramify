@@ -236,7 +236,7 @@ export function validateWireMessage(input: unknown): WireMessage {
       && shape(value.handshake.client, ['name', 'version']) && string(value.handshake.client.name) && string(value.handshake.client.version); break;
     case 'welcome': valid = shape(value, ['type', 'welcome']) && shape(value.welcome, ['protocol', 'instance', 'capabilities', 'limits'])
       && value.welcome.protocol === 'ramify.ipc/1' && instance(value.welcome.instance)
-      && Array.isArray(value.welcome.capabilities) && value.welcome.capabilities.every(item => ['contexts', 'check', 'subscribe', 'daemon-control', 'materialize', 'explorerDetails', 'dependencyDiagram', 'materialize-views'].includes(item))
+      && Array.isArray(value.welcome.capabilities) && value.welcome.capabilities.every(item => ['contexts', 'check', 'subscribe', 'daemon-control', 'materialize', 'measure', 'explorerDetails', 'dependencyDiagram', 'materialize-views'].includes(item))
       && shape(value.welcome.limits, ['maxRequestBytes', 'maxResponseBytes', 'leaseMs', 'pingMs'])
       && Object.values(value.welcome.limits).every(item => integer(item) && item > 0); break;
     case 'reject': valid = shape(value, ['type', 'error', 'daemon']) && error(value.error) && instance(value.daemon); break;

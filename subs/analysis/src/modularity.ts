@@ -30,6 +30,7 @@ import {
 } from './modularity-context.js';
 import { boundaryMetrics, cycleComponents, edgeGroups, edgeMetrics, stabilityMetrics, viewSummary } from './modularity-graph.js';
 import { behaviorByOwner, behaviorTotal, connectedness, contextSize, exposedOriginals, interfaceUse } from './modularity-owner.js';
+import { resolveDeclaredMeasurementInputs, type ResolvedDocumentationFile, type ResolvedMeasurementFile } from './module-measurements.js';
 
 /**
  * Pure projection of one completed analysis report into the modularity report
@@ -44,7 +45,13 @@ export function projectModularity(input: ModularityInput): ModularityOutcome {
   }
   const resolved = resolveOwnership(report, input.ownership);
   if (resolved.status === 'invalid') return { status: 'invalid-ownership', issues: resolved.issues };
-  const projected = project(input.revision, report, resolved.ownership, input.limits.maxBoundaryChanges);
+  const measurement = resolveDeclaredMeasurementInputs(report.snapshot.inventory, report.snapshot.areas, report.snapshot.inputs);
+  if (measurement.status === 'unavailable') {
+    return { status: 'unavailable', reason: 'analysis-incomplete', message: measurement.message };
+  }
+  const measurementFiles = measurement.files.map(file => ({ ...file, owner: resolved.ownership.ownerOf(file.path) ?? file.owner }));
+  const projected = project(input.revision, report, resolved.ownership, measurementFiles,
+    measurement.documentation, input.limits.maxBoundaryChanges);
   const bytes = Buffer.byteLength(JSON.stringify(projected), 'utf8');
   if (bytes > input.limits.maxReportBytes) {
     return { status: 'unavailable', reason: 'resource-limit',
@@ -53,13 +60,16 @@ export function projectModularity(input: ModularityInput): ModularityOutcome {
   return { status: 'projected', report: projected };
 }
 
-function project(revision: string, report: CompleteReport, ownership: OwnershipResolver, maxBoundaryChanges: number): ModularityReport {
+function project(revision: string, report: CompleteReport, ownership: OwnershipResolver,
+  measurementFiles: readonly ResolvedMeasurementFile[], documentationFiles: readonly ResolvedDocumentationFile[],
+  maxBoundaryChanges: number): ModularityReport {
   const coverage = new CoverageFacts(report);
   const originals = new OriginalFacts(report);
   const tree = new OwnershipTree(ownership);
   const occurrences = report.snapshot.accesses.map(access => resolveOccurrence(access, ownership, originals));
   const facts = (['production', 'test'] as const).map(filter => viewFacts(report, filter, ownership, occurrences));
-  const views = facts.map(view => projectView(report, view, ownership, tree, coverage, originals));
+  const views = facts.map(view => projectView(report, view, ownership, tree, coverage, originals,
+    measurementFiles, documentationFiles));
   const collected = views.flatMap(viewCoverage);
   const partial = collected.length > 0 || report.outcome.coverage === 'partial';
   const detail: MetricCoverage = {
@@ -100,7 +110,8 @@ function provenance(revision: string, report: CompleteReport, ownership: Ownersh
 }
 
 function projectView(report: CompleteReport, view: ViewFacts, ownership: OwnershipResolver, tree: OwnershipTree,
-  coverage: CoverageFacts, originals: OriginalFacts): ModularityView {
+  coverage: CoverageFacts, originals: OriginalFacts, measurementFiles: readonly ResolvedMeasurementFile[],
+  documentationFiles: readonly ResolvedDocumentationFile[]): ModularityView {
   const { filter } = view;
   const edges = edgeGroups(view);
   const exposed = ownership.declaredExposure ? exposedOriginals(report, view, ownership, originals) : new Map();
@@ -119,8 +130,8 @@ function projectView(report: CompleteReport, view: ViewFacts, ownership: Ownersh
         : behavior.owners.get(owner) ?? behaviorTotal({ owners: new Map(), failure: behavior.failure }, coverage),
       connectedness: connectedness(report, view, owner, exposed.get(owner) ?? [], coverage, ownership),
       context: {
-        exact: contextSize(report, view, exact, exposed, coverage, ownership),
-        subtree: contextSize(report, view, subtree, exposed, coverage, ownership),
+        exact: contextSize(report, view, exact, exposed, coverage, ownership, measurementFiles, documentationFiles),
+        subtree: contextSize(report, view, subtree, exposed, coverage, ownership, measurementFiles, documentationFiles),
       },
     };
   });

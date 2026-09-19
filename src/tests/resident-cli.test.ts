@@ -267,7 +267,8 @@ describe('resident materialize with views (AV28)', () => {
       // One publish call carried both views, and published every target of both: the API areas, then the architect view.
       expect(publishes).toHaveLength(1);
       const [publish] = publishes;
-      expect(publish!.input.api).not.toBeNull();
+      expect(publish!.input.api).toBeNull();
+      expect(publish!.input.renderedApi).toHaveLength(3);
       expect(publish!.input.architect).toMatchObject({ modules: 2, dependencies: 'measured' });
       if (publish!.outcome.status !== 'published') throw new Error(JSON.stringify(publish!.outcome));
       expect(publish!.outcome.targets.map(target => [target.view, target.path])).toEqual([['api', 'src/.ramify'],

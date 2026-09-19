@@ -548,7 +548,8 @@ export async function inProcessArchitectFacts(root: string): Promise<InProcessFa
       inputId: query.inputId, projectionBytes: projection.bytes, timings: { openMs, queryMs, analyzerMs },
       render(revision) {
         const view = renderArchitectView({ revision, projection,
-          dependencies: { state: 'measured', facts: outcome.diagram, testReferences: outcome.testReferences } });
+          dependencies: { state: 'measured', facts: outcome.diagram, testReferences: outcome.testReferences },
+          measurements: { state: 'unavailable', reason: 'analysis-failed' } });
         return { files: new Map(view.files.map(file => [file.path, file.text])), modules: view.modules, records: view.records, bytes: view.bytes };
       },
     };
@@ -998,7 +999,9 @@ export async function renderedInstructionBlock(): Promise<string> {
     modules: [{ module: 'm', dir: '', parent: null, children: [], tags: [], areas: [], purpose: { state: 'missing' as const }, docs: [],
       files: { own: 0, subtree: 0 } }], symbols: [], tests: [],
     counts: { coverage: 0, detailsUnavailable: 0, unknownShapes: 0, dynamicTitles: 0, testsUnavailable: 0, cut: 0 }, bytes: 0 };
-  const view = renderArchitectView({ revision: 'rev/1:0:1', projection, dependencies: { state: 'unavailable', reason: 'analysis-failed' } });
+  const view = renderArchitectView({ revision: 'rev/1:0:1', projection,
+    dependencies: { state: 'unavailable', reason: 'analysis-failed' },
+    measurements: { state: 'unavailable', reason: 'analysis-failed' } });
   const readme = view.files.find(file => file.path === 'README.md')!.text;
   const match = /^```text\n([\s\S]*?)\n```\n/.exec(readme);
   if (!match) throw new Error('The rendered README does not open with a text fence');

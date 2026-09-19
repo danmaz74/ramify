@@ -193,4 +193,10 @@ describe('BD23: service capability negotiation', () => {
     expect(decodeMessage(encodeMessage(message as never))).toEqual(message);
     for (const name of ['materialize-view', 'materializeViews']) expect(() => encodeMessage(welcome([name]) as never)).toThrow('Invalid IPC message schema');
   });
+  it('MM09: accepts the measure capability and rejects near names', () => {
+    const message = welcome(['contexts', 'check', 'measure']);
+    expect(decodeMessage(encodeMessage(message as never))).toEqual(message);
+    for (const name of ['measurements', 'module-measure']) expect(() => encodeMessage(welcome([name]) as never))
+      .toThrow('Invalid IPC message schema');
+  });
 });

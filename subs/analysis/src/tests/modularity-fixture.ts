@@ -1,7 +1,7 @@
 import { createDefaultTagRegistry } from '../../subs/model/src/index.js';
 import type { AccessResult, AnalysisReport, Capability } from '../interfaces/analysis.js';
 import type { Destination, ImportDecision, ImportReason, ModuleRecord, OriginalId, SourceArea } from '../../subs/model/src/interfaces/model.js';
-import type { InventoryFile } from '../../subs/project/src/interfaces/project.js';
+import type { CapturedInput, InventoryFile, InventoryModule } from '../../subs/project/src/interfaces/project.js';
 import type { AccessSelection, SourceAccess, SourceLimit } from '../../subs/typescript/src/interfaces/source.js';
 import type { DependencyBehaviorFact, DependencyBehaviorFacts } from '../../subs/typescript/src/interfaces/dependency-behavior.js';
 
@@ -13,7 +13,8 @@ import type { DependencyBehaviorFact, DependencyBehaviorFacts } from '../../subs
  * area-relative `OriginalId.file` the real analysis reports.
  */
 
-export interface FixtureModule { readonly id: string; readonly testing?: boolean }
+export interface FixtureModule { readonly id: string; readonly testing?: boolean;
+  readonly descriptionBytes?: number; readonly readmeBytes?: number | null }
 export interface FixtureFile { readonly path: string; readonly owner: string; readonly area?: 'ordinary' | 'tests';
   readonly kind?: 'source' | 'resource'; readonly bytes?: number; readonly state?: 'complete' | 'incomplete';
   readonly issueIds?: readonly string[] }
@@ -78,6 +79,26 @@ export function buildReport(spec: FixtureSpec): AnalysisReport {
     id: module.id, name: module.id.split('/').at(-1)!, parent: module.id.includes('/') ? module.id.slice(0, module.id.lastIndexOf('/')) : null,
     headerTags: module.testing ? ['testing'] : [], areas: areas.filter(item => item.owner === module.id),
   }));
+  const inventoryModules: InventoryModule[] = spec.modules.map(module => {
+    const dir = directory(module.id).replace(/\/$/, '');
+    const readme = dir ? `${dir}/README.md` : 'README.md';
+    return {
+      id: module.id, name: module.id.split('/').at(-1)!, parent: module.id.includes('/') ? module.id.slice(0, module.id.lastIndexOf('/')) : null,
+      directory: dir, headerTags: module.testing ? ['testing'] : [], areas: areas.filter(item => item.owner === module.id)
+        .map(item => ({ ...item, present: true })),
+      description: {} as InventoryModule['description'],
+      purpose: module.readmeBytes === null ? { state: 'missing-file', readme }
+        : { state: 'present', readme, paragraph: `${module.id} purpose.` },
+    };
+  });
+  const documentationInputs: CapturedInput[] = spec.modules.flatMap(module => {
+    const dir = directory(module.id).replace(/\/$/, '');
+    const at = (name: string) => dir ? `${dir}/${name}` : name;
+    return [
+      { path: at('module.ramify'), role: 'description' as const, sha256: 'd'.repeat(64), bytes: module.descriptionBytes ?? 10 },
+      { path: at('README.md'), role: 'readme' as const, sha256: 'r'.repeat(64), bytes: module.readmeBytes === null ? 0 : module.readmeBytes ?? 20 },
+    ];
+  });
   const inventoryFiles: InventoryFile[] = spec.files.map(file => ({ path: file.path, owner: file.owner, area: file.area ?? 'ordinary',
     kind: file.kind ?? 'source', sha256: '0'.repeat(64), bytes: file.bytes ?? 10 }));
   const accesses: SourceAccess[] = spec.accesses.map(access => {
@@ -150,8 +171,8 @@ export function buildReport(spec: FixtureSpec): AnalysisReport {
       executed: capability !== 'dependency-behavior' || behavior !== undefined })),
     stages: [], outcome: { execution: 'completed', check: 'passed', coverage: coverage.length ? 'partial' : 'complete' },
     snapshot: {
-      inventory: { scope, modules: [], files: inventoryFiles, references: [], outsideModuleFiles: [], warnings: [] },
-      areas, inputs: [],
+      inventory: { scope, modules: inventoryModules, files: inventoryFiles, references: [], outsideModuleFiles: [], warnings: [] },
+      areas, inputs: documentationInputs,
       catalog: {
         originals: spec.originals.map(original => ({ id: originalId(original.file, original.binding),
           origin: { file: original.file, area: area(original.file) }, declarations: [], hasValue: original.value ?? true,
@@ -177,7 +198,7 @@ export const paths = {
   main: 'src/main.ts', service: 'src/interfaces/service.ts',
   model: 'subs/core/src/model.ts', helper: 'subs/core/src/helper.ts',
   modelTest: 'subs/core/src/tests/model.test.ts', support: 'subs/core/src/tests/support.ts',
-  view: 'subs/ui/src/view.ts', styles: 'subs/ui/src/styles.d.ts', css: 'subs/ui/src/view.css',
+  view: 'subs/ui/src/view.ts', styles: 'subs/ui/src/styles.d.ts', css: 'subs/ui/src/guide.md',
   button: 'subs/ui/subs/widgets/src/button.ts', probe: 'subs/tools/src/probe.ts',
 } as const;
 
@@ -188,7 +209,8 @@ export const paths = {
  * Production: app→core, app→ui, ui↔widgets at runtime; core→app and ui→core type-only.
  */
 export const graphSpec: FixtureSpec = {
-  modules: [{ id: 'app' }, { id: 'app/core' }, { id: 'app/ui' }, { id: 'app/ui/widgets' }, { id: 'app/tools', testing: true }],
+  modules: [{ id: 'app' }, { id: 'app/core' }, { id: 'app/ui' }, { id: 'app/ui/widgets' },
+    { id: 'app/tools', testing: true, readmeBytes: null }],
   files: [
     { path: paths.main, owner: 'app', bytes: 100 }, { path: paths.service, owner: 'app', bytes: 50 },
     { path: paths.model, owner: 'app/core', bytes: 200 }, { path: paths.helper, owner: 'app/core', bytes: 20 },

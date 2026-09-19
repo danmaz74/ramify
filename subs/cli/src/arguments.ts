@@ -5,6 +5,7 @@ export const help = `Usage: ramify check [--root <dir>] [--format json] [--batch
        ramify watch [--root <dir>] [--format json]
        ramify materialize [--from <path>] [--all] [--root <dir>]
        ramify materialize --view <api|architect>... [--from <path> | --all] [--root <dir>]
+       ramify measure [--root <dir>] [--format json]
        ramify explore [--root <dir>]
        ramify daemon status|stop [--format json]
        ramify --help
@@ -42,6 +43,11 @@ dependency facts. Without --view, materialize refreshes the API view alone.
 --view is given. Every requested view comes from one revision and is published
 in one transaction.
 
+measure prints revision-bound context-size buckets for every module and the
+owned file inventory. --format json prints the ramify.measure/1 document;
+without it, measure prints a short exact/subtree table. It is a synchronized,
+whole-project daemon query: it writes nothing and never falls back to batch.
+
 explore selects one project through the resident daemon, starts or reuses that
 project's resident explorer server, prints its /analysis/latest URL, opens it in
 the platform browser and exits. The server keeps running after explore exits,
@@ -56,6 +62,9 @@ named configuration file).
 materialize: 0 every requested target complete, 1 the project is invalid,
 2 unavailable, partial/rollback failure, deadline, supersession or incompatible
 service, 130 interrupted.
+measure: 0 one complete document, 1 the project is invalid, 2 unavailable,
+pending, cold, deadline, supersession, resource refusal or incompatible service,
+130 interrupted.
 `;
 
 type Arguments = { readonly command: 'help' | 'version' }
@@ -66,6 +75,7 @@ type Arguments = { readonly command: 'help' | 'version' }
   | { readonly command: 'materialize'; readonly root?: string; readonly from?: string; readonly all: boolean;
       /** Present only when `--view` was given, in the order given. */
       readonly views?: readonly MaterializeViewId[] }
+  | { readonly command: 'measure'; readonly root?: string; readonly format: 'human' | 'json' }
   | { readonly command: 'explore'; readonly root?: string };
 
 /** Validate the entire invocation before dispatch, including duplicate flags. */
@@ -73,7 +83,7 @@ export function parseArguments(argv: readonly string[]): Arguments {
   if ((argv.length === 1 && argv[0] === '--help') || (argv.length === 2 && argv[0] === 'check' && argv[1] === '--help')) return { command: 'help' };
   if (argv.length === 1 && argv[0] === '--version') return { command: 'version' };
   const command = argv[0];
-  if (command !== 'check' && command !== 'watch' && command !== 'daemon' && command !== 'materialize' && command !== 'explore') {
+  if (command !== 'check' && command !== 'watch' && command !== 'daemon' && command !== 'materialize' && command !== 'measure' && command !== 'explore') {
     throw new Error(argv.length ? `Unavailable command: ${command}.` : 'Specify a command. Use ramify --help.');
   }
   const action = argv[1];
@@ -84,7 +94,7 @@ export function parseArguments(argv: readonly string[]): Arguments {
   let changed: string[] | undefined, since: string | undefined, deadlineMs: number | undefined;
   let from: string | undefined, all = false, views: MaterializeViewId[] | undefined;
   const flags = command === 'check' ? ['--root', '--format', '--batch', '--changed', '--since', '--deadline']
-    : command === 'watch' ? ['--root', '--format'] : command === 'materialize' ? ['--root', '--from', '--all', '--view']
+    : command === 'watch' || command === 'measure' ? ['--root', '--format'] : command === 'materialize' ? ['--root', '--from', '--all', '--view']
     : command === 'explore' ? ['--root'] : ['--format'];
   const seen = new Set<string>();
   for (let index = command === 'daemon' ? 2 : 1; index < argv.length; index++) {
@@ -143,6 +153,7 @@ export function parseArguments(argv: readonly string[]): Arguments {
       ...(since === undefined ? {} : { since }), ...(deadlineMs === undefined ? {} : { deadlineMs }) };
   }
   if (command === 'watch') return { command, ...project };
+  if (command === 'measure') return { command, ...project };
   if (command === 'materialize') {
     if (all && from !== undefined) throw new Error('--all cannot be combined with --from');
     if (views && !views.includes('api') && (all || from !== undefined)) throw new Error('--from and --all select the API view; add --view api');

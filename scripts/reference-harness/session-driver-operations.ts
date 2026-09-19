@@ -26,6 +26,7 @@ export function interceptSessionOperations(driver: AnalysisDriver, intercept: (
       releaseCompiler: session.releaseCompiler.bind(session),
       apiView: session.apiView.bind(session),
       architectView: session.architectView.bind(session),
+      measurements: session.measurements.bind(session),
       explorerDetails: session.explorerDetails.bind(session),
       dispose: session.dispose.bind(session),
     };

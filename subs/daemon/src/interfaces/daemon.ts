@@ -37,6 +37,10 @@ export interface DaemonServiceOptions {
   /** The injected dependency analyzer runner `dependencyDiagram` starts one job with.
    * Root assembly supplies the process runner; without one the operation is unavailable. */
   readonly dependencyDiagrams?: DependencyDiagramRunner;
+  /** Fixed for a daemon lifetime; production defaults to `measure`. */
+  readonly architectMetricsPolicy?: 'measure' | 'omit';
+  /** Direct calls reserve a conservative wire envelope within this ceiling. */
+  readonly maxResponseBytes?: number;
 }
 export interface ServiceLease {
   readonly id: string;
@@ -160,6 +164,8 @@ export interface StartDaemonOptions {
   readonly budgets: DaemonBudgets;
   readonly clock: ClockPort;
   readonly log: (entry: LogEntry) => void;
+  /** Test/compatibility override; production advertises the complete service set. */
+  readonly capabilities?: readonly ServiceCapability[];
 }
 export interface DaemonHost {
   readonly record: DaemonRecord;
@@ -187,11 +193,26 @@ export type WireMessage =
 
 /** The generated views one `publish` call can write. */
 export type MaterializedViewId = 'api' | 'architect';
+/** One encoded file within an API-view target. */
+export interface RenderedApiViewDocument {
+  readonly relativePath: string;
+  readonly bytes: Buffer;
+}
+/** One already-rendered API area, retained for publication by bounded measurement. */
+export interface RenderedApiViewArea {
+  readonly module: string;
+  readonly area: 'ordinary' | 'tests';
+  readonly root: string;
+  readonly files: readonly RenderedApiViewDocument[];
+  readonly entries: number;
+}
 /** What one `publish` call writes, in one transaction: the API view's
  * `.ramify` directories of a projection, and the rendered architect view at
  * `<root>/.ramify-architect`. `null` leaves that view untouched. */
 export interface PublishInput {
   readonly api: ApiViewProjection | null;
+  /** When present, these exact bounded-render buffers replace `api` rendering. */
+  readonly renderedApi?: readonly RenderedApiViewArea[];
   readonly architect: RenderedArchitectView | null;
 }
 /** Positive, finite byte ceilings the filesystem publisher enforces before

@@ -7,14 +7,18 @@ import type { RunControl } from '../../analysis/src/interfaces/analysis.js';
 import type { DependencyDiagramRunner } from '../../analysis/src/interfaces/dependency-analyzer.js';
 import type { ArchitectDependencies, RenderedArchitectView } from '../../analysis/src/interfaces/architect-view.js';
 import { renderArchitectView } from '../../analysis/src/architect-render.js';
+import type { ArchitectMeasurements, MeasurementViews } from '../../analysis/src/interfaces/measurements.js';
 import type { ApiViewQueryLimits, CheckOutcome, ContextEvent, ContextRevision, ContextStatus, ContextToken, OpenOutcome, SubscriptionHandle, Unavailable,
   UnavailableReason } from '../subs/contexts/src/interfaces/contexts.js';
 import { createContextManager } from '../subs/contexts/src/context-manager.js';
-import type { DaemonCounters, MaterializedArchitectSummary, MaterializeOutcome, MaterializeParams, RamifyService, ServiceErrorCode,
-  ServiceResult } from '../../../src/interfaces/service.js';
+import type { DaemonCounters, MaterializedArchitectSummary, MaterializeOutcome, MaterializeParams, MeasureDocument, MeasureOutcome,
+  MeasureParams, RamifyService, ServiceErrorCode, ServiceResult } from '../../../src/interfaces/service.js';
 import type { DaemonService, DaemonServiceOptions, ServiceLease, StopDisposition } from './interfaces/daemon.js';
 import { validateServiceRequest } from './validation.js';
 import { transportCounters } from './host-counters.js';
+import { architectMeasurements, measureApiViewBytes } from './measurements.js';
+import type { RenderedApiViewArea } from './interfaces/daemon.js';
+import { countJsonBytesBounded, measurementOwnershipRule } from './measure-response.js';
 
 /** `contracts.md`'s iteration-1 frozen `RetainedSession.apiView` bounds, and Plan 2B's
  * `architectView` bounds. Passed explicitly to `createContextManager`, rather than relying
@@ -45,6 +49,7 @@ function architectSummary(view: RenderedArchitectView, dependencies: ArchitectDe
 
 const serviceDiagnostics = channel('ramify.daemon.service');
 const stopRequests = new AsyncLocalStorage<string>();
+const responseBudgets = new AsyncLocalStorage<{ readonly maximumBytes: number; readonly requestId: string }>();
 
 /** The host supplies the wire envelope identity without changing StopParams. */
 export function withStopRequestId<T>(requestId: string, operation: () => T): T {
@@ -59,6 +64,8 @@ function domainError<T>(value: Unavailable): ServiceResult<T> {
 }
 
 export function createDaemonService(options: DaemonServiceOptions): DaemonService {
+  const directResponseBytes = options.maxResponseBytes ?? 128 * 1024 ** 2;
+  if (!Number.isSafeInteger(directResponseBytes) || directResponseBytes <= 0) throw new Error('Invalid measure response limit');
   const startedAt = options.clock.now();
   const counters = { revisions: 0, analyses: 0, cancelledAnalyses: 0, reusedRevisions: 0, coalescedEvents: 0,
     evictions: 0, rejectedRequests: 0, disconnectedSlowConsumers: 0, sweeps: 0, audits: 0, auditMismatches: 0,
@@ -102,6 +109,7 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
           report: session.report.bind(session), releaseRevision: session.releaseRevision.bind(session),
           status: session.status.bind(session), releaseCompiler: session.releaseCompiler.bind(session),
           apiView: session.apiView.bind(session), architectView: session.architectView.bind(session),
+          measurements: session.measurements.bind(session),
           explorerDetails: session.explorerDetails.bind(session), dispose: session.dispose.bind(session),
         };
         return { ...opened, session: counted };
@@ -239,10 +247,25 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
      * `withPublicationLock`, so a queued sibling invocation for the same root
      * cannot start until this one's publish (or non-projected outcome) settles. */
     async function runMaterialize(params: MaterializeParams, root: string, control?: RunControl): Promise<MaterializeOutcome> {
+      const started = options.clock.now();
+      const request = new AbortController();
+      let deadlineExpired = false;
+      const abort = (): void => request.abort(control?.signal?.reason);
+      control?.signal?.addEventListener('abort', abort, { once: true });
+      if (control?.signal?.aborted) abort();
+      let stopDeadline = (): void => {};
+      const requestControl = { signal: request.signal };
+      const interrupted = (revision: ContextRevision | null): MaterializeOutcome => deadlineExpired
+        ? { status: 'deadline-exceeded', requestId: params.requestId, revision, elapsedMs: options.clock.now() - started }
+        : { status: 'cancelled', requestId: params.requestId };
+      try {
       const lease = pair(params.token);
+      const metricsPolicy = options.architectMetricsPolicy ?? 'measure';
+      const wantsArchitect = (params.views ?? ['api']).includes('architect');
       const outcome = await manager.apiView({ token: params.token, requestId: params.requestId, freshness: params.freshness,
         selection: params.selection, ...(params.deadlineMs === undefined ? {} : { deadlineMs: params.deadlineMs }),
-        ...(params.views === undefined ? {} : { views: params.views }) }, lease, control);
+        ...(params.views === undefined ? {} : { views: params.views }),
+        ...(wantsArchitect ? { measureViews: metricsPolicy === 'measure' } : {}) }, lease, control);
       // `outcome.status === 'projected'` is checked first (a positive equality
       // narrow, which TS handles correctly) so every other branch below never
       // needs to touch `.revision`/`.projection`: TS does not narrow away the
@@ -251,25 +274,81 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
       // both of its literal values remove it from what a later branch sees),
       // so every branch here is an explicit positive check, never a fallthrough.
       if (outcome.status === 'projected') {
+        if (params.deadlineMs !== undefined) {
+          const remaining = params.deadlineMs - (options.clock.now() - started);
+          if (remaining <= 0) {
+            return { status: 'deadline-exceeded', requestId: params.requestId, revision: outcome.revision,
+              elapsedMs: options.clock.now() - started };
+          }
+          stopDeadline = options.clock.schedule(remaining, () => {
+            deadlineExpired = true; request.abort(new Error('Materialize deadline exceeded'));
+          });
+        }
+        const currentRevision = (): ContextRevision | null => {
+          const status = manager.status(params.token);
+          return 'status' in status ? null : status.published;
+        };
+        const revisionCurrent = (): boolean => currentRevision()?.revision === outcome.revision.revision;
         // The architect view waits for the dependency facts of the same revision, then renders;
         // either view's projection is null when it was not requested.
         let architect: { readonly view: RenderedArchitectView; readonly summary: MaterializedArchitectSummary } | null = null;
+        let renderedApi: readonly RenderedApiViewArea[] | undefined;
         if (outcome.architect) {
-          const waited = await waitForDependencies(params.token, params.requestId, outcome.revision, lease, control);
+          if (!outcome.measurements) {
+            return { status: 'unavailable', requestId: outcome.requestId, reason: 'analysis-failed',
+              message: 'Architect projection has no revision-bound inventory measurements' };
+          }
+          let measurements: ArchitectMeasurements;
+          if (metricsPolicy === 'omit') {
+            measurements = architectMeasurements(outcome.measurements, { state: 'unavailable', reason: 'not-requested' });
+          } else {
+            if (!outcome.measurementProjection) {
+              measurements = architectMeasurements(outcome.measurements,
+                { state: 'unavailable', reason: outcome.measurementFailure ?? 'analysis-failed' });
+            } else {
+              const selected = new Set<string>();
+              for (const module of outcome.projection?.modules ?? []) {
+                if (module.ordinary) selected.add(`${module.module}\0ordinary`);
+                if (module.tests) selected.add(`${module.module}\0tests`);
+              }
+              const rendered = await measureApiViewBytes(outcome.measurementProjection, outcome.revision.revision, {
+                maxAreaBytes: apiViewLimits.maxAreaBytes, maxInvocationBytes: apiViewLimits.maxInvocationBytes,
+                signal: request.signal, keep: (module, area) => selected.has(`${module}\0${area}`),
+                current: revisionCurrent,
+              });
+              if (rendered.status === 'cancelled') return interrupted(outcome.revision);
+              if (rendered.status === 'superseded') {
+                return { status: 'superseded', requestId: outcome.requestId, revision: outcome.revision };
+              }
+              if (rendered.status === 'unavailable') {
+                measurements = architectMeasurements(outcome.measurements,
+                  { state: 'unavailable', reason: rendered.reason });
+              } else {
+                measurements = architectMeasurements(outcome.measurements, 'measured', rendered.views);
+                renderedApi = rendered.areas;
+              }
+            }
+          }
+          const waited = await waitForDependencies(params.token, params.requestId, outcome.revision, lease, requestControl);
           if (waited.status === 'superseded') return { status: 'superseded', requestId: outcome.requestId, revision: waited.revision };
-          if (waited.status === 'cancelled') return { status: 'cancelled', requestId: outcome.requestId };
+          if (waited.status === 'cancelled') return interrupted(outcome.revision);
           if (waited.status === 'unavailable') return { status: 'unavailable', requestId: outcome.requestId, reason: waited.reason, message: waited.message };
           let view: RenderedArchitectView;
           try {
-            view = renderArchitectView({ revision: outcome.revision.revision, projection: outcome.architect, dependencies: waited.dependencies });
+            view = renderArchitectView({ revision: outcome.revision.revision, projection: outcome.architect,
+              dependencies: waited.dependencies, measurements });
           } catch (error) {
             return { status: 'unavailable', requestId: outcome.requestId, reason: 'analysis-failed', message: `Rendering the architect view failed: ${String(error)}` };
           }
           architect = { view, summary: architectSummary(view, waited.dependencies) };
         }
+        if (!revisionCurrent()) {
+          return { status: 'superseded', requestId: outcome.requestId, revision: currentRevision() };
+        }
         const published = await options.publisher.publish(root, outcome.revision.revision,
-          { api: outcome.projection, architect: architect?.view ?? null }, params.requestId, control);
-        if (published.status === 'cancelled') return { status: 'cancelled', requestId: outcome.requestId };
+          { api: renderedApi ? null : outcome.projection, ...(renderedApi ? { renderedApi } : {}),
+            architect: architect?.view ?? null }, params.requestId, requestControl);
+        if (published.status === 'cancelled') return interrupted(outcome.revision);
         if (published.status === 'unavailable') {
           // The publisher's own reason vocabulary ('invalid-path'/'resource-limit') is
           // one layer lower than MaterializeOutcome's frozen reason union, which has no
@@ -288,9 +367,110 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
       if (outcome.status === 'cold') return { status: 'cold', requestId: outcome.requestId, current: outcome.current };
       if (outcome.status === 'deadline-exceeded') return { status: 'deadline-exceeded', requestId: outcome.requestId, revision: outcome.revision, elapsedMs: outcome.elapsedMs };
       if (outcome.status === 'superseded') return { status: 'superseded', requestId: outcome.requestId, revision: outcome.revision };
-      if (outcome.status === 'cancelled') return { status: 'cancelled', requestId: outcome.requestId };
+      if (outcome.status === 'cancelled') return interrupted(null);
       if (outcome.status === 'unavailable') return { status: 'unavailable', requestId: outcome.requestId, reason: outcome.reason, message: outcome.message };
       throw new Error(`Unhandled apiView outcome status: ${(outcome as { status: string }).status}`);
+      } finally {
+        stopDeadline();
+        control?.signal?.removeEventListener('abort', abort);
+      }
+    }
+    /** Build one revision-bound measurement without publication. The contexts
+     * request supplies both inventory and the API projection from one pinned
+     * sequence; only API projection/render resource failure degrades views. */
+    async function runMeasure(params: MeasureParams, root: string, control?: RunControl): Promise<MeasureOutcome> {
+      const started = options.clock.now();
+      const request = new AbortController();
+      let deadlineExpired = false;
+      const abort = (): void => request.abort(control?.signal?.reason);
+      control?.signal?.addEventListener('abort', abort, { once: true });
+      if (control?.signal?.aborted) abort();
+      let stopDeadline = (): void => {};
+      const interrupted = (revision: ContextRevision | null): MeasureOutcome => deadlineExpired
+        ? { status: 'deadline-exceeded', requestId: params.requestId, revision, elapsedMs: options.clock.now() - started }
+        : { status: 'cancelled', requestId: params.requestId };
+      try {
+        const outcome = await manager.apiView({ token: params.token, requestId: params.requestId,
+          freshness: params.freshness, selection: { scope: 'all' }, views: [], measureViews: true,
+          measurementOnly: true, ...(params.deadlineMs === undefined ? {} : { deadlineMs: params.deadlineMs }) },
+        pair(params.token), control);
+        if (outcome.status === 'projected') {
+          if (params.deadlineMs !== undefined) {
+            const remaining = params.deadlineMs - (options.clock.now() - started);
+            if (remaining <= 0) return { status: 'deadline-exceeded', requestId: params.requestId,
+              revision: outcome.revision, elapsedMs: options.clock.now() - started };
+            stopDeadline = options.clock.schedule(remaining, () => {
+              deadlineExpired = true; request.abort(new Error('Measure deadline exceeded'));
+            });
+          }
+          const currentRevision = (): ContextRevision | null => {
+            const status = manager.status(params.token);
+            return 'status' in status ? null : status.published;
+          };
+          const revisionCurrent = (): boolean => currentRevision()?.revision === outcome.revision.revision;
+          if (!outcome.measurements) return { status: 'unavailable', requestId: outcome.requestId,
+            reason: 'analysis-failed', message: 'Measurement has no revision-bound inventory' };
+          if (outcome.measurements.inputId !== outcome.revision.fingerprints.inputId
+            || outcome.measurementProjection && (outcome.measurementProjection.inputId !== outcome.measurements.inputId
+              || outcome.measurementProjection.sequence !== outcome.measurements.sequence)) {
+            return { status: 'unavailable', requestId: outcome.requestId, reason: 'analysis-failed',
+              message: 'Measurement inventory and API projection do not describe one revision' };
+          }
+          let views: MeasurementViews;
+          let exactViews = {};
+          if (!outcome.measurementProjection) {
+            views = { state: 'unavailable', reason: outcome.measurementFailure ?? 'analysis-failed' };
+          } else {
+            const rendered = await measureApiViewBytes(outcome.measurementProjection, outcome.revision.revision, {
+              maxAreaBytes: apiViewLimits.maxAreaBytes, maxInvocationBytes: apiViewLimits.maxInvocationBytes,
+              signal: request.signal, keep: () => false, current: revisionCurrent,
+            });
+            if (rendered.status === 'cancelled') return interrupted(outcome.revision);
+            if (rendered.status === 'superseded') return { status: 'superseded', requestId: outcome.requestId,
+              revision: currentRevision() };
+            if (rendered.status === 'unavailable') views = { state: 'unavailable', reason: rendered.reason };
+            else { views = 'measured'; exactViews = rendered.views; }
+          }
+          let joined: ArchitectMeasurements;
+          try { joined = architectMeasurements(outcome.measurements, views, exactViews); }
+          catch (error) { return { status: 'unavailable', requestId: outcome.requestId,
+            reason: 'analysis-failed', message: `Joining module measurements failed: ${String(error)}` }; }
+          if (joined.state !== 'measured') return { status: 'unavailable', requestId: outcome.requestId,
+            reason: 'analysis-failed', message: `The current inventory cannot be measured: ${joined.reason}` };
+          const document: MeasureDocument = { schema: 'ramify.measure/1', revision: outcome.revision.revision,
+            root, ownershipRule: measurementOwnershipRule, views: joined.views, modules: joined.modules,
+            files: outcome.measurements.files, outsideModuleFiles: outcome.measurements.outsideModuleFiles };
+          const measured: Extract<MeasureOutcome, { readonly status: 'measured' }> = {
+            status: 'measured', requestId: outcome.requestId, freshness: outcome.freshness, document };
+          const transport = responseBudgets.getStore();
+          // A direct invocation reserves the largest legal request id so it can
+          // never succeed with a value the same configured transport would refuse.
+          const envelopeId = transport?.requestId ?? '~'.repeat(128);
+          const maximumBytes = transport?.maximumBytes ?? directResponseBytes;
+          const counted = await countJsonBytesBounded(
+            { type: 'response', id: envelopeId, result: { ok: true, value: measured } }, maximumBytes,
+            { signal: request.signal }, revisionCurrent);
+          if (counted.status === 'cancelled') return interrupted(outcome.revision);
+          if (counted.status === 'superseded') return { status: 'superseded', requestId: outcome.requestId,
+            revision: currentRevision() };
+          if (counted.status === 'exceeded') return { status: 'unavailable', requestId: outcome.requestId,
+            reason: 'resource-unavailable', message: `Measure response exceeds maxResponseBytes (${maximumBytes})` };
+          if (!revisionCurrent()) return { status: 'superseded', requestId: outcome.requestId, revision: currentRevision() };
+          return measured;
+        }
+        if (outcome.status === 'pending') return { status: 'pending', requestId: outcome.requestId, current: outcome.current };
+        if (outcome.status === 'cold') return { status: 'cold', requestId: outcome.requestId, current: outcome.current };
+        if (outcome.status === 'deadline-exceeded') return { status: 'deadline-exceeded', requestId: outcome.requestId,
+          revision: outcome.revision, elapsedMs: outcome.elapsedMs };
+        if (outcome.status === 'superseded') return { status: 'superseded', requestId: outcome.requestId, revision: outcome.revision };
+        if (outcome.status === 'cancelled') return interrupted(null);
+        if (outcome.status === 'unavailable') return { status: 'unavailable', requestId: outcome.requestId,
+          reason: outcome.reason, message: outcome.message };
+        throw new Error(`Unhandled measurement outcome status: ${(outcome as { status: string }).status}`);
+      } finally {
+        stopDeadline();
+        control?.signal?.removeEventListener('abort', abort);
+      }
     }
     const service: RamifyService = {
       async openContext(params, control) {
@@ -372,6 +552,15 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
         observe();
         return success(result.status === 'materialized' && result.timings
           ? { ...result, timings: Object.freeze({ ...result.timings, service: performance.now() - handling }) } : result);
+      },
+      async measure(params, control) {
+        const invalid = guard<MeasureOutcome>('measure', params); if (invalid) return invalid;
+        const status = manager.status(params.token);
+        if ('status' in status) return success({ status: 'unavailable', requestId: params.requestId,
+          reason: status.reason, message: status.message });
+        const result = await runMeasure(params, status.selection.root, control);
+        observe();
+        return success(result);
       },
       async subscribe(params, listener) {
         const invalid = guard<Awaited<ReturnType<RamifyService['subscribe']>> extends ServiceResult<infer T> ? T : never>('subscribe', params);
@@ -460,7 +649,8 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
 
 /** Shared request dispatch for actual IPC and codec-backed direct channels. */
 export async function dispatchServiceRequest(service: RamifyService, operation: string, params: unknown,
-  control?: RunControl, listener?: (event: ContextEvent) => void, requestId?: string): Promise<ServiceResult<unknown>> {
+  control?: RunControl, listener?: (event: ContextEvent) => void, requestId?: string,
+  maxResponseBytes?: number): Promise<ServiceResult<unknown>> {
   const input = params as never;
   switch (operation) {
     case 'openContext': return service.openContext(input, control);
@@ -469,6 +659,8 @@ export async function dispatchServiceRequest(service: RamifyService, operation: 
     case 'explorerDetails': return service.explorerDetails(input, control);
     case 'dependencyDiagram': return service.dependencyDiagram(input, control);
     case 'materialize': return service.materialize(input, control);
+    case 'measure': return maxResponseBytes === undefined || requestId === undefined ? service.measure(input, control)
+      : responseBudgets.run({ maximumBytes: maxResponseBytes, requestId }, () => service.measure(input, control));
     case 'subscribe': return listener ? service.subscribe(input, listener) : failure('invalid-request', 'Subscription listener is required');
     case 'unsubscribe': return service.unsubscribe(input);
     case 'closeContext': return service.closeContext(input);

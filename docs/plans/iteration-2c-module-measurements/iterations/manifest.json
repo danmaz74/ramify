@@ -1,0 +1,31 @@
+{
+  "createdAt": "2026-09-19T00:00:00.000Z",
+  "updatedAt": "2026-09-19T00:00:00.000Z",
+  "iterations": [
+    {
+      "file": "iteration1.md",
+      "index": 1,
+      "parallelGroup": null,
+      "title": "Specify and compute context size with documentation"
+    },
+    {
+      "file": "iteration2.md",
+      "index": 2,
+      "parallelGroup": null,
+      "title": "Measurement session operation, view bytes and architect view metrics"
+    },
+    {
+      "file": "iteration3.md",
+      "index": 3,
+      "parallelGroup": null,
+      "title": "The measure service operation"
+    },
+    {
+      "file": "iteration4.md",
+      "index": 4,
+      "parallelGroup": null,
+      "title": "Measure command, toolkit evidence and completion"
+    }
+  ],
+  "planPath": "main-plan.md"
+}

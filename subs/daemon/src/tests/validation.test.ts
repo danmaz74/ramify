@@ -9,7 +9,7 @@ const selection = { project: { cwd: '/project', scope: 'whole-project', configur
 const synchronized = { token, requestId: 'check-1', freshness: { mode: 'synchronized', expect: [] } };
 
 describe('service request structure', () => {
-  it('accepts all eight operation shapes without changing the input', () => {
+  it('accepts the basic operation shapes without changing the input', () => {
     const cases: readonly [string, unknown][] = [
       ['openContext', selection], ['contextStatus', { token }], ['check', synchronized],
       ['subscribe', { token }], ['unsubscribe', { subscription: 'subscription-1' }],
@@ -20,6 +20,19 @@ describe('service request structure', () => {
       expect(validateServiceRequest(operation, params), operation).toBeNull();
       expect(JSON.stringify(params)).toBe(before);
     }
+  });
+
+  it('MM09: accepts only synchronized measure requests with bounded optional deadlines', () => {
+    const params = { token, requestId: 'measure-1', freshness: { mode: 'synchronized', expect: [] } };
+    for (const deadlineMs of [undefined, 1, 600_000]) {
+      const request = deadlineMs === undefined ? params : { ...params, deadlineMs };
+      expect(validateServiceRequest('measure', request)).toBeNull();
+    }
+    for (const invalid of [
+      { ...params, freshness: { mode: 'published', wait: true } }, { ...params, deadlineMs: 0 },
+      { ...params, deadlineMs: 600_001 }, { ...params, selection: { scope: 'all' } },
+      { token, freshness: params.freshness },
+    ]) expect(validateServiceRequest('measure', invalid)?.code).toBe('invalid-request');
   });
 
   it('permits unsupported setups structurally so dispatch can return a domain outcome', () => {

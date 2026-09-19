@@ -11,6 +11,8 @@ import type {
 } from './interfaces/modularity.js';
 import type { Destination, ModuleId } from '../subs/model/src/interfaces/model.js';
 import type { DependencyBehaviorFact } from '../subs/typescript/src/interfaces/dependency-behavior.js';
+import type { ResolvedDocumentationFile, ResolvedMeasurementFile } from './module-measurements.js';
+import { candidateDocumentation, measureContextSize } from './module-measurements.js';
 import {
   byteOrder,
   crossOwner,
@@ -140,7 +142,8 @@ export function connectedness(report: CompleteReport, view: ViewFacts, owner: Mo
 
 export function contextSize(report: CompleteReport, view: ViewFacts, members: ReadonlySet<ModuleId>,
   exposed: ReadonlyMap<ModuleId, readonly ExposedOriginal[]>, coverage: CoverageFacts,
-  ownership: OwnershipResolver): Metric<ContextSize> {
+  ownership: OwnershipResolver, measurementFiles: readonly ResolvedMeasurementFile[],
+  documentationFiles: readonly ResolvedDocumentationFile[]): Metric<ContextSize> {
   const owners = [...members];
   const sources = owners.flatMap(owner => view.filesByOwner.get(owner) ?? []);
   const resources = owners.flatMap(owner => view.resourcesByOwner.get(owner) ?? []);
@@ -152,11 +155,12 @@ export function contextSize(report: CompleteReport, view: ViewFacts, members: Re
     accessOccurrences++;
     scope.occurrence(occurrence, true);
   }
+  const buckets = measureContextSize(measurementFiles,
+    ownership.mode === 'candidate' ? candidateDocumentation : documentationFiles, members);
+  const fileSize = view.filter === 'production' ? buckets.production : buckets.tests;
   return scope.metric({
-    sourceFiles: sources.length,
-    sourceBytes: sources.reduce((sum, path) => sum + view.sources.get(path)!.bytes, 0),
-    resourceFiles: resources.length,
-    resourceBytes: resources.reduce((sum, resource) => sum + resource.bytes, 0),
+    ...fileSize,
+    documentation: buckets.documentation,
     originals: report.snapshot.catalog.originals.filter(original => counted.has(original.origin.file)).length,
     exposedOriginals: ownership.declaredExposure
       ? owners.reduce((sum, owner) => sum + (exposed.get(owner)?.length ?? 0), 0) : null,

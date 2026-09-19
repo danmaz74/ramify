@@ -4,6 +4,7 @@ import type {
   AnalysisReport,
   CandidateOwnership,
   ChangeHistory,
+  ContextSize,
   Metric,
   ModularityLimits,
   ModularityReport,
@@ -32,7 +33,9 @@ const declaredModules: readonly OwnershipModule[] = [
 ];
 /** Splits `helper.ts` out of `app/core` into a new child. */
 const split: CandidateOwnership = { id: 'split-helpers',
-  modules: [...declaredModules, module('app/core/helpers')], files: [{ path: paths.helper, owner: 'app/core/helpers' }] };
+  modules: [...declaredModules, module('app/core/helpers')], files: [
+    { path: paths.helper, owner: 'app/core/helpers' }, { path: paths.css, owner: 'app/core/helpers' },
+  ] };
 /** Merges `app/ui/widgets` into `app/ui`. */
 const merge: CandidateOwnership = { id: 'merge-widgets',
   modules: declaredModules.filter(item => item.id !== 'app/ui/widgets'), files: [{ path: paths.button, owner: 'app/ui' }] };
@@ -61,6 +64,10 @@ const view = (result: ModularityReport, filter: 'production' | 'test'): Modulari
 const owner = (item: ModularityView, id: string): OwnerMetrics => item.owners.find(entry => entry.owner === id)!;
 const ratio = (numerator: number, denominator: number) =>
   ({ numerator, denominator, value: denominator === 0 ? null : numerator / denominator });
+const fileSize = (value: ContextSize) => ({
+  sourceFiles: value.sourceFiles, sourceBytes: value.sourceBytes,
+  resourceFiles: value.resourceFiles, resourceBytes: value.resourceBytes,
+});
 
 describe('candidate ownership: validation', () => {
   it('accepts a legal candidate as a positive control', () => {
@@ -115,7 +122,7 @@ describe('candidate ownership: validation', () => {
     expect(result.every(issue => issue.message.length > 0)).toBe(true);
     // Header tags change the classification of files an owner retains.
     expect(pairs(issues({ ...split, modules: split.modules.map(item => item.id === 'app/ui' ? module('app/ui', ['testing']) : item) })))
-      .toEqual([['classification-change', paths.styles], ['classification-change', paths.css], ['classification-change', paths.view]]);
+      .toEqual([['classification-change', paths.styles], ['classification-change', paths.view]]);
   });
 });
 
@@ -125,14 +132,18 @@ describe('candidate ownership: recomputed measures', () => {
   it('reproduces declared measures for the identity candidate, except exposure-dependent values', () => {
     const identity = projected({ id: 'identity', modules: [...declaredModules].reverse(),
       files: graphSpec.files.map(file => ({ path: file.path, owner: file.owner })) });
-    const withoutExposure = (result: ModularityReport) => JSON.parse(JSON.stringify(result.views, (key, value) =>
-      key === 'interfaceUse' || key === 'exposedOriginals' ? undefined : value));
-    expect(withoutExposure(identity)).toEqual(withoutExposure(declared));
+    const withoutCandidateUnavailable = (result: ModularityReport) => JSON.parse(JSON.stringify(result.views, (key, value) =>
+      key === 'interfaceUse' || key === 'exposedOriginals' || key === 'documentation' ? undefined : value));
+    expect(withoutCandidateUnavailable(identity)).toEqual(withoutCandidateUnavailable(declared));
     expect(identity.modules).toEqual(declared.modules);
     expect(identity.coverage).toEqual(declared.coverage);
     expect(identity.boundaryChanges).toEqual({ total: 0, changes: [], truncated: false });
     expect(declared.boundaryChanges).toBeNull();
     expect(owner(view(identity, 'production'), 'app/core').interfaceUse).toEqual({ state: 'unavailable', reason: 'candidate-exposure' });
+    for (const filtered of identity.views) for (const item of filtered.owners) {
+      expect(measured(item.context.exact).documentation).toEqual({ state: 'unavailable', reason: 'candidate-documentation' });
+      expect(measured(item.context.subtree).documentation).toEqual({ state: 'unavailable', reason: 'candidate-documentation' });
+    }
   });
 
   it('recomputes a split: new boundary, edge, behavioral dependency and null exposure values', () => {
@@ -157,7 +168,10 @@ describe('candidate ownership: recomputed measures', () => {
       expect(measured(item.context.subtree).exposedOriginals).toBeNull();
       for (const isolate of measured(item.connectedness).isolates) expect(isolate.exposedOriginals).toBeNull();
     }
-    expect(measured(owner(production, 'app/core/helpers').context.exact)).toMatchObject({ sourceFiles: 1, sourceBytes: 20, originals: 1 });
+    expect(measured(owner(production, 'app/core/helpers').context.exact)).toMatchObject({
+      sourceFiles: 1, sourceBytes: 20, resourceFiles: 1, resourceBytes: 7, originals: 1,
+      documentation: { state: 'unavailable', reason: 'candidate-documentation' },
+    });
     expect(result.boundaryChanges).toEqual({ total: 1, truncated: false, changes: [{ accessId: 'a03', filter: 'production',
       importer: paths.model, target: paths.helper, runtimeLoad: true, declared: { consumer: 'app/core', provider: 'app/core' },
       candidate: { consumer: 'app/core', provider: 'app/core/helpers' }, change: 'became-cross-owner' }] });
@@ -178,6 +192,31 @@ describe('candidate ownership: recomputed measures', () => {
     expect(measured(production.behavior)).toEqual({ behavioralDependencies: 2, nonBehavioralDependencies: 1 });
     expect(result.boundaryChanges!.changes.map(change => [change.accessId, change.change])).toEqual([
       ['a05', 'became-same-owner'], ['a06', 'became-same-owner']]);
+  });
+
+  it('preserves root context totals for splits and merges in both filters and scopes', () => {
+    for (const candidate of [split, merge]) {
+      const result = projected(candidate);
+      for (const filter of ['production', 'test'] as const) {
+        const declaredView = view(declared, filter);
+        const candidateView = view(result, filter);
+        expect(fileSize(measured(owner(candidateView, 'app').context.exact)))
+          .toEqual(fileSize(measured(owner(declaredView, 'app').context.exact)));
+        const declaredRoot = measured(owner(view(declared, filter), 'app').context.subtree);
+        const candidateRoot = measured(owner(view(result, filter), 'app').context.subtree);
+        expect(fileSize(candidateRoot)).toEqual(fileSize(declaredRoot));
+        const exact = candidateView.owners.map(item => measured(item.context.exact));
+        expect({
+          sourceFiles: exact.reduce((sum, value) => sum + value.sourceFiles, 0),
+          sourceBytes: exact.reduce((sum, value) => sum + value.sourceBytes, 0),
+          resourceFiles: exact.reduce((sum, value) => sum + value.resourceFiles, 0),
+          resourceBytes: exact.reduce((sum, value) => sum + value.resourceBytes, 0),
+        }).toEqual(fileSize(candidateRoot));
+        expect(candidateRoot.documentation).toEqual({ state: 'unavailable', reason: 'candidate-documentation' });
+      }
+    }
+    expect(fileSize(measured(owner(view(projected(merge), 'production'), 'app/ui').context.exact)))
+      .toEqual(fileSize(measured(owner(view(declared, 'production'), 'app/ui').context.subtree)));
   });
 
   it('classifies every boundary change kind in both filters, ordered by access id, and truncates at the limit', () => {

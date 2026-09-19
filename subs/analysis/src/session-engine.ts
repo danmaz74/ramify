@@ -13,6 +13,7 @@ import { planApiViewRequests, projectApiView } from './api-view.js';
 import { architectLimitIssue, planArchitectView, projectArchitectView } from './architect-view.js';
 import type { AnalysisDiagnostic, AnalysisInputs, AnalysisReport, RunControl } from './interfaces/analysis.js';
 import type { ArchitectViewQuery, ArchitectViewQueryOutcome } from './interfaces/architect-view.js';
+import type { InventoryModuleMeasurement, MeasurementFileRecord, SessionMeasurementsOutcome } from './interfaces/measurements.js';
 import type { ApiViewQuery, ApiViewQueryOutcome, FindingDelta, OperationTimings, RetainedSession, SessionChange, SessionInputs, SessionOpen,
   SessionExplorerDetailsOutcome, SessionRevision, SessionStatus, SessionUpdate, VerifyOutcome } from './interfaces/session.js';
 import { detached, diagnostic } from './report-data.js';
@@ -20,6 +21,7 @@ import { copyReport } from './report-copy.js';
 import { ReportDraft, WorkLimit, availableCapabilities } from './report.js';
 import type { PublishedReport } from './report.js';
 import { auditFacts } from './session-audit.js';
+import { measureContextSize, resolveDeclaredMeasurementInputs } from './module-measurements.js';
 import type { SessionFacts } from './session-facts.js';
 import { deepFreeze, diagnosticSurface, draftPublication, draftReport, factBytes, sortedPaths } from './session-facts.js';
 import { acquisitionDiagnostics, failureReport, invalidFacts, isCancellation, parseRefused, recomputeAll, revise, wholeCheckedSet,
@@ -426,6 +428,62 @@ class Session implements RetainedSession {
       }
       if (signal?.aborted) return { status: 'cancelled' };
       return projectArchitectView(facts, query.sequence, current.inputId, { details, shapes, tests, features: read.features }, query);
+    });
+  }
+
+  measurements(sequence: number, control: RunControl = {}): Promise<SessionMeasurementsOutcome> {
+    return this.#serialize(async () => {
+      if (control.signal?.aborted) return { status: 'cancelled' };
+      if (this.#disposed) {
+        return { status: 'unavailable', reason: 'invalid-revision', message: 'Retained session is disposed' };
+      }
+      const current = this.#current;
+      if (!current || sequence !== this.#sequence) {
+        return { status: 'unavailable', reason: 'invalid-revision',
+          message: `Sequence ${sequence} is not the session's current revision (${this.#sequence})` };
+      }
+      const facts = this.#state.facts;
+      if (!facts || facts.invalid || !facts.inventory || facts.areaIssues.length) {
+        return { status: 'unavailable', reason: 'invalid-current',
+          message: 'The current revision has no valid complete inventory' };
+      }
+      const resolved = resolveDeclaredMeasurementInputs(facts.inventory, facts.areas, current.inputs);
+      if (resolved.status === 'unavailable') {
+        return { status: 'unavailable', reason: 'analysis-failed', message: resolved.message };
+      }
+      const children = new Map<string, string[]>();
+      for (const module of facts.inventory.modules) {
+        if (module.parent === null) continue;
+        const list = children.get(module.parent) ?? [];
+        list.push(module.id);
+        children.set(module.parent, list);
+      }
+      const descendants = (owner: string): Set<string> => {
+        const found = new Set<string>();
+        const pending = [owner];
+        while (pending.length) {
+          const next = pending.pop()!;
+          if (found.has(next)) continue;
+          found.add(next);
+          pending.push(...children.get(next) ?? []);
+        }
+        return found;
+      };
+      const modules: InventoryModuleMeasurement[] = [...facts.inventory.modules]
+        .sort((a, b) => Buffer.compare(Buffer.from(a.id), Buffer.from(b.id)))
+        .map(module => ({
+          id: module.id, dir: module.directory === '.' ? '' : module.directory, parent: module.parent,
+          exact: measureContextSize(resolved.files, resolved.documentation, new Set([module.id])),
+          subtree: measureContextSize(resolved.files, resolved.documentation, descendants(module.id)),
+        }));
+      const files: MeasurementFileRecord[] = [...resolved.files, ...resolved.documentation]
+        .sort((a, b) => Buffer.compare(Buffer.from(a.path), Buffer.from(b.path)))
+        .map(({ path, owner, area, kind, bytes }) => ({ path, owner, area, kind, bytes }));
+      if (control.signal?.aborted) return { status: 'cancelled' };
+      return { status: 'measured', measurements: {
+        sequence, inputId: current.inputId, modules, files,
+        outsideModuleFiles: [...facts.inventory.outsideModuleFiles],
+      } };
     });
   }
 

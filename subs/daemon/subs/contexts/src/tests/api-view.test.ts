@@ -163,7 +163,7 @@ describe('ContextManager.apiView: requested views (AV26)', () => {
     } finally { await e.dispose(); }
   });
 
-  it('calls only the architect query for the architect view, at the pinned sequence, with the architect limits', async () => {
+  it('calls the architect query and the whole-project API projection for metrics at the pinned sequence', async () => {
     // Limits other than the defaults, so the query shows it received the manager's own.
     const limits = { ...testApiViewLimits, architect: { ...testApiViewLimits.architect, maxProjectionBytes: 4096,
       tests: { ...testApiViewLimits.architect.tests, maxTitlesPerRecord: 7 } } };
@@ -175,8 +175,20 @@ describe('ContextManager.apiView: requested views (AV26)', () => {
       if (result.status !== 'projected') throw new Error(result.status);
       expect([result.revision.sequence, result.projection, result.architect?.sequence]).toEqual([2, null, 2]);
       const session = e.script.sessions[0]!;
-      expect(session.apiViewCalls).toEqual([]);
+      expect(session.apiViewCalls).toEqual([{ sequence: 2, selection: { scope: 'all' }, details: limits.details,
+        maxAreaBytes: limits.maxAreaBytes, maxInvocationBytes: limits.maxInvocationBytes }]);
       expect(session.architectViewCalls).toEqual([{ sequence: 2, ...limits.architect }]);
+    } finally { await e.dispose(); }
+  });
+
+  it('keeps architect inventory measurements when the metrics-only API projection is unavailable', async () => {
+    const e = sessionEnvironment();
+    try {
+      const opened = await e.open();
+      e.script.apiViewPending.push(() => ({ status: 'unavailable', reason: 'resource-limit', message: 'all areas are too large' }));
+      const result = await e.manager.apiView(request(opened.token, 'architect-limited', ['architect']), 'lease');
+      expect(result).toMatchObject({ status: 'projected', projection: null, measurementProjection: null,
+        measurements: { sequence: 1 }, measurementFailure: 'resource-unavailable', architect: { sequence: 1 } });
     } finally { await e.dispose(); }
   });
 

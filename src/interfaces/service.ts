@@ -2,6 +2,7 @@ import type { RunControl } from '../../subs/analysis/src/interfaces/analysis.js'
 import type { ProjectRequest } from '../../subs/analysis/subs/project/src/interfaces/project.js';
 import type { ApiViewSelection } from '../../subs/analysis/src/interfaces/session.js';
 import type { ArchitectDependencyReason } from '../../subs/analysis/src/interfaces/architect-view.js';
+import type { MeasurementFileRecord, MeasurementViews, ModuleMeasurement } from '../../subs/analysis/src/interfaces/measurements.js';
 import type { MaterializedTarget } from '../../subs/daemon/src/interfaces/daemon.js';
 import type { ContextToken, ContextSetup, ContextStatus, ContextBudgets, CheckOutcome, Freshness, RevisionId,
   ContextRevision, FreshnessRecord, UnavailableReason, ReplyTimings,
@@ -9,9 +10,9 @@ import type { ContextToken, ContextSetup, ContextStatus, ContextBudgets, CheckOu
   DependencyDiagramRequest, ContextDependencyDiagramOutcome } from '../../subs/daemon/src/context-types.js';
 
 export type ServiceOperation = 'openContext' | 'contextStatus' | 'check' | 'subscribe'
-  | 'unsubscribe' | 'closeContext' | 'daemonStatus' | 'stopDaemon' | 'materialize' | 'explorerDetails' | 'dependencyDiagram';
+  | 'unsubscribe' | 'closeContext' | 'daemonStatus' | 'stopDaemon' | 'materialize' | 'measure' | 'explorerDetails' | 'dependencyDiagram';
 export type ServiceCapability = 'contexts' | 'check' | 'subscribe' | 'daemon-control' | 'materialize' | 'explorerDetails'
-  | 'dependencyDiagram'
+  | 'dependencyDiagram' | 'measure'
   /** `materialize` accepts `views`. */
   | 'materialize-views';
 export type ServiceErrorCode = 'invalid-request' | 'unsupported-operation'
@@ -119,6 +120,36 @@ export type MaterializeOutcome =
       readonly reason: UnavailableReason | 'invalid-location' | 'invalid-projection'
         | 'symlink' | 'output-failure' | 'rollback-failure';
       readonly message: string };
+/** One synchronized, read-only whole-project measurement request. */
+export interface MeasureParams {
+  readonly token: ContextToken;
+  readonly requestId: string;
+  readonly freshness: Extract<Freshness, { readonly mode: 'synchronized' }>;
+  readonly deadlineMs?: number;
+}
+/** The deterministic machine document returned by a successful measurement. */
+export interface MeasureDocument {
+  readonly schema: 'ramify.measure/1';
+  readonly revision: RevisionId;
+  readonly root: string;
+  readonly ownershipRule: string;
+  readonly views: MeasurementViews;
+  readonly modules: readonly ModuleMeasurement[];
+  readonly files: readonly MeasurementFileRecord[];
+  readonly outsideModuleFiles: readonly string[];
+}
+export type MeasureOutcome =
+  | { readonly status: 'measured'; readonly requestId: string;
+      readonly freshness: FreshnessRecord; readonly document: MeasureDocument }
+  | { readonly status: 'pending' | 'cold'; readonly requestId: string;
+      readonly current: ContextStatus }
+  | { readonly status: 'deadline-exceeded'; readonly requestId: string;
+      readonly revision: ContextRevision | null; readonly elapsedMs: number }
+  | { readonly status: 'superseded'; readonly requestId: string;
+      readonly revision: ContextRevision | null }
+  | { readonly status: 'cancelled'; readonly requestId: string }
+  | { readonly status: 'unavailable'; readonly requestId: string;
+      readonly reason: UnavailableReason; readonly message: string };
 export interface RamifyService {
   openContext(params: OpenContextParams, control?: RunControl): Promise<ServiceResult<OpenOutcome>>;
   contextStatus(params: ContextParams): Promise<ServiceResult<ContextStatus>>;
@@ -133,4 +164,5 @@ export interface RamifyService {
   daemonStatus(): Promise<ServiceResult<DaemonStatus>>;
   stopDaemon(params: StopParams): Promise<ServiceResult<StopAcknowledged>>;
   materialize(params: MaterializeParams, control?: RunControl): Promise<ServiceResult<MaterializeOutcome>>;
+  measure(params: MeasureParams, control?: RunControl): Promise<ServiceResult<MeasureOutcome>>;
 }

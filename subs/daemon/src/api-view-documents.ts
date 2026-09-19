@@ -1,6 +1,10 @@
 import type {
   ApiViewAreaProjection, ApiViewEntry, ApiViewFile, ApiViewProjection,
 } from '../../analysis/src/interfaces/session.js';
+import type { MeasurementViewSize } from '../../analysis/src/interfaces/measurements.js';
+import { setImmediate } from 'node:timers/promises';
+import type { RenderedApiViewArea as RenderedArea, RenderedApiViewDocument as RenderedDocument } from './interfaces/daemon.js';
+export type { RenderedApiViewArea as RenderedArea, RenderedApiViewDocument as RenderedDocument } from './interfaces/daemon.js';
 
 /**
  * Pure Markdown/`_meta.json` rendering for one materialized API-view
@@ -22,26 +26,22 @@ import type {
  * in that order.
  */
 
-/** One rendered file within a target `.ramify` directory, keyed by its path
- * relative to that directory (`<category>/<definingFile>.md`, or
- * `_meta.json`). `bytes` is the exact UTF-8 encoded file content. */
-export interface RenderedDocument {
-  readonly relativePath: string;
-  readonly bytes: Buffer;
+/** Bounds and interruption controls for an in-memory whole-project render. */
+export interface BoundedApiViewRenderOptions {
+  readonly maxAreaBytes: number;
+  readonly maxInvocationBytes: number;
+  readonly signal?: AbortSignal;
+  /** Keep buffers only for areas selected for publication. */
+  readonly keep?: (module: string, area: 'ordinary' | 'tests') => boolean;
+  /** A revision guard supplied by the caller at asynchronous checkpoints. */
+  readonly current?: () => boolean;
 }
-/** The complete rendered content of one module's ordinary or testing
- * generated directory: every document plus `_meta.json` last, in stable
- * order, ready for the publisher to stage under `<root>/.ramify`. */
-export interface RenderedArea {
-  readonly module: string;
-  readonly area: 'ordinary' | 'tests';
-  /** The source area's project-relative root (`ApiViewAreaProjection.root`),
-   * e.g. `"subs/x/src"` or `"subs/x/src/tests"`. The publisher appends
-   * `/.ramify` to obtain the target directory. */
-  readonly root: string;
-  readonly files: readonly RenderedDocument[];
-  readonly entries: number;
-}
+export type BoundedApiViewRenderOutcome =
+  | { readonly status: 'rendered'; readonly views: Readonly<Record<string, MeasurementViewSize>>;
+      readonly areas: readonly RenderedArea[] }
+  | { readonly status: 'cancelled' }
+  | { readonly status: 'superseded' }
+  | { readonly status: 'unavailable'; readonly reason: 'resource-unavailable' | 'analysis-failed'; readonly message: string };
 
 /** A code span delimiter longer than the longest backtick run inside
  * `content`, padded with a single space on each side when `content` starts or
@@ -131,4 +131,89 @@ export function renderApiView(projection: ApiViewProjection, revision: string): 
     if (module.tests) targets.push(renderArea(module.module, revision, module.tests));
   }
   return targets;
+}
+
+/**
+ * Render every API area through the publication encoder while enforcing exact
+ * encoded-byte ceilings before accepting a chunk. Measurement-only area
+ * buffers are released after their counts have been recorded; selected areas
+ * retain those same buffers for publication.
+ */
+export async function renderApiViewBounded(projection: ApiViewProjection, revision: string,
+  options: BoundedApiViewRenderOptions): Promise<BoundedApiViewRenderOutcome> {
+  const positive = (value: number): boolean => Number.isSafeInteger(value) && value > 0;
+  if (!positive(options.maxAreaBytes) || !positive(options.maxInvocationBytes)) {
+    return { status: 'unavailable', reason: 'analysis-failed', message: 'API view render limits must be positive safe integers' };
+  }
+  const interrupted = (): 'cancelled' | 'superseded' | null => options.signal?.aborted ? 'cancelled'
+    : options.current && !options.current() ? 'superseded' : null;
+  const views: Record<string, MeasurementViewSize> = {};
+  const retained: RenderedArea[] = [];
+  let total = 0, sinceYieldBytes = 0, sinceYieldRecords = 0;
+  const checkpoint = async (): Promise<'cancelled' | 'superseded' | null> => {
+    const stopped = interrupted();
+    if (stopped) return stopped;
+    if (sinceYieldRecords < 256 && sinceYieldBytes < 1024 * 1024) return null;
+    sinceYieldBytes = 0; sinceYieldRecords = 0;
+    await setImmediate();
+    return interrupted();
+  };
+  try {
+    for (const module of projection.modules) {
+      const initial = interrupted();
+      if (initial) return { status: initial };
+      const measured: { ordinaryBytes: number; testsBytes: number } = { ordinaryBytes: 0, testsBytes: 0 };
+      for (const area of [module.ordinary, module.tests]) {
+        if (!area) continue;
+        const files: RenderedDocument[] = [];
+        let areaBytes = 0, entries = 0;
+        const accept = async (bytes: Buffer, records: number): Promise<BoundedApiViewRenderOutcome | null> => {
+          if (areaBytes + bytes.byteLength > options.maxAreaBytes) {
+            return { status: 'unavailable', reason: 'resource-unavailable',
+              message: `Rendered API area ${module.module} ${area.area} exceeds ${options.maxAreaBytes} bytes` };
+          }
+          if (total + bytes.byteLength > options.maxInvocationBytes) {
+            return { status: 'unavailable', reason: 'resource-unavailable',
+              message: `Rendered API views exceed ${options.maxInvocationBytes} bytes` };
+          }
+          areaBytes += bytes.byteLength; total += bytes.byteLength;
+          sinceYieldBytes += bytes.byteLength; sinceYieldRecords += Math.max(records, 1);
+          const stopped = await checkpoint();
+          return stopped ? { status: stopped } : null;
+        };
+        for (const file of area.files) {
+          const chunks: Buffer[] = [];
+          const blocks = file.entries.length ? file.entries.map((entry, index) =>
+            `${index ? '\n\n' : ''}${renderEntry(entry)}${index === file.entries.length - 1 ? '\n' : ''}`) : ['\n'];
+          for (const [index, block] of blocks.entries()) {
+            const encoded = Buffer.from(block, 'utf8');
+            for (let offset = 0; offset < encoded.byteLength; offset += 1024 * 1024) {
+              const chunk = encoded.subarray(offset, Math.min(offset + 1024 * 1024, encoded.byteLength));
+              const stopped = await accept(chunk, offset === 0 && file.entries.length ? 1 : 0);
+              if (stopped) return stopped;
+              if (options.keep?.(module.module, area.area)) chunks.push(chunk);
+            }
+          }
+          if (options.keep?.(module.module, area.area)) {
+            files.push({ relativePath: documentPath(file), bytes: Buffer.concat(chunks) });
+          }
+          entries += file.entries.length;
+        }
+        const meta = renderMeta(module.module, revision, area);
+        const stopped = await accept(meta, 1);
+        if (stopped) return stopped;
+        if (options.keep?.(module.module, area.area)) files.push({ relativePath: '_meta.json', bytes: meta });
+        measured[area.area === 'ordinary' ? 'ordinaryBytes' : 'testsBytes'] = areaBytes;
+        if (options.keep?.(module.module, area.area)) {
+          retained.push({ module: module.module, area: area.area, root: area.root, files, entries });
+        }
+      }
+      views[module.module] = measured;
+    }
+    const final = interrupted();
+    return final ? { status: final } : { status: 'rendered', views, areas: retained };
+  } catch (error) {
+    return { status: 'unavailable', reason: 'analysis-failed',
+      message: `Rendering API views failed: ${error instanceof Error ? error.message : String(error)}` };
+  }
 }

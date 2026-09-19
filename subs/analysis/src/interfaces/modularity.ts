@@ -1,6 +1,7 @@
 import type { ModuleId, TagName } from '../../subs/model/src/interfaces/model.js';
 import type { AnalysisReport, Capability } from './analysis.js';
 import type { DependencyDiagramFacts } from './dependency-diagram.js';
+import type { MeasurementDocumentationSize } from './measurements.js';
 
 /**
  * Plain contract of the modularity projection. The units, filters, formulas,
@@ -124,11 +125,16 @@ export interface Connectedness {
 }
 
 // Section 9: context size.
+export type DocumentationSize = MeasurementDocumentationSize;
+export type ContextDocumentation = MeasurementDocumentationSize
+  | { readonly state: 'unavailable'; readonly reason: 'candidate-documentation' };
 export interface ContextSize {
   readonly sourceFiles: number;
   readonly sourceBytes: number;
   readonly resourceFiles: number;
   readonly resourceBytes: number;
+  /** Independent of the production/test source filter. */
+  readonly documentation: ContextDocumentation;
   readonly originals: number;
   /** Null under candidate ownership. */
   readonly exposedOriginals: number | null;

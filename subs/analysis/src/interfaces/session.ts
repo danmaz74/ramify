@@ -3,6 +3,7 @@ import type { CapturedInput, ObservedChange, OutsideSourceWarning } from '../../
 import type { SourceLimit, SymbolDetail, SymbolDetailLimits, SymbolDetailRequest } from '../../subs/typescript/src/interfaces/source.js';
 import type { AnalysisDiagnostic, AnalysisInputs, AnalysisReport, AnalysisSummary, RunControl } from './analysis.js';
 import type { ArchitectViewQuery, ArchitectViewQueryOutcome } from './architect-view.js';
+import type { SessionMeasurementsOutcome } from './measurements.js';
 
 /** Limits of one retained session; contexts owns request deadlines and sweep scheduling. */
 export interface SessionLimits {
@@ -128,6 +129,9 @@ export interface RetainedSession {
    * are read from disk only while their bytes equal the revision's captured
    * input; a changed one answers `superseded`. */
   architectView(query: ArchitectViewQuery, control?: RunControl): Promise<ArchitectViewQueryOutcome>;
+  /** Measure the current revision's retained inventory and captured module
+   * documentation. API-view bytes belong to the daemon and are not returned. */
+  measurements(sequence: number, control?: RunControl): Promise<SessionMeasurementsOutcome>;
   /** Read bounded symbol details only from the current valid revision and its
    * still-live compiler. This never rehydrates or substitutes a revision. */
   explorerDetails(sequence: number, requests: readonly SymbolDetailRequest[],

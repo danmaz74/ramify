@@ -13,6 +13,7 @@ import type { ContextRevision } from '../context-types.js';
 import type { QuickEnvironment } from '../../../../src/tests/quick-environment.js';
 import type { AnalysisReport, RunControl } from '../../../analysis/src/interfaces/analysis.js';
 import type { DependencyAnalyzerOutcome, DependencyDiagramRunner } from '../../../analysis/src/interfaces/dependency-analyzer.js';
+import type { ApiViewSelection } from '../../../analysis/src/interfaces/session.js';
 import type { ProjectRequest } from '../../../analysis/subs/project/src/interfaces/project.js';
 
 const roots: string[] = [], environments: QuickEnvironment[] = [];
@@ -235,15 +236,21 @@ async function until(condition: () => boolean, what: string): Promise<void> {
 
 /** A root module with one exported function and one test file that calls it, a controlled runner
  * and a publisher that records every input before publishing it for real. */
-async function architectFixture() {
+async function architectFixture(architectMetricsPolicy: 'measure' | 'omit' = 'measure', withChild = false) {
   const root = await mkdtemp(join(tmpdir(), 'ramify-materialize-views-')); roots.push(root);
   await mkdir(join(root, 'src/tests'), { recursive: true });
   await writeFile(join(root, 'module.ramify'), 'ramify 1\nmodule fixture\n');
   await writeFile(join(root, 'README.md'), '# Fixture\n\nThe fixture project.\n');
-  await writeFile(join(root, 'tsconfig.json'), '{"compilerOptions":{"types":[],"module":"ESNext","moduleResolution":"bundler"},"include":["src"]}');
+  await writeFile(join(root, 'tsconfig.json'), '{"compilerOptions":{"types":[],"module":"ESNext","moduleResolution":"bundler"},"include":["src","subs"]}');
   await writeFile(join(root, 'src/index.ts'), 'export function run(input: string): string { return input; }\nexport const value = 1;\n');
   await writeFile(join(root, 'src/tests/index.test.ts'),
     "import { run } from '../index.js';\ndescribe('run', () => { it('returns its input', () => { run('a'); }); });\n");
+  if (withChild) {
+    await mkdir(join(root, 'subs/child/src'), { recursive: true });
+    await writeFile(join(root, 'subs/child/module.ramify'), 'ramify 1\nmodule child\n');
+    await writeFile(join(root, 'subs/child/README.md'), '# Child\n\nA child fixture.\n');
+    await writeFile(join(root, 'subs/child/src/index.ts'), 'export const child = 1;\n');
+  }
   const controlled = controlledRunner();
   const inputs: PublishInput[] = [];
   const filesystem = createFilesystemApiViewPublisher({ maxAreaBytes: 32 * 1024 ** 2, maxArchitectBytes: 64 * 1024 ** 2,
@@ -251,7 +258,8 @@ async function architectFixture() {
   const publisher: ApiViewPublisher = { publish(target, revision, input, requestId, control) {
     inputs.push(input); return filesystem.publish(target, revision, input, requestId, control);
   } };
-  const environment = await createQuickEnvironment({}, { dependencyDiagrams: controlled.runner, publisher }); environments.push(environment);
+  const environment = await createQuickEnvironment({}, { dependencyDiagrams: controlled.runner, publisher,
+    architectMetricsPolicy }); environments.push(environment);
   // Every delay the service and its contexts schedule on the controlled clock, to find the dependency wait's pauses.
   const delays: number[] = [];
   const schedule = environment.clock.schedule.bind(environment.clock);
@@ -262,12 +270,16 @@ async function architectFixture() {
   if (!opened.ok || opened.value.status !== 'opened') throw new Error('Expected opened context');
   const token = opened.value.token;
   let sequence = 0;
-  const materialize = (views: readonly MaterializeViewId[] | undefined, control?: RunControl) => environment.service.materialize({
-    token, requestId: `materialize-${++sequence}`, freshness: { mode: 'synchronized', expect: [] }, selection: { scope: 'all' },
-    ...(views ? { views } : {}) }, control);
+  const materialize = (views: readonly MaterializeViewId[] | undefined, control?: RunControl, deadlineMs?: number,
+    selection: ApiViewSelection = { scope: 'all' }) => environment.service.materialize({
+    token, requestId: `materialize-${++sequence}`, freshness: { mode: 'synchronized', expect: [] }, selection,
+    ...(views ? { views } : {}), ...(deadlineMs === undefined ? {} : { deadlineMs }) }, control);
+  const measure = (control?: RunControl, deadlineMs?: number) => environment.service.measure({
+    token, requestId: `measure-${++sequence}`, freshness: { mode: 'synchronized', expect: [] },
+    ...(deadlineMs === undefined ? {} : { deadlineMs }) }, control);
   const ready = (revision: ContextRevision): DependencyAnalyzerOutcome => {
     const inputId = revision.fingerprints.inputId;
-    return { status: 'ready', diagram: { inputId, modules: ['fixture'], boundaries: [],
+    return { status: 'ready', diagram: { inputId, modules: withChild ? ['fixture', 'fixture/child'] : ['fixture'], boundaries: [],
       headline: { behavioralDependencies: 0, nonBehavioralDependencies: 0 }, coverage: { state: 'complete', unknownDependencies: 0, limitIds: [] } },
     testReferences: { inputId, files: [{ file: 'src/tests/index.test.ts', exercises: [{ kind: 'code', owner: 'fixture', file: 'index.ts', binding: 'run' }],
       unclassified: 0 }] }, behaviorRuns: 1, timings: { acquireMs: 1, classifyMs: 1, projectMs: 1, totalMs: 3 } };
@@ -279,7 +291,7 @@ async function architectFixture() {
     if (!status.ok || !status.value.published) throw new Error('Expected a published revision');
     return status.value.published;
   };
-  return { root, environment, token, project, runs: controlled.runs, inputs, delays, pauses, materialize, ready, view, meta, published };
+  return { root, environment, token, project, runs: controlled.runs, inputs, delays, pauses, materialize, measure, ready, view, meta, published };
 }
 
 describe('materialize views (AV25-AV27)', { timeout: 60_000 }, () => {
@@ -296,9 +308,13 @@ describe('materialize views (AV25-AV27)', { timeout: 60_000 }, () => {
     expect(result.value.targets).toEqual([expect.objectContaining({ view: 'architect', module: null, area: null, path: '.ramify-architect', changed: true })]);
     expect(f.inputs).toHaveLength(1);
     expect(f.inputs[0]!.api).toBeNull();
+    expect(f.inputs[0]!.renderedApi).toEqual([]);
     expect(f.inputs[0]!.architect).toMatchObject({ modules: 1, dependencies: 'measured' });
     expect(await f.meta()).toMatchObject({ schema: 'ramify.architect-view/1', revision: revision.revision, input: revision.fingerprints.inputId,
-      dependencies: 'measured', dependencyScope: 'production', testReferences: 'measured' });
+      dependencies: 'measured', dependencyScope: 'production', testReferences: 'measured', metrics: 'measured' });
+    expect(JSON.parse(await f.view('module.json'))).toMatchObject({ metrics: { state: 'measured', views: 'measured',
+      contextSize: { exact: { production: { sourceFiles: 1 }, tests: { sourceFiles: 1 },
+        documentation: { files: 2 }, views: { ordinaryBytes: expect.any(Number), testsBytes: expect.any(Number) } } } } });
     // The renderer received the references: the suite record names the function its file calls.
     expect((await f.view('tests.jsonl')).trim().split('\n').map(line => JSON.parse(line) as unknown)).toEqual([
       { module: 'fixture', file: 'src/tests/index.test.ts', suite: ['run'], tests: ['returns its input'], exercises: ['fixture#run'] }]);
@@ -349,7 +365,67 @@ describe('materialize views (AV25-AV27)', { timeout: 60_000 }, () => {
     // One transaction: the API targets and the architect target, which switches last.
     expect(f.inputs).toHaveLength(1);
     expect(result.value.targets.map(target => target.view)).toEqual(['api', 'api', 'architect']);
+    expect(f.inputs[0]!.api).toBeNull();
+    expect(f.inputs[0]!.renderedApi).toHaveLength(2);
+    const metrics = (JSON.parse(await f.view('module.json')) as { metrics: { contextSize: { exact: { views: { ordinaryBytes: number; testsBytes: number } } } } }).metrics;
+    const apiTargets = result.value.targets.filter(target => target.view === 'api');
+    expect(metrics.contextSize.exact.views).toEqual({ ordinaryBytes: apiTargets.find(target => target.area === 'ordinary')!.bytes,
+      testsBytes: apiTargets.find(target => target.area === 'tests')!.bytes });
     expect(await f.meta()).toMatchObject({ dependencies: 'measured', testReferences: 'measured' });
+  });
+
+  it('measures every module while combined publication retains only the selected module API target', async () => {
+    const f = await architectFixture('measure', true);
+    const pending = f.materialize(['api', 'architect'], undefined, undefined,
+      { scope: 'module', from: 'subs/child' });
+    await until(() => f.runs.length === 1, 'the dependency run');
+    f.runs[0]!.settle(f.ready(await f.published()));
+    const result = await pending;
+    if (!result.ok || result.value.status !== 'materialized') throw new Error(JSON.stringify(result));
+    const apiTargets = result.value.targets.filter(target => target.view === 'api');
+    expect(apiTargets).toEqual([expect.objectContaining({ module: 'fixture/child', area: 'ordinary' })]);
+    expect(f.inputs).toHaveLength(1);
+    expect(f.inputs[0]!.api).toBeNull();
+    expect(f.inputs[0]!.renderedApi).toEqual([
+      expect.objectContaining({ module: 'fixture/child', area: 'ordinary' }),
+    ]);
+
+    const root = JSON.parse(await f.view('module.json')) as { metrics: { contextSize: {
+      exact: { views: { ordinaryBytes: number; testsBytes: number } };
+      subtree: { views: { ordinaryBytes: number; testsBytes: number } } } } };
+    const child = JSON.parse(await f.view('child/module.json')) as { metrics: { contextSize: {
+      exact: { views: { ordinaryBytes: number; testsBytes: number } } } } };
+    expect(child.metrics.contextSize.exact.views.ordinaryBytes).toBe(apiTargets[0]!.bytes);
+    expect(root.metrics.contextSize.subtree.views).toEqual({
+      ordinaryBytes: root.metrics.contextSize.exact.views.ordinaryBytes + child.metrics.contextSize.exact.views.ordinaryBytes,
+      testsBytes: root.metrics.contextSize.exact.views.testsBytes + child.metrics.contextSize.exact.views.testsBytes,
+    });
+  });
+
+  it('fixed omit policy keeps inventory measured, marks views not requested and still publishes selected API targets', async () => {
+    const f = await architectFixture('omit');
+    const pending = f.materialize(['api', 'architect']);
+    await until(() => f.runs.length === 1, 'the dependency run');
+    f.runs[0]!.settle(f.ready(await f.published()));
+    const result = await pending;
+    if (!result.ok || result.value.status !== 'materialized') throw new Error(JSON.stringify(result));
+    expect(result.value.targets.map(target => target.view)).toEqual(['api', 'api', 'architect']);
+    expect(f.inputs[0]!.api).not.toBeNull();
+    expect(f.inputs[0]!.renderedApi).toBeUndefined();
+    expect(JSON.parse(await f.view('module.json'))).toMatchObject({ metrics: { state: 'measured',
+      views: { state: 'unavailable', reason: 'not-requested' }, contextSize: { exact: { production: { sourceFiles: 1 } } } } });
+    const query = await f.measure();
+    if (!query.ok || query.value.status !== 'measured') throw new Error(JSON.stringify(query));
+    expect(query.value.document).toMatchObject({ schema: 'ramify.measure/1', revision: result.value.revision.revision,
+      views: 'measured', modules: [{ id: 'fixture', exact: { production: { sourceFiles: 1 },
+        views: { ordinaryBytes: expect.any(Number), testsBytes: expect.any(Number) } } }] });
+    const architect = (JSON.parse(await f.view('module.json')) as { metrics: { contextSize: { exact: Record<string, unknown> } } }).metrics;
+    const { views: _views, ...queryInventory } = query.value.document.modules[0]!.exact;
+    expect(queryInventory).toEqual(architect.contextSize.exact);
+    const first = await f.view('module.json');
+    const repeat = await f.materialize(['api', 'architect']);
+    expect(repeat).toMatchObject({ ok: true, value: { status: 'materialized', bytesWritten: 0 } });
+    expect(await f.view('module.json')).toBe(first);
   });
 
   it('AV27 wait limit: publishes without dependencies when the facts are not ready within the limit, a running job included', async () => {
@@ -408,6 +484,21 @@ describe('materialize views (AV25-AV27)', { timeout: 60_000 }, () => {
     expect(f.inputs).toEqual([]);
     await expect(readFile(join(f.root, '.ramify-architect/_meta.json'))).rejects.toMatchObject({ code: 'ENOENT' });
     await expect(readFile(join(f.root, 'src/.ramify/_meta.json'))).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('carries the request deadline through metric rendering and dependency wait, then recovers', async () => {
+    const f = await architectFixture();
+    const limited = f.materialize(['architect'], undefined, 5);
+    await until(() => f.runs.length === 1, 'the dependency run');
+    f.environment.clock.advance(5);
+    expect(await limited).toMatchObject({ ok: true, value: { status: 'deadline-exceeded', requestId: 'materialize-1', elapsedMs: 5 } });
+    expect(f.inputs).toEqual([]);
+    expect(f.runs[0]!.signal.aborted).toBe(true);
+
+    const recovery = f.materialize(['architect']);
+    await until(() => f.runs.length === 2, 'the recovery dependency run');
+    f.runs[1]!.settle(f.ready(await f.published()));
+    expect(await recovery).toMatchObject({ ok: true, value: { status: 'materialized' } });
   });
 
   it('AV25: validates views before any context work', async () => {

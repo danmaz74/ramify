@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { AnalysisReport, RunControl } from '../../../../analysis/src/interfaces/analysis.js';
 import type { ApiViewProjection, ApiViewQueryOutcome, RetainedSession, SessionChange, SessionRevision } from '../../../../analysis/src/interfaces/session.js';
 import type { ArchitectViewProjection, ArchitectViewQueryOutcome } from '../../../../analysis/src/interfaces/architect-view.js';
+import type { SessionMeasurements, SessionMeasurementsOutcome } from '../../../../analysis/src/interfaces/measurements.js';
 import type { ProjectRequest, ProjectResolution } from '../../../../analysis/subs/project/src/interfaces/project.js';
 import type { DependencyAnalyzerOutcome } from '../../../../analysis/src/interfaces/dependency-analyzer.js';
 import type { ApiViewQueryLimits, ApiViewRequest, CaptureTimings, CaptureWork, CheckOutcome, CheckRequest, ContextApiViewOutcome, ContextDependencyDiagramOutcome, ContextDependencyFactsOutcome, ContextEvent, ContextExplorerDetailsOutcome, ContextManager, ContextManagerOptions, ContextRevision, ContextSetup, ContextStatus, ContextToken, DependencyDiagramRequest, ExplorerDetailsRequest, FreshnessRecord, OpenOutcome, ReplyTimings, RevisionCause, Unavailable, WatchBatch, WatchEvent } from './interfaces/contexts.js';
@@ -424,7 +425,8 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     const requestId = entry.request.requestId;
     context.deliveries.add(entry);
     /** Either query's answer other than `projected` settles the whole request. */
-    const settle = (outcome: Exclude<ApiViewQueryOutcome | ArchitectViewQueryOutcome, { readonly status: 'projected' }>): void => {
+    const settle = (outcome: Exclude<ApiViewQueryOutcome | ArchitectViewQueryOutcome, { readonly status: 'projected' }>
+      | Exclude<SessionMeasurementsOutcome, { readonly status: 'measured' }>): void => {
       if (outcome.status === 'superseded') {
         context.synchronization = 'reconciling'; context.sweepRequired = true;
         completeApiView(entry, { status: 'superseded', requestId, revision: publication.revision });
@@ -439,7 +441,24 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       const session = context.session;
       if (!session) { completeApiView(entry, { ...unavailable('analysis-failed', 'Session lost its published revision'), requestId }); return; }
       let projection: ApiViewProjection | null = null, architect: ArchitectViewProjection | null = null;
-      if (views.has('api')) {
+      let measurementProjection: ApiViewProjection | null = null, measurements: SessionMeasurements | null = null;
+      let measurementFailure: 'resource-unavailable' | 'analysis-failed' | null = null;
+      if (views.has('architect') || entry.request.measurementOnly === true) {
+        const measured = await session.measurements(data.sequence, control);
+        if (measured.status !== 'measured') { settle(measured); return; }
+        measurements = measured.measurements;
+        if (entry.request.measureViews !== false) {
+          const all = await session.apiView({ sequence: data.sequence, selection: { scope: 'all' },
+            details: apiViewLimits.details, maxAreaBytes: apiViewLimits.maxAreaBytes, maxInvocationBytes: apiViewLimits.maxInvocationBytes }, control);
+          if (all.status === 'projected') {
+            measurementProjection = all.projection;
+            if (views.has('api') && entry.request.selection.scope === 'all') projection = all.projection;
+          } else if (all.status === 'unavailable' && (all.reason === 'resource-limit' || all.reason === 'analysis-failed')) {
+            measurementFailure = all.reason === 'resource-limit' ? 'resource-unavailable' : 'analysis-failed';
+          } else { settle(all); return; }
+        }
+      }
+      if (views.has('api') && !projection) {
         const outcome = await session.apiView({ sequence: data.sequence, selection: entry.request.selection,
           details: apiViewLimits.details, maxAreaBytes: apiViewLimits.maxAreaBytes, maxInvocationBytes: apiViewLimits.maxInvocationBytes }, control);
         if (outcome.status !== 'projected') { settle(outcome); return; }
@@ -452,7 +471,8 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         architect = outcome.projection;
       }
       completeApiView(entry, { status: 'projected', requestId, revision: publication.revision,
-        freshness: fresh(entry, started, true, reused), projection, architect, timings: freeze({ ...timings }) });
+        freshness: fresh(entry, started, true, reused), projection, architect, measurementProjection, measurements, measurementFailure,
+        timings: freeze({ ...timings }) });
     } catch (error) { completeApiView(entry, { ...unavailable('analysis-failed', String(error)), requestId }); }
     finally { unpin(); context.deliveries.delete(entry); scheduleIdle(context); }
   }

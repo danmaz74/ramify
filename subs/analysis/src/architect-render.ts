@@ -2,6 +2,7 @@ import type { Destination, ModuleId, OriginalId } from '../subs/model/src/interf
 import type { ArchitectDependencies, ArchitectModuleFacts, ArchitectSymbol, ArchitectTestRecord, ArchitectViewFile,
   ArchitectViewProjection, RenderedArchitectView } from './interfaces/architect-view.js';
 import type { DependencyBoundaryFact, DependencyDiagramFacts, TestReferenceFacts } from './interfaces/dependency-diagram.js';
+import type { ArchitectMeasurements, ModuleMeasurement } from './interfaces/measurements.js';
 import { byteOrder } from './modularity-context.js';
 
 /**
@@ -243,7 +244,8 @@ const titleCount = (summary: ModuleSummary): number =>
  * Lists of strings and small objects stay on one line, and `uses` and `usedBy`
  * hold one pair per line; both are absent when dependencies are unavailable.
  */
-function moduleDocument(summary: ModuleSummary, revision: string): string {
+function moduleDocument(summary: ModuleSummary, revision: string, measurements: ArchitectMeasurements,
+  measurement: ModuleMeasurement | undefined): string {
   const { facts } = summary;
   const field = (key: string, value: string): string => `  ${str(key)}: ${value}`;
   const purpose = summary.purpose === null || facts.purpose.state === 'missing'
@@ -254,6 +256,10 @@ function moduleDocument(summary: ModuleSummary, revision: string): string {
       ['nonBehavioral', counts.nonBehavioral], ...counts.unknown ? [['unknown', counts.unknown] as const] : []])}`).join(',\n')}\n  ]`
     : '[]';
   const symbols = symbolCounts(summary);
+  const metrics = measurements.state === 'unavailable'
+    ? { state: 'unavailable', reason: measurements.reason }
+    : { state: 'measured', views: measurements.views,
+      contextSize: { exact: measurement!.exact, subtree: measurement!.subtree } };
   const fields = [
     field('schema', str('ramify.architect-module/1')),
     field('module', str(facts.module)),
@@ -269,7 +275,7 @@ function moduleDocument(summary: ModuleSummary, revision: string): string {
       ['unknown', symbols.unknown]])),
     field('tests', inlineObject([['suites', summary.tests.length], ['titles', titleCount(summary)]])),
     ...summary.uses && summary.usedBy ? [field('uses', pairList(summary.uses)), field('usedBy', pairList(summary.usedBy))] : [],
-    field('metrics', inlineObject([['state', 'unavailable']])),
+    field('metrics', JSON.stringify(metrics)),
     field('revision', str(revision)),
   ];
   return `{\n${fields.join(',\n')}\n}\n`;
@@ -309,13 +315,13 @@ function readme(revision: string, projection: ArchitectViewProjection, summaries
  * that have a suite record.
  */
 function metadata(revision: string, projection: ArchitectViewProjection, dependencies: ArchitectDependencies,
-  exercises: Exercises | null, purposesCut: number): string {
+  exercises: Exercises | null, purposesCut: number, measurements: ArchitectMeasurements): string {
   const meta: Record<string, unknown> = { schema: 'ramify.architect-view/1', revision, input: projection.inputId,
     modules: projection.modules.length, dependencies: dependencies.state };
   if (dependencies.state === 'unavailable') meta.dependencyReason = dependencies.reason;
   meta.dependencyScope = 'production';
   meta.testReferences = exercises ? 'measured' : 'unavailable';
-  meta.metrics = 'unavailable';
+  meta.metrics = measurements.state;
   const { counts } = projection;
   const suiteFiles = new Set(projection.tests.filter(record => record.kind === 'suite').map(record => record.file));
   const unclassifiedExercises = [...exercises?.unclassified ?? []]
@@ -337,14 +343,32 @@ export function renderArchitectView(input: {
   readonly revision: string;
   readonly projection: ArchitectViewProjection;
   readonly dependencies: ArchitectDependencies;
+  readonly measurements: ArchitectMeasurements;
 }): RenderedArchitectView {
-  const { revision, projection, dependencies } = input;
+  const { revision, projection, dependencies, measurements } = input;
   if (dependencies.state === 'measured' && dependencies.facts.inputId !== projection.inputId) {
     throw new Error(`Dependency facts for input ${dependencies.facts.inputId} cannot render the architect view of input ${projection.inputId}`);
   }
   const references = dependencies.state === 'measured' ? dependencies.testReferences : null;
   if (references && references.inputId !== projection.inputId) {
     throw new Error(`Test references for input ${references.inputId} cannot render the architect view of input ${projection.inputId}`);
+  }
+  const measuredByModule = measurements.state === 'measured'
+    ? new Map(measurements.modules.map(module => [module.id, module])) : new Map<string, ModuleMeasurement>();
+  if (measurements.state === 'measured' && (measuredByModule.size !== projection.modules.length
+    || projection.modules.some(module => !measuredByModule.has(module.module)))) {
+    throw new Error('Architect measurements do not name exactly the projection modules');
+  }
+  if (measurements.state === 'measured') for (const facts of projection.modules) {
+    const module = measuredByModule.get(facts.module)!;
+    if (module.dir !== facts.dir || module.parent !== facts.parent) {
+      throw new Error(`Architect measurement identity does not match module ${facts.module}`);
+    }
+    const exactPresent = module.exact.views !== undefined;
+    const subtreePresent = module.subtree.views !== undefined;
+    if (exactPresent !== subtreePresent || (measurements.views === 'measured') !== exactPresent) {
+      throw new Error('Architect view-byte availability is not uniform');
+    }
   }
   const use = dependencies.state === 'measured' ? useOf(dependencies.facts) : null;
   const exercises = references ? exercisesOf(references, projection) : null;
@@ -378,14 +402,14 @@ export function renderArchitectView(input: {
   });
 
   const files: ArchitectViewFile[] = [
-    { path: '_meta.json', text: metadata(revision, projection, dependencies, exercises, purposesCut) },
+    { path: '_meta.json', text: metadata(revision, projection, dependencies, exercises, purposesCut, measurements) },
     { path: 'README.md', text: readme(revision, projection, summaries) },
   ];
   let recordCount = 0;
   for (const summary of summaries) {
     const directory = viewDirectory(summary.facts.module, projection.root);
     const at = (name: string): string => directory ? `${directory}/${name}` : name;
-    files.push({ path: at('module.json'), text: moduleDocument(summary, revision) },
+    files.push({ path: at('module.json'), text: moduleDocument(summary, revision, measurements, measuredByModule.get(summary.facts.module)) },
       { path: at('behavior.jsonl'), text: jsonl(summary.behavior.map(record => record.line)) },
       { path: at('supporting.jsonl'), text: jsonl(summary.supporting.map(record => record.line)) },
       { path: at('tests.jsonl'), text: jsonl(summary.tests.map(record => testRecord(record, exercises))) });

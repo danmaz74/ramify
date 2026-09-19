@@ -404,13 +404,44 @@ For exact owner `O` or its subtree, in a source filter:
 - `sourceFiles`, `sourceBytes`: files in the subset and their inventory bytes;
 - `resourceFiles`, `resourceBytes`: resources whose area has the filter's
   classification; they are not part of the file subset;
+- `documentation`: the owner's root `README.md` when present and
+  `module.ramify`, as `files` and captured bytes. This bucket is independent of
+  the source filter and therefore has the same value in both views;
 - `originals`: catalog originals defined in those source or resource files;
 - `exposedOriginals`: exposed owned originals as in section 3, summed over the
   subtree's owners; null under candidate ownership;
 - `accessOccurrences`: occurrences whose importer is one of those files, every
   target kind.
 
-Subtree values are sums over owners; every unit is disjoint by owner.
+One shared computation receives inventory records whose effective owner and
+production/testing classification have already been resolved, the selected
+owner set and the revision's captured inputs. It computes the four inventory
+file/byte fields and documentation bucket for exact owners and subtrees. The
+declared adapter uses inventory ownership and source profiles. The candidate
+adapter uses the validated candidate resolver and tree, so source and resource
+reassignment is retained rather than inferred from directory names.
+
+Documentation bytes come only from captured inputs with role `readme` or
+`description`; the computation never reads the live filesystem. A missing
+README contributes no record, while its captured absence establishes that it
+is missing. A present empty README contributes one zero-byte record. Missing
+required capture evidence makes the projection unavailable rather than
+producing a measured zero. A documentation file beneath `src/` remains an
+inventory resource and is not also module-root documentation.
+
+Candidate ownership does not reassign documentation. In every candidate
+report `documentation` is `{ "state": "unavailable", "reason":
+"candidate-documentation" }`; declared reports use `{ "files": N, "bytes":
+N }`. The existing source/resource fields and their coverage remain measured
+under candidate ownership.
+
+Subtree values are sums over owners; every unit is disjoint by owner. From a
+complete measurement file list, `tests` area records are testing-classified.
+For an owner with ordinary records, a positive exact production file count
+(`sourceFiles + resourceFiles`) classifies all its ordinary records as
+production; otherwise they are testing-classified. An owner with no ordinary
+records supplies no classification for a future file. This derivation is never
+applied to partial or unavailable buckets.
 
 ### 10. Dependency diagram facts
 

@@ -24,6 +24,8 @@ describe('modularity Markdown', () => {
     expect(markdown).toContain('\n## Ranked evidence\n');
     expect(markdown).not.toContain('Comparison');
     expect(markdown).toContain('\n## Dependency diagram facts\n');
+    expect(markdown).toContain('| Documentation files | Documentation bytes |');
+    expect(row(markdown, '`app/core`', '## Context size: production')).toContain('| 2 | 30 B |');
     expect(row(markdown, 'production', '## Dependency diagram facts')).toContain('unavailable (not-requested)');
   });
 
@@ -52,6 +54,7 @@ describe('modularity Markdown', () => {
     expect(markdown).toContain('\n## Declared ownership\n\n### Summary and coverage\n');
     expect(markdown).toContain('\n## Candidate `merge-widgets`\n\n### Summary and coverage\n');
     expect(markdown).toContain('\n### Boundary changes\n');
+    expect(markdown).toContain('unavailable (candidate-documentation)');
     expect(markdown.indexOf('## Comparison')).toBeLessThan(markdown.indexOf('## Declared ownership'));
   });
 });

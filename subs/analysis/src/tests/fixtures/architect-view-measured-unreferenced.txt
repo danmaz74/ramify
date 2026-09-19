@@ -36,7 +36,7 @@ Revision rev/1:architect · input input/1:architect
     exposed 0 · internal 0 · supporting 1 · tests 0 · uses 1 · used by 0
 
 ==> _meta.json <==
-{"schema":"ramify.architect-view/1","revision":"rev/1:architect","input":"input/1:architect","modules":7,"dependencies":"measured","dependencyScope":"production","testReferences":"unavailable","metrics":"unavailable","unknownShapes":1,"detailsUnavailable":1,"testsUnavailable":1,"coverage":1}
+{"schema":"ramify.architect-view/1","revision":"rev/1:architect","input":"input/1:architect","modules":7,"dependencies":"measured","dependencyScope":"production","testReferences":"unavailable","metrics":"measured","unknownShapes":1,"detailsUnavailable":1,"testsUnavailable":1,"coverage":1}
 
 ==> alpha/behavior.jsonl <==
 {"module":"fixture/alpha","name":"build","role":"internal","shape":"callable","behavioral":[],"nonBehavioral":[],"sig":"function build(): Engine;","file":"subs/alpha/src/alpha.ts"}
@@ -63,7 +63,7 @@ Revision rev/1:architect · input input/1:architect
     { "module": "fixture/core/engine", "behavioral": 1, "nonBehavioral": 0 }
   ],
   "usedBy": [],
-  "metrics": { "state": "unavailable" },
+  "metrics": {"state":"measured","views":{"state":"unavailable","reason":"not-requested"},"contextSize":{"exact":{"production":{"sourceFiles":4,"sourceBytes":468,"resourceFiles":2,"resourceBytes":56},"tests":{"sourceFiles":0,"sourceBytes":0,"resourceFiles":0,"resourceBytes":0},"documentation":{"files":2,"bytes":53}},"subtree":{"production":{"sourceFiles":4,"sourceBytes":468,"resourceFiles":2,"resourceBytes":56},"tests":{"sourceFiles":0,"sourceBytes":0,"resourceFiles":0,"resourceBytes":0},"documentation":{"files":2,"bytes":53}}}},
   "revision": "rev/1:architect"
 }
 
@@ -103,7 +103,7 @@ Revision rev/1:architect · input input/1:architect
     { "module": "fixture/core/engine", "behavioral": 0, "nonBehavioral": 1 }
   ],
   "usedBy": [],
-  "metrics": { "state": "unavailable" },
+  "metrics": {"state":"measured","views":{"state":"unavailable","reason":"not-requested"},"contextSize":{"exact":{"production":{"sourceFiles":1,"sourceBytes":154,"resourceFiles":0,"resourceBytes":0},"tests":{"sourceFiles":0,"sourceBytes":0,"resourceFiles":0,"resourceBytes":0},"documentation":{"files":2,"bytes":65}},"subtree":{"production":{"sourceFiles":1,"sourceBytes":154,"resourceFiles":0,"resourceBytes":0},"tests":{"sourceFiles":0,"sourceBytes":0,"resourceFiles":0,"resourceBytes":0},"documentation":{"files":2,"bytes":65}}}},
   "revision": "rev/1:architect"
 }
 
@@ -136,7 +136,7 @@ Revision rev/1:architect · input input/1:architect
   "tests": { "suites": 3, "titles": 5 },
   "uses": [],
   "usedBy": [],
-  "metrics": { "state": "unavailable" },
+  "metrics": {"state":"measured","views":{"state":"unavailable","reason":"not-requested"},"contextSize":{"exact":{"production":{"sourceFiles":0,"sourceBytes":0,"resourceFiles":0,"resourceBytes":0},"tests":{"sourceFiles":2,"sourceBytes":463,"resourceFiles":1,"resourceBytes":175},"documentation":{"files":2,"bytes":78}},"subtree":{"production":{"sourceFiles":0,"sourceBytes":0,"resourceFiles":0,"resourceBytes":0},"tests":{"sourceFiles":2,"sourceBytes":463,"resourceFiles":1,"resourceBytes":175},"documentation":{"files":2,"bytes":78}}}},
   "revision": "rev/1:architect"
 }
 
@@ -181,7 +181,7 @@ Revision rev/1:architect · input input/1:architect
     { "module": "fixture/beta", "behavioral": 0, "nonBehavioral": 1 },
     { "module": "fixture/gamma", "behavioral": 0, "nonBehavioral": 0, "unknown": 1 }
   ],
-  "metrics": { "state": "unavailable" },
+  "metrics": {"state":"measured","views":{"state":"unavailable","reason":"not-requested"},"contextSize":{"exact":{"production":{"sourceFiles":1,"sourceBytes":387,"resourceFiles":0,"resourceBytes":0},"tests":{"sourceFiles":2,"sourceBytes":352,"resourceFiles":0,"resourceBytes":0},"documentation":{"files":1,"bytes":144}},"subtree":{"production":{"sourceFiles":1,"sourceBytes":387,"resourceFiles":0,"resourceBytes":0},"tests":{"sourceFiles":2,"sourceBytes":352,"resourceFiles":0,"resourceBytes":0},"documentation":{"files":1,"bytes":144}}}},
   "revision": "rev/1:architect"
 }
 
@@ -216,7 +216,7 @@ Revision rev/1:architect · input input/1:architect
     { "module": "fixture", "behavioral": 1, "nonBehavioral": 0 },
     { "module": "fixture/beta", "behavioral": 1, "nonBehavioral": 0 }
   ],
-  "metrics": { "state": "unavailable" },
+  "metrics": {"state":"measured","views":{"state":"unavailable","reason":"not-requested"},"contextSize":{"exact":{"production":{"sourceFiles":2,"sourceBytes":426,"resourceFiles":2,"resourceBytes":54},"tests":{"sourceFiles":2,"sourceBytes":202,"resourceFiles":0,"resourceBytes":0},"documentation":{"files":2,"bytes":237}},"subtree":{"production":{"sourceFiles":3,"sourceBytes":813,"resourceFiles":2,"resourceBytes":54},"tests":{"sourceFiles":4,"sourceBytes":554,"resourceFiles":0,"resourceBytes":0},"documentation":{"files":3,"bytes":381}}}},
   "revision": "rev/1:architect"
 }
 
@@ -253,7 +253,7 @@ Revision rev/1:architect · input input/1:architect
     { "module": "fixture/core/engine", "behavioral": 0, "nonBehavioral": 0, "unknown": 1 }
   ],
   "usedBy": [],
-  "metrics": { "state": "unavailable" },
+  "metrics": {"state":"measured","views":{"state":"unavailable","reason":"not-requested"},"contextSize":{"exact":{"production":{"sourceFiles":1,"sourceBytes":103,"resourceFiles":0,"resourceBytes":0},"tests":{"sourceFiles":0,"sourceBytes":0,"resourceFiles":0,"resourceBytes":0},"documentation":{"files":2,"bytes":58}},"subtree":{"production":{"sourceFiles":1,"sourceBytes":103,"resourceFiles":0,"resourceBytes":0},"tests":{"sourceFiles":0,"sourceBytes":0,"resourceFiles":0,"resourceBytes":0},"documentation":{"files":2,"bytes":58}}}},
   "revision": "rev/1:architect"
 }
 
@@ -287,7 +287,7 @@ Revision rev/1:architect · input input/1:architect
   "usedBy": [
     { "module": "fixture/core/engine", "behavioral": 0, "nonBehavioral": 1 }
   ],
-  "metrics": { "state": "unavailable" },
+  "metrics": {"state":"measured","views":{"state":"unavailable","reason":"not-requested"},"contextSize":{"exact":{"production":{"sourceFiles":2,"sourceBytes":175,"resourceFiles":0,"resourceBytes":0},"tests":{"sourceFiles":0,"sourceBytes":0,"resourceFiles":0,"resourceBytes":0},"documentation":{"files":2,"bytes":215}},"subtree":{"production":{"sourceFiles":11,"sourceBytes":1713,"resourceFiles":4,"resourceBytes":110},"tests":{"sourceFiles":6,"sourceBytes":1017,"resourceFiles":1,"resourceBytes":175},"documentation":{"files":13,"bytes":850}}}},
   "revision": "rev/1:architect"
 }
 

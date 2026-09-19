@@ -138,6 +138,9 @@ export async function openSocketConnection(endpoint: EndpointSelection, options:
     explorerDetails: (params, control) => request('explorerDetails', params, control),
     dependencyDiagram: (params, control) => request('dependencyDiagram', params, control),
     materialize: (params, control) => request('materialize', params, control),
+    measure: (params, control) => welcome!.capabilities.includes('measure') ? request('measure', params, control)
+      : Promise.resolve({ ok: false, error: { code: 'unsupported-operation',
+        message: 'The daemon does not support measure', details: {} } }),
     subscribe: (params, listener) => request('subscribe', params, undefined, listener),
     unsubscribe: async params => { const result = await request<null>('unsubscribe', params); if (result.ok) subscriptions.delete(params.subscription); return result; },
     closeContext: params => request('closeContext', params), daemonStatus: () => request('daemonStatus', {}),

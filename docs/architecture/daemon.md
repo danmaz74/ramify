@@ -1,6 +1,6 @@
 # Daemon and analysis architecture
 
-**Date:** 2026-09-11; revised 2026-09-18. **Status:** Implemented across the
+**Date:** 2026-09-11; revised 2026-09-19. **Status:** Implemented across the
 eleven owners of the batch engine, the resident daemon with its context manager,
 service and lightweight client, and the retained analysis session that answers
 the bounded hook check. Plans 6B–6D added four explorer owners, `service-api`,
@@ -13,6 +13,8 @@ records batch evidence, the [Plan 2 remediation](../plans/done/iteration-2-resid
 records resident evidence, and the [Plan 5 completion report](../plans/iteration-5-fast-incremental-checks/iterations/iteration13-results.md)
 records the retained session's evidence and limits. The on-demand `dependencyDiagram` operation and its analyzer
 process are implemented by [Plan 6D](../plans/iteration-6d-behavioral-dependency-diagram/iterations/iteration7-results.md). The MCP adapter and unsaved-content overlays are not implemented.
+The `measure` capability and synchronized service operation are implemented by
+Plan 2C; its CLI consumer remains iteration 4 work.
 
 The resident design calls for a long-lived local backend that maintains the
 analyzed state of each active project, updates that state as files change, and
@@ -683,6 +685,7 @@ schemas and transport framing are review items, not new `module.ramify` syntax.
 | Explanations | Explain an original binding's exposure and tag/origin decisions for a specified consumer area, or drill into a recorded source occurrence. |
 | Change notifications | Announce published revisions, status changes and updated findings; a reconnect can fetch a complete snapshot without replaying an unbounded event history. |
 | Symbol intelligence | Search usable exports and request optional details at a specified revision, with access evidence and explicit missing enrichment. |
+| Module measurement | `measure({ token, requestId, freshness, deadlineMs? })` synchronizes one current revision, joins its retained inventory/documentation buckets to one bounded all-module API-view render, and returns `ramify.measure/1` without publishing files. API projection or render limits retain valid inventory with a uniform unavailable views reason. Invalid current inventory, cancellation, deadline expiry and supersession terminate the whole request. The transport passes its negotiated `maxResponseBytes` and request-envelope identity into exact incremental escaped UTF-8 counting; direct calls reserve a conservative maximum request-id envelope. Oversized documents are refused whole as `resource-unavailable`. |
 | Dependency diagram | `dependencyDiagram({ token, requestId, revision })` answers the behavioral dependency diagram of the context's exact current published revision, only when a client requests it. A revision that is not current is `superseded`; a retained result is `ready`; an equal running job is joined; while any other job runs the answer is `busy/analysis-running`; otherwise one job starts. The job runs a separate analyzer process that acquires the project with the request the revision's inputs were captured with, the one its retained session was opened with, verifies those inputs against the published report, classifies the report's recorded imports in its own compiler helper, projects the diagram and exits. Changed inputs answer `busy/inputs-changed`; a newer publication aborts the job and answers its callers `superseded`; the last caller's cancellation aborts it. A result above its byte limit or the retained budget is `unavailable/resource-limit`. Checks, hooks, watches, materialization and the retained session never classify behavior. |
 
 At most one diagram job runs daemon-wide, and each context retains at most one

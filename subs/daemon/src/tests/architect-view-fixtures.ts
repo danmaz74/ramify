@@ -60,5 +60,6 @@ export function architectView(options: {
     counts: { coverage: 0, detailsUnavailable: 0, unknownShapes: 0, dynamicTitles: 0, testsUnavailable: 0, cut: 0 }, bytes: 0,
   };
   return renderArchitectView({ revision: options.revision ?? 'rev/1:fixture', projection,
-    dependencies: { state: 'unavailable', reason: 'wait-limit' } });
+    dependencies: { state: 'unavailable', reason: 'wait-limit' },
+    measurements: { state: 'unavailable', reason: 'analysis-failed' } });
 }

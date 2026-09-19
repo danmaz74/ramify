@@ -11,7 +11,7 @@ import type { RevisionId } from '../subs/contexts/src/interfaces/contexts.js';
 import type {
   ApiViewPublisher, ApiViewPublishLimits, MaterializedTarget, MaterializedViewId, PublishApiViewOutcome, PublishInput,
 } from './interfaces/daemon.js';
-import { renderApiView, type RenderedDocument } from './api-view-documents.js';
+import { renderApiView, type RenderedArea, type RenderedDocument } from './api-view-documents.js';
 
 /**
  * The daemon's transactional filesystem publisher
@@ -181,8 +181,7 @@ type Targets = { readonly status: 'ok'; readonly targets: readonly Target[] } | 
 /** Pure: renders the projection, then validates every target and document
  * path defensively — the publisher never trusts a caller-supplied projection
  * to already be safe, even though `analysis` also validates its own joins. */
-function collectApiTargets(projection: ApiViewProjection, revision: string): Targets {
-  const areas = renderApiView(projection, revision);
+function collectRenderedApiTargets(areas: readonly RenderedArea[]): Targets {
   const targets: Target[] = [];
   for (const area of areas) {
     if (!isSafeRelativePath(area.root)) return { status: 'invalid', message: `Area root "${area.root}" is not a safe project-relative path` };
@@ -195,6 +194,9 @@ function collectApiTargets(projection: ApiViewProjection, revision: string): Tar
       files: area.files, entries: area.entries, bytes });
   }
   return { status: 'ok', targets };
+}
+function collectApiTargets(projection: ApiViewProjection, revision: string): Targets {
+  return collectRenderedApiTargets(renderApiView(projection, revision));
 }
 
 /** True when `bytes` parse as a JSON object whose `schema` is the architect view's. */
@@ -238,7 +240,8 @@ function collectArchitectTarget(view: RenderedArchitectView): Targets {
  * the architect view, so the architect target switches last. */
 function collectTargets(input: PublishInput, revision: string): Targets {
   const targets: Target[] = [];
-  for (const collected of [input.api ? collectApiTargets(input.api, revision) : null,
+  for (const collected of [input.renderedApi ? collectRenderedApiTargets(input.renderedApi)
+    : input.api ? collectApiTargets(input.api, revision) : null,
     input.architect ? collectArchitectTarget(input.architect) : null]) {
     if (!collected) continue;
     if (collected.status === 'invalid') return collected;

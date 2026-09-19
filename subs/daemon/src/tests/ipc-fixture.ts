@@ -11,9 +11,10 @@ import { selectEndpoint } from '../discovery.js';
 import { connectDaemon } from '../connect-daemon.js';
 import type { AnalysisDriver } from '../context-types.js';
 import type { DependencyDiagramRunner } from '../../../analysis/src/interfaces/dependency-analyzer.js';
+import type { ServiceCapability } from '../../../../src/interfaces/service.js';
 
 export async function ipcFixture(overrides: Partial<DaemonBudgets> = {}, publicClient = false, driver?: AnalysisDriver,
-  dependencyDiagrams?: DependencyDiagramRunner) {
+  dependencyDiagrams?: DependencyDiagramRunner, capabilities?: readonly ServiceCapability[]) {
   const directory = await mkdtemp('/tmp/ri-');
   const project = join(directory, 'project');
   await mkdir(join(project, 'src'), { recursive: true });
@@ -30,7 +31,8 @@ export async function ipcFixture(overrides: Partial<DaemonBudgets> = {}, publicC
   const budgets: DaemonBudgets = { maxConnections: 64, maxRequestBytes: 1024 ** 2, maxResponseBytes: 32 * 1024 ** 2 + 64 * 1024,
     maxOutboundBytes: 64 * 1024 ** 2, maxOutboundFrames: 256, maxRequestsInFlight: 16,
     leaseMs: 45_000, pingMs: 15_000, idleExitMs: 1_800_000, shutdownGraceMs: 100, ...overrides };
-  const result = await startDaemon({ service: environment.service, endpoint, budgets, clock: environment.clock, log() {} });
+  const result = await startDaemon({ service: environment.service, endpoint, budgets, clock: environment.clock, log() {},
+    ...(capabilities ? { capabilities } : {}) });
   if (result.status !== 'started') throw new Error(`IPC host failed: ${JSON.stringify(result)}`);
   const sockets = new Set<Socket>();
   const connections = new Set<Awaited<ReturnType<typeof openSocketConnection>>>();

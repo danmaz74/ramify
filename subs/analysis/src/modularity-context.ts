@@ -10,6 +10,7 @@ import type {
 import type { ModuleId, OriginalId, SourceOrigin } from '../subs/model/src/interfaces/model.js';
 import type { InventoryFile } from '../subs/project/src/interfaces/project.js';
 import type { CatalogOriginal, SourceAccess } from '../subs/typescript/src/interfaces/source.js';
+import { measurementFileIsTesting } from './module-measurements.js';
 
 /**
  * Shared facts of the modularity projection: ordering, ratios, the ownership
@@ -291,9 +292,7 @@ const declaredKey = (original: OriginalId): string =>
  * classification under its candidate owner's header tags differs, so views read this.
  */
 export function testingClassified(report: CompleteReport, file: InventoryFile): boolean {
-  if (file.area === 'tests') return true;
-  return report.snapshot.areas.some(area => area.owner === file.owner && area.kind === 'ordinary'
-    && area.profile.includes('testing'));
+  return measurementFileIsTesting(file, report.snapshot.areas);
 }
 
 export function resolveOccurrence(access: SourceAccess, ownership: OwnershipResolver, originals: OriginalFacts): Occurrence {

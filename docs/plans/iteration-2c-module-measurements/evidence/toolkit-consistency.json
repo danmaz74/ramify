@@ -1,0 +1,58 @@
+{
+  "schemaVersion": "ramify.plan2c-consistency/1",
+  "revision": "rev/1:b7abfc8d-ffcd-4edd-97b0-b51fdf45df27:1",
+  "modules": 15,
+  "files": 469,
+  "diskBytes": 4702484,
+  "root": "ramify",
+  "summedExact": {
+    "production": {
+      "sourceFiles": 225,
+      "sourceBytes": 1955966,
+      "resourceFiles": 4,
+      "resourceBytes": 23492
+    },
+    "tests": {
+      "sourceFiles": 199,
+      "sourceBytes": 2565586,
+      "resourceFiles": 11,
+      "resourceBytes": 74595
+    },
+    "documentation": {
+      "files": 30,
+      "bytes": 82845
+    },
+    "views": {
+      "ordinaryBytes": 1163188,
+      "testsBytes": 1067344
+    }
+  },
+  "rootSubtree": {
+    "production": {
+      "sourceFiles": 225,
+      "sourceBytes": 1955966,
+      "resourceFiles": 4,
+      "resourceBytes": 23492
+    },
+    "tests": {
+      "sourceFiles": 199,
+      "sourceBytes": 2565586,
+      "resourceFiles": 11,
+      "resourceBytes": 74595
+    },
+    "documentation": {
+      "files": 30,
+      "bytes": 82845
+    },
+    "views": {
+      "ordinaryBytes": 1163188,
+      "testsBytes": 1067344
+    }
+  },
+  "checked": {
+    "exactSumEqualsRootSubtree": true,
+    "fileBytesEqualDisk": true,
+    "fileRecordsReconstructInventoryBuckets": true
+  },
+  "mismatches": []
+}
