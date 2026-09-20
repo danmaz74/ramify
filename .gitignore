@@ -10,6 +10,10 @@ site/.docusaurus/
 # Build output of the toolkit and the reference example.
 dist/
 
+# Editor and agent-tool artifacts written into the project root.
+.history/
+.playwright-mcp/
+
 # cucumber-viz state written into the project while Studio runs.
 .cucumber-viz/
 cucumber-viz.config.local.json
