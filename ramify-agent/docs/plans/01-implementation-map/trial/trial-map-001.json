@@ -1,0 +1,424 @@
+{
+  "schema": "ramify-agent.implementation-map/1",
+  "identity": {
+    "planId": "affected-modules",
+    "revision": 1,
+    "jobId": "20260919T190102Z-637d1a",
+    "manifest": {
+      "planHash": "5333d48c1e5d10712456c6ccab59caf41d841a1359af8a713d5598963c053176",
+      "source": {
+        "commit": "3593eae42a297370e54a965536a5fc2cfb021704",
+        "dirty": false
+      },
+      "versions": {
+        "architectPrompt": "1+sha256:7b200a855adb0020",
+        "procedure": "1+sha256:793b07b19c961138",
+        "skill": "sha256:584c06580635e900",
+        "ramify": "0.0.0"
+      },
+      "architectView": {
+        "status": "materialized",
+        "revision": "rev/1:b36f8c6c-6886-4f4c-aec2-a3f61ccd5a04:1",
+        "input": "input/1:76051bf26f7b8f68482433eedd1611dc55bf4074954f783c82bb3729112d3696",
+        "coverageLimits": [
+          "cut: 366",
+          "detailsUnavailable: 1",
+          "dynamicTitles: 21"
+        ]
+      }
+    }
+  },
+  "summary": {
+    "change": "Add a single 'affected modules' query — given one or more changed module IDs, answer with every module that depends on them directly or transitively, plus the changed modules themselves — answered from the dependency facts a project's retained analysis session already keeps for its own fast incremental invalidation (not the separate, process-spawned dependency-diagram/visualization analyzer). Offer the query through four surfaces: the ramify/analysis retained-session API itself, the daemon's context-level query surface, the daemon client/service protocol, the ramify CLI, and (newly) an MCP tool module, all reading one stated revision without re-analyzing.",
+    "preserves": [
+      "No importability rule changes: the query only reports existing dependency facts, it does not alter what any module may import.",
+      "No dependency graph is kept between queries; each answer is derived fresh from the current published revision's already-retained facts, never accumulated across queries.",
+      "Ordinary checks and hooks (RetainedSession.update/sweep) do no added work: the new query reads already-computed facts and never triggers them.",
+      "The existing dependencyDiagram/dependencyFacts capability (process-spawned analyzer, used for the presentation/explorer visualization) is left untouched and is not the mechanism for this query."
+    ]
+  },
+  "modulesTouched": [
+    {
+      "module": "ramify/analysis",
+      "weight": "heavy",
+      "why": "Owns RetainedSession and its retained per-revision incremental facts (catalogs, descriptions, model decisions) used to decide unchanged-surface vs. source-path re-checks; must add the new query as a RetainedSession capability that classifies edges as ordinary/type-only/test/declaration-level and computes the reverse transitive closure from already-retained facts, reporting incompleteness when its own coverage is partial."
+    },
+    {
+      "module": "ramify/daemon/contexts",
+      "weight": "heavy",
+      "why": "Drives one retained analysis session per context and already answers other per-revision queries (apiView, architectView, measurements, dependencyDiagram) straight from the published revision; needs a symmetrical 'affectedModules' context query that calls the new RetainedSession capability and republishes coverage/limits, without starting new analysis."
+    },
+    {
+      "module": "ramify/daemon",
+      "weight": "heavy",
+      "why": "Owns the validated in-process service, its request/response vocabulary, capability negotiation and the daemon client; needs a new service operation and capability name (alongside the existing dependencyDiagram, materialize-views, measure capabilities) and client-side plumbing to reach the new context query."
+    },
+    {
+      "module": "ramify",
+      "weight": "light",
+      "why": "Assembles the CLI, daemon and (new) MCP entry points from their owners and defines the dispatch-facing service vocabulary the daemon implements; needs to add the new query's request/response shape to that shared vocabulary and wire the new MCP module in alongside the CLI."
+    },
+    {
+      "module": "ramify/cli",
+      "weight": "light",
+      "why": "Parses arguments and reaches the daemon through an injected connector; needs one new subcommand that sends the affected-modules request and formats the module list plus coverage/limits, reusing the existing connector and report-formatting machinery."
+    },
+    {
+      "module": "ramify/mcp",
+      "weight": "heavy",
+      "why": "New module: exposes the affected-modules query (and, if bundled, the same daemon-backed queries) as an MCP tool for agent post-write hooks, reusing the existing daemon client to reach the resident daemon.",
+      "proposed": {
+        "parent": "ramify",
+        "purpose": "Exposes Ramify's daemon-backed queries, starting with affected-modules, as MCP tools over stdio for editor and agent integrations.",
+        "tags": [
+          "dispatch"
+        ]
+      }
+    }
+  ],
+  "reuse": [
+    {
+      "capability": "Retained analysis session handle shared across a project's incremental queries",
+      "symbols": [
+        {
+          "name": "RetainedSession",
+          "owner": "ramify/analysis"
+        }
+      ],
+      "requester": {
+        "module": "ramify/daemon/contexts",
+        "area": "src"
+      },
+      "availability": {
+        "status": "available",
+        "record": "subs/daemon/subs/contexts/src/.ramify/external/subs/analysis/src/interfaces/session.ts.md",
+        "importSpelling": "import type { RetainedSession } from \"ramify/analysis\""
+      }
+    },
+    {
+      "capability": "Per-project context manager driving one retained session and answering per-revision queries",
+      "symbols": [
+        {
+          "name": "ContextManager",
+          "owner": "ramify/daemon/contexts"
+        },
+        {
+          "name": "createContextManager",
+          "owner": "ramify/daemon/contexts"
+        }
+      ],
+      "requester": {
+        "module": "ramify/daemon",
+        "area": "src"
+      },
+      "availability": {
+        "status": "available",
+        "record": "subs/daemon/src/.ramify/children/subs/daemon/subs/contexts/src/interfaces/contexts.ts.md",
+        "importSpelling": "import { createContextManager, type ContextManager } from \"ramify/daemon/contexts\""
+      }
+    },
+    {
+      "capability": "Client connection to the resident daemon used to send the new request",
+      "symbols": [
+        {
+          "name": "connectDaemon",
+          "owner": "ramify/daemon"
+        }
+      ],
+      "requester": {
+        "module": "ramify/cli",
+        "area": "src"
+      },
+      "availability": {
+        "status": "available",
+        "record": "subs/cli/src/.ramify/external/subs/daemon/src/connect-daemon.ts.md",
+        "importSpelling": "import { connectDaemon } from \"ramify/daemon\""
+      }
+    },
+    {
+      "capability": "Client connection to the resident daemon used to send the new request",
+      "symbols": [
+        {
+          "name": "connectDaemon",
+          "owner": "ramify/daemon"
+        }
+      ],
+      "requester": {
+        "module": "ramify/mcp",
+        "area": "src"
+      },
+      "availability": {
+        "status": "unknown",
+        "reason": "ramify/mcp is a proposed module with no source yet, so no API view can be materialized for it in this session; its actual access to ramify/daemon's connectDaemon must be verified once the module exists and its module.ramify declares the dependency."
+      }
+    }
+  ],
+  "newCapabilities": [
+    {
+      "capability": "RetainedSession.affectedModules — reverse transitive closure of dependents from changed module IDs, from already-retained incremental facts",
+      "goal": "Answer, without re-analyzing, which modules directly or transitively depend on a set of changed modules, classifying edges as ordinary import, type-only import, test import, or module.ramify declaration dependency, and reporting incompleteness when coverage is partial.",
+      "owner": "ramify/analysis",
+      "consumers": [
+        "ramify/daemon/contexts"
+      ]
+    },
+    {
+      "capability": "ContextManager.affectedModules — per-published-revision affected-modules query",
+      "goal": "Serve the affected-modules answer for one context's currently published revision, from the retained session, joining an in-flight computation and reporting invalid/superseded like the context's other per-revision queries.",
+      "owner": "ramify/daemon/contexts",
+      "consumers": [
+        "ramify/daemon"
+      ]
+    },
+    {
+      "capability": "Daemon service operation and capability negotiation for affected-modules",
+      "goal": "Accept an affected-modules request over the daemon's validated service and wire protocol (new capability name alongside dependencyDiagram, materialize-views, measure), dispatch it to the owning context, and shape the response for every client.",
+      "owner": "ramify/daemon",
+      "consumers": [
+        "ramify/cli",
+        "ramify/mcp"
+      ]
+    },
+    {
+      "capability": "Shared dispatch-facing vocabulary for the affected-modules request/response",
+      "goal": "Give the CLI, MCP and daemon one common request/response shape for the query, assembled alongside the other dispatch entry points ramify composes.",
+      "owner": "ramify",
+      "consumers": [
+        "ramify/cli",
+        "ramify/mcp",
+        "ramify/daemon"
+      ]
+    },
+    {
+      "capability": "CLI affected-modules command",
+      "goal": "Let a CI job or hook run `ramify affected <module...>` and receive the dependent module list, coverage and the stated revision in the CLI's existing report format.",
+      "owner": "ramify/cli",
+      "consumers": []
+    },
+    {
+      "capability": "MCP affected-modules tool",
+      "goal": "Let an agent's post-write hook call an MCP tool for affected modules and receive the same answer as the CLI, over the daemon client.",
+      "owner": "ramify/mcp",
+      "consumers": []
+    }
+  ],
+  "seams": [
+    {
+      "capability": "RetainedSession.affectedModules",
+      "owner": "ramify/analysis",
+      "consumer": "ramify/daemon/contexts"
+    },
+    {
+      "capability": "Daemon service operation and capability negotiation for affected-modules",
+      "owner": "ramify/daemon",
+      "consumer": "ramify/cli"
+    },
+    {
+      "capability": "Daemon service operation and capability negotiation for affected-modules",
+      "owner": "ramify/daemon",
+      "consumer": "ramify/mcp"
+    },
+    {
+      "capability": "ContextManager.affectedModules",
+      "owner": "ramify/daemon/contexts",
+      "consumer": "ramify/cli"
+    }
+  ],
+  "entryPoint": {
+    "module": "ramify/cli",
+    "acceptance": "Running the new `ramify affected <moduleId...>` command against a project with a resident daemon at a given revision returns every module that depends, directly or transitively, on the named modules, plus the named modules themselves; states which dependency kinds (ordinary, type-only, test, module.ramify declaration) were counted; states the revision answered from; and reports incomplete coverage instead of a false-complete set, all without the daemon re-analyzing the project or slowing its ordinary incremental checks."
+  },
+  "workItems": [
+    {
+      "title": "Retain and expose affected-modules facts from the incremental session",
+      "subtreeRoot": "ramify/analysis",
+      "capabilities": [
+        "RetainedSession.affectedModules — reverse transitive closure of dependents from changed module IDs, from already-retained incremental facts"
+      ]
+    },
+    {
+      "title": "Serve affected-modules per published context revision",
+      "subtreeRoot": "ramify/daemon",
+      "capabilities": [
+        "ContextManager.affectedModules — per-published-revision affected-modules query",
+        "Daemon service operation and capability negotiation for affected-modules"
+      ]
+    },
+    {
+      "title": "Wire the shared vocabulary and CLI entry point",
+      "subtreeRoot": "ramify",
+      "capabilities": [
+        "Shared dispatch-facing vocabulary for the affected-modules request/response",
+        "CLI affected-modules command"
+      ]
+    },
+    {
+      "title": "Add an MCP affected-modules tool",
+      "subtreeRoot": "ramify/mcp",
+      "capabilities": [
+        "MCP affected-modules tool"
+      ]
+    }
+  ],
+  "assumptions": {
+    "assumed": [
+      "The 'retained-session API' the plan names is ramify/analysis's exposed RetainedSession interface, and its per-revision incremental catalogs (used to decide unchanged-surface vs. source-path re-checks in update()/sweep()) are the 'dependency facts... kept for fast incremental checks' the plan requires the answer to come from, distinct from the process-spawned dependencyDiagram/dependencyFacts analyzer used for presentation.",
+      "Because the project has no MCP-serving module today, delivering the query over MCP requires one new module, proposed here as ramify/mcp, a sibling of ramify/cli under the root, reusing the existing daemon client rather than duplicating daemon-reaching logic.",
+      "The CLI is the most representative entry point for the plan's stated CI/hook use case, so it is named as the map's entry point even though the daemon client, retained-session API and MCP tool are equally valid callers of the same underlying query.",
+      "Coverage granularity (ordinary/type-only/test/declaration) is assumed to require an extension of ramify/analysis's dependency classification beyond the existing DependencyBoundaryFact's behavioral/non-behavioral split, since that split does not itself distinguish those four kinds."
+    ],
+    "notFound": [
+      "No existing module named for MCP, or any headline/symbol mentioning MCP or the Model Context Protocol, anywhere in the 15-module architect view — absence here is direct (README lists every module and its purpose) rather than a coverage gap.",
+      "No existing RetainedSession method or test suite named affectedModules, dependents, or similar in ramify/analysis's exposed symbols or test suites — treated as evidence the capability is genuinely new, though the view's 366-symbol cut means some undocumented internal helper could exist unseen.",
+      "No exposed function on RetainedSession that already surfaces per-file or per-module import edges for external querying (only apiView, architectView, measurements and explorerDetails suites were found); the incremental catalogs are assumed to exist internally (they are described in prose as bounding 'the checked set') but their exact shape was not established because RetainedSession's full signature is cut in the view."
+    ],
+    "coverageLimits": [
+      "Architect view: cut 366, detailsUnavailable 1, dynamicTitles 21 — RetainedSession's own interface signature is cut in analysis/supporting.jsonl, so its exact current method list (and hence exactly what would be added vs. reused) could not be directly confirmed from the view.",
+      "ramify/daemon/contexts API views (src and src/tests) report coverage limits of 1 and 11 respectively — absence of any other affected-modules-like symbol there is not proof none exists.",
+      "ramify/daemon API views (src and src/tests) report coverage limits of 1 and 11 respectively — same caveat for the daemon's request/response vocabulary.",
+      "ramify/cli API views (src and src/tests) report coverage limits of 1 and 10 respectively.",
+      "ramify/mcp has no API view at all in this session because it is a proposed, not yet existing, module; its reuse of ramify/daemon's connectDaemon is recorded as unknown rather than available."
+    ]
+  },
+  "evidence": [
+    {
+      "claim": "The project has 15 modules rooted at ramify, matching this job's stated evidence.",
+      "citations": [
+        {
+          "kind": "view-record",
+          "path": ".ramify-architect/_meta.json"
+        }
+      ]
+    },
+    {
+      "claim": "ramify/analysis owns RetainedSession, an exposed interface reexposed by the root to all descendants, whose revisions recompute only the facts a change reaches.",
+      "citations": [
+        {
+          "kind": "view-record",
+          "path": ".ramify-architect/analysis/supporting.jsonl",
+          "line": 7
+        },
+        {
+          "kind": "view-record",
+          "path": ".ramify-architect/analysis/module.json"
+        }
+      ]
+    },
+    {
+      "claim": "RetainedSession already exposes apiView, architectView, measurements and explorerDetails as queryable capabilities answered from a published revision without a new report or rescan.",
+      "citations": [
+        {
+          "kind": "view-record",
+          "path": ".ramify-architect/analysis/tests.jsonl",
+          "line": 4
+        },
+        {
+          "kind": "view-record",
+          "path": ".ramify-architect/analysis/tests.jsonl",
+          "line": 34
+        },
+        {
+          "kind": "view-record",
+          "path": ".ramify-architect/analysis/tests.jsonl",
+          "line": 47
+        }
+      ]
+    },
+    {
+      "claim": "The existing dependencyDiagram/dependencyFacts capability is computed by spawning a separate analyzer process per run (createProcessDependencyAnalyzer), not by reusing already-retained incremental facts, so it is not the mechanism this plan's query should reuse.",
+      "citations": [
+        {
+          "kind": "view-record",
+          "path": ".ramify-architect/behavior.jsonl",
+          "line": 7
+        }
+      ]
+    },
+    {
+      "claim": "ramify/daemon/contexts already answers other per-revision queries (apiView, architectView, dependencyDiagram) straight from one context's published revision without rereading project files, and never keeps a graph between queries.",
+      "citations": [
+        {
+          "kind": "view-record",
+          "path": ".ramify-architect/daemon/contexts/module.json"
+        },
+        {
+          "kind": "view-record",
+          "path": ".ramify-architect/daemon/contexts/tests.jsonl",
+          "line": 16
+        },
+        {
+          "kind": "view-record",
+          "path": ".ramify-architect/daemon/contexts/tests.jsonl",
+          "line": 17
+        }
+      ]
+    },
+    {
+      "claim": "ramify/daemon owns the validated daemon service, its capability negotiation (dependencyDiagram, materialize-views, measure capability names) and the daemon client connectDaemon.",
+      "citations": [
+        {
+          "kind": "view-record",
+          "path": ".ramify-architect/daemon/tests.jsonl",
+          "line": 35
+        },
+        {
+          "kind": "view-record",
+          "path": ".ramify-architect/README.md"
+        }
+      ]
+    },
+    {
+      "claim": "ramify/daemon/contexts's own src API view lists RetainedSession as an available type-only import from ramify/analysis.",
+      "citations": [
+        {
+          "kind": "view-record",
+          "path": "subs/daemon/subs/contexts/src/.ramify/external/subs/analysis/src/interfaces/session.ts.md",
+          "line": 157
+        }
+      ]
+    },
+    {
+      "claim": "ramify/daemon's own src API view lists ContextManager and createContextManager as available imports from its contexts child.",
+      "citations": [
+        {
+          "kind": "view-record",
+          "path": "subs/daemon/src/.ramify/children/subs/daemon/subs/contexts/src/interfaces/contexts.ts.md",
+          "line": 308
+        },
+        {
+          "kind": "view-record",
+          "path": "subs/daemon/src/.ramify/children/subs/daemon/subs/contexts/src/context-manager.ts.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "claim": "ramify/cli's own src API view lists connectDaemon as an available import from ramify/daemon.",
+      "citations": [
+        {
+          "kind": "view-record",
+          "path": "subs/cli/src/.ramify/external/subs/daemon/src/connect-daemon.ts.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "claim": "No module in the project's 15-module tree is named or described as an MCP surface; the request's fourth delivery surface (MCP) does not yet exist and must be proposed.",
+      "citations": [
+        {
+          "kind": "view-record",
+          "path": ".ramify-architect/README.md"
+        }
+      ]
+    },
+    {
+      "claim": "The root module ramify assembles the command line, resident daemon and lazy batch analysis from its owners and defines the dispatch-facing service vocabulary the daemon implements, making it the natural place to add the new query's shared request/response shape and wire in a new MCP entry point.",
+      "citations": [
+        {
+          "kind": "view-record",
+          "path": ".ramify-architect/README.md"
+        }
+      ]
+    }
+  ]
+}

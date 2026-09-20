@@ -1,0 +1,62 @@
+ M ramify-agent/README.md
+ M ramify-agent/docs/README.md
+ M ramify-agent/docs/additional-to-evaluate.md
+ M ramify-agent/docs/architecture.md
+ M ramify-agent/docs/harness.principles.md
+ M ramify-agent/module.ramify
+ M ramify-agent/package-lock.json
+ M ramify-agent/package.json
+ D ramify-agent/src/index.ts
+ D ramify-agent/src/tests/formats.test.ts
+ M ramify-agent/subs/contracts/README.md
+ M ramify-agent/subs/contracts/module.ramify
+ D ramify-agent/subs/contracts/src/index.ts
+ M ramify-agent/subs/harness/README.md
+ M ramify-agent/subs/harness/module.ramify
+ D ramify-agent/subs/harness/src/index.ts
+ M ramify-agent/subs/web/README.md
+ M ramify-agent/subs/web/module.ramify
+ D ramify-agent/subs/web/src/index.ts
+ M ramify-agent/tsconfig.json
+ M ramify-agent/vitest.config.ts
+?? .history/
+?? .playwright-mcp/
+?? ramify-agent/docs/glossary.md
+?? ramify-agent/docs/implementation-loop.md
+?? ramify-agent/docs/plans/
+?? ramify-agent/docs/spikes/
+?? ramify-agent/docs/work-loop.md
+?? ramify-agent/fixtures/
+?? ramify-agent/scripts/
+?? ramify-agent/spikes/
+?? ramify-agent/src/cli.ts
+?? ramify-agent/src/main.ts
+?? ramify-agent/src/tests/cli.test.ts
+?? ramify-agent/subs/contracts/subs/
+?? ramify-agent/subs/harness/src/http/
+?? ramify-agent/subs/harness/src/jobs/
+?? ramify-agent/subs/harness/src/mapping/
+?? ramify-agent/subs/harness/src/maps/
+?? ramify-agent/subs/harness/src/plans/
+?? ramify-agent/subs/harness/src/store/
+?? ramify-agent/subs/harness/src/tests/
+?? ramify-agent/subs/harness/subs/
+?? ramify-agent/subs/web/index.html
+?? ramify-agent/subs/web/src/app.tsx
+?? ramify-agent/subs/web/src/client.ts
+?? ramify-agent/subs/web/src/connection.tsx
+?? ramify-agent/subs/web/src/main.tsx
+?? ramify-agent/subs/web/src/map-document.tsx
+?? ramify-agent/subs/web/src/map-view.tsx
+?? ramify-agent/subs/web/src/mapping.ts
+?? ramify-agent/subs/web/src/markdown.tsx
+?? ramify-agent/subs/web/src/module-tree.tsx
+?? ramify-agent/subs/web/src/plan-page.tsx
+?? ramify-agent/subs/web/src/plans-page.tsx
+?? ramify-agent/subs/web/src/progress.tsx
+?? ramify-agent/subs/web/src/routes.ts
+?? ramify-agent/subs/web/src/styles.css
+?? ramify-agent/subs/web/src/tests/
+?? ramify-agent/subs/web/src/use-query.ts
+?? ramify-agent/subs/web/tsconfig.json
+?? ramify-agent/subs/web/vite.config.ts

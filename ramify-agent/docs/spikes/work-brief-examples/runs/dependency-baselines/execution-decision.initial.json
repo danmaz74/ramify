@@ -1,0 +1,155 @@
+{
+  "caseId": "dependency-baselines",
+  "schemaVersion": 1,
+  "mapRef": "capability-map.json",
+  "approvalKind": "simulation-assumption",
+  "status": "ready-for-first-implementation",
+  "workItem": {
+    "id": "browser-dependency-comparison-presentation",
+    "consumerModule": "ramify/presentation/project-view",
+    "scopeRoot": "subs/presentation/subs/project-view",
+    "goal": "Present an already-computed dependency comparison in the browser so a person can distinguish and inspect added, removed and changed modules and directed relationships, including side-specific evidence, scope and uncertainty.",
+    "capabilityIds": [
+      "dependency-comparison-presentation"
+    ],
+    "allowedModuleIds": [
+      "ramify/presentation/project-view"
+    ],
+    "writeBoundary": "Only files owned by ramify/presentation/project-view beneath subs/presentation/subs/project-view/src/, excluding module.ramify. This iteration may add or change presentation source, styles and owned tests; it may not write another owner or expose a new module contract.",
+    "excludedWork": [
+      "ramify/explorer page state, baseline selection, save/list/delete controls, refresh orchestration and navigation wiring",
+      "ramify/service-api browser transport, DTO projection, paging and result-size enforcement",
+      "ramify/daemon persistence, shared baseline lifecycle service and project-context coordination",
+      "ramify/analysis comparison computation or changes to dependency meaning",
+      "ramify/analysis/project storage-path exclusion",
+      "ramify/cli commands, human-readable terminal output and deterministic JSON output",
+      "module.ramify changes, new modules, cross-owner contracts and cross-branch writes",
+      "end-to-end claims based only on local fixtures"
+    ]
+  },
+  "firstIteration": {
+    "goal": "Render a focused comparison summary and selectable change detail from supplied comparison data, with historical/current labeling and explicit incomplete, unavailable and limited states, while adding executable component evidence for the presentation behavior.",
+    "acceptance": [
+      "An owned component test supplies one added module, one removed module, one added relationship, one removed relationship and one relationship whose existing dependency counts or classifications differ; the rendered summary identifies each category without inventing source analysis.",
+      "Selecting a changed relationship shows the canonical consumer and provider and labeled before and after values for every supplied count and classification, without flattening the two sides into one value.",
+      "Selecting an added or removed module or relationship keeps the existing side inspectable and labels retained evidence as historical or current; absent-side wording does not imply that source still exists.",
+      "Each side's analyzed input or revision identity, production dependency scope and coverage state are visible. Partial or unavailable coverage cannot render as a clean no-change result or turn an unobserved relationship into a definite removal.",
+      "A supplied no-change comparison renders a clear no-dependency-changes result only when both sides are sufficiently complete; a qualified observation set uses qualified wording instead.",
+      "A display filter changes visible rows and labels filtered totals against full supplied totals; it does not mutate the supplied comparison or redefine its scope.",
+      "Unavailable, retryable and resource-limit outcomes are distinct, readable states and do not render an empty comparison.",
+      "The focused ramify/presentation/project-view component tests and the project TypeScript check pass after the implementation. These are new evidence to establish during the iteration, not evidence that exists now."
+    ],
+    "requiredEvidence": [
+      "New focused component tests under subs/presentation/subs/project-view/src/tests/ covering complete, partial, unavailable, retryable and resource-limit states and selectable historical/current detail.",
+      "A focused Vitest run for the changed project-view tests.",
+      "npm run type-check from /ramify.",
+      "A diff review confirming every write remains in ramify/presentation/project-view and module.ramify is unchanged."
+    ],
+    "notCompletionOf": [
+      "The browser baseline workflow or integration into an explorer page",
+      "The comparison-view-model agreement with ramify/service-api",
+      "Baseline save, list, delete, persistence, compatibility or corruption handling",
+      "Dependency comparison computation and coherent current-revision selection",
+      "Terminal human-readable or JSON output",
+      "Cross-surface or restart acceptance",
+      "The dependency-baselines feature or any provider delegation"
+    ]
+  },
+  "readFirst": [
+    {
+      "path": "CLAUDE.md",
+      "reason": "Apply Ramify ownership, model, testing and writing constraints."
+    },
+    {
+      "path": "subs/presentation/subs/project-view/README.md",
+      "reason": "Understand the owner's current pure presentation responsibility, dependency meaning and existing state vocabulary."
+    },
+    {
+      "path": "subs/presentation/subs/project-view/module.ramify",
+      "reason": "Confirm ownership and existing exposure without changing the declaration in this iteration."
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/ProjectExplorerView.tsx",
+      "reason": "Reuse the existing visual language, selection/detail behavior, coverage labels and stale/refresh presentation patterns."
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/interfaces/dependency-view.ts",
+      "reason": "Preserve the existing browser dependency counts, classifications, evidence and states rather than redefining dependency meaning."
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/interfaces/project-view.ts",
+      "reason": "Reuse canonical module identities, revision identity, source evidence and coverage vocabulary already present in the owner."
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/tests/ProjectExplorerView.test.tsx",
+      "reason": "Follow the owner's component-test conventions and existing evidence, detail, unavailable and stale cases."
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/tests/dependency-fixtures.ts",
+      "reason": "Follow existing fixture conventions while keeping newly authored comparison fixtures explicitly synthetic."
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/.ramify/_meta.json",
+      "reason": "Record that the shared requester API snapshot is revision rev/1:c0f289c6-2132-4574-a035-d16b1f73fd48:4 with complete catalog coverage for this source area."
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/.ramify/external/subs/analysis/src/interfaces/dependency-diagram.ts.md",
+      "reason": "Use the available analysis vocabulary for current dependency facts as evidence only; do not invent or import a new provider API."
+    }
+  ],
+  "knownExternalNeeds": [
+    {
+      "capability": "browser-baseline-projection",
+      "candidateOwner": "ramify/service-api",
+      "evidence": [
+        ".ramify-architect/service-api/behavior.jsonl:12",
+        ".ramify-architect/service-api/behavior.jsonl:13",
+        "subs/service-api/src/.ramify/external/subs/analysis/src/interfaces/dependency-diagram.ts.md:22"
+      ],
+      "unresolvedQuestions": [
+        "What bounded comparison result and detail retrieval states will the service supply?",
+        "Which side identities, totals, coverage, retry and resource-limit fields belong in the cross-owner agreement?",
+        "Will historical detail be included, paged or requested separately?"
+      ]
+    },
+    {
+      "capability": "browser-baseline-workflow",
+      "candidateOwner": "ramify/explorer",
+      "evidence": [
+        ".ramify-architect/explorer/behavior.jsonl:1",
+        "subs/explorer/src/.ramify/external/subs/presentation/subs/project-view/src/ProjectExplorerView.tsx.md:19"
+      ],
+      "unresolvedQuestions": [
+        "Where will comparison selection and detail state live?",
+        "How will stale results, refresh, baseline selection and explicit deletion be coordinated?"
+      ]
+    },
+    {
+      "capability": "dependency-baseline-comparison",
+      "candidateOwner": "ramify/analysis",
+      "evidence": [
+        ".ramify-architect/analysis/behavior.jsonl:95",
+        "src/.ramify/children/subs/analysis/src/interfaces/dependency-diagram.ts.md:22"
+      ],
+      "unresolvedQuestions": [
+        "What deterministic change vocabulary distinguishes definite changes from qualified observations?",
+        "What bounded evidence subset preserves historical inspection without retaining a full report or source tree?"
+      ]
+    }
+  ],
+  "localContinuation": [
+    "Reconcile the first iteration's local presentation input with the reviewed service agreement, replacing any deliberately local test adapter rather than exposing it as a provider contract.",
+    "Integrate the comparison presentation with the existing dependency diagram or a distinct comparison mode after that interaction decision is reviewed.",
+    "Add comparison-specific navigation, keyboard behavior and larger-data presentation once result/detail bounds are known.",
+    "Verify the final component against real service output and browser acceptance after provider and explorer work exists."
+  ],
+  "blockers": [],
+  "rationale": [
+    "The project-view owner is the leaf browser consumer that determines whether retained before/after facts are understandable and inspectable. A pure supplied-data iteration can produce a visible user outcome and executable evidence without scanning source or implementing a second analyzer.",
+    "The iteration is deliberately smaller than the browser work item: it covers comparison summary and detail presentation, while baseline selection, lifecycle controls, refresh orchestration and page integration remain with ramify/explorer.",
+    "The terminal is also an essential consumer, but choosing it first would not validate the request's hardest presentation obligation: inspecting removed entities with clearly separated historical and current evidence. Terminal work remains a separate consumer work item and is not dropped.",
+    "Starting with ramify/daemon, ramify/analysis or storage was rejected because the protocol requires consumer-first work and a provider-first iteration would fix contracts before a consumer demonstrates the needed information.",
+    "Starting with ramify/explorer was rejected because its workflow depends on both service operations and a pure comparison presentation; project-view gives a smaller bounded subtree and keeps cross-branch coordination explicit.",
+    "The shared generated snapshot is revision rev/1:c0f289c6-2132-4574-a035-d16b1f73fd48:4, input input/1:9ca31c2bf2f66f17d0a67b2adcba33af79e9c59821900865c32637c2c876f3f9. Architect details include one unavailable cut field, while the project-view ordinary API catalog reports coverage 1."
+  ]
+}

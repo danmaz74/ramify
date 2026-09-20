@@ -1,0 +1,25 @@
+{
+  "caseId": "copy-module-id",
+  "status": "ready-for-first-implementation",
+  "reviewer": "/root",
+  "shape": "passed",
+  "scope": "ramify/presentation/project-view only",
+  "capabilityReferences": "passed",
+  "readFirstPaths": "exist; no full global request or map required",
+  "consumerFirst": "selected-detail interaction is the requested end-user surface",
+  "iterationBounded": "complete local copy interaction; real-browser acceptance remains explicit",
+  "closedOutcomes": "passed after correction",
+  "requirementCoverage": "reviewed; async failure and stale-selection cases retained",
+  "restart": "repository-based instructions present",
+  "implementationLaunches": 0,
+  "corrections": [
+    "closed outcome vocabulary",
+    "distinguish runtime target mutation from allowed implementation edits",
+    "verification working directory",
+    "separate runtime adapter events and contract revision from scope decisions"
+  ],
+  "limitations": [
+    "Brief readiness only; no executable acceptance or implementation run."
+  ],
+  "runtimeSeparation": "adapter events distinct from semantic outcomes after final clarification"
+}

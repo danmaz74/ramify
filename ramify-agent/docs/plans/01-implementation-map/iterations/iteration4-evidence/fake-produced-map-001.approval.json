@@ -1,0 +1,9 @@
+{
+  "schema": "ramify-agent.map-approval/1",
+  "planId": "review-notes",
+  "revision": 1,
+  "mapHash": "2c0243e53ec2df75c02f647975caa26bb9ac59f92b076d2c5c431dfc6588668d",
+  "planHash": "245a21fdd5f9feea2b1cc0bbe043e557597966e00f11926dafd507d02acf4a5a",
+  "input": "input/1:97be64acda6c3c040633889039260c03a54d26b922a223afd862386b94d0522c",
+  "approvedAt": "2026-09-19T17:28:40.201Z"
+}

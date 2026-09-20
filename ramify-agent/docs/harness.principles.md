@@ -19,17 +19,33 @@ document redefines neither.
 
 ### Bounded Context Is What Makes Agents Efficient
 
-Each agent session should work on a task of limited complexity and in a
-search space of limited complexity:
+Each agent invocation should have a manageable reasoning burden. Work can be
+bounded in two ways:
 
-- architecture planning mostly works from the architect view
-- implementation agents work in only one or a small group of modules
-- integration work could touch bigger contexts, but it should always
-  only require small/simple changes
+- **A broader change goal within a narrow search space:** an agent may
+  implement several related changes within one module or a small, coherent
+  subtree.
+- **A narrow change goal within a broader search space:** an agent may inspect
+  several modules to establish one contract, integrate it in a consumer, or
+  resolve one composition issue.
 
-The division of work should also facilitate integration and maintaining
-a clean architecture. Every other principle serves this divide-and-conquer
+**The broader the search space, the narrower the change goal must be.** An
+invocation should not combine broad architectural reach with a broad
+implementation responsibility.
+
+When work requires a broad search space, split it into individual iterations,
+each with one focused goal, explicit write boundaries and a clear completion
+check. Each invocation retrieves only the information needed for that goal.
+
+A focused goal may require coordinated changes to several artifacts. Designing
+an interface, its tests and fake, and integrating them in one consumer can form
+a single coherent iteration.
+
+The division of work should also facilitate integration and maintain a clean
+architecture. Every other principle serves this divide-and-conquer
 strategy.
+
+In some cases, special views can facilitate this approach. Architecture planning requires reasoning on the whole application, and the architect view creates a smaller search space for that.
 
 ### Plans Are Incomplete; the System Adapts
 
@@ -40,6 +56,20 @@ advance is fully complete or correct.
 Discovering during work that a task needs something beyond its scope is a
 normal outcome. How the harness handles discoveries matters more than how
 thoroughly it plans.
+
+### Distinguish Breaking from Non-Breaking Changes
+
+A non-breaking change adds or extends capabilities while preserving their
+existing contracts and behavioral guarantees. Existing consumers can continue
+to use them unchanged.
+
+A breaking change intentionally revises or removes an existing contract or
+behavioral guarantee. Existing consumers may therefore need to adapt.
+
+These are different kinds of work and may require different implementation
+and verification strategies. The distinction comes from the requested
+behavior: a preference for a cleaner interface does not, by itself, make a
+breaking change necessary.
 
 ### Every Agent Scope Is a Cut on the Module Tree
 
@@ -63,9 +93,10 @@ governs several modules lives at their lowest common ancestor.
 
 Detail is retrieved when needed, never preloaded.
 
-### Architecture Planning Produces a Work-Weight Map
+### Architecture Planning Produces an Implementation Map
 
-The architecture phase identifies which modules take most of the work. That
+The implementation map says where the implementation of a plan falls on the
+module tree. Above all it identifies which modules take most of the work. That
 guides the division of the plan into phases and iterations. New modules are
 rare.
 
@@ -90,11 +121,32 @@ the reverse. Complexity evidence guides the choice. Work decomposition is not
 
 ### Horizontal Work Uses Separate Agents Joined by a Contract
 
-Work in different branches always uses separate agents. Neither side designs
-the other's interface.
+Implementation in different branches uses separate agents. Neither side
+designs the other's interface.
 
-A contract engineer reads both sides of a seam and writes only the contract:
-interface types, conformance tests and, when required, a temporary double.
+A contract iteration has the focused goal of establishing an agreement and
+integrating it in the requesting consumer. Its agent reads both sides of the
+seam and, when extending an existing capability, may read all existing
+consumers. It writes the shared interface, conformance tests and any required
+fake, and makes the consumer changes needed to integrate them. Provider
+implementation and changes to other consumers remain separate work.
+
+The iteration verifies the agreement against the consumer's behavior before
+provider implementation begins.
+
+No separate role carries it out. An engineer does, with a skill for contract
+work that the harness supplies with the iteration. What keeps the agreement
+from serving one side is not who writes it: it is what the iteration must
+read, the executable evidence it must produce, and the provider's standing to
+report that a contract needs revision.
+
+An extension preserves existing consumers' contracts, including their
+behavioral guarantees. If a proposed design would require changes to other
+consumers, the contract iteration first seeks a compatible design. If the
+requirement makes compatibility impossible, it reports the conflict for an
+explicit contract-revision decision. Only an accepted breaking change creates
+migration work in other consumers. Revalidating compatibility may require
+running their tests without changing their code.
 
 ### Fakes and Tests Guide Delegation
 
@@ -126,7 +178,7 @@ On the return, each fake is replaced by its real provider and the tests of
 that level run again. Integration therefore happens one delegation at a time,
 at every level, and not once at the end.
 
-The work-weight map says which modules carry the work. This order says where
+The implementation map says which modules carry the work. This order says where
 the work starts and how it reaches them.
 
 ### Need-to-Know Does Not Forbid Asking
@@ -182,6 +234,10 @@ agent resolves it, scoped to the subtree of the lowest common ancestor of the
 modules involved. It owns the composition and may make bounded corrections in
 descendants, avoiding a long sequence of delegations.
 
+Substantial composition work is split into focused iterations. Each invocation
+addresses one composition issue with explicit write boundaries and a clear
+completion check, even when it needs to search the whole common subtree.
+
 The conformance tests of each seam prevent it from redesigning a contract.
 Feature-level tests at the common ancestor decide completion.
 
@@ -192,8 +248,8 @@ violations reported by Ramify's checks.
 
 It reports to the harness only an outcome that changes the orchestration: the
 goal is reached; the work is partially complete, with its needs; a contract
-needs revision; the request cannot be satisfied as specified; the plan is
-wrong. The harness acts on nothing else.
+needs revision; the request cannot be satisfied as specified; the implementation
+map is wrong. The harness acts on nothing else.
 
 ### The Harness Stays Small; Ramify Stays Outside Its Control Loop
 
@@ -206,3 +262,26 @@ environment. A violation reaches the agent as an ordinary error.
 A runtime failure, such as a crashed session or malformed output, is never a
 semantic outcome.
 
+### Agent Invocations Should Be Considered Idempotent
+
+When an agent gets interrupted for any reason, we should always be able to
+restart it from the beginning. Agents are able to check the situation by
+reading files and are able not to redo/undo what's already done. When useful,
+we can choose prompts which help with this, but most of the time that's
+not necessary.
+
+### An Oriented Context Is Reused, Never Required
+
+Orientation is the largest fixed cost of a session: an architect reading the
+architect view, an engineer learning its module. An agent asked again about
+the same scope should not pay it again. A new invocation may continue, or
+fork from, an earlier session of the same role and scope.
+
+A fork is preferred to a continuation. It starts from the point where the
+earlier session was oriented, before it took up any one task, so the reused
+context stays bounded and several questions can start from it at once.
+
+A reused context is a cache. It holds no state, and any invocation must
+succeed from a fresh session and the repository alone. It describes the source
+as it was when it was read; when that source has changed, the context is
+refreshed or discarded.

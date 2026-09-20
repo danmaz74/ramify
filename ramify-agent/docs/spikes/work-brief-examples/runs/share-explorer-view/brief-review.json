@@ -1,0 +1,27 @@
+{
+  "caseId": "share-explorer-view",
+  "status": "ready-for-first-implementation",
+  "reviewer": "/root",
+  "shape": "passed",
+  "scope": "ramify/explorer only",
+  "capabilityReferences": "passed",
+  "readFirstPaths": "exist; full global request removed after correction",
+  "consumerFirst": "browser navigation and restoration in the existing explorer consumer",
+  "iterationBounded": "navigation/restoration first; copy action remains local continuation",
+  "closedOutcomes": "passed after correction",
+  "requirementCoverage": "reviewed; delayed loading, legacy links, empty filters and invalid selections retained",
+  "restart": "repository-based instructions present",
+  "implementationLaunches": 0,
+  "corrections": [
+    "closed outcome vocabulary",
+    "canonical scope ID",
+    "removed full global request from scoped context",
+    "corrected nonexistent prompt reference",
+    "root-cwd verification and refresh provenance",
+    "separate runtime adapter events and contract revision from scope decisions"
+  ],
+  "limitations": [
+    "Brief readiness only; feasibility of iteration size and browser acceptance remain untested."
+  ],
+  "runtimeSeparation": "adapter events distinct from semantic outcomes after final clarification"
+}

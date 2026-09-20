@@ -1,0 +1,270 @@
+{
+  "caseId": "dependency-baselines",
+  "schemaVersion": 1,
+  "architectRevision": "rev/1:c0f289c6-2132-4574-a035-d16b1f73fd48:4",
+  "inputIdentity": "input/1:9ca31c2bf2f66f17d0a67b2adcba33af79e9c59821900865c32637c2c876f3f9",
+  "capabilities": [
+    {
+      "id": "current-dependency-projection",
+      "description": "Produce production module dependency facts for one completed, identified analysis while preserving canonical module ownership, behavioral classifications, counts, evidence, coverage and unavailable states.",
+      "owner": "ramify/analysis",
+      "state": "existing",
+      "evidence": [
+        ".ramify-architect/analysis/behavior.jsonl:1",
+        ".ramify-architect/analysis/behavior.jsonl:95",
+        ".ramify-architect/analysis/tests.jsonl:28",
+        ".ramify-architect/README.md:23"
+      ],
+      "uncertainties": [
+        "The generated signature for analyzeDependencyDiagram has a cut documentation field, so the exact retained evidence shape and all existing result bounds need local engineering inspection."
+      ]
+    },
+    {
+      "id": "coherent-current-dependency-request",
+      "description": "Answer a dependency request from one atomic published project revision and refuse or retry when the requested current input cannot be represented coherently.",
+      "owner": "ramify/daemon/contexts",
+      "state": "existing",
+      "evidence": [
+        ".ramify-architect/README.md:44",
+        ".ramify-architect/daemon/contexts/tests.jsonl:3",
+        ".ramify-architect/daemon/contexts/tests.jsonl:22"
+      ],
+      "uncertainties": [
+        "The existing context history is explicitly bounded and process-local; it is evidence for coherent current-side selection, not durable baseline persistence."
+      ]
+    },
+    {
+      "id": "named-baseline-repository",
+      "description": "Persist, list, load and explicitly delete complete named dependency baselines for one canonical project, with atomic creation, duplicate-name refusal, compatibility metadata, corruption errors and configured storage limits.",
+      "owner": "ramify/daemon",
+      "state": "new",
+      "evidence": [
+        ".ramify-architect/README.md:41",
+        ".ramify-architect/daemon/contexts/tests.jsonl:19"
+      ],
+      "uncertainties": [
+        "The storage location, filename encoding, baseline-name rules, compatibility version and admission limits are not established by the request or generated evidence.",
+        "It is unresolved whether durable storage should remain directly in ramify/daemon or later warrant a child boundary; the map preserves the current tree because no concrete local-complexity evidence yet justifies one."
+      ]
+    },
+    {
+      "id": "dependency-baseline-comparison",
+      "description": "Compare two identified dependency fact sets deterministically by canonical module and directed consumer/provider relationship, retaining before and after values, evidence and coverage while qualifying incomplete observations.",
+      "owner": "ramify/analysis",
+      "state": "new",
+      "evidence": [
+        ".ramify-architect/analysis/behavior.jsonl:95",
+        ".ramify-architect/analysis/tests.jsonl:28",
+        ".ramify-architect/README.md:23"
+      ],
+      "uncertainties": [
+        "The exact comparison vocabulary for a relationship whose counts or classifications change is not yet defined.",
+        "The existing dependency fact evidence must be inspected to determine the smallest durable subset that preserves historical detail without retaining a full report or source tree."
+      ]
+    },
+    {
+      "id": "shared-baseline-service",
+      "description": "Expose one project-scoped save, list, delete and compare lifecycle to terminal and browser consumers while coordinating durable baselines with coherent current revisions.",
+      "owner": "ramify/daemon",
+      "state": "extension",
+      "evidence": [
+        ".ramify-architect/README.md:20",
+        ".ramify-architect/README.md:41",
+        ".ramify-architect/README.md:44"
+      ],
+      "uncertainties": [
+        "The service vocabulary, cancellation behavior and boundary between daemon orchestration and contexts revision selection are not yet designed."
+      ]
+    },
+    {
+      "id": "terminal-baseline-interface",
+      "description": "Let a terminal user save, list, delete and compare named baselines, with readable output and deterministic JSON that identify both inputs, revisions, scope, coverage and qualified changes.",
+      "owner": "ramify/cli",
+      "state": "extension",
+      "evidence": [
+        ".ramify-architect/README.md:38",
+        ".ramify-architect/cli/behavior.jsonl:1"
+      ],
+      "uncertainties": [
+        "Command names, argument grammar and the stable JSON schema are not specified by the request."
+      ]
+    },
+    {
+      "id": "browser-baseline-projection",
+      "description": "Project baseline lifecycle and comparison outcomes from the resident service into bounded browser data without scanning source or reconstructing dependency meaning.",
+      "owner": "ramify/service-api",
+      "state": "extension",
+      "evidence": [
+        ".ramify-architect/README.md:61",
+        ".ramify-architect/service-api/behavior.jsonl:12",
+        ".ramify-architect/service-api/behavior.jsonl:13",
+        ".ramify-architect/service-api/tests.jsonl:1",
+        ".ramify-architect/service-api/tests.jsonl:4"
+      ],
+      "uncertainties": [
+        "The browser DTO size bound and whether historical detail is paged or separately requested are not established."
+      ]
+    },
+    {
+      "id": "browser-baseline-workflow",
+      "description": "Let a person select and manage a named baseline, request comparison against current analysis, refresh stale results and navigate to an individual dependency change.",
+      "owner": "ramify/explorer",
+      "state": "extension",
+      "evidence": [
+        ".ramify-architect/README.md:47",
+        ".ramify-architect/explorer/behavior.jsonl:1"
+      ],
+      "uncertainties": [
+        "The page state and interaction design for baseline selection, explicit deletion and stale refresh are not defined."
+      ]
+    },
+    {
+      "id": "dependency-comparison-presentation",
+      "description": "Render added, removed and changed modules and directed relationships, including inspectable before and after evidence and clear historical, current, scope and incompleteness labels.",
+      "owner": "ramify/presentation/project-view",
+      "state": "extension",
+      "evidence": [
+        ".ramify-architect/README.md:58",
+        ".ramify-architect/presentation/project-view/behavior.jsonl:3"
+      ],
+      "uncertainties": [
+        "The request does not determine whether comparison is a mode of the existing dependency diagram or a distinct component within the project view."
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "consumerCapability": "dependency-baseline-comparison",
+      "providerCapability": "current-dependency-projection",
+      "reason": "Both sides must use Ramify's existing production dependency meaning and fact classifications."
+    },
+    {
+      "consumerCapability": "shared-baseline-service",
+      "providerCapability": "named-baseline-repository",
+      "reason": "Both terminal and browser operations need the same durable project-scoped baseline collection."
+    },
+    {
+      "consumerCapability": "shared-baseline-service",
+      "providerCapability": "coherent-current-dependency-request",
+      "reason": "Saving and comparing require one identified coherent current revision."
+    },
+    {
+      "consumerCapability": "shared-baseline-service",
+      "providerCapability": "dependency-baseline-comparison",
+      "reason": "The shared service returns one comparison meaning to every surface."
+    },
+    {
+      "consumerCapability": "terminal-baseline-interface",
+      "providerCapability": "shared-baseline-service",
+      "reason": "Terminal lifecycle and comparison operations must use the same durable baselines as the browser."
+    },
+    {
+      "consumerCapability": "browser-baseline-projection",
+      "providerCapability": "shared-baseline-service",
+      "reason": "The browser service projects shared operations and does not own persistence or analysis."
+    },
+    {
+      "consumerCapability": "browser-baseline-workflow",
+      "providerCapability": "browser-baseline-projection",
+      "reason": "The explorer page needs bounded service state for lifecycle, comparison and staleness."
+    },
+    {
+      "consumerCapability": "browser-baseline-workflow",
+      "providerCapability": "dependency-comparison-presentation",
+      "reason": "The explorer composes the pure comparison rendering and owns browser interaction state."
+    }
+  ],
+  "reuse": [
+    {
+      "capability": "current-dependency-projection",
+      "symbol": "analyzeDependencyDiagram",
+      "requester": "ramify",
+      "availability": "available",
+      "evidence": [
+        "src/.ramify/children/subs/analysis/src/dependency-analyzer.ts.md:1",
+        "src/.ramify/_meta.json:1"
+      ]
+    },
+    {
+      "capability": "current-dependency-projection",
+      "symbol": "DependencyDiagramFacts",
+      "requester": "ramify/cli",
+      "availability": "available",
+      "evidence": [
+        "subs/cli/src/.ramify/external/subs/analysis/src/interfaces/dependency-diagram.ts.md:22",
+        "subs/cli/src/.ramify/_meta.json:1"
+      ]
+    },
+    {
+      "capability": "browser-baseline-projection",
+      "symbol": "DependencyDiagramFacts",
+      "requester": "ramify/service-api",
+      "availability": "available",
+      "evidence": [
+        "subs/service-api/src/.ramify/external/subs/analysis/src/interfaces/dependency-diagram.ts.md:22",
+        "subs/service-api/src/.ramify/_meta.json:1"
+      ]
+    },
+    {
+      "capability": "browser-baseline-workflow",
+      "symbol": "ProjectExplorerView",
+      "requester": "ramify/explorer",
+      "availability": "available",
+      "evidence": [
+        "subs/explorer/src/.ramify/external/subs/presentation/subs/project-view/src/ProjectExplorerView.tsx.md:19",
+        "subs/explorer/src/.ramify/_meta.json:1"
+      ]
+    }
+  ],
+  "seams": [
+    {
+      "id": "baseline-fact-envelope",
+      "consumerCapability": "named-baseline-repository",
+      "providerCapability": "current-dependency-projection",
+      "agreementNeeded": "Agree on the canonical, versioned, bounded dependency fact subset and identities that preserve module, relationship, classification, count, evidence and coverage meaning without retaining a whole analysis report."
+    },
+    {
+      "id": "coherent-baseline-operation",
+      "consumerCapability": "shared-baseline-service",
+      "providerCapability": "coherent-current-dependency-request",
+      "agreementNeeded": "Agree on how save and compare identify a single current revision, report supersession or retry, and expose staleness when a newer revision publishes."
+    },
+    {
+      "id": "durable-baseline-outcomes",
+      "consumerCapability": "shared-baseline-service",
+      "providerCapability": "named-baseline-repository",
+      "agreementNeeded": "Agree on project identity, name handling, duplicate, missing, corrupt, incompatible, interrupted and resource-limit outcomes shared by all clients."
+    },
+    {
+      "id": "comparison-result-meaning",
+      "consumerCapability": "shared-baseline-service",
+      "providerCapability": "dependency-baseline-comparison",
+      "agreementNeeded": "Agree on deterministic module and relationship change records, before and after evidence, side-specific coverage and the distinction between definite and qualified observations."
+    },
+    {
+      "id": "terminal-service-vocabulary",
+      "consumerCapability": "terminal-baseline-interface",
+      "providerCapability": "shared-baseline-service",
+      "agreementNeeded": "Agree on lifecycle and comparison outcomes, identities and limits needed for human output and a deterministic JSON representation."
+    },
+    {
+      "id": "browser-service-vocabulary",
+      "consumerCapability": "browser-baseline-projection",
+      "providerCapability": "shared-baseline-service",
+      "agreementNeeded": "Agree on bounded browser operations and result states for baseline metadata, comparison detail, missing data, retry and staleness."
+    },
+    {
+      "id": "comparison-view-model",
+      "consumerCapability": "dependency-comparison-presentation",
+      "providerCapability": "browser-baseline-projection",
+      "agreementNeeded": "Agree on display-ready change identities, filters, totals, side labels, evidence provenance and detail retrieval without changing underlying comparison scope."
+    }
+  ],
+  "openQuestions": [
+    "Does the existing dependency fact model retain enough bounded source evidence for both historical and current inspection, or must the baseline envelope add a stable evidence projection? This does not block identifying a bounded consumer goal; resolve it during local analysis engineering before fixing a storage schema.",
+    "What compatibility identities besides baseline format, project identity and dependency-analysis semantics must reject a comparison? This does not block identifying a bounded consumer goal; resolve it while defining the durable envelope.",
+    "What configured limits apply to baseline count, bytes per baseline, total storage and comparison result/detail size? This does not block identifying a bounded consumer goal, but every owning capability must preserve explicit refusal or incomplete outcomes.",
+    "Should durable baseline storage remain within ramify/daemon or become a child after its invariants and adapters are concrete? This does not block identifying a bounded consumer goal; preserving the current tree is the mapping recommendation.",
+    "Which surface is the initial bounded consumer is a stage-B decision and is intentionally unresolved by this capability map."
+  ]
+}

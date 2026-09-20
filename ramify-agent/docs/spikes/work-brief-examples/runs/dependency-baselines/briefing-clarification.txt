@@ -1,0 +1,1 @@
+While correcting the brief, keep crashes/timeouts/malformed submissions outside semantic outcomes: they are adapter events, not facts to force into a semantic report. Ordinary compile/test failures are resolved within the invocation. This clarification came from review of other cases; do not read sibling artifacts.

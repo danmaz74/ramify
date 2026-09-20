@@ -1,0 +1,4 @@
+Review corrections:
+1. Seams in the principles join different module branches. durable-baseline-outcomes is same-owner and coherent-baseline-operation is parent/child; retain those capability relationships but do not label them cross-branch seams. Audit all seams accordingly.
+2. The request explicitly requires baseline files to stay out of source inputs, generated architecture/API content and analysis-triggering churn. The map currently has no capability relationship covering that requirement. Identify the relevant existing capability/owner from retained evidence and represent the requirement or a concrete unresolved question. Do not invent implementation work or assume baseline storage is excluded merely because it is hidden.
+Preserve capability-only mapping and edit only capability-map.json and mapping-report.md. The coordinator preserved initial versions.

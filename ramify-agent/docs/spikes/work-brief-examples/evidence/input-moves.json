@@ -1,0 +1,17 @@
+[
+  {
+    "from": "plans/example-copy-module-id/plan.md",
+    "to": "ramify-agent/docs/spikes/work-brief-examples/examples/copy-module-id/request.md",
+    "sha256": "bd89fb48c4aa3badc2b3e1780bdcee0a90a8de2c70c33080ec32996436138e62"
+  },
+  {
+    "from": "plans/example-share-explorer-view/plan.md",
+    "to": "ramify-agent/docs/spikes/work-brief-examples/examples/share-explorer-view/request.md",
+    "sha256": "b57d46756bf58fd53c47c3693a950473676b8e427e06ad61a7d09d82804af169"
+  },
+  {
+    "from": "plans/example-dependency-baselines/plan.md",
+    "to": "ramify-agent/docs/spikes/work-brief-examples/examples/dependency-baselines/request.md",
+    "sha256": "2f50d104c74822e9a421f9f0ca302ecd0e5ce31fa52277064ccf1f0ba71c1891"
+  }
+]

@@ -19,7 +19,7 @@ not settle it. This is the largest gap.
 ### Human approval of the architecture plan
 
 The principles say that structural changes are approved by a person. They do
-not say whether a person reviews the work-weight map before implementation
+not say whether a person reviews the implementation map before implementation
 starts.
 
 ### Nobody changes a contract unilaterally
@@ -27,15 +27,16 @@ starts.
 The principles state this only for the integration agent. The broader rule:
 
 - a provider may not weaken the conformance tests of a seam;
-- a consumer or provider with evidence against a contract sends it to the
-  contract engineer;
-- a contract engineer changing an existing interface considers the
+- a consumer or provider with evidence against a contract reports it, and the
+  change is made by a new contract iteration;
+- a contract iteration changing an existing interface considers the
   interface's other consumers.
 
 ### Read scope and write scope are separate
 
-The contract engineer reads both sides of a seam and writes only the
-contract. The integration agent reads a whole subtree and its changes in
+A contract iteration reads both sides of a seam, and every existing consumer
+of a capability it extends, and writes only the contract and its integration
+in the requesting consumer. The integration agent reads a whole subtree and its changes in
 descendants are bounded. The principles describe what an agent sees and may
 change as one scope.
 
@@ -79,17 +80,17 @@ A goal names no files, classes or algorithms, and it can be verified.
 - **Parallel work.** The principles are silent on it. Once the consumer has
   validated a contract against its fake, the provider's work and the rest of
   the consumer's work could proceed at the same time.
-- **Who writes the conformance tests.** The contract engineer writes the
-  contract of a seam, while the consumer's use of the fake is what validates
-  it. Whether the consumer drafts the tests and the contract engineer ratifies
-  them, or the reverse, is undecided.
+- **Who writes the conformance tests.** Settled by the contract iteration: the
+  consumer's engineer writes the spec, its behavioral tests and a provisional
+  stub; one contract iteration then writes the interface, the conformance
+  tests and the fake, and integrates them in the consumer.
 - **Exposure within the agent's own scope.** An exposure path lying entirely
   within the agent's subtree could be approved by policy without an architect
   decision. The discovery table says the architect always proposes it.
 - **Integration fallback.** Bounded corrections have no stated consequence.
   Exceeding the bound should fall back to delegation and count as friction.
 - **Origin of feature-level tests.** Completion of integration depends on
-  them, but nothing says the plan produces them.
+  them, but nothing says the implementation map produces them.
 
 ## Material for other documents
 
@@ -116,7 +117,7 @@ A goal names no files, classes or algorithms, and it can be verified.
 
 - Deduplicate outstanding needs.
 - Detect cycles among waiting work; replan a cycle at the common ancestor.
-- A changed plan has an identified revision, and every brief names the
+- A changed implementation map has an identified revision, and every brief names the
   revision it came from.
 - Test the riskiest assumption first with a small scoped spike.
 
@@ -158,5 +159,12 @@ and hand-off failures.
 - Suspended sessions with forked notes to self.
 - Iteration counts fixed in advance.
 - Agents forbidden from changing descendants.
-- Consumer-authored contracts as the default.
+- Consumer-authored contracts as the default, meaning a contract the consumer
+  writes from its own side alone. The contract iteration is carried out by an
+  engineer on the consumer's side, but it is not that: it must read the
+  provider and the existing consumers, record what it read, and produce
+  conformance tests, and the provider may report that the contract needs
+  revision.
+- The contract engineer as a separate role. A contract iteration is a kind of
+  iteration that an engineer carries out with the contracts skill.
 - Requests climbing the tree one parent at a time.

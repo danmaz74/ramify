@@ -1,0 +1,120 @@
+{
+  "schema": "ramify-agent.implementation-map/1",
+  "identity": {
+    "planId": "review-notes",
+    "revision": 1,
+    "jobId": "20260919T172828Z-e598b4",
+    "manifest": {
+      "planHash": "245a21fdd5f9feea2b1cc0bbe043e557597966e00f11926dafd507d02acf4a5a",
+      "source": null,
+      "versions": {
+        "architectPrompt": "1+sha256:7b200a855adb0020",
+        "procedure": "1+sha256:793b07b19c961138",
+        "skill": "sha256:584c06580635e900",
+        "ramify": "0.0.0"
+      },
+      "architectView": {
+        "status": "materialized",
+        "revision": "rev/1:5ec95983-8b38-4249-84c3-0902802f83b7:1",
+        "input": "input/1:97be64acda6c3c040633889039260c03a54d26b922a223afd862386b94d0522c",
+        "coverageLimits": [
+          "unknownShapes: 8",
+          "cut: 3",
+          "unclassifiedExercises: 1"
+        ]
+      }
+    }
+  },
+  "summary": {
+    "change": "SCRIPTED FAKE TEST MAP, not an architect's work: the fixed map the harness tests use for review-notes. Reviewers attach notes to a review run; the notes are kept with the review session.",
+    "preserves": [
+      "The catalog side does not depend on the review side."
+    ]
+  },
+  "modulesTouched": [
+    {
+      "module": "collection-review/workspace/reviews",
+      "weight": "heavy",
+      "why": "It owns review sessions and their adapters."
+    },
+    {
+      "module": "collection-review/workspace/reviews/ui",
+      "weight": "light",
+      "why": "It shows the notes."
+    },
+    {
+      "module": "collection-review/workspace/reviews/notes",
+      "weight": "light",
+      "why": "Test data: a proposed module, to show how one is drawn.",
+      "proposed": {
+        "parent": "collection-review/workspace/reviews",
+        "purpose": "Holds reviewer notes.",
+        "tags": []
+      }
+    }
+  ],
+  "reuse": [
+    {
+      "capability": "Identify the record a note is about",
+      "symbols": [
+        {
+          "name": "recordIdSchema",
+          "owner": "collection-review/workspace/contracts"
+        }
+      ],
+      "requester": {
+        "module": "collection-review/workspace/reviews",
+        "area": "src"
+      },
+      "availability": {
+        "status": "available",
+        "record": "subs/workspace/subs/reviews/src/.ramify/external/subs/workspace/subs/contracts/src/interfaces/vocabulary.ts.md",
+        "importSpelling": "import { recordIdSchema } from '../../contracts/src/interfaces/vocabulary.js';"
+      }
+    }
+  ],
+  "newCapabilities": [
+    {
+      "capability": "Review notes",
+      "goal": "Keep a reviewer's notes with the review session.",
+      "owner": "collection-review/workspace/reviews",
+      "consumers": [
+        "collection-review/workspace/reviews/ui"
+      ]
+    }
+  ],
+  "seams": [],
+  "entryPoint": {
+    "module": "collection-review/workspace/reviews",
+    "acceptance": "A note added to a review run is returned with the session."
+  },
+  "workItems": [
+    {
+      "title": "Review notes",
+      "subtreeRoot": "collection-review/workspace/reviews",
+      "capabilities": [
+        "Review notes"
+      ]
+    }
+  ],
+  "assumptions": {
+    "assumed": [
+      "Produced by the scripted fake agent from a fixed test map."
+    ],
+    "notFound": [],
+    "coverageLimits": [
+      "The API views of reviews report coverage limits."
+    ]
+  },
+  "evidence": [
+    {
+      "claim": "recordIdSchema is exposed by contracts.",
+      "citations": [
+        {
+          "kind": "view-record",
+          "path": ".ramify-architect/workspace/contracts/behavior.jsonl"
+        }
+      ]
+    }
+  ]
+}

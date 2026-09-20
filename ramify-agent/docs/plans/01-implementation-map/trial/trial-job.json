@@ -1,0 +1,31 @@
+{
+  "schema": "ramify-agent.job/1",
+  "jobId": "20260919T190102Z-637d1a",
+  "planId": "affected-modules",
+  "kind": "mapping",
+  "agent": "pi",
+  "createdAt": "2026-09-19T19:01:02.353Z",
+  "manifest": {
+    "planHash": "5333d48c1e5d10712456c6ccab59caf41d841a1359af8a713d5598963c053176",
+    "source": {
+      "commit": "3593eae42a297370e54a965536a5fc2cfb021704",
+      "dirty": false
+    },
+    "versions": {
+      "architectPrompt": "1+sha256:7b200a855adb0020",
+      "procedure": "1+sha256:793b07b19c961138",
+      "skill": "sha256:584c06580635e900",
+      "ramify": "0.0.0"
+    },
+    "architectView": {
+      "status": "materialized",
+      "revision": "rev/1:b36f8c6c-6886-4f4c-aec2-a3f61ccd5a04:1",
+      "input": "input/1:76051bf26f7b8f68482433eedd1611dc55bf4074954f783c82bb3729112d3696",
+      "coverageLimits": [
+        "cut: 366",
+        "detailsUnavailable: 1",
+        "dynamicTitles: 21"
+      ]
+    }
+  }
+}

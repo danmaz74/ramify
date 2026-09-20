@@ -1,0 +1,124 @@
+{
+  "caseId": "copy-module-id",
+  "schemaVersion": 1,
+  "architectRevision": "rev/1:c0f289c6-2132-4574-a035-d16b1f73fd48:4",
+  "inputIdentity": "input/1:9ca31c2bf2f66f17d0a67b2adcba33af79e9c59821900865c32637c2c876f3f9",
+  "capabilities": [
+    {
+      "id": "module-tree-selected-detail",
+      "description": "Render details and module-specific actions for the currently selected real module in the collapsible module tree.",
+      "owner": "ramify/presentation/project-view",
+      "state": "existing",
+      "evidence": [
+        ".ramify-architect/presentation/project-view/module.json:9",
+        ".ramify-architect/presentation/project-view/behavior.jsonl:2",
+        ".ramify-architect/presentation/project-view/tests.jsonl:2",
+        "subs/presentation/subs/project-view/src/ModuleTreeView.tsx:320",
+        "subs/presentation/subs/project-view/src/ModuleTreeView.tsx:372"
+      ],
+      "uncertainties": []
+    },
+    {
+      "id": "displayed-module-canonical-identity",
+      "description": "Provide the full canonical identifier of each displayed module independently of its short name and directory.",
+      "owner": "ramify/presentation/project-view",
+      "state": "existing",
+      "evidence": [
+        ".ramify-architect/presentation/project-view/supporting.jsonl:27",
+        "subs/presentation/subs/project-view/src/interfaces/project-view.ts:33",
+        "subs/presentation/subs/project-view/src/ModuleTreeView.tsx:179",
+        "subs/presentation/subs/project-view/src/ModuleTreeView.tsx:372"
+      ],
+      "uncertainties": [
+        "The current detail header displays the module name and directory, but not the canonical identifier as a distinct selectable value."
+      ]
+    },
+    {
+      "id": "copy-selected-module-identity",
+      "description": "Let a keyboard or pointer user copy the selected real module's exact canonical identifier from its module-tree detail panel without changing tree interaction state.",
+      "owner": "ramify/presentation/project-view",
+      "state": "extension",
+      "evidence": [
+        ".ramify-architect/presentation/project-view/module.json:12",
+        ".ramify-architect/presentation/project-view/behavior.jsonl:2",
+        "subs/presentation/subs/project-view/src/ModuleTreeView.tsx:245",
+        "subs/presentation/subs/project-view/src/ModuleTreeView.tsx:320",
+        "subs/presentation/subs/project-view/src/ModuleTreeView.tsx:382"
+      ],
+      "uncertainties": [
+        "No clipboard-writing behavior was found in the bounded architect-view searches; this is not proof that no unrelated clipboard helper exists outside the inspected candidates.",
+        "Exact control placement and wording can be resolved during local engineering and do not block identifying the owning capability."
+      ]
+    },
+    {
+      "id": "module-scoped-copy-feedback",
+      "description": "Announce copy success or failure for the module whose request completed, retain a selectable manual-copy value on failure, and suppress stale outcomes after selection changes.",
+      "owner": "ramify/presentation/project-view",
+      "state": "extension",
+      "evidence": [
+        ".ramify-architect/presentation/project-view/module.json:12",
+        "subs/presentation/subs/project-view/src/ModuleTreeView.tsx:157",
+        "subs/presentation/subs/project-view/src/ModuleTreeView.tsx:245",
+        "subs/presentation/subs/project-view/src/ModuleTreeView.tsx:320",
+        "subs/explorer/src/ModuleTreePage.tsx:22"
+      ],
+      "uncertainties": [
+        "The retained view contains no existing clipboard outcome behavior to reuse.",
+        "The exact accessible announcement text and visual duration can be resolved during local engineering; neither blocks the bounded consumer capability."
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "consumerCapability": "copy-selected-module-identity",
+      "providerCapability": "module-tree-selected-detail",
+      "reason": "The copy action appears only in the detail panel for a selected real module."
+    },
+    {
+      "consumerCapability": "copy-selected-module-identity",
+      "providerCapability": "displayed-module-canonical-identity",
+      "reason": "The copied text is the selected displayed module's canonical identifier rather than its name or directory."
+    },
+    {
+      "consumerCapability": "module-scoped-copy-feedback",
+      "providerCapability": "copy-selected-module-identity",
+      "reason": "Feedback reflects the asynchronous outcome of the copy request and remains associated with the identifier captured when that request began."
+    },
+    {
+      "consumerCapability": "module-scoped-copy-feedback",
+      "providerCapability": "module-tree-selected-detail",
+      "reason": "Feedback is rendered only with the matching selected module detail and is absent for the project summary or no selection."
+    }
+  ],
+  "reuse": [
+    {
+      "capability": "displayed-module-canonical-identity",
+      "symbol": "ExplorerModule",
+      "requester": "ramify/presentation/project-view",
+      "availability": "available",
+      "evidence": [
+        ".ramify-architect/presentation/project-view/supporting.jsonl:27",
+        "subs/presentation/subs/project-view/src/interfaces/project-view.ts:33"
+      ]
+    },
+    {
+      "capability": "module-tree-selected-detail",
+      "symbol": "ModuleTreeView",
+      "requester": "ramify/explorer",
+      "availability": "available",
+      "evidence": [
+        ".ramify-architect/presentation/project-view/behavior.jsonl:2",
+        ".ramify-architect/presentation/project-view/module.json:25",
+        "subs/explorer/src/.ramify/_meta.json:1",
+        "subs/explorer/src/.ramify/external/subs/presentation/subs/project-view/src/ModuleTreeView.tsx.md:1",
+        "subs/explorer/src/ModuleTreePage.tsx:2"
+      ]
+    }
+  ],
+  "seams": [],
+  "openQuestions": [
+    "Non-blocking for the initial bounded consumer goal: choose concise success and failure wording and the lifetime of transient success feedback during local engineering.",
+    "Non-blocking for the initial bounded consumer goal: decide whether the canonical identifier is always shown as selectable text or whether an additional manual-copy presentation appears only after failure, while preserving the requirement that failure leaves it visible and selectable.",
+    "Non-blocking for the initial bounded consumer goal: define the local fallback behavior for a missing clipboard API and rejected clipboard promises without introducing fresh analysis or server work."
+  ]
+}

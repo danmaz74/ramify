@@ -1,0 +1,6 @@
+Simulate stage A (capability mapping) of a pi harness invocation using Sol. Case: share-explorer-view.
+Read /ramify/ramify-agent/docs/spikes/work-brief-examples/protocol.md and obey the stage-A boundary and requested schemas.
+Your only feature request is /ramify/ramify-agent/docs/spikes/work-brief-examples/examples/share-explorer-view/request.md.
+Write only /ramify/ramify-agent/docs/spikes/work-brief-examples/runs/share-explorer-view/capability-map.json and mapping-report.md. No source, tests, contracts, fakes, module declarations, or other files may be edited. Do not spawn subagents.
+Read applicable project guidance and module-architect skill. The coordinator already ran ./dist/src/ramify materialize --view architect --view api --all; use that shared snapshot and do not refresh it. Existing generated views are read-only.
+Do not read example-selection.md, sibling runs or anticipated module counts. Maps contain capabilities only, never task scope, work items or iteration sequence. Stop after mapping; do not produce execution decisions or launch implementation. Report artifacts and key uncertainty.

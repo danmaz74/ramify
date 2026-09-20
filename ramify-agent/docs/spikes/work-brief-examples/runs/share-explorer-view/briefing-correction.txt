@@ -1,0 +1,8 @@
+Stage-B review corrections:
+1. Replace the invented four outcome labels with the principles' closed five semantic outcomes: goal-reached, partial-with-needs, contract-revision-needed, cannot-satisfy, map-wrong. A successful first iteration still leaving the copy-action continuation reports partial-with-needs with iteration completion and localContinuation/externalNeeds in its payload. Runtime errors are not semantic outcomes.
+2. scopeRoot must be the canonical module ID ramify/explorer, not the path subs/explorer. Keep the filesystem boundary in writeBoundary.
+3. Remove the global request from the implementation agent's readFirst list and brief. The briefing architect can read it, but the scoped engineer must receive a self-contained relevant slice. Your brief already carries most requirements; verify none is lost. Report any remaining optional reference as optional, not required context.
+4. Fix the nonexistent case-specific briefing-prompt path in briefing-report.md: it is in runs/share-explorer-view/.
+5. Specify /ramify as cwd and concrete existing focused verification commands, plus type/self-check when applicable. Do not execute them.
+6. The future implementation brief should not inherit a permanent ban on refreshing stale generated views from the spike. Record the evidence revision as provenance; future agent environment should provide current generated API views. The planning simulation itself still does not refresh them.
+Edit only your three allowed artifacts. Preserve initial copies; no implementation or tests.

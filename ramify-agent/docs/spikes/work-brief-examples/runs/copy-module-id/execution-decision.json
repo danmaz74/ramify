@@ -1,0 +1,119 @@
+{
+  "caseId": "copy-module-id",
+  "schemaVersion": 1,
+  "mapRef": "capability-map.json",
+  "approvalKind": "simulation-assumption",
+  "status": "ready-for-first-implementation",
+  "workItem": {
+    "id": "project-view-copy-module-id",
+    "consumerModule": "ramify/presentation/project-view",
+    "scopeRoot": "ramify/presentation/project-view",
+    "goal": "Let a user copy the currently displayed real module's full canonical identifier from the module-tree detail panel, with accessible module-scoped success or failure feedback and a selectable manual fallback.",
+    "capabilityIds": [
+      "module-tree-selected-detail",
+      "displayed-module-canonical-identity",
+      "copy-selected-module-identity",
+      "module-scoped-copy-feedback"
+    ],
+    "allowedModuleIds": [
+      "ramify/presentation/project-view"
+    ],
+    "writeBoundary": "subs/presentation/subs/project-view/src/",
+    "excludedWork": [
+      "Changes to ramify/explorer or any other module",
+      "Changes to module.ramify, public contracts, generated views, analysis, daemon or server requests",
+      "Any runtime mutation of the inspected target project's files; implementation edits remain limited to the declared toolkit source boundary",
+      "Changes to the import explorer, graph interaction, module selection, collapse state or graph position",
+      "Copying links, source paths or multiple module identifiers",
+      "Remembering clipboard feedback after the page closes"
+    ]
+  },
+  "firstIteration": {
+    "goal": "Implement and component-test the Copy module ID interaction in the existing ModuleTreeView detail panel, including exact canonical text, native keyboard activation, accessible feedback, unavailable/rejected clipboard handling, manual selection and stale-result suppression across selection changes.",
+    "acceptance": [
+      "A selected nested module and the real root module each show a selectable canonical identifier and a button with an accessible Copy module ID name; no copy action appears in the project summary or for the synthetic project node.",
+      "Activating the button passes exactly the selected ExplorerModule.id to the browser clipboard writer, with no label or whitespace, and modules with the same short name in different branches remain distinguishable by their full identifiers.",
+      "A resolved clipboard write shows and announces success for the captured module without moving focus or invoking selection, collapse, open, refresh or graph-position callbacks.",
+      "A rejected write or missing clipboard writer shows and announces a useful failure for the captured module while leaving its canonical identifier visible and selectable for manual copying.",
+      "If selection changes while a write is pending, that request's completion does not display success or failure for the newly selected module.",
+      "The focused native action works with keyboard activation, and the existing ModuleTreeView component tests, project type-check and self-check pass within their applicable scopes."
+    ],
+    "requiredEvidence": [
+      "Focused executable ModuleTreeView tests covering exact nested/root identifiers, duplicate short names, success, rejection, unavailable clipboard, keyboard activation, callback non-interference and selection change during a pending promise",
+      "From /ramify, a focused Vitest run for subs/presentation/subs/project-view/src/tests/ModuleTreeView.test.tsx",
+      "From /ramify, npm run type-check",
+      "From /ramify, npm run check:self",
+      "A diff review confirming all writes remain under subs/presentation/subs/project-view/src/ and no generated view is edited"
+    ],
+    "notCompletionOf": [
+      "Real-browser proof that copied text can be pasted outside the page",
+      "Any browser acceptance work owned outside ramify/presentation/project-view",
+      "Copy actions for links, source paths, multiple modules or the import explorer",
+      "Durable clipboard-feedback persistence"
+    ]
+  },
+  "readFirst": [
+    {
+      "path": "subs/presentation/subs/project-view/README.md",
+      "reason": "Owner purpose and browser-only, supplied-model boundary."
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/ModuleTreeView.tsx",
+      "reason": "Existing selected-module detail rendering, local state and tree callbacks to preserve."
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/interfaces/project-view.ts",
+      "reason": "ExplorerModule.id is the canonical identifier already present in displayed data."
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/tests/ModuleTreeView.test.tsx",
+      "reason": "Existing jsdom interaction suite and callback assertions to extend."
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/tests/module-tree-fixture.ts",
+      "reason": "Existing real-root and nested-ID fixture used by the component tests."
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/module-tree.css",
+      "reason": "Owner-local styles for tree-specific detail controls and feedback."
+    },
+    {
+      "path": "subs/presentation/subs/project-view/src/project-view.css",
+      "reason": "Existing detail-header, path and button presentation to preserve or reuse."
+    }
+  ],
+  "knownExternalNeeds": [
+    {
+      "candidate": "Browser Clipboard API",
+      "evidence": [
+        "examples/copy-module-id/request.md requires clipboard success, rejection and unavailable handling",
+        "subs/presentation/subs/project-view/README.md identifies this owner as pure browser-facing presentation"
+      ],
+      "unresolvedQuestions": [
+        "The local implementation must feature-detect navigator.clipboard.writeText and handle synchronous absence and promise rejection; it must not add a server or analysis dependency."
+      ]
+    },
+    {
+      "candidate": "Real-browser acceptance coverage outside the project-view write boundary",
+      "evidence": [
+        "The request's first acceptance case requires pasting elsewhere, while ModuleTreeView.test.tsx runs under jsdom."
+      ],
+      "unresolvedQuestions": [
+        "After the owner-local iteration succeeds, determine whether existing browser acceptance ownership can verify a real clipboard write and paste without broadening this first agent's scope."
+      ]
+    }
+  ],
+  "localContinuation": [
+    "Adjust owner-local wording or styling if focused interaction tests expose ambiguity or inaccessible presentation.",
+    "Complete any remaining owner-local regression coverage revealed by the implementation while preserving the same selected-detail scope.",
+    "Provide the implemented interaction and focused evidence to a later real-browser acceptance task if that task is authorized."
+  ],
+  "blockers": [],
+  "rationale": [
+    "The module-tree detail panel is the sole requested end-user surface and already owns the selected real ExplorerModule, including its canonical id, so ramify/presentation/project-view is the bounded consumer and needs no provider implementation first.",
+    "The smallest useful iteration is the complete owner-local interaction with executable component evidence: a button without module-scoped async outcomes or manual fallback would not satisfy a meaningful user path.",
+    "A separate clipboard helper module was rejected because the behavior has one current consumer and the reviewed map found no cross-owner seam or reusable provider contract.",
+    "Explorer-page, daemon and analysis changes were rejected because copying uses currently displayed data and must not request fresh analysis or change project state.",
+    "Real-browser paste proof is retained as an external acceptance need rather than silently treated as established by jsdom tests."
+  ]
+}

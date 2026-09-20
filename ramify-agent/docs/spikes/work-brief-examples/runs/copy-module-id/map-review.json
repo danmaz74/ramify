@@ -1,0 +1,15 @@
+{
+  "caseId": "copy-module-id",
+  "shape": "passed",
+  "capabilityReferences": "passed",
+  "owners": "existing",
+  "capabilityOnly": "reviewed",
+  "seams": "cross-branch only",
+  "availability": "reviewed; local-owner evidence accepted for local reuse",
+  "corrections": [
+    "removed same-owner seams"
+  ],
+  "approvalKind": "simulation-assumption",
+  "allows": "stage-B planning only",
+  "implementationAuthorized": false
+}

@@ -1,0 +1,27 @@
+{
+  "caseId": "dependency-baselines",
+  "status": "ready-for-first-implementation",
+  "reviewer": "/root",
+  "shape": "passed",
+  "scope": "ramify/cli only",
+  "capabilityReferences": "passed",
+  "readFirstPaths": "exist; global request and map not required by future engineer",
+  "consumerFirst": "terminal user-facing compare; rejected presentation-provider-first draft retained",
+  "iterationBounded": "compare-only against provisional dependency; local operations and real provider remain",
+  "closedOutcomes": "passed after second correction; goal-reached reserved for work item",
+  "requirementCoverage": "reviewed; identities, coverage, deterministic output, errors and deferred persistence/browser obligations retained",
+  "restart": "repository-based instructions present",
+  "implementationLaunches": 0,
+  "corrections": [
+    "provider-first selection",
+    "canonical scope ID",
+    "closed outcomes and runtime separation",
+    "future API-view freshness",
+    "work item versus iteration completion",
+    "future evidence distinguished from current evidence",
+    "existing CLI format convention"
+  ],
+  "limitations": [
+    "No executable tests or fake exist yet; feasibility and provider compatibility remain untested."
+  ]
+}

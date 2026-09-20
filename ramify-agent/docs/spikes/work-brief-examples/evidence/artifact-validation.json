@@ -1,0 +1,42 @@
+{
+  "checkedAt": "2026-09-19T19:04:05.382399+00:00",
+  "status": "passed",
+  "jsonFilesParsed": 27,
+  "markdownFilesChecked": 30,
+  "localMarkdownLinksChecked": 36,
+  "jsonl": "all lines parse",
+  "reviewedFinalMaps": "canonical owners and references; seams cross branches",
+  "reviewedFinalBriefs": "existing scoped read-first paths; no full global request/map required; closed outcomes and adapter-event distinction",
+  "inputPlacement": "three isolated example requests; no /ramify/plans directory",
+  "implementationLaunches": 0,
+  "cases": [
+    {
+      "caseId": "copy-module-id",
+      "status": "ready-for-first-implementation",
+      "consumerModule": "ramify/presentation/project-view",
+      "readFirstPaths": 7
+    },
+    {
+      "caseId": "share-explorer-view",
+      "status": "ready-for-first-implementation",
+      "consumerModule": "ramify/explorer",
+      "readFirstPaths": 10
+    },
+    {
+      "caseId": "dependency-baselines",
+      "status": "ready-for-first-implementation",
+      "consumerModule": "ramify/cli",
+      "readFirstPaths": 13
+    }
+  ],
+  "excludedFromSemanticValidation": "Preserved initial/intermediate artifacts intentionally retain documented defects.",
+  "notRun": [
+    "implementation",
+    "feature tests",
+    "build",
+    "type check",
+    "browser acceptance",
+    "pi runtime",
+    "harness replay"
+  ]
+}

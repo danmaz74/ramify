@@ -1,0 +1,5 @@
+Review corrections for stage B:
+1. The brief invents four outcome names (Iteration complete, Useful partial result, External need, Blocked). Preserve the principles' five closed semantic outcomes: goal-reached, partial-with-needs, contract-revision-needed, cannot-satisfy, map-wrong. Iteration completion, localContinuation and externalNeeds belong in the payload. A completed iteration with pending browser evidence reports partial-with-needs, not overall goal-reached. External needs must describe evidence and missing behavior without requiring the engineer to assign another owner or design its API. Runtime failures are not semantic outcomes.
+2. Clarify the phrase "do not change project files": runtime copying must not mutate the inspected target project, whereas implementing this work item would necessarily edit the allowed toolkit source. Remove the ambiguous blanket prohibition from the write boundary.
+3. Specify /ramify as the working directory for the listed npm/npx verification commands; a scoped agent may otherwise start inside the module directory.
+Edit only your three allowed artifacts. Initial versions are preserved. No implementation or test execution.

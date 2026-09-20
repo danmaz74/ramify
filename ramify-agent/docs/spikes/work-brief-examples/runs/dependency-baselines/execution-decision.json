@@ -1,0 +1,104 @@
+{
+  "caseId": "dependency-baselines",
+  "schemaVersion": 1,
+  "mapRef": "capability-map.json",
+  "approvalKind": "simulation-assumption",
+  "status": "ready-for-first-implementation",
+  "workItem": {
+    "id": "terminal-dependency-baselines",
+    "consumerModule": "ramify/cli",
+    "scopeRoot": "ramify/cli",
+    "goal": "Let a terminal user save, list, compare and explicitly delete named dependency baselines with readable human output and deterministic JSON while preserving project, input, revision, scope, coverage and failure meaning.",
+    "capabilityIds": ["terminal-baseline-interface"],
+    "allowedModuleIds": ["ramify/cli"],
+    "writeBoundary": "Only files owned by ramify/cli beneath subs/cli/src/, excluding subs/cli/module.ramify. Provisional test fakes for missing dependencies remain in ramify/cli owned tests.",
+    "excludedWork": [
+      "save, list and delete command implementation in the first iteration",
+      "ramify/daemon shared service, persistence, compatibility, corruption, interruption and storage-limit behavior",
+      "ramify/analysis comparison computation or changes to dependency meaning",
+      "ramify/analysis/project baseline-storage exclusion",
+      "browser projection, workflow and presentation",
+      "new modules, module.ramify edits, cross-owner contracts and cross-branch writes",
+      "claims of service or feature completion from a provisional fake"
+    ]
+  },
+  "firstIteration": {
+    "goal": "Deliver the terminal-facing `baseline compare <name>` grammar, human rendering, deterministic JSON rendering and exit behavior against an injected provisional dependency, so a user can understand complete changes and honest incomplete or unavailable outcomes while the consumer records the behavior a real shared service must later provide.",
+    "acceptance": [
+      "The CLI accepts `baseline compare <name>` with existing root selection and output conventions: human output by default and JSON only with `--format json`. It rejects missing, duplicate or ambiguous arguments before connecting and documents the command in help.",
+      "For a complete supplied comparison, human output names the baseline, identifies both analyzed inputs or revisions and production scope, and reports added and removed modules plus added, removed and changed directed consumer/provider relationships.",
+      "A changed relationship shows labeled before and after values for every supplied dependency count and classification. Historical and current evidence are distinguishable; a removed module or relationship remains inspectable in terminal detail.",
+      "JSON output is one versioned document with stable field and collection ordering for identical supplied input, including both-side identities, coverage and qualified change status.",
+      "A sufficiently complete no-change comparison reports no dependency changes. Partial or unavailable coverage never reports a clean result or treats unobserved relationships as proven removals; observed differences may be clearly qualified.",
+      "Missing or deleted baselines, incompatible or corrupt data, retryable current-input races, and resource-limit refusals produce distinct readable human and JSON results with non-success exits. Crashes, timeouts and malformed submissions are adapter events outside the semantic outcome protocol, and ordinary compile or test failures are resolved within the invocation.",
+      "The command uses an injected provisional dependency only. It does not scan source, compute dependency meaning, access baseline files directly or fall back to batch analysis.",
+      "Focused CLI tests, root type checking, build and the Ramify self-check pass after implementation. These are future evidence, not existing results.",
+      "Even when all compare-iteration acceptance passes, the semantic outcome is `partial-with-needs`: `iterationCompletion` records the completed compare slice, `localContinuation` retains save/list/delete, and `externalNeeds` retains replacement of the provisional fake by real provider behavior."
+    ],
+    "requiredEvidence": [
+      "CLI grammar tests for valid and invalid baseline compare invocations before dispatch.",
+      "Owned command tests with a provisional injected fake for complete, no-change, partial, unavailable, missing, incompatible, corrupt, retryable and resource-limit results in human and JSON formats.",
+      "Repeated JSON byte comparison for identical logical results supplied in different collection orders.",
+      "From /ramify: `npm test -- subs/cli/src/tests/arguments.test.ts subs/cli/src/tests/baseline-command.test.ts`.",
+      "From /ramify: `npm run type-check`.",
+      "From /ramify: `npm run build` followed by `npm run check:self`.",
+      "A diff review confirming all writes remain in ramify/cli and subs/cli/module.ramify is unchanged."
+    ],
+    "notCompletionOf": [
+      "terminal save, list or delete operations",
+      "a real shared service delegation or contract",
+      "durable persistence, restart behavior or storage isolation",
+      "comparison computation and coherent current-revision selection",
+      "browser behavior, cross-surface agreement or the feature"
+    ]
+  },
+  "readFirst": [
+    {"path": "CLAUDE.md", "reason": "Apply Ramify ownership, service, testing and writing constraints."},
+    {"path": "subs/cli/README.md", "reason": "Follow current parsing, injected-service, formatting and exit semantics."},
+    {"path": "subs/cli/module.ramify", "reason": "Confirm the existing boundary without changing it."},
+    {"path": "subs/cli/src/arguments.ts", "reason": "Extend complete-invocation grammar and preserve validation before dispatch."},
+    {"path": "subs/cli/src/run-cli.ts", "reason": "Use existing dispatch, exception and output boundaries."},
+    {"path": "subs/cli/src/interfaces/cli.ts", "reason": "Use existing injected environment and output abstractions."},
+    {"path": "subs/cli/src/command-support.ts", "reason": "Preserve common connection, output and exit handling."},
+    {"path": "subs/cli/src/measure-command.ts", "reason": "Follow an existing command with exact human and JSON forms."},
+    {"path": "subs/cli/src/tests/arguments.test.ts", "reason": "Follow grammar, help and pre-dispatch rejection conventions."},
+    {"path": "subs/cli/src/tests/measure-command.test.ts", "reason": "Follow command tests for injected results and resource refusal."},
+    {"path": "subs/cli/src/.ramify/_meta.json", "reason": "Record planning provenance, then use the current requester view at execution time."},
+    {"path": "subs/cli/src/.ramify/external/src/interfaces/service.ts.md", "reason": "Inspect current service vocabulary before reporting missing behavior; do not invent a foreign API."},
+    {"path": "subs/cli/src/.ramify/external/subs/analysis/src/interfaces/dependency-diagram.ts.md", "reason": "Preserve existing dependency facts and coverage meaning."}
+  ],
+  "knownExternalNeeds": [
+    {
+      "behavior": "Return one project-scoped named-baseline comparison against a coherent current production dependency analysis, including complete, qualified, unavailable, missing, incompatible, corrupt, retryable and resource-limit results.",
+      "evidence": [
+        "The request requires terminal comparison with human and deterministic JSON output identifying both inputs and coverage.",
+        "The accepted map records terminal-baseline-interface consuming shared-baseline-service through terminal-service-vocabulary.",
+        "Current subs/cli/src/arguments.ts uses human output by default, accepts only `--format json`, validates before dispatch and has no baseline command."
+      ],
+      "evidenceToCreate": [
+        "CLI tests exercising the information and states needed by both output forms",
+        "a provisional fake call log showing root, baseline name and requested operation",
+        "a final consumer-side result-shape inventory in the iteration report"
+      ],
+      "constraints": [
+        "Do not nominate another owner, prescribe transport methods or fix a foreign API in the need.",
+        "The eventual result identifies both sides, scope and side-specific coverage and retains bounded historical/current evidence.",
+        "A provisional fake proves consumer behavior only and must be replaced before delegation or feature completion."
+      ]
+    }
+  ],
+  "localContinuation": [
+    "Add save, list and explicit delete grammar and output in later iterations after compare establishes shared vocabulary needs.",
+    "Replace the provisional test dependency with the reviewed shared service surface when available.",
+    "Add real-service and restart acceptance after providers exist."
+  ],
+  "blockers": [],
+  "rationale": [
+    "ramify/cli is an actual end-user consumer. A compare-only iteration fixes observable grammar, output and exit behavior while eliciting provider needs through executable evidence.",
+    "The browser workflow is also required. Terminal compare goes first because it can establish deterministic machine and human result meaning without simultaneously needing browser state, transport and rendering providers.",
+    "Save, list and delete remain in the work-item goal but are deliberately excluded from the first iteration.",
+    "The initial Stage-B draft selected ramify/presentation/project-view as a small pure renderer. Coordinator review rejected it because the accepted map makes it a provider consumed by ramify/explorer, violating the highest-consumer rule. The corrected decision starts at ramify/cli.",
+    "The planning snapshot was revision rev/1:c0f289c6-2132-4574-a035-d16b1f73fd48:4, input input/1:9ca31c2bf2f66f17d0a67b2adcba33af79e9c59821900865c32637c2c876f3f9, with CLI ordinary API coverage 1. Execution must inspect current generated views and refresh stale or missing views under project guidance.",
+    "A completed compare-only iteration against a provisional fake cannot reach the terminal work-item goal. Its required outcome is partial-with-needs until local save/list/delete work and the real-provider need are closed."
+  ]
+}

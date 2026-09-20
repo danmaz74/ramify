@@ -1,0 +1,137 @@
+{
+  "caseId": "share-explorer-view",
+  "schemaVersion": 1,
+  "mapRef": {
+    "path": "capability-map.json",
+    "architectRevision": "rev/1:c0f289c6-2132-4574-a035-d16b1f73fd48:4",
+    "inputIdentity": "input/1:9ca31c2bf2f66f17d0a67b2adcba33af79e9c59821900865c32637c2c876f3f9"
+  },
+  "approvalKind": "simulation-assumption",
+  "status": "ready-for-first-implementation",
+  "workItem": {
+    "id": "share-current-import-explorer-view",
+    "consumerModule": "ramify/explorer",
+    "scopeRoot": "ramify/explorer",
+    "goal": "Let an import-explorer user copy a canonical link whose address restores the same meaningful view against the latest available analysis, participates correctly in browser history, and remains usable when requested state is malformed or no longer available.",
+    "capabilityIds": [
+      "explorer-view-navigation-state",
+      "copy-current-explorer-view-link",
+      "latest-revision-explorer-data",
+      "explorer-selection-reconciliation",
+      "import-explorer-controlled-presentation"
+    ],
+    "allowedModuleIds": [
+      "ramify/explorer"
+    ],
+    "writeBoundary": "Only files owned by ramify/explorer beneath subs/explorer/src/, including its owned tests. No module declaration change is authorized.",
+    "excludedWork": [
+      "Any write beneath ramify/presentation/project-view or another module",
+      "A new module, exposure, cross-branch contract or provider delegation",
+      "Server-side saved views, accounts, tokens, source contents or filesystem paths in links",
+      "Cross-machine or cross-project sharing and stable local-server addresses across restarts",
+      "Frozen or historical analysis revisions",
+      "Graph coordinates, pan, zoom, sidebar size or chat state",
+      "Sharing from the module-tree page"
+    ]
+  },
+  "firstIteration": {
+    "goal": "Make the import explorer's meaningful view state canonical in the current browser address, restore it only when its required current data is available, and make Back, Forward and reload reproduce supported views without navigation loops or default-state races.",
+    "acceptance": [
+      "A URL can represent and restore scope; module, dependency-link, own-source or no selection; presentation classes including an explicitly empty set; dependency depth; non-behavioral visibility; outside-scope visibility; and own-source-node visibility.",
+      "Equivalent state serializes to one deterministic query regardless of interaction order, and identifiers containing slashes round-trip correctly.",
+      "A URL with no new view-state fields retains today's default behavior, while legacy ?module= links retain their current focus behavior.",
+      "Initial project loading does not replace requested state with defaults or add a history entry. Dependency selection waits for the matching dependency view before reconciliation.",
+      "Meaningful user navigation updates history; Back and Forward restore earlier and later views without causing a push/replace loop. Reload restores the current address. Pan, zoom and sidebar resizing do not create navigation entries.",
+      "Malformed or unsupported optional values are ignored with a useful notice while supported independent values survive. Missing scope or selection produces a useful notice and a usable fallback without discarding valid settings.",
+      "Focused tests exercise delayed project and dependency data, all supported selection kinds, deliberately empty classes, three navigation changes with Back and Forward, reload-equivalent initialization, missing targets, malformed values, encoded module IDs, canonical ordering and legacy links.",
+      "From /ramify, `npx vitest run subs/explorer/src/tests/ProjectExplorerFocus.test.tsx subs/explorer/src/tests/ProjectExplorerPage.test.tsx`, `npm run type-check` and `npm run check:self` pass after the change."
+    ],
+    "requiredEvidence": [
+      "Executable ramify/explorer tests that fail against the current local-only state and pass after URL restoration and history synchronization are implemented.",
+      "Tests distinguish absent class state from an explicitly empty class selection and prove delayed data cannot overwrite either requested state.",
+      "Tests exercise popstate restoration separately from user changes so a restored entry does not create another history entry.",
+      "Tests preserve the existing encoded legacy ?module= behavior and show deterministic serialization for logically equivalent state.",
+      "The handoff reports commands run from /ramify, results, changed paths and any behavior that remains incomplete."
+    ],
+    "notCompletionOf": [
+      "The Copy view link action, clipboard success/failure feedback and manual-copy fallback",
+      "The complete share-explorer-view work item or its end-to-end copy-and-open acceptance",
+      "Any external provider work if current controlled presentation inputs prove insufficient",
+      "Sharing across machines, projects or historical revisions"
+    ]
+  },
+  "readFirst": [
+    {
+      "path": "subs/explorer/README.md",
+      "reason": "Explorer ownership, current revision-aligned loading behavior and page-local settings."
+    },
+    {
+      "path": "subs/explorer/src/ProjectExplorerPage.tsx",
+      "reason": "Current owner of scope, controlled selection, presentation classes, dependency settings, delayed data reconciliation and notices."
+    },
+    {
+      "path": "subs/explorer/src/browser-app.tsx",
+      "reason": "Current browser-page assembly and legacy module-query parsing."
+    },
+    {
+      "path": "subs/explorer/src/browser-entry.tsx",
+      "reason": "Current handoff from window location into the explorer app."
+    },
+    {
+      "path": "subs/explorer/src/tests/ProjectExplorerFocus.test.tsx",
+      "reason": "Existing legacy module focus, missing-module notice and slash-encoding evidence."
+    },
+    {
+      "path": "subs/explorer/src/tests/ProjectExplorerPage.test.tsx",
+      "reason": "Existing revision, delayed-result and dependency-view test fixtures to extend with executable navigation evidence."
+    },
+    {
+      "path": "subs/explorer/src/.ramify/external/subs/presentation/subs/project-view/src/ProjectExplorerView.tsx.md",
+      "reason": "Generated requester-specific API showing the controlled view inputs and callbacks available to ramify/explorer."
+    },
+    {
+      "path": "subs/explorer/src/.ramify/external/subs/presentation/subs/project-view/src/interfaces/dependency-view.ts.md",
+      "reason": "Generated requester-specific definitions for dependency settings and dependency data phases."
+    },
+    {
+      "path": "subs/explorer/src/.ramify/external/subs/presentation/subs/project-view/src/moduleGraphShared.ts.md",
+      "reason": "Generated requester-specific GraphSelection identity available to the consumer."
+    },
+    {
+      "path": "subs/explorer/src/.ramify/external/subs/presentation/subs/project-view/src/dependency-graph.ts.md",
+      "reason": "Generated requester-specific own-source identity helpers and dependency defaults available to the consumer."
+    }
+  ],
+  "knownExternalNeeds": [
+    {
+      "dependency": "ramify/presentation/project-view controlled explorer surface",
+      "evidence": "The ramify/explorer API view at revision rev/1:c0f289c6-2132-4574-a035-d16b1f73fd48:4 exposes ProjectExplorerView, DependencySettings, GraphSelection and own-source identity helpers; ProjectExplorerPage already consumes them.",
+      "unresolvedQuestions": [
+        "Confirm in executable consumer tests that a serialized dependency edge ID is sufficient to restore the same visible link after scope and settings are restored against the latest dependency model.",
+        "If current callbacks cannot distinguish restoration from user navigation, report the exact missing consumer-facing agreement instead of writing across the module boundary."
+      ]
+    },
+    {
+      "dependency": "Browser Location and History APIs",
+      "evidence": "browser-entry.tsx currently reads window.location once and browser-app.tsx passes only the legacy initial module into ProjectExplorerPage; no existing popstate integration was found in the bounded explorer source.",
+      "unresolvedQuestions": [
+        "Choose and document which meaningful transitions append entries and which initial canonical normalization replaces the current entry while satisfying the requested Back and Forward sequence."
+      ]
+    }
+  ],
+  "localContinuation": [
+    "Add the Copy view link control using the canonical address produced by this iteration.",
+    "Report clipboard success only after a successful write; on failure, show the failure and keep the generated address available for manual copying.",
+    "Run the complete copy-and-open acceptance across fresh-tab, reload and latest-analysis scenarios.",
+    "Polish notice and control presentation within ramify/explorer if the first iteration deliberately uses only existing page-level status presentation."
+  ],
+  "blockers": [],
+  "rationale": [
+    "ramify/explorer goes first because it owns the browser address, page-local view state, latest revision loading and the callbacks from the controlled presentation surface. The requester-specific API view confirms it can consume the required presentation types and helpers without provider changes.",
+    "Canonical restoration and history are the smallest useful foundation for sharing: a fresh browser address becomes observably reproducible and executable tests establish evidence before a copy button can claim to share it.",
+    "A copy-control-first iteration was rejected because it would copy an address that cannot yet restore the requested view and could count a placeholder as progress.",
+    "A generic codec-only or provider-first iteration was rejected because it would not give the user an observable restored view and no provider gap is currently established.",
+    "showOutsideScope is included in canonical state because it is an existing controlled dependency display setting that changes the visible dependency view; omitting it would let two materially different views generate the same link. This resolves a nonblocking map question for this work item.",
+    "The copy interaction remains in the same bounded consumer work item, but is deferred from the next iteration so URL/history behavior can be proven independently of clipboard UI behavior."
+  ]
+}

@@ -1,0 +1,1 @@
+The seam list contains same-owner capability relationships. A seam in the harness principles is between different module branches. Remove same-owner seams (keep valid capability relationships); copy-module-id should have no cross-module seams. For share-explorer-view retain only independently justified cross-branch seams. Do not invent work or widen scope to create seams.

@@ -1,0 +1,17 @@
+{
+  "observedAt": "2026-09-19T18:56:08.149447+00:00",
+  "changes": [
+    {
+      "path": "ramify-agent/subs/harness/subs/agent/subs/pi/src/pi-agent.ts",
+      "before": "b27aabb7eca7f3858e9338fc6ea09ecc3a401b170c834aa44d7d63aee26221ee",
+      "observed": "9e758ef658e93a0a18d6fdfb5e8eab2658dd42d064b11bd3058ba91b75b6bfca"
+    },
+    {
+      "path": "ramify-agent/subs/harness/subs/agent/subs/pi/src/tests/pi-agent.test.ts",
+      "before": "221b8a9e6906d38579c967d0e68a6da98748793da77d9b3fc8af930f6e9503f4",
+      "observed": "fa62d04c7325e7d5f657f0531aa78d89af741667800b4157666a17edd6ff194c"
+    }
+  ],
+  "action": "Left these files untouched; requested write-boundary confirmations from planning agents. Target toolkit source is checked separately.",
+  "attribution": "not established by hashes alone"
+}

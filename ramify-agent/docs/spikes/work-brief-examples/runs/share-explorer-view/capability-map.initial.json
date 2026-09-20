@@ -1,0 +1,183 @@
+{
+  "caseId": "share-explorer-view",
+  "schemaVersion": 1,
+  "architectRevision": "rev/1:c0f289c6-2132-4574-a035-d16b1f73fd48:4",
+  "inputIdentity": "input/1:9ca31c2bf2f66f17d0a67b2adcba33af79e9c59821900865c32637c2c876f3f9",
+  "capabilities": [
+    {
+      "id": "explorer-view-navigation-state",
+      "description": "Represent the meaningful import-explorer view in a canonical browser address, restore it after required project and dependency data arrive, and keep meaningful changes synchronized with browser history while preserving legacy module-focus addresses.",
+      "owner": "ramify/explorer",
+      "state": "extension",
+      "evidence": [
+        ".ramify-architect/explorer/module.json (purpose and uses)",
+        ".ramify-architect/explorer/behavior.jsonl: selectInitialModule, focusModule, ProjectExplorerPage, createProjectExplorerBrowserApp",
+        "subs/explorer/src/browser-app.tsx:16-34",
+        "subs/explorer/src/ProjectExplorerPage.tsx:20-46,51-93,153-173"
+      ],
+      "uncertainties": [
+        "The canonical query representation and which transitions replace versus append history are not established by current evidence.",
+        "The stable restoration key for a dependency link across a newly available analysis revision needs local validation against the rendered link identities.",
+        "The request names dependency depth, non-behavioral visibility and own-source visibility; the existing settings also contain showOutsideScope, whose URL treatment is not explicit in the request."
+      ]
+    },
+    {
+      "id": "copy-current-explorer-view-link",
+      "description": "Offer the current canonical explorer address for clipboard copying, report clipboard failure without reporting success, and leave the address available for manual copying.",
+      "owner": "ramify/explorer",
+      "state": "new",
+      "evidence": [
+        ".ramify-architect/explorer/module.json (browser-page ownership)",
+        ".ramify-architect/explorer/behavior.jsonl: ProjectExplorerPage",
+        "subs/explorer/src/ProjectExplorerPage.tsx:153-182"
+      ],
+      "uncertainties": [
+        "No existing view-link or clipboard behavior was found in the bounded architect-view searches; absence is not proof because the architect view reports unavailable details.",
+        "The exact control placement and manual-copy presentation remain local UI decisions."
+      ]
+    },
+    {
+      "id": "import-explorer-controlled-presentation",
+      "description": "Render an import-explorer scope, module or dependency selection, presentation-class selection, and dependency settings through controlled inputs and report user changes to its browser-page consumer.",
+      "owner": "ramify/presentation/project-view",
+      "state": "existing",
+      "evidence": [
+        ".ramify-architect/presentation/project-view/module.json (purpose and ramify/explorer consumer)",
+        ".ramify-architect/presentation/project-view/behavior.jsonl: ProjectExplorerView, ModuleGraphRadial, ownSourceNodeId, ownSourceNodeModule",
+        ".ramify-architect/presentation/project-view/tests.jsonl: ProjectExplorerView suites for filters, scope-aware roll-up, selection reconciliation and own-source selection",
+        "subs/presentation/subs/project-view/src/ProjectExplorerView.tsx:57-91,104-137,184-220",
+        "subs/presentation/subs/project-view/src/interfaces/dependency-view.ts:139-150"
+      ],
+      "uncertainties": [
+        "Current evidence establishes controlled state inputs and callbacks, but it does not establish a presentation prop for copy-link status or notices about ignored URL settings."
+      ]
+    },
+    {
+      "id": "latest-revision-explorer-data",
+      "description": "Load the latest published project model and its matching dependency view, keep revision identities aligned, and expose loading, unavailable and stale states to the explorer page.",
+      "owner": "ramify/explorer",
+      "state": "existing",
+      "evidence": [
+        ".ramify-architect/explorer/behavior.jsonl: usePublishedProjectView and usePublishedDependencyView",
+        ".ramify-architect/explorer/tests.jsonl: connected project explorer revision state and connected dependency view suites",
+        "subs/explorer/src/ProjectExplorerPage.tsx:28-34"
+      ],
+      "uncertainties": [
+        "Current tests cover revision-aligned loading and refresh, but not delayed URL-state restoration."
+      ]
+    },
+    {
+      "id": "explorer-selection-reconciliation",
+      "description": "Reconcile a requested module, dependency link or own-source selection with the currently rendered scope and settings, clearing or explaining unavailable selections without replacing independent valid settings.",
+      "owner": "ramify/explorer",
+      "state": "extension",
+      "evidence": [
+        ".ramify-architect/explorer/behavior.jsonl: focusModule and ProjectExplorerPage",
+        ".ramify-architect/explorer/tests.jsonl: MT12 import explorer focus and connected project explorer revision state",
+        ".ramify-architect/presentation/project-view/tests.jsonl: BD37, BD50 and BD60 selection reconciliation cases",
+        "subs/explorer/src/ProjectExplorerPage.tsx:66-93,159-170"
+      ],
+      "uncertainties": [
+        "The present page reports a missing legacy module but silently reconciles several other stale values; the notice policy for each malformed, unsupported or missing requested value is not yet represented."
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "consumerCapability": "explorer-view-navigation-state",
+      "providerCapability": "latest-revision-explorer-data",
+      "reason": "Requested scopes and selections can be validated only after the matching current project and dependency data become available."
+    },
+    {
+      "consumerCapability": "explorer-view-navigation-state",
+      "providerCapability": "import-explorer-controlled-presentation",
+      "reason": "The canonical browser state corresponds to the controlled scope, selection, class filters and dependency settings rendered by the project view."
+    },
+    {
+      "consumerCapability": "copy-current-explorer-view-link",
+      "providerCapability": "explorer-view-navigation-state",
+      "reason": "Copying must use the same canonical address representation that drives reload and browser history."
+    },
+    {
+      "consumerCapability": "explorer-selection-reconciliation",
+      "providerCapability": "latest-revision-explorer-data",
+      "reason": "Existence and visibility of a requested selection depend on the latest available models rather than on a frozen shared revision."
+    },
+    {
+      "consumerCapability": "explorer-selection-reconciliation",
+      "providerCapability": "import-explorer-controlled-presentation",
+      "reason": "Scope and settings determine whether a module, dependency link or own-source node is a supported visible selection."
+    }
+  ],
+  "reuse": [
+    {
+      "capability": "import-explorer-controlled-presentation",
+      "symbol": "ProjectExplorerView",
+      "requester": "ramify/explorer",
+      "availability": "available",
+      "evidence": [
+        "subs/explorer/src/.ramify/_meta.json (coverage 1 at the architect revision)",
+        "subs/explorer/src/.ramify/external/subs/presentation/subs/project-view/src/ProjectExplorerView.tsx.md:19-58",
+        "subs/explorer/src/ProjectExplorerPage.tsx:10,153-173"
+      ]
+    },
+    {
+      "capability": "import-explorer-controlled-presentation",
+      "symbol": "DependencySettings",
+      "requester": "ramify/explorer",
+      "availability": "available",
+      "evidence": [
+        "subs/explorer/src/.ramify/external/subs/presentation/subs/project-view/src/interfaces/dependency-view.ts.md:139-150",
+        "subs/explorer/src/ProjectExplorerPage.tsx:11-12,35-44"
+      ]
+    },
+    {
+      "capability": "explorer-selection-reconciliation",
+      "symbol": "ownSourceNodeModule",
+      "requester": "ramify/explorer",
+      "availability": "available",
+      "evidence": [
+        "subs/explorer/src/.ramify/external/subs/presentation/subs/project-view/src/dependency-graph.ts.md:36-39",
+        ".ramify-architect/presentation/project-view/behavior.jsonl: ownSourceNodeModule",
+        "subs/explorer/src/ProjectExplorerPage.tsx:11,66-78"
+      ]
+    },
+    {
+      "capability": "import-explorer-controlled-presentation",
+      "symbol": "GraphSelection",
+      "requester": "ramify/explorer",
+      "availability": "available",
+      "evidence": [
+        "subs/explorer/src/.ramify/external/subs/presentation/subs/project-view/src/moduleGraphShared.ts.md:1-8",
+        "subs/explorer/src/ProjectExplorerPage.tsx:8,37-38"
+      ]
+    }
+  ],
+  "seams": [
+    {
+      "id": "navigation-state-to-controlled-view",
+      "consumerCapability": "explorer-view-navigation-state",
+      "providerCapability": "import-explorer-controlled-presentation",
+      "agreementNeeded": "Agree which controlled view values are meaningful navigation, their canonical identities including deliberate empty class selection and no selection, and how user callbacks differ from restoration so history does not loop."
+    },
+    {
+      "id": "requested-state-to-current-data",
+      "consumerCapability": "explorer-selection-reconciliation",
+      "providerCapability": "latest-revision-explorer-data",
+      "agreementNeeded": "Agree when each requested value has enough current data to validate, how valid independent settings survive missing entities, and which unavailable or unsupported values produce notices."
+    },
+    {
+      "id": "canonical-address-to-copy-result",
+      "consumerCapability": "copy-current-explorer-view-link",
+      "providerCapability": "explorer-view-navigation-state",
+      "agreementNeeded": "Agree that the displayed manual-copy value and clipboard attempt use the same canonical current address and that success is reported only after the clipboard operation succeeds."
+    }
+  ],
+  "openQuestions": [
+    "Nonblocking for identifying an initial bounded consumer goal: should showOutsideScope be serialized as part of dependency settings even though the request does not name it explicitly? Resolve against product intent during local engineering before freezing the canonical representation.",
+    "Nonblocking for identifying an initial bounded consumer goal: which meaningful transitions append history and which normalize the current entry? The request fixes Back and Forward behavior but leaves this per-transition policy to local engineering.",
+    "Nonblocking for identifying an initial bounded consumer goal: what stable dependency-link identity should be serialized when the latest analysis changes? Existing deterministic edge IDs are a lead, but rendered scope and settings can change link visibility and need validation.",
+    "Nonblocking for identifying an initial bounded consumer goal: should malformed-value notices be one aggregate notice or value-specific notices? Either can preserve supported settings and keep the page usable.",
+    "No question found that blocks identifying ramify/explorer as the bounded consumer owner; this map does not choose an iteration or authorize implementation."
+  ]
+}

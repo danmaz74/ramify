@@ -1,0 +1,210 @@
+{
+  "summary": {
+    "change": "When a module description names a symbol that a source file does not offer it, or that a child's contract to its parent does not contain, the rejection gains the close names among the ones the declaration could validly have selected. The work falls inside the analysis branch: the linking stage of ramify/analysis/descriptions decides closeness, appends the suggestion to the text it already produces and carries the suggested names as data on the rejection; ramify/analysis carries that data through into the completed analysis finding. Nothing about what is exposed, or about whether the check fails, changes.",
+    "preserves": [
+      "The declaration stays invalid and the check still fails; a suggestion never changes what is exposed.",
+      "The rejection's problem code, source location and existing text are unchanged; the suggestion is appended after the existing text.",
+      "Candidates come only from names the declaration could validly select: exports the module owns in that file, or the child's contract to its parent; a name close only to a re-exported symbol owned by another module yields no suggestion.",
+      "A misspelling with nothing close reports exactly what it reports today, byte for byte.",
+      "Suggestions are carried as data on the finding, not only inside its message.",
+      "The linking stage keeps its documented boundary: captured facts only, no compiler objects, no filesystem reads, no import decisions.",
+      "No new exposure declarations are needed; the rejection and finding types are already exposed to every consumer that needs them."
+    ]
+  },
+  "modulesTouched": [
+    {
+      "module": "ramify/analysis/descriptions",
+      "weight": "heavy",
+      "why": "It owns the linking stage that rejects an exposure naming a symbol its file or its child's contract does not provide, so the candidate names, the closeness decision, the appended text and the new data on the rejection all fall here."
+    },
+    {
+      "module": "ramify/analysis",
+      "weight": "light",
+      "why": "It turns the child's rejections into the completed analysis findings, so the finding gains the optional suggestion field and the mapping copies it through."
+    }
+  ],
+  "reuse": [
+    {
+      "capability": "src-selection-suggestions",
+      "symbols": [
+        { "name": "SourceCatalog", "owner": "ramify/analysis/typescript" }
+      ],
+      "requester": { "module": "ramify/analysis/descriptions", "area": "src" },
+      "availability": {
+        "status": "available",
+        "record": "subs/analysis/subs/descriptions/src/.ramify/external/subs/analysis/subs/typescript/src/interfaces/source.ts.md",
+        "importSpelling": "import type { SourceCatalog } from '../../../typescript/src/interfaces/source.js';"
+      }
+    },
+    {
+      "capability": "report-suggestion-data",
+      "symbols": [
+        { "name": "LinkIssue", "owner": "ramify/analysis/descriptions" }
+      ],
+      "requester": { "module": "ramify/analysis", "area": "src" },
+      "availability": {
+        "status": "available",
+        "record": "subs/analysis/src/.ramify/children/subs/analysis/subs/descriptions/src/interfaces/linking.ts.md",
+        "importSpelling": "import type { LinkedDescriptions, LinkIssue } from '../../subs/descriptions/src/interfaces/linking.js';"
+      }
+    }
+  ],
+  "newCapabilities": [
+    {
+      "capability": "close-name-candidates",
+      "goal": "Given the symbol name a declaration asked for and the ordered list of names that were actually offered to it, decide which of those offered names are close enough to be worth showing as possible corrections, and return them in the order they were offered, never more than three. A name that differs from the asked-for name only in letter case always counts as close. When no offered name is close, return none rather than the least unlike one. The decision is deterministic: the same asked-for name and the same ordered list of offered names always yield the same answer, the answer never depends on what kind of declaration asked, and it never contains a name that was not in the offered list. It is done when a case-only difference, the ordered cap at three equally close names, and the empty answer for a name unlike anything offered are each demonstrated.",
+      "owner": "ramify/analysis/descriptions",
+      "consumers": ["ramify/analysis/descriptions"]
+    },
+    {
+      "capability": "src-selection-suggestions",
+      "goal": "When a module description names, in a declaration that selects exports out of one of the owner's own source files, a symbol that file does not offer that declaration, the resulting rejection additionally offers the close names among those it could have named. The rejection keeps everything it reports today - the same problem code, the same source location, and the same text - with the suggestion appended after that text, and it also carries the suggested names as separate data on the rejection so that a reader need not parse prose. The candidate names come only from what that declaration could validly have selected, namely exports the module itself owns in that file, so a misspelling resembling only a symbol the file passes on from another owner yields no suggestion. The declaration remains invalid and nothing new becomes exposed. It is done when a misspelling of an owned export yields that export as a suggestion, a misspelling resembling only a foreign-owned export yields none, and a misspelling resembling nothing yields exactly today's rejection.",
+      "owner": "ramify/analysis/descriptions",
+      "consumers": ["ramify/analysis"]
+    },
+    {
+      "capability": "sub-contract-suggestions",
+      "goal": "When a module description names, in a declaration that selects from a direct child's contract to its parent, a symbol that contract does not contain, the resulting rejection additionally offers the close names drawn from the names that contract does contain and from nothing else. As with selections out of the owner's own source, the rejection keeps its existing problem code, source location and text with the suggestion appended, carries the suggested names as separate data, and leaves the declaration invalid so that the check still fails. It is done when a misspelt selection from a child whose contract holds a similar name yields that name, and a selection naming something the child has but does not offer its parent yields no suggestion.",
+      "owner": "ramify/analysis/descriptions",
+      "consumers": ["ramify/analysis"]
+    },
+    {
+      "capability": "report-suggestion-data",
+      "goal": "The completed analysis result presents every suggestion produced while rejecting an exposure declaration as data on the corresponding finding, alongside that finding's text, so that a machine-readable consumer of the result reads the suggested names without parsing prose. A finding that has no suggestion is indistinguishable in shape from the one produced today, and no finding's problem code, location, ordering or existing text changes. The result still reports the project as failing. It is done when a run over a project whose description misspells an exposed symbol yields a machine-readable result whose finding for that declaration carries the suggested names as their own values in the offered order, and a run over a project whose misspelling resembles nothing yields a result identical to today's.",
+      "owner": "ramify/analysis",
+      "consumers": ["ramify/cli"]
+    }
+  ],
+  "seams": [
+    {
+      "capability": "report-suggestion-data",
+      "owner": "ramify/analysis",
+      "consumer": "ramify/cli"
+    }
+  ],
+  "entryPoint": {
+    "module": "ramify/analysis",
+    "acceptance": "A completed analysis of a project whose module description misspells an exposed symbol still fails, and the finding for that declaration keeps its existing problem code, location and text while adding the close names both at the end of its text and as separate data on the finding; when nothing is close, the finding is identical to today's. This holds for a misspelt selection out of the owner's own source, for a misspelt selection out of the owner's tests, and for a misspelt selection out of a child's contract to its parent, and a name close only to a symbol another module owns produces no suggestion."
+  },
+  "workItems": [
+    {
+      "title": "Suggest the nearest name for an unknown exposed symbol",
+      "subtreeRoot": "ramify/analysis",
+      "capabilities": [
+        "close-name-candidates",
+        "src-selection-suggestions",
+        "sub-contract-suggestions",
+        "report-suggestion-data"
+      ]
+    }
+  ],
+  "assumptions": {
+    "assumed": [
+      "All three exposure forms the plan names are rejected by the same linking stage of ramify/analysis/descriptions, so the plan's expose-sub case is that stage's child-contract check rather than a separate owner's.",
+      "What counts as close is left to the implementer; the plan fixes only that a difference in letter case alone is always close, that at most three equally close names are offered, and that they are offered in the file's export order.",
+      "No consumer of the analysis result parses a finding's message text, so appending a suggestion to it breaks no consumer; the CLI's human output prints the message verbatim and its machine output serializes the whole result, so neither needs a change.",
+      "The suggestion data is an optional addition to the existing rejection and finding records rather than a new record type, so every existing consumer of those records compiles unchanged.",
+      "The API views used here were already present at the same revision family as the architect view and were reused rather than refreshed in this session, as the spike's tool substitution permits."
+    ],
+    "notFound": [
+      "No behavior computing name closeness, edit distance or did-you-mean suggestions was found anywhere in the architect view; the only matches for that vocabulary were unrelated layout geometry and a model test title. Not found is not proof of absence.",
+      "No module outside ramify/analysis was found to compose the text of a description finding; not found is not proof of absence.",
+      "No existing test title in ramify/analysis/descriptions was found for an unknown-symbol rejection specifically, although its linking suite holds the neighbouring rejection cases. Not found is not proof of absence."
+    ],
+    "coverageLimits": [
+      "The architect view reports cut 366, detailsUnavailable 1 and dynamicTitles 21, so signatures and test titles are abbreviated and the absence of a member from a record is not proof it does not exist.",
+      "The API view of ramify/analysis/descriptions reports coverage 1.",
+      "The API view of ramify/analysis reports coverage 1 and truncated 1; both availability answers above rest on what those views list, and nothing in this map is claimed unavailable.",
+      "The spike forbids running ramify check --batch, so no proposal in this map was verified against the checker."
+    ]
+  },
+  "evidence": [
+    {
+      "claim": "ramify/analysis/descriptions owns the stage that links exact selections and child contracts against supplied inventory and export facts, and rejects invalid contracts.",
+      "citations": [
+        { "kind": "view-record", "path": ".ramify-architect/analysis/descriptions/module.json" },
+        { "kind": "view-record", "path": ".ramify-architect/analysis/descriptions/behavior.jsonl", "line": 1 }
+      ]
+    },
+    {
+      "claim": "That stage's rejection record carries a problem code, a message and source locations, and its codes already include the unknown-symbol cases for the exposure forms; it has no field for suggestions today.",
+      "citations": [
+        { "kind": "view-record", "path": ".ramify-architect/analysis/descriptions/supporting.jsonl", "line": 10 },
+        { "kind": "source", "path": "subs/analysis/subs/descriptions/src/interfaces/linking.ts", "line": 20 }
+      ]
+    },
+    {
+      "claim": "The description language has exactly the three exposure forms the plan names, and a named selection records the name, its alias and its span.",
+      "citations": [
+        { "kind": "view-record", "path": ".ramify-architect/analysis/descriptions/supporting.jsonl", "line": 6 },
+        { "kind": "view-record", "path": ".ramify-architect/analysis/descriptions/supporting.jsonl", "line": 12 }
+      ]
+    },
+    {
+      "claim": "The linking stage already receives the tag registry, the project inventory and the catalog of export facts, so the names a declaration could validly have selected are already in its inputs.",
+      "citations": [
+        { "kind": "view-record", "path": ".ramify-architect/analysis/descriptions/behavior.jsonl", "line": 1 },
+        { "kind": "view-record", "path": ".ramify-architect/analysis/descriptions/supporting.jsonl", "line": 9 }
+      ]
+    },
+    {
+      "claim": "ramify/analysis/descriptions may already use the export-facts catalog type owned by ramify/analysis/typescript, and already imports it.",
+      "citations": [
+        { "kind": "view-record", "path": "subs/analysis/subs/descriptions/src/.ramify/external/subs/analysis/subs/typescript/src/interfaces/source.ts.md", "line": 111 },
+        { "kind": "source", "path": "subs/analysis/subs/descriptions/src/interfaces/linking.ts", "line": 3 }
+      ]
+    },
+    {
+      "claim": "ramify/analysis turns project and description problems into the analysis findings and builds each finding's message, with a category dedicated to a symbol a file does not export.",
+      "citations": [
+        { "kind": "view-record", "path": ".ramify-architect/analysis/behavior.jsonl", "line": 96 },
+        { "kind": "view-record", "path": ".ramify-architect/analysis/behavior.jsonl", "line": 55 }
+      ]
+    },
+    {
+      "claim": "The analysis finding has no field for suggestions today, and its code type already includes the linking stage's codes.",
+      "citations": [
+        { "kind": "source", "path": "subs/analysis/src/interfaces/analysis.ts", "line": 58 },
+        { "kind": "source", "path": "subs/analysis/src/interfaces/analysis.ts", "line": 53 },
+        { "kind": "view-record", "path": ".ramify-architect/analysis/supporting.jsonl", "line": 8 }
+      ]
+    },
+    {
+      "claim": "ramify/analysis may already use the rejection type owned by its descriptions child, and already imports it.",
+      "citations": [
+        { "kind": "view-record", "path": "subs/analysis/src/.ramify/children/subs/analysis/subs/descriptions/src/interfaces/linking.ts.md", "line": 29 },
+        { "kind": "source", "path": "subs/analysis/src/interfaces/analysis.ts", "line": 3 }
+      ]
+    },
+    {
+      "claim": "The rejection type is exposed to ramify/analysis and re-exposed by it to its parent and descendants, and the finding type is exposed to the root and re-exposed to descendants, so adding an optional field to either needs no new exposure declaration.",
+      "citations": [
+        { "kind": "view-record", "path": ".ramify-architect/analysis/descriptions/supporting.jsonl", "line": 10 },
+        { "kind": "view-record", "path": ".ramify-architect/analysis/supporting.jsonl", "line": 8 }
+      ]
+    },
+    {
+      "claim": "The CLI prints each finding's message verbatim and serializes the whole result, so an appended suggestion and an added field reach a person and a machine reader without a CLI change.",
+      "citations": [
+        { "kind": "source", "path": "subs/cli/src/format.ts", "line": 60 },
+        { "kind": "source", "path": "subs/cli/src/format.ts", "line": 22 },
+        { "kind": "view-record", "path": ".ramify-architect/cli/behavior.jsonl", "line": 17 }
+      ]
+    },
+    {
+      "claim": "The acceptance cases for the linking stage's rejections live in the descriptions owner's own tests.",
+      "citations": [
+        { "kind": "view-record", "path": ".ramify-architect/analysis/descriptions/tests.jsonl", "line": 4 },
+        { "kind": "view-record", "path": ".ramify-architect/analysis/descriptions/module.json" }
+      ]
+    },
+    {
+      "claim": "No behavior computing name closeness or suggestions exists in the architect view; the closest vocabulary matches are unrelated layout geometry and a model test title about rejecting query typos.",
+      "citations": [
+        { "kind": "view-record", "path": ".ramify-architect/presentation/tests.jsonl", "line": 16 },
+        { "kind": "view-record", "path": ".ramify-architect/analysis/model/tests.jsonl", "line": 8 },
+        { "kind": "view-record", "path": ".ramify-architect/_meta.json", "line": 1 }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "checkedAt": "2026-09-19T19:03:38.168256+00:00",
+  "sourceConfigurationFilesRecorded": 613,
+  "trackedToolkitFilesRecorded": 1613,
+  "trackedToolkitChanged": [],
+  "sourceConfigurationChangesObserved": [
+    {
+      "path": "ramify-agent/subs/harness/subs/agent/subs/pi/src/pi-agent.ts",
+      "before": "b27aabb7eca7f3858e9338fc6ea09ecc3a401b170c834aa44d7d63aee26221ee",
+      "after": "9e758ef658e93a0a18d6fdfb5e8eab2658dd42d064b11bd3058ba91b75b6bfca"
+    },
+    {
+      "path": "ramify-agent/subs/harness/subs/agent/subs/pi/src/tests/pi-agent.test.ts",
+      "before": "221b8a9e6906d38579c967d0e68a6da98748793da77d9b3fc8af930f6e9503f4",
+      "after": "7b41010c2726f50b140f873120206d876cd95a3b865f9efb84ad738b80276168"
+    }
+  ],
+  "newSourceConfigurationFilesObserved": [],
+  "attribution": "Hash observations alone cannot attribute shared-workspace changes. All six agents attested artifact-only writes; coordinator touched no source.",
+  "implementationLaunches": 0
+}

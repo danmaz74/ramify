@@ -1,0 +1,433 @@
+{
+  "summary": {
+    "change": "Add a hypothetical-import explanation to Ramify: a question of the form \"may this importer import this symbol\" that is answered from the model's existing decision without any such import existing in the source. The answer travels outward unchanged through the analysis owner, the dispatch-facing service vocabulary, the resident process and its contexts, to a new `ramify why` command and to the served explorer, where it appears beside the module tree with its exposure path highlighted. Most of the new thinking falls in the analysis subtree, which forms the question and derives what would have to be exposed; the surfaces only ask and render.",
+    "preserves": [
+      "No importability rule changes; the decision stays with the model owner and the command, the daemon and the explorer add no rule of their own.",
+      "The same question gives the same answer through the command line, its batch mode, its JSON format and the explorer.",
+      "With a resident process, the answer comes from the revision already published, names that revision, and analyzes nothing again.",
+      "Ordinary checks, watches and hooks do no added work for this question.",
+      "The answer is read-only: no file, declaration or project state is written, and proposed declarations are only proposed.",
+      "An uncertain answer names its limit instead of reporting allowed or refused.",
+      "A refused hypothetical import answers with the success exit code; it is not a failed check."
+    ]
+  },
+  "modulesTouched": [
+    {
+      "module": "ramify/analysis/model",
+      "weight": "heavy",
+      "why": "It already owns the importability decision, the exposure evidence and the tag rules, so forming a hypothetical question, resolving an ambiguous symbol name and deriving the exposure steps that would allow the import belong to it."
+    },
+    {
+      "module": "ramify/analysis",
+      "weight": "heavy",
+      "why": "It composes the whole answer from the facts one analysis already holds: it resolves the importer given as a module or a file, obtains the decision, renders the proposed declarations, and reports an analysis limit as an explicit uncertainty."
+    },
+    {
+      "module": "ramify/analysis/descriptions",
+      "weight": "light",
+      "why": "It owns the version 1 declaration language, so it gains the rendering of one proposed exposure change as the exact line that language would parse."
+    },
+    {
+      "module": "ramify",
+      "weight": "light",
+      "why": "It owns the dispatch-facing service and batch vocabulary the daemon implements and the clients consume, which must carry the question, the answer, its revision, its ambiguous and uncertain forms, and the batch result of a non-check operation."
+    },
+    {
+      "module": "ramify/daemon",
+      "weight": "light",
+      "why": "It accepts, validates and routes the new read-only service operation over its local transport and reports it among its capabilities, following its existing detail-request path."
+    },
+    {
+      "module": "ramify/daemon/contexts",
+      "weight": "light",
+      "why": "It answers the question from the published revision of the addressed context through its ordered queue, with the same generation, freshness and superseded outcomes as its other read-only requests."
+    },
+    {
+      "module": "ramify/cli",
+      "weight": "heavy",
+      "why": "The new command's arguments, its resident and batch paths, its human and JSON output of the exposure path, proposals, candidates and limits, and its exit-code selection are all its own."
+    },
+    {
+      "module": "ramify/service-api",
+      "weight": "light",
+      "why": "It gains one read-only browser-facing procedure that relays the question for the bound project and maps the answer into the browser model, as it already relays the dependency view."
+    },
+    {
+      "module": "ramify/presentation/project-view",
+      "weight": "heavy",
+      "why": "It owns the module tree and its detail panel, so the answer panel, the exposure-path highlighting in the tree, and the candidate, uncertain and failure states are its rendering work."
+    },
+    {
+      "module": "ramify/explorer",
+      "weight": "light",
+      "why": "It owns the served page and its client, so it carries the module selection and typed symbol into a request and shows the returned answer."
+    },
+    {
+      "module": "ramify/integration-tests",
+      "weight": "light",
+      "why": "It verifies contracts that cross the presentation and dispatch owners, which is where the plan's agreement between the command line, batch, JSON and the explorer is demonstrated."
+    }
+  ],
+  "reuse": [
+    {
+      "capability": "why-answer",
+      "symbols": [
+        { "name": "explainImport", "owner": "ramify/analysis/model" },
+        { "name": "explainVisibility", "owner": "ramify/analysis/model" }
+      ],
+      "requester": { "module": "ramify/analysis", "area": "src" },
+      "availability": {
+        "status": "available",
+        "record": "subs/analysis/src/.ramify/children/subs/analysis/subs/model/src/decisions.ts.md",
+        "importSpelling": "import { explainImport, explainVisibility } from '../subs/model/src/index.js';"
+      }
+    },
+    {
+      "capability": "why-revision-answer",
+      "symbols": [
+        { "name": "RetainedSession", "owner": "ramify/analysis" },
+        { "name": "SessionRevision", "owner": "ramify/analysis" }
+      ],
+      "requester": { "module": "ramify/daemon/contexts", "area": "src" },
+      "availability": {
+        "status": "available",
+        "record": "subs/daemon/subs/contexts/src/.ramify/external/subs/analysis/src/interfaces/session.ts.md",
+        "importSpelling": "import type { RetainedSession, SessionRevision } from '../../../../analysis/src/interfaces/session.js';"
+      }
+    },
+    {
+      "capability": "why-command",
+      "symbols": [
+        { "name": "ServiceResult", "owner": "ramify" },
+        { "name": "ServiceError", "owner": "ramify" }
+      ],
+      "requester": { "module": "ramify/cli", "area": "src" },
+      "availability": {
+        "status": "available",
+        "record": "subs/cli/src/.ramify/external/src/interfaces/service.ts.md",
+        "importSpelling": "import type { ServiceError, ServiceResult } from '../../../src/interfaces/service.js';"
+      }
+    },
+    {
+      "capability": "why-command",
+      "symbols": [
+        { "name": "BatchOperation", "owner": "ramify" }
+      ],
+      "requester": { "module": "ramify/cli", "area": "src" },
+      "availability": {
+        "status": "available",
+        "record": "subs/cli/src/.ramify/external/src/interfaces/batch.ts.md",
+        "importSpelling": "import type { BatchOperation } from '../../../src/interfaces/batch.js';"
+      }
+    },
+    {
+      "capability": "why-procedure",
+      "symbols": [
+        { "name": "ServiceConnection", "owner": "ramify/daemon" }
+      ],
+      "requester": { "module": "ramify/service-api", "area": "src" },
+      "availability": {
+        "status": "available",
+        "record": "subs/service-api/src/.ramify/external/subs/daemon/src/interfaces/daemon.ts.md",
+        "importSpelling": "import type { ServiceConnection } from '../../daemon/src/interfaces/daemon.js';"
+      }
+    },
+    {
+      "capability": "why-panel",
+      "symbols": [
+        { "name": "ExposureHop", "owner": "ramify/analysis/model" },
+        { "name": "VisibilityDecision", "owner": "ramify/analysis/model" },
+        { "name": "ImportReason", "owner": "ramify/analysis/model" }
+      ],
+      "requester": { "module": "ramify/presentation/project-view", "area": "src" },
+      "availability": {
+        "status": "available",
+        "record": "subs/presentation/subs/project-view/src/.ramify/external/subs/analysis/subs/model/src/interfaces/model.ts.md",
+        "importSpelling": "import type { ExposureHop, ImportReason, VisibilityDecision } from '../../../../analysis/subs/model/src/interfaces/model.js';"
+      }
+    },
+    {
+      "capability": "why-page-query",
+      "symbols": [
+        { "name": "ProjectExplorerView", "owner": "ramify/presentation/project-view" }
+      ],
+      "requester": { "module": "ramify/explorer", "area": "src" },
+      "availability": {
+        "status": "available",
+        "record": "subs/explorer/src/.ramify/external/subs/presentation/subs/project-view/src/ProjectExplorerView.tsx.md",
+        "importSpelling": "import { ProjectExplorerView } from '../../presentation/subs/project-view/src/ProjectExplorerView.js';"
+      }
+    },
+    {
+      "capability": "why-agreement",
+      "symbols": [
+        { "name": "runCli", "owner": "ramify/cli" }
+      ],
+      "requester": { "module": "ramify/integration-tests", "area": "src" },
+      "availability": {
+        "status": "unknown",
+        "reason": "The requester's ordinary API view does not list the command entry, but that view reports 11 coverage notes, so its absence is not definitive; the root's declaration relays explorer, daemon, service-api, presentation and analysis symbols to descendants and relays no command-line symbol, so the agreement work item should expect to drive the installed command as a process or to ask for a root relay."
+      }
+    }
+  ],
+  "newCapabilities": [
+    {
+      "capability": "hypothetical-import-decision",
+      "goal": "Given one project's resolved module, source-area and symbol facts, an importing source area identified either by its module or by one file within it, and a symbol name, answer whether a source file in that area could import that symbol even though no such import exists anywhere in the project. An allowed answer carries, in order, every module that exposes the symbol on the way to the importer, each with the source position of the declaration that does it, so a caller can show the path. A refused answer carries exactly one first refusing rule, drawn from the rules the importability model already distinguishes: the symbol does not reach the importer, the importer lacks a tag the symbol requires of its importers, the symbol lacks a tag the importer requires of its symbols, or the importer's classification forbids reaching testing source. When the name has more than one original in the project and no owner was named, the answer lists those candidates and decides nothing. No importability rule changes: for a question that corresponds to an import the project really contains, the answer agrees with the decision an ordinary check makes about that import. It is done when each of those outcomes is produced from facts alone, for both ordinary and testing importers, and nothing is written.",
+      "owner": "ramify/analysis/model",
+      "consumers": ["ramify/analysis"]
+    },
+    {
+      "capability": "exposure-steps",
+      "goal": "For a refusal caused by the symbol not reaching the importer, produce the ordered exposure changes that would make the very same question answer allowed: for each module between the symbol's owner and the importer, which symbol that module would have to expose and to which side, together with any declaration it already has that does not take effect. Produce exactly the steps that are needed and no others, produce none for a refusal with any other cause, and change nothing. The result is data, carrying no concrete declaration syntax, and it is done when applying the described changes by hand turns the refusal into an allowed answer for every case the owner's own verification covers.",
+      "owner": "ramify/analysis/model",
+      "consumers": ["ramify/analysis"]
+    },
+    {
+      "capability": "declaration-spelling",
+      "goal": "Render one proposed exposure change as the exact single line a module's description would need, in the same version 1 declaration language this owner already parses, and never touch a file while doing it. It is done when parsing a rendered line yields the change it was rendered from, for every kind of exposure the language can express, and when an unrepresentable change is reported as such instead of being rendered approximately.",
+      "owner": "ramify/analysis/descriptions",
+      "consumers": ["ramify/analysis"]
+    },
+    {
+      "capability": "why-answer",
+      "goal": "From one analyzed project's completed facts, answer the question whether a named importer could import a named symbol, and return the whole answer as data: the decision and its single reason, the exposure path with the file and line of each declaration along it, the import a source file would write, the declarations that would be needed when the refusal is a missing exposure, or the candidate owners when the symbol name is ambiguous and no owner was named. An importer given as a file beneath a module's tests is answered under that testing area's profile, and the same module's ordinary source is answered under its ordinary profile. When a fact the answer depends on is missing or limited, the answer is explicitly uncertain and names the limit instead of reporting allowed or refused. Answering uses only what the analysis already holds: it starts no compiler, acquires no project state of its own, and writes nothing. It is done when an allowed, a refused, an ambiguous and an uncertain question each produce their complete answer, and the answer carries the identity of the analysis it came from.",
+      "owner": "ramify/analysis",
+      "consumers": ["ramify/daemon/contexts", "ramify"]
+    },
+    {
+      "capability": "why-service-contract",
+      "goal": "Extend the dispatch-facing service and batch vocabulary so a client process can ask one project whether a hypothetical import would be allowed and receive the whole answer, including the revision it was answered from, its allowed, refused, ambiguous and uncertain forms, and the documented error for an unknown module, file or symbol and for a project that is not open. The batch form carries the same answer as the resident form, which today's batch result shape cannot express because it carries a check report only. The vocabulary decides nothing and adds no rule; it is done when both a resident client and a batch client can be written against it without either inventing a field the other lacks.",
+      "owner": "ramify",
+      "consumers": ["ramify/daemon", "ramify/cli", "ramify/service-api"]
+    },
+    {
+      "capability": "why-revision-answer",
+      "goal": "Answer the hypothetical-import question for one open project from the revision already published for that project, without analyzing anything again, and name that revision in the answer. The request takes its place in the context's ordered queue and obeys the same generation, lease, freshness and deadline rules as the other read-only requests, reporting the same cold, superseded and unavailable outcomes when the published revision cannot cover it. Nothing about ordinary checking, watching or revision publication changes, and the revision path does no added work for this request. It is done when the same question asked twice against one unchanged revision is answered twice from that revision with no analysis in between, and when a question arriving across a revision change is answered from the revision the answer names.",
+      "owner": "ramify/daemon/contexts",
+      "consumers": ["ramify/daemon"]
+    },
+    {
+      "capability": "why-operation",
+      "goal": "Accept the hypothetical-import question as a read-only operation of the resident process: validate its parameters, reject a malformed or unaddressed one with the documented error, route a valid one to the addressed project, return the answer unchanged to the caller over the local transport, and report the operation among the capabilities a connecting client discovers. The operation writes no file and changes no project state, and it is done when a connected client receives, unaltered, the answer the project produced, and an older client that does not know the operation still connects and works.",
+      "owner": "ramify/daemon",
+      "consumers": ["ramify/cli", "ramify/service-api"]
+    },
+    {
+      "capability": "why-command",
+      "goal": "Provide `ramify why --from <module-or-file> --symbol <name> [--in <owner-module>] [--format json] [--batch]`, which prints whether that import would be allowed and explains the decision. An allowed answer prints the exposure path declaration by declaration with file and line, and the import to write. A refused answer names the single first rule that refuses it and, when the cause is a missing exposure, prints the declaration each module along the path would need, one per module, as a proposal the command never writes. An ambiguous symbol prints the candidates and decides nothing; an uncertain answer says so and names the limit. The JSON format carries the same content as data. The answer names the revision it came from, and the resident and batch paths give the same answer to the same question. The exit code is the success code whenever the question was answered, allowed or refused, and the documented usage and failure codes otherwise; a refused hypothetical import is not a failed check. The command writes no file. It is done when an allowed, a refused, an ambiguous and an uncertain question each print their full answer in both formats, and the exit codes hold for all of them.",
+      "owner": "ramify/cli",
+      "consumers": ["ramify"]
+    },
+    {
+      "capability": "why-procedure",
+      "goal": "Offer the hypothetical-import question to the browser as one read-only procedure of a project's local web service: it takes an importer and a symbol name for the bound project, relays the question to the resident process for that project, and returns the answer in the browser-facing shape, including the revision it came from and its allowed, refused, ambiguous and uncertain forms, with a readable failure when the project is not currently bound or the resident process is unreachable. It adds no rule of its own and reads no project file. It is done when the answer it returns for a question matches, field for field in meaning, the answer the command line receives for the same question against the same project state.",
+      "owner": "ramify/service-api",
+      "consumers": ["ramify/explorer"]
+    },
+    {
+      "capability": "why-panel",
+      "goal": "Render a hypothetical-import answer beside the module tree: with a module selected and a symbol name entered, show whether the import would be allowed, the single reason when it is refused, the proposed declarations when the cause is a missing exposure, the exposure path with each step's module, file and line, and the import to write when it is allowed. While an answer is shown, highlight in the tree the modules the exposure path passes through. Show the candidates for an ambiguous name, the named limit for an uncertain answer, and the pending and failure states. The rendering decides nothing and computes no rule: it shows only what it is given. It is done when each of those states renders from given data alone, the highlighting follows the shown path, and the panel is empty until a symbol name is entered.",
+      "owner": "ramify/presentation/project-view",
+      "consumers": ["ramify/explorer"]
+    },
+    {
+      "capability": "why-page-query",
+      "goal": "In the served explorer page, let a viewer select a module and type a symbol name, send that question to the project's local web service, and show the returned answer beside the tree. The page asks nothing while no symbol name is entered, shows the service's pending, uncertain and failure states as it receives them, and shows the answer of the project state current when it asked. It is done when selecting a module, typing a name and asking produces, in the served page, the same answer the command line gives for that question.",
+      "owner": "ramify/explorer",
+      "consumers": []
+    },
+    {
+      "capability": "why-agreement",
+      "goal": "Demonstrate, across the delivered surfaces of the reference project, that one allowed case, one refused case and one ambiguous case are answered identically by the command line, by its batch mode, by its data format and by the served explorer; that with the resident process already running the command starts no compiler; that a refused case's proposed declarations, once written by hand into that project, make an ordinary check accept the real import; and that asking from a file beneath a module's tests for a testing-classified symbol is allowed while asking from the same module's ordinary source is refused for testing-source isolation. It is done when those demonstrations run as part of the project's own verification and fail if any surface disagrees.",
+      "owner": "ramify/integration-tests",
+      "consumers": []
+    }
+  ],
+  "seams": [
+    { "capability": "why-answer", "owner": "ramify/analysis", "consumer": "ramify/daemon/contexts" },
+    { "capability": "why-operation", "owner": "ramify/daemon", "consumer": "ramify/cli" },
+    { "capability": "why-operation", "owner": "ramify/daemon", "consumer": "ramify/service-api" },
+    { "capability": "why-procedure", "owner": "ramify/service-api", "consumer": "ramify/explorer" },
+    { "capability": "why-panel", "owner": "ramify/presentation/project-view", "consumer": "ramify/explorer" }
+  ],
+  "entryPoint": {
+    "module": "ramify",
+    "acceptance": "The feature is complete when, from the assembled product, one question about a hypothetical import is answered the same way through the command line with a resident process, through the command's batch mode, through its data format and through the served explorer, for an allowed, a refused and an ambiguous case; when a refused case's proposed declarations, written by hand, make an ordinary check accept the real import; when the same question from a testing file and from ordinary source differs only as testing-source isolation requires; when an answer with an analysis limit is reported as uncertain rather than as allowed or refused; and when the command exits with the success code for both allowed and refused answers while starting no compiler against a running resident process."
+  },
+  "workItems": [
+    {
+      "title": "Explain a hypothetical import from analyzed facts",
+      "subtreeRoot": "ramify/analysis",
+      "capabilities": ["hypothetical-import-decision", "exposure-steps", "declaration-spelling", "why-answer"]
+    },
+    {
+      "title": "Carry the question and its answer in the dispatch vocabulary",
+      "subtreeRoot": "ramify",
+      "capabilities": ["why-service-contract"]
+    },
+    {
+      "title": "Answer from the resident revision",
+      "subtreeRoot": "ramify/daemon",
+      "capabilities": ["why-revision-answer", "why-operation"]
+    },
+    {
+      "title": "The ramify why command",
+      "subtreeRoot": "ramify/cli",
+      "capabilities": ["why-command"]
+    },
+    {
+      "title": "Browser-facing question procedure",
+      "subtreeRoot": "ramify/service-api",
+      "capabilities": ["why-procedure"]
+    },
+    {
+      "title": "Answer panel beside the module tree",
+      "subtreeRoot": "ramify/presentation/project-view",
+      "capabilities": ["why-panel"]
+    },
+    {
+      "title": "Asking from the explorer page",
+      "subtreeRoot": "ramify/explorer",
+      "capabilities": ["why-page-query"]
+    },
+    {
+      "title": "Agreement across the surfaces",
+      "subtreeRoot": "ramify/integration-tests",
+      "capabilities": ["why-agreement"]
+    }
+  ],
+  "assumptions": {
+    "assumed": [
+      "The plan's reference example is the toolkit's example project, which lies outside every module's own source area, so its allowed, refused and ambiguous cases are fixtures of the agreement work item rather than behavior any module owns.",
+      "Rendering a proposed declaration line belongs with the owner of the declaration language rather than with the decision owner, which keeps concrete syntax out of the model and keeps the model free of any dependency on a sibling; the composing parent asks both.",
+      "The import spelling shown in an allowed answer follows the project's existing convention of relative module-relative paths with a .js extension; I found no existing behavior that computes such a spelling.",
+      "The explorer's question travels the project's existing local web service to the resident process, as the dependency view already does, rather than over a new transport.",
+      "The agreement work item can drive the installed command as a process, since no command-line symbol is relayed to the integration owner today.",
+      "A hypothetical question for an importer that is a file is answered under that file's source area profile; the file itself need contain nothing.",
+      "The batch form of the question needs the batch result shape widened, because today it carries a check report and an exit code only."
+    ],
+    "notFound": [
+      "No behavior that proposes or renders exposure declarations; I searched the whole architect view for propose, suggest, remedy, fix and hint. Not found is not proof of absence.",
+      "No behavior that resolves a bare symbol name to the candidate originals that carry it across modules; the existing enumeration answers only what is already available to one consumer. Not found is not proof of absence.",
+      "No behavior that computes the import a requester would write; the generated API views group symbols by defining file and record no spelling. Not found is not proof of absence.",
+      "No service operation, batch result or browser procedure for a question of this kind; the recorded service operations are opening and closing a context, status, check, subscribe, materialize, measure, explorer details and dependency diagram. Not found is not proof of absence."
+    ],
+    "coverageLimits": [
+      "The architect view records 366 cut records, 1 unavailable detail and 21 dynamic test titles across 15 modules, so a member or test title absent from it is not proof of absence.",
+      "Every API view I read reports coverage notes: the analysis owner's ordinary view reports 1 coverage note and 1 truncation, the command-line owner's 1, and the integration owner's 11. Presence in such a view is definitive; absence is not, which is why the command entry's availability to the integration owner is unknown rather than unavailable.",
+      "The API views I read were published at sequence 4 of the same context whose sequence 1 produced the architect view, and I did not refresh them, so they describe a later state of the same project than the architect view does.",
+      "No proposal was verified by running a check in a scratch worktree; this session ran no such command, so every proposed declaration is unverified.",
+      "I did not materialize any API view in this session; all availability statements rest on views that were already present."
+    ]
+  },
+  "evidence": [
+    {
+      "claim": "The importability decision, its single reason, the exposure path with declaration positions and the tag requirements already exist as behavior owned by the model owner and exposed to its parent, which re-exposes them to the root's descendants.",
+      "citations": [
+        { "kind": "view-record", "path": ".ramify-architect/analysis/model/behavior.jsonl" },
+        { "kind": "source", "path": "subs/analysis/subs/model/src/interfaces/model.ts", "line": 113 }
+      ]
+    },
+    {
+      "claim": "The question the model answers today is shaped for an import that exists in source: it names the importing file, the position of the import, the target file and the forwarding chain, so a hypothetical question has to be formed rather than taken from the source.",
+      "citations": [
+        { "kind": "source", "path": "subs/analysis/subs/model/src/interfaces/model.ts", "line": 97 }
+      ]
+    },
+    {
+      "claim": "The refusal reasons the plan lists are exactly the ones the model already distinguishes, including testing-source isolation and the two tag kinds.",
+      "citations": [
+        { "kind": "source", "path": "subs/analysis/subs/model/src/interfaces/model.ts", "line": 110 }
+      ]
+    },
+    {
+      "claim": "The analysis owner already uses the decision behavior of its model child in ordinary source.",
+      "citations": [
+        { "kind": "view-record", "path": "subs/analysis/src/.ramify/children/subs/analysis/subs/model/src/decisions.ts.md", "line": 1 },
+        { "kind": "source", "path": "subs/analysis/src/evaluate-accesses.ts", "line": 3 }
+      ]
+    },
+    {
+      "claim": "The root owns the dispatch-facing service vocabulary and the batch invocation vocabulary and exposes both to its descendants.",
+      "citations": [
+        { "kind": "declaration", "path": "module.ramify", "line": 5 },
+        { "kind": "declaration", "path": "module.ramify", "line": 7 }
+      ]
+    },
+    {
+      "claim": "The batch result shape carries a check report and an exit code only, so a batch answer to this question needs the root's vocabulary widened.",
+      "citations": [
+        { "kind": "source", "path": "src/interfaces/batch.ts", "line": 8 }
+      ]
+    },
+    {
+      "claim": "The resident service enumerates its operations and capabilities, and the list contains no question of this kind, so a new operation joins that enumeration.",
+      "citations": [
+        { "kind": "view-record", "path": ".ramify-architect/supporting.jsonl" }
+      ]
+    },
+    {
+      "claim": "A read-only, revision-bound detail request already travels from the service into a context and is answered from the published revision, which is the path this question follows.",
+      "citations": [
+        { "kind": "view-record", "path": ".ramify-architect/daemon/contexts/supporting.jsonl" },
+        { "kind": "view-record", "path": ".ramify-architect/daemon/contexts/module.json" }
+      ]
+    },
+    {
+      "claim": "The contexts owner may use the analysis session vocabulary in ordinary source.",
+      "citations": [
+        { "kind": "view-record", "path": "subs/daemon/subs/contexts/src/.ramify/external/subs/analysis/src/interfaces/session.ts.md" },
+        { "kind": "source", "path": "subs/daemon/subs/contexts/src/history.ts", "line": 2 }
+      ]
+    },
+    {
+      "claim": "The command-line owner may use the root's service and batch vocabulary in ordinary source.",
+      "citations": [
+        { "kind": "view-record", "path": "subs/cli/src/.ramify/external/src/interfaces/service.ts.md" },
+        { "kind": "source", "path": "subs/cli/src/errors.ts", "line": 1 }
+      ]
+    },
+    {
+      "claim": "The command-line owner already parses arguments per subcommand, formats human and data output and selects exit codes entirely within its own source, so the new command stays inside it.",
+      "citations": [
+        { "kind": "view-record", "path": ".ramify-architect/cli/behavior.jsonl" }
+      ]
+    },
+    {
+      "claim": "The browser-facing owner may use the resident connection vocabulary and already relays an on-demand request to the resident process.",
+      "citations": [
+        { "kind": "view-record", "path": "subs/service-api/src/.ramify/external/subs/daemon/src/interfaces/daemon.ts.md" },
+        { "kind": "source", "path": "subs/service-api/src/project-binding.ts", "line": 3 },
+        { "kind": "view-record", "path": ".ramify-architect/service-api/module.json" }
+      ]
+    },
+    {
+      "claim": "The project-view owner may use the model's exposure and decision vocabulary in ordinary source, which is what the panel needs to show a path and a reason.",
+      "citations": [
+        { "kind": "view-record", "path": "subs/presentation/subs/project-view/src/.ramify/external/subs/analysis/subs/model/src/interfaces/model.ts.md", "line": 42 },
+        { "kind": "source", "path": "subs/presentation/subs/project-view/src/dependency-graph.ts", "line": 1 }
+      ]
+    },
+    {
+      "claim": "The explorer owner already renders the project-view components it would place the answer panel beside.",
+      "citations": [
+        { "kind": "view-record", "path": "subs/explorer/src/.ramify/external/subs/presentation/subs/project-view/src/ProjectExplorerView.tsx.md" },
+        { "kind": "source", "path": "subs/explorer/src/ProjectExplorerPage.tsx", "line": 10 }
+      ]
+    },
+    {
+      "claim": "The integration owner already reaches the explorer page, the browser router and the dispatch vocabulary, but the root relays no command-line symbol to its descendants.",
+      "citations": [
+        { "kind": "view-record", "path": "subs/integration-tests/src/.ramify/external/subs/explorer/src/ProjectExplorerPage.tsx.md" },
+        { "kind": "declaration", "path": "module.ramify" }
+      ]
+    },
+    {
+      "claim": "The architect view this map rests on describes 15 modules with measured dependencies and test references, and records cut, unavailable and dynamic entries that bound what absence can prove.",
+      "citations": [
+        { "kind": "view-record", "path": ".ramify-architect/_meta.json", "line": 1 }
+      ]
+    }
+  ]
+}
