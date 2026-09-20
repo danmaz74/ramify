@@ -1,4 +1,21 @@
 ramify 1
 module harness
 
-expose-src harnessFormats from "index.ts" to parent
+// The server for one project, which the root starts with the web client's
+// build output and its choice of agent. Jobs, the run store, plan discovery,
+// the mapping procedure and the HTTP adapter stay internal.
+expose-src startServer, ProjectRootError from "http/server.ts" to parent
+expose-src ProjectLockError from "store/lock.ts" to parent
+
+// The public contracts of the behavior this module implements: the
+// implementation map it validates and persists, and the HTTP protocol it
+// serves. Each file imports nothing but `zod` and its sibling schemas, so
+// every export promises browser safety and the root re-exposes it to the
+// web client.
+expose-src * from "interfaces/map.ts" tagged [browser] to parent
+expose-src * from "interfaces/protocol/ids.ts" tagged [browser] to parent
+expose-src * from "interfaces/protocol/queries.ts" tagged [browser] to parent
+expose-src * from "interfaces/protocol/errors.ts" tagged [browser] to parent
+expose-src * from "interfaces/protocol/jobs.ts" tagged [browser] to parent
+expose-src * from "interfaces/protocol/maps.ts" tagged [browser] to parent
+expose-src * from "interfaces/protocol/paths.ts" tagged [browser] to parent

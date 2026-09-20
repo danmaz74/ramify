@@ -1,6 +1,62 @@
 ramify 1
 module "ramify-agent"
 
-// The artifact and event-log formats are the only vocabulary the harness and
-// the web projection share.
-expose-sub artifactSchemaVersion, eventSchemaVersion from contracts to descendants
+// The harness owns the formats it implements and exposes them here. This
+// module re-exposes exactly that public contract surface to every descendant,
+// so the web client validates what crosses the wire with the same schemas.
+// Starting a server and its lock failures stay with the root.
+
+// map.ts
+expose-sub Availability, Citation, ImplementationMap from harness to descendants
+expose-sub InputManifest, MapApproval, MapSubmission, ModulePath from harness to descendants
+expose-sub NewCapability, Reuse, Seam, ShapeValidation from harness to descendants
+expose-sub TouchedModule, ViewIdentity, Weight, WorkItem from harness to descendants
+expose-sub availabilitySchema, citationSchema from harness to descendants
+expose-sub implementationMapSchema, inputManifestSchema from harness to descendants
+expose-sub isWithin, mapApprovalSchema, mapSubmissionSchema from harness to descendants
+expose-sub modulePathSchema, newCapabilitySchema, reuseSchema from harness to descendants
+expose-sub seamSchema, sha256Schema, touchedModuleSchema from harness to descendants
+expose-sub validateMapSubmission, viewIdentitySchema from harness to descendants
+expose-sub weightSchema, workItemSchema from harness to descendants
+
+// protocol/ids.ts
+expose-sub JobId, PlanId, jobIdSchema, planIdSchema from harness to descendants
+
+// protocol/queries.ts
+expose-sub MappingState, PlanDocument, PlanEntry from harness to descendants
+expose-sub PlanListResponse, PlanResponse, ProjectResponse from harness to descendants
+expose-sub ReadablePlanEntry, UnreadablePlanEntry from harness to descendants
+expose-sub mappingStateSchema, planEntrySchema from harness to descendants
+expose-sub planListResponseSchema, planResponseSchema from harness to descendants
+expose-sub projectResponseSchema, readablePlanEntrySchema from harness to descendants
+expose-sub unreadablePlanEntrySchema from harness to descendants
+
+// protocol/errors.ts
+expose-sub ErrorCode, ErrorResponse, errorCodeSchema from harness to descendants
+expose-sub errorHttpStatus, errorResponseSchema from harness to descendants
+
+// protocol/jobs.ts
+expose-sub AcceptedCommand, Activity, ApiViewEvidence, Command from harness to descendants
+expose-sub CommandResponse, CommandType, EventPage from harness to descendants
+expose-sub FailureReason, JobEvent, JobEventOf, JobEventType from harness to descendants
+expose-sub JobListResponse, JobResponse, JobSnapshot, JobState from harness to descendants
+expose-sub Receipt, Usage, acceptedCommandSchema, activitySchema from harness to descendants
+expose-sub apiViewEvidenceSchema, approveMapCommandSchema from harness to descendants
+expose-sub commandIdSchema, commandResponseSchema, commandSchema from harness to descendants
+expose-sub eventPageSchema, failureReasonSchema, jobEventSchema from harness to descendants
+expose-sub jobListResponseSchema, jobResponseSchema from harness to descendants
+expose-sub jobSnapshotSchema, jobStateSchema, jobVersionSchema from harness to descendants
+expose-sub receiptSchema, startMappingCommandSchema from harness to descendants
+expose-sub stopJobCommandSchema, terminalEventTypes, usageSchema from harness to descendants
+
+// protocol/maps.ts
+expose-sub MapRevision, ModuleTree, ModuleTreeResponse from harness to descendants
+expose-sub ReadableRevision, RevisionEntry, RevisionListResponse from harness to descendants
+expose-sub RevisionResponse, TreeModule from harness to descendants
+expose-sub moduleTreeResponseSchema, readableRevisionSchema from harness to descendants
+expose-sub revisionEntrySchema, revisionListResponseSchema from harness to descendants
+expose-sub revisionResponseSchema, treeModuleSchema from harness to descendants
+expose-sub unreadableRevisionSchema from harness to descendants
+
+// protocol/paths.ts
+expose-sub apiPrefix, protocolPaths from harness to descendants

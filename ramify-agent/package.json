@@ -5,18 +5,36 @@
   "description": "Agent harness for Ramify projects: architectural planning and module-scoped implementation sessions. A separate consumer of ramify.ts; ramify.ts never depends on it.",
   "type": "module",
   "scripts": {
-    "type-check": "tsc --noEmit",
+    "type-check": "tsc --noEmit && tsc --noEmit -p subs/web/tsconfig.json && tsc --noEmit -p scripts/tsconfig.json",
     "test": "vitest run",
-    "check:self": "ramify check --batch --root ."
+    "check:self": "ramify check --batch --root .",
+    "build:web": "NODE_ENV=production vite build --config subs/web/vite.config.ts",
+    "dev:web": "vite --config subs/web/vite.config.ts",
+    "serve": "tsx src/main.ts serve",
+    "real-session": "tsx scripts/real-session.ts",
+    "trial": "tsx scripts/live-trial.ts"
   },
   "dependencies": {
-    "ramify.ts": "file:.."
+    "@earendil-works/pi-coding-agent": "0.85.1",
+    "express": "5.2.1",
+    "ramify.ts": "file:..",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "react-markdown": "10.1.0",
+    "zod": "4.6.5"
   },
   "devDependencies": {
-    "@types/node": "^26.4.0",
-    "tsx": "^4.23.13",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/react": "16.3.3",
+    "@types/express": "5.0.6",
+    "@types/node": "26.6.2",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "@vitejs/plugin-react": "6.1.1",
+    "jsdom": "30.0.1",
+    "tsx": "4.23.13",
     "typescript": "7.0.2",
-    "vite": "^8.3.0",
-    "vitest": "^4.1.11"
+    "vite": "8.3.0",
+    "vitest": "4.1.11"
   }
 }

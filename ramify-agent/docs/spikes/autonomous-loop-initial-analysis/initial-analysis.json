@@ -1,0 +1,170 @@
+{
+  "schema": "ramify-agent.initial-analysis-spike/1",
+  "subject": "autonomous-implementation-loop",
+  "status": "hypothesis",
+  "evidence": {
+    "architectView": {
+      "schema": "ramify.architect-view/1",
+      "revision": "rev/1:639da6e5-c16b-4108-bbcf-c880c7aa39ae:1",
+      "input": "input/1:ddf89c5ddf11c6a8127bdd7a998dd3f9fca216027f3056168fadb840cb891a28",
+      "dependencies": "measured",
+      "dependencyScope": "production",
+      "cut": 92
+    },
+    "architecture": "docs/architecture/autonomous-implementation-loop.md",
+    "predecessor": "docs/plans/01-implementation-map/completion-report.md",
+    "requiredRefactor": "docs/plans/02-contract-authority-refactor/main-plan.md"
+  },
+  "entryAssignments": [
+    {
+      "id": "autonomous-plan-execution",
+      "description": "Given a selected implementation plan, analyze entry capabilities, coordinate architecture and engineering sessions, recover durable work, enforce completion gates, and terminate with evidence.",
+      "owner": "ramify-agent/harness",
+      "requirementRefs": [
+        "docs/architecture/autonomous-implementation-loop.md#the-idea",
+        "docs/architecture/autonomous-implementation-loop.md#8-the-harness-remains-the-deterministic-execution-owner"
+      ]
+    },
+    {
+      "id": "implementation-run-operation-and-review",
+      "description": "Let a person start and stop a run and inspect hypotheses, decisions, progress, verification and KPI evidence without owning durable execution state.",
+      "owner": "ramify-agent/web",
+      "requirementRefs": [
+        "docs/architecture/autonomous-implementation-loop.md#7-decisions-are-recorded-for-later-review",
+        "docs/architecture/autonomous-implementation-loop.md#follow-up-capability-dependency-graph-visualization"
+      ]
+    }
+  ],
+  "hypotheses": [
+    {
+      "id": "ramify-project-evidence",
+      "change": "create-by-extraction",
+      "suggestedOwner": "ramify-agent/harness/evidence",
+      "anticipatedConsumers": ["mapping", "global-architect", "local-architect", "scope-validation", "test-selection", "measurement"],
+      "confidence": "high",
+      "rationale": "The Ramify CLI, private daemon and generated-view formats are hidden knowledge with several consumers.",
+      "uncertainties": ["Exact named API and refresh granularity"]
+    },
+    {
+      "id": "durable-multi-kind-job-lifecycle",
+      "change": "create-by-extraction",
+      "suggestedOwner": "ramify-agent/harness/jobs",
+      "anticipatedConsumers": ["mapping-job", "implementation-run", "http-adapter"],
+      "confidence": "high",
+      "rationale": "An autonomous implementation run creates the second job kind anticipated by the Plan 1 extraction criterion.",
+      "uncertainties": ["Boundary between generic job events and run-specific events"]
+    },
+    {
+      "id": "harness-owned-map-and-client-contracts",
+      "change": "refactor",
+      "suggestedOwner": "ramify-agent/harness",
+      "anticipatedConsumers": ["mapping", "http-adapter", "ramify-agent/web"],
+      "confidence": "high",
+      "rationale": "The harness accepts and persists maps and implements the client API; browser-safe interfaces can be exposed without a neutral global definitions branch.",
+      "uncertainties": []
+    },
+    {
+      "id": "initial-analysis-validation",
+      "change": "extend",
+      "suggestedOwner": "ramify-agent/harness",
+      "anticipatedConsumers": ["initial-analysis", "ramify-agent/harness", "ramify-agent/web"],
+      "confidence": "medium",
+      "rationale": "The existing map validator can distinguish executable entry assignments from non-executable hypotheses.",
+      "uncertainties": ["Revise the map schema or add a sibling analysis schema"]
+    },
+    {
+      "id": "global-and-local-workflow-coordination",
+      "change": "extend",
+      "suggestedOwner": "ramify-agent/harness",
+      "anticipatedConsumers": ["autonomous-plan-execution"],
+      "confidence": "medium-high",
+      "rationale": "Scheduling, transitions and composition are harness behavior; no additional child boundary is yet justified.",
+      "uncertainties": ["Whether later growth justifies a focused coordination child"]
+    },
+    {
+      "id": "resumable-role-sessions",
+      "change": "extend",
+      "suggestedOwner": "ramify-agent/harness/agent",
+      "anticipatedConsumers": ["global-and-local-workflow-coordination"],
+      "confidence": "high",
+      "rationale": "Role-aware session operations and outcomes belong in the agent port and scripted implementation.",
+      "uncertainties": ["Smallest port surface that supports forks, continuation and context observations"]
+    },
+    {
+      "id": "pi-session-and-tool-lifecycle",
+      "change": "extend",
+      "suggestedOwner": "ramify-agent/harness/agent/pi",
+      "anticipatedConsumers": ["resumable-role-sessions"],
+      "confidence": "high",
+      "rationale": "Pi-specific forks, deferred context append, thresholds, tool guards and hooks stay behind the adapter.",
+      "uncertainties": ["Exact SDK support and behavior under cancellation"]
+    },
+    {
+      "id": "contract-and-provider-obligation-scheduling",
+      "change": "create",
+      "suggestedOwner": "ramify-agent/harness",
+      "anticipatedConsumers": ["local-architect", "module-engineer", "provider-work-item"],
+      "confidence": "medium",
+      "rationale": "The harness must serialize writers, deduplicate revision-bound obligations and close delegation after consumer verification.",
+      "uncertainties": ["Shared-obligation and cycle representation"]
+    },
+    {
+      "id": "harness-owned-check-and-repair",
+      "change": "create",
+      "suggestedOwner": "ramify-agent/harness",
+      "anticipatedConsumers": ["engineering-iterations", "work-item-completion", "final-acceptance"],
+      "confidence": "high",
+      "rationale": "Readiness, module gates, global gates and bounded repair require a deterministic harness verdict.",
+      "uncertainties": ["Supported MVP runner and hardcoded command policy"]
+    },
+    {
+      "id": "autonomous-run-protocol",
+      "change": "extend",
+      "suggestedOwner": "ramify-agent/harness",
+      "anticipatedConsumers": ["ramify-agent/web", "future-cli"],
+      "confidence": "high",
+      "rationale": "Autonomous run commands and projections should reuse the existing versioned HTTP seam.",
+      "uncertainties": ["Projection size and pagination boundaries"]
+    },
+    {
+      "id": "run-progress-and-review-ui",
+      "change": "extend",
+      "suggestedOwner": "ramify-agent/web",
+      "anticipatedConsumers": ["person-operating-harness"],
+      "confidence": "high",
+      "rationale": "The web module already owns plan, map and progress interaction while the harness owns state.",
+      "uncertainties": ["Minimum useful review layout before the graph follow-up"]
+    },
+    {
+      "id": "execution-measurement-and-kpi-projection",
+      "change": "create",
+      "suggestedOwner": "ramify-agent/harness",
+      "anticipatedConsumers": ["implementation-run-operation-and-review", "future-cli"],
+      "confidence": "medium-high",
+      "rationale": "Execution observations are harness facts and KPI projections should be computed once rather than by clients.",
+      "uncertainties": ["Reconciliation with docs/measurements-and-kpis.md", "Coverage when shell mutations bypass guarded tools"]
+    }
+  ],
+  "dependencyForecast": [
+    {"consumer": "autonomous-plan-execution", "provider": "initial-analysis-validation"},
+    {"consumer": "autonomous-plan-execution", "provider": "global-and-local-workflow-coordination"},
+    {"consumer": "global-and-local-workflow-coordination", "provider": "durable-multi-kind-job-lifecycle"},
+    {"consumer": "global-and-local-workflow-coordination", "provider": "ramify-project-evidence"},
+    {"consumer": "global-and-local-workflow-coordination", "provider": "resumable-role-sessions"},
+    {"consumer": "resumable-role-sessions", "provider": "pi-session-and-tool-lifecycle"},
+    {"consumer": "global-and-local-workflow-coordination", "provider": "contract-and-provider-obligation-scheduling"},
+    {"consumer": "global-and-local-workflow-coordination", "provider": "harness-owned-check-and-repair"},
+    {"consumer": "global-and-local-workflow-coordination", "provider": "execution-measurement-and-kpi-projection"},
+    {"consumer": "implementation-run-operation-and-review", "provider": "autonomous-run-protocol"},
+    {"consumer": "implementation-run-operation-and-review", "provider": "run-progress-and-review-ui"},
+    {"consumer": "implementation-run-operation-and-review", "provider": "execution-measurement-and-kpi-projection"},
+    {"consumer": "autonomous-run-protocol", "provider": "harness-owned-map-and-client-contracts"},
+    {"consumer": "run-progress-and-review-ui", "provider": "harness-owned-map-and-client-contracts"}
+  ],
+  "constraints": {
+    "hypothesesScheduleWork": false,
+    "breakingChangeClassificationDeferredToLocalArchitect": true,
+    "contractAuthorityRefactorRequired": true,
+    "requesterImportabilityEstablished": false
+  }
+}

@@ -1,0 +1,9 @@
+ramify 1
+// Untagged on purpose: the neutral vocabulary must be importable by core,
+// adapter, and view source alike.
+module contracts
+
+// The interface-file wildcard makes every export of that one file part of the
+// contract. `browser` is this owner's promise that the vocabulary and its
+// schema dependency are browser-safe.
+expose-src * from "interfaces/vocabulary.ts" tagged [browser] to parent

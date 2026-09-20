@@ -57,6 +57,32 @@ Discovering during work that a task needs something beyond its scope is a
 normal outcome. How the harness handles discoveries matters more than how
 thoroughly it plans.
 
+### Forecast Early; Decide with Current Evidence
+
+Early analysis forecasts needs across the plan for two purposes:
+
+- **Improve global decisions.** Seeing related needs together can reveal
+  opportunities to reuse a new or extended capability across several consumers,
+  before local decisions produce separate solutions.
+- **Enable high-level human review.** The forecast makes the intended
+  architectural direction, reuse opportunities and uncertainties visible
+  before detailed implementation.
+
+Forecasts and actual decisions remain separate. A forecast informs later
+choices but does not, by itself, create work or establish a contract.
+
+When a concrete need arises, reuse the responsible agent's oriented context
+with the new evidence, through continuation or a fork carrying accumulated
+decision briefs. It considers the immediate need alongside forecast needs
+elsewhere, earlier decisions and current findings. Anticipated consumers inform
+the design, but their requirements remain provisional until examined during
+their own work. Considering them does not by itself coordinate their execution.
+
+Forecasts, decisions and their rationale are recorded in the repository.
+Session continuity improves efficiency and consistency; it is never required
+for recovery or correctness. Making a forecast available for review is
+separate from requiring execution to wait for approval.
+
 ### Distinguish Breaking from Non-Breaking Changes
 
 A non-breaking change adds or extends capabilities while preserving their
@@ -168,6 +194,22 @@ completion.
 This applies to a seam, to a need discovered during work, and to a parent
 delegating to a descendant outside its agent's scope.
 
+### Fakes Are Explicitly Named
+
+Fake implementation files use a `.fake` suffix before the language extension,
+such as `send-email.fake.ts`. Exported fake implementations, factories and
+classes include `Fake` in their names, such as `createSendEmailFake`.
+Re-exports preserve that designation rather than exposing a fake under a
+production-looking name.
+
+Shared contracts keep behavior-oriented names, such as `SendEmail`, because
+both the fake and the real provider implement them. The contract iteration
+checks the naming convention as part of completion.
+
+Explicit names make fakes recognizable in source and generated architectural
+evidence. A contract and fake can establish a capability's intended placement;
+their presence does not establish that its real implementation is ready.
+
 ### Work Starts at the Consumer; Integration Happens on the Return
 
 Work begins at the highest consumer of the feature. It writes its behavioral
@@ -277,11 +319,30 @@ architect view, an engineer learning its module. An agent asked again about
 the same scope should not pay it again. A new invocation may continue, or
 fork from, an earlier session of the same role and scope.
 
-A fork is preferred to a continuation. It starts from the point where the
-earlier session was oriented, before it took up any one task, so the reused
+Fork an oriented session for independent tasks. It starts from the point where
+the earlier session was oriented, before it took up any one task, so the reused
 context stays bounded and several questions can start from it at once.
 
-A reused context is a cache. It holds no state, and any invocation must
-succeed from a fresh session and the repository alone. It describes the source
-as it was when it was read; when that source has changed, the context is
-refreshed or discarded.
+When successive tasks benefit from shared orientation but produce substantial
+exploratory context, execute each task in a fork of the updated long-lived
+context. The fork can make decisions within its assigned authority and returns
+a concise brief of its conclusions, rationale, corrected assumptions and
+required follow-ups, referencing the durable records.
+
+Append that brief to the long-lived context without invoking the model. The
+next invocation receives the accumulated updates; detailed searches and tool
+results remain in the fork. Tasks whose decisions depend on one another must
+receive the preceding accepted decisions before starting.
+
+Continuity can come from accumulated decision briefs as well as from continuing
+the full conversation. Use direct continuation when its continuity is more
+valuable than isolating task exploration. Forks limit accumulated context but
+do not necessarily reduce total tokens or latency.
+
+Each request supplies relevant new findings; context reuse does not
+automatically reveal changes in the repository.
+
+A reused context is a cache, never the sole authority for decisions or progress.
+Any invocation must succeed from a fresh session and the repository alone.
+Context describes the source as it was when it was read; when that source has
+changed, the context is refreshed or discarded.

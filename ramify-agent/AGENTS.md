@@ -27,8 +27,9 @@ repository.
 - ESM with `.js` extensions in source imports and strict TypeScript. Tests go
   in the owner's `src/tests/`.
 - The project is a Ramify project. `npm run check:self` must pass. The harness
-  is the only writer of durable state; the web module projects files and
-  forwards commands, and receives only `contracts`.
+  is the only writer of durable state and owns the public contracts of the
+  behavior it implements; the web module projects files and forwards commands,
+  and receives only those contracts.
 - The toolkit's writing conventions apply to documents here: expose and
   receive, never grant or route; behavioral terms for what Ramify derives,
   capability for what an agent ascribes.

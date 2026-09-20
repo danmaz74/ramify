@@ -1,0 +1,8 @@
+{
+  // The package's scripts: run with tsx, type-checked apart from the modules.
+  // They reach the harness only through its command line and its HTTP protocol.
+  "extends": "../tsconfig.json",
+  "compilerOptions": { "rootDir": ".." },
+  "include": ["*.ts"],
+  "exclude": []
+}

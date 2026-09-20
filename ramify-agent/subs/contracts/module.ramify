@@ -1,4 +1,0 @@
-ramify 1
-module contracts
-
-expose-src artifactSchemaVersion, eventSchemaVersion from "index.ts" to parent

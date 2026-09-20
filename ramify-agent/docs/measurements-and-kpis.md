@@ -29,9 +29,9 @@ ramify-agent. Ramify is never taught which harness or model consumed its data.
 | Behavioral dependencies and visible original-symbol evidence | Change attribution, owner/seam/reuse drift and adaptation causes |
 | Check outcomes | Run acceptance, KPI formulas, coverage and browser/API presentation |
 
-Existing scaffolding in `ramify-agent/` provides `contracts`, `harness` and `web`.
-The harness acquires evidence and computes KPIs; contracts defines wire shapes;
-the web renders returned values. A future CLI receives the same values. No
+Existing scaffolding in `ramify-agent/` provides `harness` and `web`.
+The harness acquires evidence, computes KPIs and owns the wire shapes it
+publishes; the web renders returned values. A future CLI receives the same values. No
 client performs independent KPI calculation or writes authoritative records.
 
 ## Evidence capture and consistency

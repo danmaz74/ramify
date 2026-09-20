@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.reference-work/
+
+# Materialized API-view catalogs, the materialized architect view and the
+# publisher's reserved transient staging/rollback siblings of each, with their
+# sibling marker files. See /ramify/.gitignore for the matching rule.
+.ramify/
+.ramify.tmp-*/
+.ramify.old-*/
+.ramify.tmp-*.marker.json
+.ramify.old-*.marker.json
+.ramify-architect/
+.ramify-architect.tmp-*/
+.ramify-architect.old-*/
+.ramify-architect.tmp-*.marker.json
+.ramify-architect.old-*.marker.json

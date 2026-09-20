@@ -408,7 +408,7 @@ the fresh agent handles partially completed work under the same brief.
 ## 8. Small first implementation and its acceptance
 
 Implement the reducer and sequential driver in `harness`, the shared records
-in `contracts`, and pi behind the agent port. The web client projects the
+among its public contracts, and pi behind the agent port. The web client projects the
 same state and submits commands. No additional module boundaries are needed
 just to name these responsibilities.
 

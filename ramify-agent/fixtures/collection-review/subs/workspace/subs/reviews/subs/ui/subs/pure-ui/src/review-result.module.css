@@ -1,0 +1,32 @@
+/*
+ * This view's own styles. It is a second resource described by the same
+ * ambient declaration as the catalog card's stylesheet, and a separate binding
+ * all the same: the two default exports are owned by different modules and
+ * never merge into one symbol.
+ */
+
+.result {
+  border: 1px solid rgb(128 128 128 / 40%);
+  border-radius: 0.5rem;
+  margin-top: 0.75rem;
+  padding: 0.75rem 1rem;
+}
+
+.heading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+  margin: 0 0 0.5rem;
+}
+
+.findings {
+  margin: 0 0 0.5rem;
+  padding-left: 1.25rem;
+}
+
+.observations {
+  margin: 0;
+  padding-left: 1.25rem;
+  opacity: 0.75;
+}

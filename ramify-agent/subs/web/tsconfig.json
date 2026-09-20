@@ -1,0 +1,18 @@
+{
+  // The browser code's own compiler settings: the DOM library and no Node
+  // types. Ramify reads only the root tsconfig.json and still sees this
+  // module's src/ as the web module's owned source.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": [],
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src/**/*"]
+}

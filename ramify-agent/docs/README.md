@@ -3,6 +3,11 @@
 Design documents for the separate agent harness:
 
 - [Harness principles](harness.principles.md)
+- [Decomposition hypothesis 3](decomposition/dan-hypothesis-3.md), initial draft:
+  local coordinators, unified delegation and decisions recorded without review waits
+- [Decomposition hypothesis 3b](decomposition/dan-hypothesis-3b.md), alternative:
+  global and local architects share and refine architectural hypotheses;
+  global forks decide and append briefs without a parent model call
 - [Breaking and non-breaking plans](decomposition/breaking-vs-non-breaking-plans.md),
   reasoning, sequential sub-plan hypothesis and non-breaking-only MVP scope
 - [Harness architecture](architecture.md), early draft

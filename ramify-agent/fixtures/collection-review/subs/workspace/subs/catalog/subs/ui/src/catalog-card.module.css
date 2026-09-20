@@ -1,0 +1,19 @@
+/*
+ * This view's own styles. The stylesheet is a resource of this owner: its
+ * default export is a binding `catalog-card.tsx` imports under the ordinary
+ * same-owner rules, and the review view's stylesheet beside it is a different
+ * resource with a different identity, however alike the two files look.
+ */
+
+.card {
+  border: 1px solid rgb(128 128 128 / 40%);
+  border-radius: 0.5rem;
+  padding: 1rem;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 0.75rem;
+  margin: 0.75rem 0 0;
+}

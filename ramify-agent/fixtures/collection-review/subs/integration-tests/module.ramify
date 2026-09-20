@@ -1,0 +1,9 @@
+ramify 1
+
+// The baseline's one separately declared testing module. Its header classifies
+// its ordinary src/, so the scenario, its steps, its World and its hooks all
+// carry [testing, dispatch]. It has no private access to the root: the
+// configured system reaches it only through the root's expose-test of
+// createTestSystem to descendants, and that symbol's [testing, dispatch] tags
+// are why this header must carry both. It exposes nothing.
+module integration-tests tagged [testing, dispatch]

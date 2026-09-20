@@ -582,8 +582,8 @@ loop:
 
 The machine is a candidate module, `harness/loop`: it hides the transition
 rules and exposes the three functions and the kind table to its parent. The
-item, outcome and transition schemas belong in `contracts`, beside the map,
-because the web client projects them.
+item, outcome and transition schemas belong with the harness's other public
+contracts, beside the map, because the web client projects them.
 
 Tests follow the structure. Table tests cover every pair of state and trigger,
 including the pairs that must be rejected. A property test folds every prefix

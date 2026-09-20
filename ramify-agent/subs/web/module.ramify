@@ -1,4 +1,5 @@
 ramify 1
-module web
-
-expose-src projectedFormats from "index.ts" to parent
+// Browser code: it renders what the harness publishes and imports only the
+// browser-safe contracts it receives from the root. It exposes nothing; the
+// root reaches it only through its build output.
+module web tagged [ui, browser]

@@ -17,7 +17,7 @@ import {
   type MapSubmission,
   type Reuse,
   type WorkItem,
-} from '../../../subs/contracts/subs/map/src/interfaces/map.js';
+} from '../../../subs/harness/src/interfaces/map.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const planId = process.argv[2];

@@ -1,9 +1,14 @@
 {
+  // The whole-project configuration, which Ramify also reads. The web
+  // module's source is browser code and is type-checked by its own
+  // subs/web/tsconfig.json, with the DOM library; it stays in Ramify's view
+  // because Ramify reads every owned file whatever this file selects.
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["ES2022"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "jsx": "react-jsx",
     "strict": true,
     "declaration": true,
     "outDir": "dist",
@@ -14,5 +19,5 @@
     "forceConsistentCasingInFileNames": true
   },
   "include": ["src/**/*", "subs/**/src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "exclude": ["node_modules", "dist", "subs/web/src/**/*"]
 }

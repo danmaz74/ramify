@@ -109,13 +109,10 @@ verified, never files, classes or algorithms.
 
 The existing module tree holds the architecture.
 
-### `contracts`
-
-The formats: implementation map, work item, brief, need, outcome and event log.
-
 ### `harness`
 
-The only writer of durable state.
+The only writer of durable state, and the owner of the public formats it
+publishes: implementation map, work item, brief, need, outcome and event log.
 
 | Part | Responsibility |
 | --- | --- |

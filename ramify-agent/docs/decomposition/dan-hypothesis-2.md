@@ -138,7 +138,7 @@ This iteration has one focused goal:
 > Establish an executable agreement for the requested capability, demonstrated
 > by the consumer's real behavior working against a conforming fake.
 
-There is no contract engineer. A contract iteration is a kind of iteration,
+A contract iteration is a kind of iteration,
 not a role: an engineer session carries it out with the **contracts skill**,
 and what sets it apart is its scope, its skill and its completion criteria.
 One session owns both designing the agreement and integrating it in the
@@ -149,16 +149,8 @@ Three rules keep that arrangement honest:
 
 - **The harness supplies the skill.** The brief of every contract iteration
   carries the contracts skill. It is never left to the agent to load it.
-- **The session forks from the consumer module's oriented context, not from
-  the session that wrote the spec.** It knows the module and pays for no
-  orientation, but it learns the need only from the repository: the spec, the
-  stub and the tests. The provider will later read that spec with none of the
-  consumer's context, so a spec this session cannot work from is too thin,
-  and this is the cheapest moment to find out.
-- **The result records what was read.** It names the provider constraints and,
-  for an extension, the existing consumers' obligations that were examined.
-  An agreement shaped only to the consumer's convenience is otherwise
-  invisible until the provider fails.
+- **The session could fork from the consumer module's oriented context, not from
+  the session that wrote the spec.** If not available, the session starts clean.
 
 The agreement's neutrality rests on these, on the executable completion
 criteria below, and on the provider's standing to report that a contract needs

@@ -1,0 +1,41 @@
+import { useEffect, useState } from 'react';
+import type { ProtocolClient } from './client.js';
+import { ConnectionStatus } from './connection.js';
+import { PlanPage } from './plan-page.js';
+import { PlansPage } from './plans-page.js';
+import { parseRoute, routeHref } from './routes.js';
+import { useQuery } from './use-query.js';
+
+function useHash(): string {
+  const [hash, setHash] = useState(() => window.location.hash);
+  useEffect(() => {
+    const update = () => setHash(window.location.hash);
+    window.addEventListener('hashchange', update);
+    return () => window.removeEventListener('hashchange', update);
+  }, []);
+  return hash;
+}
+
+/** The web client: a header with the project and the connection, and the current page. */
+export function App({ client }: { readonly client: ProtocolClient }) {
+  const route = parseRoute(useHash());
+  const { state: project } = useQuery('project', () => client.getProject());
+  const projectInfo = project.status === 'ready' ? project.data : undefined;
+  useEffect(() => {
+    document.title = projectInfo ? `${projectInfo.name} · ramify-agent` : 'ramify-agent';
+  }, [projectInfo]);
+  return (
+    <div className="app">
+      <header className="app-header">
+        <a className="brand" href={routeHref({ page: 'plans' })}>ramify-agent</a>
+        <span className="project" title={projectInfo?.root}>{projectInfo?.name ?? ''}</span>
+        <ConnectionStatus client={client} />
+      </header>
+      <main>
+        {route.page === 'plans'
+          ? <PlansPage client={client} project={projectInfo} />
+          : <PlanPage client={client} planId={route.planId} view={route.view} revision={route.revision} />}
+      </main>
+    </div>
+  );
+}
