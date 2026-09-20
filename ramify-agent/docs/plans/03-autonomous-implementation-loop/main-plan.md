@@ -348,7 +348,7 @@ The [core records proposal](core-records.proposal.md) defines the ten rules,
 the identifiers, the run layout, `RunRecord`, `RunPolicy`, `EntryAssignments`,
 `Hypothesis`, `RegistryEntry`, `PlacementRequest`, `PlacementDecision`,
 `GlobalContext`, `WorkItem`, `WorkItemOutline`, `IterationAssignment`,
-`WriteScope`, `TestSelection`, `IterationResult`, `Invocation`,
+`WriteScope`, `ModuleProposal`, `TestSelectionPolicy`, `TestSelection`, `IterationResult`, `Invocation`,
 `InvocationOutcome`, `ContractRecord`, `ProviderObligation`,
 `ConsumerRequirement`, `GateAttempt`, the submission unions, the run log, the
 observation log and the public projections. This plan adopts all of them.
@@ -500,7 +500,7 @@ case is iteration 4's exit evidence.
 | Records | `EntryAssignments` (once), every `Hypothesis` at revision 1, one `RegistryEntry` and one `WorkItem` per entry capability |
 | Idempotency | `InvocationId`; the submission hash. Every record of the phase is in the one `analysis-accepted` line; recovery re-materializes the files |
 | Bounds | `rejectedSubmissionsPerTurn`, then `invalid-submission`; one retry of the invocation itself under `sessionReconstructionsPerWork` |
-| Invalid inputs | An owner absent from the refreshed architect view, a duplicate capability slug, a `PlanRef` outside the captured plan |
+| Invalid inputs | An owner absent from the refreshed view without a valid `ModuleProposal`, a conflicting proposal, a duplicate capability slug, a `PlanRef` outside the captured plan |
 | Proves completion | `analysis-accepted`, one event committing every record of the phase |
 
 Revision 1 of every hypothesis is never rewritten. No harness code reads a
@@ -536,51 +536,77 @@ hypothesis to create work, an obligation or a completion requirement.
 | Idempotency | `WorkItemId` from the count of committed work items; `work-item-started` is appended once per item |
 | Bounds | `maxIterationsPerWorkItem`, `repairRoundsPerWorkItemGate` |
 | Stale inputs | A delivered hypothesis revision or decision arrives at the next coordination point and never rewrites an active assignment |
-| May start an agent | `work-item-started` and `iteration-closed` license the local architect |
-| Proves completion | `work-item-completed`, which requires a passing `work-item` gate and no open `ConsumerRequirement` of this item |
+| May start an agent | `work-item-started`, `iteration-closed`, `work-item-resumed` and `revision-needed` license the local architect at a coordination point |
+| Proves completion | `work-item-completed`, which requires a passing `work-item` gate and current conformance/verification for every obligation or requirement bound to this item, including follow-up bindings |
 
 The local architect's submissions are the proposal's `LocalArchitectSubmission`
-union. `yield-for-providers` appends `work-item-yielded` with the requirements
-waited for; `work-item-resumed` returns when every one is verified.
+union. `yield-for-providers` appends `work-item-yielded` with the current
+requirement references waited for. `work-item-resumed` licenses the consumer's
+local architect when every waited-for provider has conformed at the current
+contract revision; it then assigns consumer verification. The requirements
+remain open until those verification iterations pass. A revision-needed report
+also returns control to the consumer architect, without claiming conformance.
 
 ### SM5 — An iteration
 
 | | |
 | --- | --- |
 | States | `assigned`, `implementing`, `proposed`, `gating`, `repairing`, `accepted`, `partial`, `unsuitable`, `exhausted`, `superseded` |
-| Records | `IterationAssignment` with its captured `WriteScope`, `TestSelection` and guarded hashes; `IterationResult`; `GateAttempt`s |
+| Records | `IterationAssignment` with its captured `WriteScope`, `TestSelectionPolicy` and guarded hashes; `IterationResult`; `GateAttempt`s with freshly resolved `TestSelection`s |
 | Idempotency | `IterationId` = `<work-item>.i<nn>` from the count of committed assignments; `writer-acquired` carries the scope revision |
 | Bounds | `repairRoundsPerIteration`, `budgetReturnsPerIteration`, `sessionReconstructionsPerWork`. A fresh session never resets them |
-| Invalid inputs | A scope that names a module absent from the view; an `expose` path outside the assignment; a `TestSelection` that resolves to nothing where tests are required |
+| Invalid inputs | An absent module without accepted creation authority; an `expose` path outside the assignment. An empty required test selection fails the gate, not assignment validation |
 | May start a writer | `writer-acquired`, appended before `startSession` |
 | Proves completion | `iteration-closed` with `outcome: 'accepted'` and the passing `GateAttemptId` |
 
-`gate` and `TestSelection` are derived by the policy from `kind` and `scope`.
-No submission carries them, so an agent cannot narrow the selection.
+`gate` and `TestSelectionPolicy` are derived from `kind`, `scope` and required
+evidence. No submission carries them. Each gate resolves the actual test files
+again, so tests created by the assignment run before acceptance.
+
+An accepted entry or placement decision may authorize a `ModuleProposal`.
+Its existing parent and non-conflicting direct-child directory are validated
+before acceptance. The first assignment captures `WriteScope.bootstrap` from
+its registry reference, with the declaration, README and own source locations
+and explicit exposure files. It can create missing directories through the
+guard's nearest-existing-ancestor resolution. A hypothesis alone cannot do so.
+Before passing the gate, refresh the view and require the created module to
+match the proposal; this does not widen the captured write scope. The proposal's
+[work-item contract](core-records.proposal.md#work-items-outlines-and-assignments)
+defines the validation and bootstrap inputs.
 
 ### SM6 — Contract delegation and a provider obligation
 
 | | |
 | --- | --- |
 | States | `requested`, `establishing`, `established`, `registered`, `provider-pending`, `provider-conformed`, `verifying`, `verified`, `revision-needed`, `incomplete` |
-| Records | a `contract` `IterationAssignment` with `requestedBy`; `ContractRecord`; `ProviderObligation`; `ConsumerRequirement` |
-| Idempotency | `ObligationId` = `ob-<contract-id>`; registration keyed by `(obligation, revision)` and by `requirement`. A registration already in the log is not appended again |
+| Records | a `contract` assignment with `requestedBy` or `revisesContract`; `ContractRecord`; `ProviderObligation`; revisioned `ConsumerRequirement`s and their work bindings |
+| Idempotency | `ObligationId` = `ob-<contract-id>`; registration and scheduling keyed by `(obligation, revision)` and `(requirement, revision)`. Replay never duplicates work |
 | Bounds | The requesting work item's limits. A `provider-cannot-conform` return is one `revision-needed` per contract revision |
-| Stale inputs | A new `ContractRecord` revision leaves the obligation and every requirement on it open; a completion naming an earlier revision does not satisfy it |
+| Stale inputs | A contract revision commits current obligation/requirement revisions and their work bindings; unfinished items receive new assignments, completed items get follow-ups. Earlier evidence remains historical |
 | May start an agent | `contract-requested` licenses the contract engineer; `work-item-started` for the provider work item |
 | Proves completion | `requirement-verified`, the only event that closes a delegation. It requires a passing gate **and** that no `fakeInjections` location still references the fake |
 
 Scheduling is depth-first. A consumer finishes what it can against the fake and
 yields at an iteration boundary; the harness runs the provider work items of its
 open requirements before the next independent entry work item, then returns the
-consumer for verification. A shared obligation is one obligation with several
-requirements: its provider work item runs once and each consumer verifies on its
-own. A cycle is a cycle of **capabilities**, never of modules or changes: the graph's
+consumer for verification after current provider conformance. A shared obligation
+has one provider execution per revision and each consumer verifies separately.
+The proposal's [contract revision and follow-up work](core-records.proposal.md#contract-revision-and-follow-up-work)
+defines revision requests, atomic scheduling bindings, successor work and replay.
+Completed work stays completed; a new evidence obligation still blocks run
+completion until its assigned work and current verification finish.
+
+`provider-cannot-conform` belongs to the ordinary provider engineer's union,
+only when its assignment carries a real-provider obligation. The harness
+records `revision-needed` and returns to the consumer architect for a contract
+revision assignment or `unresolved`; the provider cannot change the contract.
+
+A cycle is a cycle of **capabilities**, never of modules or changes: the graph's
 nodes are capabilities, and a requirement adds the edge from the capability its
 consumer is implementing to the capability of its obligation. Change 1 in module
 A needing change 2 in module B needing change 3 in module A is three
 capabilities and three work items, which complete in the order 3, 2, 1; a
-provider obligation always starts a work item of its own, even in a module that
+new provider obligation starts a work item of its own, even in a module that
 has one yielded. The harness checks the graph when it commits a requirement, and
 a capability that transitively depends on itself appends `dependency-cycle-detected`, returns to the local architect of the
 work item that closed it, and is a notice the person sees. The run fails with
@@ -744,7 +770,12 @@ absence. A nested package whose dependencies are missing is a readiness failure,
 not a code-repair assignment. The `collection-review` fixture has none; the
 fixtures of iteration 4 add one.
 
-**Test discovery and selection.** `TestSelection.resolved` is the union of
+**Test discovery and selection.** Assignments and requirements capture a
+`TestSelectionPolicy`, not a file list. With the writer settled, every gate
+attempt, including repairs, refreshes the module inventory and discovers tests
+from the current tree under that policy. `run_scope_tests` uses the same resolver
+on each call. The resulting `TestSelection.resolved` is stored on the attempt
+(or diagnostic observation) and is the union of
 
 1. each exact owner's test files beneath its `src/tests/`;
 2. every descendant owner's test files for each included child subtree;
@@ -752,10 +783,16 @@ fixtures of iteration 4 add one.
    the selection;
 4. `extraSuites` from `evidenceObligations`;
 
-filtered by the project's Vitest `include` patterns. Owner-to-directory mapping
-comes from the architect view. Selection never shrinks to changed files and
+filtered by the project's Vitest discovery rules, including exclusions.
+Owner-to-directory mapping comes from the refreshed architect view; failed
+discovery is `not-verified`, never reuse of a stale list. An initially testless
+owner can receive an assignment and add its first test. Selection never shrinks
+to changed files and
 never expands through an inferred impact graph. An empty selection where the
 checkpoint requires tests is `not-verified` with reason `empty-selection`.
+Required `extraSuites` must exist and be selected; a missing required suite
+cannot disappear through rediscovery. Guarded configuration and contract checks
+still run before commands, so rediscovery cannot authorize weakened discovery.
 
 The `collection-review` fixture also has a Cucumber suite, `test:cucumber`,
 which the MVP's one supported runner does not select. That is recorded as a
@@ -828,11 +865,15 @@ inputsHash, submission hash)`, and the accepted submission is stored verbatim at
 
 `edit` and `write` are intercepted before execution. The target is resolved
 against the invocation's working directory, then `realpath` is taken of the
-target, or of the existing parent of a new file, and the lexical containment
+target, or of the nearest existing ancestor for a new path, and the lexical containment
 check from [reuse/resolve-contained-path.ts](reuse/resolve-contained-path.ts)
 is applied against the recorded `WriteScope.resolved.roots` and `files`. A
 target that cannot be resolved is blocked as `blocked-unresolved`, which is a
 distinct verdict from `blocked-scope`.
+For missing intermediate directories, append the validated remaining path
+components to that ancestor's real path, rejecting traversal and checking
+containment against the captured scope. This supports authorized module
+creation without treating an absent parent directory as a scope failure.
 
 A block returns a concise explanation naming the target and the scope and
 directing the engineer to report the need or use the delegation mechanism. It
@@ -1115,8 +1156,8 @@ the same iteration:
    on `kind`. The stored `submission.json` carries the
    `schema: 'ramify-agent.<name>/1'` literal; the agent does not supply it;
 2. validate beyond the schema: references that must exist in committed state,
-   owners that must exist in the refreshed view, paths that must lie in the
-   scope, uniqueness of a proposed slug;
+   existing owners in the refreshed view or validated `ModuleProposal`s,
+   paths that must lie in the scope, uniqueness of a proposed slug;
 3. change nothing on failure;
 4. return every error to the same session as the tool's error result, as JSON:
    `{ accepted: false, errors: [{ path, message, expected? }], remainingAttempts }`,
@@ -1195,7 +1236,7 @@ Ramify toolkit.
 | [run-command-with-cleanup.sh](reuse/run-command-with-cleanup.sh) | 2 | `harness/evidence`, as a resource beside `run-command.ts` | None; verbatim with its header | A command that leaves a descendant; TERM during a run; a timeout |
 | [exec-and-collect.ts](reuse/exec-and-collect.ts) | 2 | `harness/evidence`, inside `run-command.ts` | Tell a timeout from a failure using Node's `killed` and `signal`; write the complete output to a file and return `{ path, bytes, truncated, tail }`; surface a spawn failure's string `code` as `runnerError`; resolve the wrapper script from the module's own directory | Success, non-zero exit, spawn failure, timeout, abort, output cap |
 | [clean-env.ts](reuse/clean-env.ts) | 2 | `harness/evidence`, inside `run-command.ts` | Becomes `cleanEnvironment`, the only builder of a child environment | `NODE_OPTIONS` is absent in the child |
-| [resolve-contained-path.ts](reuse/resolve-contained-path.ts) | 6 | `harness`, in `src/guard/` | `realpath` the target, or the existing parent of a new file, before the lexical check; return `blocked-unresolved` distinctly | Existing file, new file, traversal, symlink, absolute path, unresolvable parent |
+| [resolve-contained-path.ts](reuse/resolve-contained-path.ts) | 6 | `harness`, in `src/guard/` | Resolve the target or nearest existing ancestor, validate remaining components and containment; return `blocked-unresolved` distinctly | Existing file, new nested directories in a bootstrap scope, traversal, symlink, absolute path, unresolvable ancestor |
 
 ### Measurement capture
 
@@ -1244,15 +1285,17 @@ split into two cases so that each has one owner; that is noted below.
 | G6 | A later fork finds a locally registered unimplemented capability without a parent brief | 8 | A local decision registers a capability; a later fork's input contains no brief for it and its decision reuses the registry entry |
 | G7 | A relevant hypothesis revision reaches affected local architects before dependent work is assigned | 8 | `hypotheses-delivered` precedes the next `iteration-assigned` of every work item whose `involvedModules` match |
 | G8 | One small work item completes in one iteration; another is revised across several without losing obligations | 6 | Two work items: one outline with `decomposition: 'single-iteration'` and one accepted iteration; one with three outline revisions whose open requirements survive every revision |
+| G9 | An accepted proposed entry owner reaches implementation | 6 | An entry with a valid ModuleProposal receives a bootstrap assignment, creates nested source directories and its first test, passes its gate with the owner in the refreshed view, and emits a creation notice. An absent owner without authority and writes outside the creation scope are rejected |
+| G10 | Global placement can authorize a new owner without claiming it already exists | 8 | A create decision and matching registry proposal lead to a passing creation assignment. A nonexistent parent, conflicting directory and reuse of an absent owner without an accepted proposal are rejected; reuse of an already registered proposal preserves its capability identity |
 
 ### Contract and provider flow
 
 | # | Case | Owner | Executable evidence |
 | --- | --- | ---: | --- |
-| P1 | One consumer performs one real delegation, works against a named fake, registers the provider once, implements it and verifies on return | 9 | The `review-notes` fixture driven by the scripted agent: `contract-registered`, one `ProviderObligation`, `provider-conformed`, `requirement-verified` |
+| P1 | One consumer delegates, resumes after provider conformance and verifies against the real provider | 9 | The review-notes fixture: provider-conformed precedes work-item-resumed while the requirement remains open; the consumer then replaces its fake and requirement-verified closes the delegation |
 | P2 | Fake files, exports and re-exports remain unmistakable, and architectural evidence does not present them as production behavior | 9 | The contract gate rejects a fake file without `.fake`, an exported fake without `Fake`, and a re-export that drops the designation; the architect view of the accepted state shows the fake under its fake name |
-| P3 | Duplicate obligation registration is idempotent; a changed contract revision reopens implementation and conformance evidence | 9 | A repeated registration appends no second line; a new `ContractRecord` revision leaves the obligation and every requirement open |
-| P4 | A provider that cannot implement the agreement reports a revision need rather than changing the contract | 9 | A `provider-cannot-conform` submission returns `revision-needed` to the consumer's local architect and leaves the `ContractRecord` untouched |
+| P3 | A contract revision reschedules current evidence without resetting completed work | 9 | Within an active run, complete revision 1 with two consumers, register revision 2, restart after evidence-reopened, then finish one provider follow-up and both consumer follow-ups. Earlier completions remain historical, old evidence cannot satisfy revision 2, and replay and repeated registration duplicate nothing. A second case revises unfinished items and supersedes their old assignments |
+| P4 | An ordinary provider engineer reports inability to conform through its own submission union | 9 | A real-provider engineer submits unsuitable/provider-cannot-conform; revision-needed reaches the waiting consumer architect once, followed by a contract revision assignment. The old contract stays unchanged until registration. The same reason from unrelated or contract engineers is rejected |
 | P5 | Shared obligations and at least one cycle or unresolvable dependency reach a deterministic outcome | 9 | One obligation with two requirements runs its provider once and verifies each consumer separately; a module chain A, B, A over three capabilities completes with no notice; a constructed capability cycle appends `dependency-cycle-detected`, returns to the local architect and appears in `RunSnapshot.notices`; the same cycle detected again fails the run with `dependency-cycle` and the cycle as evidence |
 
 ### Checks, repair and breaking work
@@ -1261,12 +1304,13 @@ split into two cases so that each has one owner; that is noted below.
 | --- | --- | ---: | --- |
 | K1 | A module gate fails, returns concise diagnostics, is repaired and reruns the complete gate | 6 | A failing assertion in scope: `cause: 'in-scope'`, `next: 'repair'`, a second attempt at `repairRound: 1` running the full required set |
 | K2 | A global work-item gate exposes a failure outside the last engineer's scope; the local architect assigns repair and rechecks | 6 | `cause: 'outside-assignment'`, `next: 'return-to-local-architect'`, a new assignment whose scope covers the failing owner, then a passing work-item gate |
-| K3 | Exact-owner and included-child-subtree test selection are both exercised | 6 | Two assignments over `workspace/reviews`, one with no included children and one including `reviews/core`; their `TestSelection.resolved` lists differ by exactly the subtree's test files |
+| K3 | Exact-owner and included-child-subtree test selection are both exercised | 6 | Two assignments over workspace/reviews, one without included children and one including reviews/core; their gate-time TestSelection.resolved lists differ by exactly the subtree test files |
 | K4 | Fake and real-provider conformance obligations are both enforced | 9 | The contract gate runs the conformance suite against the fake; the provider gate runs the same suite against the real provider; neither substitutes for the other |
 | K5a | Missing nested dependencies, a missing command and a failing initial baseline retain distinct causes and recovery paths | 4 | Three readiness fixtures; each `ReadinessAttempt` names a different failing step, and only the recoverable one consumes a `readinessRecoveries` attempt |
 | K5b | An invalid session, a test timeout and exhausted repair limits retain distinct causes and recovery paths | 6 | `invalid-session` reconstructs the session and preserves the counters; a timeout records `not-verified`/`timeout` and one infrastructure retry; exhaustion records `next: 'exhausted'` with the original cause preserved |
 | K6 | Narrowing test discovery or disabling a required suite is rejected unless an accepted revision authorizes it | 10 | An engineer edit to the Vitest configuration is a `guarded-change` and the gate does not pass; the same edit under a recorded obligation revision is authorized |
 | K7 | A breaking feature is isolated into coherent iterations and all project tests pass at every accepted boundary | 10 | The `reviewer-identity` fixture: an outline with `breakingChanges` and staged iterations, each accepted boundary carrying a passing `breaking-iteration` gate |
+| K8 | Every gate resolves current tests under the captured policy | 6 | A new failing test added after assignment, including during repair, fails that attempt. An initially testless owner can add its first passing test; remaining empty is not-verified. Discovery failure and a missing required suite never fall back to an earlier list |
 
 ### Context and boundary controls
 

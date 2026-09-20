@@ -55,8 +55,14 @@ architect explains intent and local discoveries; it does not reproduce the view.
 `ForkSubmission.decision` commits, in one `decision-accepted` event, the
 `PlacementDecision`, the `RegistryEntry` revisions it creates and the
 `Hypothesis` revisions it makes. `outcome` is `reuse`, `extend`, `create`,
-`extract` or `external`; `owner` is null only for `external` and is otherwise
-validated against the refreshed view. A decision that replaces an earlier one
+`extract` or `external`; `owner` is null only for `external`. An existing owner
+is validated against the refreshed view. `create` or `extract` may instead
+carry a `ModuleProposal` with an existing parent and a non-conflicting direct-child
+directory; the decision and registry must carry the same proposal. Iteration 6's
+bootstrap assignment creates it, and its gate requires the refreshed view to
+recognize it. `reuse` and `extend` may reference an already accepted proposal in
+the registry, preserving capability identity before implementation; they cannot
+introduce an absent owner themselves. A decision that replaces an earlier one
 carries `revises` with the affected work items, contracts and consequences: a
 silent contradiction is impossible because the field is required for a
 conflicting owner.
@@ -115,13 +121,14 @@ Neither an empty search nor an absent hit establishes absent behavior.
 | G5 | A local architect uses an external-owner hypothesis as evidence, makes routine local refinements without a global call, and escalates real counterevidence | Three scripted local architects over one hypothesis: one refines locally with no `placement-requested`, one escalates with counterevidence, and the local decision is recorded without a parent append |
 | G6 | A later fork finds a locally registered unimplemented capability without a parent brief | A local decision registers a capability; a later fork's input contains no brief for it, and its decision reuses the registry entry |
 | G7 | A relevant hypothesis revision reaches affected local architects before dependent work is assigned | `hypotheses-delivered` precedes the next `iteration-assigned` of every work item whose `involvedModules` match the revision |
+| G10 | Global placement can authorize a new owner without claiming it already exists | A create decision and matching registry proposal lead to a passing creation assignment. A nonexistent parent, conflicting directory and reuse of an absent owner without an accepted proposal are rejected; reuse of an already registered proposal preserves its capability identity |
 | X1c | A decision fork threshold returns partial findings and no accepted decision | `fork-returned-partial`; no `decision-accepted`, no append, one retry within `forkRetriesPerRequest`, then an unresolved outcome to the local architect |
 
 ## Guards owned
 
 The cross-cutting JSON rule for both `ForkSubmission` members and for
 `request-placement`, each with its schema-break and rule-break test. An owner
-absent from the refreshed view is the named rule-break case.
+absent from the refreshed view without a valid proposal is the named rule-break case.
 
 ## Exit evidence
 
@@ -133,4 +140,7 @@ absent from the refreshed view is the named rule-break case.
 - A fork that is interrupted mid-investigation and repeats from current records
   and revalidated evidence, producing one decision, not two.
 - A view identity that changes during an investigation, forcing revalidation.
+- A global `create` decision proposing a new owner, followed by a bootstrap
+  assignment that creates it and passes its gate; absent parents, conflicting
+  directories and absent owners without accepted proposals for `reuse` are rejected.
 - `npm run type-check`, `npm test`, `npm run build:web`, `npm run check:self`.

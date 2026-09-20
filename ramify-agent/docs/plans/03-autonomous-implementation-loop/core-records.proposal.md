@@ -92,8 +92,9 @@ the same session shape; the main plan has the
     fundamental and has no exception: every submission and every input of a
     harness tool is JSON, validated completely before it has any effect. The
     validation is the strict schema, then the rules the schema cannot hold:
-    references that must exist in committed state, owners that must exist in
-    the view, paths that must lie in the scope, uniqueness of proposed slugs.
+    references that must exist in committed state, existing owners in the view
+    or validated module proposals, paths that must lie in the scope, uniqueness
+    of proposed slugs.
     A failure changes nothing. Every error, each naming its path and what is
     expected, returns to the same session as an error result with a request
     to correct and retry. Retries are bounded per turn, each rejection is an
@@ -164,7 +165,7 @@ plans/<plan-id>/.harness/jobs/<run-id>/
   work-items/<wi>/iterations/<nn>/result.json       IterationResult
   contracts/<contract-id>/<rev>.json        ContractRecord
   obligations/<obligation-id>/<rev>.json    ProviderObligation
-  requirements/<requirement-id>.json        ConsumerRequirement
+  requirements/<requirement-id>/<rev>.json  ConsumerRequirement
   gates/<gate-attempt-id>/attempt.json      GateAttempt, beside its logs
   invocations/<inv>/invocation.json         Invocation
   invocations/<inv>/submission.json         accepted submission, verbatim
@@ -240,7 +241,7 @@ interface EntryAssignments {                // analysis/entries.json, written on
   view: ViewIdentity;
   entries: Array<{
     capability: CapabilityId; description: string;
-    owner: ModulePath; proposed?: { parent: ModulePath; purpose: string; tags: string[] };
+    owner: ModulePath; proposed?: ModuleProposal;
     requirementRefs: PlanRef[]; acceptanceRefs: PlanRef[];
     citations: Citation[];
   }>;
@@ -248,6 +249,12 @@ interface EntryAssignments {                // analysis/entries.json, written on
 }
 /** A heading anchor or line range of the captured plan. */
 interface PlanRef { anchor?: string; lines?: [number, number] }
+
+interface ModuleProposal {
+  parent: ModulePath;                       // must already exist in the refreshed view
+  directory: string;                        // project-relative direct child under the parent's subs/
+  purpose: string; tags: string[];
+}
 
 interface Hypothesis {                      // hypotheses/<id>/<rev>.json
   schema: 'ramify-agent.hypothesis/1';
@@ -283,7 +290,7 @@ interface RegistryEntry {                   // registry/<capability-id>/<rev>.js
   schema: 'ramify-agent.capability/1';
   capability: CapabilityId; revision: number;
   behavior: string;
-  owner: ModulePath; proposed?: { parent: ModulePath; purpose: string; tags: string[] };
+  owner: ModulePath; proposed?: ModuleProposal;
   origin: 'entry' | 'global-decision' | 'local-decision';
   decision: DecisionId | null;              // null for an entry assignment
   /** Confirmed consumer-to-dependency links this revision adds. */
@@ -312,7 +319,8 @@ interface PlacementDecision {               // decisions/<decision-id>.json
   /** `extract` moves existing behavior to a new owner and requires `revises` or affected consumers.
    *  `external` is satisfied by a package or another system: no owner module, no provider obligation. */
   outcome: 'reuse' | 'extend' | 'create' | 'extract' | 'external';
-  capability: CapabilityId; owner: ModulePath | null;   // null only for `external`; otherwise validated against the view
+  capability: CapabilityId; owner: ModulePath | null;   // null only for `external`
+  proposed?: ModuleProposal;                // required for an owner not yet in the view
   rationale: string; constraints: string[]; uncertainties: string[];
   evidence: { view: ViewIdentity; citations: Citation[]; gaps: string[] };
   /** An earlier decision this one replaces, with what it affects. Never silent. */
@@ -348,11 +356,34 @@ key and is a no-op when the session already holds that key.
 
 ### Work items, outlines and assignments
 
+An absent owner is valid only with a `ModuleProposal` on an accepted entry or
+placement decision and its matching registry entry. Its parent must exist;
+the directory must be a non-conflicting direct child under that parent's
+`subs/`, and the owner, directory and declaration name must agree. A hypothesis
+alone never authorizes creation. `create` and `extract` may introduce a proposal;
+`reuse` and `extend` may reference an already accepted proposal in the registry,
+but cannot introduce an absent owner themselves. Multiple capabilities may
+reference the same proposal but cannot propose conflicting definitions for one
+directory.
+
+The first assignment that creates that owner captures a `bootstrap` scope from
+the committed registry reference: its declaration, README and own `src/`, plus
+only explicitly assigned exposure files in existing owners. It receives the
+parent's onboarding and views with the proposal; a nonexistent module's own
+view is unavailable. The guard resolves missing paths through the nearest
+existing ancestor and checks the remaining components for containment. Once
+created, a refreshed view must recognize the proposed owner at that directory
+before its gate can pass; the assignment's write authority never expands from
+the refresh. Further child creation requires another accepted proposal.
+
 ```ts
 interface WorkItem {                        // work-items/<wi>/item.json
   schema: 'ramify-agent.work-item/1';
   id: WorkItemId; module: ModulePath;
-  origin: { entry: CapabilityId } | { obligation: RecordRef };   // one capability per work item, always
+  origin: { entry: CapabilityId } | { obligation: RecordRef } | { verification: RecordRef };
+  // The harness derives the one capability from the entry, obligation or requirement.
+  /** A completed item's follow-up preserves that item's historical completion. */
+  follows?: WorkItemId;
   goal: string;
   requirementRefs: PlanRef[]; acceptanceRefs: PlanRef[];
   /** The work item whose yield started this one; the depth-first stack. */
@@ -382,13 +413,15 @@ interface IterationAssignment {             // .../iterations/<nn>/assignment.js
   externalCapabilities: Array<{ capability: CapabilityId; owner: ModulePath; role: 'use' | 'request'; contract?: RecordRef }>;
   completionEvidence: string;
   /** Registered evidence this iteration must satisfy, owned anywhere. */
-  evidenceObligations: Array<{ obligation?: RecordRef; requirement?: RequirementId; suite: string[]; against: 'fake' | 'real' }>;
+  evidenceObligations: Array<{ obligation?: RecordRef; requirement?: RecordRef; suite: string[]; against: 'fake' | 'real' }>;
   /** Derived by the policy from `kind` and `scope`; no submission carries it. */
-  gate: { checkpoint: Checkpoint; tests: TestSelection };
+  gate: { checkpoint: Checkpoint; tests: TestSelectionPolicy };
   /** Guarded files as captured; a gate compares the tree with them. */
   guarded: Array<{ path: string; hash: string }>;
   /** Set for a contract iteration: the engineer iteration that asked for it. */
   requestedBy?: IterationId;
+  /** A local architect may assign a contract revision directly; the harness supplies the next revision. */
+  revisesContract?: RecordRef;
 }
 
 interface WriteScope {
@@ -399,16 +432,21 @@ interface WriteScope {
   /** Locations assigned beyond the base: contract, conformance, fake, exposure declaration. */
   extra: Array<{ path: string; purpose: 'contract' | 'conformance' | 'fake' | 'exposure-declaration' | 'consumer' }>;
   read: ModulePath[];                       // declared read scope beyond the base; soft
+  /** Creation authority captured from accepted registry entries, never from hypotheses. */
+  bootstrap: Array<{ capability: RecordRef; directory: string }>;
   rationale: string;
-  /** Resolved at capture against the module tree: real paths the guard compares with. */
+  /** Captured canonical paths, including validated absent bootstrap paths under a real ancestor. */
   resolved: { roots: string[]; files: string[]; view: ViewIdentity };
 }
 
-interface TestSelection {
+interface TestSelectionPolicy {
   policy: 'owned-by-scope' | 'all-project';
   exactOwners: ModulePath[]; subtrees: ModulePath[];
   extraSuites: string[];                    // from evidenceObligations
-  /** The test files or suites the policy selected. Empty where tests are required is never a pass. */
+}
+/** Resolved anew from the current tree before each gate or diagnostic test run. */
+interface TestSelection extends TestSelectionPolicy {
+  /** Recorded on the attempt, not the assignment. Empty required selections never pass. */
   resolved: string[];
 }
 type Checkpoint = 'readiness' | 'iteration' | 'contract' | 'breaking-iteration' | 'work-item' | 'final';
@@ -503,30 +541,76 @@ interface ProviderObligation {              // obligations/<obligation-id>/<rev>
   evidence: { conformance: string[]; against: 'real' };
 }
 
-interface ConsumerRequirement {             // requirements/<requirement-id>.json
+interface ConsumerRequirement {             // requirements/<requirement-id>/<rev>.json
   schema: 'ramify-agent.consumer-requirement/1';
-  id: RequirementId; workItem: WorkItemId; consumer: ModulePath;
+  id: RequirementId; revision: number;       // equals contractRevision
+  workItem: WorkItemId; consumer: ModulePath; // original consumer item; identity stays stable
   /** The capability the consumer is implementing: the tail of the dependency edge. The harness fills it from the work item. */
   forCapability: CapabilityId;
   obligation: ObligationId; contractRevision: number;
   behavior: string;
-  evidence: { tests: TestSelection; fakeInjections: string[] };   // what verification replaces
+  evidence: { tests: TestSelectionPolicy; fakeInjections: string[] };   // what verification replaces
 }
 ```
 
-Registration is keyed by `(obligation, revision)` and by `requirement`, and a
-registration already in the log is not appended again. A shared obligation is one
-obligation with several requirements; its provider work item runs once and
-each consumer verifies on its own. Completion evidence names the revision it
-satisfied, so a new contract revision leaves the obligation and every
-requirement on it open.
+Registration is keyed by `(obligation, revision)` and `(requirement, revision)`;
+a registration already in the log is not appended again. Shared consumers use
+one provider execution per obligation revision and verify separately. A yielded
+consumer resumes when all providers it waits for have conformed at the current
+contract revisions. Its requirements remain open until its verification
+iterations replace the fakes and pass; resumption never waits for that outcome.
+
+#### Contract revision and follow-up work
+
+A local architect requests revision through an assignment of kind `contract`
+with `revisesContract` naming the current record and an approach explaining the
+required change. `requestedBy` is absent for this direct assignment. The
+accepted assignment is committed through `contract-requested`, as for a
+sub-session, and licenses the contract engineer. The contract engineer
+establishes the revised agreement through the same contract
+gate; it cannot choose or overwrite the revision number. Until registration,
+the existing contract remains authoritative.
+
+Registering a new revision uses one `evidence-reopened` transaction in place of
+the initial `contract-registered` transaction. It atomically commits the
+contract, obligation and new
+revisions of every attached requirement, and opens their evidence. Requirement
+IDs and original `workItem` links stay stable. Prior records and gate results
+remain historical; only the latest requirement revision can satisfy completion.
+The same transaction records scheduling bindings from each
+new obligation/requirement reference to the work item responsible for it:
+
+- Reuse its existing unfinished work item, delivering the new evidence at its
+  next coordination point. After writer settlement, any other unfinished assignment
+  bound to the previous revision closes as `superseded`; a new assignment must
+  carry the current references. No old assignment is rewritten or accepted for
+  the new revision.
+- If its previous work item completed, create a follow-up with `follows` naming
+  it: an obligation-origin provider item or a verification-origin consumer
+  item. Copy the relevant original requirement and acceptance references. The
+  prior item stays completed. A new consumer attachment uses its own unfinished
+  item and reuses any current provider conformance.
+
+The provider binding is unique per `(obligation, revision)`; the consumer
+binding is unique per `(requirement, revision)`. Replay restores the bindings
+and follow-up records without scheduling duplicates. Provider work precedes
+consumer verification, including when all previous items had completed.
+Work-item completion checks evidence assigned by these bindings, not just the
+requirement's original `workItem` field. A follow-up cannot complete while its
+bound verification is open. Follow-ups use fresh local architect sessions
+oriented from the prior item, its acceptance references and the current evidence.
+Bindings to unfinished items may reuse one item across revisions, but each
+revision requires its own evidence. All work and invocations count toward the
+existing run and work-item limits. The final gate waits for every follow-up
+and every latest requirement revision. P3 must exercise this through completion
+after restart, not stop at the reopened projection.
 
 A cycle is a cycle of **capabilities**, never of modules or of changes. The
 graph the harness checks has capabilities as its nodes: a requirement adds the
 edge from the capability its consumer is implementing (`forCapability`) to the
 capability of its obligation. It is ordinary for change 1 in module A to need
 change 2 in module B, which needs change 3 in module A: those are three
-capabilities and three work items, since a provider obligation always starts a
+capabilities and three work items, since a new provider obligation starts a
 work item of its own, even in a module that already has one yielded, and they
 complete in the order 3, 2, 1. Only a capability that transitively depends on
 itself is a cycle. No module identity enters the check.
@@ -565,7 +649,8 @@ interface GateAttempt {                     // gates/<gate-attempt-id>/attempt.j
     command: CheckCommand; selection?: TestSelection;
     startedAt: string; elapsedMs: number; exitCode: number | null;
     outcome: 'passed' | 'failed' | 'not-verified';
-    notVerified?: 'timeout' | 'runner-error' | 'command-missing' | 'empty-selection' | 'interrupted';
+    notVerified?: 'timeout' | 'runner-error' | 'command-missing' | 'empty-selection' | 'interrupted'
+      | 'discovery-error' | 'required-suite-missing';
     /** Set only by the code that spawns the command, such as a spawn error with a string code. Never inferred from output. */
     runnerError: { kind: string; message: string } | null;
     /** The complete output is a file beside attempt.json; `tail` has a fixed bound. */
@@ -616,12 +701,12 @@ type EngineerSubmission =                                             // also br
   | { kind: 'completion-proposed'; summary: string; findings: string[]; recommendation?: string }
   | { kind: 'contract-needed'; capability: CapabilityId; behavior: NeedAsBehavior }
   | { kind: 'partial'; done: string[]; unfinished: string[]; findings: string[] }   // also the budget report
-  | { kind: 'unsuitable'; reason: 'scope' | 'break-discovered' | 'obligation-change' | 'unplaced-need'; detail: string };
+  | { kind: 'unsuitable'; reason: 'scope' | 'break-discovered' | 'obligation-change' | 'unplaced-need' | 'provider-cannot-conform'; detail: string };
 
 type ContractSubmission =
   | { kind: 'established'; contract: Omit<ContractRecord, 'schema' | 'id' | 'revision' | 'establishedBy'>; changedPaths: string[] }
   | { kind: 'incomplete'; done: string[]; unfinished: string[] }      // registers nothing
-  | { kind: 'unsuitable'; reason: 'break-discovered' | 'provider-cannot-conform' | 'scope'; detail: string };
+  | { kind: 'unsuitable'; reason: 'break-discovered' | 'scope'; detail: string };
 
 interface NeedAsBehavior { useCases: string[]; inputs: string; outputs: string; sideEffects: string; constraints: string[]; existingEvidence: string[] }
 ```
@@ -630,11 +715,22 @@ interface NeedAsBehavior { useCases: string[]; inputs: string; outputs: string; 
 without the fields the harness assigns: IDs, revisions, hashes, resolved
 paths, captured gate and guarded hashes.
 
+`provider-cannot-conform` is offered only to engineers assigned real-provider
+obligations. The harness resolves the provider item's current obligation binding, settles
+the writer and closes the iteration as `unsuitable`, then records
+`revision-needed` and returns to the requesting consumer's local architect.
+That architect assigns a contract revision or returns `unresolved`; the report
+does not itself alter the agreement. Other roles receive a validation error
+for that reason. `obligation-change` remains the general report of an assignment
+whose evidence needs revision; it does not claim provider inability.
+
 ## The run log
 
-One envelope, as Plan 1: `{ sequence, jobId, at, type, data }`. An event's
-data holds references, not record bodies. The events that commit a record or
-license an agent are the core; the plan adds the rest.
+One event envelope, as Plan 1: `{ sequence, jobId, at, type, data }`. Its
+`data` holds references and scheduling bindings; the enclosing ledger
+transaction also carries every record body committed by that event, as rules
+3 and 4 require. The events that commit a record or license an agent are the
+core; the plan adds the rest.
 
 | Event | Commits or records | May start |
 | --- | --- | --- |
@@ -655,14 +751,16 @@ license an agent are the core; the plan adds the rest.
 | `iteration-assigned` | `IterationAssignment`, local `PlacementDecision`s | — |
 | `writer-acquired` | `{ invocation, scopeRevision }` | the one writer |
 | `writer-released` | `{ invocation, confirmed }`; unconfirmed blocks every writer and gate | — |
-| `contract-requested` | a `contract` `IterationAssignment` with `requestedBy` | contract engineer |
-| `contract-registered` | `ContractRecord`, `ProviderObligation`, `ConsumerRequirement` | — |
+| `contract-requested` | a `contract` `IterationAssignment` with `requestedBy` for a sub-session or `revisesContract` for a direct revision | contract engineer |
+| `contract-registered` | Initial `ContractRecord`, `ProviderObligation`, `ConsumerRequirement`s and their scheduling bindings and new work items; access-only contracts create no obligation | — |
 | `gate-attempted` | `GateAttempt` | engineer repair, or local architect |
 | `iteration-closed` | `IterationResult` | local architect |
-| `work-item-yielded` / `work-item-resumed` | the requirements waited for | provider work item |
+| `work-item-yielded` | current requirement references waited for | provider work item |
+| `work-item-resumed` | the requirements and current provider-conformance gates that permit resumption | consumer local architect, to assign verification |
 | `provider-conformed` | `{ obligation: RecordRef, gate }` | — |
-| `requirement-verified` | `{ requirement, contractRevision, gate }`; requires that no `fakeInjections` location still references the fake; the only event that closes a delegation | — |
-| `evidence-reopened` | `{ subject, cause }` | — |
+| `requirement-verified` | `{ requirement: RecordRef, workItem, gate }`; only the current revision, with no remaining fake injection; the only event that closes a delegation | — |
+| `evidence-reopened` | `{ cause, bindings: Array<{ subject: RecordRef, workItem: WorkItemId }> }`, current evidence records, superseded assignment results and follow-up `WorkItem`s in one transaction; a contract revision includes its contract, obligation and every attached requirement | provider work, then consumer verification |
+| `revision-needed` | `{ obligation: RecordRef, iteration, consumerWorkItem }`; deduplicated per obligation revision | consumer local architect, even if yielded |
 | `dependency-cycle-detected` | `{ cycle: CapabilityId[], requirements: RequirementId[], closedBy: WorkItemId, occurrence }`; a cycle of capabilities, never of modules; a notice for the person | the local architect of `closedBy` |
 | `work-item-completed` | `{ workItem, gate }` | next work item |
 | `stop-requested`, `job-completed`, `job-failed`, `job-stopped`, `job-interrupted` | as Plan 1; `job-completed` names the `final` gate | — |

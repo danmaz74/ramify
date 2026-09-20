@@ -84,7 +84,10 @@ Tests whose expectations the request explicitly supersedes are revised; every
 unrelated guarantee remains binding. Recording a break does not discharge its
 consequences: affected consumers must be adapted and verified before the run can
 complete, and previously completed work may acquire new evidence obligations
-through `evidence-reopened`.
+through `evidence-reopened`. Apply iteration 9's work-binding rule to those
+obligations: unfinished items receive current assignments, completed items get
+follow-up verification work, and run completion waits for the new evidence.
+Historical completed items are never reset.
 
 ### The fixture feature
 

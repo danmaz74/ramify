@@ -22,7 +22,7 @@ Iteration 1: `harness/evidence` exists and the harness's `src/jobs/` writes thro
   check forms on `RamifyCli`.
 - In `harness`: the `GateAttempt` record as the
   [proposal](../core-records.proposal.md#gate-attempts) defines it, `CheckCommand`,
-  `Checkpoint` and `TestSelection` as shapes; the policy that chooses them
+  `Checkpoint`, `TestSelectionPolicy` and `TestSelection` as shapes; the policy that chooses them
   arrives in iterations 4, 6, 9 and 10.
 
 ## Work
@@ -85,7 +85,9 @@ will replace its body later; nothing of that tool is built here.
   caller.
 - **Classification.** `commands[].outcome` is `passed`, `failed` or
   `not-verified`, with `notVerified` one of `timeout`, `runner-error`,
-  `command-missing`, `empty-selection` or `interrupted`.
+  `command-missing`, `empty-selection`, `interrupted`, `discovery-error` or
+  `required-suite-missing`. The latter two cover failed current-tree discovery
+  and a required suite that rediscovery cannot select; neither uses a stale list.
   `verdict` and `cause` derive from `runnerError`, the timeout and the exit
   codes; `unknown` stays explicit.
 - **Guarded changes.** `guardedChanges[]` compares the captured hashes with the
@@ -117,7 +119,8 @@ None. The checkpoints that use this engine arrive in iterations 4, 6, 9 and 10.
 - A command that spawns a descendant which outlives it: after `runCommand`
   returns, the descendant is gone, confirmed by its process group.
 - `NODE_OPTIONS` is absent from the child environment.
-- Five `not-verified` reasons each produced by a real case, and an attempt with a
+- Every `not-verified` reason produced by a case (discovery cases supplied with
+  the selection policy in iteration 6), and an attempt with a
   missing command that runs nothing at all.
 - A timeout is distinguished from a non-zero exit; a spawn failure yields
   `runnerError` with its string code.

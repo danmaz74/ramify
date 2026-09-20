@@ -69,10 +69,12 @@ architect view and the module-architect skill. Its submission commits, in one
 one `RegistryEntry` per entry capability with `origin: 'entry'` and
 `decision: null`, and one `WorkItem` per entry capability.
 
-Validation beyond the schema: every owner exists in the refreshed view or
-carries a `proposed` block; capability and hypothesis slugs are unique in the
-run; every `PlanRef` lies inside the captured plan. A failure returns every error with its path
-to the same session.
+Validation beyond the schema: every entry owner exists in the refreshed view or
+carries a valid `ModuleProposal`, with an existing parent and a non-conflicting
+direct-child directory under its `subs/`. The owner, directory and declaration
+name must agree; a hypothesis alone gives no creation authority. Capability and
+hypothesis slugs are unique in the run; every `PlanRef` lies inside the captured
+plan. A failure returns every error with its path to the same session.
 
 **A hypothesis never creates work.** It has no reference to a work item, and
 nothing references it but a decision and a local architect's input. Revision 1
@@ -81,7 +83,10 @@ is never rewritten. `change` offers `reuse`, `extend`, `create` and
 confirm it and every union value must have a producer. That is a revision of the
 [proposal](../core-records.proposal.md#initial-analysis) and is recorded as such.
 
-Work-item grouping comes from the submission and is applied mechanically.
+One work item is created per entry capability. A proposed owner's local
+architect receives the proposal and existing parent's onboarding and views;
+its own view is unavailable until creation. Iteration 6 implements the first
+creation assignment.
 
 ### Hypothesis delivery
 
@@ -139,8 +144,9 @@ rule-break test.
   already satisfied: two work items, two outlines recorded as
   `single-iteration`, two passing work-item gates, one passing final gate,
   completed.
-- An initial submission naming an owner absent from the view is rejected with
-  its path, corrected, and accepted.
+- An initial submission naming an absent owner without a valid proposal is
+  rejected with its path; a valid proposal with an existing parent is accepted.
+  A conflicting directory or nonexistent parent is rejected before work starts.
 - A duplicate capability slug is rejected; three rejections end the invocation
   as `invalid-submission`.
 - A work-item gate failure returns to the local architect and exhausts

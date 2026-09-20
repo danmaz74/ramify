@@ -27,7 +27,7 @@ Consumed: `WorkItem`, `WorkItemOutline`, `GateAttempt`, the check engine, the
 port's context policy and outcomes, its `guard` callback and its `edit` and
 `write` built-ins, `loadArchitectIndex`, `readMeasurement`.
 
-Established: `IterationAssignment`, `WriteScope`, `TestSelection`,
+Established: `IterationAssignment`, `WriteScope`, `TestSelectionPolicy`, `TestSelection`,
 `IterationResult`, `LineEventSummary`, the `guard` observation, the `LocalArchitectSubmission` member
 `assign`, the `EngineerSubmission` union, and the run-log events
 `iteration-assigned`, `gate-attempted` and `iteration-closed`.
@@ -43,41 +43,60 @@ immediate children: each child subtree is wholly included or excluded, and no
 descendant is selected individually. `WriteScope.resolved` captures the real
 paths and the view identity; `guarded` captures the guarded files' hashes.
 
-The architect submits no test selection. `gate` and `TestSelection` are derived
-by the policy from `kind` and `scope`, so narrowing is impossible rather than
-detected.
+The architect submits no test selection. `gate` and `TestSelectionPolicy` are
+derived from `kind`, `scope` and required evidence. The assignment freezes that
+policy; each gate attempt resolves and records the current files.
 
 Validation beyond the schema: every module in the scope exists in the refreshed
-view; every `extra` path lies under a module of the run; `includedChildren` name
+view or has accepted creation authority as described below; every `extra` path
+lies under an existing or authorized proposed module; `includedChildren` name
 direct children only; `externalCapabilities` reference registry entries that
 exist.
 
+For a proposed owner, `WriteScope.bootstrap` captures its accepted registry
+reference and directory. The first assignment may create its `module.ramify`,
+README and own `src/`, plus explicitly listed exposure files in existing owners.
+The parent exists in the view; the missing child directory is not rejected.
+The proposal supplies the new owner's onboarding until its own files exist.
+Before acceptance, refresh the view and verify the declaration and owner match
+the proposal. Neither the refresh nor creation authorizes unselected children
+or unrelated parent files. No module is created merely because a hypothesis
+mentions it.
+
 ### Test selection
 
-`TestSelection.resolved` is built as the
+Before every gate attempt, including a repair, `TestSelection.resolved` is built
+from the current tree and refreshed module inventory as the
 [main plan](../main-plan.md#commands) defines it: each exact owner's
 `src/tests/`, every descendant owner's tests for an included subtree, the
 ordinary `src/` of a testing module inside the selection, and `extraSuites`,
-filtered by the project's Vitest `include` patterns. `resolved` is stored, so a
-reader sees that an included subtree really contributed tests and an empty list
-is visible. The fixture's Cucumber suite lies outside the one supported runner
+filtered by the project's Vitest discovery rules. `resolved` is stored on the
+attempt, so a reader sees that an included subtree really contributed tests and
+an empty list is visible. The fixture's Cucumber suite lies outside the one supported runner
 and is recorded as a `coverage-gap` on every attempt over that fixture.
+`run_scope_tests` resolves the same policy anew on each call. An assignment is
+valid before its first test exists; an empty required selection is checked at
+gate time. A missing required suite or failed discovery is `not-verified`.
+Rediscovery never authorizes changes to guarded configuration or contracts.
 
 ### The engineer
 
 One invocation per attempt, with `builtinTools` of read, search, `edit` and
 `write`, the last two behind the write guard below, one
-harness tool `run_scope_tests` that runs the assignment's selection through the
-lifted executor, and the `EngineerSubmission` union. The `shell` tool arrives in iteration 7, by decision 12. Its submission members here are `completion-proposed`, `partial`
+harness tool `run_scope_tests` that resolves the assignment's policy and runs it
+through the lifted executor, and the `EngineerSubmission` union. The `shell`
+tool arrives in iteration 7, by decision 12. Its submission members here are `completion-proposed`, `partial`
 and `unsuitable`; `contract-needed` is offered from iteration 9.
 
 ### The write guard
 
 Place [resolve-contained-path.ts](../reuse/resolve-contained-path.ts) in
 `src/guard/`, keeping its provenance comment. Adjust it as the main plan
-requires: take `realpath` of the target, or of the existing parent of a new
-file, before the lexical check, and return `blocked-unresolved` as a distinct
-result. Device and inode revalidation around a rename is deferred; the remainder
+requires: take `realpath` of the target, or of the nearest existing ancestor of a
+new path and append its validated remaining components, before the containment
+check. This permits missing intermediate directories inside an authorized
+bootstrap scope; traversal and symlink escapes remain blocked. Return
+`blocked-unresolved` as a distinct result. Device and inode revalidation around a rename is deferred; the remainder
 of cucumber-viz's containment file is read, not copied.
 
 The guard runs before `edit` or `write` executes. It resolves the target
@@ -165,12 +184,14 @@ metrics.
 | # | Case | Evidence |
 | --- | --- | --- |
 | G8 | One small work item completes in one iteration; another is revised across several without losing obligations | Two work items: one outline `single-iteration` with one accepted iteration; one with three outline revisions whose open evidence obligations survive every revision |
+| G9 | An accepted proposed entry owner reaches implementation | An entry with a valid ModuleProposal receives a bootstrap assignment, creates nested source directories and its first test, passes its gate with the owner in the refreshed view, and emits a creation notice. An absent owner without authority and writes outside the creation scope are rejected |
 | C4 | A crash after passing checks recovers the accepted result; a later source change invalidates stale evidence | A restart between `gate-attempted` and `iteration-closed` recovers the acceptance and makes the one commit. By Dan's decision of 2026-09-20 a later source change invalidates nothing: it is uncommitted work for the next gate, and the accepted commit stays as it is |
-| K3 | Exact-owner and included-child-subtree test selection are both exercised | Two assignments over `workspace/reviews`, one with no included children and one including `reviews/core`; their `resolved` lists differ by exactly the subtree's test files |
+| K3 | Exact-owner and included-child-subtree test selection are both exercised | Two assignments over workspace/reviews, one without included children and one including reviews/core; their gate-time TestSelection.resolved lists differ by exactly the subtree test files |
 | K5b | An invalid session, a test timeout and exhausted repair limits retain distinct causes and recovery paths | `invalid-session` reconstructs the session and preserves the counters; a timeout records `not-verified`/`timeout` and one infrastructure retry; exhaustion preserves the original cause |
 | X1a | An engineer threshold returns partial evidence without compaction or false completion; repeated returns do not reset limits | `context-budget-reached` with report, threshold and usage; no `compaction` observation for the role; the third return exhausts `budgetReturnsPerIteration` |
 | K1 | A module gate fails, returns concise diagnostics, is repaired and reruns the complete gate | A failing assertion in scope: `cause: 'in-scope'`, `next: 'repair'`, a second attempt at `repairRound: 1` running the full required set |
 | K2 | A global work-item gate exposes a failure outside the last engineer's scope; the local architect assigns repair and rechecks | `cause: 'outside-assignment'`, `next: 'return-to-local-architect'`, a new assignment covering the failing owner, then a passing work-item gate |
+| K8 | Every gate resolves current tests under the captured policy | A new failing test added after assignment, including during repair, fails that attempt. An initially testless owner can add its first passing test; remaining empty is not-verified. Discovery failure and a missing required suite never fall back to an earlier list |
 | X3 | Allowed and denied `edit`/`write` targets cover existing files, new files, traversal, symlinks and explicit contract or exposure locations | One table-driven case each, asserting verdict, resolved target and the absence of a mutation |
 | X4 | Denied tools do not mutate, return useful guidance and stay deduplicated across replay while a new retry is counted separately | A replayed `(invocation, callId)` appears once; a fresh call to the same target appears again |
 | X5 | A path-resolution failure differs from a proven scope violation | `blocked-unresolved` and `blocked-scope` are distinct verdicts with distinct reasons and distinct counts |
@@ -190,9 +211,14 @@ member and the `run_scope_tests` tool.
 
 - A run over the fixture where one work item is assigned, executed and accepted,
   and a second is revised across three outline revisions.
-- An assignment naming a module absent from the view is rejected with its path.
+- An assignment naming an absent module without accepted creation authority is
+  rejected. A valid proposed entry creates a new module with nested source
+  directories and its first test, passes the gate and emits its creation notice.
 - An assignment selecting a grandchild rather than a direct child is rejected.
-- Two `TestSelection.resolved` lists that differ only by an included subtree.
+- Two gate-time `TestSelection.resolved` lists that differ only by an included
+  subtree; a newly added failing test prevents acceptance, including on repair.
+- An initially testless owner can receive an assignment and pass after adding
+  its first passing test; leaving it testless produces `empty-selection`.
 - A gate failing three times exhausts and returns to the local architect with
   the original cause.
 - A budget return followed by a fresh session that continues from files and does

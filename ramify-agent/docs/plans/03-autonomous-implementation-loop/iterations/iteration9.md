@@ -27,7 +27,9 @@ Established: `ContractRecord`, `ProviderObligation`, `ConsumerRequirement`, the
 with `NeedAsBehavior`, the `LocalArchitectSubmission` member
 `yield-for-providers`, and the run-log events `contract-requested`,
 `contract-registered`, `work-item-yielded`, `work-item-resumed`,
-`provider-conformed`, `requirement-verified` and `evidence-reopened`.
+`provider-conformed`, `requirement-verified`, `revision-needed` and
+`evidence-reopened`. Ordinary provider engineers gain the `unsuitable` reason
+`provider-cannot-conform`; contract engineers do not receive it.
 
 ## Work
 
@@ -79,11 +81,16 @@ a production-looking name.
 
 ### Registration
 
-Only `ContractSubmission.established` registers. `contract-registered` commits
+Only `ContractSubmission.established` followed by a passing contract gate registers.
+For an initial agreement, `contract-registered` commits
 the `ContractRecord`, one `ProviderObligation` keyed `ob-<contract-id>` at the
-contract's revision, and one `ConsumerRequirement` per consumer. Registration is
-keyed by `(obligation, revision)` and by `requirement`: a registration already
-in the log is not appended again.
+contract's revision, and one `ConsumerRequirement` per consumer, with scheduling
+bindings and the provider work item. An access-only agreement creates neither
+an obligation nor fake-backed requirements. Registration and scheduling are
+keyed by `(obligation, revision)` and `(requirement, revision)`: a registration
+already in the log is not appended again. Attaching another consumer to an
+existing agreement adds only its requirement and binding, reusing the current
+provider work or conformance.
 `ContractSubmission.incomplete` registers nothing.
 
 ### Scheduling
@@ -93,13 +100,16 @@ Depth-first. The consumer finishes what it can against the fake and submits
 `work-item-yielded` with the requirements waited for. The harness runs the
 provider work items of those requirements before the next independent entry work
 item; each provider is an ordinary work item with its own local architect. A
-shared obligation is one obligation with several requirements: its provider work
-item runs once and each consumer verifies on its own.
+shared obligation has one provider execution per revision and each consumer
+verifies separately. `work-item-resumed` occurs when all providers the consumer
+waits for have conformed at the current contract revisions. It licenses the
+consumer architect to assign verification while the requirements are still open;
+waiting for `requirement-verified` before resuming would deadlock.
 
 A cycle is a cycle of **capabilities**, never of modules or changes. The graph's
 nodes are capabilities: a requirement adds the edge from its `forCapability` to
 the capability of its obligation, and the graph is checked when a requirement is
-committed. A provider obligation always starts a work item of its own, even in a
+committed. A new provider obligation starts a work item of its own, even in a
 module that has one yielded, so change 1 in module A needing change 2 in module
 B needing change 3 in module A completes in the order 3, 2, 1 with no cycle and
 no notice; a test shows it. A capability that transitively depends on itself
@@ -108,10 +118,18 @@ appends
 and returns to that work item's local architect as a finding at its next turn.
 The same cycle detected again, or `cycleReplansPerWorkItem` spent, fails the run
 with `dependency-cycle` and the cycle as evidence. Every detected cycle is a
-notice in `RunSnapshot.notices`, resolved or not, so the person is told. A provider that reports
-`provider-cannot-conform` returns `revision-needed` to the consumer's local
-architect, bounded by the work item's limits, and leaves the `ContractRecord`
-untouched.
+notice in `RunSnapshot.notices`, resolved or not, so the person is told.
+
+An ordinary provider engineer may submit `unsuitable` with
+`provider-cannot-conform` only when its assignment carries a real-provider
+obligation. The harness derives that obligation from the assignment, settles the
+writer, closes the iteration as `unsuitable` and records `revision-needed`, once
+per obligation revision. It delivers the report to the consumer architect that
+requested this provider work, even while that consumer is yielded. The architect
+assigns a contract revision or submits `unresolved`. The existing agreement stays
+unchanged until the revision passes its contract gate and is registered. An
+unrelated engineer or contract engineer using this reason is rejected by the
+submission validator; it is not parsed from free text.
 
 ### Verification
 
@@ -122,18 +140,38 @@ provider and appends `provider-conformed`. The consumer then gets a
 requires that no `fakeInjections` location still references the fake.
 Fake-backed completion never completes the capability.
 
-A new `ContractRecord` revision appends `evidence-reopened` for the obligation
-and every requirement on it; completion evidence names the revision it
-satisfied, so stale completion cannot be reused.
+### Contract revisions
+
+Implement the proposal's
+[contract revision and follow-up work](../core-records.proposal.md#contract-revision-and-follow-up-work)
+as one scheduling path, including its record revisions and idempotency keys.
+The consumer architect assigns kind `contract` with `revisesContract` naming
+the current agreement and its revision rationale in `approach`; this direct
+assignment needs no `requestedBy`. The harness fills the next revision only
+after the contract gate passes.
+
+One `evidence-reopened` transaction registers the new contract, obligation and
+requirement revisions together with all work bindings. Unfinished items receive
+current evidence at their next coordination point; their old unfinished
+assignments other than the revision-establishing iteration close as `superseded`
+after settlement. Completed items remain completed and get follow-up work:
+provider items name the revised obligation;
+consumer items name the revised requirement. `follows` preserves the link to
+the prior completed item. Their fresh local architects receive the prior work
+and current evidence. Work-item completion checks the current bindings, so a
+follow-up cannot close before its assigned verification passes. The final gate
+waits for these follow-ups and for every latest requirement revision. Replay restores the same bindings and work
+IDs without duplicates. No arbitrary source change triggers this path: an
+explicit contract revision does.
 
 ## Acceptance cases owned
 
 | # | Case | Evidence |
 | --- | --- | --- |
-| P1 | One consumer performs one real delegation, works against a named fake, registers the provider once, implements it and verifies on return | The `review-notes` fixture driven by the scripted agent: `contract-registered`, one obligation, `provider-conformed`, `requirement-verified` |
+| P1 | One consumer delegates, resumes after provider conformance and verifies against the real provider | The review-notes fixture: provider-conformed precedes work-item-resumed while the requirement remains open; the consumer then replaces its fake and requirement-verified closes the delegation |
 | P2 | Fake files, exports and re-exports remain unmistakable, and architectural evidence does not present them as production behavior | The gate rejects a file without `.fake`, an export without `Fake` and a re-export that drops the designation; the architect view of the accepted state shows the fake under its fake name |
-| P3 | Duplicate obligation registration is idempotent; a changed contract revision reopens implementation and conformance evidence | A repeated registration appends no second line; a new revision leaves the obligation and every requirement open |
-| P4 | A provider that cannot implement the agreement reports a revision need rather than changing the contract | `provider-cannot-conform` returns `revision-needed` and the `ContractRecord` is unchanged |
+| P3 | A contract revision reschedules current evidence without resetting completed work | Within an active run, complete revision 1 with two consumers, register revision 2, restart after evidence-reopened, then finish one provider follow-up and both consumer follow-ups. Earlier completions remain historical, old evidence cannot satisfy revision 2, and replay and repeated registration duplicate nothing. A second case revises unfinished items and supersedes their old assignments |
+| P4 | An ordinary provider engineer reports inability to conform through its own submission union | A real-provider engineer submits unsuitable/provider-cannot-conform; revision-needed reaches the waiting consumer architect once, followed by a contract revision assignment. The old contract stays unchanged until registration. The same reason from unrelated or contract engineers is rejected |
 | P5 | Shared obligations and at least one cycle or unresolvable dependency reach a deterministic outcome | One obligation with two requirements runs its provider once and verifies each consumer separately; a module chain A, B, A over three capabilities completes with no notice; a constructed capability cycle appends `dependency-cycle-detected`, returns to the local architect and appears in `RunSnapshot.notices`; the same cycle detected again fails the run with `dependency-cycle` |
 | K4 | Fake and real-provider conformance obligations are both enforced | The contract gate runs the conformance suite against the fake; the provider gate runs the same suite against the real provider; neither substitutes for the other |
 | X1b | A contract sub-session threshold returns incomplete and registers nothing | An `incomplete` submission commits no `ContractRecord` and no obligation, and its caller accounts for the partial work |
@@ -156,6 +194,12 @@ Plus the cross-cutting JSON rule for `ContractSubmission`, `contract-needed` and
   records without its original reply.
 - The evidence obligations of an assignment are visible before execution, and an
   engineer cannot remove one or weaken the contract to obtain a pass.
-- A cycle, a shared obligation and a `revision-needed` each reaching their
-  recorded outcome.
+- A cycle, a shared obligation and a provider engineer's `revision-needed` each
+  reaching their recorded outcome through validated submissions.
+- Complete revision 1 with two consumers, revise the contract, restart after
+  `evidence-reopened`, and complete revision 2 with one provider follow-up and
+  two consumer follow-ups. Earlier items stay completed; stale evidence cannot
+  satisfy revision 2 and replay creates no duplicate work.
+- Revise while provider and consumer items are unfinished: supersede their old
+  assignments, reuse those items with current evidence, and finish the run.
 - `npm run type-check`, `npm test`, `npm run build:web`, `npm run check:self`.
