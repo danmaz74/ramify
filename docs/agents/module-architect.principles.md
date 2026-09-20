@@ -33,6 +33,15 @@ responsibilities should move.
 When an existing capability is not accessible where needed, the architect
 decides whether the architecture should change to make it accessible.
 
+### Contracts Follow Responsibility
+
+Place contracts with the responsibility that governs their meaning. Normally,
+a capability's public contract belongs with its implementation, so coordinated
+changes remain local. Consumer-defined ports belong with the consumer's
+responsibility. A separate contract module needs an independent agreement,
+compatibility responsibility, or abstraction benefit that outweighs its
+navigation and coordination costs. Sharing alone does not justify separation.
+
 ### Ramify Supplies Evidence, the Architect Supplies Meaning
 
 Ramify exposes deterministic architectural evidence: module topology,

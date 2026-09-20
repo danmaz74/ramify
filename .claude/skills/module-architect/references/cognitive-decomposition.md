@@ -32,6 +32,45 @@ Speculative growth is weak evidence.
 Work decomposition is not module decomposition. Iterations may divide a large
 task without creating durable architectural boundaries.
 
+## Place contracts
+
+Apply [Contracts Follow Responsibility](../../../../docs/agents/module-architect.principles.md#contracts-follow-responsibility)
+when choosing a contract's owner. Distinguish authority to revise the agreement,
+ownership of its source, and responsibility for implementing it; these roles
+need not coincide.
+
+| Contract | Placement candidate | Responsibility to establish |
+| --- | --- | --- |
+| Provider API | The capability's owner | Define the promise and demonstrate that its implementation fulfills it. |
+| Consumer-defined port | The consumer's responsibility, possibly in a child | Define the required behavior and the conformance expected of adapters. |
+| Peer agreement | The common coordinating owner | Maintain an agreement neither participant may revise unilaterally. |
+| Independent protocol | A dedicated protocol owner | Govern versions and compatibility across independently evolving implementations. |
+| Shared domain vocabulary | The owner of its meaning and invariants | Maintain domain rules; determine whether validation or other behavior warrants a boundary. |
+
+Ask:
+
+1. Who determines the contract's meaning and may revise it?
+2. Which contract, implementation, consumer and conformance tests ordinarily
+   change together? Which changes should leave the contract stable?
+3. What knowledge would a separate boundary let consumers or the parent stop
+   understanding? What knowledge and coordination would still cross it?
+4. Could an ordinary exposed file or same-owner `src/interfaces/` area provide
+   the same discoverability and import separation without another owner?
+5. Who receives a contract-change work item, and what evidence lets that owner
+   judge its responsibility complete? Which implementation obligations remain?
+
+Locality means a coherent responsibility and engineering scope, not necessarily
+one file. Colocation can simplify coordinated changes, but it must preserve a
+stable public promise when only implementation details change. Compare its
+increase in local context with the knowledge a separate module actually hides.
+
+A schema module can own meaningful validation or compatibility behavior;
+mostly containing definitions does not disqualify it. Conversely, multiple
+consumers or implementations do not alone establish independent authority.
+For example, a versioned plugin protocol may warrant a separate owner when
+that owner maintains compatibility rules and a conformance suite for independently
+released providers. State that responsibility and evidence explicitly.
+
 ## Evaluate a proposed boundary
 
 Ask:
