@@ -362,10 +362,11 @@ hypotheses with their rationales. It:
    or unresolved placement, and checks requester-specific access separately.
 3. Identifies required breaking changes and their affected consumers during
    its initial analysis, before assigning implementation iterations.
-4. Makes an initial iterative plan to satisfy the work-item goal, choosing
-   which whole child subtrees each non-breaking iteration includes. It isolates
-   breaking work as far as practical, assigns its explicit scope, and orders
-   the iterations around the resulting dependencies.
+4. Identifies broad stages, breaking segments and dependency constraints, then
+   makes the next iteration executable. It chooses that iteration's goal,
+   scope and completion evidence, including which whole child subtrees a
+   non-breaking iteration includes. Later iterations remain a provisional
+   outline rather than a detailed implementation plan.
 5. Delegates each iteration to a module engineer and assesses its result.
 6. Revises remaining iterations when evidence, dependencies or relevant global
    hypotheses change, reporting architectural findings and local decisions.
@@ -375,6 +376,25 @@ architect continues its session across iterations; this variant does not apply
 the global architect's per-request fork mechanism to local planning. There is
 no separate planning session before every iteration. Only the next iteration
 is fixed; later iterations remain provisional.
+
+The local architect owns iteration boundaries, not detailed implementation
+steps. For the next assignment it determines the required outcome, search and
+write scope, dependencies, applicable requirements, execution approach and
+completion evidence. The engineer chooses which files to inspect, the
+implementation and test sequence, and internal implementation details within
+that assignment. It reports discoveries that make the boundary unsuitable
+rather than silently expanding its scope.
+
+For example, an iteration may implement the customer-page send action against
+the agreed fake, including loading, success and failure behavior, within the
+page and its selected rendering child. Its completion check is the relevant
+consumer tests. The local architect need not prescribe component edits,
+individual test cases or each red/green step.
+
+The local architect may assign a small work item as one iteration. Several
+iterations may also use the same module scope; substantial work does not by
+itself justify introducing another module boundary. Decomposition should
+produce manageable goals, not a mandatory number of iterations.
 
 The local architect's broader visibility serves a narrow planning responsibility.
 It does not become an unrestricted implementation agent. It passes the engineer
@@ -387,7 +407,13 @@ contract details are established through contract sub-sessions where needed;
 newly discovered dependencies can revise the plan.
 
 Results return as concise findings, changed assumptions and artifact references,
-not entire engineering transcripts.
+not entire engineering transcripts. Engineers may include a recommendation for
+the next iteration or a proposed split of remaining work, explaining the
+dependencies or discoveries behind it. The local architect assesses that
+recommendation and records the next assignment using the ordinary result
+handoff; no extra planning agent or invocation is required merely to obtain
+the recommendation. An engineer's recommendation does not itself change the
+assigned scope or discharge unfinished obligations.
 
 Where the module is new, the local architect uses its recorded purpose and
 placement and includes creating it in the work. Where new information
@@ -796,6 +822,11 @@ remain available for the person to inspect alongside the initial hypotheses.
 
 The first experiment should exercise one consumer, one real delegation and
 verification on return, including a restart after contract registration.
+Check that the first assignment is executable without a detailed full-work-item
+breakdown, that the engineer chooses its implementation steps, and that a
+recommended split of remaining work informs the next local assignment while
+preserving unfinished obligations. Include a small case requiring only one
+iteration to check that decomposition is not imposed unnecessarily.
 It should also resolve two sequential placement requests in forks without a
 diff baseline. The first revises a deeper hypothesis and records a newly placed
 capability; the second inherits its brief and finds that capability in the
