@@ -22,7 +22,7 @@ function revision(sequence: number): SessionRevision {
     summary: { complete: true, owners: 0, sourceFiles: 0, resources: 0, originals: 0, accesses: 0,
       allowed: 0, denied: 0, errors: 0, warnings: 0, coverageNotes: 0, external: 0 },
     diagnostics: [], warnings: [], coverage: [], delta: { added: [], removed: [], positionOnly: [] },
-    timings: { classify: 0, inventory: 0, compiler: 0, descriptions: 0, accesses: 0, link: 0, decide: 0, publish: 0, total: 0 } };
+    timings: { classify: 0, inventory: 0, compiler: 0, descriptions: 0, accesses: 0, link: 0, decide: 0, companions: 0, publish: 0, total: 0 } };
 }
 
 describe('daemon session audit accounting', () => {

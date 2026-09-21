@@ -1,9 +1,10 @@
 ramify 1
 // The browser shell. It also relays: feature adapters travel through it to the
-// root, and shared vocabulary travels through it down to every descendant.
+// root, and shared vocabulary travels through it down to every descendant and
+// up to the root, whose assembly names it through the inspection port.
 module workspace tagged [ui, browser, dispatch]
 
-expose-sub * from contracts to descendants
+expose-sub * from contracts to parent, descendants
 
 // The catalog's finished API surfaces, on their way to the root that mounts
 // them. This shell cannot value-import them itself; relaying is a declaration,
@@ -17,7 +18,7 @@ expose-sub createReviewsRouter, createReviewsTools, InspectionPort from reviews 
 // The catalog's test fixture, for the tests of every other owner beneath this
 // one. Their ordinary source cannot import it: the fixture is tagged
 // `testing`.
-expose-sub makeCatalogFixture from catalog to descendants
+expose-sub makeCatalogFixture, CatalogFixtureRecord from catalog to descendants
 
 // The shared presentation primitives, down to every descendant. Both feature
 // views take them; their core siblings see them and cannot import them,

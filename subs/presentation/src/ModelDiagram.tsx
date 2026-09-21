@@ -73,8 +73,6 @@ export interface ModelDiagramProps {
    * built and validated once, on first use.
    */
   readonly definition?: DiagramDefinition;
-  /** A prebuilt layout, overriding `definition`. */
-  readonly layout?: DiagramLayout;
   /** Pin the palette. Omitted follows the reader's `prefers-color-scheme`. */
   readonly theme?: Theme;
   /** Controlled selection. Omit to let the component own it. */
@@ -183,7 +181,7 @@ export function ModelDiagram(props: ModelDiagramInteractiveProps): ReactElement 
     ...rest
   } = props;
 
-  const layout = rest.layout ?? diagramLayout(rest.definition ?? shopDiagram);
+  const layout = diagramLayout(rest.definition ?? shopDiagram);
   const base = layout.viewBox;
 
   const [internal, setInternal] = useState<SymbolName | null>(defaultSelectedSymbol);
@@ -531,7 +529,6 @@ function ViewportControls({ scale, reset, onZoomIn, onZoomOut, onReset }: Viewpo
 export function ModelDiagramSvg(props: ModelDiagramProps): ReactElement {
   const {
     definition = shopDiagram,
-    layout = diagramLayout(definition),
     theme,
     selectedSymbol = null,
     onSelectSymbol,
@@ -551,6 +548,7 @@ export function ModelDiagramSvg(props: ModelDiagramProps): ReactElement {
     onTogglePlay,
   } = props;
 
+  const layout = diagramLayout(definition);
   const { viewBox } = layout;
   // The window actually shown. Zoom narrows it; the static export never sets it.
   const shown = view ?? viewBox;

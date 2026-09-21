@@ -41,7 +41,8 @@ export async function loadReview(
   };
 }
 
-interface ReviewPanelProps {
+/** The panel's props, exposed with the panel because its signature names them. */
+export interface ReviewPanelProps {
   client: TRPCClient<AppRouter>;
   recordId: string;
 }

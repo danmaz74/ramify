@@ -11,3 +11,5 @@ expose-src buildModel from "model.ts" tagged [browser] to parent
 expose-src explainVisibility, explainImport from "decisions.ts" tagged [browser] to parent
 // M7: pure available-original enumeration, sharing decisions.ts's requirement helper.
 expose-src listAvailableOriginals from "availability.ts" tagged [browser] to parent
+// M8: the signature-companion rule over the same exposure data.
+expose-src listCompanionViolations from "companions.ts" tagged [browser] to parent

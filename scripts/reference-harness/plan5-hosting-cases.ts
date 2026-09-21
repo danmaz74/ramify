@@ -24,7 +24,7 @@ const s1000DeadlineLimits = { ...sessionLimits, workerHeapMiB: 1024, maxRetained
 const coreCatalog = `${coreDirectory}/src/catalog.ts`;
 const reviewsRouter = 'subs/workspace/subs/reviews/src/router.ts';
 const zodDeclaration = 'node_modules/zod/index.d.cts';
-const timingKeys = ['accesses', 'classify', 'compiler', 'decide', 'descriptions', 'inventory', 'link', 'publish', 'total'];
+const timingKeys = ['accesses', 'classify', 'companions', 'compiler', 'decide', 'descriptions', 'inventory', 'link', 'publish', 'total'];
 const comparable = (report: AnalysisReport): unknown => ({ ...report, runId: 'compared' });
 const pause = (milliseconds: number): Promise<void> => new Promise(resolve => setTimeout(resolve, milliseconds));
 

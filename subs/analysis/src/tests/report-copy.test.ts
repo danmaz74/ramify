@@ -118,7 +118,7 @@ describe('detached report data with shared immutable subtrees', () => {
       outcome: { execution: 'completed', check: 'failed', coverage: 'complete' },
       summary: { complete: true, owners: 2, sourceFiles: 1, resources: 0, originals: 1, accesses: 1, allowed: 0, denied: 1, errors: 1, warnings: 0, coverageNotes: 0, external: 0 },
       diagnostics: [finding], warnings: [], coverage: [], delta: { added: [finding], removed: [], positionOnly: [] },
-      timings: { classify: 0, inventory: 1, compiler: 2, descriptions: 3, accesses: 4, link: 0, decide: 5, publish: 1, total: 16 },
+      timings: { classify: 0, inventory: 1, compiler: 2, descriptions: 3, accesses: 4, link: 0, decide: 5, companions: 0, publish: 1, total: 16 },
     };
     const copy = copyReport(revision);
     expect(JSON.stringify(copy)).toBe(JSON.stringify(revision));

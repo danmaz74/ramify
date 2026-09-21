@@ -13,14 +13,21 @@ async function setup(name, run) {
   const scratch = await mkdtemp(join(tmpdir(), 'fast-fixture-control-'));
   const templates = join(scratch, 'templates');
   const files = name === 'reference' ? {
-    'src/assembly.ts': "export type AppRouter = AssembledSystem['router'];\nexport function build() { return { ready: true }; }\n",
+    'src/assembly.ts': "export type AppRouter = ReturnType<typeof assembleRouter>;\nexport function build() { return { ready: true }; }\n",
     'subs/workspace/README.md': 'Workspace is the browser shell.\n\nFixture documentation.\n',
     'subs/workspace/module.ramify': 'expose-sub createCatalogRouter, createCatalogTools, inspectRecord from catalog to parent\n',
+    'module.ramify': 'expose-src McpToolContribution, ToolInputSchema, ToolResult from "interfaces/protocol.ts" to descendants\n',
+    'subs/workspace/subs/reviews/subs/core/subs/tasks/src/result.ts':
+      'export function summarizeTaskResult(result: InspectionTaskResult): TaskSummary { return result; }\n',
   } : {
     'src/impl0.ts': 'export function implementation(input) { return input.value + value; }\n',
     'subs/m001/src/interfaces/api.ts': 'export const value = 1;\n',
     'subs/m001/module.ramify': 'module fixture\n',
     'subs/m001/README.md': 'Supplies deterministic workload bytes.\n\nFixture documentation.\n',
+    ...(name === 'X100' ? {
+      'subs/m002/src/impl0.ts': 'export function run0(input: Input, previous: PreviousInput): Output { return input.value; }\n',
+      'subs/m099/module.ramify': 'module fixture\nexpose-src * from "interfaces/api.ts" to parent\n',
+    } : {}),
   };
   files['tsconfig.json'] = '{"compilerOptions":{"target": "ES2022"}}\n';
   try {
@@ -33,7 +40,7 @@ async function setup(name, run) {
     assert.deepEqual(treeIdentity(join(templates, name)), frozen, 'Frozen generator/template bytes must stay unchanged');
   } finally { await rm(scratch, { recursive: true, force: true }); }
 }
-for (const name of ['reference', 'S100']) {
+for (const name of ['reference', 'S100', 'X100']) {
   test(`${name}: all alternating edits preserve the observed-deletion witness and setup identity`, () => setup(name, async project => {
     const sourcePath = join(project.root, project.body);
     assert.equal((await readFile(sourcePath, 'utf8')).split(witness).length, 2,
@@ -41,11 +48,13 @@ for (const name of ['reference', 'S100']) {
     assert.deepEqual(project.setupIdentity, treeIdentity(project.root));
     const expectedImporters = name === 'reference'
       ? ['src/server.ts', 'src/interfaces/protocol.ts', 'src/tests/setup.ts', 'src/tests/http.test.ts']
-      : ['src/impl0.ts', ...Array.from({ length: 9 }, (_, index) => `subs/m001/src/impl${index}.ts`)];
+      : ['src/impl0.ts', ...Array.from({ length: 9 }, (_, index) => `subs/m001/src/impl${index}.ts`),
+        ...(name === 'X100' ? Array.from({ length: 9 }, (_, index) => `subs/m002/src/impl${index}.ts`) : [])];
     assert.deepEqual(project.sourceImporters, expectedImporters);
+    assert.equal(Boolean(project.signature), name !== 'S100', 'Plan 8 edit classes exist on the reference and X100 only');
     assert.deepEqual(project.creationWitness, { path: project.body, specifier: './fast-measurement-created.js' });
     const initialTarget = await readFile(join(project.root, project.created), 'utf8');
-    for (const kind of ['body', 'source', 'description', 'readme', 'configuration']) {
+    for (const kind of ['body', 'source', 'description', 'readme', 'configuration', ...(project.signature ? ['signature', 'companion'] : [])]) {
       for (let index = 0; index < 4; index++) {
         await project.change(kind, index);
         assert.equal((await readFile(sourcePath, 'utf8')).split(witness).length, 2, `${kind} ${index} lost or duplicated the witness`);

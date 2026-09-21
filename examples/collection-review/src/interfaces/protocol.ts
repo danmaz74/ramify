@@ -1,29 +1,33 @@
-// A type-only import of this owner's own runtime file, so that
-// `ProtocolFacilities` is exactly what `createFacilities` returns and
-// cannot drift from it. Nothing is imported at runtime.
-import type { createFacilities } from '../protocol.js';
+// The runtime's type is read off the tRPC package itself, so that
+// `ProtocolFacilities` names no binding of this owner's runtime files. The
+// assembly passes what `createFacilities` returns wherever this type is
+// expected, so the two cannot drift. Nothing is imported at runtime.
+import type { initTRPC } from '@trpc/server';
 
 /**
  * The neutral protocol vocabulary the application root shares with its
  * dispatch-classified descendants.
  *
- * Only the names this owner exposes leave it. The remaining exports are the
- * shapes those exposed contracts are written in; a descendant builds them
- * through contextual typing rather than by importing them.
+ * Only the names this owner exposes leave it. The shapes those exposed
+ * contracts are written in are exposed with them: a symbol's signature
+ * companions must be available wherever the symbol is.
  */
 
 /**
  * The application router's type, forwarded from the assembly that builds it.
  *
  * This is a same-owner alias rather than a new binding: the original stays in
- * `assembly.ts`, owned here and carrying this owner's `dispatch` tag, and the
- * assembly itself stays private. A descendant that receives the router type
- * imports it from this file, which is the only file the root exposes it from.
+ * `assembly.ts`, owned here and carrying this owner's `dispatch` tag. The
+ * router's type is inferred from the function that composes it, so that
+ * function travels with the type as its signature companion. The rest of the
+ * assembly stays private. A descendant that receives the router type imports
+ * it from this file, which is the only file the root exposes it from.
  *
  * `export type` erases the statement entirely, so nothing of the assembly's
- * Node runtime can travel to a browser along this route.
+ * Node runtime can travel to a browser along this route: `assembleRouter` is
+ * usable here only in a type position.
  */
-export type { AppRouter } from '../assembly.js';
+export type { AppRouter, assembleRouter } from '../assembly.js';
 
 /**
  * What every request knows about itself, whichever protocol carried it. It is
@@ -41,7 +45,10 @@ export interface InvocationContext {
  * its own router. The root creates the runtime once and hands these to each
  * factory; it never exposes the runtime itself as an importable singleton.
  */
-export type ProtocolFacilities = Pick<ReturnType<typeof createFacilities>, 'procedure' | 'router'>;
+export type ProtocolFacilities = Pick<
+  ReturnType<ReturnType<typeof initTRPC.context<InvocationContext>>['create']>,
+  'procedure' | 'router'
+>;
 
 /** The request identity an MCP tool receives, taken from its request context. */
 export interface ToolInvocation {

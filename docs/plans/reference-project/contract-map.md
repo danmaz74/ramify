@@ -1,6 +1,7 @@
 # Reference project: contract map
 
-**Date:** 2026-09-07. **Current through:** iteration 5.
+**Date:** 2026-09-07; updated 2026-09-21. **Current through:** iteration 5 and
+[Plan 8](../iteration-8-signature-companions/main-plan.md)'s signature-companion remediation.
 **Status:** complete for the baseline. Every owner, statement and exposed symbol
 of the reference project is recorded below, and all fifteen descriptions have
 passed the plan's [description review checklist](implementation.md#description-review-checklist).
@@ -51,8 +52,13 @@ ordinary source.
 | `ProtocolFacilities` | `collection-review` | `src/interfaces/protocol.ts` | type | `[dispatch]` | R1 | `workspace/catalog`, `workspace/reviews` |
 | `McpToolContribution` | `collection-review` | `src/interfaces/protocol.ts` | type | `[dispatch]` | R1 | `workspace/catalog`, `workspace/reviews` |
 | `ToolInvocation` | `collection-review` | `src/interfaces/protocol.ts` | type | `[dispatch]` | R1 | `workspace/reviews` |
+| `ToolInputSchema` | `collection-review` | `src/interfaces/protocol.ts` | type | `[dispatch]` | R1 | — |
+| `ToolResult` | `collection-review` | `src/interfaces/protocol.ts` | type | `[dispatch]` | R1 | — |
 | `AppRouter` | `collection-review` | `src/assembly.ts` | type | `[dispatch]` | R3 | `workspace`, `workspace (tests)`, `workspace/reviews/ui` |
+| `assembleRouter` | `collection-review` | `src/assembly.ts` | function (value), forwarded type-only | `[dispatch]` | R3 | — |
 | `createTestSystem` | `collection-review` | `src/tests/setup.ts` | function (value) | `[testing, dispatch]` | R2 | `workspace (tests)`, `workspace/catalog (tests)`, `workspace/reviews (tests)`, `workspace/reviews/ui (tests)`, `integration-tests` (its ordinary `src/`, testing-classified by its header) |
+| `TestSystem` | `collection-review` | `src/tests/setup.ts` | type | `[testing, dispatch]` | R2 | — |
+| `McpSession` | `collection-review` | `src/tests/setup.ts` | type | `[testing, dispatch]` | R2 | — |
 
 ### Catalog
 
@@ -62,9 +68,11 @@ ordinary source.
 | `inspect` | `workspace/catalog/core` | `subs/workspace/subs/catalog/subs/core/src/catalog.ts` | function (value) | `[]` | K1, A3 (as `inspectRecord`), W2 | `workspace/catalog`, `collection-review` |
 | `CatalogSummary` | `workspace/catalog/core` | `subs/workspace/subs/catalog/subs/core/src/catalog.ts` | type | `[]` | K1, A5 | `workspace/catalog`, `workspace/catalog (tests)`, `workspace/catalog/ui` |
 | `makeCatalogFixture` | `workspace/catalog/core` | `subs/workspace/subs/catalog/subs/core/src/tests/fixture.ts` | function (value) | `[testing]` | K2, A4, W3 | `workspace/reviews/core (tests)` |
+| `CatalogFixtureRecord` | `workspace/catalog/core` | `subs/workspace/subs/catalog/subs/core/src/tests/fixture.ts` | type | `[testing]` | K2, A4, W3 | — |
 | `createCatalogRouter` | `workspace/catalog` | `subs/workspace/subs/catalog/src/router.ts` | function (value) | `[dispatch]` | A1, W2 | `collection-review` |
 | `createCatalogTools` | `workspace/catalog` | `subs/workspace/subs/catalog/src/mcp.ts` | function (value) | `[dispatch]` | A2, W2 | `collection-review` |
 | `CatalogCard` | `workspace/catalog/ui` | `subs/workspace/subs/catalog/subs/ui/src/catalog-card.tsx` | component (value) | `[ui, browser]` | KU1, A6 | `workspace` |
+| `CatalogCardProps` | `workspace/catalog/ui` | `subs/workspace/subs/catalog/subs/ui/src/catalog-card.tsx` | type | `[ui, browser]` | KU1, A6 | — |
 
 ### Reviews
 
@@ -72,16 +80,21 @@ ordinary source.
 | --- | --- | --- | --- | --- | --- | --- |
 | `validateRevisionChain` | `workspace/reviews/validation` | `subs/workspace/subs/reviews/subs/validation/src/validate.ts` | function (value) | `[]` | VL1, RV4 | `workspace/reviews/core` |
 | `runInspectionTask` | `workspace/reviews/core/tasks` | `subs/workspace/subs/reviews/subs/core/subs/tasks/src/inspection-task.ts` | function (value) | `[]` | TK1, RC3 | `workspace/reviews/core/controller` |
+| `InspectionTaskInput` | `workspace/reviews/core/tasks` | `subs/workspace/subs/reviews/subs/core/subs/tasks/src/inspection-task.ts` | type | `[]` | TK1, RC3 | `workspace/reviews/core/controller` |
+| `InspectionTaskResult` | `workspace/reviews/core/tasks` | `subs/workspace/subs/reviews/subs/core/subs/tasks/src/inspection-task.ts` | type | `[]` | TK1, RC3 | — |
 | `summarizeTaskResult` | `workspace/reviews/core/tasks` | `subs/workspace/subs/reviews/subs/core/subs/tasks/src/result.ts` | function (value) | `[]` | TK2, RC3 | `workspace/reviews/core/controller` |
+| `TaskSummary` | `workspace/reviews/core/tasks` | `subs/workspace/subs/reviews/subs/core/subs/tasks/src/result.ts` | type | `[]` | TK2, RC3 | `workspace/reviews/core/controller` |
 | `tick` | `workspace/reviews/core/controller` | `subs/workspace/subs/reviews/subs/core/subs/controller/src/controller.ts` | function (value) | `[]` | CT1 | `workspace/reviews/core` |
 | `InspectionPort` | `workspace/reviews/core` | `subs/workspace/subs/reviews/subs/core/src/interfaces/port.ts` | type | `[]` | RC1, RV3, W4 | `workspace/reviews`, `workspace/reviews/core/tasks`, `workspace/reviews/core/tasks (tests)`, `workspace/reviews/core/controller (tests)`, `collection-review` |
 | `createReviewRuntime` | `workspace/reviews/core` | `subs/workspace/subs/reviews/subs/core/src/runtime.ts` | function (value) | `[]` | RC2 | `workspace/reviews` |
+| `ReviewRuntime` | `workspace/reviews/core` | `subs/workspace/subs/reviews/subs/core/src/runtime.ts` | type | `[]` | RC2 | — |
 | `ReviewOutcome` | `workspace/reviews/core` | `subs/workspace/subs/reviews/subs/core/src/runtime.ts` | type | `[]` | RC2 | `workspace/reviews`, `workspace/reviews (tests)` |
 | `createReviewsRouter` | `workspace/reviews` | `subs/workspace/subs/reviews/src/router.ts` | function (value) | `[dispatch]` | RV1, W4 | `collection-review` |
 | `createReviewsTools` | `workspace/reviews` | `subs/workspace/subs/reviews/src/mcp.ts` | function (value) | `[dispatch]` | RV2, W4 | `collection-review` |
 | `ReviewResult` | `workspace/reviews/ui/pure-ui` | `subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.tsx` | component (value) | `[ui, browser]` | PU1 | `workspace/reviews/ui`, `workspace/reviews/ui (tests)` |
 | `ReviewResultProps` | `workspace/reviews/ui/pure-ui` | `subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.tsx` | type | `[ui, browser]` | PU1 | `workspace/reviews/ui` |
 | `ReviewPanel` | `workspace/reviews/ui` | `subs/workspace/subs/reviews/subs/ui/src/review-panel.tsx` | component (value) | `[ui, dispatch, browser]` | RU1, RV5 | `workspace`, `workspace (tests)` |
+| `ReviewPanelProps` | `workspace/reviews/ui` | `subs/workspace/subs/reviews/subs/ui/src/review-panel.tsx` | type | `[ui, dispatch, browser]` | RU1, RV5 | — |
 
 ### Shared UI
 
@@ -95,36 +108,36 @@ ordinary source.
 | Id | Owner | Statement |
 | --- | --- | --- |
 | C1 | `workspace/contracts` | `expose-src * from "interfaces/vocabulary.ts" tagged [browser] to parent` |
-| W1 | `workspace` | `expose-sub * from contracts to descendants` |
-| R1 | `collection-review` | `expose-src InvocationContext, ProtocolFacilities, McpToolContribution, ToolInvocation from "interfaces/protocol.ts" to descendants` |
-| R2 | `collection-review` | `expose-test createTestSystem from "setup.ts" to descendants` |
-| R3 | `collection-review` | `expose-src AppRouter from "interfaces/protocol.ts" to descendants` |
+| W1 | `workspace` | `expose-sub * from contracts to parent, descendants` |
+| R1 | `collection-review` | `expose-src InvocationContext, ProtocolFacilities, McpToolContribution, ToolInvocation, ToolInputSchema, ToolResult from "interfaces/protocol.ts" to descendants` |
+| R2 | `collection-review` | `expose-test createTestSystem, TestSystem, McpSession from "setup.ts" to descendants` |
+| R3 | `collection-review` | `expose-src AppRouter, assembleRouter from "interfaces/protocol.ts" to descendants` |
 | K1 | `workspace/catalog/core` | `expose-src getRecord, inspect, CatalogSummary from "catalog.ts" to parent` |
-| K2 | `workspace/catalog/core` | `expose-test makeCatalogFixture from "fixture.ts" to parent` |
+| K2 | `workspace/catalog/core` | `expose-test makeCatalogFixture, CatalogFixtureRecord from "fixture.ts" to parent` |
 | A1 | `workspace/catalog` | `expose-src createCatalogRouter from "router.ts" to parent` |
 | A2 | `workspace/catalog` | `expose-src createCatalogTools from "mcp.ts" to parent` |
 | A3 | `workspace/catalog` | `expose-sub inspect as inspectRecord from core to parent` |
-| A4 | `workspace/catalog` | `expose-sub makeCatalogFixture from core to parent` |
-| A5 | `workspace/catalog` | `expose-sub CatalogSummary from core to descendants` |
-| A6 | `workspace/catalog` | `expose-sub CatalogCard from "ui" to parent` |
-| KU1 | `workspace/catalog/ui` | `expose-src CatalogCard from "catalog-card.tsx" tagged [ui, browser] to parent` |
+| A4 | `workspace/catalog` | `expose-sub makeCatalogFixture, CatalogFixtureRecord from core to parent` |
+| A5 | `workspace/catalog` | `expose-sub CatalogSummary from core to parent, descendants` |
+| A6 | `workspace/catalog` | `expose-sub CatalogCard, CatalogCardProps from "ui" to parent` |
+| KU1 | `workspace/catalog/ui` | `expose-src CatalogCard, CatalogCardProps from "catalog-card.tsx" tagged [ui, browser] to parent` |
 | VL1 | `workspace/reviews/validation` | `expose-src validateRevisionChain from "validate.ts" to parent` |
-| TK1 | `workspace/reviews/core/tasks` | `expose-src runInspectionTask from "inspection-task.ts" to parent` |
-| TK2 | `workspace/reviews/core/tasks` | `expose-src summarizeTaskResult from "result.ts" to parent` |
+| TK1 | `workspace/reviews/core/tasks` | `expose-src runInspectionTask, InspectionTaskInput, InspectionTaskResult from "inspection-task.ts" to parent` |
+| TK2 | `workspace/reviews/core/tasks` | `expose-src summarizeTaskResult, TaskSummary from "result.ts" to parent` |
 | CT1 | `workspace/reviews/core/controller` | `expose-src tick from "controller.ts" to parent` |
 | RC1 | `workspace/reviews/core` | `expose-src InspectionPort from "interfaces/port.ts" to parent, descendants` |
-| RC2 | `workspace/reviews/core` | `expose-src createReviewRuntime, ReviewOutcome from "runtime.ts" to parent` |
-| RC3 | `workspace/reviews/core` | `expose-sub runInspectionTask, summarizeTaskResult from tasks to descendants` |
+| RC2 | `workspace/reviews/core` | `expose-src createReviewRuntime, ReviewRuntime, ReviewOutcome from "runtime.ts" to parent` |
+| RC3 | `workspace/reviews/core` | `expose-sub runInspectionTask, summarizeTaskResult, InspectionTaskInput, InspectionTaskResult, TaskSummary from tasks to descendants` |
 | RV1 | `workspace/reviews` | `expose-src createReviewsRouter from "router.ts" to parent` |
 | RV2 | `workspace/reviews` | `expose-src createReviewsTools from "mcp.ts" to parent` |
 | RV3 | `workspace/reviews` | `expose-sub InspectionPort from core to parent` |
 | RV4 | `workspace/reviews` | `expose-sub validateRevisionChain from validation to descendants` |
-| RV5 | `workspace/reviews` | `expose-sub ReviewPanel from "ui" to parent` |
-| RU1 | `workspace/reviews/ui` | `expose-src ReviewPanel from "review-panel.tsx" tagged [ui, dispatch, browser] to parent` |
+| RV5 | `workspace/reviews` | `expose-sub ReviewPanel, ReviewPanelProps from "ui" to parent` |
+| RU1 | `workspace/reviews/ui` | `expose-src ReviewPanel, ReviewPanelProps from "review-panel.tsx" tagged [ui, dispatch, browser] to parent` |
 | PU1 | `workspace/reviews/ui/pure-ui` | `expose-src ReviewResult, ReviewResultProps from "review-result.tsx" tagged [ui, browser] to parent` |
 | SU1 | `workspace/shared-ui` | `expose-src StatusBadge, StatusBadgeProps from "status-badge.tsx" tagged [ui, browser] to parent` |
 | W2 | `workspace` | `expose-sub createCatalogRouter, createCatalogTools, inspectRecord from catalog to parent` |
-| W3 | `workspace` | `expose-sub makeCatalogFixture from catalog to descendants` |
+| W3 | `workspace` | `expose-sub makeCatalogFixture, CatalogFixtureRecord from catalog to descendants` |
 | W4 | `workspace` | `expose-sub createReviewsRouter, createReviewsTools, InspectionPort from reviews to parent` |
 | W5 | `workspace` | `expose-sub * from shared-ui to descendants` |
 
@@ -134,9 +147,10 @@ the contract, and W1's child-contract wildcard relays it onward, without either
 description changing.
 
 W1 makes the vocabulary visible in every proper descendant of `workspace`,
-which is every other owner except the application root. The root receives
-nothing from this chain: C1 exposes to `contracts`' parent only, and `workspace`
-does not expose the vocabulary to its parent.
+which is every other owner except the application root, and in the root too.
+The root's own source names none of it; it needs the vocabulary visible because
+the `inspect` operation and the `InspectionPort` it receives through W2 and W4
+name the vocabulary in their signatures.
 
 Each vocabulary symbol's tags are `[browser]` exactly. `contracts` declares no
 header tags, so its ordinary source has no required-importer tags and its
@@ -147,7 +161,7 @@ schemas, while the absence of `ui` and `dispatch` keeps the vocabulary
 importable by the untagged core owners as well — as `catalog/core` and every
 owner of the review runtime now do, from untagged source areas.
 
-R1's four symbols default to `[dispatch]`, the root's only header tag. That is
+R1's six symbols default to `[dispatch]`, the root's only header tag. That is
 what keeps the protocol vocabulary out of the core owners, the validator and
 the pure view: they are within the exposure's reach and can never import it, in
 either import form.
@@ -197,8 +211,10 @@ R3 is the tree's second same-owner forwarding alias, after A3's rename. The
 original `AppRouter` is declared in the root's private `src/assembly.ts`;
 `src/interfaces/protocol.ts` re-exports it with `export type { AppRouter } from
 '../assembly.js'`, and R3 selects that export. The alias is not a new binding,
-so the symbol keeps the root's ownership and its `[dispatch]` tag, and the
-assembly file itself stays unexposed. No `browser` promise accompanies it,
+so the symbol keeps the root's ownership and its `[dispatch]` tag. The router's
+type is `ReturnType<typeof assembleRouter>`, so `assembleRouter` is its signature
+companion and R3 selects it too, through the same file's type-only re-export.
+The rest of the assembly file stays unexposed. No `browser` promise accompanies it,
 which is exactly right: both importers take it as a type. The shell's
 `client.ts` uses the statement-level `import type` form and the connected panel
 the inline `import { type AppRouter }` form; the required-symbol rule reaches
@@ -214,16 +230,17 @@ tree receives the same symbols from the same statement and can import neither,
 in either form, because no core source carries `ui`.
 
 A5 and A6 are the catalog's two directions. The summary type is exposed to the
-catalog's own view child, which renders it; the card reaches the shell, which
-composes it. Neither reaches the other feature: `CatalogSummary` stops inside
-the catalog's subtree, and `CatalogCard` stops at `workspace`. The shell
-therefore names no catalog type at all — it derives the shape it passes from the
-router type it already has.
+catalog's own view child, which renders it; the card and its props reach the
+shell, which composes it. Because `CatalogCardProps` names `CatalogSummary`, A5
+also exposes the summary to the catalog's parent, so both stop at `workspace`
+together. Neither reaches the other feature. The shell still names no catalog
+type in its source; it derives the shape it passes from the router type it
+already has.
 
 PU1, RU1 and RV5 are the same arrangement on the review side, one level deeper.
 The pure view exposes its component and its own props to the connected parent;
-the connected parent exposes only the component to its parent, and the feature relays
-it to the shell. `ReviewPanel` carries `dispatch` as well as `ui`, because its
+the connected parent exposes its component and that component's props to its
+parent, and the feature relays both to the shell. `ReviewPanel` carries `dispatch` as well as `ui`, because its
 defining area does: the shell can import it and no pure view could, whatever
 else it carried.
 
@@ -249,22 +266,17 @@ all.
 ## Symbols exported but deliberately not exposed
 
 These are exported TypeScript symbols that no statement selects. They stay
-private to their owner, and a consumer that needs one builds it through
-contextual typing instead.
+private to their owner. None of them is named by an exposed symbol's signature,
+so no exposure requires them as a signature companion.
 
 | Symbol | Owner | Defining file | Why it stays private |
 | --- | --- | --- | --- |
-| `ToolInputSchema`, `ToolResult` | `collection-review` | `src/interfaces/protocol.ts` | Two of the shapes `McpToolContribution` is written in. Exposing a contract does not expose the types its signature mentions; both features build a contribution without naming them. |
-| `AssembledSystem`, `assembleSystem` | `collection-review` | `src/assembly.ts` | The root's own composition. `AppRouter` is declared here too and is the one export of this file that leaves the owner, through the forwarding alias R3 selects in `src/interfaces/protocol.ts`. |
-| `createFacilities`, `createMcpServer` | `collection-review` | `src/protocol.ts` | The configured runtimes themselves. Features receive facilities as an argument rather than importing a singleton. |
+| `AssembledSystem`, `assembleSystem` | `collection-review` | `src/assembly.ts` | The root's own composition. `AppRouter` and its companion `assembleRouter` are declared here too and are the exports of this file that leave the owner, through the forwarding aliases R3 selects in `src/interfaces/protocol.ts`. |
+| `createFacilities`, `createMcpServer` | `collection-review` | `src/protocol.ts` | The configured runtimes themselves. Features receive facilities as an argument rather than importing a singleton. `ProtocolFacilities` is written against the tRPC package's own types, so it does not name `createFacilities`. |
 | `startApiServer`, `ApiServer`, `ApiServerOptions` | `collection-review` | `src/server.ts` | The listener, and the shape of what it answers with. `src/main.ts` is the entry that chooses a port and calls it; this owner's own HTTP test is the only other caller, and nothing below the root needs to start a server. |
 | `CatalogRecord`, `listRecords`, `findRecord` | `workspace/catalog/core` | `.../catalog/subs/core/src/records.ts` | The fixed records are this owner's private data. |
 | `PredecessorResolution`, `resolvePredecessors` | `workspace/catalog/core` | `.../catalog/subs/core/src/history.ts` | The private history helper of case O01: this owner's own `src/tests/` reads it directly, and no other owner can. |
-| `CatalogFixtureRecord` | `workspace/catalog/core` | `.../catalog/subs/core/src/tests/fixture.ts` | The fixture's element type. Only `makeCatalogFixture` is exposed. |
-| `McpSession`, `TestSystem` | `collection-review` | `src/tests/setup.ts` | The setup's own result types; a foreign test infers them from `createTestSystem`. |
-| `collectObservations`, `InspectionTaskInput`, `InspectionTaskResult` | `workspace/reviews/core/tasks` | `.../core/subs/tasks/src/inspection-task.ts` | The task's private observation collector and the shapes of its own signature. This owner's tests read the collector directly; the controller above derives the input type from `runInspectionTask` rather than naming it. |
-| `TaskSummary` | `workspace/reviews/core/tasks` | `.../core/subs/tasks/src/result.ts` | The summary's shape. The controller derives it from `summarizeTaskResult`, and the runtime declares its own `ReviewOutcome` instead. |
-| `ReviewRuntime` | `workspace/reviews/core` | `.../reviews/subs/core/src/runtime.ts` | The factory's result type. Its adapters hold the runtime the factory returns and never name the type. |
+| `collectObservations` | `workspace/reviews/core/tasks` | `.../core/subs/tasks/src/inspection-task.ts` | The task's private observation collector. This owner's tests read it directly. |
 | `SessionBinding`, `SessionBindingRequest`, `SessionTable`, `createSessionTable` | `workspace/reviews` | `.../reviews/src/session.ts` | The review-session table is this feature's own state. `createReviewsTools` creates the one instance the application uses, and only this owner's tests reach the factory. |
 | `createClient` | `workspace` | `subs/workspace/src/client.ts` | The shell builds its own client and hands it to the views it composes. A view that could build one would be choosing its own transport. |
 | `App`, `Shell`, `loadShell` | `workspace` | `subs/workspace/src/app.tsx` | The screen itself. Nothing is above `workspace` that renders it, and nothing below it composes the screen; only this owner's tests read `Shell` and `loadShell`. |
@@ -451,3 +463,44 @@ The setup's result types stay unexposed, so the World reads them off the
 exposed function. R2's importer column gains the new owner; no other row
 changes. It is case K05's fixture and the baseline witness for O07's positive
 half, and the harness runs it.
+
+### Plan 8 — signature companions
+
+[Plan 8](../iteration-8-signature-companions/main-plan.md) enforces the
+[companion rule](../../model/cross-module-importability.principles.md#exposure-requires-available-signature-companions):
+an exposure must make the project symbols its symbol's declared signature names
+visible wherever it makes the symbol visible. The baseline had 23 violations, so
+the contract changed where the rule requires it; the principle that a wildcard or
+a named exposure never exposes a signature's types implicitly is unchanged.
+
+Statements changed: R1, R2, R3, W1, W3, K2, A4, A5, A6, KU1, TK1, TK2, RC2, RC3,
+RU1 and RV5. The statement count stays 33. Symbols added to the contract:
+`ToolInputSchema`, `ToolResult`, `TestSystem`, `McpSession`, `assembleRouter`,
+`CatalogFixtureRecord`, `CatalogCardProps`, `ReviewPanelProps`, `ReviewRuntime`,
+`InspectionTaskInput`, `InspectionTaskResult` and `TaskSummary`; they left the
+table of symbols deliberately not exposed. W1 and A5 each gained the parent
+destination.
+
+Four source changes accompany them:
+
+- `ProtocolFacilities` is written against `initTRPC`'s own types instead of
+  `typeof createFacilities`, so the configured runtime stays private.
+- `AppRouter` is `ReturnType<typeof assembleRouter>`. `assembleRouter` is now
+  exported, takes `ProtocolFacilities`, and is re-exported type-only beside
+  `AppRouter`, so an importer can name it only in a type position. It carries
+  `dispatch` without `browser`, so the browser-classified owners that name the
+  router type could not value-import it either. `AssembledSystem` names
+  `AppRouter`.
+- `tick` names `InspectionTaskInput` and `TaskSummary`, which it now receives
+  through RC3, instead of two local aliases derived from the task operations.
+  Unexported local types would be companions no statement could expose.
+- `CatalogCardProps` and `ReviewPanelProps` are exported, because the exposed
+  components' signatures name them.
+
+No import decision changed from denied to allowed: the baseline had no denied
+import. The added type imports in `controller.ts` and `assembly.ts` and the
+package type import in `protocol.ts` raise the counts to 92 originals, 298
+accesses, 169 allowed and 129 external. The check reports 11
+`signature-inferred` coverage notes, for the inferred return types of
+`assembleRouter` and the two feature routers and for the eight vocabulary
+schemas.

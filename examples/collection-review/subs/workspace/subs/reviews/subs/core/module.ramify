@@ -7,11 +7,13 @@ module core
 // one, and down to the children that work against it.
 expose-src InspectionPort from "interfaces/port.ts" to parent, descendants
 
-// The runtime and the outcome it answers with, for the adapters above. They
-// travel no further down than this owner, so the views never name them.
-expose-src createReviewRuntime, ReviewOutcome from "runtime.ts" to parent
+// The runtime, the interface it is built as and the outcome it answers with,
+// for the adapters above. They travel no further down than this owner, so the
+// views never name them.
+expose-src createReviewRuntime, ReviewRuntime, ReviewOutcome from "runtime.ts" to parent
 
-// The task operations, back down to the controller that schedules them. This
+// The task operations and the types their signatures name, back down to the
+// controller that schedules them. This
 // relay is the whole route between the two children; neither can reach the
 // other on its own.
-expose-sub runInspectionTask, summarizeTaskResult from tasks to descendants
+expose-sub runInspectionTask, summarizeTaskResult, InspectionTaskInput, InspectionTaskResult, TaskSummary from tasks to descendants

@@ -33,7 +33,8 @@ export function defineDiagramModel(root: TeachingModule): DiagramModelInput {
         symbol.tags === undefined ? [] : [{ tags: symbol.tags, location: evidence[0]! }]));
       const original: Original = { id: { kind: 'code', owner: id, file: 'fixtures.ts', binding: symbol.name },
         origin: { area, file: `${area.root}/fixtures.ts` }, declarations: evidence,
-        tags: assignment.tags, tagEvidence: assignment.evidence, hasValue: true, hasType: true };
+        tags: assignment.tags, tagEvidence: assignment.evidence, hasValue: true, hasType: true,
+        companions: { named: [], evidence: [], inferred: false, unresolved: 0 } };
       originals.push(original);
       if (symbol.destinations?.length) exposures.push({ module: id, original: original.id,
         names: [symbol.name], destinations: symbol.destinations, evidence, provider: null, effective: true });

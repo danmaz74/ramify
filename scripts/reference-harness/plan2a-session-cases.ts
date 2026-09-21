@@ -90,7 +90,8 @@ function factsFrom(report: AnalysisReport): SessionFacts {
   const snapshot = report.snapshot;
   if (!snapshot?.model || !snapshot.catalog) throw new Error('Reference report has no valid model/catalog snapshot');
   return { registry: report.registry!, invalid: null, inventory: snapshot.inventory, areas: snapshot.areas, areaIssues: [],
-    files: {}, catalog: snapshot.catalog, linked: snapshot.linked, linkIssues: [], model: snapshot.model, decisions: {}, indexes: emptyIndexes };
+    files: {}, catalog: snapshot.catalog, linked: snapshot.linked, linkIssues: [], model: snapshot.model, decisions: {},
+    companions: { diagnostics: [], coverage: [] }, indexes: emptyIndexes };
 }
 function stubDetail(request: SymbolDetailRequest): SymbolDetail {
   return { state: 'described', original: request.original, exportName: request.exportName, signature: `const ${request.exportName}: unknown` };

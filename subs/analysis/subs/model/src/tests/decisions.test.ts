@@ -147,3 +147,34 @@ describe('testing origin precedes same-owner and tag exemptions', () => {
     }
   });
 });
+
+describe('decision originals', () => {
+  const root = moduleRecord('app');
+  const child = moduleRecord('app/child');
+  const symbol = original(root, 'api');
+
+  it('refer to the frozen original of a built model instead of copying it', () => {
+    const model = modelOf([root, child], [symbol], [exposure(root, symbol, ['descendants'])]);
+    const decision = explainImport(model, question(child, symbol));
+    expect(decision.status).toBe('allowed');
+    expect(decision.original).toBe(model.originals[0]);
+    expect(Object.isFrozen(decision)).toBe(true);
+    expect(JSON.parse(JSON.stringify(decision))).toEqual(decision);
+  });
+
+  it('copy the original of a model that is not deeply frozen, and freeze nothing of the caller', () => {
+    const built = modelOf([root, child], [symbol], [exposure(root, symbol, ['descendants'])]);
+    const mutable = JSON.parse(JSON.stringify(built)) as typeof built;
+    const decision = explainImport(mutable, question(child, symbol));
+    expect(decision.original).toEqual(mutable.originals[0]);
+    expect(decision.original).not.toBe(mutable.originals[0]);
+    expect(Object.isFrozen(decision.original)).toBe(true);
+    expect(Object.isFrozen(mutable.originals[0])).toBe(false);
+    // A frozen original with a mutable member is still copied.
+    const partly = { ...mutable, originals: [Object.freeze({ ...mutable.originals[0]! })] };
+    const copied = explainImport(partly, question(child, symbol)).original;
+    expect(copied).not.toBe(partly.originals[0]);
+    expect(Object.isFrozen(copied!.declarations)).toBe(true);
+    expect(Object.isFrozen(partly.originals[0]!.declarations)).toBe(false);
+  });
+});

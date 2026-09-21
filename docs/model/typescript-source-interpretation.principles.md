@@ -391,6 +391,52 @@ still applies along forwarding paths. Verification of a symbol's browser-safety
 promise remains a separate owner obligation; a passing bounded source check
 does not certify runtime closure.
 
+### A Declared Signature Names Its Companions
+
+The [companion rule](cross-module-importability.principles.md#exposure-requires-available-signature-companions)
+reads an exported original's declared signature syntactically, from the
+original's declarations. Each named identifier resolves through forwarding
+aliases to its original binding.
+
+| Original | Positions read |
+| --- | --- |
+| Function, including every overload | Type parameters' constraints and defaults, parameter types, return type |
+| Class | Type parameters; `extends` and `implements` clauses; constructor parameters, including `private` parameter properties; the declared types of every public or protected member: properties, methods, a getter's return type and a setter's parameter type. `private` and `#`-named members are not read |
+| Interface, including merged declarations | Type parameters, `extends`, every member |
+| Type alias | Type parameters and the aliased type |
+| Variable or constant | Its type annotation; when absent, the signature of a directly assigned arrow function or function expression |
+| Enum, namespace, resource binding | None |
+
+An explicit variable or property type annotation defines the contract, and
+the initializer is then not read. Without one, a directly assigned arrow
+function or function expression, ignoring enclosing parentheses, supplies the
+signature: its type parameters' constraints and defaults, parameter types and
+return type. This also applies to public and protected class properties. The
+callable's body and parameter default expressions are not read, and other
+initializers, including calls, identifier aliases and object literals, are not
+followed. For example, `export const placeOrder = (order: Order): void => {}`
+names `Order` exactly as the equivalent function declaration does.
+
+Type references, `typeof` queries, `import('...').T` types and qualified names
+all name originals. A reference resolving to an external package, a
+standard-library or built-in declaration, a type parameter, or the original
+itself names no companion.
+
+Two analysis limits are recorded for every exported original and reported as
+nonblocking coverage notes only for an original with an effective exposure,
+once per original, since an unexposed original's signature is no contract:
+
+- **Inferred signature:** a read position has no annotation where TypeScript
+  would infer a type, such as a function without a return type, a constant
+  initialized from a call, or a callable parameter without a type. A fully
+  annotated arrow function or function expression is not inferred merely
+  because its variable or property has no annotation. Inferred types are not
+  computed; the explicit annotations are still read and enforced.
+- **Unresolved reference:** a reference resolves to no single project original,
+  or to a project file outside every module.
+
+Neither limit is reported as satisfying the rule.
+
 ### Scope And Unsupported Forms Are Reported Explicitly
 
 The initial interpretation covers ECMAScript imports and exports in application

@@ -144,12 +144,22 @@ to the root regardless of the working directory. Ordering is deterministic.
 | Exit | Meaning |
 | --- | --- |
 | 0 | Checking completed. No definite violations, no invalid input. Warnings and analysis limits are allowed. |
-| 1 | Definite import violations, an invalid description, registry or layout, or a known missing export. |
+| 1 | Definite import violations, an exposure without an available signature companion, an invalid description, registry or layout, or a known missing export. |
 | 2 | The check could not complete: invalid invocation, no project, no configuration, an unavailable capability, an acquisition or execution failure, or a resource limit. Findings obtained before the failure are retained. |
 | 130 | Interrupted. No result is claimed. |
 
 Exit 0 is never chosen from an empty finding list without confirming that
 every required stage completed.
+
+An exposure statement that makes a symbol visible without a companion its
+signature names is the finding `exposed-without-companion`, category
+`exposure`. It is located at the statement, names the naming position in the
+signature as its related location and in its message, and states the exposure or
+tag to add. The description stays valid and every import is still decided.
+The analysis limits `signature-inferred` and `signature-unresolved` note, once
+per exposed original, a signature position left to inference and references
+that name no single project original. They never change the exit code. The same
+finding and notes appear in `--changed`, complete and batch checks.
 
 ## Resident and batch execution
 

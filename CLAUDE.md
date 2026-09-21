@@ -58,7 +58,13 @@ only. Directory placement alone exposes nothing. Expansion preserves original
 ownership and tags, rejects foreign-owned exports, and includes added exports.
 `expose-sub` names direct children and permits wildcard selection of their
 effective to-parent contracts. The three forms use the same parent/descendants exposure
-channels. Read the specification before changing discovery, description parsing,
+channels. Every exposure, including re-exposure, must make the exposed symbol's
+signature companions (the project symbols its declared signature names) visible
+wherever it makes the symbol visible. Each companion's required-importer tags must
+also be tags of the symbol. A violation is an `exposed-without-companion` finding
+at the first exposure step that lacks the companion. It fails the check and leaves
+the model and every import decision unchanged. Ramify never supplies the missing
+exposure, and there is no opt-out. Read the specification before changing discovery, description parsing,
 source references, or documentation of the file format. It records the model's
 rules; the batch engine implements the version 1 parser and filesystem loader.
 

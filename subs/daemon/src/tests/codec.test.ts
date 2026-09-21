@@ -155,7 +155,7 @@ describe('revision capture timings', () => {
   const revision = { token, revision: 'rev/1:00000000-0000-4000-8000-000000000000:2', sequence: 2, publishedAt: 260, cause: 'watch',
     fingerprints: { inputId: 'input', declarations: 'd', source: 's', configuration: 'c', registry: 'r', engine: 'e' }, changed: ['src/a.ts'],
     checked: { path: 'source', files: ['src/a.ts'], accesses: 1, modelRebuilt: false }, delta: { added: 0, removed: 0, positionOnly: 0 },
-    timings: { classify: 1, inventory: 1, compiler: 1, descriptions: 1, accesses: 1, link: 1, decide: 1, publish: 1, total: 9 },
+    timings: { classify: 1, inventory: 1, compiler: 1, descriptions: 1, accesses: 1, link: 1, decide: 1, companions: 0, publish: 1, total: 9 },
     capture: { invocationCheck: 0.5, promotion: 3.5, workerStatus: 0.25, workerRoundTrip: 20.5, sweep: 8, watch: { receivedAt: 150, flushedAt: 250 } },
     outcome: { execution: 'completed', check: 'passed', coverage: 'complete' },
     summary: { complete: true, owners: 1, sourceFiles: 1, resources: 0, originals: 0, accesses: 1, allowed: 1, denied: 0, errors: 0, warnings: 0, coverageNotes: 0, external: 0 } };

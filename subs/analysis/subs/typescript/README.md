@@ -34,6 +34,18 @@ A resource description is the union of what every importing specifier reaches, s
 describing one reads those importers again, and a shim's content identity, not its
 own export description, is the edge that reaches the resources it describes.
 
+Every exported code original carries its signature companions: the project
+originals its declared signature names, the first naming position of each, and
+whether a read position is inferred or a reference is unresolved. A syntactic
+walk of the original's declarations gathers the names, following the source
+interpretation principles' harvesting table, and one batched symbol request per
+round resolves them. An import alias is followed through the round's resolved
+export descriptions, not through further checker requests, and its target file
+becomes a dependency of the naming description, so a barrel that forwards a
+different original recomputes it. Nothing on this path computes a type, and the
+positions are evidence that a declaration move refreshes without changing the
+description's surface.
+
 `createRetainedSourceAnalysis` keeps one warm compiler server with exactly one
 live snapshot in the caller's thread. `update` names the changed, created and
 deleted files of one disk state, regenerates the synthetic configuration and

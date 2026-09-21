@@ -125,7 +125,7 @@ export function buildReport(spec: FixtureSpec): AnalysisReport {
     const decision = (file: string, binding: string, status: 'allowed' | 'denied', reason: ImportReason): ImportDecision => ({
       status, reason, question, visibility: null, requirements: [], checkedOrigins: [], blockingOrigins: [],
       original: { id: originalId(file, binding), origin: { file, area: area(file) }, declarations: [], hasValue: true, hasType: false,
-        tags: [], tagEvidence: [] } });
+        tags: [], tagEvidence: [], companions: { named: [], evidence: [], inferred: false, unresolved: 0 } } });
     const decisions = source.target.kind !== 'application' ? [] : access.decisions
       ? access.decisions.map(item => decision(item.file, item.binding, item.status, item.reason))
       : (access.selections ?? []).filter(selection => (selection.status ?? 'resolved') === 'resolved')
@@ -176,7 +176,7 @@ export function buildReport(spec: FixtureSpec): AnalysisReport {
       catalog: {
         originals: spec.originals.map(original => ({ id: originalId(original.file, original.binding),
           origin: { file: original.file, area: area(original.file) }, declarations: [], hasValue: original.value ?? true,
-          hasType: !(original.value ?? true) })),
+          hasType: !(original.value ?? true), companions: { named: [], evidence: [], inferred: false, unresolved: 0 } })),
         files: spec.files.map(file => ({ file: file.path, state: file.state ?? 'complete', exports: [], issueIds: file.issueIds ?? [],
           descriptionFiles: [] })),
         coverage: [],

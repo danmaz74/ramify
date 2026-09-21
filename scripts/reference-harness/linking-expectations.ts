@@ -40,25 +40,26 @@ type Binding = readonly [name: string, id: OriginalId, tags: readonly string[]];
 const bindings = (owner: string, file: string, names: readonly string[], tags: readonly string[] = []): Binding[] =>
   names.map(name => [name, code(owner, file, name), [...tags].sort()]);
 const vocab = bindings('workspace/contracts', 'interfaces/vocabulary.ts', vocabulary, ['browser']);
-const rootTypes = bindings('', 'interfaces/protocol.ts', ['InvocationContext', 'ProtocolFacilities', 'McpToolContribution', 'ToolInvocation'], ['dispatch']);
-const setup = bindings('', 'tests/setup.ts', ['createTestSystem'], ['testing', 'dispatch']);
+const rootTypes = bindings('', 'interfaces/protocol.ts', ['InvocationContext', 'ProtocolFacilities', 'McpToolContribution', 'ToolInvocation',
+  'ToolInputSchema', 'ToolResult'], ['dispatch']);
+const setup = bindings('', 'tests/setup.ts', ['createTestSystem', 'TestSystem', 'McpSession'], ['testing', 'dispatch']);
 const catalog = 'workspace/catalog';
 const core = `${catalog}/core`;
 const reviews = 'workspace/reviews';
 const runtime = `${reviews}/core`;
 const k1 = bindings(core, 'catalog.ts', ['getRecord', 'inspect', 'CatalogSummary']);
-const fixture = bindings(core, 'tests/fixture.ts', ['makeCatalogFixture'], ['testing']);
+const fixture = bindings(core, 'tests/fixture.ts', ['makeCatalogFixture', 'CatalogFixtureRecord'], ['testing']);
 const router = bindings(catalog, 'router.ts', ['createCatalogRouter'], ['dispatch']);
 const tools = bindings(catalog, 'mcp.ts', ['createCatalogTools'], ['dispatch']);
 const inspect: Binding[] = [['inspectRecord', code(core, 'catalog.ts', 'inspect'), []]];
-const card = bindings(`${catalog}/ui`, 'catalog-card.tsx', ['CatalogCard'], ['ui', 'browser']);
+const card = bindings(`${catalog}/ui`, 'catalog-card.tsx', ['CatalogCard', 'CatalogCardProps'], ['ui', 'browser']);
 const validation = bindings(`${reviews}/validation`, 'validate.ts', ['validateRevisionChain']);
-const task = bindings(`${runtime}/tasks`, 'inspection-task.ts', ['runInspectionTask']);
-const summary = bindings(`${runtime}/tasks`, 'result.ts', ['summarizeTaskResult']);
+const task = bindings(`${runtime}/tasks`, 'inspection-task.ts', ['runInspectionTask', 'InspectionTaskInput', 'InspectionTaskResult']);
+const summary = bindings(`${runtime}/tasks`, 'result.ts', ['summarizeTaskResult', 'TaskSummary']);
 const port = bindings(runtime, 'interfaces/port.ts', ['InspectionPort']);
 const reviewRouter = bindings(reviews, 'router.ts', ['createReviewsRouter'], ['dispatch']);
 const reviewTools = bindings(reviews, 'mcp.ts', ['createReviewsTools'], ['dispatch']);
-const panel = bindings(`${reviews}/ui`, 'review-panel.tsx', ['ReviewPanel'], ['ui', 'dispatch', 'browser']);
+const panel = bindings(`${reviews}/ui`, 'review-panel.tsx', ['ReviewPanel', 'ReviewPanelProps'], ['ui', 'dispatch', 'browser']);
 const badge = bindings('workspace/shared-ui', 'status-badge.tsx', ['StatusBadge', 'StatusBadgeProps'], ['ui', 'browser']);
 
 // All 33 statements, independently transcribed from the reviewed contract map.
@@ -67,17 +68,17 @@ const badge = bindings('workspace/shared-ui', 'status-badge.tsx', ['StatusBadge'
 export const referenceContracts: readonly (readonly [id: string, owner: string, index: number, provider: string,
   form: 'expose-src' | 'expose-test' | 'expose-sub', selector: 'named' | 'wildcard', destinations: readonly ('parent' | 'descendants')[], pairs: readonly Binding[]])[] = [
   ['C1', 'workspace/contracts', 0, 'interfaces/vocabulary.ts', 'expose-src', 'wildcard', ['parent'], vocab],
-  ['W1', 'workspace', 0, 'contracts', 'expose-sub', 'wildcard', ['descendants'], vocab],
+  ['W1', 'workspace', 0, 'contracts', 'expose-sub', 'wildcard', ['parent', 'descendants'], vocab],
   ['R1', '', 0, 'interfaces/protocol.ts', 'expose-src', 'named', ['descendants'], rootTypes],
   ['R2', '', 1, 'setup.ts', 'expose-test', 'named', ['descendants'], setup],
-  ['R3', '', 2, 'interfaces/protocol.ts', 'expose-src', 'named', ['descendants'], bindings('', 'assembly.ts', ['AppRouter'], ['dispatch'])],
+  ['R3', '', 2, 'interfaces/protocol.ts', 'expose-src', 'named', ['descendants'], bindings('', 'assembly.ts', ['AppRouter', 'assembleRouter'], ['dispatch'])],
   ['K1', core, 0, 'catalog.ts', 'expose-src', 'named', ['parent'], k1],
   ['K2', core, 1, 'fixture.ts', 'expose-test', 'named', ['parent'], fixture],
   ['A1', catalog, 0, 'router.ts', 'expose-src', 'named', ['parent'], router],
   ['A2', catalog, 1, 'mcp.ts', 'expose-src', 'named', ['parent'], tools],
   ['A3', catalog, 2, 'core', 'expose-sub', 'named', ['parent'], inspect],
   ['A4', catalog, 3, 'core', 'expose-sub', 'named', ['parent'], fixture],
-  ['A5', catalog, 4, 'core', 'expose-sub', 'named', ['descendants'], bindings(core, 'catalog.ts', ['CatalogSummary'])],
+  ['A5', catalog, 4, 'core', 'expose-sub', 'named', ['parent', 'descendants'], bindings(core, 'catalog.ts', ['CatalogSummary'])],
   ['A6', catalog, 5, 'ui', 'expose-sub', 'named', ['parent'], card],
   ['KU1', `${catalog}/ui`, 0, 'catalog-card.tsx', 'expose-src', 'named', ['parent'], card],
   ['VL1', `${reviews}/validation`, 0, 'validate.ts', 'expose-src', 'named', ['parent'], validation],
@@ -85,7 +86,7 @@ export const referenceContracts: readonly (readonly [id: string, owner: string, 
   ['TK2', `${runtime}/tasks`, 1, 'result.ts', 'expose-src', 'named', ['parent'], summary],
   ['CT1', `${runtime}/controller`, 0, 'controller.ts', 'expose-src', 'named', ['parent'], bindings(`${runtime}/controller`, 'controller.ts', ['tick'])],
   ['RC1', runtime, 0, 'interfaces/port.ts', 'expose-src', 'named', ['parent', 'descendants'], port],
-  ['RC2', runtime, 1, 'runtime.ts', 'expose-src', 'named', ['parent'], bindings(runtime, 'runtime.ts', ['createReviewRuntime', 'ReviewOutcome'])],
+  ['RC2', runtime, 1, 'runtime.ts', 'expose-src', 'named', ['parent'], bindings(runtime, 'runtime.ts', ['createReviewRuntime', 'ReviewRuntime', 'ReviewOutcome'])],
   ['RC3', runtime, 2, 'tasks', 'expose-sub', 'named', ['descendants'], [...task, ...summary]],
   ['RV1', reviews, 0, 'router.ts', 'expose-src', 'named', ['parent'], reviewRouter],
   ['RV2', reviews, 1, 'mcp.ts', 'expose-src', 'named', ['parent'], reviewTools],
@@ -118,7 +119,7 @@ export function assertReference(result: { input: Pick<ValidProject['input'], 'in
     [...pairs].sort((a, b) => a[0] < b[0] ? -1 : 1).map(([name, original, tags]) => [name, original, tags, true]));
     assertions.ok(`${id}: located declaration`, selection.statement.file.endsWith('module.ramify') && selection.statement.line > 2 && selection.statement.column === 1);
   }
-  for (const name of ['ToolInputSchema', 'ToolResult', 'assembleSystem', 'resolvePredecessors', 'collectObservations', 'formatFinding']) {
+  for (const name of ['createFacilities', 'loadReview', 'assembleSystem', 'resolvePredecessors', 'collectObservations', 'formatFinding']) {
     const original = result.linked.modelInput.originals.find(original => original.id.binding === name)!;
     assertions.ok(`${name}: private original retained`, original);
     assertions.ok(`${name}: no accidental exposure`, !result.linked.modelInput.exposures.some(exposure => originalKey(exposure.original) === originalKey(original.id)));

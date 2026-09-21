@@ -12,6 +12,7 @@ import { createSourceAnalysis } from '../subs/typescript/src/source-analysis.js'
 import type { SourceAnalysis } from '../subs/typescript/src/interfaces/source.js';
 import type { DependencyBehaviorFacts } from '../subs/typescript/src/interfaces/dependency-behavior.js';
 import type { AccessResult, AnalysisInputs, AnalysisRun } from './interfaces/analysis.js';
+import { companionOutputs } from './companion-findings.js';
 import { evaluateAccessesAsync } from './evaluate-accesses.js';
 import { batchCapabilities, byteOrder, ReportDraft, WorkLimit } from './report.js';
 import { diagnostic, projectDiagnostics } from './report-data.js';
@@ -166,6 +167,10 @@ export async function runAnalysis(inputs: AnalysisInputs, cancellation: AbortSig
                       await evaluateAccessesAsync(model.value, accesses.accesses, inputs.limits.maxDiagnostics, {
                         diagnostic: item => draft.record([item]), result: item => results.push(item), checkpoint: check,
                       });
+                      // The companion rule leaves the model valid and every decision
+                      // unchanged; its findings fail the check as a denied import does.
+                      const companions = companionOutputs(model.value);
+                      draft.record(companions.diagnostics); draft.cover(companions.coverage);
                       draft.stage('decide', 'completed', draft.diagnostics); draft.execution = 'completed';
                     }
                   }

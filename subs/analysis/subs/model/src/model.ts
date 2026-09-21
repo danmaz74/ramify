@@ -1,5 +1,5 @@
-import type { Exposure, Model, ModelInput, ModelIssue, ModelResult, ModuleRecord, Original, SourceArea, SourceOrigin } from './interfaces/model.js';
-import { compare, immutable, issue, locations, namePattern, sortedNames, validDeclarationLocation, validLocation, validPath, validText } from './data.js';
+import type { Exposure, Model, ModelInput, ModelIssue, ModelResult, ModuleRecord, Original, SignatureCompanions, SourceArea, SourceOrigin } from './interfaces/model.js';
+import { compare, immutable, isRecord, issue, locations, namePattern, sortedNames, validDeclarationLocation, validLocation, validPath, validText } from './data.js';
 import { originalKey, validModuleId, validOriginalId } from './identity.js';
 import { deriveSourceAreas, requiredImporterTags, tagIssues } from './profiles.js';
 import { validateRegistry } from './registry.js';
@@ -34,6 +34,25 @@ export function canonicalOrigin(modules: readonly ModuleRecord[], origin: Source
   if (!area || origin.area.kind !== kind || origin.area.root !== area.root
     || !Array.isArray(origin.area.profile) || !sameNames(origin.area.profile, area.profile)) return undefined;
   return { file: origin.file, area };
+}
+
+/**
+ * Companion facts are well formed: distinct named originals of known owners in
+ * `originalKey` order, excluding the original itself, each with one evidence
+ * location. Returns the canonical copy, or undefined when malformed.
+ */
+function canonicalCompanions(value: unknown, self: string, modules: ReadonlyMap<string, ModuleRecord>): SignatureCompanions | undefined {
+  if (!isRecord(value) || !Array.isArray(value.named) || !Array.isArray(value.evidence)
+    || value.named.length !== value.evidence.length || typeof value.inferred !== 'boolean'
+    || !Number.isInteger(value.unresolved) || Number(value.unresolved) < 0) return undefined;
+  const named = value.named as unknown[];
+  if (!named.every(validOriginalId) || !value.evidence.every(validLocation)) return undefined;
+  const keys = named.map(originalKey);
+  if (keys.some((key, index) => key === self || (index > 0 && compare(keys[index - 1], key) >= 0))
+    || named.some(({ owner }) => !modules.has(owner))) return undefined;
+  return { named: named.map(({ kind, owner, file, binding }) => ({ kind, owner, file, binding })),
+    evidence: value.evidence.map(({ file, start, end, line, column }) => ({ file, start, end, line, column })),
+    inferred: value.inferred, unresolved: Number(value.unresolved) };
 }
 
 export function exposureOrder(a: Exposure, b: Exposure): number {
@@ -132,6 +151,11 @@ export function buildModel(input: ModelInput): ModelResult<Model> {
       issues.push(issue('invalid-original', `Original ${originalKey(original.id)} has inconsistent ownership or source origin`, original.declarations));
       continue;
     }
+    const companions = canonicalCompanions(original.companions, originalKey(original.id), modules);
+    if (!companions) {
+      issues.push(issue('invalid-original', `Original ${originalKey(original.id)} requires well-formed signature companions`, original.declarations));
+      continue;
+    }
     const unknown = tagIssues(registry.value, original.tags, `original ${originalKey(original.id)}`, original.tagEvidence);
     issues.push(...unknown);
     if (unknown.length) continue;
@@ -147,10 +171,13 @@ export function buildModel(input: ModelInput): ModelResult<Model> {
     if (previous && (previous.hasValue !== original.hasValue || previous.hasType !== original.hasType)) {
       issues.push(issue('invalid-original', `Original ${key} has inconsistent binding existence`, [...previous.declarations, ...original.declarations]));
     }
+    if (previous && JSON.stringify(previous.companions) !== JSON.stringify(companions)) {
+      issues.push(issue('invalid-original', `Original ${key} has inconsistent signature companions`, [...previous.declarations, ...original.declarations]));
+    }
     const { kind, owner, file, binding } = original.id;
     originals.set(key, { id: { kind, owner, file, binding }, origin, hasValue: original.hasValue, hasType: original.hasType,
       tags: sortedNames(original.tags), declarations: locations([...(previous?.declarations ?? []), ...original.declarations]),
-      tagEvidence: locations([...(previous?.tagEvidence ?? []), ...original.tagEvidence]) });
+      tagEvidence: locations([...(previous?.tagEvidence ?? []), ...original.tagEvidence]), companions });
   }
   const exposures: Exposure[] = [];
   const exposedNames = new Map<string, Exposure>();

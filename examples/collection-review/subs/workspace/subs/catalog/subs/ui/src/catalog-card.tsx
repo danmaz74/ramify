@@ -18,7 +18,8 @@ import styles from './catalog-card.module.css';
  * browser-classified view still may import the shape.
  */
 
-interface CatalogCardProps {
+/** The card's props, exposed with the card because its signature names them. */
+export interface CatalogCardProps {
   summary: CatalogSummary;
 }
 

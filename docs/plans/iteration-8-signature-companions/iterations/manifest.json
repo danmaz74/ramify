@@ -1,0 +1,37 @@
+{
+  "createdAt": "2026-09-21T00:00:00.000Z",
+  "updatedAt": "2026-09-21T00:00:00.000Z",
+  "iterations": [
+    {
+      "file": "iteration1.md",
+      "index": 1,
+      "parallelGroup": null,
+      "title": "Model documents, exposure index and the companion rule"
+    },
+    {
+      "file": "iteration2.md",
+      "index": 2,
+      "parallelGroup": null,
+      "title": "Companion facts from declared signatures"
+    },
+    {
+      "file": "iteration3.md",
+      "index": 3,
+      "parallelGroup": null,
+      "title": "The finding in batch, the retained session and the CLI"
+    },
+    {
+      "file": "iteration4.md",
+      "index": 4,
+      "parallelGroup": null,
+      "title": "Toolkit and reference example conform; teaching and architecture text"
+    },
+    {
+      "file": "iteration5.md",
+      "index": 5,
+      "parallelGroup": null,
+      "title": "Exposing fixture, latency and memory evidence, completion"
+    }
+  ],
+  "planPath": "main-plan.md"
+}

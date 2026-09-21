@@ -69,7 +69,7 @@ export async function fixture(scratch, templates, name, suffix = name) {
   const definitions = name === 'reference' ? {
     readme: ['subs/workspace/README.md', 'Workspace is the browser shell.', 'Workspace is the browser shell for resident measurements.'],
     exposure: ['subs/workspace/module.ramify', 'expose-sub createCatalogRouter, createCatalogTools, inspectRecord from catalog to parent', 'expose-sub createCatalogTools, inspectRecord from catalog to parent'],
-    source: ['src/assembly.ts', "export type AppRouter = AssembledSystem['router'];", "export type AppRouter = AssembledSystem['router'];\nexport const residentMeasurementValue = 1;"],
+    source: ['src/assembly.ts', "export type AppRouter = ReturnType<typeof assembleRouter>;", "export type AppRouter = ReturnType<typeof assembleRouter>;\nexport const residentMeasurementValue = 1;"],
     configuration: ['tsconfig.json', '"target": "ES2022"', '"target": "ES2021"'],
   } : {
     readme: ['subs/m001/README.md', 'Supplies deterministic workload bytes', 'Supplies current deterministic workload bytes'],

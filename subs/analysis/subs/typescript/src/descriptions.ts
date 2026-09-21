@@ -69,7 +69,8 @@ function surface(description: FileDescription): string {
   return JSON.stringify({
     file: description.file,
     exports: { ...description.exports, issueIds: description.exports.issueIds.map(note) },
-    originals: description.originals.map(original => ({ ...original, declarations: original.declarations.map(place) })),
+    originals: description.originals.map(original => ({ ...original, declarations: original.declarations.map(place),
+      companions: { ...original.companions, evidence: original.companions.evidence.map(place) } })),
     // A note's identity contains its position, so compare its located parts.
     coverage: description.coverage.map(issue => ({ code: issue.code, message: issue.message,
       compilerCode: issue.compilerCode ?? null, file: issue.location.file, related: issue.related.map(place) })),

@@ -193,6 +193,11 @@ re-exposing them means exposing the symbol together with its tag set.
 NB: if module M1 exposes symbol S to its descendant M2, M2 can re-expose it, but that's
 a no-op as the same symbol is already visible in M2's parent and all M2's descendants.
 
+## Signature companion
+
+A **signature companion** of symbol S is a project-owned symbol T, other than S,
+that S's declared signature names.
+
 ## Module header
 
 The **module header** is the `module` statement of `module.ramify`: the

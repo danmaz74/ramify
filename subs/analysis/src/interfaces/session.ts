@@ -37,6 +37,8 @@ export interface RevisionTimings {
   readonly accesses: number;
   readonly link: number;
   readonly decide: number;
+  /** The signature-companion pass of the decide stage; inside `decide`, not added to it. */
+  readonly companions: number;
   readonly publish: number;
   readonly total: number;
 }
