@@ -5,7 +5,9 @@
 contract decisions RD-1 to RD-7 on 2026-09-21. The
 [completion report](iterations/iteration5-results.md) records SC01 to SC27 and
 three measured budgets it did not meet, SC23's X100 deleted row, SC24's
-description stage and SC25's `factBytes`, with proposals for decision. This plan adds one enforced rule to the model: a module that
+description stage and SC25's `factBytes`, with proposals for decision. SC26's
+Plan 1 gate fails on harness pins of the pre-plan reference example, left for
+decision. This plan adds one enforced rule to the model: a module that
 exposes a symbol must also make the project symbols named in that symbol's
 declared signature type-available wherever the exposure makes the symbol
 visible. Ramify reports the missing exposure; it never supplies it. The plan

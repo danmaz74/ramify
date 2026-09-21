@@ -4611,7 +4611,7 @@
           "gzipSha256": "48b19e4ab58cf4b333c392682b3002e6948ad120910b51bb75f2e99b1725ffc4"
         }
       ],
-      "note": "Plan 5 actual process measurements; timing and memory targets are ideal budgets, never enforced. Missing and failed evidence retained.",
+      "note": "Plan 5 actual process measurements; timing and memory targets are ideal budgets, never enforced. Missing and failed evidence retained. Superseded: run before the final recipe fixes; see fast-2026-09-21T16-01-54.380Z.",
       "measuredAt": "2026-09-21T14:31:28.446Z",
       "completedAt": "2026-09-21T14:33:04.944Z",
       "phase": "fast",
@@ -6098,6 +6098,133 @@
           "name": "I5-13:hot-warm-memory",
           "status": "not-executed",
           "passed": false
+        },
+        {
+          "name": "I5-13:cold-open",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:entry-footprints",
+          "status": "not-executed",
+          "passed": false
+        }
+      ]
+    },
+    {
+      "file": "fast-2026-09-21T16-01-54.380Z-468d2522-adcd-431a-9901-34df4002a542.json.gz",
+      "rawSha256": "9d8713f01566be3d1dccb5ca28f9114f1e310290a6953b9852c467e1dddcfe94",
+      "gzipSha256": "80c0ccccb13dc4de0269ca52cfc7fe8acf080381f421e14bb0e4b7fbd4262bdc",
+      "rawBytes": 31206079,
+      "gzipBytes": 550738,
+      "gzipMembers": [
+        {
+          "offset": 0,
+          "length": 125566,
+          "rawBytes": 4194304,
+          "rawSha256": "42b7b4ac694e71b0714de06fa22f3280d1ddf98286eb9af7130b35464d1635d5",
+          "gzipSha256": "fe66b48c366dc4fc527f6c6cff38ea87425702764e89f5c5850571e25731469c"
+        },
+        {
+          "offset": 125566,
+          "length": 53673,
+          "rawBytes": 4194304,
+          "rawSha256": "6e2ec9846176174231e00c20eb89e69b5ed12762e9027dcc963a4ad6e2edeb09",
+          "gzipSha256": "e457657958de5e4a5afa283017fcc2e63ffdbb34b8f1230c6aba552a9b97efb9"
+        },
+        {
+          "offset": 179239,
+          "length": 51482,
+          "rawBytes": 4194304,
+          "rawSha256": "99b10aa886f6b7f1f65d4a2f8fb365da75b1e707a1414c3c0c9e574c72774750",
+          "gzipSha256": "9fbc92a64970d43eb9ce831c96fc9bafb71f6bcdd12b302714baa6250142da86"
+        },
+        {
+          "offset": 230721,
+          "length": 49757,
+          "rawBytes": 4194304,
+          "rawSha256": "ac4a773c11b7dd89c7aca19e6e8480689a6282e486583c035d1ad3524ff2ff65",
+          "gzipSha256": "9e219cc3846341f0cc8c91cc10a39d500b619eb93e0ddada647a20bf65aadee1"
+        },
+        {
+          "offset": 280478,
+          "length": 49852,
+          "rawBytes": 4194304,
+          "rawSha256": "17a2554b12f9b5e08101ae0a53f68abbe3648f184183b8cb8e0f3e2f953c4a1d",
+          "gzipSha256": "cdea289e84783c1bfd96e35ef5436df735c9e023f82cc14f165f63409b928a29"
+        },
+        {
+          "offset": 330330,
+          "length": 49342,
+          "rawBytes": 4194304,
+          "rawSha256": "334e138ddf8a4d1bb041113406faafd31ed9a9f2f0333792cfc6ffb9882fc9be",
+          "gzipSha256": "aad5b4e472a59586baba6efb16434cdf4afda68886237d75b4d7da161aed1a0b"
+        },
+        {
+          "offset": 379672,
+          "length": 132014,
+          "rawBytes": 4194304,
+          "rawSha256": "553ef37fd1614020081e178a35990d5f806aa5d4bbe2dc18b5299db4efd864c9",
+          "gzipSha256": "3a492d8870105ab4b7b05cd56c0d39a000286123b747a7253f7fee795e83bdb9"
+        },
+        {
+          "offset": 511686,
+          "length": 39052,
+          "rawBytes": 1845951,
+          "rawSha256": "058e4e7271b21fb05be05fb5ccf92862af7ce24289a9ccef3025163bb4d50ccb",
+          "gzipSha256": "6f43a645d473543d7333eaa7c706aaa3943bddcd0e5c3915618fe6046e17bb75"
+        }
+      ],
+      "note": "Plan 5 actual process measurements; timing and memory targets are ideal budgets, never enforced. Missing and failed evidence retained.",
+      "measuredAt": "2026-09-21T16:01:54.380Z",
+      "completedAt": "2026-09-21T16:03:26.126Z",
+      "phase": "fast",
+      "passed": false,
+      "payloadSchema": "ramify.fast-measurements/1",
+      "build": {
+        "files": 466,
+        "sha256": "dd083132b6ca23fccd936262f9e7d23b1f94e2f2b295724df2364f7b7fb59bfc"
+      },
+      "workloads": [
+        {
+          "name": "I5-13:hook-latency-reference",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s100",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s1000",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-x100",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:checked-set-bounded",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:repeated-edit-plateau",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hot-warm-memory",
+          "status": "measured",
+          "passed": true
         },
         {
           "name": "I5-13:cold-open",

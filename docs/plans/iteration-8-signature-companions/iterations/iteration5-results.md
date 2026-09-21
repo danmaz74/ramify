@@ -229,8 +229,8 @@ cost 5,429, 79,769 and 70,801 bytes a copy; RD-2 records them deliberately.
   (reference example) and 8.1 → 0 MB (S100); worker heap beyond history 3.9 → 0
   MB and 0.06 → 0 MB; all within 64 and 16 MiB.
 - `I5-13:hot-warm-memory`, Plan 5's two hot and six warm S100 contexts: passes,
-  combined RSS 1,379 MiB of 1,536 MiB, 9,451,936 bytes of facts per context. It
-  was re-run on the final recipe; see [checks run](#checks-run).
+  combined RSS 1,366 MiB of 1,536 MiB, 9,451,936 bytes of facts per context, on
+  the final recipe.
 - `I2-29:many-contexts`, the row Plan 5's addendum fixed: passes all its
   predicates. Settled RSS is 131.4 MiB of 1,024 MiB, global retained bytes
   72.3 MiB of 512 MiB, and 9,447,268 bytes of facts per context. Plan 5 closure
@@ -248,8 +248,8 @@ iteration 4's remediation changed. Iteration 4's handoff predicted this.
 | Failures | Cause | Instances |
 | ---: | --- | --- |
 | 51 | The baseline expects `coverage: 'complete'`; the conforming example reports its 11 `signature-inferred` notes, so coverage is `partial` | `I1-01:baseline`, `I1-23`, `I1-24` and others |
-| 20 | An access count pin, 292, now 296: iteration 4 added imports to the example | `I1-06`, `I1-07`, `I1-08` cases |
-| 22 | An access count pin, 164, now 167, for the same reason | `I1-12`, `I1-15`, `I1-16` cases |
+| 20 | The baseline static occurrence count of the reference example, pinned at 292, is now 296: iteration 4 added imports | `I1-06`, `I1-07`, `I1-08` cases |
+| 22 | The baseline application decision count, pinned at 164, is now 167, for the same reason | `I1-12`, `I1-15`, `I1-16` cases |
 | 1 | `I1-09:signature-only-type` asserts that `ToolInputSchema`, a type only a signature names, is unexposed. The rule now requires its exposure, and iteration 4 exposed it | `I1-09:signature-only-type` |
 | 2 | Present before the plan. `I1-28:relocated-package` fails first on the partial coverage, where it failed on an exit code before. `I1-30:production-selection/toolkit` pins a build file list without the explorer assets | `I1-28:relocated-package`, `I1-30:production-selection/toolkit` |
 
@@ -289,8 +289,29 @@ These are recorded, not implemented. Iteration 5 owns evidence only.
 
 ## Checks run
 
-- `node --test scripts/measurements/*.test.mjs`: 62 tests pass, including
+- `node --test scripts/measurements/*.test.mjs`: 61 tests pass, including
   `companion-assertions.test.mjs` and the X100 case of `fast-fixture.test.mjs`.
+- The focused suites of the structural-edit plan's closure, which cover Plan 5's
+  owners, each run as its own `npx vitest run` over the directory's test files:
+
+| Suite | Files | Tests | Result |
+| --- | ---: | ---: | --- |
+| `subs/analysis/src/tests` | 33 | 387 | pass |
+| `subs/analysis/subs/project/src/tests` | 9 | 160 | pass |
+| `subs/analysis/subs/typescript/src/tests` | 19 | 215 | pass |
+| `subs/daemon/subs/contexts/src/tests` | 12 | 167 | pass |
+| `subs/daemon/src/tests` | 20 | 235 | pass |
+| `subs/cli/src/tests` | 7 | 205 | pass |
+| `src/tests` | 19 | 88 | **3 fail** |
+
+  The three failures reproduce alone and are pins of the pre-plan reference
+  example, like the gate's: `dependency-analyzer-process.test.ts` expects 48
+  non-behavioral dependencies and finds 50, after iteration 4's added imports;
+  `dependency-diagram-daemon.test.ts` (BD24) expects coverage `complete`; and
+  `dependency-view-server.test.ts` (BD28) expects the dependency view's state
+  `complete` and finds `partial`, because the example's 11 nonblocking notes make
+  its coverage partial. They belong to Plan 6D's owners and were not changed
+  (open item 6).
 - The measurements above, archived under `scripts/measurements/results/` and
   indexed in `results/index.json`:
 
@@ -302,14 +323,15 @@ These are recorded, not implemented. Iteration 5 owns evidence only.
 | `hook-latency-x100` | final | `fast-2026-09-21T14-35-24.787Z-d19ea3ed-….json.gz` | path predicates fail, as above |
 | `hook-latency-reference` | final | `fast-2026-09-21T14-45-52.606Z-05325119-….json.gz` | passes; `verify-fast-evidence.mjs` passes |
 | `repeated-edit-plateau` | final | `fast-2026-09-21T14-53-02.403Z-f611075f-….json.gz` | passes; `verify-fast-evidence.mjs` passes |
-| `hot-warm-memory` | final | see below | passes |
+| `hot-warm-memory` | final | `fast-2026-09-21T16-01-54.380Z-468d2522-….json.gz` | passes; `verify-fast-evidence.mjs` passes |
 | `I2-29:many-contexts` | final | `resident-2026-09-21T15-14-38.854Z-6fac5cf4-….json.gz` | passes |
 | Stage timings | both | `companion-stages-2026-09-21T14-09-52.254Z-preplan`, `…T14-17-47.436Z-final`, `…T15-16-03.819Z-preplan`, `…T15-19-33.009Z-final` (`.json.gz`) | complete, no failure |
 | Fact decomposition and index lookup | both | `plan8-fact-decomposition.json.gz`, `plan8-exposure-index.json.gz` | scratch probes |
 
-  Three earlier final-build archives of the same day are marked superseded in the
-  index: an X100 run whose recipe changed while it ran, and the two harness
-  defects above.
+  Four earlier final-build archives of the same day are marked superseded in the
+  index: an X100 run whose recipe changed while it ran, the two runs that found
+  the harness defects above, and a `hot-warm-memory` run on the recipe before
+  those fixes, which passed.
 - The scratch probes ran as temporary Vitest files in `subs/analysis/src/tests/`
   of each checkout and were removed. They are not committed.
 - `dist/src/ramify check --root . --batch` and the reference example's batch
@@ -352,7 +374,7 @@ These are recorded, not implemented. Iteration 5 owns evidence only.
 | SC23 | 5 | X100 and reference hook rows above | **fails on X100's deleted row** (4,237 ms); every other row within 2 s; configuration row +2 and +18 ms |
 | SC24 | 5 | `companions` stage timing; description stage | **pass for the pass** (1.0, 14.4, 12.9 ms); **description stage fails** (+19.6, +37.7, +20.9 %) |
 | SC25 | 5 | `factBytes`; plateau; many contexts | **`factBytes` fails** (+14.7, +19.6, +15.2 %); plateau and many-contexts rows hold |
-| SC26 | 5 | [SC26](#sc26-regression-gates), [checks run](#checks-run) | **Plan 1 gate fails** on 94 new harness pins of the pre-plan example (212 of 308; pre-plan 306); focused suites as listed |
+| SC26 | 5 | [SC26](#sc26-regression-gates), [checks run](#checks-run) | **fails**: the Plan 1 gate on 94 new harness pins of the pre-plan example (212 of 308 pass; 306 before the plan), and 3 `src/tests` pins; the other six focused suites pass |
 
 ### Contract decisions
 
@@ -378,9 +400,11 @@ These are recorded, not implemented. Iteration 5 owns evidence only.
    components, and the `planApiViewRequests` and `projectApiView` exposure
    removed in `analysis`.
 5. Proposals 1 to 3 above, for the three exceeded budgets.
-6. SC26: whether to update the Plan 1 harness pins to the conforming reference
-   example, and how `I1-09:signature-only-type` should be restated under the
-   rule.
+6. SC26: whether to update the Plan 1 harness pins and the three `src/tests` pins
+   to the conforming reference example, and how `I1-09:signature-only-type`
+   should be restated under the rule. A related question: the explorer's
+   dependency view now reports the reference example as `partial` because of
+   nonblocking `signature-inferred` notes.
 7. The plan is not moved to `docs/plans/done/`. Only Plans 1 and 2 are there, each
    moved in its own commit; completed Plans 5, 2B and 6 to 6C remain in
    `docs/plans/`.

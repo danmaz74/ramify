@@ -1065,7 +1065,8 @@ implemented on 2026-09-21; its
 [completion report](plans/iteration-8-signature-companions/iterations/iteration5-results.md)
 records SC01 to SC27, the measured costs and the remaining gaps. Three
 measured budgets are not met: X100's deleted hook row, the description stage
-and retained `factBytes`. The report proposes remedies for decision.
+and retained `factBytes`. The Plan 1 gate fails on harness pins of the
+pre-plan reference example. The report proposes remedies for decision.
 
 **Working outcome.** A symbol exposed without a project symbol that its
 declared signature names fails the check with `exposed-without-companion`,
