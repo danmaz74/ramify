@@ -16,7 +16,7 @@ const fixtureFiles = {
   'package.json': '{"type":"module"}',
   'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'bundler',
     types: [], skipLibCheck: true }, include: ['src', 'subs', 'tools'] }),
-  'src/interfaces/api.ts': 'export const publicValue = 1;\nexport const privateValue = 2;\nexport const anotherPrivate = 3;\n',
+  'src/interfaces/api.ts': 'export const publicValue: number = 1;\nexport const privateValue = 2;\nexport const anotherPrivate = 3;\n',
   'subs/consumer/module.ramify': 'ramify 1\nmodule consumer\n',
   'subs/consumer/src/probe.ts': "import { publicValue } from '../../../src/interfaces/api.js';\nvoid publicValue;\n",
 };
@@ -555,7 +555,7 @@ describe('iteration 12 constraint remediation', () => {
   };
   it.each(Object.entries(selections).flatMap(([form, source]) => (['private', 'unpromised', 'allowed'] as const).map(permission => ({ form, source, permission }))))(
     'checks the $permission merged binding in $form empty nested destructuring', async ({ source, permission }) => fixture(async (root, inputs) => {
-      await put(root, 'src/interfaces/api.ts', 'export function Merged() {}\nexport namespace Merged { export const member = 1; }\n');
+      await put(root, 'src/interfaces/api.ts', 'export function Merged(): void {}\nexport namespace Merged { export const member = 1; }\n');
       await put(root, 'module.ramify', `ramify 1\nmodule fixture\n${permission === 'private' ? ''
         : `expose-src Merged from "interfaces/api.ts"${permission === 'allowed' ? ' tagged [browser]' : ''} to descendants\n`}`);
       await put(root, 'subs/consumer/module.ramify', 'ramify 1\nmodule consumer tagged [browser]\n');

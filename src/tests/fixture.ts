@@ -19,7 +19,7 @@ export async function fixture(run: (root: string) => Promise<void>): Promise<voi
       'package.json': '{"type":"module"}',
       'tsconfig.json': JSON.stringify({ compilerOptions: { module: 'ESNext', moduleResolution: 'Bundler',
         types: [], skipLibCheck: true }, include: ['src', 'subs', 'tests'] }),
-      'src/interfaces/api.ts': 'export const value = 1; export const privateValue = 2;\n',
+      'src/interfaces/api.ts': 'export const value: number = 1; export const privateValue = 2;\n',
       'subs/consumer/module.ramify': 'ramify 1\nmodule consumer\n',
       'subs/consumer/src/use.ts': "import { value } from '../../../src/interfaces/api.js'; void value;\n",
     })) await put(root, path, text);

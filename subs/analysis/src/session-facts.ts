@@ -4,6 +4,7 @@ import { originalKey } from '../subs/model/src/index.js';
 import type { Model, ResolvedTagRegistry, SourceArea, SourceLocation } from '../subs/model/src/interfaces/model.js';
 import type { CapturedInput, ProjectInventory } from '../subs/project/src/interfaces/project.js';
 import type { FileDescription, SourceAccess, SourceCatalog, SourceLimit } from '../subs/typescript/src/interfaces/source.js';
+import type { CompanionOutputs } from './companion-findings.js';
 import type { AccessResult, AnalysisDiagnostic, AnalysisInputs } from './interfaces/analysis.js';
 import { ReportDraft, byteOrder } from './report.js';
 import type { SnapshotCounts } from './report.js';
@@ -64,6 +65,8 @@ export interface SessionFacts {
   readonly linkIssues: readonly AnalysisDiagnostic[];
   readonly model: Model | null;
   readonly decisions: Readonly<Record<string, AccessDecision>>;
+  /** The signature-companion findings and notes of `model`; empty without a model. */
+  readonly companions: CompanionOutputs;
   readonly indexes: FactIndexes;
 }
 
@@ -192,7 +195,7 @@ export function recordedDiagnostics(facts: SessionFacts, accesses: readonly Sour
   if (facts.invalid) return [...facts.invalid.issues];
   if (facts.areaIssues.length) return [...facts.areaIssues];
   if (facts.linkIssues.length || !facts.model) return [...facts.linkIssues];
-  return accesses.flatMap(access => facts.decisions[access.id]?.diagnostics ?? []);
+  return [...accesses.flatMap(access => facts.decisions[access.id]?.diagnostics ?? []), ...facts.companions.diagnostics];
 }
 
 /**
@@ -268,11 +271,14 @@ function driveReport(facts: SessionFacts, request: AnalysisInputs, snapshot: boo
         });
         draft.patch({ results });
         draft.record(recordedDiagnostics(facts, accesses));
+        draft.cover(facts.companions.coverage);
       } else {
         draft.cover(assembleCoverage(facts.files)); draft.stage('access', 'completed');
         draft.current = 'decide';
         draft.counts = { ...draft.counts!, ...decisionCounts(facts) };
         draft.record(decidedDiagnostics(facts));
+        draft.record(facts.companions.diagnostics);
+        draft.cover(facts.companions.coverage);
       }
       draft.stage('decide', 'completed', draft.diagnostics); draft.execution = 'completed';
     }

@@ -48,7 +48,7 @@ export function capture(version = 1, execution: 'completed' | 'invalid' | 'incom
     checked: { path: version === 1 ? 'cold' : 'source', files: observed.filter(input => input.role === 'source').map(input => input.path), accesses: 0, modelRebuilt: version === 1 },
     outcome: report.outcome, summary: report.summary, diagnostics: report.diagnostics, warnings: report.warnings, coverage: report.coverage,
     delta: { added: [], removed: [], positionOnly: [] },
-    timings: { classify: 1, inventory: 2, compiler: 3, descriptions: 4, accesses: 5, link: 6, decide: 7, publish: 8, total: 36 },
+    timings: { classify: 1, inventory: 2, compiler: 3, descriptions: 4, accesses: 5, link: 6, decide: 7, companions: 0, publish: 8, total: 36 },
   } };
 }
 export interface ScriptedCall {

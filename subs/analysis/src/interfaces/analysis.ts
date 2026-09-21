@@ -54,11 +54,11 @@ export type AnalysisCode = ModelIssue['code'] | DescriptionIssue['code']
   | ProjectIssue['code'] | LinkIssue['code'] | ImportReason
   | 'missing-export' | 'invalid-invocation' | 'unavailable-capability'
   | 'missing-stage' | 'session-used' | 'session-disposed' | 'output-failure'
-  | 'resource-limit' | 'internal-error';
+  | 'resource-limit' | 'internal-error' | 'exposed-without-companion';
 export interface AnalysisDiagnostic {
   readonly id: string;
   readonly category: 'invocation' | 'registry' | 'layout' | 'description'
-    | 'missing-export' | 'import' | 'acquisition' | 'unavailable' | 'execution' | 'limit';
+    | 'missing-export' | 'import' | 'exposure' | 'acquisition' | 'unavailable' | 'execution' | 'limit';
   readonly code: AnalysisCode;
   readonly message: string;
   readonly location: SourceLocation | null;

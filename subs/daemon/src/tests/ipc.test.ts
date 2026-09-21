@@ -118,7 +118,7 @@ import { createMeasureDriver } from './measure-driver.js';
         freshness: { mode: 'synchronized', expect: [{ path: 'src/index.ts', sha256: createHash('sha256').update(text).digest('hex') }] } });
       if (!result.ok || result.value.status !== 'reported' || !result.value.published) throw new Error(JSON.stringify(result));
       const { revision } = result.value, timings = result.value.timings!;
-      expect(Object.keys(revision.timings)).toHaveLength(9);
+      expect(Object.keys(revision.timings)).toHaveLength(10);
       expect(Object.keys(timings).sort()).toEqual(['clientTransport', 'invocationCheck', 'promotion', 'publication', 'service', 'sweep', 'workerRoundTrip', 'workerStatus']);
       expect(Object.values(timings).every(value => Number.isFinite(value) && value >= 0)).toBe(true);
       expect([timings.invocationCheck > 0, timings.promotion > 0, timings.workerStatus > 0, timings.workerRoundTrip > 0]).toEqual([true, true, true, true]);

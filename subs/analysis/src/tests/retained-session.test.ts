@@ -17,7 +17,7 @@ const fixtureFiles = {
   'package.json': '{"type":"module"}',
   'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'bundler',
     types: [], skipLibCheck: true }, include: ['src', 'subs'] }),
-  [api]: 'export const publicValue = 1;\nexport const privateValue = 2;\nexport interface PublicType { readonly v: number }\nexport function helper(): number {\n  return 1;\n}\n',
+  [api]: 'export const publicValue: number = 1;\nexport const privateValue = 2;\nexport interface PublicType { readonly v: number }\nexport function helper(): number {\n  return 1;\n}\n',
   'subs/consumer/module.ramify': 'ramify 1\nmodule consumer\n',
   'subs/consumer/README.md': '# Consumer\n\nThe consumer imports the fixture vocabulary.\n',
   [probe]: "import { publicValue } from '../../../src/interfaces/api.js';\nvoid publicValue;\n",
@@ -175,7 +175,7 @@ workerSuite('retained analysis session', import.meta.url, () => {
       await replace(root, other, 'export function compute', "import { privateValue } from '../../../src/interfaces/api.js';\nvoid privateValue;\nexport function compute");
       const denied = await revised(handle, [other]);
       const before = denied.delta.added[0]!;
-      await replace(root, api, 'export const publicValue = 1;', '// Every declaration below moves.\nexport const publicValue = 1;');
+      await replace(root, api, 'export const publicValue: number = 1;', '// Every declaration below moves.\nexport const publicValue: number = 1;');
       const moved = await revised(handle, [api]);
       expect(moved.checked).toEqual({ path: 'unchanged-surface', files: [api], accesses: 0, modelRebuilt: false });
       expect(moved.delta.added).toEqual([]);

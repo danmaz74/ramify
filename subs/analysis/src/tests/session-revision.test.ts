@@ -669,7 +669,7 @@ describe('timing fields outside the revision total', () => {
   it('timing-fields: an update reports its invocation check beside unchanged revision timings', () => fixture(async (root, inputs) => {
     const { handle, revision } = await opened(inputs);
     try {
-      const stages = ['accesses', 'classify', 'compiler', 'decide', 'descriptions', 'inventory', 'link', 'publish', 'total'];
+      const stages = ['accesses', 'classify', 'companions', 'compiler', 'decide', 'descriptions', 'inventory', 'link', 'publish', 'total'];
       expect(Object.keys(revision.timings).sort()).toEqual(stages);
       const invocation = { project: inputs.project, capabilities: inputs.capabilities };
       // Without an invocation nothing is checked.
@@ -712,7 +712,8 @@ describe('timing fields outside the revision total', () => {
       if (created.status !== 'revised') throw new Error(JSON.stringify(created));
       expect([created.identical, created.revision.checked.path, promotions]).toEqual([false, 'membership', 1]);
       expect(Object.keys(created.timings!)).toEqual(['invocationCheck', 'promotion']);
-      expect(Object.keys(created.revision.timings).sort()).toEqual([...stages, 'total'].sort());
+      // The companion pass is timed inside `decide`, so it is a field but not a disjoint stage.
+      expect(Object.keys(created.revision.timings).sort()).toEqual([...stages, 'companions', 'total'].sort());
       const { promotion } = created.timings!;
       expect(promotion).toBeGreaterThanOrEqual(delayMs - 1);
       // The stages are disjoint, so the promotion fits in the time outside them.

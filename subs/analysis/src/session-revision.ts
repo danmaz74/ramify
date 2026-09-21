@@ -10,6 +10,8 @@ import type { CapturedInput, InventoryUpdate, ObservedChange, ProjectInventory, 
 import { readProject } from '../subs/project/src/read-project.js';
 import type { AccessInterpreter, CatalogDelta, CatalogOriginal, MembershipReach, RetainedSourceAnalysis, SourceAccess, SourceCatalog,
   SourceLimit } from '../subs/typescript/src/interfaces/source.js';
+import { companionOutputs, noCompanionOutputs } from './companion-findings.js';
+import type { CompanionOutputs } from './companion-findings.js';
 import { evaluateAccessesAsync } from './evaluate-accesses.js';
 import type { AccessResult, AnalysisDiagnostic, AnalysisInputs, AnalysisReport, StageId } from './interfaces/analysis.js';
 import type { CheckedSet, RevisionPath, RevisionTimings, SessionLimits } from './interfaces/session.js';
@@ -63,7 +65,7 @@ export const isCancellation = (error: unknown, signal?: AbortSignal): boolean =>
   || (error !== null && typeof error === 'object' && 'code' in error && error.code === 'cancelled')
   || (error instanceof Error && error.name === 'AbortError');
 const check = (signal?: AbortSignal): void => { if (signal?.aborted) throw cancelled(); };
-export const zeroTimings = (): PhaseTimings => ({ classify: 0, inventory: 0, compiler: 0, descriptions: 0, accesses: 0, link: 0, decide: 0 });
+export const zeroTimings = (): PhaseTimings => ({ classify: 0, inventory: 0, compiler: 0, descriptions: 0, accesses: 0, link: 0, decide: 0, companions: 0 });
 const internal = (message: string): Error => Object.assign(new Error(message), { code: 'internal-error' });
 
 /** A failure report shaped like a batch failure at the named stage. */
@@ -100,7 +102,8 @@ export const parseRefused = (issues: readonly ProjectIssue[]): boolean => issues
 export function invalidFacts(state: SessionState, issues: readonly AnalysisDiagnostic[], inventory: ProjectInventory | null,
   parseInvalid: boolean, inputs: readonly CapturedInput[] = []): SessionFacts {
   return deepFreeze({ registry: state.registry, invalid: { issues, inventory, inputs, parseInvalid }, inventory: state.facts?.inventory ?? null,
-    areas: [], areaIssues: [], files: {}, catalog: emptyCatalog, linked: null, linkIssues: [], model: null, decisions: {}, indexes: emptyIndexes });
+    areas: [], areaIssues: [], files: {}, catalog: emptyCatalog, linked: null, linkIssues: [], model: null, decisions: {},
+    companions: noCompanionOutputs, indexes: emptyIndexes });
 }
 
 /** A local invalid update has no current inventory. Capture the batch's invalid
@@ -163,6 +166,21 @@ export async function decide(state: SessionState, model: Model, accesses: readon
   return decisions;
 }
 
+/**
+ * The decide stage's companion pass over the current model. The outputs are a
+ * function of the model alone, so the previous revision's are reused only when
+ * its model is this same object, whose semantic and positional inputs are
+ * therefore unchanged; a relinked or position-patched model is evaluated again.
+ */
+function companionPass(model: Model | null, previous: SessionFacts | null, timings: PhaseTimings): CompanionOutputs {
+  if (!model) return noCompanionOutputs;
+  if (previous?.model === model) return previous.companions;
+  const start = performance.now();
+  const outputs = companionOutputs(model);
+  timings.companions += performance.now() - start;
+  return outputs;
+}
+
 type Interpreted = Awaited<ReturnType<AccessInterpreter['interpret']>>;
 
 /** Per-file access facts from one interpretation of the named files. */
@@ -190,7 +208,7 @@ export async function recomputeAll(state: SessionState, inventory: ProjectInvent
   const derived = deriveAreas(state.registry, inventory);
   if (derived.issues.length) {
     return deepFreeze({ registry: state.registry, invalid: null, inventory, areas: [], areaIssues: derived.issues, files: {},
-      catalog: emptyCatalog, linked: null, linkIssues: [], model: null, decisions: {}, indexes: emptyIndexes });
+      catalog: emptyCatalog, linked: null, linkIssues: [], model: null, decisions: {}, companions: noCompanionOutputs, indexes: emptyIndexes });
   }
   const observer = state.observer;
   if (!observer) throw internal('The session has no observer');
@@ -236,9 +254,10 @@ export async function recomputeAll(state: SessionState, inventory: ProjectInvent
   start = performance.now();
   check(signal);
   const decisions = linked.model ? await decide(state, linked.model, assembleAccesses(files), signal) : {};
+  const companions = companionPass(linked.model, null, timings);
   timings.decide += performance.now() - start;
   return deepFreeze({ registry: state.registry, invalid: null, inventory, areas: derived.areas, areaIssues: [], files, catalog,
-    linked: linked.linked, linkIssues: linked.issues, model: linked.model, decisions, indexes: buildIndexes(files, inventory.scope.root) });
+    linked: linked.linked, linkIssues: linked.issues, model: linked.model, decisions, companions, indexes: buildIndexes(files, inventory.scope.root) });
 }
 
 export function wholeCheckedSet(path: RevisionPath, facts: SessionFacts): CheckedSet {
@@ -259,14 +278,16 @@ export function changedInputs(before: readonly CapturedInput[], after: readonly 
   return sortedPaths(changed);
 }
 
-/** An original's parts other than its declaration positions. */
+/** An original's parts other than its declaration and companion positions. */
 const originalSurface = (original: CatalogOriginal): string =>
-  JSON.stringify({ id: original.id, origin: original.origin, hasValue: original.hasValue, hasType: original.hasType, declarations: original.declarations.map(at => at.file) });
+  JSON.stringify({ id: original.id, origin: original.origin, hasValue: original.hasValue, hasType: original.hasType, declarations: original.declarations.map(at => at.file),
+    companions: { named: original.companions.named, inferred: original.companions.inferred, unresolved: original.companions.unresolved } });
 
 /**
- * Replace the declaration evidence of moved originals inside the retained
- * model and its link input, without a relink. The decisions selecting those
- * originals are decided again by the caller so their evidence and diagnostic
+ * Replace the declaration and companion evidence of moved originals inside
+ * the retained model and its link input, without a relink. The decisions
+ * selecting those originals are decided again by the caller, and the companion
+ * pass runs again over the patched model, so their evidence and diagnostic
  * identities match a fresh pass.
  */
 function patchPositions(linked: LinkedDescriptions, model: Model, catalog: SourceCatalog, moved: ReadonlySet<string>): { linked: LinkedDescriptions; model: Model } {
@@ -274,14 +295,14 @@ function patchPositions(linked: LinkedDescriptions, model: Model, catalog: Sourc
   const patchedModel: Model = deepFreeze({ ...model, originals: model.originals.map(original => {
     const key = originalKey(original.id);
     const current = fresh.get(key);
-    return moved.has(key) && current ? { ...original, declarations: canonicalLocations(current.declarations) } : original;
+    return moved.has(key) && current ? { ...original, declarations: canonicalLocations(current.declarations), companions: current.companions } : original;
   }) });
   if (linked.status !== 'valid') return { linked, model: patchedModel };
   const patchedLinked: LinkedDescriptions = deepFreeze({ ...linked, modelInput: { ...linked.modelInput,
     originals: linked.modelInput.originals.map(original => {
       const key = originalKey(original.id);
       const current = fresh.get(key);
-      return moved.has(key) && current ? { ...original, declarations: current.declarations } : original;
+      return moved.has(key) && current ? { ...original, declarations: current.declarations, companions: current.companions } : original;
     }) } });
   return { linked: patchedLinked, model: patchedModel };
 }
@@ -431,6 +452,7 @@ interface Relinked {
   readonly linkIssues: readonly AnalysisDiagnostic[];
   readonly rebuild: boolean;
   readonly decisions: Record<string, AccessDecision>;
+  readonly companions: CompanionOutputs;
   readonly indexes: FactIndexes;
   /** Accesses decided because their own facts, their original or its exposures changed. */
   readonly decided: number;
@@ -498,8 +520,9 @@ async function relinkAndDecide(state: SessionState, facts: SessionFacts, invento
     decided = targets.filter(access => !refreshed.has(access.id)).length;
     if (targets.length) Object.assign(decisions, await decide(state, model, targets, signal));
   }
+  const companions = companionPass(model, facts, timings);
   timings.decide = performance.now() - start;
-  return { linked, model, linkIssues, rebuild, decisions, indexes, decided, positionRefreshed: sortedPaths(positionRefreshed) };
+  return { linked, model, linkIssues, rebuild, decisions, companions, indexes, decided, positionRefreshed: sortedPaths(positionRefreshed) };
 }
 
 /**
@@ -636,7 +659,8 @@ export async function revise(state: SessionState, changes: readonly ObservedChan
       const decided = await relinkAndDecide(state, facts, inventory, ordered, catalog, delta, interpretedFiles, [], true, timings,
         next => { stage = next; }, signal);
       const next: SessionFacts = deepFreeze({ registry: state.registry, invalid: null, inventory, areas: facts.areas, areaIssues: [], files: ordered, catalog,
-        linked: decided.linked, linkIssues: decided.linkIssues, model: decided.model, decisions: decided.decisions, indexes: decided.indexes });
+        linked: decided.linked, linkIssues: decided.linkIssues, model: decided.model, decisions: decided.decisions, companions: decided.companions,
+        indexes: decided.indexes });
       return { status: 'computed', facts: next,
         checked: { path: 'membership', files: interpretedFiles, accesses: decided.decided, modelRebuilt: decided.rebuild },
         changed, timings, positionRefreshed: decided.positionRefreshed };
@@ -661,8 +685,9 @@ export async function revise(state: SessionState, changes: readonly ObservedChan
       const targets = outcome.model ? accesses.filter(access => selected.has(access.id) || !previous!.decisions[access.id]) : [];
       const decisions: Record<string, AccessDecision> = outcome.model ? { ...previous!.decisions } : {};
       if (outcome.model && targets.length) Object.assign(decisions, await decide(state, outcome.model, targets, signal));
+      const companions = companionPass(outcome.model, previous, timings);
       timings.decide = performance.now() - start;
-      const facts = deepFreeze({ ...previous!, inventory, linked: outcome.linked, model: outcome.model, linkIssues: outcome.issues, decisions });
+      const facts = deepFreeze({ ...previous!, inventory, linked: outcome.linked, model: outcome.model, linkIssues: outcome.issues, decisions, companions });
       return { status: 'computed', facts, checked: { path: 'description', files: [], accesses: targets.length, modelRebuilt: outcome.model !== null },
         changed, timings, positionRefreshed: [] };
     }
@@ -736,10 +761,10 @@ export async function revise(state: SessionState, changes: readonly ObservedChan
 
     const decided = await relinkAndDecide(state, facts, inventory, files, catalog, delta, interpretedFiles, descriptions, false, timings,
       next => { stage = next; }, signal);
-    const { linked, model, linkIssues, rebuild, decisions, indexes } = decided;
+    const { linked, model, linkIssues, rebuild, decisions, companions, indexes } = decided;
     const path: RevisionPath = model && unchangedSurface && !descriptions.length ? 'unchanged-surface' : 'source';
     const next: SessionFacts = deepFreeze({ registry: state.registry, invalid: null, inventory, areas: facts.areas, areaIssues: [], files, catalog,
-      linked, linkIssues, model, decisions, indexes });
+      linked, linkIssues, model, decisions, companions, indexes });
     return { status: 'computed', facts: next, checked: { path, files: interpretedFiles, accesses: decided.decided, modelRebuilt: rebuild },
       changed, timings, positionRefreshed: decided.positionRefreshed };
   } catch (error) {

@@ -37,6 +37,7 @@ export function compareFacts(retained: SessionFacts, recomputed: SessionFacts): 
       note(`decisions[${id}].result.decisions[${i}].original.declarations`, before[i]?.original?.declarations, after[i]?.original?.declarations);
     }
   }
+  note('companions', retained.companions, recomputed.companions);
   note('indexes', retained.indexes, recomputed.indexes);
   return fields;
 }

@@ -26,6 +26,15 @@ carries its checked set, finding delta and timings; `report` materializes the
 `analyzeProject` over the same inputs except `runId`, and `verify` recomputes
 everything from the warm compiler and compares it with the retained facts.
 
+The decide stage also evaluates the signature-companion rule over the model, in
+batch and on every revision path, as its own `companions` timing. Each violation
+becomes an `exposed-without-companion` finding at its exposure statement; the
+model stays valid and every access is still decided. Exposed originals with
+`inferred` or `unresolved` companion facts add the `signature-inferred` and
+`signature-unresolved` coverage notes. The outputs are a function of the model:
+a revision that keeps the model object reuses them, and a relinked or
+position-patched model is evaluated again without compiler work.
+
 Iteration 7 provides `validateProject(inputs, control?)` through
 `src/validation-entry.ts`. Supply the reviewed project request, resolved registry
 and analysis limits. Validation runs acquisition, parsing, source cataloguing

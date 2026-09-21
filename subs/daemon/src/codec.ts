@@ -169,7 +169,7 @@ function summary(value: unknown): boolean {
     && typeof value.complete === 'boolean' && Object.entries(value).every(([key, count]) => key === 'complete' || integer(count));
 }
 function timings(value: unknown): boolean {
-  return shape(value, ['classify', 'inventory', 'compiler', 'descriptions', 'accesses', 'link', 'decide', 'publish', 'total'])
+  return shape(value, ['classify', 'inventory', 'compiler', 'descriptions', 'accesses', 'link', 'decide', 'companions', 'publish', 'total'])
     && Object.values(value).every(item => typeof item === 'number' && Number.isFinite(item) && item >= 0);
 }
 function capture(value: unknown): boolean {

@@ -106,7 +106,7 @@ workerSuite('retained session worker', import.meta.url, () => {
       expect(handle.current).toBe(completed.revision);
       expect(handle.current?.checked.path).toBe('broad');
       const timings = completed.revision.timings;
-      expect(Object.keys(timings).sort()).toEqual(['classify', 'inventory', 'compiler', 'descriptions', 'accesses', 'link', 'decide', 'publish', 'total'].sort());
+      expect(Object.keys(timings).sort()).toEqual(['classify', 'inventory', 'compiler', 'descriptions', 'accesses', 'link', 'decide', 'companions', 'publish', 'total'].sort());
       for (const elapsed of Object.values(timings)) { expect(Number.isFinite(elapsed)).toBe(true); expect(elapsed).toBeGreaterThanOrEqual(0); }
       expect(timings.total).toBeGreaterThan(1);
       expect(timings.compiler).toBeGreaterThan(0);
@@ -402,7 +402,7 @@ workerSuite('retained session worker', import.meta.url, () => {
       if (same.status !== 'revised') throw new Error(JSON.stringify(same));
       // The identical update keeps the published revision; its own durations sit beside it.
       expect(same.revision).toBe(revision);
-      expect(Object.keys(revision.timings).sort()).toEqual(['accesses', 'classify', 'compiler', 'decide', 'descriptions', 'inventory', 'link', 'publish', 'total']);
+      expect(Object.keys(revision.timings).sort()).toEqual(['accesses', 'classify', 'companions', 'compiler', 'decide', 'descriptions', 'inventory', 'link', 'publish', 'total']);
       const timings = same.timings!;
       frozenPlain(timings);
       expect(Object.keys(timings).sort()).toEqual(['invocationCheck', 'promotion', 'workerRoundTrip', 'workerStatus']);
