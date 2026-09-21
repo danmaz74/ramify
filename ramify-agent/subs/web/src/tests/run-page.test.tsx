@@ -1,8 +1,8 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, expect, test } from 'vitest';
 import {
-  analysisResponseSchema, capabilityListResponseSchema, decisionListResponseSchema, gateViewSchema, metricsResponseSchema,
-  runSnapshotSchema, type RunSnapshot,
+  analysisResponseSchema, capabilityListResponseSchema, capabilityStateSchema, decisionListResponseSchema, gateViewSchema, metricsResponseSchema,
+  runSnapshotSchema, workItemListResponseSchema, workItemResponseSchema, type RunSnapshot, type WorkItemSummary,
 } from '../../../harness/src/interfaces/protocol/runs.js';
 import { ClientError } from '../client.js';
 import { RunPage } from '../run-page.js';
@@ -98,6 +98,12 @@ function stubRun(extra: Partial<RunSnapshot> = {}): StubRun {
   };
 }
 
+const workItemSummary: WorkItemSummary = {
+  id: 'wi-001', module: 'collection-review/workspace/reviews', capability: 'send-button', origin: 'entry', goal: 'The send button',
+  state: 'working', follows: null, startedFor: null, currentIteration: 'wi-001.i02', waitingFor: [], completedBy: null,
+  counts: { outlineRevisions: 1, iterations: 2, gateAttempts: 4, invocations: 5 },
+};
+
 function clientWith(run: StubRun): StubClient {
   const client = new StubClient();
   client.runs.set(runId, run);
@@ -172,19 +178,131 @@ test('hypotheses are shown as forecasts with standing and revision, beside the d
   expect(decision.textContent).toContain('note-search@2');
 });
 
-test('progress lays out retained dependencies, keeps state totals, and opens the selected evidence', async () => {
+test('CM20: Progress offers By module and Dependencies, Dependencies by default, and mounts only the selected view', async () => {
+  const client = clientWith(stubRun());
+  render(<RunPage client={client} planId="review-notes" runId={runId} interval={60_000} />);
+  fireEvent.click(await screen.findByRole('tab', { name: 'Progress' }));
+  const progress = await screen.findByLabelText('Progress');
+  const views = within(within(progress).getByLabelText('Progress views')).getAllByRole('tab');
+  expect(views.map(view => [view.textContent, view.getAttribute('aria-selected')])).toEqual([['By module', 'false'], ['Dependencies', 'true']]);
+  await within(progress).findByLabelText('Scrollable capability dependency graph');
+  expect(within(progress).queryByLabelText('By module')).toBeNull();
+
+  fireEvent.click(within(progress).getByRole('tab', { name: 'By module' }));
+  const byModule = within(progress).getByLabelText('By module');
+  expect(byModule.textContent).toContain('By module is not available yet');
+  expect(within(progress).queryByLabelText('Dependencies')).toBeNull();
+  expect(within(progress).queryByLabelText('Scrollable capability dependency graph')).toBeNull();
+  // By module reads nothing until it is built; the comparison is not fetched.
+  expect(client.calls.filter(call => call.startsWith('getModuleCapabilities'))).toEqual([]);
+
+  const before = client.calls.filter(call => call.startsWith('getCapabilities')).length;
+  fireEvent.click(within(progress).getByRole('tab', { name: 'Dependencies' }));
+  await within(progress).findByLabelText('Scrollable capability dependency graph');
+  expect(client.calls.filter(call => call.startsWith('getCapabilities')).length).toBe(before + 1);
+});
+
+test('CM20: Progress stays visible while loading, empty or unavailable, naming the condition and never showing todo', async () => {
+  class PendingClient extends StubClient {
+    override getCapabilities(): Promise<never> { return new Promise(() => undefined); }
+  }
+  const pending = new PendingClient();
+  pending.runs.set(runId, stubRun());
+  render(<RunPage client={pending} planId="review-notes" runId={runId} interval={60_000} />);
+  fireEvent.click(await screen.findByRole('tab', { name: 'Progress' }));
+  const loading = within(await screen.findByLabelText('Dependencies')).getByRole('status');
+  expect(loading.textContent).toBe('Loading the capability progress…');
+  expect(screen.getByLabelText('Progress').textContent).not.toContain('todo');
+  cleanup();
+
+  const empty = clientWith({ ...stubRun(), capabilities: capabilityListResponseSchema.parse({ capabilities: [], total: 0 }) });
+  render(<RunPage client={empty} planId="review-notes" runId={runId} interval={60_000} />);
+  fireEvent.click(await screen.findByRole('tab', { name: 'Progress' }));
+  expect((await screen.findByText('The run has no registered or forecast capability yet.')).getAttribute('role')).toBe('status');
+  expect(screen.getByLabelText('Progress').textContent).not.toContain('todo');
+  cleanup();
+
+  const unavailable = clientWith({ ...stubRun(), capabilities: undefined });
+  render(<RunPage client={unavailable} planId="review-notes" runId={runId} interval={60_000} />);
+  fireEvent.click(await screen.findByRole('tab', { name: 'Progress' }));
+  const alert = await within(screen.getByLabelText('Progress')).findByRole('alert');
+  expect(alert.textContent).toContain('The capability progress is unavailable');
+  expect(screen.getByLabelText('Progress views')).toBeTruthy();
+  expect(screen.getByLabelText('Progress').textContent).not.toContain('todo');
+});
+
+test('CM15–CM17: Dependencies lays out retained dependencies with literal states, owners and the selected evidence', async () => {
   render(<RunPage client={clientWith(stubRun())} planId="review-notes" runId={runId} interval={60_000} />);
   fireEvent.click(await screen.findByRole('tab', { name: 'Progress' }));
   const graph = await screen.findByLabelText('Scrollable capability dependency graph');
-  expect(within(graph).getByRole('button', { name: 'send-button, working on, entry' })).toBeTruthy();
-  expect(within(graph).getByRole('button', { name: 'note-rendering, todo, forecast' })).toBeTruthy();
-  expect(screen.getByLabelText('Progress totals').textContent).toContain('Completed1');
+  const sendButton = within(graph).getByRole('button', { name: 'send-button, working, entry' });
+  expect(sendButton.textContent).toContain('current owner');
+  const forecast = within(graph).getByRole('button', { name: 'note-rendering, todo, forecast only' });
+  expect(forecast.textContent).toContain('suggested owner');
+  expect(screen.getByLabelText('State counts of the 4 returned capabilities').textContent).toContain('completed1');
   expect(screen.getByText('Dependency list').parentElement?.textContent).toContain('send-button depends on send-email');
 
   fireEvent.click(within(graph).getByRole('button', { name: 'send-email, completed' }));
   const details = screen.getByLabelText('Details for send-email');
   expect(details.textContent).toContain('ga-0007, ga-0006');
-  expect(details.textContent).toContain('wi-002');
+  expect(details.textContent).toContain('Provider work completed with current evidence');
+  expect(details.textContent).toContain('Depended on bysend-button');
+});
+
+test('CM19: a failed run says failed at run level only; a capability keeps its literal state and links to its work-item history', async () => {
+  expect(capabilityStateSchema.options).toEqual(['todo', 'working', 'completed']);
+  const failed = stubRun({
+    state: 'failed', phase: 'ended', endedAt: at, current: null, writer: { held: null, unsettled: null },
+    failure: { reason: 'repair-exhausted', message: 'Repair rounds of wi-001 were spent without a passing gate', evidence: ['ga-0005'] },
+  });
+  const run: StubRun = {
+    ...failed,
+    capabilities: capabilityListResponseSchema.parse({
+      capabilities: [
+        { capability: 'send-button', owner: 'collection-review/workspace/reviews', entry: true, tentative: false, state: 'working', reason: 'wi-001 is under way, iteration wi-001.i02', dependsOn: [], workItems: ['wi-001'], evidence: [] },
+        { capability: 'send-email', owner: 'collection-review/workspace/reviews', entry: false, tentative: false, state: 'todo', reason: 'wi-002 not started', dependsOn: [], workItems: ['wi-002'], evidence: [] },
+      ],
+      total: 2,
+    }),
+    workItems: workItemListResponseSchema.parse({
+      workItems: [workItemSummary],
+      total: 1,
+    }),
+    workItem: {
+      'wi-001': workItemResponseSchema.parse({
+        workItem: workItemSummary,
+        outlines: [],
+        iterations: [{
+          id: 'wi-001.i02', kind: 'implementation', stage: 0, goal: 'Send the note', approach: 'non-breaking',
+          scope: { modules: ['collection-review/workspace/reviews'], includedChildren: [], broad: false, rationale: 'The owner.', extra: [], read: [] },
+          checkpoint: 'iteration', completionEvidence: 'Its tests pass.', authorizations: [],
+          result: { outcome: 'exhausted', gate: 'ga-0005', commit: null, findings: [], changedAssumptions: [], recommendation: null },
+          gates: [{ id: 'ga-0005', checkpoint: 'iteration', verdict: 'failed', cause: 'in-scope', next: 'exhausted', repairRound: 3 }],
+          invocations: [],
+        }],
+        gates: [], requirements: [], requests: [],
+      }),
+    },
+  };
+  render(<RunPage client={clientWith(run)} planId="review-notes" runId={runId} interval={60_000} />);
+  await screen.findByText(/Read at version 12/);
+  // The run's own status carries the failure.
+  expect(document.querySelector('.run-page > .page-header .run-state')!.textContent).toBe('failed');
+
+  fireEvent.click(screen.getByRole('tab', { name: 'Progress' }));
+  const progress = screen.getByLabelText('Progress');
+  const graph = await within(progress).findByLabelText('Scrollable capability dependency graph');
+  expect(within(graph).getByRole('button', { name: 'send-button, working, entry' })).toBeTruthy();
+  expect(within(graph).getByRole('button', { name: 'send-email, todo' })).toBeTruthy();
+  expect(progress.textContent).not.toMatch(/fail/i);
+
+  fireEvent.click(within(graph).getByRole('button', { name: 'send-button, working, entry' }));
+  expect(screen.getByLabelText('Details for send-button').textContent).not.toMatch(/fail/i);
+  fireEvent.click(screen.getByRole('button', { name: 'Open the history of work item wi-001' }));
+  expect(screen.getByRole('tab', { name: 'Work items' }).getAttribute('aria-selected')).toBe('true');
+  const history = await screen.findByLabelText('Work item wi-001');
+  expect(await within(history).findByText(/Result: exhausted/)).toBeTruthy();
+  expect(history.textContent).toContain('ga-0005 failed');
 });
 
 test('a gate shows its commands and its bounded output tail', async () => {

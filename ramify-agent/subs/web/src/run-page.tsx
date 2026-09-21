@@ -3,7 +3,7 @@ import type {
   DecisionView, GateView, HypothesisView, InvocationEvaluation, Metric, MetricsResponse,
   ProjectedRunEvent, RunNotice, RunSnapshot, WorkItemResponse,
 } from '../../harness/src/interfaces/protocol/runs.js';
-import { CapabilityGraph } from './capability-graph.js';
+import { CapabilityDependencyGraph } from './capability-graph.js';
 import { newCommandId, type ConnectionState, type ProtocolClient } from './client.js';
 import { Markdown } from './markdown.js';
 import { routeHref } from './routes.js';
@@ -55,6 +55,7 @@ export function RunPage({ client, planId, runId, interval }: {
   const { run, events, error } = useRunProgress(client, planId, runId, interval);
   const connection = useConnection(client);
   const [area, setArea] = useState<Area>('overview');
+  const [workItem, setWorkItem] = useState<string | undefined>(undefined);
   const version = run?.version;
   const props: AreaProps = { client, planId, runId, version };
 
@@ -79,9 +80,9 @@ export function RunPage({ client, planId, runId, interval }: {
       {run && area === 'overview' && <Overview client={client} run={run} events={events} />}
       {area === 'plan' && <PlanAndEntries {...props} />}
       {area === 'decisions' && <HypothesesAndDecisions {...props} />}
-      {area === 'work' && <WorkItems {...props} />}
+      {area === 'work' && <WorkItems {...props} selected={workItem} onSelect={setWorkItem} />}
       {area === 'checks' && <Checks {...props} events={events} />}
-      {area === 'progress' && <Progress {...props} />}
+      {area === 'progress' && <Progress {...props} onOpenWorkItem={id => { setWorkItem(id); setArea('work'); }} />}
       {area === 'measurements' && <Measurements {...props} />}
     </section>
   );
@@ -355,9 +356,11 @@ function Decision({ decision }: { readonly decision: DecisionView }) {
 
 // Work items
 
-function WorkItems({ client, planId, runId, version }: AreaProps) {
+function WorkItems({ client, planId, runId, version, selected, onSelect: setSelected }: AreaProps & {
+  readonly selected: string | undefined;
+  readonly onSelect: (workItem: string) => void;
+}) {
   const list = useRunQuery(`work-items:${runId}`, version, () => client.getWorkItems(planId, runId));
-  const [selected, setSelected] = useState<string | undefined>(undefined);
   return (
     <div className="area" aria-label="Work items">
       <Loading state={list} what="the work items">
@@ -490,14 +493,47 @@ function GateDetail({ client, planId, runId, version, gate }: AreaProps & { read
 
 // Progress
 
-function Progress({ client, planId, runId, version }: AreaProps) {
-  const state = useRunQuery(`capabilities:${runId}`, version, () => client.getCapabilities(planId, runId));
+const progressViews = [
+  ['module', 'By module'],
+  ['dependencies', 'Dependencies'],
+] as const;
+type ProgressView = typeof progressViews[number][0];
+
+/*
+ * Two views of the harness's capability progress. Only the selected one is
+ * mounted, so the page never loads both large visualizations at once. Until
+ * By module is built on the shared module tree, Dependencies is the default.
+ */
+function Progress({ onOpenWorkItem, ...props }: AreaProps & { readonly onOpenWorkItem: (workItem: string) => void }) {
+  const [view, setView] = useState<ProgressView>('dependencies');
   return (
     <div className="area" aria-label="Progress">
-      <Loading state={state} what="the progress">
-        {data => <CapabilityGraph capabilities={data.capabilities} total={data.total} />}
-      </Loading>
+      <nav className="tabs progress-views" aria-label="Progress views">
+        {progressViews.map(([id, label]) => (
+          <button key={id} type="button" role="tab" aria-selected={view === id} className={view === id ? 'tab tab-selected' : 'tab'} onClick={() => setView(id)}>{label}</button>
+        ))}
+      </nav>
+      {view === 'module' && (
+        <section className="progress-view" aria-label="By module">
+          <p className="muted" role="status">By module is not available yet. Dependencies shows every returned capability with its state.</p>
+        </section>
+      )}
+      {view === 'dependencies' && <Dependencies {...props} onOpenWorkItem={onOpenWorkItem} />}
     </div>
+  );
+}
+
+/** The dependency graph, or the condition that stands in for it: never a `todo` in place of an answer. */
+function Dependencies({ client, planId, runId, version, onOpenWorkItem }: AreaProps & { readonly onOpenWorkItem: (workItem: string) => void }) {
+  const state = useRunQuery(`capabilities:${runId}`, version, () => client.getCapabilities(planId, runId));
+  return (
+    <section className="progress-view" aria-label="Dependencies">
+      {state.status === 'loading' && <p className="muted" role="status">Loading the capability progress…</p>}
+      {state.status === 'failed' && <p className="failure" role="alert">The capability progress is unavailable: {state.error.message}</p>}
+      {state.status === 'ready' && (
+        <CapabilityDependencyGraph capabilities={state.data.capabilities} total={state.data.total} onOpenWorkItem={onOpenWorkItem} />
+      )}
+    </section>
   );
 }
 

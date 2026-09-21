@@ -1,8 +1,17 @@
 import { useId, useMemo, useState } from 'react';
-import type { CapabilityProgress } from '../../harness/src/interfaces/protocol/runs.js';
+import type { CapabilityListResponse, CapabilityProgress } from '../../harness/src/interfaces/protocol/runs.js';
+
+/*
+ * Progress → Dependencies: every capability the harness returned, once, with
+ * arrows from each consumer to the capabilities it depends on. The harness
+ * owns every displayed fact: the state is its literal `todo`, `working` or
+ * `completed`, and the reason is its retained text, never read for meaning.
+ * The browser owns only deterministic placement and selection. Columns are
+ * dependency depth, not an execution order.
+ */
 
 const nodeWidth = 232;
-const baseNodeHeight = 126;
+const baseNodeHeight = 142;
 const ownerCharactersPerLine = 24;
 const ownerLineHeight = 18;
 const columnGap = 88;
@@ -10,6 +19,16 @@ const rowGap = 28;
 const horizontalPadding = 28;
 const graphTop = 54;
 const graphBottom = 24;
+/** The room a cycle group keeps above its first member for its label. */
+const cycleHeader = 26;
+const cyclePadding = 9;
+
+export interface CapabilityDependencyGraphProps {
+  readonly capabilities: CapabilityListResponse['capabilities'];
+  readonly total: CapabilityListResponse['total'];
+  /** Opens one work item's history; without it, work items are listed as text. */
+  readonly onOpenWorkItem?: ((workItem: string) => void) | undefined;
+}
 
 export interface CapabilityGraphNode {
   readonly capability: CapabilityProgress;
@@ -27,6 +46,7 @@ export interface CapabilityGraphEdge {
   readonly tentative: boolean;
 }
 
+/** Strongly connected capabilities: one group, drawn with its internal edges. */
 export interface CapabilityGraphCycle {
   readonly component: number;
   readonly capabilities: readonly string[];
@@ -40,10 +60,16 @@ export interface CapabilityGraphLayout {
   readonly nodes: readonly CapabilityGraphNode[];
   readonly edges: readonly CapabilityGraphEdge[];
   readonly cycles: readonly CapabilityGraphCycle[];
+  /** Dependency targets absent from the response, in first-reference order; no node is made for them. */
+  readonly omittedTargets: readonly string[];
   readonly columns: number;
   readonly width: number;
   readonly height: number;
 }
+
+/** The owner's label: a registered capability's module is its current owner; a forecast's is only suggested. */
+export const ownerLabel = (capability: Pick<CapabilityProgress, 'tentative'>): string =>
+  capability.tentative ? 'suggested owner' : 'current owner';
 
 function nodeHeight(capability: CapabilityProgress): number {
   const segments = capability.owner.split('/').map((segment, index, all) => `${segment}${index < all.length - 1 ? '/' : ''}`);
@@ -71,9 +97,11 @@ function ModulePath({ module }: { readonly module: string }) {
 }
 
 /**
- * A deterministic, dependency-first layout for the harness projection.
- * Consumers stay on the left and the capabilities they depend on move right.
- * Strongly connected capabilities share a column and get one cycle outline.
+ * A deterministic layout of one response. Each capability's column is its
+ * longest dependency depth from a capability nothing returned depends on, so
+ * consumers are left of their dependencies and direct links may skip
+ * columns. Strongly connected capabilities form one group in one column,
+ * outlined with their internal edges, rather than an implied order.
  */
 export function layoutCapabilityGraph(capabilities: readonly CapabilityProgress[]): CapabilityGraphLayout {
   const byId = new Map(capabilities.map(capability => [capability.capability, capability]));
@@ -82,7 +110,10 @@ export function layoutCapabilityGraph(capabilities: readonly CapabilityProgress[
     capability.capability,
     [...new Set(capability.dependsOn.map(link => link.capability).filter(target => byId.has(target)))],
   ]));
+  const omittedTargets = [...new Set(capabilities.flatMap(capability => capability.dependsOn.map(link => link.capability))
+    .filter(target => !byId.has(target)))];
 
+  // Tarjan's strongly connected components, visited in response order.
   let nextIndex = 0;
   const indices = new Map<string, number>();
   const lowLinks = new Map<string, number>();
@@ -139,18 +170,15 @@ export function layoutCapabilityGraph(capabilities: readonly CapabilityProgress[
     }
   }
 
-  const componentOrder = (left: number, right: number): number => {
-    const leftIndex = Math.min(...components[left]!.map(id => order.get(id)!));
-    const rightIndex = Math.min(...components[right]!.map(id => order.get(id)!));
-    return leftIndex - rightIndex || components[left]![0]!.localeCompare(components[right]![0]!);
-  };
+  const firstIndex = components.map(component => Math.min(...component.map(id => order.get(id)!)));
+  const componentOrder = (left: number, right: number): number => firstIndex[left]! - firstIndex[right]!;
+
+  // Longest path over the condensation, which is acyclic.
   const queue = incoming.map((count, component) => ({ count, component }))
     .filter(({ count }) => count === 0).map(({ component }) => component).sort(componentOrder);
   const rank = components.map(() => 0);
-  const visited: number[] = [];
   while (queue.length > 0) {
     const component = queue.shift()!;
-    visited.push(component);
     for (const dependency of [...outgoing[component]!].sort(componentOrder)) {
       rank[dependency] = Math.max(rank[dependency]!, rank[component]! + 1);
       incoming[dependency]! -= 1;
@@ -161,12 +189,6 @@ export function layoutCapabilityGraph(capabilities: readonly CapabilityProgress[
     }
   }
 
-  // The SCC condensation is acyclic, but retaining this fallback makes a
-  // partially malformed future projection visible rather than unrenderable.
-  for (let component = 0; component < components.length; component += 1) {
-    if (!visited.includes(component)) visited.push(component);
-  }
-
   const columnCount = capabilities.length === 0 ? 0 : Math.max(...rank) + 1;
   const componentColumns = Array.from({ length: columnCount }, () => [] as number[]);
   for (let component = 0; component < components.length; component += 1) {
@@ -174,40 +196,38 @@ export function layoutCapabilityGraph(capabilities: readonly CapabilityProgress[
   }
   for (const column of componentColumns) column.sort(componentOrder);
 
+  const isCycle = (component: number): boolean =>
+    components[component]!.length > 1 || components[component]!.some(id => dependencies.get(id)?.includes(id));
+
   const nodes: CapabilityGraphNode[] = [];
   const cycles: CapabilityGraphCycle[] = [];
   let greatestBottom = graphTop;
   componentColumns.forEach((column, columnIndex) => {
     let row = 0;
     let y = graphTop;
+    const x = horizontalPadding + columnIndex * (nodeWidth + columnGap);
     for (const component of column) {
-      const firstY = y;
+      const cycle = isCycle(component);
+      const groupTop = y;
+      if (cycle) y += cycleHeader;
       for (const id of components[component]!) {
         const capability = byId.get(id)!;
         const height = nodeHeight(capability);
-        nodes.push({
-          capability,
-          component,
-          column: columnIndex,
-          row,
-          x: horizontalPadding + columnIndex * (nodeWidth + columnGap),
-          y,
-          height,
-        });
+        nodes.push({ capability, component, column: columnIndex, row, x, y, height });
         row += 1;
         y += height + rowGap;
       }
-      const selfLoop = components[component]!.some(id => dependencies.get(id)?.includes(id));
-      if (components[component]!.length > 1 || selfLoop) {
+      if (cycle) {
         const lastBottom = y - rowGap;
         cycles.push({
           component,
           capabilities: components[component]!,
-          x: horizontalPadding - 9 + columnIndex * (nodeWidth + columnGap),
-          y: firstY - 9,
-          width: nodeWidth + 18,
-          height: lastBottom - firstY + 18,
+          x: x - cyclePadding,
+          y: groupTop - cyclePadding,
+          width: nodeWidth + 2 * cyclePadding,
+          height: lastBottom - groupTop + 2 * cyclePadding,
         });
+        y += cyclePadding;
       }
     }
     if (row > 0) greatestBottom = Math.max(greatestBottom, y - rowGap);
@@ -222,7 +242,7 @@ export function layoutCapabilityGraph(capabilities: readonly CapabilityProgress[
       edgeByPair.set(key, {
         from: capability.capability,
         to: link.capability,
-        // If malformed input repeats an edge, a confirmed observation wins.
+        // If a response repeats an edge, a confirmed observation wins.
         tentative: (previous?.tentative ?? true) && link.tentative,
       });
     }
@@ -232,6 +252,7 @@ export function layoutCapabilityGraph(capabilities: readonly CapabilityProgress[
     nodes,
     edges: [...edgeByPair.values()],
     cycles,
+    omittedTargets,
     columns: columnCount,
     width: columnCount === 0 ? 0 : horizontalPadding * 2 + columnCount * nodeWidth + (columnCount - 1) * columnGap,
     height: capabilities.length === 0 ? 0 : greatestBottom + graphBottom,
@@ -243,6 +264,7 @@ function edgePath(from: CapabilityGraphNode, to: CapabilityGraphNode): string {
   const fromY = from.y + from.height / 2;
   const toY = to.y + to.height / 2;
   if (from.column === to.column) {
+    // Within a cycle group: loop out to the right and back.
     const outside = fromX + 36 + Math.abs(from.row - to.row) * 5;
     return `M ${fromX} ${fromY} C ${outside} ${fromY}, ${outside} ${toY}, ${to.x + nodeWidth} ${toY}`;
   }
@@ -251,64 +273,89 @@ function edgePath(from: CapabilityGraphNode, to: CapabilityGraphNode): string {
   return `M ${fromX} ${fromY} C ${middle} ${fromY}, ${middle} ${toY}, ${toX} ${toY}`;
 }
 
-const stateLabel = (state: CapabilityProgress['state']): string => state === 'working' ? 'working on' : state;
+function nodeName(capability: CapabilityProgress): string {
+  return `${capability.capability}, ${capability.state}${capability.entry ? ', entry' : ''}${capability.tentative ? ', forecast only' : ''}`;
+}
 
-export function CapabilityGraph({ capabilities, total }: {
-  readonly capabilities: readonly CapabilityProgress[];
-  readonly total: number;
-}) {
+export function CapabilityDependencyGraph({ capabilities, total, onOpenWorkItem }: CapabilityDependencyGraphProps) {
   const layout = useMemo(() => layoutCapabilityGraph(capabilities), [capabilities]);
   const markerPrefix = useId().replaceAll(':', '');
   const confirmedMarker = `${markerPrefix}-confirmed-arrow`;
   const tentativeMarker = `${markerPrefix}-tentative-arrow`;
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const selected = capabilities.find(capability => capability.capability === selectedId)
-    ?? capabilities.find(capability => capability.entry)
-    ?? capabilities[0];
+  const selected = capabilities.find(capability => capability.capability === selectedId);
   const nodeById = new Map(layout.nodes.map(node => [node.capability.capability, node]));
-  const missingTargets = [...new Set(capabilities.flatMap(capability => capability.dependsOn.map(link => link.capability))
-    .filter(target => !nodeById.has(target)))];
+  const omitted = new Set(layout.omittedTargets);
   const counts = {
     todo: capabilities.filter(capability => capability.state === 'todo').length,
     working: capabilities.filter(capability => capability.state === 'working').length,
     completed: capabilities.filter(capability => capability.state === 'completed').length,
   };
+  const bounded = total > capabilities.length;
+
+  const coverage = (bounded || omitted.size > 0) && (
+    <div className="graph-coverage warn" role="status" aria-label="Response coverage">
+      {bounded && (
+        <p>
+          Showing <strong>{capabilities.length} / {total}</strong> capabilities: the response is bounded, and the
+          other {total - capabilities.length} are not in it. Every count here is of the returned set.
+        </p>
+      )}
+      {omitted.size > 0 && (
+        <>
+          <p>Dependencies not in this response, shown as unavailable rather than as nodes:</p>
+          <ul aria-label="Unavailable dependency targets">
+            {layout.omittedTargets.map(target => <li key={target}><code>{target}</code></li>)}
+          </ul>
+        </>
+      )}
+    </div>
+  );
 
   if (capabilities.length === 0) {
-    return <section className="panel capability-graph" aria-label="Capability dependency graph"><h2>Capability progress</h2><p className="empty">No capabilities have been projected for this run.</p></section>;
+    return (
+      <section className="panel capability-graph" aria-label="Capability dependency graph">
+        <div className="capability-graph-header"><h2>Capability dependencies</h2></div>
+        {coverage}
+        {!bounded && <p className="empty" role="status">The run has no registered or forecast capability yet.</p>}
+      </section>
+    );
   }
 
   return (
     <section className="panel capability-graph" aria-labelledby="capability-graph-heading">
       <div className="capability-graph-header">
         <div>
-          <h2 id="capability-graph-heading">Capability progress</h2>
-          <p className="muted">Arrows run from a consumer to the capability it depends on. Select a capability for its retained reason and evidence.</p>
+          <h2 id="capability-graph-heading">Capability dependencies</h2>
+          <p className="muted">
+            Arrows run from a consumer to the capability it depends on. Columns are dependency depth, not an
+            execution order. Select a capability for its reason, dependencies, work items and evidence.
+          </p>
         </div>
-        <dl className="capability-counts" aria-label="Progress totals">
-          <div><dt>Todo</dt><dd>{counts.todo}</dd></div>
-          <div><dt>Working on</dt><dd>{counts.working}</dd></div>
-          <div><dt>Completed</dt><dd>{counts.completed}</dd></div>
-        </dl>
+        <div className="capability-counts-block">
+          <p className="capability-counts-label" id={`${markerPrefix}-counts`}>
+            State counts of the {capabilities.length} returned {capabilities.length === 1 ? 'capability' : 'capabilities'}
+          </p>
+          <dl className="capability-counts" aria-labelledby={`${markerPrefix}-counts`}>
+            <div><dt>todo</dt><dd>{counts.todo}</dd></div>
+            <div><dt>working</dt><dd>{counts.working}</dd></div>
+            <div><dt>completed</dt><dd>{counts.completed}</dd></div>
+          </dl>
+        </div>
       </div>
-      {(total > capabilities.length || missingTargets.length > 0) && (
-        <p className="graph-coverage warn" role="status">
-          This graph is incomplete: showing {capabilities.length} of {total} capabilities
-          {missingTargets.length > 0 ? `; ${missingTargets.length} referenced ${missingTargets.length === 1 ? 'dependency is' : 'dependencies are'} unavailable in this response (${missingTargets.join(', ')})` : ''}.
-        </p>
-      )}
+      {coverage}
       <div className="graph-legend" aria-label="Graph legend">
         <span><i className="legend-line" /> confirmed dependency</span>
         <span><i className="legend-line legend-tentative" /> tentative dependency</span>
         <span><i className="legend-node legend-entry" /> entry</span>
-        <span><i className="legend-node legend-forecast" /> forecast</span>
+        <span><i className="legend-node legend-forecast" /> forecast only</span>
         <span><i className="legend-cycle" /> dependency cycle</span>
       </div>
       <div className="capability-graph-scroll" tabIndex={0} aria-label="Scrollable capability dependency graph">
-        <div className="capability-graph-surface" style={{ width: layout.width, height: layout.height }} role="group" aria-label={`${capabilities.length} capabilities in ${layout.columns} dependency columns`}>
+        <div className="capability-graph-surface" style={{ width: layout.width, height: layout.height }} role="group" aria-label={`${capabilities.length} capabilities in ${layout.columns} dependency depth columns`}>
           {Array.from({ length: layout.columns }, (_, column) => (
             <div key={column} className="graph-column-label" style={{ left: horizontalPadding + column * (nodeWidth + columnGap), width: nodeWidth }}>
-              {column === 0 ? 'Starting capabilities' : `Dependency depth ${column}`}
+              Depth {column}
             </div>
           ))}
           <svg className="capability-edges" width={layout.width} height={layout.height} aria-hidden="true">
@@ -321,51 +368,135 @@ export function CapabilityGraph({ capabilities, total }: {
               </marker>
             </defs>
             {layout.cycles.map(cycle => <rect key={cycle.component} className="capability-cycle" x={cycle.x} y={cycle.y} width={cycle.width} height={cycle.height} rx="10" />)}
-            {layout.edges.map((edge, index) => {
+            {layout.edges.map(edge => {
               const from = nodeById.get(edge.from)!;
               const to = nodeById.get(edge.to)!;
-              return <path key={`${edge.from}:${edge.to}:${index}`} className={`capability-edge${edge.tentative ? ' capability-edge-tentative' : ''}`} d={edgePath(from, to)} markerEnd={`url(#${edge.tentative ? tentativeMarker : confirmedMarker})`} />;
+              return (
+                <path
+                  key={`${edge.from}:${edge.to}`}
+                  className={`capability-edge${edge.tentative ? ' capability-edge-tentative' : ''}`}
+                  data-from={edge.from}
+                  data-to={edge.to}
+                  d={edgePath(from, to)}
+                  markerEnd={`url(#${edge.tentative ? tentativeMarker : confirmedMarker})`}
+                />
+              );
             })}
           </svg>
+          {layout.cycles.map(cycle => (
+            <div key={cycle.component} className="capability-cycle-label" style={{ left: cycle.x + 10, top: cycle.y + 6, width: cycle.width - 20 }}>
+              Dependency cycle: no order among {cycle.capabilities.length === 1 ? 'itself' : 'these'}
+            </div>
+          ))}
           {layout.nodes.map(node => {
             const capability = node.capability;
+            const isSelected = selected?.capability === capability.capability;
             return (
               <button
                 key={capability.capability}
                 type="button"
-                className={`capability-node capability-node-${capability.state}${capability.tentative ? ' capability-node-tentative' : ''}${selected?.capability === capability.capability ? ' capability-node-selected' : ''}`}
+                className={`capability-node capability-node-${capability.state}${capability.tentative ? ' capability-node-tentative' : ''}${isSelected ? ' capability-node-selected' : ''}`}
                 style={{ left: node.x, top: node.y, width: nodeWidth, height: node.height }}
-                aria-pressed={selected?.capability === capability.capability}
-                aria-label={`${capability.capability}, ${stateLabel(capability.state)}${capability.entry ? ', entry' : ''}${capability.tentative ? ', forecast' : ''}`}
+                aria-pressed={isSelected}
+                aria-label={nodeName(capability)}
                 onClick={() => setSelectedId(capability.capability)}
               >
                 <span className="capability-node-title"><code>{capability.capability}</code></span>
+                <span className="capability-node-owner-label">{ownerLabel(capability)}</span>
                 <span className="capability-node-owner"><ModulePath module={capability.owner} /></span>
-                <span className="capability-node-badges"><span className={`badge state-${capability.state}`}>{stateLabel(capability.state)}</span>{capability.entry && <span className="badge">entry</span>}{capability.tentative && <span className="badge tentative">forecast</span>}</span>
+                <span className="capability-node-badges">
+                  <span className={`badge state-${capability.state}`}>{capability.state}</span>
+                  {capability.entry && <span className="badge">entry</span>}
+                  {capability.tentative && <span className="badge tentative">forecast only</span>}
+                </span>
                 <span className="capability-node-meta">{capability.workItems.length} work item{capability.workItems.length === 1 ? '' : 's'} · {capability.evidence.length} evidence</span>
               </button>
             );
           })}
         </div>
       </div>
-      {selected && (
-        <section className="capability-detail" aria-live="polite" aria-label={`Details for ${selected.capability}`}>
-          <h3><code>{selected.capability}</code></h3>
-          <p>{selected.reason}</p>
-          <dl className="facts">
-            <div><dt>Owner</dt><dd><code>{selected.owner}</code></dd></div>
-            <div><dt>Work items</dt><dd>{selected.workItems.length > 0 ? selected.workItems.join(', ') : 'none recorded'}</dd></div>
-            <div><dt>Verification evidence</dt><dd>{selected.evidence.length > 0 ? selected.evidence.join(', ') : 'none recorded'}</dd></div>
-            <div><dt>Depends on</dt><dd>{selected.dependsOn.length > 0 ? selected.dependsOn.map(link => `${link.capability}${link.tentative ? ' (tentative)' : ''}`).join(', ') : 'nothing recorded'}</dd></div>
-          </dl>
-        </section>
-      )}
+      {selected
+        ? <CapabilityDetail capability={selected} capabilities={capabilities} omitted={omitted} onOpenWorkItem={onOpenWorkItem} />
+        : <p className="capability-detail muted">No capability is selected.</p>}
       <details className="capability-dependency-list">
         <summary>Dependency list</summary>
         {layout.edges.length === 0
-          ? <p className="muted">No dependency links are recorded.</p>
-          : <ul>{layout.edges.map((edge, index) => <li key={`${edge.from}:${edge.to}:${index}`}><code>{edge.from}</code> depends on <code>{edge.to}</code>{edge.tentative ? ' (tentative)' : ''}</li>)}</ul>}
+          ? <p className="muted">No dependency between returned capabilities is recorded.</p>
+          : <ul>{layout.edges.map(edge => <li key={`${edge.from}:${edge.to}`}><code>{edge.from}</code> depends on <code>{edge.to}</code>{edge.tentative ? ' (tentative)' : ''}</li>)}</ul>}
+        {layout.cycles.length > 0 && (
+          <>
+            <p>Dependency cycles, each with its internal dependencies:</p>
+            <ul aria-label="Dependency cycles">
+              {layout.cycles.map(cycle => {
+                const members = new Set(cycle.capabilities);
+                const internal = layout.edges.filter(edge => members.has(edge.from) && members.has(edge.to));
+                return (
+                  <li key={cycle.component}>
+                    <code>{cycle.capabilities.join(', ')}</code>: {internal.map(edge => `${edge.from} → ${edge.to}${edge.tentative ? ' (tentative)' : ''}`).join('; ')}
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        )}
       </details>
+    </section>
+  );
+}
+
+function CapabilityDetail({ capability, capabilities, omitted, onOpenWorkItem }: {
+  readonly capability: CapabilityProgress;
+  readonly capabilities: readonly CapabilityProgress[];
+  readonly omitted: ReadonlySet<string>;
+  readonly onOpenWorkItem: ((workItem: string) => void) | undefined;
+}) {
+  const dependents = capabilities.filter(other => other.dependsOn.some(link => link.capability === capability.capability));
+  return (
+    <section className="capability-detail" aria-live="polite" aria-label={`Details for ${capability.capability}`}>
+      <h3>
+        <code>{capability.capability}</code> <span className={`badge state-${capability.state}`}>{capability.state}</span>
+        {capability.entry && <span className="badge">entry</span>}
+        {capability.tentative && <span className="badge tentative">forecast only</span>}
+      </h3>
+      <dl className="facts">
+        <div><dt>Reason</dt><dd>{capability.reason}</dd></div>
+        <div><dt>{ownerLabel(capability)}</dt><dd><code>{capability.owner}</code></dd></div>
+        <div>
+          <dt>Depends on</dt>
+          <dd>
+            {capability.dependsOn.length === 0 ? 'nothing recorded' : (
+              <ul className="inline-list">
+                {capability.dependsOn.map(link => (
+                  <li key={link.capability}>
+                    <code>{link.capability}</code>{link.tentative ? ' (tentative)' : ''}{omitted.has(link.capability) ? ' (not in this response)' : ''}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt>Depended on by</dt>
+          <dd>{dependents.length === 0 ? 'no returned capability' : dependents.map(other => other.capability).join(', ')}</dd>
+        </div>
+        <div>
+          <dt>Work items</dt>
+          <dd>
+            {capability.workItems.length === 0 ? 'none recorded' : (
+              <ul className="inline-list" aria-label="Work items">
+                {capability.workItems.map(workItem => (
+                  <li key={workItem}>
+                    {onOpenWorkItem
+                      ? <button type="button" className="link" aria-label={`Open the history of work item ${workItem}`} onClick={() => onOpenWorkItem(workItem)}>{workItem}</button>
+                      : <code>{workItem}</code>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </dd>
+        </div>
+        <div><dt>Verification evidence</dt><dd>{capability.evidence.length > 0 ? capability.evidence.join(', ') : 'none recorded'}</dd></div>
+      </dl>
     </section>
   );
 }
