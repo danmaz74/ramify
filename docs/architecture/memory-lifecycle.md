@@ -1,6 +1,6 @@
 # Memory lifecycle
 
-**Date:** 2026-09-11; revised 2026-09-17. **Status:** Decided resource-management
+**Date:** 2026-09-11; revised 2026-09-21. **Status:** Decided resource-management
 requirements, implemented for the resident daemon and its retained analysis
 sessions with the defaults below. Hook latency on the reference and 100-owner
 projects is measured against its acceptable-time budget; memory plateaus, the
@@ -147,8 +147,20 @@ project, so the daemon keeps it only for the most recently used contexts:
 | `maxHotContexts` | 2 | Contexts holding a compiler server. |
 | `warmIdleMs`, `coldRetainMs` | 600,000 ms, 1,800,000 ms | Idle demotion and expiry. |
 | `workerHeapMiB` | 512 | The worker's effective V8 old-generation limit. Exhaustion is an explicit resource failure, never a pass. |
-| `maxRetainedFactBytes` | 96 MiB | Current and historical facts of one session, accounted at publication; an oversized candidate fails explicitly. |
+| `maxRetainedFactBytes` | 96 MiB | Current and historical facts of one session, counted by object identity at publication, as below; an oversized candidate fails explicitly and the current facts remain. |
 | `maxRetainedBytesGlobal` | 512 MiB | Retained bytes across contexts. |
+
+Retained facts are counted by object identity. Each distinct object that the
+current or a historical version reaches contributes its own serialized bytes
+once: its brackets, separators, keys and primitive members, while each object
+member is counted as an object of its own. A frozen object shared by several
+versions, or by several parents in one version, therefore counts once, and facts
+that share nothing count exactly their serialized length. A candidate is counted
+jointly with the retained versions, so it adds only the objects none of them
+holds. The session keeps a reference count per counted object: a publication
+visits only the candidate's new objects, and releasing a version visits only
+the objects no other retained version reaches. The session's `factBytes` is this
+joint total, and context eviction uses it.
 
 The compiler server's native memory lies outside the worker's heap limit. The
 session status samples its RSS as evidence and enforces no RSS limit. Worker

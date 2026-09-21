@@ -150,9 +150,113 @@ export function buildIndexes(files: Readonly<Record<string, FileFacts>>, root: s
     contributors: Object.fromEntries([...contributors].sort(([a], [b]) => byteOrder(a, b)).map(([key, set]) => [key, sortedPaths(set)])) });
 }
 
-/** Serialized size of the retained facts; measured at publication. */
+const plainString = /^[\x20\x21\x23-\x5b\x5d-\x7e]*$/;
+/** UTF-8 length of a string's JSON serialization. */
+const stringBytes = (value: string): number => plainString.test(value) ? value.length + 2 : Buffer.byteLength(JSON.stringify(value));
+const numberBytes = (value: number): number => Number.isFinite(value) ? String(value).length : 4;
+/** Each ledger entry packs an object's own bytes, below 2^32, and its reference count. */
+const countSpan = 2 ** 21;
+
+/**
+ * An object's own serialized bytes: its brackets, separators, keys and
+ * primitive members, with each object or array member contributing nothing,
+ * since that member is counted as an object of its own. Summed over every
+ * object of an unshared tree, this equals the tree's JSON length.
+ */
+function ownBytes(value: object, children: object[]): number {
+  let bytes = 2, members = 0;
+  if (Array.isArray(value)) {
+    for (const item of value as unknown[]) {
+      if (members++) bytes++;
+      if (typeof item === 'object' && item !== null) children.push(item);
+      else bytes += typeof item === 'string' ? stringBytes(item) : typeof item === 'number' ? numberBytes(item)
+        : typeof item === 'boolean' ? (item ? 4 : 5) : 4;
+    }
+    return bytes;
+  }
+  for (const key in value) {
+    const item = (value as Record<string, unknown>)[key];
+    let size: number;
+    if (typeof item === 'object') { size = item === null ? 4 : 0; if (item !== null) children.push(item); }
+    else if (typeof item === 'string') size = stringBytes(item);
+    else if (typeof item === 'number') size = numberBytes(item);
+    else if (typeof item === 'boolean') size = item ? 4 : 5;
+    else continue;
+    if (members++) bytes++;
+    bytes += stringBytes(key) + 1 + size;
+  }
+  return bytes;
+}
+
+/**
+ * Retained-fact accounting by object identity. Every distinct object reachable
+ * from the retained roots counts its own serialized bytes once, however many
+ * roots and parents refer to it. Facts are frozen, so an object's bytes and
+ * members never change while it is counted. Retaining a root visits only the
+ * objects not yet counted; releasing one visits only the objects it alone
+ * kept, by reference counts over the acyclic facts.
+ */
+export class FactLedger {
+  readonly #entries = new Map<object, number>();
+  /** References beyond the packed count's range, for an object referred to that often. */
+  readonly #overflow = new Map<object, number>();
+  #total = 0;
+
+  /** Bytes of every distinct object the retained roots reach. */
+  get total(): number { return this.#total; }
+
+  /** Count `root` as retained once more; returns the bytes it added. */
+  retain(root: object): number {
+    const entries = this.#entries, pending: object[] = [root];
+    let added = 0;
+    while (pending.length) {
+      const value = pending.pop()!;
+      const entry = entries.get(value);
+      if (entry !== undefined) {
+        if (entry % countSpan < countSpan - 1) entries.set(value, entry + 1);
+        else this.#overflow.set(value, (this.#overflow.get(value) ?? 0) + 1);
+        continue;
+      }
+      const bytes = ownBytes(value, pending);
+      entries.set(value, bytes * countSpan + 1);
+      added += bytes;
+    }
+    this.#total += added;
+    return added;
+  }
+
+  /** Release one retention of `root`; returns the bytes no retained root reaches any longer. */
+  release(root: object): number {
+    const entries = this.#entries, pending: object[] = [root];
+    let freed = 0;
+    while (pending.length) {
+      const value = pending.pop()!;
+      const entry = entries.get(value);
+      if (entry === undefined) throw new Error('Released facts were not retained');
+      const extra = this.#overflow.get(value);
+      if (extra !== undefined) { if (extra > 1) this.#overflow.set(value, extra - 1); else this.#overflow.delete(value); continue; }
+      if (entry % countSpan > 1) { entries.set(value, entry - 1); continue; }
+      entries.delete(value);
+      freed += Math.floor(entry / countSpan);
+      if (Array.isArray(value)) { for (const item of value as unknown[]) if (typeof item === 'object' && item !== null) pending.push(item); }
+      else for (const key in value) {
+        const item = (value as Record<string, unknown>)[key];
+        if (typeof item === 'object' && item !== null) pending.push(item);
+      }
+    }
+    this.#total -= freed;
+    return freed;
+  }
+
+  clear(): void { this.#entries.clear(); this.#overflow.clear(); this.#total = 0; }
+}
+
+/**
+ * Retained size of one fact set: the serialized bytes of its distinct
+ * objects, each counted once however often the facts refer to it.
+ */
 export function factBytes(facts: SessionFacts): number {
-  return Buffer.byteLength(JSON.stringify(facts));
+  return new FactLedger().retain(facts);
 }
 
 const place = (location: SourceLocation): string => location.file;

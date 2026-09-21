@@ -585,6 +585,10 @@ and outcomes out. A full report crosses only when a caller requests one. Batch
 checks keep their finite compiler helpers and share the pipeline code.
 
 **Retained facts.** The session retains the observed inputs, per-file export descriptions with the files, resources, shims and absences each one depended on, per-file access facts, the linked model, per-access decisions and reverse indexes.
+The linked descriptions hold the model itself, one frozen object built once per
+link, and each decision refers to that model's frozen original. Versions share
+every unchanged frozen object, and the retained-fact limit counts a shared
+object once, as [memory lifecycle](memory-lifecycle.md#retained-sessions-and-their-levels) defines.
 The whole-project catalog is the assembly of the per-file descriptions, so batch
 and session produce it with the same code. The project observer records every
 input the analysis used, including the compiler's reads, existence probes and

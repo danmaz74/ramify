@@ -4,7 +4,7 @@ import type { LinkedDescriptions } from '../subs/descriptions/src/interfaces/lin
 import { linkDescriptions } from '../subs/descriptions/src/link.js';
 import type { ParsedDescription } from '../subs/descriptions/src/interfaces/syntax.js';
 import { parseDescription } from '../subs/descriptions/src/parse.js';
-import { buildModel, deriveSourceAreas, originalKey } from '../subs/model/src/index.js';
+import { deriveSourceAreas, originalKey } from '../subs/model/src/index.js';
 import type { Model, ResolvedTagRegistry, SourceArea } from '../subs/model/src/interfaces/model.js';
 import type { CapturedInput, InventoryUpdate, ObservedChange, ProjectInventory, ProjectIssue, ProjectObserver, ProjectRequest } from '../subs/project/src/interfaces/project.js';
 import { readProject } from '../subs/project/src/read-project.js';
@@ -145,11 +145,9 @@ function link(state: SessionState, inventory: ProjectInventory, catalog: SourceC
     pairs += selection.pairs.length;
     if (pairs > state.request.limits.maxExposurePairs) throw new WorkLimit('maxExposurePairs', state.request.limits.maxExposurePairs, pairs);
   }
-  const model = buildModel(linked.modelInput);
-  if (model.status === 'invalid') {
-    return { linked, model: null, issues: model.issues.map(issue => diagnostic(issue.code, issue.message, 'description', issue.locations)) };
-  }
-  return { linked, model: model.value, issues: [] };
+  // Linking built and validated the model; its frozen result is the retained
+  // model, so the linked layer and the model are one object.
+  return { linked, model: linked.modelInput, issues: [] };
 }
 
 /** Decide the named accesses against the model; diagnostics are grouped per access. */
@@ -285,7 +283,8 @@ const originalSurface = (original: CatalogOriginal): string =>
 
 /**
  * Replace the declaration and companion evidence of moved originals inside
- * the retained model and its link input, without a relink. The decisions
+ * the retained model, without a relink. The model is patched once and the
+ * link input refers to the patched model, as a relink would. The decisions
  * selecting those originals are decided again by the caller, and the companion
  * pass runs again over the patched model, so their evidence and diagnostic
  * identities match a fresh pass.
@@ -298,13 +297,7 @@ function patchPositions(linked: LinkedDescriptions, model: Model, catalog: Sourc
     return moved.has(key) && current ? { ...original, declarations: canonicalLocations(current.declarations), companions: current.companions } : original;
   }) });
   if (linked.status !== 'valid') return { linked, model: patchedModel };
-  const patchedLinked: LinkedDescriptions = deepFreeze({ ...linked, modelInput: { ...linked.modelInput,
-    originals: linked.modelInput.originals.map(original => {
-      const key = originalKey(original.id);
-      const current = fresh.get(key);
-      return moved.has(key) && current ? { ...original, declarations: current.declarations, companions: current.companions } : original;
-    }) } });
-  return { linked: patchedLinked, model: patchedModel };
+  return { linked: Object.freeze({ ...linked, modelInput: patchedModel }), model: patchedModel };
 }
 
 /** Original keys whose record or exposure set differs between two models. */

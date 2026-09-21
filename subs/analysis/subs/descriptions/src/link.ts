@@ -186,6 +186,8 @@ export function linkDescriptions({ registry, inventory, catalog }: LinkInputs): 
   if (issues.length) return invalid();
   const model = buildModel({ registry, modules, originals, exposures });
   if (model.status === 'invalid') { modelIssues(model.issues); return invalid(); }
-  return detached({ status: 'valid', modelInput: model.value, selections: selections.sort((a, b) =>
-    compare(a.module, b.module) || a.statement.start - b.statement.start) });
+  // buildModel returns a frozen copy that shares nothing with its input, so the
+  // model is kept as it is; only the selections are detached here.
+  return Object.freeze({ status: 'valid', modelInput: model.value, selections: detached(selections.sort((a, b) =>
+    compare(a.module, b.module) || a.statement.start - b.statement.start)) });
 }

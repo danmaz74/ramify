@@ -23,18 +23,17 @@ import type { PublishedReport } from './report.js';
 import { auditFacts } from './session-audit.js';
 import { measureContextSize, resolveDeclaredMeasurementInputs } from './module-measurements.js';
 import type { SessionFacts } from './session-facts.js';
-import { deepFreeze, diagnosticSurface, draftPublication, draftReport, factBytes, sortedPaths } from './session-facts.js';
+import { FactLedger, deepFreeze, diagnosticSurface, draftPublication, draftReport, sortedPaths } from './session-facts.js';
 import { acquisitionDiagnostics, failureReport, invalidFacts, isCancellation, parseRefused, recomputeAll, revise, wholeCheckedSet,
   zeroTimings } from './session-revision.js';
 import type { Computed, SessionState } from './session-revision.js';
 
-/** One published version: the facts a report projection needs, and its measured size. */
+/** One published version: the facts a report projection needs. */
 interface Version {
   readonly facts: SessionFacts;
   readonly inputs: readonly CapturedInput[];
   readonly inputId: string | null;
   readonly request: AnalysisInputs;
-  readonly bytes: number;
 }
 
 /** Distinct invocation requests whose resolutions a session keeps for reuse. */
@@ -124,6 +123,8 @@ const sealedIdentity = (inputs: readonly CapturedInput[] | null): string =>
 class Session implements RetainedSession {
   readonly #state: SessionState;
   readonly #versions = new Map<number, Version>();
+  /** The retained versions' facts, each distinct object counted once across all of them. */
+  readonly #ledger = new FactLedger();
   #current: SessionRevision | null = null;
   #sequence = 0;
   #queue: Promise<unknown> = Promise.resolve();
@@ -305,17 +306,18 @@ class Session implements RetainedSession {
   releaseRevision(sequence: number): Promise<void> {
     return this.#serialize(async () => {
       if (sequence === this.#sequence) throw new Error('The current revision cannot be released');
+      const version = this.#versions.get(sequence);
+      if (!version) return;
       this.#versions.delete(sequence);
+      this.#ledger.release(version.facts);
     });
   }
 
   status(): SessionStatus {
     const memory = process.memoryUsage();
-    let bytes = 0;
-    for (const version of this.#versions.values()) bytes += version.bytes;
     return Object.freeze({
       level: this.#state.adapter?.hot ? 'hot' : 'warm', sequence: this.#sequence,
-      observedInputs: this.#state.observer?.inputs.length ?? this.#sealed?.length ?? 0, factBytes: bytes,
+      observedInputs: this.#state.observer?.inputs.length ?? this.#sealed?.length ?? 0, factBytes: this.#ledger.total,
       worker: Object.freeze({ heapUsed: memory.heapUsed, rss: memory.rss }),
       compiler: Object.freeze({ pid: null, rss: null }), lastSweepAt: this.#lastSweepAt,
     });
@@ -554,7 +556,7 @@ class Session implements RetainedSession {
       finally {
         try { await observer?.dispose(); }
         finally {
-          this.#versions.clear();
+          this.#versions.clear(); this.#ledger.clear();
           this.#current = null; this.#sealed = null; this.#resolutions = []; this.#observedResolution = null;
           this.#state.facts = null; this.#state.parsed.clear();
         }
@@ -751,23 +753,28 @@ class Session implements RetainedSession {
       state.stale = true;
       return { report: failureReport(state, error, 'report', computed.facts.inventory) };
     }
-    const bytes = factBytes(computed.facts);
-    let retained = bytes;
-    for (const version of this.#versions.values()) retained += version.bytes;
+    // The candidate is counted jointly with every retained version: objects it
+    // shares with them add nothing. A refused candidate is released again.
+    this.#ledger.retain(computed.facts);
+    const retained = this.#ledger.total;
     if (retained > state.limits.maxRetainedFactBytes) {
+      this.#ledger.release(computed.facts);
       state.stale = true;
       return { report: failureReport(state, new WorkLimit('maxRetainedFactBytes', state.limits.maxRetainedFactBytes, retained), 'report', computed.facts.inventory) };
     }
     const sequence = this.#sequence + 1;
-    const delta = findingDelta(this.#current?.diagnostics ?? [], report.diagnostics);
-    const publish = performance.now() - publishStart;
-    const timings = { ...computed.timings, publish, total: performance.now() - started };
-    const revision: SessionRevision = deepFreeze({
-      sequence, inputId: inputId ?? sealedIdentity(inputs), inputs, changed: computed.changed, checked: computed.checked,
-      outcome: report.outcome, summary: report.summary, diagnostics: report.diagnostics, warnings: report.warnings, coverage: report.coverage,
-      delta, timings,
-    });
-    this.#versions.set(sequence, { facts: computed.facts, inputs, inputId, request: state.request, bytes });
+    let revision: SessionRevision;
+    try {
+      const delta = findingDelta(this.#current?.diagnostics ?? [], report.diagnostics);
+      const publish = performance.now() - publishStart;
+      const timings = { ...computed.timings, publish, total: performance.now() - started };
+      revision = deepFreeze({
+        sequence, inputId: inputId ?? sealedIdentity(inputs), inputs, changed: computed.changed, checked: computed.checked,
+        outcome: report.outcome, summary: report.summary, diagnostics: report.diagnostics, warnings: report.warnings, coverage: report.coverage,
+        delta, timings,
+      });
+    } catch (error) { this.#ledger.release(computed.facts); throw error; }
+    this.#versions.set(sequence, { facts: computed.facts, inputs, inputId, request: state.request });
     this.#sequence = sequence;
     this.#current = revision;
     state.facts = computed.facts;

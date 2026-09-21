@@ -61,6 +61,39 @@ describe('description, metadata and broad session revisions', () => {
     } finally { await handle.dispose(); }
   }), timeout);
 
+  it('shares one frozen model between the linked layer, the model and the decisions on every path', () => fixture(async (root, inputs) => {
+    const { handle, state } = await opened(inputs);
+    try {
+      // A decision refers to the model it was decided against; a relink keeps
+      // unaffected decisions, which refer to the previous model's originals.
+      const shared = (facts: SessionFacts, previous?: SessionFacts): void => {
+        expect(facts.linked?.status === 'valid' && facts.linked.modelInput).toBe(facts.model);
+        const originals = new Set([...facts.model!.originals, ...previous?.model?.originals ?? []]);
+        const selected = Object.values(facts.decisions).flatMap(decision => decision.result.decisions)
+          .map(decision => decision.original).filter(original => original !== null);
+        expect(selected.length).toBeGreaterThan(0);
+        for (const original of selected) expect(originals.has(original!)).toBe(true);
+      };
+      shared(state.facts!);
+      // Declarations of a selected original move: the position patch replaces the model once.
+      const before = state.facts!;
+      await replace(root, paths.provider, 'export const value', '// Moves the declaration.\nexport const value');
+      const moved = await revised(handle, [paths.provider]);
+      expect(moved.checked.path).toBe('unchanged-surface');
+      expect(state.facts!.model).not.toBe(before.model);
+      shared(state.facts!);
+      await audited(handle);
+      // A relink builds the model once.
+      const patched = state.facts!;
+      await replace(root, paths.description, parentExposure, `// Relink.\n${parentExposure}`);
+      expect((await revised(handle, [paths.description])).checked.path).toBe('description');
+      expect(state.facts!.model).not.toBe(patched.model);
+      shared(state.facts!, patched);
+      await audited(handle);
+      await equalToBatch(handle, inputs);
+    } finally { await handle.dispose(); }
+  }), timeout);
+
   it('refreshes README purposes without compiler, link or decision work', () => fixture(async (root, inputs) => {
     const { handle, state } = await opened(inputs);
     try {
@@ -394,7 +427,11 @@ describe('description, metadata and broad session revisions', () => {
     const baseline = await opened(inputs);
     const bytes = baseline.handle.status().factBytes;
     await baseline.handle.dispose();
-    const { handle, state, revision } = await opened({ ...inputs, session: { ...inputs.session, maxRetainedFactBytes: 2 * bytes - 1 } });
+    // The candidate is counted jointly with the retained revision, so only the
+    // objects it does not share with that revision add to the total. A budget
+    // of exactly the cold facts admits the cold open and refuses any candidate
+    // that adds an object.
+    const { handle, state, revision } = await opened({ ...inputs, session: { ...inputs.session, maxRetainedFactBytes: bytes } });
     try {
       const before = state.facts;
       const report = await handle.report();

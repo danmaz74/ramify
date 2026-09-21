@@ -187,7 +187,7 @@ retained session and executes before the separately reviewed Plan 3 successor.
 | [3. Understand a project](#plan-3-project-inspection) | Remaining project explanations, module summaries and usage queries are selected in a successor review after filesystem discovery exists. | Plan 2A. | The existing [Detailed Plan 3](plans/iteration-3-project-inspection/main-plan.md) is preserved but must be revised and reviewed before execution. |
 | [4. Use Ramify through MCP](#plan-4-mcp-access) | A host-launched stdio adapter exposes the daemon's checks and inspection. | Plan 2's service and Plan 3's queries for this deliverable's full scope. | Brief below; detailed plan not yet written. |
 | [7. Find modules affected by changes](#plan-7-affected-modules) | An on-demand reverse dependency query uses retained facts to select modules for testing through API, CLI and MCP. | Plan 5's retained session and contexts; Plan 4's stdio provider for MCP. | [Detailed Plan 7](plans/iteration-7-affected-modules/main-plan.md), draft awaiting contract review. |
-| [8. Require signature companions](#plan-8-signature-companions) | Implemented: a module exposing a symbol must make the project symbols named in its declared signature type-available wherever the exposure makes it visible. Ramify reports the missing exposure at the exposure statement and never supplies it. | Plans 1 and 5. | [Detailed Plan 8](plans/iteration-8-signature-companions/main-plan.md), implemented on 2026-09-21 on branch `feat/plan8-signature-companions`, not merged to `main`; its [completion report](plans/iteration-8-signature-companions/iterations/iteration5-results.md) records the evidence, the budget outcomes and the remaining gaps. |
+| [8. Require signature companions](#plan-8-signature-companions) | Implemented: a module exposing a symbol must make the project symbols named in its declared signature type-available wherever the exposure makes it visible. Ramify reports the missing exposure at the exposure statement and never supplies it. | Plans 1 and 5. | [Detailed Plan 8](plans/iteration-8-signature-companions/main-plan.md), implemented on 2026-09-21 on branch `feat/plan8-signature-companions`, not merged to `main`; its [completion report](plans/iteration-8-signature-companions/iterations/iteration5-results.md) records the evidence, the budget outcomes and the remaining gaps, and [iteration 6](plans/iteration-8-signature-companions/iterations/iteration6-results.md) meets the hook-latency and retained-fact budgets by identity accounting and a shared model. |
 | [6. Explore visually](#plan-6-project-explorer) | Complete: a standalone live explorer through a separate tRPC web process. | Plan 2's published report and lightweight client. | [Detailed Plan 6](plans/iteration-6-project-explorer/main-plan.md) and [completion report](plans/iteration-6-project-explorer/iterations/iteration7-results.md). |
 | [6A. Show only Ramify-module imports](#plan-6a-module-only-project-explorer) | Complete: the explorer shows only Ramify modules and cross-module imports, while analysis retains external facts. | Completed Plan 6. | [Detailed Plan 6A](plans/iteration-6a-module-only-project-explorer/main-plan.md) and [completion report](plans/iteration-6a-module-only-project-explorer/iterations/iteration4-results.md). |
 | [6B. Serve the explorer continuously](#plan-6b-resident-explorer-server) | Implemented: a PM2-manageable explorer server that owns and subscribes to one project context, with a home page and a stable `/analysis/latest` URL. | Completed Plans 6 and 6A. | [Detailed Plan 6B](plans/iteration-6b-resident-explorer-server/main-plan.md) and [completion report](plans/iteration-6b-resident-explorer-server/iterations/iteration4-results.md). |
@@ -1063,10 +1063,17 @@ visualization remain outside this deliverable.
 **Detailed artifact:** [Plan 8](plans/iteration-8-signature-companions/main-plan.md),
 implemented on 2026-09-21; its
 [completion report](plans/iteration-8-signature-companions/iterations/iteration5-results.md)
-records SC01 to SC27, the measured costs and the remaining gaps. Three
-measured budgets are not met: X100's deleted hook row, the description stage
-and retained `factBytes`. The Plan 1 gate fails on harness pins of the
-pre-plan reference example. The report proposes remedies for decision.
+records SC01 to SC27, the measured costs and the remaining gaps. It left three
+measured budgets unmet: X100's deleted hook row, the description stage and
+retained `factBytes`. The follow-up
+[iteration 6](plans/iteration-8-signature-companions/iterations/iteration6-results.md)
+counts retained facts by object identity and shares one frozen model between
+the linked layer, the model and the decisions, with byte-identical output.
+Every hook row then meets its budget, and `factBytes` falls about 10 percent
+below the pre-plan facts under the identity count, though the serialized size
+still grows 13 to 20 percent. The description stage remains over budget. The
+Plan 1 gate fails on harness pins of the pre-plan reference example. The
+reports propose remedies for decision.
 
 **Working outcome.** A symbol exposed without a project symbol that its
 declared signature names fails the check with `exposed-without-companion`,

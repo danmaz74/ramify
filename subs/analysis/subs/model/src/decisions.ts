@@ -1,5 +1,5 @@
 import type { BindingRequest, Exposure, ExposureHop, ImportDecision, ImportQuestion, Model, ModuleId, Original, OriginalId, SourceArea, SourceOrigin, TagRequirement, VisibilityDecision } from './interfaces/model.js';
-import { compare, immutable, locations, validLocation } from './data.js';
+import { compare, frozenData, immutable, locations, validLocation } from './data.js';
 import { originalKey } from './identity.js';
 import { canonicalOrigin } from './model.js';
 
@@ -142,10 +142,14 @@ export function explainImport(model: Model, question: ImportQuestion): ImportDec
     selection: original ? { original: original.id, request: question.selection!.request } : null };
   const checkedOrigins = [target, ...forwarding, ...(original ? [original.origin] : [])];
   const blockingOrigins = checkedOrigins.filter(({ area }) => testingBlocked(importer.area.profile, area));
+  // A frozen model's original is referred to, not copied: it cannot change, so
+  // the decision still shares nothing mutable with the model.
+  const shared = original !== null && frozenData(original) ? original : null;
   function decision(status: ImportDecision['status'], reason: ImportDecision['reason'],
     visibility: VisibilityDecision | null = null, requirements: readonly TagRequirement[] = []): ImportDecision {
-    return immutable({ status, reason, question: establishedQuestion, original, visibility,
+    const copied = immutable({ status, reason, question: establishedQuestion, original: shared ? null : original, visibility,
       requirements, checkedOrigins, blockingOrigins });
+    return shared ? Object.freeze({ ...copied, original: shared }) : copied;
   }
   if (blockingOrigins.length) return decision('denied', 'testing-origin');
   if (!original) return decision('allowed', 'symbol-free');

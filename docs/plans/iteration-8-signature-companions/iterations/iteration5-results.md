@@ -220,6 +220,15 @@ growth. The retained-fact limit and SC25 both use the serialized size, which is
 what brings X100 to the limit sooner (SC23). Empty facts on unexposed originals
 cost 5,429, 79,769 and 70,801 bytes a copy; RD-2 records them deliberately.
 
+> **Correction, 2026-09-21 ([iteration 6](iteration6-results.md)).** The
+> statement that the in-memory objects are shared frozen references is wrong
+> for this build. Only `catalog` and `files[*].description` shared their
+> objects. `linked.modelInput` and `model` were distinct, content-equal copies:
+> linking detached its model through a JSON round trip and the session built the
+> model a second time. Each `ImportDecision.original` was a further copy of the
+> model's original. Iteration 6 makes these layers share one frozen model and
+> counts retained facts by object identity.
+
 **The plateau and many-contexts rows hold.**
 
 - `I5-13:repeated-edit-plateau`, 200 alternating edits on the reference example

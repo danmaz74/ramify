@@ -70,3 +70,32 @@ export function immutable<T>(input: T): T {
   }
   return copy(input) as T;
 }
+
+const sharedData = new WeakSet<object>();
+
+/**
+ * Whether `value` is deeply frozen, acyclic, finite JSON data held in plain
+ * data properties. Such a value cannot change, so retained data may refer to
+ * it instead of copying it. A verified object stays verified.
+ */
+export function frozenData(value: unknown): boolean {
+  const active = new Set<object>();
+  function verify(item: unknown): boolean {
+    if (item === null || typeof item === 'string' || typeof item === 'boolean') return true;
+    if (typeof item === 'number') return Number.isFinite(item);
+    if (typeof item !== 'object' || (!Array.isArray(item) && !isRecord(item))) return false;
+    if (sharedData.has(item)) return true;
+    if (!Object.isFrozen(item) || active.has(item)) return false;
+    active.add(item);
+    let valid = true;
+    for (const key of Reflect.ownKeys(item)) {
+      const property = Object.getOwnPropertyDescriptor(item, key)!;
+      if (Array.isArray(item) && key === 'length') continue;
+      if (typeof key !== 'string' || !property.enumerable || !('value' in property) || !verify(property.value)) { valid = false; break; }
+    }
+    active.delete(item);
+    if (valid) sharedData.add(item);
+    return valid;
+  }
+  return verify(value);
+}

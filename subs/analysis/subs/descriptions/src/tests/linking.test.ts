@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { linkDescriptions } from '../link.js';
 import { parseDescription } from '../parse.js';
-import { createDefaultTagRegistry, deriveSourceAreas } from '../../../model/src/index.js';
+import { buildModel, createDefaultTagRegistry, deriveSourceAreas } from '../../../model/src/index.js';
 import type { OriginalId } from '../../../model/src/interfaces/model.js';
 import type { LinkInputs } from '../interfaces/linking.js';
 
@@ -120,6 +120,9 @@ describe('pure description linking', () => {
     expect(Object.isFrozen(result.selections[0]!.pairs[0]!.original)).toBe(true);
     expect(Object.isFrozen(inputs.catalog.originals[0]!.id)).toBe(false);
     expect(result.modelInput.originals[0]!.id).not.toBe(inputs.catalog.originals[0]!.id);
+    // The model input is the built model itself: deeply frozen, and a rebuild of it is equal.
+    expect(Object.isFrozen(result) && Object.isFrozen(result.modelInput.originals[0]!.companions.named)).toBe(true);
+    expect(buildModel(result.modelInput)).toEqual({ status: 'valid', value: result.modelInput });
     const empty = linkDescriptions({ ...inputs, catalog: { ...inputs.catalog, originals: [], files: [{ ...inputs.catalog.files[0]!, exports: [] }] } });
     expect(empty.status).toBe('valid');
     if (empty.status === 'valid') expect(empty.selections.map(item => item.pairs)).toEqual([[], []]);
