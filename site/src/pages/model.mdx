@@ -215,6 +215,65 @@ would leave `ShipmentPlan` visible in both: `shipping`'s exposure still reaches
 its whole subtree. Former same-owner access does change, however. Imports
 between the new owners need exposure through the ordinary channels.
 
+## Exposing a signature
+
+An importer of a function has to be able to name the types of its arguments.
+So when a module exposes a symbol, the project symbols named by that symbol's
+declared signature must travel with it: they are its
+[**signature companions**](/glossary#signature-companion). They are the types
+of its parameters and its return value, the constraints and defaults of its
+type parameters, and, for an interface or a class, its members and what it
+extends or implements. Types from external packages and the TypeScript library
+are not companions.
+
+The rule: a module that exposes a symbol must make every companion visible
+wherever that exposure makes the symbol visible. Suppose `shipping`'s child
+`routing` declares its own options type beside the function it exposes:
+
+```ts
+import type { ShipmentPlan } from "../../../src/shipment-plan.js";
+
+export interface RouteOptions {
+  readonly maxStops: number;
+}
+
+export function optimizeRoute(plan: ShipmentPlan, options: RouteOptions): ShipmentPlan {
+  return { stops: plan.stops.slice(0, options.maxStops) };
+}
+```
+
+```ramify
+ramify 1
+module routing
+
+expose-src optimizeRoute from "optimize-route.ts" to parent
+```
+
+`ShipmentPlan` is not a problem: `shipping` owns it, so it is visible where
+`optimizeRoute` arrives. `RouteOptions` is visible only in `routing`, and the
+check fails at the exposure statement:
+
+```text
+Error [exposed-without-companion] subs/shipping/subs/routing/module.ramify:4:1: `optimizeRoute` is exposed to parent without `RouteOptions`, which its signature names (subs/shipping/subs/routing/src/optimize-route.ts:7:60). Expose `RouteOptions` to parent, or remove it from the signature.
+```
+
+There are two corrections. `routing` can expose the companion through the same
+channel, with `expose-src optimizeRoute, RouteOptions from "optimize-route.ts" to parent`,
+or it can change the signature so that it no longer names a type that should
+stay internal. Ramify never adds the exposure itself: `module.ramify` remains
+the complete statement of what a module exposes, and wildcards expose only what
+they select.
+
+The rule applies to every exposure, including re-exposure. If `shipping`
+exposed `optimizeRoute` to its parent without `ShipmentPlan`, the finding would
+be at `shipping`'s statement, the first one that carries the function where
+its companion is not visible. An exposed companion is itself subject to the
+rule, so its own signature's companions must travel too. A finding fails the
+check but changes no import decision. Tags add one condition: every
+required-importer tag of a companion (see the [tags page](/tags)) must also be
+a tag of the symbol, so a companion is never more restricted than the symbol
+that names it.
+
 ## Where the precision lives
 
 The tree rules on this page are half the complete rule; the other half is on

@@ -6,5 +6,6 @@ module core
 // themselves and the predecessor helper stay private.
 expose-src getRecord, inspect, CatalogSummary from "catalog.ts" to parent
 
-// Test data built from those private records, for other owners' tests.
-expose-test makeCatalogFixture from "fixture.ts" to parent
+// Test data built from those private records, for other owners' tests, and
+// the record shape its signature names.
+expose-test makeCatalogFixture, CatalogFixtureRecord from "fixture.ts" to parent

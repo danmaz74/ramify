@@ -10,8 +10,8 @@ const core = `${workspace}/catalog/core`;
 const vocabularyNames = ['Finding', 'InspectionReport', 'Observation', 'ObservationCallback', 'RecordId',
   'Revision', 'RevisionChain', 'RevisionScope', 'ReviewStatus', 'findingSchema', 'inspectionReportSchema',
   'observationSchema', 'recordIdSchema', 'reviewStatusSchema', 'revisionChainSchema', 'revisionSchema', 'revisionScopeSchema'].sort();
-const baselineSummary = { complete: true, owners: 15, sourceFiles: 54, resources: 5, originals: 89,
-  accesses: 294, allowed: 166, denied: 0, errors: 0, warnings: 2, coverageNotes: 0, external: 128 };
+const baselineSummary = { complete: true, owners: 15, sourceFiles: 54, resources: 5, originals: 92,
+  accesses: 298, allowed: 169, denied: 0, errors: 0, warnings: 2, coverageNotes: 11, external: 129 };
 
 function wildcardPairs(report: AnalysisReport, owner: string) {
   const linked = report.snapshot?.linked;

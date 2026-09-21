@@ -265,7 +265,10 @@ interface wildcard: every selected original must belong to that owner, otherwise
 the whole declaration is invalid. Importing foreign types to describe an owned
 interface is allowed when those types are themselves importable. Types that a
 foreign consumer needs to import explicitly require their own exposure paths;
-there is no automatic signature-type exposure.
+there is no automatic signature-type exposure. The
+[companion rule](../model/cross-module-importability.principles.md#exposure-requires-available-signature-companions)
+makes the owner state those paths: an exposure whose symbol's signature names a
+project type that the same step leaves out fails the check at that statement.
 
 Browser module headers do not assign browser promises to exports. Portable model,
 description and layout values consumed by browser source need explicit `[browser]`
@@ -592,6 +595,27 @@ request's own resolution, while `scope.root`, `scope.configuration` and `inputId
 stay the context's. Because `inputId` identifies the project's captured inputs and
 excludes the invocation's discovery climb, it can differ from a batch run that
 found the root by climbing from a subdirectory.
+
+**Signature companions.** Every exported original in the catalog, exposed or
+not, carries its companion facts: the originals its declared signature names,
+the first naming position of each, whether a harvested position is left to
+inference, and the number of references that name no single project original.
+They are collected with the file's export description, with one batched symbol
+request per described file and no type computation. The named originals, the
+inference fact and the unresolved count belong to the description surface, so
+a change to them takes the `source` path. The naming positions are positional
+and are refreshed with the declarations when only positions move. Because the
+facts are retained, a `module.ramify` edit evaluates the rule with no compiler
+work. The decide stage of every revision and of the batch engine derives an
+exposure index from the current model: for each module, the originals it
+exposes to its parent and to its descendants. The index is held per model
+object, never across revisions, and is not part of the retained facts. The
+resulting `exposed-without-companion` findings and the `signature-inferred` and
+`signature-unresolved` coverage notes are retained facts. They are reused only
+while a revision keeps the same model object; otherwise they are regenerated
+from current facts, so their locations, messages and identities equal a batch
+check's. There is no reverse index from a companion to the symbols that name it
+and no cross-revision verdict cache.
 
 **Revision paths.** An update classifies the named changes and takes one of the
 paths `unchanged-surface`, `source`, `description`, `metadata`, `membership` and `broad`:

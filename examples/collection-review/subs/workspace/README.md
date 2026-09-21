@@ -8,5 +8,6 @@ becoming available to a sibling feature's UI.
 
 Workspace is also the tree's relay point. Feature adapters travel through it to
 the root, which mounts them, and the neutral vocabulary travels through it down
-to every descendant. Those relays are declarations in `module.ramify`, not a
+to every descendant and up to the root, whose assembly names it through the
+inspection port. Those relays are declarations in `module.ramify`, not a
 source barrel: the shell forwards symbols its own source could not import.

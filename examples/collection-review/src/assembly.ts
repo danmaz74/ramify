@@ -4,7 +4,7 @@ import { createCatalogTools } from '../subs/workspace/subs/catalog/src/mcp.js';
 import { createCatalogRouter } from '../subs/workspace/subs/catalog/src/router.js';
 import { createReviewsTools } from '../subs/workspace/subs/reviews/src/mcp.js';
 import { createReviewsRouter } from '../subs/workspace/subs/reviews/src/router.js';
-import type { McpToolContribution } from './interfaces/protocol.js';
+import type { McpToolContribution, ProtocolFacilities } from './interfaces/protocol.js';
 import type { InspectionPort } from '../subs/workspace/subs/reviews/subs/core/src/interfaces/port.js';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 
@@ -22,9 +22,6 @@ import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
  * knows that the wiring below exists.
  */
 
-/** The configured tRPC runtime, as the feature factories receive it. */
-type ProtocolRuntime = ReturnType<typeof createFacilities>;
-
 /**
  * The catalog's inspection, as the review's port. It fits without an adapter
  * because both sides are written in the neutral vocabulary the `contracts`
@@ -34,7 +31,8 @@ type ProtocolRuntime = ReturnType<typeof createFacilities>;
  */
 const inspectionPort: InspectionPort = { inspect };
 
-function assembleRouter(facilities: ProtocolRuntime) {
+/** Mounts every feature's router under its own key; its return type is the application router's. */
+export function assembleRouter(facilities: ProtocolFacilities) {
   return facilities.router({
     catalog: createCatalogRouter(facilities),
     reviews: createReviewsRouter(facilities, inspectionPort),
@@ -43,7 +41,7 @@ function assembleRouter(facilities: ProtocolRuntime) {
 
 /** The assembled application: one router, one tool list, one server factory. */
 export interface AssembledSystem {
-  router: ReturnType<typeof assembleRouter>;
+  router: AppRouter;
   contributions: readonly McpToolContribution[];
   createMcpServer: () => Server;
 }
@@ -68,4 +66,4 @@ export function assembleSystem(): AssembledSystem {
 }
 
 /** The application router's type, as the browser client and the tests use it. */
-export type AppRouter = AssembledSystem['router'];
+export type AppRouter = ReturnType<typeof assembleRouter>;

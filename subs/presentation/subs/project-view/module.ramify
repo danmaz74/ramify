@@ -14,3 +14,4 @@ expose-src ExportDetailState from "ExportList.tsx" to parent
 expose-src ModuleTreeView from "ModuleTreeView.tsx" tagged [ui, browser] to parent
 expose-src ModuleTreeViewProps from "ModuleTreeView.tsx" to parent
 expose-src indexModuleTree, collapsibleAtDepth, ancestorsOf from "module-tree.ts" tagged [ui, browser] to parent
+expose-src ModuleTreeIndex from "module-tree.ts" to parent

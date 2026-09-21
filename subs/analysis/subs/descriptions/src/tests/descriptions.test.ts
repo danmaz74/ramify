@@ -57,8 +57,8 @@ const syntaxNames = ['TextSpan', 'DescriptionToken', 'DescriptionIssue', 'NamedS
 const projectNames = ['ProjectRequest', 'ProjectScope', 'CapturedInput', 'InventoryArea', 'ModulePurpose',
   'InventoryModule', 'InventoryFile', 'ExactReference', 'OutsideSourceWarning', 'ProjectInventory',
   'ProjectIssue', 'AcquisitionLimits', 'ProjectInputView', 'ProjectReadOptions', 'ProjectRead', 'ProjectResolution', 'RetainedConfiguration'];
-// The sink remains inside analysis; iteration 9 relays the other observer types.
-const observerNames = ['ObservationSink', 'InputChangeKind', 'ObservedChange', 'InventoryUpdate', 'ProjectObserver', 'ProjectObserve'];
+// Plan 8: the observer's signature companions travel with it, so the root relays the sink too.
+const observerNames = ['ObservationSink', 'ObservationRetirement', 'InputChangeKind', 'ObservedChange', 'InventoryUpdate', 'ProjectObserver', 'ProjectObserve'];
 
 // Independent literal selections from Plan 2 owners.md R7 and N5.
 const contextNames = ['ContextId', 'GenerationId', 'RevisionId', 'LeaseId', 'ContextToken', 'ContextSetup',
@@ -72,9 +72,16 @@ const residentNames = ['DaemonInstance', 'LogEntry', 'DaemonBudgets', 'EndpointS
   'RecoveryOutcome', 'ServiceConnection', 'ConnectOutcome', 'ServiceConnector', 'WireMessage'];
 
 const sourceNames = ['CatalogOriginal', 'CatalogExport', 'FileExports', 'SourceCatalog', 'SourceTarget', 'WrittenForm', 'AccessSelection', 'SourceAccess', 'SourceLimit',
-  'SourceWorkLimits', 'SourceAnalysisInputs', 'SourceAnalysis'];
+  'SourceWorkLimits', 'SourceAnalysisInputs', 'SuppliedAccesses', 'SourceAnalysis',
+  // Plan 8: the dependency-behavior facts `SourceAnalysis` names.
+  'DependencyBehaviorFacts', 'DependencyBehaviorFact', 'DependencyBehaviorAccessFact', 'BehaviorClassification', 'BehaviorEvidence',
+  'BehaviorLimit'];
 
+// Plan 8: the definition and props vocabulary the relayed signatures name.
+const presentationVocabulary = ['WhatIfNote', 'NodeContentOptions', 'DecisionPolicy', 'LegendGroup', 'LegendEntry',
+  'TracedSymbol', 'TracedColorKey', 'ChordSpec'];
 const presentationNames = ['DiagramDefinition', 'TreeDiagramDefinition', 'FocusDiagramDefinition',
+  'TreeFocus', ...presentationVocabulary, 'Theme', 'SymbolName', 'ViewRect',
   'ModelDiagramProps', 'ModelDiagramInteractiveProps', 'TreeDiagramProps', 'FocusDiagramProps',
   'ModelDiagram', 'ModelDiagramSvg', 'TreeDiagram', 'TreeDiagramSvg', 'FocusDiagram', 'FocusDiagramSvg',
   'shopDiagram', 'example1Diagram', 'example1aDiagram', 'example1bDiagram', 'example2Diagram',
@@ -99,6 +106,8 @@ const presentationStatements = [
   src(['TreeDiagramProps'], 'TreeDiagram.tsx'), src(['FocusDiagramProps'], 'FocusDiagram.tsx'),
   src(['DiagramDefinition'], 'diagram-definition.ts'), src(['TreeDiagramDefinition'], 'tree-diagram.ts'),
   src(['FocusDiagramDefinition'], 'focus-diagram.ts'),
+  src(['TreeFocus'], 'tree-diagram.ts'), src(presentationVocabulary, 'diagram-definition.ts'),
+  src(['Theme'], 'theme.ts'), src(['SymbolName'], 'model-access.ts'), sub(['ViewRect'], 'layout'),
   ...['shop', 'example1', 'example1a', 'example1b', 'example2', 'example3', 'example4']
     .map((name) => src([`${name}Diagram`], `diagrams/${name}.ts`, uiBrowser)),
   src(['shopTreeDiagram', 'shopFocusDiagram'], 'diagrams/shop-tree.ts', uiBrowser),
@@ -106,10 +115,11 @@ const presentationStatements = [
   sub(['ModuleGraphProps', 'GraphSelection'], 'project-view'), sub(['ProjectExplorerView'], 'project-view'),
   sub(projectViewProps, 'project-view'),
   sub(['ModuleTreeView'], 'project-view'), sub(['ModuleTreeViewProps'], 'project-view'),
-  sub(['indexModuleTree', 'collapsibleAtDepth', 'ancestorsOf'], 'project-view'),
+  sub(['indexModuleTree', 'collapsibleAtDepth', 'ancestorsOf', 'ModuleTreeIndex'], 'project-view'),
   sub([...dependencyViewNames, 'ActiveDependencyEdge', 'ScopeNodeId'], 'project-view'),
   sub(['defaultDependencySettings', 'ownSourceNodeId', 'ownSourceNodeModule'], 'project-view'),
-  sub(['placeTree', 'Point'], 'layout', descendants),
+  sub(['placeTree', 'Point', 'LayoutGraphInput', 'LayoutNodeInput', 'LayoutEdgeInput', 'LayoutOptions', 'LayoutResult',
+    'LayoutNode', 'LayoutEdge', 'Box'], 'layout', descendants),
 ];
 const layoutStatements = [
   src('*', 'interfaces/layout.ts'),
@@ -132,37 +142,42 @@ const toolkit: readonly Fixture[] = [
     src('*', 'interfaces/batch.ts', null, descendants), src('*', 'interfaces/service.ts', null, descendants),
     statement('expose-test', ['createQuickEnvironment', 'QuickEnvironment'], 'quick-environment.ts', descendants),
     sub([...modelNames, ...availabilityNames], 'analysis', descendants), sub([...syntaxNames, ...linkingNames], 'analysis', descendants),
-    sub([...projectNames, ...observerNames.slice(1), 'isRamifyGeneratedPath'], 'analysis', descendants),
+    sub([...projectNames, ...observerNames, 'isRamifyGeneratedPath'], 'analysis', descendants),
     sub([...sourceNames, ...symbolDetailNames], 'analysis', descendants),
     sub([...analysisNames, ...apiViewNames], 'analysis', descendants),
     sub(measurementNames, 'analysis', descendants),
     sub(['DependencyBoundaryFact', 'DependencyDiagramFacts', 'DependencyDiagramOutcome', 'BehavioralDependencyMetrics', 'TestFileReferences',
       'TestReferenceFacts'], 'analysis', descendants),
-    sub(['DependencyDiagramRunner', 'DependencyAnalyzerOutcome'], 'analysis', descendants),
+    sub(['DependencyDiagramRunner', 'DependencyAnalyzerOutcome', 'DependencyAnalyzerTimings'], 'analysis', descendants),
     sub([...architectNames, 'ExportKind', 'ExportBehavior', 'TestTitleLimits'], 'analysis', descendants),
     sub(presentationNames, 'presentation', descendants),
     sub([...projectViewModelNames, 'ModuleGraphProps', 'GraphSelection'], 'presentation', descendants),
     sub(['ModuleGraphRadial'], 'presentation', descendants), sub(projectViewProps, 'presentation', descendants),
     sub(['ProjectExplorerView'], 'presentation', descendants),
-    sub(['ModuleTreeView', 'ModuleTreeViewProps', 'indexModuleTree', 'collapsibleAtDepth', 'ancestorsOf'], 'presentation', descendants),
+    sub(['ModuleTreeView', 'ModuleTreeViewProps', 'indexModuleTree', 'collapsibleAtDepth', 'ancestorsOf', 'ModuleTreeIndex'],
+      'presentation', descendants),
     sub([...dependencyViewNames, 'ActiveDependencyEdge', 'ScopeNodeId', 'defaultDependencySettings',
       'ownSourceNodeId', 'ownSourceNodeModule'], 'presentation', descendants),
     sub(explorerServiceNames, 'service-api', descendants), sub(['createProjectExplorerModel'], 'service-api', descendants),
     sub(explorerDependencyNames, 'service-api', descendants),
-    sub(['createExplorerRouter', 'ExplorerRouter', 'startExplorerWebProcess'], 'service-api', descendants),
-    sub(['createProjectBinding', 'ProjectBinding', 'BindingState'], 'service-api', descendants),
+    sub(['createExplorerRouter', 'ExplorerRouter', 'startExplorerWebProcess', 'ExplorerWebProcess', 'ExplorerRouterOptions',
+      'ExplorerWebProcessOptions', 'DependencyViews', 'DependencyViewsStatus', 'DependencyViewCounters'], 'service-api', descendants),
+    sub(['createProjectBinding', 'ProjectBinding', 'BindingState', 'ProjectBindingOptions', 'ProjectBindingConnector',
+      'ProjectBindingLogEntry'], 'service-api', descendants),
     sub(['selectExplorerEndpoint', 'readExplorerProcessRecord', 'reusableExplorerProcess', 'probeExplorerReadiness',
       'explorerProjectUrl', 'explorerProjectKey', 'ExplorerEndpointSelection', 'ensureExplorerWebProcess', 'ExplorerLaunchOptions',
       'ExplorerProcessLaunch'], 'service-api', descendants),
-    sub(['ProjectExplorerPage', 'createProjectExplorerBrowserApp'], 'explorer', descendants),
-    sub([...contextNames, ...residentNames, ...controlledNames, 'MaterializedTarget'], 'daemon', descendants),
+    sub(['ProjectExplorerPage', 'createProjectExplorerBrowserApp', 'ProjectExplorerPageProps', 'BrowserPage',
+      'ProjectExplorerBrowserApp', 'ExplorerClient', 'ProjectViewResult'], 'explorer', descendants),
+    sub([...contextNames, ...residentNames, ...controlledNames, 'MaterializedTarget', 'MaterializedViewId', 'DaemonService',
+      'ServiceLease', 'ApiViewPublisher', 'PublishInput', 'RenderedApiViewArea', 'RenderedApiViewDocument', 'PublishApiViewOutcome',
+      'AnalysisDriver', 'WatchBatch', 'CaptureTimings', 'CaptureWork'], 'daemon', descendants),
     sub(['connectDaemon', 'selectEndpoint', 'readDaemonRecord'], 'daemon', descendants),
   ] },
   { path: 'subs/analysis/', name: 'analysis', tags: [], statements: [sub('*', 'model', both), sub([...syntaxNames, ...linkingNames], 'descriptions', both), sub([...projectNames, ...observerNames, 'isRamifyGeneratedPath'], 'project', both), sub([...sourceNames, ...symbolDetailNames], 'typescript', both), src(['validateProject'], 'validation.ts'), src('*', 'interfaces/analysis.ts'), src(['acquireInventory'], 'inventory.ts'), src(['createAnalysisSession'], 'session.ts'), src(['analyzeProject'], 'analyze-project.ts'), src(['resolveProject'], 'resolve-project.ts'), src('*', 'interfaces/session.ts'), src(['openRetainedSession'], 'retained-session.ts'),
     src('*', 'interfaces/measurements.ts'),
     src('*', 'interfaces/architect-view.ts'), sub(['ExportKind', 'ExportBehavior', 'TestTitleLimits'], 'typescript'),
     src(['renderArchitectView'], 'architect-render.ts'),
-    src(['planApiViewRequests', 'projectApiView'], 'api-view.ts'),
     src(['DependencyBoundaryFact', 'DependencyDiagramFacts', 'DependencyDiagramOutcome', 'TestFileReferences', 'TestReferenceFacts',
       'TestReferenceOutcome'], 'interfaces/dependency-diagram.ts'),
     src(['BehavioralDependencyMetrics'], 'interfaces/modularity.ts'),
@@ -178,7 +193,7 @@ const toolkit: readonly Fixture[] = [
   { path: 'subs/analysis/subs/project/', name: 'project', tags: [], statements: [src(['readProject'], 'read-project.ts'), src('*', 'interfaces/project.ts'), src(['resolveProjectRoot'], 'resolve-root.ts'), src(['observeProject'], 'observer.ts'), src(['isRamifyGeneratedPath'], 'generated-path.ts')] },
   { path: 'subs/analysis/subs/typescript/', name: 'typescript', tags: [], statements: [src(['createSourceAnalysis'], 'source-analysis.ts'), src('*', 'interfaces/source.ts'), src(['createAccessInterpreter'], 'access-interpreter.ts'),
       src(['describeFiles', 'assembleCatalog'], 'descriptions.ts'), src(['createRetainedSourceAnalysis'], 'retained-source-analysis.ts'),
-      src(['describeSymbolDetails'], 'symbol-details.ts'), src('*', 'interfaces/dependency-behavior.ts')] },
+      src(['describeSymbolDetails', 'DeclarationInputs'], 'symbol-details.ts'), src('*', 'interfaces/dependency-behavior.ts')] },
   { path: 'subs/cli/', name: 'cli', tags: ['dispatch'], statements: [src(['runCli'], 'run-cli.ts'), src('*', 'interfaces/cli.ts'),
     src(['capabilities'], 'command-support.ts')] },
   { path: 'subs/daemon/', name: 'daemon', tags: ['dispatch'], statements: [
@@ -191,7 +206,8 @@ const toolkit: readonly Fixture[] = [
     src(['selectEndpoint', 'readDaemonRecord'], 'discovery.ts'),
     src(['startDaemon'], 'start-daemon.ts'),
     src('*', 'interfaces/daemon.ts'),
-    sub(['AnalysisDriver', ...contextNames, 'ContextManagerOptions', 'ContextManager', ...controlledNames], 'contexts'),
+    sub(['AnalysisDriver', ...contextNames, 'ContextManagerOptions', 'ContextManager', 'ApiViewQueryLimits', 'WatchBatch',
+      'ApiViewRequest', 'ContextApiViewOutcome', 'ContextDependencyFactsOutcome', 'CaptureTimings', 'CaptureWork', ...controlledNames], 'contexts'),
   ] },
   { path: 'subs/daemon/subs/contexts/', name: 'contexts', tags: [], statements: [
     src(['createContextManager'], 'context-manager.ts'),
@@ -201,6 +217,8 @@ const toolkit: readonly Fixture[] = [
   { path: 'subs/explorer/', name: 'explorer', tags: ['ui', 'browser', 'dispatch'], statements: [
     src(['ProjectExplorerPage'], 'ProjectExplorerPage.tsx', ['ui', 'browser', 'dispatch']),
     src(['createProjectExplorerBrowserApp'], 'browser-app.tsx', ['ui', 'browser', 'dispatch']),
+    src(['ProjectExplorerPageProps'], 'ProjectExplorerPage.tsx'), src(['BrowserPage', 'ProjectExplorerBrowserApp'], 'browser-app.tsx'),
+    src(['ExplorerClient', 'ProjectViewResult'], 'published-project-view.ts'),
   ] },
   { path: 'subs/integration-tests/', name: 'integration-tests', tags: ['testing', 'ui', 'dispatch'], statements: [] },
   { path: 'subs/presentation/', name: 'presentation', tags: uiBrowser, statements: presentationStatements },
@@ -217,16 +235,19 @@ const toolkit: readonly Fixture[] = [
     src(['ExportDetailState'], 'ExportList.tsx'),
     src(['ModuleTreeView'], 'ModuleTreeView.tsx', uiBrowser), src(['ModuleTreeViewProps'], 'ModuleTreeView.tsx'),
     src(['indexModuleTree', 'collapsibleAtDepth', 'ancestorsOf'], 'module-tree.ts', uiBrowser),
+    src(['ModuleTreeIndex'], 'module-tree.ts'),
   ] },
   { path: 'subs/service-api/', name: 'service-api', tags: ['dispatch'], statements: [
     src('*', 'interfaces/explorer-service.ts'), src('*', 'interfaces/explorer-dependencies.ts'),
     src(['createProjectExplorerModel'], 'project-view.ts'),
-    src(['createExplorerRouter', 'ExplorerRouter'], 'router.ts'),
-    src(['startExplorerWebProcess', 'ExplorerWebProcess'], 'web-process.ts'),
+    src(['DependencyViews', 'DependencyViewsStatus', 'DependencyViewCounters'], 'dependency-view.ts'),
+    src(['createExplorerRouter', 'ExplorerRouter', 'ExplorerRouterOptions'], 'router.ts'),
+    src(['startExplorerWebProcess', 'ExplorerWebProcess', 'ExplorerWebProcessOptions'], 'web-process.ts'),
     src(['selectExplorerEndpoint', 'readExplorerProcessRecord', 'reusableExplorerProcess', 'probeExplorerReadiness',
       'explorerProjectUrl', 'explorerProjectKey', 'ExplorerEndpointSelection'], 'web-discovery.ts'),
     src(['ensureExplorerWebProcess', 'ExplorerLaunchOptions', 'ExplorerProcessLaunch'], 'web-launcher.ts'),
-    src(['createProjectBinding', 'ProjectBinding', 'BindingState'], 'project-binding.ts'),
+    src(['createProjectBinding', 'ProjectBinding', 'BindingState', 'ProjectBindingOptions', 'ProjectBindingConnector',
+      'ProjectBindingLogEntry'], 'project-binding.ts'),
   ] },
 ];
 const workspace = 'subs/workspace/';
@@ -235,40 +256,42 @@ const reviews = `${workspace}subs/reviews/`;
 const core = `${reviews}subs/core/`;
 const reference: readonly Fixture[] = [
   { path: '', name: 'collection-review', tags: ['dispatch'], statements: [
-    src(['InvocationContext', 'ProtocolFacilities', 'McpToolContribution', 'ToolInvocation'], 'interfaces/protocol.ts', null, descendants), // R1
-    statement('expose-test', ['createTestSystem'], 'setup.ts', descendants), // R2
-    src(['AppRouter'], 'interfaces/protocol.ts', null, descendants), // R3
+    src(['InvocationContext', 'ProtocolFacilities', 'McpToolContribution', 'ToolInvocation', 'ToolInputSchema', 'ToolResult'],
+      'interfaces/protocol.ts', null, descendants), // R1
+    statement('expose-test', ['createTestSystem', 'TestSystem', 'McpSession'], 'setup.ts', descendants), // R2
+    src(['AppRouter', 'assembleRouter'], 'interfaces/protocol.ts', null, descendants), // R3
   ] },
   { path: 'subs/integration-tests/', name: 'integration-tests', tags: ['testing', 'dispatch'], statements: [] },
   { path: workspace, name: 'workspace', tags: ['ui', 'browser', 'dispatch'], statements: [
-    sub('*', 'contracts', descendants), // W1
+    sub('*', 'contracts', both), // W1
     sub(['createCatalogRouter', 'createCatalogTools', 'inspectRecord'], 'catalog'), // W2
     sub(['createReviewsRouter', 'createReviewsTools', 'InspectionPort'], 'reviews'), // W4 precedes W3 in the authored file.
-    sub(['makeCatalogFixture'], 'catalog', descendants), // W3
+    sub(['makeCatalogFixture', 'CatalogFixtureRecord'], 'catalog', descendants), // W3
     sub('*', 'shared-ui', descendants), // W5
   ] },
   { path: catalog, name: 'catalog', tags: ['dispatch'], statements: [
     src(['createCatalogRouter'], 'router.ts'), src(['createCatalogTools'], 'mcp.ts'), // A1-A2
-    sub([['inspect', 'inspectRecord']], 'core'), sub(['makeCatalogFixture'], 'core'), // A3-A4
-    sub(['CatalogSummary'], 'core', descendants), sub(['CatalogCard'], 'ui'), // A5-A6
+    sub([['inspect', 'inspectRecord']], 'core'), sub(['makeCatalogFixture', 'CatalogFixtureRecord'], 'core'), // A3-A4
+    sub(['CatalogSummary'], 'core', both), sub(['CatalogCard', 'CatalogCardProps'], 'ui'), // A5-A6
   ] },
   { path: `${catalog}subs/core/`, name: 'core', tags: [], statements: [
-    src(['getRecord', 'inspect', 'CatalogSummary'], 'catalog.ts'), statement('expose-test', ['makeCatalogFixture'], 'fixture.ts'), // K1-K2
+    src(['getRecord', 'inspect', 'CatalogSummary'], 'catalog.ts'), statement('expose-test', ['makeCatalogFixture', 'CatalogFixtureRecord'], 'fixture.ts'), // K1-K2
   ] },
-  { path: `${catalog}subs/ui/`, name: 'ui', tags: uiBrowser, statements: [src(['CatalogCard'], 'catalog-card.tsx', uiBrowser)] }, // KU1
+  { path: `${catalog}subs/ui/`, name: 'ui', tags: uiBrowser, statements: [src(['CatalogCard', 'CatalogCardProps'], 'catalog-card.tsx', uiBrowser)] }, // KU1
   { path: `${workspace}subs/contracts/`, name: 'contracts', tags: [], statements: [src('*', 'interfaces/vocabulary.ts', browser)] }, // C1
   { path: reviews, name: 'reviews', tags: ['dispatch'], statements: [
     src(['createReviewsRouter'], 'router.ts'), src(['createReviewsTools'], 'mcp.ts'), // RV1-RV2
-    sub(['InspectionPort'], 'core'), sub(['validateRevisionChain'], 'validation', descendants), sub(['ReviewPanel'], 'ui'), // RV3-RV5
+    sub(['InspectionPort'], 'core'), sub(['validateRevisionChain'], 'validation', descendants), sub(['ReviewPanel', 'ReviewPanelProps'], 'ui'), // RV3-RV5
   ] },
   { path: core, name: 'core', tags: [], statements: [
     src(['InspectionPort'], 'interfaces/port.ts', null, both), // RC1
-    src(['createReviewRuntime', 'ReviewOutcome'], 'runtime.ts'), // RC2
-    sub(['runInspectionTask', 'summarizeTaskResult'], 'tasks', descendants), // RC3
+    src(['createReviewRuntime', 'ReviewRuntime', 'ReviewOutcome'], 'runtime.ts'), // RC2
+    sub(['runInspectionTask', 'summarizeTaskResult', 'InspectionTaskInput', 'InspectionTaskResult', 'TaskSummary'], 'tasks', descendants), // RC3
   ] },
   { path: `${core}subs/controller/`, name: 'controller', tags: [], statements: [src(['tick'], 'controller.ts')] }, // CT1
-  { path: `${core}subs/tasks/`, name: 'tasks', tags: [], statements: [src(['runInspectionTask'], 'inspection-task.ts'), src(['summarizeTaskResult'], 'result.ts')] }, // TK1-TK2
-  { path: `${reviews}subs/ui/`, name: 'ui', tags: ['ui', 'browser', 'dispatch'], statements: [src(['ReviewPanel'], 'review-panel.tsx', ['ui', 'dispatch', 'browser'])] }, // RU1
+  { path: `${core}subs/tasks/`, name: 'tasks', tags: [], statements: [src(['runInspectionTask', 'InspectionTaskInput', 'InspectionTaskResult'], 'inspection-task.ts'),
+    src(['summarizeTaskResult', 'TaskSummary'], 'result.ts')] }, // TK1-TK2
+  { path: `${reviews}subs/ui/`, name: 'ui', tags: ['ui', 'browser', 'dispatch'], statements: [src(['ReviewPanel', 'ReviewPanelProps'], 'review-panel.tsx', ['ui', 'dispatch', 'browser'])] }, // RU1
   { path: `${reviews}subs/ui/subs/pure-ui/`, name: 'pure-ui', tags: uiBrowser, statements: [src(['ReviewResult', 'ReviewResultProps'], 'review-result.tsx', uiBrowser)] }, // PU1
   { path: `${reviews}subs/validation/`, name: 'validation', tags: [], statements: [src(['validateRevisionChain'], 'validate.ts')] }, // VL1
   { path: `${workspace}subs/shared-ui/`, name: 'shared-ui', tags: uiBrowser, statements: [src(['StatusBadge', 'StatusBadgeProps'], 'status-badge.tsx', uiBrowser)] }, // SU1

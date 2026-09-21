@@ -19,7 +19,6 @@ import { classes, renderTreeEdge, renderTreeNode, renderTreeRows } from './tree-
 
 export interface FocusDiagramProps {
   readonly definition: FocusDiagramDefinition;
-  readonly layout?: FocusDiagramLayout;
   readonly theme?: Theme;
   readonly idPrefix?: string;
   readonly className?: string;
@@ -28,9 +27,13 @@ export interface FocusDiagramProps {
 }
 
 export function FocusDiagramSvg(props: FocusDiagramProps): ReactElement {
+  return renderFocusDiagramSvg(props, layoutFocusDiagram(props.definition));
+}
+
+/** The `<svg>` of an already computed layout, so the page wrapper lays out once. */
+function renderFocusDiagramSvg(props: FocusDiagramProps, layout: FocusDiagramLayout): ReactElement {
   const {
     definition,
-    layout = layoutFocusDiagram(definition),
     theme,
     idPrefix = 'rmf-focus',
     className,
@@ -187,7 +190,7 @@ function renderCard(card: FocusCardLayout, idPrefix: string): ReactElement {
 }
 
 export function FocusDiagram(props: FocusDiagramProps): ReactElement {
-  const layout = props.layout ?? layoutFocusDiagram(props.definition);
+  const layout = layoutFocusDiagram(props.definition);
   const rootStyle: CSSProperties = {
     width: '100%',
     maxWidth: layout.viewBox.width,
@@ -195,7 +198,7 @@ export function FocusDiagram(props: FocusDiagramProps): ReactElement {
   };
   return (
     <div className="rmf-root" style={rootStyle} data-kind="focus-diagram-root">
-      <FocusDiagramSvg {...props} layout={layout} responsive />
+      {renderFocusDiagramSvg({ ...props, responsive: true }, layout)}
     </div>
   );
 }

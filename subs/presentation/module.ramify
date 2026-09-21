@@ -5,13 +5,19 @@ module presentation tagged [ui, browser]
 expose-src ModelDiagram, ModelDiagramSvg from "ModelDiagram.tsx" tagged [ui, browser] to parent
 expose-src TreeDiagram, TreeDiagramSvg from "TreeDiagram.tsx" tagged [ui, browser] to parent
 expose-src FocusDiagram, FocusDiagramSvg from "FocusDiagram.tsx" tagged [ui, browser] to parent
-// V4-V7: owned props, no implicit exposure of types they mention.
+// V4-V7: owned props and definitions; the vocabulary they name is exposed below.
 expose-src ModelDiagramProps, ModelDiagramInteractiveProps from "ModelDiagram.tsx" to parent
 expose-src TreeDiagramProps from "TreeDiagram.tsx" to parent
 expose-src FocusDiagramProps from "FocusDiagram.tsx" to parent
 expose-src DiagramDefinition from "diagram-definition.ts" to parent
 expose-src TreeDiagramDefinition from "tree-diagram.ts" to parent
 expose-src FocusDiagramDefinition from "focus-diagram.ts" to parent
+// The vocabulary the props and definitions name.
+expose-src TreeFocus from "tree-diagram.ts" to parent
+expose-src WhatIfNote, NodeContentOptions, DecisionPolicy, LegendGroup, LegendEntry, TracedSymbol, TracedColorKey, ChordSpec from "diagram-definition.ts" to parent
+expose-src Theme from "theme.ts" to parent
+expose-src SymbolName from "model-access.ts" to parent
+expose-sub ViewRect from layout to parent
 // V8-V15: independently owned teaching fixtures.
 expose-src shopDiagram from "diagrams/shop.ts" tagged [ui, browser] to parent
 expose-src example1Diagram from "diagrams/example1.ts" tagged [ui, browser] to parent
@@ -32,9 +38,9 @@ expose-sub ProjectExplorerViewProps, ExplorerDiscussionProps, ExplorerDiscussion
 // P4: the module tree view, laid out by the neutral tree placement.
 expose-sub ModuleTreeView from project-view to parent
 expose-sub ModuleTreeViewProps from project-view to parent
-expose-sub indexModuleTree, collapsibleAtDepth, ancestorsOf from project-view to parent
+expose-sub indexModuleTree, collapsibleAtDepth, ancestorsOf, ModuleTreeIndex from project-view to parent
 
 // P5: behavioral dependency view vocabulary, active link shape and default settings.
 expose-sub DependencyGraphCount, DependencyGraphImportedCount, DependencyGraphModule, DependencyGraphEvidence, DependencyGraphImportedEdge, DependencyGraphOriginalEdge, DependencyGraphEdge, DependencyGraphModel, DependencyDepthMode, DependencySettings, DependencyPhase, DependencyGraphState, ActiveDependencyEdge, ScopeNodeId from project-view to parent
 expose-sub defaultDependencySettings, ownSourceNodeId, ownSourceNodeModule from project-view to parent
-expose-sub placeTree, Point from layout to descendants
+expose-sub placeTree, Point, LayoutGraphInput, LayoutNodeInput, LayoutEdgeInput, LayoutOptions, LayoutResult, LayoutNode, LayoutEdge, Box from layout to descendants

@@ -29,11 +29,11 @@ export interface EditSequence {
   readonly steps: readonly SequenceStep[];
 }
 const text = (mutation: TextMutation, reverse = false): Edit => ({ kind: 'text', mutation, reverse });
-const source: TextMutation = { path: 'src/assembly.ts', before: 'export type AppRouter = AssembledSystem[\'router\'];',
-  after: 'export type AppRouter = AssembledSystem[\'router\'];\nexport const residentSequenceValue = 1;' };
+const source: TextMutation = { path: 'src/assembly.ts', before: 'export type AppRouter = ReturnType<typeof assembleRouter>;',
+  after: 'export type AppRouter = ReturnType<typeof assembleRouter>;\nexport const residentSequenceValue = 1;' };
 const configuration: TextMutation = { path: 'tsconfig.json', before: '"target": "ES2022"', after: '"target": "ES2021"' };
-const macro: TextMutation = { path: 'src/assembly.ts', before: 'export type AppRouter = AssembledSystem[\'router\'];',
-  after: 'export type AppRouter = AssembledSystem[\'router\'];\nvoid import.meta.glob(\'./*.ts\');' };
+const macro: TextMutation = { path: 'src/assembly.ts', before: 'export type AppRouter = ReturnType<typeof assembleRouter>;',
+  after: 'export type AppRouter = ReturnType<typeof assembleRouter>;\nvoid import.meta.glob(\'./*.ts\');' };
 const s100Exposure: TextMutation = { path: 'subs/m001/module.ramify',
   before: 'expose-src value from "interfaces/api.ts" to parent\n', after: '// sequence: exposure removed\n' };
 const s100Readme: TextMutation = { path: 'subs/m001/README.md',

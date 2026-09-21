@@ -3,7 +3,8 @@ ramify 1
 module tasks
 
 // The task and its summary travel up to the review runtime, which relays them
-// back down to the controller that schedules them. The observation collector
-// the task uses stays private to this owner.
-expose-src runInspectionTask from "inspection-task.ts" to parent
-expose-src summarizeTaskResult from "result.ts" to parent
+// back down to the controller that schedules them. The input, result and
+// summary types their signatures name travel with them. The observation
+// collector the task uses stays private to this owner.
+expose-src runInspectionTask, InspectionTaskInput, InspectionTaskResult from "inspection-task.ts" to parent
+expose-src summarizeTaskResult, TaskSummary from "result.ts" to parent

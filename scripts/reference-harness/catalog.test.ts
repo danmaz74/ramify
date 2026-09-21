@@ -40,7 +40,7 @@ function resource(file: string, binding: string, owner: string): OriginalId {
 // the module descriptions, or the adapter being tested.
 const expectedFiles = [
   ['', 'interfaces/protocol.ts', [], ['InvocationContext', 'ProtocolFacilities', 'McpToolContribution', 'ToolInvocation', 'ToolInputSchema', 'ToolResult']],
-  ['', 'assembly.ts', ['assembleSystem'], ['AppRouter', 'AssembledSystem']],
+  ['', 'assembly.ts', ['assembleRouter', 'assembleSystem'], ['AppRouter', 'AssembledSystem']],
   ['', 'protocol.ts', ['createFacilities', 'createMcpServer'], []],
   ['', 'server.ts', ['startApiServer'], ['ApiServer', 'ApiServerOptions']],
   ['', 'tests/setup.ts', ['createTestSystem'], ['McpSession', 'TestSystem']],
@@ -54,7 +54,7 @@ const expectedFiles = [
   ['workspace/catalog/core', 'tests/fixture.ts', ['makeCatalogFixture'], ['CatalogFixtureRecord']],
   ['workspace/catalog', 'router.ts', ['createCatalogRouter'], []],
   ['workspace/catalog', 'mcp.ts', ['createCatalogTools'], []],
-  ['workspace/catalog/ui', 'catalog-card.tsx', ['CatalogCard'], []],
+  ['workspace/catalog/ui', 'catalog-card.tsx', ['CatalogCard'], ['CatalogCardProps']],
   ['workspace/reviews/validation', 'validate.ts', ['validateRevisionChain'], []],
   ['workspace/reviews/core/tasks', 'inspection-task.ts', ['runInspectionTask', 'collectObservations'], ['InspectionTaskInput', 'InspectionTaskResult']],
   ['workspace/reviews/core/tasks', 'result.ts', ['summarizeTaskResult'], ['TaskSummary']],
@@ -64,7 +64,7 @@ const expectedFiles = [
   ['workspace/reviews', 'router.ts', ['createReviewsRouter'], []],
   ['workspace/reviews', 'mcp.ts', ['createReviewsTools'], []],
   ['workspace/reviews', 'session.ts', ['createSessionTable'], ['SessionBinding', 'SessionBindingRequest', 'SessionTable']],
-  ['workspace/reviews/ui', 'review-panel.tsx', ['ReviewPanel', 'loadReview'], []],
+  ['workspace/reviews/ui', 'review-panel.tsx', ['ReviewPanel', 'loadReview'], ['ReviewPanelProps']],
   ['workspace/reviews/ui/pure-ui', 'review-result.tsx', ['ReviewResult'], ['ReviewResultProps']],
   ['workspace/reviews/ui/pure-ui', 'format.ts', ['formatFinding'], []],
   ['workspace/shared-ui', 'status-badge.tsx', ['StatusBadge'], ['StatusBadgeProps']],

@@ -20,8 +20,6 @@ import { classes, renderTreeEdge, renderTreeNode } from './tree-render.js';
 
 export interface TreeDiagramProps {
   readonly definition: TreeDiagramDefinition;
-  /** Precomputed layout; derived from the definition when omitted. */
-  readonly layout?: TreeDiagramLayout;
   /** Pin the palette; omit to follow the reader's setting. */
   readonly theme?: Theme;
   readonly idPrefix?: string;
@@ -33,9 +31,13 @@ export interface TreeDiagramProps {
 }
 
 export function TreeDiagramSvg(props: TreeDiagramProps): ReactElement {
+  return renderTreeDiagramSvg(props, layoutTreeDiagram(props.definition));
+}
+
+/** The `<svg>` of an already computed layout, so the page wrapper lays out once. */
+function renderTreeDiagramSvg(props: TreeDiagramProps, layout: TreeDiagramLayout): ReactElement {
   const {
     definition,
-    layout = layoutTreeDiagram(definition),
     theme,
     idPrefix = 'rmf-tree',
     className,
@@ -89,7 +91,7 @@ export function TreeDiagramSvg(props: TreeDiagramProps): ReactElement {
 }
 
 export function TreeDiagram(props: TreeDiagramProps): ReactElement {
-  const layout = props.layout ?? layoutTreeDiagram(props.definition);
+  const layout = layoutTreeDiagram(props.definition);
   const rootStyle: CSSProperties = {
     width: '100%',
     maxWidth: layout.viewBox.width,
@@ -97,7 +99,7 @@ export function TreeDiagram(props: TreeDiagramProps): ReactElement {
   };
   return (
     <div className="rmf-root" style={rootStyle} data-kind="tree-diagram-root">
-      <TreeDiagramSvg {...props} layout={layout} responsive />
+      {renderTreeDiagramSvg({ ...props, responsive: true }, layout)}
     </div>
   );
 }

@@ -3,3 +3,7 @@ module explorer tagged [ui, browser, dispatch]
 
 expose-src ProjectExplorerPage from "ProjectExplorerPage.tsx" tagged [ui, browser, dispatch] to parent
 expose-src createProjectExplorerBrowserApp from "browser-app.tsx" tagged [ui, browser, dispatch] to parent
+// The page props and the browser app contract its signatures name.
+expose-src ProjectExplorerPageProps from "ProjectExplorerPage.tsx" to parent
+expose-src BrowserPage, ProjectExplorerBrowserApp from "browser-app.tsx" to parent
+expose-src ExplorerClient, ProjectViewResult from "published-project-view.ts" to parent

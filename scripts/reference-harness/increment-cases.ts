@@ -38,8 +38,8 @@ async function equal(root: string, run: Reported, a: Assertions, prefix = ''): P
 const baselines = new Map<string, Reported>();
 const handlers = new Map<string, InstanceHandler>();
 const unchanged = async () => {};
-const sourceEdit = { path: 'src/assembly.ts', before: "export type AppRouter = AssembledSystem['router'];",
-  after: "export type AppRouter = AssembledSystem['router'];\nexport const residentSequenceValue = 1;" };
+const sourceEdit = { path: 'src/assembly.ts', before: "export type AppRouter = ReturnType<typeof assembleRouter>;",
+  after: "export type AppRouter = ReturnType<typeof assembleRouter>;\nexport const residentSequenceValue = 1;" };
 
 for (const variant of ['given', 'found', 'no-configuration'] as const) {
   handlers.set(`I2-10:resolve-${variant}`, { kind: 'project', workRoot: join(tmpdir(), 'ramify-resolve-cases'), fixture: { kind: 'create', create: createProjectFixture },

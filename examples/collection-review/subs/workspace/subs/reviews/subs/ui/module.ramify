@@ -3,7 +3,7 @@ ramify 1
 // declared name is quoted because `ui` is a reserved keyword.
 module "ui" tagged [ui, browser, dispatch]
 
-// The connected panel, for the feature parent to relay up to the shell. The
-// loading function beside it stays private: what this owner publishes is a
-// component, not a way to call the API.
-expose-src ReviewPanel from "review-panel.tsx" tagged [ui, dispatch, browser] to parent
+// The connected panel and the props its signature names, for the feature parent
+// to relay up to the shell. The loading function beside it stays private: what
+// this owner publishes is a component, not a way to call the API.
+expose-src ReviewPanel, ReviewPanelProps from "review-panel.tsx" tagged [ui, dispatch, browser] to parent
