@@ -14,13 +14,13 @@ import {
 } from '../interfaces/protocol/queries.js';
 import {
   analysisResponseSchema, capabilityListResponseSchema, decisionListResponseSchema, gateResponseSchema,
-  metricsResponseSchema, runCommandSchema, runEventPageSchema, runListResponseSchema, runResponseSchema,
+  metricsResponseSchema, moduleCapabilityComparisonResponseSchema, runCommandSchema, runEventPageSchema, runListResponseSchema, runResponseSchema,
   workItemListResponseSchema, workItemResponseSchema,
 } from '../interfaces/protocol/runs.js';
-import { loadModuleTree } from '../../subs/evidence/src/views.js';
 import { CommandRejection } from '../jobs/commands.js';
 import { discoverPlans, readPlan } from '../plans/discover.js';
 import { ProjectionError } from '../projections/inputs.js';
+import { currentModuleTree } from '../projections/tree.js';
 import { RunQueries } from '../projections/queries.js';
 import type { RunService } from '../run/service.js';
 
@@ -74,19 +74,7 @@ export function createApp(options: AppOptions): express.Express {
   });
 
   app.get(protocolPaths.modules, async (_request, response) => {
-    let tree;
-    try {
-      tree = { status: 'available' as const, ...await loadModuleTree(projectRoot) };
-    } catch (error) {
-      const missing = (error as NodeJS.ErrnoException).code === 'ENOENT';
-      tree = {
-        status: 'unavailable' as const,
-        message: missing
-          ? 'The architect view has not been materialized yet; a run materializes it before its initial analysis.'
-          : `The architect view cannot be read: ${error instanceof Error ? error.message : String(error)}`,
-      };
-    }
-    send(response, moduleTreeResponseSchema, { tree });
+    send(response, moduleTreeResponseSchema, { tree: await currentModuleTree(projectRoot) });
   });
 
   app.get(protocolPaths.plans, async (_request, response) => {
@@ -144,6 +132,10 @@ export function createApp(options: AppOptions): express.Express {
 
   app.get(`${apiPrefix}/plans/:planId/runs/:runId/capabilities`, async (request: RunRequest, response) => {
     send(response, capabilityListResponseSchema, await projected(() => queries.capabilities(request.params.planId, request.params.runId)));
+  });
+
+  app.get(`${apiPrefix}/plans/:planId/runs/:runId/module-capabilities`, async (request: RunRequest, response) => {
+    send(response, moduleCapabilityComparisonResponseSchema, await projected(() => queries.moduleCapabilities(request.params.planId, request.params.runId)));
   });
 
   app.get(`${apiPrefix}/plans/:planId/runs/:runId/gates/:gate`, async (request: GateRequest, response) => {

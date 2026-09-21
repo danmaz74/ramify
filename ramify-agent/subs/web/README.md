@@ -31,6 +31,16 @@ it is editable, and closing or reloading it does not affect a run.
   from the run's state. `src/run-progress.ts` reads the event page after a
   cursor, as Plan 1's page did, and reads each area again when the run's
   version moves.
+- Progress has two views, and only the selected one is mounted. By module
+  is not available yet. Dependencies (`src/capability-graph.tsx`) draws the
+  harness's capability progress answer as a dependency graph: each returned
+  capability once, in columns of longest dependency depth, with explicit
+  cycle groups, dashed tentative links, the literal `todo`, `working` or
+  `completed` state, and current or suggested owners. A bounded answer
+  reports what it shows of the total and lists omitted dependency targets.
+  Selected detail opens the capability's work-item history. With the dev
+  server, `?example=capability-graph` previews it over the projection's
+  answers for the cases of `harness/src/tests/progress.test.ts`.
 - `src/module-tree.tsx` draws modules marked as touched on the project's
   module tree, with their weights. Branches that hold marked modules are
   open; a module that does not exist yet is drawn under its parent and marked

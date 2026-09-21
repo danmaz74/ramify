@@ -16,7 +16,7 @@ const bucketSchema = z.object({
   views: z.object({ ordinaryBytes: z.number(), testsBytes: z.number() }),
 });
 
-const moduleSchema = z.object({
+export const moduleSchema = z.object({
   id: z.string(),
   dir: z.string(),
   parent: z.string().nullable(),
@@ -29,7 +29,7 @@ const moduleSchema = z.object({
 /** The one document version this reader supports. */
 export const measureSchemaVersion = 'ramify.measure/1';
 
-const documentSchema = z.object({
+export const documentSchema = z.object({
   schema: z.literal(measureSchemaVersion),
   revision: z.string(),
   root: z.string(),

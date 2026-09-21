@@ -263,8 +263,10 @@ button.link[aria-pressed='true'] { font-weight: 700; }
 .capability-graph-header p { margin: 0; max-width: 46rem; }
 .capability-counts { display: flex; gap: 1.15rem; margin: 0; flex: 0 0 auto; }
 .capability-counts div { min-width: 4.2rem; text-align: center; }
-.capability-counts dt { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.capability-counts dt { color: var(--muted); font-size: 0.78rem; font-family: ui-monospace, monospace; }
 .capability-counts dd { margin: 0; font-size: 1.3rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.capability-counts-block { flex: 0 0 auto; }
+.capability-counts-label { margin: 0 0 0.3rem; color: var(--muted); font-size: 0.74rem; text-align: right; }
 .graph-coverage { margin: 0; padding: 0.55rem 1.35rem; border-bottom: 1px solid #ead7ad; background: #fff8e8; }
 .graph-legend {
   display: flex; flex-wrap: wrap; gap: 0.65rem 1rem; align-items: center;
@@ -308,6 +310,8 @@ button.link[aria-pressed='true'] { font-weight: 700; }
 .capability-node-tentative { border-top-style: dashed; border-right-style: dashed; border-bottom-style: dashed; border-color: var(--warn); background: #fffdf7; }
 .capability-node-title { display: block; font-weight: 750; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .capability-node-owner { color: var(--muted); font-size: 0.76rem; line-height: 1.35; overflow-wrap: break-word; white-space: normal; }
+.capability-node-owner-label { color: var(--muted); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.capability-cycle-label { position: absolute; color: var(--bad); font-size: 0.72rem; font-weight: 700; }
 .capability-node-badges { display: flex; flex-wrap: wrap; gap: 0.25rem; min-height: 1.2rem; }
 .capability-node-badges .badge { margin-left: 0; }
 .capability-node-meta { margin-top: auto; color: var(--muted); font-size: 0.74rem; }
@@ -319,9 +323,18 @@ button.link[aria-pressed='true'] { font-weight: 700; }
 .capability-dependency-list summary { cursor: pointer; }
 .capability-dependency-list ul { margin-bottom: 0; }
 .capability-preview-shell main { max-width: none; }
+.capability-preview-case { margin-bottom: 1.5rem; }
+.capability-preview-case > h2 { font-size: 1rem; margin: 0 0 0.4rem; }
+.progress-views { margin-top: 0; }
+.inline-list { display: inline; margin: 0; padding: 0; list-style: none; }
+.inline-list li { display: inline; }
+.inline-list li + li::before { content: ', '; }
+.graph-coverage p { margin: 0.2rem 0; }
+.graph-coverage ul { margin: 0.2rem 0 0.3rem; }
 
 @media (max-width: 760px) {
   .capability-graph-header { display: block; }
   .capability-counts { margin-top: 0.8rem; justify-content: flex-start; }
+  .capability-counts-label { text-align: left; }
   .capability-graph-scroll { max-height: 34rem; }
 }

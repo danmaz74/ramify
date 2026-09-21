@@ -15,10 +15,12 @@ import { createApp } from './app.js';
  * `fake` is the scripted fake, chosen explicitly and never the default: its
  * initial architect submits an analysis with no entry capability, so the
  * run it drives exercises the lifecycle, readiness and the final gate over
- * the project's own commands, and changes no source.
+ * the project's own commands, and changes no source. A test of this module
+ * may supply an implementation of its own.
  */
 export type AgentChoice = 'pi' | 'fake' | AgentPort;
 
+/** What the root starts a server with. */
 export interface ServerOptions {
   /** The project to serve; it must contain a root `module.ramify`. */
   readonly projectRoot: string;
@@ -29,9 +31,18 @@ export interface ServerOptions {
   /** The built web client; omitted or missing, only the protocol is served. */
   readonly assetsDirectory?: string | undefined;
   /** Without an agent, the harness serves plans and runs but starts none. */
-  readonly agent?: AgentChoice | undefined;
+  readonly agent?: 'pi' | 'fake' | undefined;
   /** The model pi runs, such as `anthropic/claude-opus-4-5`; default: the first model pi has credentials for. */
   readonly piModel?: string | undefined;
+}
+
+/**
+ * What this module's own tests may add to the root's options: an agent they
+ * built, the Ramify command line and run settings. They stay internal, with
+ * the run service they configure.
+ */
+export interface ServerSettings extends Omit<ServerOptions, 'agent'> {
+  readonly agent?: AgentChoice | undefined;
   /**
    * How the harness runs Ramify. Default: the `ramify` CLI with a daemon of
    * the harness's own, which `close` stops.
@@ -85,7 +96,12 @@ function demonstrationScript(): ScriptStep[] {
  * runs a previous harness left without a terminal event, and serves the
  * protocol's queries and commands.
  */
-export async function startServer(options: ServerOptions): Promise<RunningServer> {
+export function startServer(options: ServerOptions): Promise<RunningServer> {
+  return startServerWith(options);
+}
+
+/** `startServer`, with the settings only this module's tests supply. */
+export async function startServerWith(options: ServerSettings): Promise<RunningServer> {
   const projectRoot = resolve(options.projectRoot);
   if (!existsSync(projectRoot) || !statSync(projectRoot).isDirectory()) {
     throw new ProjectRootError(`The project root ${projectRoot} is not a directory`);

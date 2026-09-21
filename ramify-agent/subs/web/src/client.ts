@@ -13,10 +13,10 @@ import {
 } from '../../harness/src/interfaces/protocol/queries.js';
 import {
   analysisResponseSchema, capabilityListResponseSchema, decisionListResponseSchema, gateResponseSchema,
-  metricsResponseSchema, runEventPageSchema, runListResponseSchema, runResponseSchema,
+  metricsResponseSchema, moduleCapabilityComparisonResponseSchema, runEventPageSchema, runListResponseSchema, runResponseSchema,
   workItemListResponseSchema, workItemResponseSchema,
   type AnalysisResponse, type CapabilityListResponse, type DecisionListResponse, type GateView,
-  type MetricsResponse, type RunCommand, type RunEventPage, type RunListResponse, type RunSnapshot,
+  type MetricsResponse, type ModuleCapabilityComparisonResponse, type RunCommand, type RunEventPage, type RunListResponse, type RunSnapshot,
   type WorkItemListResponse, type WorkItemResponse,
 } from '../../harness/src/interfaces/protocol/runs.js';
 
@@ -61,6 +61,8 @@ export interface ProtocolClient {
   getWorkItems(planId: string, runId: string): Promise<WorkItemListResponse>;
   getWorkItem(planId: string, runId: string, workItem: string): Promise<WorkItemResponse>;
   getCapabilities(planId: string, runId: string): Promise<CapabilityListResponse>;
+  /** The initial analysis's module associations beside the capabilities verified at their current owners. */
+  getModuleCapabilities(planId: string, runId: string): Promise<ModuleCapabilityComparisonResponse>;
   getGate(planId: string, runId: string, gate: string): Promise<GateView>;
   getMetrics(planId: string, runId: string): Promise<MetricsResponse>;
   /**
@@ -134,6 +136,7 @@ export function createProtocolClient(origin = '', fetchImpl: typeof fetch = (...
     getWorkItems: (planId, runId) => get(protocolPaths.runWorkItems(planId, runId), workItemListResponseSchema),
     getWorkItem: (planId, runId, workItem) => get(protocolPaths.runWorkItem(planId, runId, workItem), workItemResponseSchema),
     getCapabilities: (planId, runId) => get(protocolPaths.runCapabilities(planId, runId), capabilityListResponseSchema),
+    getModuleCapabilities: (planId, runId) => get(protocolPaths.runModuleCapabilities(planId, runId), moduleCapabilityComparisonResponseSchema),
     getGate: async (planId, runId, gate) => (await get(protocolPaths.runGate(planId, runId, gate), gateResponseSchema)).gate,
     getMetrics: (planId, runId) => get(protocolPaths.runMetrics(planId, runId), metricsResponseSchema),
     sendCommand: async command => {
