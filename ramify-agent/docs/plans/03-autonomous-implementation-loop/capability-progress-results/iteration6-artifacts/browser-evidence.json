@@ -1,0 +1,197 @@
+{
+  "schema": "ramify-agent.capability-progress-browser-evidence/1",
+  "date": "2026-09-21",
+  "browser": "Chromium via the Playwright MCP server",
+  "server": "subs/harness/src/tests/helpers/serve-progress-fixture.ts on 127.0.0.1:4191, serving ramify-agent/dist/web",
+  "fixture": {
+    "placements": {
+      "plan": "revision-diff",
+      "state": "completed"
+    },
+    "proposed": {
+      "plan": "review-notes",
+      "state": "failed",
+      "failure": "unresolvable-requirement"
+    },
+    "capabilityBound": {
+      "plan": "reviewer-identity",
+      "state": "completed"
+    },
+    "rowBound": {
+      "plan": "status-badge-tone",
+      "state": "completed"
+    },
+    "sixtyRows": {
+      "plan": "status-badge-tone",
+      "state": "completed"
+    }
+  },
+  "viewports": {
+    "desktop": [
+      1440,
+      1000
+    ],
+    "narrow": [
+      390,
+      844
+    ]
+  },
+  "oneReact": {
+    "sourceMapModules": [
+      "ramify-agent/node_modules/react/cjs/react.production.js",
+      "ramify-agent/node_modules/react/index.js",
+      "ramify-agent/node_modules/scheduler/cjs/scheduler.production.js",
+      "ramify-agent/node_modules/scheduler/index.js",
+      "ramify-agent/node_modules/react-dom/cjs/react-dom.production.js",
+      "ramify-agent/node_modules/react-dom/index.js",
+      "ramify-agent/node_modules/react-dom/cjs/react-dom-client.production.js",
+      "ramify-agent/node_modules/react-dom/client.js",
+      "ramify-agent/node_modules/react/cjs/react-jsx-runtime.production.js",
+      "ramify-agent/node_modules/react/jsx-runtime.js"
+    ],
+    "note": "Production build with --sourcemap into a scratch directory; every react, react-dom and scheduler module comes from ramify-agent/node_modules, none from the checkout root.",
+    "runtimeRenderers": [
+      {
+        "rendererPackageName": "react-dom",
+        "version": "19.2.8",
+        "reconcilerVersion": "19.2.8",
+        "bundleType": 0
+      }
+    ],
+    "runtimeNote": "A stub React DevTools hook installed before load; exactly one renderer injected itself. Hook-using rows rendered and selected."
+  },
+  "console": {
+    "session": "0 messages of any level for the whole session (browser_console_messages level=debug all=true)"
+  },
+  "byModule": {
+    "mountedOnlySelected": {
+      "byModule": {
+        "reactFlowCanvases": 1,
+        "dependencyGraphs": 0
+      },
+      "dependencies": {
+        "reactFlowCanvases": 0,
+        "dependencyGraphs": 1
+      }
+    },
+    "placementsRows": [
+      "core: compare-revisions Initial entry owner + Implemented",
+      "core: field-diff Initial suggested owner",
+      "core: revision-chain Implemented",
+      "ui: compare-panel Initial entry owner + Implemented",
+      "ui: field-diff Implemented",
+      "ui: note-preview Initial suggested owner",
+      "contracts: field-diff Initial involved"
+    ],
+    "autoFit": {
+      "placementsDesktop": "scale 0.1766 in a 432 x 610 canvas",
+      "sixtyRowsDesktop": "scale 0.1897",
+      "rowBoundDesktop": "scale 0.1 (the canvas minimum)",
+      "placementsNarrow": "scale 0.1398 in a 342 x 482 canvas"
+    },
+    "zoomWheel": {
+      "from": "scale 0.1766",
+      "to": "scale 1.3003"
+    },
+    "pan": {
+      "dragPane": "translate x -266.0 -> -26.0 at scale 0.789",
+      "tallNode": "9 drags moved translate y by -3600 at scale 1.948; check-060 then in view"
+    },
+    "zoomControls": {
+      "in": "0.1803 -> 0.2164",
+      "out": "back to 0.1803"
+    },
+    "minimap": {
+      "marks": 15,
+      "titledMarks": true,
+      "dragPans": "translate x 15.7 -> -105.9"
+    },
+    "collapse": {
+      "clickReviews": "15 -> 9 -> 15 nodes",
+      "enterWorkspaceToggleAfterFix": "15 -> 3 nodes, label +12, no module selected; Enter again 15",
+      "arrowLeftRightOnShell": "15 -> 9 -> 15"
+    },
+    "focusOrder": [
+      "catalog/core shell",
+      "compare-revisions row",
+      "field-diff row",
+      "revision-chain row",
+      "catalog/ui shell"
+    ],
+    "rowKeys": {
+      "enter": "selects compare-revisions, no synthetic click, shell not selected",
+      "enterThenClick": "one click event (the mouse click); selection unchanged",
+      "space": "selects field-diff, no click event"
+    },
+    "spacePanKey": "A Space keydown on a row reaches window with defaultPrevented true, so React Flow's pan-activation key registers (a button is not an input node for its filter). No observable effect here: the pane is already draggable, the wheel still zooms, no click, one selection.",
+    "shell": {
+      "click": "selects catalog/core; detail lists its three rows",
+      "enter": "selects catalog/ui",
+      "paneClick": "clears"
+    },
+    "proposed": {
+      "class": "module-tree__node module-tree__node--provisional",
+      "borderTopStyle": "dashed",
+      "label": "proposed at start",
+      "placedUnderParent": {
+        "archiveTop": 1056,
+        "parentBottom": 1045,
+        "centerX": 691
+      }
+    },
+    "overlaps": {
+      "rowBound": 0,
+      "sixtyRows": 0,
+      "rowsOutsideShell": 0
+    },
+    "sixtyRows": {
+      "rows": 60,
+      "layoutHeightPx": 2373
+    },
+    "narrowPageWidth": "390 for every run and both subviews after the tab-wrap fix (752 before)"
+  },
+  "dependencies": {
+    "placements": {
+      "columns": [
+        "Depth 0",
+        "Depth 1",
+        "Depth 2"
+      ],
+      "depthChain": "review-digest (0) -> digest-format (1) -> text-wrap (2)",
+      "sharedDependency": "text-wrap: Depended on by field-diff, digest-format, note-preview",
+      "edges": 8,
+      "tentativeEdges": 6,
+      "cycleGroups": 1,
+      "cycleLabel": "Dependency cycle: no order among these",
+      "unavailableTargets": [
+        "spell-check"
+      ],
+      "counts": "State counts of the 10 returned capabilities: todo 6, working 0, completed 4",
+      "ownerLabels": "current owner on the 4 registered nodes, suggested owner on the 6 forecast nodes"
+    },
+    "cycleLabelAfterFix": {
+      "labelHeight": 35,
+      "labelBottom": 1126,
+      "firstMemberTop": 1135
+    },
+    "proposed": {
+      "nodes": [
+        "badge-archive, working, entry",
+        "badge-tones, todo, forecast only",
+        "badge-legend, todo, entry"
+      ],
+      "wordFailedInProgress": false,
+      "runHeader": "failed"
+    },
+    "capabilityBound": {
+      "nodes": 500,
+      "coverage": "Showing 500 / 520 capabilities: the response is bounded, and the other 20 are not in it. Every count here is of the returned set.",
+      "counts": "State counts of the 500 returned capabilities"
+    },
+    "keyboard": {
+      "enter": "selects compare-revisions",
+      "tabThenSpace": "selects compare-panel",
+      "enterThenClick": "two click events, one per action (native button); selection idempotent"
+    }
+  }
+}
