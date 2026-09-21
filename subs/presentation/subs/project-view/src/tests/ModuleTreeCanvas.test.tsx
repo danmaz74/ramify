@@ -256,6 +256,22 @@ describe('ModuleTreeCanvas interaction', () => {
     expect(screen.getByRole('treeitem', { name: 'Alpha' })).toHaveAttribute('aria-selected', 'false');
   });
 
+  it('leaves Enter and the other shell keys on a focused collapse control to the control', () => {
+    const onSelectNode = vi.fn();
+    const onToggleCollapsed = vi.fn();
+    const onOpenNode = vi.fn();
+    render(<ModuleTreeCanvas {...props({ nodes: mixedNodes(), onSelectNode, onToggleCollapsed, onOpenNode })} />);
+    const toggle = screen.getByRole('button', { name: 'Collapse Alpha' });
+    // Not prevented, so the browser turns Enter into the control's own click.
+    for (const key of ['Enter', 'ArrowLeft', 'ArrowRight', 'o']) expect(fireEvent.keyDown(toggle, { key })).toBe(true);
+    expect(onSelectNode).not.toHaveBeenCalled();
+    expect(onToggleCollapsed).not.toHaveBeenCalled();
+    expect(onOpenNode).not.toHaveBeenCalled();
+    fireEvent.click(toggle);
+    expect(onToggleCollapsed).toHaveBeenCalledTimes(1);
+    expect(onSelectNode).not.toHaveBeenCalled();
+  });
+
   it('handles Enter, arrows and o on the shell, and opens by double-click', () => {
     const onSelectNode = vi.fn();
     const onToggleCollapsed = vi.fn();

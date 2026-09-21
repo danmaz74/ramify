@@ -104,7 +104,9 @@ function ModuleTreeCanvasNodeView({ data }: NodeProps<CanvasFlowNode>): React.Re
   }
   const emphasis = node.emphasis ?? 'normal';
   const keyDown = (event: React.KeyboardEvent) => {
-    if (bodyRef.current?.contains(event.target as globalThis.Node)) return;
+    // Only a key pressed on the shell itself: a body control's keys belong to
+    // the body, and the collapse control's Enter and Space to its own click.
+    if (event.target !== event.currentTarget) return;
     if (event.key === 'Enter') data.onSelect(node.id);
     else if (event.key === 'ArrowLeft' && data.childCount > 0 && !data.isCollapsed) data.onToggle(node.id);
     else if (event.key === 'ArrowRight' && data.isCollapsed) data.onToggle(node.id);
