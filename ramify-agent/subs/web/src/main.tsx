@@ -9,9 +9,9 @@ if (!container) throw new Error('The page has no #root element');
 const example = (import.meta as ImportMeta & { readonly env: { readonly DEV: boolean } }).env.DEV
   ? new URLSearchParams(window.location.search).get('example')
   : null;
-if (example === 'module-activity') {
-  const { ModuleActivityExample } = await import('./examples/module-activity-example.js');
-  createRoot(container).render(<StrictMode><ModuleActivityExample /></StrictMode>);
+if (example === 'capability-module') {
+  const { CapabilityModuleExample } = await import('./examples/capability-module-example.js');
+  createRoot(container).render(<StrictMode><CapabilityModuleExample /></StrictMode>);
 } else if (example === 'capability-graph') {
   const { CapabilityGraphExample } = await import('./examples/capability-graph-example.js');
   createRoot(container).render(<StrictMode><CapabilityGraphExample /></StrictMode>);

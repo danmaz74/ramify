@@ -4,6 +4,7 @@ import type {
   ProjectedRunEvent, RunNotice, RunSnapshot, WorkItemResponse,
 } from '../../harness/src/interfaces/protocol/runs.js';
 import { CapabilityDependencyGraph } from './capability-graph.js';
+import { CapabilityModuleTree, type ModuleCapabilitySelection } from './capability-module-tree.js';
 import { newCommandId, type ConnectionState, type ProtocolClient } from './client.js';
 import { Markdown } from './markdown.js';
 import { routeHref } from './routes.js';
@@ -56,6 +57,7 @@ export function RunPage({ client, planId, runId, interval }: {
   const connection = useConnection(client);
   const [area, setArea] = useState<Area>('overview');
   const [workItem, setWorkItem] = useState<string | undefined>(undefined);
+  const [moduleSelection, setModuleSelection] = useState<ModuleCapabilitySelection | null>(null);
   const version = run?.version;
   const props: AreaProps = { client, planId, runId, version };
 
@@ -82,7 +84,10 @@ export function RunPage({ client, planId, runId, interval }: {
       {area === 'decisions' && <HypothesesAndDecisions {...props} />}
       {area === 'work' && <WorkItems {...props} selected={workItem} onSelect={setWorkItem} />}
       {area === 'checks' && <Checks {...props} events={events} />}
-      {area === 'progress' && <Progress {...props} onOpenWorkItem={id => { setWorkItem(id); setArea('work'); }} />}
+      {area === 'progress' && (
+        <Progress {...props} moduleSelection={moduleSelection} onSelectModule={setModuleSelection}
+          onOpenWorkItem={id => { setWorkItem(id); setArea('work'); }} />
+      )}
       {area === 'measurements' && <Measurements {...props} />}
     </section>
   );
@@ -501,11 +506,16 @@ type ProgressView = typeof progressViews[number][0];
 
 /*
  * Two views of the harness's capability progress. Only the selected one is
- * mounted, so the page never loads both large visualizations at once. Until
- * By module is built on the shared module tree, Dependencies is the default.
+ * mounted, so the page never loads both large visualizations at once. By
+ * module is the default: it answers the run's initial-versus-current
+ * placement question.
  */
-function Progress({ onOpenWorkItem, ...props }: AreaProps & { readonly onOpenWorkItem: (workItem: string) => void }) {
-  const [view, setView] = useState<ProgressView>('dependencies');
+function Progress({ onOpenWorkItem, moduleSelection, onSelectModule, ...props }: AreaProps & {
+  readonly onOpenWorkItem: (workItem: string) => void;
+  readonly moduleSelection: ModuleCapabilitySelection | null;
+  readonly onSelectModule: (selection: ModuleCapabilitySelection | null) => void;
+}) {
+  const [view, setView] = useState<ProgressView>('module');
   return (
     <div className="area" aria-label="Progress">
       <nav className="tabs progress-views" aria-label="Progress views">
@@ -513,13 +523,24 @@ function Progress({ onOpenWorkItem, ...props }: AreaProps & { readonly onOpenWor
           <button key={id} type="button" role="tab" aria-selected={view === id} className={view === id ? 'tab tab-selected' : 'tab'} onClick={() => setView(id)}>{label}</button>
         ))}
       </nav>
-      {view === 'module' && (
-        <section className="progress-view" aria-label="By module">
-          <p className="muted" role="status">By module is not available yet. Dependencies shows every returned capability with its state.</p>
-        </section>
-      )}
+      {view === 'module' && <ByModule {...props} selection={moduleSelection} onSelect={onSelectModule} />}
       {view === 'dependencies' && <Dependencies {...props} onOpenWorkItem={onOpenWorkItem} />}
     </div>
+  );
+}
+
+/** The module-capability comparison on the shared module tree, or the condition that stands in for it. */
+function ByModule({ client, planId, runId, version, selection, onSelect }: AreaProps & {
+  readonly selection: ModuleCapabilitySelection | null;
+  readonly onSelect: (selection: ModuleCapabilitySelection | null) => void;
+}) {
+  const state = useRunQuery(`module-capabilities:${runId}`, version, () => client.getModuleCapabilities(planId, runId));
+  return (
+    <section className="progress-view" aria-label="By module">
+      {state.status === 'loading' && <p className="muted" role="status">Loading the module comparison…</p>}
+      {state.status === 'failed' && <p className="failure" role="alert">The module comparison is unavailable: {state.error.message}</p>}
+      {state.status === 'ready' && <CapabilityModuleTree comparison={state.data} selection={selection} onSelect={onSelect} />}
+    </section>
   );
 }
 

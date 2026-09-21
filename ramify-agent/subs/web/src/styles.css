@@ -1,3 +1,7 @@
+/* The packaged Ramify module-tree canvas, with the React Flow base rules it
+ * needs: imported once, here, and never copied. */
+@import 'ramify.ts/module-tree.css';
+
 :root {
   --ink: #1d232b;
   --muted: #5d6874;
@@ -179,76 +183,51 @@ h1 { font-size: 1.5rem; margin: 0.5rem 0; }
 button.link { border: none; background: none; padding: 0; color: var(--accent); text-decoration: underline; }
 button.link[aria-pressed='true'] { font-weight: 700; }
 
-/* Initial-hypothesis versus implemented capabilities on the module tree. */
-.module-activity { padding: 0; overflow: hidden; }
-.module-activity-header {
-  display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem;
-  padding: 1.25rem 1.4rem 0.9rem; background: linear-gradient(135deg, #f7f9fc 0%, #fff 65%);
-  border-bottom: 1px solid var(--line);
+/* Progress → By module. The packaged Ramify canvas owns the node shells,
+ * edges and controls; these rules style only the node bodies and the page
+ * around the canvas. */
+.capability-module-tree { display: grid; gap: 0.75rem; }
+.capability-module-header { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 0.6rem 1.25rem 0.75rem; }
+.capability-module-header h2 { font-size: 1.15rem; margin: 0.3rem 0; }
+.capability-module-header p { margin: 0.3rem 0; }
+.capability-coverage { margin: 0.4rem 0; font-weight: 600; }
+.capability-coverage-partial { font-weight: normal; color: var(--warn); }
+.capability-coverage-partial ul { margin: 0.2rem 0; }
+.capability-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.6rem; color: var(--muted); font-size: 0.82rem; }
+.capability-module-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem); gap: 1rem; align-items: start; }
+.capability-module-canvas { height: 38rem; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.capability-module-canvas-empty { border: 1px dashed var(--line); border-radius: 8px; padding: 0.75rem 1rem; }
+.capability-module-side { display: grid; gap: 1rem; }
+.capability-module-side > section { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 0.5rem 1rem 0.75rem; overflow-wrap: anywhere; }
+.capability-module-detail h3 { margin: 0.3rem 0; font-size: 1rem; }
+.capability-module-detail h4 { margin: 0.6rem 0 0.2rem; font-size: 0.85rem; color: var(--muted); }
+.capability-module-detail ul { margin: 0.2rem 0; padding-left: 1.1rem; }
+.capability-module-detail li .capability-mark { margin-left: 0.4rem; }
+.capability-unplaced h3 { margin: 0.3rem 0; font-size: 1rem; }
+.capability-unplaced ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6rem; }
+.capability-module { display: flex; flex-direction: column; min-width: 0; }
+.capability-module-name { display: block; font-weight: 700; font-size: 12px; line-height: 18px; white-space: nowrap; }
+.capability-module-proposed { display: block; color: var(--warn); font-size: 10px; font-weight: 700; line-height: 16px; }
+.capability-rows { display: flex; flex-direction: column; }
+.capability-row {
+  display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 1px;
+  box-sizing: border-box; width: 100%; padding: 2px 6px; border: 1px solid var(--line); border-radius: 5px;
+  background: #fff; text-align: left; font-size: 11px; line-height: 15px; white-space: nowrap;
 }
-.module-activity-header h2 { margin: 0.05rem 0 0.25rem; font-size: 1.25rem; }
-.module-activity-header p { margin: 0; max-width: 44rem; }
-.eyebrow { color: var(--accent); font-size: 0.72rem; font-weight: 750; letter-spacing: 0.09em; text-transform: uppercase; }
-.activity-totals { display: flex; gap: 1.25rem; margin: 0; flex: 0 0 auto; }
-.activity-totals div { text-align: center; }
-.activity-totals dt { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; }
-.activity-totals dd { margin: 0; font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-.activity-toolbar {
-  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem 1.5rem;
-  padding: 0.75rem 1.4rem; border-bottom: 1px solid var(--line); background: #fff;
-}
-.activity-legend { display: flex; flex-wrap: wrap; gap: 0.8rem; color: var(--muted); font-size: 0.8rem; }
-.activity-legend span { display: inline-flex; align-items: center; gap: 0.3rem; }
-.activity-legend-swatch { width: 0.72rem; height: 0.72rem; border-radius: 3px; display: inline-block; }
-.activity-legend-initial { background: #fff; border: 1px dashed var(--accent); }
-.activity-legend-implemented { background: #dcefe3; border: 1px solid var(--good); }
-.activity-legend-both { background: linear-gradient(135deg, #fff 0 46%, #dcefe3 46% 100%); border: 1px solid var(--good); outline: 1px dashed var(--accent); outline-offset: 1px; }
-.activity-count-note { color: var(--muted); font-size: 0.76rem; }
-.activity-coverage { padding: 0.6rem 1.4rem; color: var(--warn); background: #fff8e8; border-bottom: 1px solid #ead7ad; font-size: 0.88rem; }
-.activity-identity { margin: 0; padding: 0.55rem 1.4rem; color: var(--muted); background: #fbfbfa; border-bottom: 1px solid var(--line); font-size: 0.8rem; }
-.module-activity-layout { display: grid; grid-template-columns: minmax(24rem, 1fr) minmax(28rem, 1fr); min-height: 27rem; }
-.activity-tree { padding: 1.15rem 1.4rem 1.5rem; overflow: auto; border-right: 1px solid var(--line); }
-.activity-tree ul { list-style: none; margin: 0; padding-left: 1.15rem; border-left: 1px solid #e3e7eb; }
-.activity-tree > ul { padding-left: 0; border-left: 0; }
-.activity-node { position: relative; padding: 0.12rem 0 0.12rem 0.35rem; }
-.activity-node::before { content: ''; position: absolute; left: -1px; top: 1.05rem; width: 0.7rem; border-top: 1px solid #e3e7eb; }
-.activity-tree > ul > .activity-node::before { display: none; }
-.activity-node-line { display: flex; align-items: center; min-height: 2rem; gap: 0.45rem; }
-.activity-node-button { border: 0; padding: 0.22rem 0.4rem; background: transparent; font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; font-size: 0.86rem; text-align: left; }
-.activity-node-button:disabled { cursor: default; }
-.activity-node-button[aria-pressed='true'] { color: var(--accent); background: #eef3fa; box-shadow: inset 3px 0 0 var(--accent); font-weight: 700; }
-.activity-node-marked > .activity-node-line > .activity-node-button { font-weight: 700; color: var(--ink); }
-.activity-node-muted > .activity-node-line > .activity-node-button { color: #98a1ab; }
-.activity-markers { display: inline-flex; flex-wrap: wrap; gap: 0.28rem; }
-.activity-marker, .activity-role, .activity-capability-completed {
-  display: inline-block; padding: 0.08rem 0.42rem; border-radius: 999px; font-size: 0.7rem; font-weight: 700; line-height: 1.45;
-}
-.activity-marker-initial { color: var(--accent); background: #fff; border: 1px dashed var(--accent); }
-.activity-marker-implemented { color: var(--good); background: #e4f3e9; border: 1px solid #93c4a6; }
-.activity-marker-both { color: #235e3c; background: linear-gradient(135deg, #f4f8fd 0 42%, #e4f3e9 42% 100%); border: 1px solid #78aa8b; box-shadow: inset 3px 0 0 var(--accent); }
-.activity-marker-proposed { color: #6f4b0c; background: #f7ecd4; border: 1px solid #d9ba78; }
-.activity-detail { padding: 1.15rem 1.4rem 1.5rem; background: #fcfcfb; }
-.activity-detail > h3 { margin: 0.1rem 0 0.8rem; color: var(--ink); }
-.activity-detail-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
-.activity-detail-section { min-width: 0; padding-top: 0.8rem; margin-top: 0.8rem; border-top: 1px solid var(--line); }
-.activity-detail-section h4 { margin: 0 0 0.45rem; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.055em; color: var(--muted); }
-.activity-capabilities { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.55rem; }
-.activity-capabilities li { padding: 0.45rem 0.55rem; border: 1px solid #e3e7eb; border-radius: 6px; background: #fff; }
-.activity-capabilities p { margin: 0.25rem 0 0; font-size: 0.82rem; }
-.activity-roles { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.3rem; }
-.activity-role { color: var(--accent); background: #f4f8fd; border: 1px dashed #8ba8cf; }
-.activity-capability-completed { color: var(--good); background: #dcefe3; }
-.activity-missing { margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--line); }
-.activity-preview-shell main { max-width: 78rem; }
+.capability-row:hover { border-color: #9facba; }
+.capability-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.capability-row-selected { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.capability-row-id { font-size: 11px; }
+.capability-row-marks { display: flex; gap: 0.3rem; }
+.capability-mark { display: inline-block; padding: 0 0.35rem; border-radius: 4px; font-size: 10px; font-weight: 700; line-height: 14px; }
+.capability-mark-initial { color: var(--accent); background: #fff; border: 1px solid var(--accent); }
+.capability-mark-implemented { color: #fff; background: var(--good); border: 1px solid var(--good); }
 .preview-kicker { margin: 0.25rem 0 0.8rem; color: var(--muted); }
 .preview-source { font-size: 0.82rem; }
 
 @media (max-width: 760px) {
-  .module-activity-header { display: block; }
-  .activity-totals { margin-top: 0.8rem; justify-content: flex-start; }
-  .module-activity-layout { grid-template-columns: 1fr; }
-  .activity-tree { border-right: 0; border-bottom: 1px solid var(--line); }
-  .activity-detail-columns { grid-template-columns: 1fr; }
+  .capability-module-layout { grid-template-columns: 1fr; }
+  .capability-module-canvas { height: 30rem; }
 }
 
 /* Capability dependency progress. The harness owns every displayed fact; the

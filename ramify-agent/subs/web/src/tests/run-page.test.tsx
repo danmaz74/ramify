@@ -1,14 +1,16 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import {
   analysisResponseSchema, capabilityListResponseSchema, capabilityStateSchema, decisionListResponseSchema, gateViewSchema, metricsResponseSchema,
-  runSnapshotSchema, workItemListResponseSchema, workItemResponseSchema, type RunSnapshot, type WorkItemSummary,
+  moduleCapabilityComparisonResponseSchema, runSnapshotSchema, workItemListResponseSchema, workItemResponseSchema, type RunSnapshot, type WorkItemSummary,
 } from '../../../harness/src/interfaces/protocol/runs.js';
 import { ClientError } from '../client.js';
 import { RunPage } from '../run-page.js';
 import { StubClient, type StubRun } from './helpers/stub-client.js';
 
-afterEach(cleanup);
+// Progress → By module draws the packaged React Flow canvas, which jsdom cannot measure.
+beforeEach(() => { vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }); });
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 const runId = '20260921T080000Z-c0ffee';
 const at = '2026-09-21T08:00:00.000Z';
@@ -71,6 +73,30 @@ function stubRun(extra: Partial<RunSnapshot> = {}): StubRun {
         { capability: 'note-storage', owner: 'collection-review/workspace/reviews', entry: false, tentative: true, state: 'todo', reason: 'Forecast by hypothesis note-storage at revision 1 (tentative); no work derives from a hypothesis', dependsOn: [], workItems: [], evidence: [] },
       ],
       total: 4,
+    }),
+    moduleCapabilities: moduleCapabilityComparisonResponseSchema.parse({
+      identityPolicy: 'exact-capability-slug/1',
+      runVersion: 12,
+      initialView: { status: 'placeholder' },
+      tree: {
+        status: 'available', revision: 'rev/1:tree:3', input: 'input/1:abc',
+        modules: [{ module: 'shop', dir: '', parent: null }, { module: 'shop/notes', dir: 'subs/notes', parent: 'shop' }, { module: 'shop/search', dir: 'subs/search', parent: 'shop' }],
+      },
+      modules: [
+        { module: 'shop', placement: 'declared', proposedAtStart: null, capabilities: [] },
+        {
+          module: 'shop/notes', placement: 'declared', proposedAtStart: null, capabilities: [
+            { capability: 'review-note', initial: [{ role: 'entry-owner', hypothesis: null }], implementedHere: { reason: 'wi-001 passed its work-item gate ga-0003', evidence: ['ga-0003'] } },
+            { capability: 'note-search', initial: [{ role: 'suggested-owner', hypothesis: 'note-search' }], implementedHere: null },
+          ],
+        },
+        {
+          module: 'shop/search', placement: 'declared', proposedAtStart: null, capabilities: [
+            { capability: 'note-search', initial: [{ role: 'involved', hypothesis: 'note-search' }], implementedHere: null },
+          ],
+        },
+      ],
+      coverage: { state: 'complete', capabilities: 2, implemented: 1 },
     }),
     gates: {
       'ga-0002': gateViewSchema.parse({
@@ -178,28 +204,76 @@ test('hypotheses are shown as forecasts with standing and revision, beside the d
   expect(decision.textContent).toContain('note-search@2');
 });
 
-test('CM20: Progress offers By module and Dependencies, Dependencies by default, and mounts only the selected view', async () => {
+test('CM20: Progress offers By module and Dependencies, By module by default, and mounts only the selected view', async () => {
   const client = clientWith(stubRun());
   render(<RunPage client={client} planId="review-notes" runId={runId} interval={60_000} />);
   fireEvent.click(await screen.findByRole('tab', { name: 'Progress' }));
   const progress = await screen.findByLabelText('Progress');
   const views = within(within(progress).getByLabelText('Progress views')).getAllByRole('tab');
-  expect(views.map(view => [view.textContent, view.getAttribute('aria-selected')])).toEqual([['By module', 'false'], ['Dependencies', 'true']]);
-  await within(progress).findByLabelText('Scrollable capability dependency graph');
-  expect(within(progress).queryByLabelText('By module')).toBeNull();
-
-  fireEvent.click(within(progress).getByRole('tab', { name: 'By module' }));
-  const byModule = within(progress).getByLabelText('By module');
-  expect(byModule.textContent).toContain('By module is not available yet');
+  expect(views.map(view => [view.textContent, view.getAttribute('aria-selected')])).toEqual([['By module', 'true'], ['Dependencies', 'false']]);
+  await within(progress).findByLabelText('Modules with their capability rows');
   expect(within(progress).queryByLabelText('Dependencies')).toBeNull();
-  expect(within(progress).queryByLabelText('Scrollable capability dependency graph')).toBeNull();
-  // By module reads nothing until it is built; the comparison is not fetched.
-  expect(client.calls.filter(call => call.startsWith('getModuleCapabilities'))).toEqual([]);
+  expect(client.calls.filter(call => call.startsWith('getCapabilities'))).toEqual([]);
+  expect(client.calls.filter(call => call.startsWith('getModuleCapabilities'))).toHaveLength(1);
 
-  const before = client.calls.filter(call => call.startsWith('getCapabilities')).length;
   fireEvent.click(within(progress).getByRole('tab', { name: 'Dependencies' }));
   await within(progress).findByLabelText('Scrollable capability dependency graph');
-  expect(client.calls.filter(call => call.startsWith('getCapabilities')).length).toBe(before + 1);
+  expect(within(progress).queryByLabelText('By module')).toBeNull();
+  expect(within(progress).queryByLabelText('Modules with their capability rows')).toBeNull();
+  expect(document.querySelector('.module-tree__canvas')).toBeNull();
+
+  fireEvent.click(within(progress).getByRole('tab', { name: 'By module' }));
+  await within(progress).findByLabelText('Modules with their capability rows');
+  expect(within(progress).queryByLabelText('Scrollable capability dependency graph')).toBeNull();
+  expect(client.calls.filter(call => call.startsWith('getModuleCapabilities'))).toHaveLength(2);
+});
+
+test('By module: every row in its node on the packaged canvas; row selection is Run-page state, apart from the module', async () => {
+  render(<RunPage client={clientWith(stubRun())} planId="review-notes" runId={runId} interval={60_000} />);
+  fireEvent.click(await screen.findByRole('tab', { name: 'Progress' }));
+  const byModule = await screen.findByLabelText('By module');
+  const canvas = await within(byModule).findByLabelText('Modules with their capability rows');
+  const notes = canvas.querySelector<HTMLElement>('[data-module-id="shop/notes"]')!;
+  expect(within(notes).getAllByRole('button', { name: /^(review-note|note-search),/ }).map(row => row.getAttribute('aria-label')))
+    .toEqual(['review-note, Initial: entry owner, Implemented', 'note-search, Initial: suggested owner']);
+  expect(canvas.querySelector<HTMLElement>('[data-module-id="shop"]')!.dataset.emphasis).toBe('muted');
+  expect(within(byModule).getByLabelText('Coverage').textContent).toBe('Coverage complete: 1 of 2 capabilities implemented.');
+  expect(within(byModule).getByLabelText('Compared states').textContent).toContain('Run version12');
+
+  const search = canvas.querySelector<HTMLElement>('[data-module-id="shop/search"]')!;
+  fireEvent.keyDown(within(search).getByRole('button', { name: 'note-search, Initial: involved' }), { key: 'Enter' });
+  const detail = within(byModule).getByLabelText('Details for note-search in shop/search');
+  expect(detail.textContent).toContain('involved: hypothesis note-search');
+  expect(search.getAttribute('aria-selected')).toBe('false');
+  // CM09 for the whole By module view with a row selected.
+  expect(byModule.textContent).not.toMatch(/\b(activity|commits?|changed|lines|deployed)\b|%/i);
+
+  // The selection is the Run page's: it survives leaving Progress and returning.
+  fireEvent.click(screen.getByRole('tab', { name: 'Overview' }));
+  fireEvent.click(screen.getByRole('tab', { name: 'Progress' }));
+  expect((await screen.findByLabelText('Details for note-search in shop/search')).textContent).toContain('Not implemented in this module now.');
+
+  fireEvent.click(document.querySelector<HTMLElement>('[data-module-id="shop/notes"]')!);
+  expect(screen.getByLabelText('Details for module shop/notes').textContent).toContain('declared in the current module tree');
+});
+
+test('By module names its loading and unavailable conditions', async () => {
+  class PendingClient extends StubClient {
+    override getModuleCapabilities(): Promise<never> { return new Promise(() => undefined); }
+  }
+  const pending = new PendingClient();
+  pending.runs.set(runId, stubRun());
+  render(<RunPage client={pending} planId="review-notes" runId={runId} interval={60_000} />);
+  fireEvent.click(await screen.findByRole('tab', { name: 'Progress' }));
+  expect(within(await screen.findByLabelText('By module')).getByRole('status').textContent).toBe('Loading the module comparison…');
+  cleanup();
+
+  const unavailable = clientWith({ ...stubRun(), moduleCapabilities: undefined });
+  render(<RunPage client={unavailable} planId="review-notes" runId={runId} interval={60_000} />);
+  fireEvent.click(await screen.findByRole('tab', { name: 'Progress' }));
+  const alert = await within(screen.getByLabelText('By module')).findByRole('alert');
+  expect(alert.textContent).toContain('The module comparison is unavailable');
+  expect(screen.getByLabelText('Progress views')).toBeTruthy();
 });
 
 test('CM20: Progress stays visible while loading, empty or unavailable, naming the condition and never showing todo', async () => {
@@ -210,6 +284,7 @@ test('CM20: Progress stays visible while loading, empty or unavailable, naming t
   pending.runs.set(runId, stubRun());
   render(<RunPage client={pending} planId="review-notes" runId={runId} interval={60_000} />);
   fireEvent.click(await screen.findByRole('tab', { name: 'Progress' }));
+  fireEvent.click(screen.getByRole('tab', { name: 'Dependencies' }));
   const loading = within(await screen.findByLabelText('Dependencies')).getByRole('status');
   expect(loading.textContent).toBe('Loading the capability progress…');
   expect(screen.getByLabelText('Progress').textContent).not.toContain('todo');
@@ -218,6 +293,7 @@ test('CM20: Progress stays visible while loading, empty or unavailable, naming t
   const empty = clientWith({ ...stubRun(), capabilities: capabilityListResponseSchema.parse({ capabilities: [], total: 0 }) });
   render(<RunPage client={empty} planId="review-notes" runId={runId} interval={60_000} />);
   fireEvent.click(await screen.findByRole('tab', { name: 'Progress' }));
+  fireEvent.click(screen.getByRole('tab', { name: 'Dependencies' }));
   expect((await screen.findByText('The run has no registered or forecast capability yet.')).getAttribute('role')).toBe('status');
   expect(screen.getByLabelText('Progress').textContent).not.toContain('todo');
   cleanup();
@@ -225,6 +301,7 @@ test('CM20: Progress stays visible while loading, empty or unavailable, naming t
   const unavailable = clientWith({ ...stubRun(), capabilities: undefined });
   render(<RunPage client={unavailable} planId="review-notes" runId={runId} interval={60_000} />);
   fireEvent.click(await screen.findByRole('tab', { name: 'Progress' }));
+  fireEvent.click(screen.getByRole('tab', { name: 'Dependencies' }));
   const alert = await within(screen.getByLabelText('Progress')).findByRole('alert');
   expect(alert.textContent).toContain('The capability progress is unavailable');
   expect(screen.getByLabelText('Progress views')).toBeTruthy();
@@ -234,6 +311,7 @@ test('CM20: Progress stays visible while loading, empty or unavailable, naming t
 test('CM15–CM17: Dependencies lays out retained dependencies with literal states, owners and the selected evidence', async () => {
   render(<RunPage client={clientWith(stubRun())} planId="review-notes" runId={runId} interval={60_000} />);
   fireEvent.click(await screen.findByRole('tab', { name: 'Progress' }));
+  fireEvent.click(screen.getByRole('tab', { name: 'Dependencies' }));
   const graph = await screen.findByLabelText('Scrollable capability dependency graph');
   const sendButton = within(graph).getByRole('button', { name: 'send-button, working, entry' });
   expect(sendButton.textContent).toContain('current owner');
@@ -290,6 +368,7 @@ test('CM19: a failed run says failed at run level only; a capability keeps its l
   expect(document.querySelector('.run-page > .page-header .run-state')!.textContent).toBe('failed');
 
   fireEvent.click(screen.getByRole('tab', { name: 'Progress' }));
+  fireEvent.click(screen.getByRole('tab', { name: 'Dependencies' }));
   const progress = screen.getByLabelText('Progress');
   const graph = await within(progress).findByLabelText('Scrollable capability dependency graph');
   expect(within(graph).getByRole('button', { name: 'send-button, working, entry' })).toBeTruthy();

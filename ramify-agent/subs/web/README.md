@@ -31,8 +31,22 @@ it is editable, and closing or reloading it does not affect a run.
   from the run's state. `src/run-progress.ts` reads the event page after a
   cursor, as Plan 1's page did, and reads each area again when the run's
   version moves.
-- Progress has two views, and only the selected one is mounted. By module
-  is not available yet. Dependencies (`src/capability-graph.tsx`) draws the
+- Progress has two views, and only the selected one is mounted. By module,
+  the default (`src/capability-module-tree.tsx`), draws the harness's
+  module-capability comparison in the module-tree canvas Ramify packages as
+  `ramify.ts/module-tree`: one node per module the harness placed, sized to
+  list every returned capability row, each row with its literal ID, an
+  outlined Initial indication with its revision-1 roles and a filled
+  Implemented indication. A module proposed at start is labelled so, and
+  drawn with the provisional shell when it is not in the tree; modules
+  without rows are muted, and `unplaced` modules are listed beside the
+  canvas. A row button selects the capability's roles, hypotheses, reason
+  and evidence; the module shell selects its capability list. The view names
+  the compared initial view, tree and run version, and the coverage: a
+  complete count, or known subtotals with their gaps. `styles.css` imports
+  `ramify.ts/module-tree.css` once, and the web module adds no shell or
+  React Flow rules. `?example=capability-module` previews it over the
+  answers of `harness/src/tests/run-protocol.test.ts`. Dependencies (`src/capability-graph.tsx`) draws the
   harness's capability progress answer as a dependency graph: each returned
   capability once, in columns of longest dependency depth, with explicit
   cycle groups, dashed tentative links, the literal `todo`, `working` or
@@ -62,4 +76,8 @@ type check, and Ramify still reads it as this module's owned source.
 ## Testing
 
 Tests in `src/tests/` run in jsdom against `StubClient`, an in-memory
-protocol client, and never start a harness.
+protocol client, and never start a harness. The packaged canvas renders with
+the real React Flow there; the `web` Vitest project deduplicates React and
+inlines `ramify.ts`, `@xyflow/react` and `zustand`, and prebundles the
+CommonJS selector shim, so every copy of React the canvas reaches is this
+module's own. `vite.config.ts` deduplicates React for the build.
