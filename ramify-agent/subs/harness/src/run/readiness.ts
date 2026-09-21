@@ -2,6 +2,7 @@ import { readFile, readdir, stat } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 import { runGate } from '../checks/gate.js';
 import { allProjectChecks, checkpointPolicies } from '../checks/checkpoint.js';
+import { checkCommandEnvironment } from '../checks/records.js';
 import type { GateAttempt } from '../checks/records.js';
 import { isCleanRepository, GitError } from '../../subs/evidence/src/git.js';
 import { runCommand } from '../../subs/evidence/src/run-command.js';
@@ -353,7 +354,7 @@ export async function performRecovery(request: RecoveryRequest): Promise<Infrast
         }
         const outputFile = join(request.directory, `${request.id}-${directory.split('/').join('-')}.log`);
         const run = await runCommand({
-          argv: command.argv, cwd: command.cwd, env: command.env, timeoutMs: command.timeoutMs, outputFile,
+          argv: command.argv, cwd: command.cwd, env: checkCommandEnvironment(command), timeoutMs: command.timeoutMs, outputFile,
           ...(request.signal === undefined ? {} : { signal: request.signal }),
         });
         evidence.push(outputFile);

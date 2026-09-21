@@ -89,10 +89,14 @@ hiding or measured complexity justifies it.
     invocation's observation log records.
 - `checks/`: the check engine, which knows nothing of runs.
   - `records.ts`: the `GateAttempt` record and the shapes it is built from:
-    a `Checkpoint`, a `CheckCommand` with the complete environment the
-    harness built for it, and a `TestSelectionPolicy` with the
-    `TestSelection` it resolves to. The policy that chooses them belongs to
-    the iterations that assign work.
+    a `Checkpoint`, a `CheckCommand`, and a `TestSelectionPolicy` with the
+    `TestSelection` it resolves to. A `CheckCommand` names the environment
+    its child receives and holds no value of one: `env` is those names,
+    sorted, and `envAdditions` the harness's own settings for that command.
+    `checkCommand` is its one constructor and `checkCommandEnvironment` the
+    one way to the environment a spawn is given, built from
+    `childEnvironment`'s allowlist at the moment it runs. The policy that
+    chooses them belongs to the iterations that assign work.
   - `verify.ts`: verification before execution. Every command and every
     selection of an attempt is verified before the first command runs, so a
     checkpoint that cannot run what it requires runs nothing at all: a
@@ -123,10 +127,25 @@ hiding or measured complexity justifies it.
     the code it chose, never from what it printed; a Ramify check exiting 2
     was not checked, which is never a pass. The complete output of each
     command is a file beside the attempt, and the record carries its path,
-    its size and a bounded tail. The attempt is returned, not written: the
-    harness commits it with the event that closes the checkpoint. A
+    its size and a bounded tail. A Ramify check that failed printed a report
+    that names each finding's own file, and that report attributes the
+    cause: `attribution` records those locations against the write scope the
+    attempt followed, and the check itself is left out of the scope
+    comparison, because a command of the whole project would otherwise call
+    every module violation a failure outside the assignment. A failed Ramify
+    check returns to the local architect whatever scope its findings lie in:
+    what a module may import is the architect's to arrange with the owner,
+    and an engineer given the same brief again cannot widen it. No test
+    output is parsed for any of this. The attempt is returned, not written:
+    the harness commits it with the event that closes the checkpoint. A
     standalone commit-audit tool, extracted from cucumber-viz, will replace
     this body later, which is why it has one caller.
+  - `diagnostics.ts`: what a failing attempt says to the agent that receives
+    it. Each command that did not pass is named with what it reported: a
+    Ramify check's findings, worded by the one function that words a finding
+    anywhere, or the bounded end of the command's own output where it
+    reported no structure. The local architect also receives what a module
+    violation leaves it to decide.
 - `run/`: implementation runs. A run is a job, and the only durable authority
   of one is its `events.jsonl`: one flushed line is one transition, carrying
   the bodies of every record it commits, and the files beneath the run are
@@ -139,8 +158,10 @@ hiding or measured complexity justifies it.
     persisting a record is the run's concern.
   - `policy.ts`: the hardcoded policy a run captures, its bounds, each role's
     context policy and every command it reaches the project through, each
-    with the complete environment the harness built for it. It also walks the
-    project for independent nested packages.
+    naming the environment the harness built for it. `job.json` holds those
+    names and the harness's own settings, never a value of this process's
+    environment; a run recorded before that is read as the names its map
+    held. It also walks the project for independent nested packages.
   - `log.ts`: the run log and its events, from `job-started` through
     readiness to the terminal event. Nothing follows a terminal event.
   - `observations.ts`: one invocation's observation log. It is canonical for
@@ -191,7 +212,10 @@ hiding or measured complexity justifies it.
   - `records.ts`: the `Hypothesis` and the `RegistryEntry`. A hypothesis is a
     forecast and nothing more: it has no reference to a work item, and
     nothing references it but a decision and a local architect's input.
-    Revision 1 is never rewritten.
+    Revision 1 is never rewritten. Its `change` has no value for extending a
+    capability: an extension is forecast as `create`, and
+    `changesExistingSymbols` says whether implementing it is expected to
+    change symbols that already have consumers.
   - `accept.ts`: what one accepted analysis commits, in the single
     `analysis-accepted` transition: the entry assignments, every hypothesis
     at revision 1, one registry entry per entry capability and one work item
@@ -212,8 +236,11 @@ hiding or measured complexity justifies it.
     with an existing parent and a free direct-child directory, the same
     proposal on the decision and its registry entry, `revises` wherever a
     registered capability is placed elsewhere, and a hypothesis revision that
-    names a hypothesis this run committed. `reuse` and `extend` may name an
-    owner an accepted proposal created; they never introduce one.
+    names a hypothesis this run committed. `reuse` may name an owner an
+    accepted proposal created; it never introduces one. There is no outcome
+    for extending a capability: an extension is a `create` whose owner is an
+    existing module, and only such an owner may carry
+    `changesExistingSymbols`.
   - `accept.ts`: what one accepted decision commits, in the single
     `decision-accepted` transition: the decision, the registry entries it
     creates or revises and the hypothesis revisions it makes. It is a pure
@@ -373,8 +400,10 @@ hiding or measured complexity justifies it.
 - `tools/`: the harness's own tools that are not one role's. `shell.ts` is
   the shell an engineer receives in place of the implementation's own: one
   command through the lifted executor, in its own process group, with a
-  clean environment, a timeout it may be given and an 8 KiB tail beside a
-  file holding everything. It declares itself mutating, so the post-write
+  environment built from the same allowlist as every other child, a timeout
+  it may be given and an 8 KiB tail beside a file holding everything. The
+  allowlist is deliberate here: the command is one an agent wrote, so a
+  wider environment would hand it every secret of the person's session. It declares itself mutating, so the post-write
   hook check runs after it, and it settles what it left running before the
   writer is released.
 - `hooks/`: the post-write hook check the harness installs itself, because
@@ -384,9 +413,24 @@ hiding or measured complexity justifies it.
   editing and is never a pass. Where the changed set cannot be established,
   or where a changed path is a named configuration file that no changed
   check covers, the harness answers that at once as not checked and runs a
-  complete check instead of claiming hook coverage. A finding this
-  invocation has already been told about is not newly introduced, so it is
-  not reported at the engineer twice.
+  complete check instead of claiming hook coverage. That complete check is
+  then the one that speaks: where it answered, the changed form it replaced
+  is not reported as a gap, because saying nothing was verified when the
+  complete check verified everything is a false alarm, and a model that
+  learns to ignore the hook ignores the one message that matters. Only a
+  complete check that could not run itself leaves a gap to state. A finding
+  this invocation has already been told about is not newly introduced, so it
+  is not reported at the engineer twice, and a check that no longer reports
+  one says in a line that what was reported no longer stands.
+
+  A claimed completion is checked afresh over the whole write scope before
+  it is judged, because the hook checks saw only the mutations they covered:
+  a violation written through the shell, or written while a check did not
+  run, would otherwise reach the gate. That check is bounded, and it can
+  answer that it did not check. It is never a pass then and never a refusal
+  either: the submission proceeds, the acceptance says the check could not
+  run, and the gate's own complete check answers. A completion is not held
+  back for a check the harness could not get an answer from.
 - `kpi/`: measurement capture. A snapshot holds one `ramify.measure/1`
   document verbatim with its hash, and `scopeSize` is the `S_s` recipe over
   it. A missing component makes the total unavailable with its known
@@ -623,6 +667,12 @@ the commit rule on a log of their own: a repeated transition, a repeated
 external effect, the three outcomes of a reader, a torn line that leaves no
 trace, and one recovery loop that rewrites every record kind without
 appending or starting a session.
+
+`recorded-environment.test.ts` covers what a record holds of an environment:
+a variable set in this process reaches neither the policy `job.json`
+captures, nor a gate attempt, nor the environment a gate command prints of
+itself, while the names a command received are recorded and a run written
+before the names is still read.
 
 `gate-not-verified.test.ts` and `tree-identity.test.ts` cover the check
 engine on commands of their own: every reason a check can record for not

@@ -29,6 +29,13 @@ export const decisionBodySchema = z.object({
   question: text,
   outcome: placementOutcomeSchema,
   capability: slugSchema,
+  /**
+   * Whether implementing this capability changes symbols that already have
+   * consumers. An extension of existing behavior is a `create` whose owner
+   * is an existing module and whose flag is true; a capability whose owner
+   * does not exist yet has no such symbols.
+   */
+  changesExistingSymbols: z.boolean(),
   /** Null only for `external`, which no module owns. */
   owner: modulePathSchema.nullable(),
   /** Required for an owner the refreshed view does not have yet, and only for `create` or `extract`. */
@@ -75,6 +82,7 @@ export const hypothesisRevisionSchema = z.object({
   /** Why this revision was made, which the revision's cause records. */
   reason: text,
   change: hypothesisChangeSchema.optional(),
+  changesExistingSymbols: z.boolean().optional(),
   suggestedOwner: modulePathSchema.optional(),
   anticipatedConsumers: z.array(text).optional(),
   involvedModules: z.array(modulePathSchema).optional(),
@@ -324,8 +332,32 @@ function decisionErrors(
     });
   }
 
+  errors.push(...existingSymbolErrors(body, evidence, prefix));
   errors.push(...citationErrors(body.evidence.citations, evidence, `${prefix}.evidence.citations`));
   return errors;
+}
+
+/**
+ * The rule for `changesExistingSymbols`: only a module that already exists
+ * has symbols with consumers, so a capability satisfied outside the project
+ * or owned by a module this decision proposes changes none.
+ */
+function existingSymbolErrors(body: DecisionBody, evidence: PlacementEvidence, prefix: string): SubmissionError[] {
+  if (!body.changesExistingSymbols) return [];
+  if (body.owner === null) {
+    return [{
+      path: `${prefix}.changesExistingSymbols`,
+      message: 'A capability satisfied outside this project has no implementation here, so it changes no symbol that already has consumers',
+      expected: 'false',
+    }];
+  }
+  if (evidence.index === null) return [];
+  if (findModule(evidence.index, body.owner) !== undefined) return [];
+  return [{
+    path: `${prefix}.changesExistingSymbols`,
+    message: `No module "${body.owner}" is in the refreshed architect view yet, so it has no symbols that already have consumers`,
+    expected: 'false',
+  }];
 }
 
 /** Whether the owner exists, or is one an accepted proposal creates. */
@@ -341,11 +373,11 @@ function ownerErrors(body: DecisionBody, evidence: PlacementEvidence, prefix: st
     }];
   }
 
-  if (body.outcome === 'reuse' || body.outcome === 'extend') {
+  if (body.outcome === 'reuse') {
     if (body.proposed !== undefined) {
       return [{
         path: `${prefix}.proposed`,
-        message: `A decision whose outcome is "${body.outcome}" does not introduce an owner; propose one with "create" or "extract"`,
+        message: 'A decision whose outcome is "reuse" does not introduce an owner; propose one with "create" or "extract"',
         expected: 'no proposal',
       }];
     }

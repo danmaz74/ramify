@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import type { ArchitectIndex } from '../../subs/evidence/src/views.js';
 import { architectIndex, moduleEntry } from './helpers/views.js';
 import type { Hypothesis, RegistryEntry } from '../analysis/records.js';
-import type { PlacementDecision } from '../architecture/records.js';
+import { extensionIsANewCapability, type PlacementDecision } from '../architecture/records.js';
 import { forkJsonSchema, forkToolName, validateFork, type PlacementEvidence } from '../architecture/submission.js';
 import { validateLocalArchitect } from '../work/submission.js';
 import { decision, forkDecision, placementRequest, registryChange } from './helpers/placement.js';
@@ -39,7 +39,7 @@ const proposedEntry: RegistryEntry = {
 const forecast: Hypothesis = {
   schema: 'ramify-agent.hypothesis/1',
   id: 'email-delivery', revision: 1, standing: 'tentative', capability: 'send-email', change: 'reuse',
-  suggestedOwner: 'shop/orders', anticipatedConsumers: [], involvedModules: ['shop/orders'], dependsOn: [],
+  changesExistingSymbols: false, suggestedOwner: 'shop/orders', anticipatedConsumers: [], involvedModules: ['shop/orders'], dependsOn: [],
   confidence: 'medium', rationale: 'Orders already sends confirmations.', assumptions: [], uncertainties: [],
   citations: [], cause: { initial: 'inv-0001' },
 };
@@ -47,7 +47,8 @@ const forecast: Hypothesis = {
 const earlier: PlacementDecision = {
   schema: 'ramify-agent.placement-decision/1',
   id: 'gd-001', authority: 'global', request: 'pr-001', workItem: 'wi-001', invocation: 'inv-0003',
-  question: 'Where does sending an email belong?', outcome: 'reuse', capability: 'send-email', owner: 'shop/orders',
+  question: 'Where does sending an email belong?', outcome: 'reuse', capability: 'send-email',
+  changesExistingSymbols: false, owner: 'shop/orders',
   rationale: 'Orders already owns it.', constraints: [], uncertainties: [],
   evidence: { view: { status: 'placeholder' }, citations: [], gaps: [] },
   registry: [], hypothesisRevisions: [],
@@ -69,6 +70,10 @@ const withProposal: PlacementEvidence = {
 
 function paths(result: ReturnType<typeof validateFork>): string[] {
   return result.ok ? [] : result.errors.map(error => error.path);
+}
+
+function messages(result: ReturnType<typeof validateFork>): string[] {
+  return result.ok ? [] : result.errors.map(error => error.message);
 }
 
 describe('the fork submission schema', () => {
@@ -265,6 +270,46 @@ describe('the rules the fork schema cannot hold', () => {
       decision: decision({ outcome: 'external', capability: 'notify', owner: null }),
       registry: [],
     }), evidence).ok).toBe(true);
+  });
+
+  test('an extension submitted as the retired "extend" outcome is refused, and told to register a new capability', () => {
+    const extended = validateFork({
+      ...forkDecision(),
+      decision: { ...decision({ capability: 'send-email', owner: 'shop/orders' }), outcome: 'extend' },
+    }, evidence);
+    expect(paths(extended)).toEqual(['decision.outcome']);
+    expect(messages(extended)[0]).toBe(extensionIsANewCapability);
+    expect(messages(extended)[0]).toContain('new capability named for itself');
+    expect(messages(extended)[0]).toContain('"create"');
+
+    // The same extension, as the model now states it: a new capability of its
+    // own, owned by the module that already holds the behavior.
+    expect(validateFork(forkDecision({
+      decision: decision({
+        outcome: 'create', capability: 'send-email-with-attachment', changesExistingSymbols: true, owner: 'shop/orders',
+      }),
+      registry: [registryChange({ capability: 'send-email-with-attachment', owner: 'shop/orders' })],
+    }), evidence).ok).toBe(true);
+  });
+
+  test('only a module the view already has can change symbols that already have consumers', () => {
+    const external = validateFork(forkDecision({
+      decision: decision({ outcome: 'external', capability: 'notify', changesExistingSymbols: true, owner: null }),
+      registry: [],
+    }), evidence);
+    expect(paths(external)).toContain('decision.changesExistingSymbols');
+
+    const proposing = validateFork(forkDecision({
+      decision: decision({
+        outcome: 'create', capability: 'notify', changesExistingSymbols: true, owner: 'shop/notifications',
+        proposed: { parent: 'shop', directory: 'subs/notifications', purpose: 'Tells a person that something happened.', tags: [] },
+      }),
+      registry: [registryChange({
+        capability: 'notify', owner: 'shop/notifications',
+        proposed: { parent: 'shop', directory: 'subs/notifications', purpose: 'Tells a person that something happened.', tags: [] },
+      })],
+    }), evidence);
+    expect(paths(proposing)).toContain('decision.changesExistingSymbols');
   });
 
   test('a revision of a hypothesis nothing committed, and a consumer of a work item nothing committed, are refused', () => {

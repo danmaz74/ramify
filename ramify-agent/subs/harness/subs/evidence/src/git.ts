@@ -1,6 +1,6 @@
 import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { runCommand, cleanEnvironment } from './run-command.js';
+import { runCommand, childEnvironment } from './run-command.js';
 import type { CommandOutcome } from './run-command.js';
 
 /*
@@ -44,7 +44,7 @@ async function git(root: string, args: readonly string[], signal?: AbortSignal):
   const run = await runCommand({
     argv,
     cwd: root,
-    env: cleanEnvironment({ GIT_TERMINAL_PROMPT: '0' }),
+    env: childEnvironment({ GIT_TERMINAL_PROMPT: '0' }),
     timeoutMs: gitTimeoutMs,
     ...(signal === undefined ? {} : { signal }),
   });

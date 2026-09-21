@@ -61,8 +61,8 @@ import type { Hypothesis, RegistryEntry } from '../analysis/records.js';
 import { creationAuthority } from '../work/assignment.js';
 import { engineerEquipment, type EngineerEquipment, type EquipContext, type Equipment } from '../work/engineer-equipment.js';
 import {
-  engineerJsonSchema, engineerSubmissionDescription, engineerToolName, iterationMessage, validateEngineer,
-  type EngineerSubmission, type IterationApiViews,
+  engineerJsonSchema, engineerSubmissionDescription, engineerToolName, iterationAcceptance, iterationMessage,
+  validateEngineer, type EngineerSubmission, type IterationApiViews,
 } from '../work/engineer.js';
 import {
   iterationAssignmentSchema, iterationId, iterationLayout, iterationResultSchema, moduleNoticeSchema,
@@ -70,12 +70,15 @@ import {
   type IterationAssignment, type IterationResult, type ModuleNotice,
 } from '../work/iterations.js';
 import { resolveRealTarget } from '../guard/resolve-contained-path.js';
-import { captureGuardedFiles, checkpointOf, guardedScopeOf, resolveWriteScope, scopeProbePolicyOf, testPolicyOf } from '../work/scope.js';
+import {
+  captureGuardedFiles, checkpointOf, guardedScopeOf, resolveWriteScope, scopePaths, scopeProbePolicyOf, testPolicyOf,
+} from '../work/scope.js';
 import { committedRecords, refOf } from '../work/committed.js';
 import { capabilityOf, frontierOrder, hypothesesFor } from '../work/frontier.js';
 import { workLayout, workItemId, workItemOutlineSchema, type WorkItem, type WorkItemOutline } from '../work/records.js';
 import { apiViewsOf, iterationApiViews, onboardingOf, workItemMessage, type DelegationBriefing } from '../work/session.js';
 import { localArchitectJsonSchema, localArchitectToolName, validateLocalArchitect, type LocalArchitectSubmission } from '../work/submission.js';
+import { gateDiagnostics, type GateAudience } from '../checks/diagnostics.js';
 import { commitForGate, commitMessage, commitsOnPass, currentHead, runCheckpoint, withCommit } from './gates.js';
 import { capturePlan, EvidenceUnavailableError, type RunInputs } from './inputs.js';
 import { RunLog, type RunEvent, type RunEventInput, type RunEventOf } from './log.js';
@@ -201,6 +204,12 @@ interface InvocationRequest<T> {
   /** The schema literal the stored submission declares; the agent never supplies it. */
   readonly submissionSchema: string;
   readonly validate: (input: unknown) => SubmissionValidation<T> | Promise<SubmissionValidation<T>>;
+  /**
+   * What an accepted submission is answered with. Without it the agent
+   * implementation's own acknowledgement is used, which knows nothing of the
+   * kind that was submitted.
+   */
+  readonly acceptedText?: ((value: T) => string) | undefined;
   readonly scope: Invocation['scope'];
   /** Whether this invocation holds the run's one writer. */
   readonly writer?: boolean | undefined;
@@ -242,6 +251,13 @@ interface IterationOutcome {
   /** Set where the iteration reported that the provider cannot conform. */
   readonly reportedRevision?: boolean | undefined;
   readonly result: IterationResult;
+  /**
+   * The gate that returned this iteration to the local architect, with what
+   * each failing command reported. It is not in the result record: the
+   * record holds the findings, and this is the diagnosis the next architect
+   * briefing carries.
+   */
+  readonly returnedGate?: { readonly id: string; readonly cause: string | null; readonly summary: readonly string[] } | undefined;
   readonly need?: {
     readonly need: NeedAsBehavior;
     readonly suggestedProvider?: string | undefined;
@@ -834,6 +850,7 @@ export class RunService {
         submissionHash = sha256(content);
       },
       observations,
+      ...(request.acceptedText === undefined ? {} : { acceptedText: request.acceptedText }),
       closed: () => (this.ignoring(run) ? 'This run accepts no further submissions.' : undefined),
     });
 
@@ -1254,6 +1271,8 @@ export class RunService {
     let lastAssignment: IterationAssignment | undefined;
     /** What the last iteration of this work item ended with, for the architect that receives it. */
     let lastResult: IterationResult | undefined;
+    /** The gate that returned that iteration, where one did, with what it found. */
+    let lastIterationGate: { id: string; cause: string | null; summary: readonly string[] } | undefined;
     /** A placement request of this work item that came back without a decision. */
     let unresolvedRequest: { id: string; findings: readonly string[]; gaps: readonly string[] } | undefined;
     /** A cycle one of this item's registrations closed, delivered once as a finding. */
@@ -1334,6 +1353,7 @@ export class RunService {
             findings: lastResult.findings,
             ...(lastResult.recommendation === undefined ? {} : { recommendation: lastResult.recommendation }),
             commit: lastResult.commit,
+            ...(lastIterationGate === undefined ? {} : { gate: lastIterationGate }),
           },
         }),
       });
@@ -1423,6 +1443,7 @@ export class RunService {
           const revised = await this.reviseContract(run, agent, packages, baseline, item, assigned);
           if (revised === null) return null;
           if (revised.result !== undefined) lastResult = revised.result;
+          lastIterationGate = undefined;
           failedGate = undefined;
           if (revised.cycle !== undefined) cycleFinding = revised.cycle;
           continue;
@@ -1430,6 +1451,7 @@ export class RunService {
         const outcome = await this.takeIteration(run, agent, packages, baseline, item, assigned, index);
         if (outcome === null) return null;
         lastResult = outcome.result;
+        lastIterationGate = outcome.returnedGate;
         failedGate = undefined;
         // The provider reported that the agreement cannot be met. This work
         // item's turn ends here: what blocks it is the consumer architect's
@@ -1496,7 +1518,7 @@ export class RunService {
         return 'completed';
       }
 
-      failedGate = diagnosticsOf(gate);
+      failedGate = await diagnosticsOf(gate, 'local-architect');
       firstCause ??= { gate: gate.id, cause: gate.cause };
       if (gateRound > bound) {
         await this.fail(run, 'repair-exhausted',
@@ -2268,12 +2290,19 @@ export class RunService {
         description: engineerSubmissionDescription,
         inputSchema: engineerJsonSchema,
         submissionSchema: 'ramify-agent.engineer-submission/1',
-        validate: input => validateEngineer(input, {
+        // A claimed completion is checked afresh over the write scope
+        // before it is judged, because the hook checks saw only the
+        // mutations they covered.
+        validate: async input => validateEngineer(input, {
           obligation: assignment.evidenceObligations
             .find(evidence => evidence.obligation !== undefined && evidence.against === 'real')?.obligation ?? null,
           kind: assignment.kind,
-          openFindings: tools.openFindings(),
+          openFindings: await tools.findingsAtCompletion(input),
         }),
+        acceptedText: value => {
+          const check = tools.completionCheck();
+          return iterationAcceptance(value.kind, check?.kind === 'not-checked' ? check.reason : null);
+        },
         scope: {
           write: assignment.scope.revision,
           measurement: run.record.baseline && 'measurement' in run.record.baseline ? run.record.baseline.measurement : null,
@@ -2399,11 +2428,15 @@ export class RunService {
             if (change.authorizedBy !== null) continue;
             findings.push(`no record authorizes the change to the guarded file "${change.path}"${change.after === null ? ', which this iteration deleted' : ''}`);
           }
-          return close('unsuitable');
+          // What failed and what it reported travel with the outcome: a
+          // cause alone was read as a write outside the assignment, the
+          // architect narrowed the file list, and the same failure returned.
+          const returnedGate = await diagnosticsOf(gate, 'local-architect');
+          return { ...await close('unsuitable'), returnedGate };
         }
         // One repair round: the rerun runs the gate's complete required set.
         repairRound += 1;
-        failedGate = diagnosticsOf(gate);
+        failedGate = await diagnosticsOf(gate);
         break;
       }
     }
@@ -2825,7 +2858,7 @@ export class RunService {
 
       if (gate.next === 'repair' && repairRound + 1 < run.record.policy.limits.repairRoundsPerIteration) {
         repairRound += 1;
-        failedGate = diagnosticsOf(gate);
+        failedGate = await diagnosticsOf(gate);
         continue;
       }
       findings.push(`the contract gate did not pass: ${gate.cause ?? 'unknown'} at gate ${gate.id}; nothing was registered`);
@@ -2888,6 +2921,7 @@ export class RunService {
       subject: { workItem: item.id, iteration: assignment.id },
       tests,
       guarded: assignment.guarded,
+      writeScope: writeScopePaths(this.projectRoot, assignment),
       authorizations: assignment.authorizations.map(entry => ({ path: entry.path, by: entry.by })),
       rules,
     });
@@ -3358,6 +3392,7 @@ export class RunService {
       ...(tests === undefined ? {} : { tests }),
       ...(probe === undefined || probe.selection.resolved.length === 0 ? {} : { scopeProbe: probe }),
       guarded: assignment.guarded,
+      writeScope: writeScopePaths(this.projectRoot, assignment),
       authorizations: assignment.authorizations.map(entry => ({ path: entry.path, by: entry.by })),
     });
 
@@ -3598,6 +3633,7 @@ export class RunService {
       repairRound,
       subject: { workItem: item.id },
       ...(probe === undefined || probe.selection.resolved.length === 0 ? {} : { scopeProbe: probe }),
+      ...(lastAssignment === undefined ? {} : { writeScope: writeScopePaths(this.projectRoot, lastAssignment) }),
     });
     const subject = { ...attempt, subject: { workItem: item.id } } satisfies GateAttempt;
 
@@ -3989,17 +4025,20 @@ function gateBodyOf(run: Run, id: string): GateAttempt | undefined {
   return undefined;
 }
 
-/** What a failing gate tells the agent that receives it: its cause and one line per command. */
-function diagnosticsOf(gate: GateAttempt): { id: string; cause: string | null; summary: string[] } {
-  return {
-    id: gate.id,
-    cause: gate.cause,
-    summary: gate.commands.map(command => [
-      `${command.kind}: ${command.outcome}`,
-      command.notVerified === undefined ? '' : ` (${command.notVerified})`,
-      command.output.tail === '' ? '' : ` — ${command.output.tail.split('\n').slice(-6).join(' ').slice(0, 600)}`,
-    ].join('')),
-  };
+/**
+ * What a failing gate tells the agent that receives it: its cause, each
+ * command that did not pass, and what that command reported. A Ramify
+ * check's findings are relayed as findings; anything else is quoted from the
+ * end of its own output.
+ */
+function diagnosticsOf(gate: GateAttempt, audience: GateAudience = 'engineer'): Promise<{ id: string; cause: string | null; summary: string[] }> {
+  return gateDiagnostics(gate, audience).then(diagnostics => ({ ...diagnostics, summary: [...diagnostics.summary] }));
+}
+
+/** The write scope of one assignment, project-relative, as a gate attributes findings against it. */
+function writeScopePaths(projectRoot: string, assignment: IterationAssignment): string[] {
+  const paths = scopePaths(projectRoot, assignment.scope);
+  return [...paths.roots, ...paths.files];
 }
 
 function rootModuleOf(index: ArchitectIndex | null): string | undefined {

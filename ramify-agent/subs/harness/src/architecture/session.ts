@@ -95,14 +95,14 @@ export function forkMessage(briefing: ForkBriefing): string {
   lines.push('', '### Decisions already made', '');
   if (briefing.decisions.length === 0) lines.push('None.');
   else for (const decision of briefing.decisions) {
-    lines.push(`- \`${decision.id}\` (${decision.authority}): \`${decision.capability}\` ${decision.outcome} → ${decision.owner === null ? 'outside this project' : `\`${decision.owner}\``}. ${decision.rationale}`);
+    lines.push(`- \`${decision.id}\` (${decision.authority}): \`${decision.capability}\` ${decision.outcome} → ${decision.owner === null ? 'outside this project' : `\`${decision.owner}\``}.${decision.changesExistingSymbols ? ' It changes symbols that already have consumers.' : ''} ${decision.rationale}`);
   }
   lines.push('', 'To place a capability differently from one of these, name that decision in `decision.revises` with what it affects. A contradiction that says nothing is refused.');
 
   lines.push('', '### The hypotheses of this run', '');
   if (briefing.hypotheses.length === 0) lines.push('None.');
   else for (const hypothesis of briefing.hypotheses) {
-    lines.push(`- \`${hypothesis.id}\` revision ${hypothesis.revision}, ${hypothesis.standing}, confidence ${hypothesis.confidence}: capability \`${hypothesis.capability}\`, change \`${hypothesis.change}\`, suggested owner \`${hypothesis.suggestedOwner}\`. ${hypothesis.rationale}`);
+    lines.push(`- \`${hypothesis.id}\` revision ${hypothesis.revision}, ${hypothesis.standing}, confidence ${hypothesis.confidence}: capability \`${hypothesis.capability}\`, change \`${hypothesis.change}\`, suggested owner \`${hypothesis.suggestedOwner}\`.${hypothesis.changesExistingSymbols ? ' It is forecast to change symbols that already have consumers.' : ''} ${hypothesis.rationale}`);
   }
 
   if (briefing.partial !== undefined) {

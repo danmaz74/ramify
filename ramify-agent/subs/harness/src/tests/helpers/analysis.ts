@@ -34,6 +34,7 @@ export function hypothesis(id: string, extra: Partial<InitialAnalysisSubmission[
     id,
     capability: id,
     change: 'reuse' as const,
+    changesExistingSymbols: false,
     suggestedOwner: 'collection-review',
     anticipatedConsumers: [] as string[],
     involvedModules: [] as string[],

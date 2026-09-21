@@ -36,6 +36,8 @@ const hypothesisSubmissionSchema = z.object({
   id: slugSchema,
   capability: slugSchema,
   change: hypothesisChangeSchema,
+  /** Whether implementing the forecast capability is expected to change symbols that already have consumers. */
+  changesExistingSymbols: z.boolean(),
   suggestedOwner: modulePathSchema,
   anticipatedConsumers: z.array(text),
   involvedModules: z.array(modulePathSchema),

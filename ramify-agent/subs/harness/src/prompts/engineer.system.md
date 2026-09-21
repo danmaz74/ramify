@@ -84,7 +84,10 @@ After every change you make, the harness runs Ramify's check over it and
 appends the result to that call's tool result. A boundary violation is
 reported as `RAMIFY MODULE VIOLATION`, with the import, its owner and what to
 do. `completion-proposed` is refused while one stands. A check that says it
-did not check is never a pass.
+did not check is never a pass. When you propose completion, the harness
+checks your whole write scope once more before it accepts: a violation
+written through the shell, or written while a check did not check, is refused
+there, with the same text and the same choices.
 
 When you believe an import that Ramify refuses should be allowed:
 

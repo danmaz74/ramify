@@ -75,7 +75,7 @@ export function briefText(decision: PlacementDecision): string {
   return [
     `## Decision ${decision.id}${decision.request === null ? '' : ` (request ${decision.request})`}`,
     '',
-    `Capability \`${decision.capability}\`: ${decision.outcome}, owner ${decision.owner === null ? 'none — it is satisfied outside this project' : `\`${decision.owner}\``}${decision.proposed === undefined ? '' : `, to be created at \`${decision.proposed.directory}\``}.`,
+    `Capability \`${decision.capability}\`: ${decision.outcome}, owner ${decision.owner === null ? 'none — it is satisfied outside this project' : `\`${decision.owner}\``}${decision.proposed === undefined ? '' : `, to be created at \`${decision.proposed.directory}\``}.${decision.changesExistingSymbols ? ' Implementing it changes symbols that already have consumers.' : ''}`,
     ...(decision.revises === undefined ? [] : [`It replaces ${decision.revises.decision}.`]),
     '',
     decision.brief ?? decision.rationale,
@@ -105,7 +105,7 @@ export function orientation(records: {
   ];
   if (records.hypotheses.length === 0) lines.push('The initial analysis forecast none.');
   else for (const hypothesis of records.hypotheses) {
-    lines.push(`- \`${hypothesis.id}\` (revision ${hypothesis.revision}, ${hypothesis.standing}): capability \`${hypothesis.capability}\`, change \`${hypothesis.change}\`, suggested owner \`${hypothesis.suggestedOwner}\`. ${hypothesis.rationale}`);
+    lines.push(`- \`${hypothesis.id}\` (revision ${hypothesis.revision}, ${hypothesis.standing}): capability \`${hypothesis.capability}\`, change \`${hypothesis.change}\`, suggested owner \`${hypothesis.suggestedOwner}\`.${hypothesis.changesExistingSymbols ? ' It is forecast to change symbols that already have consumers.' : ''} ${hypothesis.rationale}`);
   }
   lines.push('', '## The capability registry', '');
   if (records.registry.length === 0) lines.push('It is empty.');

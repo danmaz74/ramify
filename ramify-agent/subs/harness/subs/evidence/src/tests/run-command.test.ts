@@ -3,7 +3,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { cleanEnvironment, outputTailBytes, runCommand } from '../run-command.js';
+import { childEnvironment, environmentNames, outputTailBytes, runCommand } from '../run-command.js';
 import { temporaryDirectory } from './helpers/temporary.js';
 
 const exec = promisify(execFile);
@@ -24,7 +24,7 @@ describe('runCommand', () => {
   const request = (script: string, overrides: Partial<Parameters<typeof runCommand>[0]> = {}) => ({
     argv: ['bash', '-c', script],
     cwd: directory.path,
-    env: cleanEnvironment(),
+    env: childEnvironment(),
     timeoutMs: 30_000,
     outputFile: join(directory.path, 'output.log'),
     ...overrides,
@@ -117,7 +117,7 @@ describe('runCommand', () => {
   });
 });
 
-describe('cleanEnvironment', () => {
+describe('childEnvironment', () => {
   it('leaves NODE_OPTIONS out of the child environment', async () => {
     const directory = await temporaryDirectory();
     const inherited = process.env['NODE_OPTIONS'];
@@ -126,11 +126,11 @@ describe('cleanEnvironment', () => {
       const run = await runCommand({
         argv: ['bash', '-c', 'echo "[${NODE_OPTIONS-unset}]"; echo "[$RAMIFY_AGENT_PROBE]"'],
         cwd: directory.path,
-        env: cleanEnvironment({ RAMIFY_AGENT_PROBE: 'given' }),
+        env: childEnvironment({ RAMIFY_AGENT_PROBE: 'given' }),
         timeoutMs: 30_000,
       });
 
-      expect(cleanEnvironment()).not.toHaveProperty('NODE_OPTIONS');
+      expect(childEnvironment()).not.toHaveProperty('NODE_OPTIONS');
       expect(run.stdout).toBe('[unset]\n[given]\n');
     } finally {
       if (inherited === undefined) delete process.env['NODE_OPTIONS'];
@@ -140,10 +140,42 @@ describe('cleanEnvironment', () => {
   });
 
   it('builds a complete environment, so no caller merges this process again', () => {
-    const env = cleanEnvironment({ RAMIFY_AGENT_PROBE: 'given' });
+    const env = childEnvironment({ RAMIFY_AGENT_PROBE: 'given' });
 
     expect(env['PATH']).toBe(process.env['PATH']);
     expect(env['RAMIFY_AGENT_PROBE']).toBe('given');
     expect(Object.values(env).every(value => typeof value === 'string')).toBe(true);
+  });
+
+  it('passes on the allowlist and withholds everything else, in a real child', async () => {
+    const directory = await temporaryDirectory();
+    process.env['RAMIFY_AGENT_TEST_SECRET'] = 'hunter2';
+    process.env['npm_config_registry'] = 'https://registry.invalid/';
+    try {
+      const env = childEnvironment();
+      expect(env).not.toHaveProperty('RAMIFY_AGENT_TEST_SECRET');
+      expect(env['npm_config_registry']).toBe('https://registry.invalid/');
+
+      const run = await runCommand({
+        argv: ['bash', '-c', 'echo "[${RAMIFY_AGENT_TEST_SECRET-unset}]"; echo "[${npm_config_registry-unset}]"; echo "[${HOME:+set}]"'],
+        cwd: directory.path,
+        env,
+        timeoutMs: 30_000,
+      });
+
+      expect(run.stdout).toBe('[unset]\n[https://registry.invalid/]\n[set]\n');
+      expect(run.stdout).not.toContain('hunter2');
+    } finally {
+      delete process.env['RAMIFY_AGENT_TEST_SECRET'];
+      delete process.env['npm_config_registry'];
+      await directory.remove();
+    }
+  });
+});
+
+describe('environmentNames', () => {
+  it('answers the names of an environment, sorted, and no value of it', () => {
+    expect(environmentNames({ PATH: '/bin', HOME: '/home/app', CI: undefined })).toEqual(['CI', 'HOME', 'PATH']);
+    expect(JSON.stringify(environmentNames({ SECRET: 'hunter2' }))).not.toContain('hunter2');
   });
 });

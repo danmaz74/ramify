@@ -53,7 +53,7 @@ describe('a run whose work items need no change', () => {
     const submitted = analysis(
       [entry('reviewer-note', reviews, 'A reviewer can attach one note to a completed review run.'),
         entry('note-in-panel', root, 'The review panel shows the note under the findings.')],
-      [hypothesis('note-storage', { change: 'extend', involvedModules: [reviews] }),
+      [hypothesis('note-storage', { change: 'create', changesExistingSymbols: true, involvedModules: [reviews] }),
         hypothesis('note-validation', { change: 'create', suggestedOwner: reviews, anticipatedConsumers: [reviews] }),
         hypothesis('note-transport', { change: 'reuse', suggestedOwner: root, involvedModules: [root] }),
         hypothesis('note-rendering', { change: 'create', suggestedOwner: root, anticipatedConsumers: ['note-in-panel'] })],
@@ -269,7 +269,7 @@ describe('a work-item gate that does not pass', () => {
     for (const session of local.slice(1)) expect(session.start).toEqual({ mode: 'continue' });
     // Each turn after the first is told what the gate found.
     expect(local[1]!.spec.prompt).toContain('The gate did not pass');
-    expect(local[1]!.spec.prompt).toContain('tests: failed');
+    expect(local[1]!.spec.prompt).toContain('- `tests`: failed');
   }, 300_000);
 });
 

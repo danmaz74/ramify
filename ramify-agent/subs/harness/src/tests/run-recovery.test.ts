@@ -161,7 +161,7 @@ async function eventTypes(path: string): Promise<string[]> {
 function oneWorkItem(): OpenRunsOptions['script'] {
   const submitted = analysis(
     [entry('reviewer-note', 'collection-review/workspace/reviews')],
-    [{ id: 'note-storage', capability: 'note-storage', change: 'reuse' as const, suggestedOwner: 'collection-review/workspace/reviews',
+    [{ id: 'note-storage', capability: 'note-storage', change: 'reuse' as const, changesExistingSymbols: false, suggestedOwner: 'collection-review/workspace/reviews',
       anticipatedConsumers: [], involvedModules: [], dependsOn: [], confidence: 'medium' as const,
       rationale: 'A note may already have somewhere to live.', assumptions: [], uncertainties: [], citations: [] }],
   );

@@ -39,6 +39,8 @@ export interface HookCheck {
 interface ReportedCheck extends HookCheck {
   readonly added: readonly HookFinding[];
   readonly repeated: readonly HookFinding[];
+  /** Findings that stood before this check and that it no longer reports. */
+  readonly cleared: readonly HookFinding[];
 }
 
 /** A coverage gap the hook check itself observed. */
@@ -139,6 +141,22 @@ export interface HookCheckOptions {
 }
 
 /**
+ * The deadline the check at `completion-proposed` is given. It covers the
+ * whole write scope rather than one file, so it is longer than a hook check
+ * after a single edit, and it is still bounded: a check that does not answer
+ * within it is not checked, the submission proceeds, and the gate's own
+ * complete check answers.
+ */
+export const completionCheckDeadlineMs = 60_000;
+
+/**
+ * How many source files the check at `completion-proposed` passes to one
+ * changed check. A write scope larger than this is not checked here; the
+ * gate's complete check covers it.
+ */
+export const completionCheckFileLimit = 400;
+
+/**
  * Runs the hook check for one settled mutation and answers what to record
  * and what the engineer must be told.
  */
@@ -159,7 +177,7 @@ export async function runHookCheck(options: HookCheckOptions): Promise<HookOutco
     });
     checks.push({
       paths: [], mode: 'changed', outcome: 'not-checked',
-      reason: 'the changed set could not be established', newFindings: 0, log: null, added: [], repeated: [],
+      reason: 'the changed set could not be established', newFindings: 0, log: null, added: [], repeated: [], cleared: [],
     });
   } else if (configuration.length > 0) {
     completeNeeded = true;
@@ -172,6 +190,7 @@ export async function runHookCheck(options: HookCheckOptions): Promise<HookOutco
       log: null,
       added: [],
       repeated: [],
+      cleared: [],
     });
   } else {
     ran += 1;
@@ -190,7 +209,7 @@ export async function runHookCheck(options: HookCheckOptions): Promise<HookOutco
   }
 
   return {
-    checks: checks.map(({ added: _added, repeated: _repeated, ...check }) => check),
+    checks: checks.map(({ added: _added, repeated: _repeated, cleared: _cleared, ...check }) => check),
     gaps,
     text: describe(checks),
   };
@@ -204,11 +223,16 @@ function reported(
   seen: FindingsSeen,
 ): ReportedCheck {
   const found = findingsOf(result.report);
+  const before = seen.open();
   // A check that did not check answers for nothing: what stood still stands.
   if (check.outcome !== 'not-checked') seen.settle(covered, found);
+  const stands = new Set(seen.open().map(finding => finding.identity));
   const added = seen.admit(found);
   const repeated = found.filter(finding => !added.includes(finding));
-  return { ...check, newFindings: added.length, added, repeated };
+  // What this check cleared: a finding it covered and no longer reports. It
+  // was reported to the engineer when it arose, so its going is news too.
+  const cleared = before.filter(finding => !stands.has(finding.identity));
+  return { ...check, newFindings: added.length, added, repeated, cleared };
 }
 
 /** Exit 0 is checked with nothing to report, 1 is findings, and anything else is not checked. */
@@ -283,11 +307,21 @@ export function findingIdentities(report: unknown): string[] {
  * is spelled out in full every time it is reported, new or still standing,
  * because a model acts on what its tool result says and not on a file it
  * would have to open. A check that did not check says so, and is not a pass.
+ *
+ * A changed check the harness answered at once never ran, which is why it
+ * runs a complete check instead. That complete check covers everything the
+ * changed form would have, so it is the one that speaks: it found something,
+ * or it found nothing, or it could not run and says so. Reporting the
+ * changed form's own gap beside it would say nothing was verified when
+ * something was, and would say it twice when nothing was.
  */
 function describe(checks: readonly ReportedCheck[]): string | null {
   const added = unique(checks.flatMap(check => check.added));
   const standing = unique(checks.flatMap(check => check.repeated)).filter(finding => !added.some(other => other.identity === finding.identity));
-  const unchecked = checks.filter(check => check.outcome === 'not-checked');
+  const cleared = unique(checks.flatMap(check => check.cleared))
+    .filter(finding => ![...added, ...standing].some(other => other.identity === finding.identity));
+  const superseded = checks.some(check => check.mode === 'complete');
+  const unchecked = checks.filter(check => check.outcome === 'not-checked' && !(superseded && check.mode === 'changed'));
   const lines: string[] = [];
   if (added.length > 0) {
     lines.push(`${label(added.length)}. The iteration gate fails while ${added.length === 1 ? 'it stands' : 'they stand'}.`);
@@ -299,16 +333,29 @@ function describe(checks: readonly ReportedCheck[]): string | null {
     for (const finding of standing) lines.push(`- ${sentenceOf(finding)}`);
     if (added.length === 0) lines.push(`Fix ${standing.length === 1 ? 'it' : 'them'}, or submit \`contract-needed\` or \`unsuitable\`. \`completion-proposed\` is refused while ${standing.length === 1 ? 'it stands' : 'they stand'}.`);
   }
+  if (cleared.length > 0) lines.push(clearedLine(cleared));
   if (unchecked.length > 0) {
     lines.push('Ramify hook check:');
     for (const check of unchecked) {
-      const where = check.paths.length === 0 ? 'the whole project' : check.paths.join(', ');
+      const where = check.mode === 'complete' || check.paths.length === 0 ? 'the whole project' : check.paths.join(', ');
       const head = `- ${check.mode} check over ${where}: ${check.outcome}`;
       lines.push(check.reason === null ? head : `${head} (${check.reason})`);
       lines.push('  Nothing was verified by this check. It is not a pass, and you may keep editing.');
     }
   }
   return lines.length === 0 ? null : lines.join('\n');
+}
+
+/**
+ * The one line a cleared violation gets. An edit that removes a reported
+ * violation would otherwise be answered with nothing at all, which reads
+ * like a check that did not run.
+ */
+function clearedLine(cleared: readonly HookFinding[]): string {
+  const at = cleared.map(where).join(', ');
+  return cleared.length === 1
+    ? `Cleared: the Ramify module violation reported earlier (${at}) no longer stands.`
+    : `Cleared: the ${cleared.length} Ramify module violations reported earlier (${at}) no longer stand.`;
 }
 
 function unique(findings: readonly HookFinding[]): HookFinding[] {
@@ -334,8 +381,14 @@ function projectPathOf(original: NonNullable<HookFinding['original']>): string {
   return [...children.flatMap(child => ['subs', child]), 'src', original.file].join('/');
 }
 
-/** One finding as a sentence: where, what, and which rule, in words a model acts on. */
-function sentenceOf(finding: HookFinding): string {
+/**
+ * One finding as a sentence: where, what, and which rule, in words a model
+ * acts on. It is the one place that words a finding, for the hook's own
+ * text, for the refusal of a completion and for the briefing a failing gate
+ * carries; the per-code sentences go when Ramify's own messages are
+ * self-sufficient, and then only this function changes.
+ */
+export function sentenceOf(finding: HookFinding): string {
   const at = where(finding);
   const original = finding.original;
   if (original !== null && original.file !== '') {
@@ -355,13 +408,18 @@ function sentenceOf(finding: HookFinding): string {
   return `${at}: ${finding.message} [${finding.code}]`;
 }
 
-/** What the engineer can do about them, in the terms of its own submission. */
+/**
+ * What the engineer can do about them, in the terms of its own submission:
+ * one decision procedure, each fact said once. The engineer's own prompt
+ * carries the same procedure at length; this is the reminder beside the
+ * finding, not a second copy of it.
+ */
 function remedyOf(findings: readonly HookFinding[]): string {
   const imported = findings.flatMap(finding => finding.original === null ? [] : [finding.original]);
   const owners = [...new Set(imported.map(original => original.owner))];
   const symbols = [...new Set(imported.map(original => `\`${original.binding}\``))];
   const fix = imported.length > 0
-    ? `Fix: drop the import and use what your module receives; its API view, named in your assignment, lists that. If the work truly needs ${symbols.length === 1 ? symbols[0] : 'one of them'}, drop the import anyway and submit \`unsuitable\` with reason \`scope\`, naming the symbol and its owner: the architect decides whether it is exposed. If a symbol you already receive mentions it in its signature, say so: that is an incomplete exposure. Do not copy or derive it. Editing ${owners.map(owner => `\`${owner}\``).join(' or ')}'s module.ramify is outside your write scope.`
+    ? `Fix: drop the import and use what your API view, named in your assignment, lists instead. If nothing there serves, submit \`unsuitable\` with reason \`scope\`, naming ${symbols.length === 1 ? symbols[0] : 'the symbol'} and its owner: the architect decides whether it is exposed. Say so if a symbol you already receive mentions it in its signature; that is an incomplete exposure. Never copy or derive it, and ${owners.map(owner => `\`${owner}\``).join(' or ')}'s module.ramify is outside your write scope.`
     : 'Fix it inside your write scope, or submit `contract-needed`, or `unsuitable` with reason `scope`.';
   return `${fix} \`completion-proposed\` is refused while ${findings.length === 1 ? 'this stands' : 'these stand'}.`;
 }

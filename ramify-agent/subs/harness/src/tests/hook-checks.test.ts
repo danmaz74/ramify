@@ -109,7 +109,9 @@ describe('a hook check after a settled mutation', () => {
     expect(result.checks[0]!.log).toBeNull();
     // The changed form never ran, so nothing claims hook coverage of it.
     expect(result.checks[1]!.log).not.toBeNull();
-    expect(result.text).toContain('not-checked');
+    // The complete check covered everything the changed form would have and
+    // it passed, so there is no gap left to tell the engineer about.
+    expect(result.text).toBeNull();
   });
 
   test('a mutation whose changed set is unknown records the gap and runs a complete check', async () => {
@@ -131,6 +133,39 @@ describe('a hook check after a settled mutation', () => {
     expect(result.checks[0]!.outcome).toBe('not-checked');
     expect(result.checks[1]!.outcome).toBe('findings');
     expect(result.checks[1]!.newFindings).toBe(1);
+    // What the engineer is told is the complete check's own answer, and not
+    // that the changed form it replaced verified nothing.
+    expect(result.text).toContain('RAMIFY MODULE VIOLATION');
+    expect(result.text).not.toContain('Nothing was verified');
+  });
+
+  test('a shell call whose complete check passes is not told at all: the gap is recorded, not reported', async () => {
+    const { ramify, root } = await stub([
+      'if [ "$2" = "--batch" ]; then',
+      '  echo \'{"schemaVersion":"ramify.analysis/1","diagnostics":[]}\'',
+      '  exit 0',
+      'fi',
+      'exit 9',
+    ].join('\n'));
+
+    const result = await runHookCheck(request(ramify, root, null));
+
+    expect(result.checks.map(check => [check.mode, check.outcome])).toEqual([['changed', 'not-checked'], ['complete', 'passed']]);
+    expect(result.gaps.map(gap => gap.kind)).toEqual(['changed-paths-unknown']);
+    expect(result.text).toBeNull();
+  });
+
+  test('a shell call whose complete check could not run is told that it could not, and is never a pass', async () => {
+    const { ramify, root } = await stub('echo \'{"schemaVersion":"ramify.check/1","outcome":"not-checked","reason":"cold"}\'\nexit 2');
+
+    const result = await runHookCheck(request(ramify, root, null));
+
+    expect(result.checks.map(check => [check.mode, check.outcome])).toEqual([['changed', 'not-checked'], ['complete', 'not-checked']]);
+    expect(result.text).toBe([
+      'Ramify hook check:',
+      '- complete check over the whole project: not-checked (cold)',
+      '  Nothing was verified by this check. It is not a pass, and you may keep editing.',
+    ].join('\n'));
   });
 
   test('a check that passed with nothing new tells the engineer nothing', async () => {
@@ -204,7 +239,9 @@ describe('a mutation is observed even when the tool failed', () => {
     // One hook check per settled mutation, and the run's stubbed `ramify`
     // checks nothing, which is recorded as such and never as a pass.
     const hooks = observations.filter(line => line.type === 'hook-check');
-    expect(hooks).toHaveLength(2);
+    // Two checks after the two settled mutations, and the fresh check the
+    // claimed completion was judged against, which names itself.
+    expect(hooks.map(line => (line.type === 'hook-check' ? line.data.atCompletion ?? false : null))).toEqual([false, false, true]);
     expect(hooks.every(line => line.type === 'hook-check' && line.data.outcome === 'not-checked')).toBe(true);
     expect(hooks.every(line => line.type === 'hook-check' && line.data.mode === 'changed')).toBe(true);
 
@@ -246,7 +283,7 @@ describe('what the engineer is told about a Ramify module violation', () => {
     expect(result.text).toBe([
       'RAMIFY MODULE VIOLATION. The iteration gate fails while it stands.',
       `- ${mcp}:13 imports \`ToolResult\` from src/interfaces/protocol.ts (module \`collection-review\`), which does not expose it to your module. \`import type\` counts too.`,
-      'Fix: drop the import and use what your module receives; its API view, named in your assignment, lists that. If the work truly needs `ToolResult`, drop the import anyway and submit `unsuitable` with reason `scope`, naming the symbol and its owner: the architect decides whether it is exposed. If a symbol you already receive mentions it in its signature, say so: that is an incomplete exposure. Do not copy or derive it. Editing `collection-review`\'s module.ramify is outside your write scope. `completion-proposed` is refused while this stands.',
+      'Fix: drop the import and use what your API view, named in your assignment, lists instead. If nothing there serves, submit `unsuitable` with reason `scope`, naming `ToolResult` and its owner: the architect decides whether it is exposed. Say so if a symbol you already receive mentions it in its signature; that is an incomplete exposure. Never copy or derive it, and `collection-review`\'s module.ramify is outside your write scope. `completion-proposed` is refused while this stands.',
     ].join('\n'));
     // The report is kept for the record, but the engineer is not sent to it.
     expect(result.text).not.toContain(root);
@@ -279,10 +316,11 @@ describe('what the engineer is told about a Ramify module violation', () => {
     expect(seen.open().map(finding => finding.line)).toEqual([15]);
     expect(moved.text).toContain(`${mcp}:15 imports \`ToolResult\``);
 
-    // The file checked clean clears it, and nothing is said.
+    // The file checked clean clears it, and that is said in one line: an
+    // edit that removes a reported violation is answered, not passed over.
     await writeFile(report, checkReport([]));
     const clean = await runHookCheck({ ...request(ramify, root, [mcp], seen), ran: 4 });
     expect(seen.open()).toEqual([]);
-    expect(clean.text).toBeNull();
+    expect(clean.text).toBe(`Cleared: the Ramify module violation reported earlier (${mcp}:15) no longer stands.`);
   });
 });

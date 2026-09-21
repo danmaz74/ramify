@@ -66,6 +66,12 @@ export const observationSchema = z.discriminatedUnion('type', [
     reason: z.string().nullable(),
     newFindings: z.int().nonnegative(),
     log: z.string().nullable(),
+    /**
+     * Set on the fresh check a claimed completion is judged against, which
+     * covers the write scope rather than one mutation's paths. Absent on the
+     * check that follows a settled mutation.
+     */
+    atCompletion: z.boolean().optional(),
   }).strict()),
   observation('excursion', z.object({ callId: z.string(), module: z.string(), firstEntry: z.boolean() }).strict()),
   /**

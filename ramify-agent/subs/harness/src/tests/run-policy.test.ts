@@ -12,7 +12,8 @@ import { join } from 'node:path';
  * reached the project through. It is hardcoded and recorded, not
  * configurable while the run runs, so an exhaustion is reproducible.
  *
- * `env` is built by the harness and never passed on from its own process.
+ * `env` names the variables the harness's allowlist gives the child and holds
+ * no value of one; `recorded-environment.test.ts` covers what that keeps out.
  */
 
 const cleanups: Array<() => Promise<void>> = [];
@@ -21,7 +22,7 @@ afterEach(async () => {
 });
 
 describe('the captured commands', () => {
-  test('are the main plan\'s table, with the complete environment the harness built', () => {
+  test('are the main plan\'s table, naming the environment the harness built', () => {
     const policy = defaultRunPolicy({ projectRoot: '/project', nested: [] });
     expect(policy.version).toBe('run-policy/1');
     expect(policy.commands.typeCheck.argv).toEqual(['npm', 'run', 'type-check']);
@@ -35,8 +36,9 @@ describe('the captured commands', () => {
     expect(policy.commands.ramifyChanged.timeoutMs).toBe(5_000);
     for (const command of [policy.commands.typeCheck, policy.commands.allTests, policy.commands.ramifyCheck]) {
       expect(command.cwd).toBe('/project');
-      expect(Object.keys(command.env).length).toBeGreaterThan(0);
-      expect(command.env).not.toHaveProperty('NODE_OPTIONS');
+      expect(command.env).toContain('PATH');
+      expect(command.env).not.toContain('NODE_OPTIONS');
+      expect(command.envAdditions).toEqual({});
     }
   });
 

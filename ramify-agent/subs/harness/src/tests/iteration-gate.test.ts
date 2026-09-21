@@ -356,7 +356,7 @@ function timingOutScopedTests(projectRoot: string) {
     ...base,
     commands: {
       ...base.commands,
-      scopedTests: { argv: [process.execPath, '-e', 'setTimeout(() => undefined, 60000)'], cwd: projectRoot, env: base.commands.scopedTests.env, timeoutMs: 500 },
+      scopedTests: { ...base.commands.scopedTests, argv: [process.execPath, '-e', 'setTimeout(() => undefined, 60000)'], cwd: projectRoot, timeoutMs: 500 },
     },
   };
 }

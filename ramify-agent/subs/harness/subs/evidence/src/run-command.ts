@@ -9,14 +9,16 @@ import { promisify } from 'node:util';
  *
  * `execAndCollect` is copied from cucumber-viz 0.7.0,
  * src/core/shared/services/test-process/test-process.ts lines 124-207, and
- * `cleanEnvironment` from
+ * `childEnvironment` began as `cleanEnvironment` from
  * src/domain-sub-apps/implementation-studio/core/runtime/check-execution/check-runner.ts
  * lines 92-100. Same author; licensed here under GPL-3.0 with ramify-agent.
  * The wrapper script beside this file is verbatim. Plan 3 iteration 2 adjusts
  * the executor: a timeout is told from a failure with Node's `killed`, the
  * complete output is written to a file and answered as a bounded description,
  * a spawn failure's string `code` becomes a structured runner error, and the
- * wrapper script is resolved from this module's own directory.
+ * wrapper script is resolved from this module's own directory. The lifted
+ * builder passed on every variable of this process; `childEnvironment` builds
+ * from an allowlist instead, and the source it came from does not.
  *
  * `runCommand` never throws. Every way a command can end is one of four
  * outcomes, and none of them is read from what the command printed.
@@ -91,20 +93,95 @@ export interface CommandRequest {
   readonly maxBytes?: number | undefined;
 }
 
+/*
+ * The allowlist: the one definition of what a child process inherits from
+ * this one.
+ *
+ * The harness runs under whatever a person's session holds — an agent
+ * session token, a provider API key, a credential helper's socket — and none
+ * of that is a Node toolchain's business. So a child receives the variables
+ * named here and nothing else. A variable a command genuinely needs is added
+ * here, in this one place, or passed as an addition by the caller that knows
+ * about it.
+ *
+ * This applies to the engineer's `shell` tool as well, and deliberately: that
+ * tool runs a command the agent wrote, so a broader environment for it would
+ * hand an arbitrary command every secret of the session. Whether a project
+ * whose own tooling needs more than this gets a wider environment for
+ * `shell` alone is Dan's decision and is not taken here; until it is taken,
+ * `shell` uses this allowlist like every other child.
+ */
+
+/** Variables a child inherits by name. */
+const allowedNames = new Set([
+  // The toolchain itself: where to find executables, where a home-directory
+  // configuration such as `.npmrc` lives, and who the process is.
+  'PATH',
+  'HOME',
+  'USER',
+  'LOGNAME',
+  'SHELL',
+  // Terminal, locale and time, which change what a command prints.
+  'TERM',
+  'TZ',
+  'LANG',
+  // Where a command may write a temporary file.
+  'TMPDIR',
+  'TEMP',
+  'TMP',
+  // Present in an automated environment, and read by tools that suppress
+  // interactive prompts and progress output.
+  'CI',
+  // Git reads its configuration from the files these name. A test points
+  // them at `/dev/null` so that no person's identity or configuration is in
+  // reach of the git the harness runs, which only works if a child inherits
+  // them. They name paths, never credentials.
+  'GIT_CONFIG_GLOBAL',
+  'GIT_CONFIG_SYSTEM',
+  'GIT_CONFIG_NOSYSTEM',
+]);
+
+/** Variable name prefixes a child inherits whole. */
+const allowedPrefixes = ['LC_', 'NODE_', 'npm_config_'];
+
 /**
- * Build a clean environment for a child process: every variable of this
- * process except `NODE_OPTIONS`, whose flags (`--import tsx` from a test
- * harness, for instance) would otherwise reach a child that has no such
- * package installed, plus the caller's own additions.
+ * Withheld although the prefixes above admit it: `NODE_OPTIONS`'s flags
+ * (`--import tsx` from a test harness, for instance) would otherwise reach a
+ * child that has no such package installed.
+ */
+const withheldNames = new Set(['NODE_OPTIONS']);
+
+/** Whether a child inherits the variable of this name. */
+function inherited(name: string): boolean {
+  if (withheldNames.has(name)) return false;
+  return allowedNames.has(name) || allowedPrefixes.some(prefix => name.startsWith(prefix));
+}
+
+/**
+ * Build the environment for a child process: the allowlisted variables of
+ * this process, plus the caller's own additions, which are the harness's own
+ * settings and never something it inherited.
  *
  * This is the only builder of a child environment in the harness. What it
  * returns is complete, so no caller merges `process.env` again.
  */
-export function cleanEnvironment(additions: Readonly<Record<string, string>> = {}): Record<string, string> {
-  const { NODE_OPTIONS: _stripped, ...inherited } = process.env;
+export function childEnvironment(additions: Readonly<Record<string, string>> = {}): Record<string, string> {
   const env: Record<string, string> = {};
-  for (const [name, value] of Object.entries(inherited)) if (value !== undefined) env[name] = value;
+  for (const [name, value] of Object.entries(process.env)) {
+    if (value === undefined || !inherited(name)) continue;
+    env[name] = value;
+  }
   return { ...env, ...additions };
+}
+
+/**
+ * The names of the variables in one environment, sorted. This is what a
+ * record holds of an environment: a value of it is never recorded, because a
+ * record is read, projected and committed, and a secret in one is a secret
+ * everywhere it goes.
+ */
+export function environmentNames(env: Readonly<Record<string, string | undefined>>): string[] {
+  return Object.keys(env).sort();
 }
 
 /**

@@ -213,9 +213,47 @@ describe('a single engineer session', () => {
     expect(summary.standingViolations).toEqual([]);
     expect(result.exitStatus).toBe(0);
 
+    // Two appended texts: the violation, and the one line that says the
+    // edit removing it cleared what was reported.
     const appended = events.filter(event => event.type === 'harness-text' && event.kind === 'appended');
-    expect(appended).toHaveLength(1);
+    expect(appended).toHaveLength(2);
+    expect((appended[1] as Extract<SessionProgress, { type: 'harness-text' }>).text)
+      .toBe(`Cleared: the Ramify module violation reported earlier (${notesSource}:1) no longer stands.`);
     expect(events.filter(event => event.type === 'submission').map(event => (event.type === 'submission' ? event.accepted : null))).toEqual([false, true]);
+  }, 120_000);
+
+  test('a violation written through the shell, which no hook check saw, is caught when completion is proposed', async () => {
+    const root = await project();
+
+    const { result, agent, events } = await session(root, [
+      // The shell names no changed set, so the hook runs a complete check,
+      // which this stub does not answer: nothing saw the violation.
+      shell(`printf '// FORBIDDEN\\n' >> ${notesSource}`),
+      { kind: 'submit', input: completionProposed('The limit is 500.') },
+      shell(`sed -i '/FORBIDDEN/d' ${notesSource}`),
+      { kind: 'submit', input: completionProposed('The limit is 500, and the import is gone.') },
+    ]);
+
+    const summary = finished(result);
+    const record = agent.sessions[0]!;
+    // The hook after the shell call saw nothing: the complete check it ran
+    // could not run, which is stated and is not a pass.
+    const appended = events.filter(event => event.type === 'harness-text' && event.kind === 'appended');
+    expect((appended[0] as Extract<SessionProgress, { type: 'harness-text' }>).text).toContain('Nothing was verified by this check');
+    expect((appended[0] as Extract<SessionProgress, { type: 'harness-text' }>).text).not.toContain('RAMIFY MODULE VIOLATION');
+
+    // The fresh check at `completion-proposed` found it all the same.
+    expect(record.verdicts[0]).toMatchObject({ accepted: false });
+    expect(JSON.stringify(record.verdicts[0])).toContain('RAMIFY MODULE VIOLATION');
+    expect(JSON.stringify(record.verdicts[0])).toContain(notesSource);
+    expect(record.verdicts[1]).toMatchObject({ accepted: true });
+    expect(summary.standingViolations).toEqual([]);
+    expect(summary.ended).toBe('submitted');
+
+    // Both checks at completion name themselves in the observations.
+    const observations = await observationsOf(summary.records);
+    const atCompletion = observations.filter(line => line.type === 'hook-check' && line.data.atCompletion === true);
+    expect(atCompletion.map(line => (line.type === 'hook-check' ? line.data.outcome : null))).toEqual(['findings', 'passed']);
   }, 120_000);
 
   test('unsuitable and contract-needed are recorded and answered, and no further session starts', async () => {
@@ -344,8 +382,10 @@ describe('the session\'s records', () => {
     gateAttemptSchema.parse(JSON.parse(await readFile(join(records, 'gate', 'attempt.json'), 'utf8')));
 
     expect(await readdir(join(records, 'shell'))).toEqual(['001.log']);
+    // One check after each of the two mutations, and the fresh check over
+    // the write scope that the claimed completion was judged against.
     const hooks = await readdir(join(records, 'hooks'));
-    expect(hooks).toEqual(['001.json', '002.json']);
+    expect(hooks).toEqual(['001.json', '002.json', '003.json']);
     for (const hook of hooks) JSON.parse(await readFile(join(records, 'hooks', hook), 'utf8'));
     expect((await stat(join(records, 'session'))).isDirectory()).toBe(true);
 

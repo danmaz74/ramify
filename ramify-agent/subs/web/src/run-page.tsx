@@ -308,7 +308,7 @@ function Decision({ decision }: { readonly decision: DecisionView }) {
     case 'placement':
       return (
         <li className="card decision">
-          <p><span className="badge decided">placement</span> <code>{decision.id}</code> ({decision.authority}) for {decision.workItem}: {decision.outcome} <code>{decision.capability}</code>{decision.owner && <> in <code>{decision.owner}</code></>}</p>
+          <p><span className="badge decided">placement</span> <code>{decision.id}</code> ({decision.authority}) for {decision.workItem}: {decision.outcome} <code>{decision.capability}</code>{decision.owner && <> in <code>{decision.owner}</code></>}{decision.changesExistingSymbols && <> — changes symbols that already have consumers</>}</p>
           <p className="muted">{decision.question}</p>
           <p>{decision.rationale}</p>
           {decision.proposed && <p className="muted">Proposes a module under {decision.proposed.parent}: {decision.proposed.purpose}</p>}

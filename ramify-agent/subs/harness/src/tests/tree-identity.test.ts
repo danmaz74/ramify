@@ -2,9 +2,9 @@ import { rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { guardedFilesHash } from '../../subs/evidence/src/guarded-files.js';
-import { cleanEnvironment } from '../../subs/evidence/src/run-command.js';
 import { runGate } from '../checks/gate.js';
 import type { GateRequest } from '../checks/gate.js';
+import { checkCommand } from '../checks/records.js';
 import type { CheckCommand, GateAttempt } from '../checks/records.js';
 import type { PlannedCheck } from '../checks/verify.js';
 import { temporaryDirectory } from './helpers/fixture.js';
@@ -30,12 +30,8 @@ describe('the evidence a gate is bound to', () => {
     await directory.remove();
   });
 
-  const command = (script: string): CheckCommand => ({
-    argv: ['bash', '-c', script],
-    cwd: directory.path,
-    env: cleanEnvironment(),
-    timeoutMs: 30_000,
-  });
+  const command = (script: string): CheckCommand =>
+    checkCommand({ argv: ['bash', '-c', script], cwd: directory.path, timeoutMs: 30_000 });
   const passing = (): PlannedCheck[] => [
     { kind: 'ramify-check', command: command('echo "0 findings"') },
     { kind: 'type-check', command: command('true') },

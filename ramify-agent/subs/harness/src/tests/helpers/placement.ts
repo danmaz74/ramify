@@ -13,6 +13,7 @@ export function decision(extra: Partial<DecisionBody> = {}): DecisionBody {
     question: 'Where does this behavior belong?',
     outcome: 'reuse',
     capability: 'send-email',
+    changesExistingSymbols: false,
     owner: 'shop/orders',
     rationale: 'The behavior the request needs is what this module already owns.',
     constraints: [],

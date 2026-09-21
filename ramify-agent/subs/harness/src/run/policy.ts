@@ -1,19 +1,19 @@
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { join, relative } from 'node:path';
-import { cleanEnvironment } from '../../subs/evidence/src/run-command.js';
 import { ramifyExecutable } from '../../subs/evidence/src/ramify-cli.js';
+import { checkCommand, type CheckCommand } from '../checks/records.js';
 import type { Role } from '../interfaces/protocol/runs.js';
-import { roles, runPolicySchema, type CheckCommandRecord, type RunPolicy } from './records.js';
+import { roles, runPolicySchema, type RunPolicy } from './records.js';
 
 /*
  * The policy one run runs under. It is hardcoded, captured in `job.json`
  * before the first event, and not configurable while the run runs, so that
  * an exhaustion is reproducible from the record.
  *
- * Every command carries the complete environment the harness built for it.
- * Nothing of this process is passed on: `cleanEnvironment` is the one
- * builder, and it strips `NODE_OPTIONS`, whose flags would otherwise reach a
- * child that has no such package installed.
+ * Every command names the environment the harness built for it and holds no
+ * value of it. `checkCommand` is the one constructor, and the environment its
+ * child receives is the allowlist of `childEnvironment` plus the command's
+ * own settings, built again at the moment of the spawn.
  */
 
 /** The version this policy is recorded under. */
@@ -153,8 +153,8 @@ async function isDirectory(path: string): Promise<boolean> {
 }
 
 /** The MVP's one test runner, reached through the project's own npm scripts. */
-function npmCommand(cwd: string, args: readonly string[], timeoutMs: number): CheckCommandRecord {
-  return { argv: ['npm', ...args], cwd, env: cleanEnvironment(), timeoutMs };
+function npmCommand(cwd: string, args: readonly string[], timeoutMs: number): CheckCommand {
+  return checkCommand({ argv: ['npm', ...args], cwd, timeoutMs });
 }
 
 export interface RunPolicyOptions {
@@ -169,13 +169,14 @@ export interface RunPolicyOptions {
 
 /**
  * The policy a run captures. The commands are the main plan's table, built
- * here and nowhere else, so that a captured `CheckCommand` is complete: a
- * policy stored without its environment would run with none at all.
+ * here and nowhere else, so that a captured `CheckCommand` is complete: it
+ * names the variables its child received and carries the settings the harness
+ * chose, and the values come from the allowlist when it runs.
  */
 export function defaultRunPolicy(options: RunPolicyOptions): RunPolicy {
   const { projectRoot } = options;
   const ramify = options.ramify ?? ramifyExecutable;
-  const ramifyEnv = cleanEnvironment(options.endpointDirectory === undefined ? {} : { RAMIFY_ENDPOINT_DIR: options.endpointDirectory });
+  const ramifySettings: Record<string, string> = options.endpointDirectory === undefined ? {} : { RAMIFY_ENDPOINT_DIR: options.endpointDirectory };
   const context = Object.fromEntries(roles.map(role => [role, defaultContextPolicies[role]])) as RunPolicy['context'];
   return runPolicySchema.parse({
     version: runPolicyVersion,
@@ -190,30 +191,29 @@ export function defaultRunPolicy(options: RunPolicyOptions): RunPolicy {
        * as the project installed it, because a selection of files is not
        * something an npm script takes.
        */
-      scopedTests: {
+      scopedTests: checkCommand({
         argv: [join(projectRoot, 'node_modules', '.bin', 'vitest'), 'run'],
         cwd: projectRoot,
-        env: cleanEnvironment(),
         timeoutMs: commandTimeouts.scopedTests,
-      },
-      ramifyCheck: {
+      }),
+      ramifyCheck: checkCommand({
         argv: [ramify, 'check', '--batch', '--root', projectRoot, '--format', 'json'],
         cwd: projectRoot,
-        env: ramifyEnv,
+        envAdditions: ramifySettings,
         timeoutMs: commandTimeouts.ramifyCheck,
-      },
+      }),
       /**
        * The hook check's template. The changed paths follow `--changed` and
        * the working directory becomes the one they are relative to; nothing
        * else of it changes. An exit of 2 is not checked with the CLI's
        * reason, which is never a pass.
        */
-      ramifyChanged: {
+      ramifyChanged: checkCommand({
         argv: [ramify, 'check', '--changed', '--format', 'json', '--deadline', String(commandTimeouts.hook)],
         cwd: projectRoot,
-        env: ramifyEnv,
+        envAdditions: ramifySettings,
         timeoutMs: commandTimeouts.hook,
-      },
+      }),
       hookTimeoutMs: commandTimeouts.hook,
       nestedPackages: options.nested.map(nested => ({
         directory: nested.directory,

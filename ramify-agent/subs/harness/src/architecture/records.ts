@@ -30,12 +30,22 @@ export const globalDecisionId = (request: string): string => `gd-${request.repla
 /** `ld-wi-001-02`, from the work item and the count of its committed local decisions. */
 export const localDecisionId = (workItem: string, count: number): string => `ld-${workItem}-${String(count).padStart(2, '0')}`;
 
+/** What the retired `extend` value is answered with, in the terms the role submits. */
+export const extensionIsANewCapability = 'An existing capability is never revised to cover more. Register the extended behavior as a new capability named for itself, with outcome "create" and the existing module as its owner, and set "changesExistingSymbols" to true where implementing it changes symbols that already have consumers';
+
 /**
  * What a decision resolved. `extract` moves existing behavior to a new
  * owner; `external` is satisfied by a package or another system, so it has
  * no owner module and creates no provider obligation.
+ *
+ * There is no outcome for extending a capability. An extension is a new
+ * capability named for itself, so it is `create` with an existing module as
+ * its owner, and `changesExistingSymbols` says whether implementing it
+ * changes symbols that already have consumers.
  */
-export const placementOutcomeSchema = z.enum(['reuse', 'extend', 'create', 'extract', 'external']);
+export const placementOutcomeSchema = z.enum(['reuse', 'create', 'extract', 'external'], {
+  error: issue => (issue.input === 'extend' ? extensionIsANewCapability : undefined),
+});
 export type PlacementOutcome = z.infer<typeof placementOutcomeSchema>;
 
 /** Who decided: one fork of the global architect, or the work item's own local architect. */
@@ -80,6 +90,12 @@ export const placementDecisionSchema = z.object({
   question: text,
   outcome: placementOutcomeSchema,
   capability: slugSchema,
+  /**
+   * Whether implementing this capability changes symbols that already have
+   * consumers. It is what break analysis reads, and what gives a contract
+   * engineer reason to read the existing consumers.
+   */
+  changesExistingSymbols: z.boolean(),
   /** Null only for `external`. */
   owner: modulePathSchema.nullable(),
   /** Required for an owner the refreshed view does not have yet. */

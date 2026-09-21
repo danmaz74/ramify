@@ -1,11 +1,11 @@
 import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
+import { checkCommand } from '../checks/records.js';
 import type { GateAttempt } from '../checks/records.js';
 import { iterationLayout, type IterationResult } from '../work/iterations.js';
 import { workLayout } from '../work/records.js';
 import { runLayout } from '../run/records.js';
-import { cleanEnvironment } from '../../subs/evidence/src/run-command.js';
 import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { addModule, assign, byRole, completionProposed, edit, installMiniRunner, outline, submit, treeInputs } from './helpers/iterations.js';
@@ -107,12 +107,11 @@ function wholeProject(projectRoot: string) {
     ...base,
     commands: {
       ...base.commands,
-      allTests: {
+      allTests: checkCommand({
         argv: [join(projectRoot, 'node_modules', '.bin', 'vitest'), 'run', `${notesDirectory}/src/tests/notes.test.ts`, `${alertsDirectory}/src/tests/alerts.test.ts`],
         cwd: projectRoot,
-        env: cleanEnvironment(),
         timeoutMs: 60_000,
-      },
+      }),
     },
   };
 }

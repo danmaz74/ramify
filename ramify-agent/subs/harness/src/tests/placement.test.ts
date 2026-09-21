@@ -66,6 +66,7 @@ function firstDecision(brief: string) {
       question: 'Where does comparing two revisions field by field belong?',
       outcome: 'create',
       capability: 'field-diff',
+      changesExistingSymbols: false,
       owner: core,
       rationale: 'The core already holds the revision chain, and both surfaces read it from there.',
       constraints: ['The comparison is read-only.'],
@@ -91,6 +92,7 @@ function secondDecision() {
       question: 'Does the panel need its own comparison?',
       outcome: 'reuse',
       capability: 'field-diff',
+      changesExistingSymbols: false,
       owner: core,
       rationale: 'The brief of gd-001 already placed it in the core, and the panel is the consumer it anticipated.',
       constraints: [],
@@ -460,7 +462,7 @@ describe('a fork whose submissions are invalid', () => {
         { kind: 'submit', input: forkDecision({
           decision: {
             question: 'Where does it belong?', outcome: 'create', capability: 'field-diff',
-            owner: 'collection-review/workspace/nowhere',
+            changesExistingSymbols: false, owner: 'collection-review/workspace/nowhere',
             rationale: 'r', constraints: [], uncertainties: [], evidence: { citations: [], gaps: [] },
           },
           registry: [],
@@ -554,6 +556,7 @@ describe('a decision that replaces an earlier one', () => {
             question: 'Is the core still the right owner now that only the panel reads it?',
             outcome: 'extract',
             capability: 'field-diff',
+            changesExistingSymbols: true,
             owner: panel,
             rationale: 'The only reader is the panel, and the comparison has no other consumer.',
             constraints: [],

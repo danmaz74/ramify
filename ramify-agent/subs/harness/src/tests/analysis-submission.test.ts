@@ -3,6 +3,7 @@ import { afterEach, describe, expect, test } from 'vitest';
 import type { ArchitectIndex } from '../../subs/evidence/src/views.js';
 import { architectIndex, moduleEntry } from './helpers/views.js';
 import { describePlan, initialAnalysisJsonSchema, initialAnalysisToolName, validateInitialAnalysis } from '../analysis/submission.js';
+import { extensionIsANewForecast } from '../analysis/records.js';
 import { runLayout, type InvocationOutcome } from '../run/records.js';
 import { loadPromptPackages } from '../prompts/packages.js';
 import { copyFixture } from './helpers/fixture.js';
@@ -30,6 +31,26 @@ const index: ArchitectIndex = {
 
 /** The captured plan every rule below is checked against. */
 const plan = describePlan(['# A plan', '', 'Intro.', '', '## Request', '', 'Do the thing.', '', '## Acceptance', '', 'It is done.'].join('\n'));
+
+/** One hypothesis of a submission, which creates nothing. */
+function forecast(extra: Record<string, unknown> = {}) {
+  return {
+    id: 'email-delivery',
+    capability: 'send-email',
+    change: 'reuse',
+    changesExistingSymbols: false,
+    suggestedOwner: 'shop/orders',
+    anticipatedConsumers: [],
+    involvedModules: [],
+    dependsOn: [],
+    confidence: 'medium',
+    rationale: 'Orders already sends confirmations.',
+    assumptions: [],
+    uncertainties: [],
+    citations: [{ module: 'shop/orders' }],
+    ...extra,
+  };
+}
 
 function entry(capability: string, extra: Record<string, unknown> = {}) {
   return {
@@ -62,6 +83,26 @@ describe('the schema', () => {
     if (slug.ok) return;
     expect(slug.errors[0]!.path).toBe('entries.0.capability');
     expect(slug.errors[0]!.message).toContain('kebab-case');
+  });
+
+  test('a forecast extension submitted as the retired "extend" change is refused, and told to forecast a new capability', () => {
+    const extended = validateInitialAnalysis({
+      entries: [entry('send-email')],
+      hypotheses: [forecast({ change: 'extend' })],
+      coverageLimits: [],
+    }, { index, plan });
+    expect(extended.ok).toBe(false);
+    if (extended.ok) return;
+    expect(extended.errors.map(error => error.path)).toEqual(['hypotheses.0.change']);
+    expect(extended.errors[0]!.message).toBe(extensionIsANewForecast);
+    expect(extended.errors[0]!.message).toContain('new capability named for itself');
+
+    // The same forecast, as the model now states it.
+    expect(validateInitialAnalysis({
+      entries: [entry('send-email')],
+      hypotheses: [forecast({ capability: 'send-email-with-attachment', change: 'create', changesExistingSymbols: true })],
+      coverageLimits: [],
+    }, { index, plan }).ok).toBe(true);
   });
 
   test('has no field for an ID the harness already knows', () => {

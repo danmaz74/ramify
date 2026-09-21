@@ -71,6 +71,7 @@ export function hypothesesOf(view: RunView): HypothesisView[] {
       revision: current.revision,
       standing: current.standing,
       change: current.change,
+      changesExistingSymbols: current.changesExistingSymbols,
       suggestedOwner: current.suggestedOwner,
       confidence: current.confidence,
       rationale: current.rationale,
@@ -115,6 +116,7 @@ export function decisionsOf(view: RunView): DecisionView[] {
       question: decision.question,
       outcome: decision.outcome,
       capability: decision.capability,
+      changesExistingSymbols: decision.changesExistingSymbols,
       owner: decision.owner,
       proposed: decision.proposed === undefined
         ? null

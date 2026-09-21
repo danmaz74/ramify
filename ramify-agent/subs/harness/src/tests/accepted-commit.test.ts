@@ -183,10 +183,10 @@ describe('the message the harness writes', () => {
       proposedBy: 'inv-0014', repairRound: 1, infrastructureAttempt: 0,
       head: 'abc', commit: null, guardedChanges: [],
       commands: [
-        { kind: 'ramify-check', command: { argv: ['ramify'], cwd: '/p', env: {}, timeoutMs: 1 }, startedAt: 'now', elapsedMs: 1200, exitCode: 0, outcome: 'passed', runnerError: null, output: { path: 'a', bytes: 0, truncated: false, tail: '' } },
-        { kind: 'type-check', command: { argv: ['npm'], cwd: '/p', env: {}, timeoutMs: 1 }, startedAt: 'now', elapsedMs: 8400, exitCode: 0, outcome: 'passed', runnerError: null, output: { path: 'b', bytes: 0, truncated: false, tail: '' } },
+        { kind: 'ramify-check', command: { argv: ['ramify'], cwd: '/p', env: [], envAdditions: {}, timeoutMs: 1 }, startedAt: 'now', elapsedMs: 1200, exitCode: 0, outcome: 'passed', runnerError: null, output: { path: 'a', bytes: 0, truncated: false, tail: '' } },
+        { kind: 'type-check', command: { argv: ['npm'], cwd: '/p', env: [], envAdditions: {}, timeoutMs: 1 }, startedAt: 'now', elapsedMs: 8400, exitCode: 0, outcome: 'passed', runnerError: null, output: { path: 'b', bytes: 0, truncated: false, tail: '' } },
         {
-          kind: 'tests', command: { argv: ['vitest'], cwd: '/p', env: {}, timeoutMs: 1 }, startedAt: 'now', elapsedMs: 21000, exitCode: 0, outcome: 'passed', runnerError: null,
+          kind: 'tests', command: { argv: ['vitest'], cwd: '/p', env: [], envAdditions: {}, timeoutMs: 1 }, startedAt: 'now', elapsedMs: 21000, exitCode: 0, outcome: 'passed', runnerError: null,
           selection: { policy: 'owned-by-scope', exactOwners: ['workspace/reviews'], subtrees: ['reviews/core'], extraSuites: [], resolved: ['a.test.ts', 'b.test.ts'] },
           output: { path: 'c', bytes: 0, truncated: false, tail: '' },
         },

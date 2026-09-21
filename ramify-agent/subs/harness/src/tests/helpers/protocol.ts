@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
-import { cleanEnvironment } from '../../../subs/evidence/src/run-command.js';
+import { checkCommand } from '../../checks/records.js';
 import type { RunPolicy } from '../../run/records.js';
 import { copyFixture } from './fixture.js';
 import { analysis, entry, hypothesis, requestCompletion } from './analysis.js';
@@ -56,12 +56,11 @@ export function protocolPolicy(projectRoot: string): RunPolicy {
     ...base,
     commands: {
       ...base.commands,
-      allTests: {
+      allTests: checkCommand({
         argv: [process.execPath, '-e', `process.stdout.write('x'.repeat(${longOutputBytes - 12}) + '\\nall passed\\n')`],
         cwd: projectRoot,
-        env: cleanEnvironment(),
         timeoutMs: 30_000,
-      },
+      }),
     },
   };
 }

@@ -208,6 +208,7 @@ describe('G10: global placement authorizes a new owner without claiming it exist
             question: 'Does a reviewer\'s note belong in this module, or in one of its own?',
             outcome: 'create',
             capability: 'note-store',
+            changesExistingSymbols: false,
             owner: notes,
             proposed: proposal,
             rationale: 'A note has its own limit and its own lifetime, and the reviews module already carries the run.',

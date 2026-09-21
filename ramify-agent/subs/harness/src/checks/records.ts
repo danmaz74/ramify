@@ -1,8 +1,15 @@
+import { childEnvironment, environmentNames } from '../../subs/evidence/src/run-command.js';
+
 /*
  * The gate's record and the shapes it is built from. Nothing here knows about
  * a run: a checkpoint names what must hold, a check command names what to run,
  * and a selection names which test files the checkpoint requires. The policy
  * that chooses them belongs to the iterations that assign work.
+ *
+ * A check command names its environment and never holds its values, which is
+ * why the shapes are built here rather than written out by each caller:
+ * `checkCommand` is the one constructor and `checkCommandEnvironment` the one
+ * way to the environment a child receives.
  */
 
 /** A gate attempt's identifier, `ga-0012`, counted over committed attempts. */
@@ -24,12 +31,55 @@ export interface RecordReference {
   readonly hash: string;
 }
 
-/** One external command, with the complete environment the harness built for it. */
+/**
+ * One external command, with the environment the harness built for it named
+ * and not quoted.
+ *
+ * `env` is the sorted names of the variables the child receives, which is all
+ * a record ever holds of an environment. `envAdditions` is the harness's own
+ * settings for this command, values included: they are the harness's, built
+ * from the project and never inherited, and a command whose settings were
+ * dropped would run against the wrong daemon rather than fail. Everything
+ * else of the environment comes from the allowlist at the moment the command
+ * is spawned, so a captured command is still complete: a run resumed after a
+ * crash builds the same environment again.
+ */
 export interface CheckCommand {
   readonly argv: string[];
   readonly cwd: string;
-  readonly env: Record<string, string>;
+  readonly env: string[];
+  readonly envAdditions: Record<string, string>;
   readonly timeoutMs: number;
+}
+
+/** One external command as it is asked for; its environment is built here. */
+export interface CheckCommandRequest {
+  readonly argv: string[];
+  readonly cwd: string;
+  readonly timeoutMs: number;
+  /** The harness's own settings for this command. Never a variable of this process. */
+  readonly envAdditions?: Record<string, string> | undefined;
+}
+
+/** The one constructor of a check command: it names the environment the child will receive. */
+export function checkCommand(request: CheckCommandRequest): CheckCommand {
+  const envAdditions = request.envAdditions ?? {};
+  return {
+    argv: [...request.argv],
+    cwd: request.cwd,
+    env: environmentNames(childEnvironment(envAdditions)),
+    envAdditions,
+    timeoutMs: request.timeoutMs,
+  };
+}
+
+/**
+ * The complete environment a check command's child receives: the allowlist as
+ * it stands now, plus the command's own settings. It is built at the moment
+ * of the spawn and read from no record.
+ */
+export function checkCommandEnvironment(command: CheckCommand): Record<string, string> {
+  return childEnvironment(command.envAdditions);
 }
 
 /** What a set of checks is being run for. */
@@ -71,7 +121,21 @@ export type NotVerified =
   | 'timeout' | 'runner-error' | 'command-missing' | 'empty-selection'
   | 'interrupted' | 'discovery-error' | 'required-suite-missing';
 
-/** What a verdict is attributed to. It derives from the runner error, the timeout and the exit codes, never from output text. */
+/**
+ * What the cause was read from, beyond the runner error, the timeout and the
+ * exit codes. A Ramify check prints a structured report that names each
+ * finding's own file, so a failure of it is attributed to where the findings
+ * lie: `inScope` and `outside` are those locations against the write scope of
+ * the assignment the attempt followed. No test output is parsed for this, and
+ * an attempt with no such report records no attribution.
+ */
+export interface GateAttribution {
+  readonly basis: 'ramify-findings';
+  readonly inScope: string[];
+  readonly outside: string[];
+}
+
+/** What a verdict is attributed to. It derives from the runner error, the timeout, the exit codes and a Ramify report's own locations, never from output text. */
 export type GateCause =
   | 'in-scope' | 'infrastructure' | 'timeout' | 'invalid-session'
   | 'outside-assignment' | 'guarded-change' | 'unknown';
@@ -127,6 +191,8 @@ export interface GateAttempt {
   readonly commands: GateCommandRecord[];
   readonly verdict: 'passed' | 'failed' | 'not-verified';
   readonly cause: GateCause | null;
+  /** What the cause was read from, where a report of its own named the files. */
+  readonly attribution?: GateAttribution;
   readonly next: GateNext;
 }
 

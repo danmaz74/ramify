@@ -490,7 +490,10 @@ function submissionTool(tool: SubmissionTool, hooks: {
       const verdict = await tool.accept(unwrapped, signal ?? new AbortController().signal);
       if (verdict.accepted) {
         hooks.onAccepted(unwrapped);
-        return { content: [{ type: 'text', text: verdict.text ?? 'The submission was accepted. Your work is complete.' }], details: {}, terminate: true };
+        // The adapter knows the verdict and not what was submitted, so its
+        // own acknowledgement says only that. What follows an accepted
+        // submission is the harness's to word, by the kind it accepted.
+        return { content: [{ type: 'text', text: verdict.text ?? 'The submission was accepted and recorded.' }], details: {}, terminate: true };
       }
       const text = `The submission was rejected:\n${verdict.errors.map(error => `- ${error}`).join('\n')}`;
       if ('final' in verdict) {

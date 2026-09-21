@@ -165,7 +165,7 @@ const iteration: Scenario = {
     'initial-architect': [submit(analysis(
       [entry('review-note', notes)],
       [
-        hypothesis('note-storage', { change: 'extend', suggestedOwner: notes, involvedModules: [notes], confidence: 'medium' }),
+        hypothesis('note-storage', { change: 'create', changesExistingSymbols: true, suggestedOwner: notes, involvedModules: [notes], confidence: 'medium' }),
         hypothesis('note-index', { change: 'reuse', suggestedOwner: notes, confidence: 'low' }),
         hypothesis('note-export', { change: 'create', suggestedOwner: notes, confidence: 'high' }),
         hypothesis('note-drafts', { change: 'create-by-extraction', suggestedOwner: notes, confidence: 'high' }),
@@ -246,9 +246,10 @@ const delegation: Scenario = {
 
 /**
  * Two placement requests: the first answered by a fork that returns partial
- * findings and then one that extends the capability where it is, the second
- * by one that finds the capability outside the project. Each decision
- * revises a hypothesis the request tested.
+ * findings and then one that registers a new capability in the module that
+ * already holds the behavior it extends, the second by one that finds the
+ * capability outside the project. Each decision revises a hypothesis the
+ * request tested.
  */
 const placement: Scenario = {
   name: 'placement',
@@ -281,9 +282,16 @@ const placement: Scenario = {
     'global-fork': [
       submit(forkPartial()),
       submit(forkDecision({
-        decision: decisionBody({ outcome: 'extend', capability: 'reviewer-note', owner: reviews }),
+        // An extension: a new capability named for itself, owned by the module
+        // that already holds the behavior, whose implementation changes symbols
+        // that already have consumers.
+        decision: decisionBody({
+          outcome: 'create', capability: 'reviewer-note-attachment', changesExistingSymbols: true, owner: reviews,
+          rationale: 'The note is attached to the review run this module already owns, so the attached note is a capability of its own here.',
+        }),
+        registry: [registryChange({ capability: 'reviewer-note-attachment', owner: reviews, behavior: 'A reviewer note is attached to a completed review run.' })],
         hypothesisRevisions: [{ hypothesis: 'note-home', standing: 'confirmed', reason: 'The review run is where the note belongs.', confidence: 'high' }],
-        brief: 'The note extends the reviews module, which already holds a review run.',
+        brief: 'The attached note is a new capability of the reviews module, which already holds a review run; implementing it changes symbols that already have consumers.',
       })),
       submit(forkDecision({
         decision: decisionBody({ outcome: 'external', capability: 'note-mail', owner: null, rationale: 'Notifications are sent by a service outside this project.' }),

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { JsonSchema, ToolDefinition, ToolResult } from '../../subs/agent/src/interfaces/port.js';
-import { cleanEnvironment, runCommand, type CommandOutcome } from '../../subs/evidence/src/run-command.js';
+import { childEnvironment, runCommand, type CommandOutcome } from '../../subs/evidence/src/run-command.js';
 
 /*
  * The engineer's shell.
@@ -8,11 +8,19 @@ import { cleanEnvironment, runCommand, type CommandOutcome } from '../../subs/ev
  * By decision 12 of the core records proposal an engineer has a shell, and
  * the implementation's own is withheld: what it receives is this harness
  * tool, run through the lifted executor. The command gets its own process
- * group, a clean environment, a bounded timeout and an 8 KiB tail; the
+ * group, a built environment, a bounded timeout and an 8 KiB tail; the
  * complete output is a file beside the invocation's observations.
  *
+ * Its environment is `childEnvironment`'s allowlist, the same one every other
+ * child of the harness gets, and this is a decision and not an omission: the
+ * command here is one an agent wrote, so an environment wider than the
+ * allowlist would hand an arbitrary command every secret of the person's
+ * session. A project whose own tooling needs a variable the allowlist does
+ * not name would need it added there, for every child at once; whether
+ * `shell` alone should receive more is Dan's to decide and is open.
+ *
  * What it writes passes no guard. That is the MVP's stated limit, not an
- * oversight: there is no sandbox and no allowlist, the writes are seen
+ * oversight: there is no sandbox and no write allowlist, the writes are seen
  * afterwards in `git status`, reported in `InvocationOutcome.outsideScope`,
  * and every invocation that used the shell carries the `unguarded-shell`
  * coverage gap. Zero blocked calls is never proof that every write respected
@@ -106,7 +114,7 @@ export function createShellTool(options: ShellOptions): ShellTool {
     name: shellToolName,
     description: [
       'Runs one shell command in the project\'s working directory, in its own process group and with a',
-      'clean environment. The complete output is kept in a file; you receive the last 8 KiB of it.',
+      'built environment. The complete output is kept in a file; you receive the last 8 KiB of it.',
       'What this writes passes no write guard: it is observed afterwards, and a change outside your scope is',
       'reported rather than prevented. Stay inside your scope here as you do with `edit` and `write`.',
     ].join(' '),
@@ -130,7 +138,7 @@ export function createShellTool(options: ShellOptions): ShellTool {
       const done = runCommand({
         argv: ['bash', '-c', request.command],
         cwd: options.workingDirectory,
-        env: cleanEnvironment(),
+        env: childEnvironment(),
         timeoutMs: call.timeoutMs,
         outputFile: call.outputFile,
         signal: signal === undefined ? controller.signal : AbortSignal.any([signal, controller.signal]),

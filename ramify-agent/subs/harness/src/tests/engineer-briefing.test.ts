@@ -31,6 +31,7 @@ describe('what an engineer is told about the Ramify project it works in', () => 
     expect(prompt).toContain('`src/tests/.ramify/`');
     expect(prompt).toContain('not by reading\nother modules\' source');
     expect(prompt).toContain('`RAMIFY MODULE VIOLATION`');
+    expect(prompt).toContain('the harness\nchecks your whole write scope once more before it accepts');
     expect(prompt).toContain('submit `unsuitable` with reason `scope`');
     expect(prompt).toContain('do not copy its definition');
     expect(prompt).toContain('Expose a symbol together with every named type its signature mentions');

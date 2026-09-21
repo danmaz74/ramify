@@ -35,9 +35,10 @@ once per process and is `null` when the executable cannot be run.
 
 `ramifyExecutable` is the path of the `ramify` this package depends on. It is
 the one part of the command line that crosses: a run captures the complete
-command it ran each check with, its environment included, so that the check
-can be run again and so that what it ran is in the record. A captured
-command that names no executable is not a command.
+command it ran each check with, so that the check can be run again and so
+that what it ran is in the record. A captured command that names no
+executable is not a command. Of the environment it captures the names only;
+the values come from the allowlist again when the command runs.
 
 `checkComplete` and `checkChanged` are Ramify's two check forms, read from
 their exit codes alone: 0 is checked with no findings, 1 is findings or an
@@ -63,10 +64,21 @@ cap truncated it, and a tail of a fixed bound. That bound is
 `outputTailBytes`, which crosses so that a caller answering a tail names it
 rather than restating a figure of its own.
 
-`cleanEnvironment` is the harness's only builder of a child environment. It
-answers a complete environment without `NODE_OPTIONS`, whose flags would
-otherwise reach a child with no such package installed, so no caller merges
-this process's own environment again.
+`childEnvironment` is the harness's only builder of a child environment, and
+the one definition of the allowlist it builds from. A child receives the
+variables that allowlist names — the toolchain's `PATH` and `HOME`, the
+locale, a temporary directory, `NODE_*` without `NODE_OPTIONS` whose flags
+would otherwise reach a child with no such package installed,
+`npm_config_*`, and the files git reads its configuration from — plus the
+caller's own additions, and nothing else of this process. The harness runs
+under whatever a person's session holds, and a session token or an API key of
+theirs is no business of a command the harness spawns. What the builder
+answers is complete, so no caller merges this process's own environment
+again.
+
+`environmentNames` answers the sorted names of one environment. It is what a
+record holds of an environment: a record is read, projected and committed, so
+a value in one is a value everywhere it goes.
 
 ## Reading what Ramify generates
 
@@ -121,7 +133,8 @@ hashes to, and decides nothing about a gate.
 
 `src/tests/` covers what this module owns and what it cannot learn from a
 caller: a command that leaves a descendant behind is settled by its process
-group, `NODE_OPTIONS` is absent from a child's environment, a timeout is told
+group, a child's environment is the allowlist and not this process's, a
+variable outside it does not reach a real child, a timeout is told
 from a non-zero exit and a spawn failure carries its string code, the
 measurement document's versions and rejections, the guarded set's hashes and
 absences, and the run branch, whose commit succeeds where a project hook

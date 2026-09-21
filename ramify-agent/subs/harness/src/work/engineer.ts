@@ -5,6 +5,7 @@ import { runCommand } from '../../subs/evidence/src/run-command.js';
 import type { ArchitectIndex } from '../../subs/evidence/src/views.js';
 import type { ProjectCommands } from '../checks/checkpoint.js';
 import { scopedTestCheck } from '../checks/checkpoint.js';
+import { checkCommandEnvironment } from '../checks/records.js';
 import type { TestSelectionPolicy } from '../checks/records.js';
 import { resolveTestSelection } from '../checks/selection.js';
 import { validateAgainst, type SubmissionError, type SubmissionValidation } from '../run/submissions.js';
@@ -91,6 +92,33 @@ export const engineerSubmissionKinds = ['completion-proposed', 'partial', 'unsui
 export const engineerJsonSchema = z.toJSONSchema(engineerSubmissionSchema) as JsonSchema;
 
 export const engineerToolName = 'submit_iteration_result';
+
+/**
+ * What one accepted submission is answered with, by kind. Only a proposal of
+ * completion asks for the gate; an accepted `partial`, `unsuitable` or
+ * `contract-needed` report is a report, and answering it with completed work
+ * tells the engineer something that is not so.
+ *
+ * `checkNotRun` is the reason the fresh Ramify check over the write scope
+ * could not run, where it could not. It is stated rather than passed over: a
+ * check that did not run is never a pass, and the gate's complete check is
+ * what answers instead.
+ */
+export function iterationAcceptance(kind: EngineerSubmission['kind'], checkNotRun: string | null = null): string {
+  const note = checkNotRun === null
+    ? ''
+    : ` The Ramify check over your write scope could not be run (${checkNotRun}), so nothing here verified it.`;
+  switch (kind) {
+    case 'completion-proposed':
+      return `The submission was accepted and recorded. The iteration gate now runs the complete required set and owns the verdict; nothing is committed until it passes.${note} Nothing more is asked of you in this session.`;
+    case 'partial':
+      return 'The report was accepted and recorded. The work is not complete: the local architect reads what is unfinished and decides what follows. Nothing more is asked of you in this session.';
+    case 'unsuitable':
+      return 'The report was accepted and recorded. This iteration closes on it, unverified and uncommitted, and the local architect decides what follows. Nothing more is asked of you in this session.';
+    case 'contract-needed':
+      return 'The report was accepted and recorded. This iteration closes with what it did, and the harness answers the need you named with a contract iteration of its own. Nothing more is asked of you in this session.';
+  }
+}
 
 /** What the submission tool tells the engineer about itself. */
 export const engineerSubmissionDescription = 'End your turn with the result of this iteration. The harness validates it; an invalid submission is returned with every error and its path, and a valid one ends this invocation.';
@@ -276,7 +304,7 @@ export function createScopeTestsTool(options: ScopeTestsOptions): ToolDefinition
       const run = await runCommand({
         argv: check.command.argv,
         cwd: check.command.cwd,
-        env: check.command.env,
+        env: checkCommandEnvironment(check.command),
         timeoutMs: check.command.timeoutMs,
         ...(signal === undefined ? {} : { signal }),
       });
@@ -318,7 +346,11 @@ export interface IterationBriefing {
   readonly base: string;
   /** The API views of the modules this iteration writes, or why one has none. */
   readonly views?: readonly IterationApiViews[] | undefined;
-  /** Diagnostics of the attempt that did not pass, where this invocation is a repair. */
+  /**
+   * Diagnostics of the attempt that did not pass, where this invocation is a
+   * repair: its cause and the lines the harness prepared, one per failing
+   * command with the findings or the output end of that command.
+   */
   readonly failedGate?: { readonly id: string; readonly cause: string | null; readonly summary: readonly string[] } | undefined;
   /** What an earlier invocation of this iteration reported before it ran out of context. */
   readonly handoff?: { readonly done: readonly string[]; readonly unfinished: readonly string[]; readonly returns: number } | undefined;
@@ -403,8 +435,8 @@ export function iterationMessage(briefing: IterationBriefing): string {
 
   if (briefing.failedGate !== undefined) {
     lines.push('## The gate did not pass', '');
-    lines.push(`Attempt \`${briefing.failedGate.id}\`${briefing.failedGate.cause === null ? '' : ` (${briefing.failedGate.cause})`}:`);
-    for (const line of briefing.failedGate.summary) lines.push(`- ${line}`);
+    lines.push(`Attempt \`${briefing.failedGate.id}\`${briefing.failedGate.cause === null ? '' : ` (${briefing.failedGate.cause})`}. What ran, and what it reported:`, '');
+    lines.push(...briefing.failedGate.summary);
     lines.push('', 'Repair it and propose completion again. The next attempt runs the complete required set, not only what failed.', '');
   }
 

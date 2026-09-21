@@ -120,6 +120,11 @@ view is yours. Record such a choice in `localDecisions`, with the registry
 entry it creates, so that later work finds the capability without asking
 anyone. Nothing is appended to the global architect's context for it.
 
+An extension is a new capability, never a change to a registered one. Name
+the extended behavior for itself, register it with the module that already
+holds the behavior, and set `decision.changesExistingSymbols` where
+implementing it changes symbols that already have consumers.
+
 Physical containment alone does not make a capability yours. A hypothesis
 that suggests an owner outside your subtree, especially with anticipated
 consumers elsewhere, is strong evidence against keeping the capability

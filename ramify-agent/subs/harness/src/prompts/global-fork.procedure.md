@@ -18,16 +18,27 @@ One decision, the registry entries it creates or revises, the hypothesis
 revisions it makes, and the brief that reaches later forks.
 
 - `decision.outcome` is `reuse` when an existing capability already covers
-  the behavior, `extend` when a registered one grows to cover it, `create`
-  when a new capability is needed, `extract` when existing behavior moves to
-  a new owner, and `external` when a package or another system satisfies it.
+  the behavior, `create` when a new capability is needed, `extract` when
+  existing behavior moves to a new owner, and `external` when a package or
+  another system satisfies it.
+- An extension is a `create`. Never revise a registered capability's behavior
+  to cover more: name the extended behavior for itself, such as
+  `send-email-with-attachment` beside `send-email`, register it as a new
+  capability, and give it the module that already holds the behavior as its
+  owner. The two capabilities may end at the same symbol, and no relation
+  between them is recorded.
+- `decision.changesExistingSymbols` is true when implementing this capability
+  will change symbols that already have consumers. Say so: it is what break
+  analysis reads, and what lets the contract engineer read those consumers.
+  Only a module the refreshed view already has can be true here, so a
+  capability whose owner you propose, and an `external` one, are false.
 - `decision.owner` is the module that owns the capability. It is `null` only
   for `external`, which no module owns.
 - An owner the refreshed view does not have yet needs `decision.proposed`,
   and only `create` and `extract` may propose one. Its parent must exist and
   its directory must be a free direct child under that parent's `subs/`.
-  `reuse` and `extend` may name an owner an accepted proposal already
-  created; they never introduce one.
+  `reuse` may name an owner an accepted proposal already created; it never
+  introduces one.
 - `decision.revises` names the decision this one replaces and what that
   affects. It is required wherever you place a capability with an owner
   other than the one the registry already gives it. A contradiction that

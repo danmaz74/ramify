@@ -145,15 +145,27 @@ export type SingleSessionResult =
 /**
  * What an accepted submission is answered with in a session. Nothing
  * follows it but a person's review, so it says that instead of claiming
- * that the work is complete.
+ * that the work is complete, and it says it by the kind that was submitted.
+ *
+ * `checkNotRun` is the reason the fresh Ramify check over the write scope
+ * could not run, where it could not: a check that did not run is never
+ * reported as a pass.
  */
-export function sessionAcceptance(kind: EngineerSubmission['kind'], gate: boolean): string {
+export function sessionAcceptance(kind: EngineerSubmission['kind'], gate: boolean, checkNotRun: string | null = null): string {
   if (kind === 'completion-proposed') {
+    const note = checkNotRun === null
+      ? ''
+      : ` The Ramify check over your write scope could not be run (${checkNotRun}), so nothing here verified it.`;
     return gate
-      ? 'The submission was accepted. The iteration checkpoint now runs over your module and a person reviews its verdict and your changes; nothing is committed. Nothing more is asked of you in this session.'
-      : 'The submission was accepted. Nothing verifies or commits your changes in this session: they stay in the working tree for a person to review. Nothing more is asked of you in this session.';
+      ? `The submission was accepted. The iteration checkpoint now runs over your module and a person reviews its verdict and your changes; nothing is committed.${note} Nothing more is asked of you in this session.`
+      : `The submission was accepted. Nothing verifies or commits your changes in this session: they stay in the working tree for a person to review.${note} Nothing more is asked of you in this session.`;
   }
-  return 'The submission was accepted and recorded. Nothing follows it in this session: no contract, no architect and no further session act on it. A person reads your report. Nothing more is asked of you in this session.';
+  const what = kind === 'partial'
+    ? 'The report of what is done and what is unfinished was accepted and recorded.'
+    : kind === 'unsuitable'
+      ? 'The report that this assignment is unsuitable was accepted and recorded.'
+      : 'The report that the behavior you need is owned elsewhere was accepted and recorded.';
+  return `${what} Nothing follows it in this session: no contract, no architect and no further session act on it. A person reads your report. Nothing more is asked of you in this session.`;
 }
 
 /** Runs one engineer session on one module, from the lock to the records. */
@@ -314,14 +326,21 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
   const judge = new SubmissionJudge<EngineerSubmission>({
     target: engineerToolName,
     bound: limits.rejectedSubmissionsPerTurn,
-    validate: input => validateEngineer(input, { kind: 'ordinary', obligation: null, openFindings: tools.openFindings() }),
+    // A claimed completion is checked afresh over the write scope before it
+    // is judged: the hook checks saw only the mutations they covered.
+    validate: async input => validateEngineer(input, {
+      kind: 'ordinary', obligation: null, openFindings: await tools.findingsAtCompletion(input),
+    }),
     accept: async value => {
       const content = `${JSON.stringify({ schema: 'ramify-agent.engineer-submission/1', ...value }, null, 2)}\n`;
       await writeFileAtomic(at(sessionLayout.submission), content);
       accepted = value;
       submissionHash = sha256(content);
     },
-    acceptedText: value => sessionAcceptance(value.kind, options.gate === true),
+    acceptedText: value => {
+      const check = tools.completionCheck();
+      return sessionAcceptance(value.kind, options.gate === true, check?.kind === 'not-checked' ? check.reason : null);
+    },
     observations,
   });
 

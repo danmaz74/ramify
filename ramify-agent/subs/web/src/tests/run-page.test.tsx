@@ -46,7 +46,8 @@ function stubRun(extra: Partial<RunSnapshot> = {}): StubRun {
         status: 'accepted', view: { status: 'placeholder' },
         entries: [{ capability: 'review-note', description: 'd', owner: 'shop/notes', proposed: null, workItem: 'wi-001' }],
         hypotheses: [{
-          id: 'note-search', capability: 'note-search', revision: 2, standing: 'superseded', change: 'reuse', suggestedOwner: 'shop/search',
+          id: 'note-search', capability: 'note-search', revision: 2, standing: 'superseded', change: 'reuse',
+          changesExistingSymbols: false, suggestedOwner: 'shop/search',
           confidence: 'low', rationale: 'now', dependsOn: [], anticipatedConsumers: [],
           initial: { change: 'create', suggestedOwner: 'shop/notes', rationale: 'Notes may need to be searched later.' },
           decisions: ['gd-001'], supersededBy: null, confirmedBy: null,
@@ -57,7 +58,7 @@ function stubRun(extra: Partial<RunSnapshot> = {}): StubRun {
     decisions: decisionListResponseSchema.parse({
       decisions: [{
         kind: 'placement', at, sequence: 5, workItem: 'wi-001', id: 'gd-001', authority: 'global', request: 'pr-001', question: 'Where is search?',
-        outcome: 'reuse', capability: 'note-search', owner: 'shop/search', proposed: null, rationale: 'Search exists.', revises: null,
+        outcome: 'reuse', capability: 'note-search', changesExistingSymbols: false, owner: 'shop/search', proposed: null, rationale: 'Search exists.', revises: null,
         hypotheses: [{ id: 'note-search', revision: 2 }], registry: ['note-search'],
       }],
       total: 1,

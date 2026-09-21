@@ -1,4 +1,5 @@
-import { relative } from 'node:path';
+import { readdir } from 'node:fs/promises';
+import { join, relative, sep } from 'node:path';
 import type {
   BuiltinTool, GuardedCall, GuardDecision, SettledMutation, ToolDefinition, WriteTool,
 } from '../../subs/agent/src/interfaces/port.js';
@@ -7,7 +8,9 @@ import type { ArchitectIndex } from '../../subs/evidence/src/views.js';
 import type { ProjectCommands } from '../checks/checkpoint.js';
 import type { TestSelectionPolicy } from '../checks/records.js';
 import { blockExplanation, decideWrite, type GuardedScope } from '../guard/write-guard.js';
-import { FindingsSeen, runHookCheck, type HookFinding } from '../hooks/post-write.js';
+import {
+  completionCheckDeadlineMs, completionCheckFileLimit, FindingsSeen, runHookCheck, type HookFinding,
+} from '../hooks/post-write.js';
 import { ownerOf } from '../kpi/lines.js';
 import type { ObservationLog } from '../run/observations.js';
 import { ToolInputJudge, validateAgainst } from '../run/submissions.js';
@@ -74,6 +77,15 @@ export interface EngineerEquipmentInputs {
   readonly outputPath: (kind: 'shell' | 'hook', invocation: string, number: number) => string;
 }
 
+/**
+ * What the fresh check at `completion-proposed` answered. A check that could
+ * not run is never a pass and never a refusal either: it is stated, the
+ * submission proceeds, and the gate's own complete check answers.
+ */
+export type CompletionCheck =
+  | { readonly kind: 'checked' }
+  | { readonly kind: 'not-checked'; readonly reason: string };
+
 export interface EngineerEquipment {
   /**
    * Builds the equipment of one invocation. The context carries the
@@ -86,6 +98,17 @@ export interface EngineerEquipment {
   readonly shellCalls: () => number;
   /** The Ramify findings this session's edits introduced that no later check has cleared. */
   readonly openFindings: () => readonly HookFinding[];
+  /**
+   * The findings that stand against one submission on its way to being
+   * validated. An input that claims completion is checked afresh over the
+   * whole write scope first, because the hook checks saw only the mutations
+   * they covered: a violation written through the shell, or one written
+   * while a check did not run, would otherwise reach the gate. Any other
+   * input is answered with what the hook checks already saw.
+   */
+  readonly findingsAtCompletion: (input: unknown) => Promise<readonly HookFinding[]>;
+  /** What the last fresh check answered, or null where none has run. */
+  readonly completionCheck: () => CompletionCheck | null;
 }
 
 /**
@@ -100,12 +123,19 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
   let toolJudge: ToolInputJudge<Record<string, never>> | undefined;
   let shellJudge: ToolInputJudge<{ command: string; timeoutMs?: number }> | undefined;
   let shell: ShellTool | undefined;
+  /** The invocation now equipped, which the check at completion records against. */
+  let current: EquipContext | undefined;
+  /** How many checks of this invocation have written a log, which names the next one's. */
+  let hookChecks = 0;
+  let completion: CompletionCheck | null = null;
   const equip = (session: EquipContext): Equipment => {
     // The findings this invocation has already been told about, so a
     // hook check reports what is newly introduced and not the same
     // thing at every step.
     seen = new FindingsSeen();
-    let hookChecks = 0;
+    current = session;
+    hookChecks = 0;
+    completion = null;
     // What each guarded call resolved to, which is what the mutation
     // observation of that call names.
     const mutated = new Map<string, string[]>();
@@ -241,12 +271,99 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
       },
     };
   };
+  /**
+   * The fresh check one claimed completion is judged against. It runs while
+   * the session is still open, so the engineer can act on the answer, and it
+   * covers the write scope rather than the paths the mutations named. A
+   * check that could not run leaves the findings the hook checks saw as they
+   * were: the submission proceeds to the gate, whose complete check answers.
+   */
+  const findingsAtCompletion = async (input: unknown): Promise<readonly HookFinding[]> => {
+    const standing = seen;
+    const session = current;
+    const claimed = typeof input === 'object' && input !== null ? (input as { readonly kind?: unknown }).kind : undefined;
+    if (claimed !== 'completion-proposed' || standing === undefined || session === undefined) return standing?.open() ?? [];
+
+    const record = async (check: {
+      readonly paths: readonly string[]; readonly mode: 'changed' | 'complete';
+      readonly outcome: 'passed' | 'findings' | 'not-checked'; readonly reason: string | null;
+      readonly newFindings: number; readonly log: string | null;
+    }) => {
+      await session.observations.record({ type: 'hook-check', data: { ...check, paths: [...check.paths], atCompletion: true } });
+    };
+    const notChecked = async (reason: string): Promise<readonly HookFinding[]> => {
+      completion = { kind: 'not-checked', reason };
+      await record({ paths: [], mode: 'changed', outcome: 'not-checked', reason, newFindings: 0, log: null });
+      return standing.open();
+    };
+
+    const scope = await writeScopeSource(projectRoot, inputs.guarded);
+    if (scope.length === 0) return notChecked('the write scope holds no source file to check');
+    if (scope.length > completionCheckFileLimit) {
+      return notChecked(`the write scope holds ${scope.length} source files, more than the ${completionCheckFileLimit} one check is given`);
+    }
+    const outcome = await runHookCheck({
+      ramify: inputs.ramify,
+      projectRoot,
+      paths: scope,
+      hookTimeoutMs: completionCheckDeadlineMs,
+      seen: standing,
+      ran: hookChecks,
+      logFile: check => inputs.outputPath('hook', session.invocation, check),
+    }).catch(error => ({ checks: [], gaps: [], text: null, failure: message(error) }));
+    if ('failure' in outcome) return notChecked(`the check could not be run: ${outcome.failure}`);
+
+    hookChecks += outcome.checks.filter(check => check.log !== null).length;
+    for (const check of outcome.checks) await record(check);
+    const answered = outcome.checks.find(check => check.outcome !== 'not-checked');
+    if (answered === undefined) {
+      completion = { kind: 'not-checked', reason: outcome.checks[0]?.reason ?? 'the check did not answer' };
+      return standing.open();
+    }
+    completion = { kind: 'checked' };
+    return standing.open();
+  };
+
   return {
     equip,
     exhausted: () => toolJudge?.exhausted === true || shellJudge?.exhausted === true,
     shellCalls: () => shell?.calls ?? 0,
     openFindings: () => seen?.open() ?? [],
+    findingsAtCompletion,
+    completionCheck: () => completion,
   };
+}
+
+/** Whether this file is source a Ramify check reads. */
+function isSource(name: string): boolean {
+  return /\.(?:[cm]?[jt]sx?)$/.test(name);
+}
+
+/** Directories no check of a write scope descends into. */
+const skipped = new Set(['node_modules', '.git', '.ramify', 'dist', 'coverage']);
+
+/**
+ * The write scope's own source files, project-relative, as the changed check
+ * takes them: everything beneath its roots and every file of it that is
+ * source. It reads the tree as it stands, so a file the session has just
+ * created is in it.
+ */
+async function writeScopeSource(projectRoot: string, guarded: GuardedScope): Promise<string[]> {
+  const found = new Set<string>();
+  const shorten = (path: string) => relative(projectRoot, path).split(sep).join('/');
+  const walk = async (directory: string): Promise<void> => {
+    const entries = await readdir(directory, { withFileTypes: true }).catch(() => []);
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        if (!skipped.has(entry.name)) await walk(join(directory, entry.name));
+      } else if (entry.isFile() && isSource(entry.name)) {
+        found.add(shorten(join(directory, entry.name)));
+      }
+    }
+  };
+  for (const root of guarded.roots) await walk(root);
+  for (const file of guarded.files) if (isSource(file)) found.add(shorten(file));
+  return [...found].filter(path => path !== '' && !path.startsWith('../')).sort();
 }
 
 function message(error: unknown): string {

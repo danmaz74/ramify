@@ -47,11 +47,27 @@ export type SessionMode = z.infer<typeof sessionModeSchema>;
 const timestamp = z.iso.datetime();
 const text = z.string().min(1);
 
-/** One external command, with the complete environment the harness built for it. */
+/**
+ * One external command, with the environment the harness built for it named
+ * and not quoted. `env` is the sorted names of the variables its child
+ * receives and `envAdditions` the harness's own settings; `checks/records.ts`
+ * says why.
+ *
+ * A run written before this harness recorded names holds `env` as a
+ * name-to-value map. It is read as the names it maps, which is the whole of
+ * what this harness now keeps of one, so a run on disk stays readable through
+ * the same `ramify-agent.job/2`: a version bump would have made every
+ * recorded run unreadable to gain nothing, since no reader wanted the values.
+ * Its settings are not recoverable from such a map and are read as none.
+ */
 export const checkCommandSchema = z.object({
   argv: z.array(z.string()),
   cwd: text,
-  env: z.record(z.string(), z.string()),
+  env: z.union([
+    z.array(z.string()),
+    z.record(z.string(), z.string()).transform(recorded => Object.keys(recorded).sort()),
+  ]),
+  envAdditions: z.record(z.string(), z.string()).default({}),
   timeoutMs: z.int().positive(),
 }).strict();
 
@@ -434,6 +450,15 @@ export const gateAttemptSchema = z.object({
   }).strict()),
   verdict: z.enum(['passed', 'failed', 'not-verified']),
   cause: z.enum(['in-scope', 'infrastructure', 'timeout', 'invalid-session', 'outside-assignment', 'guarded-change', 'unknown']).nullable(),
+  /**
+   * Where a failed Ramify check's own findings lie, against the write scope
+   * the attempt followed. Absent for an attempt with no such report.
+   */
+  attribution: z.object({
+    basis: z.literal('ramify-findings'),
+    inScope: z.array(z.string()),
+    outside: z.array(z.string()),
+  }).strict().optional(),
   next: z.enum(['accept', 'repair', 'retry-infrastructure', 'return-to-local-architect', 'exhausted']),
 }).strict();
 

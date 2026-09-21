@@ -209,7 +209,15 @@ describe('a rejected submission in a run', () => {
     };
     expect(answer.errors[0]!.path).toBe('findings');
     expect(answer.remainingAttempts).toBe(2);
-    expect(engineer.verdicts[1]).toEqual({ accepted: true });
+    // The accepted submission is answered by its kind: what follows a
+    // proposal of completion is the gate, and not completed work. The fresh
+    // check over the write scope could not run against the stub, which the
+    // answer says rather than passing over.
+    expect(engineer.verdicts[1]).toMatchObject({ accepted: true });
+    expect((engineer.verdicts[1] as { text: string }).text)
+      .toContain('The iteration gate now runs the complete required set and owns the verdict');
+    expect((engineer.verdicts[1] as { text: string }).text)
+      .toContain('The Ramify check over your write scope could not be run');
 
     // Nothing was derived from the input that failed, and the rejection is
     // an observation with its errors.
@@ -376,7 +384,7 @@ describe('a Ramify module violation in a run', () => {
     const refusal = engineer.verdicts[0] as { accepted: false; errors: string[] };
     expect(refusal.accepted).toBe(false);
     expect(refusal.errors.join('\n')).toContain('RAMIFY MODULE VIOLATION still standing; the iteration gate fails on it.');
-    expect(engineer.verdicts[1]).toEqual({ accepted: true });
+    expect(engineer.verdicts[1]).toMatchObject({ accepted: true });
     // The edit that fixed it checked clean, so it told the engineer nothing about Ramify.
     expect(fixed!.text).not.toContain('RAMIFY');
   }, 300_000);

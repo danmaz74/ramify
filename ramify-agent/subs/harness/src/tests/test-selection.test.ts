@@ -2,10 +2,10 @@ import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import { resolveTestSelection, testArea } from '../checks/selection.js';
+import { checkCommand } from '../checks/records.js';
 import type { TestSelectionPolicy } from '../checks/records.js';
 import { scopedChecks } from '../checks/checkpoint.js';
 import { verifyChecks } from '../checks/verify.js';
-import { cleanEnvironment } from '../../subs/evidence/src/run-command.js';
 import { copyFixture } from './helpers/fixture.js';
 import { architectIndex, moduleEntry } from './helpers/views.js';
 
@@ -146,10 +146,10 @@ describe('K8: every resolution reads the tree as it stands', () => {
   test('a discovery failure and an empty required selection each stop the checkpoint before a command runs', async () => {
     const root = await fixture();
     const commands = {
-      typeCheck: { argv: [process.execPath, '-e', ''], cwd: root, env: cleanEnvironment(), timeoutMs: 1000 },
-      allTests: { argv: [process.execPath, '-e', ''], cwd: root, env: cleanEnvironment(), timeoutMs: 1000 },
-      scopedTests: { argv: [process.execPath, '-e', ''], cwd: root, env: cleanEnvironment(), timeoutMs: 1000 },
-      ramifyCheck: { argv: [process.execPath, '-e', ''], cwd: root, env: cleanEnvironment(), timeoutMs: 1000 },
+      typeCheck: checkCommand({ argv: [process.execPath, '-e', ''], cwd: root, timeoutMs: 1000 }),
+      allTests: checkCommand({ argv: [process.execPath, '-e', ''], cwd: root, timeoutMs: 1000 }),
+      scopedTests: checkCommand({ argv: [process.execPath, '-e', ''], cwd: root, timeoutMs: 1000 }),
+      ramifyCheck: checkCommand({ argv: [process.execPath, '-e', ''], cwd: root, timeoutMs: 1000 }),
       nestedPackages: [],
     };
     const discovery = await resolveTestSelection({ projectRoot: root, index: null, policy: policy(['collection-review/workspace/reviews']) });

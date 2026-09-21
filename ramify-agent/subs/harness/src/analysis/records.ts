@@ -20,12 +20,22 @@ const text = z.string().min(1);
 /** A capability or hypothesis slug: an architect proposes it, and it is unique in the run. */
 export const slugSchema = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'A kebab-case slug, such as "send-email"');
 
+/** What the retired `extend` value is answered with, in the terms the role submits. */
+export const extensionIsANewForecast = 'An existing capability is never revised to cover more. Forecast the extended behavior as a new capability named for itself, with change "create" and the existing module as its suggested owner, and set "changesExistingSymbols" to true where implementing it changes symbols that already have consumers';
+
 /**
  * What a hypothesis forecasts. Each value has a decision outcome that can
  * confirm it, and `create-by-extraction` pairs with the outcome `extract`.
  * `refactor` is not here: no decision outcome could confirm it.
+ *
+ * There is no value for extending a capability. An extension is a new
+ * capability named for itself, so it is forecast as `create`, and
+ * `changesExistingSymbols` says whether implementing it changes symbols
+ * that already have consumers.
  */
-export const hypothesisChangeSchema = z.enum(['reuse', 'extend', 'create', 'create-by-extraction']);
+export const hypothesisChangeSchema = z.enum(['reuse', 'create', 'create-by-extraction'], {
+  error: issue => (issue.input === 'extend' ? extensionIsANewForecast : undefined),
+});
 export type HypothesisChange = z.infer<typeof hypothesisChangeSchema>;
 
 export const hypothesisSchema = z.object({
@@ -36,6 +46,12 @@ export const hypothesisSchema = z.object({
   /** The forecast capability. It is not a registry entry. */
   capability: slugSchema,
   change: hypothesisChangeSchema,
+  /**
+   * Whether implementing the forecast capability is expected to change
+   * symbols that already have consumers, which a later decision confirms or
+   * revises.
+   */
+  changesExistingSymbols: z.boolean(),
   suggestedOwner: modulePathSchema,
   anticipatedConsumers: z.array(text),
   /** Which local architects receive it, beside the anticipated consumers. */

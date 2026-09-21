@@ -290,6 +290,8 @@ export const hypothesisViewSchema = z.object({
   revision: z.int().positive(),
   standing: hypothesisStandingSchema,
   change: text,
+  /** Whether implementing the forecast capability is expected to change symbols that already have consumers. */
+  changesExistingSymbols: z.boolean(),
   suggestedOwner: text,
   confidence: text,
   rationale: text,
@@ -323,7 +325,7 @@ export const analysisResponseSchema = z.object({
 }).strict();
 export type AnalysisResponse = z.infer<typeof analysisResponseSchema>;
 
-export const placementOutcomeViewSchema = z.enum(['reuse', 'extend', 'create', 'extract', 'external']);
+export const placementOutcomeViewSchema = z.enum(['reuse', 'create', 'extract', 'external']);
 
 const decisionBase = { at: timestamp, sequence: z.int().positive(), workItem: text };
 
@@ -344,6 +346,8 @@ export const decisionViewSchema = z.discriminatedUnion('kind', [
     question: text,
     outcome: placementOutcomeViewSchema,
     capability: text,
+    /** Whether implementing it changes symbols that already have consumers. */
+    changesExistingSymbols: z.boolean(),
     owner: text.nullable(),
     proposed: moduleProposalView.nullable(),
     rationale: text,

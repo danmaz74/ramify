@@ -118,7 +118,11 @@ export interface WorkItemBriefing {
   readonly outlines: readonly WorkItemOutline[];
   /** What this work item owes and is owed across a delegation. */
   readonly delegation?: DelegationBriefing | undefined;
-  /** A gate that failed and returned to the architect, with what it found. */
+  /**
+   * A gate that failed and returned to the architect, with what it found:
+   * its cause and the lines the harness prepared, one per failing command
+   * with what that command reported.
+   */
   readonly failedGate?: { readonly id: string; readonly cause: string | null; readonly summary: readonly string[] } | undefined;
   /** The iteration this architect last assigned, as the harness closed it. */
   readonly lastIteration?: {
@@ -127,6 +131,8 @@ export interface WorkItemBriefing {
     readonly findings: readonly string[];
     readonly recommendation?: string | undefined;
     readonly commit: string | null;
+    /** The gate that returned it, where one did, with what each failing command reported. */
+    readonly gate?: { readonly id: string; readonly cause: string | null; readonly summary: readonly string[] } | undefined;
   } | undefined;
 }
 
@@ -206,7 +212,7 @@ export function workItemMessage(briefing: WorkItemBriefing): string {
   } else {
     for (const hypothesis of briefing.hypotheses) {
       lines.push(`### ${hypothesis.id} (revision ${hypothesis.revision}, ${hypothesis.standing})`);
-      lines.push(`- Capability \`${hypothesis.capability}\`, change \`${hypothesis.change}\`, confidence ${hypothesis.confidence}.`);
+      lines.push(`- Capability \`${hypothesis.capability}\`, change \`${hypothesis.change}\`, confidence ${hypothesis.confidence}.${hypothesis.changesExistingSymbols ? ' It is forecast to change symbols that already have consumers.' : ''}`);
       lines.push(`- Suggested owner: \`${hypothesis.suggestedOwner}\`. Involves: ${list(hypothesis.involvedModules)}. Anticipated consumers: ${list(hypothesis.anticipatedConsumers)}.`);
       lines.push(`- Rationale: ${hypothesis.rationale}`);
       if (hypothesis.assumptions.length > 0) lines.push(`- Assumptions: ${hypothesis.assumptions.join('; ')}`);
@@ -230,7 +236,7 @@ export function workItemMessage(briefing: WorkItemBriefing): string {
     lines.push('None yet. Placement that is yours to decide is recorded with your assignment; placement that is not is asked for.');
   } else {
     for (const decision of briefing.decisions) {
-      lines.push(`- \`${decision.id}\` (${decision.authority}${decision.request === null ? '' : `, request ${decision.request}`}): \`${decision.capability}\` ${decision.outcome} → ${decision.owner === null ? 'outside this project' : `\`${decision.owner}\``}${decision.proposed === undefined ? '' : `, to be created at \`${decision.proposed.directory}\``}. ${decision.rationale}`);
+      lines.push(`- \`${decision.id}\` (${decision.authority}${decision.request === null ? '' : `, request ${decision.request}`}): \`${decision.capability}\` ${decision.outcome} → ${decision.owner === null ? 'outside this project' : `\`${decision.owner}\``}${decision.proposed === undefined ? '' : `, to be created at \`${decision.proposed.directory}\``}.${decision.changesExistingSymbols ? ' It changes symbols that already have consumers, so existing consumers may need to adapt.' : ''} ${decision.rationale}`);
       for (const constraint of decision.constraints) lines.push(`  - Constraint: ${constraint}`);
       for (const uncertainty of decision.uncertainties) lines.push(`  - Uncertain: ${uncertainty}`);
       if (decision.revises !== undefined) {
@@ -316,13 +322,17 @@ export function workItemMessage(briefing: WorkItemBriefing): string {
       lines.push(`- Recommendation: ${last.recommendation}`);
       lines.push('  A recommendation is advice. It never widens a scope and never discharges an obligation; you decide.');
     }
+    if (last.gate !== undefined) {
+      lines.push('', `Its gate \`${last.gate.id}\` did not pass${last.gate.cause === null ? '' : ` (${last.gate.cause})`}. What ran, and what it reported:`, '');
+      lines.push(...last.gate.summary);
+    }
     lines.push('', 'Assign the next iteration, or request completion and let the work item\'s gate answer.', '');
   }
 
   if (briefing.failedGate !== undefined) {
     lines.push('## The gate did not pass', '');
-    lines.push(`Attempt \`${briefing.failedGate.id}\`${briefing.failedGate.cause === null ? '' : ` (${briefing.failedGate.cause})`}:`);
-    for (const line of briefing.failedGate.summary) lines.push(`- ${line}`);
+    lines.push(`Attempt \`${briefing.failedGate.id}\`${briefing.failedGate.cause === null ? '' : ` (${briefing.failedGate.cause})`}:`, '');
+    lines.push(...briefing.failedGate.summary);
     lines.push('', 'Revise your outline and say in `revisionReason` what you changed and why, or answer `unresolved`.', '');
   } else if (briefing.outlines.length > 0) {
     lines.push(`## Earlier outlines`, '', `This work item already has ${briefing.outlines.length} outline revision(s).`, '');

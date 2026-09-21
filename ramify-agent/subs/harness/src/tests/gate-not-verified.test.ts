@@ -1,9 +1,9 @@
 import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { cleanEnvironment } from '../../subs/evidence/src/run-command.js';
 import { runGate } from '../checks/gate.js';
 import type { GateRequest } from '../checks/gate.js';
+import { checkCommand } from '../checks/records.js';
 import type { CheckCommand, TestSelection } from '../checks/records.js';
 import type { PlannedCheck } from '../checks/verify.js';
 import { temporaryDirectory } from './helpers/fixture.js';
@@ -25,10 +25,7 @@ describe('a gate that cannot run what its checkpoint requires', () => {
   });
 
   const command = (script: string, overrides: Partial<CheckCommand> = {}): CheckCommand => ({
-    argv: ['bash', '-c', script],
-    cwd: directory.path,
-    env: cleanEnvironment(),
-    timeoutMs: 30_000,
+    ...checkCommand({ argv: ['bash', '-c', script], cwd: directory.path, timeoutMs: 30_000 }),
     ...overrides,
   });
 

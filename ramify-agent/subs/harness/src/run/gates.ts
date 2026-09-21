@@ -2,7 +2,7 @@ import { allProjectChecks, checkpointPolicies, scopedChecks, type CheckpointPoli
 import { runGate } from '../checks/gate.js';
 import type { Checkpoint, GateAttempt, GateRuleRecord, RecordReference } from '../checks/records.js';
 import { commitAccepted, findCommitByTrailer } from '../../subs/evidence/src/git.js';
-import { cleanEnvironment, runCommand } from '../../subs/evidence/src/run-command.js';
+import { childEnvironment, runCommand } from '../../subs/evidence/src/run-command.js';
 import type { RunPolicy } from './records.js';
 
 /*
@@ -45,6 +45,11 @@ export interface CheckpointRequest {
   readonly scopeProbe?: ResolvedTests | undefined;
   /** The guarded files as the assignment captured them. */
   readonly guarded?: readonly { readonly path: string; readonly hash: string }[] | undefined;
+  /**
+   * The project-relative write scope of the assignment this checkpoint
+   * follows. A failed Ramify check's findings are attributed against it.
+   */
+  readonly writeScope?: readonly string[] | undefined;
   readonly authorizations?: readonly { readonly path: string; readonly by: RecordReference }[] | undefined;
   /** Rules the harness verified over the tree itself, such as a contract gate's fake naming. */
   readonly rules?: readonly GateRuleRecord[] | undefined;
@@ -76,6 +81,7 @@ export async function runCheckpoint(request: CheckpointRequest): Promise<GateAtt
     ...(request.repairRound === undefined ? {} : { repairRound: request.repairRound }),
     ...(request.infrastructureAttempt === undefined ? {} : { infrastructureAttempt: request.infrastructureAttempt }),
     ...(request.guarded === undefined ? {} : { guarded: request.guarded }),
+    ...(request.writeScope === undefined ? {} : { writeScope: request.writeScope }),
     ...(request.authorizations === undefined ? {} : { authorizations: request.authorizations }),
     ...(request.rules === undefined ? {} : { rules: request.rules }),
     limits: {
@@ -180,6 +186,6 @@ export function withCommit(gate: GateAttempt, commit: string | null): GateAttemp
 
 /** The commit the working directory is on, or `''` where git cannot say. */
 export async function currentHead(projectRoot: string): Promise<string> {
-  const run = await runCommand({ argv: ['git', 'rev-parse', 'HEAD'], cwd: projectRoot, env: cleanEnvironment(), timeoutMs: 30_000 });
+  const run = await runCommand({ argv: ['git', 'rev-parse', 'HEAD'], cwd: projectRoot, env: childEnvironment(), timeoutMs: 30_000 });
   return run.outcome.kind === 'completed' && run.outcome.exitCode === 0 ? run.stdout.trim() : '';
 }

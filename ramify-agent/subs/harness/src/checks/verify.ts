@@ -1,6 +1,7 @@
 import { access, stat } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { delimiter, isAbsolute, join } from 'node:path';
+import { checkCommandEnvironment } from './records.js';
 import type { CheckCommand, CheckCommandKind, NotVerified, TestSelection } from './records.js';
 
 /*
@@ -87,7 +88,7 @@ async function isDirectory(path: string): Promise<boolean> {
 async function isExecutable(executable: string, command: CheckCommand): Promise<boolean> {
   const candidates = executable.includes('/')
     ? [isAbsolute(executable) ? executable : join(command.cwd, executable)]
-    : (command.env['PATH'] ?? '').split(delimiter).filter(entry => entry !== '').map(entry => join(entry, executable));
+    : (checkCommandEnvironment(command)['PATH'] ?? '').split(delimiter).filter(entry => entry !== '').map(entry => join(entry, executable));
   for (const candidate of candidates) {
     try {
       await access(candidate, constants.X_OK);

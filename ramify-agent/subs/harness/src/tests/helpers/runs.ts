@@ -5,7 +5,8 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { createScriptedAgent, type Script, type ScriptedAgent } from '../../../subs/agent/src/scripted.js';
-import { cleanEnvironment } from '../../../subs/evidence/src/run-command.js';
+import { childEnvironment } from '../../../subs/evidence/src/run-command.js';
+import { checkCommand } from '../../checks/records.js';
 import { privateRamify, RamifyCli, ramifyExecutable } from '../../../subs/evidence/src/ramify-cli.js';
 import type { InputManifest } from '../../interfaces/protocol/evidence.js';
 import type { RunCommand } from '../../interfaces/protocol/runs.js';
@@ -35,7 +36,7 @@ const identity = ['-c', 'user.name=fixture', '-c', 'user.email=fixture@localhost
 export async function git(root: string, ...args: string[]): Promise<string> {
   const { stdout } = await exec('git', args, {
     cwd: root,
-    env: { ...cleanEnvironment(), GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' },
+    env: childEnvironment({ GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' }),
   });
   return stdout;
 }
@@ -63,7 +64,7 @@ export async function installTestRunner(root: string): Promise<void> {
 
 /** A command that runs for real and answers `code`. */
 export function exits(code: number, cwd: string, timeoutMs = 30_000) {
-  return { argv: [process.execPath, '-e', `process.exit(${code})`], cwd, env: cleanEnvironment(), timeoutMs };
+  return checkCommand({ argv: [process.execPath, '-e', `process.exit(${code})`], cwd, timeoutMs });
 }
 
 /**
@@ -80,7 +81,7 @@ export function exitsAfter(failFrom: number, cwd: string, counter: string, timeo
     'fs.writeFileSync(p, String(n));',
     `process.exit(n >= ${failFrom} ? 1 : 0);`,
   ].join('');
-  return { argv: [process.execPath, '-e', program], cwd, env: cleanEnvironment(), timeoutMs };
+  return checkCommand({ argv: [process.execPath, '-e', program], cwd, timeoutMs });
 }
 
 export interface TestPolicyOptions {
@@ -109,10 +110,10 @@ export function testPolicy(projectRoot: string, options: TestPolicyOptions = {})
   });
   const command = (name: 'allTests' | 'typeCheck' | 'ramifyCheck') => {
     if (options.missingCommand === name) {
-      return { argv: [join(projectRoot, 'no-such-command')], cwd: projectRoot, env: cleanEnvironment(), timeoutMs: 30_000 };
+      return checkCommand({ argv: [join(projectRoot, 'no-such-command')], cwd: projectRoot, timeoutMs: 30_000 });
     }
     if (name === 'allTests' && options.timingOut === 'allTests') {
-      return { argv: [process.execPath, '-e', 'setTimeout(() => undefined, 60000)'], cwd: projectRoot, env: cleanEnvironment(), timeoutMs: 500 };
+      return checkCommand({ argv: [process.execPath, '-e', 'setTimeout(() => undefined, 60000)'], cwd: projectRoot, timeoutMs: 500 });
     }
     if (name === 'allTests' && options.testsFailFrom !== undefined) {
       return exitsAfter(options.testsFailFrom.run, projectRoot, options.testsFailFrom.counter);

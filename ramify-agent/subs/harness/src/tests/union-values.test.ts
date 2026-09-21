@@ -314,7 +314,7 @@ describe('the records this iteration establishes', () => {
 
   test('every hypothesis change, standing and confidence is written and read back', async () => {
     const store = await ledger();
-    expect(hypothesisChangeSchema.options).toEqual(['reuse', 'extend', 'create', 'create-by-extraction']);
+    expect(hypothesisChangeSchema.options).toEqual(['reuse', 'create', 'create-by-extraction']);
     expect(hypothesisSchema.shape.standing.options).toEqual(['tentative', 'confirmed', 'superseded']);
 
     let index = 0;
@@ -325,6 +325,7 @@ describe('the records this iteration establishes', () => {
           const id = `h-${index}`;
           const read = await store.roundTrip(analysisLayout.hypothesis(id, 1), {
             schema: 'ramify-agent.hypothesis/1', id, revision: 1, standing, capability: id, change,
+            changesExistingSymbols: change !== 'reuse',
             suggestedOwner: 'shop/orders', anticipatedConsumers: [], involvedModules: ['shop'],
             dependsOn: [], confidence, rationale: 'r', assumptions: [], uncertainties: [],
             citations: [citation], cause: { initial: 'inv-0001' },
@@ -338,7 +339,7 @@ describe('the records this iteration establishes', () => {
     // which a placement fork produces.
     const fromDecision = await store.roundTrip(analysisLayout.hypothesis('h-decided', 2), {
       schema: 'ramify-agent.hypothesis/1', id: 'h-decided', revision: 2, standing: 'confirmed', capability: 'h-decided',
-      change: 'create', suggestedOwner: 'shop/orders', anticipatedConsumers: [], involvedModules: [],
+      change: 'create', changesExistingSymbols: true, suggestedOwner: 'shop/orders', anticipatedConsumers: [], involvedModules: [],
       dependsOn: [], confidence: 'high', rationale: 'r', assumptions: [], uncertainties: [],
       citations: [], cause: { decision: 'gd-001', reason: 'the fork decided otherwise' }, confirmedBy: 'gd-001',
     }, analysisSchemas.hypothesis);
@@ -579,7 +580,7 @@ describe('the records this iteration establishes', () => {
 
   test('every placement outcome and authority is written and read back', async () => {
     const store = await ledger();
-    expect(placementOutcomeSchema.options).toEqual(['reuse', 'extend', 'create', 'extract', 'external']);
+    expect(placementOutcomeSchema.options).toEqual(['reuse', 'create', 'extract', 'external']);
     expect(decisionAuthoritySchema.options).toEqual(['global', 'local']);
 
     let index = 0;
@@ -595,6 +596,9 @@ describe('the records this iteration establishes', () => {
           question: 'Where does it belong?',
           outcome,
           capability: 'send-email',
+          // An extension is a `create` with an existing owner and this flag,
+          // never an outcome of its own.
+          changesExistingSymbols: outcome === 'create',
           // Null only for `external`, which no module owns.
           owner: outcome === 'external' ? null : 'shop/orders',
           ...(outcome === 'create' || outcome === 'extract'
@@ -847,7 +851,7 @@ describe('the run protocol a client reads', () => {
         type: 'decision-accepted', data: {},
         records: [{ path: 'decisions/gd-001.json', body: {
           schema: 'ramify-agent.placement-decision/1', id: 'gd-001', authority: 'global', request: 'pr-001', workItem: 'wi-001', invocation: 'inv-0003',
-          question: 'Where?', outcome: 'reuse', capability: 'send-email', owner: 'shop', rationale: 'r', constraints: [], uncertainties: [],
+          question: 'Where?', outcome: 'reuse', capability: 'send-email', changesExistingSymbols: false, owner: 'shop', rationale: 'r', constraints: [], uncertainties: [],
           evidence: { view: { status: 'placeholder' }, citations: [], gaps: [] },
           registry: [{ id: 'send-email', revision: 1, hash: hash64 }], hypothesisRevisions: [{ id: 'mail', revision: 2, hash: hash64 }], brief: 'b',
         } }],
