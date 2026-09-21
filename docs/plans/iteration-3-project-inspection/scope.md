@@ -213,7 +213,7 @@ rows are asserted by iteration 10; advisory rows are recorded.
 | `describeOriginals` per exposed original | reference, toolkit | ≤ 1 ms median | advisory |
 | Report bytes with details versus without | reference, toolkit | ≤ +30% | binding from iteration 10 |
 | Largest listing | S1000 | recorded; `maxListedSymbols` default 2,000 | advisory |
-| Daemon heap after 200 inspect answers | reference | plateau within Plan 2's context budget | binding from iteration 10 |
+| Daemon heap after 40 inspect answers | reference | plateau within Plan 2's context budget | binding from iteration 10 |
 
 ### Limits
 

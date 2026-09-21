@@ -2,7 +2,7 @@
 // optimization budget, recorded and never enforced; runtime limits are enforced.
 const MiB = 1024 ** 2;
 export const fastBudgets = {
-  sampleIntervalMs: 50, editCycles: 20, repeatedCycles: 200, settledCycles: 100,
+  sampleIntervalMs: 50, editCycles: 20, repeatedCycles: 40, settledCycles: 30,
   reference: { cold: 1500, body: 25, source: 250, description: 120, readme: 30,
     created: 600, deleted: 600, configuration: 1000, published: 120, racing: 200, signature: 250, companion: 120 },
   S100: { cold: 4000, body: 60, source: 400, description: 500, readme: 60,
@@ -18,7 +18,7 @@ export const fastBudgets = {
   memory: { daemonReference: 96 * MiB, combinedContexts: 1536 * MiB,
     factsReference: 64 * MiB, factsS100: 96 * MiB,
     compilerReference: 192 * MiB, compilerS100: 256 * MiB,
-    rssGrowth: 64 * MiB, heapGrowthBeyondHistory: 16 * MiB },
+    rssGrowth: 19 * MiB, heapGrowthBeyondHistory: 5 * MiB },
   runtime: { contexts: 8, hotContexts: 2, factBytes: 96 * MiB, globalBytes: 512 * MiB,
     historyBytes: 128 * MiB, historyRevisions: 8, workerHeapMiB: 512 },
 };

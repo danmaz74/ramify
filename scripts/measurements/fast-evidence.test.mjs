@@ -108,7 +108,7 @@ function instrumentation(index, disposed = false) {
 }
 
 function plateauProject() {
-  const cycles = Array.from({ length: 200 }, (_, index) => {
+  const cycles = Array.from({ length: fastBudgets.repeatedCycles }, (_, index) => {
     const item = cycle(index);
     item.settled = { pid: 40, memory: { rss: 1024, heapUsed: 512 }, counters: { auditMismatches: 0, analyses: index + 1 },
       instrumentation: instrumentation(index), contexts: [{ level: 'hot', retainedBytes: 1024,
@@ -120,7 +120,7 @@ function plateauProject() {
   });
   return { cycles, telemetry: cycles.map(item => structuredClone(item.settled)), telemetryErrors: [],
     processSamples: cycles.map(item => structuredClone(item.settledProcessSample)),
-    finalInstrumentation: instrumentation(200, true), cleanup: { stopped: true, liveProcesses: [] } };
+    finalInstrumentation: instrumentation(fastBudgets.repeatedCycles, true), cleanup: { stopped: true, liveProcesses: [] } };
 }
 
 function plateaus() { return { reference: plateauProject(), S100: plateauProject() }; }
@@ -384,11 +384,11 @@ test('plateaus account separately for daemon, worker, compiler and combined phys
     assert.equal(assertions.find(value => value.name === name).targetMet, false);
   }
   const missing = plateaus();
-  missing.reference.cycles[120].settledProcessSample.processes.splice(1, 1);
-  missing.reference.cycles[120].settledProcessSample.combinedRssBytes -= 2048;
+  missing.reference.cycles[24].settledProcessSample.processes.splice(1, 1);
+  missing.reference.cycles[24].settledProcessSample.combinedRssBytes -= 2048;
   assert.equal(assertFastWorkload('I5-13:repeated-edit-plateau', missing)
     .find(value => value.name === 'reference: settled process samples identify every daemon, worker and compiler PID exactly once').passed, false);
-  const duplicate = plateaus(), sample = duplicate.reference.cycles[120].settledProcessSample;
+  const duplicate = plateaus(), sample = duplicate.reference.cycles[24].settledProcessSample;
   sample.processes.push({ ...sample.processes[1] }); sample.combinedRssBytes += 2048;
   assert.equal(assertFastWorkload('I5-13:repeated-edit-plateau', duplicate)
     .find(value => value.name === 'reference: settled process samples identify every daemon, worker and compiler PID exactly once').passed, false);
@@ -404,7 +404,7 @@ test('transient telemetry retention violations fail even when every settled cycl
     sample => { sample.contexts = Array.from({ length: 6 }, () => ({ ...structuredClone(sample.contexts[0]),
       retainedBytes: fastBudgets.runtime.factBytes, session: { ...sample.contexts[0].session, factBytes: fastBudgets.runtime.factBytes } })); },
   ]) {
-    const measurements = plateaus(); mutate(measurements.reference.telemetry[70]);
+    const measurements = plateaus(); mutate(measurements.reference.telemetry[14]);
     const assertions = assertFastWorkload('I5-13:repeated-edit-plateau', measurements);
     assert.equal(assertions.find(value => value.name === 'reference: runtime retention throughout telemetry').passed, false);
     assert.ok(assertions.filter(value => /^reference \d+: runtime retention$/.test(value.name)).every(value => value.passed));
@@ -415,18 +415,18 @@ test('plateau lifetime controls reject unbalanced counters, resets, growing hand
   const tied = plateaus();
   // An open/close can fall between two snapshots with the same millisecond.
   // The periodic stream observed it after the settled stream at that instant.
-  for (const sample of [...tied.reference.telemetry.slice(80).map(value => value.instrumentation),
-    ...tied.reference.cycles.slice(81).map(value => value.settled.instrumentation), tied.reference.finalInstrumentation]) {
+  for (const sample of [...tied.reference.telemetry.slice(16).map(value => value.instrumentation),
+    ...tied.reference.cycles.slice(17).map(value => value.settled.instrumentation), tied.reference.finalInstrumentation]) {
     sample.totals.filesOpened = 2; sample.totals.filesClosed = 2;
   }
   passing(assertFastWorkload('I5-13:repeated-edit-plateau', tied));
   for (const [mutate, predicate] of [
-    [data => { data.telemetry[80].instrumentation.totals.compilersStarted++; }, 'reference: lifetime totals balance at every observed checkpoint'],
-    [data => { data.telemetry[80].instrumentation.totals.filesOpened = 0;
-      data.telemetry[80].instrumentation.totals.filesClosed = 0; }, 'reference: lifetime totals never reset'],
-    [data => { data.cycles[180].settled.instrumentation.timers = 4; }, 'reference: watchers, timers and open files stay bounded after settling'],
-    [data => { data.cycles[180].settled.instrumentation.watchers++;
-      data.cycles[180].settled.instrumentation.totals.watchersOpened++; }, 'reference: watchers, timers and open files stay bounded after settling'],
+    [data => { data.telemetry[16].instrumentation.totals.compilersStarted++; }, 'reference: lifetime totals balance at every observed checkpoint'],
+    [data => { data.telemetry[16].instrumentation.totals.filesOpened = 0;
+      data.telemetry[16].instrumentation.totals.filesClosed = 0; }, 'reference: lifetime totals never reset'],
+    [data => { data.cycles[36].settled.instrumentation.timers = 4; }, 'reference: watchers, timers and open files stay bounded after settling'],
+    [data => { data.cycles[36].settled.instrumentation.watchers++;
+      data.cycles[36].settled.instrumentation.totals.watchersOpened++; }, 'reference: watchers, timers and open files stay bounded after settling'],
     [data => { data.finalInstrumentation.activeSessions = 1;
       data.finalInstrumentation.totals.sessionsDisposed = 0; }, 'reference: final instrumentation records released lifetimes'],
   ]) {

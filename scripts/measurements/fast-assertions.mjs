@@ -374,22 +374,22 @@ export function assertFastWorkload(id, measurements) {
   } else if (id === 'I5-13:repeated-edit-plateau') {
     for (const name of ['reference', 'S100']) {
       const data = measurements[name], cycles = data?.cycles;
-      count(`${name}: alternating cycles`, cycles, 200);
+      count(`${name}: alternating cycles`, cycles, budgets.repeatedCycles);
       for (const [index, cycle] of (cycles ?? []).entries()) { completed(`${name} ${index + 1}`, cycle, 0, [], { fixture: name }); retained(`${name} ${index + 1}`, cycle.settled); }
       check(`${name}: exactly two alternating identities`, new Set(cycles?.map(cycle => cycle.revision?.fingerprints?.inputId)).size === 2
         && cycles?.every((cycle, index) => index === 0 || cycle.revision.sequence > cycles[index - 1].revision.sequence
           && cycle.revision.fingerprints.inputId !== cycles[index - 1].revision.fingerprints.inputId), cycles?.length ?? null);
-      const last100 = cycles?.slice(-100) ?? [], first = last100[0]?.settled, last = last100.at(-1)?.settled;
-      count(`${name}: settled plateau samples`, last100, 100);
+      const settled = cycles?.slice(-budgets.settledCycles) ?? [], first = settled[0]?.settled, last = settled.at(-1)?.settled;
+      count(`${name}: settled plateau samples`, settled, budgets.settledCycles);
       const history = sample => sample.contexts.reduce((sum, row) => sum + row.history.bytes, 0);
       const workerHeap = sample => sample.contexts.reduce((sum, row) => sum + row.session.worker.heapUsed, 0);
-      const physical = last100.map(physicalMemory);
+      const physical = settled.map(physicalMemory);
       check(`${name}: settled process samples identify every daemon, worker and compiler PID exactly once`,
-        cycles?.length === 200 && cycles.every(cycle => physicalMemory(cycle) !== null),
+        cycles?.length === budgets.repeatedCycles && cycles.every(cycle => physicalMemory(cycle) !== null),
       { samples: cycles?.length ?? 0, invalid: cycles?.flatMap((cycle, index) => physicalMemory(cycle) === null ? [index + 1] : []).slice(0, 20) ?? [] });
       for (const [role, label] of [['daemon', 'daemon'], ['worker', 'worker supervisor'], ['compiler', 'compiler'], ['combined', 'combined process']]) {
         const values = physical.map(sample => sample?.[role] ?? null);
-        target(`${name}: ${label} RSS growth`, values.length === 100 && values.every(finite)
+        target(`${name}: ${label} RSS growth`, values.length === budgets.settledCycles && values.every(finite)
           ? Math.max(0, values.at(-1) - values[0]) : null, budgets.memory.rssGrowth);
       }
       // Signed growth may be negative after GC; retain it instead of treating a drop as missing evidence.
@@ -398,9 +398,9 @@ export function assertFastWorkload(id, measurements) {
       const compilerRss = physical.map(sample => sample?.compiler ?? null);
       target(`${name}: compiler server RSS`, compilerRss.every(value => finite(value) && value > 0) ? Math.max(...compilerRss) : null,
         name === 'reference' ? budgets.memory.compilerReference : budgets.memory.compilerS100);
-      check(`${name}: one retained session and one compiler`, last100.length > 0 && last100.every(cycle => cycle.settled.contexts.length === 1
+      check(`${name}: one retained session and one compiler`, settled.length > 0 && settled.every(cycle => cycle.settled.contexts.length === 1
         && cycle.settled.contexts[0].session?.level === 'hot' && cycle.settled.contexts[0].session.compiler.pid > 0
-        && cycle.settled.instrumentation.workerCount === 1 && cycle.settled.instrumentation.compilerCount === 1), last100.length);
+        && cycle.settled.instrumentation.workerCount === 1 && cycle.settled.instrumentation.compilerCount === 1), settled.length);
       const checkpoints = [...(data?.telemetry ?? []).map(sample => sample.instrumentation),
         ...(cycles ?? []).map(cycle => cycle.settled?.instrumentation), data?.finalInstrumentation];
       check(`${name}: lifetime totals balance at every observed checkpoint`, checkpoints.length > 1 && checkpoints.every(balanced),
@@ -417,12 +417,12 @@ export function assertFastWorkload(id, measurements) {
         && checkpoints.slice(0, -1).every(sample => finite(data?.finalInstrumentation?.at)
           && data.finalInstrumentation.at >= sample?.at
           && totalFields.every(field => data.finalInstrumentation.totals?.[field] >= sample?.totals?.[field])), checkpoints.length);
-      check(`${name}: watchers, timers and open files stay bounded after settling`, last100.length === 100 && last100.every(cycle => {
+      check(`${name}: watchers, timers and open files stay bounded after settling`, settled.length === budgets.settledCycles && settled.every(cycle => {
         const observed = cycle.settled?.instrumentation, baseline = first?.instrumentation;
         return natural(observed?.watchers) && observed.watchers === baseline?.watchers
           && natural(observed.timers) && natural(baseline?.timers) && observed.timers <= baseline.timers + 1
           && natural(observed.files) && observed.files === baseline.files;
-      }), last100.map(cycle => ({ watchers: cycle.settled?.instrumentation?.watchers,
+      }), settled.map(cycle => ({ watchers: cycle.settled?.instrumentation?.watchers,
         timers: cycle.settled?.instrumentation?.timers, files: cycle.settled?.instrumentation?.files })));
       check(`${name}: final instrumentation records released lifetimes`, balanced(data?.finalInstrumentation)
         && lifetimeFields.every(([, , live]) => data.finalInstrumentation[live] === 0)

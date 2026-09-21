@@ -101,12 +101,12 @@ export function assertResidentWorkload(id, measurements) {
   } else if (suffix === 'repeated-edit-plateau') {
     for (const name of ['reference', 'S100']) {
       const cycles = measurements[name]?.cycles;
-      count(`${name}: 200 alternating edit cycles`, cycles, budgets.plateau.cycles);
+      count(`${name}: ${budgets.plateau.cycles} alternating edit cycles`, cycles, budgets.plateau.cycles);
       check(`${name}: every edit publishes an advancing verified capture`, advances(cycles), cycles?.map(cycle => cycle.revision?.sequence));
       check(`${name}: repeated source/revert uses exactly two captured identities`, new Set(cycles?.map(cycle => cycle.report?.inputId)).size === 2,
         [...new Set(cycles?.map(cycle => cycle.report?.inputId))]);
       const settled = cycles?.slice(-budgets.plateau.settledCycles) ?? [];
-      count(`${name}: last 100 settled observations`, settled, budgets.plateau.settledCycles);
+      count(`${name}: last ${budgets.plateau.settledCycles} settled observations`, settled, budgets.plateau.settledCycles);
       const first = settled[0]?.settled, last = settled.at(-1)?.settled;
       const history = sample => sample?.contexts?.reduce((sum, context) => sum + context.history.bytes, 0);
       target(`${name}: settled RSS growth`, last && first ? last.memory.rss - first.memory.rss : null, budgets.plateau.rssGrowthBytes);

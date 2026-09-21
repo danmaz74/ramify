@@ -174,7 +174,7 @@ the compiled production daemon and the frozen fixture generator. Allow roughly
 still exits 1 because the other required workloads are unmeasured.
 
 The driver measures five independent cold starts and twenty unchanged, README,
-exposure, source and configuration cycles on both the reference and S100; 200
+exposure, source and configuration cycles on both the reference and S100; 40
 alternating source edits on each; eight warm S100 contexts; a non-reading peer
 over ten S100 publications; cold/source checks on S500 and S1000; and publication
 and serialization peaks. Revision paths come from the actual retained session replies.
@@ -279,7 +279,7 @@ while settling. A sweep that begins inside the settle window is maintenance, not
 the hook's work; an update the hook forced, or a request that was not covered,
 fails.
 
-Additional workloads retain 200 alternating body edits on the reference and
+Additional workloads retain 40 alternating body edits on the reference and
 S100, two hot and six warm S100 contexts with active subscriptions, four cold
 opens, and Plan 2's unchanged entry-footprint workloads. The checked-set and cold
 instances reuse those process observations with independent predicates; they do

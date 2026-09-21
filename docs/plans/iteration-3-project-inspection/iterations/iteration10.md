@@ -46,7 +46,7 @@ and the scale fixtures with raw results archived beside Plan 1's and Plan 2's.
    `package.json`, beside `measure:resident`, running the recipe: a warm
    daemon on each fixture, repeated `available` answers at each detail level,
    a batch answer with details, the largest listing on S1000, and a
-   two-hundred-answer heap plateau run on the reference project. It reuses
+   forty-answer heap plateau run on the reference project. It reuses
    `common.mjs`, `identities.mjs`, `repeated.mjs` and `archive.mjs`, sets its
    own `RAMIFY_ENDPOINT_DIR` and stops the daemon it started in `finally`.
 2. Raw results archived under `scripts/measurements/results/` with fixture and

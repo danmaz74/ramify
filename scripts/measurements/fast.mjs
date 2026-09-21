@@ -16,7 +16,7 @@ import { assertFastWorkload, deriveFastMeasurements, fastDeferrals } from './fas
 const args = process.argv.slice(2);
 if (args.length === 1 && args[0] === '--help') {
   process.stdout.write('Usage: npm run measure:fast -- [--output FILE] [--workload all|I5-13-suffix]\n'
-    + 'Twenty edits per class on four fixtures, 200-cycle plateaus, contexts and footprints.\n'
+    + 'Twenty edits per class on four fixtures, 40-cycle plateaus, contexts and footprints.\n'
     + 'Every timing and memory target is an ideal optimization budget: a miss is recorded with its target, enforcement \'ideal\' and targetMet false, and never fails a workload.\n'
     + 'Correctness predicates, runtime limits and missing evidence fail. Partial runs retain missing rows and exit 1.\n');
   process.exit(0);
