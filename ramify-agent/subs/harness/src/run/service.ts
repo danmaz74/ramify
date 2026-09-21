@@ -2,18 +2,16 @@ import { mkdir, readFile, stat } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import type { AgentPort, AgentSession, JsonSchema, SessionSpec, SessionStart } from '../../subs/agent/src/interfaces/port.js';
 import { changedEntries, changedPaths, commitNameStatus, createRunBranch, GitError } from '../../subs/evidence/src/git.js';
-import { cleanEnvironment, runCommand } from '../../subs/evidence/src/run-command.js';
 import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import { coverageLimitsOf, findModule, readArchitectMeta, type ArchitectIndex } from '../../subs/evidence/src/views.js';
 import type { GateAttempt, GateRuleRecord, TestSelectionPolicy } from '../checks/records.js';
 import { resolveTestSelection } from '../checks/selection.js';
 import type { GuardedScope } from '../guard/write-guard.js';
 import { ExcursionWatcher } from './excursions.js';
-import { takeMutationSnapshot } from './mutations.js';
+import { recordSettledSnapshot } from './mutations.js';
 import type { Receipt } from '../interfaces/protocol/jobs.js';
 import type { ViewIdentity } from '../interfaces/protocol/evidence.js';
 import type { Role, RunCommand, RunFailureReason } from '../interfaces/protocol/runs.js';
-import { activityOf } from '../jobs/activity.js';
 import { CommandLedger, CommandRejection } from '../jobs/commands.js';
 import { commitRecord, readCommitted, recoverCommits, type RecordRef as CommitRecord } from '../jobs/commit.js';
 import { Mutex } from '../jobs/mutex.js';
@@ -63,7 +61,7 @@ import type { Hypothesis, RegistryEntry } from '../analysis/records.js';
 import { creationAuthority } from '../work/assignment.js';
 import { engineerEquipment, type EngineerEquipment, type EquipContext, type Equipment } from '../work/engineer-equipment.js';
 import {
-  engineerJsonSchema, engineerToolName, iterationMessage, validateEngineer,
+  engineerJsonSchema, engineerSubmissionDescription, engineerToolName, iterationMessage, validateEngineer,
   type EngineerSubmission, type IterationApiViews,
 } from '../work/engineer.js';
 import {
@@ -76,12 +74,13 @@ import { captureGuardedFiles, checkpointOf, guardedScopeOf, resolveWriteScope, s
 import { committedRecords, refOf } from '../work/committed.js';
 import { capabilityOf, frontierOrder, hypothesesFor } from '../work/frontier.js';
 import { workLayout, workItemId, workItemOutlineSchema, type WorkItem, type WorkItemOutline } from '../work/records.js';
-import { apiViewsOf, onboardingOf, workItemMessage, type DelegationBriefing } from '../work/session.js';
+import { apiViewsOf, iterationApiViews, onboardingOf, workItemMessage, type DelegationBriefing } from '../work/session.js';
 import { localArchitectJsonSchema, localArchitectToolName, validateLocalArchitect, type LocalArchitectSubmission } from '../work/submission.js';
-import { commitForGate, commitMessage, commitsOnPass, runCheckpoint, withCommit } from './gates.js';
+import { commitForGate, commitMessage, commitsOnPass, currentHead, runCheckpoint, withCommit } from './gates.js';
 import { capturePlan, EvidenceUnavailableError, type RunInputs } from './inputs.js';
 import { RunLog, type RunEvent, type RunEventInput, type RunEventOf } from './log.js';
 import { ObservationLog } from './observations.js';
+import { endedOf, InvocationBounds, PortEventRecorder } from './port-events.js';
 import { defaultRunPolicy, discoverNestedPackages } from './policy.js';
 import { failingStep, performRecovery, recoveryFor, runReadiness, withRecovery } from './readiness.js';
 import {
@@ -838,7 +837,6 @@ export class RunService {
       closed: () => (this.ignoring(run) ? 'This run accepts no further submissions.' : undefined),
     });
 
-    const calls = new Map<string, string>();
     // Read boundaries are soft: an excursion into another module is
     // permitted, recorded once, and reminded of once.
     const excursions = new ExcursionWatcher({
@@ -846,20 +844,18 @@ export class RunService {
       index: run.index,
       scope: request.guarded,
     });
+    const context = run.record.policy.context[request.role];
+    const recorder = new PortEventRecorder({ projectRoot: this.projectRoot, observations, judge, excursions, context });
     const equipment: Equipment = request.equip?.({
       invocation: id,
       observations,
-      callId: tool => calls.get(tool) ?? '',
+      callId: tool => recorder.callId(tool),
       reminders: () => excursions.takeReminders(),
     }) ?? {};
 
     // Every port event is activity; `touch` is what the idle bound resets.
-    let touch: () => void = () => undefined;
-    const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 };
-    let usageSeen = false;
-    let contextSeen = false;
+    const bounds = new InvocationBounds(run.record.policy.limits);
     let budget: InvocationOutcome['budget'] | undefined;
-    const context = run.record.policy.context[request.role];
 
     const spec: SessionSpec = {
       role: request.role,
@@ -880,46 +876,9 @@ export class RunService {
       },
       sessionDirectory: run.path(runLayout.session(id)),
       onEvent: event => {
-        touch();
-        void (async () => {
-          if (event.type === 'message' && event.usage) {
-            usageSeen = true;
-            for (const part of ['input', 'output', 'cacheRead', 'cacheWrite', 'total'] as const) usage[part] += event.usage[part];
-          }
-          if (event.type === 'tool-started') calls.set(event.tool, event.callId);
-          if (event.type === 'context-observed') {
-            contextSeen = true;
-            await observations.record({
-              type: 'context',
-              data: { tokens: event.tokens, window: event.window, threshold: context.budgetTokens },
-            });
-          } else if (event.type === 'compaction' && event.phase === 'ended') {
-            await observations.record({
-              type: 'compaction',
-              data: {
-                trigger: event.reason === 'manual' ? 'explicit' : event.reason,
-                succeeded: event.aborted !== true,
-                before: event.tokensBefore ?? null,
-                after: event.tokensAfter ?? null,
-              },
-            });
-          } else if (event.type === 'tool-finished' && !event.reachedTool) {
-            // The implementation rejected the input before the tool ran. It
-            // counts toward the same bound, and no message text is read.
-            await judge.countImplementationRejection(event.callId, event.tool, event.errorText ?? 'the input was rejected before the tool ran');
-          }
-          const activity = activityOf(event, this.projectRoot, this.projectRoot);
-          if (activity) await observations.record({ type: 'activity', data: { activity } });
-          if (activity?.kind === 'read') {
-            const excursion = excursions.observe(activity.path);
-            if (excursion !== null) {
-              await observations.record({
-                type: 'excursion',
-                data: { callId: activity.callId, module: excursion.module, firstEntry: excursion.firstEntry },
-              });
-            }
-          }
-        })().catch(error => this.warn(`Run ${run.record.jobId}: observation not recorded: ${message(error)}`));
+        bounds.touch();
+        void recorder.record(event)
+          .catch(error => this.warn(`Run ${run.record.jobId}: observation not recorded: ${message(error)}`));
       },
     };
 
@@ -937,61 +896,14 @@ export class RunService {
     }
     run.session = agentSession;
 
-    // The policy's two bounds on one invocation: no port event for
-    // `invocationIdleMs`, and `invocationAbsoluteMs` in all. Either asks the
-    // session to stop and ends the invocation as failed with the bound as
-    // its interruption. A session that does not stop is waited for no longer
-    // than `writerSettleMs`; settlement below is what then says whether it
-    // is gone.
+    // The policy's two bounds on one invocation. Either asks the session to
+    // stop and ends the invocation as failed with the bound as its
+    // interruption; settlement below is what then says whether it is gone.
     const limits = run.record.policy.limits;
-    let interruption: 'idle-timeout' | 'absolute-timeout' | undefined;
-    let expired: () => void = () => undefined;
-    const expiry = new Promise<void>(resolve => { expired = resolve; });
-    const expire = (bound: 'idle-timeout' | 'absolute-timeout') => {
-      if (interruption !== undefined) return;
-      interruption = bound;
-      void agentSession.stop().catch(() => undefined);
-      expired();
-    };
-    let idleTimer: NodeJS.Timeout | undefined;
-    touch = () => {
-      clearTimeout(idleTimer);
-      idleTimer = setTimeout(() => expire('idle-timeout'), limits.invocationIdleMs);
-    };
-    touch();
-    const absoluteTimer = setTimeout(() => expire('absolute-timeout'), limits.invocationAbsoluteMs);
-    let outcome: Awaited<AgentSession['outcome']>;
-    try {
-      outcome = await Promise.race([
-        agentSession.outcome,
-        expiry.then(() => delay(limits.writerSettleMs)).then(() => ({ kind: 'stopped' as const })),
-      ]);
-    } finally {
-      touch = () => undefined;
-      clearTimeout(idleTimer);
-      clearTimeout(absoluteTimer);
-    }
+    const outcome = await bounds.outcome(agentSession);
+    const interruption = bounds.interruption;
     const elapsedMs = Date.now() - started;
-    if (!contextSeen) {
-      await observations.record({
-        type: 'coverage-gap',
-        data: {
-          kind: 'context-unavailable',
-          detail: agent.observations.context.available
-            ? 'the session reported no context size at all, so no threshold could fire'
-            : agent.observations.context.reason,
-        },
-      });
-    }
-    if (!usageSeen) {
-      await observations.record({
-        type: 'coverage-gap',
-        data: {
-          kind: 'usage-unavailable',
-          detail: agent.observations.usage.available ? 'the session reported no usage' : agent.observations.usage.reason,
-        },
-      });
-    }
+    await recorder.recordGaps(agent);
     if (outcome.kind === 'context-budget-reached') {
       budget = { threshold: context.budgetTokens ?? 0, observed: outcome.tokens, reportDelivered: outcome.report !== undefined };
     }
@@ -1011,34 +923,12 @@ export class RunService {
     // the scope is what fills `outsideScope`. Nothing here blocks anything.
     let outsideScope: string[] = [];
     if (request.writer === true) {
-      const snapshot = await takeMutationSnapshot({
+      const snapshot = await recordSettledSnapshot({
         projectRoot: this.projectRoot,
         changed: () => changedPaths(this.projectRoot),
         scope: request.guarded,
-      });
-      if (snapshot.failure !== null) {
-        await observations.record({
-          type: 'coverage-gap',
-          data: { kind: 'changed-paths-unknown', detail: `the tree could not be read when the writer settled (${snapshot.failure})` },
-        });
-      } else {
-        outsideScope = [...snapshot.outsideScope];
-        await observations.record({
-          type: 'mutation',
-          data: {
-            callId: null,
-            paths: [...snapshot.paths],
-            added: null,
-            deleted: null,
-            observedBy: 'snapshot',
-            toolFailed: false,
-            // The snapshot covers everything since the last accepted commit,
-            // which may include an earlier session of the same iteration, so
-            // it is not one call's doing.
-            attributable: false,
-          },
-        });
-      }
+      }, observations);
+      outsideScope = [...snapshot.outsideScope];
     }
 
     const ended = interruption !== undefined ? 'failed' : request.endedAs?.() ?? endedOf(outcome.kind, judge.boundReached);
@@ -1064,7 +954,7 @@ export class RunService {
       ...(budget === undefined ? {} : { budget }),
       settled,
       outsideScope,
-      usage: usageSeen ? usage : { unavailable: agent.observations.usage.available ? 'the session reported no usage' : agent.observations.usage.reason },
+      usage: recorder.outcomeUsage(agent),
       elapsedMs,
       ...(outcome.kind === 'failed' && interruption === undefined ? { error: outcome.error } : {}),
     });
@@ -2375,7 +2265,7 @@ export class RunService {
         start,
         ...(degraded === undefined ? {} : { degraded }),
         toolName: engineerToolName,
-        description: 'End your turn with the result of this iteration. The harness validates it; an invalid submission is returned with every error and its path, and a valid one ends this invocation.',
+        description: engineerSubmissionDescription,
         inputSchema: engineerJsonSchema,
         submissionSchema: 'ramify-agent.engineer-submission/1',
         validate: input => validateEngineer(input, {
@@ -3657,17 +3547,7 @@ export class RunService {
   private async iterationViews(run: Run, assignment: IterationAssignment): Promise<IterationApiViews[]> {
     const base = assignment.scope.base;
     const modules = 'module' in base ? [base.module, ...base.includedChildren] : [...base.modules];
-    const entries: IterationApiViews[] = [];
-    for (const module of modules) {
-      const result = await apiViewsOf(this.options.ramify, this.projectRoot, run.index, module)
-        .catch(error => ({ evidence: null, unavailable: `the API view could not be read: ${message(error)}` }));
-      entries.push({
-        module,
-        views: result.evidence === null ? [] : result.evidence.views.map(view => ({ area: view.area, path: view.path, coverage: view.coverage })),
-        unavailable: result.unavailable,
-      });
-    }
-    return entries;
+    return iterationApiViews(this.options.ramify, this.projectRoot, run.index, modules);
   }
 
   /**
@@ -4152,14 +4032,6 @@ function requestedSession<T>(request: InvocationRequest<T>): Invocation['session
   return { requested: 'fresh', actual: 'fresh', ref: '' };
 }
 
-function endedOf(kind: string, boundReached: boolean): InvocationOutcome['ended'] {
-  if (kind === 'submitted') return 'submitted';
-  if (kind === 'context-budget-reached') return 'context-budget-reached';
-  if (kind === 'failed') return 'failed';
-  if (kind === 'stopped') return 'stopped';
-  return boundReached ? 'invalid-submission' : 'ended';
-}
-
 function analysisFailure(ended: InvocationOutcome['ended'], kind: string): string {
   switch (ended) {
     case 'invalid-submission': return 'Every allowed submission of the initial analysis was invalid';
@@ -4211,11 +4083,6 @@ function analysisMessage(record: RunRecord, plan: string): string {
 }
 
 /** The commit the working directory is on, or the empty string outside git. */
-async function currentHead(projectRoot: string): Promise<string> {
-  const run = await runCommand({ argv: ['git', 'rev-parse', 'HEAD'], cwd: projectRoot, env: cleanEnvironment(), timeoutMs: 30_000 });
-  return run.outcome.kind === 'completed' && run.outcome.exitCode === 0 ? run.stdout.trim() : '';
-}
-
 async function writeOnce(path: string, content: string | Uint8Array): Promise<void> {
   await mkdir(join(path, '..'), { recursive: true });
   if (await writeFileExclusive(path, content) === 'exists') {

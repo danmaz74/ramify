@@ -2,6 +2,7 @@ import { allProjectChecks, checkpointPolicies, scopedChecks, type CheckpointPoli
 import { runGate } from '../checks/gate.js';
 import type { Checkpoint, GateAttempt, GateRuleRecord, RecordReference } from '../checks/records.js';
 import { commitAccepted, findCommitByTrailer } from '../../subs/evidence/src/git.js';
+import { cleanEnvironment, runCommand } from '../../subs/evidence/src/run-command.js';
 import type { RunPolicy } from './records.js';
 
 /*
@@ -175,4 +176,10 @@ function selectionOf(command: GateAttempt['commands'][number]): string {
 /** The same attempt, naming the commit the effect made. Records are immutable: this one is written once, here. */
 export function withCommit(gate: GateAttempt, commit: string | null): GateAttempt {
   return { ...gate, commit };
+}
+
+/** The commit the working directory is on, or `''` where git cannot say. */
+export async function currentHead(projectRoot: string): Promise<string> {
+  const run = await runCommand({ argv: ['git', 'rev-parse', 'HEAD'], cwd: projectRoot, env: cleanEnvironment(), timeoutMs: 30_000 });
+  return run.outcome.kind === 'completed' && run.outcome.exitCode === 0 ? run.stdout.trim() : '';
 }

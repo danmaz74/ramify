@@ -5,6 +5,7 @@ import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import type { ApiViewEvidence } from '../interfaces/protocol/jobs.js';
 import type { RegistryEntry, Hypothesis } from '../analysis/records.js';
 import type { PlacementDecision } from '../architecture/records.js';
+import type { IterationApiViews } from './engineer.js';
 import type { WorkItem, WorkItemOutline } from './records.js';
 
 /*
@@ -73,6 +74,29 @@ export async function apiViewsOf(
   }
   if (views.length === 0) return { evidence: null, unavailable: `"${module}" has no source area with an API view` };
   return { evidence: { module, views }, unavailable: null };
+}
+
+/**
+ * The API views of the modules one implementation session writes, for its
+ * briefing: each module's views, or why it has none.
+ */
+export async function iterationApiViews(
+  ramify: RamifyCli,
+  projectRoot: string,
+  index: ArchitectIndex | null,
+  modules: readonly string[],
+): Promise<IterationApiViews[]> {
+  const entries: IterationApiViews[] = [];
+  for (const module of modules) {
+    const result = await apiViewsOf(ramify, projectRoot, index, module)
+      .catch(error => ({ evidence: null, unavailable: `the API view could not be read: ${error instanceof Error ? error.message : String(error)}` }));
+    entries.push({
+      module,
+      views: result.evidence === null ? [] : result.evidence.views.map(view => ({ area: view.area, path: view.path, coverage: view.coverage })),
+      unavailable: result.unavailable,
+    });
+  }
+  return entries;
 }
 
 export interface WorkItemBriefing {

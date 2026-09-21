@@ -266,7 +266,7 @@ export function createScriptedAgent(script: Script, options: ScriptedAgentOption
               spec.onEvent({ type: 'tool-started', callId, tool: spec.submission.name, input: step.input, mutating: false });
               const verdict = await spec.submission.accept(step.input, controller.signal);
               record.verdicts.push(verdict);
-              const text = verdict.accepted ? 'The submission was accepted.' : verdict.errors.join('\n');
+              const text = verdict.accepted ? verdict.text ?? 'The submission was accepted.' : verdict.errors.join('\n');
               finish(spec, record, { callId, tool: spec.submission.name, text, isError: !verdict.accepted }, true);
               if (verdict.accepted) return { kind: 'submitted', input: step.input };
               if ('final' in verdict) return { kind: 'ended', message: verdict.errors.join('\n') };

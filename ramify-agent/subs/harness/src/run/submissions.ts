@@ -79,6 +79,8 @@ export interface SubmissionJudgeOptions<T> {
   /** Applied only to an accepted input, and only once. */
   readonly accept: AcceptInput<T>;
   readonly observations: ObservationLog;
+  /** What the agent is told when its input is accepted; without it the implementation's own acknowledgement is used. */
+  readonly acceptedText?: ((value: T) => string) | undefined;
   /** Refuses further inputs, such as after a stop; its text is the final answer. */
   readonly closed?: (() => string | undefined) | undefined;
 }
@@ -145,7 +147,8 @@ export class SubmissionJudge<T> {
     if (result.ok) {
       await this.options.accept(result.value);
       this.accepted = true;
-      return { accepted: true };
+      const text = this.options.acceptedText?.(result.value);
+      return text === undefined ? { accepted: true } : { accepted: true, text };
     }
 
     this.rejectionCount += 1;

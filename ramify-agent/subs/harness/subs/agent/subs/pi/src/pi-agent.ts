@@ -490,7 +490,7 @@ function submissionTool(tool: SubmissionTool, hooks: {
       const verdict = await tool.accept(unwrapped, signal ?? new AbortController().signal);
       if (verdict.accepted) {
         hooks.onAccepted(unwrapped);
-        return { content: [{ type: 'text', text: 'The submission was accepted. Your work is complete.' }], details: {}, terminate: true };
+        return { content: [{ type: 'text', text: verdict.text ?? 'The submission was accepted. Your work is complete.' }], details: {}, terminate: true };
       }
       const text = `The submission was rejected:\n${verdict.errors.map(error => `- ${error}`).join('\n')}`;
       if ('final' in verdict) {

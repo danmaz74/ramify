@@ -92,6 +92,9 @@ export const engineerJsonSchema = z.toJSONSchema(engineerSubmissionSchema) as Js
 
 export const engineerToolName = 'submit_iteration_result';
 
+/** What the submission tool tells the engineer about itself. */
+export const engineerSubmissionDescription = 'End your turn with the result of this iteration. The harness validates it; an invalid submission is returned with every error and its path, and a valid one ends this invocation.';
+
 /** A line that would be read as one of the trailers the harness writes itself. */
 const trailerLine = /^\s*Ramify-[A-Za-z-]*\s*:/m;
 

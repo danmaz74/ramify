@@ -1,6 +1,7 @@
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { isContained } from '../guard/resolve-contained-path.js';
 import type { GuardedScope } from '../guard/write-guard.js';
+import type { ObservationLog } from './observations.js';
 
 /*
  * What a writer changed, as the tree reports it.
@@ -73,4 +74,37 @@ export function outsideScope(projectRoot: string, scope: GuardedScope, paths: re
 export function toRelative(projectRoot: string, path: string): string {
   const inside = relative(projectRoot, isAbsolute(path) ? path : resolve(projectRoot, path));
   return inside.split(sep).join('/');
+}
+
+/**
+ * Takes the snapshot one settled writer leaves and records it: the changed
+ * paths as a `mutation` observed by the snapshot, or the gap when the tree
+ * could not be read. It is the only observation that sees a write no guard
+ * saw, and nothing here blocks anything.
+ */
+export async function recordSettledSnapshot(request: SnapshotRequest, observations: ObservationLog): Promise<MutationSnapshot> {
+  const snapshot = await takeMutationSnapshot(request);
+  if (snapshot.failure !== null) {
+    await observations.record({
+      type: 'coverage-gap',
+      data: { kind: 'changed-paths-unknown', detail: `the tree could not be read when the writer settled (${snapshot.failure})` },
+    });
+    return snapshot;
+  }
+  await observations.record({
+    type: 'mutation',
+    data: {
+      callId: null,
+      paths: [...snapshot.paths],
+      added: null,
+      deleted: null,
+      observedBy: 'snapshot',
+      toolFailed: false,
+      // The snapshot covers everything since the last accepted commit,
+      // which may include an earlier session of the same work, so it is
+      // not one call's doing.
+      attributable: false,
+    },
+  });
+  return snapshot;
 }

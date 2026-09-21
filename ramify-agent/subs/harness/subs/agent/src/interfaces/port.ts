@@ -134,7 +134,8 @@ export interface ToolDefinition {
 
 /** The harness's verdict on one submission. */
 export type SubmissionVerdict =
-  | { readonly accepted: true }
+  /** `text` is what the agent is told; without it the implementation's own acknowledgement is used. */
+  | { readonly accepted: true; readonly text?: string | undefined }
   /** The errors go back to the same session as an error tool result; the session continues. */
   | { readonly accepted: false; readonly errors: readonly string[] }
   /** The session must end without a result, for example because the job was stopped or the bound was reached. */
