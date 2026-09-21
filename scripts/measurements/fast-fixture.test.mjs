@@ -15,7 +15,7 @@ async function setup(name, run) {
   const files = name === 'reference' ? {
     'src/assembly.ts': "export type AppRouter = ReturnType<typeof assembleRouter>;\nexport function build() { return { ready: true }; }\n",
     'subs/workspace/README.md': 'Workspace is the browser shell.\n\nFixture documentation.\n',
-    'subs/workspace/module.ramify': 'expose-sub createCatalogRouter, createCatalogTools, inspectRecord from catalog to parent\n',
+    'subs/workspace/module.ramify': 'expose-sub createCatalogRouter, CatalogProcedures, createCatalogTools, inspectRecord from catalog to parent\n',
     'module.ramify': 'expose-src McpToolContribution, ToolInputSchema, ToolResult from "interfaces/protocol.ts" to descendants\n',
     'subs/workspace/subs/reviews/subs/core/subs/tasks/src/result.ts':
       'export function summarizeTaskResult(result: InspectionTaskResult): TaskSummary { return result; }\n',

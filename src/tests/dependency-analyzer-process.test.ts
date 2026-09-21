@@ -72,7 +72,7 @@ describe('dependency analyzer process runner', () => {
     if (outcome.status !== 'ready') throw new Error(`Expected a ready outcome: ${JSON.stringify(outcome)}`);
     expect(outcome.behaviorRuns).toBe(1);
     expect(outcome.diagram.inputId).toBe(report.inputId);
-    expect(outcome.diagram.headline).toEqual({ behavioralDependencies: 17, nonBehavioralDependencies: 48 });
+    expect(outcome.diagram.headline).toEqual({ behavioralDependencies: 17, nonBehavioralDependencies: 58 });
     await exited([analyzer, helper], settled);
     const direct = await analyzeDependencyDiagram({ project, report,
       limits: { source: limits.source, maxResultBytes: dependencyAnalyzerCapacity.maxResultBytes, deadlineMs: dependencyAnalyzerCapacity.deadlineMs } });

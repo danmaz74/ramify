@@ -10,19 +10,22 @@ export interface TextMutation {
   readonly after: string;
 }
 
-const w2 = 'expose-sub createCatalogRouter, createCatalogTools, inspectRecord from catalog to parent';
+const w2 = 'expose-sub createCatalogRouter, CatalogProcedures, createCatalogTools, inspectRecord from catalog to parent';
 const k1 = 'expose-src getRecord, inspect, CatalogSummary from "catalog.ts" to parent';
 const callback = 'export type ObservationCallback = (observation: Observation) => void;';
 
 /** Authored causes only. Returned paths are edit hints, never driver evidence. */
 export const residentTextMutations = {
   'remove-hop': { path: workspaceDescription, before: w2,
-    after: 'expose-sub createCatalogTools, inspectRecord from catalog to parent' },
+    after: 'expose-sub CatalogProcedures, createCatalogTools, inspectRecord from catalog to parent' },
   'tag-change': { path: coreDescription, before: '\nmodule core\n', after: '\nmodule core tagged [ui]\n' },
   'wildcard-add': { path: vocabulary, before: callback,
     after: `${callback}\nexport interface ResidentVocabulary { readonly revision: number }` },
-  'wildcard-remove': { path: vocabulary, before: 'export type RecordId = z.infer<typeof recordIdSchema>;',
-    after: 'type RecordId = z.infer<typeof recordIdSchema>;' },
+  // RecordId is named by the root's R4 exposure (Plan 8 iteration 7), so removing
+  // it would invalidate that description; RevisionChain is selected by the
+  // wildcards alone and still imported by the catalog core.
+  'wildcard-remove': { path: vocabulary, before: 'export type RevisionChain = z.infer<typeof revisionChainSchema>;',
+    after: 'type RevisionChain = z.infer<typeof revisionChainSchema>;' },
   'foreign-wildcard-invalid': { path: vocabulary, before: callback,
     after: `${callback}\nexport { inspect } from '../../../catalog/subs/core/src/catalog.js';` },
   'type-to-runtime-merge': { path: providerApi, before: 'export interface Type { readonly value: number }',

@@ -14,8 +14,8 @@ import type { CommandResult } from './processes.js';
 import type { InstanceHandler, ProjectContext } from './runner.js';
 
 const referencePath = 'examples/collection-review';
-const relay = 'expose-sub createCatalogRouter, createCatalogTools, inspectRecord from catalog to parent';
-const withoutRouter = 'expose-sub createCatalogTools, inspectRecord from catalog to parent';
+const relay = 'expose-sub createCatalogRouter, CatalogProcedures, createCatalogTools, inspectRecord from catalog to parent';
+const withoutRouter = 'expose-sub CatalogProcedures, createCatalogTools, inspectRecord from catalog to parent';
 const entryFunctions = {
   'ramify.ts': 'createAnalysisSession', 'ramify.ts/analysis': 'analyzeProject',
   'ramify.ts/analysis/inventory': 'acquireInventory', 'ramify.ts/model': 'createDefaultTagRegistry',

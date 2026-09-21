@@ -735,8 +735,8 @@ const seeds: readonly InstanceSeed[] = [
   ],
   [
     "I1-09:signature-only-type", 7, ["E07"], "catalog, link", "R",
-    "Observe `ToolInputSchema` and `ToolResult` in root protocol.ts signatures while R1 selects its four authored exports only.",
-    "Both private originals remain unexposed; McpToolContribution's signature does not expose them.",
+    "Observe `ToolInputSchema` and `ToolResult` in root protocol.ts signatures while R1 selects its four authored exports only. **Amended 2026-09-21 (Plan 8):** remove `ToolInputSchema` and `ToolResult` from R1, restoring its four-name statement from before Plan 8, and run the check.",
+    "Both private originals remain unexposed; McpToolContribution's signature does not expose them. **Amended 2026-09-21 (Plan 8):** linking still leaves both as unexposed private originals and R1 selects exactly its four authored names, with a valid description: nothing is exposed automatically. The check reports exactly two `exposed-without-companion` findings at R1, one per missing type, each naming `McpToolContribution`, the descendants destination and the signature position; it exits 1 with a completed execution.",
     null,
     null,
   ],

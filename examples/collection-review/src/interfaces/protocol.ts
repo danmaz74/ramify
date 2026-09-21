@@ -2,7 +2,7 @@
 // `ProtocolFacilities` names no binding of this owner's runtime files. The
 // assembly passes what `createFacilities` returns wherever this type is
 // expected, so the two cannot drift. Nothing is imported at runtime.
-import type { initTRPC } from '@trpc/server';
+import type { initTRPC, TRPCBuiltRouter, TRPCDefaultErrorShape, TRPCRouterRecord } from '@trpc/server';
 
 /**
  * The neutral protocol vocabulary the application root shares with its
@@ -18,9 +18,10 @@ import type { initTRPC } from '@trpc/server';
  *
  * This is a same-owner alias rather than a new binding: the original stays in
  * `assembly.ts`, owned here and carrying this owner's `dispatch` tag. The
- * router's type is inferred from the function that composes it, so that
- * function travels with the type as its signature companion. The rest of the
- * assembly stays private. A descendant that receives the router type imports
+ * router's type is the declared return type of the function that composes it,
+ * so that function travels with the type as its signature companion, and the
+ * feature procedure records its return type names travel with both. The rest
+ * of the assembly stays private. A descendant that receives the router type imports
  * it from this file, which is the only file the root exposes it from.
  *
  * `export type` erases the statement entirely, so nothing of the assembly's
@@ -48,6 +49,18 @@ export interface InvocationContext {
 export type ProtocolFacilities = Pick<
   ReturnType<ReturnType<typeof initTRPC.context<InvocationContext>>['create']>,
   'procedure' | 'router'
+>;
+
+/**
+ * A router built by `ProtocolFacilities['router']`, written out: the runtime's
+ * root types and the procedures the router mounts. A feature factory declares
+ * its router as this type over its own procedure record, so the procedures'
+ * input and output types are part of the factory's stated contract rather
+ * than left to inference.
+ */
+export type ProtocolRouter<TRecord extends TRPCRouterRecord> = TRPCBuiltRouter<
+  { ctx: InvocationContext; meta: object; errorShape: TRPCDefaultErrorShape; transformer: false },
+  TRecord
 >;
 
 /** The request identity an MCP tool receives, taken from its request context. */

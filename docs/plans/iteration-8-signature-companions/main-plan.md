@@ -11,8 +11,11 @@ by object identity and shares one frozen model between the linked layer, the
 model and the decisions, with byte-identical output; SC23 then passes on every
 row and SC25's `factBytes` passes under that metric, while the serialized size
 still grows 13 to 20 percent. SC24's description stage remains over budget.
-SC26's Plan 1 gate fails on harness pins of the pre-plan reference example,
-left for decision. This plan adds one enforced rule to the model: a module that
+SC26's Plan 1 gate still fails. [Iteration 7](iterations/iteration7-results.md)
+cleared the reference example's pins by declaring its inferred signatures, so
+274 of 308 instances pass. Of the 34 failures, 30 come from fixture F's
+literal constant `value`, 2 from the toolkit's own `signature-inferred` notes,
+and 2 predate the plan; they are left for decision. This plan adds one enforced rule to the model: a module that
 exposes a symbol must also make the project symbols named in that symbol's
 declared signature type-available wherever the exposure makes the symbol
 visible. Ramify reports the missing exposure; it never supplies it. The plan

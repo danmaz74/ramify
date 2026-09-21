@@ -106,7 +106,10 @@ owner keeps its tests in `src/tests/`.
 
 `workspace` is the browser shell and the tree's relay point: feature adapters
 travel through it to the root, and shared vocabulary travels through it down to
-every descendant and up to the root. The two owners named `ui` declare `module "ui"`, because `ui`
+every descendant and up to the root. The router type the root exposes to its
+descendants is declared, not inferred: each feature factory states its
+procedure record in the shared vocabulary, and the root exposes those records,
+with the vocabulary they name, beside it. The two owners named `ui` declare `module "ui"`, because `ui`
 is a reserved keyword; their identifiers are still `workspace/catalog/ui` and
 `workspace/reviews/ui`.
 

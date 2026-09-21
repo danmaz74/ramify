@@ -45,9 +45,9 @@ export async function fastFixture(scratch, templates, name, suffix) {
     source: [source, originals.get(source), originals.get(source)
       + (exposing ? '\nexport const fastMeasurementExport: number = 1;\n' : '\nexport const fastMeasurementExport = 1;\n')],
     description: [description, reference
-      ? 'expose-sub createCatalogRouter, createCatalogTools, inspectRecord from catalog to parent'
+      ? 'expose-sub createCatalogRouter, CatalogProcedures, createCatalogTools, inspectRecord from catalog to parent'
       : 'expose-src value from "interfaces/api.ts" to parent', reference
-      ? 'expose-sub createCatalogTools, inspectRecord from catalog to parent'
+      ? 'expose-sub CatalogProcedures, createCatalogTools, inspectRecord from catalog to parent'
       : '// measurement exposure removed'],
     readme: [readme, originals.get(readme), originals.get(readme).replace(/\n\n/, '\n\nMeasured purpose. ')],
     configuration: ['tsconfig.json', '"target": "ES2022"', '"target": "ES2021"'],

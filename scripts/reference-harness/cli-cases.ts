@@ -136,8 +136,8 @@ for (const variant of ['help', 'version']) handlers.set(`I1-26:help-version/${va
 
 for (const kind of ['clean', 'denied', 'invalid'] as const) for (const format of ['human', 'json'] as const) {
   add(`I1-28:compiled-cli-${kind}/${format}`, 'R', kind === 'clean' ? unchanged : ({ root }) => kind === 'denied'
-    ? replaceExactlyOnce(join(root, 'subs/workspace/module.ramify'), 'expose-sub createCatalogRouter, createCatalogTools, inspectRecord from catalog to parent',
-      'expose-sub createCatalogTools, inspectRecord from catalog to parent')
+    ? replaceExactlyOnce(join(root, 'subs/workspace/module.ramify'), 'expose-sub createCatalogRouter, CatalogProcedures, createCatalogTools, inspectRecord from catalog to parent',
+      'expose-sub CatalogProcedures, createCatalogTools, inspectRecord from catalog to parent')
     : replaceExactlyOnce(join(root, 'subs/workspace/subs/contracts/module.ramify'), 'from "interfaces/vocabulary.ts"', 'from "interfaces/missing.ts"'), async context => {
     if (kind === 'denied') await compilerValid(context.root, context.assertions);
     const expected = await sessionReport(context.root);

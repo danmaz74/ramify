@@ -49,7 +49,7 @@ const reviews = 'workspace/reviews';
 const runtime = `${reviews}/core`;
 const k1 = bindings(core, 'catalog.ts', ['getRecord', 'inspect', 'CatalogSummary']);
 const fixture = bindings(core, 'tests/fixture.ts', ['makeCatalogFixture', 'CatalogFixtureRecord'], ['testing']);
-const router = bindings(catalog, 'router.ts', ['createCatalogRouter'], ['dispatch']);
+const router = bindings(catalog, 'router.ts', ['createCatalogRouter', 'CatalogProcedures'], ['dispatch']);
 const tools = bindings(catalog, 'mcp.ts', ['createCatalogTools'], ['dispatch']);
 const inspect: Binding[] = [['inspectRecord', code(core, 'catalog.ts', 'inspect'), []]];
 const card = bindings(`${catalog}/ui`, 'catalog-card.tsx', ['CatalogCard', 'CatalogCardProps'], ['ui', 'browser']);
@@ -57,12 +57,12 @@ const validation = bindings(`${reviews}/validation`, 'validate.ts', ['validateRe
 const task = bindings(`${runtime}/tasks`, 'inspection-task.ts', ['runInspectionTask', 'InspectionTaskInput', 'InspectionTaskResult']);
 const summary = bindings(`${runtime}/tasks`, 'result.ts', ['summarizeTaskResult', 'TaskSummary']);
 const port = bindings(runtime, 'interfaces/port.ts', ['InspectionPort']);
-const reviewRouter = bindings(reviews, 'router.ts', ['createReviewsRouter'], ['dispatch']);
+const reviewRouter = bindings(reviews, 'router.ts', ['createReviewsRouter', 'ReviewsProcedures'], ['dispatch']);
 const reviewTools = bindings(reviews, 'mcp.ts', ['createReviewsTools'], ['dispatch']);
 const panel = bindings(`${reviews}/ui`, 'review-panel.tsx', ['ReviewPanel', 'ReviewPanelProps'], ['ui', 'dispatch', 'browser']);
 const badge = bindings('workspace/shared-ui', 'status-badge.tsx', ['StatusBadge', 'StatusBadgeProps'], ['ui', 'browser']);
 
-// All 33 statements, independently transcribed from the reviewed contract map.
+// All 34 statements, independently transcribed from the reviewed contract map.
 // Statement indexes are their actual authored order; expectations are never read
 // from descriptions or calculated with the permission model under test.
 export const referenceContracts: readonly (readonly [id: string, owner: string, index: number, provider: string,
@@ -71,7 +71,12 @@ export const referenceContracts: readonly (readonly [id: string, owner: string, 
   ['W1', 'workspace', 0, 'contracts', 'expose-sub', 'wildcard', ['parent', 'descendants'], vocab],
   ['R1', '', 0, 'interfaces/protocol.ts', 'expose-src', 'named', ['descendants'], rootTypes],
   ['R2', '', 1, 'setup.ts', 'expose-test', 'named', ['descendants'], setup],
-  ['R3', '', 2, 'interfaces/protocol.ts', 'expose-src', 'named', ['descendants'], bindings('', 'assembly.ts', ['AppRouter', 'assembleRouter'], ['dispatch'])],
+  ['R3', '', 2, 'interfaces/protocol.ts', 'expose-src', 'named', ['descendants'], [...bindings('', 'assembly.ts', ['AppRouter', 'assembleRouter'], ['dispatch']),
+    ...bindings('', 'interfaces/protocol.ts', ['ProtocolRouter'], ['dispatch'])]],
+  ['R4', '', 3, 'workspace', 'expose-sub', 'named', ['descendants'], [...bindings(catalog, 'router.ts', ['CatalogProcedures'], ['dispatch']),
+    ...bindings(reviews, 'router.ts', ['ReviewsProcedures'], ['dispatch']), ...bindings('workspace/contracts', 'interfaces/vocabulary.ts', ['RecordId',
+      'recordIdSchema', 'revisionScopeSchema', 'ReviewStatus', 'reviewStatusSchema', 'Finding', 'findingSchema', 'Observation',
+      'observationSchema'], ['browser'])]],
   ['K1', core, 0, 'catalog.ts', 'expose-src', 'named', ['parent'], k1],
   ['K2', core, 1, 'fixture.ts', 'expose-test', 'named', ['parent'], fixture],
   ['A1', catalog, 0, 'router.ts', 'expose-src', 'named', ['parent'], router],
@@ -105,7 +110,7 @@ export function assertReference(result: { input: Pick<ValidProject['input'], 'in
   catalog: ValidProject['catalog']; linked: ValidProject['linked'] }, assertions: Assertions, permutation?: string): void {
   assertions.equal('fifteen reference owners', result.input.inventory.modules.length, 15);
   assertions.equal('all reference source files catalogued', result.catalog.files.length, 59);
-  assertions.equal('all 33 reference statements expanded', result.linked.selections.length, 33);
+  assertions.equal('all 34 reference statements expanded', result.linked.selections.length, 34);
   for (const [id, owner, index, provider, form, selector, destinations, pairs] of referenceContracts) {
     const module = ownerId(owner);
     const selections = result.linked.selections.filter(selection => selection.module === module);

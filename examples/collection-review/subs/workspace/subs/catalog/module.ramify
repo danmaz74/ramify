@@ -3,8 +3,9 @@ ramify 1
 // transport-independent.
 module catalog tagged [dispatch]
 
-// The two native surfaces this feature builds for the root to mount.
-expose-src createCatalogRouter from "router.ts" to parent
+// The two native surfaces this feature builds for the root to mount, with the
+// procedure record the router factory's declared return type names.
+expose-src createCatalogRouter, CatalogProcedures from "router.ts" to parent
 expose-src createCatalogTools from "mcp.ts" to parent
 
 // The core's inspection, forwarded upward under the name the review side will
