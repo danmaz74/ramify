@@ -1,0 +1,63 @@
+{
+  "schema": "ramify-agent.readiness-attempt/1",
+  "attempt": 1,
+  "head": "0c707b06e52b5d961284faac4b46874d89deddb0",
+  "steps": [
+    {
+      "step": "project-root",
+      "outcome": "passed",
+      "detail": "/tmp/ramify-agent-fixture-trial-ukKaKn/collection-review, with its package.json"
+    },
+    {
+      "step": "git-clean",
+      "outcome": "passed",
+      "detail": "the working tree is clean"
+    },
+    {
+      "step": "compiler-config",
+      "outcome": "passed",
+      "detail": "tsconfig.json"
+    },
+    {
+      "step": "test-runner",
+      "outcome": "passed",
+      "detail": "`test` is `vitest run`, with node_modules/.bin/vitest installed"
+    },
+    {
+      "step": "nested-packages",
+      "outcome": "passed",
+      "detail": "no independent nested package"
+    },
+    {
+      "step": "test-discovery",
+      "outcome": "passed",
+      "detail": "15 test files discovered, such as src/tests/assembly.test.ts, src/tests/http.test.ts, src/tests/protocol-typing.test.ts"
+    },
+    {
+      "step": "ramify-daemon",
+      "outcome": "passed",
+      "detail": "the Ramify command line answers: 0.0.0"
+    },
+    {
+      "step": "baseline-tests",
+      "outcome": "passed",
+      "detail": "the project's tests: `npm test` passed in 2173 ms;  Test Files  20 passed (20)\n      Tests  77 passed (77)\n   Start at  07:36:57\n   Duration  1.46s (import 47%, transform 39%, tests 12%, worker 2%)\n\n  Transform  transforming modules took 3.49s · 39% of tracked time, re-done on every run\n             persist transforms across runs with fsModuleCache: true\n             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns",
+      "gate": "ga-0001"
+    },
+    {
+      "step": "baseline-type-check",
+      "outcome": "passed",
+      "detail": "the type check: `npm run type-check` passed in 857 ms; > collection-review@0.0.0 type-check\n> tsc --noEmit -p tsconfig.json",
+      "gate": "ga-0001"
+    },
+    {
+      "step": "baseline-ramify-check",
+      "outcome": "passed",
+      "detail": "the complete Ramify check: `/ramify/ramify-agent/node_modules/.bin/ramify check --batch --root /tmp/ramify-agent-fixture-trial-ukKaKn/collection-review --format json` passed in 4318 ms; nings\":[{\"code\":\"outside-module-source\",\"entry\":\"vite.config.ts\",\"count\":1,\"files\":[\"vite.config.ts\"]},{\"code\":\"outside-module-source\",\"entry\":\"vitest.config.ts\",\"count\":1,\"files\":[\"vitest.config.ts\"]}],\"coverage\":[],\"summary\":{\"complete\":true,\"owners\":15,\"sourceFiles\":54,\"resources\":5,\"originals\":89,\"accesses\":294,\"allowed\":166,\"denied\":0,\"errors\":0,\"warnings\":2,\"coverageNotes\":0,\"external\":128}}",
+      "gate": "ga-0001"
+    }
+  ],
+  "nested": [],
+  "verdict": "passed",
+  "recovery": null
+}

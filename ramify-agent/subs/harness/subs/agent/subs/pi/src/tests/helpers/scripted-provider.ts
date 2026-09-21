@@ -9,6 +9,10 @@ import { join } from 'node:path';
  * session, with its real agent loop, tool validation, built-in tools, events,
  * abort and session file, runs on it; only the model's replies are scripted.
  * Nothing here calls a network or imports pi-ai, which pi keeps private.
+ *
+ * `contextWindow` and `maxTokens` are overridable so that pi's compaction
+ * threshold and a session's context budget are reachable without a large
+ * transcript.
  */
 
 type Provider = Parameters<ModelRuntime['registerNativeProvider']>[0];
@@ -24,7 +28,7 @@ export type ReplyBlock =
   | { readonly type: 'toolCall'; readonly name: string; readonly arguments: Record<string, unknown>; readonly id?: string };
 
 export type Reply =
-  | { readonly kind: 'reply'; readonly blocks: readonly ReplyBlock[]; readonly usage?: { input: number; output: number } | undefined }
+  | { readonly kind: 'reply'; readonly blocks: readonly ReplyBlock[]; readonly usage?: { input: number; output: number; cacheRead?: number; cacheWrite?: number } | undefined }
   /** Streams nothing until the request is aborted, like a model that is still thinking. */
   | { readonly kind: 'hold' }
   /** The provider reports an error. */
@@ -32,9 +36,11 @@ export type Reply =
 
 export type ReplyStep = Reply | ((context: Context) => Reply);
 
-export const text = (value: string, usage?: { input: number; output: number }): Reply => ({ kind: 'reply', blocks: [{ type: 'text', text: value }], usage });
-export const call = (name: string, args: Record<string, unknown>, id?: string): Reply => ({ kind: 'reply', blocks: [{ type: 'toolCall', name, arguments: args, id }] });
+export const text = (value: string, usage?: { input: number; output: number; cacheRead?: number; cacheWrite?: number }): Reply => ({ kind: 'reply', blocks: [{ type: 'text', text: value }], usage });
+export const call = (name: string, args: Record<string, unknown>, id?: string, usage?: { input: number; output: number; cacheRead?: number; cacheWrite?: number }): Reply => ({ kind: 'reply', blocks: [{ type: 'toolCall', name, arguments: args, id }], usage });
 export const calls = (...blocks: ReplyBlock[]): Reply => ({ kind: 'reply', blocks });
+/** Streams nothing until the request is aborted. */
+export const hold: Reply = { kind: 'hold' };
 
 /** What the model was sent on each request. */
 export interface Request {
@@ -49,17 +55,25 @@ export interface ScriptedProvider {
   readonly requests: Request[];
   /** Replies still queued. */
   pending(): number;
+  /** Queues further replies after construction. */
+  push(...steps: readonly ReplyStep[]): void;
 }
 
 let callCount = 0;
 
-export function scriptedProvider(steps: readonly ReplyStep[]): ScriptedProvider {
+export interface ScriptedOptions {
+  /** The model's context window. A small one makes pi's compaction threshold reachable without a large transcript. */
+  readonly contextWindow?: number;
+  readonly maxTokens?: number;
+}
+
+export function scriptedProvider(steps: readonly ReplyStep[], options: ScriptedOptions = {}): ScriptedProvider {
   const queue = [...steps];
   const requests: Request[] = [];
   const model = {
     id: 'scripted-1', name: 'Scripted', api: 'scripted', provider: 'scripted', baseUrl: 'http://localhost:0',
     reasoning: false, input: ['text'], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-    contextWindow: 200_000, maxTokens: 16_384,
+    contextWindow: options.contextWindow ?? 200_000, maxTokens: options.maxTokens ?? 16_384,
   } as unknown as Model;
 
   const stream: StreamFunction = (requestModel, context, options?: StreamOptions) => {
@@ -84,7 +98,7 @@ export function scriptedProvider(steps: readonly ReplyStep[]): ScriptedProvider 
     stream,
     streamSimple: stream,
   } as unknown as Provider;
-  return { provider, model, requests, pending: () => queue.length };
+  return { provider, model, requests, pending: () => queue.length, push: (...steps) => { queue.push(...steps); } };
 }
 
 /** A model runtime isolated in a temporary agent directory, with the scripted provider registered. */
@@ -112,7 +126,7 @@ type AssistantMessage = {
 };
 
 async function play(events: ReplyStream, reply: Reply, model: Model, signal: AbortSignal | undefined): Promise<void> {
-  const usage = (input = 0, output = 0) => ({ input, output, cacheRead: 0, cacheWrite: 0, totalTokens: input + output, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } });
+  const usage = (input = 0, output = 0, cacheRead = 0, cacheWrite = 0) => ({ input, output, cacheRead, cacheWrite, totalTokens: input + output + cacheRead + cacheWrite, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } });
   const message = (content: AssistantMessage['content'], stopReason: string, extra: Partial<AssistantMessage> = {}): AssistantMessage => ({
     role: 'assistant', content, api: model.api, provider: model.provider, model: model.id, usage: usage(), stopReason, timestamp: Date.now(), ...extra,
   });
@@ -150,7 +164,7 @@ async function play(events: ReplyStream, reply: Reply, model: Model, signal: Abo
       events.push({ type: 'toolcall_end', contentIndex: index, toolCall: block, partial: { ...partial } });
     }
   });
-  const final = message(content, content.some(block => block.type === 'toolCall') ? 'toolUse' : 'stop', { usage: usage(reply.usage?.input, reply.usage?.output) });
+  const final = message(content, content.some(block => block.type === 'toolCall') ? 'toolUse' : 'stop', { usage: usage(reply.usage?.input, reply.usage?.output, reply.usage?.cacheRead, reply.usage?.cacheWrite) });
   events.push({ type: 'done', reason: final.stopReason, message: final });
   events.end(final);
 }

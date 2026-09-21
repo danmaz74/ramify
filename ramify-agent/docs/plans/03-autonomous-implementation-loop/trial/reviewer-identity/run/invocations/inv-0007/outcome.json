@@ -1,0 +1,25 @@
+{
+  "schema": "ramify-agent.invocation-outcome/1",
+  "invocation": "inv-0007",
+  "ended": "submitted",
+  "rejectedSubmissions": 0,
+  "disposition": "applied",
+  "session": {
+    "ref": "scripted-5@7#0",
+    "mode": "fresh"
+  },
+  "submission": {
+    "hash": "f5112aad8106e8c74cfa4353e5d72795d0a3970fc9c2ef072d285127621eea1a"
+  },
+  "settled": {
+    "confirmed": true,
+    "at": "2026-09-21T07:53:06.566Z",
+    "groupsKilled": 0,
+    "lateWrites": []
+  },
+  "outsideScope": [],
+  "usage": {
+    "unavailable": "the session reported no usage"
+  },
+  "elapsedMs": 4934
+}

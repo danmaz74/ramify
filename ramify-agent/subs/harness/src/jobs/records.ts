@@ -1,45 +1,34 @@
 import { randomBytes } from 'node:crypto';
-import { mkdir, readdir, readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { inputManifestSchema } from '../interfaces/map.js';
 import { jobIdSchema, planIdSchema } from '../interfaces/protocol/ids.js';
-import { writeFileExclusive } from '../store/atomic.js';
-import { ensureStateDirectory } from '../store/state-directory.js';
 
 /*
- * The files of a job and of a plan's saved maps:
+ * Where a job of a plan lives:
  *
- *   plans/<plan-id>/map/<revision>.json               immutable map content
- *   plans/<plan-id>/map/<revision>.approval.json      written on approval, never changed
- *   plans/<plan-id>/.harness/jobs/<job-id>/job.json    the input manifest; never rewritten
+ *   plans/<plan-id>/.harness/jobs/<job-id>/job.json    the job record; never rewritten
  *   .../input/plan.md                                  the captured plan
  *   .../events.jsonl                                   the canonical record
- *   .../output/map.json                                the validated submission, before publication
- *   .../session/                                       the agent's own session record
+ *
+ * An implementation run is the one kind of job, and `run/records.ts` holds
+ * its record. What stays here is what a directory of jobs is, whatever a job
+ * turns out to be: where it lives, how its ID is made and how a directory
+ * whose record this harness does not support is reported rather than served.
  */
 
-/** `job.json`: what a job was started with. Written once, before the first event. */
-export const jobRecordSchema = z.object({
-  schema: z.literal('ramify-agent.job/1'),
-  jobId: jobIdSchema,
-  planId: planIdSchema,
-  kind: z.literal('mapping'),
-  /** The agent implementation, such as `scripted` or `pi`. */
-  agent: z.string().min(1),
-  createdAt: z.iso.datetime(),
-  manifest: inputManifestSchema,
-}).strict();
-export type JobRecord = z.infer<typeof jobRecordSchema>;
+/** The one `job.json` schema a job declares. */
+export const jobSchemaVersion = 'ramify-agent.job/2';
 
-export interface JobPaths {
-  readonly directory: string;
-  readonly record: string;
-  readonly capturedPlan: string;
-  readonly events: string;
-  readonly output: string;
-  readonly session: string;
-}
+/** The kinds of job a directory under `jobs/` can hold. */
+export const jobKindSchema = z.enum(['implementation']);
+export type JobKind = z.infer<typeof jobKindSchema>;
+
+/** What every `job.json` declares, whatever its kind, before its kind's reader parses it. */
+export const jobEnvelopeSchema = z.object({
+  schema: z.literal(jobSchemaVersion),
+  kind: jobKindSchema,
+}).loose();
 
 /** A plan's state directory, `plans/<plan-id>/.harness/`. */
 export function planStateDirectory(projectRoot: string, planId: string): string {
@@ -50,92 +39,31 @@ export function jobsDirectory(projectRoot: string, planId: string): string {
   return join(planStateDirectory(projectRoot, planId), 'jobs');
 }
 
-/**
- * Creates the plan's state directory and its map directory, each with the
- * marker that keeps it out of Ramify's inputs, where they are missing. Once
- * both exist, nothing the harness writes for the plan, its saved maps
- * included, changes the input identity a job or an approval is compared by.
- */
-export async function ensurePlanDirectories(projectRoot: string, planId: string): Promise<void> {
-  await ensureStateDirectory(planStateDirectory(projectRoot, planId));
-  await ensureStateDirectory(mapDirectory(projectRoot, planId));
-}
-
-export function jobPaths(projectRoot: string, planId: string, jobId: string): JobPaths {
-  const directory = join(jobsDirectory(projectRoot, planId), jobId);
-  return {
-    directory,
-    record: join(directory, 'job.json'),
-    capturedPlan: join(directory, 'input', 'plan.md'),
-    events: join(directory, 'events.jsonl'),
-    output: join(directory, 'output', 'map.json'),
-    session: join(directory, 'session'),
-  };
-}
-
-export function mapDirectory(projectRoot: string, planId: string): string {
-  return join(projectRoot, 'plans', planId, 'map');
-}
-
-/** A revision's file name: `001.json`. */
-export function revisionFileName(revision: number): string {
-  return `${String(revision).padStart(3, '0')}.json`;
-}
-
-/** A revision's approval record's file name: `001.approval.json`. */
-export function approvalFileName(revision: number): string {
-  return `${String(revision).padStart(3, '0')}.approval.json`;
-}
-
-/** The highest saved revision of a plan's map, or `null` when none is saved. */
-export async function highestRevision(projectRoot: string, planId: string): Promise<number | null> {
-  let names: string[];
-  try {
-    names = await readdir(mapDirectory(projectRoot, planId));
-  } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
-    if (code === 'ENOENT' || code === 'ENOTDIR') return null;
-    throw error;
-  }
-  let highest: number | null = null;
-  for (const name of names) {
-    const match = /^(\d+)\.json$/.exec(name);
-    if (!match) continue;
-    const revision = Number(match[1]);
-    if (revision > 0 && (highest === null || revision > highest)) highest = revision;
-  }
-  return highest;
-}
-
 /** A new job ID, ordered by creation time: `20260919T143211Z-3f9a1c`. */
 export function newJobId(now: Date): string {
   return `${now.toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z')}-${randomBytes(3).toString('hex')}`;
 }
 
-/**
- * Creates a job's directory with its captured plan and then its `job.json`,
- * each written once and never overwritten. The first event follows.
- */
-export async function createJobFiles(paths: JobPaths, capturedPlan: Uint8Array, record: JobRecord): Promise<void> {
-  await mkdir(join(paths.directory, 'input'), { recursive: true });
-  await mkdir(join(paths.directory, 'output'), { recursive: true });
-  await mkdir(paths.session, { recursive: true });
-  if (await writeFileExclusive(paths.capturedPlan, capturedPlan) === 'exists') throw new Error(`${paths.capturedPlan} already exists`);
-  if (await writeFileExclusive(paths.record, `${JSON.stringify(jobRecordSchema.parse(record), null, 2)}\n`) === 'exists') {
-    throw new Error(`${paths.record} already exists`);
-  }
+/** What a `job.json` the current reader does not support declares as its schema. */
+export function declaredSchemaOf(document: unknown): string {
+  const declared = (document as { schema?: unknown } | null)?.schema;
+  return typeof declared === 'string' && declared !== '' ? declared : 'no schema';
 }
 
-/** A job's `job.json`, or `undefined` when it is missing: the job was never created. */
-export async function readJobRecord(path: string): Promise<JobRecord | undefined> {
+/** The JSON of one file, or null when it is absent or not JSON. */
+export async function readJobDocument(path: string): Promise<unknown> {
   let text: string;
   try {
     text = await readFile(path, 'utf8');
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
     throw error;
   }
-  return jobRecordSchema.parse(JSON.parse(text));
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return null;
+  }
 }
 
 /** Every job directory in the project, by plan. */

@@ -1,0 +1,36 @@
+{
+  "schema": "ramify-agent.local-architect-submission/1",
+  "kind": "assign",
+  "localDecisions": [],
+  "assignment": {
+    "stage": 1,
+    "kind": "breaking",
+    "goal": "Make the review outcome carry the structured reviewer, required, through the runtime, both surfaces and every caller.",
+    "approach": "Change the source, then the tests that state it.",
+    "scope": {
+      "base": {
+        "modules": [
+          "collection-review/workspace/reviews/core",
+          "collection-review/workspace/reviews",
+          "collection-review/workspace/reviews/ui",
+          "collection-review/workspace",
+          "collection-review",
+          "collection-review/integration-tests"
+        ],
+        "rationale": "The runtime's signature and the tRPC input change together, and every caller of either must move in the same boundary or the project stops compiling."
+      },
+      "extra": [],
+      "read": [
+        "collection-review/workspace/contracts"
+      ],
+      "rationale": "The break and every adaptation it forces are one accepted boundary."
+    },
+    "requirementRefs": [
+      {
+        "anchor": "Request"
+      }
+    ],
+    "externalCapabilities": [],
+    "completionEvidence": "The tests this scope owns pass."
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "schema": "ramify-agent.work-item-outline/1",
+  "workItem": "wi-001",
+  "revision": 1,
+  "invocation": "inv-0002",
+  "changes": "A review outcome carries a structured reviewer; both surfaces take it and report it; the views show it.",
+  "decomposition": {
+    "kind": "staged",
+    "rationale": "The outcome has four kinds of reader, and each boundary must compile and pass."
+  },
+  "reuse": [],
+  "breakingChanges": [
+    {
+      "guarantee": "reviews.run is called with a record id and an optional scope, and answers an outcome with no reviewer",
+      "reason": "The request requires every review to be attributed to a structured reviewer, supplied by the caller.",
+      "affectedConsumers": [
+        "collection-review/workspace/reviews",
+        "collection-review/workspace/reviews/ui",
+        "collection-review/workspace",
+        "collection-review",
+        "collection-review/integration-tests"
+      ],
+      "citations": []
+    },
+    {
+      "guarantee": "ReviewResultProps carries no reviewer",
+      "reason": "The review panel must show the reviewer's display name and role.",
+      "affectedConsumers": [
+        "collection-review/workspace/reviews/ui"
+      ],
+      "citations": []
+    }
+  ],
+  "stages": [
+    {
+      "title": "The reviewer in the shared vocabulary",
+      "approach": "non-breaking",
+      "dependsOn": [],
+      "note": "Nothing reads it yet."
+    },
+    {
+      "title": "The outcome and both surfaces carry the reviewer",
+      "approach": "breaking",
+      "dependsOn": [
+        0
+      ],
+      "note": "Every caller of reviews.run moves in the same step."
+    },
+    {
+      "title": "The views show the reviewer",
+      "approach": "breaking",
+      "dependsOn": [
+        1
+      ],
+      "note": "The pure view's props and the panel that fills them move together."
+    }
+  ],
+  "hypothesesSeen": [],
+  "revisionReason": ""
+}

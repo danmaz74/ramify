@@ -1,27 +1,39 @@
-import type { Command, EventPage, JobEvent, JobSnapshot, Receipt } from '../../../../harness/src/interfaces/protocol/jobs.js';
-import type { MapRevision, ModuleTree, RevisionEntry } from '../../../../harness/src/interfaces/protocol/maps.js';
+import type { ModuleTree } from '../../../../harness/src/interfaces/protocol/evidence.js';
+import type { Receipt } from '../../../../harness/src/interfaces/protocol/jobs.js';
 import type { PlanDocument, PlanEntry } from '../../../../harness/src/interfaces/protocol/queries.js';
+import type {
+  AnalysisResponse, CapabilityListResponse, DecisionListResponse, GateView, MetricsResponse, ProjectedRunEvent,
+  RunCommand, RunEventPage, RunListResponse, RunSnapshot, WorkItemListResponse, WorkItemResponse,
+} from '../../../../harness/src/interfaces/protocol/runs.js';
 import { ClientError, type ConnectionState, type ProjectInfo, type ProtocolClient } from '../../client.js';
 
 export const project: ProjectInfo = { name: 'collection-review', root: '/work/collection-review', planPattern: 'plans/<plan-id>/plan.md' };
+
+/** A run as the stub answers it, with every query's answer. */
+export interface StubRun {
+  snapshot: RunSnapshot;
+  events: ProjectedRunEvent[];
+  analysis?: AnalysisResponse;
+  decisions?: DecisionListResponse;
+  workItems?: WorkItemListResponse;
+  workItem?: Record<string, WorkItemResponse>;
+  capabilities?: CapabilityListResponse;
+  gates?: Record<string, GateView>;
+  metrics?: MetricsResponse;
+}
 
 /** A protocol client answering from memory, with a settable connection state. */
 export class StubClient implements ProtocolClient {
   plans: PlanEntry[] = [];
   documents = new Map<string, PlanDocument>();
+  runs = new Map<string, StubRun>();
+  runList: RunListResponse = { runs: [], total: 0, agent: 'scripted', unserved: [] };
   failure: ClientError | undefined;
   state: ConnectionState = 'connected';
   calls: string[] = [];
-  /** Jobs by `planId/jobId`, with their events. */
-  jobs = new Map<string, { job: JobSnapshot; events: JobEvent[] }>();
-  commands: Command[] = [];
-  /** Saved revisions by plan ID, each with its full content. */
-  revisions = new Map<string, MapRevision[]>();
+  commands: RunCommand[] = [];
+  receipt: Receipt = { commandId: 'c', jobId: '20260921T080000Z-c0ffee', sequence: 1, acceptedAt: '2026-09-21T08:00:00.000Z' };
   tree: ModuleTree = { status: 'unavailable', message: 'The architect view has not been materialized yet.' };
-  /** Answers a command; by default every command is accepted. */
-  onCommand: (command: Command) => Receipt = command => ({
-    commandId: command.commandId, jobId: 'jobId' in command.payload ? command.payload.jobId : 'new-job', sequence: 1, acceptedAt: '2026-09-19T12:00:00.000Z',
-  });
   private listeners = new Set<(state: ConnectionState) => void>();
 
   async getProject(): Promise<ProjectInfo> {
@@ -43,47 +55,55 @@ export class StubClient implements ProtocolClient {
     return plan;
   }
 
-  async getJob(planId: string, jobId: string): Promise<JobSnapshot> {
-    this.calls.push(`getJob:${planId}/${jobId}`);
-    if (this.failure) throw this.failure;
-    const entry = this.jobs.get(`${planId}/${jobId}`);
-    if (!entry) throw new ClientError('protocol', `No job ${jobId}`, 'not-found');
-    return entry.job;
-  }
-
-  async listRevisions(planId: string): Promise<RevisionEntry[]> {
-    this.calls.push(`listRevisions:${planId}`);
-    if (this.failure) throw this.failure;
-    return (this.revisions.get(planId) ?? []).map(saved => ({
-      status: 'readable', revision: saved.revision, path: saved.path, jobId: saved.map.identity.jobId, mapHash: saved.mapHash, approval: saved.approval,
-    }));
-  }
-
-  async getRevision(planId: string, revision: number): Promise<MapRevision> {
-    this.calls.push(`getRevision:${planId}/${revision}`);
-    if (this.failure) throw this.failure;
-    const saved = this.revisions.get(planId)?.find(entry => entry.revision === revision);
-    if (!saved) throw new ClientError('protocol', `No revision ${revision}`, 'not-found');
-    return saved;
-  }
-
   async getModuleTree(): Promise<ModuleTree> {
     this.calls.push('getModuleTree');
     return this.tree;
   }
 
-  async getEvents(planId: string, jobId: string, after: number): Promise<EventPage> {
-    this.calls.push(`getEvents:${planId}/${jobId}@${after}`);
+  async listRuns(planId: string): Promise<RunListResponse> {
+    this.calls.push(`listRuns:${planId}`);
     if (this.failure) throw this.failure;
-    const entry = this.jobs.get(`${planId}/${jobId}`);
-    if (!entry) throw new ClientError('protocol', `No job ${jobId}`, 'not-found');
-    const events = entry.events.filter(event => event.sequence > after);
-    return { job: entry.job, events, cursor: events.at(-1)?.sequence ?? after, more: false };
+    return this.runList;
   }
 
-  async sendCommand(command: Command): Promise<Receipt> {
+  private run(runId: string): StubRun {
+    if (this.failure) throw this.failure;
+    const run = this.runs.get(runId);
+    if (!run) throw new ClientError('protocol', `No run ${runId}`, 'not-found');
+    return run;
+  }
+
+  private answer<T>(runId: string, pick: (run: StubRun) => T | undefined, what: string): T {
+    const value = pick(this.run(runId));
+    if (value === undefined) throw new ClientError('protocol', `No ${what} for run ${runId}`, 'not-found');
+    return value;
+  }
+
+  async getRun(_planId: string, runId: string): Promise<RunSnapshot> {
+    this.calls.push(`getRun:${runId}`);
+    return this.run(runId).snapshot;
+  }
+
+  async getEvents(_planId: string, runId: string, after: number): Promise<RunEventPage> {
+    this.calls.push(`getEvents:${runId}:${after}`);
+    const run = this.run(runId);
+    const events = run.events.filter(event => event.sequence > after);
+    return { run: run.snapshot, events, cursor: events.at(-1)?.sequence ?? after, more: false };
+  }
+
+  async getAnalysis(_planId: string, runId: string) { this.calls.push(`getAnalysis:${runId}`); return this.answer(runId, run => run.analysis, 'analysis'); }
+  async getDecisions(_planId: string, runId: string) { this.calls.push(`getDecisions:${runId}`); return this.answer(runId, run => run.decisions, 'decisions'); }
+  async getWorkItems(_planId: string, runId: string) { this.calls.push(`getWorkItems:${runId}`); return this.answer(runId, run => run.workItems, 'work items'); }
+  async getWorkItem(_planId: string, runId: string, workItem: string) { this.calls.push(`getWorkItem:${runId}:${workItem}`); return this.answer(runId, run => run.workItem?.[workItem], `work item ${workItem}`); }
+  async getCapabilities(_planId: string, runId: string) { this.calls.push(`getCapabilities:${runId}`); return this.answer(runId, run => run.capabilities, 'capabilities'); }
+  async getGate(_planId: string, runId: string, gate: string) { this.calls.push(`getGate:${runId}:${gate}`); return this.answer(runId, run => run.gates?.[gate], `gate ${gate}`); }
+  async getMetrics(_planId: string, runId: string) { this.calls.push(`getMetrics:${runId}`); return this.answer(runId, run => run.metrics, 'metrics'); }
+
+  async sendCommand(command: RunCommand): Promise<Receipt> {
+    this.calls.push(`sendCommand:${command.type}`);
     this.commands.push(command);
-    return this.onCommand(command);
+    if (this.failure) throw this.failure;
+    return { ...this.receipt, commandId: command.commandId };
   }
 
   connection(): ConnectionState {

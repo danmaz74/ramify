@@ -3,14 +3,8 @@ import { existsSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import type { z } from 'zod';
 import { errorHttpStatus, errorResponseSchema, type ErrorCode } from '../interfaces/protocol/errors.js';
-import {
-  commandResponseSchema,
-  commandSchema,
-  eventPageSchema,
-  jobListResponseSchema,
-  jobResponseSchema,
-} from '../interfaces/protocol/jobs.js';
-import { moduleTreeResponseSchema, revisionListResponseSchema, revisionResponseSchema } from '../interfaces/protocol/maps.js';
+import { moduleTreeResponseSchema } from '../interfaces/protocol/evidence.js';
+import { commandResponseSchema } from '../interfaces/protocol/jobs.js';
 import { apiPrefix, protocolPaths } from '../interfaces/protocol/paths.js';
 import {
   planListResponseSchema,
@@ -18,38 +12,57 @@ import {
   projectResponseSchema,
   type PlanEntry,
 } from '../interfaces/protocol/queries.js';
-import { CommandRejection, type JobService } from '../jobs/service.js';
-import { listRevisions, readRevision } from '../maps/revisions.js';
-import { loadModuleTree } from '../mapping/views.js';
+import {
+  analysisResponseSchema, capabilityListResponseSchema, decisionListResponseSchema, gateResponseSchema,
+  metricsResponseSchema, runCommandSchema, runEventPageSchema, runListResponseSchema, runResponseSchema,
+  workItemListResponseSchema, workItemResponseSchema,
+} from '../interfaces/protocol/runs.js';
+import { loadModuleTree } from '../../subs/evidence/src/views.js';
+import { CommandRejection } from '../jobs/commands.js';
 import { discoverPlans, readPlan } from '../plans/discover.js';
+import { ProjectionError } from '../projections/inputs.js';
+import { RunQueries } from '../projections/queries.js';
+import type { RunService } from '../run/service.js';
 
 export interface AppOptions {
   /** The absolute root of the project this harness serves. */
   readonly projectRoot: string;
   /** The built web client. Absent or missing, only the protocol is served. */
   readonly assetsDirectory?: string | undefined;
-  /** The project's mapping jobs. */
-  readonly jobs: JobService;
+  /** The project's implementation runs: the commands act on it and the queries project it. */
+  readonly runs: RunService;
 }
 
 /** A failure the protocol reports with a code; anything else is `internal`. */
 class ProtocolFailure extends Error {
-  constructor(readonly code: ErrorCode, message: string, readonly currentVersion?: number) {
+  constructor(
+    readonly code: ErrorCode,
+    message: string,
+    readonly currentVersion?: number,
+    readonly evidence?: readonly string[],
+  ) {
     super(message);
   }
 }
 
 type PlanRequest = Request<{ planId: string }>;
-type JobRequest = Request<{ planId: string; jobId: string }>;
-type RevisionRequest = Request<{ planId: string; revision: string }>;
+type RunRequest = Request<{ planId: string; runId: string }>;
+type WorkItemRequest = Request<{ planId: string; runId: string; workItem: string }>;
+type GateRequest = Request<{ planId: string; runId: string; gate: string }>;
 
 /**
  * The Express application: the protocol's queries and commands under
  * `/api/v1`, every response validated against its `interfaces/protocol`
  * schema, and the web client's assets when they are built.
+ *
+ * It serves the project, its module tree, its plans and their runs. A query
+ * is a projection of the run's log and records and never appends an event;
+ * the command endpoint is the only route that changes anything, and it acts
+ * through the run service alone.
  */
 export function createApp(options: AppOptions): express.Express {
-  const { projectRoot, jobs } = options;
+  const { projectRoot, runs } = options;
+  const queries = new RunQueries(runs);
   const app = express();
   app.disable('x-powered-by');
 
@@ -69,7 +82,7 @@ export function createApp(options: AppOptions): express.Express {
       tree = {
         status: 'unavailable' as const,
         message: missing
-          ? 'The architect view has not been materialized yet; a mapping job materializes it.'
+          ? 'The architect view has not been materialized yet; a run materializes it before its initial analysis.'
           : `The architect view cannot be read: ${error instanceof Error ? error.message : String(error)}`,
       };
     }
@@ -80,7 +93,7 @@ export function createApp(options: AppOptions): express.Express {
     const plans: PlanEntry[] = [];
     for (const plan of await discoverPlans(projectRoot)) {
       plans.push(plan.status === 'readable'
-        ? { status: 'readable', id: plan.id, title: plan.title, path: plan.path, mapping: await jobs.mappingState(plan.id) }
+        ? { status: 'readable', id: plan.id, title: plan.title, path: plan.path }
         : plan);
     }
     send(response, planListResponseSchema, { plans });
@@ -91,56 +104,65 @@ export function createApp(options: AppOptions): express.Express {
     if (!plan) throw new ProtocolFailure('not-found', `No plan with ID "${request.params.planId}"`);
     if (plan.status === 'unreadable') throw new ProtocolFailure('unreadable', `${plan.path}: ${plan.message}`);
     send(response, planResponseSchema, {
-      plan: { id: plan.id, title: plan.title, path: plan.path, markdown: plan.markdown, mapping: await jobs.mappingState(plan.id) },
+      plan: { id: plan.id, title: plan.title, path: plan.path, markdown: plan.markdown },
     });
   });
 
-  app.get(`${apiPrefix}/plans/:planId/jobs`, async (request: PlanRequest, response) => {
+  // The runs of a plan. Every one of these is a projection.
+
+  app.get(`${apiPrefix}/plans/:planId/runs`, async (request: PlanRequest, response) => {
     const plan = await readPlan(projectRoot, request.params.planId);
     if (!plan) throw new ProtocolFailure('not-found', `No plan with ID "${request.params.planId}"`);
-    send(response, jobListResponseSchema, { jobs: jobs.listJobs(plan.id) });
+    send(response, runListResponseSchema, await projected(() => queries.list(plan.id)));
   });
 
-  app.get(`${apiPrefix}/plans/:planId/maps`, async (request: PlanRequest, response) => {
-    const plan = await readPlan(projectRoot, request.params.planId);
-    if (!plan) throw new ProtocolFailure('not-found', `No plan with ID "${request.params.planId}"`);
-    send(response, revisionListResponseSchema, { revisions: await listRevisions(projectRoot, plan.id) });
+  app.get(`${apiPrefix}/plans/:planId/runs/:runId`, async (request: RunRequest, response) => {
+    send(response, runResponseSchema, await projected(() => queries.run(request.params.planId, request.params.runId)));
   });
 
-  app.get(`${apiPrefix}/plans/:planId/maps/:revision`, async (request: RevisionRequest, response) => {
-    const plan = await readPlan(projectRoot, request.params.planId);
-    if (!plan) throw new ProtocolFailure('not-found', `No plan with ID "${request.params.planId}"`);
-    if (!/^[1-9]\d{0,8}$/.test(request.params.revision)) throw new ProtocolFailure('invalid-request', 'A revision is a positive number');
-    const revision = Number(request.params.revision);
-    const saved = await readRevision(projectRoot, plan.id, revision);
-    if (!saved) throw new ProtocolFailure('not-found', `Plan "${plan.id}" has no revision ${revision}`);
-    if (saved.status === 'unreadable') throw new ProtocolFailure('unreadable', `${saved.path}: ${saved.message}`);
-    send(response, revisionResponseSchema, {
-      revision: { revision, path: saved.path, mapHash: saved.mapHash, map: saved.map, approval: saved.approval },
-    });
-  });
-
-  app.get(`${apiPrefix}/plans/:planId/jobs/:jobId`, (request: JobRequest, response) => {
-    const job = jobs.getJob(request.params.planId, request.params.jobId);
-    if (!job) throw new ProtocolFailure('not-found', `No job ${request.params.jobId} for plan "${request.params.planId}"`);
-    send(response, jobResponseSchema, { job });
-  });
-
-  app.get(`${apiPrefix}/plans/:planId/jobs/:jobId/events`, (request: JobRequest, response) => {
+  app.get(`${apiPrefix}/plans/:planId/runs/:runId/events`, async (request: RunRequest, response) => {
     const after = request.query['after'] ?? '0';
-    if (typeof after !== 'string' || !/^\d+$/.test(after)) throw new ProtocolFailure('invalid-request', '"after" must be a sequence number');
-    const page = jobs.eventPage(request.params.planId, request.params.jobId, Number(after));
-    if (!page) throw new ProtocolFailure('not-found', `No job ${request.params.jobId} for plan "${request.params.planId}"`);
-    send(response, eventPageSchema, page);
+    if (typeof after !== 'string' || !/^\d{1,15}$/.test(after)) throw new ProtocolFailure('invalid-request', '"after" must be a sequence number');
+    send(response, runEventPageSchema, await projected(() => queries.events(request.params.planId, request.params.runId, Number(after))));
   });
+
+  app.get(`${apiPrefix}/plans/:planId/runs/:runId/analysis`, async (request: RunRequest, response) => {
+    send(response, analysisResponseSchema, await projected(() => queries.analysis(request.params.planId, request.params.runId)));
+  });
+
+  app.get(`${apiPrefix}/plans/:planId/runs/:runId/decisions`, async (request: RunRequest, response) => {
+    send(response, decisionListResponseSchema, await projected(() => queries.decisions(request.params.planId, request.params.runId)));
+  });
+
+  app.get(`${apiPrefix}/plans/:planId/runs/:runId/work-items`, async (request: RunRequest, response) => {
+    send(response, workItemListResponseSchema, await projected(() => queries.workItems(request.params.planId, request.params.runId)));
+  });
+
+  app.get(`${apiPrefix}/plans/:planId/runs/:runId/work-items/:workItem`, async (request: WorkItemRequest, response) => {
+    send(response, workItemResponseSchema, await projected(() => queries.workItem(request.params.planId, request.params.runId, request.params.workItem)));
+  });
+
+  app.get(`${apiPrefix}/plans/:planId/runs/:runId/capabilities`, async (request: RunRequest, response) => {
+    send(response, capabilityListResponseSchema, await projected(() => queries.capabilities(request.params.planId, request.params.runId)));
+  });
+
+  app.get(`${apiPrefix}/plans/:planId/runs/:runId/gates/:gate`, async (request: GateRequest, response) => {
+    send(response, gateResponseSchema, await projected(() => queries.gate(request.params.planId, request.params.runId, request.params.gate)));
+  });
+
+  app.get(`${apiPrefix}/plans/:planId/runs/:runId/metrics`, async (request: RunRequest, response) => {
+    send(response, metricsResponseSchema, await projected(() => queries.metrics(request.params.planId, request.params.runId)));
+  });
+
+  // The one route that changes anything: a command, through the run service.
 
   app.post(protocolPaths.commands, express.json({ limit: '64kb' }), async (request, response) => {
-    const parsed = commandSchema.safeParse(request.body);
+    const parsed = runCommandSchema.safeParse(request.body);
     if (!parsed.success) {
       throw new ProtocolFailure('invalid-request', `Not a command: ${parsed.error.issues.map(issue => `${issue.path.join('.') || 'command'}: ${issue.message}`).join('; ')}`);
     }
     try {
-      const receipt = await jobs.execute(parsed.data);
+      const receipt = await runs.execute(parsed.data);
       send(response.status(202), commandResponseSchema, { receipt });
     } catch (error) {
       if (error instanceof CommandRejection) throw new ProtocolFailure(error.code, error.message, error.currentVersion);
@@ -171,11 +193,26 @@ export function createApp(options: AppOptions): express.Express {
         : new ProtocolFailure('internal', error instanceof Error ? error.message : String(error));
     if (failure.code === 'internal') console.error(error);
     response.status(errorHttpStatus[failure.code]).json(errorResponseSchema.parse({
-      error: { code: failure.code, message: failure.message, ...(failure.currentVersion === undefined ? {} : { currentVersion: failure.currentVersion }) },
+      error: {
+        code: failure.code,
+        message: failure.message,
+        ...(failure.currentVersion === undefined ? {} : { currentVersion: failure.currentVersion }),
+        ...(failure.evidence === undefined || failure.evidence.length === 0 ? {} : { evidence: [...failure.evidence] }),
+      },
     }));
   });
 
   return app;
+}
+
+/** Runs one projection, reporting a record it cannot read with the protocol's code and its evidence. */
+async function projected<T>(query: () => Promise<T>): Promise<T> {
+  try {
+    return await query();
+  } catch (error) {
+    if (error instanceof ProjectionError) throw new ProtocolFailure(error.code, error.message, undefined, error.evidence);
+    throw error;
+  }
 }
 
 /** A body Express's JSON parser refused: malformed, too large or of another type. */

@@ -2,22 +2,26 @@
 export const apiPrefix = '/api/v1';
 
 const plan = (planId: string): string => `${apiPrefix}/plans/${encodeURIComponent(planId)}`;
-const job = (planId: string, jobId: string): string => `${plan(planId)}/jobs/${encodeURIComponent(jobId)}`;
+const runs = (planId: string): string => `${plan(planId)}/runs`;
+const run = (planId: string, runId: string): string => `${runs(planId)}/${encodeURIComponent(runId)}`;
 
-/** The paths of the queries and commands, relative to the server's origin. */
+/** The paths of the queries and of the command endpoint, relative to the server's origin. */
 export const protocolPaths = {
   project: `${apiPrefix}/project`,
   /** The project's module tree, as the architect view last materialized it. */
   modules: `${apiPrefix}/project/modules`,
   plans: `${apiPrefix}/plans`,
   plan,
-  jobs: (planId: string): string => `${plan(planId)}/jobs`,
-  job,
-  /** The events after `after`, which defaults to 0. */
-  events: (planId: string, jobId: string, after = 0): string => `${job(planId, jobId)}/events?after=${after}`,
-  /** The plan's saved map revisions, newest first. */
-  maps: (planId: string): string => `${plan(planId)}/maps`,
-  /** One saved map revision with its approval. */
-  map: (planId: string, revision: number): string => `${plan(planId)}/maps/${revision}`,
+  /** `POST`: every command, answered `202` with its receipt. */
   commands: `${apiPrefix}/commands`,
+  runs,
+  run,
+  runEvents: (planId: string, runId: string, after: number): string => `${run(planId, runId)}/events?after=${after}`,
+  runAnalysis: (planId: string, runId: string): string => `${run(planId, runId)}/analysis`,
+  runDecisions: (planId: string, runId: string): string => `${run(planId, runId)}/decisions`,
+  runWorkItems: (planId: string, runId: string): string => `${run(planId, runId)}/work-items`,
+  runWorkItem: (planId: string, runId: string, workItem: string): string => `${run(planId, runId)}/work-items/${encodeURIComponent(workItem)}`,
+  runCapabilities: (planId: string, runId: string): string => `${run(planId, runId)}/capabilities`,
+  runGate: (planId: string, runId: string, gate: string): string => `${run(planId, runId)}/gates/${encodeURIComponent(gate)}`,
+  runMetrics: (planId: string, runId: string): string => `${run(planId, runId)}/metrics`,
 } as const;

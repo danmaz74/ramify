@@ -25,7 +25,10 @@ export function activityOf(event: AgentEvent, workingDirectory: string, projectR
           : `${pattern ?? ''}${path ? ` in ${shown(path)}` : ''}${text('glob') ? ` (${text('glob')})` : ''}`;
         return { kind: 'search', callId: event.callId, tool: event.tool, query };
       }
-      return { kind: 'tool', callId: event.callId, tool: event.tool };
+      // A tool that runs a command records it: the harness's shell is the
+      // one that does, and nothing of the input is read beyond that field.
+      const command = text('command');
+      return { kind: 'tool', callId: event.callId, tool: event.tool, ...(command === undefined ? {} : { command }) };
     }
     case 'tool-finished':
       return event.isError

@@ -1,0 +1,314 @@
+{
+  "schema": "ramify-agent.prompt-manifest/1",
+  "packages": {
+    "initial-architect": {
+      "package": "initial-architect/1",
+      "hash": "41dc4b24f76a5b0045bfa7ae061543c997385ba488f698a0d0bf05657293f7e2",
+      "files": [
+        {
+          "path": "subs/harness/src/prompts/initial-architect.system.md",
+          "hash": "e9f5c20a8aa34b08abad7b77654b31c000970d8a9d59dd57d966b67b3a937383",
+          "kind": "system"
+        },
+        {
+          "path": "subs/harness/src/prompts/initial-analysis.procedure.md",
+          "hash": "b0d6c264b6fc120315acd36ac8a73b4aa3ae1853f8e95e7e20a40e38f6532708",
+          "kind": "procedure"
+        },
+        {
+          "path": "skills/module-architect/SKILL.md",
+          "hash": "9cd720b081d723246a1a60501178b47e8fafa777d3f950bccee15841b594f9c8",
+          "kind": "skill"
+        },
+        {
+          "path": "skills/module-architect/references/access.md",
+          "hash": "02712d2ab498c9b2209b488238cf2bcd047b207d25224d3b225f2c68bb559a40",
+          "kind": "skill"
+        },
+        {
+          "path": "skills/module-architect/references/cognitive-decomposition.md",
+          "hash": "f4ba2187c7f3c7eaadae8e0e1d6d93e2120c4ff93132b6296a0ac2ac1ad92ac4",
+          "kind": "skill"
+        },
+        {
+          "path": "skills/module-architect/references/discovery.md",
+          "hash": "050ec8a2c271a3c408646c5e8b3b3a09908b2af8eb964c0110ad1296e1cb5a3a",
+          "kind": "skill"
+        },
+        {
+          "path": "skills/module-architect/references/placement.md",
+          "hash": "b2c4179167eebd4a40ff7b211db13333e8803d523a9403d65d4570ca7ebdf847",
+          "kind": "skill"
+        },
+        {
+          "path": "skills/module-architect/references/refactoring.md",
+          "hash": "655add700f41da7ba47c168b84c1780771404b36ef928db5bd35cfd998cca31f",
+          "kind": "skill"
+        },
+        {
+          "path": "skills/module-architect/report.md",
+          "hash": "5fcbba58499ebf3f7e8e04ab022b2573319c378de63db0b3c5abe79118535012",
+          "kind": "skill"
+        },
+        {
+          "path": "initial-analysis.schema.json",
+          "hash": "f92a7768b1d5fa88d0db1f7173e4fc3c18e34ffebf325de84b5143070e004a87",
+          "kind": "submission-schema"
+        }
+      ],
+      "submissionKinds": [
+        "initial-analysis"
+      ]
+    },
+    "global-fork": {
+      "package": "global-fork/1",
+      "hash": "6d343763f91e9705ad96e23db94708c9dc4c5a1aa1d01cd5f47addfcc5c01d2b",
+      "files": [
+        {
+          "path": "subs/harness/src/prompts/global-fork.system.md",
+          "hash": "c5bf6f29fa34e4f085339aa85ce2c32aab73aac8379cc53c308553007e31da0c",
+          "kind": "system"
+        },
+        {
+          "path": "subs/harness/src/prompts/global-fork.procedure.md",
+          "hash": "65adf15e906b6b40113cdf343b05cd31aca58c5ca9969303887f314427184668",
+          "kind": "procedure"
+        },
+        {
+          "path": "skills/module-architect/SKILL.md",
+          "hash": "9cd720b081d723246a1a60501178b47e8fafa777d3f950bccee15841b594f9c8",
+          "kind": "skill"
+        },
+        {
+          "path": "skills/module-architect/references/access.md",
+          "hash": "02712d2ab498c9b2209b488238cf2bcd047b207d25224d3b225f2c68bb559a40",
+          "kind": "skill"
+        },
+        {
+          "path": "skills/module-architect/references/cognitive-decomposition.md",
+          "hash": "f4ba2187c7f3c7eaadae8e0e1d6d93e2120c4ff93132b6296a0ac2ac1ad92ac4",
+          "kind": "skill"
+        },
+        {
+          "path": "skills/module-architect/references/discovery.md",
+          "hash": "050ec8a2c271a3c408646c5e8b3b3a09908b2af8eb964c0110ad1296e1cb5a3a",
+          "kind": "skill"
+        },
+        {
+          "path": "skills/module-architect/references/placement.md",
+          "hash": "b2c4179167eebd4a40ff7b211db13333e8803d523a9403d65d4570ca7ebdf847",
+          "kind": "skill"
+        },
+        {
+          "path": "skills/module-architect/references/refactoring.md",
+          "hash": "655add700f41da7ba47c168b84c1780771404b36ef928db5bd35cfd998cca31f",
+          "kind": "skill"
+        },
+        {
+          "path": "skills/module-architect/report.md",
+          "hash": "5fcbba58499ebf3f7e8e04ab022b2573319c378de63db0b3c5abe79118535012",
+          "kind": "skill"
+        },
+        {
+          "path": "global-fork.schema.json",
+          "hash": "e345c220aa9b90f2c29749275d720a681895de02fe2898aea900a32fa1216805",
+          "kind": "submission-schema"
+        }
+      ],
+      "submissionKinds": [
+        "decision",
+        "partial"
+      ]
+    },
+    "local-architect": {
+      "package": "local-architect/1",
+      "hash": "1ee2b7110dd35d01a06af9b33746d8282c03a6892c8a142c87d71a7182d26a81",
+      "files": [
+        {
+          "path": "subs/harness/src/prompts/local-architect.system.md",
+          "hash": "5b803430e39bede36cf21228b32c712bbbc6bd1a6dcc531587cf1cd4aea5aef9",
+          "kind": "system"
+        },
+        {
+          "path": "subs/harness/src/prompts/local-architect.procedure.md",
+          "hash": "7fe74c3ff3fed398d7ccbfb51ad3ef21fabec64d8188f1eb6f7bb13e73c88564",
+          "kind": "procedure"
+        },
+        {
+          "path": "skills/module-architect/SKILL.md",
+          "hash": "9cd720b081d723246a1a60501178b47e8fafa777d3f950bccee15841b594f9c8",
+          "kind": "skill"
+        },
+        {
+          "path": "skills/module-architect/references/access.md",
+          "hash": "02712d2ab498c9b2209b488238cf2bcd047b207d25224d3b225f2c68bb559a40",
+          "kind": "skill"
+        },
+        {
+          "path": "skills/module-architect/references/cognitive-decomposition.md",
+          "hash": "f4ba2187c7f3c7eaadae8e0e1d6d93e2120c4ff93132b6296a0ac2ac1ad92ac4",
+          "kind": "skill"
+        },
+        {
+          "path": "skills/module-architect/references/discovery.md",
+          "hash": "050ec8a2c271a3c408646c5e8b3b3a09908b2af8eb964c0110ad1296e1cb5a3a",
+          "kind": "skill"
+        },
+        {
+          "path": "skills/module-architect/references/placement.md",
+          "hash": "b2c4179167eebd4a40ff7b211db13333e8803d523a9403d65d4570ca7ebdf847",
+          "kind": "skill"
+        },
+        {
+          "path": "skills/module-architect/references/refactoring.md",
+          "hash": "655add700f41da7ba47c168b84c1780771404b36ef928db5bd35cfd998cca31f",
+          "kind": "skill"
+        },
+        {
+          "path": "skills/module-architect/report.md",
+          "hash": "5fcbba58499ebf3f7e8e04ab022b2573319c378de63db0b3c5abe79118535012",
+          "kind": "skill"
+        },
+        {
+          "path": "local-architect.schema.json",
+          "hash": "fbacc9e596ab84cc23d2e3949bc2fa953094c23d315bd465f03d4dc59fa39f83",
+          "kind": "submission-schema"
+        }
+      ],
+      "submissionKinds": [
+        "assign",
+        "request-placement",
+        "request-completion",
+        "yield-for-providers",
+        "unresolved"
+      ]
+    },
+    "engineer": {
+      "package": "engineer/1",
+      "hash": "84b84f5a56981133a3ea071b737e59f6b6298c171e96fa9332d4dd6c70570794",
+      "files": [
+        {
+          "path": "subs/harness/src/prompts/engineer.system.md",
+          "hash": "1a67feb201b0c4c33f427940e5b48094b4134a878f60ba3e92d60119a4a07a6d",
+          "kind": "system"
+        },
+        {
+          "path": "subs/harness/src/prompts/engineer.procedure.md",
+          "hash": "1e2fa84593f33c3bf175320902377e24c769e21b6604dc8e59f6b558af466e74",
+          "kind": "procedure"
+        },
+        {
+          "path": "skills/module-architect/SKILL.md",
+          "hash": "9cd720b081d723246a1a60501178b47e8fafa777d3f950bccee15841b594f9c8",
+          "kind": "skill"
+        },
+        {
+          "path": "skills/module-architect/references/access.md",
+          "hash": "02712d2ab498c9b2209b488238cf2bcd047b207d25224d3b225f2c68bb559a40",
+          "kind": "skill"
+        },
+        {
+          "path": "skills/module-architect/references/cognitive-decomposition.md",
+          "hash": "f4ba2187c7f3c7eaadae8e0e1d6d93e2120c4ff93132b6296a0ac2ac1ad92ac4",
+          "kind": "skill"
+        },
+        {
+          "path": "skills/module-architect/references/discovery.md",
+          "hash": "050ec8a2c271a3c408646c5e8b3b3a09908b2af8eb964c0110ad1296e1cb5a3a",
+          "kind": "skill"
+        },
+        {
+          "path": "skills/module-architect/references/placement.md",
+          "hash": "b2c4179167eebd4a40ff7b211db13333e8803d523a9403d65d4570ca7ebdf847",
+          "kind": "skill"
+        },
+        {
+          "path": "skills/module-architect/references/refactoring.md",
+          "hash": "655add700f41da7ba47c168b84c1780771404b36ef928db5bd35cfd998cca31f",
+          "kind": "skill"
+        },
+        {
+          "path": "skills/module-architect/report.md",
+          "hash": "5fcbba58499ebf3f7e8e04ab022b2573319c378de63db0b3c5abe79118535012",
+          "kind": "skill"
+        },
+        {
+          "path": "engineer.schema.json",
+          "hash": "222d2f62f8fd634e1409f6e032ed88e70185c1cb9de2ba8c83fb0019a55a069c",
+          "kind": "submission-schema"
+        }
+      ],
+      "submissionKinds": [
+        "completion-proposed",
+        "partial",
+        "unsuitable",
+        "contract-needed"
+      ]
+    },
+    "contract-engineer": {
+      "package": "contract-engineer/1",
+      "hash": "3cdd32b6b6b811f62cb5ddf36774a6c5645ec174cac263f31ac9bcc07ba92518",
+      "files": [
+        {
+          "path": "subs/harness/src/prompts/contract-engineer.system.md",
+          "hash": "2bb1e85425abb223accb9dbeb04565294d51689283d4ee0c24d34f32d80709b9",
+          "kind": "system"
+        },
+        {
+          "path": "subs/harness/src/prompts/contract.procedure.md",
+          "hash": "df6b25d5e96cdc78d3adbd0b6ba112ddc7dd238b6e1bb6b646f30a44705c1486",
+          "kind": "procedure"
+        },
+        {
+          "path": "skills/module-architect/SKILL.md",
+          "hash": "9cd720b081d723246a1a60501178b47e8fafa777d3f950bccee15841b594f9c8",
+          "kind": "skill"
+        },
+        {
+          "path": "skills/module-architect/references/access.md",
+          "hash": "02712d2ab498c9b2209b488238cf2bcd047b207d25224d3b225f2c68bb559a40",
+          "kind": "skill"
+        },
+        {
+          "path": "skills/module-architect/references/cognitive-decomposition.md",
+          "hash": "f4ba2187c7f3c7eaadae8e0e1d6d93e2120c4ff93132b6296a0ac2ac1ad92ac4",
+          "kind": "skill"
+        },
+        {
+          "path": "skills/module-architect/references/discovery.md",
+          "hash": "050ec8a2c271a3c408646c5e8b3b3a09908b2af8eb964c0110ad1296e1cb5a3a",
+          "kind": "skill"
+        },
+        {
+          "path": "skills/module-architect/references/placement.md",
+          "hash": "b2c4179167eebd4a40ff7b211db13333e8803d523a9403d65d4570ca7ebdf847",
+          "kind": "skill"
+        },
+        {
+          "path": "skills/module-architect/references/refactoring.md",
+          "hash": "655add700f41da7ba47c168b84c1780771404b36ef928db5bd35cfd998cca31f",
+          "kind": "skill"
+        },
+        {
+          "path": "skills/module-architect/report.md",
+          "hash": "5fcbba58499ebf3f7e8e04ab022b2573319c378de63db0b3c5abe79118535012",
+          "kind": "skill"
+        },
+        {
+          "path": "subs/harness/src/prompts/contract.skill.md",
+          "hash": "18876072fc4dbfb21e3f6c4b3c5a99d31954790fe7761dabceaf5c98ba0c60a3",
+          "kind": "skill"
+        },
+        {
+          "path": "contract-engineer.schema.json",
+          "hash": "aa8beaa92f26fd5abebe94c11baacecc9a0ad73b527bafa445ecead8bcfe0339",
+          "kind": "submission-schema"
+        }
+      ],
+      "submissionKinds": [
+        "established",
+        "incomplete"
+      ]
+    }
+  }
+}

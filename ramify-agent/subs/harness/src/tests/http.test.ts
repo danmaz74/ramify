@@ -43,8 +43,10 @@ describe('the protocol over HTTP, with the web assets absent', () => {
     expect(status).toBe(200);
     expect(planListResponseSchema.parse(body).plans).toEqual([
       { status: 'unreadable', id: 'broken', path: 'plans/broken/plan.md', message: 'plan.md is a directory, not a file' },
-      { status: 'readable', id: 'review-notes', title: 'Reviewer notes on a review run', path: 'plans/review-notes/plan.md', mapping: { state: 'not-mapped' } },
-      { status: 'readable', id: 'revision-diff', title: 'Compare two revisions of a record', path: 'plans/revision-diff/plan.md', mapping: { state: 'not-mapped' } },
+      { status: 'readable', id: 'review-notes', title: 'Reviewer notes on a review run', path: 'plans/review-notes/plan.md' },
+      { status: 'readable', id: 'reviewer-identity', title: 'Who reviewed a record', path: 'plans/reviewer-identity/plan.md' },
+      { status: 'readable', id: 'revision-diff', title: 'Compare two revisions of a record', path: 'plans/revision-diff/plan.md' },
+      { status: 'readable', id: 'status-badge-tone', title: 'A tone for the status badge', path: 'plans/status-badge-tone/plan.md' },
     ]);
   });
 
@@ -52,7 +54,7 @@ describe('the protocol over HTTP, with the web assets absent', () => {
     const { status, body } = await query(server, protocolPaths.plan('revision-diff'));
     expect(status).toBe(200);
     const { plan } = planResponseSchema.parse(body);
-    expect(plan).toMatchObject({ id: 'revision-diff', title: 'Compare two revisions of a record', mapping: { state: 'not-mapped' } });
+    expect(plan).toMatchObject({ id: 'revision-diff', title: 'Compare two revisions of a record' });
     expect(plan.markdown).toMatch(/^# Compare two revisions of a record\n/);
   });
 

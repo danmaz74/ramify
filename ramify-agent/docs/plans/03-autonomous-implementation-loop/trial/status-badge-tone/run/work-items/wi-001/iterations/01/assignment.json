@@ -1,0 +1,85 @@
+{
+  "schema": "ramify-agent.iteration-assignment/1",
+  "id": "wi-001.i01",
+  "workItem": "wi-001",
+  "outline": {
+    "id": "wi-001",
+    "revision": 1,
+    "hash": "81eb8fe5b8d51ca573cb351597b52e2072cbb294a664cc67bfc9b956b983d62b"
+  },
+  "stage": 0,
+  "kind": "ordinary",
+  "goal": "Give the status badge a tone, with tests of its own.",
+  "approach": "Change the source, then the tests that state it.",
+  "scope": {
+    "revision": 1,
+    "base": {
+      "module": "collection-review/workspace/shared-ui",
+      "includedChildren": []
+    },
+    "extra": [],
+    "read": [],
+    "bootstrap": [],
+    "rationale": "The work is in this module.",
+    "resolved": {
+      "roots": [
+        "/tmp/ramify-agent-fixture-trial-ukKaKn/collection-review/subs/workspace/subs/shared-ui/src"
+      ],
+      "files": [
+        "/tmp/ramify-agent-fixture-trial-ukKaKn/collection-review/subs/workspace/subs/shared-ui/module.ramify",
+        "/tmp/ramify-agent-fixture-trial-ukKaKn/collection-review/subs/workspace/subs/shared-ui/README.md"
+      ],
+      "view": {
+        "status": "materialized",
+        "revision": "rev/1:d1c8d3e4-79f0-4323-9d42-47dfc970bb48:1",
+        "input": "input/1:4e2a4b748c41ef2bbae8640cfd175df0e10bd015c2ec11c72f5b11a7fc983170",
+        "coverageLimits": [
+          "cut: 9",
+          "detailsUnavailable: 2"
+        ]
+      }
+    }
+  },
+  "requirementRefs": [
+    {
+      "anchor": "Request"
+    }
+  ],
+  "externalCapabilities": [],
+  "completionEvidence": "The tests this scope owns pass.",
+  "evidenceObligations": [],
+  "gate": {
+    "checkpoint": "iteration",
+    "tests": {
+      "policy": "owned-by-scope",
+      "exactOwners": [
+        "collection-review/workspace/shared-ui"
+      ],
+      "subtrees": [],
+      "extraSuites": []
+    }
+  },
+  "guarded": [
+    {
+      "path": "cucumber.js",
+      "hash": "d75c4a8957da207a13d2792b4275fe68985aa92429b334dd68b6775692cda407"
+    },
+    {
+      "path": "package.json",
+      "hash": "1c4069b67e516510626b5ce68d621bdd86000d7dcf4f06f6126e0049d4879a82"
+    },
+    {
+      "path": "tsconfig.json",
+      "hash": "4050f9725f7014705ef88b4b44b52ad185b02821b599bf7084e872728ed606e3"
+    },
+    {
+      "path": "vite.config.ts",
+      "hash": "6b19c73fc1516d843b11a70191cff52b611d8840aa27f2d4ef62eda654c2b323"
+    },
+    {
+      "path": "vitest.config.ts",
+      "hash": "39a8918f589dbd06527a4bc14df2c4b11fe988c2b18bb8cd63b40f6dfd98f6cc"
+    }
+  ],
+  "authorizations": []
+}

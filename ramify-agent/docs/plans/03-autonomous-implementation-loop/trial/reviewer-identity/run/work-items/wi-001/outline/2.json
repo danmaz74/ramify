@@ -1,0 +1,16 @@
+{
+  "schema": "ramify-agent.work-item-outline/1",
+  "workItem": "wi-001",
+  "revision": 2,
+  "invocation": "inv-0008",
+  "changes": "Every stage is accepted; the reviewer is carried and shown.",
+  "decomposition": {
+    "kind": "single-iteration",
+    "rationale": "No change is needed, so one empty piece of work carries the goal."
+  },
+  "reuse": [],
+  "breakingChanges": [],
+  "stages": [],
+  "hypothesesSeen": [],
+  "revisionReason": "The last stage is accepted."
+}

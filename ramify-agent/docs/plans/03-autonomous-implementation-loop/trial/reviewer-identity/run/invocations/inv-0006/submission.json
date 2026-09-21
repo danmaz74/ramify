@@ -1,0 +1,30 @@
+{
+  "schema": "ramify-agent.local-architect-submission/1",
+  "kind": "assign",
+  "localDecisions": [],
+  "assignment": {
+    "stage": 2,
+    "kind": "breaking",
+    "goal": "Show the reviewer's display name and role above the verdict.",
+    "approach": "Change the source, then the tests that state it.",
+    "scope": {
+      "base": {
+        "modules": [
+          "collection-review/workspace/reviews/ui",
+          "collection-review/workspace/reviews/ui/pure-ui"
+        ],
+        "rationale": "The pure view's props gain a required reviewer, and the panel that fills them must supply it in the same step."
+      },
+      "extra": [],
+      "read": [],
+      "rationale": "The view and its one filler move together."
+    },
+    "requirementRefs": [
+      {
+        "anchor": "Request"
+      }
+    ],
+    "externalCapabilities": [],
+    "completionEvidence": "The tests this scope owns pass."
+  }
+}

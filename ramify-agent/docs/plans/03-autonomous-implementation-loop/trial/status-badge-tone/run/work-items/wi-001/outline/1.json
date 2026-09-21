@@ -1,0 +1,16 @@
+{
+  "schema": "ramify-agent.work-item-outline/1",
+  "workItem": "wi-001",
+  "revision": 1,
+  "invocation": "inv-0002",
+  "changes": "The badge takes an optional tone and carries it as data-tone; it reads as neutral without one.",
+  "decomposition": {
+    "kind": "single-iteration",
+    "rationale": "One component and its tests; nothing else changes and nothing depends on the change."
+  },
+  "reuse": [],
+  "breakingChanges": [],
+  "stages": [],
+  "hypothesesSeen": [],
+  "revisionReason": ""
+}

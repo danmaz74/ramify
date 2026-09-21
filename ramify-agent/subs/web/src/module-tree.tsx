@@ -1,5 +1,19 @@
-import type { TouchedModule, Weight } from '../../harness/src/interfaces/map.js';
-import type { ModuleTree as Tree } from '../../harness/src/interfaces/protocol/maps.js';
+import type { ModuleTree as Tree } from '../../harness/src/interfaces/protocol/evidence.js';
+
+/**
+ * How much of a module a change touches. It is a presentation choice of this
+ * page, not a record of the harness: whatever the Run page comes to draw on
+ * the tree supplies one of these for each module it marks.
+ */
+export type Weight = 'heavy' | 'light' | 'exposure-only';
+
+/** One module drawn as touched, with why and, for a module that does not exist yet, its proposal. */
+export interface TouchedModule {
+  readonly module: string;
+  readonly weight: Weight;
+  readonly why: string;
+  readonly proposed?: { readonly parent: string; readonly purpose: string; readonly tags: readonly string[] } | undefined;
+}
 
 interface Node {
   readonly module: string;
@@ -19,8 +33,8 @@ function leaf(module: string): string {
 }
 
 /**
- * The modules a map touches, drawn on the project's module tree with their
- * weights. The branches that hold touched modules are open; every other
+ * The modules a change touches, drawn on the project's module tree with
+ * their weights. The branches that hold touched modules are open; every other
  * module is one muted line with the number of modules beneath it. A proposed
  * module is drawn under its parent and marked as proposed.
  */

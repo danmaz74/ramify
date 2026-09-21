@@ -1,0 +1,584 @@
+{
+  "description": "The executable form of the main plan's acceptance matrix, which composition.test.ts and scripts/composition-gate.ts read. Each case names its owning iteration and the tests, trial record or document that are its evidence. The main plan is the authority for the cases themselves.",
+  "cases": [
+    {
+      "case": "C1",
+      "owner": 11,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/run-protocol.test.ts",
+          "titles": [
+            "C1: a run completes with no client, and a client attached afterwards reads the same state and events"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "C2",
+      "owner": 4,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/run-recovery.test.ts",
+          "titles": [
+            "the recovery table"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "C3",
+      "owner": 7,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/late-writes.test.ts",
+          "titles": [
+            "is settled with its process group, and its result completes nothing"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "C4",
+      "owner": 6,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/accepted-commit.test.ts",
+          "titles": [
+            "a crash between the gate",
+            "a later source change invalidates nothing: the accepted commit stays as it is"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "C5",
+      "owner": 4,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/run-commands.test.ts",
+          "titles": [
+            "an identical retry returns the original receipt and starts no second run",
+            "a reused ID with other content is a conflict, and nothing is started",
+            "a stale expected version is rejected with the current version"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "G1",
+      "owner": 5,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/work-items.test.ts",
+          "titles": [
+            "hypotheses create no work, and a hypothesis appears in no work record"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "G2",
+      "owner": 8,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/placement.test.ts",
+          "titles": [
+            "the first creates a capability and revises its hypothesis; the second inherits its brief and reuses the entry"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "G3",
+      "owner": 8,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/placement.test.ts",
+          "titles": [
+            "G2, G3: two sequential placement forks, and the brief between them"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "G4",
+      "owner": 8,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/run-recovery.test.ts",
+          "titles": [
+            "G4: a crash after the append and before its completion answers already-present, and one brief exists"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "G5",
+      "owner": 8,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/local-authority.test.ts",
+          "titles": [
+            "G5, G6, G7: local authority, escalation and what a revision reaches"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "G6",
+      "owner": 8,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/local-authority.test.ts",
+          "titles": [
+            "G5, G6, G7: local authority, escalation and what a revision reaches"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "G7",
+      "owner": 8,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/local-authority.test.ts",
+          "titles": [
+            "G5, G6, G7: local authority, escalation and what a revision reaches"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "G8",
+      "owner": 6,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/iterations.test.ts",
+          "titles": [
+            "G8: one small work item completes in one iteration",
+            "G8: a work item revised across several iterations keeps every obligation"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "G9",
+      "owner": 6,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/module-creation.test.ts",
+          "titles": [
+            "G9: an accepted proposed entry owner reaches implementation"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "G10",
+      "owner": 8,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/module-creation.test.ts",
+          "titles": [
+            "G10: global placement authorizes a new owner without claiming it exists"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "P1",
+      "owner": 9,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/contract-delegation.test.ts",
+          "titles": [
+            "P1: one consumer delegates, resumes after provider conformance and verifies against the real provider"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "P2",
+      "owner": 9,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/requirement-verification.test.ts",
+          "titles": [
+            "P2: the contract gate rejects a fake under a production-looking name",
+            "P2: architectural evidence does not present a fake as production behavior"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "P3",
+      "owner": 9,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/contract-revision.test.ts",
+          "titles": [
+            "P3: a contract revision reschedules current evidence without resetting completed work"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "P4",
+      "owner": 9,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/contract-revision.test.ts",
+          "titles": [
+            "P4: an ordinary provider engineer reports inability to conform through its own submission union"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "P5",
+      "owner": 9,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/contract-scheduling.test.ts",
+          "titles": [
+            "P5: a shared obligation runs its provider once and each consumer verifies separately",
+            "P5: a chain of changes back through a module that has yielded is not a cycle",
+            "P5: a capability that transitively depends on itself"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "K1",
+      "owner": 6,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/iteration-gate.test.ts",
+          "titles": [
+            "K1: a module gate fails, is repaired and reruns the complete gate"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "K2",
+      "owner": 6,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/no-rewind.test.ts",
+          "titles": [
+            "K2: a failure outside the last engineer"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "K3",
+      "owner": 6,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/iterations.test.ts",
+          "titles": [
+            "K3: exact-owner and included-subtree selections at gate time"
+          ]
+        },
+        {
+          "file": "subs/harness/src/tests/test-selection.test.ts",
+          "titles": [
+            "K3: an exact owner and an included child subtree"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "K4",
+      "owner": 9,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/contract-delegation.test.ts",
+          "titles": [
+            "K4: the contract gate runs the suite against the fake and the provider gate runs it against the real provider"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "K5a",
+      "owner": 4,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/readiness.test.ts",
+          "titles": [
+            "the three causes a readiness failure can have"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "K5b",
+      "owner": 6,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/iteration-gate.test.ts",
+          "titles": [
+            "K5b: an invalid session, a timeout and an exhausted limit keep distinct causes"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "K6",
+      "owner": 10,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/breaking-work.test.ts",
+          "titles": [
+            "K6: the gate is not satisfied by weakening what it checks"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "K7",
+      "owner": 10,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/breaking-work.test.ts",
+          "titles": [
+            "K7: a breaking feature is isolated into iterations that are green at every accepted boundary"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "K8",
+      "owner": 6,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/iteration-gate.test.ts",
+          "titles": [
+            "K8: every gate resolves the current tests under the captured policy"
+          ]
+        },
+        {
+          "file": "subs/harness/src/tests/test-selection.test.ts",
+          "titles": [
+            "K8: every resolution reads the tree as it stands"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "X1a",
+      "owner": 6,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/iterations.test.ts",
+          "titles": [
+            "X1a: an engineer reaches its context budget"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "X1b",
+      "owner": 9,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/contract-delegation.test.ts",
+          "titles": [
+            "X1b: a contract sub-session that returns incomplete registers nothing"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "X1c",
+      "owner": 8,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/placement.test.ts",
+          "titles": [
+            "X1c: a fork that returns partial findings and no decision"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "X2",
+      "owner": 5,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/compaction.test.ts",
+          "titles": [
+            "an initial architect and a local architect that compact are both recorded"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "X3",
+      "owner": 6,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/write-guard.test.ts",
+          "titles": [
+            "X3: allowed and denied targets"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "X4",
+      "owner": 6,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/iterations.test.ts",
+          "titles": [
+            "X4: a denied call mutates nothing and stays deduplicated"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "X5",
+      "owner": 6,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/write-guard.test.ts",
+          "titles": [
+            "X5: a resolution failure is not a scope violation"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "X6",
+      "owner": 7,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/unguarded-write.test.ts",
+          "titles": [
+            "X6: an unguarded shell mutation and an outside read make the MVP"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "M1",
+      "owner": 5,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/progress.test.ts",
+          "titles": [
+            "the record kinds are distinct directories, and the projection appends nothing"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "M2",
+      "owner": 11,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/progress.test.ts",
+          "titles": [
+            "M2: provider waits, verified reuse, reopened evidence and superseded hypotheses"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "M3",
+      "owner": 11,
+      "tests": [
+        {
+          "file": "subs/web/src/tests/run-page.test.tsx",
+          "titles": [
+            "a lost connection is shown apart from the run"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "M4",
+      "owner": 11,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/kpi-metrics.test.ts",
+          "titles": [
+            "M4: every metric keeps its numerator, denominator, version and coverage"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "M5",
+      "owner": 6,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/line-events.test.ts",
+          "titles": [
+            "M5: every session counts, whatever ended it"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "T1",
+      "owner": 12,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/composition.test.ts",
+          "titles": [
+            "the recovery tables of the ten state machines",
+            "every value of every union has a producer",
+            "no query appends an event",
+            "the acceptance matrix, composed"
+          ]
+        },
+        {
+          "file": "subs/harness/src/tests/composition-recovery.test.ts",
+          "titles": [
+            "the composed recovery table"
+          ]
+        },
+        {
+          "file": "subs/harness/src/tests/composition-recovery-delegation.test.ts",
+          "titles": [
+            "the composed recovery table"
+          ]
+        },
+        {
+          "file": "subs/harness/src/tests/composition-recovery-chains.test.ts",
+          "titles": [
+            "the composed recovery table"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "T2",
+      "owner": 12,
+      "trial": "trial/review-notes"
+    },
+    {
+      "case": "T3",
+      "owner": 12,
+      "tests": [
+        {
+          "file": "subs/harness/src/tests/fixture-trials.test.ts",
+          "titles": [
+            "T3: reviewer-identity on the real fixture toolchain"
+          ]
+        }
+      ],
+      "trial": "trial/reviewer-identity"
+    },
+    {
+      "case": "T4",
+      "owner": 12,
+      "document": "trial/review-sheet.md"
+    }
+  ]
+}

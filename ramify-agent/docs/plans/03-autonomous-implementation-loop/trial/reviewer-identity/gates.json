@@ -1,0 +1,358 @@
+[
+  {
+    "id": "ga-0001",
+    "checkpoint": "readiness",
+    "subject": {},
+    "verdict": "passed",
+    "cause": null,
+    "commit": null,
+    "commands": [
+      {
+        "kind": "tests",
+        "argv": [
+          "npm",
+          "test"
+        ],
+        "outcome": "passed",
+        "exitCode": 0,
+        "elapsedMs": 1631,
+        "selection": null
+      },
+      {
+        "kind": "type-check",
+        "argv": [
+          "npm",
+          "run",
+          "type-check"
+        ],
+        "outcome": "passed",
+        "exitCode": 0,
+        "elapsedMs": 656,
+        "selection": null
+      },
+      {
+        "kind": "ramify-check",
+        "argv": [
+          "/ramify/ramify-agent/node_modules/.bin/ramify",
+          "check",
+          "--batch",
+          "--root",
+          "<project>",
+          "--format",
+          "json"
+        ],
+        "outcome": "passed",
+        "exitCode": 0,
+        "elapsedMs": 3554,
+        "selection": null
+      }
+    ]
+  },
+  {
+    "id": "ga-0002",
+    "checkpoint": "iteration",
+    "subject": {
+      "workItem": "wi-001",
+      "iteration": "wi-001.i01"
+    },
+    "verdict": "passed",
+    "cause": null,
+    "commit": "1a3a661fc1c73e0f93ffc51895a5657ddf268734",
+    "commands": [
+      {
+        "kind": "tests",
+        "argv": [
+          "<project>/node_modules/.bin/vitest",
+          "run",
+          "subs/workspace/subs/contracts/src/tests/vocabulary.test.ts"
+        ],
+        "outcome": "passed",
+        "exitCode": 0,
+        "elapsedMs": 708,
+        "selection": [
+          "subs/workspace/subs/contracts/src/tests/vocabulary.test.ts"
+        ]
+      },
+      {
+        "kind": "type-check",
+        "argv": [
+          "npm",
+          "run",
+          "type-check"
+        ],
+        "outcome": "passed",
+        "exitCode": 0,
+        "elapsedMs": 711,
+        "selection": null
+      },
+      {
+        "kind": "ramify-check",
+        "argv": [
+          "/ramify/ramify-agent/node_modules/.bin/ramify",
+          "check",
+          "--batch",
+          "--root",
+          "<project>",
+          "--format",
+          "json"
+        ],
+        "outcome": "passed",
+        "exitCode": 0,
+        "elapsedMs": 3776,
+        "selection": null
+      }
+    ]
+  },
+  {
+    "id": "ga-0003",
+    "checkpoint": "breaking-iteration",
+    "subject": {
+      "workItem": "wi-001",
+      "iteration": "wi-001.i02"
+    },
+    "verdict": "passed",
+    "cause": null,
+    "commit": "a99964562af700ad78b4dda3f44a96207d880bb0",
+    "commands": [
+      {
+        "kind": "tests",
+        "argv": [
+          "npm",
+          "test"
+        ],
+        "outcome": "passed",
+        "exitCode": 0,
+        "elapsedMs": 1512,
+        "selection": null
+      },
+      {
+        "kind": "type-check",
+        "argv": [
+          "npm",
+          "run",
+          "type-check"
+        ],
+        "outcome": "passed",
+        "exitCode": 0,
+        "elapsedMs": 690,
+        "selection": null
+      },
+      {
+        "kind": "ramify-check",
+        "argv": [
+          "/ramify/ramify-agent/node_modules/.bin/ramify",
+          "check",
+          "--batch",
+          "--root",
+          "<project>",
+          "--format",
+          "json"
+        ],
+        "outcome": "passed",
+        "exitCode": 0,
+        "elapsedMs": 3337,
+        "selection": null
+      },
+      {
+        "kind": "tests",
+        "argv": [
+          "<project>/node_modules/.bin/vitest",
+          "run",
+          "src/tests/assembly.test.ts",
+          "src/tests/http.test.ts",
+          "src/tests/protocol-typing.test.ts",
+          "subs/workspace/src/tests/shell.test.tsx",
+          "subs/workspace/subs/reviews/src/tests/router.test.ts",
+          "subs/workspace/subs/reviews/src/tests/sessions.test.ts",
+          "subs/workspace/subs/reviews/src/tests/typing.test.ts",
+          "subs/workspace/subs/reviews/subs/core/src/tests/runtime.test.ts",
+          "subs/workspace/subs/reviews/subs/ui/src/tests/review-panel.test.tsx"
+        ],
+        "outcome": "passed",
+        "exitCode": 0,
+        "elapsedMs": 1143,
+        "selection": [
+          "src/tests/assembly.test.ts",
+          "src/tests/http.test.ts",
+          "src/tests/protocol-typing.test.ts",
+          "subs/workspace/src/tests/shell.test.tsx",
+          "subs/workspace/subs/reviews/src/tests/router.test.ts",
+          "subs/workspace/subs/reviews/src/tests/sessions.test.ts",
+          "subs/workspace/subs/reviews/src/tests/typing.test.ts",
+          "subs/workspace/subs/reviews/subs/core/src/tests/runtime.test.ts",
+          "subs/workspace/subs/reviews/subs/ui/src/tests/review-panel.test.tsx"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "ga-0004",
+    "checkpoint": "breaking-iteration",
+    "subject": {
+      "workItem": "wi-001",
+      "iteration": "wi-001.i03"
+    },
+    "verdict": "passed",
+    "cause": null,
+    "commit": "2023cb565805cfe16ac7b546d0b295435b2499e8",
+    "commands": [
+      {
+        "kind": "tests",
+        "argv": [
+          "npm",
+          "test"
+        ],
+        "outcome": "passed",
+        "exitCode": 0,
+        "elapsedMs": 1557,
+        "selection": null
+      },
+      {
+        "kind": "type-check",
+        "argv": [
+          "npm",
+          "run",
+          "type-check"
+        ],
+        "outcome": "passed",
+        "exitCode": 0,
+        "elapsedMs": 719,
+        "selection": null
+      },
+      {
+        "kind": "ramify-check",
+        "argv": [
+          "/ramify/ramify-agent/node_modules/.bin/ramify",
+          "check",
+          "--batch",
+          "--root",
+          "<project>",
+          "--format",
+          "json"
+        ],
+        "outcome": "passed",
+        "exitCode": 0,
+        "elapsedMs": 3418,
+        "selection": null
+      },
+      {
+        "kind": "tests",
+        "argv": [
+          "<project>/node_modules/.bin/vitest",
+          "run",
+          "subs/workspace/subs/reviews/subs/ui/src/tests/review-panel.test.tsx",
+          "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/tests/format.test.ts",
+          "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/tests/review-result.test.tsx"
+        ],
+        "outcome": "passed",
+        "exitCode": 0,
+        "elapsedMs": 932,
+        "selection": [
+          "subs/workspace/subs/reviews/subs/ui/src/tests/review-panel.test.tsx",
+          "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/tests/format.test.ts",
+          "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/tests/review-result.test.tsx"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "ga-0005",
+    "checkpoint": "work-item",
+    "subject": {
+      "workItem": "wi-001"
+    },
+    "verdict": "passed",
+    "cause": null,
+    "commit": null,
+    "commands": [
+      {
+        "kind": "tests",
+        "argv": [
+          "npm",
+          "test"
+        ],
+        "outcome": "passed",
+        "exitCode": 0,
+        "elapsedMs": 1680,
+        "selection": null
+      },
+      {
+        "kind": "type-check",
+        "argv": [
+          "npm",
+          "run",
+          "type-check"
+        ],
+        "outcome": "passed",
+        "exitCode": 0,
+        "elapsedMs": 686,
+        "selection": null
+      },
+      {
+        "kind": "ramify-check",
+        "argv": [
+          "/ramify/ramify-agent/node_modules/.bin/ramify",
+          "check",
+          "--batch",
+          "--root",
+          "<project>",
+          "--format",
+          "json"
+        ],
+        "outcome": "passed",
+        "exitCode": 0,
+        "elapsedMs": 3585,
+        "selection": null
+      }
+    ]
+  },
+  {
+    "id": "ga-0006",
+    "checkpoint": "final",
+    "subject": {},
+    "verdict": "passed",
+    "cause": null,
+    "commit": null,
+    "commands": [
+      {
+        "kind": "tests",
+        "argv": [
+          "npm",
+          "test"
+        ],
+        "outcome": "passed",
+        "exitCode": 0,
+        "elapsedMs": 1565,
+        "selection": null
+      },
+      {
+        "kind": "type-check",
+        "argv": [
+          "npm",
+          "run",
+          "type-check"
+        ],
+        "outcome": "passed",
+        "exitCode": 0,
+        "elapsedMs": 673,
+        "selection": null
+      },
+      {
+        "kind": "ramify-check",
+        "argv": [
+          "/ramify/ramify-agent/node_modules/.bin/ramify",
+          "check",
+          "--batch",
+          "--root",
+          "<project>",
+          "--format",
+          "json"
+        ],
+        "outcome": "passed",
+        "exitCode": 0,
+        "elapsedMs": 3535,
+        "selection": null
+      }
+    ]
+  }
+]

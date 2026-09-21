@@ -1,0 +1,27 @@
+ramify 1
+module evidence
+
+// Running the Ramify CLI: its exit codes and the private daemon stay here.
+// The executable's own path crosses, because a run captures the complete
+// command it ran the Ramify check with, environment included, and a captured
+// command that names no executable cannot be run again.
+expose-src RamifyCli, RamifyRun, RamifyCheckResult, MaterializeResult, ramifyVersion, privateRamify, ramifyExecutable from "ramify-cli.ts" to parent
+
+// Reading what Ramify generates: the architect view, a requester API view and
+// the measurement document. Their file formats stay here.
+expose-src architectViewDirectory, ArchitectMeta, readArchitectMeta, coverageLimitsOf, ArchitectIndex, loadArchitectIndex, loadModuleTree from "views.ts" to parent
+expose-src ModuleEntry, SymbolRecord, findModule, symbolRecords, SourceArea, ApiViewSnapshot, readApiView, findInView from "views.ts" to parent
+expose-src isTestingModule from "views.ts" to parent
+expose-src MeasurementDocument, ModuleMeasurement, MeasurementRead, readMeasurement from "measure.ts" to parent
+
+// Running one of the target project's own commands, in its own process group
+// and with a clean environment.
+expose-src runCommand, CommandRequest, CommandRun, CommandOutcome, CommandOutput, cleanEnvironment, outputTailBytes from "run-command.ts" to parent
+
+// The identity of the state the evidence describes.
+expose-src guardedFilesHash from "guarded-files.ts" to parent
+
+// Git, for the run branch: a clean-repository check, the branch, the commit made
+// after a gate passes, and what changed.
+expose-src GitError, isCleanRepository, createRunBranch, commitAccepted, findCommitByTrailer, changedPaths, diffNumstat from "git.ts" to parent
+expose-src commitNameStatus, worktreeLineChanges, changedEntries from "git.ts" to parent

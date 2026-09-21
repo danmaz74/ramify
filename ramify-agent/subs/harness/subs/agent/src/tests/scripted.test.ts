@@ -13,6 +13,8 @@ function spec(verdicts: SubmissionVerdict[] = [{ accepted: true }]): { spec: Ses
       scope: { workingDirectory: '/project' },
       systemPrompt: 'system',
       prompt: 'map the plan',
+      session: { mode: 'fresh' },
+      context: { compaction: 'allowed', budgetTokens: null, budgetFraction: null, reportReserveTokens: 0 },
       builtinTools: ['read', 'grep'],
       tools: [{
         name: 'echo',

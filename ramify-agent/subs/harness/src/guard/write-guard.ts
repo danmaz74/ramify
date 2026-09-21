@@ -1,0 +1,106 @@
+import { isContained, resolveRealTarget } from './resolve-contained-path.js';
+
+/*
+ * The write guard. `edit` and `write` are intercepted before they execute:
+ * the target is resolved against the invocation's working directory, then
+ * against the real filesystem, and only then checked against the write scope
+ * the assignment recorded.
+ *
+ * A block makes no mutation, does not end the session, does not request
+ * approval and does not widen the scope. Only a recorded assignment changes
+ * write authority: a retry or a successful read does not.
+ *
+ * Nothing here stores what the call proposed to write.
+ */
+
+/** The write scope as the guard uses it: canonical paths, and the revision that recorded them. */
+export interface GuardedScope {
+  /** The revision of the `WriteScope` these paths were captured at. */
+  readonly revision: number;
+  /** Canonical directories whose whole contents the assignment may write. */
+  readonly roots: readonly string[];
+  /** Canonical single files the assignment may write, such as a declaration or a contract. */
+  readonly files: readonly string[];
+}
+
+/** What the guard decided about one call. */
+export type GuardVerdict = 'allowed' | 'blocked-scope' | 'blocked-unresolved';
+
+/** One guarded call, as the observation records it. Never the proposed contents. */
+export interface GuardDecisionRecord {
+  readonly verdict: GuardVerdict;
+  /** The target exactly as the agent wrote it. */
+  readonly requested: string;
+  /** What it resolved to, or null when it could not be resolved. */
+  readonly resolved: string | null;
+  readonly reason: string;
+}
+
+/** The field a mutating built-in names its target in. */
+function targetOf(input: unknown): string | null {
+  if (typeof input !== 'object' || input === null) return null;
+  const record = input as Record<string, unknown>;
+  for (const field of ['path', 'file_path', 'filePath']) {
+    const value = record[field];
+    if (typeof value === 'string' && value.trim() !== '') return value;
+  }
+  return null;
+}
+
+/**
+ * Decides one guarded call. It resolves the target first and judges the
+ * scope second, so a path that cannot be resolved is never reported as a
+ * scope violation and a scope violation is never reported as a resolution
+ * failure.
+ */
+export async function decideWrite(
+  scope: GuardedScope,
+  workingDirectory: string,
+  input: unknown,
+): Promise<GuardDecisionRecord> {
+  const requested = targetOf(input);
+  if (requested === null) {
+    return { verdict: 'blocked-unresolved', requested: '', resolved: null, reason: 'the call names no path to write' };
+  }
+  const target = await resolveRealTarget(workingDirectory, requested);
+  if (!target.ok) {
+    return { verdict: 'blocked-unresolved', requested, resolved: null, reason: target.reason };
+  }
+  if (scope.files.includes(target.resolved)) {
+    return { verdict: 'allowed', requested, resolved: target.resolved, reason: 'the write scope names this file' };
+  }
+  const root = scope.roots.find(candidate => isContained(candidate, target.resolved));
+  if (root !== undefined) {
+    return { verdict: 'allowed', requested, resolved: target.resolved, reason: `the write scope contains ${root}` };
+  }
+  return {
+    verdict: 'blocked-scope',
+    requested,
+    resolved: target.resolved,
+    reason: `${target.resolved} lies outside every location this assignment may write`,
+  };
+}
+
+/**
+ * What a blocked call tells the agent: the target, the scope, and what to do
+ * instead. It never offers to widen the scope and never asks for approval.
+ */
+export function blockExplanation(decision: GuardDecisionRecord, scope: GuardedScope): string {
+  const locations = [
+    ...scope.roots.map(root => `${root}/ (and everything beneath it)`),
+    ...scope.files.map(file => file),
+  ];
+  const where = locations.length === 0 ? '  (this assignment may write nothing)' : locations.map(line => `  ${line}`).join('\n');
+  const head = decision.verdict === 'blocked-unresolved'
+    ? `The target "${decision.requested}" could not be resolved: ${decision.reason}. Nothing was written.`
+    : `The target "${decision.requested}" resolves to ${decision.resolved ?? 'nothing'}, which is outside this iteration's write scope. Nothing was written.`;
+  return [
+    head,
+    '',
+    `Write scope (revision ${scope.revision}):`,
+    where,
+    '',
+    'Report the need in your submission, or ask for it through the delegation mechanism.',
+    'Do not retry the same target: a retry does not widen the scope, and only a recorded assignment changes what you may write.',
+  ].join('\n');
+}

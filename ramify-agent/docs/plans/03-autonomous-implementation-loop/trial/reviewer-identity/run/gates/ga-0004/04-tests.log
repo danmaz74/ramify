@@ -1,0 +1,9 @@
+
+ RUN  v5.0.0 /tmp/ramify-agent-fixture-trial-sugtii/collection-review
+
+
+ Test Files  3 passed (3)
+      Tests  8 passed (8)
+   Start at  07:53:13
+   Duration  411ms (import 45%, transform 42%, tests 10%, worker 2%)
+

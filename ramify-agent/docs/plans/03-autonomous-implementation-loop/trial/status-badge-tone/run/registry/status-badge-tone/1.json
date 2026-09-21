@@ -1,0 +1,10 @@
+{
+  "schema": "ramify-agent.capability/1",
+  "capability": "status-badge-tone",
+  "revision": 1,
+  "behavior": "The module provides status-badge-tone.",
+  "owner": "collection-review/workspace/shared-ui",
+  "origin": "entry",
+  "decision": null,
+  "consumers": []
+}

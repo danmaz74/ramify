@@ -19,11 +19,13 @@ describe('planTitle', () => {
 });
 
 describe('the fixture project', () => {
-  test('has two plans, titled by their first heading', async () => {
+  test('has four plans, titled by their first heading', async () => {
     const plans = await discoverPlans(fixtureRoot);
     expect(plans.map(plan => [plan.id, plan.status, plan.status === 'readable' ? plan.title : '', plan.path])).toEqual([
       ['review-notes', 'readable', 'Reviewer notes on a review run', 'plans/review-notes/plan.md'],
+      ['reviewer-identity', 'readable', 'Who reviewed a record', 'plans/reviewer-identity/plan.md'],
       ['revision-diff', 'readable', 'Compare two revisions of a record', 'plans/revision-diff/plan.md'],
+      ['status-badge-tone', 'readable', 'A tone for the status badge', 'plans/status-badge-tone/plan.md'],
     ]);
   });
 });

@@ -1,0 +1,20 @@
+{
+  "schema": "ramify-agent.work-item/1",
+  "id": "wi-001",
+  "module": "collection-review/workspace/shared-ui",
+  "origin": {
+    "entry": "status-badge-tone"
+  },
+  "goal": "The module provides status-badge-tone.",
+  "requirementRefs": [
+    {
+      "anchor": "Request"
+    }
+  ],
+  "acceptanceRefs": [
+    {
+      "anchor": "Acceptance"
+    }
+  ],
+  "startedFor": null
+}

@@ -1,0 +1,23 @@
+{
+  "schema": "ramify-agent.initial-analysis/1",
+  "entries": [
+    {
+      "capability": "status-badge-tone",
+      "description": "The module provides status-badge-tone.",
+      "owner": "collection-review/workspace/shared-ui",
+      "requirementRefs": [
+        {
+          "anchor": "Request"
+        }
+      ],
+      "acceptanceRefs": [
+        {
+          "anchor": "Acceptance"
+        }
+      ],
+      "citations": []
+    }
+  ],
+  "hypotheses": [],
+  "coverageLimits": []
+}

@@ -11,6 +11,10 @@ import { z } from 'zod';
  *   no agent configured, or an approval whose evidence cannot be materialized;
  * - `inputs-changed`: an approval refused as stale, because the plan or the
  *   source is no longer what the map's manifest names.
+ *
+ * For queries, `unsupported-version` is a record whose schema version this
+ * harness does not read. It is a failure with evidence, never an absent
+ * record, so a query never answers `not-found` for a record that exists.
  */
 export const errorCodeSchema = z.enum([
   'invalid-request',
@@ -22,6 +26,7 @@ export const errorCodeSchema = z.enum([
   'unavailable',
   'inputs-changed',
   'internal',
+  'unsupported-version',
 ]);
 export type ErrorCode = z.infer<typeof errorCodeSchema>;
 
@@ -36,6 +41,7 @@ export const errorHttpStatus: Readonly<Record<ErrorCode, number>> = {
   unavailable: 503,
   'inputs-changed': 409,
   internal: 500,
+  'unsupported-version': 422,
 };
 
 /** The body of every non-2xx response under `/api/v1`. */
@@ -45,6 +51,8 @@ export const errorResponseSchema = z.object({
     message: z.string(),
     /** The job's current version, on a `stale-version` rejection. */
     currentVersion: z.int().nonnegative().optional(),
+    /** What establishes the failure, such as the record's path and the schema it declares. */
+    evidence: z.array(z.string()).optional(),
   }).strict(),
 }).strict();
 export type ErrorResponse = z.infer<typeof errorResponseSchema>;

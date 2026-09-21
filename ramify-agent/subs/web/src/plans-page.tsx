@@ -1,10 +1,9 @@
 import type { PlanEntry } from '../../harness/src/interfaces/protocol/queries.js';
 import type { ProjectInfo, ProtocolClient } from './client.js';
-import { mappingLabel } from './mapping.js';
 import { routeHref } from './routes.js';
 import { useQuery } from './use-query.js';
 
-/** Every plan of the project, with its latest mapping state. */
+/** Every plan of the project. */
 export function PlansPage({ client, project }: { readonly client: ProtocolClient; readonly project: ProjectInfo | undefined }) {
   const { state, reload, reloading } = useQuery('plans', () => client.listPlans());
   return (
@@ -42,9 +41,8 @@ function PlanList({ plans }: { readonly plans: readonly PlanEntry[] }) {
       {plans.map(plan => plan.status === 'readable'
         ? (
           <li key={plan.id} className="plan-entry">
-            <a className="plan-title" href={routeHref({ page: 'plan', planId: plan.id, view: 'plan' })}>{plan.title}</a>
+            <a className="plan-title" href={routeHref({ page: 'plan', planId: plan.id })}>{plan.title}</a>
             <code className="plan-path">{plan.path}</code>
-            <span className={`mapping mapping-${plan.mapping.state}`}>{mappingLabel(plan.mapping)}</span>
           </li>
         )
         : (

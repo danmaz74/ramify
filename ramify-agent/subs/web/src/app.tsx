@@ -3,6 +3,7 @@ import type { ProtocolClient } from './client.js';
 import { ConnectionStatus } from './connection.js';
 import { PlanPage } from './plan-page.js';
 import { PlansPage } from './plans-page.js';
+import { RunPage } from './run-page.js';
 import { parseRoute, routeHref } from './routes.js';
 import { useQuery } from './use-query.js';
 
@@ -32,9 +33,9 @@ export function App({ client }: { readonly client: ProtocolClient }) {
         <ConnectionStatus client={client} />
       </header>
       <main>
-        {route.page === 'plans'
-          ? <PlansPage client={client} project={projectInfo} />
-          : <PlanPage client={client} planId={route.planId} view={route.view} revision={route.revision} />}
+        {route.page === 'plans' && <PlansPage client={client} project={projectInfo} />}
+        {route.page === 'plan' && <PlanPage client={client} planId={route.planId} />}
+        {route.page === 'run' && <RunPage key={`${route.planId}/${route.runId}`} client={client} planId={route.planId} runId={route.runId} />}
       </main>
     </div>
   );

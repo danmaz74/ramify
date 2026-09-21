@@ -1,0 +1,1606 @@
+{
+  "schema": "ramify-agent.measurement-snapshot/1",
+  "id": "ms-0001",
+  "policy": "scope-size/1",
+  "head": "",
+  "measure": {
+    "revision": "rev/1:d1c8d3e4-79f0-4323-9d42-47dfc970bb48:1",
+    "document": {
+      "schema": "ramify.measure/1",
+      "revision": "rev/1:d1c8d3e4-79f0-4323-9d42-47dfc970bb48:1",
+      "root": "/tmp/ramify-agent-fixture-trial-ukKaKn/collection-review",
+      "views": "measured",
+      "modules": [
+        {
+          "id": "collection-review",
+          "dir": "",
+          "parent": null,
+          "exact": {
+            "production": {
+              "sourceFiles": 5,
+              "sourceBytes": 16076,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "tests": {
+              "sourceFiles": 4,
+              "sourceBytes": 20205,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "documentation": {
+              "files": 2,
+              "bytes": 10045
+            },
+            "views": {
+              "ordinaryBytes": 1812,
+              "testsBytes": 1809
+            }
+          },
+          "subtree": {
+            "production": {
+              "sourceFiles": 28,
+              "sourceBytes": 64096,
+              "resourceFiles": 4,
+              "resourceBytes": 2438
+            },
+            "tests": {
+              "sourceFiles": 26,
+              "sourceBytes": 84409,
+              "resourceFiles": 1,
+              "resourceBytes": 1415
+            },
+            "documentation": {
+              "files": 30,
+              "bytes": 25544
+            },
+            "views": {
+              "ordinaryBytes": 60840,
+              "testsBytes": 63620
+            }
+          }
+        },
+        {
+          "id": "collection-review/integration-tests",
+          "dir": "subs/integration-tests",
+          "parent": "collection-review",
+          "exact": {
+            "production": {
+              "sourceFiles": 0,
+              "sourceBytes": 0,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "tests": {
+              "sourceFiles": 4,
+              "sourceBytes": 14736,
+              "resourceFiles": 1,
+              "resourceBytes": 1415
+            },
+            "documentation": {
+              "files": 2,
+              "bytes": 1304
+            },
+            "views": {
+              "ordinaryBytes": 1916,
+              "testsBytes": 0
+            }
+          },
+          "subtree": {
+            "production": {
+              "sourceFiles": 0,
+              "sourceBytes": 0,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "tests": {
+              "sourceFiles": 4,
+              "sourceBytes": 14736,
+              "resourceFiles": 1,
+              "resourceBytes": 1415
+            },
+            "documentation": {
+              "files": 2,
+              "bytes": 1304
+            },
+            "views": {
+              "ordinaryBytes": 1916,
+              "testsBytes": 0
+            }
+          }
+        },
+        {
+          "id": "collection-review/workspace",
+          "dir": "subs/workspace",
+          "parent": "collection-review",
+          "exact": {
+            "production": {
+              "sourceFiles": 3,
+              "sourceBytes": 5911,
+              "resourceFiles": 2,
+              "resourceBytes": 1269
+            },
+            "tests": {
+              "sourceFiles": 1,
+              "sourceBytes": 3967,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "documentation": {
+              "files": 2,
+              "bytes": 1885
+            },
+            "views": {
+              "ordinaryBytes": 6318,
+              "testsBytes": 7971
+            }
+          },
+          "subtree": {
+            "production": {
+              "sourceFiles": 23,
+              "sourceBytes": 48020,
+              "resourceFiles": 4,
+              "resourceBytes": 2438
+            },
+            "tests": {
+              "sourceFiles": 18,
+              "sourceBytes": 49468,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "documentation": {
+              "files": 26,
+              "bytes": 14195
+            },
+            "views": {
+              "ordinaryBytes": 57112,
+              "testsBytes": 61811
+            }
+          }
+        },
+        {
+          "id": "collection-review/workspace/catalog",
+          "dir": "subs/workspace/subs/catalog",
+          "parent": "collection-review/workspace",
+          "exact": {
+            "production": {
+              "sourceFiles": 2,
+              "sourceBytes": 4059,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "tests": {
+              "sourceFiles": 1,
+              "sourceBytes": 3285,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "documentation": {
+              "files": 2,
+              "bytes": 1544
+            },
+            "views": {
+              "ordinaryBytes": 6108,
+              "testsBytes": 6339
+            }
+          },
+          "subtree": {
+            "production": {
+              "sourceFiles": 6,
+              "sourceBytes": 11569,
+              "resourceFiles": 1,
+              "resourceBytes": 525
+            },
+            "tests": {
+              "sourceFiles": 4,
+              "sourceBytes": 9315,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "documentation": {
+              "files": 6,
+              "bytes": 3338
+            },
+            "views": {
+              "ordinaryBytes": 13740,
+              "testsBytes": 14125
+            }
+          }
+        },
+        {
+          "id": "collection-review/workspace/catalog/core",
+          "dir": "subs/workspace/subs/catalog/subs/core",
+          "parent": "collection-review/workspace/catalog",
+          "exact": {
+            "production": {
+              "sourceFiles": 3,
+              "sourceBytes": 5832,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "tests": {
+              "sourceFiles": 2,
+              "sourceBytes": 4557,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "documentation": {
+              "files": 2,
+              "bytes": 979
+            },
+            "views": {
+              "ordinaryBytes": 3424,
+              "testsBytes": 3421
+            }
+          },
+          "subtree": {
+            "production": {
+              "sourceFiles": 3,
+              "sourceBytes": 5832,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "tests": {
+              "sourceFiles": 2,
+              "sourceBytes": 4557,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "documentation": {
+              "files": 2,
+              "bytes": 979
+            },
+            "views": {
+              "ordinaryBytes": 3424,
+              "testsBytes": 3421
+            }
+          }
+        },
+        {
+          "id": "collection-review/workspace/catalog/ui",
+          "dir": "subs/workspace/subs/catalog/subs/ui",
+          "parent": "collection-review/workspace/catalog",
+          "exact": {
+            "production": {
+              "sourceFiles": 1,
+              "sourceBytes": 1678,
+              "resourceFiles": 1,
+              "resourceBytes": 525
+            },
+            "tests": {
+              "sourceFiles": 1,
+              "sourceBytes": 1473,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "documentation": {
+              "files": 2,
+              "bytes": 815
+            },
+            "views": {
+              "ordinaryBytes": 4208,
+              "testsBytes": 4365
+            }
+          },
+          "subtree": {
+            "production": {
+              "sourceFiles": 1,
+              "sourceBytes": 1678,
+              "resourceFiles": 1,
+              "resourceBytes": 525
+            },
+            "tests": {
+              "sourceFiles": 1,
+              "sourceBytes": 1473,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "documentation": {
+              "files": 2,
+              "bytes": 815
+            },
+            "views": {
+              "ordinaryBytes": 4208,
+              "testsBytes": 4365
+            }
+          }
+        },
+        {
+          "id": "collection-review/workspace/contracts",
+          "dir": "subs/workspace/subs/contracts",
+          "parent": "collection-review/workspace",
+          "exact": {
+            "production": {
+              "sourceFiles": 1,
+              "sourceBytes": 3004,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "tests": {
+              "sourceFiles": 1,
+              "sourceBytes": 942,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "documentation": {
+              "files": 2,
+              "bytes": 1163
+            },
+            "views": {
+              "ordinaryBytes": 169,
+              "testsBytes": 326
+            }
+          },
+          "subtree": {
+            "production": {
+              "sourceFiles": 1,
+              "sourceBytes": 3004,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "tests": {
+              "sourceFiles": 1,
+              "sourceBytes": 942,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "documentation": {
+              "files": 2,
+              "bytes": 1163
+            },
+            "views": {
+              "ordinaryBytes": 169,
+              "testsBytes": 326
+            }
+          }
+        },
+        {
+          "id": "collection-review/workspace/reviews",
+          "dir": "subs/workspace/subs/reviews",
+          "parent": "collection-review/workspace",
+          "exact": {
+            "production": {
+              "sourceFiles": 3,
+              "sourceBytes": 9896,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "tests": {
+              "sourceFiles": 3,
+              "sourceBytes": 13885,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "documentation": {
+              "files": 2,
+              "bytes": 1327
+            },
+            "views": {
+              "ordinaryBytes": 6593,
+              "testsBytes": 6824
+            }
+          },
+          "subtree": {
+            "production": {
+              "sourceFiles": 12,
+              "sourceBytes": 26280,
+              "resourceFiles": 1,
+              "resourceBytes": 644
+            },
+            "tests": {
+              "sourceFiles": 11,
+              "sourceBytes": 34214,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "documentation": {
+              "files": 14,
+              "bytes": 6757
+            },
+            "views": {
+              "ordinaryBytes": 33464,
+              "testsBytes": 35811
+            }
+          }
+        },
+        {
+          "id": "collection-review/workspace/reviews/core",
+          "dir": "subs/workspace/subs/reviews/subs/core",
+          "parent": "collection-review/workspace/reviews",
+          "exact": {
+            "production": {
+              "sourceFiles": 2,
+              "sourceBytes": 3239,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "tests": {
+              "sourceFiles": 1,
+              "sourceBytes": 3828,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "documentation": {
+              "files": 2,
+              "bytes": 1369
+            },
+            "views": {
+              "ordinaryBytes": 4566,
+              "testsBytes": 4723
+            }
+          },
+          "subtree": {
+            "production": {
+              "sourceFiles": 5,
+              "sourceBytes": 8357,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "tests": {
+              "sourceFiles": 4,
+              "sourceBytes": 11646,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "documentation": {
+              "files": 6,
+              "bytes": 2744
+            },
+            "views": {
+              "ordinaryBytes": 13480,
+              "testsBytes": 13951
+            }
+          }
+        },
+        {
+          "id": "collection-review/workspace/reviews/core/controller",
+          "dir": "subs/workspace/subs/reviews/subs/core/subs/controller",
+          "parent": "collection-review/workspace/reviews/core",
+          "exact": {
+            "production": {
+              "sourceFiles": 1,
+              "sourceBytes": 1607,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "tests": {
+              "sourceFiles": 1,
+              "sourceBytes": 2201,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "documentation": {
+              "files": 2,
+              "bytes": 497
+            },
+            "views": {
+              "ordinaryBytes": 4680,
+              "testsBytes": 4837
+            }
+          },
+          "subtree": {
+            "production": {
+              "sourceFiles": 1,
+              "sourceBytes": 1607,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "tests": {
+              "sourceFiles": 1,
+              "sourceBytes": 2201,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "documentation": {
+              "files": 2,
+              "bytes": 497
+            },
+            "views": {
+              "ordinaryBytes": 4680,
+              "testsBytes": 4837
+            }
+          }
+        },
+        {
+          "id": "collection-review/workspace/reviews/core/tasks",
+          "dir": "subs/workspace/subs/reviews/subs/core/subs/tasks",
+          "parent": "collection-review/workspace/reviews/core",
+          "exact": {
+            "production": {
+              "sourceFiles": 2,
+              "sourceBytes": 3511,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "tests": {
+              "sourceFiles": 2,
+              "sourceBytes": 5617,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "documentation": {
+              "files": 2,
+              "bytes": 878
+            },
+            "views": {
+              "ordinaryBytes": 4234,
+              "testsBytes": 4391
+            }
+          },
+          "subtree": {
+            "production": {
+              "sourceFiles": 2,
+              "sourceBytes": 3511,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "tests": {
+              "sourceFiles": 2,
+              "sourceBytes": 5617,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "documentation": {
+              "files": 2,
+              "bytes": 878
+            },
+            "views": {
+              "ordinaryBytes": 4234,
+              "testsBytes": 4391
+            }
+          }
+        },
+        {
+          "id": "collection-review/workspace/reviews/ui",
+          "dir": "subs/workspace/subs/reviews/subs/ui",
+          "parent": "collection-review/workspace/reviews",
+          "exact": {
+            "production": {
+              "sourceFiles": 1,
+              "sourceBytes": 2837,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "tests": {
+              "sourceFiles": 1,
+              "sourceBytes": 2576,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "documentation": {
+              "files": 2,
+              "bytes": 978
+            },
+            "views": {
+              "ordinaryBytes": 6062,
+              "testsBytes": 6843
+            }
+          },
+          "subtree": {
+            "production": {
+              "sourceFiles": 3,
+              "sourceBytes": 5493,
+              "resourceFiles": 1,
+              "resourceBytes": 644
+            },
+            "tests": {
+              "sourceFiles": 3,
+              "sourceBytes": 5316,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "documentation": {
+              "files": 4,
+              "bytes": 1856
+            },
+            "views": {
+              "ordinaryBytes": 9961,
+              "testsBytes": 11449
+            }
+          }
+        },
+        {
+          "id": "collection-review/workspace/reviews/ui/pure-ui",
+          "dir": "subs/workspace/subs/reviews/subs/ui/subs/pure-ui",
+          "parent": "collection-review/workspace/reviews/ui",
+          "exact": {
+            "production": {
+              "sourceFiles": 2,
+              "sourceBytes": 2656,
+              "resourceFiles": 1,
+              "resourceBytes": 644
+            },
+            "tests": {
+              "sourceFiles": 2,
+              "sourceBytes": 2740,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "documentation": {
+              "files": 2,
+              "bytes": 878
+            },
+            "views": {
+              "ordinaryBytes": 3899,
+              "testsBytes": 4606
+            }
+          },
+          "subtree": {
+            "production": {
+              "sourceFiles": 2,
+              "sourceBytes": 2656,
+              "resourceFiles": 1,
+              "resourceBytes": 644
+            },
+            "tests": {
+              "sourceFiles": 2,
+              "sourceBytes": 2740,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "documentation": {
+              "files": 2,
+              "bytes": 878
+            },
+            "views": {
+              "ordinaryBytes": 3899,
+              "testsBytes": 4606
+            }
+          }
+        },
+        {
+          "id": "collection-review/workspace/reviews/validation",
+          "dir": "subs/workspace/subs/reviews/subs/validation",
+          "parent": "collection-review/workspace/reviews",
+          "exact": {
+            "production": {
+              "sourceFiles": 1,
+              "sourceBytes": 2534,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "tests": {
+              "sourceFiles": 1,
+              "sourceBytes": 3367,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "documentation": {
+              "files": 2,
+              "bytes": 830
+            },
+            "views": {
+              "ordinaryBytes": 3430,
+              "testsBytes": 3587
+            }
+          },
+          "subtree": {
+            "production": {
+              "sourceFiles": 1,
+              "sourceBytes": 2534,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "tests": {
+              "sourceFiles": 1,
+              "sourceBytes": 3367,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "documentation": {
+              "files": 2,
+              "bytes": 830
+            },
+            "views": {
+              "ordinaryBytes": 3430,
+              "testsBytes": 3587
+            }
+          }
+        },
+        {
+          "id": "collection-review/workspace/shared-ui",
+          "dir": "subs/workspace/subs/shared-ui",
+          "parent": "collection-review/workspace",
+          "exact": {
+            "production": {
+              "sourceFiles": 1,
+              "sourceBytes": 1256,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "tests": {
+              "sourceFiles": 1,
+              "sourceBytes": 1030,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "documentation": {
+              "files": 2,
+              "bytes": 1052
+            },
+            "views": {
+              "ordinaryBytes": 3421,
+              "testsBytes": 3578
+            }
+          },
+          "subtree": {
+            "production": {
+              "sourceFiles": 1,
+              "sourceBytes": 1256,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "tests": {
+              "sourceFiles": 1,
+              "sourceBytes": 1030,
+              "resourceFiles": 0,
+              "resourceBytes": 0
+            },
+            "documentation": {
+              "files": 2,
+              "bytes": 1052
+            },
+            "views": {
+              "ordinaryBytes": 3421,
+              "testsBytes": 3578
+            }
+          }
+        }
+      ],
+      "ownershipRule": "Normalize the path within root; malformed paths and escapes are not attributable.\n1. A reserved generated segment is generated before area or owner lookup: .ramify, .ramify-architect, and their .tmp-<suffix>/.old-<suffix> siblings at any depth, including sibling marker files. Similar names are not reserved.\n2. A path in files is inventoried with exactly its recorded owner, area, kind, and bytes. A path in outsideModuleFiles is outside the owned inventory and has no owner.\n3. An unlisted path beneath .git, node_modules, bower_components, or jspm_packages is excluded.\n4. Every other unlisted path is unobserved. Its nearest listed module supplies only a provisional owner/area beneath that module's src/ (src/tests/ first) or at its root README.md/module.ramify; never climb to an ancestor source area when the nearest module does not own the location.\nConfigured output exclusions, independent compiler scopes, invalid boundaries, and symlink observations are not fully encoded. Unobserved spelling proves neither inventory membership, ownership, area, emptiness, nor project exclusion; no symlink following is implied. Refreshing the inventory can establish a new file.",
+      "files": [
+        {
+          "path": "README.md",
+          "owner": "collection-review",
+          "area": "documentation",
+          "kind": "documentation",
+          "bytes": 8766
+        },
+        {
+          "path": "module.ramify",
+          "owner": "collection-review",
+          "area": "documentation",
+          "kind": "documentation",
+          "bytes": 1279
+        },
+        {
+          "path": "src/assembly.ts",
+          "owner": "collection-review",
+          "area": "ordinary",
+          "kind": "source",
+          "bytes": 3082
+        },
+        {
+          "path": "src/interfaces/protocol.ts",
+          "owner": "collection-review",
+          "area": "ordinary",
+          "kind": "source",
+          "bytes": 3400
+        },
+        {
+          "path": "src/main.ts",
+          "owner": "collection-review",
+          "area": "ordinary",
+          "kind": "source",
+          "bytes": 485
+        },
+        {
+          "path": "src/protocol.ts",
+          "owner": "collection-review",
+          "area": "ordinary",
+          "kind": "source",
+          "bytes": 2762
+        },
+        {
+          "path": "src/server.ts",
+          "owner": "collection-review",
+          "area": "ordinary",
+          "kind": "source",
+          "bytes": 6347
+        },
+        {
+          "path": "src/tests/assembly.test.ts",
+          "owner": "collection-review",
+          "area": "tests",
+          "kind": "source",
+          "bytes": 6312
+        },
+        {
+          "path": "src/tests/http.test.ts",
+          "owner": "collection-review",
+          "area": "tests",
+          "kind": "source",
+          "bytes": 8802
+        },
+        {
+          "path": "src/tests/protocol-typing.test.ts",
+          "owner": "collection-review",
+          "area": "tests",
+          "kind": "source",
+          "bytes": 2219
+        },
+        {
+          "path": "src/tests/setup.ts",
+          "owner": "collection-review",
+          "area": "tests",
+          "kind": "source",
+          "bytes": 2872
+        },
+        {
+          "path": "subs/integration-tests/README.md",
+          "owner": "collection-review/integration-tests",
+          "area": "documentation",
+          "kind": "documentation",
+          "bytes": 802
+        },
+        {
+          "path": "subs/integration-tests/module.ramify",
+          "owner": "collection-review/integration-tests",
+          "area": "documentation",
+          "kind": "documentation",
+          "bytes": 502
+        },
+        {
+          "path": "subs/integration-tests/src/features/collection-review.viz.feature",
+          "owner": "collection-review/integration-tests",
+          "area": "ordinary",
+          "kind": "resource",
+          "bytes": 1415
+        },
+        {
+          "path": "subs/integration-tests/src/steps/collection-review.steps.ts",
+          "owner": "collection-review/integration-tests",
+          "area": "ordinary",
+          "kind": "source",
+          "bytes": 7115
+        },
+        {
+          "path": "subs/integration-tests/src/support/hooks.ts",
+          "owner": "collection-review/integration-tests",
+          "area": "ordinary",
+          "kind": "source",
+          "bytes": 1299
+        },
+        {
+          "path": "subs/integration-tests/src/support/initialization.ts",
+          "owner": "collection-review/integration-tests",
+          "area": "ordinary",
+          "kind": "source",
+          "bytes": 2283
+        },
+        {
+          "path": "subs/integration-tests/src/support/world.ts",
+          "owner": "collection-review/integration-tests",
+          "area": "ordinary",
+          "kind": "source",
+          "bytes": 4039
+        },
+        {
+          "path": "subs/workspace/README.md",
+          "owner": "collection-review/workspace",
+          "area": "documentation",
+          "kind": "documentation",
+          "bytes": 674
+        },
+        {
+          "path": "subs/workspace/module.ramify",
+          "owner": "collection-review/workspace",
+          "area": "documentation",
+          "kind": "documentation",
+          "bytes": 1211
+        },
+        {
+          "path": "subs/workspace/src/app.tsx",
+          "owner": "collection-review/workspace",
+          "area": "ordinary",
+          "kind": "source",
+          "bytes": 4404
+        },
+        {
+          "path": "subs/workspace/src/client.ts",
+          "owner": "collection-review/workspace",
+          "area": "ordinary",
+          "kind": "source",
+          "bytes": 906
+        },
+        {
+          "path": "subs/workspace/src/index.html",
+          "owner": "collection-review/workspace",
+          "area": "ordinary",
+          "kind": "resource",
+          "bytes": 298
+        },
+        {
+          "path": "subs/workspace/src/main.tsx",
+          "owner": "collection-review/workspace",
+          "area": "ordinary",
+          "kind": "source",
+          "bytes": 601
+        },
+        {
+          "path": "subs/workspace/src/styles.css",
+          "owner": "collection-review/workspace",
+          "area": "ordinary",
+          "kind": "resource",
+          "bytes": 971
+        },
+        {
+          "path": "subs/workspace/src/tests/shell.test.tsx",
+          "owner": "collection-review/workspace",
+          "area": "tests",
+          "kind": "source",
+          "bytes": 3967
+        },
+        {
+          "path": "subs/workspace/subs/catalog/README.md",
+          "owner": "collection-review/workspace/catalog",
+          "area": "documentation",
+          "kind": "documentation",
+          "bytes": 490
+        },
+        {
+          "path": "subs/workspace/subs/catalog/module.ramify",
+          "owner": "collection-review/workspace/catalog",
+          "area": "documentation",
+          "kind": "documentation",
+          "bytes": 1054
+        },
+        {
+          "path": "subs/workspace/subs/catalog/src/mcp.ts",
+          "owner": "collection-review/workspace/catalog",
+          "area": "ordinary",
+          "kind": "source",
+          "bytes": 2914
+        },
+        {
+          "path": "subs/workspace/subs/catalog/src/router.ts",
+          "owner": "collection-review/workspace/catalog",
+          "area": "ordinary",
+          "kind": "source",
+          "bytes": 1145
+        },
+        {
+          "path": "subs/workspace/subs/catalog/src/tests/adapters.test.ts",
+          "owner": "collection-review/workspace/catalog",
+          "area": "tests",
+          "kind": "source",
+          "bytes": 3285
+        },
+        {
+          "path": "subs/workspace/subs/catalog/subs/core/README.md",
+          "owner": "collection-review/workspace/catalog/core",
+          "area": "documentation",
+          "kind": "documentation",
+          "bytes": 544
+        },
+        {
+          "path": "subs/workspace/subs/catalog/subs/core/module.ramify",
+          "owner": "collection-review/workspace/catalog/core",
+          "area": "documentation",
+          "kind": "documentation",
+          "bytes": 435
+        },
+        {
+          "path": "subs/workspace/subs/catalog/subs/core/src/catalog.ts",
+          "owner": "collection-review/workspace/catalog/core",
+          "area": "ordinary",
+          "kind": "source",
+          "bytes": 2872
+        },
+        {
+          "path": "subs/workspace/subs/catalog/subs/core/src/history.ts",
+          "owner": "collection-review/workspace/catalog/core",
+          "area": "ordinary",
+          "kind": "source",
+          "bytes": 1200
+        },
+        {
+          "path": "subs/workspace/subs/catalog/subs/core/src/records.ts",
+          "owner": "collection-review/workspace/catalog/core",
+          "area": "ordinary",
+          "kind": "source",
+          "bytes": 1760
+        },
+        {
+          "path": "subs/workspace/subs/catalog/subs/core/src/tests/catalog.test.ts",
+          "owner": "collection-review/workspace/catalog/core",
+          "area": "tests",
+          "kind": "source",
+          "bytes": 3621
+        },
+        {
+          "path": "subs/workspace/subs/catalog/subs/core/src/tests/fixture.ts",
+          "owner": "collection-review/workspace/catalog/core",
+          "area": "tests",
+          "kind": "source",
+          "bytes": 936
+        },
+        {
+          "path": "subs/workspace/subs/catalog/subs/ui/README.md",
+          "owner": "collection-review/workspace/catalog/ui",
+          "area": "documentation",
+          "kind": "documentation",
+          "bytes": 388
+        },
+        {
+          "path": "subs/workspace/subs/catalog/subs/ui/module.ramify",
+          "owner": "collection-review/workspace/catalog/ui",
+          "area": "documentation",
+          "kind": "documentation",
+          "bytes": 427
+        },
+        {
+          "path": "subs/workspace/subs/catalog/subs/ui/src/catalog-card.module.css",
+          "owner": "collection-review/workspace/catalog/ui",
+          "area": "ordinary",
+          "kind": "resource",
+          "bytes": 525
+        },
+        {
+          "path": "subs/workspace/subs/catalog/subs/ui/src/catalog-card.tsx",
+          "owner": "collection-review/workspace/catalog/ui",
+          "area": "ordinary",
+          "kind": "source",
+          "bytes": 1678
+        },
+        {
+          "path": "subs/workspace/subs/catalog/subs/ui/src/tests/catalog-card.test.tsx",
+          "owner": "collection-review/workspace/catalog/ui",
+          "area": "tests",
+          "kind": "source",
+          "bytes": 1473
+        },
+        {
+          "path": "subs/workspace/subs/contracts/README.md",
+          "owner": "collection-review/workspace/contracts",
+          "area": "documentation",
+          "kind": "documentation",
+          "bytes": 761
+        },
+        {
+          "path": "subs/workspace/subs/contracts/module.ramify",
+          "owner": "collection-review/workspace/contracts",
+          "area": "documentation",
+          "kind": "documentation",
+          "bytes": 402
+        },
+        {
+          "path": "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts",
+          "owner": "collection-review/workspace/contracts",
+          "area": "ordinary",
+          "kind": "source",
+          "bytes": 3004
+        },
+        {
+          "path": "subs/workspace/subs/contracts/src/tests/vocabulary.test.ts",
+          "owner": "collection-review/workspace/contracts",
+          "area": "tests",
+          "kind": "source",
+          "bytes": 942
+        },
+        {
+          "path": "subs/workspace/subs/reviews/README.md",
+          "owner": "collection-review/workspace/reviews",
+          "area": "documentation",
+          "kind": "documentation",
+          "bytes": 516
+        },
+        {
+          "path": "subs/workspace/subs/reviews/module.ramify",
+          "owner": "collection-review/workspace/reviews",
+          "area": "documentation",
+          "kind": "documentation",
+          "bytes": 811
+        },
+        {
+          "path": "subs/workspace/subs/reviews/src/mcp.ts",
+          "owner": "collection-review/workspace/reviews",
+          "area": "ordinary",
+          "kind": "source",
+          "bytes": 5568
+        },
+        {
+          "path": "subs/workspace/subs/reviews/src/router.ts",
+          "owner": "collection-review/workspace/reviews",
+          "area": "ordinary",
+          "kind": "source",
+          "bytes": 1670
+        },
+        {
+          "path": "subs/workspace/subs/reviews/src/session.ts",
+          "owner": "collection-review/workspace/reviews",
+          "area": "ordinary",
+          "kind": "source",
+          "bytes": 2658
+        },
+        {
+          "path": "subs/workspace/subs/reviews/src/tests/router.test.ts",
+          "owner": "collection-review/workspace/reviews",
+          "area": "tests",
+          "kind": "source",
+          "bytes": 2329
+        },
+        {
+          "path": "subs/workspace/subs/reviews/src/tests/sessions.test.ts",
+          "owner": "collection-review/workspace/reviews",
+          "area": "tests",
+          "kind": "source",
+          "bytes": 10157
+        },
+        {
+          "path": "subs/workspace/subs/reviews/src/tests/typing.test.ts",
+          "owner": "collection-review/workspace/reviews",
+          "area": "tests",
+          "kind": "source",
+          "bytes": 1399
+        },
+        {
+          "path": "subs/workspace/subs/reviews/subs/core/README.md",
+          "owner": "collection-review/workspace/reviews/core",
+          "area": "documentation",
+          "kind": "documentation",
+          "bytes": 548
+        },
+        {
+          "path": "subs/workspace/subs/reviews/subs/core/module.ramify",
+          "owner": "collection-review/workspace/reviews/core",
+          "area": "documentation",
+          "kind": "documentation",
+          "bytes": 821
+        },
+        {
+          "path": "subs/workspace/subs/reviews/subs/core/src/interfaces/port.ts",
+          "owner": "collection-review/workspace/reviews/core",
+          "area": "ordinary",
+          "kind": "source",
+          "bytes": 1204
+        },
+        {
+          "path": "subs/workspace/subs/reviews/subs/core/src/runtime.ts",
+          "owner": "collection-review/workspace/reviews/core",
+          "area": "ordinary",
+          "kind": "source",
+          "bytes": 2035
+        },
+        {
+          "path": "subs/workspace/subs/reviews/subs/core/src/tests/runtime.test.ts",
+          "owner": "collection-review/workspace/reviews/core",
+          "area": "tests",
+          "kind": "source",
+          "bytes": 3828
+        },
+        {
+          "path": "subs/workspace/subs/reviews/subs/core/subs/controller/README.md",
+          "owner": "collection-review/workspace/reviews/core/controller",
+          "area": "documentation",
+          "kind": "documentation",
+          "bytes": 329
+        },
+        {
+          "path": "subs/workspace/subs/reviews/subs/core/subs/controller/module.ramify",
+          "owner": "collection-review/workspace/reviews/core/controller",
+          "area": "documentation",
+          "kind": "documentation",
+          "bytes": 168
+        },
+        {
+          "path": "subs/workspace/subs/reviews/subs/core/subs/controller/src/controller.ts",
+          "owner": "collection-review/workspace/reviews/core/controller",
+          "area": "ordinary",
+          "kind": "source",
+          "bytes": 1607
+        },
+        {
+          "path": "subs/workspace/subs/reviews/subs/core/subs/controller/src/tests/controller.test.ts",
+          "owner": "collection-review/workspace/reviews/core/controller",
+          "area": "tests",
+          "kind": "source",
+          "bytes": 2201
+        },
+        {
+          "path": "subs/workspace/subs/reviews/subs/core/subs/tasks/README.md",
+          "owner": "collection-review/workspace/reviews/core/tasks",
+          "area": "documentation",
+          "kind": "documentation",
+          "bytes": 483
+        },
+        {
+          "path": "subs/workspace/subs/reviews/subs/core/subs/tasks/module.ramify",
+          "owner": "collection-review/workspace/reviews/core/tasks",
+          "area": "documentation",
+          "kind": "documentation",
+          "bytes": 395
+        },
+        {
+          "path": "subs/workspace/subs/reviews/subs/core/subs/tasks/src/inspection-task.ts",
+          "owner": "collection-review/workspace/reviews/core/tasks",
+          "area": "ordinary",
+          "kind": "source",
+          "bytes": 2403
+        },
+        {
+          "path": "subs/workspace/subs/reviews/subs/core/subs/tasks/src/result.ts",
+          "owner": "collection-review/workspace/reviews/core/tasks",
+          "area": "ordinary",
+          "kind": "source",
+          "bytes": 1108
+        },
+        {
+          "path": "subs/workspace/subs/reviews/subs/core/subs/tasks/src/tests/inspection-task.test.ts",
+          "owner": "collection-review/workspace/reviews/core/tasks",
+          "area": "tests",
+          "kind": "source",
+          "bytes": 3781
+        },
+        {
+          "path": "subs/workspace/subs/reviews/subs/core/subs/tasks/src/tests/result.test.ts",
+          "owner": "collection-review/workspace/reviews/core/tasks",
+          "area": "tests",
+          "kind": "source",
+          "bytes": 1836
+        },
+        {
+          "path": "subs/workspace/subs/reviews/subs/ui/README.md",
+          "owner": "collection-review/workspace/reviews/ui",
+          "area": "documentation",
+          "kind": "documentation",
+          "bytes": 503
+        },
+        {
+          "path": "subs/workspace/subs/reviews/subs/ui/module.ramify",
+          "owner": "collection-review/workspace/reviews/ui",
+          "area": "documentation",
+          "kind": "documentation",
+          "bytes": 475
+        },
+        {
+          "path": "subs/workspace/subs/reviews/subs/ui/src/review-panel.tsx",
+          "owner": "collection-review/workspace/reviews/ui",
+          "area": "ordinary",
+          "kind": "source",
+          "bytes": 2837
+        },
+        {
+          "path": "subs/workspace/subs/reviews/subs/ui/src/tests/review-panel.test.tsx",
+          "owner": "collection-review/workspace/reviews/ui",
+          "area": "tests",
+          "kind": "source",
+          "bytes": 2576
+        },
+        {
+          "path": "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/README.md",
+          "owner": "collection-review/workspace/reviews/ui/pure-ui",
+          "area": "documentation",
+          "kind": "documentation",
+          "bytes": 424
+        },
+        {
+          "path": "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/module.ramify",
+          "owner": "collection-review/workspace/reviews/ui/pure-ui",
+          "area": "documentation",
+          "kind": "documentation",
+          "bytes": 454
+        },
+        {
+          "path": "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/format.ts",
+          "owner": "collection-review/workspace/reviews/ui/pure-ui",
+          "area": "ordinary",
+          "kind": "source",
+          "bytes": 817
+        },
+        {
+          "path": "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.module.css",
+          "owner": "collection-review/workspace/reviews/ui/pure-ui",
+          "area": "ordinary",
+          "kind": "resource",
+          "bytes": 644
+        },
+        {
+          "path": "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.tsx",
+          "owner": "collection-review/workspace/reviews/ui/pure-ui",
+          "area": "ordinary",
+          "kind": "source",
+          "bytes": 1839
+        },
+        {
+          "path": "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/tests/format.test.ts",
+          "owner": "collection-review/workspace/reviews/ui/pure-ui",
+          "area": "tests",
+          "kind": "source",
+          "bytes": 1132
+        },
+        {
+          "path": "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/tests/review-result.test.tsx",
+          "owner": "collection-review/workspace/reviews/ui/pure-ui",
+          "area": "tests",
+          "kind": "source",
+          "bytes": 1608
+        },
+        {
+          "path": "subs/workspace/subs/reviews/subs/validation/README.md",
+          "owner": "collection-review/workspace/reviews/validation",
+          "area": "documentation",
+          "kind": "documentation",
+          "bytes": 514
+        },
+        {
+          "path": "subs/workspace/subs/reviews/subs/validation/module.ramify",
+          "owner": "collection-review/workspace/reviews/validation",
+          "area": "documentation",
+          "kind": "documentation",
+          "bytes": 316
+        },
+        {
+          "path": "subs/workspace/subs/reviews/subs/validation/src/tests/validate.test.ts",
+          "owner": "collection-review/workspace/reviews/validation",
+          "area": "tests",
+          "kind": "source",
+          "bytes": 3367
+        },
+        {
+          "path": "subs/workspace/subs/reviews/subs/validation/src/validate.ts",
+          "owner": "collection-review/workspace/reviews/validation",
+          "area": "ordinary",
+          "kind": "source",
+          "bytes": 2534
+        },
+        {
+          "path": "subs/workspace/subs/shared-ui/README.md",
+          "owner": "collection-review/workspace/shared-ui",
+          "area": "documentation",
+          "kind": "documentation",
+          "bytes": 524
+        },
+        {
+          "path": "subs/workspace/subs/shared-ui/module.ramify",
+          "owner": "collection-review/workspace/shared-ui",
+          "area": "documentation",
+          "kind": "documentation",
+          "bytes": 528
+        },
+        {
+          "path": "subs/workspace/subs/shared-ui/src/status-badge.tsx",
+          "owner": "collection-review/workspace/shared-ui",
+          "area": "ordinary",
+          "kind": "source",
+          "bytes": 1256
+        },
+        {
+          "path": "subs/workspace/subs/shared-ui/src/tests/status-badge.test.tsx",
+          "owner": "collection-review/workspace/shared-ui",
+          "area": "tests",
+          "kind": "source",
+          "bytes": 1030
+        }
+      ],
+      "outsideModuleFiles": [
+        "vite.config.ts",
+        "vitest.config.ts"
+      ]
+    },
+    "hash": "e078a8a97fe4a6c24dd15a56035816736ae0205678d72e76c4b927b435f087ba"
+  },
+  "view": {
+    "status": "materialized",
+    "revision": "rev/1:d1c8d3e4-79f0-4323-9d42-47dfc970bb48:1",
+    "input": "input/1:4e2a4b748c41ef2bbae8640cfd175df0e10bd015c2ec11c72f5b11a7fc983170",
+    "coverageLimits": [
+      "cut: 9",
+      "detailsUnavailable: 2"
+    ]
+  },
+  "supplementary": [
+    {
+      "path": "plans/status-badge-tone/plan.md",
+      "bytes": 1099
+    },
+    {
+      "path": "subs/harness/src/prompts/initial-architect.system.md",
+      "bytes": 2084
+    },
+    {
+      "path": "subs/harness/src/prompts/initial-analysis.procedure.md",
+      "bytes": 2958
+    },
+    {
+      "path": "skills/module-architect/SKILL.md",
+      "bytes": 3202
+    },
+    {
+      "path": "skills/module-architect/references/access.md",
+      "bytes": 1602
+    },
+    {
+      "path": "skills/module-architect/references/cognitive-decomposition.md",
+      "bytes": 5824
+    },
+    {
+      "path": "skills/module-architect/references/discovery.md",
+      "bytes": 1855
+    },
+    {
+      "path": "skills/module-architect/references/placement.md",
+      "bytes": 2095
+    },
+    {
+      "path": "skills/module-architect/references/refactoring.md",
+      "bytes": 1677
+    },
+    {
+      "path": "skills/module-architect/report.md",
+      "bytes": 1360
+    },
+    {
+      "path": "initial-analysis.schema.json",
+      "bytes": 7182
+    },
+    {
+      "path": "subs/harness/src/prompts/global-fork.system.md",
+      "bytes": 2379
+    },
+    {
+      "path": "subs/harness/src/prompts/global-fork.procedure.md",
+      "bytes": 3257
+    },
+    {
+      "path": "skills/module-architect/SKILL.md",
+      "bytes": 3202
+    },
+    {
+      "path": "skills/module-architect/references/access.md",
+      "bytes": 1602
+    },
+    {
+      "path": "skills/module-architect/references/cognitive-decomposition.md",
+      "bytes": 5824
+    },
+    {
+      "path": "skills/module-architect/references/discovery.md",
+      "bytes": 1855
+    },
+    {
+      "path": "skills/module-architect/references/placement.md",
+      "bytes": 2095
+    },
+    {
+      "path": "skills/module-architect/references/refactoring.md",
+      "bytes": 1677
+    },
+    {
+      "path": "skills/module-architect/report.md",
+      "bytes": 1360
+    },
+    {
+      "path": "global-fork.schema.json",
+      "bytes": 11679
+    },
+    {
+      "path": "subs/harness/src/prompts/local-architect.system.md",
+      "bytes": 2077
+    },
+    {
+      "path": "subs/harness/src/prompts/local-architect.procedure.md",
+      "bytes": 11579
+    },
+    {
+      "path": "skills/module-architect/SKILL.md",
+      "bytes": 3202
+    },
+    {
+      "path": "skills/module-architect/references/access.md",
+      "bytes": 1602
+    },
+    {
+      "path": "skills/module-architect/references/cognitive-decomposition.md",
+      "bytes": 5824
+    },
+    {
+      "path": "skills/module-architect/references/discovery.md",
+      "bytes": 1855
+    },
+    {
+      "path": "skills/module-architect/references/placement.md",
+      "bytes": 2095
+    },
+    {
+      "path": "skills/module-architect/references/refactoring.md",
+      "bytes": 1677
+    },
+    {
+      "path": "skills/module-architect/report.md",
+      "bytes": 1360
+    },
+    {
+      "path": "local-architect.schema.json",
+      "bytes": 31683
+    },
+    {
+      "path": "subs/harness/src/prompts/engineer.system.md",
+      "bytes": 3101
+    },
+    {
+      "path": "subs/harness/src/prompts/engineer.procedure.md",
+      "bytes": 5466
+    },
+    {
+      "path": "skills/module-architect/SKILL.md",
+      "bytes": 3202
+    },
+    {
+      "path": "skills/module-architect/references/access.md",
+      "bytes": 1602
+    },
+    {
+      "path": "skills/module-architect/references/cognitive-decomposition.md",
+      "bytes": 5824
+    },
+    {
+      "path": "skills/module-architect/references/discovery.md",
+      "bytes": 1855
+    },
+    {
+      "path": "skills/module-architect/references/placement.md",
+      "bytes": 2095
+    },
+    {
+      "path": "skills/module-architect/references/refactoring.md",
+      "bytes": 1677
+    },
+    {
+      "path": "skills/module-architect/report.md",
+      "bytes": 1360
+    },
+    {
+      "path": "engineer.schema.json",
+      "bytes": 4039
+    },
+    {
+      "path": "subs/harness/src/prompts/contract-engineer.system.md",
+      "bytes": 3465
+    },
+    {
+      "path": "subs/harness/src/prompts/contract.procedure.md",
+      "bytes": 2835
+    },
+    {
+      "path": "skills/module-architect/SKILL.md",
+      "bytes": 3202
+    },
+    {
+      "path": "skills/module-architect/references/access.md",
+      "bytes": 1602
+    },
+    {
+      "path": "skills/module-architect/references/cognitive-decomposition.md",
+      "bytes": 5824
+    },
+    {
+      "path": "skills/module-architect/references/discovery.md",
+      "bytes": 1855
+    },
+    {
+      "path": "skills/module-architect/references/placement.md",
+      "bytes": 2095
+    },
+    {
+      "path": "skills/module-architect/references/refactoring.md",
+      "bytes": 1677
+    },
+    {
+      "path": "skills/module-architect/report.md",
+      "bytes": 1360
+    },
+    {
+      "path": "subs/harness/src/prompts/contract.skill.md",
+      "bytes": 2364
+    },
+    {
+      "path": "contract-engineer.schema.json",
+      "bytes": 5158
+    },
+    {
+      "path": ".ramify-architect",
+      "bytes": 93846
+    }
+  ]
+}

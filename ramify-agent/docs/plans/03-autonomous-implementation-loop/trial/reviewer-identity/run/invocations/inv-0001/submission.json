@@ -1,0 +1,23 @@
+{
+  "schema": "ramify-agent.initial-analysis/1",
+  "entries": [
+    {
+      "capability": "reviewer-identity",
+      "description": "The module provides reviewer-identity.",
+      "owner": "collection-review/workspace/reviews",
+      "requirementRefs": [
+        {
+          "anchor": "Request"
+        }
+      ],
+      "acceptanceRefs": [
+        {
+          "anchor": "Acceptance"
+        }
+      ],
+      "citations": []
+    }
+  ],
+  "hypotheses": [],
+  "coverageLimits": []
+}

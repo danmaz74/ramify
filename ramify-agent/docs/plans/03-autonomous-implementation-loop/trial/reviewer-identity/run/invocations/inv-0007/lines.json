@@ -1,0 +1,53 @@
+{
+  "schema": "ramify-agent.line-events/1",
+  "invocation": "inv-0007",
+  "paths": [
+    {
+      "path": "subs/workspace/subs/reviews/subs/ui/src/review-panel.tsx",
+      "owner": "collection-review/workspace/reviews/ui",
+      "added": 1,
+      "deleted": 0,
+      "binary": false,
+      "bytes": null
+    },
+    {
+      "path": "subs/workspace/subs/reviews/subs/ui/src/tests/review-panel.test.tsx",
+      "owner": "collection-review/workspace/reviews/ui",
+      "added": 2,
+      "deleted": 0,
+      "binary": false,
+      "bytes": null
+    },
+    {
+      "path": "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.module.css",
+      "owner": "collection-review/workspace/reviews/ui/pure-ui",
+      "added": 6,
+      "deleted": 0,
+      "binary": false,
+      "bytes": null
+    },
+    {
+      "path": "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.tsx",
+      "owner": "collection-review/workspace/reviews/ui/pure-ui",
+      "added": 8,
+      "deleted": 1,
+      "binary": false,
+      "bytes": null
+    },
+    {
+      "path": "subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/tests/review-result.test.tsx",
+      "owner": "collection-review/workspace/reviews/ui/pure-ui",
+      "added": 15,
+      "deleted": 1,
+      "binary": false,
+      "bytes": null
+    }
+  ],
+  "unmapped": {
+    "paths": 0,
+    "added": 0,
+    "deleted": 0
+  },
+  "coverage": "complete",
+  "gaps": []
+}

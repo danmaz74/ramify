@@ -1,0 +1,73 @@
+{
+  "schema": "ramify-agent.invocation/1",
+  "id": "inv-0004",
+  "role": "local-architect",
+  "work": {
+    "workItem": "wi-001"
+  },
+  "attempt": 2,
+  "session": {
+    "requested": "continued",
+    "actual": "continued",
+    "ref": "scripted-2@1#0",
+    "from": "scripted-2@1#0"
+  },
+  "prompt": {
+    "package": "local-architect/1",
+    "hash": "1ee2b7110dd35d01a06af9b33746d8282c03a6892c8a142c87d71a7182d26a81",
+    "inputsHash": "eb8e4e08e43dbf76d1b0848f2a0952b525aa3c58d999d1075c5af9e0fc6e108c"
+  },
+  "scope": {
+    "write": null,
+    "measurement": {
+      "id": "ms-0001",
+      "revision": 1,
+      "hash": "c9381805912bba65f73b8536cf7eb3cbec0c21ecb7d3990d8a69a6c0bd7cbfd3"
+    },
+    "size": {
+      "policy": "scope-size/1",
+      "snapshot": "ms-0001",
+      "components": [
+        {
+          "component": "owned-source",
+          "detail": "collection-review/workspace/reviews (subtree)",
+          "bytes": 67895,
+          "state": "measured",
+          "buckets": {
+            "production": 26924,
+            "tests": 34214,
+            "documentation": 6757
+          }
+        },
+        {
+          "component": "api-views",
+          "detail": "each declared ordinary and testing area once, by owner and physical source area",
+          "bytes": 69275,
+          "state": "measured",
+          "buckets": {
+            "ordinary": 33464,
+            "tests": 35811
+          }
+        },
+        {
+          "component": "architect-view",
+          "detail": ".ramify-architect/, at its publication size",
+          "bytes": 93846,
+          "state": "measured"
+        },
+        {
+          "component": "support-documents",
+          "detail": "plans/reviewer-identity/plan.md, subs/harness/src/prompts/initial-architect.system.md, subs/harness/src/prompts/initial-analysis.procedure.md, skills/module-architect/SKILL.md, skills/module-architect/references/access.md, skills/module-architect/references/cognitive-decomposition.md, skills/module-architect/references/discovery.md, skills/module-architect/references/placement.md, skills/module-architect/references/refactoring.md, skills/module-architect/report.md, initial-analysis.schema.json, subs/harness/src/prompts/global-fork.system.md, subs/harness/src/prompts/global-fork.procedure.md, skills/module-architect/SKILL.md, skills/module-architect/references/access.md, skills/module-architect/references/cognitive-decomposition.md, skills/module-architect/references/discovery.md, skills/module-architect/references/placement.md, skills/module-architect/references/refactoring.md, skills/module-architect/report.md, global-fork.schema.json, subs/harness/src/prompts/local-architect.system.md, subs/harness/src/prompts/local-architect.procedure.md, skills/module-architect/SKILL.md, skills/module-architect/references/access.md, skills/module-architect/references/cognitive-decomposition.md, skills/module-architect/references/discovery.md, skills/module-architect/references/placement.md, skills/module-architect/references/refactoring.md, skills/module-architect/report.md, local-architect.schema.json, subs/harness/src/prompts/engineer.system.md, subs/harness/src/prompts/engineer.procedure.md, skills/module-architect/SKILL.md, skills/module-architect/references/access.md, skills/module-architect/references/cognitive-decomposition.md, skills/module-architect/references/discovery.md, skills/module-architect/references/placement.md, skills/module-architect/references/refactoring.md, skills/module-architect/report.md, engineer.schema.json, subs/harness/src/prompts/contract-engineer.system.md, subs/harness/src/prompts/contract.procedure.md, skills/module-architect/SKILL.md, skills/module-architect/references/access.md, skills/module-architect/references/cognitive-decomposition.md, skills/module-architect/references/discovery.md, skills/module-architect/references/placement.md, skills/module-architect/references/refactoring.md, skills/module-architect/report.md, subs/harness/src/prompts/contract.skill.md, contract-engineer.schema.json, .ramify-architect",
+          "bytes": 285407,
+          "state": "measured"
+        }
+      ],
+      "bytes": 516423,
+      "subtotal": 516423,
+      "coverage": "complete"
+    }
+  },
+  "writer": false,
+  "base": "1a3a661fc1c73e0f93ffc51895a5657ddf268734",
+  "startedAt": "2026-09-21T07:52:40.886Z"
+}

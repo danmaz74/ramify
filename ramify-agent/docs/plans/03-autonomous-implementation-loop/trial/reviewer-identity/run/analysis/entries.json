@@ -1,0 +1,30 @@
+{
+  "schema": "ramify-agent.entry-assignments/1",
+  "view": {
+    "status": "materialized",
+    "revision": "rev/1:ae43380e-9ce1-4724-9521-9915b7aad94c:1",
+    "input": "input/1:6eedf35a86c066ea38f1e17e9418ad3525c64a3c2c228c87891cb49ec8ab6424",
+    "coverageLimits": [
+      "cut: 9",
+      "detailsUnavailable: 2"
+    ]
+  },
+  "entries": [
+    {
+      "capability": "reviewer-identity",
+      "description": "The module provides reviewer-identity.",
+      "owner": "collection-review/workspace/reviews",
+      "requirementRefs": [
+        {
+          "anchor": "Request"
+        }
+      ],
+      "acceptanceRefs": [
+        {
+          "anchor": "Acceptance"
+        }
+      ],
+      "citations": []
+    }
+  ]
+}

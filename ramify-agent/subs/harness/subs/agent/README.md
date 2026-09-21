@@ -14,13 +14,47 @@ implementations beneath this module receive it:
 
 - `AgentPort.startSession(spec)` returns an `AgentSession` at once. A failure
   to start is reported through its `outcome`, never thrown.
+- `AgentPort.observations` says what the implementation can observe. Usage,
+  context size and compaction are port events; an implementation that lacks
+  one reports it unavailable with a reason, which the harness records as a
+  coverage gap. Silence is never read as an empty context.
 - `SessionSpec` holds the role, the scope (the working directory), the
-  complete system prompt, the first user message, and the built-in read and
-  search tools to enable. It also holds the harness's own tools with JSON
-  Schema inputs, the submission tool, a directory for the implementation's
-  session record, and an `onEvent` callback.
-- Events are `tool-started` and `tool-finished`, matched by `callId`, and
-  `message` with token usage where the agent reports it.
+  complete system prompt, the first user message, and the built-in tools to
+  enable, which may include `edit` and `write` but never a shell. It also
+  holds the harness's own tools with JSON Schema inputs, the submission tool,
+  a directory for the implementation's session record, and an `onEvent`
+  callback.
+- `SessionSpec.session` is where the session starts: `fresh`, `continue` from
+  a ref, or `fork` from one. `AgentSession.start` reports the mode that was
+  **actual**, with a `degradedReason` when the requested one could not be
+  honored, so that a fork which silently became a fresh session cannot pass
+  for a fork.
+- `SessionSpec.context` is the context policy: whether compaction is
+  `forbidden` or `allowed`, the budget as a fraction of the reported window
+  or as an absolute figure, and the room reserved for a final report. It is
+  port policy and never prompt text.
+- `SessionSpec.guard` is called before a mutating call executes; a denial
+  becomes that call's error result and nothing is mutated.
+  `SessionSpec.afterMutation` is called after a mutating call that executed
+  settles, whether it succeeded or not, and never for a denied one; its text
+  is appended to the call's result, so a check the harness ran reaches the
+  agent before its next step. A tool declares its own mutation; no generic
+  code infers it from a name.
+- A `SessionRef` names a point in a session's history, not a session.
+  `AgentSession.ref` advances as the session runs, and
+  `AgentPort.appendContext(ref, key, text)` stores text without a model call,
+  answering `appended`, `already-present` for a repeated key, or
+  `session-lost`.
+- `AgentSession.settled()` answers `settled` or `timed-out`. It is the
+  implementation's own belief, which the harness uses as evidence and never
+  relies on: the harness confirms settlement itself, by process group and a
+  stable tree.
+- Events are `tool-started`, carrying `mutating`, and `tool-finished`,
+  matched by `callId` and carrying `reachedTool`, which is false when the
+  implementation rejected the input before the tool ran; `message` with token
+  usage where the agent reports it; `context-observed` with the estimated
+  size and the window, where `tokens: null` means unknown and never room; and
+  `compaction` with its reason and its sizes.
 - The submission tool's `accept` judges every call:
   - accepted ends the session with outcome `submitted`;
   - rejected with errors goes back to the same session as an error tool
@@ -28,8 +62,10 @@ implementations beneath this module receive it:
   - a `final` rejection ends the session with outcome `ended`.
   An agent finishes only through this tool; a closing message is never a
   result.
-- `outcome` settles once with `submitted`, `ended`, `failed` or `stopped`,
-  and never rejects.
+- `outcome` settles once with `submitted`, `ended`, `failed`, `stopped` or
+  `context-budget-reached`, and never rejects. Reaching the budget disables
+  the tools, allows one final response and ends the session with that
+  response as the report; it is never a completion.
 - `stop()` aborts cooperatively and resolves when the session is idle, which
   may be late or never. The caller bounds the wait and discards anything the
   session produces afterwards.
@@ -40,7 +76,14 @@ implementations beneath this module receive it:
 before each one:
 
 - `tool` calls a harness tool for real, or only reports a built-in one.
+  `mutating` overrides what the tool declares, so a script can exercise the
+  guard over any name, and `reachedTool: false` is a call the implementation
+  itself rejected before the tool ran.
 - `message` reports a message, with optional usage.
+- `context` observes the context after a boundary, and reaches the budget
+  when the policy says so.
+- `compaction` compacts, unless the session's policy forbids it, in which
+  case the step is suppressed and counted.
 - `submit` calls the submission tool.
 - `wait` waits and ends early on Stop.
 - `stall` waits and ignores Stop. With `thenIgnoreStop`, it keeps running
@@ -49,7 +92,12 @@ before each one:
 - `fail` crashes the session; `end` stops without a submission.
 
 A script may be a function of the session's spec. `sessions` records each
-spec, verdict and outcome for tests.
+spec, verdict and outcome for tests, along with the mode that was actual,
+the appended context the session started with, every tool result the agent
+saw, the calls the guard denied, and what the policy or the budget refused.
+The fake implements every port behavior, including the session modes,
+`appendContext`, the guard and the after-mutation hook, settlement and the
+budget, so the harness's tests never depend on pi.
 
 ## Testing
 

@@ -23,11 +23,11 @@ test('the connection is shown apart from the page content', async () => {
 test('the fragment selects the page', async () => {
   const client = new StubClient();
   client.documents.set('review-notes', {
-    id: 'review-notes', title: 'Reviewer notes', path: 'plans/review-notes/plan.md', markdown: '# Reviewer notes', mapping: { state: 'not-mapped' },
+    id: 'review-notes', title: 'Reviewer notes', path: 'plans/review-notes/plan.md', markdown: '# Reviewer notes',
   });
-  window.location.hash = '#/plans/review-notes/map';
+  window.location.hash = '#/plans/review-notes';
   render(<App client={client} />);
-  expect(await screen.findByText('No implementation map yet.')).toBeTruthy();
+  expect(await screen.findByRole('article', { name: 'Plan text' })).toBeTruthy();
   expect(await screen.findByText('collection-review')).toBeTruthy();
   act(() => { window.location.hash = '#/'; window.dispatchEvent(new HashChangeEvent('hashchange')); });
   expect(await screen.findByText('This project has no plans yet.')).toBeTruthy();

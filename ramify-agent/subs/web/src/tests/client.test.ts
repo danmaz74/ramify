@@ -39,19 +39,36 @@ test('requests the encoded plan path', async () => {
   expect(urls).toEqual(['http://h/api/v1/plans/a%20b']);
 });
 
-test('a command is resent unchanged when the harness does not answer, and a stale rejection carries the version', async () => {
+test('a command the harness does not answer is sent again with the same ID', async () => {
   const bodies: string[] = [];
   let calls = 0;
-  const receipt = { commandId: 'c1', jobId: 'j1', sequence: 4, acceptedAt: '2026-09-19T12:00:00.000Z' };
-  const flaky = createProtocolClient('', async (_url, init) => {
+  const client = createProtocolClient('', async (_input, init) => {
+    calls += 1;
     bodies.push(String(init?.body));
-    if (++calls === 1) throw new TypeError('fetch failed');
-    return new Response(JSON.stringify({ receipt }), { status: 202, headers: { 'content-type': 'application/json' } });
+    if (calls < 3) throw new TypeError('fetch failed');
+    return new Response(JSON.stringify({ receipt: { commandId: 'c1', jobId: 'j1', sequence: 1, acceptedAt: '2026-09-21T08:00:00.000Z' } }), { status: 202 });
   }, 1);
-  const command = { commandId: 'c1', expectedVersion: 3, type: 'stop-job', payload: { planId: 'p', jobId: 'j1' } } as const;
-  expect(await flaky.sendCommand(command)).toEqual(receipt);
-  expect(bodies).toEqual([JSON.stringify(command), JSON.stringify(command)]);
+  const receipt = await client.sendCommand({ commandId: 'c1', expectedVersion: 0, type: 'start-run', payload: { planId: 'p', agent: 'scripted' } });
+  expect(receipt.jobId).toBe('j1');
+  expect(bodies).toHaveLength(3);
+  expect(new Set(bodies).size).toBe(1);
+  expect(client.connection()).toBe('connected');
+});
 
-  const stale = createProtocolClient('', respond(409, { error: { code: 'stale-version', message: 'm', currentVersion: 7 } }));
-  await expect(stale.sendCommand(command)).rejects.toMatchObject({ kind: 'protocol', code: 'stale-version', currentVersion: 7 });
+test('a refused command carries its code, its current version and its evidence', async () => {
+  const client = createProtocolClient('', respond(409, { error: { code: 'stale-version', message: 'The job is at version 9, not 3', currentVersion: 9 } }));
+  await expect(client.sendCommand({ commandId: 'c', expectedVersion: 3, type: 'stop-job', payload: { planId: 'p', jobId: 'j' } }))
+    .rejects.toMatchObject({ kind: 'protocol', code: 'stale-version', currentVersion: 9 });
+  const unsupported = createProtocolClient('', respond(422, { error: { code: 'unsupported-version', message: 'declares /3', evidence: ['job.json', 'declares ramify-agent.job/3'] } }));
+  await expect(unsupported.getRun('p', 'j')).rejects.toMatchObject({ code: 'unsupported-version', evidence: ['job.json', 'declares ramify-agent.job/3'] });
+});
+
+test('reads the run\'s event page after a cursor', async () => {
+  const urls: string[] = [];
+  const client = createProtocolClient('http://h', async input => {
+    urls.push(String(input));
+    return new Response('{}', { status: 500 });
+  });
+  await expect(client.getEvents('p', 'r1', 42)).rejects.toMatchObject({ kind: 'invalid-response' });
+  expect(urls).toEqual(['http://h/api/v1/plans/p/runs/r1/events?after=42']);
 });

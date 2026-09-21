@@ -1,0 +1,25 @@
+{
+  "schema": "ramify-agent.loop-trial-verification/1",
+  "project": "/tmp/ramify-agent-fixture-trial-ukKaKn/collection-review",
+  "plan": "status-badge-tone",
+  "run": "20260921T073654Z-47e6b7",
+  "baseline": "0c707b06e52b5d961284faac4b46874d89deddb0",
+  "branch": "ramify-agent/run-20260921T073654Z-47e6b7",
+  "terminal": "job-completed",
+  "scopes": 1,
+  "counts": {
+    "changed": 1,
+    "added": 1,
+    "deleted": 0
+  },
+  "inScope": [
+    "M subs/workspace/subs/shared-ui/src/status-badge.tsx  (wi-001.i01)",
+    "A subs/workspace/subs/shared-ui/src/tests/status-badge-tone.test.tsx  (wi-001.i01)"
+  ],
+  "recordedOutside": [],
+  "defects": [],
+  "evaluation": {
+    "outsideScope": []
+  },
+  "status": []
+}

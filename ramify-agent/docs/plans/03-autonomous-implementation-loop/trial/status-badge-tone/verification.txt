@@ -1,0 +1,11 @@
+Copy: /tmp/ramify-agent-fixture-trial-ukKaKn/collection-review
+Run: 20260921T073654Z-47e6b7 of "status-badge-tone", last event job-completed; 1 recorded write scopes.
+Branch ramify-agent/run-20260921T073654Z-47e6b7; baseline 0c707b06e52b5d961284faac4b46874d89deddb0.
+Changed since the baseline: 1 modified, 1 added, 0 deleted.
+Inside a recorded write scope: 2
+  M subs/workspace/subs/shared-ui/src/status-badge.tsx  (wi-001.i01)
+  A subs/workspace/subs/shared-ui/src/tests/status-badge-tone.test.tsx  (wi-001.i01)
+Outside every scope, and in outsideScope and in the evaluation: 0
+In neither, a defect of the loop: 0
+git status: clean
+Every change is inside a recorded write scope, or recorded outside one and in the evaluation.

@@ -1,0 +1,29 @@
+{
+  "schema": "ramify-agent.line-events/1",
+  "invocation": "inv-0003",
+  "paths": [
+    {
+      "path": "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts",
+      "owner": "collection-review/workspace/contracts",
+      "added": 13,
+      "deleted": 0,
+      "binary": false,
+      "bytes": null
+    },
+    {
+      "path": "subs/workspace/subs/contracts/src/tests/vocabulary.test.ts",
+      "owner": "collection-review/workspace/contracts",
+      "added": 14,
+      "deleted": 1,
+      "binary": false,
+      "bytes": null
+    }
+  ],
+  "unmapped": {
+    "paths": 0,
+    "added": 0,
+    "deleted": 0
+  },
+  "coverage": "complete",
+  "gaps": []
+}

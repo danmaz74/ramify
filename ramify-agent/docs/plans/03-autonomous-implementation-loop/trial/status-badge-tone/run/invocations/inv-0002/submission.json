@@ -1,0 +1,38 @@
+{
+  "schema": "ramify-agent.local-architect-submission/1",
+  "kind": "assign",
+  "outline": {
+    "changes": "The badge takes an optional tone and carries it as data-tone; it reads as neutral without one.",
+    "decomposition": {
+      "kind": "single-iteration",
+      "rationale": "One component and its tests; nothing else changes and nothing depends on the change."
+    },
+    "reuse": [],
+    "breakingChanges": [],
+    "stages": [],
+    "revisionReason": ""
+  },
+  "localDecisions": [],
+  "assignment": {
+    "stage": 0,
+    "kind": "ordinary",
+    "goal": "Give the status badge a tone, with tests of its own.",
+    "approach": "Change the source, then the tests that state it.",
+    "scope": {
+      "base": {
+        "module": "collection-review/workspace/shared-ui",
+        "includedChildren": []
+      },
+      "extra": [],
+      "read": [],
+      "rationale": "The work is in this module."
+    },
+    "requirementRefs": [
+      {
+        "anchor": "Request"
+      }
+    ],
+    "externalCapabilities": [],
+    "completionEvidence": "The tests this scope owns pass."
+  }
+}

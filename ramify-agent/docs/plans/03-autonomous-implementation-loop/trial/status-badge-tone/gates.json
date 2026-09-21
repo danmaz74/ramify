@@ -1,0 +1,224 @@
+[
+  {
+    "id": "ga-0001",
+    "checkpoint": "readiness",
+    "subject": {},
+    "verdict": "passed",
+    "cause": null,
+    "commit": null,
+    "commands": [
+      {
+        "kind": "tests",
+        "argv": [
+          "npm",
+          "test"
+        ],
+        "outcome": "passed",
+        "exitCode": 0,
+        "elapsedMs": 2173,
+        "selection": null
+      },
+      {
+        "kind": "type-check",
+        "argv": [
+          "npm",
+          "run",
+          "type-check"
+        ],
+        "outcome": "passed",
+        "exitCode": 0,
+        "elapsedMs": 857,
+        "selection": null
+      },
+      {
+        "kind": "ramify-check",
+        "argv": [
+          "/ramify/ramify-agent/node_modules/.bin/ramify",
+          "check",
+          "--batch",
+          "--root",
+          "<project>",
+          "--format",
+          "json"
+        ],
+        "outcome": "passed",
+        "exitCode": 0,
+        "elapsedMs": 4318,
+        "selection": null
+      }
+    ]
+  },
+  {
+    "id": "ga-0002",
+    "checkpoint": "iteration",
+    "subject": {
+      "workItem": "wi-001",
+      "iteration": "wi-001.i01"
+    },
+    "verdict": "passed",
+    "cause": null,
+    "commit": "4d694883933d6ce621e8db3b487b1e0f9c051a2e",
+    "commands": [
+      {
+        "kind": "tests",
+        "argv": [
+          "<project>/node_modules/.bin/vitest",
+          "run",
+          "subs/workspace/subs/shared-ui/src/tests/status-badge-tone.test.tsx",
+          "subs/workspace/subs/shared-ui/src/tests/status-badge.test.tsx"
+        ],
+        "outcome": "passed",
+        "exitCode": 0,
+        "elapsedMs": 863,
+        "selection": [
+          "subs/workspace/subs/shared-ui/src/tests/status-badge-tone.test.tsx",
+          "subs/workspace/subs/shared-ui/src/tests/status-badge.test.tsx"
+        ]
+      },
+      {
+        "kind": "type-check",
+        "argv": [
+          "npm",
+          "run",
+          "type-check"
+        ],
+        "outcome": "passed",
+        "exitCode": 0,
+        "elapsedMs": 726,
+        "selection": null
+      },
+      {
+        "kind": "ramify-check",
+        "argv": [
+          "/ramify/ramify-agent/node_modules/.bin/ramify",
+          "check",
+          "--batch",
+          "--root",
+          "<project>",
+          "--format",
+          "json"
+        ],
+        "outcome": "passed",
+        "exitCode": 0,
+        "elapsedMs": 4529,
+        "selection": null
+      }
+    ]
+  },
+  {
+    "id": "ga-0003",
+    "checkpoint": "work-item",
+    "subject": {
+      "workItem": "wi-001"
+    },
+    "verdict": "passed",
+    "cause": null,
+    "commit": null,
+    "commands": [
+      {
+        "kind": "tests",
+        "argv": [
+          "npm",
+          "test"
+        ],
+        "outcome": "passed",
+        "exitCode": 0,
+        "elapsedMs": 2375,
+        "selection": null
+      },
+      {
+        "kind": "type-check",
+        "argv": [
+          "npm",
+          "run",
+          "type-check"
+        ],
+        "outcome": "passed",
+        "exitCode": 0,
+        "elapsedMs": 946,
+        "selection": null
+      },
+      {
+        "kind": "ramify-check",
+        "argv": [
+          "/ramify/ramify-agent/node_modules/.bin/ramify",
+          "check",
+          "--batch",
+          "--root",
+          "<project>",
+          "--format",
+          "json"
+        ],
+        "outcome": "passed",
+        "exitCode": 0,
+        "elapsedMs": 5076,
+        "selection": null
+      },
+      {
+        "kind": "tests",
+        "argv": [
+          "<project>/node_modules/.bin/vitest",
+          "run",
+          "subs/workspace/subs/shared-ui/src/tests/status-badge-tone.test.tsx",
+          "subs/workspace/subs/shared-ui/src/tests/status-badge.test.tsx"
+        ],
+        "outcome": "passed",
+        "exitCode": 0,
+        "elapsedMs": 1195,
+        "selection": [
+          "subs/workspace/subs/shared-ui/src/tests/status-badge-tone.test.tsx",
+          "subs/workspace/subs/shared-ui/src/tests/status-badge.test.tsx"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "ga-0004",
+    "checkpoint": "final",
+    "subject": {},
+    "verdict": "passed",
+    "cause": null,
+    "commit": null,
+    "commands": [
+      {
+        "kind": "tests",
+        "argv": [
+          "npm",
+          "test"
+        ],
+        "outcome": "passed",
+        "exitCode": 0,
+        "elapsedMs": 2533,
+        "selection": null
+      },
+      {
+        "kind": "type-check",
+        "argv": [
+          "npm",
+          "run",
+          "type-check"
+        ],
+        "outcome": "passed",
+        "exitCode": 0,
+        "elapsedMs": 947,
+        "selection": null
+      },
+      {
+        "kind": "ramify-check",
+        "argv": [
+          "/ramify/ramify-agent/node_modules/.bin/ramify",
+          "check",
+          "--batch",
+          "--root",
+          "<project>",
+          "--format",
+          "json"
+        ],
+        "outcome": "passed",
+        "exitCode": 0,
+        "elapsedMs": 4658,
+        "selection": null
+      }
+    ]
+  }
+]

@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { readFile, rename, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { z } from 'zod';
-import { writeFileExclusive } from './atomic.js';
+import { writeFileExclusive } from '../../subs/ledger/src/atomic.js';
 import { ensureStateDirectory } from './state-directory.js';
 
 /** The project lock's path, relative to the project root. */
@@ -44,7 +44,7 @@ export interface ProjectLock {
  */
 export async function acquireProjectLock(projectRoot: string): Promise<ProjectLock> {
   const path = join(projectRoot, lockPath);
-  await ensureStateDirectory(dirname(path));
+  await ensureStateDirectory(dirname(path), { gitignore: true });
   const record: LockRecord = {
     pid: process.pid,
     startedAt: new Date(Date.now() - process.uptime() * 1000).toISOString(),

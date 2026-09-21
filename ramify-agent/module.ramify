@@ -6,27 +6,20 @@ module "ramify-agent"
 // so the web client validates what crosses the wire with the same schemas.
 // Starting a server and its lock failures stay with the root.
 
-// map.ts
-expose-sub Availability, Citation, ImplementationMap from harness to descendants
-expose-sub InputManifest, MapApproval, MapSubmission, ModulePath from harness to descendants
-expose-sub NewCapability, Reuse, Seam, ShapeValidation from harness to descendants
-expose-sub TouchedModule, ViewIdentity, Weight, WorkItem from harness to descendants
-expose-sub availabilitySchema, citationSchema from harness to descendants
-expose-sub implementationMapSchema, inputManifestSchema from harness to descendants
-expose-sub isWithin, mapApprovalSchema, mapSubmissionSchema from harness to descendants
-expose-sub modulePathSchema, newCapabilitySchema, reuseSchema from harness to descendants
-expose-sub seamSchema, sha256Schema, touchedModuleSchema from harness to descendants
-expose-sub validateMapSubmission, viewIdentitySchema from harness to descendants
-expose-sub weightSchema, workItemSchema from harness to descendants
+// protocol/evidence.ts
+expose-sub Citation, InputManifest, ModulePath from harness to descendants
+expose-sub ModuleTree, ModuleTreeResponse, TreeModule from harness to descendants
+expose-sub ViewIdentity, citationSchema, inputManifestSchema from harness to descendants
+expose-sub isWithin, modulePathSchema, moduleTreeResponseSchema from harness to descendants
+expose-sub sha256Schema, treeModuleSchema, viewIdentitySchema from harness to descendants
 
 // protocol/ids.ts
 expose-sub JobId, PlanId, jobIdSchema, planIdSchema from harness to descendants
 
 // protocol/queries.ts
-expose-sub MappingState, PlanDocument, PlanEntry from harness to descendants
-expose-sub PlanListResponse, PlanResponse, ProjectResponse from harness to descendants
-expose-sub ReadablePlanEntry, UnreadablePlanEntry from harness to descendants
-expose-sub mappingStateSchema, planEntrySchema from harness to descendants
+expose-sub PlanDocument, PlanEntry, PlanListResponse from harness to descendants
+expose-sub PlanResponse, ProjectResponse, ReadablePlanEntry from harness to descendants
+expose-sub UnreadablePlanEntry, planEntrySchema from harness to descendants
 expose-sub planListResponseSchema, planResponseSchema from harness to descendants
 expose-sub projectResponseSchema, readablePlanEntrySchema from harness to descendants
 expose-sub unreadablePlanEntrySchema from harness to descendants
@@ -36,27 +29,39 @@ expose-sub ErrorCode, ErrorResponse, errorCodeSchema from harness to descendants
 expose-sub errorHttpStatus, errorResponseSchema from harness to descendants
 
 // protocol/jobs.ts
-expose-sub AcceptedCommand, Activity, ApiViewEvidence, Command from harness to descendants
-expose-sub CommandResponse, CommandType, EventPage from harness to descendants
-expose-sub FailureReason, JobEvent, JobEventOf, JobEventType from harness to descendants
-expose-sub JobListResponse, JobResponse, JobSnapshot, JobState from harness to descendants
-expose-sub Receipt, Usage, acceptedCommandSchema, activitySchema from harness to descendants
-expose-sub apiViewEvidenceSchema, approveMapCommandSchema from harness to descendants
-expose-sub commandIdSchema, commandResponseSchema, commandSchema from harness to descendants
-expose-sub eventPageSchema, failureReasonSchema, jobEventSchema from harness to descendants
-expose-sub jobListResponseSchema, jobResponseSchema from harness to descendants
-expose-sub jobSnapshotSchema, jobStateSchema, jobVersionSchema from harness to descendants
-expose-sub receiptSchema, startMappingCommandSchema from harness to descendants
-expose-sub stopJobCommandSchema, terminalEventTypes, usageSchema from harness to descendants
-
-// protocol/maps.ts
-expose-sub MapRevision, ModuleTree, ModuleTreeResponse from harness to descendants
-expose-sub ReadableRevision, RevisionEntry, RevisionListResponse from harness to descendants
-expose-sub RevisionResponse, TreeModule from harness to descendants
-expose-sub moduleTreeResponseSchema, readableRevisionSchema from harness to descendants
-expose-sub revisionEntrySchema, revisionListResponseSchema from harness to descendants
-expose-sub revisionResponseSchema, treeModuleSchema from harness to descendants
-expose-sub unreadableRevisionSchema from harness to descendants
+expose-sub AcceptedCommand, Activity, ApiViewEvidence from harness to descendants
+expose-sub CommandResponse, JobState, Receipt, Usage from harness to descendants
+expose-sub acceptedCommandSchema, activitySchema from harness to descendants
+expose-sub apiViewEvidenceSchema, commandIdSchema from harness to descendants
+expose-sub commandResponseSchema, jobStateSchema from harness to descendants
+expose-sub jobVersionSchema, receiptSchema, stopJobCommandSchema from harness to descendants
+expose-sub usageSchema from harness to descendants
 
 // protocol/paths.ts
 expose-sub apiPrefix, protocolPaths from harness to descendants
+
+// protocol/runs.ts
+expose-sub runIdSchema, RunId, roleSchema, Role, runAgentSchema, RunAgent from harness to descendants
+expose-sub startRunCommandSchema, StartRunCommand, runCommandSchema, RunCommand from harness to descendants
+expose-sub RunCommandType, runFailureReasonSchema, RunFailureReason from harness to descendants
+expose-sub runPhaseSchema, RunPhase, runQueryLimits, measurementPolicySchema from harness to descendants
+expose-sub kpiPolicySchema, runNoticeSchema, RunNotice, RunNoticeKind from harness to descendants
+expose-sub runSnapshotSchema, RunSnapshot, unservedRunSchema, UnservedRun from harness to descendants
+expose-sub runListResponseSchema, RunListResponse, runResponseSchema, RunResponse from harness to descendants
+expose-sub runEventRefKindSchema, RunEventRefKind, projectedRunEventSchema from harness to descendants
+expose-sub ProjectedRunEvent, runEventPageSchema, RunEventPage, entryViewSchema from harness to descendants
+expose-sub EntryView, hypothesisStandingSchema, HypothesisStanding from harness to descendants
+expose-sub hypothesisViewSchema, HypothesisView, analysisResponseSchema from harness to descendants
+expose-sub AnalysisResponse, placementOutcomeViewSchema, decisionViewSchema from harness to descendants
+expose-sub DecisionView, DecisionKind, decisionListResponseSchema from harness to descendants
+expose-sub DecisionListResponse, workItemStateSchema, WorkItemState from harness to descendants
+expose-sub workItemSummarySchema, WorkItemSummary, workItemListResponseSchema from harness to descendants
+expose-sub WorkItemListResponse, gateVerdictSchema, gateCheckpointSchema from harness to descendants
+expose-sub gateCauseSchema, gateNextSchema, workItemResponseSchema from harness to descendants
+expose-sub WorkItemResponse, capabilityStateSchema, CapabilityState from harness to descendants
+expose-sub capabilityProgressSchema, CapabilityProgress from harness to descendants
+expose-sub capabilityListResponseSchema, CapabilityListResponse, gateViewSchema from harness to descendants
+expose-sub GateView, gateResponseSchema, GateResponse, metricStateSchema from harness to descendants
+expose-sub MetricState, metricSchema, Metric, guardingViewSchema, GuardingView from harness to descendants
+expose-sub invocationEvaluationSchema, InvocationEvaluation from harness to descendants
+expose-sub metricsResponseSchema, MetricsResponse from harness to descendants

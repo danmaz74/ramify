@@ -12,19 +12,19 @@ record, it means that record.
 | Iteration | Brief | Results |
 | ---: | --- | --- |
 | 0 | [Pi and session lifecycle spike](iteration0.md) | [complete](iteration0-results.md) |
-| 0B | [The ledger](iteration0b.md) | `iteration0b-results.md` |
-| 1 | [Extract `harness/evidence` and move jobs onto the ledger](iteration1.md) | `iteration1-results.md` |
-| 2 | [External commands and the check engine](iteration2.md) | `iteration2-results.md` |
-| 3 | [Agent port additions and the pi adapter](iteration3.md) | `iteration3-results.md` |
-| 4 | [The implementation run](iteration4.md) | `iteration4-results.md` |
-| 5 | [Initial analysis and work-item coordination](iteration5.md) | `iteration5-results.md` |
-| 6 | [Iteration assignments, engineers and the iteration gate](iteration6.md) | `iteration6-results.md` |
-| 7 | [The shell, mutations and hooks](iteration7.md) | `iteration7-results.md` |
-| 8 | [Global architect decisions](iteration8.md) | `iteration8-results.md` |
-| 9 | [Contract delegation and provider obligations](iteration9.md) | `iteration9-results.md` |
-| 10 | [Breaking work and gate integrity](iteration10.md) | `iteration10-results.md` |
-| 11 | [Protocol, web MVP and KPI projections](iteration11.md) | `iteration11-results.md` |
-| 12 | [Integrated trials and the completion gate](iteration12.md) | `iteration12-results.md`, then the completion report |
+| 0B | [The ledger](iteration0b.md) | [complete](iteration0b-results.md) |
+| 1 | [Extract `harness/evidence` and move jobs onto the ledger](iteration1.md) | [complete](iteration1-results.md) |
+| 2 | [External commands and the check engine](iteration2.md) | [complete](iteration2-results.md) |
+| 3 | [Agent port additions and the pi adapter](iteration3.md) | [complete](iteration3-results.md) |
+| 4 | [The implementation run](iteration4.md) | [complete](iteration4-results.md) |
+| 5 | [Initial analysis and work-item coordination](iteration5.md) | [complete](iteration5-results.md) |
+| 6 | [Iteration assignments, engineers and the iteration gate](iteration6.md) | [complete](iteration6-results.md) |
+| 7 | [The shell, mutations and hooks](iteration7.md) | [complete](iteration7-results.md) |
+| 8 | [Global architect decisions](iteration8.md) | [complete](iteration8-results.md) |
+| 9 | [Contract delegation and provider obligations](iteration9.md) | [complete](iteration9-results.md), in two parts |
+| 10 | [Breaking work and gate integrity](iteration10.md) | [complete](iteration10-results.md) |
+| 11 | [Protocol, web MVP and KPI projections](iteration11.md) | [complete](iteration11-results.md) |
+| 12 | [Integrated trials and the completion gate](iteration12.md) | [complete](iteration12-results.md), in two parts; [completion report](../completion-report.md) |
 
 ## Rules for every iteration
 

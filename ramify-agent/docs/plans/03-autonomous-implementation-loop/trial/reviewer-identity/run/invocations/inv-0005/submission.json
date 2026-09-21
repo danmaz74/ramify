@@ -1,0 +1,6 @@
+{
+  "schema": "ramify-agent.engineer-submission/1",
+  "kind": "completion-proposed",
+  "summary": "The outcome requires the reviewer, and the runtime, both surfaces and every caller carry it.",
+  "findings": []
+}

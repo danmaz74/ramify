@@ -1,0 +1,29 @@
+{
+  "schema": "ramify-agent.line-events/1",
+  "invocation": "inv-0003",
+  "paths": [
+    {
+      "path": "subs/workspace/subs/shared-ui/src/status-badge.tsx",
+      "owner": "collection-review/workspace/shared-ui",
+      "added": 11,
+      "deleted": 5,
+      "binary": false,
+      "bytes": null
+    },
+    {
+      "path": "subs/workspace/subs/shared-ui/src/tests/status-badge-tone.test.tsx",
+      "owner": "collection-review/workspace/shared-ui",
+      "added": 25,
+      "deleted": 0,
+      "binary": false,
+      "bytes": null
+    }
+  ],
+  "unmapped": {
+    "paths": 0,
+    "added": 0,
+    "deleted": 0
+  },
+  "coverage": "complete",
+  "gaps": []
+}

@@ -1,0 +1,6 @@
+{
+  "schema": "ramify-agent.engineer-submission/1",
+  "kind": "completion-proposed",
+  "summary": "The review panel shows the reviewer's name and role above the verdict.",
+  "findings": []
+}

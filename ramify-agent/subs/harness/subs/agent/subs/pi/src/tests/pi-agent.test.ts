@@ -38,6 +38,8 @@ async function run(steps: readonly ReplyStep[], options: {
   verdicts?: SubmissionVerdict[];
   tools?: ToolDefinition[];
   systemPrompt?: string;
+  session?: SessionSpec['session'];
+  context?: SessionSpec['context'];
 } = {}): Promise<Harness> {
   const workingDirectory = await mkdtemp(join(tmpdir(), 'ramify-agent-pi-cwd-'));
   cleanups.push(() => rm(workingDirectory, { recursive: true, force: true }));
@@ -60,6 +62,8 @@ async function run(steps: readonly ReplyStep[], options: {
     scope: { workingDirectory },
     systemPrompt: options.systemPrompt ?? 'You are the architect. Exactly this prompt.',
     prompt: 'Map the plan.',
+    session: options.session ?? { mode: 'fresh' },
+    context: options.context ?? { compaction: 'allowed', budgetTokens: null, budgetFraction: null, reportReserveTokens: 0 },
     builtinTools: ['read', 'grep', 'ls'],
     tools: options.tools ?? [],
     submission: {
@@ -112,9 +116,9 @@ describe('the pi adapter', () => {
 
     const started = harness.events.filter(event => event.type === 'tool-started');
     expect(started).toEqual([
-      { type: 'tool-started', callId: 'c-read', tool: 'read', input: { path: 'module.ramify' } },
-      { type: 'tool-started', callId: 'c-grep', tool: 'grep', input: { pattern: 'expose-sub', path: 'subs' } },
-      { type: 'tool-started', callId: 'c-echo', tool: 'echo', input: { word: 'hello' } },
+      { type: 'tool-started', callId: 'c-read', tool: 'read', input: { path: 'module.ramify' }, mutating: false },
+      { type: 'tool-started', callId: 'c-grep', tool: 'grep', input: { pattern: 'expose-sub', path: 'subs' }, mutating: false },
+      { type: 'tool-started', callId: 'c-echo', tool: 'echo', input: { word: 'hello' }, mutating: false },
     ]);
     const finished = harness.events.filter(event => event.type === 'tool-finished');
     expect(finished.map(event => [event.callId, event.isError]).sort()).toEqual([['c-echo', false], ['c-grep', false], ['c-read', false]]);
@@ -193,7 +197,7 @@ describe('the pi adapter', () => {
     };
     const harness = await run([call('materialize_api_view', { module: 'nope' }, 'c-1'), call('submit_implementation_map', validMap)], { tools: [failing] });
     await expect(harness.outcome).resolves.toMatchObject({ kind: 'submitted' });
-    expect(harness.events).toContainEqual({ type: 'tool-finished', callId: 'c-1', tool: 'materialize_api_view', isError: true, errorText: 'Unknown module "nope"' });
+    expect(harness.events).toContainEqual({ type: 'tool-finished', callId: 'c-1', tool: 'materialize_api_view', isError: true, errorText: 'Unknown module "nope"', reachedTool: true });
   });
 
   test('a provider error fails the session once pi\'s retries are spent', async () => {
@@ -250,7 +254,10 @@ describe('the pi adapter', () => {
     const directory = await mkdtemp(join(tmpdir(), 'ramify-agent-pi-cwd-'));
     cleanups.push(() => rm(directory, { recursive: true, force: true }));
     const session = agent.startSession({
-      role: 'architect', scope: { workingDirectory: directory }, systemPrompt: 's', prompt: 'p', builtinTools: [], tools: [],
+      role: 'architect', scope: { workingDirectory: directory }, systemPrompt: 's', prompt: 'p',
+      session: { mode: 'fresh' },
+      context: { compaction: 'allowed', budgetTokens: null, budgetFraction: null, reportReserveTokens: 0 },
+      builtinTools: [], tools: [],
       submission: { name: 'submit', description: 'd', inputSchema: { type: 'object' }, accept: async () => ({ accepted: true }) },
       sessionDirectory: directory, onEvent: () => undefined,
     });

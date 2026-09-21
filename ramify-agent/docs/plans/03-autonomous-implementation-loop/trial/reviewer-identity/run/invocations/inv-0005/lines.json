@@ -1,0 +1,133 @@
+{
+  "schema": "ramify-agent.line-events/1",
+  "invocation": "inv-0005",
+  "paths": [
+    {
+      "path": "src/tests/assembly.test.ts",
+      "owner": "collection-review",
+      "added": 6,
+      "deleted": 3,
+      "binary": false,
+      "bytes": null
+    },
+    {
+      "path": "src/tests/http.test.ts",
+      "owner": "collection-review",
+      "added": 8,
+      "deleted": 5,
+      "binary": false,
+      "bytes": null
+    },
+    {
+      "path": "subs/integration-tests/src/steps/collection-review.steps.ts",
+      "owner": "collection-review/integration-tests",
+      "added": 6,
+      "deleted": 3,
+      "binary": false,
+      "bytes": null
+    },
+    {
+      "path": "subs/workspace/src/app.tsx",
+      "owner": "collection-review/workspace",
+      "added": 58,
+      "deleted": 3,
+      "binary": false,
+      "bytes": null
+    },
+    {
+      "path": "subs/workspace/src/tests/shell.test.tsx",
+      "owner": "collection-review/workspace",
+      "added": 15,
+      "deleted": 2,
+      "binary": false,
+      "bytes": null
+    },
+    {
+      "path": "subs/workspace/subs/reviews/src/mcp.ts",
+      "owner": "collection-review/workspace/reviews",
+      "added": 35,
+      "deleted": 3,
+      "binary": false,
+      "bytes": null
+    },
+    {
+      "path": "subs/workspace/subs/reviews/src/router.ts",
+      "owner": "collection-review/workspace/reviews",
+      "added": 5,
+      "deleted": 5,
+      "binary": false,
+      "bytes": null
+    },
+    {
+      "path": "subs/workspace/subs/reviews/src/session.ts",
+      "owner": "collection-review/workspace/reviews",
+      "added": 24,
+      "deleted": 4,
+      "binary": false,
+      "bytes": null
+    },
+    {
+      "path": "subs/workspace/subs/reviews/src/tests/router.test.ts",
+      "owner": "collection-review/workspace/reviews",
+      "added": 26,
+      "deleted": 4,
+      "binary": false,
+      "bytes": null
+    },
+    {
+      "path": "subs/workspace/subs/reviews/src/tests/sessions.test.ts",
+      "owner": "collection-review/workspace/reviews",
+      "added": 56,
+      "deleted": 9,
+      "binary": false,
+      "bytes": null
+    },
+    {
+      "path": "subs/workspace/subs/reviews/src/tests/typing.test.ts",
+      "owner": "collection-review/workspace/reviews",
+      "added": 4,
+      "deleted": 1,
+      "binary": false,
+      "bytes": null
+    },
+    {
+      "path": "subs/workspace/subs/reviews/subs/core/src/runtime.ts",
+      "owner": "collection-review/workspace/reviews/core",
+      "added": 11,
+      "deleted": 6,
+      "binary": false,
+      "bytes": null
+    },
+    {
+      "path": "subs/workspace/subs/reviews/subs/core/src/tests/runtime.test.ts",
+      "owner": "collection-review/workspace/reviews/core",
+      "added": 14,
+      "deleted": 4,
+      "binary": false,
+      "bytes": null
+    },
+    {
+      "path": "subs/workspace/subs/reviews/subs/ui/src/review-panel.tsx",
+      "owner": "collection-review/workspace/reviews/ui",
+      "added": 9,
+      "deleted": 4,
+      "binary": false,
+      "bytes": null
+    },
+    {
+      "path": "subs/workspace/subs/reviews/subs/ui/src/tests/review-panel.test.tsx",
+      "owner": "collection-review/workspace/reviews/ui",
+      "added": 6,
+      "deleted": 3,
+      "binary": false,
+      "bytes": null
+    }
+  ],
+  "unmapped": {
+    "paths": 0,
+    "added": 0,
+    "deleted": 0
+  },
+  "coverage": "complete",
+  "gaps": []
+}

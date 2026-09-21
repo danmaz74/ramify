@@ -1,0 +1,13 @@
+
+> collection-review@0.0.0 test
+> vitest run
+
+
+ RUN  v5.0.0 /tmp/ramify-agent-fixture-trial-sugtii/collection-review
+
+
+ Test Files  20 passed (20)
+      Tests  77 passed (77)
+   Start at  07:52:19
+   Duration  1.04s (import 52%, transform 32%, tests 14%, worker 2%)
+

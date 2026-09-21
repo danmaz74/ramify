@@ -1,0 +1,43 @@
+{
+  "schema": "ramify-agent.loop-trial-verification/1",
+  "project": "/tmp/ramify-agent-fixture-trial-sugtii/collection-review",
+  "plan": "reviewer-identity",
+  "run": "20260921T075217Z-236cd4",
+  "baseline": "362d55cfb83d8f04045548ccbbcc88f0a4b99c32",
+  "branch": "ramify-agent/run-20260921T075217Z-236cd4",
+  "terminal": "job-completed",
+  "scopes": 3,
+  "counts": {
+    "changed": 20,
+    "added": 0,
+    "deleted": 0
+  },
+  "inScope": [
+    "M src/tests/assembly.test.ts  (wi-001.i02)",
+    "M src/tests/http.test.ts  (wi-001.i02)",
+    "M subs/integration-tests/src/steps/collection-review.steps.ts  (wi-001.i02)",
+    "M subs/workspace/src/app.tsx  (wi-001.i02)",
+    "M subs/workspace/src/tests/shell.test.tsx  (wi-001.i02)",
+    "M subs/workspace/subs/contracts/src/interfaces/vocabulary.ts  (wi-001.i01)",
+    "M subs/workspace/subs/contracts/src/tests/vocabulary.test.ts  (wi-001.i01)",
+    "M subs/workspace/subs/reviews/src/mcp.ts  (wi-001.i02)",
+    "M subs/workspace/subs/reviews/src/router.ts  (wi-001.i02)",
+    "M subs/workspace/subs/reviews/src/session.ts  (wi-001.i02)",
+    "M subs/workspace/subs/reviews/src/tests/router.test.ts  (wi-001.i02)",
+    "M subs/workspace/subs/reviews/src/tests/sessions.test.ts  (wi-001.i02)",
+    "M subs/workspace/subs/reviews/src/tests/typing.test.ts  (wi-001.i02)",
+    "M subs/workspace/subs/reviews/subs/core/src/runtime.ts  (wi-001.i02)",
+    "M subs/workspace/subs/reviews/subs/core/src/tests/runtime.test.ts  (wi-001.i02)",
+    "M subs/workspace/subs/reviews/subs/ui/src/review-panel.tsx  (wi-001.i02)",
+    "M subs/workspace/subs/reviews/subs/ui/src/tests/review-panel.test.tsx  (wi-001.i02)",
+    "M subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.module.css  (wi-001.i02)",
+    "M subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.tsx  (wi-001.i02)",
+    "M subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/tests/review-result.test.tsx  (wi-001.i02)"
+  ],
+  "recordedOutside": [],
+  "defects": [],
+  "evaluation": {
+    "outsideScope": []
+  },
+  "status": []
+}

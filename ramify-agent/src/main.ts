@@ -13,16 +13,19 @@ async function main(argv: readonly string[]): Promise<number> {
     console.log(usage);
     return 0;
   }
-  const server = await startServer({ projectRoot: commandLine.projectRoot, port: commandLine.port, assetsDirectory, agent: commandLine.agent, piModel: commandLine.model });
+  const server = await startServer({
+    projectRoot: commandLine.projectRoot, port: commandLine.port, assetsDirectory, agent: commandLine.agent, piModel: commandLine.model,
+  });
   console.log(`Serving ${server.projectRoot}`);
   console.log(`Open ${server.url}/`);
-  console.log(server.agent ? `Mapping jobs run on the ${server.agent} agent.` : 'No agent is configured; mapping jobs cannot start. Pass --agent pi, or --agent fake for the scripted fake.');
+  console.log(server.agent
+    ? `Implementation runs start on the ${server.agent} agent.`
+    : 'No agent is configured; runs can be read but not started. Pass --agent pi, or --agent fake for the scripted fake.');
   if (server.agentStatus) console.log(server.agentStatus);
-  const { interrupted, completed, failed, skipped, approvals } = server.recovery;
-  if (interrupted.length + completed.length + failed.length + skipped.length > 0) {
-    console.log(`Recovered jobs: ${interrupted.length} interrupted, ${completed.length} completed, ${failed.length} failed, ${skipped.length} skipped.`);
+  const { interrupted, rematerialized, effects, invocations, skipped } = server.recovery;
+  if (interrupted.length + rematerialized.length + effects.length + invocations.length + skipped.length > 0) {
+    console.log(`Recovered runs: ${interrupted.length} interrupted, ${rematerialized.length} rematerialized, ${effects.length} effects completed, ${invocations.length} invocations closed, ${skipped.length} skipped.`);
   }
-  if (approvals.length > 0) console.log(`Recovered approval records: ${approvals.join(', ')}.`);
   if (!server.servesWebClient) console.log('The web client is not built; run `npm run build:web`. The protocol is served under /api/v1.');
   const stop = () => {
     void server.close().then(() => process.exit(0));

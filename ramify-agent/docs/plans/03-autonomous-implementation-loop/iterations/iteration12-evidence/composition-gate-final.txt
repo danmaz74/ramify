@@ -1,0 +1,112 @@
+Running 31 test files for 46 cases, with the fixture trials.
+met     C1   (iteration 11)
+          subs/harness/src/tests/run-protocol.test.ts: "C1: a run completes with no client, and a client attached afterwards reads the same state and events": 1 passed
+met     C2   (iteration 4)
+          subs/harness/src/tests/run-recovery.test.ts: "the recovery table": 19 passed
+met     C3   (iteration 7)
+          subs/harness/src/tests/late-writes.test.ts: "is settled with its process group, and its result completes nothing": 1 passed
+met     C4   (iteration 6)
+          subs/harness/src/tests/accepted-commit.test.ts: "a crash between the gate": 1 passed
+          subs/harness/src/tests/accepted-commit.test.ts: "a later source change invalidates nothing: the accepted commit stays as it is": 1 passed
+met     C5   (iteration 4)
+          subs/harness/src/tests/run-commands.test.ts: "an identical retry returns the original receipt and starts no second run": 1 passed
+          subs/harness/src/tests/run-commands.test.ts: "a reused ID with other content is a conflict, and nothing is started": 1 passed
+          subs/harness/src/tests/run-commands.test.ts: "a stale expected version is rejected with the current version": 1 passed
+met     G1   (iteration 5)
+          subs/harness/src/tests/work-items.test.ts: "hypotheses create no work, and a hypothesis appears in no work record": 1 passed
+met     G2   (iteration 8)
+          subs/harness/src/tests/placement.test.ts: "the first creates a capability and revises its hypothesis; the second inherits its brief and reuses the entry": 1 passed
+met     G3   (iteration 8)
+          subs/harness/src/tests/placement.test.ts: "G2, G3: two sequential placement forks, and the brief between them": 1 passed
+met     G4   (iteration 8)
+          subs/harness/src/tests/run-recovery.test.ts: "G4: a crash after the append and before its completion answers already-present, and one brief exists": 1 passed
+met     G5   (iteration 8)
+          subs/harness/src/tests/local-authority.test.ts: "G5, G6, G7: local authority, escalation and what a revision reaches": 1 passed
+met     G6   (iteration 8)
+          subs/harness/src/tests/local-authority.test.ts: "G5, G6, G7: local authority, escalation and what a revision reaches": 1 passed
+met     G7   (iteration 8)
+          subs/harness/src/tests/local-authority.test.ts: "G5, G6, G7: local authority, escalation and what a revision reaches": 1 passed
+met     G8   (iteration 6)
+          subs/harness/src/tests/iterations.test.ts: "G8: one small work item completes in one iteration": 1 passed
+          subs/harness/src/tests/iterations.test.ts: "G8: a work item revised across several iterations keeps every obligation": 1 passed
+met     G9   (iteration 6)
+          subs/harness/src/tests/module-creation.test.ts: "G9: an accepted proposed entry owner reaches implementation": 2 passed
+met     G10  (iteration 8)
+          subs/harness/src/tests/module-creation.test.ts: "G10: global placement authorizes a new owner without claiming it exists": 1 passed
+met     P1   (iteration 9)
+          subs/harness/src/tests/contract-delegation.test.ts: "P1: one consumer delegates, resumes after provider conformance and verifies against the real provider": 2 passed
+met     P2   (iteration 9)
+          subs/harness/src/tests/requirement-verification.test.ts: "P2: the contract gate rejects a fake under a production-looking name": 1 passed
+          subs/harness/src/tests/requirement-verification.test.ts: "P2: architectural evidence does not present a fake as production behavior": 1 passed
+met     P3   (iteration 9)
+          subs/harness/src/tests/contract-revision.test.ts: "P3: a contract revision reschedules current evidence without resetting completed work": 1 passed
+met     P4   (iteration 9)
+          subs/harness/src/tests/contract-revision.test.ts: "P4: an ordinary provider engineer reports inability to conform through its own submission union": 2 passed
+met     P5   (iteration 9)
+          subs/harness/src/tests/contract-scheduling.test.ts: "P5: a shared obligation runs its provider once and each consumer verifies separately": 1 passed
+          subs/harness/src/tests/contract-scheduling.test.ts: "P5: a chain of changes back through a module that has yielded is not a cycle": 1 passed
+          subs/harness/src/tests/contract-scheduling.test.ts: "P5: a capability that transitively depends on itself": 1 passed
+met     K1   (iteration 6)
+          subs/harness/src/tests/iteration-gate.test.ts: "K1: a module gate fails, is repaired and reruns the complete gate": 2 passed
+met     K2   (iteration 6)
+          subs/harness/src/tests/no-rewind.test.ts: "K2: a failure outside the last engineer": 1 passed
+met     K3   (iteration 6)
+          subs/harness/src/tests/iterations.test.ts: "K3: exact-owner and included-subtree selections at gate time": 1 passed
+          subs/harness/src/tests/test-selection.test.ts: "K3: an exact owner and an included child subtree": 2 passed
+met     K4   (iteration 9)
+          subs/harness/src/tests/contract-delegation.test.ts: "K4: the contract gate runs the suite against the fake and the provider gate runs it against the real provider": 1 passed
+met     K5a  (iteration 4)
+          subs/harness/src/tests/readiness.test.ts: "the three causes a readiness failure can have": 7 passed
+met     K5b  (iteration 6)
+          subs/harness/src/tests/iteration-gate.test.ts: "K5b: an invalid session, a timeout and an exhausted limit keep distinct causes": 2 passed
+met     K6   (iteration 10)
+          subs/harness/src/tests/breaking-work.test.ts: "K6: the gate is not satisfied by weakening what it checks": 2 passed
+met     K7   (iteration 10)
+          subs/harness/src/tests/breaking-work.test.ts: "K7: a breaking feature is isolated into iterations that are green at every accepted boundary": 1 passed
+met     K8   (iteration 6)
+          subs/harness/src/tests/iteration-gate.test.ts: "K8: every gate resolves the current tests under the captured policy": 3 passed
+          subs/harness/src/tests/test-selection.test.ts: "K8: every resolution reads the tree as it stands": 5 passed
+met     X1a  (iteration 6)
+          subs/harness/src/tests/iterations.test.ts: "X1a: an engineer reaches its context budget": 1 passed
+met     X1b  (iteration 9)
+          subs/harness/src/tests/contract-delegation.test.ts: "X1b: a contract sub-session that returns incomplete registers nothing": 1 passed
+met     X1c  (iteration 8)
+          subs/harness/src/tests/placement.test.ts: "X1c: a fork that returns partial findings and no decision": 1 passed
+met     X2   (iteration 5)
+          subs/harness/src/tests/compaction.test.ts: "an initial architect and a local architect that compact are both recorded": 1 passed
+met     X3   (iteration 6)
+          subs/harness/src/tests/write-guard.test.ts: "X3: allowed and denied targets": 3 passed
+met     X4   (iteration 6)
+          subs/harness/src/tests/iterations.test.ts: "X4: a denied call mutates nothing and stays deduplicated": 1 passed
+met     X5   (iteration 6)
+          subs/harness/src/tests/write-guard.test.ts: "X5: a resolution failure is not a scope violation": 2 passed
+met     X6   (iteration 7)
+          subs/harness/src/tests/unguarded-write.test.ts: "X6: an unguarded shell mutation and an outside read make the MVP": 1 passed
+met     M1   (iteration 5)
+          subs/harness/src/tests/progress.test.ts: "the record kinds are distinct directories, and the projection appends nothing": 1 passed
+met     M2   (iteration 11)
+          subs/harness/src/tests/progress.test.ts: "M2: provider waits, verified reuse, reopened evidence and superseded hypotheses": 4 passed
+met     M3   (iteration 11)
+          subs/web/src/tests/run-page.test.tsx: "a lost connection is shown apart from the run": 1 passed
+met     M4   (iteration 11)
+          subs/harness/src/tests/kpi-metrics.test.ts: "M4: every metric keeps its numerator, denominator, version and coverage": 10 passed
+met     M5   (iteration 6)
+          subs/harness/src/tests/line-events.test.ts: "M5: every session counts, whatever ended it": 1 passed
+met     T1   (iteration 12)
+          subs/harness/src/tests/composition.test.ts: "the recovery tables of the ten state machines": 1 passed
+          subs/harness/src/tests/composition.test.ts: "every value of every union has a producer": 1 passed
+          subs/harness/src/tests/composition.test.ts: "no query appends an event": 1 passed
+          subs/harness/src/tests/composition.test.ts: "the acceptance matrix, composed": 1 passed
+          subs/harness/src/tests/composition-recovery.test.ts: "the composed recovery table": 19 passed
+          subs/harness/src/tests/composition-recovery-delegation.test.ts: "the composed recovery table": 6 passed
+          subs/harness/src/tests/composition-recovery-chains.test.ts: "the composed recovery table": 10 passed
+NOT MET T2   (iteration 12)
+          trial/review-notes: not run; Not run because no pi login exists in this environment: `~/.pi` is absent and none of the provider variables pi reads is set, and no credential the person has not set up for pi was used.
+met     T3   (iteration 12)
+          subs/harness/src/tests/fixture-trials.test.ts: "T3: reviewer-identity on the real fixture toolchain": 1 passed
+          trial/reviewer-identity: run completed; 0 change(s) outside what the records account for
+met     T4   (iteration 12)
+          trial/review-sheet.md: present
+
+45 of 46 cases met. Not met: T2.
+EXIT 1

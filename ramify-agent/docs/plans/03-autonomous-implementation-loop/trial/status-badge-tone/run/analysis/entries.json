@@ -1,0 +1,30 @@
+{
+  "schema": "ramify-agent.entry-assignments/1",
+  "view": {
+    "status": "materialized",
+    "revision": "rev/1:d1c8d3e4-79f0-4323-9d42-47dfc970bb48:1",
+    "input": "input/1:4e2a4b748c41ef2bbae8640cfd175df0e10bd015c2ec11c72f5b11a7fc983170",
+    "coverageLimits": [
+      "cut: 9",
+      "detailsUnavailable: 2"
+    ]
+  },
+  "entries": [
+    {
+      "capability": "status-badge-tone",
+      "description": "The module provides status-badge-tone.",
+      "owner": "collection-review/workspace/shared-ui",
+      "requirementRefs": [
+        {
+          "anchor": "Request"
+        }
+      ],
+      "acceptanceRefs": [
+        {
+          "anchor": "Acceptance"
+        }
+      ],
+      "citations": []
+    }
+  ]
+}

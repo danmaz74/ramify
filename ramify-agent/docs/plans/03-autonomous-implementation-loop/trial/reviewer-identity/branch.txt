@@ -1,0 +1,46 @@
+2023cb565805cfe16ac7b546d0b295435b2499e8 wi-001.i03: Show the reviewer's display name and role above the verdict.
+The review panel shows the reviewer's name and role above the verdict.
+
+Checks: passed (gate ga-0004, checkpoint breaking-iteration)
+  tests         passed       1.6 s
+  type-check    passed       0.7 s
+  ramify-check  passed       3.4 s
+  tests         passed       0.9 s   3 files; owners collection-review/workspace/reviews/ui, collection-review/workspace/reviews/ui/pure-ui
+
+Ramify-Run: 20260921T075217Z-236cd4
+Ramify-Work-Item: wi-001
+Ramify-Iteration: wi-001.i03
+Ramify-Gate: ga-0004
+Ramify-Invocations: inv-0001, inv-0002, inv-0003, inv-0004, inv-0005, inv-0006, inv-0007
+
+a99964562af700ad78b4dda3f44a96207d880bb0 wi-001.i02: Make the review outcome carry the structured reviewer, required, through the runtime, both surfaces and every caller.
+The outcome requires the reviewer, and the runtime, both surfaces and every caller carry it.
+
+Checks: passed (gate ga-0003, checkpoint breaking-iteration)
+  tests         passed       1.5 s
+  type-check    passed       0.7 s
+  ramify-check  passed       3.3 s
+  tests         passed       1.1 s   9 files; owners collection-review/workspace/reviews/core, collection-review/workspace/reviews, collection-review/workspace/reviews/ui, collection-review/workspace, collection-review, collection-review/integration-tests
+
+Ramify-Run: 20260921T075217Z-236cd4
+Ramify-Work-Item: wi-001
+Ramify-Iteration: wi-001.i02
+Ramify-Gate: ga-0003
+Ramify-Invocations: inv-0001, inv-0002, inv-0003, inv-0004, inv-0005
+
+1a3a661fc1c73e0f93ffc51895a5657ddf268734 wi-001.i01: Add the structured reviewer to the shared vocabulary, where both sides can name it.
+The shared vocabulary has the structured reviewer.
+
+Checks: passed (gate ga-0002, checkpoint iteration)
+  tests         passed       0.7 s   1 file; owners collection-review/workspace/contracts
+  type-check    passed       0.7 s
+  ramify-check  passed       3.8 s
+
+Ramify-Run: 20260921T075217Z-236cd4
+Ramify-Work-Item: wi-001
+Ramify-Iteration: wi-001.i01
+Ramify-Gate: ga-0002
+Ramify-Invocations: inv-0001, inv-0002, inv-0003
+
+362d55cfb83d8f04045548ccbbcc88f0a4b99c32 fixture
+

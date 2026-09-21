@@ -1,0 +1,70 @@
+{
+  "schema": "ramify-agent.invocation/1",
+  "id": "inv-0001",
+  "role": "initial-architect",
+  "work": {},
+  "attempt": 1,
+  "session": {
+    "requested": "fresh",
+    "actual": "fresh",
+    "ref": ""
+  },
+  "prompt": {
+    "package": "initial-architect/1",
+    "hash": "41dc4b24f76a5b0045bfa7ae061543c997385ba488f698a0d0bf05657293f7e2",
+    "inputsHash": "feec3041b21c979e6f58831c7700b4892b3b34e7b247fce2ebc2c904419f1e13"
+  },
+  "scope": {
+    "write": null,
+    "measurement": {
+      "id": "ms-0001",
+      "revision": 1,
+      "hash": "c9381805912bba65f73b8536cf7eb3cbec0c21ecb7d3990d8a69a6c0bd7cbfd3"
+    },
+    "size": {
+      "policy": "scope-size/1",
+      "snapshot": "ms-0001",
+      "components": [
+        {
+          "component": "owned-source",
+          "detail": "collection-review (subtree)",
+          "bytes": 177902,
+          "state": "measured",
+          "buckets": {
+            "production": 66534,
+            "tests": 85824,
+            "documentation": 25544
+          }
+        },
+        {
+          "component": "api-views",
+          "detail": "each declared ordinary and testing area once, by owner and physical source area",
+          "bytes": 124460,
+          "state": "measured",
+          "buckets": {
+            "ordinary": 60840,
+            "tests": 63620
+          }
+        },
+        {
+          "component": "architect-view",
+          "detail": ".ramify-architect/, at its publication size",
+          "bytes": 93846,
+          "state": "measured"
+        },
+        {
+          "component": "support-documents",
+          "detail": "plans/reviewer-identity/plan.md, subs/harness/src/prompts/initial-architect.system.md, subs/harness/src/prompts/initial-analysis.procedure.md, skills/module-architect/SKILL.md, skills/module-architect/references/access.md, skills/module-architect/references/cognitive-decomposition.md, skills/module-architect/references/discovery.md, skills/module-architect/references/placement.md, skills/module-architect/references/refactoring.md, skills/module-architect/report.md, initial-analysis.schema.json, subs/harness/src/prompts/global-fork.system.md, subs/harness/src/prompts/global-fork.procedure.md, skills/module-architect/SKILL.md, skills/module-architect/references/access.md, skills/module-architect/references/cognitive-decomposition.md, skills/module-architect/references/discovery.md, skills/module-architect/references/placement.md, skills/module-architect/references/refactoring.md, skills/module-architect/report.md, global-fork.schema.json, subs/harness/src/prompts/local-architect.system.md, subs/harness/src/prompts/local-architect.procedure.md, skills/module-architect/SKILL.md, skills/module-architect/references/access.md, skills/module-architect/references/cognitive-decomposition.md, skills/module-architect/references/discovery.md, skills/module-architect/references/placement.md, skills/module-architect/references/refactoring.md, skills/module-architect/report.md, local-architect.schema.json, subs/harness/src/prompts/engineer.system.md, subs/harness/src/prompts/engineer.procedure.md, skills/module-architect/SKILL.md, skills/module-architect/references/access.md, skills/module-architect/references/cognitive-decomposition.md, skills/module-architect/references/discovery.md, skills/module-architect/references/placement.md, skills/module-architect/references/refactoring.md, skills/module-architect/report.md, engineer.schema.json, subs/harness/src/prompts/contract-engineer.system.md, subs/harness/src/prompts/contract.procedure.md, skills/module-architect/SKILL.md, skills/module-architect/references/access.md, skills/module-architect/references/cognitive-decomposition.md, skills/module-architect/references/discovery.md, skills/module-architect/references/placement.md, skills/module-architect/references/refactoring.md, skills/module-architect/report.md, subs/harness/src/prompts/contract.skill.md, contract-engineer.schema.json, .ramify-architect",
+          "bytes": 285407,
+          "state": "measured"
+        }
+      ],
+      "bytes": 681615,
+      "subtotal": 681615,
+      "coverage": "complete"
+    }
+  },
+  "writer": false,
+  "base": "362d55cfb83d8f04045548ccbbcc88f0a4b99c32",
+  "startedAt": "2026-09-21T07:52:18.390Z"
+}

@@ -5,7 +5,7 @@ module agent
 // fake that implements it. How a session is driven stays behind the port.
 // The port also reaches the implementations beneath this module.
 expose-src * from "interfaces/port.ts" to parent, descendants
-expose-src createScriptedAgent, ScriptStep, Script, ScriptedAgent, ScriptedSessionRecord from "scripted.ts" to parent
+expose-src createScriptedAgent, ScriptStep, Script, ScriptedAgent, ScriptedAgentOptions, ScriptedSessionRecord, ScriptedToolResult from "scripted.ts" to parent
 
 // pi, the port's first real implementation, relayed to the harness that
 // chooses it.

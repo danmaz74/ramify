@@ -1,0 +1,17 @@
+
+> collection-review@0.0.0 test
+> vitest run
+
+
+ RUN  v5.0.0 /tmp/ramify-agent-fixture-trial-ukKaKn/collection-review
+
+
+ Test Files  21 passed (21)
+      Tests  80 passed (80)
+   Start at  07:37:27
+   Duration  1.51s (import 50%, transform 32%, tests 16%, worker 2%)
+
+  Transform  transforming modules took 2.98s · 32% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

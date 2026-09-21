@@ -1,0 +1,13 @@
+{
+  "schema": "ramify-agent.iteration-result/1",
+  "iteration": "wi-001.i01",
+  "outcome": "accepted",
+  "invocations": [
+    "inv-0003"
+  ],
+  "gate": "ga-0002",
+  "commit": "4d694883933d6ce621e8db3b487b1e0f9c051a2e",
+  "findings": [],
+  "changedAssumptions": [],
+  "artifacts": []
+}

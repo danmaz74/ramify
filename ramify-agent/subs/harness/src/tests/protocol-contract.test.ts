@@ -1,26 +1,27 @@
 import { describe, expect, test } from 'vitest';
 import { errorHttpStatus, errorResponseSchema } from '../interfaces/protocol/errors.js';
 import { jobIdSchema, planIdSchema } from '../interfaces/protocol/ids.js';
-import { commandSchema, eventPageSchema, jobEventSchema, receiptSchema, type JobSnapshot } from '../interfaces/protocol/jobs.js';
-import { moduleTreeResponseSchema, revisionListResponseSchema } from '../interfaces/protocol/maps.js';
+import { acceptedCommandSchema, activitySchema, apiViewEvidenceSchema, receiptSchema, stopJobCommandSchema } from '../interfaces/protocol/jobs.js';
+import { citationSchema, inputManifestSchema, modulePathSchema, moduleTreeResponseSchema, sha256Schema, viewIdentitySchema } from '../interfaces/protocol/evidence.js';
 import { protocolPaths } from '../interfaces/protocol/paths.js';
-import { mappingStateSchema, planListResponseSchema, planResponseSchema, projectResponseSchema } from '../interfaces/protocol/queries.js';
+import { planListResponseSchema, planResponseSchema, projectResponseSchema } from '../interfaces/protocol/queries.js';
 
 describe('queries', () => {
   test('a plan list carries readable and unreadable entries', () => {
     const list = {
       plans: [
-        { status: 'readable', id: 'a', title: 'A', path: 'plans/a/plan.md', mapping: { state: 'not-mapped' } },
+        { status: 'readable', id: 'a', title: 'A', path: 'plans/a/plan.md' },
         { status: 'unreadable', id: 'b', path: 'plans/b/plan.md', message: 'EISDIR' },
       ],
     };
     expect(planListResponseSchema.parse(list)).toEqual(list);
   });
 
-  test('a readable entry needs a mapping state and rejects unknown fields', () => {
+  test('a readable entry rejects unknown fields', () => {
     const entry = { status: 'readable', id: 'a', title: 'A', path: 'plans/a/plan.md' };
-    expect(planListResponseSchema.safeParse({ plans: [entry] }).success).toBe(false);
-    expect(planListResponseSchema.safeParse({ plans: [{ ...entry, mapping: { state: 'not-mapped' }, extra: 1 }] }).success).toBe(false);
+    expect(planListResponseSchema.safeParse({ plans: [entry] }).success).toBe(true);
+    expect(planListResponseSchema.safeParse({ plans: [{ ...entry, extra: 1 }] }).success).toBe(false);
+    expect(planListResponseSchema.safeParse({ plans: [{ status: 'readable', id: 'a', path: 'plans/a/plan.md' }] }).success).toBe(false);
   });
 
   test('plan IDs are one non-hidden path segment', () => {
@@ -34,7 +35,7 @@ describe('queries', () => {
       project: { name: 'p', root: '/tmp/p', planPattern: 'plans/<plan-id>/plan.md' },
     }).success).toBe(true);
     expect(planResponseSchema.safeParse({
-      plan: { id: 'a', title: 'A', path: 'plans/a/plan.md', markdown: '# A', mapping: { state: 'not-mapped' } },
+      plan: { id: 'a', title: 'A', path: 'plans/a/plan.md', markdown: '# A' },
     }).success).toBe(true);
   });
 });
@@ -50,51 +51,29 @@ describe('errors', () => {
 describe('jobs', () => {
   const at = '2026-09-19T12:00:00.000Z';
   const receipt = { commandId: 'c1', jobId: 'j1', sequence: 1, acceptedAt: at };
-  const snapshot: JobSnapshot = {
-    jobId: 'j1', planId: 'a', agent: 'scripted', version: 1, state: 'running', stopRequested: false,
-    startedAt: at, updatedAt: at, endedAt: null,
-    inputs: { planHash: 'h', source: null, architectView: 'placeholder' },
-    revision: null, failure: null,
-    totals: { filesRead: 0, searches: 0, rejectedSubmissions: 0, usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
-  };
 
-  test('commands carry an ID, an expected version and a typed payload', () => {
-    expect(commandSchema.safeParse({ commandId: 'c1', expectedVersion: 0, type: 'start-mapping', payload: { planId: 'a' } }).success).toBe(true);
-    expect(commandSchema.safeParse({ commandId: 'c2', expectedVersion: 4, type: 'stop-job', payload: { planId: 'a', jobId: 'j1' } }).success).toBe(true);
-    expect(commandSchema.safeParse({ commandId: 'c3', expectedVersion: 9, type: 'approve-map', payload: { planId: 'a', jobId: 'j1', revision: 1 } }).success).toBe(true);
-    expect(commandSchema.safeParse({ commandId: 'c1', type: 'start-mapping', payload: { planId: 'a' } }).success).toBe(false);
-    expect(commandSchema.safeParse({ commandId: 'c1', expectedVersion: 0, type: 'start', payload: {} }).success).toBe(false);
-    expect(commandSchema.safeParse({ commandId: 'c1', expectedVersion: 0, type: 'stop-job', payload: { planId: 'a' } }).success).toBe(false);
+  test('the stop command carries an ID, an expected version and a typed payload', () => {
+    expect(stopJobCommandSchema.safeParse({ commandId: 'c2', expectedVersion: 4, type: 'stop-job', payload: { planId: 'a', jobId: 'j1' } }).success).toBe(true);
+    expect(stopJobCommandSchema.safeParse({ commandId: 'c2', type: 'stop-job', payload: { planId: 'a', jobId: 'j1' } }).success).toBe(false);
+    expect(stopJobCommandSchema.safeParse({ commandId: 'c2', expectedVersion: 4, type: 'stop-job', payload: { planId: 'a' } }).success).toBe(false);
   });
 
-  test('events are typed by their type', () => {
-    const started = { sequence: 1, jobId: 'j1', type: 'job-started', at, data: { command: { commandId: 'c1', contentHash: 'x', receipt } } };
-    expect(jobEventSchema.parse(started)).toEqual(started);
-    expect(jobEventSchema.safeParse({ ...started, data: null }).success).toBe(false);
-    const activity = { sequence: 2, jobId: 'j1', type: 'activity', at, data: { activity: { kind: 'read', callId: 'c', path: 'module.ramify' } } };
-    expect(jobEventSchema.safeParse(activity).success).toBe(true);
-    expect(jobEventSchema.safeParse({ ...activity, type: 'progress' }).success).toBe(false);
-    const evidence = { sequence: 3, jobId: 'j1', type: 'api-view-materialized', at, data: { module: 'shop/orders', views: [{ area: 'src', path: 'subs/orders/src/.ramify', revision: 'rev/1:x:1', coverage: null }] } };
-    expect(jobEventSchema.safeParse(evidence).success).toBe(true);
-    expect(jobEventSchema.safeParse({ ...evidence, data: { ...evidence.data, views: [{ ...evidence.data.views[0], area: 'lib' }] } }).success).toBe(false);
-    expect(jobEventSchema.safeParse({ sequence: 4, jobId: 'j1', type: 'job-failed', at, data: { reason: 'evidence-unavailable', message: 'm', diagnostics: [] } }).success).toBe(true);
-  });
-
-  test('a receipt and an event page', () => {
+  test('a receipt and the accepted command that records it', () => {
     expect(receiptSchema.safeParse(receipt).success).toBe(true);
-    expect(eventPageSchema.safeParse({
-      job: snapshot,
-      events: [{ sequence: 1, jobId: 'j1', type: 'job-interrupted', at, data: { message: 'm' } }],
-      cursor: 1,
-      more: false,
-    }).success).toBe(true);
+    expect(acceptedCommandSchema.safeParse({ commandId: 'c1', contentHash: 'x', receipt }).success).toBe(true);
+    expect(acceptedCommandSchema.safeParse({ commandId: 'c1', receipt }).success).toBe(false);
   });
 
-  test('mapping states name the latest job', () => {
-    expect(mappingStateSchema.safeParse({ state: 'running', jobId: 'j1', latestRevision: null }).success).toBe(true);
-    expect(mappingStateSchema.safeParse({ state: 'completed', jobId: 'j1', latestRevision: 2 }).success).toBe(true);
-    expect(mappingStateSchema.safeParse({ state: 'running' }).success).toBe(false);
-    expect(mappingStateSchema.safeParse({ state: 'not-mapped', jobId: 'j1' }).success).toBe(false);
+  test('observed activity is typed by its kind', () => {
+    expect(activitySchema.safeParse({ kind: 'read', callId: 'c', path: 'module.ramify' }).success).toBe(true);
+    expect(activitySchema.safeParse({ kind: 'message', text: 'hello', usage: null }).success).toBe(true);
+    expect(activitySchema.safeParse({ kind: 'progress', text: 'x' }).success).toBe(false);
+  });
+
+  test('API-view evidence names one source area of one module', () => {
+    const evidence = { module: 'shop/orders', views: [{ area: 'src', path: 'subs/orders/src/.ramify', revision: 'rev/1:x:1', coverage: null }] };
+    expect(apiViewEvidenceSchema.parse(evidence)).toEqual(evidence);
+    expect(apiViewEvidenceSchema.safeParse({ ...evidence, views: [{ ...evidence.views[0], area: 'lib' }] }).success).toBe(false);
   });
 
   test('job IDs', () => {
@@ -105,40 +84,53 @@ describe('jobs', () => {
 
 test('paths encode their IDs', () => {
   expect(protocolPaths.plan('a b')).toBe('/api/v1/plans/a%20b');
-  expect(protocolPaths.events('a b', 'j1', 3)).toBe('/api/v1/plans/a%20b/jobs/j1/events?after=3');
-  expect(protocolPaths.commands).toBe('/api/v1/commands');
-  expect(protocolPaths.map('a b', 2)).toBe('/api/v1/plans/a%20b/maps/2');
+  expect(protocolPaths.plans).toBe('/api/v1/plans');
   expect(protocolPaths.modules).toBe('/api/v1/project/modules');
+  expect(protocolPaths.commands).toBe('/api/v1/commands');
+  expect(protocolPaths.runs('a b')).toBe('/api/v1/plans/a%20b/runs');
+  expect(protocolPaths.runEvents('p', 'r/1', 7)).toBe('/api/v1/plans/p/runs/r%2F1/events?after=7');
+  expect(protocolPaths.runWorkItem('p', 'r', 'wi-001')).toBe('/api/v1/plans/p/runs/r/work-items/wi-001');
+  expect(protocolPaths.runGate('p', 'r', 'ga 1')).toBe('/api/v1/plans/p/runs/r/gates/ga%201');
+  for (const path of [protocolPaths.runAnalysis('p', 'r'), protocolPaths.runDecisions('p', 'r'), protocolPaths.runWorkItems('p', 'r'), protocolPaths.runCapabilities('p', 'r'), protocolPaths.runMetrics('p', 'r')]) {
+    expect(path.startsWith('/api/v1/plans/p/runs/r/')).toBe(true);
+  }
 });
 
-describe('maps and approvals', () => {
-  const approval = {
-    schema: 'ramify-agent.map-approval/1', planId: 'a', revision: 1, mapHash: 'b'.repeat(64), planHash: 'c'.repeat(64),
-    input: 'input/1:abc', approvedAt: '2026-09-19T12:00:00.000Z',
-  };
-  const accepted = { commandId: 'c', contentHash: 'x', receipt: { commandId: 'c', jobId: 'j1', sequence: 9, acceptedAt: '2026-09-19T12:00:00.000Z' } };
+describe('the evidence a run works from', () => {
+  test('a module path is a declared-name path from the root', () => {
+    for (const path of ['app', 'app/orders', 'ramify-agent/harness/agent']) expect(modulePathSchema.safeParse(path).success).toBe(true);
+    for (const path of ['', '/app', 'app/', 'app orders']) expect(modulePathSchema.safeParse(path).success).toBe(false);
+  });
 
-  test('a revision list carries approvals and unreadable files', () => {
-    const list = {
-      revisions: [
-        { status: 'readable', revision: 2, path: 'plans/a/map/002.json', jobId: 'j2', mapHash: 'd'.repeat(64), approval: null },
-        { status: 'readable', revision: 1, path: 'plans/a/map/001.json', jobId: 'j1', mapHash: 'b'.repeat(64), approval },
-        { status: 'unreadable', revision: 3, path: 'plans/a/map/003.json', message: 'Not a valid implementation map' },
-      ],
+  test('a digest is lowercase hexadecimal of the right length', () => {
+    expect(sha256Schema.safeParse('a'.repeat(64)).success).toBe(true);
+    expect(sha256Schema.safeParse('A'.repeat(64)).success).toBe(false);
+    expect(sha256Schema.safeParse('a'.repeat(63)).success).toBe(false);
+  });
+
+  test('a citation names a module, and may narrow it to a file and a symbol', () => {
+    expect(citationSchema.safeParse({ module: 'app/orders' }).success).toBe(true);
+    expect(citationSchema.safeParse({ module: 'app/orders', file: 'subs/orders/src/x.ts', symbol: 'price', note: 'why' }).success).toBe(true);
+    expect(citationSchema.safeParse({ module: 'app/orders', extra: 1 }).success).toBe(false);
+    expect(citationSchema.safeParse({ file: 'x.ts' }).success).toBe(false);
+  });
+
+  test('a view identity is a placeholder or a materialization', () => {
+    expect(viewIdentitySchema.safeParse({ status: 'placeholder' }).success).toBe(true);
+    expect(viewIdentitySchema.safeParse({ status: 'materialized', revision: 'r', input: 'i', coverageLimits: [] }).success).toBe(true);
+    expect(viewIdentitySchema.safeParse({ status: 'materialized', revision: 'r' }).success).toBe(false);
+  });
+
+  test('an input manifest carries the plan hash, the checkout and the view', () => {
+    const manifest = {
+      planHash: 'a'.repeat(64),
+      source: { commit: 'abc', dirty: false },
+      versions: { architectPrompt: '1', procedure: '1', skill: '1', ramify: '1' },
+      architectView: { status: 'placeholder' },
     };
-    expect(revisionListResponseSchema.parse(list)).toEqual(list);
-    expect(revisionListResponseSchema.safeParse({ revisions: [{ ...list.revisions[1], approval: { ...approval, extra: 1 } }] }).success).toBe(false);
-  });
-
-  test('map-approved holds the command and the approval record', () => {
-    const event = { sequence: 9, jobId: 'j1', type: 'map-approved', at: '2026-09-19T12:00:00.000Z', data: { command: accepted, approval } };
-    expect(jobEventSchema.parse(event)).toEqual(event);
-    expect(jobEventSchema.safeParse({ ...event, data: { command: accepted, approval: { ...approval, mapHash: 'short' } } }).success).toBe(false);
-  });
-
-  test('a stale approval is a 409 inputs-changed error', () => {
-    expect(errorHttpStatus['inputs-changed']).toBe(409);
-    expect(errorResponseSchema.safeParse({ error: { code: 'inputs-changed', message: 'stale' } }).success).toBe(true);
+    expect(inputManifestSchema.parse(manifest)).toEqual(manifest);
+    expect(inputManifestSchema.safeParse({ ...manifest, planHash: 'short' }).success).toBe(false);
+    expect(inputManifestSchema.safeParse({ ...manifest, source: null }).success).toBe(true);
   });
 
   test('the module tree is available with the view\'s identity, or unavailable with a reason', () => {

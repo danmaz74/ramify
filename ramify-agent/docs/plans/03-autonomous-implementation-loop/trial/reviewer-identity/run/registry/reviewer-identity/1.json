@@ -1,0 +1,10 @@
+{
+  "schema": "ramify-agent.capability/1",
+  "capability": "reviewer-identity",
+  "revision": 1,
+  "behavior": "The module provides reviewer-identity.",
+  "owner": "collection-review/workspace/reviews",
+  "origin": "entry",
+  "decision": null,
+  "consumers": []
+}

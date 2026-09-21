@@ -2,20 +2,23 @@ ramify 1
 module harness
 
 // The server for one project, which the root starts with the web client's
-// build output and its choice of agent. Jobs, the run store, plan discovery,
-// the mapping procedure and the HTTP adapter stay internal.
+// build output. Runs, their records, plan discovery, the evidence the
+// analysis works from and the HTTP adapter stay internal.
 expose-src startServer, ProjectRootError from "http/server.ts" to parent
 expose-src ProjectLockError from "store/lock.ts" to parent
 
 // The public contracts of the behavior this module implements: the
-// implementation map it validates and persists, and the HTTP protocol it
+// vocabulary of the evidence a run works from, and the HTTP protocol it
 // serves. Each file imports nothing but `zod` and its sibling schemas, so
 // every export promises browser safety and the root re-exposes it to the
 // web client.
-expose-src * from "interfaces/map.ts" tagged [browser] to parent
+expose-src * from "interfaces/protocol/evidence.ts" tagged [browser] to parent
 expose-src * from "interfaces/protocol/ids.ts" tagged [browser] to parent
 expose-src * from "interfaces/protocol/queries.ts" tagged [browser] to parent
 expose-src * from "interfaces/protocol/errors.ts" tagged [browser] to parent
 expose-src * from "interfaces/protocol/jobs.ts" tagged [browser] to parent
-expose-src * from "interfaces/protocol/maps.ts" tagged [browser] to parent
 expose-src * from "interfaces/protocol/paths.ts" tagged [browser] to parent
+
+// The run protocol, beside the job protocol this module already owns: the
+// commands, the queries and every projection a client reads of a run.
+expose-src * from "interfaces/protocol/runs.ts" tagged [browser] to parent

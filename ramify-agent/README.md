@@ -12,10 +12,13 @@ repository later. See [AGENTS.md](AGENTS.md) for the working rules.
 ## Modules
 
 - `harness`: the only writer, and the owner of the public contracts of the
-  behavior it implements. The project lock, mapping jobs with their event
-  logs, the mapping procedure on Ramify's views, publication, approval and recovery,
-  plan discovery and the HTTP adapter.
-  - `src/interfaces/map.ts`: the implementation map and its shape validation.
+  behavior it implements. The project lock, implementation runs with their
+  event logs and records, the initial analysis on Ramify's views, work items
+  and their local architects, the completion gates, recovery, plan discovery
+  and the HTTP adapter.
+  - `src/interfaces/protocol/evidence.ts`: the vocabulary of the evidence a
+    run works from — module paths, digests, citations, view identities, the
+    input manifest and the module tree.
   - `src/interfaces/protocol/`: the HTTP JSON protocol under `/api/v1`.
   - Both are browser-safe and exposed to the root, which re-exposes exactly
     those names to every descendant.
@@ -39,28 +42,23 @@ npm test
 npm run check:self
 npm run build:web
 cp -r fixtures/collection-review /tmp/collection-review
-npm run serve -- --project /tmp/collection-review [--port 4180] [--agent pi [--model <provider/model>] | --agent fake]
-npm run real-session -- [--model <provider/model>] [--plan <plan-id>] [--keep]
+npm run serve -- --project /tmp/collection-review [--port 4180]
 npm run trial -- prepare [--into <directory>]
 npm run trial -- verify <clone>
 ```
 
 `serve` prints the address to open. Without `build:web` it serves only the
 protocol under `/api/v1`. It takes the project lock, `plans/.harness/lock`,
-and refuses a project another live harness holds.
+and refuses a project another live harness holds. It shows the project's
+plans; starting and watching an implementation run from the browser arrives
+with the Run page.
 
-Mapping jobs write into the served project (`plans/<plan-id>/map/` and
-`plans/<plan-id>/.harness/`) and materialize Ramify's views there
-(`.ramify-architect/` and `src/.ramify/`), so serve a copy of the fixture,
-never the fixture itself. `--agent pi` runs the architect on pi with the
-person's own pi login; `--agent fake` runs jobs on the scripted fake, which
-submits a demonstration map. Without an agent, jobs cannot start; neither
-agent is the default.
+A run writes into the served project (`plans/<plan-id>/.harness/`) and
+materializes Ramify's views there (`.ramify-architect/` and `src/.ramify/`),
+so serve a copy of the fixture, never the fixture itself.
 
-`real-session` is the check that a real pi session saves a valid map: it
-copies the fixture to a temporary directory, serves it with `--agent pi`,
-starts a mapping job over HTTP, prints the job's activity, and exits 0 only
-when a valid map is saved. It needs a pi login, which it does not provide:
+A run on a real pi session needs a pi login, which the harness does not
+provide:
 
 1. From `ramify-agent/`, run `npx pi` (pi 0.85.1, the pinned dependency).
 2. Type `/login` and choose a subscription, such as Claude Pro/Max or
@@ -73,16 +71,10 @@ when a valid map is saved. It needs a pi login, which it does not provide:
 Credentials stay in pi's agent directory (`~/.pi/agent/auth.json`, or
 `PI_CODING_AGENT_DIR`).
 
-`trial` prepares and checks Plan 1's live trial on the toolkit: a disposable
-clone of its committed state with the trial plan added, and afterwards a
-comparison showing that mapping left the clone's source, `module.ramify` files
-and `plan.md` unchanged. The
-[review sheet](docs/plans/01-implementation-map/trial/review-sheet.md) has the
-steps.
-
-On the Map page a person reads a saved map, selects earlier revisions,
-approves one, or regenerates. Approval is refused as stale when the plan or
-the source changed since the map was made.
+`trial` prepares and checks the live trial on the toolkit: a disposable clone
+of its committed state with the trial plan added, and afterwards a comparison
+showing that the run's initial analysis left the clone's source,
+`module.ramify` files and `plan.md` unchanged.
 
 ## Fixture
 

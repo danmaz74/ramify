@@ -1,22 +1,29 @@
 /*
- * The real-session check: one mapping job with a real pi session on a
- * temporary copy of the fixture project, through the harness's own command
- * line and HTTP protocol, as a person would run it. It needs a pi login; see
- * the usage below. It calls a model and costs tokens.
+ * The real-session check: one implementation run with a real pi session on a
+ * disposable copy of the fixture project, through the harness's own command
+ * line and HTTP protocol, as a person would run it from the browser. It needs
+ * a pi login; see the usage below. It calls a model and costs tokens.
  *
- *   npm run real-session -- [--model <provider/model>] [--plan <plan-id>] [--keep]
+ *   npm run real-session -- [--project <prepared copy>] [--plan <plan-id>] [--model <provider/model>]
  *
- * Exit status: 0 when the job completed and a valid map was saved, 1 when the
- * job ended any other way, 2 when the check could not run.
+ * Without `--project` it prepares a copy first, as `npm run trial --
+ * prepare` does: the fixture copied, its toolchain installed with `npm ci`,
+ * and one commit, so that readiness can pass. The copy is kept, with the
+ * run's records, for `npm run trial -- verify <copy>` and for review.
+ *
+ * It posts `start-run` to `/api/v1/commands`, then reads the run's event page
+ * from its cursor until the run is no longer running.
+ *
+ * Exit status: 0 when the run completed, 1 when it ended any other way, 2
+ * when the check could not run: no pi login, a copy that could not be
+ * prepared, or a start the harness refused.
  */
 import { spawn } from 'node:child_process';
-import { cp, mkdtemp, readFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const packageRoot = fileURLToPath(new URL('..', import.meta.url));
-const fixture = join(packageRoot, 'fixtures', 'collection-review');
+const tsx = join(packageRoot, 'node_modules', '.bin', 'tsx');
 
 function option(name: string): string | undefined {
   const index = process.argv.indexOf(name);
@@ -24,20 +31,47 @@ function option(name: string): string | undefined {
 }
 const model = option('--model');
 const planId = option('--plan') ?? 'review-notes';
-const keep = process.argv.includes('--keep');
 
-interface JobSnapshot { state: string; version: number; failure: { reason: string; message: string } | null; revision: number | null; totals: { filesRead: number; searches: number; rejectedSubmissions: number; usage: { input: number; output: number; total: number } } }
-interface JobEvent { sequence: number; type: string; data: Record<string, unknown> }
+/** The environment a child gets: this one's, without the Node flags this process was started with. */
+function childEnvironment(): NodeJS.ProcessEnv {
+  const { NODE_OPTIONS: _options, ...rest } = process.env;
+  return rest;
+}
+
+interface RunSnapshot {
+  state: string;
+  phase: string;
+  version: number;
+  failure: { reason: string; message: string; evidence: string[] } | null;
+  counts: { workItems: number; completedWorkItems: number; openRequirements: number; invocations: number; gateAttempts: number };
+}
+interface ProjectedEvent { sequence: number; transition: string; summary: string }
+interface EventPage { run: RunSnapshot; events: ProjectedEvent[]; cursor: number; more: boolean }
+
+/** Prepares a copy with the trial script and answers its path. */
+async function prepareCopy(): Promise<string | null> {
+  return new Promise(done => {
+    const child = spawn(tsx, ['scripts/live-trial.ts', 'prepare', '--plan', planId], { cwd: packageRoot, env: childEnvironment(), stdio: ['ignore', 'pipe', 'inherit'] });
+    let output = '';
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (chunk: string) => {
+      output += chunk;
+      process.stdout.write(chunk.replace(/^(?=.)/gm, '[prepare] '));
+    });
+    child.on('close', code => done(code === 0 ? /^Trial copy: (.+)$/m.exec(output)?.[1] ?? null : null));
+  });
+}
 
 async function main(): Promise<number> {
-  const directory = await mkdtemp(join(tmpdir(), 'ramify-agent-real-'));
-  const project = join(directory, 'collection-review');
-  await cp(fixture, project, { recursive: true });
-  console.log(`Fixture copy: ${project}`);
+  const project = option('--project') ?? await prepareCopy();
+  if (project === null) {
+    console.error('The fixture copy could not be prepared, so no run can start.');
+    return 2;
+  }
+  console.log(`Project: ${project}`);
 
   const args = ['src/main.ts', 'serve', '--project', project, '--port', '0', '--agent', 'pi', ...(model ? ['--model', model] : [])];
-  const server = spawn(join(packageRoot, 'node_modules', '.bin', 'tsx'), args, { cwd: packageRoot, stdio: ['ignore', 'pipe', 'inherit'] });
-  let exitCode = 2;
+  const server = spawn(tsx, args, { cwd: packageRoot, env: childEnvironment(), stdio: ['ignore', 'pipe', 'inherit'] });
   try {
     const { origin, ready } = await new Promise<{ origin: string; ready: boolean }>((resolve, reject) => {
       let output = '';
@@ -58,65 +92,38 @@ async function main(): Promise<number> {
     const response = await fetch(`${origin}/api/v1/commands`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ commandId: `real-session-${Date.now()}`, expectedVersion: 0, type: 'start-mapping', payload: { planId } }),
+      body: JSON.stringify({ commandId: `real-session-${Date.now()}`, expectedVersion: 0, type: 'start-run', payload: { planId, agent: 'pi' } }),
     });
-    const body = await response.json() as { receipt?: { jobId: string }; error?: { message: string } };
+    const body = await response.json() as { receipt?: { jobId: string }; error?: { code: string; message: string } };
     if (!body.receipt) {
-      console.error(`The start was refused: ${body.error?.message ?? response.status}`);
+      console.error(`The start was refused: ${body.error ? `${body.error.code}: ${body.error.message}` : response.status}`);
       return 2;
     }
-    const jobId = body.receipt.jobId;
-    console.log(`Job ${jobId} started on plan "${planId}".`);
+    const runId = body.receipt.jobId;
+    console.log(`Run ${runId} started on plan "${planId}". Closing this script does not stop the run; stopping the harness does.`);
 
     let cursor = 0;
-    let job: JobSnapshot;
+    let run: RunSnapshot;
     for (;;) {
-      const page = await (await fetch(`${origin}/api/v1/plans/${planId}/jobs/${jobId}/events?after=${cursor}`)).json() as { job: JobSnapshot; events: JobEvent[]; cursor: number; more: boolean };
-      for (const event of page.events) console.log(describe(event));
+      const page = await (await fetch(`${origin}/api/v1/plans/${planId}/runs/${runId}/events?after=${cursor}`)).json() as EventPage;
+      for (const event of page.events) console.log(`${String(event.sequence).padStart(4)} ${event.transition}: ${event.summary}`);
       cursor = page.cursor;
-      job = page.job;
-      if (job.state !== 'running' && !page.more) break;
-      if (!page.more) await new Promise(resolve => setTimeout(resolve, 1000));
+      run = page.run;
+      if (run.state !== 'running' && !page.more) break;
+      if (!page.more) await new Promise(resolve => setTimeout(resolve, 2000));
     }
 
-    const { totals } = job;
-    console.log(`\nState: ${job.state}. Files read ${totals.filesRead}, searches ${totals.searches}, rejected submissions ${totals.rejectedSubmissions}, tokens ${totals.usage.input} in / ${totals.usage.output} out.`);
-    if (job.state !== 'completed' || job.revision === null) {
-      console.log(`The job did not save a map${job.failure ? `: ${job.failure.reason}: ${job.failure.message}` : ''}.`);
-      exitCode = 1;
-      return exitCode;
-    }
-    const mapPath = join(project, 'plans', planId, 'map', `${String(job.revision).padStart(3, '0')}.json`);
-    const map = JSON.parse(await readFile(mapPath, 'utf8')) as { summary: { change: string }; modulesTouched: Array<{ module: string; weight: string }>; reuse: unknown[]; seams: unknown[] };
-    console.log(`Saved ${mapPath}`);
-    console.log(`Summary: ${map.summary.change}`);
-    console.log(`Modules touched: ${map.modulesTouched.map(entry => `${entry.module} (${entry.weight})`).join(', ')}`);
-    console.log(`Reuse findings: ${map.reuse.length}; seams: ${map.seams.length}.`);
-    exitCode = 0;
-    return exitCode;
+    const { counts } = run;
+    console.log(`\nState: ${run.state}. Work items ${counts.completedWorkItems} of ${counts.workItems} completed, ${counts.openRequirements} requirements open, ${counts.invocations} invocations, ${counts.gateAttempts} gate attempts.`);
+    if (run.failure) console.log(`Failure: ${run.failure.reason}: ${run.failure.message}${run.failure.evidence.map(line => `\n  - ${line}`).join('')}`);
+    console.log(`The run's records are in ${join(project, 'plans', planId, '.harness', 'jobs', runId)}.`);
+    console.log(`Check what it changed with: npm run trial -- verify ${project} --run ${runId}`);
+    return run.state === 'completed' ? 0 : 1;
   } finally {
+    // The server stops its private Ramify daemon when it exits.
     server.kill('SIGTERM');
     await new Promise(resolve => { if (server.exitCode !== null) resolve(undefined); else server.once('exit', resolve); });
-    if (keep || exitCode !== 2) console.log(`The fixture copy, with the job's records and session, is kept at ${project}.`);
-    else await rm(directory, { recursive: true, force: true });
-  }
-}
-
-function describe(event: JobEvent): string {
-  const data = event.data;
-  switch (event.type) {
-    case 'activity': {
-      const activity = data.activity as { kind: string; path?: string; query?: string; tool?: string; text?: string; error?: string };
-      if (activity.kind === 'read') return `  read ${activity.path}`;
-      if (activity.kind === 'search') return `  ${activity.tool} ${activity.query}`;
-      if (activity.kind === 'tool') return `  call ${activity.tool}`;
-      if (activity.kind === 'tool-error') return `  ${activity.tool} error: ${activity.error}`;
-      return `  agent: ${activity.text}`;
-    }
-    case 'api-view-materialized': return `  API views of ${data.module as string} materialized`;
-    case 'submission-rejected': return `  submission ${data.attempt as number} rejected:\n${(data.errors as string[]).map(error => `    - ${error}`).join('\n')}`;
-    case 'job-failed': return `${event.type}: ${data.reason as string}: ${data.message as string}${(data.diagnostics as string[]).map(line => `\n    - ${line}`).join('')}`;
-    default: return `${event.type}${Object.keys(data).length ? ` ${JSON.stringify(data)}` : ''}`;
+    console.log(`The project copy is kept at ${project}.`);
   }
 }
 

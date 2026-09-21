@@ -1,42 +1,42 @@
 # web
 
 The browser client of the harness. It renders what the harness publishes
-through the harness's HTTP protocol and sends its commands; it owns only
-selection, layout and connection state, and never writes harness state. It
-receives the harness's public map and protocol contracts from the root, and
-nothing else from `harness`.
+through the harness's HTTP protocol; it owns only selection, layout and
+connection state, and never writes harness state. It receives the harness's
+public evidence and protocol contracts from the root, and nothing else from
+`harness`.
+
+It shows the project's plans and their implementation runs. Start, on the
+Plan page, and Stop, on the Run page, are its only commands; nothing else on
+it is editable, and closing or reloading it does not affect a run.
 
 ## Entry points
 
 - `src/main.tsx` mounts `App` with a client of the page's own origin.
 - `src/client.ts` is the protocol client: every answer is validated against
   the protocol's schemas, and it reports the connection state (`connecting`,
-  `connected`, `disconnected`) apart from any answer's content. A command
-  that gets no answer is resent unchanged, which is safe because an
-  identical retry returns the original receipt.
+  `connected`, `disconnected`) apart from any answer's content. A command the
+  harness does not answer is sent again with the same ID, which returns the
+  original receipt.
 - Pages are chosen by the URL fragment (`src/routes.ts`): `#/` lists the
-  plans, `#/plans/<id>` shows one plan, `#/plans/<id>/map` its latest map
-  and `#/plans/<id>/map/<n>` revision `n`.
-- `src/progress.tsx` is the Progress view. It fetches a job's events after a
-  cursor every second while the job runs, and shows:
-  - the state, the current activity and the elapsed time;
-  - totals and inputs, including an uncommitted checkout the agent sees;
-  - the activity feed;
-  - Stop.
-  Activity keeps advancing the job's version, so a stale Stop is sent again
-  as a new command at the version the harness reports. The connection note
-  is shown apart from the job state.
-- The Plan page's Map tab (`src/map-view.tsx`) starts a mapping job, shows
-  the latest job's progress, and lists the saved revisions, each selectable
-  with its approval state. The chosen revision is shown with Approve, and
-  Regenerate starts a new job. Approve fetches the version of the job that
-  saved the revision and sends `approve-map`. A stale refusal is shown with
-  the harness's reasons.
-- `src/map-document.tsx` renders a map read-only, section by section.
-  `src/module-tree.tsx` draws the modules touched on the project's module
-  tree with their weights. Branches that hold touched modules are open. A
-  proposed module is drawn under its parent. Without a tree, the touched
-  modules are listed.
+  plans, `#/plans/<id>` shows one plan with its runs and Start, and
+  `#/plans/<id>/runs/<run-id>` is the Run page.
+- `src/run-page.tsx` is the Run page, list and detail only: the overview
+  with notices first (every module created or removed, then every
+  dependency cycle, resolved or not), then state, current work, waits,
+  counts, failure and the event feed; the plan and entries; hypotheses as
+  forecasts with standing and revision beside the decisions; work items;
+  checks with bounded output tails; capability progress; and the metrics
+  with the evaluation evidence. The connection to the harness is shown apart
+  from the run's state. `src/run-progress.ts` reads the event page after a
+  cursor, as Plan 1's page did, and reads each area again when the run's
+  version moves.
+- `src/module-tree.tsx` draws modules marked as touched on the project's
+  module tree, with their weights. Branches that hold marked modules are
+  open; a module that does not exist yet is drawn under its parent and marked
+  as proposed; without a tree, the marked modules are listed. What a module
+  is marked with is this page's own presentation choice, supplied by whatever
+  draws on the tree.
 - `src/markdown.tsx` renders a plan read-only. Embedded HTML is turned into
   visible text before rendering, so it never reaches the page as markup.
 

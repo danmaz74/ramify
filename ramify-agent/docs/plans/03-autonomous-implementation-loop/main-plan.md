@@ -1470,15 +1470,37 @@ broad container module created only to hold loop-related files.
 
 ## Status of execution
 
-**Iteration 0 is complete; nothing else has run.** Its
-[results](iterations/iteration0-results.md) hold the re-run baseline, sixteen
-probe verdicts and the port contract, and its probes are under
-`spikes/autonomous-loop/`. It wrote no production code. No source has been
-changed by this plan, and nothing in it is evidence of an implemented
-capability.
+**Iterations 0 to 12 have run, each with its results note, and the loop has
+not yet run with a real model.** The
+[completion report](completion-report.md) gives every item of the
+[completion gate](#completion-gate) its result; in short, as of 2026-09-21:
 
-The one predecessor condition, Plan 2's completion gate, is satisfied as
-recorded in [Predecessor evidence](#predecessor-evidence), and iteration 0 re-ran the complete
-baseline: the type check, 21 test files with 160 tests, the browser build and
-`check:self` all pass, with the same 5 owners, 73 source files, 776 accesses
-and 0 findings.
+- **Item 1 is not met.** There is no pi login in the execution environment,
+  so the real pi trial on `review-notes` (T2) did not run and nothing was
+  simulated in its place ([NOT-RUN.md](trial/review-notes/NOT-RUN.md)). The
+  loop has run end to end only with the scripted agent: in a browser
+  (iteration 11), and over the fixture's real toolchain in two trials
+  (iteration 12).
+- **Items 2, 5 and 6 are met**, item 6 with the person's review verdict open.
+  **Item 4 is met for the runs that ran**: both trials' changes were inside
+  their recorded write scopes. `shell` is unguarded, and neither trial used
+  the shell or a model.
+- **Item 3 is partially met.** `scripts/composition-gate.ts --with-trials`
+  runs every owning test and both fixture trials together, and reports every
+  case met except T2. T4 is met by the review sheet's presence; its verdict
+  is the person's. Cross-cutting rule 2 is not fully met: 28 union values
+  have no producer and are listed with their reasons.
+- **T3 ran with the scripted agent** over the fixture's real toolchain. Every
+  breaking boundary passed an all-project gate; the first, non-breaking
+  boundary passed a scoped one, as the checkpoint table prescribes. It shows
+  the harness carrying a staged break, not a model staging one.
+
+What remains for the person: a pi login and the T2 trial, the review
+verdict, the depth-4-versus-5 question for nested-package discovery, and the
+28 producerless union values. The completion report lists them with the
+rest.
+
+The predecessor condition, Plan 2's completion gate, was satisfied as
+recorded in [Predecessor evidence](#predecessor-evidence). The sizes in
+[Measured sizes](#measured-sizes) are the before figures; the after figures
+are in the completion report.

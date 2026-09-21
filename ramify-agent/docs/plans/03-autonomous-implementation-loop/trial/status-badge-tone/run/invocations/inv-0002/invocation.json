@@ -1,0 +1,72 @@
+{
+  "schema": "ramify-agent.invocation/1",
+  "id": "inv-0002",
+  "role": "local-architect",
+  "work": {
+    "workItem": "wi-001"
+  },
+  "attempt": 1,
+  "session": {
+    "requested": "fresh",
+    "actual": "fresh",
+    "ref": ""
+  },
+  "prompt": {
+    "package": "local-architect/1",
+    "hash": "1ee2b7110dd35d01a06af9b33746d8282c03a6892c8a142c87d71a7182d26a81",
+    "inputsHash": "0743bda3944bc65e4fa582842ba7f960707dead7586b7ec81a4f353e8648b263"
+  },
+  "scope": {
+    "write": null,
+    "measurement": {
+      "id": "ms-0001",
+      "revision": 1,
+      "hash": "5d64c3a1ca8925257b62df7b185b0806f128cf147d363e13d616c3bc8d951f92"
+    },
+    "size": {
+      "policy": "scope-size/1",
+      "snapshot": "ms-0001",
+      "components": [
+        {
+          "component": "owned-source",
+          "detail": "collection-review/workspace/shared-ui (subtree)",
+          "bytes": 3338,
+          "state": "measured",
+          "buckets": {
+            "production": 1256,
+            "tests": 1030,
+            "documentation": 1052
+          }
+        },
+        {
+          "component": "api-views",
+          "detail": "each declared ordinary and testing area once, by owner and physical source area",
+          "bytes": 6999,
+          "state": "measured",
+          "buckets": {
+            "ordinary": 3421,
+            "tests": 3578
+          }
+        },
+        {
+          "component": "architect-view",
+          "detail": ".ramify-architect/, at its publication size",
+          "bytes": 93846,
+          "state": "measured"
+        },
+        {
+          "component": "support-documents",
+          "detail": "plans/status-badge-tone/plan.md, subs/harness/src/prompts/initial-architect.system.md, subs/harness/src/prompts/initial-analysis.procedure.md, skills/module-architect/SKILL.md, skills/module-architect/references/access.md, skills/module-architect/references/cognitive-decomposition.md, skills/module-architect/references/discovery.md, skills/module-architect/references/placement.md, skills/module-architect/references/refactoring.md, skills/module-architect/report.md, initial-analysis.schema.json, subs/harness/src/prompts/global-fork.system.md, subs/harness/src/prompts/global-fork.procedure.md, skills/module-architect/SKILL.md, skills/module-architect/references/access.md, skills/module-architect/references/cognitive-decomposition.md, skills/module-architect/references/discovery.md, skills/module-architect/references/placement.md, skills/module-architect/references/refactoring.md, skills/module-architect/report.md, global-fork.schema.json, subs/harness/src/prompts/local-architect.system.md, subs/harness/src/prompts/local-architect.procedure.md, skills/module-architect/SKILL.md, skills/module-architect/references/access.md, skills/module-architect/references/cognitive-decomposition.md, skills/module-architect/references/discovery.md, skills/module-architect/references/placement.md, skills/module-architect/references/refactoring.md, skills/module-architect/report.md, local-architect.schema.json, subs/harness/src/prompts/engineer.system.md, subs/harness/src/prompts/engineer.procedure.md, skills/module-architect/SKILL.md, skills/module-architect/references/access.md, skills/module-architect/references/cognitive-decomposition.md, skills/module-architect/references/discovery.md, skills/module-architect/references/placement.md, skills/module-architect/references/refactoring.md, skills/module-architect/report.md, engineer.schema.json, subs/harness/src/prompts/contract-engineer.system.md, subs/harness/src/prompts/contract.procedure.md, skills/module-architect/SKILL.md, skills/module-architect/references/access.md, skills/module-architect/references/cognitive-decomposition.md, skills/module-architect/references/discovery.md, skills/module-architect/references/placement.md, skills/module-architect/references/refactoring.md, skills/module-architect/report.md, subs/harness/src/prompts/contract.skill.md, contract-engineer.schema.json, .ramify-architect",
+          "bytes": 284326,
+          "state": "measured"
+        }
+      ],
+      "bytes": 388509,
+      "subtotal": 388509,
+      "coverage": "complete"
+    }
+  },
+  "writer": false,
+  "base": "0c707b06e52b5d961284faac4b46874d89deddb0",
+  "startedAt": "2026-09-21T07:37:06.228Z"
+}

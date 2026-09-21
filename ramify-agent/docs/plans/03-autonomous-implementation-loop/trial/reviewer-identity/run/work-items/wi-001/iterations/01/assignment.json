@@ -1,0 +1,85 @@
+{
+  "schema": "ramify-agent.iteration-assignment/1",
+  "id": "wi-001.i01",
+  "workItem": "wi-001",
+  "outline": {
+    "id": "wi-001",
+    "revision": 1,
+    "hash": "c63c9c240f694b203e9ea46cfab42c2c180a7bd722dbda745ae9207debf7400f"
+  },
+  "stage": 0,
+  "kind": "ordinary",
+  "goal": "Add the structured reviewer to the shared vocabulary, where both sides can name it.",
+  "approach": "Change the source, then the tests that state it.",
+  "scope": {
+    "revision": 1,
+    "base": {
+      "module": "collection-review/workspace/contracts",
+      "includedChildren": []
+    },
+    "extra": [],
+    "read": [],
+    "bootstrap": [],
+    "rationale": "The work is in this module.",
+    "resolved": {
+      "roots": [
+        "/tmp/ramify-agent-fixture-trial-sugtii/collection-review/subs/workspace/subs/contracts/src"
+      ],
+      "files": [
+        "/tmp/ramify-agent-fixture-trial-sugtii/collection-review/subs/workspace/subs/contracts/module.ramify",
+        "/tmp/ramify-agent-fixture-trial-sugtii/collection-review/subs/workspace/subs/contracts/README.md"
+      ],
+      "view": {
+        "status": "materialized",
+        "revision": "rev/1:ae43380e-9ce1-4724-9521-9915b7aad94c:1",
+        "input": "input/1:6eedf35a86c066ea38f1e17e9418ad3525c64a3c2c228c87891cb49ec8ab6424",
+        "coverageLimits": [
+          "cut: 9",
+          "detailsUnavailable: 2"
+        ]
+      }
+    }
+  },
+  "requirementRefs": [
+    {
+      "anchor": "Request"
+    }
+  ],
+  "externalCapabilities": [],
+  "completionEvidence": "The tests this scope owns pass.",
+  "evidenceObligations": [],
+  "gate": {
+    "checkpoint": "iteration",
+    "tests": {
+      "policy": "owned-by-scope",
+      "exactOwners": [
+        "collection-review/workspace/contracts"
+      ],
+      "subtrees": [],
+      "extraSuites": []
+    }
+  },
+  "guarded": [
+    {
+      "path": "cucumber.js",
+      "hash": "d75c4a8957da207a13d2792b4275fe68985aa92429b334dd68b6775692cda407"
+    },
+    {
+      "path": "package.json",
+      "hash": "1c4069b67e516510626b5ce68d621bdd86000d7dcf4f06f6126e0049d4879a82"
+    },
+    {
+      "path": "tsconfig.json",
+      "hash": "4050f9725f7014705ef88b4b44b52ad185b02821b599bf7084e872728ed606e3"
+    },
+    {
+      "path": "vite.config.ts",
+      "hash": "6b19c73fc1516d843b11a70191cff52b611d8840aa27f2d4ef62eda654c2b323"
+    },
+    {
+      "path": "vitest.config.ts",
+      "hash": "39a8918f589dbd06527a4bc14df2c4b11fe988c2b18bb8cd63b40f6dfd98f6cc"
+    }
+  ],
+  "authorizations": []
+}

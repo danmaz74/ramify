@@ -1,0 +1,16 @@
+4d694883933d6ce621e8db3b487b1e0f9c051a2e wi-001.i01: Give the status badge a tone, with tests of its own.
+The badge carries its tone, neutral by default, with its own tests.
+
+Checks: passed (gate ga-0002, checkpoint iteration)
+  tests         passed       0.9 s   2 files; owners collection-review/workspace/shared-ui
+  type-check    passed       0.7 s
+  ramify-check  passed       4.5 s
+
+Ramify-Run: 20260921T073654Z-47e6b7
+Ramify-Work-Item: wi-001
+Ramify-Iteration: wi-001.i01
+Ramify-Gate: ga-0002
+Ramify-Invocations: inv-0001, inv-0002, inv-0003
+
+0c707b06e52b5d961284faac4b46874d89deddb0 fixture
+

@@ -1,0 +1,9 @@
+
+ RUN  v5.0.0 /tmp/ramify-agent-fixture-trial-ukKaKn/collection-review
+
+
+ Test Files  2 passed (2)
+      Tests  5 passed (5)
+   Start at  07:37:35
+   Duration  229ms (transform 45%, import 36%, tests 15%, worker 4%)
+

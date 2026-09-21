@@ -1,22 +1,7 @@
 import type { z } from 'zod';
 import { errorResponseSchema, type ErrorCode } from '../../harness/src/interfaces/protocol/errors.js';
-import {
-  commandResponseSchema,
-  eventPageSchema,
-  jobResponseSchema,
-  type Command,
-  type EventPage,
-  type JobSnapshot,
-  type Receipt,
-} from '../../harness/src/interfaces/protocol/jobs.js';
-import {
-  moduleTreeResponseSchema,
-  revisionListResponseSchema,
-  revisionResponseSchema,
-  type MapRevision,
-  type ModuleTree,
-  type RevisionEntry,
-} from '../../harness/src/interfaces/protocol/maps.js';
+import { moduleTreeResponseSchema, type ModuleTree } from '../../harness/src/interfaces/protocol/evidence.js';
+import { commandResponseSchema, type Receipt } from '../../harness/src/interfaces/protocol/jobs.js';
 import { protocolPaths } from '../../harness/src/interfaces/protocol/paths.js';
 import {
   planListResponseSchema,
@@ -26,6 +11,14 @@ import {
   type PlanEntry,
   type ProjectResponse,
 } from '../../harness/src/interfaces/protocol/queries.js';
+import {
+  analysisResponseSchema, capabilityListResponseSchema, decisionListResponseSchema, gateResponseSchema,
+  metricsResponseSchema, runEventPageSchema, runListResponseSchema, runResponseSchema,
+  workItemListResponseSchema, workItemResponseSchema,
+  type AnalysisResponse, type CapabilityListResponse, type DecisionListResponse, type GateView,
+  type MetricsResponse, type RunCommand, type RunEventPage, type RunListResponse, type RunSnapshot,
+  type WorkItemListResponse, type WorkItemResponse,
+} from '../../harness/src/interfaces/protocol/runs.js';
 
 export type ProjectInfo = ProjectResponse['project'];
 
@@ -41,8 +34,10 @@ export class ClientError extends Error {
     readonly kind: 'protocol' | 'connection' | 'invalid-response',
     message: string,
     readonly code?: ErrorCode,
-    /** The job's version, on a `stale-version` rejection. */
+    /** The run's version, on a `stale-version` rejection. */
     readonly currentVersion?: number,
+    /** What establishes the failure, such as a record's path and the schema it declares. */
+    readonly evidence?: readonly string[],
   ) {
     super(message);
     this.name = 'ClientError';
@@ -54,22 +49,26 @@ export interface ProtocolClient {
   getProject(): Promise<ProjectInfo>;
   listPlans(): Promise<PlanEntry[]>;
   getPlan(planId: string): Promise<PlanDocument>;
-  /** A job's snapshot. */
-  getJob(planId: string, jobId: string): Promise<JobSnapshot>;
-  /** A job's snapshot and its events after `after`. */
-  getEvents(planId: string, jobId: string, after: number): Promise<EventPage>;
-  /** A plan's saved map revisions, newest first. */
-  listRevisions(planId: string): Promise<RevisionEntry[]>;
-  /** One saved map revision with its approval. */
-  getRevision(planId: string, revision: number): Promise<MapRevision>;
   /** The project's module tree, as the architect view was last materialized. */
   getModuleTree(): Promise<ModuleTree>;
+  /** A plan's runs, newest first, the agent runs start with, and run directories not served. */
+  listRuns(planId: string): Promise<RunListResponse>;
+  getRun(planId: string, runId: string): Promise<RunSnapshot>;
+  /** The run's snapshot and its projected events after the cursor. */
+  getEvents(planId: string, runId: string, after: number): Promise<RunEventPage>;
+  getAnalysis(planId: string, runId: string): Promise<AnalysisResponse>;
+  getDecisions(planId: string, runId: string): Promise<DecisionListResponse>;
+  getWorkItems(planId: string, runId: string): Promise<WorkItemListResponse>;
+  getWorkItem(planId: string, runId: string, workItem: string): Promise<WorkItemResponse>;
+  getCapabilities(planId: string, runId: string): Promise<CapabilityListResponse>;
+  getGate(planId: string, runId: string, gate: string): Promise<GateView>;
+  getMetrics(planId: string, runId: string): Promise<MetricsResponse>;
   /**
    * Sends a command and returns its receipt. When the harness does not
    * answer, the identical command is sent again, which is safe: a retry
    * returns the original receipt.
    */
-  sendCommand(command: Command): Promise<Receipt>;
+  sendCommand(command: RunCommand): Promise<Receipt>;
   connection(): ConnectionState;
   /** Calls `listener` on every change of connection state; returns the unsubscribe. */
   onConnectionChange(listener: (state: ConnectionState) => void): () => void;
@@ -82,7 +81,7 @@ export function newCommandId(): string {
     : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }
 
-/** How often a command is sent when the harness does not answer, and the pause before a retry. */
+/** How often a command is sent when the harness does not answer. */
 const commandAttempts = 3;
 
 /** A client of the harness at `origin`, the page's own origin by default. */
@@ -114,7 +113,8 @@ export function createProtocolClient(origin = '', fetchImpl: typeof fetch = (...
     if (!response.ok) {
       const failure = errorResponseSchema.safeParse(body);
       if (!failure.success) throw new ClientError('invalid-response', `HTTP ${response.status} without a protocol error`);
-      throw new ClientError('protocol', failure.data.error.message, failure.data.error.code, failure.data.error.currentVersion);
+      const { code, message, currentVersion, evidence } = failure.data.error;
+      throw new ClientError('protocol', message, code, currentVersion, evidence);
     }
     const parsed = schema.safeParse(body);
     if (!parsed.success) throw new ClientError('invalid-response', `The answer to ${path} does not match the protocol`);
@@ -125,11 +125,17 @@ export function createProtocolClient(origin = '', fetchImpl: typeof fetch = (...
     getProject: async () => (await get(protocolPaths.project, projectResponseSchema)).project,
     listPlans: async () => (await get(protocolPaths.plans, planListResponseSchema)).plans,
     getPlan: async planId => (await get(protocolPaths.plan(planId), planResponseSchema)).plan,
-    getJob: async (planId, jobId) => (await get(protocolPaths.job(planId, jobId), jobResponseSchema)).job,
-    getEvents: (planId, jobId, after) => get(protocolPaths.events(planId, jobId, after), eventPageSchema),
-    listRevisions: async planId => (await get(protocolPaths.maps(planId), revisionListResponseSchema)).revisions,
-    getRevision: async (planId, revision) => (await get(protocolPaths.map(planId, revision), revisionResponseSchema)).revision,
     getModuleTree: async () => (await get(protocolPaths.modules, moduleTreeResponseSchema)).tree,
+    listRuns: planId => get(protocolPaths.runs(planId), runListResponseSchema),
+    getRun: async (planId, runId) => (await get(protocolPaths.run(planId, runId), runResponseSchema)).run,
+    getEvents: (planId, runId, after) => get(protocolPaths.runEvents(planId, runId, after), runEventPageSchema),
+    getAnalysis: (planId, runId) => get(protocolPaths.runAnalysis(planId, runId), analysisResponseSchema),
+    getDecisions: (planId, runId) => get(protocolPaths.runDecisions(planId, runId), decisionListResponseSchema),
+    getWorkItems: (planId, runId) => get(protocolPaths.runWorkItems(planId, runId), workItemListResponseSchema),
+    getWorkItem: (planId, runId, workItem) => get(protocolPaths.runWorkItem(planId, runId, workItem), workItemResponseSchema),
+    getCapabilities: (planId, runId) => get(protocolPaths.runCapabilities(planId, runId), capabilityListResponseSchema),
+    getGate: async (planId, runId, gate) => (await get(protocolPaths.runGate(planId, runId, gate), gateResponseSchema)).gate,
+    getMetrics: (planId, runId) => get(protocolPaths.runMetrics(planId, runId), metricsResponseSchema),
     sendCommand: async command => {
       const init = { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(command) };
       for (let attempt = 1; ; attempt++) {
