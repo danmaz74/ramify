@@ -55,6 +55,7 @@ describe('a projection never writes, and no query appends an event', () => {
       const { workItems } = await queries.workItems(plan, runId);
       for (const item of workItems) await queries.workItem(plan, runId, item.id);
       await queries.capabilities(plan, runId);
+      await queries.moduleCapabilities(plan, runId);
       await queries.metrics(plan, runId);
       const events = await queries.events(plan, runId, 0);
       for (const gate of new Set(events.events.flatMap(event => event.refs.filter(ref => ref.kind === 'gate').map(ref => ref.id)))) {
@@ -77,6 +78,8 @@ describe('a projection never writes, and no query appends an event', () => {
       protocolPaths.runDecisions(plan, runId),
       protocolPaths.runWorkItems(plan, runId),
       protocolPaths.runCapabilities(plan, runId),
+      protocolPaths.runModuleCapabilities(plan, runId),
+      protocolPaths.runModuleCapabilities(plan, '20990101T000000Z-000000'),
       protocolPaths.runMetrics(plan, runId),
       protocolPaths.runWorkItem(plan, runId, 'wi-999'),
       protocolPaths.runGate(plan, runId, 'ga-9999'),
@@ -115,6 +118,8 @@ describe('a projection never writes, and no query appends an event', () => {
       fileURLToPath(new URL('../kpi/guarding.ts', import.meta.url)),
     ];
     expect(files.length).toBeGreaterThan(5);
+    // The comparison's projection and the tree load it shares with the module-tree query are among them.
+    expect(files).toEqual(expect.arrayContaining([join(directory, 'module-capabilities.ts'), join(directory, 'tree.ts')]));
     for (const file of files) {
       const offending = (await readFile(file, 'utf8')).split('\n').filter(line => writing.test(line) && !line.trim().startsWith('*') && !line.trim().startsWith('//'));
       expect([file, offending]).toEqual([file, []]);

@@ -61,6 +61,12 @@ expose-sub gateCauseSchema, gateNextSchema, workItemResponseSchema from harness 
 expose-sub WorkItemResponse, capabilityStateSchema, CapabilityState from harness to descendants
 expose-sub capabilityProgressSchema, CapabilityProgress from harness to descendants
 expose-sub capabilityListResponseSchema, CapabilityListResponse, gateViewSchema from harness to descendants
+expose-sub comparisonIdentityPolicySchema, ComparisonIdentityPolicy, modulePlacementSchema from harness to descendants
+expose-sub ModulePlacement, initialRoleSchema, InitialRole, initialAssociationSchema from harness to descendants
+expose-sub InitialAssociation, moduleCapabilityRowSchema, ModuleCapabilityRow from harness to descendants
+expose-sub moduleCapabilitiesSchema, ModuleCapabilities, comparisonCoverageSchema from harness to descendants
+expose-sub ComparisonCoverage, moduleCapabilityComparisonResponseSchema from harness to descendants
+expose-sub ModuleCapabilityComparisonResponse from harness to descendants
 expose-sub GateView, gateResponseSchema, GateResponse, metricStateSchema from harness to descendants
 expose-sub MetricState, metricSchema, Metric, guardingViewSchema, GuardingView from harness to descendants
 expose-sub invocationEvaluationSchema, InvocationEvaluation from harness to descendants

@@ -1,10 +1,12 @@
 import { describe, expect, test } from 'vitest';
+import { z } from 'zod';
 import { errorHttpStatus, errorResponseSchema } from '../interfaces/protocol/errors.js';
 import { jobIdSchema, planIdSchema } from '../interfaces/protocol/ids.js';
 import { acceptedCommandSchema, activitySchema, apiViewEvidenceSchema, receiptSchema, stopJobCommandSchema } from '../interfaces/protocol/jobs.js';
 import { citationSchema, inputManifestSchema, modulePathSchema, moduleTreeResponseSchema, sha256Schema, viewIdentitySchema } from '../interfaces/protocol/evidence.js';
 import { protocolPaths } from '../interfaces/protocol/paths.js';
 import { planListResponseSchema, planResponseSchema, projectResponseSchema } from '../interfaces/protocol/queries.js';
+import { moduleCapabilityComparisonResponseSchema, runQueryLimits } from '../interfaces/protocol/runs.js';
 
 describe('queries', () => {
   test('a plan list carries readable and unreadable entries', () => {
@@ -137,5 +139,120 @@ describe('the evidence a run works from', () => {
     expect(moduleTreeResponseSchema.safeParse({ tree: { status: 'available', revision: 'r', input: 'i', modules: [{ module: 'app', dir: '', parent: null }] } }).success).toBe(true);
     expect(moduleTreeResponseSchema.safeParse({ tree: { status: 'unavailable', message: 'not materialized' } }).success).toBe(true);
     expect(moduleTreeResponseSchema.safeParse({ tree: { status: 'available', modules: [] } }).success).toBe(false);
+  });
+});
+
+describe('the module-capability comparison', () => {
+  const tree = { status: 'available' as const, revision: 'rev/1', input: 'input/1', modules: [{ module: 'app', dir: '', parent: null }, { module: 'app/notes', dir: 'subs/notes', parent: 'app' }] };
+  const valid = {
+    identityPolicy: 'exact-capability-slug/1',
+    runVersion: 12,
+    initialView: { status: 'placeholder' },
+    tree,
+    modules: [
+      { module: 'app', placement: 'declared', proposedAtStart: null, capabilities: [] },
+      {
+        module: 'app/notes', placement: 'declared', proposedAtStart: null, capabilities: [
+          { capability: 'review-note', initial: [{ role: 'entry-owner', hypothesis: null }], implementedHere: { reason: 'wi-001 passed its work-item gate ga-0002', evidence: ['ga-0002'] } },
+          { capability: 'note-search', initial: [{ role: 'suggested-owner', hypothesis: 'note-search' }, { role: 'involved', hypothesis: 'note-search' }], implementedHere: null },
+        ],
+      },
+      {
+        module: 'app/notes/drafts', placement: 'proposed', proposedAtStart: { parent: 'app/notes', purpose: 'Drafts.', tags: [] }, capabilities: [
+          { capability: 'note-drafts', initial: [{ role: 'entry-owner', hypothesis: null }], implementedHere: null },
+        ],
+      },
+    ],
+    coverage: { state: 'complete', capabilities: 3, implemented: 1 },
+  };
+  type Response = typeof valid & Record<string, unknown>;
+  const with_ = (change: (response: Response) => void): unknown => {
+    const copy = structuredClone(valid) as Response;
+    change(copy);
+    return copy;
+  };
+  const accepts = (body: unknown) => moduleCapabilityComparisonResponseSchema.safeParse(body).success;
+  const partial = (gaps: string[], extra: Record<string, unknown> = {}) => ({ state: 'partial', knownCapabilities: 3, knownImplemented: 1, totalCapabilities: null, gaps, ...extra });
+
+  test('the path and the bounds', () => {
+    expect(protocolPaths.runModuleCapabilities('p', 'r 1')).toBe('/api/v1/plans/p/runs/r%201/module-capabilities');
+    expect(runQueryLimits.capabilities).toBe(500);
+    expect(runQueryLimits.moduleCapabilityRows).toBe(2000);
+  });
+
+  test('a complete comparison', () => {
+    expect(moduleCapabilityComparisonResponseSchema.parse(valid)).toEqual(valid);
+    // Its counts are of what it returns.
+    expect(accepts(with_(response => { response.coverage.implemented = 0; }))).toBe(false);
+    expect(accepts(with_(response => { response.coverage.capabilities = 5; }))).toBe(false);
+  });
+
+  test('a pending or unreadable analysis is unavailable, with no initial view and no modules', () => {
+    const unavailable = { ...valid, initialView: null, modules: [], coverage: { state: 'unavailable', reason: 'The initial analysis is pending.' } };
+    expect(accepts(unavailable)).toBe(true);
+    expect(accepts({ ...unavailable, initialView: { status: 'placeholder' } })).toBe(false);
+    expect(accepts({ ...unavailable, modules: valid.modules })).toBe(false);
+    // Only an unavailable comparison lacks the view.
+    expect(accepts({ ...valid, initialView: null })).toBe(false);
+  });
+
+  test('an unavailable tree is partial, with every module unplaced', () => {
+    const unplaced = with_(response => {
+      (response as Record<string, unknown>)['tree'] = { status: 'unavailable', message: 'not materialized' };
+      for (const entry of response.modules) entry.placement = 'unplaced';
+    }) as Response;
+    expect(accepts(unplaced)).toBe(false);
+    expect(accepts({ ...unplaced, coverage: partial(['The current module tree is unavailable: not materialized']) })).toBe(true);
+    const placed = structuredClone(unplaced);
+    placed.modules[0]!.placement = 'declared';
+    expect(accepts({ ...placed, coverage: partial(['The current module tree is unavailable: not materialized']) })).toBe(false);
+  });
+
+  test('recorded coverage limits of the initial view are never complete', () => {
+    expect(accepts({ ...valid, initialView: { status: 'materialized', revision: 'r', input: 'i', coverageLimits: ['dependencies unavailable'] } })).toBe(false);
+    expect(accepts({ ...valid, initialView: { status: 'materialized', revision: 'r', input: 'i', coverageLimits: ['dependencies unavailable'] }, coverage: partial(['The architect view reports: dependencies unavailable']) })).toBe(true);
+  });
+
+  test('an unplaced module and a conflicting proposal are never complete', () => {
+    const unplaced = with_(response => { response.modules[2]!.placement = 'unplaced'; response.modules[2]!.proposedAtStart = null as never; });
+    expect(accepts(unplaced)).toBe(false);
+    expect(accepts({ ...(unplaced as object), coverage: partial(['Module app/notes/drafts: the entries that propose it disagree.']) })).toBe(true);
+    // A proposed module is placed from its recorded proposal.
+    expect(accepts(with_(response => { response.modules[2]!.proposedAtStart = null as never; }))).toBe(false);
+  });
+
+  test('a partial comparison names its gaps and gives a total only when a bound dropped capabilities', () => {
+    expect(accepts({ ...valid, coverage: partial([]) })).toBe(false);
+    expect(accepts({ ...valid, coverage: partial(['The capabilities (500) bound returned 3 of 4 capabilities'], { totalCapabilities: 4 }) })).toBe(true);
+    expect(accepts({ ...valid, coverage: partial(['a gap'], { totalCapabilities: 3 }) })).toBe(false);
+    expect(accepts({ ...valid, coverage: partial(['a gap'], { knownImplemented: 0 }) })).toBe(false);
+  });
+
+  test('a row is an association or an implementation, a capability is implemented in one module, and a module is listed once', () => {
+    expect(accepts(with_(response => { response.modules[1]!.capabilities[1]!.initial = []; }))).toBe(false);
+    expect(accepts(with_(response => {
+      response.modules[2]!.capabilities[0]!.capability = 'review-note';
+      response.modules[2]!.capabilities[0]!.implementedHere = { reason: 'again', evidence: [] } as never;
+      response.coverage.capabilities = 2;
+    }))).toBe(false);
+    expect(accepts(with_(response => { response.modules[0]!.module = 'app/notes'; }))).toBe(false);
+  });
+
+  test('CM09: the response carries no activity, commit, change, line or deployment field', () => {
+    const keys = new Set<string>();
+    const walk = (node: unknown): void => {
+      if (Array.isArray(node)) { node.forEach(walk); return; }
+      if (node === null || typeof node !== 'object') return;
+      for (const [key, value] of Object.entries(node)) {
+        if (key === 'properties' && value !== null && typeof value === 'object') for (const name of Object.keys(value)) keys.add(name);
+        walk(value);
+      }
+    };
+    walk(z.toJSONSchema(moduleCapabilityComparisonResponseSchema, { io: 'input' }));
+    expect(keys.size).toBeGreaterThan(10);
+    expect([...keys].filter(key => /activity|commit|change|lines|deploy|percent/i.test(key))).toEqual([]);
+    // And the schema refuses such a field where a client might look for it.
+    expect(accepts({ ...valid, deployed: true })).toBe(false);
+    expect(accepts(with_(response => { (response.modules[1]!.capabilities[0]! as Record<string, unknown>)['commit'] = 'abc'; }))).toBe(false);
   });
 });

@@ -22,6 +22,8 @@ export const protocolPaths = {
   runWorkItems: (planId: string, runId: string): string => `${run(planId, runId)}/work-items`,
   runWorkItem: (planId: string, runId: string, workItem: string): string => `${run(planId, runId)}/work-items/${encodeURIComponent(workItem)}`,
   runCapabilities: (planId: string, runId: string): string => `${run(planId, runId)}/capabilities`,
+  /** The initial analysis's module associations beside the capabilities verified at their current owners. */
+  runModuleCapabilities: (planId: string, runId: string): string => `${run(planId, runId)}/module-capabilities`,
   runGate: (planId: string, runId: string, gate: string): string => `${run(planId, runId)}/gates/${encodeURIComponent(gate)}`,
   runMetrics: (planId: string, runId: string): string => `${run(planId, runId)}/metrics`,
 } as const;

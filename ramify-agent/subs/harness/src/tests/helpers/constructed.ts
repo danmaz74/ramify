@@ -71,7 +71,7 @@ export function registered(capability: string, extra: Partial<RegistryEntry> = {
 export function forecast(id: string, capability: string, extra: Partial<Hypothesis> = {}): Hypothesis {
   return hypothesisSchema.parse({
     schema: 'ramify-agent.hypothesis/1', id, revision: 1, standing: 'tentative', capability,
-    change: 'create', suggestedOwner: reviews, anticipatedConsumers: [], involvedModules: [],
+    change: 'create', changesExistingSymbols: false, suggestedOwner: reviews, anticipatedConsumers: [], involvedModules: [],
     dependsOn: [], confidence: 'low', rationale: 'It may be needed.', assumptions: [], uncertainties: [],
     citations: [], cause: { initial: 'inv-0001' }, ...extra,
   });
