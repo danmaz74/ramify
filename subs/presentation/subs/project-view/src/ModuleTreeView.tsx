@@ -1,15 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Background,
-  BackgroundVariant,
-  Controls,
-  Handle,
-  MiniMap,
-  Position,
-  ReactFlow,
-} from '@xyflow/react';
-import type { Edge, EdgeProps, Node, NodeProps, ReactFlowInstance } from '@xyflow/react';
-import type { Point } from '../../layout/src/interfaces/layout.js';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import type {
   ExplorerCoverage,
   ExplorerEdge,
@@ -17,17 +6,16 @@ import type {
   ExplorerModule,
   ProjectExplorerModel,
 } from './interfaces/project-view.js';
+import { ModuleTreeCanvas, type ModuleTreeCanvasNode } from './ModuleTreeCanvas.js';
 import {
   ancestorsOf,
   indexModuleTree,
-  layoutModuleTree,
-  PROJECT_NODE_ID,
   TREE_NODE_HEIGHT,
   TREE_NODE_WIDTH,
 } from './module-tree.js';
-import { useAutoFit } from './auto-fit.js';
 import { getPresentationClassColor, getPresentationClassLabel } from './moduleTypePresentation.js';
 import './project-view.css';
+import './module-tree-canvas.css';
 import './module-tree.css';
 
 export interface ModuleTreeViewProps {
@@ -49,98 +37,6 @@ export interface ModuleTreeViewProps {
   readonly centerModuleId?: string | null;
 }
 
-interface TreeNodeData extends Record<string, unknown> {
-  readonly module: ExplorerModule | null;
-  readonly isSelected: boolean;
-  readonly isCollapsed: boolean;
-  readonly childCount: number;
-  readonly hiddenCount: number;
-  readonly coverageCount: number;
-  readonly onSelect: (id: string) => void;
-  readonly onToggle: (id: string) => void;
-  readonly onOpen: (id: string) => void;
-}
-
-type TreeNode = Node<TreeNodeData, 'moduleTreeNode'>;
-type TreeEdge = Edge<{ readonly points: readonly Point[] }, 'treeElbow'>;
-
-function ModuleTreeNodeView({ data }: NodeProps<TreeNode>): React.ReactElement {
-  const module = data.module;
-  if (module === null) {
-    return <div className="module-tree__node module-tree__node--project" style={{ width: TREE_NODE_WIDTH, height: TREE_NODE_HEIGHT }}>
-      <Handle type="source" position={Position.Bottom} className="module-tree__handle" />
-      <span className="module-tree__node-name">Project</span>
-    </div>;
-  }
-  const color = getPresentationClassColor(module.presentationClass);
-  const keyDown = (event: React.KeyboardEvent) => {
-    if (event.key === 'Enter') data.onSelect(module.id);
-    else if (event.key === 'ArrowLeft' && data.childCount > 0 && !data.isCollapsed) data.onToggle(module.id);
-    else if (event.key === 'ArrowRight' && data.isCollapsed) data.onToggle(module.id);
-    else if (event.key === 'o') data.onOpen(module.id);
-    else return;
-    event.preventDefault();
-    event.stopPropagation();
-  };
-  return (
-    <div
-      className={`module-tree__node${data.isSelected ? ' module-tree__node--selected' : ''}`}
-      style={{ width: TREE_NODE_WIDTH, height: TREE_NODE_HEIGHT, borderLeftColor: color }}
-      data-module-id={module.id}
-      role="treeitem"
-      aria-selected={data.isSelected}
-      aria-expanded={data.childCount > 0 ? !data.isCollapsed : undefined}
-      aria-label={module.name}
-      tabIndex={0}
-      onKeyDown={keyDown}
-      title={module.directory}
-    >
-      <Handle type="target" position={Position.Top} className="module-tree__handle" />
-      <Handle type="source" position={Position.Bottom} className="module-tree__handle" />
-      <div className="module-tree__node-top">
-        <span className="module-tree__node-name">{module.name}</span>
-        {module.metrics.deniedAccesses > 0 && (
-          <span className="module-tree__marker module-tree__marker--denied" title="Denied accesses">
-            {module.metrics.deniedAccesses}
-          </span>
-        )}
-        {data.coverageCount > 0 && (
-          <span className="module-tree__marker module-tree__marker--coverage" title="Coverage notes">!</span>
-        )}
-      </div>
-      <div className="module-tree__node-class" style={{ color }}>
-        {getPresentationClassLabel(module.presentationClass)}
-      </div>
-      <div className="module-tree__node-meta">
-        <span>{module.metrics.ownedFiles} files · {data.childCount} subs</span>
-        {module.purpose.state !== 'present' && <span className="module-tree__marker--readme">no README</span>}
-      </div>
-      {data.childCount > 0 && (
-        <button
-          type="button"
-          className="module-tree__toggle nodrag nopan"
-          aria-label={`${data.isCollapsed ? 'Expand' : 'Collapse'} ${module.name}`}
-          onClick={event => { event.stopPropagation(); data.onToggle(module.id); }}
-          onDoubleClick={event => event.stopPropagation()}
-        >
-          {data.isCollapsed ? `+${data.hiddenCount}` : '−'}
-        </button>
-      )}
-    </div>
-  );
-}
-
-function TreeElbowEdge({ id, data }: EdgeProps<TreeEdge>): React.ReactElement | null {
-  const points = data?.points ?? [];
-  if (points.length === 0) return null;
-  const path = points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x},${point.y}`).join(' ');
-  return <path id={id} d={path} className="module-tree__edge" fill="none" />;
-}
-
-const nodeTypes = { moduleTreeNode: ModuleTreeNodeView };
-const treeFitOptions = { padding: 0.12, minZoom: 0.1, maxZoom: 1.2 };
-const edgeTypes = { treeElbow: TreeElbowEdge };
-
 export function ModuleTreeView({
   data,
   isLoading,
@@ -161,7 +57,6 @@ export function ModuleTreeView({
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [sidebarWidth, setSidebarWidth] = useState(360);
   const contentRef = useRef<HTMLDivElement>(null);
-  const centered = useRef<string | null>(null);
 
   const index = useMemo(() => indexModuleTree(data?.modules ?? [], data?.rootModuleId), [data]);
   const coverageByModule = useMemo(() => {
@@ -173,46 +68,20 @@ export function ModuleTreeView({
     }
     return result;
   }, [data]);
-  const layout = useMemo(() => layoutModuleTree(index, collapsedModuleIds), [collapsedModuleIds, index]);
-
-  const nodes = useMemo<TreeNode[]>(() => layout.nodes.map(node => {
-    const module = index.modulesById.get(node.id) ?? null;
-    const childCount = index.children.get(node.id)?.length ?? 0;
-    return {
-      id: node.id,
-      type: 'moduleTreeNode',
-      position: { x: node.x, y: node.y },
-      // Controlled nodes never receive measurements back; the minimap needs their size.
-      initialWidth: TREE_NODE_WIDTH,
-      initialHeight: TREE_NODE_HEIGHT,
-      draggable: false,
-      selectable: module !== null,
-      data: {
-        module,
-        isSelected: node.id === selectedModuleId,
-        isCollapsed: collapsedModuleIds.has(node.id),
-        childCount,
-        hiddenCount: index.descendants.get(node.id) ?? 0,
-        coverageCount: coverageByModule.get(node.id)?.length ?? 0,
-        onSelect: onSelectModule,
-        onToggle: onToggleCollapsed,
-        onOpen: onOpenModule,
-      },
-    };
-  }), [collapsedModuleIds, coverageByModule, index, layout, onOpenModule, onSelectModule, onToggleCollapsed, selectedModuleId]);
-  const edges = useMemo<TreeEdge[]>(() => layout.edges.map(edge => ({
-    id: edge.id, source: edge.parent, target: edge.child, type: 'treeElbow', data: { points: edge.points },
-  })), [layout]);
-  const autoFit = useAutoFit<ReactFlowInstance<TreeNode, TreeEdge>>(nodes.length, treeFitOptions, centerModuleId === null);
-  const flow = autoFit.flow;
-
-  useEffect(() => {
-    if (!flow || !centerModuleId || centered.current === centerModuleId) return;
-    const node = layout.nodes.find(item => item.id === centerModuleId);
-    if (!node) return;
-    centered.current = centerModuleId;
-    void flow.setCenter(node.x + TREE_NODE_WIDTH / 2, node.y + TREE_NODE_HEIGHT / 2, { zoom: 1 });
-  }, [centerModuleId, flow, layout]);
+  const canvasNodes = useMemo<ModuleTreeCanvasNode[]>(() => (data?.modules ?? []).map(module => ({
+    id: module.id,
+    name: module.name,
+    parent: module.parent,
+    children: module.children,
+    color: getPresentationClassColor(module.presentationClass),
+    width: TREE_NODE_WIDTH,
+    height: TREE_NODE_HEIGHT,
+  })), [data]);
+  const renderNodeBody = useCallback((node: ModuleTreeCanvasNode): React.ReactNode => {
+    const module = index.modulesById.get(node.id);
+    return module ? moduleNodeBody(module, index.children.get(module.id)?.length ?? 0,
+      coverageByModule.get(module.id)?.length ?? 0) : null;
+  }, [coverageByModule, index]);
 
   const handleResizeStart = useCallback((event: React.MouseEvent) => {
     event.preventDefault();
@@ -279,34 +148,18 @@ export function ModuleTreeView({
 
         <div className="module-arch__content" ref={contentRef}>
           <div className="module-arch__main">
-            <div className="module-tree__canvas" role="tree" aria-label="Module tree" ref={autoFit.containerRef}>
-              <ReactFlow
-                nodes={nodes}
-                edges={edges}
-                nodeTypes={nodeTypes}
-                edgeTypes={edgeTypes}
-                nodesDraggable={false}
-                nodesConnectable={false}
-                onNodeClick={(_event, node) => { if (node.id !== PROJECT_NODE_ID) onSelectModule(node.id); }}
-                onNodeDoubleClick={(_event, node) => { if (node.id !== PROJECT_NODE_ID) onOpenModule(node.id); }}
-                onPaneClick={() => onSelectModule(null)}
-                zoomOnDoubleClick={false}
-                onInit={autoFit.onInit}
-                onMoveStart={autoFit.onMoveStart}
-                fitView={centerModuleId === null}
-                fitViewOptions={treeFitOptions}
-                minZoom={0.1}
-                proOptions={{ hideAttribution: true }}
-              >
-                <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="#dbe3f0" />
-                <Controls showInteractive={false} />
-                <MiniMap style={{ bottom: 12 }} pannable zoomable
-                  nodeColor={node => {
-                    const module = (node.data as TreeNodeData).module;
-                    return module ? getPresentationClassColor(module.presentationClass) : '#94a3b8';
-                  }} />
-              </ReactFlow>
-            </div>
+            <ModuleTreeCanvas
+              nodes={canvasNodes}
+              rootNodeId={model.rootModuleId}
+              selectedNodeId={selectedModuleId}
+              collapsedNodeIds={collapsedModuleIds}
+              ariaLabel="Module tree"
+              renderNodeBody={renderNodeBody}
+              onSelectNode={onSelectModule}
+              onToggleCollapsed={onToggleCollapsed}
+              onOpenNode={onOpenModule}
+              centerNodeId={centerModuleId}
+            />
           </div>
 
           <div
@@ -546,6 +399,33 @@ export function ModuleTreeView({
 }
 
 export default ModuleTreeView;
+
+/** The explorer's 184 by 64 node body: name, markers, class and counts. */
+function moduleNodeBody(module: ExplorerModule, childCount: number, coverageCount: number): React.ReactElement {
+  const color = getPresentationClassColor(module.presentationClass);
+  return (
+    <div className="module-tree__node-content" title={module.directory}>
+      <div className="module-tree__node-top">
+        <span className="module-tree__node-name">{module.name}</span>
+        {module.metrics.deniedAccesses > 0 && (
+          <span className="module-tree__marker module-tree__marker--denied" title="Denied accesses">
+            {module.metrics.deniedAccesses}
+          </span>
+        )}
+        {coverageCount > 0 && (
+          <span className="module-tree__marker module-tree__marker--coverage" title="Coverage notes">!</span>
+        )}
+      </div>
+      <div className="module-tree__node-class" style={{ color }}>
+        {getPresentationClassLabel(module.presentationClass)}
+      </div>
+      <div className="module-tree__node-meta">
+        <span>{module.metrics.ownedFiles} files · {childCount} subs</span>
+        {module.purpose.state !== 'present' && <span className="module-tree__marker--readme">no README</span>}
+      </div>
+    </div>
+  );
+}
 
 /** Owned exports by the destinations this module exposes them to. */
 function exportGroups(module: ExplorerModule): {
