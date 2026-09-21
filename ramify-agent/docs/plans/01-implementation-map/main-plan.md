@@ -92,7 +92,8 @@ ramify-agent
 The remaining responsibilities of `harness` start as directories in its
 `src/`: jobs and the run store, plan discovery, the mapping job, and the HTTP
 adapter. They are candidates for modules. One is extracted when a second
-consumer, a dependency worth hiding or measured complexity justifies it; the
+consumer, a dependency worth hiding or an evidenced assessment of local
+cognitive complexity justifies it; the
 completion report records what was found.
 
 | Work | Weight | Notes |

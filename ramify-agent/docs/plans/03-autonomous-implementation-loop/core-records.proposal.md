@@ -868,7 +868,7 @@ interface AgentPort {
 }
 // AgentEvent gains 'context-observed' and 'compaction'; SessionOutcome gains 'context-budget-reached'.
 // 'tool-started' gains `mutating: boolean`: the implementation, not generic harness code, says which of its tools mutate.
-// `startSession` reports the session mode that was actual. Usage, context size and compaction are port events and
+// `startSession` reports the session mode that was actual. Token cost, model context usage in tokens and compaction are port events and
 // port policy, never prompt text; an implementation that cannot observe one reports it unavailable with a reason,
 // and the scripted fake emits all of them.
 ```

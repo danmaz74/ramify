@@ -6,6 +6,15 @@ This document proposes an approach to module decomposition that shares the archi
 
 Its practical goal is to inform decomposition and placement decisions made by a module architect skill or collection of skills. It introduces no new importability rule, metric or implementation plan.
 
+## Terminology
+
+Throughout this proposal, **local complexity**, **cognitive complexity** and
+implementation knowledge that an abstraction hides refer to **local cognitive
+complexity** in the [metrics glossary](../metrics/glossary.md). This is a
+qualitative assessment, not delivered-change complexity or a source-line
+count. Inventory context size, when cited, means Ramify's counts and bytes;
+model context usage is a different token observation.
+
 ## The approach
 
 This approach treats **cognitive divide-and-conquer** as the primary reason for hierarchical module decomposition.
@@ -140,7 +149,7 @@ Ask:
 
 Use Ramify's retained evidence to support these judgments.
 
-Existing context-size, connectedness, dependency, interface-use and history measures can indicate where to investigate, but none directly measures cognitive complexity. Preserve their coverage, scope and provenance.
+Existing inventory context-size, connectedness, dependency, interface-use and history measures can indicate where to investigate, but none directly measures cognitive complexity. Preserve their coverage, scope and provenance.
 
 Evaluate cohesion and coupling at each relevant tree level: within each child, across the parent's composition of its children, and between the subtree and the surrounding application. Keep exact-owner and subtree measurements separate.
 

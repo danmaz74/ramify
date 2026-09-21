@@ -92,7 +92,7 @@ None. The roles that use these semantics arrive from iteration 4 onward.
 
 | Guard | Test |
 | --- | --- |
-| Usage, context size and compaction are port events; an implementation that lacks one reports unavailable with a reason, and the scripted fake emits all of them | `subs/harness/subs/agent/src/tests/port-observations.test.ts` |
+| Token cost, model context usage in tokens and compaction are port events; an implementation that lacks one reports unavailable with a reason, and the scripted fake emits all of them | `subs/harness/subs/agent/src/tests/port-observations.test.ts` |
 | Compaction is port policy, never prompt text | `subs/harness/subs/agent/subs/pi/src/tests/compaction-policy.test.ts` |
 
 ## Exit evidence

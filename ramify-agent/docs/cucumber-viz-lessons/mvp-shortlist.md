@@ -97,7 +97,7 @@ Each of these cost cucumber-viz real work, and each has a cheap guard.
 | A skipped check that passes | See section 1. | `not-verified` with a reason; an empty required selection never passes. |
 | Cancellation taken for settlement | Adapters report cancelled, then signal only the direct child; test workers reparent to PID 1 and keep running. | Process groups, killed and confirmed by the harness, and a stable tree before a writer or a gate starts. |
 | A guard nothing calls | The pre-write policy for sealed files is defined and exported, and no production code calls it. | A test makes a denied call through the real adapter for every writer role. |
-| Observations an adapter drops | One adapter parses token usage and never delivers it; the other reads the result line only for the session ID. | Usage, context size and compaction are port events; an implementation that lacks one reports `unavailable` with a reason, and the scripted fake emits all of them. |
+| Observations an adapter drops | One adapter parses token usage and never delivers it; the other reads the result line only for the session ID. | Token cost, model context usage in tokens and compaction are port events; an implementation that lacks one reports `unavailable` with a reason, and the scripted fake emits all of them. |
 | Compaction as prompt text | `/compact` was sent as a prompt and then disabled because neither tool treated it as a command. | Compaction is port policy, never text. |
 
 ## 4. Plan improvements that add no complexity

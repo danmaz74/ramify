@@ -4,6 +4,11 @@
 investigation and recommendations, not source refactoring or changes to the
 principles documents.
 
+Terminology follows the [metrics glossary](../metrics/glossary.md): cognitive
+complexity here means local cognitive complexity at the compared abstraction
+levels. It is assessed qualitatively. Inventory context-size measurements are
+counts and bytes, not model context usage or delivered change volume.
+
 ## Question
 
 When does placing contracts in a separate Ramify module reduce total cognitive
@@ -178,11 +183,11 @@ For each candidate boundary, answer:
    the contract, implementation and consumers?
 8. Does the boundary replace a more expensive knowledge dependency, or only
    add source and coordination dependencies?
-9. How do exact-owner and subtree context sizes change under each alternative?
+9. How do exact-owner and subtree inventory context sizes change under each alternative?
 10. Would a directory, same-owner `src/interfaces/` area or ordinary exposed
     file provide the same benefit without another module?
 
-Treat context size, dependency counts and changed-file history as evidence, not
+Treat inventory context size, dependency counts and changed-file history as evidence, not
 as a composite health score. Preserve revision, scope and coverage. Do not turn
 unknown or unavailable measurements into zero.
 

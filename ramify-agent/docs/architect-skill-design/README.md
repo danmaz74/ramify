@@ -9,7 +9,7 @@ practical use and trials.
 | Hypothesis | Starting point | Role of cohesion and coupling |
 | --- | --- | --- |
 | [Cohesion and coupling indices](2026-09-18-cohesion-coupling-indices.md) | Internally cohesive, externally loosely coupled modules are the primary criterion. | The criterion is examined through separate indices, with coverage and counterexamples. |
-| [Cognitive decomposition through the module tree](2026-09-18-cognitive-decomposition.md) | Recursive abstraction makes local complexity manageable. | Evidence about whether the chosen abstractions reduce the complexity that must be understood together. |
+| [Cognitive decomposition through the module tree](2026-09-18-cognitive-decomposition.md) | Recursive abstraction makes local cognitive complexity manageable. | Evidence about whether the chosen abstractions reduce the complexity that must be understood together. |
 
 The second hypothesis offers an alternative organizing principle. It can
 reuse evidence from the first without adopting its criterion as the

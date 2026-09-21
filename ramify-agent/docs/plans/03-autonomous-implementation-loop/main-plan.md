@@ -435,8 +435,8 @@ type RunFailureReason =
 
 ### The S_s recipe
 
-`MeasurementSnapshot` plus an invocation's declared scope yields `S_s`, the
-deduplicated union in bytes, as
+`MeasurementSnapshot` plus an invocation's declared scope yields `S_s`, its
+declared search-space size (inventory-byte proxy), as
 [the KPI contract](../../measurements-and-kpis.md#scope-size-policy-v1)
 defines it. The recipe is mechanical:
 
@@ -727,7 +727,7 @@ inference, and any reorientation or compaction happens under the next
 `context: Record<Role, ...>`; this plan fills it by recording parent maintenance
 against the fork that performed it.
 
-**The context size is always an estimate, and unknown is never room.**
+**Model context usage is always an estimate in tokens, and unknown is never room.**
 Iteration 0 found that pi's `getContextUsage().tokens` is itself an estimate
 from the last assistant usage, which charges cached context, because that is
 what occupies the window. The harness therefore computes no estimate of its
@@ -1044,6 +1044,14 @@ trial: the frozen baseline, each invocation's scope measurement and `S_s`
 components, role and session identity, usage by category, timing, outcome,
 mutation and `LineEventSummary`, compactions, budget returns, gate attempts,
 adaptation causes, guarded-call verdicts and observation coverage.
+
+In the [metrics terminology](../../metrics/terminology.md), `B` is the root
+scope-byte baseline and `S_s` is declared search-space size in bytes. Neither
+is the new source-line baseline `S0`. `reduction-factor` is an inverse
+scope-byte ratio, not measured token savings. The table's line-event design
+targets cumulative edit volume; the current collector reports invocation
+numstat increases, as the terminology map explains. Do not substitute either
+for delivered change volume.
 
 MVP metrics, all with `state`, `value`, `numerator`, `denominator`, `coverage`
 and `evidence`:
@@ -1453,7 +1461,7 @@ broad container module created only to hold loop-related files.
 | --- | --- | --- |
 | A real provider may reject a `z.toJSONSchema` union discriminated on `kind` | Every submission schema | Iteration 0 verified pi's side only, with the scripted provider. Iteration 3 tests it in its first real-model test and keeps the permissive submission schema until then |
 | pi validates and coerces tool input before the harness sees it | Rule 10, the rejection counts | The adapter reports `tool-finished.reachedTool`; the harness validates again whatever reaches it. See [validated JSON](#every-agent-communication-is-validated-json) |
-| The context size is unknown after a compaction | Every context-budget return of an architect role | `tokens: null` means unknown and the threshold cannot fire; the gap is recorded |
+| Model context usage is unknown after a compaction | Every context-budget return of an architect role | `tokens: null` means unknown and the threshold cannot fire; the gap is recorded |
 | The daemon stalls for about 125 s after a structural change | Every view refresh and hook check after a file is created | Plan 1's private-daemon workaround is inherited by `harness/evidence`, which restarts it before a capture. A stall is an infrastructure cause with bounded recovery, never a code-repair assignment |
 | Breaking-change isolation may not keep every boundary green | Iteration 10 and the architecture's second open question | The fixture feature is small and staged; a failure is reported as a finding of the trial, not hidden |
 | The fixture's Cucumber suite is outside the one supported runner | Every gate over the fixture | Recorded as a `coverage-gap` on each attempt |

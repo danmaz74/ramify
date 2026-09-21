@@ -7,11 +7,38 @@ search-space measures it builds on are summarized in the
 [archive index](.superseded/README.md#measurement).
 
 
+The [metrics documentation](metrics/README.md) records the newly agreed
+delivered-change token-efficiency policy and its rationale. Its source-line
+baseline and final-diff denominator are distinct from the scope-byte and
+mutation-event measures below; exploration measurement is deferred for that
+policy.
+
+## Terminology and implementation boundary
+
+Use the [metrics glossary](metrics/glossary.md) for the common vocabulary.
+Here, **scope size** means declared search-space size (inventory-byte proxy),
+with `B` as its root scope-byte baseline. These byte measures differ from `S0`,
+the starting search-space size (source-line proxy) in `token-efficiency/1`.
+Ramify's inventory context-size buckets are counts and bytes; model context
+usage is a token observation.
+
+The mutation-event design below targets **cumulative edit volume**. The current
+[line-event collector](../subs/harness/src/kpi/lines.ts) instead records
+**invocation numstat increases**: positive differences in per-path Git counts.
+It can miss edits that preserve those counts and reversions that reduce them.
+Its `LineEventSummary` name does not establish exact cumulative edit volume.
+Neither measure is **delivered change volume**, the accepted endpoint diff.
+
+The existing `scope-size-ratio` and `reduction-factor` describe declared scope
+bytes relative to `B`. Their names do not establish observed token savings.
+These distinctions qualify the older design without changing its formulas or
+claiming that every collection requirement below is implemented.
+
 ## Ownership and dependency
 
 [Ramify Plan 2C](../../docs/plans/iteration-2c-module-measurements/main-plan.md)
-will produce `ramify.measure/1`, per-module context-size summaries in the architect
-view, and a file/owner inventory. ramify-agent consumes the installed CLI and
+will produce `ramify.measure/1`, per-module inventory context-size summaries in
+the architect view, and a file/owner inventory. ramify-agent consumes the installed CLI and
 generated files. It never imports toolkit internals or builds another project
 analyzer. See the [producer review](reviews/2026-09-19-plan2c-consumer-review.md)
 for contracts to resolve before accepting the adapter.
@@ -64,9 +91,10 @@ module summaries relevant to choosing scopes, not the complete file list.
 
 ## Scope size policy v1
 
-The proposed v1 uses **Ramify inventoried scope bytes**, a proxy
-for scope size. This is not literal default `rg` traversal, text actually read,
-or model context tokens. Preserve production, testing, documentation and
+The proposed v1 uses **declared search-space size (inventory-byte proxy)**,
+also called Ramify inventoried scope bytes in the original contract. This is
+not literal default `rg` traversal, text actually read, or model context tokens.
+Preserve production, testing, documentation and
 ordinary/testing API buckets separately beside the aggregate.
 
 For each attempt define `S_s`, in bytes, as the deduplicated union of:
@@ -124,11 +152,12 @@ work weights are not measured implementation cost. Show implementation KPIs as
 owner/work-weight map, seams and reuse findings for comparison in the successor.
 No extra human confirmation or numerical planning optimizer is introduced.
 
-## Implementation cost KPIs
+## Implementation activity and declared-scope KPIs
 
 For change-weighted arithmetic, index each attributable mutation event e with
 weight `w_e` (nonmechanical added/deleted text lines) and the enclosing attempt's
-scope size `S_e`. For session-weighted arithmetic use distinct pi sessions s.
+declared scope bytes `S_e`. For session-weighted arithmetic use distinct pi
+sessions s.
 The included session/attempt set covers initial architecture, later architects,
 contract/engineering/integration work and failures/retries linked to this run.
 An explicitly linked initial planning job is counted once. A resumed pi session
@@ -138,9 +167,9 @@ compaction alone do not create a new pi session.
 
 | KPI | Definition |
 | --- | --- |
-| Mean scope bytes per changed line | `sum(w_e * S_e) / sum(w_e)` |
-| Scope-size ratio | Mean scope bytes per changed line divided by frozen B |
-| Reduction factor | `1 / scope-size ratio`, only when defined and positive |
+| Mean declared scope bytes per cumulative edit line | `sum(w_e * S_e) / sum(w_e)` |
+| Declared-scope ratio (`scope-size-ratio`) | Mean declared scope bytes per cumulative edit line divided by frozen B |
+| Inverse declared-scope ratio (`reduction-factor`) | `1 / scope-size ratio`, only when defined and positive |
 | Session count | Distinct pi sessions in the included run, including no-change/failed sessions |
 | Session-weighted total | `sum(S_s / B)` over included pi sessions |
 | Adaptation session share | Distinct sessions caused by a recorded adaptation / all included sessions |

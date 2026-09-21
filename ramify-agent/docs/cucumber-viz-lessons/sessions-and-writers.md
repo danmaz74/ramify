@@ -147,7 +147,7 @@ Evidence: `IS/core/workflow-service/checks-regression.ts:214-220`;
 `AC/runtimes/codex-runtime/codex-jsonl-parser.ts:326-336`, not read directly.
 
 Consequence: the port already reports usage per message. Keep compaction and
-context size as port events and port policy, never as prompt text. An
+model context usage in tokens as port events and port policy, never as prompt text. An
 implementation that cannot observe one reports `unavailable` with a reason, so
 the KPI states coverage instead of a silent zero. The scripted fake emits both,
 so tests cover the consumers.

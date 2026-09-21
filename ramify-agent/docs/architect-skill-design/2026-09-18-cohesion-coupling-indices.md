@@ -9,6 +9,11 @@ numbers rather than impressions. Its practical goal is to inform the
 evidence and decision procedures of a module architect skill or collection
 of skills. The guidelines themselves are deliberately not written here.
 
+Use the [metrics glossary](../metrics/glossary.md) for shared terms. Cohesion
+and coupling are concepts assessed using the named measures below; the indices
+do not define a general complexity score. Inventory context size means counts
+and bytes, not model context tokens.
+
 ## The criterion
 
 A module is **internally cohesive and externally loosely coupled**: its
@@ -28,7 +33,7 @@ The [modularity report](../../../docs/architecture/modularity-report.spec.md) al
 computes, per exact owner and where defined per subtree, the material for
 most of the indices below: boundary locality (section 1), contract breadth (2), interface
 economy (3), the behavioral estimate (4), stability direction (5), cycle
-structure (6), internal connectedness (7) and context size (9). Structural
+structure (6), internal connectedness (7) and inventory context size (9). Structural
 metrics use `Metric<T>`: `measured`, `partial` with an observed value and
 coverage, or `unavailable` with a reason. A ratio's value is null when its
 denominator is zero.
@@ -232,4 +237,4 @@ statement that roles and thresholds are declared per project.
   alternative is a separate file the architect reads beside the view.
 - Whether reference density earns its place; the skill trials decide.
 - Whether subtree values are wanted for every index or only for locality
-  and context size, where the report already defines them.
+  and inventory context size, where the report already defines them.

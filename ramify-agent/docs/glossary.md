@@ -12,6 +12,9 @@ Ramify's own vocabulary is defined in the toolkit's
 [model glossary](../../docs/model/glossary.md) and
 [agents glossary](../../docs/agents/glossary.md) and is not repeated here.
 
+For search space, delivered-change complexity, token efficiency and their
+selected measurements, use the [metrics glossary](metrics/glossary.md).
+
 ## Plan
 
 A **plan** is a person's request for a feature, written as

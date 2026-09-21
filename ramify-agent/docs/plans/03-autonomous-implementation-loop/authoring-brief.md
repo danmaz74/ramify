@@ -106,7 +106,7 @@ Before finalizing the plan:
 2. Treat Plan 2 as a separate prerequisite, not an iteration hidden inside
    Plan 3. After it runs, refresh the architect view and requester API views.
 3. Record the current source, view revision/input identity, module tree,
-   exact/subtree context sizes, existing tests and exposed APIs. Preserve
+   exact/subtree inventory context sizes (counts and bytes), existing tests and exposed APIs. Preserve
    unavailable or bounded evidence explicitly.
 4. Run the current ramify-agent baseline from its root:
 
@@ -364,7 +364,7 @@ Resolve and test:
 - forking from a specific oriented point;
 - appending a decision brief to a parent session without model inference;
 - ensuring the append enters the next fork's model input;
-- current context-size observation or a conservative estimate;
+- current model context usage in tokens or a conservative estimate;
 - disabling compaction for engineer, contract and decision-fork roles;
 - allowing and observing compaction for initial/global/local architect roles;
 - a threshold-triggered final response with tools disabled;

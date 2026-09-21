@@ -46,6 +46,9 @@ Design documents for the separate agent harness:
 - [Plan 3 core records](plans/03-autonomous-implementation-loop/core-records.proposal.md),
   proposal for the durable records, submissions and identities the plan will reference
 - [Module architect skill design](architect-skill-design/README.md)
+- [Metrics](metrics/README.md), glossary, measurement principles and the initial
+  delivered-change token-efficiency policy; its glossary names concepts and
+  their selected measurements, and its terminology map clarifies older names
 - [Ramify measurements and agent KPIs](measurements-and-kpis.md)
 - [Potential future capabilities](future/README.md), candidate user-facing
   features that are not yet scheduled or approved for implementation

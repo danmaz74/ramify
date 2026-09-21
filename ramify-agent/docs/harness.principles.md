@@ -19,6 +19,13 @@ document redefines neither.
 
 ### Bounded Context Is What Makes Agents Efficient
 
+Here, search space means the information available for an invocation to
+investigate, including selected source and generated views. Its declared byte
+size differs from the whole-project source-line baseline used in token-cost
+comparisons. Model context usage is the tokens currently occupying the model
+context. Bounded reasoning is a strategy intended to improve token efficiency;
+its benefit must be measured from run token cost and delivered work.
+
 Each agent invocation should have a manageable reasoning burden. Work can be
 bounded in two ways:
 
@@ -79,8 +86,9 @@ the design, but their requirements remain provisional until examined during
 their own work. Considering them does not by itself coordinate their execution.
 
 Forecasts, decisions and their rationale are recorded in the repository.
-Session continuity improves efficiency and consistency; it is never required
-for recovery or correctness. Making a forecast available for review is
+Session continuity aims to reduce the token cost of repeated orientation and
+preserve consistency; it is never required for recovery or correctness.
+Making a forecast available for review is
 separate from requiring execution to wait for approval.
 
 ### Distinguish Breaking from Non-Breaking Changes
@@ -136,14 +144,16 @@ Finer detail is left to the engineer who reads the code.
 
 ### Vertical Work Is Not Split Artificially
 
-When a change touches a module and its descendants, one agent can workworks at
-all of those levels if the descendant changes are simple or the complexity of
-the subtree is manageable.
+When a change touches a module and its descendants, one agent can work at
+all of those levels if the descendant changes are simple or the local cognitive
+complexity of reasoning about the subtree is manageable.
 
 The agent's scope is one subtree. The choice is which module is its root: a
-higher root gives fewer hand-offs but a larger context, and a lower root gives
-the reverse. Complexity evidence guides the choice. Work decomposition is not
-1:1 with module decomposition.
+higher root gives fewer hand-offs but a broader declared search space, and a
+lower root gives the reverse. Local cognitive complexity means the knowledge
+that must be understood together at that abstraction level; it is assessed
+qualitatively rather than computed from source size. That assessment guides
+the choice. Work decomposition is not 1:1 with module decomposition.
 
 ### Horizontal Work Uses Separate Agents Joined by a Contract
 

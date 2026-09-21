@@ -20,6 +20,11 @@ where they require a person's architectural approval, and from the
 [non-breaking-only MVP](../decomposition/breaking-vs-non-breaking-plans.md). Those documents
 remain unchanged; this hypothesis explores a different implementation boundary.
 
+The [metrics glossary](../metrics/glossary.md) distinguishes search space from
+its measurements. Here, an invocation's search space is its available source
+and selected views; model context usage is the tokens occupying its model
+context. Neither is the frozen whole-project source-line baseline `S0`.
+
 ## The idea
 
 The eventual harness should let a person review important choices before work
@@ -949,7 +954,7 @@ registry, finding-adjudication workflow or commit/publication machinery.
 
 ### Context budgets and compaction
 
-The harness monitors context size and applies a policy by session role:
+The harness monitors model context usage in tokens and applies a policy by session role:
 
 | Session role | Context policy |
 | --- | --- |
@@ -962,7 +967,7 @@ The harness monitors context size and applies a policy by session role:
 Each engineer or architect-decision invocation has a configurable context
 threshold, leaving room below the model's context limit for a final report.
 The measurement is current
-context usage, including cached context, rather than cumulative tokens spent.
+model context usage, including cached context, rather than cumulative tokens spent.
 The harness checks after each model/tool turn. Measurements can be estimates,
 and tool results can arrive in large chunks, so this is a threshold checked at
 execution boundaries rather than an exact token ceiling.

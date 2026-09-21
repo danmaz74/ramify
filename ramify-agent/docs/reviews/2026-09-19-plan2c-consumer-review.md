@@ -62,7 +62,7 @@ and the inspected service interface has no `measure` operation yet.
 
 ## Consumer compatibility, not producer defects
 
-Context-size inventory is not the literal default `rg` search space: it has
+Inventory context size (counts and bytes) is not the literal default `rg` search space: it has
 its own exclusions, includes the declared documentation bucket and excludes
 uninventoried support. Use a named inventory-based proxy unless exact search
 semantics become a separate requirement. Do not silently rename these buckets
