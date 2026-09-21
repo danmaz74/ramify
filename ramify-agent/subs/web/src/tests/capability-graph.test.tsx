@@ -93,6 +93,11 @@ describe('CM17: layout by longest dependency depth', () => {
       expect(node.y).toBeGreaterThan(group.y);
       expect(node.y + node.height).toBeLessThan(group.y + group.height);
     }
+    // The label starts 6 px inside the outline and wraps to two lines at the
+    // node width in Chromium; the first member starts below both lines
+    // (0.72rem at the page's 1.5 line height).
+    const firstMember = Math.min(...layout.nodes.filter(entry => ['a', 'b'].includes(entry.capability.capability)).map(entry => entry.y));
+    expect(firstMember - (layout.cycles[0]!.y + 6)).toBeGreaterThanOrEqual(2 * 0.72 * 16 * 1.5);
 
     render(<CapabilityDependencyGraph {...input} />);
     expect(screen.getByText('Dependency cycle: no order among these')).toBeTruthy();

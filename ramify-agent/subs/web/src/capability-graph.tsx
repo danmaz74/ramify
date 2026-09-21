@@ -20,7 +20,8 @@ const horizontalPadding = 28;
 const graphTop = 54;
 const graphBottom = 24;
 /** The room a cycle group keeps above its first member for its label. */
-const cycleHeader = 26;
+// Room above a cycle's first member for its label, which wraps to two lines at the node width.
+const cycleHeader = 40;
 const cyclePadding = 9;
 
 export interface CapabilityDependencyGraphProps {

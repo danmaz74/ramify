@@ -390,3 +390,11 @@ test('CM01: the web module imports the canvas and its styles only from the packa
     expect(file.text, file.path).not.toMatch(/\.module-tree__|react-flow__|\bnodrag\b|\bnopan\b|ProjectExplorerModel|module-activity|ModuleActivity/);
   }
 });
+
+// Found by the browser acceptance: at 390 px the Run page's seven area tabs
+// ran 340 px past the viewport, with Progress itself off-screen. The tab rows
+// wrap; the browser run records the page width that results.
+test('the tab rows wrap, so Progress stays reachable at a narrow width', () => {
+  const styles = webFiles.find(file => file.path === 'styles.css')!.text;
+  expect(/^\.tabs \{[^}]*flex-wrap: wrap;/m.test(styles)).toBe(true);
+});
