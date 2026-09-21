@@ -65,10 +65,12 @@ function stubRun(extra: Partial<RunSnapshot> = {}): StubRun {
     }),
     capabilities: capabilityListResponseSchema.parse({
       capabilities: [
-        { capability: 'review-note', owner: 'shop/notes', entry: true, tentative: false, state: 'working', reason: 'Waiting for provider ob-ct-001 (rq-001)', dependsOn: [], workItems: ['wi-001'], evidence: [] },
-        { capability: 'note-export', owner: 'shop/notes', entry: false, tentative: true, state: 'todo', reason: 'Forecast by hypothesis h at revision 1 (tentative); no work derives from a hypothesis', dependsOn: [], workItems: [], evidence: [] },
+        { capability: 'send-button', owner: 'collection-review/workspace/reviews', entry: true, tentative: false, state: 'working', reason: 'Waiting for provider ob-ct-001 (rq-001)', dependsOn: [{ capability: 'send-email', tentative: false }], workItems: ['wi-001'], evidence: [] },
+        { capability: 'send-email', owner: 'collection-review/workspace/reviews', entry: false, tentative: false, state: 'completed', reason: 'Provider work completed with current evidence', dependsOn: [], workItems: ['wi-002'], evidence: ['ga-0007', 'ga-0006'] },
+        { capability: 'note-rendering', owner: 'collection-review', entry: false, tentative: true, state: 'todo', reason: 'Forecast by hypothesis note-rendering at revision 1 (tentative); no work derives from a hypothesis', dependsOn: [{ capability: 'note-storage', tentative: true }], workItems: [], evidence: [] },
+        { capability: 'note-storage', owner: 'collection-review/workspace/reviews', entry: false, tentative: true, state: 'todo', reason: 'Forecast by hypothesis note-storage at revision 1 (tentative); no work derives from a hypothesis', dependsOn: [], workItems: [], evidence: [] },
       ],
-      total: 2,
+      total: 4,
     }),
     gates: {
       'ga-0002': gateViewSchema.parse({
@@ -170,13 +172,19 @@ test('hypotheses are shown as forecasts with standing and revision, beside the d
   expect(decision.textContent).toContain('note-search@2');
 });
 
-test('progress shows todo, working on and completed with reasons, and marks a forecast', async () => {
+test('progress lays out retained dependencies, keeps state totals, and opens the selected evidence', async () => {
   render(<RunPage client={clientWith(stubRun())} planId="review-notes" runId={runId} interval={60_000} />);
   fireEvent.click(await screen.findByRole('tab', { name: 'Progress' }));
-  const working = await screen.findByLabelText('Working on');
-  expect(working.textContent).toContain('Waiting for provider ob-ct-001 (rq-001)');
-  const todo = screen.getByLabelText('Todo');
-  expect(within(todo).getByText('forecast')).toBeTruthy();
+  const graph = await screen.findByLabelText('Scrollable capability dependency graph');
+  expect(within(graph).getByRole('button', { name: 'send-button, working on, entry' })).toBeTruthy();
+  expect(within(graph).getByRole('button', { name: 'note-rendering, todo, forecast' })).toBeTruthy();
+  expect(screen.getByLabelText('Progress totals').textContent).toContain('Completed1');
+  expect(screen.getByText('Dependency list').parentElement?.textContent).toContain('send-button depends on send-email');
+
+  fireEvent.click(within(graph).getByRole('button', { name: 'send-email, completed' }));
+  const details = screen.getByLabelText('Details for send-email');
+  expect(details.textContent).toContain('ga-0007, ga-0006');
+  expect(details.textContent).toContain('wi-002');
 });
 
 test('a gate shows its commands and its bounded output tail', async () => {

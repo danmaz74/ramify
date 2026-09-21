@@ -1,8 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import type {
-  CapabilityProgress, DecisionView, GateView, HypothesisView, InvocationEvaluation, Metric, MetricsResponse,
+  DecisionView, GateView, HypothesisView, InvocationEvaluation, Metric, MetricsResponse,
   ProjectedRunEvent, RunNotice, RunSnapshot, WorkItemResponse,
 } from '../../harness/src/interfaces/protocol/runs.js';
+import { CapabilityGraph } from './capability-graph.js';
 import { newCommandId, type ConnectionState, type ProtocolClient } from './client.js';
 import { Markdown } from './markdown.js';
 import { routeHref } from './routes.js';
@@ -494,32 +495,9 @@ function Progress({ client, planId, runId, version }: AreaProps) {
   return (
     <div className="area" aria-label="Progress">
       <Loading state={state} what="the progress">
-        {data => (
-          <div className="columns three">
-            {(['todo', 'working', 'completed'] as const).map(column => (
-              <section key={column} className="panel" aria-label={column === 'working' ? 'Working on' : column === 'todo' ? 'Todo' : 'Completed'}>
-                <h2>{column === 'working' ? 'Working on' : column === 'todo' ? 'Todo' : 'Completed'}</h2>
-                <ul className="cards">
-                  {data.capabilities.filter(capability => capability.state === column).map(capability => <Capability key={capability.capability} capability={capability} />)}
-                </ul>
-              </section>
-            ))}
-          </div>
-        )}
+        {data => <CapabilityGraph capabilities={data.capabilities} total={data.total} />}
       </Loading>
     </div>
-  );
-}
-
-function Capability({ capability }: { readonly capability: CapabilityProgress }) {
-  return (
-    <li className={`card capability${capability.tentative ? ' capability-tentative' : ''}`}>
-      <p><code>{capability.capability}</code>{capability.entry && <span className="badge">entry</span>}{capability.tentative && <span className="badge tentative">forecast</span>}</p>
-      <p className="muted"><code>{capability.owner}</code></p>
-      <p>{capability.reason}</p>
-      {capability.dependsOn.length > 0 && <p className="muted">Depends on {capability.dependsOn.map(link => `${link.capability}${link.tentative ? ' (tentative)' : ''}`).join(', ')}</p>}
-      {capability.evidence.length > 0 && <p className="muted">Evidence: {capability.evidence.join(', ')}</p>}
-    </li>
   );
 }
 
