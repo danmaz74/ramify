@@ -34,8 +34,9 @@ export class Resolution {
     this.project = project; this.inventory = inventory;
     this.files = new Map(inventory.files.map(file => [resolve(inventory.scope.root, file.path), file]));
   }
-  module(node: Node): ResolvedModule {
-    const module = this.project.checker.getSymbolAtLocation(node);
+  /** `known` supplies the specifier's module symbol from an earlier batched request. */
+  module(node: Node, known?: { readonly symbol: CompilerSymbol | undefined }): ResolvedModule {
+    const module = known ? known.symbol : this.project.checker.getSymbolAtLocation(node);
     const specifier = isStringLiteral(node) ? node.text : '';
     const declarations = module?.declarations ?? [];
     // NodeHandle.path is the compiler's canonical key, which can be case-folded.

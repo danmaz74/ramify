@@ -29,7 +29,8 @@ function fixture(child: string, root = 'expose-sub * from child to descendants',
     references: modules.flatMap(module => module.description.document.statements.filter(statement => statement.kind !== 'expose-sub').map(statement => ({
       description: module.description.document.file, statement: statement.index, decoded: statement.from.value, normalized: file, status: 'file' as const, interfaceEligible: true,
     }))), outsideModuleFiles: [], warnings: [] },
-  catalog: { originals: [{ id, origin: { file, area: area.value[0]! }, declarations: [location], hasValue: true, hasType: false }],
+  catalog: { originals: [{ id, origin: { file, area: area.value[0]! }, declarations: [location], hasValue: true, hasType: false,
+    companions: { named: [], evidence: [], inferred: false, unresolved: 0 } }],
     files: [{ file, state: 'complete', exports: [{ name: 'value', original: id, namespace: null, forwarding: [] }], issueIds: [], descriptionFiles: [] }], coverage: [] } };
 }
 const owned = 'expose-src value from "interfaces/api.ts"';

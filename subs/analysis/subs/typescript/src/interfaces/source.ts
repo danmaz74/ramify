@@ -1,4 +1,4 @@
-import type { OriginalId, SourceOrigin, SourceLocation, SourceArea, BindingRequest } from '../../../model/src/interfaces/model.js';
+import type { OriginalId, SourceOrigin, SourceLocation, SourceArea, BindingRequest, SignatureCompanions } from '../../../model/src/interfaces/model.js';
 import type { DependencyBehaviorFacts } from './dependency-behavior.js';
 import type { ObservationSink, ProjectInputView, ProjectInventory } from '../../../project/src/interfaces/project.js';
 
@@ -8,6 +8,8 @@ export interface CatalogOriginal {
   readonly declarations: readonly SourceLocation[];
   readonly hasValue: boolean;
   readonly hasType: boolean;
+  /** What the original's declared signature names, recorded for every exported original. */
+  readonly companions: SignatureCompanions;
 }
 export interface CatalogExport {
   readonly name: string;

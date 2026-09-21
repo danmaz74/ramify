@@ -4,22 +4,31 @@ import { SyntaxKind, isExportDeclaration, isExportSpecifier, isImportDeclaration
   isImportSpecifier, isImportClause, isNamespaceImport,
   isModuleDeclaration, isIdentifier, isStringLiteral, isExportAssignment, isCallExpression, isImportTypeNode, isLiteralTypeNode,
   isVariableStatement, isFunctionDeclaration, isClassDeclaration, isEnumDeclaration, isInterfaceDeclaration, isTypeAliasDeclaration,
-  type Node, type SourceFile } from 'typescript/unstable/ast';
+  isVariableDeclarationList, isModuleBlock, isNamedImports, isObjectBindingPattern, isArrayBindingPattern, isBindingElement,
+  type Identifier, type Node, type SourceFile } from 'typescript/unstable/ast';
 import { originalKey } from '../../model/src/identity.js';
-import type { OriginalId, SourceArea, SourceLocation, SourceOrigin } from '../../model/src/interfaces/model.js';
+import type { OriginalId, SignatureCompanions, SourceArea, SourceLocation, SourceOrigin } from '../../model/src/interfaces/model.js';
 import type { InventoryFile, ProjectInventory } from '../../project/src/interfaces/project.js';
 import type { CatalogDelta, CatalogOriginal, CatalogExport, DescriptionDependencies, FileDescription,
   FileExports, SourceCatalog, SourceLimit, SourceWorkLimits } from './interfaces/source.js';
-import { Resolution, type CatalogHost } from './resolution.js';
+import { Resolution, type CatalogHost, type ResolvedModule } from './resolution.js';
+import { harvestSignature, type SignatureReference } from './signatures.js';
 import { SourceFailure } from './wire.js';
 
 interface Inputs { readonly inventory: ProjectInventory; readonly areas: readonly SourceArea[]; readonly limits: SourceWorkLimits }
 interface MutableFile { file: string; state: FileExports['state']; exports: CatalogExport[]; issueIds: string[]; descriptionFiles: string[] }
 interface Selection { file: string; name: string; node: Node }
 interface Stars { source: SourceFile; explicit: Set<string>; targets: { file: string; node: Node; typeOnly: boolean }[] }
+type SymbolLookup = (node: Node) => { readonly symbol: CompilerSymbol | undefined } | null;
 interface MutableDependencies { files: Set<string>; resources: Set<string>; shims: Set<string>; probed: Map<string, boolean> }
 const order = (a: string, b: string) => Buffer.compare(Buffer.from(a), Buffer.from(b));
 const sorted = (values: Iterable<string>): readonly string[] => [...new Set(values)].sort(order);
+const noCompanions: SignatureCompanions = { named: [], evidence: [], inferred: false, unresolved: 0 };
+
+let companionRequests = 0;
+/** Batched symbol requests the companion collection has made in this process: the
+ * witness that collecting companions costs at most one request per described round. */
+export function companionSymbolRequests(): number { return companionRequests; }
 
 /** One file's description together with the extraction facts a later round needs
  * to treat it as a resolved leaf without re-reading it from the compiler. */
@@ -106,6 +115,12 @@ class CatalogBuilder {
   private readonly extractionStates = new Map<string, FileExports['state']>();
   private readonly reporters = new Map<string, string>();
   private readonly ownedPaths: ReadonlySet<string>;
+  /** The declaration nodes of each code original this round recorded, for the companion walk. */
+  private readonly declarationNodes = new Map<string, readonly Node[]>();
+  private foldedPaths: ReadonlyMap<string, InventoryFile> | undefined;
+  private readonly importTargets = new Map<string, ResolvedModule>();
+  private readonly aliasImports = new Map<number, { readonly specifier: Node; readonly selected: string | null } | null>();
+  private readonly declaredSymbols = new Map<number, { readonly id: OriginalId; readonly files: readonly string[] } | null | 'unresolved' | 'member'>();
   private describing: string | null = null;
   /** The specifier scan looks for resource descriptions only, so the files and
    * probes it resolves are not edges of the describing file's own exports. */
@@ -148,8 +163,8 @@ class CatalogBuilder {
   }
   /** Resolve a specifier and record the owned files, resources and absent paths
    * the description of the file being read therefore depends on. */
-  private target(node: Node): ReturnType<Resolution['module']> {
-    const resolved = this.resolution.module(node);
+  private target(node: Node, known?: { readonly symbol: CompilerSymbol | undefined }): ResolvedModule {
+    const resolved = this.resolution.module(node, known);
     if (this.describing && resolved.kind === 'application' && resolved.file) {
       const dependencies = this.dependencyRecord(this.describing);
       if (resolved.resource) {
@@ -242,6 +257,7 @@ class CatalogBuilder {
     }
     for (const [path, file] of this.files) this.extractionStates.set(path, file.state);
     this.resolveExports();
+    this.companions();
     return this.records();
   }
 
@@ -293,6 +309,196 @@ class CatalogBuilder {
       this.scanning = true;
       try { visit(source); } finally { this.describing = null; this.scanning = false; }
     }
+  }
+
+  /** Companion facts of every code original this round recorded: one syntactic walk
+   * of its declarations and one batched symbol request for all of the round's names.
+   * Aliases are followed through the round's resolved export descriptions, never
+   * through further checker requests, and nothing here computes a type. */
+  private companions(): void {
+    interface Pending { readonly key: string; readonly original: CatalogOriginal;
+      readonly references: readonly SignatureReference[]; readonly inferred: boolean }
+    const pending: Pending[] = [];
+    const nodes: Node[] = [];
+    const slots = new Map<string, number>();
+    const slot = (node: Node): string => `${node.getSourceFile().fileName}\0${node.kind}\0${node.pos}\0${node.end}`;
+    const indices = new Map<Node, number>();
+    const ask = (node: Node): void => {
+      if (indices.has(node)) return;
+      const key = slot(node);
+      if (!slots.has(key)) { slots.set(key, nodes.length); nodes.push(node); }
+      indices.set(node, slots.get(key)!);
+    };
+    const imports = new Map<string, ReadonlyMap<string, Node>>();
+    // A spelling pre-filter: the module specifier of each top-level import that
+    // binds a name a signature's first identifier spells joins the same request.
+    const importsOf = (source: SourceFile): ReadonlyMap<string, Node> => {
+      const cached = imports.get(source.fileName);
+      if (cached) return cached;
+      const bound = new Map<string, Node>();
+      for (const statement of source.statements) {
+        if (!isImportDeclaration(statement) || !statement.importClause) continue;
+        const clause = statement.importClause, names: Identifier[] = [];
+        if (clause.name) names.push(clause.name);
+        if (clause.namedBindings && isNamespaceImport(clause.namedBindings)) names.push(clause.namedBindings.name);
+        else if (clause.namedBindings && isNamedImports(clause.namedBindings)) names.push(...clause.namedBindings.elements.map(element => element.name));
+        for (const name of names) bound.set(name.text, statement.moduleSpecifier);
+      }
+      imports.set(source.fileName, bound);
+      return bound;
+    };
+    for (const [key, original] of this.originals) {
+      const declarations = this.declarationNodes.get(key);
+      if (!declarations) continue;
+      const { references, inferred } = harvestSignature(declarations);
+      pending.push({ key, original, references, inferred });
+      for (const reference of references) {
+        if (reference.specifier) { ask(reference.specifier); continue; }
+        reference.names.forEach(ask);
+        const specifier = importsOf(reference.node.getSourceFile()).get(reference.names[0]!.text);
+        if (specifier) ask(specifier);
+      }
+    }
+    let symbols: readonly (CompilerSymbol | undefined)[] = [];
+    if (nodes.length) { companionRequests++; symbols = this.project.checker.getSymbolAtLocation(nodes); }
+    const symbolAt: SymbolLookup = node => {
+      const index = indices.get(node) ?? slots.get(slot(node));
+      return index === undefined ? null : { symbol: symbols[index] };
+    };
+    for (const { key, original, references, inferred } of pending) {
+      const found = new Map<string, { readonly id: OriginalId; readonly evidence: SourceLocation }>();
+      let unresolved = 0;
+      const self = originalKey(original.id);
+      for (const reference of references) {
+        const named = this.companion(reference, symbolAt, original.origin.file);
+        if (named === 'unresolved') { unresolved++; continue; }
+        if (!named) continue;
+        const namedKey = originalKey(named);
+        if (namedKey === self) continue;
+        const evidence = this.location(reference.node), previous = found.get(namedKey);
+        if (!previous || order(evidence.file, previous.evidence.file) < 0
+          || (evidence.file === previous.evidence.file && evidence.start < previous.evidence.start)) found.set(namedKey, { id: named, evidence });
+      }
+      const entries = [...found].sort((a, b) => order(a[0], b[0])).map(([, entry]) => entry);
+      if (!entries.length && !inferred && !unresolved) continue;
+      this.originals.set(key, { ...original, companions: {
+        named: entries.map(entry => entry.id), evidence: entries.map(entry => entry.evidence), inferred, unresolved } });
+    }
+  }
+  /** The original one signature reference names: null for an external, library,
+   * type-parameter or local binding, `unresolved` when no single project original
+   * is established or the name reaches a project file outside every module. */
+  private companion(reference: SignatureReference, symbolAt: SymbolLookup, describing: string): OriginalId | null | 'unresolved' {
+    const names = reference.names.map(name => name.text);
+    if (reference.specifier) return this.imported(reference.specifier, symbolAt, names, describing);
+    const first = symbolAt(reference.names[0]!)?.symbol;
+    if (!first || this.project.checker.isUnknownSymbol(first)) return 'unresolved';
+    if (first.flags & SymbolFlags.Alias) {
+      const selection = this.importOf(first);
+      if (!selection) return 'unresolved';
+      const { specifier, selected } = selection;
+      return this.imported(specifier, symbolAt, selected === null ? names.slice(1) : [selected, ...names.slice(1)], describing);
+    }
+    // A member of a class, enum, object or local scope is no original; the
+    // rightmost name declared at module level is.
+    for (let index = reference.names.length - 1; index >= 0; index--) {
+      const symbol = symbolAt(reference.names[index]!)?.symbol;
+      if (!symbol || this.project.checker.isUnknownSymbol(symbol)) {
+        if (index === reference.names.length - 1) return 'unresolved';
+        continue;
+      }
+      const named = this.declared(symbol);
+      if (named === 'member') continue;
+      if (typeof named !== 'object' || named === null) return named;
+      const dependencies = this.dependencyRecord(describing);
+      for (const file of named.files) if (file !== describing) dependencies.files.add(file);
+      return named.id;
+    }
+    return null;
+  }
+  /** The import declaration an alias symbol's single declaration belongs to. */
+  private importOf(alias: CompilerSymbol): { readonly specifier: Node; readonly selected: string | null } | null {
+    if (this.aliasImports.has(alias.id)) return this.aliasImports.get(alias.id)!;
+    const declaration = alias.declarations.length === 1 ? alias.declarations[0]!.resolve(this.project) : undefined;
+    let statement = declaration;
+    while (statement && !isImportDeclaration(statement) && statement.kind !== SyntaxKind.SourceFile) statement = statement.parent;
+    const result = declaration && statement && isImportDeclaration(statement)
+      ? { specifier: statement.moduleSpecifier, selected: this.selectedName(declaration) } : null;
+    this.aliasImports.set(alias.id, result);
+    return result;
+  }
+  /** What a non-alias symbol's own declarations establish, independent of the naming file. */
+  private declared(symbol: CompilerSymbol): { readonly id: OriginalId; readonly files: readonly string[] } | null | 'unresolved' | 'member' {
+    if (this.declaredSymbols.has(symbol.id)) return this.declaredSymbols.get(symbol.id)!;
+    const result = ((): { readonly id: OriginalId; readonly files: readonly string[] } | null | 'unresolved' | 'member' => {
+      if (symbol.flags & SymbolFlags.TypeParameter) return null;
+      if (symbol.flags & SymbolFlags.Alias) return 'unresolved';
+      // The checker's stand-in for an unresolvable name is a transient symbol without declarations.
+      if (!symbol.declarations.length) return symbol.flags & SymbolFlags.Transient ? 'unresolved' : null;
+      const owned = symbol.declarations.map(handle => this.ownedAt(handle.path));
+      if (owned.every(file => !file)) return symbol.declarations.some(handle => this.projectPath(handle.path)) ? 'unresolved' : null;
+      if (owned.some(file => !file || file.kind !== 'source')) return 'unresolved';
+      const declarations = symbol.declarations.map(handle => handle.resolve(this.project));
+      if (declarations.some(node => !node)) return 'unresolved';
+      const placed = declarations.map(node => this.placement(node!));
+      if (placed.includes('member')) return 'member';
+      if (placed.includes('ambient')) return 'unresolved';
+      if (new Set(owned.map(file => `${file!.owner}:${file!.area}`)).size !== 1) return 'unresolved';
+      return { id: this.codeOriginal(declarations as Node[], symbol).id, files: sorted(owned.map(file => file!.path)) };
+    })();
+    this.declaredSymbols.set(symbol.id, result);
+    return result;
+  }
+  /** A name selected from a module specifier, resolved through the resolved export
+   * descriptions the round holds. The target becomes a dependency of `describing`. */
+  private imported(specifier: Node, symbolAt: SymbolLookup, names: readonly string[], describing: string): OriginalId | null | 'unresolved' {
+    const known = symbolAt(specifier);
+    if (!known) return 'unresolved';
+    // One resolution per specifier records the describing file's dependencies once.
+    const key = `${describing}\0${specifier.getSourceFile().fileName}\0${specifier.pos}`;
+    let target = this.importTargets.get(key);
+    if (!target) {
+      const outer = this.describing;
+      this.describing = describing;
+      try { target = this.target(specifier, known); } finally { this.describing = outer; }
+      this.importTargets.set(key, target);
+    }
+    if (target.kind === 'external') return null;
+    if (target.kind !== 'application' || !target.file || !names.length) return 'unresolved';
+    let entries = this.view(target.file)?.exports, parent: CatalogExport | undefined;
+    for (let index = 0; index < names.length; index++) {
+      const entry = entries?.find(item => item.name === names[index]);
+      if (!entry) return parent?.original ?? 'unresolved';
+      if (index === names.length - 1 || !entry.namespace) return entry.original ?? 'unresolved';
+      parent = entry; entries = entry.namespace;
+    }
+    return 'unresolved';
+  }
+  /** Whether a declaration is a module-level binding of an external module, a
+   * member or local binding, or an ambient or global declaration. */
+  private placement(node: Node): 'module' | 'member' | 'ambient' {
+    if (node.kind === SyntaxKind.SourceFile) return 'ambient';
+    for (let current = node.parent; current.kind !== SyntaxKind.SourceFile; current = current.parent) {
+      if (isModuleDeclaration(current)) {
+        if (!isIdentifier(current.name) || current.name.text === 'global') return 'ambient';
+      } else if (!(isVariableDeclarationList(current) || isVariableStatement(current) || isModuleBlock(current)
+        || isObjectBindingPattern(current) || isArrayBindingPattern(current) || isBindingElement(current))) return 'member';
+    }
+    return node.getSourceFile().externalModuleIndicator ? 'module' : 'ambient';
+  }
+  /** The owned file at a compiler path key, which can be case-folded. */
+  private ownedAt(path: string): InventoryFile | undefined {
+    const exact = this.resolution.files.get(resolve(path));
+    if (exact) return exact;
+    // Only a case-folded key needs the folded comparison.
+    if (path !== path.toLowerCase()) return undefined;
+    this.foldedPaths ??= new Map([...this.resolution.files].map(([key, file]) => [key.toLowerCase(), file]));
+    return this.foldedPaths.get(resolve(path).toLowerCase());
+  }
+  /** A path inside the project root that no package or library supplies. */
+  private projectPath(path: string): boolean {
+    const local = relative(this.root, resolve(path));
+    return !!local && !local.startsWith('..') && !local.split(/[\\/]/).includes('node_modules');
   }
 
   /** Split the round's facts by the file each belongs to. Native star enumeration
@@ -527,7 +733,8 @@ class CatalogBuilder {
     // Resource locations describe the effective declaration; identity and area
     // still belong to the resource rather than that declaration's owner.
     this.originals.set(originalKey(id), { id, origin, declarations,
-      hasValue: forcedBinding === 'default' || Boolean(target.flags & SymbolFlags.Value), hasType: Boolean(target.flags & SymbolFlags.Type) });
+      hasValue: forcedBinding === 'default' || Boolean(target.flags & SymbolFlags.Value), hasType: Boolean(target.flags & SymbolFlags.Type),
+      companions: noCompanions });
     return { name, original: id, namespace: null, forwarding: [] };
   }
   private moduleSpecifier(node: Node): Node | null {
@@ -638,19 +845,27 @@ class CatalogBuilder {
       this.limit(file, 'ambiguous-original', `Export ${name} has declarations in different owners or source areas`, declarations[0], locations);
       return { name, original: null, namespace: null, forwarding: chain };
     }
-    const sorted = [...declarations].sort((a, b) => order(this.location(a).file, this.location(b).file) || a.getStart() - b.getStart());
-    const node = sorted[0], origin = this.origin(this.location(node).file)!;
-    const ordinary = this.inputs.areas.find(area => area.owner === origin.area.owner && area.kind === 'ordinary')!;
-    const id: OriginalId = { kind: 'code', owner: origin.area.owner,
-      file: relative(resolve(this.root, ordinary.root), resolve(this.root, origin.file)), binding: this.binding(node, symbol) };
+    const { id, origin, node } = this.codeOriginal(declarations, symbol);
     this.originals.set(originalKey(id), { id, origin, declarations: locations.sort((a, b) => order(a.file, b.file) || a.start - b.start),
-      hasValue: Boolean(symbol.flags & SymbolFlags.Value), hasType: Boolean(symbol.flags & SymbolFlags.Type) });
+      hasValue: Boolean(symbol.flags & SymbolFlags.Value), hasType: Boolean(symbol.flags & SymbolFlags.Type), companions: noCompanions });
+    this.declarationNodes.set(originalKey(id), declarations);
     let namespace: CatalogExport[] | null = null;
     if (symbol.flags & SymbolFlags.Namespace) namespace = this.project.checker.getExportsOfModule(symbol).map(member => {
       this.check(depth, true); return this.export(member, member.name, file, depth + 1, chain, nextSeen);
     });
     if (namespace) this.runtimeMembers(symbol, node, namespace);
     return { name, original: id, namespace, forwarding: chain };
+  }
+  /** The identity of a code original from its declarations, which share one owner and area. */
+  private codeOriginal(declarations: readonly Node[], symbol: CompilerSymbol): { id: OriginalId; origin: SourceOrigin; node: Node } {
+    const fileOf = (node: Node): string => relative(this.root, node.getSourceFile().fileName);
+    const sorted = declarations.map(node => ({ node, file: fileOf(node), start: node.getStart() }))
+      .sort((a, b) => order(a.file, b.file) || a.start - b.start);
+    const node = sorted[0]!.node, origin = this.origin(sorted[0]!.file)!;
+    const ordinary = this.inputs.areas.find(area => area.owner === origin.area.owner && area.kind === 'ordinary')!;
+    const id: OriginalId = { kind: 'code', owner: origin.area.owner,
+      file: relative(resolve(this.root, ordinary.root), resolve(this.root, origin.file)), binding: this.binding(node, symbol) };
+    return { id, origin, node };
   }
   private binding(node: Node, symbol: CompilerSymbol): string {
     const parts: string[] = [];

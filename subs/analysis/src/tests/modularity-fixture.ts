@@ -176,7 +176,7 @@ export function buildReport(spec: FixtureSpec): AnalysisReport {
       catalog: {
         originals: spec.originals.map(original => ({ id: originalId(original.file, original.binding),
           origin: { file: original.file, area: area(original.file) }, declarations: [], hasValue: original.value ?? true,
-          hasType: !(original.value ?? true) })),
+          hasType: !(original.value ?? true), companions: { named: [], evidence: [], inferred: false, unresolved: 0 } })),
         files: spec.files.map(file => ({ file: file.path, state: file.state ?? 'complete', exports: [], issueIds: file.issueIds ?? [],
           descriptionFiles: [] })),
         coverage: [],
