@@ -58,6 +58,10 @@ export interface PiOptions {
   readonly session?: SessionSpec['session'] | undefined;
   readonly context?: ContextPolicy | undefined;
   readonly builtinTools?: SessionSpec['builtinTools'] | undefined;
+  /** The model as the adapter is given it; default `scripted/scripted-1`. */
+  readonly model?: string | undefined;
+  /** Whether the scripted model supports thinking. */
+  readonly reasoning?: boolean | undefined;
   /** The model's context window, small enough to reach a threshold cheaply. */
   readonly contextWindow?: number | undefined;
   /** pi's own compaction thresholds. */
@@ -94,12 +98,15 @@ export async function startPi(cleanups: Array<() => Promise<void>>, steps: reado
     for (const [name, content] of Object.entries(options.files)) await writeFile(join(places.workingDirectory, name), content);
   }
 
-  const scripted = scriptedProvider(steps, options.contextWindow === undefined ? {} : { contextWindow: options.contextWindow });
+  const scripted = scriptedProvider(steps, {
+    ...(options.contextWindow === undefined ? {} : { contextWindow: options.contextWindow }),
+    ...(options.reasoning === undefined ? {} : { reasoning: options.reasoning }),
+  });
   const isolated = await scriptedRuntime(scripted);
   cleanups.push(isolated.remove);
   const agent = createPiAgentOn({
     agentDirectory: isolated.agentDirectory,
-    model: 'scripted/scripted-1',
+    model: options.model ?? 'scripted/scripted-1',
     settleMs: options.settleMs ?? 5_000,
     compaction: options.compaction,
     runtime: async () => isolated.runtime,

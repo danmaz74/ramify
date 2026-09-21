@@ -70,9 +70,16 @@ type PiToolDefinition = Parameters<typeof defineTool>[0];
 /** What a `tool_result` handler may replace. pi does not export the type. */
 type PiToolResult = { content?: ToolResultEvent['content']; isError?: boolean };
 type PiModel = NonNullable<ReturnType<ModelRuntime['getModel']>>;
+type PiThinkingLevel = NonNullable<ReturnType<typeof resolveCliModel>['thinkingLevel']>;
+/** A model with the thinking level a `provider/model:level` request named, if it named one. */
+interface ChosenModel { readonly model: PiModel; readonly thinkingLevel: PiThinkingLevel | undefined }
 
 export interface PiAgentOptions {
-  /** The model as pi's `--model` accepts it, such as `anthropic/claude-opus-4-5`. Default: the first model pi has credentials for. */
+  /**
+   * The model as pi's `--model` accepts it, such as `anthropic/claude-opus-4-5`,
+   * optionally with a thinking level, such as `openai-codex/gpt-5.6-sol:high`.
+   * Default: the first model pi has credentials for, at pi's default level.
+   */
   readonly model?: string | undefined;
   /** pi's agent directory, which holds its credentials (`auth.json`) and model settings. Default: pi's own, `~/.pi/agent` or `PI_CODING_AGENT_DIR`. */
   readonly agentDirectory?: string | undefined;
@@ -118,8 +125,8 @@ export async function piReadiness(options: PiAgentOptions = {}): Promise<{ reado
   const agentDirectory = options.agentDirectory ?? getAgentDir();
   try {
     const runtime = await ModelRuntime.create({ authPath: join(agentDirectory, 'auth.json'), modelsPath: join(agentDirectory, 'models.json') });
-    const model = await chooseModel(runtime, options.model);
-    return { ready: true, model: `${model.provider}/${model.id}` };
+    const { model, thinkingLevel } = await chooseModel(runtime, options.model);
+    return { ready: true, model: `${model.provider}/${model.id}${thinkingLevel === undefined ? '' : `:${thinkingLevel}`}` };
   } catch (error) {
     return { ready: false, reason: message(error) };
   }
@@ -225,19 +232,24 @@ function openSessionManager(spec: SessionSpec): { readonly manager: SessionManag
   return fresh();
 }
 
-async function chooseModel(runtime: ModelRuntime, requested: string | undefined): Promise<PiModel> {
+/**
+ * pi's resolver parses a `:level` suffix but does not apply it; the level is
+ * returned beside the model so the session can be started with it. Dropping
+ * it would run the model at pi's default level while the request named another.
+ */
+async function chooseModel(runtime: ModelRuntime, requested: string | undefined): Promise<ChosenModel> {
   if (requested !== undefined) {
     const resolved = resolveCliModel({ cliModel: requested, modelRuntime: runtime });
     if (resolved.error !== undefined || resolved.model === undefined) throw new Error(resolved.error ?? `pi does not know the model "${requested}"`);
     if ((await runtime.getAvailable(resolved.model.provider)).length === 0) {
       throw new Error(`pi has no credentials for ${resolved.model.provider}. Log in with \`npx pi\` and /login first.`);
     }
-    return resolved.model;
+    return { model: resolved.model, thinkingLevel: resolved.thinkingLevel };
   }
   const available = await runtime.getAvailable();
   const model = available[0];
   if (!model) throw new Error('pi has no model with credentials. Log in with `npx pi` and /login, or pass a model.');
-  return model;
+  return { model, thinkingLevel: undefined };
 }
 
 function startPiSession(spec: SessionSpec, source: PiRuntimeSource, live: Map<string, PiSession>): AgentSession {
@@ -298,7 +310,7 @@ function startPiSession(spec: SessionSpec, source: PiRuntimeSource, live: Map<st
 
   const run = async (): Promise<SessionOutcome> => {
     const runtime = await source.runtime();
-    const model = await chooseModel(runtime, source.model);
+    const { model, thinkingLevel } = await chooseModel(runtime, source.model);
     const settingsManager = SettingsManager.inMemory({
       retry: { enabled: true, maxRetries: 2 },
       ...(source.compaction === undefined ? {} : { compaction: source.compaction }),
@@ -357,6 +369,7 @@ function startPiSession(spec: SessionSpec, source: PiRuntimeSource, live: Map<st
       agentDir: source.agentDirectory,
       modelRuntime: runtime,
       model,
+      ...(thinkingLevel === undefined ? {} : { thinkingLevel }),
       tools: [...spec.builtinTools, ...spec.tools.map(tool => tool.name), spec.submission.name],
       customTools,
       resourceLoader: loader,
@@ -484,7 +497,9 @@ function submissionTool(tool: SubmissionTool, hooks: {
         hooks.onFinal(callId, verdict.errors);
         return { content: [{ type: 'text', text }], details: {}, terminate: true };
       }
-      throw new Error(`${text}\nCorrect these errors and submit again.`);
+      // The harness's answer already says what to do next; adding a second
+      // instruction here only competes with it.
+      throw new Error(text);
     },
   });
 }

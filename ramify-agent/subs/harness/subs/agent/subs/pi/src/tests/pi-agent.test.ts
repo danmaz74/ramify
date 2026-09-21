@@ -143,7 +143,9 @@ describe('the pi adapter', () => {
     expect(harness.judged).toEqual([invalid, validMap]);
     const result = harness.scripted.requests[1]!.messages.find(message => message.role === 'toolResult') as { isError: boolean; content: Array<{ text: string }> };
     expect(result.isError).toBe(true);
-    expect(result.content[0]!.text).toContain('summary: expected a string');
+    // The model reads the harness's errors as they are, with no instruction
+    // of the adapter's own competing with the harness's answer.
+    expect(result.content[0]!.text).toBe('The submission was rejected:\n- summary: expected a string\n- extra: not allowed');
     expect(harness.events).toContainEqual(expect.objectContaining({ type: 'tool-finished', callId: 'c-1', isError: true }));
     expect(harness.scripted.requests).toHaveLength(2);
   });

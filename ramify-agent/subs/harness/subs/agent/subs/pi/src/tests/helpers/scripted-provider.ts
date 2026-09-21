@@ -47,6 +47,8 @@ export interface Request {
   readonly systemPrompt: string | undefined;
   readonly tools: ReadonlyArray<{ readonly name: string; readonly parameters: unknown; readonly description: string }>;
   readonly messages: Context['messages'];
+  /** The thinking level pi asked for, or undefined when it asked for none. */
+  readonly reasoning: unknown;
 }
 
 export interface ScriptedProvider {
@@ -65,6 +67,8 @@ export interface ScriptedOptions {
   /** The model's context window. A small one makes pi's compaction threshold reachable without a large transcript. */
   readonly contextWindow?: number;
   readonly maxTokens?: number;
+  /** Whether the model supports thinking; pi clamps a requested level to `off` for one that does not. */
+  readonly reasoning?: boolean;
 }
 
 export function scriptedProvider(steps: readonly ReplyStep[], options: ScriptedOptions = {}): ScriptedProvider {
@@ -72,7 +76,7 @@ export function scriptedProvider(steps: readonly ReplyStep[], options: ScriptedO
   const requests: Request[] = [];
   const model = {
     id: 'scripted-1', name: 'Scripted', api: 'scripted', provider: 'scripted', baseUrl: 'http://localhost:0',
-    reasoning: false, input: ['text'], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    reasoning: options.reasoning ?? false, input: ['text'], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: options.contextWindow ?? 200_000, maxTokens: options.maxTokens ?? 16_384,
   } as unknown as Model;
 
@@ -81,6 +85,7 @@ export function scriptedProvider(steps: readonly ReplyStep[], options: ScriptedO
       systemPrompt: context.systemPrompt,
       tools: (context.tools ?? []).map(tool => ({ name: tool.name, parameters: tool.parameters, description: tool.description })),
       messages: structuredClone(context.messages),
+      reasoning: (options as { reasoning?: unknown } | undefined)?.reasoning,
     });
     const events = new ReplyStream();
     const step = queue.shift();
