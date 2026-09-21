@@ -565,3 +565,26 @@ recorded processes exited and removes the directory. The cases are:
 - The instruction block in `AGENTS.md` and `CLAUDE.md` equals the rendered one.
 
 `RAMIFY_PLAN2B_EVIDENCE=<file>` writes the collected evidence as JSON.
+
+## Module-tree package surface
+
+The package declares `ramify.ts/module-tree` and the stylesheet entry
+`ramify.ts/module-tree.css`, a string export target. `react` and `react-dom`
+are optional peers, not dependencies. Two focused runners check the packed
+package; neither registers or passes a matrix instance.
+
+- `npx tsx scripts/reference-harness/module-tree-consumer.ts`, after
+  `npm run build`, packs the checkout and installs the tarball into a copy of
+  `fixtures/module-tree-consumer` outside it. That consumer has its own
+  manifest, React and compiler scope. The runner type-checks and Vite-builds
+  it, and requires the built CSS to hold the canvas and React Flow base rules
+  from its one stylesheet import. It renders hook-using bodies in
+  variable-height nodes under jsdom, requires exactly one installed `react`,
+  and probes under plain Node that `ramify.ts/presentation` resolves neither
+  `@xyflow/react` nor a stylesheet while `ramify.ts/module-tree` resolves
+  `@xyflow/react`.
+- `npx tsx scripts/reference-harness/relocation-smoke.ts` runs
+  `prepareRelocatedPackage` and the installed denial of `I1-28` in an external
+  copy, without `testRelocatedPackage`'s copied `npm test`. Its consumer
+  installs the peer React ranges beside the tarball, imports every entry and
+  resolves the stylesheet entry to its packed file.

@@ -28,6 +28,11 @@
       "types": "./dist/subs/presentation/src/index.d.ts",
       "import": "./dist/subs/presentation/src/index.js"
     },
+    "./module-tree": {
+      "types": "./dist/subs/presentation/src/module-tree-entry.d.ts",
+      "import": "./dist/subs/presentation/src/module-tree-entry.js"
+    },
+    "./module-tree.css": "./dist/subs/presentation/src/module-tree-entry.css",
     "./cli": {
       "types": "./dist/subs/cli/src/index.d.ts",
       "import": "./dist/subs/cli/src/index.js"
@@ -90,6 +95,8 @@
     "bun": "1.4.2",
     "jsdom": "^30.0.1",
     "playwright-core": "1.63.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "tsx": "^4.23.13",
     "vite": "^8.3.0",
     "vitest": "^4.1.11"
@@ -101,10 +108,20 @@
     "d3-hierarchy": "^3.1.2",
     "d3-shape": "^3.2.0",
     "express": "^5.2.1",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8",
     "typescript": "7.0.2",
     "zod": "^4.6.5"
+  },
+  "peerDependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
   },
   "main": "./dist/subs/analysis/src/index.js",
   "types": "./dist/subs/analysis/src/index.d.ts"
