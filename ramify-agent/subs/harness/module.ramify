@@ -7,6 +7,18 @@ module harness
 expose-src startServer, ProjectRootError from "http/server.ts" to parent
 expose-src ProjectLockError from "store/lock.ts" to parent
 
+// One engineer session on one module, from a prompt, which the root's
+// `session` command runs and prints. The command's entry builds the agent
+// and the Ramify command line itself, so the agent port, the Ramify command
+// line and the run policy stay internal. The named types the summary
+// mentions are exposed with it, since a symbol's signature is part of what
+// its receiver must be able to name.
+expose-src runSessionCommand, SessionCommandOptions, SessionAgentChoice from "sessions/command.ts" to parent
+expose-src SingleSessionResult, SessionSummary, SessionProgress, SessionGateResult from "sessions/single.ts" to parent
+expose-src EngineerSubmission, engineerSubmissionSchema from "work/engineer.ts" to parent
+expose-src HookFinding from "hooks/post-write.ts" to parent
+expose-src InvocationOutcome, invocationOutcomeSchema from "run/records.ts" to parent
+
 // The public contracts of the behavior this module implements: the
 // vocabulary of the evidence a run works from, and the HTTP protocol it
 // serves. Each file imports nothing but `zod` and its sibling schemas, so

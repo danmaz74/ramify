@@ -11,7 +11,8 @@ serves.
 ## Layout
 
 `src/interfaces/` holds this module's public contracts, the only source it
-exposes beyond `startServer` and its two errors:
+exposes beyond `startServer` and its two errors and the `session` command's
+entry with the types it names:
 
 - `interfaces/protocol/`: the HTTP JSON protocol under `/api/v1` between the
   harness and any client, one file per concern: `ids.ts`, `evidence.ts`,
@@ -420,6 +421,28 @@ hiding or measured complexity justifies it.
   through `RunService.execute` alone. `ProjectLockError` is exposed beside
   it. The agent is pi, the scripted fake chosen explicitly as `fake` (an
   analysis with no entry capability), or an implementation a test supplies.
+- `sessions/`: one engineer session on one module, from a prompt a person
+  writes, outside any run; the root's `session` command runs it.
+  - `single.ts`: `runSingleSession` takes the project lock, resolves the
+    module in the architect view before any agent starts, and gives the
+    engineer the equipment an implementation run gives its engineers
+    (`work/engineer-equipment.ts`). The prompt is the iteration's goal; the
+    write scope is the module's own contents plus the extra paths. It reports
+    what it observes through a progress callback, and an accepted submission
+    is answered with what follows in a session, which is a person's review
+    and nothing else. With the gate option it runs the `iteration` checkpoint
+    over the module afterwards. It never commits.
+  - `records.ts`: the session's plain files under
+    `plans/.harness/sessions/<session-id>/`: `session.json`,
+    `observations.jsonl` with the run's observation schema, `submission.json`,
+    `outcome.json`, the shell and hook outputs, the implementation's
+    transcript under `session/`, and the gate attempt under `gate/`.
+  - `command.ts`: `runSessionCommand`, the command's entry. It builds the
+    agent the person chose, pi after its readiness or the scripted fake from a
+    JSON script file, and a private Ramify daemon, and disposes of both. The
+    root receives it with the progress, result, summary and gate types and the
+    named types the summary mentions; the agent port, the Ramify command line
+    and the run policy stay internal.
 
 The child `agent` holds the agent port and the scripted fake, and relays its
 child `pi`. Everything here depends on the port; the caller of
@@ -563,6 +586,16 @@ Neither child receives this module's vocabulary.
   before `job.json` is written, because `job.json` names it. Every invocation
   records the snapshot it was measured against and the components of its own
   scope, captured when the observation happens and never added afterwards.
+
+## Quick pi tests
+
+The `session` command is also the quick pi test: one real engineer session
+on a prepared copy of the fixture, with the equipment a run uses, to observe
+how a model reacts to one harness text, tool or refusal in about a minute.
+The root [README](../../README.md#quick-pi-tests) shows how to prepare a copy
+and a forced-violation example. It calls a model, so it is a development
+check and never a test; `session-command.test.ts` at the root runs the
+command on the scripted fake instead.
 
 ## Ramify's daemon
 

@@ -12,7 +12,7 @@
     "dev:web": "vite --config subs/web/vite.config.ts",
     "serve": "tsx src/main.ts serve",
     "real-session": "tsx scripts/real-session.ts",
-    "quick-pi": "tsx subs/harness/src/dev/quick-session.ts",
+    "session": "tsx src/main.ts session",
     "trial": "tsx scripts/live-trial.ts"
   },
   "dependencies": {

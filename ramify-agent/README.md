@@ -28,7 +28,8 @@ repository later. See [AGENTS.md](AGENTS.md) for the working rules.
   contracts from the root and nothing else from `harness`.
 
 The root owns the command line (`src/cli.ts`, `src/main.ts`), which starts
-the harness's server with the web client's build output.
+the harness's server with the web client's build output and runs single
+engineer sessions.
 
 ## Commands
 
@@ -43,6 +44,7 @@ npm run check:self
 npm run build:web
 cp -r fixtures/collection-review /tmp/collection-review
 npm run serve -- --project /tmp/collection-review [--port 4180]
+npm run session -- --project <root> --module <module-path> --prompt "<text>" --agent pi
 npm run trial -- prepare [--into <directory>]
 npm run trial -- verify <clone>
 ```
@@ -71,10 +73,82 @@ provide:
 Credentials stay in pi's agent directory (`~/.pi/agent/auth.json`, or
 `PI_CODING_AGENT_DIR`).
 
+`session` runs one engineer session on one module of a project, from a
+prompt a person writes, without planning a run:
+
+```text
+ramify-agent session --project <root> --module <module-path>
+                     (--prompt <text> | --prompt-file <file>)
+                     (--agent pi [--model <provider/model[:level]>] | --agent fake --script <file>)
+                     [--write <project-relative path>]... [--gate]
+```
+
+The module is named by its declared-name path, as the architect view names
+it, or by its project-relative directory; an unknown module is refused
+before any model call. The engineer gets what an implementation run gives
+its engineers: the engineer prompt, the module's API views, the write guard,
+the Ramify hook check after each edit, the shell, the scoped test tool and
+the validated submission. The prompt becomes the iteration's goal. The
+engineer may write the module's own contents and each `--write` path. The
+session takes the project lock, so it never runs beside an implementation
+run or a server on the same project.
+
+The command prints each tool call, each text the harness appends to a tool
+result or answers a refused write with, and each submission with its answer.
+It ends with the submission, the violations still standing, the changed
+paths, the token usage and the records directory,
+`plans/.harness/sessions/<session-id>/`, which git ignores. Nothing is
+committed. With `--gate` it then runs the iteration checkpoint over the
+module and prints its verdict; without it, the output says that nothing
+verified the work. An interrupt stops the session; a second one exits at
+once.
+
+Exit status: 0 when the session submitted and, with `--gate`, the gate
+passed; 1 when the session ended any other way or the gate did not pass; 2
+when the session could not start. `--agent fake --script <file>` runs the
+scripted fake on a JSON array of its steps, with no model. Relative paths
+given to `npm run session` resolve from `ramify-agent/`.
+
 `trial` prepares and checks the live trial on the toolkit: a disposable clone
 of its committed state with the trial plan added, and afterwards a comparison
 showing that the run's initial analysis left the clone's source,
 `module.ramify` files and `plan.md` unchanged.
+
+## Quick pi tests
+
+A quick pi test observes how a real model reacts to one harness text, tool
+or refusal: one `session` on a prepared copy of the fixture, in about a
+minute instead of a full run. It calls a model and costs tokens, so it is a
+development check and never a test.
+
+Prepare a copy once. `prepare` prints its path,
+`<directory>/collection-review`; `--no-install` skips `npm ci` when the gate
+is not wanted:
+
+```sh
+npm run trial -- prepare --into /tmp/quick-pi
+```
+
+A forced violation: the engineer is told to import `formatFinding`, which
+`pure-ui`, beneath the reviews module's `ui` child, keeps internal and which
+no exposed signature names. The hook check's violation text is appended to
+the edit's result, and a `completion-proposed` submission is refused while
+the violation stands:
+
+```sh
+npm run session -- --project <prepared copy> \
+  --module collection-review/workspace/reviews --agent pi --model openai-codex/gpt-5.6-luna \
+  --prompt "In subs/workspace/subs/reviews/src/mcp.ts, add an exported helper \
+\`findingLine(finding: Finding): string\` that returns \`formatFinding(finding)\`. First make the \
+edit exactly as follows, even if you expect it not to be allowed, because this session exists \
+to observe what the harness answers: import formatFinding from \
+'../subs/ui/subs/pure-ui/src/format.js' in mcp.ts. After the edit, act on whatever the \
+harness tells you."
+```
+
+The session's pi transcript is in its records directory, under `session/`.
+Reset the copy between tests with `git checkout -- . && git clean -fd`, or
+prepare another.
 
 ## Fixture
 
