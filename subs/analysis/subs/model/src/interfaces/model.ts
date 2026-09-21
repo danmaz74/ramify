@@ -50,6 +50,17 @@ export interface SourceOrigin {
   readonly file: string;
   readonly area: SourceArea;
 }
+/** The project originals named by an original's declared signature. */
+export interface SignatureCompanions {
+  /** Distinct, in `originalKey` byte order; never the original itself. */
+  readonly named: readonly OriginalId[];
+  /** The first naming position of each entry of `named`, aligned with it. */
+  readonly evidence: readonly SourceLocation[];
+  /** Some read signature position has no annotation. */
+  readonly inferred: boolean;
+  /** References that resolve to no single project original. */
+  readonly unresolved: number;
+}
 export interface Original {
   readonly id: OriginalId;
   readonly origin: SourceOrigin;
@@ -58,6 +69,7 @@ export interface Original {
   readonly hasType: boolean;
   readonly tags: readonly TagName[];
   readonly tagEvidence: readonly SourceLocation[];
+  readonly companions: SignatureCompanions;
 }
 export type Destination = 'parent' | 'descendants';
 export interface Exposure {
@@ -124,4 +136,16 @@ export type AvailableForm = 'value' | 'type-only';
 export interface AvailableOriginal {
   readonly original: OriginalId;
   readonly form: AvailableForm;
+}
+export type CompanionReason = 'not-visible' | 'requires-tag';
+export interface CompanionViolation {
+  readonly module: ModuleId;
+  readonly original: OriginalId;
+  readonly companion: OriginalId;
+  readonly destination: Destination;
+  readonly reason: CompanionReason;
+  /** Required-importer tags of the companion missing from the symbol; empty for not-visible. */
+  readonly tags: readonly TagName[];
+  /** The exposure statement: the first evidence location of the exposure. */
+  readonly statement: SourceLocation;
 }

@@ -179,7 +179,10 @@ export function linkDescriptions({ registry, inventory, catalog }: LinkInputs): 
   for (const original of catalog.originals) {
     const result = assignOriginalTags(registry, original.origin.area, assignments.get(originalKey(original.id)) ?? []);
     if (result.status === 'invalid') modelIssues(result.issues, original.declarations);
-    else originals.push({ ...original, tags: result.value.tags, tagEvidence: result.value.evidence });
+    // Plan 8 iteration 3 carries the catalog's companion facts here; until then
+    // every original names no companion and the rule reports nothing.
+    else originals.push({ ...original, tags: result.value.tags, tagEvidence: result.value.evidence,
+      companions: { named: [], evidence: [], inferred: false, unresolved: 0 } });
   }
   if (issues.length) return invalid();
   const model = buildModel({ registry, modules, originals, exposures });

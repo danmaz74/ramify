@@ -33,6 +33,7 @@ function evaluate(registry: ResolvedTagRegistry, importerTags: readonly string[]
     id: { kind: 'code', owner: provider.id, file: 'api.ts', binding: 'api' },
     origin: { file: 'subs/provider/src/api.ts', area: provider.areas[0] },
     hasValue: true, hasType: true, tags: tags.tags, tagEvidence: tags.evidence,
+    companions: { named: [], evidence: [], inferred: false, unresolved: 0 },
     declarations: [{ file: 'subs/provider/src/api.ts', start: 0, end: 24, line: 1, column: 1 }],
   };
   const model = valid(buildModel({ registry, modules: [root, provider, importer], originals: [symbol], exposures: [

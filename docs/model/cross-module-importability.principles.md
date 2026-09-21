@@ -389,6 +389,38 @@ value import. A type-only import remains subject to the `testing`
 requirement and is exempt from the browser requirement. If that symbol
 also carries `ui`, the importing area must carry `ui` for either form.
 
+### Exposure Requires Available Signature Companions
+
+A module exposing a symbol must make that symbol's
+[signature companions](glossary.md#signature-companion) type-available
+wherever the exposure makes the symbol visible. For every effective exposure
+of symbol `S` by module `M` and every companion `T` of `S`:
+
+1. **Visibility:** `T` must be visible in every module in which that exposure
+   makes `S` visible: `M`'s parent for an exposure to parent, and every proper
+   descendant of `M` for an exposure to descendants.
+2. **Tags:** every required-importer tag of `T` must also be a tag of `S`.
+
+The two tag kinds act in opposite directions. A required-importer tag
+restricts, so `T` must not be more restricted than `S`. A required-symbol tag
+applies only to value imports, and a companion is needed as a type, so
+required-symbol tags are not compared in either direction. A companion that
+callers must also use as a value is therefore not covered: for example, a
+`browser` function whose parameter is an enum without `browser` satisfies this
+rule, and a browser importer's value import of that enum is denied by the
+import rule, at the importer. A companion defined in testing source carries
+`testing`, so the tag condition requires `S` to carry it too.
+
+The rule applies to every exposure, including re-exposure. A violation
+belongs to the first exposure that makes `S` visible where `T` is not, so
+one missing exposure yields one finding. The rule is one level deep: `T` is
+itself exposed, so its own signature is subject to the same rule.
+
+Ramify reports a missing companion; it never supplies the exposure, so the
+module description remains the complete statement of a module's contract.
+A violation fails a check but leaves the model valid: the exposure stays
+effective and every import decision is unchanged.
+
 ### Source Checking Reports Definite Violations And Its Coverage
 
 Ramify provides bounded architectural checks, not a proof of every runtime

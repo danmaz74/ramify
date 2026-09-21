@@ -1,5 +1,16 @@
-import { assignOriginalTags, buildModel, createDefaultTagRegistry, deriveSourceAreas } from '../index.js';
-import type { Destination, Exposure, ImportQuestion, Model, ModelResult, ModuleRecord, Original, ResolvedTagRegistry, SourceArea, SourceLocation } from '../index.js';
+import { assignOriginalTags, buildModel, createDefaultTagRegistry, deriveSourceAreas, explainVisibility, originalKey } from '../index.js';
+import type { Destination, Exposure, ImportQuestion, Model, ModelResult, ModuleRecord, Original, ResolvedTagRegistry, SignatureCompanions, SourceArea, SourceLocation } from '../index.js';
+import { exposureIndexFor, visibleIn } from '../exposure-index.js';
+
+/** The companion facts of an original whose signature names no project original. */
+export const noCompanions: SignatureCompanions = { named: [], evidence: [], inferred: false, unresolved: 0 };
+
+/** Companion facts naming `named` in `originalKey` order, each with its own evidence. */
+export function companionsOf(named: readonly Original[], options: Partial<Omit<SignatureCompanions, 'named' | 'evidence'>> = {}): SignatureCompanions {
+  const sorted = [...named].sort((a, b) => originalKey(a.id) < originalKey(b.id) ? -1 : 1);
+  return { ...noCompanions, ...options, named: sorted.map(({ id }) => id),
+    evidence: sorted.map((_, index) => location('signature.ts', 10 + index)) };
+}
 
 export function valid<T>(result: ModelResult<T>): T {
   if (result.status === 'invalid') throw new Error(JSON.stringify(result.issues));
@@ -20,7 +31,7 @@ export function moduleRecord(id: string, tags: readonly string[] = [], registry 
 
 export function original(module: ModuleRecord, binding = 'api', options: {
   file?: string; tags?: readonly string[]; kind?: 'code' | 'resource'; hasValue?: boolean; hasType?: boolean;
-  registry?: ResolvedTagRegistry;
+  registry?: ResolvedTagRegistry; companions?: SignatureCompanions;
 } = {}): Original {
   const file = options.file ?? 'api.ts';
   const area = module.areas.find(({ kind }) => kind === (file.startsWith('tests/') ? 'tests' : 'ordinary'))!;
@@ -29,7 +40,7 @@ export function original(module: ModuleRecord, binding = 'api', options: {
     options.tags === undefined ? [] : [{ tags: options.tags, location: location(module.areas[0].root.replace(/src$/, 'module.ramify'), 2) }]));
   return { id: { kind: options.kind ?? 'code', owner: module.id, file, binding }, origin: { file: sourceFile, area },
     declarations: [location(sourceFile)], hasValue: options.hasValue ?? true, hasType: options.hasType ?? true,
-    tags: assignment.tags, tagEvidence: assignment.evidence };
+    tags: assignment.tags, tagEvidence: assignment.evidence, companions: options.companions ?? noCompanions };
 }
 
 export function exposure(module: ModuleRecord, symbol: Original, destinations: readonly Destination[],
@@ -48,5 +59,18 @@ export function question(importer: ModuleRecord | SourceArea, symbol: Original |
 
 export function modelOf(modules: readonly ModuleRecord[], originals: readonly Original[], exposures: readonly Exposure[] = [],
   registry = createDefaultTagRegistry()): Model {
-  return valid(buildModel({ registry, modules, originals, exposures }));
+  const model = valid(buildModel({ registry, modules, originals, exposures }));
+  assertIndexAgreement(model);
+  return model;
+}
+
+/** The exposure index answers visibility exactly as `explainVisibility` does, for every module and original. */
+export function assertIndexAgreement(model: Model): void {
+  const index = exposureIndexFor(model);
+  for (const module of model.modules) for (const symbol of model.originals) {
+    const expected = explainVisibility(model, module.id, symbol.id).visible;
+    if (visibleIn(index, symbol.id, module.id) !== expected) {
+      throw new Error(`Exposure index disagrees for ${JSON.stringify(symbol.id)} in "${module.id}": expected ${expected}`);
+    }
+  }
 }

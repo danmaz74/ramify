@@ -565,7 +565,10 @@ and `default` if present. It expands the file's complete effective export
 description; it does not filter by symbol kind. The directory curates module
 vocabulary, but the selector does not impose a separate ban on function exports.
 It neither discovers other files nor exposes types merely referenced by a
-selected binding's signature.
+selected binding's signature. Those types are the binding's signature
+companions, and the
+[companion rule](cross-module-importability.principles.md#exposure-requires-available-signature-companions)
+requires the owner to expose them by their own statements.
 
 Eligibility is checked after the ordinary path normalization and ownership
 checks. The resolved file must be beneath `<module>/src/interfaces/`, including
@@ -893,6 +896,12 @@ The following are accepted and may produce advisory diagnostics:
 | A wildcard over a child with no effective to-parent exposures | Empty selection; no effect |
 | A wildcard over a valid interface file with no exports | Empty selection; no effect |
 | Repeated exposure of the same symbol to the same destination | Set union; no extra effect |
+
+The following leave the description valid and fail a check:
+
+| Condition | Effect |
+| --- | --- |
+| An effective exposure makes a symbol visible where a signature companion is not, or the companion carries a required-importer tag the symbol lacks | A finding at that exposure statement; the exposure stays effective and import decisions are unchanged |
 
 Diagnostics must identify the description file, location, and failed
 reference or rule. They must not infer missing tags, supply a missing exposure,

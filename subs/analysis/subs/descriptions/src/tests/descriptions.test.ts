@@ -25,7 +25,8 @@ const uiBrowser = ['ui', 'browser'];
 const modelNames = [
   'ModuleId', 'TagName', 'TagKind', 'TagDefinition', 'ResolvedTagRegistry', 'SourceLocation',
   'ModelIssue', 'ModelResult', 'SourceArea', 'ModuleRecord', 'OriginalId', 'SourceOrigin',
-  'Original', 'Destination', 'Exposure', 'ModelInput', 'Model', 'ExposureHop', 'VisibilityDecision',
+  // Plan 8: `Original` names its signature companions.
+  'SignatureCompanions', 'Original', 'Destination', 'Exposure', 'ModelInput', 'Model', 'ExposureHop', 'VisibilityDecision',
   'BindingRequest', 'ImportQuestion', 'TagRequirement', 'ImportReason', 'ImportDecision',
   'resolveTagRegistry', 'createDefaultTagRegistry', 'deriveSourceAreas', 'assignOriginalTags',
   'originalKey', 'buildModel', 'explainVisibility', 'explainImport',
@@ -172,6 +173,7 @@ const toolkit: readonly Fixture[] = [
     src(['deriveSourceAreas', 'assignOriginalTags'], 'profiles.ts', browser), src(['originalKey'], 'identity.ts', browser),
     src(['buildModel'], 'model.ts', browser), src(['explainVisibility', 'explainImport'], 'decisions.ts', browser),
     src(['listAvailableOriginals'], 'availability.ts', browser),
+    src(['listCompanionViolations'], 'companions.ts', browser),
   ] },
   { path: 'subs/analysis/subs/project/', name: 'project', tags: [], statements: [src(['readProject'], 'read-project.ts'), src('*', 'interfaces/project.ts'), src(['resolveProjectRoot'], 'resolve-root.ts'), src(['observeProject'], 'observer.ts'), src(['isRamifyGeneratedPath'], 'generated-path.ts')] },
   { path: 'subs/analysis/subs/typescript/', name: 'typescript', tags: [], statements: [src(['createSourceAnalysis'], 'source-analysis.ts'), src('*', 'interfaces/source.ts'), src(['createAccessInterpreter'], 'access-interpreter.ts'),

@@ -17,6 +17,15 @@ is present precisely when at least one of its requests would be
 request would allow, never both. Same-owner originals are absent; results are
 unique by original identity and byte-ordered by owner, then file, then binding.
 
+`listCompanionViolations` applies the signature-companion rule to a built
+model: each original's `companions` name the project originals its declared
+signature names, and every effective exposure step must make those visible
+wherever it makes the original visible, with no required-importer tag the
+original lacks. It reads an exposure index derived once per frozen model and
+never changes visibility or import decisions; a violation leaves the model
+valid. Results are ordered by statement location, original key, then
+companion key.
+
 Module IDs use declared name chains. Original IDs use the original owner,
 source-relative file and lexical binding or resource binding. `SourceOrigin.file`
 and area roots are project-relative. Derived areas retain intended ordinary

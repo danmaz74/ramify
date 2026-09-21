@@ -1,6 +1,7 @@
 import type { Model, ImportQuestion, ImportDecision } from '../interfaces/model.js';
 
-// Recorded with the pre-iteration engine e0be049658b922ba6606172f1cf5166c01a49f1d.
+// Recorded with the pre-iteration engine e0be049658b922ba6606172f1cf5166c01a49f1d;
+// Plan 8 added the empty `companions` field to each original.
 export const recorded: { model: Model; questions: readonly ImportQuestion[]; decisions: readonly ImportDecision[] } = {
   "model": {
     "registry": {
@@ -122,7 +123,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "column": 1
           }
         ],
-        "tagEvidence": []
+        "tagEvidence": [],
+        "companions": { "named": [], "evidence": [], "inferred": false, "unresolved": 0 }
       },
       {
         "id": {
@@ -152,7 +154,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "column": 1
           }
         ],
-        "tagEvidence": []
+        "tagEvidence": [],
+        "companions": { "named": [], "evidence": [], "inferred": false, "unresolved": 0 }
       },
       {
         "id": {
@@ -186,7 +189,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "column": 1
           }
         ],
-        "tagEvidence": []
+        "tagEvidence": [],
+        "companions": { "named": [], "evidence": [], "inferred": false, "unresolved": 0 }
       }
     ],
     "exposures": [
@@ -494,7 +498,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "column": 1
           }
         ],
-        "tagEvidence": []
+        "tagEvidence": [],
+        "companions": { "named": [], "evidence": [], "inferred": false, "unresolved": 0 }
       },
       "visibility": {
         "visible": true,
@@ -601,7 +606,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "column": 1
           }
         ],
-        "tagEvidence": []
+        "tagEvidence": [],
+        "companions": { "named": [], "evidence": [], "inferred": false, "unresolved": 0 }
       },
       "visibility": {
         "visible": true,
@@ -735,7 +741,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "column": 1
           }
         ],
-        "tagEvidence": []
+        "tagEvidence": [],
+        "companions": { "named": [], "evidence": [], "inferred": false, "unresolved": 0 }
       },
       "visibility": {
         "visible": false,
@@ -846,7 +853,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "column": 1
           }
         ],
-        "tagEvidence": []
+        "tagEvidence": [],
+        "companions": { "named": [], "evidence": [], "inferred": false, "unresolved": 0 }
       },
       "visibility": null,
       "requirements": [],
