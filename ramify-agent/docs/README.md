@@ -50,6 +50,9 @@ Design documents for the separate agent harness:
 - [Plan 4: delivered-solution token efficiency](plans/04-token-efficiency/main-plan.md),
   including context-limit and overflow visibility; planned and blocked until
   Plan 3 is complete and merged
+- [Plan 5: single engineer sessions](plans/05-single-engineer-sessions/main-plan.md),
+  the `ramify-agent session` command for one engineer session on one module;
+  proposed
 - [Module architect skill design](architect-skill-design/README.md)
 - [Metrics](metrics/README.md), glossary, measurement principles and the initial
   delivered-change token-efficiency policy; its glossary names concepts and
