@@ -1,10 +1,17 @@
 # Capability progress visualizations: implementation plan
 
-**Date:** 2026-09-21. **Status:** proposed; its contracts await review.
-Execution has not started. A dependency-graph prototype is wired into the
-current working tree, but is not accepted implementation evidence. The
-nested-list module-tree prototype is rejected and is not implementation
-evidence for this plan.
+**Date:** 2026-09-21. **Status:** implemented on branch
+`feat/capability-progress-views` (iterations 1–6); the
+[results](capability-progress-results/) map CM01–CM24 to tests and browser
+artifacts. Not yet closed:
+
+- the root suite's audited run has one failure outside this plan's surface
+  (BD24, pre-existing `signature-inferred` coverage);
+- `ramify-agent`'s complete suite has no audited run;
+- the frozen Plan 2 and 2B package gates and the review decisions below
+  await their owners.
+
+The nested-list module-tree prototype is rejected and was removed.
 
 This file keeps the name it was proposed under. It is the implementation plan
 for both capability-progress diagrams, not an unspecified later phase of a
