@@ -1,0 +1,49 @@
+{
+  "createdAt": "2026-09-21T00:00:00.000Z",
+  "updatedAt": "2026-09-21T00:00:00.000Z",
+  "planPath": "main-plan.md",
+  "iterations": [
+    {
+      "file": "iteration1.md",
+      "index": 1,
+      "parallelGroup": null,
+      "title": "Contract, catalogue, envelope fields and structured identity"
+    },
+    {
+      "file": "iteration2.md",
+      "index": 2,
+      "parallelGroup": null,
+      "title": "Import denials and `missing-export`"
+    },
+    {
+      "file": "iteration3.md",
+      "index": 3,
+      "parallelGroup": "A",
+      "title": "Description syntax and exposure linking"
+    },
+    {
+      "file": "iteration4.md",
+      "index": 4,
+      "parallelGroup": "A",
+      "title": "Layout, acquisition and the outside-source warning"
+    },
+    {
+      "file": "iteration5.md",
+      "index": 5,
+      "parallelGroup": "A",
+      "title": "Registry and model issues"
+    },
+    {
+      "file": "iteration6.md",
+      "index": 6,
+      "parallelGroup": "A",
+      "title": "Analysis limits"
+    },
+    {
+      "file": "iteration7.md",
+      "index": 7,
+      "parallelGroup": null,
+      "title": "Renderers, not-checked replies, service messages and completion"
+    }
+  ]
+}
