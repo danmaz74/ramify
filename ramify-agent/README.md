@@ -44,7 +44,7 @@ npm run check:self
 npm run build:web
 cp -r fixtures/collection-review /tmp/collection-review
 npm run serve -- --project /tmp/collection-review [--port 4180]
-npm run session -- --project <root> --module <module-path> --prompt "<text>" --agent pi
+npm run session -- --project <root> --module <module-path> --prompt "<text>"
 npm run trial -- prepare [--into <directory>]
 npm run trial -- verify <clone>
 ```
@@ -79,7 +79,7 @@ prompt a person writes, without planning a run:
 ```text
 ramify-agent session --project <root> --module <module-path>
                      (--prompt <text> | --prompt-file <file>)
-                     (--agent pi [--model <provider/model[:level]>] | --agent fake --script <file>)
+                     [--agent pi [--model <provider/model[:level]>] | --agent fake --script <file>]
                      [--write <project-relative path>]... [--gate]
 ```
 
@@ -105,7 +105,8 @@ once.
 
 Exit status: 0 when the session submitted and, with `--gate`, the gate
 passed; 1 when the session ended any other way or the gate did not pass; 2
-when the session could not start. `--agent fake --script <file>` runs the
+when the session could not start. The agent is pi unless `--agent fake
+--script <file>` chooses the
 scripted fake on a JSON array of its steps, with no model. Relative paths
 given to `npm run session` resolve from `ramify-agent/`.
 
@@ -137,7 +138,7 @@ the violation stands:
 
 ```sh
 npm run session -- --project <prepared copy> \
-  --module collection-review/workspace/reviews --agent pi --model openai-codex/gpt-5.6-luna \
+  --module collection-review/workspace/reviews --model openai-codex/gpt-5.6-luna \
   --prompt "In subs/workspace/subs/reviews/src/mcp.ts, add an exported helper \
 \`findingLine(finding: Finding): string\` that returns \`formatFinding(finding)\`. First make the \
 edit exactly as follows, even if you expect it not to be allowed, because this session exists \

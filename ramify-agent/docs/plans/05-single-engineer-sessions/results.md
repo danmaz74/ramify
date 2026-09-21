@@ -15,16 +15,15 @@
 ```text
 ramify-agent session --project <root> --module <module-path>
                      (--prompt <text> | --prompt-file <file>)
-                     (--agent pi [--model <provider/model[:level]>] | --agent fake --script <file>)
+                     [--agent pi [--model <provider/model[:level]>] | --agent fake --script <file>]
                      [--write <project-relative path>]... [--gate]
 ```
 
-Two choices differ from the plan's runnable outcome:
+pi is the default agent, as the plan's form shows: without `--agent` the
+session runs on pi, and `--model` alone selects its model. `serve` still
+requires an explicit choice. One choice differs from the plan's runnable
+outcome:
 
-- **`--agent` is required.** The plan's form shows the agent group in
-  brackets. The command requires it, as `serve` requires an explicit choice
-  and never defaults to pi or to the fake: a model call costs tokens, and the
-  fake is useful only with a script.
 - **The root receives a command entry, not `runSingleSession`.** The harness
   exposes `runSessionCommand` in `sessions/command.ts`, which builds the pi or
   scripted agent and a private Ramify daemon and disposes of both. Exposing

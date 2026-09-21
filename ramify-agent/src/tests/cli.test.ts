@@ -29,7 +29,7 @@ test('usage errors', () => {
 describe('session', () => {
   const base = ['session', '--project', 'p', '--module', 'app/reviews'];
 
-  test('takes a project, a module, a prompt and an agent', () => {
+  test('takes a project, a module, a prompt and an agent, pi by default', () => {
     expect(parseCommandLine([...base, '--prompt', 'Raise the limit.', '--agent', 'pi'])).toEqual({
       command: 'session', projectRoot: 'p', module: 'app/reviews', prompt: { text: 'Raise the limit.' },
       agent: { name: 'pi', model: undefined }, write: [], gate: false,
@@ -39,6 +39,8 @@ describe('session', () => {
       command: 'session', projectRoot: 'p', module: 'app/reviews', prompt: { file: 'goal.md' },
       agent: { name: 'pi', model: 'openai-codex/gpt-5.6-luna:low' }, write: ['docs/notes.md', 'subs/shared/'], gate: true,
     });
+    expect(parseCommandLine([...base, '--prompt', 'x'])).toMatchObject({ agent: { name: 'pi', model: undefined } });
+    expect(parseCommandLine([...base, '--prompt', 'x', '--model', 'x/y'])).toMatchObject({ agent: { name: 'pi', model: 'x/y' } });
     expect(parseCommandLine([...base, '--prompt', 'x', '--agent', 'fake', '--script', 'steps.json'])).toMatchObject({
       agent: { name: 'fake', script: 'steps.json' },
     });
@@ -50,8 +52,7 @@ describe('session', () => {
     expect(() => parseCommandLine([...base, '--prompt', '  ', '--agent', 'pi'])).toThrow(UsageError);
   });
 
-  test('--model applies to --agent pi only, and --script to --agent fake only', () => {
-    expect(() => parseCommandLine([...base, '--prompt', 'x', '--model', 'x/y'])).toThrow(UsageError);
+  test('--model applies to pi only, and --script to --agent fake only', () => {
     expect(() => parseCommandLine([...base, '--prompt', 'x', '--agent', 'fake', '--script', 's.json', '--model', 'x/y'])).toThrow(/--agent pi only/);
     expect(() => parseCommandLine([...base, '--prompt', 'x', '--agent', 'pi', '--script', 's.json'])).toThrow(/--agent fake only/);
     expect(() => parseCommandLine([...base, '--prompt', 'x', '--agent', 'fake'])).toThrow(/needs --script/);
@@ -61,7 +62,6 @@ describe('session', () => {
     for (const argv of [
       ['session', '--module', 'm', '--prompt', 'x', '--agent', 'pi'],
       ['session', '--project', 'p', '--prompt', 'x', '--agent', 'pi'],
-      [...base, '--prompt', 'x'],
       [...base, '--prompt', 'x', '--agent', 'claude'],
       [...base, '--prompt', 'x', '--agent', 'pi', '--verbose'],
       [...base, '--prompt', 'x', '--agent', 'pi', '--gate=yes'],

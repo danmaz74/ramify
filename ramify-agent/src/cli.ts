@@ -1,7 +1,7 @@
 /** The default port of `serve`. */
 export const defaultPort = 4180;
 
-/** The agents `serve --agent` and `session --agent` accept: pi, with the person's own pi login, and `fake`, the scripted fake. Neither is the default. */
+/** The agents `serve --agent` and `session --agent` accept: pi, with the person's own pi login, and `fake`, the scripted fake. `serve` has no default; `session` defaults to pi. */
 export const agentNames = ['pi', 'fake'] as const;
 export type AgentName = typeof agentNames[number];
 
@@ -39,7 +39,7 @@ export const usage = [
   '  ramify-agent serve --project <root> [--port <n>] [--agent pi [--model <provider/model>] | --agent fake]',
   '  ramify-agent session --project <root> --module <module-path>',
   '                       (--prompt <text> | --prompt-file <file>)',
-  '                       (--agent pi [--model <provider/model[:level]>] | --agent fake --script <file>)',
+  '                       [--agent pi [--model <provider/model[:level]>] | --agent fake --script <file>]',
   '                       [--write <project-relative path>]... [--gate]',
 ].join('\n');
 
@@ -122,8 +122,7 @@ function parseSession(rest: readonly string[]): CommandLine {
   if (text !== undefined && file !== undefined) throw new UsageError('Give the prompt once: --prompt or --prompt-file, not both');
   if (text === undefined && file === undefined) throw new UsageError('session needs a prompt: --prompt <text> or --prompt-file <file>');
   if (text !== undefined && text.trim() === '') throw new UsageError('--prompt needs a value');
-  if (agent === undefined) throw new UsageError('session needs --agent pi, or --agent fake with --script <file>');
-  if (model !== undefined && agent !== 'pi') throw new UsageError('--model applies to --agent pi only');
+  if (model !== undefined && agent === 'fake') throw new UsageError('--model applies to --agent pi only');
   if (script !== undefined && agent !== 'fake') throw new UsageError('--script applies to --agent fake only');
   if (agent === 'fake' && script === undefined) throw new UsageError('--agent fake needs --script <file>');
   return {
@@ -131,7 +130,7 @@ function parseSession(rest: readonly string[]): CommandLine {
     projectRoot,
     module,
     prompt: text !== undefined ? { text } : { file: file! },
-    agent: agent === 'pi' ? { name: 'pi', model } : { name: 'fake', script: script! },
+    agent: agent === 'fake' ? { name: 'fake', script: script! } : { name: 'pi', model },
     write,
     gate,
   };

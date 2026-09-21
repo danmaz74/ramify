@@ -438,8 +438,8 @@ hiding or measured complexity justifies it.
     `outcome.json`, the shell and hook outputs, the implementation's
     transcript under `session/`, and the gate attempt under `gate/`.
   - `command.ts`: `runSessionCommand`, the command's entry. It builds the
-    agent the person chose, pi after its readiness or the scripted fake from a
-    JSON script file, and a private Ramify daemon, and disposes of both. The
+    agent, pi after its readiness unless the person chose the scripted fake
+    with a JSON script file, and a private Ramify daemon, and disposes of both. The
     root receives it with the progress, result, summary and gate types and the
     named types the summary mentions; the agent port, the Ramify command line
     and the run policy stay internal.
