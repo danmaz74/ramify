@@ -29,6 +29,8 @@ Design documents for the separate agent harness:
   spike output and reusable input for the later implementation plan
 - [Glossary](glossary.md)
 - [Additional points to evaluate](additional-to-evaluate.md)
+- [To do](todo.md), harness work decided in outline and not yet started
+- [Dan's to-do](dan-to-do.md), decisions and actions only Dan can take
 - [Plan 1: from a chosen plan to an implementation map](plans/01-implementation-map/main-plan.md),
   implemented except its live items: the real pi session and the live trial,
   which need a person's pi login. See its
@@ -52,6 +54,9 @@ Design documents for the separate agent harness:
   Plan 3 is complete and merged
 - [Plan 5: single engineer sessions](plans/05-single-engineer-sessions/main-plan.md),
   the `ramify-agent session` command for one engineer session on one module;
+  proposed
+- [Plan 6: role-specific prompts](plans/06-role-specific-prompts/main-plan.md),
+  self-contained prompts per role in place of the module-architect skill;
   proposed
 - [Module architect skill design](architect-skill-design/README.md)
 - [Metrics](metrics/README.md), glossary, measurement principles and the initial

@@ -29,6 +29,47 @@ Plan 3's byte-based scope KPIs. It also adds precise context-limit visibility:
 budget returns, compaction triggers and exact overflow-triggered occurrences.
 Actual exploration and solution efficiency remain outside that plan.
 
+## Planning
+
+### Plan-scoped capability registry with entry points
+
+**Maturity:** Captured. Post-MVP.
+
+One registry per plan holds every capability the agents name, existing or new,
+under a name the harness forces to be unique. The initial architect registers
+what it discovers; later roles add to it. The dependency graph is drawn over
+these entries, and the harness runs the checks the entries make possible.
+
+- **Entry points.** An entry for a capability that exists points to its entry
+  point, usually a function or a method: module, file and exported name. At
+  the start only some lower-level capabilities have one, and no top-level
+  capability does, because a top-level capability that exists needs no work.
+  As the plan advances every capability gains an entry point, unless it is
+  retired because of information acquired later, with the reason recorded.
+- **An extension is a new capability.** Adding attachments to an existing
+  "send email" is registered as "send email with attachment", a capability of
+  its own with no entry point yet. No relation to "send email" is recorded.
+  Several capabilities may end at the same symbol.
+- **Names are ephemeral.** They are units of decomposition used while
+  planning. They are never materialized in the project, and nothing outside
+  the plan's records depends on them.
+- **What the harness verifies** is form and existence, never meaning: a name is
+  unique; a graph is coherent (no unknown name, no cycle, nothing depends on a
+  top-level capability); a registered entry point exists, is owned by the
+  stated module and appears in each registered consumer's API view; a
+  registered entry point that a later iteration removes or renames is reported
+  at the next gate; the run ends with every capability mapped or retired.
+  Whether a symbol is the capability stays the agents' judgment.
+- **What it gives the roles.** An engineer's briefing names the entry point of
+  each capability another module owns and says whether its module receives
+  it, so it does not search that module's source.
+
+Today's run-scoped registry (`ramify-agent.capability/1`) records behavior,
+owner, origin and consumers, without entry points or a lifecycle, and keeps
+forecast capabilities apart as hypotheses. The
+[capability dependency progress graph](#capability-dependency-progress-graph)
+would read this registry.
+
 ## Execution visibility
 
 ### Capability dependency progress graph

@@ -33,10 +33,10 @@ continues automatically. A person can review the decisions and resulting work
 afterwards. A recorded decision is not recorded human approval.
 
 A global architect initially identifies the top-level capabilities and their
-owner modules and proposes hypotheses about deeper capabilities to reuse,
-extend or create. The hypotheses are recorded for review, but do not schedule
-work. The global architect
-retains one long-lived context throughout the run. Sequential forks resolve
+owner modules and proposes hypotheses about deeper capabilities to reuse or
+create. The hypotheses are recorded for review, but do not schedule work.
+The global architect retains one long-lived context throughout the run.
+Sequential forks resolve
 capability identity and placement when local architects encounter actual
 needs, then return concise decision briefs to that context without a parent
 model invocation. Iteration planning happens locally: a local architect examines
@@ -79,9 +79,12 @@ to an existing or proposed module.
 The entry assignments contain capability identifiers, short descriptions,
 owners and references to applicable requirements and acceptance conditions.
 The architect also analyzes likely deeper needs and records hypotheses about
-capabilities to reuse, extend or create, with suggested owners, rationale and
-uncertainties. This is architectural foresight, not an exhaustive iteration
-plan or an upfront breaking-change execution gate.
+capabilities to reuse or create, with suggested owners, rationale and
+uncertainties. A need that extends existing behavior is a new capability
+named for itself, forecast in the module that already holds that behavior;
+no capability is ever revised to cover more. This is architectural
+foresight, not an exhaustive iteration plan or an upfront breaking-change
+execution gate.
 
 **Architectural hypotheses and actual decisions are separate records.** Both
 are available for display and human review, without an approval wait. The harness starts work
@@ -110,12 +113,15 @@ contradict it.
 A local architect supplies the required behavior, relevant discoveries and current
 artifact references, and may suggest candidates or an owner. The architect fork
 consults the inherited hypotheses, current architectural evidence and previous decisions,
-then resolves the need to reuse an existing capability, extend a registered
-capability, or create a new capability with an owner. The harness records the
-decision and returns its reference to the local architect before contract work
-begins. Ordinary use of an already identified, available API needs no new
-placement decision. Local refinements within established responsibilities use
-the local authority described in section 2. Unresolved responsibility boundaries,
+then resolves the need to reuse an existing capability, or create a new
+capability with an owner. Extending existing behavior is the second of
+those: a new capability named for itself, owned by the module that already
+holds the behavior, recorded as changing symbols that already have
+consumers. The harness records the decision and returns its reference to the
+local architect before contract work begins. Ordinary use of an already
+identified, available API needs no new placement decision. Local refinements
+within established responsibilities use the local authority described in
+section 2. Unresolved responsibility boundaries,
 competing reuse or placement candidates, and revisions of established ownership
 come to the global architect in both breaking and non-breaking work.
 
@@ -585,7 +591,8 @@ the requesting consumer. It has:
 - Read and write access to the selected contract, tests and fake locations.
 - Read access to the provider, or the requested capability and available
   architectural evidence when no implementation exists.
-- Read access to existing consumers when extending a capability.
+- Read access to existing consumers where the capability changes symbols
+  those consumers already use.
 - Explicitly scoped exposure-declaration changes when required by the chosen
   access arrangement.
 
@@ -1046,12 +1053,15 @@ Replacing engineer compaction with fresh invocations must not hide that signal.
 5. When the page needs its real provider, the server work item starts. Its
    local architect discovers an existing notification service and requests a delivery
    placement. The next architect fork inherits the preceding decision brief,
-   checks current evidence and decides to extend that service. It revises the
+   checks current evidence and registers a new capability, `send-order-email`,
+   owned by that existing service module, recording that implementing it
+   changes symbols the service's current consumers already use. The service's
+   own notification capability is left as it stands. The fork revises the
    relevant hypothesis: both consumers can share transport, while message
    composition remains separate. The harness records the revision and supplies
    it to affected local architects at their next coordination point. No
-   speculative delivery task needs cancellation: none was scheduled. The
-   actual extension follows the same contract and delegation process.
+   speculative delivery task needs cancellation: none was scheduled. The new
+   capability follows the same contract and delegation process as any other.
 6. The server satisfies the agreement. A page iteration replaces the fake and
    verifies the real interaction. Final composition checks the feature as a
    whole.

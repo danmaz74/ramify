@@ -69,8 +69,8 @@ thoroughly it plans.
 Early analysis forecasts needs across the plan for two purposes:
 
 - **Improve global decisions.** Seeing related needs together can reveal
-  opportunities to reuse a new or extended capability across several consumers,
-  before local decisions produce separate solutions.
+  opportunities to reuse one new capability across several consumers, before
+  local decisions produce separate solutions.
 - **Enable high-level human review.** The forecast makes the intended
   architectural direction, reuse opportunities and uncertainties visible
   before detailed implementation.
@@ -93,9 +93,9 @@ separate from requiring execution to wait for approval.
 
 ### Distinguish Breaking from Non-Breaking Changes
 
-A non-breaking change adds or extends capabilities while preserving their
-existing contracts and behavioral guarantees. Existing consumers can continue
-to use them unchanged.
+A non-breaking change adds capabilities while preserving every existing
+contract and behavioral guarantee. Existing consumers can continue to use
+them unchanged.
 
 A breaking change intentionally revises or removes an existing contract or
 behavioral guarantee. Existing consumers may therefore need to adapt.
@@ -162,9 +162,10 @@ designs the other's interface.
 
 A contract iteration has the focused goal of establishing an agreement and
 integrating it in the requesting consumer. Its agent reads both sides of the
-seam and, when extending an existing capability, may read all existing
-consumers. It writes the shared interface, conformance tests and any required
-fake, and makes the consumer changes needed to integrate them. Provider
+seam and, where the capability changes symbols that already have consumers,
+may read all of those consumers. It writes the shared interface, conformance
+tests and any required fake, and makes the consumer changes needed to
+integrate them. Provider
 implementation and changes to other consumers remain separate work.
 
 The iteration verifies the agreement against the consumer's behavior before
@@ -176,9 +177,10 @@ from serving one side is not who writes it: it is what the iteration must
 read, the executable evidence it must produce, and the provider's standing to
 report that a contract needs revision.
 
-An extension preserves existing consumers' contracts, including their
-behavioral guarantees. If a proposed design would require changes to other
-consumers, the contract iteration first seeks a compatible design. If the
+Changing symbols that already have consumers preserves those consumers'
+contracts, including their behavioral guarantees. If a proposed design would
+require changes to other consumers, the contract iteration first seeks a
+compatible design. If the
 requirement makes compatibility impossible, it reports the conflict for an
 explicit contract-revision decision. Only an accepted breaking change creates
 migration work in other consumers. Revalidating compatibility may require

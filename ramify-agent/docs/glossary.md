@@ -24,6 +24,43 @@ The harness reads and captures a plan and never edits it. The plans that
 deliver ramify-agent itself are development documents under `docs/plans/` and
 are not plans in this sense.
 
+## Capability
+
+A **capability** is a named unit of decomposition that agents use while
+planning: an ability the software provides or is expected to provide.
+
+The term is the toolkit's
+([agents glossary](../../docs/agents/glossary.md#capability)); this entry adds
+how the harness treats it. A capability is not an object of the project. Its
+name is ephemeral: it exists in a plan's records and is never materialized in
+the project's source, declarations or documentation. Only an agent maps a
+capability to the symbols that implement it. The harness records and relays
+that mapping and verifies its form, never its meaning.
+
+## Top-level capability
+
+A **top-level capability** is a capability a [plan](#plan) requires that is
+used from outside the plan: by a person, by an external system, or by a part
+of the project the plan does not change.
+
+"A button that sends an email" is one. It is new, since otherwise the plan
+would already be satisfied; a change to existing behavior is a
+[capability extension](#capability-extension), which is new. No other
+capability of the plan depends on it. The harness's records and prompts call
+it an **entry capability**, and the harness makes one
+[work item](#work-item) for each.
+
+## Capability extension
+
+A **capability extension** is a new capability: the behavior an existing
+capability would have after the requested change, named for itself.
+
+Adding attachments to an existing "send email" is the capability "send email
+with attachment". It is planned, owned and implemented as any new capability
+is, and no relation to "send email" is recorded. Its implementation may change
+the symbols that implement the existing capability, and both capabilities may
+end at the same symbol. An existing capability is never revised to cover more.
+
 ## Implementation map
 
 The **implementation map** is the architect's record of where the
