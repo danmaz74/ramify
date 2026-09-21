@@ -212,7 +212,7 @@ handlers.set('I5-06:export-removed-missing', {
     try {
       const before = await batch(root);
       const { revision } = await step(assertions, session, root, 'export removed', async () =>
-        [await replace(root, vocabulary, 'export const revisionScopeSchema = z.discriminatedUnion(', 'const revisionScopeSchema = z.discriminatedUnion(')]);
+        [await replace(root, vocabulary, 'export const revisionScopeSchema: z.ZodDiscriminatedUnion<', 'const revisionScopeSchema: z.ZodDiscriminatedUnion<')]);
       const importingFiles = (before.snapshot?.accesses ?? []).filter(access => access.selections.some(selection => selection.exportedName === 'revisionScopeSchema'))
         .map(access => access.importer.file).sort(order);
       assertions.equal('three files import the removed name', importingFiles, ['subs/workspace/subs/catalog/src/mcp.ts', 'subs/workspace/subs/reviews/src/mcp.ts', reviewsRouter]);

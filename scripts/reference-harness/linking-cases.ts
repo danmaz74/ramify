@@ -1,6 +1,9 @@
 import { readFile, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { validateProject } from '../../subs/analysis/src/validation-entry.js';
+import type { AnalysisReport } from '../../subs/analysis/src/index.js';
+import { runCli } from '../../subs/cli/src/index.js';
+import { runBatch } from '../../src/batch.js';
 import { recordObservation } from './observations.js';
 import type { AnalysisCode } from '../../subs/analysis/src/validation-entry.js';
 import { originalKey } from '../../subs/analysis/subs/model/src/index.js';
@@ -115,7 +118,7 @@ add('I1-05:named-growth', 'R', ({ root }) => append(root, sourcePath('workspace/
     assertReference(result, context.assertions);
     privateOriginal(context, result, ownerId('workspace/catalog/core'), 'hiddenGrowth');
     context.assertions.equal('unexposed new original defaults', result.linked.modelInput.originals.find(item => item.id.binding === 'hiddenGrowth')!.tags, []);
-    context.assertions.equal('named declarations remain 33', result.linked.selections.length, 33);
+    context.assertions.equal('named declarations remain 34', result.linked.selections.length, 34);
   });
 add('I1-09:equivalent-names', 'R', ({ root }) => replaceC1(root, c1.replace(' * ', ` ${vocabulary.join(', ')} `)), async context => {
   const result = await validated(context.root, context.assertions);
@@ -135,11 +138,40 @@ add('I1-09:unselected-file', 'R', ({ root }) => put(root, sourcePath(cOwner, 'in
     privateOriginal(context, result, ownerId(cOwner), 'unselected');
     checkVocabulary(context, result, vocabulary);
   });
-add('I1-09:signature-only-type', 'R', async () => {}, async context => {
-  const result = await validated(context.root, context.assertions);
+// Plan 8 amendment (2026-09-21): R1 loses the two companions it gained, so
+// linking must still expose nothing automatically and the check must report
+// each missing companion at R1.
+const r1 = 'expose-src InvocationContext, ProtocolFacilities, McpToolContribution, ToolInvocation, ToolInputSchema, ToolResult from "interfaces/protocol.ts" to descendants';
+const r1Authored = 'expose-src InvocationContext, ProtocolFacilities, McpToolContribution, ToolInvocation from "interfaces/protocol.ts" to descendants';
+add('I1-09:signature-only-type', 'R', ({ root }) => replace(root, 'module.ramify', r1, r1Authored), async context => {
+  const a = context.assertions;
+  const result = await validated(context.root, a);
   for (const name of ['ToolInputSchema', 'ToolResult']) privateOriginal(context, result, ownerId(''), name);
-  context.assertions.equal('R1 has only its four selected names', result.linked.selections.filter(item => item.module === ownerId(''))[0]!.pairs.map(pair => pair.name),
+  a.equal('R1 has only its four selected names', result.linked.selections.filter(item => item.module === ownerId(''))[0]!.pairs.map(pair => pair.name),
     ['InvocationContext', 'McpToolContribution', 'ProtocolFacilities', 'ToolInvocation']);
+  // Independent positions: the authored R1 line and each type's reference in McpToolContribution's signature.
+  const r1Line = (await readFile(join(context.root, 'module.ramify'), 'utf8')).split('\n').indexOf(r1Authored) + 1;
+  const protocol = (await readFile(join(context.root, 'src/interfaces/protocol.ts'), 'utf8')).split('\n');
+  const position = (marker: string, name: string): string => {
+    const line = protocol.findIndex(text => text.includes(marker));
+    return `src/interfaces/protocol.ts:${line + 1}:${protocol[line]!.indexOf(name, protocol[line]!.indexOf(marker)) + 1}`;
+  };
+  const expected = [['ToolInputSchema', position('inputSchema: ToolInputSchema', 'ToolInputSchema')], ['ToolResult', position('Promise<ToolResult>', 'ToolResult')]]
+    .map(([name, at]) => ({ code: 'exposed-without-companion', category: 'exposure', location: `module.ramify:${r1Line}:1`, related: [at],
+      original: { kind: 'code', owner: ownerId(''), file: 'interfaces/protocol.ts', binding: 'McpToolContribution' },
+      message: `\`McpToolContribution\` is exposed to descendants without \`${name}\`, which its signature names (${at}). `
+        + `Expose \`${name}\` to descendants, or remove it from the signature.` }));
+  const stdout: string[] = [], stderr: string[] = [];
+  const code = await runCli(['check', '--batch', '--root', context.root, '--format', 'json'], { cwd: context.root, version: 'test',
+    connect: async () => { throw new Error('Unexpected daemon connection'); }, stdout: text => { stdout.push(text); }, stderr: text => { stderr.push(text); }, batch: runBatch });
+  const report = JSON.parse(stdout.join('')) as AnalysisReport;
+  recordObservation('signature-only-type-check', { code, outcome: report.outcome, diagnostics: report.diagnostics });
+  a.equal('check exits 1 with a completed execution and a valid model', [code, stderr.join(''), report.outcome.execution, report.outcome.check, report.summary.denied],
+    [1, '', 'completed', 'failed', 0]);
+  const at = (item: { file: string; line: number; column: number } | null): string => item ? `${item.file}:${item.line}:${item.column}` : '';
+  a.equal('exactly two companion findings at R1, one per missing type', report.diagnostics.map(item => ({ code: item.code, category: item.category,
+    location: at(item.location), related: item.related.map(at), original: item.original, message: item.message }))
+    .sort((left, right) => left.message < right.message ? -1 : 1), expected);
 });
 add('I1-09:empty-file', 'R', async ({ root }) => {
   await put(root, sourcePath(cOwner, 'interfaces/empty.ts'), 'export {};\n');

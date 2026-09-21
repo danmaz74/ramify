@@ -31,8 +31,8 @@ export async function assertBaseline(report: AnalysisReport, assertions: Asserti
   if (!catalog || linked?.status !== 'valid') throw new Error('Baseline lacks catalog or valid contracts');
   assertions.equal('exact fifteen declared owners', inventory.modules.map(module => module.id), referenceOwners.map(ownerId));
   assertions.equal('expected whole baseline counts', report.summary, { complete: true, owners: 15,
-    sourceFiles: 54, resources: 5, originals: 92, accesses: 298, allowed: 169, denied: 0,
-    errors: 0, warnings: 2, coverageNotes: 11, external: 129 });
+    sourceFiles: 54, resources: 5, originals: 95, accesses: 313, allowed: 179, denied: 0,
+    errors: 0, warnings: 2, coverageNotes: 0, external: 134 });
   assertions.equal('separate expected configuration warnings', report.warnings,
     ['vite.config.ts', 'vitest.config.ts'].map(file => ({ code: 'outside-module-source', entry: file, count: 1, files: [file] })));
   const disk = (await Promise.all(referenceOwners.map(owner => filesBelow(root, sourcePath(owner, '').replace(/\/$/, ''))))).flat().sort();

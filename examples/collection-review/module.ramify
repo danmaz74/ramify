@@ -16,9 +16,19 @@ expose-test createTestSystem, TestSystem, McpSession from "setup.ts" to descenda
 
 // The application router's type, for the shell that builds a client from it
 // and the connected view that names that client. It is a same-owner alias of
-// the assembly's own type, and the router's type is inferred from
-// `assembleRouter`, which therefore travels with it; the rest of `assembly.ts`
-// stays private. Both carry this owner's `dispatch` tag and no browser
-// promise: the core owners and the pure view see them and can import them in
-// neither form, and the two owners that can import them do so as types.
-expose-src AppRouter, assembleRouter from "interfaces/protocol.ts" to descendants
+// the assembly's own type, and the router's type is the declared return type
+// of `assembleRouter`, which therefore travels with it; the rest of `assembly.ts`
+// stays private. `ProtocolRouter` is the router type that return type, and
+// each feature factory's, is written as. All three carry this owner's
+// `dispatch` tag and no browser promise: the core owners and the pure view see
+// them and can import them in neither form, and the owners that can import
+// them do so as types.
+expose-src AppRouter, assembleRouter, ProtocolRouter from "interfaces/protocol.ts" to descendants
+
+// The contract `assembleRouter`'s declared return type states: each feature's
+// procedure record and the vocabulary those records are written in. It travels
+// wherever the router type does. The shell's descendants already receive the
+// vocabulary from the shell; the root exposes it again so that every owner
+// seeing the router type, the testing module included, also sees the types
+// that describe it.
+expose-sub CatalogProcedures, ReviewsProcedures, RecordId, recordIdSchema, revisionScopeSchema, ReviewStatus, reviewStatusSchema, Finding, findingSchema, Observation, observationSchema from workspace to descendants

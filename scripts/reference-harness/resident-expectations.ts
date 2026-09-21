@@ -10,8 +10,8 @@ const core = `${workspace}/catalog/core`;
 const vocabularyNames = ['Finding', 'InspectionReport', 'Observation', 'ObservationCallback', 'RecordId',
   'Revision', 'RevisionChain', 'RevisionScope', 'ReviewStatus', 'findingSchema', 'inspectionReportSchema',
   'observationSchema', 'recordIdSchema', 'reviewStatusSchema', 'revisionChainSchema', 'revisionSchema', 'revisionScopeSchema'].sort();
-const baselineSummary = { complete: true, owners: 15, sourceFiles: 54, resources: 5, originals: 92,
-  accesses: 298, allowed: 169, denied: 0, errors: 0, warnings: 2, coverageNotes: 11, external: 129 };
+const baselineSummary = { complete: true, owners: 15, sourceFiles: 54, resources: 5, originals: 95,
+  accesses: 313, allowed: 179, denied: 0, errors: 0, warnings: 2, coverageNotes: 0, external: 134 };
 
 function wildcardPairs(report: AnalysisReport, owner: string) {
   const linked = report.snapshot?.linked;
@@ -68,7 +68,7 @@ export function assertReferenceEditReport(edit: ReferenceEdit, baseline: Analysi
       equal(`${owner} baseline wildcard membership`, wildcardPairs(baseline, owner).map(p => p.name).sort(), vocabularyNames);
       const pairs = wildcardPairs(report, owner);
       equal(`${owner} changed wildcard membership`, pairs.map(p => p.name).sort(), edit === 'wildcard-add'
-        ? [...vocabularyNames, 'ResidentVocabulary'].sort() : vocabularyNames.filter(name => name !== 'RecordId'));
+        ? [...vocabularyNames, 'ResidentVocabulary'].sort() : vocabularyNames.filter(name => name !== 'RevisionChain'));
       if (edit === 'wildcard-add') equal(`${owner} preserves the new original`,
         pairs.find(p => p.name === 'ResidentVocabulary')!.original,
         { kind: 'code', owner: `${workspace}/contracts`, file: 'interfaces/vocabulary.ts', binding: 'ResidentVocabulary' });
@@ -77,11 +77,11 @@ export function assertReferenceEditReport(edit: ReferenceEdit, baseline: Analysi
       ok('removed type has a located consumer error', report.diagnostics.some(d => d.code === 'missing-export'
         && d.location?.file === `${coreDirectory}/src/catalog.ts` && d.location.line > 0 && d.location.column > 0));
       const access = report.snapshot!.accesses.find(a => a.importer.file === `${coreDirectory}/src/catalog.ts`
-        && a.selections.some(s => s.exportedName === 'RecordId'));
-      ok('consumer selection explicitly lost RecordId', access?.selections.some(s =>
-        s.exportedName === 'RecordId' && s.status === 'missing-export'));
+        && a.selections.some(s => s.exportedName === 'RevisionChain'));
+      ok('consumer selection explicitly lost RevisionChain', access?.selections.some(s =>
+        s.exportedName === 'RevisionChain' && s.status === 'missing-export'));
       equal('removed export is absent from the catalog', report.snapshot!.catalog!.files.find(f => f.file === vocabulary)!
-        .exports.some(e => e.name === 'RecordId'), false);
+        .exports.some(e => e.name === 'RevisionChain'), false);
     } else equal('added vocabulary is valid', report.diagnostics, []);
     return;
   }

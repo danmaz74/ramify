@@ -259,18 +259,20 @@ const reference: readonly Fixture[] = [
     src(['InvocationContext', 'ProtocolFacilities', 'McpToolContribution', 'ToolInvocation', 'ToolInputSchema', 'ToolResult'],
       'interfaces/protocol.ts', null, descendants), // R1
     statement('expose-test', ['createTestSystem', 'TestSystem', 'McpSession'], 'setup.ts', descendants), // R2
-    src(['AppRouter', 'assembleRouter'], 'interfaces/protocol.ts', null, descendants), // R3
+    src(['AppRouter', 'assembleRouter', 'ProtocolRouter'], 'interfaces/protocol.ts', null, descendants), // R3
+    sub(['CatalogProcedures', 'ReviewsProcedures', 'RecordId', 'recordIdSchema', 'revisionScopeSchema', 'ReviewStatus',
+      'reviewStatusSchema', 'Finding', 'findingSchema', 'Observation', 'observationSchema'], 'workspace', descendants), // R4
   ] },
   { path: 'subs/integration-tests/', name: 'integration-tests', tags: ['testing', 'dispatch'], statements: [] },
   { path: workspace, name: 'workspace', tags: ['ui', 'browser', 'dispatch'], statements: [
     sub('*', 'contracts', both), // W1
-    sub(['createCatalogRouter', 'createCatalogTools', 'inspectRecord'], 'catalog'), // W2
-    sub(['createReviewsRouter', 'createReviewsTools', 'InspectionPort'], 'reviews'), // W4 precedes W3 in the authored file.
+    sub(['createCatalogRouter', 'CatalogProcedures', 'createCatalogTools', 'inspectRecord'], 'catalog'), // W2
+    sub(['createReviewsRouter', 'ReviewsProcedures', 'createReviewsTools', 'InspectionPort'], 'reviews'), // W4 precedes W3 in the authored file.
     sub(['makeCatalogFixture', 'CatalogFixtureRecord'], 'catalog', descendants), // W3
     sub('*', 'shared-ui', descendants), // W5
   ] },
   { path: catalog, name: 'catalog', tags: ['dispatch'], statements: [
-    src(['createCatalogRouter'], 'router.ts'), src(['createCatalogTools'], 'mcp.ts'), // A1-A2
+    src(['createCatalogRouter', 'CatalogProcedures'], 'router.ts'), src(['createCatalogTools'], 'mcp.ts'), // A1-A2
     sub([['inspect', 'inspectRecord']], 'core'), sub(['makeCatalogFixture', 'CatalogFixtureRecord'], 'core'), // A3-A4
     sub(['CatalogSummary'], 'core', both), sub(['CatalogCard', 'CatalogCardProps'], 'ui'), // A5-A6
   ] },
@@ -280,7 +282,7 @@ const reference: readonly Fixture[] = [
   { path: `${catalog}subs/ui/`, name: 'ui', tags: uiBrowser, statements: [src(['CatalogCard', 'CatalogCardProps'], 'catalog-card.tsx', uiBrowser)] }, // KU1
   { path: `${workspace}subs/contracts/`, name: 'contracts', tags: [], statements: [src('*', 'interfaces/vocabulary.ts', browser)] }, // C1
   { path: reviews, name: 'reviews', tags: ['dispatch'], statements: [
-    src(['createReviewsRouter'], 'router.ts'), src(['createReviewsTools'], 'mcp.ts'), // RV1-RV2
+    src(['createReviewsRouter', 'ReviewsProcedures'], 'router.ts'), src(['createReviewsTools'], 'mcp.ts'), // RV1-RV2
     sub(['InspectionPort'], 'core'), sub(['validateRevisionChain'], 'validation', descendants), sub(['ReviewPanel', 'ReviewPanelProps'], 'ui'), // RV3-RV5
   ] },
   { path: core, name: 'core', tags: [], statements: [

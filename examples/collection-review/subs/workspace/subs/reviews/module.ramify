@@ -2,8 +2,9 @@ ramify 1
 // The review feature's own source is its adapter layer and its session table.
 module reviews tagged [dispatch]
 
-// The two native surfaces this feature builds for the root to mount.
-expose-src createReviewsRouter from "router.ts" to parent
+// The two native surfaces this feature builds for the root to mount, with the
+// procedure record the router factory's declared return type names.
+expose-src createReviewsRouter, ReviewsProcedures from "router.ts" to parent
 expose-src createReviewsTools from "mcp.ts" to parent
 
 // The port both factories take, so whoever assembles the application can build

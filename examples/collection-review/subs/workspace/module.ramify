@@ -7,13 +7,14 @@ module workspace tagged [ui, browser, dispatch]
 expose-sub * from contracts to parent, descendants
 
 // The catalog's finished API surfaces, on their way to the root that mounts
-// them. This shell cannot value-import them itself; relaying is a declaration,
-// not an import.
-expose-sub createCatalogRouter, createCatalogTools, inspectRecord from catalog to parent
+// them, with the procedure record the router's declared type names. This shell
+// cannot value-import them itself; relaying is a declaration, not an import.
+expose-sub createCatalogRouter, CatalogProcedures, createCatalogTools, inspectRecord from catalog to parent
 
-// The review feature's finished API surfaces, and the port its factories take
-// so the root can build one out of the catalog's inspection.
-expose-sub createReviewsRouter, createReviewsTools, InspectionPort from reviews to parent
+// The review feature's finished API surfaces, with the procedure record the
+// router's declared type names, and the port its factories take so the root
+// can build one out of the catalog's inspection.
+expose-sub createReviewsRouter, ReviewsProcedures, createReviewsTools, InspectionPort from reviews to parent
 
 // The catalog's test fixture, for the tests of every other owner beneath this
 // one. Their ordinary source cannot import it: the fixture is tagged

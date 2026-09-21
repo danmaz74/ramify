@@ -4,7 +4,9 @@ import { createCatalogTools } from '../subs/workspace/subs/catalog/src/mcp.js';
 import { createCatalogRouter } from '../subs/workspace/subs/catalog/src/router.js';
 import { createReviewsTools } from '../subs/workspace/subs/reviews/src/mcp.js';
 import { createReviewsRouter } from '../subs/workspace/subs/reviews/src/router.js';
-import type { McpToolContribution, ProtocolFacilities } from './interfaces/protocol.js';
+import type { CatalogProcedures } from '../subs/workspace/subs/catalog/src/router.js';
+import type { ReviewsProcedures } from '../subs/workspace/subs/reviews/src/router.js';
+import type { McpToolContribution, ProtocolFacilities, ProtocolRouter } from './interfaces/protocol.js';
 import type { InspectionPort } from '../subs/workspace/subs/reviews/subs/core/src/interfaces/port.js';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 
@@ -32,7 +34,9 @@ import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 const inspectionPort: InspectionPort = { inspect };
 
 /** Mounts every feature's router under its own key; its return type is the application router's. */
-export function assembleRouter(facilities: ProtocolFacilities) {
+export function assembleRouter(
+  facilities: ProtocolFacilities,
+): ProtocolRouter<{ catalog: CatalogProcedures; reviews: ReviewsProcedures }> {
   return facilities.router({
     catalog: createCatalogRouter(facilities),
     reviews: createReviewsRouter(facilities, inspectionPort),

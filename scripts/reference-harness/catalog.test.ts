@@ -39,7 +39,7 @@ function resource(file: string, binding: string, owner: string): OriginalId {
 // its deliberately unexposed exports. These are not derived from the compiler,
 // the module descriptions, or the adapter being tested.
 const expectedFiles = [
-  ['', 'interfaces/protocol.ts', [], ['InvocationContext', 'ProtocolFacilities', 'McpToolContribution', 'ToolInvocation', 'ToolInputSchema', 'ToolResult']],
+  ['', 'interfaces/protocol.ts', [], ['InvocationContext', 'ProtocolFacilities', 'ProtocolRouter', 'McpToolContribution', 'ToolInvocation', 'ToolInputSchema', 'ToolResult']],
   ['', 'assembly.ts', ['assembleRouter', 'assembleSystem'], ['AppRouter', 'AssembledSystem']],
   ['', 'protocol.ts', ['createFacilities', 'createMcpServer'], []],
   ['', 'server.ts', ['startApiServer'], ['ApiServer', 'ApiServerOptions']],
@@ -52,7 +52,7 @@ const expectedFiles = [
   ['workspace/catalog/core', 'records.ts', ['listRecords', 'findRecord'], ['CatalogRecord']],
   ['workspace/catalog/core', 'history.ts', ['resolvePredecessors'], ['PredecessorResolution']],
   ['workspace/catalog/core', 'tests/fixture.ts', ['makeCatalogFixture'], ['CatalogFixtureRecord']],
-  ['workspace/catalog', 'router.ts', ['createCatalogRouter'], []],
+  ['workspace/catalog', 'router.ts', ['createCatalogRouter'], ['CatalogProcedures']],
   ['workspace/catalog', 'mcp.ts', ['createCatalogTools'], []],
   ['workspace/catalog/ui', 'catalog-card.tsx', ['CatalogCard'], ['CatalogCardProps']],
   ['workspace/reviews/validation', 'validate.ts', ['validateRevisionChain'], []],
@@ -61,7 +61,7 @@ const expectedFiles = [
   ['workspace/reviews/core/controller', 'controller.ts', ['tick'], []],
   ['workspace/reviews/core', 'interfaces/port.ts', [], ['InspectionPort']],
   ['workspace/reviews/core', 'runtime.ts', ['createReviewRuntime'], ['ReviewOutcome', 'ReviewRuntime']],
-  ['workspace/reviews', 'router.ts', ['createReviewsRouter'], []],
+  ['workspace/reviews', 'router.ts', ['createReviewsRouter'], ['ReviewsProcedures']],
   ['workspace/reviews', 'mcp.ts', ['createReviewsTools'], []],
   ['workspace/reviews', 'session.ts', ['createSessionTable'], ['SessionBinding', 'SessionBindingRequest', 'SessionTable']],
   ['workspace/reviews/ui', 'review-panel.tsx', ['ReviewPanel', 'loadReview'], ['ReviewPanelProps']],

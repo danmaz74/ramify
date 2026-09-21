@@ -247,6 +247,10 @@ cost 5,429, 79,769 and 70,801 bytes a copy; RD-2 records them deliberately.
 
 ## SC26: regression gates
 
+**2026-09-21:** [iteration 7](iteration7-results.md) clears the reference
+example's pins: the Plan 1 gate passes 274 of 308, and the remaining failures
+come from fixture F's `value` and the toolkit's own notes.
+
 **`npm run reference:verify -- --plan 1` fails on the final build: 308 required
 instances, 212 passed, 96 failed, none unexecuted** (11 min 34 s). The same gate
 on the pre-plan build, with the pre-plan example, passes 306 and fails 2

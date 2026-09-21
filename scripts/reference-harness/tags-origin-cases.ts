@@ -17,7 +17,7 @@ const fixtureProbe = 'subs/consumer/src/probe.ts', api = 'subs/provider/src/inte
 const consumerDescription = 'subs/consumer/module.ramify', providerDescription = 'subs/provider/module.ramify';
 const fixtureSource = sourcePath(core, 'tests/fixture.ts');
 const runtimeTest = sourcePath(runtime, 'tests/runtime.test.ts'), catalogTest = sourcePath(core, 'tests/catalog.test.ts');
-const w3 = 'expose-sub makeCatalogFixture from catalog to descendants';
+const w3 = 'expose-sub makeCatalogFixture, CatalogFixtureRecord from catalog to descendants';
 const specifier = (importer: string, target: string): string => {
   const path = relative(dirname(importer), target).replace(/\.tsx?$/, '.js');
   return path.startsWith('.') ? path : `./${path}`;
@@ -49,7 +49,7 @@ function add(id: string, fixture: 'R' | 'F', mutate: ProjectHandler['mutate'],
       const result = await staticProject(context.root);
       cleanStatic(result, context.assertions);
       context.assertions.equal('baseline owners', result.inventory.modules.length, fixture === 'R' ? 15 : 3);
-      context.assertions.equal('baseline static application decisions', result.decisions.length, fixture === 'R' ? 164 : 1);
+      context.assertions.equal('baseline static application decisions', result.decisions.length, fixture === 'R' ? 177 : 1);
       context.assertions.equal('baseline analysis diagnostics', result.diagnostics, []);
     }, mutate,
     run: async context => {

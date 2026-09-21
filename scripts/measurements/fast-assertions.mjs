@@ -88,15 +88,13 @@ export function revisionTimingsValid(timings) {
 
 /**
  * The `signature-inferred` notes a build that enforces the rule reports on each
- * fixture, by original: Plan 8 iteration 4's conforming reference example has
- * eleven. The measurement setup of S100, S500 and S1000 exposes m001's
- * literal-initialized `value`, which sets `inferred`; X100 annotates every
- * exposed signature and has none.
+ * fixture, by original. The reference example declares every exposed signature
+ * (Plan 8 iteration 7) and has none. The measurement setup of S100, S500 and
+ * S1000 exposes m001's literal-initialized `value`, which sets `inferred`; X100
+ * annotates every exposed signature and has none.
  */
 const signatureNotes = {
-  reference: ['assembleRouter', 'createCatalogRouter', 'createReviewsRouter', 'findingSchema', 'inspectionReportSchema',
-    'observationSchema', 'recordIdSchema', 'reviewStatusSchema', 'revisionChainSchema', 'revisionSchema', 'revisionScopeSchema']
-    .map(original => `signature-inferred:${original}`),
+  reference: [],
   ...Object.fromEntries(['S100', 'S500', 'S1000'].map(name => [name, ['signature-inferred:value']])),
 };
 const signatureNote = item => typeof item?.code === 'string' && item.code.startsWith('signature-');

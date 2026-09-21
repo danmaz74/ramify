@@ -342,9 +342,9 @@ that removes a companion's exposure and restores it (the `description` path).
 On a build that enforces the rule, a removal fails the check with only
 `exposed-without-companion` findings, one on the reference and nine on X100,
 and no denied import. Revision timings then carry a tenth field, `companions`,
-and the reference example's eleven and each S fixture's one pinned
-`signature-inferred` notes are expected in coverage; a pre-plan build reports
-neither. X100 joins no derived row or deferral trigger.
+and each S fixture's one pinned `signature-inferred` note is expected in
+coverage; the reference example declares every exposed signature and has none,
+and a pre-plan build reports neither. X100 joins no derived row or deferral trigger.
 
 `companion-stages.mjs` records Plan 8's stage timings and retained facts on the
 reference example, the toolkit and X100, through this checkout's measurement
