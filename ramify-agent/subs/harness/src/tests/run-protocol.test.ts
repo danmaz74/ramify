@@ -12,7 +12,7 @@ import {
   workItemListResponseSchema, workItemResponseSchema,
   type ProjectedRunEvent, type RunSnapshot,
 } from '../interfaces/protocol/runs.js';
-import { startServer, type RunningServer } from '../http/server.js';
+import { startServerWith, type RunningServer } from '../http/server.js';
 import { terminalRunEvents } from '../run/log.js';
 import { treeInputs } from './helpers/iterations.js';
 import {
@@ -90,8 +90,8 @@ async function everyAnswer(server: RunningServer, runId: string): Promise<Record
   return answers;
 }
 
-async function serve(root: string, extra: Partial<Parameters<typeof startServer>[0]> = {}): Promise<RunningServer> {
-  const server = await startServer({
+async function serve(root: string, extra: Partial<Parameters<typeof startServerWith>[0]> = {}): Promise<RunningServer> {
+  const server = await startServerWith({
     projectRoot: root,
     port: 0,
     assetsDirectory: join(root, 'no-such-build'),

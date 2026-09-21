@@ -4,8 +4,9 @@ module harness
 // The server for one project, which the root starts with the web client's
 // build output. Runs, their records, plan discovery, the evidence the
 // analysis works from and the HTTP adapter stay internal.
-expose-src startServer, ProjectRootError from "http/server.ts" to parent
-expose-src ProjectLockError from "store/lock.ts" to parent
+expose-src startServer, ServerOptions, RunningServer, ProjectRootError from "http/server.ts" to parent
+expose-src ProjectLockError, LockRecord, lockRecordSchema from "store/lock.ts" to parent
+expose-src RunRecoveryReport from "run/service.ts" to parent
 
 // One engineer session on one module, from a prompt, which the root's
 // `session` command runs and prints. The command's entry builds the agent

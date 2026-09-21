@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, test } from 'vitest';
 import { protocolPaths } from '../interfaces/protocol/paths.js';
 import { runEventPageSchema, runListResponseSchema, workItemListResponseSchema } from '../interfaces/protocol/runs.js';
-import { startServer, type RunningServer } from '../http/server.js';
+import { startServerWith, type RunningServer } from '../http/server.js';
 import { RunQueries } from '../projections/queries.js';
 import { treeInputs } from './helpers/iterations.js';
 import { fileHashes, protocolPolicy, protocolScript, protocolTarget } from './helpers/protocol.js';
@@ -66,7 +66,7 @@ describe('a projection never writes, and no query appends an event', () => {
     await opened.service.close();
 
     // Then over HTTP, against a harness that loaded the run afresh.
-    const server = await startServer({
+    const server = await startServerWith({
       projectRoot: root, port: 0, ramify: await stubRamify(),
       runs: { inputs: treeInputs(), policy: projectRoot => protocolPolicy(projectRoot), stopGraceMs: 500, warn: () => undefined },
     });

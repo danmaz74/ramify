@@ -12,7 +12,7 @@ expose-src RamifyCli, RamifyRun, RamifyCheckResult, MaterializeResult, ramifyVer
 expose-src architectViewDirectory, ArchitectMeta, readArchitectMeta, coverageLimitsOf, ArchitectIndex, loadArchitectIndex, loadModuleTree from "views.ts" to parent
 expose-src ModuleEntry, SymbolRecord, findModule, symbolRecords, SourceArea, ApiViewSnapshot, readApiView, findInView from "views.ts" to parent
 expose-src isTestingModule from "views.ts" to parent
-expose-src MeasurementDocument, ModuleMeasurement, MeasurementRead, readMeasurement from "measure.ts" to parent
+expose-src MeasurementDocument, ModuleMeasurement, documentSchema, moduleSchema, MeasurementRead, readMeasurement from "measure.ts" to parent
 
 // Running one of the target project's own commands, in its own process group
 // and with a clean environment.

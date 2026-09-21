@@ -8,7 +8,7 @@ import { ensureStateDirectory } from './state-directory.js';
 /** The project lock's path, relative to the project root. */
 export const lockPath = 'plans/.harness/lock';
 
-const lockRecordSchema = z.object({
+export const lockRecordSchema = z.object({
   pid: z.int().positive(),
   /** When the owning process started. */
   startedAt: z.iso.datetime(),
