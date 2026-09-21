@@ -1,9 +1,6 @@
 import { mkdir, readFile, stat } from 'node:fs/promises';
 import { join, relative } from 'node:path';
-import type {
-  AgentPort, AgentSession, BuiltinTool, GuardedCall, GuardDecision, JsonSchema,
-  SessionSpec, SessionStart, SettledMutation, ToolDefinition, WriteTool,
-} from '../../subs/agent/src/interfaces/port.js';
+import type { AgentPort, AgentSession, JsonSchema, SessionSpec, SessionStart } from '../../subs/agent/src/interfaces/port.js';
 import { changedEntries, changedPaths, commitNameStatus, createRunBranch, GitError } from '../../subs/evidence/src/git.js';
 import { cleanEnvironment, runCommand } from '../../subs/evidence/src/run-command.js';
 import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
@@ -11,9 +8,6 @@ import { coverageLimitsOf, findModule, readArchitectMeta, type ArchitectIndex } 
 import type { GateAttempt, GateRuleRecord, TestSelectionPolicy } from '../checks/records.js';
 import { resolveTestSelection } from '../checks/selection.js';
 import type { GuardedScope } from '../guard/write-guard.js';
-import { blockExplanation, decideWrite } from '../guard/write-guard.js';
-import { FindingsSeen, runHookCheck, type HookFinding } from '../hooks/post-write.js';
-import { createShellTool, shellInputSchema, shellJsonSchema, shellToolName, type ShellTool } from '../tools/shell.js';
 import { ExcursionWatcher } from './excursions.js';
 import { takeMutationSnapshot } from './mutations.js';
 import type { Receipt } from '../interfaces/protocol/jobs.js';
@@ -31,7 +25,7 @@ import {
   renderInitialArchitectPrompt, renderLocalArchitectPrompt, sha256, type LoadedPackage,
 } from '../prompts/packages.js';
 import { baselineScope, captureSnapshot, rootModuleOfSnapshot, scopeSize, supportDocument } from '../kpi/capture.js';
-import { lineEvents, ownerOf, takeLineSnapshot, type LineSnapshot } from '../kpi/lines.js';
+import { lineEvents, takeLineSnapshot, type LineSnapshot } from '../kpi/lines.js';
 import { writeFileAtomic, writeFileExclusive } from '../../subs/ledger/src/atomic.js';
 import type { ProjectLock } from '../store/lock.js';
 import { acceptAnalysis } from '../analysis/accept.js';
@@ -67,10 +61,10 @@ import {
 import { remainingInjections } from '../contracts/verification.js';
 import type { Hypothesis, RegistryEntry } from '../analysis/records.js';
 import { creationAuthority } from '../work/assignment.js';
+import { engineerEquipment, type EngineerEquipment, type EquipContext, type Equipment } from '../work/engineer-equipment.js';
 import {
-  createScopeTestsTool, engineerJsonSchema, engineerToolName, iterationMessage,
-  scopeTestsInputSchema, scopeTestsToolName, validateEngineer, type EngineerSubmission,
-  type IterationApiViews,
+  engineerJsonSchema, engineerToolName, iterationMessage, validateEngineer,
+  type EngineerSubmission, type IterationApiViews,
 } from '../work/engineer.js';
 import {
   iterationAssignmentSchema, iterationId, iterationLayout, iterationResultSchema, moduleNoticeSchema,
@@ -96,7 +90,7 @@ import {
   type Invocation, type InvocationOutcome, type MeasurementSnapshot, type RecordRef, type RunPolicy, type RunRecord,
 } from './records.js';
 import { runSnapshot, type RunSnapshot } from './snapshot.js';
-import { SubmissionJudge, ToolInputJudge, validateAgainst, type SubmissionValidation } from './submissions.js';
+import { SubmissionJudge, type SubmissionValidation } from './submissions.js';
 import { nodeProcessGroups, WriterBlockedError, WriterOwnership, type ProcessGroups, type TreeObserver } from './writer.js';
 
 /*
@@ -230,36 +224,6 @@ interface InvocationRequest<T> {
   readonly endedAs?: (() => InvocationOutcome['ended'] | undefined) | undefined;
   /** A session mode the caller could not honor, recorded on the invocation. */
   readonly degraded?: { readonly requested: 'fresh' | 'continued' | 'fork'; readonly reason: string } | undefined;
-}
-
-/** What an invocation's equipment is built from. */
-export interface EquipContext {
-  readonly invocation: string;
-  readonly observations: ObservationLog;
-  /** The identifier of the call in flight for one tool, as the port reported it. */
-  readonly callId: (tool: string) => string;
-  /**
-   * Text the harness owes the running session, emptied by whoever can carry
-   * it. The port reaches a running session with text through the result of a
-   * mutating call and through nothing else, so a reminder waits for one.
-   */
-  readonly reminders: () => string[];
-}
-
-/** The tools and the guard of one invocation. */
-export interface Equipment {
-  readonly builtinTools?: readonly (BuiltinTool | WriteTool)[] | undefined;
-  readonly tools?: readonly ToolDefinition[] | undefined;
-  readonly guard?: ((call: GuardedCall) => Promise<GuardDecision>) | undefined;
-  /**
-   * What runs after each mutating call that executed, whether it succeeded
-   * or not: the mutation is observed and the hook check runs, and what the
-   * engineer must know before its next step is appended to that call's
-   * result.
-   */
-  readonly afterMutation?: ((call: SettledMutation) => Promise<{ readonly text: string } | null>) | undefined;
-  /** Ends what the equipment itself started, before the writer is released. */
-  readonly settle?: (() => Promise<void>) | undefined;
 }
 
 /**
@@ -2252,173 +2216,27 @@ export class RunService {
   }
 
   /**
-   * The tools, the guard and the post-write hook of one implementation
-   * session. An ordinary engineer and a contract sub-session are given the
-   * same equipment: what differs between them is the scope they may write
-   * and the submission they end with, never what they can do.
+   * The equipment of one implementation session, over this run: its paths
+   * hold the shell output and the hook logs, and its policy supplies the
+   * commands and the bounds.
    */
   private implementationTools(run: Run, options: {
     readonly scopeRevision: number;
     readonly guarded: GuardedScope;
     readonly tests: TestSelectionPolicy;
-  }): {
-    readonly equip: (session: EquipContext) => Equipment;
-    readonly exhausted: () => boolean;
-    readonly shellCalls: () => number;
-    /** The Ramify findings this session's edits introduced that no later check has cleared. */
-    readonly openFindings: () => readonly HookFinding[];
-  } {
-    let seen: FindingsSeen | undefined;
-    let toolJudge: ToolInputJudge<Record<string, never>> | undefined;
-    let shellJudge: ToolInputJudge<{ command: string; timeoutMs?: number }> | undefined;
-    let shell: ShellTool | undefined;
-    const equip = (session: EquipContext): Equipment => {
-        // The findings this invocation has already been told about, so a
-        // hook check reports what is newly introduced and not the same
-        // thing at every step.
-        seen = new FindingsSeen();
-        let hookChecks = 0;
-        // What each guarded call resolved to, which is what the mutation
-        // observation of that call names.
-        const mutated = new Map<string, string[]>();
-        let shellGapRecorded = false;
-
-        shellJudge = new ToolInputJudge({
-          tool: shellToolName,
-          bound: run.record.policy.limits.rejectedToolInputsPerTurn,
-          validate: input => validateAgainst(shellInputSchema, input),
-          observations: session.observations,
-        });
-        shell = createShellTool({
-          workingDirectory: this.projectRoot,
-          judge: input => shellJudge!.judge(input, session.callId(shellToolName)),
-          outputFile: call => run.path(runLayout.shellOutput(session.invocation, call)),
-          // The call itself is already an `activity` observation holding
-          // the command text, recorded from the port's own event before
-          // the command runs. What is added here is the gap that qualifies
-          // every later count: this invocation wrote through a tool no
-          // guard judged.
-          starting: async () => {
-            if (shellGapRecorded) return;
-            shellGapRecorded = true;
-            await session.observations.record({
-              type: 'coverage-gap',
-              data: {
-                kind: 'unguarded-shell',
-                detail: 'this invocation ran commands through the shell, whose writes pass no guard; what they changed is seen only in the tree afterwards',
-              },
-            });
-          },
-          ended: async () => undefined,
-        });
-
-        toolJudge = new ToolInputJudge({
-          tool: scopeTestsToolName,
-          bound: run.record.policy.limits.rejectedToolInputsPerTurn,
-          validate: input => validateAgainst(scopeTestsInputSchema, input),
-          observations: session.observations,
-        });
-        return {
-          builtinTools: ['read', 'grep', 'ls', 'edit', 'write'],
-          settle: () => shell!.settle(),
-          tools: [shell.definition, createScopeTestsTool({
-            projectRoot: this.projectRoot,
-            commands: run.record.policy.commands,
-            policy: options.tests,
-            refresh: () => this.refreshIndex(run),
-            judge: input => toolJudge!.judge(input, session.callId(scopeTestsToolName)),
-            observe: async observation => {
-              await session.observations.record({
-                type: 'scope-tests',
-                data: {
-                  callId: session.callId(scopeTestsToolName),
-                  resolved: [...observation.resolved],
-                  outcome: observation.outcome,
-                  notVerified: observation.notVerified,
-                  exitCode: observation.exitCode,
-                  elapsedMs: observation.elapsedMs,
-                },
-              });
-            },
-          })],
-          guard: async call => {
-            if (call.tool === shellToolName) {
-              // The shell declares itself mutating so that the hook check
-              // runs after it, but it names no target to judge: its writes
-              // are unguarded by design, seen afterwards in the tree and
-              // reported in `outsideScope`. Nothing here prevents them.
-              return { allow: true };
-            }
-            const decision = await decideWrite(options.guarded, this.projectRoot, call.input);
-            await session.observations.record({
-              type: 'guard',
-              data: {
-                callId: call.callId,
-                tool: call.tool,
-                requested: decision.requested,
-                resolved: decision.resolved,
-                owner: decision.resolved === null ? null : ownerOf(run.index, relative(this.projectRoot, decision.resolved)),
-                scopeRevision: options.scopeRevision,
-                verdict: decision.verdict,
-                reason: decision.reason,
-              },
-            });
-            if (decision.verdict === 'allowed' && decision.resolved !== null) {
-              mutated.set(call.callId, [relative(this.projectRoot, decision.resolved)]);
-            }
-            return decision.verdict === 'allowed'
-              ? { allow: true }
-              : { allow: false, text: blockExplanation(decision, options.guarded) };
-          },
-          afterMutation: async call => {
-            // The mutation is observed whether the tool succeeded or not.
-            // The shell's changed set is unknown, which is a different
-            // thing from an empty one and is recorded as such.
-            const paths = call.tool === shellToolName ? null : mutated.get(call.callId) ?? null;
-            await session.observations.record({
-              type: 'mutation',
-              data: {
-                callId: call.callId,
-                paths: paths ?? [],
-                added: null,
-                deleted: null,
-                observedBy: 'tool',
-                toolFailed: call.failed,
-                attributable: paths !== null,
-              },
-            });
-            const hook = await runHookCheck({
-              ramify: this.options.ramify,
-              projectRoot: this.projectRoot,
-              paths,
-              hookTimeoutMs: run.record.policy.commands.hookTimeoutMs,
-              seen: seen!,
-              ran: hookChecks,
-              logFile: check => run.path(runLayout.hookOutput(session.invocation, check)),
-            }).catch(error => ({
-              checks: [{
-                paths: paths ?? [], mode: 'changed' as const, outcome: 'not-checked' as const,
-                reason: `the hook check could not be run: ${message(error)}`, newFindings: 0, log: null,
-              }],
-              gaps: [],
-              text: `Ramify hook check: it could not be run (${message(error)}). Nothing was verified.`,
-            }));
-            hookChecks += hook.checks.filter(check => check.log !== null).length;
-            for (const check of hook.checks) {
-              await session.observations.record({ type: 'hook-check', data: { ...check, paths: [...check.paths] } });
-            }
-            for (const gap of hook.gaps) await session.observations.record({ type: 'coverage-gap', data: gap });
-            const text = [hook.text, ...session.reminders()].filter(line => line !== null && line !== '').join('\n\n');
-            return text === '' ? null : { text };
-          },
-        };
-    };
-    return {
-      equip,
-      exhausted: () => toolJudge?.exhausted === true || shellJudge?.exhausted === true,
-      shellCalls: () => shell?.calls ?? 0,
-      openFindings: () => seen?.open() ?? [],
-    };
+  }): EngineerEquipment {
+    return engineerEquipment({
+      projectRoot: this.projectRoot,
+      ramify: this.options.ramify,
+      commands: run.record.policy.commands,
+      bounds: run.record.policy.limits,
+      refresh: () => this.refreshIndex(run),
+      index: () => run.index,
+      ...options,
+      outputPath: (kind, invocation, number) => run.path(kind === 'shell'
+        ? runLayout.shellOutput(invocation, number)
+        : runLayout.hookOutput(invocation, number)),
+    });
   }
 
   /**
