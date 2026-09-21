@@ -140,13 +140,16 @@ sessionChannel.subscribe(session); workerChannel.subscribe(observeWorker); servi
 function snapshot() {
   ownOperation = true;
   try {
-    filesystem.writeFileSync(metricsPath, JSON.stringify({ schemaVersion: 'ramify.measurement-counters/1', pid: process.pid,
+    // Written beside the snapshot and renamed over it, so a concurrent reader
+    // sees the previous or the next snapshot, never a torn one.
+    filesystem.writeFileSync(`${metricsPath}.next`, JSON.stringify({ schemaVersion: 'ramify.measurement-counters/1', pid: process.pid,
       at: Date.now(), generation, memory: process.memoryUsage(), activeSessions, files: files.size,
       watchers: watchers.size, helpers: helpers.size, timers: timers.size, totals,
       outboundMaximum, outbound: [...outbound.values()], services, workers: [...workers.values()], workerCount: workers.size,
       compilerPids: [...compilerPids], compilerCount: compilerPids.size, workerMessages, workerSequence,
       activeProbeCount,
       workerSampling: 'Worker heap and status are real reply checkpoints; 50 ms snapshots retain their latest statusAt. Round-trip timings include worker execution, serialization and transport.' }));
+    filesystem.renameSync(`${metricsPath}.next`, metricsPath);
   } finally { ownOperation = false; }
 }
 async function requestedClone() {

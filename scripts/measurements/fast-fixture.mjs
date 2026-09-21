@@ -9,6 +9,8 @@ import { treeIdentity } from './identities.mjs';
 export async function fastFixture(scratch, templates, name, suffix) {
   const project = await fixture(scratch, templates, name, suffix);
   const reference = name === 'reference';
+  // Plan 8's exposing fixture, X100: S100's owners and paths with exposures.
+  const exposing = name === 'X100';
   const body = reference ? 'src/assembly.ts' : 'src/impl0.ts';
   const source = reference ? 'src/assembly.ts' : 'subs/m001/src/interfaces/api.ts';
   const description = reference ? 'subs/workspace/module.ramify' : 'subs/m001/module.ramify';
@@ -24,14 +26,24 @@ export async function fastFixture(scratch, templates, name, suffix) {
   // Begin with complete coverage. Each measured pair deletes this owned target
   // and then recreates it; only the deleted phase has an unresolved-target note.
   await writeFile(join(project.root, created), 'export const createdMeasurement = 0;\n', { flag: 'wx' });
+  // Plan 8 edit classes. A signature edit adds a named original that is already
+  // exposed where the symbol is; a companion edit removes an exposure a signature
+  // names and restores it. The removal fails the check on a build that enforces
+  // the rule with `companionFindings` findings and no denied import.
+  const signature = reference ? 'subs/workspace/subs/reviews/subs/core/subs/tasks/src/result.ts' : 'subs/m002/src/impl0.ts';
+  const companion = reference ? 'module.ramify' : 'subs/m099/module.ramify';
+  const companionEdits = reference || exposing;
   const originals = new Map();
-  for (const path of new Set([body, source, description, readme, 'tsconfig.json'])) {
+  for (const path of new Set([body, source, description, readme, 'tsconfig.json', ...(companionEdits ? [signature, companion] : [])])) {
     originals.set(path, await readFile(join(project.root, path), 'utf8'));
   }
   const definitions = {
     body: [body, reference ? 'return {' : 'return input.value + value;',
       reference ? 'void 1; return {' : 'return input.value + value + 1;'],
-    source: [source, originals.get(source), originals.get(source) + '\nexport const fastMeasurementExport = 1;\n'],
+    // X100 exposes the edited file by wildcard, so its added export is annotated
+    // and leaves coverage complete.
+    source: [source, originals.get(source), originals.get(source)
+      + (exposing ? '\nexport const fastMeasurementExport: number = 1;\n' : '\nexport const fastMeasurementExport = 1;\n')],
     description: [description, reference
       ? 'expose-sub createCatalogRouter, createCatalogTools, inspectRecord from catalog to parent'
       : 'expose-src value from "interfaces/api.ts" to parent', reference
@@ -39,14 +51,29 @@ export async function fastFixture(scratch, templates, name, suffix) {
       : '// measurement exposure removed'],
     readme: [readme, originals.get(readme), originals.get(readme).replace(/\n\n/, '\n\nMeasured purpose. ')],
     configuration: ['tsconfig.json', '"target": "ES2022"', '"target": "ES2021"'],
+    ...(companionEdits ? {
+      signature: [signature, reference
+        ? 'export function summarizeTaskResult(result: InspectionTaskResult): TaskSummary {'
+        : 'export function run0(input: Input, previous: PreviousInput): Output {', reference
+        ? "export function summarizeTaskResult(result: InspectionTaskResult, input?: import('./inspection-task.js').InspectionTaskInput): TaskSummary {"
+        : 'export function run0(input: Input, previous: PreviousInput, seed?: typeof value): Output {'],
+      companion: [companion, reference
+        ? 'ToolInputSchema, ToolResult from "interfaces/protocol.ts" to descendants'
+        : 'expose-src * from "interfaces/api.ts" to parent', reference
+        ? 'ToolInputSchema from "interfaces/protocol.ts" to descendants'
+        : 'expose-src Input, value from "interfaces/api.ts" to parent'],
+    } : {}),
   };
   for (const [path, before] of Object.values(definitions)) {
     assert.equal(originals.get(path).split(before).length, 2, `Unique edit anchor: ${name}/${path}`);
   }
   const sourceImporters = reference
     ? ['src/server.ts', 'src/interfaces/protocol.ts', 'src/tests/setup.ts', 'src/tests/http.test.ts']
-    : ['src/impl0.ts', ...Array.from({ length: 9 }, (_, index) => `subs/m001/src/impl${index}.ts`)];
+    : ['src/impl0.ts', ...Array.from({ length: 9 }, (_, index) => `subs/m001/src/impl${index}.ts`),
+      // In X100, m002's signatures name m001's `Input`.
+      ...(exposing ? Array.from({ length: 9 }, (_, index) => `subs/m002/src/impl${index}.ts`) : [])];
   return { ...project, body, source, created, sourceImporters,
+    ...(companionEdits ? { signature, companion, companionFindings: reference ? 1 : 9 } : {}),
     creationWitness: { path: body, specifier: './fast-measurement-created.js' },
     setupIdentity: treeIdentity(project.root),
     async change(kind, index = 0) {

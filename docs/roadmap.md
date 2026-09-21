@@ -31,6 +31,11 @@ with `rg`. It supersedes Plan 3's proposed `ramify available`/MCP search surface
 without replacing the existing Plan 3 artifact; that artifact is preserved and
 must receive a separate successor review before execution.
 
+**Addition, 2026-09-21:** [Plan 8: signature companions](#plan-8-signature-companions)
+adds one enforced rule to the model: an exposed symbol's declared signature
+companions must be type-available wherever the exposure makes the symbol
+visible. It is implemented on branch `feat/plan8-signature-companions`.
+
 The intended system is defined in the [architecture documents](architecture/README.md).
 They own the decided process/client, resource and testing architecture, plus
 the proposed module tree, exposure paths, retained state and synchronization.
@@ -182,6 +187,7 @@ retained session and executes before the separately reviewed Plan 3 successor.
 | [3. Understand a project](#plan-3-project-inspection) | Remaining project explanations, module summaries and usage queries are selected in a successor review after filesystem discovery exists. | Plan 2A. | The existing [Detailed Plan 3](plans/iteration-3-project-inspection/main-plan.md) is preserved but must be revised and reviewed before execution. |
 | [4. Use Ramify through MCP](#plan-4-mcp-access) | A host-launched stdio adapter exposes the daemon's checks and inspection. | Plan 2's service and Plan 3's queries for this deliverable's full scope. | Brief below; detailed plan not yet written. |
 | [7. Find modules affected by changes](#plan-7-affected-modules) | An on-demand reverse dependency query uses retained facts to select modules for testing through API, CLI and MCP. | Plan 5's retained session and contexts; Plan 4's stdio provider for MCP. | [Detailed Plan 7](plans/iteration-7-affected-modules/main-plan.md), draft awaiting contract review. |
+| [8. Require signature companions](#plan-8-signature-companions) | Implemented: a module exposing a symbol must make the project symbols named in its declared signature type-available wherever the exposure makes it visible. Ramify reports the missing exposure at the exposure statement and never supplies it. | Plans 1 and 5. | [Detailed Plan 8](plans/iteration-8-signature-companions/main-plan.md), implemented on 2026-09-21 on branch `feat/plan8-signature-companions`, not merged to `main`; its [completion report](plans/iteration-8-signature-companions/iterations/iteration5-results.md) records the evidence, the budget outcomes and the remaining gaps. |
 | [6. Explore visually](#plan-6-project-explorer) | Complete: a standalone live explorer through a separate tRPC web process. | Plan 2's published report and lightweight client. | [Detailed Plan 6](plans/iteration-6-project-explorer/main-plan.md) and [completion report](plans/iteration-6-project-explorer/iterations/iteration7-results.md). |
 | [6A. Show only Ramify-module imports](#plan-6a-module-only-project-explorer) | Complete: the explorer shows only Ramify modules and cross-module imports, while analysis retains external facts. | Completed Plan 6. | [Detailed Plan 6A](plans/iteration-6a-module-only-project-explorer/main-plan.md) and [completion report](plans/iteration-6a-module-only-project-explorer/iterations/iteration4-results.md). |
 | [6B. Serve the explorer continuously](#plan-6b-resident-explorer-server) | Implemented: a PM2-manageable explorer server that owns and subscribes to one project context, with a home page and a stable `/analysis/latest` URL. | Completed Plans 6 and 6A. | [Detailed Plan 6B](plans/iteration-6b-resident-explorer-server/main-plan.md) and [completion report](plans/iteration-6b-resident-explorer-server/iterations/iteration4-results.md). |
@@ -1052,6 +1058,42 @@ API/wire/tool schemas, source scope, coverage limits and measured costs.
 Git diff discovery, historical/deleted-module impact, test execution and
 visualization remain outside this deliverable.
 
+## Plan 8: Signature companions
+
+**Detailed artifact:** [Plan 8](plans/iteration-8-signature-companions/main-plan.md),
+implemented on 2026-09-21; its
+[completion report](plans/iteration-8-signature-companions/iterations/iteration5-results.md)
+records SC01 to SC27, the measured costs and the remaining gaps. Three
+measured budgets are not met: X100's deleted hook row, the description stage
+and retained `factBytes`. The report proposes remedies for decision.
+
+**Working outcome.** A symbol exposed without a project symbol that its
+declared signature names fails the check with `exposed-without-companion`,
+located at the exposure statement, in batch, in the retained session and in
+the post-write hook. The user chose this on 2026-09-21 over implicit exposure,
+with type-availability as the requirement, every re-exposure step verified
+and no opt-out. This changes the model documents.
+
+**Prerequisites and ownership.** Plan 1's catalog, link and model and Plan 5's
+retained session. `typescript` collects companion facts from declared
+annotations with one batched symbol request per file and no type computation;
+`model` owns the rule and an exposure index derived per model; `analysis`
+reports the finding in the decide stage on a valid model.
+
+**Contract decisions.** Settled: a decide-stage finding on a valid model;
+facts for every exported original; the subset test on required-importer tags
+with required-symbol tags not compared; public and protected members; facts
+on the original with position-free surfaces; remediation of the toolkit and
+the reference example only; no reverse index or verdict cache unless the
+measured pass exceeds its budget. Inferred and unresolved signatures are
+nonblocking coverage notes, reported for exposed symbols.
+
+**Completion and handoff.** SC01 to SC27 executed, including X100, a synthetic
+fixture that declares exposures, since S100 declares none. The toolkit and the
+reference example conform. The completion report hands off the exposure index
+and its measured cost, the finding and note codes, and the inferred-signature
+count, and records the budgets the measurement did not meet.
+
 ## Information to preserve between plans
 
 Every completion report must leave enough concrete information to author its
@@ -1073,6 +1115,7 @@ source/architecture document; do not depend on conversation history.
 | Plan 6C | Module tree view props and helpers; shared published-view hook; `?module=` focus contract for both pages; layout timings and tree transport size. | Later explorer pages and a possible tree-specific projection. |
 | Plan 6D | Per-import-path behavior facts; on-demand daemon `dependencyDiagram` operation with its lean analyzer process, time, memory and retention evidence; imported-module/original-owner dependency DTOs; controls, panels, lifecycle and browser evidence. | Later modularity trends, source-filter controls and redesign assistance. |
 | Plan 7 | Live module graph semantics; affected query and test-selection contracts; revision/coverage outcomes; CLI/MCP schemas; on-demand construction, temporary memory and query resource evidence. | Test-runner integrations and later explorer features. |
+| Plan 8 | The companion rule's finding and coverage-note codes; per-original companion facts; the per-model exposure index with its measured lookup and pass costs; the exposing synthetic fixture; the inferred-signature count. | The Plan 3 successor, Plans 4 and 7, agent hook hosts and consuming projects. |
 
 Across every handoff, preserve the distinctions between original and accessed
 file, visibility and availability, ordinary/testing source, declared exposure

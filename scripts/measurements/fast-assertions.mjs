@@ -1,4 +1,4 @@
-import { fastBudgets as budgets, fastFixtures, fixtureForId, editKinds } from './fast-plan.mjs';
+import { fastBudgets as budgets, fastFixtures, fixtureForId, editKindsFor } from './fast-plan.mjs';
 import { assertResidentWorkload } from './resident-assertions.mjs';
 import { median } from './common.mjs';
 import { isDeepStrictEqual } from 'node:util';
@@ -9,13 +9,15 @@ const finite = value => Number.isFinite(value) && value >= 0;
 const med = values => values?.length && values.every(finite) ? median(values) : null;
 const timing = cycle => cycle?.revision?.timings?.total;
 
-function coveringEdit(cycle) {
+/** `fixture` names the pinned signature notes a build enforcing Plan 8's rule adds; see `coverageMatches`. */
+function coveringEdit(cycle, fixture = null) {
   const revision = cycle?.revision, hook = cycle?.hook, document = hook?.document;
+  const notes = expectedSignatureNotes(fixture, revision?.timings).length;
   return hook?.failure === null && hook.signal === null && hook.stderr === '' && [0, 1].includes(hook.code)
     && document?.schemaVersion === 'ramify.check/1' && document.outcome === 'checked'
     && document.execution === 'completed' && document.exitCode === hook.code
-    && revision?.outcome?.execution === 'completed' && revision.outcome.coverage === 'complete'
-    && Array.isArray(document.coverage) && document.coverage.length === 0
+    && revision?.outcome?.execution === 'completed' && revision.outcome.coverage === (notes ? 'partial' : 'complete')
+    && coverageMatches(fixture, revision.timings, document.coverage, [])
     && Number.isSafeInteger(cycle.beforeSequence) && cycle.beforeSequence >= 0
     && Number.isSafeInteger(revision.sequence) && revision.sequence > cycle.beforeSequence
     && document.revision?.sequence === revision.sequence && document.revision.id === revision.revision
@@ -30,7 +32,7 @@ function scopedEdits(data, kind, path) {
   const rows = data?.cycles?.[kind];
   return rows?.length === budgets.editCycles && rows.every((cycle, index) => {
     const denied = kind === 'description' && index % 2 === 0 ? 1 : 0;
-    return cycle.kind === kind && cycle.revision?.checked?.path === path && coveringEdit(cycle)
+    return cycle.kind === kind && cycle.revision?.checked?.path === path && coveringEdit(cycle, data?.name ?? null)
       && cycle.revision.summary?.denied === denied && cycle.hook.code === (denied ? 1 : 0)
       && cycle.hook.document.findings?.length === denied && finite(timing(cycle))
       && (index === 0 || cycle.beforeSequence >= rows[index - 1].revision.sequence
@@ -52,7 +54,7 @@ function completedCold(data, name) {
   const reply = data?.cold?.reply, revision = reply?.revision;
   return reply?.status === 'reported' && reply.published === true
     && revision?.checked?.path === 'cold' && revision.outcome?.execution === 'completed'
-    && revision.outcome.coverage === 'complete'
+    && revision.outcome.coverage === (expectedSignatureNotes(name, revision.timings).length ? 'partial' : 'complete')
     && revision.summary?.owners === (name === 'reference' ? 15 : Number(name.slice(1)))
     && finite(revision.timings?.total);
 }
@@ -69,6 +71,45 @@ function deletedCoverage(data, name, cycle) {
     : 'access-limit/1:797e8a8de4b78a82be864b29b885b098b6f01f5c5c942cb9f2db4cbb1d812c53',
   code: 'unresolved-target', location: { file: body, start: 7, end: 38, line: 1, column: 8 },
   message: 'Cannot establish the accessed source or resource target', related: [] }];
+}
+
+/**
+ * Plan 8 adds `companions`, the signature-companion pass measured inside
+ * `decide`, to the nine revision timings. A build reports all nine, and the
+ * tenth exactly when it enforces the rule.
+ */
+const stageTimings = ['classify', 'inventory', 'compiler', 'descriptions', 'accesses', 'link', 'decide', 'publish', 'total'];
+export const enforcesCompanions = timings => Object.hasOwn(timings ?? {}, 'companions');
+export function revisionTimingsValid(timings) {
+  const keys = Object.keys(timings ?? {}).sort();
+  const expected = [...stageTimings, ...(enforcesCompanions(timings) ? ['companions'] : [])].sort();
+  return same(keys, expected) && Object.values(timings).every(finite);
+}
+
+/**
+ * The `signature-inferred` notes a build that enforces the rule reports on each
+ * fixture, by original: Plan 8 iteration 4's conforming reference example has
+ * eleven. The measurement setup of S100, S500 and S1000 exposes m001's
+ * literal-initialized `value`, which sets `inferred`; X100 annotates every
+ * exposed signature and has none.
+ */
+const signatureNotes = {
+  reference: ['assembleRouter', 'createCatalogRouter', 'createReviewsRouter', 'findingSchema', 'inspectionReportSchema',
+    'observationSchema', 'recordIdSchema', 'reviewStatusSchema', 'revisionChainSchema', 'revisionSchema', 'revisionScopeSchema']
+    .map(original => `signature-inferred:${original}`),
+  ...Object.fromEntries(['S100', 'S500', 'S1000'].map(name => [name, ['signature-inferred:value']])),
+};
+const signatureNote = item => typeof item?.code === 'string' && item.code.startsWith('signature-');
+const noteKey = item => `${item.code}:${/^`([^`]+)`/.exec(item.message ?? '')?.[1] ?? ''}`;
+export function expectedSignatureNotes(fixture, timings) {
+  return enforcesCompanions(timings) ? signatureNotes[fixture] ?? [] : [];
+}
+/** Other coverage entries equal `expected`; signature notes equal the fixture's pinned set, once each. */
+export function coverageMatches(fixture, timings, coverage, expected) {
+  if (!Array.isArray(coverage) || !Array.isArray(expected)) return false;
+  const notes = coverage.filter(signatureNote).map(noteKey).sort();
+  return isDeepStrictEqual(coverage.filter(item => !signatureNote(item)), expected)
+    && same(notes, [...expectedSignatureNotes(fixture, timings)].sort());
 }
 
 const counterFields = ['analyses', 'revisions', 'coveredRequests', 'sweeps', 'audits'];
@@ -108,10 +149,10 @@ const replySessionWork = ['invocationCheck', 'workerStatus', 'workerRoundTrip', 
  * analysis must have run. A covered answer from another revision, more than one
  * covered request, or a covered reply that reports session work fails.
  */
-export function racingHookAttributed(cycle) {
+export function racingHookAttributed(cycle, fixture = null) {
   const b = cycle?.countersBeforeSave, s = cycle?.settled?.counters, reply = cycle?.hook?.document?.timings?.reply;
   if (![b, s].every(counters => counterFields.every(field => Number.isSafeInteger(counters?.[field]) && counters[field] >= 0))) return false;
-  if (!coveringEdit(cycle) || cycle.hook.code !== 0) return false;
+  if (!coveringEdit(cycle, fixture) || cycle.hook.code !== 0) return false;
   if (s.analyses - b.analyses - (maintenance(s) - maintenance(b)) < 1) return false;
   const covered = s.coveredRequests - b.coveredRequests;
   if (covered === 1) return reply === undefined || replySessionWork.every(field => reply[field] === 0);
@@ -162,10 +203,12 @@ export function assertFastWorkload(id, measurements) {
     processes(name, data?.processSamples);
     check(`${name}: observed cleanup`, data?.cleanup?.stopped === true && same(data.cleanup.liveProcesses, []), data?.cleanup ?? null);
   }
-  function completed(label, cycle, denied = 0, expectedCoverage = []) {
+  function completed(label, cycle, denied = 0, expectedCoverage = [], { fixture = null, findings = denied } = {}) {
     const hook = cycle?.hook, doc = hook?.document;
+    const timings = cycle?.revision?.timings;
+    const notes = expectedSignatureNotes(fixture, timings).length;
     check(`${label}: real covering CLI result`, hook?.failure === null && hook.signal === null && hook.stderr === ''
-      && hook.code === (denied ? 1 : 0) && doc?.schemaVersion === 'ramify.check/1'
+      && hook.code === (findings ? 1 : 0) && doc?.schemaVersion === 'ramify.check/1'
       && doc.outcome === 'checked' && doc.execution === 'completed' && doc.exitCode === hook.code
       && natural(cycle.beforeSequence) && doc.revision?.sequence > cycle.beforeSequence
       && cycle.revision?.revision === doc.revision.id && cycle.revision.sequence === doc.revision.sequence
@@ -174,21 +217,22 @@ export function assertFastWorkload(id, measurements) {
         item.covered && item.path === cycle.expected[index].path && item.sha256 === cycle.expected[index].sha256),
     { code: hook?.code ?? null, reason: doc?.reason ?? null, sequence: doc?.revision?.sequence ?? null });
     check(`${label}: independent outcome`, cycle?.revision?.outcome?.execution === 'completed'
-      && cycle.revision.summary?.denied === denied && doc?.findings?.length === denied
-      && Array.isArray(expectedCoverage) && isDeepStrictEqual(doc.coverage, expectedCoverage)
-      && cycle.revision.outcome.coverage === (expectedCoverage.length ? 'partial' : 'complete'),
-    { denied: cycle?.revision?.summary?.denied ?? null, findings: doc?.findings?.length ?? null });
-    check(`${label}: timings match the covering revision`, same(doc?.timings?.daemon, cycle?.revision?.timings)
-      && Object.values(cycle?.revision?.timings ?? {}).length === 9
-      && Object.values(cycle?.revision?.timings ?? {}).every(finite) && finite(hook?.durationMs), timing(cycle) ?? null);
+      && cycle.revision.summary?.denied === denied && doc?.findings?.length === findings
+      && coverageMatches(fixture, timings, doc?.coverage, expectedCoverage)
+      && cycle.revision.outcome.coverage === (expectedCoverage.length + notes ? 'partial' : 'complete'),
+    { denied: cycle?.revision?.summary?.denied ?? null, findings: doc?.findings?.length ?? null,
+      coverage: doc?.coverage?.length ?? null });
+    check(`${label}: timings match the covering revision`, same(doc?.timings?.daemon, timings)
+      && revisionTimingsValid(timings) && finite(hook?.durationMs), timing(cycle) ?? null);
   }
   /**
    * The configuration row's hook is answered at once as not checked: a configuration
    * edit is not the kind of change a post-write hook verifies. The cycle's revision is
    * the one the daemon published behind that reply, read after the cycle settled.
    */
-  function notChecked(label, cycle) {
+  function notChecked(label, cycle, fixture = null) {
     const hook = cycle?.hook, doc = hook?.document;
+    const notes = expectedSignatureNotes(fixture, cycle?.revision?.timings).length;
     check(`${label}: real immediate not-checked CLI result`, hook?.failure === null && hook.signal === null && hook.stderr === ''
       && hook.code === 2 && doc?.schemaVersion === 'ramify.check/1' && doc.outcome === 'not-checked'
       && doc.reason === 'configuration-changed' && doc.exitCode === 2 && doc.revision === null
@@ -200,12 +244,11 @@ export function assertFastWorkload(id, measurements) {
     check(`${label}: independent outcome`, cycle?.revision?.outcome?.execution === 'completed'
       && cycle.revision.summary?.denied === 0 && doc?.findings?.length === 0
       && Array.isArray(doc.coverage) && isDeepStrictEqual(doc.coverage, [])
-      && cycle.revision.outcome.coverage === 'complete',
+      && cycle.revision.outcome.coverage === (notes ? 'partial' : 'complete'),
     { denied: cycle?.revision?.summary?.denied ?? null, findings: doc?.findings?.length ?? null });
     check(`${label}: background revision published behind the reply`, natural(cycle?.beforeSequence)
       && cycle.revision?.sequence > cycle.beforeSequence
-      && Object.values(cycle.revision.timings ?? {}).length === 9
-      && Object.values(cycle.revision.timings ?? {}).every(finite) && finite(hook?.durationMs),
+      && revisionTimingsValid(cycle.revision.timings) && finite(hook?.durationMs),
     { before: cycle?.beforeSequence ?? null, sequence: cycle?.revision?.sequence ?? null, durationMs: hook?.durationMs ?? null });
   }
   function retained(label, settled) {
@@ -218,7 +261,7 @@ export function assertFastWorkload(id, measurements) {
     const body = data?.cycles?.body, source = data?.cycles?.source;
     count(`${name}: body checked sets`, body, 20); count(`${name}: export checked sets`, source, 20);
     for (const [kind, cycles] of [['body', body], ['source', source]]) {
-      for (const [index, cycle] of (cycles ?? []).entries()) completed(`${name}: ${kind} checked set ${index + 1}`, cycle);
+      for (const [index, cycle] of (cycles ?? []).entries()) completed(`${name}: ${kind} checked set ${index + 1}`, cycle, 0, [], { fixture: name });
       check(`${name}: ${kind} checked sets belong to advancing revisions`, cycles?.length > 0
         && cycles.every((cycle, index) => index === 0 || cycle.beforeSequence >= cycles[index - 1].revision?.sequence
           && cycle.revision?.sequence > cycles[index - 1].revision?.sequence), cycles?.map(cycle => cycle.revision?.sequence) ?? null);
@@ -273,13 +316,24 @@ export function assertFastWorkload(id, measurements) {
       && row.after.counters.coveredRequests > row.before.counters.coveredRequests),
     data.zeroWork?.map(row => row.hook?.durationMs) ?? null);
     const paths = { body: 'unchanged-surface', source: 'source', description: 'description', readme: 'metadata',
-      created: 'membership', deleted: 'membership', configuration: 'broad' };
-    for (const kind of editKinds) {
+      created: 'membership', deleted: 'membership', configuration: 'broad', signature: 'source', companion: 'description' };
+    const definition = data.fixtures?.find(item => item.name === name);
+    for (const kind of editKindsFor(name)) {
       const cycles = data.cycles?.[kind]; count(`${kind}: twenty cycles`, cycles, 20);
       for (const [index, cycle] of (cycles ?? []).entries()) {
-        if (kind === 'configuration') notChecked(`${kind} ${index + 1}`, cycle);
-        else completed(`${kind} ${index + 1}`, cycle, kind === 'description' && index % 2 === 0 ? 1 : 0,
-          kind === 'deleted' ? deletedCoverage(data, name, cycle) : []);
+        const removal = index % 2 === 0;
+        if (kind === 'configuration') notChecked(`${kind} ${index + 1}`, cycle, name);
+        // X100's wildcard still exposes the value whose extra named exposure the description edit removes.
+        else if (kind === 'description') completed(`${kind} ${index + 1}`, cycle, removal && name !== 'X100' ? 1 : 0, [], { fixture: name });
+        // A companion removal fails the check with its pinned findings, and no denied import, only where the rule is enforced.
+        else if (kind === 'companion') completed(`${kind} ${index + 1}`, cycle, 0, [], { fixture: name,
+          findings: removal && enforcesCompanions(cycle?.revision?.timings) ? definition?.companionFindings ?? -1 : 0 });
+        else completed(`${kind} ${index + 1}`, cycle, 0, kind === 'deleted' ? deletedCoverage(data, name, cycle) : [], { fixture: name });
+        if (kind === 'companion' && removal && enforcesCompanions(cycle?.revision?.timings)) {
+          check(`${kind} ${index + 1}: companion findings only`, cycle.hook?.document?.findings?.every(finding =>
+            finding.code === 'exposed-without-companion' && finding.location?.file === definition?.companion),
+          cycle.hook?.document?.findings?.map(finding => finding.code) ?? null);
+        }
         check(`${kind} ${index + 1}: revision path`, cycle.revision?.checked?.path === paths[kind], cycle.revision?.checked?.path ?? null);
         retained(`${kind} ${index + 1}`, cycle.settled);
       }
@@ -288,13 +342,13 @@ export function assertFastWorkload(id, measurements) {
     const racing = data.cycles?.body;
     check('racing hooks launched before publication', racing?.length > 0 && racing.every(cycle => cycle.hookStartedAt <= cycle.revision?.publishedAt),
       racing?.map(cycle => ({ started: cycle.hookStartedAt, published: cycle.revision?.publishedAt })) ?? null);
-    check('racing hooks are answered from the racing revision', racing?.length > 0 && racing.every(racingHookAttributed),
+    check('racing hooks are answered from the racing revision', racing?.length > 0 && racing.every(cycle => racingHookAttributed(cycle, name)),
       { cycles: racing?.length ?? 0,
         covered: racing?.filter(cycle => cycle.settled?.counters?.coveredRequests === cycle.countersBeforeSave?.coveredRequests + 1).length ?? 0,
-        unattributed: racing?.flatMap((cycle, index) => racingHookAttributed(cycle) ? [] : [index + 1]) ?? [] });
+        unattributed: racing?.flatMap((cycle, index) => racingHookAttributed(cycle, name) ? [] : [index + 1]) ?? [] });
     target('racing: median hook end to end (ms)', med(racing?.map(cycle => cycle.hook.durationMs)), limit.racing);
     count('watcher already published: twenty hooks', data.published, 20);
-    for (const [index, cycle] of (data.published ?? []).entries()) completed(`published ${index + 1}`, cycle);
+    for (const [index, cycle] of (data.published ?? []).entries()) completed(`published ${index + 1}`, cycle, 0, [], { fixture: name });
     check('published hooks perform zero analysis', data.published?.length > 0 && data.published.every(publishedHookAttributed),
       { cycles: data.published?.length ?? 0,
         unattributed: data.published?.flatMap((cycle, index) => publishedHookAttributed(cycle) ? [] : [index + 1]) ?? [] });
@@ -321,7 +375,7 @@ export function assertFastWorkload(id, measurements) {
     for (const name of ['reference', 'S100']) {
       const data = measurements[name], cycles = data?.cycles;
       count(`${name}: alternating cycles`, cycles, 200);
-      for (const [index, cycle] of (cycles ?? []).entries()) { completed(`${name} ${index + 1}`, cycle); retained(`${name} ${index + 1}`, cycle.settled); }
+      for (const [index, cycle] of (cycles ?? []).entries()) { completed(`${name} ${index + 1}`, cycle, 0, [], { fixture: name }); retained(`${name} ${index + 1}`, cycle.settled); }
       check(`${name}: exactly two alternating identities`, new Set(cycles?.map(cycle => cycle.revision?.fingerprints?.inputId)).size === 2
         && cycles?.every((cycle, index) => index === 0 || cycle.revision.sequence > cycles[index - 1].revision.sequence
           && cycle.revision.fingerprints.inputId !== cycles[index - 1].revision.fingerprints.inputId), cycles?.length ?? null);

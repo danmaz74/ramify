@@ -3843,6 +3843,2273 @@
           "passed": true
         }
       ]
+    },
+    {
+      "file": "fast-2026-09-21T13-38-51.031Z-7f1089a6-c21d-4e4b-aa8f-c80cffb8346d.json.gz",
+      "rawSha256": "58a0e96fb8e2b5c108977f4d4ea9eb6975d1fe92a76ff124fd6ac729b8b3b948",
+      "gzipSha256": "429c0f0ebe921ade875369397f2f8b25857027cbe4de8f26e3f6055e513a26e3",
+      "rawBytes": 109066579,
+      "gzipBytes": 3787388,
+      "gzipMembers": [
+        {
+          "offset": 0,
+          "length": 286932,
+          "rawBytes": 4194304,
+          "rawSha256": "2e2cbce59b6cac2edc947d1734bbe7856e3dd02c0ddbb6914667502db5400053",
+          "gzipSha256": "d311b4d15c1cd1960bc72b621a231853e0fb5303cb9f620479cc23d97db7c46f"
+        },
+        {
+          "offset": 286932,
+          "length": 221920,
+          "rawBytes": 4194304,
+          "rawSha256": "e057bdfa72c15e35116661f001450d4eff330acf9738a1b634f34091b1f17741",
+          "gzipSha256": "91e962d08f23088b45e4a797e91c085ea883d5caa4e6a27429e2ebed10683d58"
+        },
+        {
+          "offset": 508852,
+          "length": 219598,
+          "rawBytes": 4194304,
+          "rawSha256": "9fe903c45be2f907511427249e4892d58d9e92d1120124a40e18d34df65e3eea",
+          "gzipSha256": "8d8af64da113060c7b202cf6c60dab525474d2f446794b0d7dff07f4c482dd61"
+        },
+        {
+          "offset": 728450,
+          "length": 217711,
+          "rawBytes": 4194304,
+          "rawSha256": "c663a0d8b5422aee8bd75f30a80b8eca1dcc3de8e174f860f191540784f61211",
+          "gzipSha256": "78af1914d560424ad6d96f48362d509f69c0ec1c97e242c4542c0074001a2c17"
+        },
+        {
+          "offset": 946161,
+          "length": 234997,
+          "rawBytes": 4194304,
+          "rawSha256": "cf710b1469c2e42e341cef90ab87dc3a0f65768c9485e35f2b3ae13960a5b8ad",
+          "gzipSha256": "a43e1137892244d89a69298480d92d433c8db27802c0d6960496ff433298d305"
+        },
+        {
+          "offset": 1181158,
+          "length": 272332,
+          "rawBytes": 4194304,
+          "rawSha256": "e4e7849affa657a1fb560aca64a0156907d2661ccdcda3e7919349dd016d40bc",
+          "gzipSha256": "4d55d23551be6e6a02655edf03cbe10a6a21fded5e6e7b21f51d5369090f885c"
+        },
+        {
+          "offset": 1453490,
+          "length": 236704,
+          "rawBytes": 4194304,
+          "rawSha256": "3ce78db23b4d936875851a171fccadf15c890ad42821a6853e32661d1a8951e3",
+          "gzipSha256": "c07c7693000640e11c5052b7ced97d91fd2c75bc26bdcd338079ff1f689fc559"
+        },
+        {
+          "offset": 1690194,
+          "length": 226254,
+          "rawBytes": 4194304,
+          "rawSha256": "0f72a4da54f2c8e13745ede241a82cdbf00e0f0408ea2b292f6b22d77c83acb3",
+          "gzipSha256": "a462eaa6e3a58549eb83cb97e3190c9cadd4d175f0c0f73a8f9053e69f1c75f0"
+        },
+        {
+          "offset": 1916448,
+          "length": 226632,
+          "rawBytes": 4194304,
+          "rawSha256": "a19f0e089ca30acc2f194886493d6cf1fb3e383204858491f69ee6a09ce2c821",
+          "gzipSha256": "ef10680cc9685d4597acaf9d66cd71bedaa360462c26bc22c226654508a358a3"
+        },
+        {
+          "offset": 2143080,
+          "length": 236858,
+          "rawBytes": 4194304,
+          "rawSha256": "03ff1d40d768812504f3bc5c07dacedca13479a441d9f1d932b1bb444e57ea5f",
+          "gzipSha256": "a67a7a3667af0b15355e04fab45c18313cbe78aaa43f45d8f4f56c4b291b9116"
+        },
+        {
+          "offset": 2379938,
+          "length": 268603,
+          "rawBytes": 4194304,
+          "rawSha256": "e8aad1701b4c6a2b7adb8379bf2e05ffe20bf307053ea6f57194561501666a03",
+          "gzipSha256": "e24b85c962799275e373b16a21f3481f5f504f974c9224956a6b3f0ce18c17b8"
+        },
+        {
+          "offset": 2648541,
+          "length": 108041,
+          "rawBytes": 4194304,
+          "rawSha256": "2efe19e97d2095dca2ce6bac3c0d58f338962328eeedfea1319014e446d5d7e5",
+          "gzipSha256": "18c918a39aa744838516813e5b6d8d4b29ff7b217be05527b43bf268bf3335e9"
+        },
+        {
+          "offset": 2756582,
+          "length": 55645,
+          "rawBytes": 4194304,
+          "rawSha256": "91be6934aa9de38e1be0497b04e845d415a5f2caa529c50f2cdb498b6fcc43db",
+          "gzipSha256": "b36f089990b5a7ee361c7bca3a386633388129422e0c0f888412ffa0afd5b5ef"
+        },
+        {
+          "offset": 2812227,
+          "length": 55128,
+          "rawBytes": 4194304,
+          "rawSha256": "058b69f0c908dd4081107b82539948dc3a94a63bc55cc28425870516206b7c92",
+          "gzipSha256": "c5459b0084c5c630e03758def5df0aba2e4f8ce773615d40534d28afe706e7b9"
+        },
+        {
+          "offset": 2867355,
+          "length": 54735,
+          "rawBytes": 4194304,
+          "rawSha256": "587d721b57ecaeb581ade64b412f3b8095e9a897e76ae9c36db2685b60f938c4",
+          "gzipSha256": "4b6b469af0056bc21d05cc24565c83b3e0f6059aa0106d421a88f4823917fa38"
+        },
+        {
+          "offset": 2922090,
+          "length": 55992,
+          "rawBytes": 4194304,
+          "rawSha256": "def4369aebdb220709db1cdb3014c9e1f4ff9e9a1fcdcd4c4e2bbf10f4b1f24d",
+          "gzipSha256": "ebd6594730d335692961d676dfb7a323a72a9df5e700e5d11a0c38984a3626da"
+        },
+        {
+          "offset": 2978082,
+          "length": 55539,
+          "rawBytes": 4194304,
+          "rawSha256": "42f8fb51b52d9488a3a016a76a0f93a1eb50e2ef67799250232a79c11bae5649",
+          "gzipSha256": "00280070d61b0b7393b6e268223a14d91f5ee701d97bb7fc720891614a2c7523"
+        },
+        {
+          "offset": 3033621,
+          "length": 57419,
+          "rawBytes": 4194304,
+          "rawSha256": "f58661ad65a88f759b3ea04c1476976e69c93ca14ffe48144652d9e71d708762",
+          "gzipSha256": "736d8256e2adb95d2f0e4e4f3e992337ce8028cdabe8fa621f5250ccb777569a"
+        },
+        {
+          "offset": 3091040,
+          "length": 57963,
+          "rawBytes": 4194304,
+          "rawSha256": "8c2a7031e3260afbe8f0b1383586a9e65a738c3dd91beb95b9e1101f87400c19",
+          "gzipSha256": "5b5a3670b837898a6cb3b279ad8c0c93d59ed4b9d6adc8bbc5e26a55a99df741"
+        },
+        {
+          "offset": 3149003,
+          "length": 61863,
+          "rawBytes": 4194304,
+          "rawSha256": "c8aa568c5ea4728af5c5077abdbed61fe727d9eb3c9cdf41199360b2949ed39f",
+          "gzipSha256": "216b1ea632c02a0fa080b5de89ceea57a18fa19e609a2f6310ecb752c8e18508"
+        },
+        {
+          "offset": 3210866,
+          "length": 84409,
+          "rawBytes": 4194304,
+          "rawSha256": "31a4f8e6e77730496eb2c9eccc3dc8a58231541f0d334c73746ce60cc4df8bb1",
+          "gzipSha256": "56a458f5fd442b5b32c725ba253f69063c71431593c95ae8389ab32020a5e0a7"
+        },
+        {
+          "offset": 3295275,
+          "length": 111213,
+          "rawBytes": 4194304,
+          "rawSha256": "5fb9f478c6f9e53cfd5937378d5e7e8d63f6fc80052b9bc14dc80453636d6191",
+          "gzipSha256": "a97605893dc5d024028d1f825e8dbecaa4444db6a4c3a830310a733608ed39da"
+        },
+        {
+          "offset": 3406488,
+          "length": 104525,
+          "rawBytes": 4194304,
+          "rawSha256": "04c91feed68580f75c1b268747723c1cd5b2dff28bb86e4b11130b3b30dd0ae9",
+          "gzipSha256": "eef453dff479d6e25bdb9ad8cdb1b3b9d026bfc39d0dd7ed303434653ad75459"
+        },
+        {
+          "offset": 3511013,
+          "length": 90016,
+          "rawBytes": 4194304,
+          "rawSha256": "b21c653cd0057afe578b061fb5d67200042f0343095cce02fcf307378013e218",
+          "gzipSha256": "7639f450d2236154480658d3f1d0f766b3cfcd08d35268a4b136e16cf18b5a7e"
+        },
+        {
+          "offset": 3601029,
+          "length": 102991,
+          "rawBytes": 4194304,
+          "rawSha256": "e8997d799f4bae462f3be13a5d5395d462899f64525497b707644b44223db67e",
+          "gzipSha256": "ae2befea01ec94aa8df0075a37be22e0f7f996e0484bd357199bcfa1027ee3fa"
+        },
+        {
+          "offset": 3704020,
+          "length": 81447,
+          "rawBytes": 4194304,
+          "rawSha256": "d5766a535cd603f2c941c2fec5cbd743a2cd1802b566ed0686fbd5d2a5544d38",
+          "gzipSha256": "a659c7174e10cc876585bab1bbc0a8da2147664b2a98d9debfa4142a57e7dec8"
+        },
+        {
+          "offset": 3785467,
+          "length": 1921,
+          "rawBytes": 14675,
+          "rawSha256": "221e1569ef2c4b76bdb325861b33417ebb92d1fe7118db488bbd78c8ff7d52ff",
+          "gzipSha256": "c5002e927770b3eaabdbc4327a0331f0877b00d34a67111e975b004dfb37c4df"
+        }
+      ],
+      "note": "Plan 5 actual process measurements; timing and memory targets are ideal budgets, never enforced. Missing and failed evidence retained. Superseded: the recipe changed during this X100 run, so its inputs are not one identity; see fast-2026-09-21T14-35-24.787Z.",
+      "measuredAt": "2026-09-21T13:38:51.031Z",
+      "completedAt": "2026-09-21T13:50:28.617Z",
+      "phase": "fast",
+      "passed": false,
+      "payloadSchema": "ramify.fast-measurements/1",
+      "build": {
+        "files": 466,
+        "sha256": "dd083132b6ca23fccd936262f9e7d23b1f94e2f2b295724df2364f7b7fb59bfc"
+      },
+      "workloads": [
+        {
+          "name": "I5-13:hook-latency-reference",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s100",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s1000",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-x100",
+          "status": "measured",
+          "passed": false
+        },
+        {
+          "name": "I5-13:checked-set-bounded",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:repeated-edit-plateau",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hot-warm-memory",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:cold-open",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:entry-footprints",
+          "status": "not-executed",
+          "passed": false
+        }
+      ]
+    },
+    {
+      "file": "fast-2026-09-21T14-13-12.725Z-d1cc9a98-d96a-497d-b38c-288086e5aa7c.json.gz",
+      "rawSha256": "0f48c2f60ac7132324ffd11fb7117ed3d12380b16726b92bbce242bf0479f3db",
+      "gzipSha256": "1cfe1adf56e0f2f05eef231cba3c407cde48bd1b382839e31883df18fc900c4f",
+      "rawBytes": 63714671,
+      "gzipBytes": 2894023,
+      "gzipMembers": [
+        {
+          "offset": 0,
+          "length": 252438,
+          "rawBytes": 4194304,
+          "rawSha256": "6f67a7de17c7655d8911b4492e9873aa341dbeed5abeffa331128e7af003954b",
+          "gzipSha256": "71b6beac3d9ffe3c10653de9877777dbfece1dfcf16c26deb8a86c8b82c54f9c"
+        },
+        {
+          "offset": 252438,
+          "length": 237974,
+          "rawBytes": 4194304,
+          "rawSha256": "0429e2b11440b7ff4356f08dc9d37adab90eab84a0f68bfbe0cb25aaeeefca03",
+          "gzipSha256": "9fcae628dd4a28be8a223747990393ad393617e6036507350e7bdf17bfa91630"
+        },
+        {
+          "offset": 490412,
+          "length": 225577,
+          "rawBytes": 4194304,
+          "rawSha256": "fee8a9351e77434b763af68c6a2ee40f789a3d89d0c3f17a1f8fe20162d9527e",
+          "gzipSha256": "29284dc3dc2c307fa25d8e1c105465f6cdbab652a5d01434cdeb63ea1b62a216"
+        },
+        {
+          "offset": 715989,
+          "length": 267881,
+          "rawBytes": 4194304,
+          "rawSha256": "c68b7c8988db3ce2f2a456a38b5430b7d39fb7bded017fcb7a5bf5cc02373a80",
+          "gzipSha256": "397fd0591a7ae2b23c855460276e4559ce315d54a0b66957eaa3c6e3bfcfed1c"
+        },
+        {
+          "offset": 983870,
+          "length": 315690,
+          "rawBytes": 4194304,
+          "rawSha256": "6180ab57b842bbb8eaf31bd45349e35d7137f66b6d62c2841ab7ffee03e4776c",
+          "gzipSha256": "2580cf1e44a8e4853ab94d2b4fe12e5e22dc076bcb52c81b0677933ffbdcf5e9"
+        },
+        {
+          "offset": 1299560,
+          "length": 261261,
+          "rawBytes": 4194304,
+          "rawSha256": "d3b06f8666f2f48342f7004a13ccc34103f53fff9bfd17dbf84137dc45a0f7be",
+          "gzipSha256": "b5c4a0974f88a939ebd79b12785962d1518a61992eabe40e8e5a953a52ba1349"
+        },
+        {
+          "offset": 1560821,
+          "length": 250376,
+          "rawBytes": 4194304,
+          "rawSha256": "8f99007476940e67d002ef633b959b2b8ebbc73dce769f6bb79276fda23e85a3",
+          "gzipSha256": "e562d5dd52ae174983652be684bf1766ad81c2dffa34c9c0658beafc917fa62e"
+        },
+        {
+          "offset": 1811197,
+          "length": 242584,
+          "rawBytes": 4194304,
+          "rawSha256": "fc5e402db9a790385636346518fda108415696d54636dba9f4610fb20ca6c99e",
+          "gzipSha256": "7e0c893695e29154e3f5766ce5d86e7f8999529fe79b2fa23839cc72312d7b9a"
+        },
+        {
+          "offset": 2053781,
+          "length": 238512,
+          "rawBytes": 4194304,
+          "rawSha256": "2c788300c6a3a15b5c98c97b2dc41322f90b29c1dcaaf64c4e37dfc7f3f5e0b9",
+          "gzipSha256": "548cc64253f1f128bc15caef503ef2cef3c71a9ff6334a4ce117c4dce72286c9"
+        },
+        {
+          "offset": 2292293,
+          "length": 169311,
+          "rawBytes": 4194304,
+          "rawSha256": "74f6ba240774f8f5ad2caf076c70c7fad02ecace3b9b82d3ae1be7ea91fa7e7f",
+          "gzipSha256": "f1eb82a4b9b250f7d22142bae12cd99cc8b94ed3906df5784dcbe3ed22be6195"
+        },
+        {
+          "offset": 2461604,
+          "length": 66470,
+          "rawBytes": 4194304,
+          "rawSha256": "ed3e0aa0d96eb1bd507289a67d9f1805a20763439e0f63c0c61d735e369be240",
+          "gzipSha256": "97b7b0cd64fd2aea0a9f5cbbd9f02c926d0fbe4027c358bec0e20b3b13746f9c"
+        },
+        {
+          "offset": 2528074,
+          "length": 65869,
+          "rawBytes": 4194304,
+          "rawSha256": "75059c180aad5af2b55ae380858a78cdcc7947d9e507eb6220e9d6f2977d2eb7",
+          "gzipSha256": "ffbc531ba19bd220e5c556ad267d2dba58ab7159020ed06df1436b87a364848f"
+        },
+        {
+          "offset": 2593943,
+          "length": 65614,
+          "rawBytes": 4194304,
+          "rawSha256": "99c65e7082f4228d46b14e184c4d9db8f2d7d22fb3636abf1dc9e2a138f8d652",
+          "gzipSha256": "0878940aa40c540e1038b64bbf17279a98ed89bd4f85a61ad0f1b3c70cb11649"
+        },
+        {
+          "offset": 2659557,
+          "length": 108259,
+          "rawBytes": 4194304,
+          "rawSha256": "4008424856e9255d0b7d15aa529a626b5b79ef7dd2d9d1f2a5e61fe76c25a33f",
+          "gzipSha256": "6b81849bdcb70e77a540f3ef0ee4c6327b6281ea660645fd47318bf490834f0a"
+        },
+        {
+          "offset": 2767816,
+          "length": 109344,
+          "rawBytes": 4194304,
+          "rawSha256": "0bde34d5ff97dc244e567f6b2bb2830174e95c1766f2778b25db2379ba314e0a",
+          "gzipSha256": "7f7e0002f5509a6250e9be47eedfc7e6d78e11f7cfd24a224bd48652d3203c2c"
+        },
+        {
+          "offset": 2877160,
+          "length": 16863,
+          "rawBytes": 800111,
+          "rawSha256": "a99e6885ea27e2bbd6bd5fba92499b5a0cb9d53e9b58d2a6ceb5b04f03f0a1da",
+          "gzipSha256": "cb9c175d0c5868f96ef2c86bd82b876923cdfa256860ab797f827c30f2bf2ef2"
+        }
+      ],
+      "note": "Plan 5 actual process measurements; timing and memory targets are ideal budgets, never enforced. Missing and failed evidence retained. Superseded: coveringEdit did not yet admit the pinned signature notes, so the racing predicate failed on a harness defect; see fast-2026-09-21T14-45-52.606Z.",
+      "measuredAt": "2026-09-21T14:13:12.725Z",
+      "completedAt": "2026-09-21T14:17:33.046Z",
+      "phase": "fast",
+      "passed": false,
+      "payloadSchema": "ramify.fast-measurements/1",
+      "build": {
+        "files": 466,
+        "sha256": "dd083132b6ca23fccd936262f9e7d23b1f94e2f2b295724df2364f7b7fb59bfc"
+      },
+      "workloads": [
+        {
+          "name": "I5-13:hook-latency-reference",
+          "status": "measured",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s100",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s1000",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-x100",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:checked-set-bounded",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:repeated-edit-plateau",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hot-warm-memory",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:cold-open",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:entry-footprints",
+          "status": "not-executed",
+          "passed": false
+        }
+      ]
+    },
+    {
+      "file": "fast-2026-09-21T14-22-03.435Z-e219f9f0-d356-48b2-9413-0ce23c4f86ad.json.gz",
+      "rawSha256": "9bc461ec0d8c71b3870612baafec0e2b6c5966f202d4c5daf5d5a89557bae918",
+      "gzipSha256": "9defeabdabd14c973097e327c1961f6e5aa37a4533c8a3eb3f0eea32a0a24601",
+      "rawBytes": 110259742,
+      "gzipBytes": 4618382,
+      "gzipMembers": [
+        {
+          "offset": 0,
+          "length": 269424,
+          "rawBytes": 4194304,
+          "rawSha256": "99d0d75ee5c5bc5b9257a842b033a2bf313c1144c279143ba8938570b298bd0f",
+          "gzipSha256": "b03e5834f755aa353ce4d74cabd095f3468b4e9124deee90d6ef5a1f3ca4e416"
+        },
+        {
+          "offset": 269424,
+          "length": 234336,
+          "rawBytes": 4194304,
+          "rawSha256": "cfde688b6566da90949b6570e861126c6ff0b05340056cb7c6764ea6846ae765",
+          "gzipSha256": "4a28903d9edcf2ccdfe6fa1887b9a24ab4e1ed5c148f96f439a1bed57b1f1e2d"
+        },
+        {
+          "offset": 503760,
+          "length": 227525,
+          "rawBytes": 4194304,
+          "rawSha256": "f1783da3311bbb78834aee88f9e7e892d366dda958b9456f993f88c65506f224",
+          "gzipSha256": "ebefd43229b43f4fdd5a13a51b9f8dea916b0d7dcd193ef24f382ea5b2ab047b"
+        },
+        {
+          "offset": 731285,
+          "length": 227631,
+          "rawBytes": 4194304,
+          "rawSha256": "84b26ff65fcc8e8ee1e3914a419481c7d21268819608733d2a1d4134203d18a7",
+          "gzipSha256": "5968d87e2a1efdf53e6fa6de477435c1149be27a44cde043f7c8c642c4f1e76c"
+        },
+        {
+          "offset": 958916,
+          "length": 234195,
+          "rawBytes": 4194304,
+          "rawSha256": "243db0cb21a1b6e198e231286ccacc49b61947e0ac155fbb607c2efeccd8817c",
+          "gzipSha256": "cdb1bf2b04b29d96a9bca71a305fabd652e6b0edd1d979b9b6e2cb434b7dc9fc"
+        },
+        {
+          "offset": 1193111,
+          "length": 228694,
+          "rawBytes": 4194304,
+          "rawSha256": "ddba672f5fdf63be099a99954b62a09dc5baf0f811172af6d0497689f53e3cea",
+          "gzipSha256": "94ae632dc0d954614f32709c9efd349f56555fe36a39d075da3000261698e84d"
+        },
+        {
+          "offset": 1421805,
+          "length": 226753,
+          "rawBytes": 4194304,
+          "rawSha256": "c87407107c5ded85d09d1a74e1f1969f5a9f7d7e4504906ff8c4b3204f4fb0df",
+          "gzipSha256": "68e3338907e8b62a2a2f8df074a626e5d50175b00a0157514a9cb87cbde2b522"
+        },
+        {
+          "offset": 1648558,
+          "length": 230103,
+          "rawBytes": 4194304,
+          "rawSha256": "7306fc1aef8db0d64b2550e2821f7d5f01e3bcca7ab54bf94ae04c1b0222dd86",
+          "gzipSha256": "b4ad3c86734e229a0b09741a4c43677f51a5f861d195b6fc3d0c1745bde2599c"
+        },
+        {
+          "offset": 1878661,
+          "length": 174347,
+          "rawBytes": 4194304,
+          "rawSha256": "ea065f5b09ce1fd9bbd585ca4724f13c8cf4ef461e00de6994b189a6d438d605",
+          "gzipSha256": "94c9f5cef1414279e43b9fcad92d7ea3aafff7e7b6a09394a2f345bacc016fad"
+        },
+        {
+          "offset": 2053008,
+          "length": 69210,
+          "rawBytes": 4194304,
+          "rawSha256": "da11262072b65b48435e483771c5b4bda08427a4e769f7a75c1602d042412217",
+          "gzipSha256": "b2b846da219b91ed107152c4bef220be4ef7cc37418c91247413b785febd0b50"
+        },
+        {
+          "offset": 2122218,
+          "length": 68751,
+          "rawBytes": 4194304,
+          "rawSha256": "c74f716158dd9b6f2ab32af8f25dd7213f0c204184a555af4ddb5f6c01c75ea3",
+          "gzipSha256": "574695800319c188eabaa8fb833b6ef8db81edf4cd75aa53a31d3970eda58841"
+        },
+        {
+          "offset": 2190969,
+          "length": 122944,
+          "rawBytes": 4194304,
+          "rawSha256": "ecbb3489c66340157b8c63c46c5749108efdeceec07c10b4b87a1eab72249fc8",
+          "gzipSha256": "7d18051d455c2bc5afdb9434ae7d419dcbdbcd5753448bf5667e4e8a088f93b9"
+        },
+        {
+          "offset": 2313913,
+          "length": 230106,
+          "rawBytes": 4194304,
+          "rawSha256": "e20c49b26f6ccb1f90682ad89d12b0c361a4ea3dcaa8115b648b676aae454a35",
+          "gzipSha256": "bf47eecdeeeb0f17aeac27a256ca2a5e03ba6b046851ee013f41f00e5f3196b8"
+        },
+        {
+          "offset": 2544019,
+          "length": 217644,
+          "rawBytes": 4194304,
+          "rawSha256": "d0be170b35ff6cd88f464eb55b56498d3607f38ef1baa88aec2bf9bbd00a7edc",
+          "gzipSha256": "a6e407399045794cbdfeef06ac703df61d66a2ae213da3dc9856786a22e65dc5"
+        },
+        {
+          "offset": 2761663,
+          "length": 219190,
+          "rawBytes": 4194304,
+          "rawSha256": "94f5d89c66aea13d1481429a0e83a8126b459677109bcba8b6b0d20051275095",
+          "gzipSha256": "b3de9fd3f497f7444b61d2f33ec5d718f644c0ce99b11cc5c15203b9834d6905"
+        },
+        {
+          "offset": 2980853,
+          "length": 224104,
+          "rawBytes": 4194304,
+          "rawSha256": "ea9f0429c0ecf07bdb28f073d7817ab35e0371ba03d5edf8728056bc51871bb6",
+          "gzipSha256": "95b9f10f3fc27b5b18b0ed54fee9ae58df4b2cb698914678e2f9012364f020e2"
+        },
+        {
+          "offset": 3204957,
+          "length": 218867,
+          "rawBytes": 4194304,
+          "rawSha256": "58761fb37d8b10535450207204f59b440f708f04d5bc8d6739844e637ec32b4c",
+          "gzipSha256": "6ae0eb8825e87f9c44979f6071393e6cdd7bf9b23a7da0c135b7745b8a387f5e"
+        },
+        {
+          "offset": 3423824,
+          "length": 217414,
+          "rawBytes": 4194304,
+          "rawSha256": "80602273fbf3bfe76003c3ca8c0db412c58bdb04c66c5ff0cd92a446179a13a8",
+          "gzipSha256": "95ae6e9a090df3afd766fe6af0be325807491b541491d74ac8a636b10dd30b82"
+        },
+        {
+          "offset": 3641238,
+          "length": 217026,
+          "rawBytes": 4194304,
+          "rawSha256": "9291e33414118be84789e912a61cf6775076adc1fbd0ef2bd9a1a235de4c1246",
+          "gzipSha256": "5f311c92bb3d5492f0265ec0404095240205275514c0a8db6de72621cc7dfc6d"
+        },
+        {
+          "offset": 3858264,
+          "length": 221047,
+          "rawBytes": 4194304,
+          "rawSha256": "281a699c433dcb05304b96c157c37df64142389b5603b373d7519a91745feba1",
+          "gzipSha256": "0c1ed663a92501fafe6b475ed802f0359852139cf132ddd0c6413477ca17030f"
+        },
+        {
+          "offset": 4079311,
+          "length": 100638,
+          "rawBytes": 4194304,
+          "rawSha256": "4615c5d1b69883bac3ba2baec99ba8390465ff3b7c06cfcb319c4e32910dcb82",
+          "gzipSha256": "2a54ad710b908f0e777583fc7b9caa367694c136301a3e9cd50b1bd80c585c55"
+        },
+        {
+          "offset": 4179949,
+          "length": 66115,
+          "rawBytes": 4194304,
+          "rawSha256": "5e05bf14f778b4a0701053e7aedffaa82517dfc39db10c96655a8b9408d181df",
+          "gzipSha256": "5f2a8f02743d5c0b47d719612114a045f6661cb0da88bdc54d1e4a62c481e8f0"
+        },
+        {
+          "offset": 4246064,
+          "length": 66042,
+          "rawBytes": 4194304,
+          "rawSha256": "2971ab30fd72d835e5ee6a883a66e5350f31a4540361a654ce296a7cfd47c220",
+          "gzipSha256": "75fca07ffa79fc1330860d9498b65a0286d105e6a596b2f2a1a6b267297a490b"
+        },
+        {
+          "offset": 4312106,
+          "length": 105383,
+          "rawBytes": 4194304,
+          "rawSha256": "2ca755d7b23201728a525129ef765f7ea3e314ee88896276d235e6c2b643dba3",
+          "gzipSha256": "ce4eae17aad998c04aa3aded107dcbbd55bbba12e499e658b7b7754d32e07942"
+        },
+        {
+          "offset": 4417489,
+          "length": 95344,
+          "rawBytes": 4194304,
+          "rawSha256": "e5b5620f76f6c029700b26f7b72e3c9bb2c5fdac1dec311a704605724a7277a4",
+          "gzipSha256": "f63eb03d2887b5f2ab7a9a9cab2a7bb9a47c9a4f734a707db3808484900861bb"
+        },
+        {
+          "offset": 4512833,
+          "length": 81146,
+          "rawBytes": 4194304,
+          "rawSha256": "4c2555f7ef9c108aca9cea0e6e025730d9a7fdd482d72514499a52fae2be136b",
+          "gzipSha256": "1d2e03f9948350e618979c8ab9fa51844abaf395961c6edd5615187a9f93631c"
+        },
+        {
+          "offset": 4593979,
+          "length": 24403,
+          "rawBytes": 1207838,
+          "rawSha256": "5309c5da494f751444acd3c73a88d17dc94b7281192d0a00f8988db2a007fae5",
+          "gzipSha256": "66d3753355d487e0437be80bfea0b8c6d5688cafa76480decd98e4a37cad38a2"
+        }
+      ],
+      "note": "Plan 5 actual process measurements; timing and memory targets are ideal budgets, never enforced. Missing and failed evidence retained. Superseded: S100 pinned no signature note and torn measurement.json reads failed the lifetime predicates; see fast-2026-09-21T14-53-02.403Z.",
+      "measuredAt": "2026-09-21T14:22:03.435Z",
+      "completedAt": "2026-09-21T14:31:04.155Z",
+      "phase": "fast",
+      "passed": false,
+      "payloadSchema": "ramify.fast-measurements/1",
+      "build": {
+        "files": 466,
+        "sha256": "dd083132b6ca23fccd936262f9e7d23b1f94e2f2b295724df2364f7b7fb59bfc"
+      },
+      "workloads": [
+        {
+          "name": "I5-13:hook-latency-reference",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s100",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s1000",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-x100",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:checked-set-bounded",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:repeated-edit-plateau",
+          "status": "measured",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hot-warm-memory",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:cold-open",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:entry-footprints",
+          "status": "not-executed",
+          "passed": false
+        }
+      ]
+    },
+    {
+      "file": "fast-2026-09-21T14-31-28.446Z-c43393a8-18eb-4abc-8d7f-d4ab11222785.json.gz",
+      "rawSha256": "7e10ebc422d23db31c23bd57e81212ff1d8952eb0c9676a5604db695f1ae3d26",
+      "gzipSha256": "669140f717a98522a92fe66be0716aba15aa051b3923713e49cc847137f76e74",
+      "rawBytes": 31398855,
+      "gzipBytes": 552168,
+      "gzipMembers": [
+        {
+          "offset": 0,
+          "length": 126073,
+          "rawBytes": 4194304,
+          "rawSha256": "423de7f1de754980aaaedfc4e6c9e46b0aa1798f331019ddec9bdbe4746c0f34",
+          "gzipSha256": "48b5604ecd196597487696046069678273b4d8186025545c07c5456ba4a34802"
+        },
+        {
+          "offset": 126073,
+          "length": 52139,
+          "rawBytes": 4194304,
+          "rawSha256": "378e73d7bd085fde2d37b30a5ddd388ea3364c17947d9f2f56d8e02e55778c7b",
+          "gzipSha256": "04f43c5b441e11f430380d2f4bde78ac80ccd830d1569e95705d6450092b8a78"
+        },
+        {
+          "offset": 178212,
+          "length": 50837,
+          "rawBytes": 4194304,
+          "rawSha256": "42b5e5c1b45b7b321743fe0d386eb881247caf494c35c89eb715bbb693079aab",
+          "gzipSha256": "4a02c17c5485ca15bae1fe7533a470a4af44e4362463b0f9a1bafb419e9fa619"
+        },
+        {
+          "offset": 229049,
+          "length": 51639,
+          "rawBytes": 4194304,
+          "rawSha256": "3b6f08650bfb36182d5f7f1467c4c8ca676cb6bb4641e4355e424b038b2381f4",
+          "gzipSha256": "58fa3b936a8426a7286e449f15aac74a06170429d4faf57da291b1fe03e644c9"
+        },
+        {
+          "offset": 280688,
+          "length": 51435,
+          "rawBytes": 4194304,
+          "rawSha256": "574236637bea504d5f2536ead676c9e2ccb0cf09ee2f619610a01cc6675df5fd",
+          "gzipSha256": "3e7b924c60f32c8d09da057d15aa601fb539e07087258a7c29b2dc13290782fb"
+        },
+        {
+          "offset": 332123,
+          "length": 51090,
+          "rawBytes": 4194304,
+          "rawSha256": "cbc3724072caac88d2b5be370c7cf25c16bdc00cd0252c59f13280da0715b984",
+          "gzipSha256": "65f16b1bb5aa9ba4b0b1d487762f005f63a837101a5138c224730571d70f75de"
+        },
+        {
+          "offset": 383213,
+          "length": 126095,
+          "rawBytes": 4194304,
+          "rawSha256": "34b524e9069f8e509e8dcaef8ee630efed052e0c41e6394e399d09c34533ba8c",
+          "gzipSha256": "aee796ffa65f09093c63d1550fcceb0e7264155d73f51b6fa47f662fb151a61b"
+        },
+        {
+          "offset": 509308,
+          "length": 42860,
+          "rawBytes": 2038727,
+          "rawSha256": "a8808df2b0989bfee3195cc636fcbe7e9713b1d7e5f4262dbfee7278f8202598",
+          "gzipSha256": "48b19e4ab58cf4b333c392682b3002e6948ad120910b51bb75f2e99b1725ffc4"
+        }
+      ],
+      "note": "Plan 5 actual process measurements; timing and memory targets are ideal budgets, never enforced. Missing and failed evidence retained.",
+      "measuredAt": "2026-09-21T14:31:28.446Z",
+      "completedAt": "2026-09-21T14:33:04.944Z",
+      "phase": "fast",
+      "passed": false,
+      "payloadSchema": "ramify.fast-measurements/1",
+      "build": {
+        "files": 466,
+        "sha256": "dd083132b6ca23fccd936262f9e7d23b1f94e2f2b295724df2364f7b7fb59bfc"
+      },
+      "workloads": [
+        {
+          "name": "I5-13:hook-latency-reference",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s100",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s1000",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-x100",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:checked-set-bounded",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:repeated-edit-plateau",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hot-warm-memory",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I5-13:cold-open",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:entry-footprints",
+          "status": "not-executed",
+          "passed": false
+        }
+      ]
+    },
+    {
+      "file": "fast-2026-09-21T14-35-24.787Z-d19ea3ed-a146-44b4-bcc3-296df7ed1069.json.gz",
+      "rawSha256": "b3e93e3ee37ea0d291392e9d7e90e57bedfa817c281c0cda91a1c71ca9ddda63",
+      "gzipSha256": "afad0b267f8c23bdf5517a61c4e9faddf91d1789ea6c6b6093aa6706ec7de54d",
+      "rawBytes": 114077620,
+      "gzipBytes": 3822211,
+      "gzipMembers": [
+        {
+          "offset": 0,
+          "length": 285811,
+          "rawBytes": 4194304,
+          "rawSha256": "2a10235c8567edfa75b4a3287d95c701677e28c51972b33cfe672e1bbb59ec96",
+          "gzipSha256": "ad33bef8393d072f99cc90f49bbd64bcdb56cc2aadf2b82a0a29f63b5be767bd"
+        },
+        {
+          "offset": 285811,
+          "length": 224558,
+          "rawBytes": 4194304,
+          "rawSha256": "a16e68d50f13ad26da604171066aa20f7f8c9e32dde19e0c98f400cc564f3e3a",
+          "gzipSha256": "f2172032b99dd402931e4a814db846210b40ed23a125fc2f63efd3fff94d7597"
+        },
+        {
+          "offset": 510369,
+          "length": 221563,
+          "rawBytes": 4194304,
+          "rawSha256": "fc46d66542c79e49b0577e325407d43eece3ed7a2ba4cfd0444af1bd91087fca",
+          "gzipSha256": "c468cf5f99ba8806db813270da0df2fd66df0feb4ed721636d9dd94f8a1a5b95"
+        },
+        {
+          "offset": 731932,
+          "length": 216666,
+          "rawBytes": 4194304,
+          "rawSha256": "94d4da2efdc9a8ac3439e9df8afd26a087216d217bda469136c58516d76c1244",
+          "gzipSha256": "56ecfac596b5dafbebdcbdbbdce9935de71fa087b8debad97f70381a4b1ec193"
+        },
+        {
+          "offset": 948598,
+          "length": 237597,
+          "rawBytes": 4194304,
+          "rawSha256": "4ac061adca9b8f65a6d10db0a6bfe31f8376014cb508046f066ae6591c2ae3d5",
+          "gzipSha256": "071555d56c551ae035c785df45f094a58533c8ab0af431eb96d35d0ccb2709fa"
+        },
+        {
+          "offset": 1186195,
+          "length": 273985,
+          "rawBytes": 4194304,
+          "rawSha256": "c9c66d6128157e9e01efd00b4e5b0cd57f7961e3696e5ffd5b25138dc345b614",
+          "gzipSha256": "13a801ee351b8f207e7f6451b9ab74b432abc01eb54450e1b9708992ce713b1d"
+        },
+        {
+          "offset": 1460180,
+          "length": 237936,
+          "rawBytes": 4194304,
+          "rawSha256": "a24ff4ae491e236c9e176e186633621560c79602c48086640e379a5caf3b90d7",
+          "gzipSha256": "5b9ef644036b761da88764a2723b21fb2b71edd8040e3423d95ab6a0fb9203f2"
+        },
+        {
+          "offset": 1698116,
+          "length": 232251,
+          "rawBytes": 4194304,
+          "rawSha256": "69f64d2846ce2fa21509a278e78890c76a5f1addf71b7170ea24a442729ae1fe",
+          "gzipSha256": "2c080019e526c5f32d4a2b7dd558544eaaabc7fc990e8a1c128e9fdb8fc4b8c1"
+        },
+        {
+          "offset": 1930367,
+          "length": 231012,
+          "rawBytes": 4194304,
+          "rawSha256": "9a18e85ee88c202d92607ed52a9a51b6d20367d7c578c578f96d38eb0b0c8de6",
+          "gzipSha256": "615322b99450a6f5fc825716fed3bcafbc20ebabf0c910524e7a1e4342abe522"
+        },
+        {
+          "offset": 2161379,
+          "length": 229669,
+          "rawBytes": 4194304,
+          "rawSha256": "6311e07b40d0acfd3f8ef5bc56846273bcfc7799a945ece78d540c40c716326e",
+          "gzipSha256": "55c6f3a7ed322a7ea9988d520b85d74cce0c518bdce2d21111d966ff81744172"
+        },
+        {
+          "offset": 2391048,
+          "length": 256906,
+          "rawBytes": 4194304,
+          "rawSha256": "325908f326427e234b96203acd0f30a1e99d17ea7390e86dbf47c8fbb0ffab2c",
+          "gzipSha256": "af0dc6d6475623b4577b534e575cb8615b0a64da9bef28a125c3c3a52aa28bd8"
+        },
+        {
+          "offset": 2647954,
+          "length": 106534,
+          "rawBytes": 4194304,
+          "rawSha256": "fb33dae97e9b1d131cd479ed12ac026b0494e066d6fbf5d6a451ba47b55e6e3d",
+          "gzipSha256": "eebe5dfdb0f77d5e09b9e2dabcd24816aa0ad8d1b044e648c587193b486f6a82"
+        },
+        {
+          "offset": 2754488,
+          "length": 56146,
+          "rawBytes": 4194304,
+          "rawSha256": "0bfbdbfc1275a3ab79595d28da1232f3f8dbfdea756a4bf3421a41079bc5a039",
+          "gzipSha256": "5d6df8ea06e25a2bd6fe71416ce54469773dd87d1eb1612257f7d223671b0ffd"
+        },
+        {
+          "offset": 2810634,
+          "length": 56322,
+          "rawBytes": 4194304,
+          "rawSha256": "be1bad7e7932ea1504e576614b6fbf68e643edaec2fac1b85380ac15018d0615",
+          "gzipSha256": "d7fd703a60de5ad329e997bf2817e1374430dede8c263fe55a1fbf429c3dc54c"
+        },
+        {
+          "offset": 2866956,
+          "length": 53477,
+          "rawBytes": 4194304,
+          "rawSha256": "280318fb694ecade8d2f2186c5e802a94f1ad54080090e64c464c64de6e86070",
+          "gzipSha256": "9e77ca7bf9a77c1739ade24d8ebc5b1ac4211ad7e7217802e540f2eb65b95e77"
+        },
+        {
+          "offset": 2920433,
+          "length": 53606,
+          "rawBytes": 4194304,
+          "rawSha256": "9b1c04039a692bd22f67f207fc9cfdb300fb9bffc2314a7695b5647631648e0c",
+          "gzipSha256": "2907f0f73f94e271ac3b180fa5de1af39ee5674432281a6fb72270464488015e"
+        },
+        {
+          "offset": 2974039,
+          "length": 55122,
+          "rawBytes": 4194304,
+          "rawSha256": "ac96ac73596dbed38a4510ee80cc8e679f42da7557a81109a3d8279220b12ca4",
+          "gzipSha256": "28761a9e84af86f2f1109083cc441a0473eff6d6f4a24592699d807eb43519b1"
+        },
+        {
+          "offset": 3029161,
+          "length": 55668,
+          "rawBytes": 4194304,
+          "rawSha256": "a04bf8c08b96d38135d057c00cedbaa0fcea1c1fc942b82bc4ba254f59e19609",
+          "gzipSha256": "71404f66020c0aa786484cba3ad6021c3e091dcf973e9ea5ec739c8339af75a8"
+        },
+        {
+          "offset": 3084829,
+          "length": 56135,
+          "rawBytes": 4194304,
+          "rawSha256": "08a1591efce917fdd6aabdcf78dec97a0d7b81b7c41fb69271cdf70db5db78dd",
+          "gzipSha256": "ed05a0b888ab24987c2fc799cd5d832a70f638a0d3ff56c2e78f1d15351869e9"
+        },
+        {
+          "offset": 3140964,
+          "length": 56110,
+          "rawBytes": 4194304,
+          "rawSha256": "759f99802a8a1822ae8f48ea768f402c7669ece4f57c37ea8bb03d1423925362",
+          "gzipSha256": "6cf9f5563c59aa685560d707c13c8b7c6db403976ea62ffbd7e6d1ff98227778"
+        },
+        {
+          "offset": 3197074,
+          "length": 56709,
+          "rawBytes": 4194304,
+          "rawSha256": "658c10c68fdc03b6ba0822d036cda1ea2c2443bb39b4e6066d2c13d9713c7048",
+          "gzipSha256": "5c6648de4f811ec5d963f1663e7b0ae42a40046161e3df5afe28cf0753c8a09a"
+        },
+        {
+          "offset": 3253783,
+          "length": 55340,
+          "rawBytes": 4194304,
+          "rawSha256": "73346b51ad69d3dc01f11b2e5f49ac61bc498ae7686759f384f3bb9990d0fff5",
+          "gzipSha256": "d65db13e475eb0eb1b1348af1a53fd33fcaafdac44456c614c8af12cd3ebc02c"
+        },
+        {
+          "offset": 3309123,
+          "length": 90465,
+          "rawBytes": 4194304,
+          "rawSha256": "e7c3f602bbe24ac0c5c161a5c9e82ab2bca3f890950e4be37e2e1adb87c117ee",
+          "gzipSha256": "4409cca94ce6b158a5818a104039889f1e41372228213bcafc4e4619696e421a"
+        },
+        {
+          "offset": 3399588,
+          "length": 106347,
+          "rawBytes": 4194304,
+          "rawSha256": "1e4ec9b280dd5f53f834bfbcb62346f61ff8baf7e778a6f735b3850ed57f1c76",
+          "gzipSha256": "a9b8c49fef6eeb188a36bfc8522d55257356c45e4e1805dcb989c23d8bd8f925"
+        },
+        {
+          "offset": 3505935,
+          "length": 107478,
+          "rawBytes": 4194304,
+          "rawSha256": "438b039dfbc90cee4533b913fa1dabf34597f721a10f2bb3d04977bd9a2ba432",
+          "gzipSha256": "0f3587e4694fd3f9ba64ceca7e188cd0ecf07747b232e655cc1d442cb87cc94e"
+        },
+        {
+          "offset": 3613413,
+          "length": 105205,
+          "rawBytes": 4194304,
+          "rawSha256": "d780f7f10e98556ddf27415d3ac2976612ff10d00b642995cb8aaba324fe5ff8",
+          "gzipSha256": "8636a2603fff147e40bfa5e37f2659a810aa28eb2f2bead71fb6bac53960c445"
+        },
+        {
+          "offset": 3718618,
+          "length": 84969,
+          "rawBytes": 4194304,
+          "rawSha256": "d6cd69e2ab2e54f15dcc06474dede46428c4a7e269be4e62fbff68d5a547dbae",
+          "gzipSha256": "9502839531c7d3f0141ba5a26d01a2f6ac35fba840a3fc6c91b079dea0abf499"
+        },
+        {
+          "offset": 3803587,
+          "length": 18624,
+          "rawBytes": 831412,
+          "rawSha256": "678d7a5025d97b4f7e8c87aff74583fb359533cd99bab3d875bae2cdc43067d9",
+          "gzipSha256": "2bda1500f32397925b4dc6ef05be25fb41e7b98bd5e8119013e5ea56d9580220"
+        }
+      ],
+      "note": "Plan 5 actual process measurements; timing and memory targets are ideal budgets, never enforced. Missing and failed evidence retained.",
+      "measuredAt": "2026-09-21T14:35:24.787Z",
+      "completedAt": "2026-09-21T14:45:24.469Z",
+      "phase": "fast",
+      "passed": false,
+      "payloadSchema": "ramify.fast-measurements/1",
+      "build": {
+        "files": 466,
+        "sha256": "dd083132b6ca23fccd936262f9e7d23b1f94e2f2b295724df2364f7b7fb59bfc"
+      },
+      "workloads": [
+        {
+          "name": "I5-13:hook-latency-reference",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s100",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s1000",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-x100",
+          "status": "measured",
+          "passed": false
+        },
+        {
+          "name": "I5-13:checked-set-bounded",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:repeated-edit-plateau",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hot-warm-memory",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:cold-open",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:entry-footprints",
+          "status": "not-executed",
+          "passed": false
+        }
+      ]
+    },
+    {
+      "file": "fast-2026-09-21T14-45-52.606Z-05325119-2620-4c66-b7cb-a6ad25681295.json.gz",
+      "rawSha256": "8e55781a79e9feccbcf59ffde7ddef55507392cfeec794437d6f9732fdf3126b",
+      "gzipSha256": "d5569e2609f5b46dbbd9550f57aa4cc10f1fe5c06f88ca177d689e67663cd473",
+      "rawBytes": 62367351,
+      "gzipBytes": 2994755,
+      "gzipMembers": [
+        {
+          "offset": 0,
+          "length": 252791,
+          "rawBytes": 4194304,
+          "rawSha256": "2f9dca2363a0be3d0604df65105842df9f8ed1d6060bffceb2029fefb2ede66f",
+          "gzipSha256": "9698fdf589336260574a60eb92cc1ebe13d2f36696daf1f3ad8409379026ec9f"
+        },
+        {
+          "offset": 252791,
+          "length": 240071,
+          "rawBytes": 4194304,
+          "rawSha256": "728526990936c4f6bf3d8c96f5df8532f53d1d96b5ad2c60dc1e6e39f83d4ce0",
+          "gzipSha256": "edd99ceead75146cda40bc0d988674ef02ab0bbf795a5239fc9b5b36a2c653ec"
+        },
+        {
+          "offset": 492862,
+          "length": 231764,
+          "rawBytes": 4194304,
+          "rawSha256": "6f0d858bac111076ac4fa1d7a896369be2fa40aa0579427b2693e4fd2e86ce4c",
+          "gzipSha256": "41a0b4036c6d7096c419bbd7f0a31df329c701e533f1acf8c43ce52fc1e6214d"
+        },
+        {
+          "offset": 724626,
+          "length": 270044,
+          "rawBytes": 4194304,
+          "rawSha256": "0db5b1012acd275f1eb8123fc5a45a7188686266390417ae1859f65f8abb61f0",
+          "gzipSha256": "36e5e059c0da02d6dcef803c67b92eff37851441a94ad3310f4d929aaad2e615"
+        },
+        {
+          "offset": 994670,
+          "length": 316033,
+          "rawBytes": 4194304,
+          "rawSha256": "7cb583a06929d80e7ac367bac483bfb30084d0daaa4aae0db0a133b5e34b5744",
+          "gzipSha256": "6aaee61a5de94aca0f1e28a3cef0a07dc559872a5d6c1cff83e869c3326d2365"
+        },
+        {
+          "offset": 1310703,
+          "length": 283959,
+          "rawBytes": 4194304,
+          "rawSha256": "28c52a3168fe526cf7ce6156cd32bb1d322c26e6a72c8b49e0a8fc378e46d3dc",
+          "gzipSha256": "a3609610f63bb123182eae46eb58ce9ee1cfca3437ce0af1686a771c77396538"
+        },
+        {
+          "offset": 1594662,
+          "length": 275885,
+          "rawBytes": 4194304,
+          "rawSha256": "b415ab806a4c92fde8dbac5ee416ef3c1d3b8dc88fed599b048cd3dc75a10ea7",
+          "gzipSha256": "1b07e006f60e21b2869f7567942c106a202d4c18588d144de157475c42ae945e"
+        },
+        {
+          "offset": 1870547,
+          "length": 277738,
+          "rawBytes": 4194304,
+          "rawSha256": "4c1bcaf248e23e4f433a117d2ec45505d9c190730e598902c34009b47dffee8c",
+          "gzipSha256": "dd94ff535971a0e2099c86cf91f89083d09f8d93c6531e2f07ff261e59ea0a9e"
+        },
+        {
+          "offset": 2148285,
+          "length": 263756,
+          "rawBytes": 4194304,
+          "rawSha256": "eaeff16c6d5019886c0ef810e84a665dda6e6b64e1e9f43598293d35cdf09c36",
+          "gzipSha256": "2ca443ca9ca6046abdb36b469c946b00d1173a42a1d3d4ff24360a48f6bc691f"
+        },
+        {
+          "offset": 2412041,
+          "length": 145917,
+          "rawBytes": 4194304,
+          "rawSha256": "6d90800a962e2a4c18a5a07c947c0e0ceecff834c30f70a3b6716be252ca7f11",
+          "gzipSha256": "cd4388d1303e83c5cc447357d7b649aa536c8b354a24008149777c8d36097b85"
+        },
+        {
+          "offset": 2557958,
+          "length": 69701,
+          "rawBytes": 4194304,
+          "rawSha256": "0d3a9e3ddcd51286a4f78290c9d3a9f20e22b12b8447b61298c67573b20077bd",
+          "gzipSha256": "2c526f6920c202ee189a8e7ac7506b9775708e7ba3dd72104e560864967f0d43"
+        },
+        {
+          "offset": 2627659,
+          "length": 73516,
+          "rawBytes": 4194304,
+          "rawSha256": "e7d8f2c2be5ac308daa6bc3c12a5b675cf8a899c882ad07d4f94768dcfba17ab",
+          "gzipSha256": "44fdfe4681f78eb39a59603b503e76fe43a8cb6989742caf8a92edf18c079ac5"
+        },
+        {
+          "offset": 2701175,
+          "length": 106510,
+          "rawBytes": 4194304,
+          "rawSha256": "a90a4d6bdd0d8973a6ff0a1d6976b2bb324bef1bb8b0ada2f1f8923e0aa10b9b",
+          "gzipSha256": "649d04da2d5743b6069dbc49e7a577e8862032feccc492e4c5c5b5b6c1d5e2b9"
+        },
+        {
+          "offset": 2807685,
+          "length": 115550,
+          "rawBytes": 4194304,
+          "rawSha256": "8600b5b6c1ca49cc6e44883d8fb28f56d3249244d9b72755bb440145e3aa7cd6",
+          "gzipSha256": "81f74316705423df6a331e5bf89eb9d865ce34cf99049a93a9319c9266d4564d"
+        },
+        {
+          "offset": 2923235,
+          "length": 71520,
+          "rawBytes": 3647095,
+          "rawSha256": "38c26172d47de4d076722fb26d876a0959f59ca1bafbb681b8c5bb8e6352b884",
+          "gzipSha256": "a4ce8e9c7adee90927dcb1ac7a88c612c207117647d55d5985b1d180512dd671"
+        }
+      ],
+      "note": "Plan 5 actual process measurements; timing and memory targets are ideal budgets, never enforced. Missing and failed evidence retained.",
+      "measuredAt": "2026-09-21T14:45:52.606Z",
+      "completedAt": "2026-09-21T14:52:45.753Z",
+      "phase": "fast",
+      "passed": false,
+      "payloadSchema": "ramify.fast-measurements/1",
+      "build": {
+        "files": 466,
+        "sha256": "dd083132b6ca23fccd936262f9e7d23b1f94e2f2b295724df2364f7b7fb59bfc"
+      },
+      "workloads": [
+        {
+          "name": "I5-13:hook-latency-reference",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I5-13:hook-latency-s100",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s1000",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-x100",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:checked-set-bounded",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:repeated-edit-plateau",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hot-warm-memory",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:cold-open",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:entry-footprints",
+          "status": "not-executed",
+          "passed": false
+        }
+      ]
+    },
+    {
+      "file": "fast-2026-09-21T14-53-02.403Z-f611075f-ede1-4e43-99ab-e5b7dc5a0860.json.gz",
+      "rawSha256": "cb8ae42d9e25b7375e8e668da42bed2602e120647434365ebcc1c1698e899f66",
+      "gzipSha256": "b8957c1d59e971f19d3d9337118c1f760895cfd5685a35e811d95e904a59a3ce",
+      "rawBytes": 109768976,
+      "gzipBytes": 4650787,
+      "gzipMembers": [
+        {
+          "offset": 0,
+          "length": 279514,
+          "rawBytes": 4194304,
+          "rawSha256": "f881965b5920130d6753e762eb8a98b008afa3c98f42b2548a605152a683e6ac",
+          "gzipSha256": "21cef8a513cfb3635b841d4d1c399decddc54bcfca11f9d6338cd61b02a8f059"
+        },
+        {
+          "offset": 279514,
+          "length": 242444,
+          "rawBytes": 4194304,
+          "rawSha256": "c9391e51e7391ad6b5d2d6ee36aeb607cbc9d2d217a3aa346d92d5f4b555f397",
+          "gzipSha256": "b71bd2f8c5c63a46399e5ad4fd940fa85460bc0d6f66222a84100365a65e29b8"
+        },
+        {
+          "offset": 521958,
+          "length": 245517,
+          "rawBytes": 4194304,
+          "rawSha256": "4f14b783db41122325b4b8d5aeed0f292bf917e344a1d2b99df654d53fd30016",
+          "gzipSha256": "d3a38581b1dd8587942a6195ec162977137fa4b3802bdbbd7651a154ceb4fb4c"
+        },
+        {
+          "offset": 767475,
+          "length": 229221,
+          "rawBytes": 4194304,
+          "rawSha256": "695585dce4cd4748bf1d714bbc2c3beb3acd87a217326679877bded5768fefd5",
+          "gzipSha256": "033bb84b878bb3922166f8cb52c98623c67aa855bfa124f7c25ab141bd6fba64"
+        },
+        {
+          "offset": 996696,
+          "length": 230360,
+          "rawBytes": 4194304,
+          "rawSha256": "d8a81d55dd4e7e44435495c236a30a9d1ee6125a9fdca10d5bb7bcd948f936e5",
+          "gzipSha256": "b250f536612f0549a930a03f7b900d13b52a607e5eaf992634624e16943617de"
+        },
+        {
+          "offset": 1227056,
+          "length": 232575,
+          "rawBytes": 4194304,
+          "rawSha256": "652f93bbefe1b34ed1cb375e8cdd7005c5e52f428d89c7ee61db6c136c3e8206",
+          "gzipSha256": "9c7041b9d92f8486f504f5536cbd8c3078194fd88911403d40506cab91607391"
+        },
+        {
+          "offset": 1459631,
+          "length": 231209,
+          "rawBytes": 4194304,
+          "rawSha256": "e8f00850740a3fd08acb36c7445f08be0c4688a9f2dca7b0457300718b8cc654",
+          "gzipSha256": "2c9325fcafce6e32bc8ef4e1974b01ee3424ef69fa150d34d537582fa99ce66e"
+        },
+        {
+          "offset": 1690840,
+          "length": 231020,
+          "rawBytes": 4194304,
+          "rawSha256": "d311e80286c3cdd8eca3a3191786c23c91f3a950955a3beacaeaf06808bc42ed",
+          "gzipSha256": "ffa8788022c61f98128558fda952f6d1929a9dc99f7bb77575d91dcaddce9805"
+        },
+        {
+          "offset": 1921860,
+          "length": 164582,
+          "rawBytes": 4194304,
+          "rawSha256": "0be9306219e39305543352d8cc7378a69015bec83c1721071edcb418a221f3c4",
+          "gzipSha256": "12b34ac2a7a0ef6e754684ca1c931a5a9a74f157f3979849cf736dee641ae35f"
+        },
+        {
+          "offset": 2086442,
+          "length": 68929,
+          "rawBytes": 4194304,
+          "rawSha256": "cb40023a27c1fef5a4192a58315c73a9577af7468033e3f6bade10cf0ec844b1",
+          "gzipSha256": "c4a15505c04ee93920350667c9e35159374964417fb989513f1bfecb8a0e9e4a"
+        },
+        {
+          "offset": 2155371,
+          "length": 71766,
+          "rawBytes": 4194304,
+          "rawSha256": "fd4f367f2c530e280da8d6af578cffe7cec0bb5d13c77bc6805e111b33d7e3d1",
+          "gzipSha256": "30f95c9455b2fe675df3ea84d525b796c7dd15ca11b22edf71eaab61fa2ecef1"
+        },
+        {
+          "offset": 2227137,
+          "length": 165467,
+          "rawBytes": 4194304,
+          "rawSha256": "857c3930c3afa254582f9c35c063af3822831277b03a9bad05bc895dd5c1ada6",
+          "gzipSha256": "308728d42cf25638d3a44bc295e0186048af5a513cb74947cd70e68a24961337"
+        },
+        {
+          "offset": 2392604,
+          "length": 222236,
+          "rawBytes": 4194304,
+          "rawSha256": "8f05d9242aad1a0bc033ea85f392dc9da7b8f5ce2daebc461c4ee9c6df416bb9",
+          "gzipSha256": "a35f6ecba3a618d9539f81747e147352acba57fadd3b7ab83294f3ffee8849b6"
+        },
+        {
+          "offset": 2614840,
+          "length": 218251,
+          "rawBytes": 4194304,
+          "rawSha256": "1e857dd3be96d0cf33ffc27c2f5d4e903129389c0c536e82b63cef66dbf266e4",
+          "gzipSha256": "d6d6a5dacb20a3f89940e41e08d1f93679711ad9f1bd2274402b8f6e21620945"
+        },
+        {
+          "offset": 2833091,
+          "length": 220060,
+          "rawBytes": 4194304,
+          "rawSha256": "b50497dfa3f234a186e9dd79c59c5794a53a7afd085c185bb1ae5ff44f90246f",
+          "gzipSha256": "44c18d1e4dcdef110966171f59ab3ef828f2494e5125f19e459523491c886c23"
+        },
+        {
+          "offset": 3053151,
+          "length": 220623,
+          "rawBytes": 4194304,
+          "rawSha256": "8034b5d747daeadfdc2bfec21356f0a843e8f2ebaa27c28c856ca54c2cb589fb",
+          "gzipSha256": "bfd67b574f2ccc004559e3ae0e94f519d49d1f05765c1e9eb03e9fc0cdd1a880"
+        },
+        {
+          "offset": 3273774,
+          "length": 221176,
+          "rawBytes": 4194304,
+          "rawSha256": "3bf95b6507a3ce07cc46bd4226efc9d52d3241e4710122e91b524fbe64483926",
+          "gzipSha256": "18667f7ec190dd9aa9e4269a932a4e87be4c94a037ec601a236ef290332f3f05"
+        },
+        {
+          "offset": 3494950,
+          "length": 218304,
+          "rawBytes": 4194304,
+          "rawSha256": "9805960a294ff79cdc72888578c10bc7225ee83b9311ca702ddfef40adddb5ea",
+          "gzipSha256": "3934a02acba2e412567a972672aef0b51f9be4392fa1f002a11bed7239fff649"
+        },
+        {
+          "offset": 3713254,
+          "length": 220058,
+          "rawBytes": 4194304,
+          "rawSha256": "0afa924f2922d38691670b0b0da162ac67a0a3da9be4e6cfb77f1beca36cf38e",
+          "gzipSha256": "8a1b30198141bfd57788b3b086415c7f9d741e52704a6a672a7a891607587e13"
+        },
+        {
+          "offset": 3933312,
+          "length": 218507,
+          "rawBytes": 4194304,
+          "rawSha256": "9073014d127633bc849f6888e976a0dd8ccb17eaf148ca4e225a4073046e2fd0",
+          "gzipSha256": "7c13165d2bcd58a8925057f1a23379d59865bd14a8f4fedbd9c29b2e6cb4f953"
+        },
+        {
+          "offset": 4151819,
+          "length": 65450,
+          "rawBytes": 4194304,
+          "rawSha256": "33ee5d9c278d11668b0b7d14e2a224688ac8a1efd4df48906d87985857b4273f",
+          "gzipSha256": "e1ed5ae01fd04a626fdf6fdf968b798af95cad16a9b6880a4b9493680eb45797"
+        },
+        {
+          "offset": 4217269,
+          "length": 65589,
+          "rawBytes": 4194304,
+          "rawSha256": "7ce990547478b0087b0011747c9c58b16acdd6d182525ec99a595946ab971eef",
+          "gzipSha256": "627fdf708835a827c11a56f9e35b3657f193a3de84d98f97691a5fe75e94ff86"
+        },
+        {
+          "offset": 4282858,
+          "length": 66412,
+          "rawBytes": 4194304,
+          "rawSha256": "d6d66e1d7d2ded75aa47b8f22b46712af47fbe17f822eb315dfaea49d491c32c",
+          "gzipSha256": "ac0e94d87637e9efe6453fd7b87be1675e28aeba810dc083761b0e2d3034748a"
+        },
+        {
+          "offset": 4349270,
+          "length": 116405,
+          "rawBytes": 4194304,
+          "rawSha256": "ad4a9b85d3151bdb31630110cad77a3db2dd9454f88f6dc5d5d46a0415e78750",
+          "gzipSha256": "7e809471b19e5b230a82036d2c4b66e2d38fe6fd875e54240efd575874c1b3fd"
+        },
+        {
+          "offset": 4465675,
+          "length": 90787,
+          "rawBytes": 4194304,
+          "rawSha256": "4fe0cf7fdf0b0175711c9e2e34a10e9b66edbdd74bebedea7eac0faf021bfd55",
+          "gzipSha256": "86831c5b59057365d8f84a9936a764fd8218ae2f7008c8ccb71260f6eda602c7"
+        },
+        {
+          "offset": 4556462,
+          "length": 79058,
+          "rawBytes": 4194304,
+          "rawSha256": "4b2b41dc9757bcade33ce003e340c711babe5b8dccfbaeb244f94e2871417b9a",
+          "gzipSha256": "4af295c3211cb51fb9ba41f09cce147f270d68ca8ead87c4502b706deb99a3c2"
+        },
+        {
+          "offset": 4635520,
+          "length": 15267,
+          "rawBytes": 717072,
+          "rawSha256": "00c11b660f926bdea5149384490e54e02f8471ead208cd518833bbe84d5f86eb",
+          "gzipSha256": "c9f78a4ca6b4314bfae6b56cd040ddfd2717ba892d44fe10b5833329758101c8"
+        }
+      ],
+      "note": "Plan 5 actual process measurements; timing and memory targets are ideal budgets, never enforced. Missing and failed evidence retained.",
+      "measuredAt": "2026-09-21T14:53:02.403Z",
+      "completedAt": "2026-09-21T15:02:41.287Z",
+      "phase": "fast",
+      "passed": false,
+      "payloadSchema": "ramify.fast-measurements/1",
+      "build": {
+        "files": 466,
+        "sha256": "dd083132b6ca23fccd936262f9e7d23b1f94e2f2b295724df2364f7b7fb59bfc"
+      },
+      "workloads": [
+        {
+          "name": "I5-13:hook-latency-reference",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s100",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s1000",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-x100",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:checked-set-bounded",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:repeated-edit-plateau",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I5-13:hot-warm-memory",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:cold-open",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:entry-footprints",
+          "status": "not-executed",
+          "passed": false
+        }
+      ]
+    },
+    {
+      "file": "resident-2026-09-21T15-14-38.854Z-6fac5cf4-e4a0-4eaa-81d6-224464e4efe6.json.gz",
+      "rawSha256": "83eb03495a7ecc6e6500046263a52ff1ed4fdc97c419f23110a2eb6a59d8d1a3",
+      "gzipSha256": "33aef0115411951081f9998b0c1404cb342b6be58d40f4115ddac2abfa435aeb",
+      "rawBytes": 4180324,
+      "gzipBytes": 185887,
+      "gzipMembers": [
+        {
+          "offset": 0,
+          "length": 185887,
+          "rawBytes": 4180324,
+          "rawSha256": "83eb03495a7ecc6e6500046263a52ff1ed4fdc97c419f23110a2eb6a59d8d1a3",
+          "gzipSha256": "33aef0115411951081f9998b0c1404cb342b6be58d40f4115ddac2abfa435aeb"
+        }
+      ],
+      "note": "Real resident workload observations; advisory performance targets, binding runtime limits, missing and failing evidence retained.",
+      "measuredAt": "2026-09-21T15:14:38.854Z",
+      "completedAt": "2026-09-21T15:16:01.568Z",
+      "phase": "resident",
+      "passed": false,
+      "payloadSchema": "ramify.resident-measurements/1",
+      "build": {
+        "files": 466,
+        "sha256": "dd083132b6ca23fccd936262f9e7d23b1f94e2f2b295724df2364f7b7fb59bfc"
+      },
+      "workloads": [
+        {
+          "name": "I2-29:entry-footprints",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:cold-warm-broad-reference",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:cold-warm-broad-hundred",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:repeated-edit-plateau",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:many-contexts",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I2-29:slow-consumer",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:synthetic-500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:synthetic-1000",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I2-29:publication-peak",
+          "status": "not-executed",
+          "passed": false
+        }
+      ]
+    },
+    {
+      "file": "fast-2026-09-21T13-53-16.968Z-4df783c0-11ba-4d46-bda6-a545cbf4e7c1.json.gz",
+      "rawSha256": "0a624bc1c67f49ccf2a1085384f9df335675a0b26823f68220a5a0e59b1cdb88",
+      "gzipSha256": "24ce36e118e0f127b522c8567b27c808d3867dd8501bcad780b3185054a0096f",
+      "rawBytes": 59098415,
+      "gzipBytes": 2688080,
+      "gzipMembers": [
+        {
+          "offset": 0,
+          "length": 236411,
+          "rawBytes": 4194304,
+          "rawSha256": "17189977d95f7b6fa39cb90392ca9938d0d70f4afc6a8470a00ac643f29dbfc8",
+          "gzipSha256": "830c8ecbe9477607d79b5398b00557cc6bf606cdfa73f4b55fd17c73771f0c4a"
+        },
+        {
+          "offset": 236411,
+          "length": 219853,
+          "rawBytes": 4194304,
+          "rawSha256": "b3e47234d0f3a14cb09badf25c783d229a7e5c35e5f345a1f885729565da4e32",
+          "gzipSha256": "9be4d57046ff1b06114b4c4b794757a06ea76d1f1e6cd6ac3629f723b30341b5"
+        },
+        {
+          "offset": 456264,
+          "length": 200607,
+          "rawBytes": 4194304,
+          "rawSha256": "84335c482882679d65365f95644d72bcae5d0cad47beacfcf3e1522d2601ab98",
+          "gzipSha256": "781ed850eaa7812b678d109b02c0688105b11afb921ed995f0194a838d3a69d5"
+        },
+        {
+          "offset": 656871,
+          "length": 283144,
+          "rawBytes": 4194304,
+          "rawSha256": "9b14652523580b9994fb7fe6677d70e2b2905c965e2fb20a7d058b1eaf82ea3b",
+          "gzipSha256": "fedf46d00932180965ccbb1859c02f6c39b8063e924ce507e64f664f54ac4ae3"
+        },
+        {
+          "offset": 940015,
+          "length": 311186,
+          "rawBytes": 4194304,
+          "rawSha256": "8df1e312fbbbc56cc445e73eff6d401e7d685cd0deed0839908e01d6ddc80ad7",
+          "gzipSha256": "82744047b8eb1aa425d703cb4d59bffb664f156bd1bbb05f0d46ca177c696a27"
+        },
+        {
+          "offset": 1251201,
+          "length": 263966,
+          "rawBytes": 4194304,
+          "rawSha256": "ad9c43555700d5ff4d2df90f1882ac6e06c6be197965cea5f10c14724e27ec37",
+          "gzipSha256": "df3c8abe76de3d0dd28459949c368b04ce1227cc8f4ac33c9a06ee71ede94a69"
+        },
+        {
+          "offset": 1515167,
+          "length": 265015,
+          "rawBytes": 4194304,
+          "rawSha256": "cbcd9528407670274cbade9ae39eb45a72cca9abb0fcf1258fbb643f65143270",
+          "gzipSha256": "89992722bdc770f6d5d203ec1a18b9b702a458b31fcffff8eb16a796c414bf8f"
+        },
+        {
+          "offset": 1780182,
+          "length": 247579,
+          "rawBytes": 4194304,
+          "rawSha256": "3ccc2776e3c6f6df02bc4ff95aa8d5fe3c9b425edfbef79392d284ea0a911cdd",
+          "gzipSha256": "dce49ae334b6603029438a3d55a58e6abeeed966586b50944287f22b7335501e"
+        },
+        {
+          "offset": 2027761,
+          "length": 214091,
+          "rawBytes": 4194304,
+          "rawSha256": "cec80e8086e7e5ffa5325d0473c30f8b9dec1b1c148b3abbbe814d1e24e2bcb6",
+          "gzipSha256": "1e48fdf7a3a7fc9717bc7bd389d8d5985146aa724051907574240cec2e712e85"
+        },
+        {
+          "offset": 2241852,
+          "length": 69333,
+          "rawBytes": 4194304,
+          "rawSha256": "dc672a6070778044ad79a62c88d9769ee12097154db35e980b1c3db5068f2b55",
+          "gzipSha256": "b7cf29d9398c7eb1a4d49beb215e45bf0759a5a9307f25d252c0914da82b6f73"
+        },
+        {
+          "offset": 2311185,
+          "length": 75426,
+          "rawBytes": 4194304,
+          "rawSha256": "dc50af91621c2ee8ef318f8ce83e404bbca64d8b50fd1a8350a4f8ebe50e7816",
+          "gzipSha256": "c1594ffdf43503282286a1d0acb65539c16f1c9ca72e7c7095f3ba197dce77f1"
+        },
+        {
+          "offset": 2386611,
+          "length": 98843,
+          "rawBytes": 4194304,
+          "rawSha256": "67e55fdea461fd40cb568d53deb756914e7d2593baed9004e3e8de9aea74703d",
+          "gzipSha256": "b888e7a813e142a20b04375e89ad9547e5c7649e65c0256606bdfec2bc7be307"
+        },
+        {
+          "offset": 2485454,
+          "length": 106196,
+          "rawBytes": 4194304,
+          "rawSha256": "512e060ab3fba15183b05b77fc979cf2e73614a7bc3a503b028ac2853c3cdd80",
+          "gzipSha256": "e7154cfe864292183b872d0b4ed36e3834d454d77422b931495064953e47b0cc"
+        },
+        {
+          "offset": 2591650,
+          "length": 87954,
+          "rawBytes": 4194304,
+          "rawSha256": "544853035b809002b33b93bd99253ef02151a679d98e01a199ef81ec90771e20",
+          "gzipSha256": "ed2b34aa0423d4ace2c05441ba019085730a4a71b55f8783020c50e552c0f507"
+        },
+        {
+          "offset": 2679604,
+          "length": 8476,
+          "rawBytes": 378159,
+          "rawSha256": "217a35c0cd80b63a27c643a9ba5eb3a2db339b06d33e581f86854227b2c96dc1",
+          "gzipSha256": "068471420ae11606c0f881813101ca7ad8919f8659adc2a09b4f2ce031bbc5b8"
+        }
+      ],
+      "note": "Plan 5 actual process measurements; timing and memory targets are ideal budgets, never enforced. Missing and failed evidence retained. Pre-plan baseline (Plan 8 base commit 6dd9b4c), measured in a detached worktree and copied here.",
+      "measuredAt": "2026-09-21T13:53:16.968Z",
+      "completedAt": "2026-09-21T13:59:55.900Z",
+      "phase": "fast",
+      "passed": false,
+      "payloadSchema": "ramify.fast-measurements/1",
+      "build": {
+        "files": 458,
+        "sha256": "846c07c49355248ff366d2b939090e2431e74664dae9458570d6d7614c8a011c"
+      },
+      "workloads": [
+        {
+          "name": "I5-13:hook-latency-reference",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I5-13:hook-latency-s100",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s1000",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-x100",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:checked-set-bounded",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:repeated-edit-plateau",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hot-warm-memory",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:cold-open",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:entry-footprints",
+          "status": "not-executed",
+          "passed": false
+        }
+      ]
+    },
+    {
+      "file": "fast-2026-09-21T14-00-13.233Z-faf531d1-5515-4b78-8f20-390305015aad.json.gz",
+      "rawSha256": "1c736b9d11e2646b6d055941694c8422fe5dacfd5596e3417357e6237368777c",
+      "gzipSha256": "1933cd3f365a2b2b059b7212dc6efe7b22f36dfec3c857fce2688765e9f497a7",
+      "rawBytes": 95662556,
+      "gzipBytes": 3456994,
+      "gzipMembers": [
+        {
+          "offset": 0,
+          "length": 290147,
+          "rawBytes": 4194304,
+          "rawSha256": "304b1b7475acde308d1d6ddf22b29e35924ab3b254b7900411ac88b15eae4445",
+          "gzipSha256": "804333539abba177a6219e51c9b6d4fabb95175007fcf239202d0826a8c119ec"
+        },
+        {
+          "offset": 290147,
+          "length": 228865,
+          "rawBytes": 4194304,
+          "rawSha256": "bbca2145d13eee5ff6604cdb5b8746e450910e375429663a05aa950ea3693f53",
+          "gzipSha256": "cefaa38ca10f5ae371bbc9342bff8cfc8bdc990e2ac46ce1d6d5292d31ab0a0d"
+        },
+        {
+          "offset": 519012,
+          "length": 223056,
+          "rawBytes": 4194304,
+          "rawSha256": "611cfc53bee53608a5e87146a6e162cf40b53c9ff4567be34e6e026e88e894f8",
+          "gzipSha256": "3b5f8b70d72d36a7af085e2f3ceac255867865b96b74c4584ee24e63517fff26"
+        },
+        {
+          "offset": 742068,
+          "length": 215917,
+          "rawBytes": 4194304,
+          "rawSha256": "5cf271edf9f14ddfe2c7e9b316c3229d208548ed3259c396539effcc5c6473b0",
+          "gzipSha256": "2c8e8609e4c9a569b73c8ff588f170ccfc2d289203aae07cc3faee60bb49e42f"
+        },
+        {
+          "offset": 957985,
+          "length": 257770,
+          "rawBytes": 4194304,
+          "rawSha256": "dcefdb791d48e95378d94333ee27fa45f8cdcf132824a972b07fe5af41711b66",
+          "gzipSha256": "eaa3cdb5d91fe449fd5e37b5f5635f470358347ea24229429515e666a3278e91"
+        },
+        {
+          "offset": 1215755,
+          "length": 254129,
+          "rawBytes": 4194304,
+          "rawSha256": "50a195d2d4946338b739d362a4cf46cd03b687e59d0ba38e4261eb9d493ca4f7",
+          "gzipSha256": "2bb9beb0d176f1eded50cc1a5eae30246b9adf05a52b7c0c62f23dcb7301eccb"
+        },
+        {
+          "offset": 1469884,
+          "length": 237594,
+          "rawBytes": 4194304,
+          "rawSha256": "3c5887a09436fbc5386e6509d353ea522f21018245ddf7a4637fa1fa023ef859",
+          "gzipSha256": "0ed1144af768e7cc5e6a2cd6fcdf28b039cf37fa4e1cbde58853f4718cdfb67f"
+        },
+        {
+          "offset": 1707478,
+          "length": 232926,
+          "rawBytes": 4194304,
+          "rawSha256": "8150fa9965862f1e0fe1e21a6df7ac020d475a37f1dd1a96dec04a3def08efc6",
+          "gzipSha256": "89a28140aeb68d5e47672eb493aac3e988b0ff9639f400b35abe31435fe09d3a"
+        },
+        {
+          "offset": 1940404,
+          "length": 227218,
+          "rawBytes": 4194304,
+          "rawSha256": "6ebcdc6fb9f7f958aa52de02f1af2f84909595a0b41d3b1321d47e693d5cf17f",
+          "gzipSha256": "d70cac8f5683668e6c24702c21d846171a237c39c6b0a731eb2417f465c17c0f"
+        },
+        {
+          "offset": 2167622,
+          "length": 231408,
+          "rawBytes": 4194304,
+          "rawSha256": "7999be7a98236ca8ae7b38dc66a19fc1ee36077b074a09c4d27d5748f56848b7",
+          "gzipSha256": "2dae3fa2a674f54b7c62b52c127e84368853a984e28c3a90475a6c1e2bee88de"
+        },
+        {
+          "offset": 2399030,
+          "length": 165866,
+          "rawBytes": 4194304,
+          "rawSha256": "9493f544db147e2b5e274f7c3ccd8732c81639ebcb77b7c51c1b3b94ec230f73",
+          "gzipSha256": "465efb9be8c949e27e232ffbf9f25910f60523e3109f1825386bae34be4c5adf"
+        },
+        {
+          "offset": 2564896,
+          "length": 63116,
+          "rawBytes": 4194304,
+          "rawSha256": "369002280a9a85dd10a3b1f36be084ae6b90a1a134be173774d11e626a6b4e67",
+          "gzipSha256": "dba922d7ed30ffa0b256177e33a294d86a67206519d45e11f075727dff348ebc"
+        },
+        {
+          "offset": 2628012,
+          "length": 55764,
+          "rawBytes": 4194304,
+          "rawSha256": "6442b50722e4bf0afaf209bd578aca7780df2c0093f35f2481e5301e0ed351cf",
+          "gzipSha256": "b767ba5789a773cace7915e057903bcd2630cfb275b46478dff11123b4c86961"
+        },
+        {
+          "offset": 2683776,
+          "length": 57173,
+          "rawBytes": 4194304,
+          "rawSha256": "17567cd08d88a919c68e368e6c719d42351d6565d44cbbd21f63384053129cdb",
+          "gzipSha256": "174490bfa67930a05de59e61cdcc357ab9fe4bcfb7a23ec1d5be61c5a3955f3f"
+        },
+        {
+          "offset": 2740949,
+          "length": 57617,
+          "rawBytes": 4194304,
+          "rawSha256": "faefd09642dfb242910684a68a6e8259bf597c2ac6628ea0c5bf8a5d1e2b08b2",
+          "gzipSha256": "7607928330a2bb920028c6edf3f3fd56703c7e7bdb1631a206e73bc8ef5e1bf4"
+        },
+        {
+          "offset": 2798566,
+          "length": 56472,
+          "rawBytes": 4194304,
+          "rawSha256": "c90747932a69449d110cc56452fc4fe79317131028bea5f15554160a9b8d1891",
+          "gzipSha256": "b113a57423a078f31e3372d82b3de32ce3ffc4aa3f724d05c0eb5e3be5a69d8d"
+        },
+        {
+          "offset": 2855038,
+          "length": 58697,
+          "rawBytes": 4194304,
+          "rawSha256": "dd9b3002e760f21df3067e6546cc8b6e5cc722cdaf5fdd0760e3d75d919677b2",
+          "gzipSha256": "6b84146f45e6892abcfc7b89816f206a784989bd2efc39f574ddaa7800c92553"
+        },
+        {
+          "offset": 2913735,
+          "length": 56472,
+          "rawBytes": 4194304,
+          "rawSha256": "16329c540ef6faa5b29ff7c572189b2f85e5b7ddbf1b56656480f54e172fd0a6",
+          "gzipSha256": "4abb2313447d527ee01981d70a9d7c6729283498c01ce0e0062ae4aaa475c7b5"
+        },
+        {
+          "offset": 2970207,
+          "length": 87236,
+          "rawBytes": 4194304,
+          "rawSha256": "edafbdfb9bbde68bf4c52b7ca65aa4add6dd1862e5fb54311ce3b4104966a13e",
+          "gzipSha256": "6ab01d20646dbf80cb73cf979556b91bf94e4dbb8c381a9926df29ed9b1df110"
+        },
+        {
+          "offset": 3057443,
+          "length": 113378,
+          "rawBytes": 4194304,
+          "rawSha256": "481b4b08c7b6114a7e338b89bd83b7a41b9ecbd0a5a2dede0f1d67145925df8d",
+          "gzipSha256": "26fc1e85f98b44f2649962c32557a32e5a1a0663d5bd066e92be5f7759382de0"
+        },
+        {
+          "offset": 3170821,
+          "length": 107858,
+          "rawBytes": 4194304,
+          "rawSha256": "b97894a7b4c3fa18d339b883d5c9998f897bd98c76f734147785912a39db52e6",
+          "gzipSha256": "d5e5f97b105cc71952a27e84211a2d7c2a7be8b680d25c8c923f735779d93874"
+        },
+        {
+          "offset": 3278679,
+          "length": 107059,
+          "rawBytes": 4194304,
+          "rawSha256": "a3e7f50e4fa2984b37cb63d2c3b5c382a56ef63f3e1abcaa89491bb6301d9788",
+          "gzipSha256": "b0389dfe0e024cd877c2103d9ab119ec26b3dbace2c1ee46979eeaf5b1060dfd"
+        },
+        {
+          "offset": 3385738,
+          "length": 71256,
+          "rawBytes": 3387868,
+          "rawSha256": "0b5806a8ed6b40d77d4ce377bb7937808155324432df82b6cf270fa44663600a",
+          "gzipSha256": "b839d5099ffe9a0c9fda100eaee3edb2a113a5b06057e032908660c4cd60fb1f"
+        }
+      ],
+      "note": "Plan 5 actual process measurements; timing and memory targets are ideal budgets, never enforced. Missing and failed evidence retained. Pre-plan baseline (Plan 8 base commit 6dd9b4c), measured in a detached worktree and copied here.",
+      "measuredAt": "2026-09-21T14:00:13.233Z",
+      "completedAt": "2026-09-21T14:09:29.605Z",
+      "phase": "fast",
+      "passed": false,
+      "payloadSchema": "ramify.fast-measurements/1",
+      "build": {
+        "files": 458,
+        "sha256": "846c07c49355248ff366d2b939090e2431e74664dae9458570d6d7614c8a011c"
+      },
+      "workloads": [
+        {
+          "name": "I5-13:hook-latency-reference",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s100",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s1000",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-x100",
+          "status": "measured",
+          "passed": false
+        },
+        {
+          "name": "I5-13:checked-set-bounded",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:repeated-edit-plateau",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hot-warm-memory",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:cold-open",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:entry-footprints",
+          "status": "not-executed",
+          "passed": false
+        }
+      ]
+    },
+    {
+      "file": "fast-2026-09-21T15-03-09.859Z-2530dfac-5d73-4998-8a30-eb45d900ed0d.json.gz",
+      "rawSha256": "9599c8e54a3002463548bae8839e04b0bb49d50f3a569b6ce8d384b5d83729b2",
+      "gzipSha256": "6b0c227586c435955b24fcd9682d12bdac2a9a76e2289fbc3ea3450164ca6167",
+      "rawBytes": 105915854,
+      "gzipBytes": 4303848,
+      "gzipMembers": [
+        {
+          "offset": 0,
+          "length": 246920,
+          "rawBytes": 4194304,
+          "rawSha256": "0d3bbae05886088ac267edd86a0ef70a6adc91bae72d3a08fe4452c5284e71f6",
+          "gzipSha256": "0778d021f2313a1d1ff4e1feb7e9354d7046e043fdbd575c5e98a0605173836e"
+        },
+        {
+          "offset": 246920,
+          "length": 214967,
+          "rawBytes": 4194304,
+          "rawSha256": "0c1ec6db7d4632d03c077448416e576409926b26f81e9ad34594a15479574f5c",
+          "gzipSha256": "06ea98230cc34bee20e02a0ef34355e6ec980298098dbf0e4b21e85d71f4b055"
+        },
+        {
+          "offset": 461887,
+          "length": 211651,
+          "rawBytes": 4194304,
+          "rawSha256": "cf0b3b38f341501518f84d6070cb749a724d37777f5cb09590619973edfcda00",
+          "gzipSha256": "b2385824dbff411c15f6b4c884479b8f28f88fcca0f3565a7f9dbbf227c61286"
+        },
+        {
+          "offset": 673538,
+          "length": 214927,
+          "rawBytes": 4194304,
+          "rawSha256": "464188c50c0ddaf66babf1da0fc653e95478715b197251985a3f41ee430b5423",
+          "gzipSha256": "bee5f9c71cacd8bf716c83ea99c2107e64823826f8adce62a34b26277c4fcd1a"
+        },
+        {
+          "offset": 888465,
+          "length": 211555,
+          "rawBytes": 4194304,
+          "rawSha256": "05d14d67919c26d75a21a58a0f46f1a36c9473caf6ad74ef617db2fc7680a5ed",
+          "gzipSha256": "11e2e86aaa4d0711fab698b8c3ccb222f4de2c37d26433c0f26b8295c2ec4de8"
+        },
+        {
+          "offset": 1100020,
+          "length": 213574,
+          "rawBytes": 4194304,
+          "rawSha256": "ef42f89aa83026a4f8b1770a71d6ddad4e72886a65e21dfd5ea44b941a0ad53b",
+          "gzipSha256": "8fdf42b2fa9a63f45559443f8b69a6d13118beb81aa4b8023669e81857991e5d"
+        },
+        {
+          "offset": 1313594,
+          "length": 210589,
+          "rawBytes": 4194304,
+          "rawSha256": "b2087d043ecf262a31822ca8948d219ddf03c200a431fb6cca117c3486224ab4",
+          "gzipSha256": "bf1b1edc762f68341ab8ab1734013136ed3a7a2fc3f4ba7c10add131d12a42df"
+        },
+        {
+          "offset": 1524183,
+          "length": 217917,
+          "rawBytes": 4194304,
+          "rawSha256": "eb9bd2e003b1b88111c2d0da85228fe687ea5ac2a4393c61addc52428e29f32d",
+          "gzipSha256": "b9dec3c9ce5e87f918eda3271670b94dc697ae17a4eb018c2078fbaa03b41eb9"
+        },
+        {
+          "offset": 1742100,
+          "length": 84973,
+          "rawBytes": 4194304,
+          "rawSha256": "8737632bfcdd56936931643357362ea409506ad59bb4003ad918ff394be1ad85",
+          "gzipSha256": "76e14e5d5fa2dcb20b343d7719fb2540ed9094842ae165671fcdbd2ae3133463"
+        },
+        {
+          "offset": 1827073,
+          "length": 68951,
+          "rawBytes": 4194304,
+          "rawSha256": "3141e04a9b3f7d47431fdc353c017646d6bf95487f8e611052c6faeb163ad815",
+          "gzipSha256": "de324c200008f4695b91d191bbac69150cf4a05439620c78a1504f1ed0ebebbc"
+        },
+        {
+          "offset": 1896024,
+          "length": 82965,
+          "rawBytes": 4194304,
+          "rawSha256": "33f9da3e15f9adcac81ca12a1f7b83a79573877565f22321bb6dd2f077aff339",
+          "gzipSha256": "d6e5df67f14aa0056a3864d33ab0d4e4fab71f6b6739c619019344837e339ce6"
+        },
+        {
+          "offset": 1978989,
+          "length": 207418,
+          "rawBytes": 4194304,
+          "rawSha256": "1eaec1edaf4ccb099f1c943e7f4d85108156fc1ff13d46513fd70841d3d2c387",
+          "gzipSha256": "7eb1302901d65943acee0fdae3cef716d71750f0b23bd3460f020cc6013cd36e"
+        },
+        {
+          "offset": 2186407,
+          "length": 224027,
+          "rawBytes": 4194304,
+          "rawSha256": "a83d20f222f1d6273042c0b2e3eb4fa0b1032a530988bdd798c4882d9a4741b1",
+          "gzipSha256": "2c8c8006c9854176ffc6f1023ad979e58b67c56d3d236f393e3e485b7f8f90a3"
+        },
+        {
+          "offset": 2410434,
+          "length": 220829,
+          "rawBytes": 4194304,
+          "rawSha256": "b2c6305a63cff4cd67fa396e838bddbef6d202d9513b591f5493e2697afa8d84",
+          "gzipSha256": "2200102a762f9913c1ee942c0cc28738f2b986178482c89945f52131f0d29a61"
+        },
+        {
+          "offset": 2631263,
+          "length": 224937,
+          "rawBytes": 4194304,
+          "rawSha256": "3a30a35a5b3c855e579eb1cd75dd5e8f1ef11c3eae54571b48283fd198bf6cd2",
+          "gzipSha256": "5ef6ff5ca4d79d94a1e19e8f1dc49c371ac18712c277e30ea7a2294b16bb0d58"
+        },
+        {
+          "offset": 2856200,
+          "length": 226779,
+          "rawBytes": 4194304,
+          "rawSha256": "ef2cfbb8eb0e6f803f5e1fc7bc41e38c24052876e0835f6b86c0ca006e10e09b",
+          "gzipSha256": "2921307c4ec66e82cd18a921943bcf23d683f9abfeb650ef345df3facef1cc91"
+        },
+        {
+          "offset": 3082979,
+          "length": 221695,
+          "rawBytes": 4194304,
+          "rawSha256": "b49083fe3fa1cb47e3d8b8a4aa64230f657a000fdc9f1eb8f092956cffe39fb0",
+          "gzipSha256": "93a85fcbb763dbc3e1ff01ff0562bc37aac6211e5dc3ee09d3e024b7087b2d92"
+        },
+        {
+          "offset": 3304674,
+          "length": 222217,
+          "rawBytes": 4194304,
+          "rawSha256": "189620feb362adbcc84993530f7ddf4c485d9c0521c091a23b34c85a1087592b",
+          "gzipSha256": "462d76ce240511277747a384c70341678a667c372dc76a11203df769d4096f83"
+        },
+        {
+          "offset": 3526891,
+          "length": 218313,
+          "rawBytes": 4194304,
+          "rawSha256": "2c2aa58917a6551f89f183ad38def82a26a745ee989e43695d30caec13661066",
+          "gzipSha256": "40905878f0fdbf4197ba53ca06a60ff4de8a810a02d20aa19454bd88737f166e"
+        },
+        {
+          "offset": 3745204,
+          "length": 111674,
+          "rawBytes": 4194304,
+          "rawSha256": "c6da6d74c1b5f4edf7365bd9dcc3cfcec41bb0946deab0bdc134b35dd0fe8c24",
+          "gzipSha256": "7c043e92c30297507e88cb3b3eb98a08c441fbee4e5bf0b1505999a0917f521a"
+        },
+        {
+          "offset": 3856878,
+          "length": 71731,
+          "rawBytes": 4194304,
+          "rawSha256": "090b29a8a3fd2b1cd542442211b12d3abac20300f845940298eda53adf5b260f",
+          "gzipSha256": "d7d43d5af9e58caea74b9742b674fc331463ffdc7bd42c3bba53dca04225f26b"
+        },
+        {
+          "offset": 3928609,
+          "length": 84065,
+          "rawBytes": 4194304,
+          "rawSha256": "b84818ea01dcafbaa5de2e040793aea9cf713383a65af45fd98dbec13efd7b1e",
+          "gzipSha256": "51c4d1e7983c4fef731aa1f5db88b4a84c10585396d4d3e882fe45eac5216099"
+        },
+        {
+          "offset": 4012674,
+          "length": 110915,
+          "rawBytes": 4194304,
+          "rawSha256": "570f70df70cd5c490e6a76fde0ffc4cdce2cc76902edcf74d2aa17d0c8679167",
+          "gzipSha256": "b06fdab7de4729f2496b5a95f87b35748402e25057eba7a96983066d6fd6fb18"
+        },
+        {
+          "offset": 4123589,
+          "length": 83136,
+          "rawBytes": 4194304,
+          "rawSha256": "719018bfb5acd76d17ba66b18a9292c9e5539f14e912a446ac73ebc748432e2e",
+          "gzipSha256": "a75f261c94de2464c68155b9f17898cf322530a7e4cc99a8632f30af1aa59858"
+        },
+        {
+          "offset": 4206725,
+          "length": 76248,
+          "rawBytes": 4194304,
+          "rawSha256": "b88583b6d67550b1473b8cc1f6921125de1350d5d89ad465a9026caab4dea259",
+          "gzipSha256": "0a13d70c36ea135fdfd2b6766f5e44929bc9d906c3c1b70e7f082442d8ec404a"
+        },
+        {
+          "offset": 4282973,
+          "length": 20875,
+          "rawBytes": 1058254,
+          "rawSha256": "7f72d69e71504e8a9d87257cc719e5a4c5c5dc43ff76416d080374528e5395fd",
+          "gzipSha256": "4ffbd7a828fe5ef05e24926882732f5a4c26f2bbb967fa4e0291ed23cb6d93e7"
+        }
+      ],
+      "note": "Plan 5 actual process measurements; timing and memory targets are ideal budgets, never enforced. Missing and failed evidence retained. Pre-plan baseline (Plan 8 base commit 6dd9b4c), measured in a detached worktree and copied here.",
+      "measuredAt": "2026-09-21T15:03:09.859Z",
+      "completedAt": "2026-09-21T15:14:13.977Z",
+      "phase": "fast",
+      "passed": false,
+      "payloadSchema": "ramify.fast-measurements/1",
+      "build": {
+        "files": 458,
+        "sha256": "846c07c49355248ff366d2b939090e2431e74664dae9458570d6d7614c8a011c"
+      },
+      "workloads": [
+        {
+          "name": "I5-13:hook-latency-reference",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s100",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s500",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-s1000",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:hook-latency-x100",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:checked-set-bounded",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:repeated-edit-plateau",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "I5-13:hot-warm-memory",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:cold-open",
+          "status": "not-executed",
+          "passed": false
+        },
+        {
+          "name": "I5-13:entry-footprints",
+          "status": "not-executed",
+          "passed": false
+        }
+      ]
     }
   ],
   "finalRecord": "merged-main.json.gz"

@@ -10,7 +10,7 @@ import { installedCommand, packageRoot } from './common.mjs';
 import { treeIdentity } from './identities.mjs';
 import { measureProcess, processRows } from './process-observer.mjs';
 import { fastInputs, fastDependencies } from './fast-inputs.mjs';
-import { fastBudgets, fastWorkloads, fastFixtures } from './fast-plan.mjs';
+import { fastBudgets, fastWorkloads, fastFixtures, exposingFixtures } from './fast-plan.mjs';
 import { assertFastWorkload, deriveFastMeasurements, fastDeferrals } from './fast-assertions.mjs';
 
 const args = process.argv.slice(2);
@@ -65,7 +65,7 @@ try {
   cpSync(reference, join(templates, 'reference'), { recursive: true, dereference: false,
     filter: path => !relative(reference, path).split('/').some(part => ['node_modules', 'dist', '.reference-work', '.git', '.vite'].includes(part)) });
   report.fixtures.push({ fixture: 'reference', identityKind: 'authored-tree', ...treeIdentity(join(templates, 'reference')) });
-  for (const name of fastFixtures.slice(1)) {
+  for (const name of [...fastFixtures.slice(1), ...exposingFixtures]) {
     if (controller.signal.aborted) throw new Error('Interrupted preparing fixtures');
     const child = spawnSync(process.execPath, ['--import', 'tsx', 'scripts/measurements/materialize.ts', join(templates, name), name],
       { cwd: packageRoot, env: { ...process.env, NODE_OPTIONS: '' }, encoding: 'utf8', timeout: 60_000, maxBuffer: 1024 * 1024 });

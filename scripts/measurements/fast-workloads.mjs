@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { FastResident, compactStatus } from './fast-driver.mjs';
 import { fastFixture } from './fast-fixture.mjs';
-import { fastBudgets, fixtureForId } from './fast-plan.mjs';
+import { companionEditKinds, editKindsFor, fastBudgets, fixtureForId } from './fast-plan.mjs';
 import { command, sampleMetrics, unwrap } from './resident-driver.mjs';
 import { executeResidentWorkload } from './resident-workloads.mjs';
 import { sha256 } from './common.mjs';
@@ -30,7 +30,9 @@ export async function executeFastWorkload(id, options, measurements, checkpoint)
     measurements.fixtures ??= [];
     measurements.fixtures.push({ name, owners: project.owners, setupIdentity: project.setupIdentity,
       body: project.body, source: project.source, created: project.created,
-      creationWitness: project.creationWitness, sourceImporters: project.sourceImporters });
+      creationWitness: project.creationWitness, sourceImporters: project.sourceImporters,
+      ...(project.signature ? { signature: project.signature, companion: project.companion,
+        companionFindings: project.companionFindings } : {}) });
     return project;
   }
   async function start(host, project, target = measurements) {
@@ -102,6 +104,14 @@ export async function executeFastWorkload(id, options, measurements, checkpoint)
         measurements.cycles.deleted.push(await save(host, project, token, 'deleted', index));
         measurements.cycles.created.push(await save(host, project, token, 'created', index));
         checkpoint('deleted/created pairs', index + 1, 20);
+      }
+      // Plan 8's two edit classes follow every Plan 5 racing class, so those keep their order;
+      // the published hooks stay last, where the clone probe reads their revision.
+      for (const kind of companionEditKinds.filter(kind => editKindsFor(name).includes(kind))) {
+        const cycles = measurements.cycles[kind] = [];
+        for (let index = 0; index < fastBudgets.editCycles; index++) {
+          cycles.push(await save(host, project, token, kind, index)); checkpoint(kind, index + 1, 20);
+        }
       }
       for (let index = 0; index < fastBudgets.editCycles; index++) {
         measurements.published.push(await save(host, project, token, 'body', index, 'published'));

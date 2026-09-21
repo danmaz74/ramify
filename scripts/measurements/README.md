@@ -150,6 +150,16 @@ or a fixture used concurrently by another measurement.
 The iteration 13 resident command below records their identities using this same
 generator.
 
+Plan 8 adds X100, an exposing variant of S100 with the same owners and paths
+(`materialize.ts <new-directory> X100`, or `syntheticOwnerFiles(n, { exposures: true })`).
+Every non-root owner exposes its `interfaces/api.ts` by wildcard and its nine
+`run<N>` functions by name to parent. Each `run<N>` signature names that file's
+`Input` and `Output` and the `Input` of the nearest preceding untagged owner.
+The root, the grouping level, re-exposes each tenth owner's contract and every
+named `Input` to descendants, aliased with the owner's name. The project passes
+the signature-companion rule with complete coverage. The default output stays
+byte-identical, and the S100 content-map hash is still asserted.
+
 ## Resident measurements
 
 ```sh
@@ -323,6 +333,34 @@ RSS growth includes the separate worker supervisor and compiler as well as the
 daemon. Runtime retention ceilings apply to every recorded poll; lifecycle
 counters must balance at settled checkpoints and after cleanup. A failed
 correctness predicate needs an owner fix; the recipe never relaxes its assertion.
+
+`hook-latency-x100` runs the same rows on X100. On the reference example and on
+X100 it adds Plan 8's two edit classes, twenty cycles each, after the
+deleted/created pairs: a signature edit that adds a named original already
+exposed wherever the symbol is (the `source` path), and a `module.ramify` edit
+that removes a companion's exposure and restores it (the `description` path).
+On a build that enforces the rule, a removal fails the check with only
+`exposed-without-companion` findings, one on the reference and nine on X100,
+and no denied import. Revision timings then carry a tenth field, `companions`,
+and the reference example's eleven and each S fixture's one pinned
+`signature-inferred` notes are expected in coverage; a pre-plan build reports
+neither. X100 joins no derived row or deferral trigger.
+
+`companion-stages.mjs` records Plan 8's stage timings and retained facts on the
+reference example, the toolkit and X100, through this checkout's measurement
+daemon over the real socket. After a cold open it alternates ten
+`tsconfig.json` target edits (the broad path, which describes every file again)
+and ten `module.ramify` comment edits (the description path, which relinks with
+no compiler work), and archives every revision's timings, `factBytes` and
+history bytes:
+
+```sh
+node scripts/measurements/companion-stages.mjs --output FILE [--cycles 10] [--toolkit DIR] [--fixtures reference,toolkit,X100]
+```
+
+`--toolkit` names the toolkit tree to copy, so a pre-plan build can measure
+the same toolkit bytes. The script evaluates no budget; it reports medians per
+edit kind, counting only revisions on the expected path.
 
 The nine `fast-measure` handlers verify existing current evidence rather than
 starting measurements concurrently with the prerequisite matrix:
