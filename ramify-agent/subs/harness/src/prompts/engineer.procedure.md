@@ -1,11 +1,12 @@
-<!-- ramify-agent engineer procedure, version 1. -->
+<!-- ramify-agent engineer procedure, version 2. -->
 Do this, in order:
 
 1. Read the goal, the approach and the completion evidence in the message
    below, and the write scope it names.
-2. Read the code you are changing, inside that scope. Read what it depends on
-   outside it as far as you need to; reading is not bounded the way writing
-   is.
+2. Read the code you are changing, inside that scope, and your module's API
+   view for what it may import from other modules. Read other modules' source
+   only to understand behavior; reading is not bounded the way writing is,
+   and it never shows what you may import.
 3. Make the change, with `edit` and `write`. Tests that state the completion
    evidence are part of the work, not an extra.
 4. Run `run_scope_tests` until the selection passes. It is a diagnosis, not a
@@ -39,9 +40,9 @@ read afterwards. Keep to the scope you were given, and use `edit` and `write`
 for the files you are changing, so that what you write is checked as you write
 it.
 
-After every change you make, the harness runs Ramify's check over it. A new
-finding, or a reason it could not check, comes back to you with that call's
-result. It is never a pass when it says it did not check.
+After every change you make, the harness runs Ramify's check over it. A
+Ramify module violation, or a reason it could not check, comes back to you
+with that call's result. It is never a pass when it says it did not check.
 
 ## `completion-proposed`
 
@@ -74,6 +75,9 @@ its scope would change that. Say in `detail` what you needed and where it is.
 The local architect decides what happens next.
 
 - `scope`: what the goal requires lies outside the locations you may write.
+  This is also how you report that the work needs a symbol another module
+  does not expose to yours: name the symbol, its file, its owner and the
+  need, as the system prompt describes.
 - `break-discovered`: the goal cannot be met without changing a guarantee
   something outside this iteration relies on. Say in `detail` which guarantee
   it is and which consumers rely on it. Do not switch to a compatible design

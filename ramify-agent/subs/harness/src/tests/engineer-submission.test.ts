@@ -1,13 +1,16 @@
 import { existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import { afterEach, describe, expect, test } from 'vitest';
 import { engineerJsonSchema, engineerToolName, scopeTestsJsonSchema, scopeTestsToolName, validateEngineer } from '../work/engineer.js';
+import type { HookFinding } from '../hooks/post-write.js';
 import { iterationLayout } from '../work/iterations.js';
 import { runLayout, type InvocationOutcome } from '../run/records.js';
 import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
-import { addModule, assign, byRole, completionProposed, installMiniRunner, outline, runScopeTests, submit, treeInputs } from './helpers/iterations.js';
+import { addModule, assign, byRole, completionProposed, edit, installMiniRunner, outline, runScopeTests, submit, treeInputs } from './helpers/iterations.js';
 import { initRepository, onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 
 /*
@@ -107,6 +110,29 @@ describe('the rules the schema cannot hold', () => {
     // The same report with the reason the schema does not offer is refused
     // before any rule runs.
     expect(validateEngineer({ ...report, reason: 'obligation-change' }, { obligation: { id: 'ob-ct-001', revision: 1 } }).ok).toBe(false);
+  });
+
+  test('a completion is refused while a Ramify module violation from this session stands, and nothing else is', () => {
+    const standing: HookFinding = {
+      identity: 'code=not-visible', code: 'not-visible', message: 'collection-review:interfaces/protocol.ts#ToolResult: not-visible',
+      file: 'subs/workspace/subs/reviews/src/mcp.ts', line: 13, importer: 'collection-review/workspace/reviews',
+      original: { owner: 'collection-review', file: 'interfaces/protocol.ts', binding: 'ToolResult' },
+    };
+
+    const refused = validateEngineer(completionProposed(), { openFindings: [standing] });
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) {
+      expect(refused.errors).toHaveLength(1);
+      expect(refused.errors[0]!.path).toBe('kind');
+      expect(refused.errors[0]!.message).toMatch(/^RAMIFY MODULE VIOLATION still standing; the iteration gate fails on it\. /);
+      expect(refused.errors[0]!.message).toContain('subs/workspace/subs/reviews/src/mcp.ts:13 imports `ToolResult` from src/interfaces/protocol.ts (module `collection-review`)');
+    }
+
+    // Reporting the need, the scope or what is unfinished stays open to it.
+    expect(validateEngineer({ kind: 'unsuitable', reason: 'scope', detail: 'It needs ToolResult, which is not exposed here.' }, { openFindings: [standing] }).ok).toBe(true);
+    expect(validateEngineer({ kind: 'partial', done: ['the notes'], unfinished: ['the MCP result'], findings: [] }, { openFindings: [standing] }).ok).toBe(true);
+    // And with nothing standing, a completion is what it always was.
+    expect(validateEngineer(completionProposed(), { openFindings: [] }).ok).toBe(true);
   });
 
   test('a partial report names what was done or what is unfinished', () => {
@@ -266,5 +292,92 @@ describe('a rejected submission in a run', () => {
     expect(ran[0]!.data.resolved).toEqual([`${notesDirectory}/src/tests/notes.test.ts`]);
     expect(ran[0]!.data.outcome).toBe('passed');
     expect(existsSync(join(root, notesDirectory, 'src', 'notes.ts'))).toBe(true);
+  }, 300_000);
+});
+
+/**
+ * A `ramify` that reports a `not-visible` finding, shaped as the CLI prints
+ * one, for every changed file holding the marker, and checks clean
+ * otherwise. Everything else it answers as the run tests' stub does.
+ */
+async function markerRamify(marker: string): Promise<RamifyCli> {
+  const directory = await mkdtemp(join(tmpdir(), 'ramify-agent-marker-'));
+  cleanups.push(() => rm(directory, { recursive: true, force: true }));
+  const executable = join(directory, 'ramify');
+  await writeFile(executable, `#!/usr/bin/env node
+const { readFileSync } = require('node:fs');
+const args = process.argv.slice(2);
+if (args[0] === '--version') { console.log('ramify 0.0.0 (marker stub)'); process.exit(0); }
+if (args[0] !== 'check' || args[1] !== '--changed') {
+  console.log(JSON.stringify({ schemaVersion: 'ramify.cli/1', status: 'unavailable', reason: 'stub', exitCode: 2 }));
+  process.exit(2);
+}
+const paths = [];
+for (const arg of args.slice(2)) { if (arg.startsWith('--')) break; paths.push(arg); }
+const findings = paths.filter(path => { try { return readFileSync(path, 'utf8').includes(${JSON.stringify(marker)}); } catch { return false; } }).map(path => ({
+  id: 'source-diagnostic/1:' + path, category: 'import', code: 'not-visible', message: 'collection-review:interfaces/protocol.ts#ToolResult: not-visible',
+  location: { file: path, start: 0, end: 1, line: 1, column: 1 },
+  importer: { owner: 'collection-review/workspace/reviews/notes', kind: 'ordinary' },
+  original: { kind: 'code', owner: 'collection-review', file: 'interfaces/protocol.ts', binding: 'ToolResult' }, new: true,
+}));
+console.log(JSON.stringify({ schemaVersion: 'ramify.check/1', outcome: findings.length === 0 ? 'checked' : 'findings', findings }));
+process.exit(findings.length === 0 ? 0 : 1);
+`);
+  await chmod(executable, 0o755);
+  return new RamifyCli({ executable, timeoutMs: 30_000 });
+}
+
+describe('a Ramify module violation in a run', () => {
+  test('the edit that introduces it is told, a completion is refused while it stands, and the fixed work completes', async () => {
+    const fixture = await copyFixture();
+    cleanups.push(fixture.remove);
+    const root = fixture.root;
+    await addModule(root, notesDirectory, 'notes', {
+      'src/notes.ts': 'export const noteLimit = 400;\n',
+      'src/tests/notes.test.ts': [
+        'import { test, expect } from \'vitest\';',
+        'import { noteLimit } from \'../notes.ts\';',
+        '',
+        'test(\'the limit is what the plan asks for\', () => { expect(noteLimit).toBe(500); });',
+        '',
+      ].join('\n'),
+    });
+    await installMiniRunner(root);
+    await initRepository(root);
+
+    const marker = '/* NOT-EXPOSED-IMPORT */';
+    const file = `${notesDirectory}/src/notes.ts`;
+    const { service, agent } = await openRuns(root, {
+      inputs: treeInputs(),
+      ramify: await markerRamify(marker),
+      script: byRole({
+        'initial-architect': [submit(analysis([entry('review-note', notes)]))],
+        'local-architect': [submit(assign(notes, {}, outline())), submit(requestCompletion())],
+        engineer: [[
+          edit(file, 'noteLimit = 400;', `noteLimit = 500; ${marker}`),
+          { kind: 'submit', input: completionProposed() },
+          edit(file, ` ${marker}`, ''),
+          { kind: 'submit', input: completionProposed() },
+        ]],
+      }),
+    });
+    cleanups.push(() => service.close());
+    const receipt = await service.execute(startRun('review-notes'));
+    await service.settled('review-notes', receipt.jobId);
+    expect(onlyRun(service, 'review-notes').state).toBe('completed');
+
+    const engineer = agent!.sessions.find(session => session.spec.role === 'engineer')!;
+    const [introduced, fixed] = engineer.results.filter(result => result.tool === 'edit');
+    // The edit that introduced it carries the finding itself, in the tool result the model reads.
+    expect(introduced!.text).toContain('RAMIFY MODULE VIOLATION. The iteration gate fails while it stands.');
+    expect(introduced!.text).toContain(`${file}:1 imports \`ToolResult\` from src/interfaces/protocol.ts (module \`collection-review\`)`);
+    // The completion proposed while it stood was refused with the same sentence; the fixed one was accepted.
+    expect(engineer.verdicts).toHaveLength(2);
+    const refusal = engineer.verdicts[0] as { accepted: false; errors: string[] };
+    expect(refusal.accepted).toBe(false);
+    expect(refusal.errors.join('\n')).toContain('RAMIFY MODULE VIOLATION still standing; the iteration gate fails on it.');
+    expect(engineer.verdicts[1]).toEqual({ accepted: true });
+    // The edit that fixed it checked clean, so it told the engineer nothing about Ramify.
+    expect(fixed!.text).not.toContain('RAMIFY');
   }, 300_000);
 });

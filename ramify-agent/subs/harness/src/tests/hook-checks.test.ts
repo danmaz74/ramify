@@ -53,12 +53,13 @@ describe('a hook check after a settled mutation', () => {
     expect(first.checks).toHaveLength(1);
     expect(first.checks[0]).toMatchObject({ mode: 'changed', outcome: 'findings', paths: ['a.ts'], newFindings: 1 });
     expect(first.checks[0]!.outcome).not.toBe('passed');
-    expect(first.text).toContain('1 finding not reported before');
+    expect(first.text).toContain('RAMIFY MODULE VIOLATION');
+    expect(first.text).toContain('a.ts: not exposed [denied-access]');
     expect(await readFile(first.checks[0]!.log!, 'utf8')).toContain('denied-access');
 
     // The second check reports the same finding; it is not newly introduced.
     expect(again.checks[0]!.newFindings).toBe(0);
-    expect(again.text).toContain('findings');
+    expect(again.text).toContain('RAMIFY MODULE VIOLATION still standing (1)');
     expect(seen.size).toBe(1);
   });
 
@@ -212,4 +213,76 @@ describe('a mutation is observed even when the tool failed', () => {
     const outcome = JSON.parse(await readFile(runPath(root, 'review-notes', receipt.jobId, runLayout.outcome(invocation)), 'utf8')) as InvocationOutcome;
     expect(outcome.outsideScope).toEqual([]);
   }, 300_000);
+});
+
+/** A finding exactly as `ramify check --changed --format json` reports one. */
+function notVisible(file: string, line: number): Record<string, unknown> {
+  return {
+    id: `source-diagnostic/1:${file}:${line}`,
+    category: 'import',
+    code: 'not-visible',
+    message: 'collection-review:interfaces/protocol.ts#ToolResult: not-visible',
+    location: { file, start: 587, end: 597, line, column: 3 },
+    related: [{ file: 'src/interfaces/protocol.ts', start: 2478, end: 2578, line: 64, column: 1 }],
+    importer: { owner: 'collection-review/workspace/reviews', kind: 'ordinary', root: 'subs/workspace/subs/reviews/src', profile: ['dispatch'] },
+    original: { kind: 'code', owner: 'collection-review', file: 'interfaces/protocol.ts', binding: 'ToolResult' },
+    accessId: `access/1:${file}`,
+    new: true,
+  };
+}
+
+function checkReport(findings: readonly Record<string, unknown>[]): string {
+  return JSON.stringify({ schemaVersion: 'ramify.check/1', outcome: findings.length === 0 ? 'checked' : 'findings', findings });
+}
+
+describe('what the engineer is told about a Ramify module violation', () => {
+  const mcp = 'subs/workspace/subs/reviews/src/mcp.ts';
+
+  test('the finding itself reaches the engineer, labelled, located and with what to do, never as a file to open', async () => {
+    const { ramify, root } = await stub(`echo '${checkReport([notVisible(mcp, 13)])}'\nexit 1`);
+
+    const result = await runHookCheck(request(ramify, root, [mcp]));
+
+    expect(result.text).toBe([
+      'RAMIFY MODULE VIOLATION. The iteration gate fails while it stands.',
+      `- ${mcp}:13 imports \`ToolResult\` from src/interfaces/protocol.ts (module \`collection-review\`), which does not expose it to your module. \`import type\` counts too.`,
+      'Fix: drop the import and use what your module receives; its API view, named in your assignment, lists that. If the work truly needs `ToolResult`, drop the import anyway and submit `unsuitable` with reason `scope`, naming the symbol and its owner: the architect decides whether it is exposed. If a symbol you already receive mentions it in its signature, say so: that is an incomplete exposure. Do not copy or derive it. Editing `collection-review`\'s module.ramify is outside your write scope. `completion-proposed` is refused while this stands.',
+    ].join('\n'));
+    // The report is kept for the record, but the engineer is not sent to it.
+    expect(result.text).not.toContain(root);
+  });
+
+  test('a finding stands until a check covering its file no longer reports it, and a check that did not check clears nothing', async () => {
+    const report = join(tmpdir(), `ramify-agent-hook-report-${process.pid}-${Date.now()}.json`);
+    cleanups.push(() => rm(report, { force: true }));
+    await writeFile(report, checkReport([notVisible(mcp, 13)]));
+    // The stub answers what the test last wrote, and exit 2 when told to.
+    const { ramify, root } = await stub(`if grep -q not-checked '${report}'; then cat '${report}'; exit 2; fi\ncat '${report}'\ngrep -q '"findings":\\[\\]' '${report}' && exit 0\nexit 1`);
+    const seen = new FindingsSeen();
+
+    await runHookCheck(request(ramify, root, [mcp], seen));
+    expect(seen.open().map(finding => finding.code)).toEqual(['not-visible']);
+
+    // An edit elsewhere answers only for its own file.
+    await writeFile(report, checkReport([]));
+    await runHookCheck({ ...request(ramify, root, ['subs/workspace/subs/reviews/src/other.ts'], seen), ran: 1 });
+    expect(seen.open()).toHaveLength(1);
+
+    // A check that did not check answers for nothing.
+    await writeFile(report, JSON.stringify({ schemaVersion: 'ramify.check/1', outcome: 'not-checked', reason: 'cold' }));
+    await runHookCheck({ ...request(ramify, root, [mcp], seen), ran: 2 });
+    expect(seen.open()).toHaveLength(1);
+
+    // The line moved: the same violation, still standing, spelled out again.
+    await writeFile(report, checkReport([notVisible(mcp, 15)]));
+    const moved = await runHookCheck({ ...request(ramify, root, [mcp], seen), ran: 3 });
+    expect(seen.open().map(finding => finding.line)).toEqual([15]);
+    expect(moved.text).toContain(`${mcp}:15 imports \`ToolResult\``);
+
+    // The file checked clean clears it, and nothing is said.
+    await writeFile(report, checkReport([]));
+    const clean = await runHookCheck({ ...request(ramify, root, [mcp], seen), ran: 4 });
+    expect(seen.open()).toEqual([]);
+    expect(clean.text).toBeNull();
+  });
 });

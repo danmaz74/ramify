@@ -167,8 +167,9 @@ function loadLocalArchitect(options: PromptPackageOptions): Promise<LoadedPackag
 
 /**
  * The engineer's package. It offers the four members of the union this
- * iteration produces. The engineer's skill is the module architect's,
- * unchanged: it is what tells it what a module's API view means.
+ * iteration produces. Its system prompt does not include the module
+ * architect's skill: what a Ramify project is, where the API view is and how
+ * an unexposed symbol is reported are stated in the prompt itself.
  */
 function loadEngineer(options: PromptPackageOptions): Promise<LoadedPackage> {
   return loadPackage({

@@ -12,7 +12,7 @@ import type { GateAttempt, GateRuleRecord, TestSelectionPolicy } from '../checks
 import { resolveTestSelection } from '../checks/selection.js';
 import type { GuardedScope } from '../guard/write-guard.js';
 import { blockExplanation, decideWrite } from '../guard/write-guard.js';
-import { FindingsSeen, runHookCheck } from '../hooks/post-write.js';
+import { FindingsSeen, runHookCheck, type HookFinding } from '../hooks/post-write.js';
 import { createShellTool, shellInputSchema, shellJsonSchema, shellToolName, type ShellTool } from '../tools/shell.js';
 import { ExcursionWatcher } from './excursions.js';
 import { takeMutationSnapshot } from './mutations.js';
@@ -70,6 +70,7 @@ import { creationAuthority } from '../work/assignment.js';
 import {
   createScopeTestsTool, engineerJsonSchema, engineerToolName, iterationMessage,
   scopeTestsInputSchema, scopeTestsToolName, validateEngineer, type EngineerSubmission,
+  type IterationApiViews,
 } from '../work/engineer.js';
 import {
   iterationAssignmentSchema, iterationId, iterationLayout, iterationResultSchema, moduleNoticeSchema,
@@ -2264,7 +2265,10 @@ export class RunService {
     readonly equip: (session: EquipContext) => Equipment;
     readonly exhausted: () => boolean;
     readonly shellCalls: () => number;
+    /** The Ramify findings this session's edits introduced that no later check has cleared. */
+    readonly openFindings: () => readonly HookFinding[];
   } {
+    let seen: FindingsSeen | undefined;
     let toolJudge: ToolInputJudge<Record<string, never>> | undefined;
     let shellJudge: ToolInputJudge<{ command: string; timeoutMs?: number }> | undefined;
     let shell: ShellTool | undefined;
@@ -2272,7 +2276,7 @@ export class RunService {
         // The findings this invocation has already been told about, so a
         // hook check reports what is newly introduced and not the same
         // thing at every step.
-        const seen = new FindingsSeen();
+        seen = new FindingsSeen();
         let hookChecks = 0;
         // What each guarded call resolved to, which is what the mutation
         // observation of that call names.
@@ -2388,7 +2392,7 @@ export class RunService {
               projectRoot: this.projectRoot,
               paths,
               hookTimeoutMs: run.record.policy.commands.hookTimeoutMs,
-              seen,
+              seen: seen!,
               ran: hookChecks,
               logFile: check => run.path(runLayout.hookOutput(session.invocation, check)),
             }).catch(error => ({
@@ -2413,6 +2417,7 @@ export class RunService {
       equip,
       exhausted: () => toolJudge?.exhausted === true || shellJudge?.exhausted === true,
       shellCalls: () => shell?.calls ?? 0,
+      openFindings: () => seen?.open() ?? [],
     };
   }
 
@@ -2545,6 +2550,7 @@ export class RunService {
           assignment,
           projectRoot: this.projectRoot,
           base: await currentHead(this.projectRoot),
+          views: await this.iterationViews(run, assignment),
           ...(failedGate === undefined ? {} : { failedGate }),
           ...(handoff === undefined ? {} : { handoff: { ...handoff, returns: this.budgetReturns(run, assignment.id) } }),
         }),
@@ -2558,6 +2564,7 @@ export class RunService {
           obligation: assignment.evidenceObligations
             .find(evidence => evidence.obligation !== undefined && evidence.against === 'real')?.obligation ?? null,
           kind: assignment.kind,
+          openFindings: tools.openFindings(),
         }),
         scope: {
           write: assignment.scope.revision,
@@ -3826,6 +3833,23 @@ export class RunService {
     if (invocation === '') return;
     const summary = lineEvents({ invocation, before, after, index: run.index, gaps });
     await writeFileAtomic(run.path(runLayout.lineEvents(invocation)), `${JSON.stringify(summary, null, 2)}\n`);
+  }
+
+  /** The API views of the modules one iteration writes, for the engineer's briefing. */
+  private async iterationViews(run: Run, assignment: IterationAssignment): Promise<IterationApiViews[]> {
+    const base = assignment.scope.base;
+    const modules = 'module' in base ? [base.module, ...base.includedChildren] : [...base.modules];
+    const entries: IterationApiViews[] = [];
+    for (const module of modules) {
+      const result = await apiViewsOf(this.options.ramify, this.projectRoot, run.index, module)
+        .catch(error => ({ evidence: null, unavailable: `the API view could not be read: ${message(error)}` }));
+      entries.push({
+        module,
+        views: result.evidence === null ? [] : result.evidence.views.map(view => ({ area: view.area, path: view.path, coverage: view.coverage })),
+        unavailable: result.unavailable,
+      });
+    }
+    return entries;
   }
 
   /**

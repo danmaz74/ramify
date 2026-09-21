@@ -8,6 +8,7 @@ import { scopedTestCheck } from '../checks/checkpoint.js';
 import type { TestSelectionPolicy } from '../checks/records.js';
 import { resolveTestSelection } from '../checks/selection.js';
 import { validateAgainst, type SubmissionError, type SubmissionValidation } from '../run/submissions.js';
+import { openFindingsMessage, type HookFinding } from '../hooks/post-write.js';
 import { needAsBehaviorSchema } from '../contracts/submission.js';
 import type { IterationAssignment } from './iterations.js';
 import { scopePaths } from './scope.js';
@@ -103,6 +104,13 @@ export interface EngineerEvidence {
   readonly obligation?: { readonly id: string; readonly revision: number } | null | undefined;
   /** The kind of iteration this engineer is working, as the assignment fixed it. */
   readonly kind?: string | undefined;
+  /**
+   * Ramify findings this session's own edits introduced that no later hook
+   * check has cleared. The gate runs the same check, so a completion
+   * proposed while one stands would fail there; it is refused here instead,
+   * where the session can still act on it.
+   */
+  readonly openFindings?: readonly HookFinding[] | undefined;
 }
 
 /**
@@ -168,6 +176,14 @@ export function validateEngineer(input: unknown, evidence: EngineerEvidence = {}
       path: 'reason',
       message: 'This iteration is already the breaking one its outline planned, so there is no break to discover; report what is unfinished instead',
       expected: '"scope", or a "partial" report',
+    });
+  }
+
+  if (value.kind === 'completion-proposed' && evidence.openFindings !== undefined && evidence.openFindings.length > 0) {
+    errors.push({
+      path: 'kind',
+      message: openFindingsMessage(evidence.openFindings),
+      expected: '"completion-proposed" only once no Ramify module violation stands',
     });
   }
 
@@ -285,11 +301,20 @@ export function createScopeTestsTool(options: ScopeTestsOptions): ToolDefinition
 
 // The briefing.
 
+/** What one written module may import: its API views, or why none was materialized. */
+export interface IterationApiViews {
+  readonly module: string;
+  readonly views: readonly { readonly area: string; readonly path: string; readonly coverage: number | null }[];
+  readonly unavailable: string | null;
+}
+
 export interface IterationBriefing {
   readonly assignment: IterationAssignment;
   readonly projectRoot: string;
   /** The commit `git diff` compares against: the last accepted boundary. */
   readonly base: string;
+  /** The API views of the modules this iteration writes, or why one has none. */
+  readonly views?: readonly IterationApiViews[] | undefined;
   /** Diagnostics of the attempt that did not pass, where this invocation is a repair. */
   readonly failedGate?: { readonly id: string; readonly cause: string | null; readonly summary: readonly string[] } | undefined;
   /** What an earlier invocation of this iteration reported before it ran out of context. */
@@ -319,6 +344,23 @@ export function iterationMessage(briefing: IterationBriefing): string {
     'Nothing else. A write outside this scope is refused before it happens; report the need instead of working around it.',
     '',
   ];
+
+  if (briefing.views !== undefined && briefing.views.length > 0) {
+    lines.push('## What you may import', '');
+    lines.push('Imports from other modules are answered by the API view of the module that imports, not by other modules\' source:', '');
+    for (const entry of briefing.views) {
+      if (entry.views.length === 0) {
+        lines.push(`- \`${entry.module}\`: no API view, because ${entry.unavailable ?? 'none was materialized'}. Absence of a view is not permission; the Ramify check after each change still answers.`);
+        continue;
+      }
+      for (const view of entry.views) {
+        lines.push(`- \`${entry.module}\` (${view.area}): \`${view.path}/\`; ${view.coverage === null
+          ? 'coverage complete, so a symbol it does not list is not importable'
+          : `coverage limits: ${view.coverage}, so absence is not proof`}.`);
+      }
+    }
+    lines.push('', 'A symbol you need that is not there is reported with `unsuitable`, reason `scope`; it is never imported anyway.', '');
+  }
 
   if (assignment.scope.bootstrap.length > 0) {
     lines.push('This iteration creates a module. Its directory does not exist yet, and you may create it with its');

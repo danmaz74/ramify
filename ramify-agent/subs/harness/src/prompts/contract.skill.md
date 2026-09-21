@@ -49,3 +49,11 @@ consumer's current call sites and not from the provider's current internals.
 A cross-module import passes through a `module.ramify` exposure. Where the
 agreement needs one, change the declarations along the path — and only those
 your write scope names.
+
+Expose a symbol together with every named type its signature mentions: its
+parameter types, its return type, the types of its members, and the types
+those mention in turn. Expose them to the same audience, in the same
+declaration where the file is the same. A consumer that receives a function
+but not the types it is written in cannot use it cleanly, and Ramify does not
+expose them for you. A class or an enum that a signature mentions is exposed
+too; its importers take it with `import type` where they need only the type.
