@@ -110,6 +110,33 @@ The adjusted normalized token-cost metric `K = 100T / (C * g(S0))` under
 The reported or estimated tokens occupying a model context at a specified
 observation point.
 
+## Context-limit occurrence
+
+An automatic response to model context pressure under the recorded run policy:
+either a context budget return or a compaction triggered by a threshold or
+provider overflow. An explicit/manual compaction is recorded separately and is
+not an automatic context-limit occurrence.
+
+## Context budget return
+
+An invocation ending `context-budget-reached` after its configured threshold
+fires, with its final report opportunity and subsequent workflow action
+recorded. Reaching the proactive threshold does not establish that the provider
+overflowed.
+
+## Compaction occurrence
+
+One observed compaction attempt, with trigger, completion state and reported
+model context usage before and after it. Its trigger is threshold, provider
+overflow or explicit/manual action.
+
+## Overflow-triggered compaction
+
+A compaction occurrence whose provider or adapter reports `overflow` as its
+trigger. This is the selected exact meaning of **context overflow occurrence**;
+context budget returns and threshold-triggered compactions are related
+context-limit occurrences but are not relabeled as provider overflows.
+
 ## Editing activity
 
 Source changes performed during execution, including work later replaced or

@@ -42,16 +42,21 @@ Design documents for the separate agent harness:
   its agent studios teach about state, checks, planning and sessions, with the
   consequences proposed for Plan 3
 - [Plan 3: the autonomous implementation loop MVP](plans/03-autonomous-implementation-loop/main-plan.md),
-  authored and not executed; thirteen [iterations](plans/03-autonomous-implementation-loop/iterations/README.md)
+  in implementation; its thirteen-iteration
+  [index](plans/03-autonomous-implementation-loop/iterations/README.md) records
+  current progress
 - [Plan 3 core records](plans/03-autonomous-implementation-loop/core-records.proposal.md),
   proposal for the durable records, submissions and identities the plan will reference
+- [Plan 4: delivered-solution token efficiency](plans/04-token-efficiency/main-plan.md),
+  including context-limit and overflow visibility; planned and blocked until
+  Plan 3 is complete and merged
 - [Module architect skill design](architect-skill-design/README.md)
 - [Metrics](metrics/README.md), glossary, measurement principles and the initial
   delivered-change token-efficiency policy; its glossary names concepts and
   their selected measurements, and its terminology map clarifies older names
 - [Ramify measurements and agent KPIs](measurements-and-kpis.md)
-- [Potential future capabilities](future/README.md), candidate user-facing
-  features that are not yet scheduled or approved for implementation
+- [Potential future capabilities](future/README.md), candidate and planned
+  user-facing features with their maturity
 - [Plan 2C consumer review](reviews/2026-09-19-plan2c-consumer-review.md)
 
 What Ramify provides to agents is described in the toolkit's

@@ -76,6 +76,22 @@ at first mention, then `S0` or **declared scope bytes** within that context.
 Use **model context usage** for the token observation. Unqualified "context size" or "search space" does not
 identify the unit, included content or observation being described.
 
+## Context limits and compaction
+
+| Preferred term | Existing evidence | Distinction |
+| --- | --- | --- |
+| Context budget return | `InvocationOutcome.ended = context-budget-reached` and `InvocationOutcome.budget` | A harness threshold and handoff mechanism; it does not prove provider overflow. |
+| Compaction occurrence | A `compaction` observation with trigger, success and before/after model context usage | The current observation records completed attempts; Plan 4 also records their starts so interrupted attempts remain visible. |
+| Overflow-triggered compaction | A compaction observation whose trigger is `overflow` | The exact count of reported context overflows. |
+| Context-limit occurrence | Budget returns plus threshold- or overflow-triggered compaction attempts | An umbrella operational count. Explicit/manual compactions remain visible but outside this automatic total. |
+
+Plan 3's `compactions.<role>` metric combines every compaction trigger, while
+`budget-return-rate.<role>` and `repeated-budget-returns` describe threshold
+returns. Those metrics retain their compatibility identifiers. The
+[Plan 4 context-limit projection](../plans/04-token-efficiency/main-plan.md#context-limit-visibility)
+adds trigger, outcome and workflow-action detail without relabeling a proactive
+threshold as an overflow.
+
 ## Change, cost and efficiency
 
 | Preferred term | Existing quantity | Distinction |

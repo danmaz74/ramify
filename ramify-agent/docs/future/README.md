@@ -15,6 +15,20 @@ The maturity labels used here are:
 - **Specified:** a design describes the expected behavior.
 - **Planned:** an implementation plan exists under `docs/plans/`.
 
+## Measurement and evaluation
+
+### Delivered-solution token efficiency
+
+**Maturity:** Planned; blocked until Plan 3 is complete and merged.
+
+Measure provider-reported token cost against the accepted endpoint source diff,
+with a fixed allowance for the starting project's source-line search-space
+proxy. [Plan 4](../plans/04-token-efficiency/main-plan.md) implements the agreed
+[`token-efficiency/1`](../metrics/token-efficiency.md) policy without changing
+Plan 3's byte-based scope KPIs. It also adds precise context-limit visibility:
+budget returns, compaction triggers and exact overflow-triggered occurrences.
+Actual exploration and solution efficiency remain outside that plan.
+
 ## Execution visibility
 
 ### Capability dependency progress graph
@@ -98,4 +112,3 @@ its destination. A design must cover source preparation, branch ownership,
 concurrent changes, conflicts, final validation, merge authority, recovery and
 worktree cleanup. Keep the merge decision distinct from implementation-loop
 completion.
-

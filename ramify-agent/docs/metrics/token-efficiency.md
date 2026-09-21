@@ -3,6 +3,10 @@
 **Status:** agreed initial policy; not an implementation or empirical validation
 claim. **Policy identifier:** `token-efficiency/1`.
 
+Implementation is planned by
+[Plan 4](../plans/04-token-efficiency/main-plan.md), after Plan 3 is complete and
+merged.
+
 This policy follows the [measurement principles](measurement-principles.md)
 and uses the [metrics glossary](glossary.md). It measures the token cost of the
 delivered change with a simple allowance for the starting search space.
@@ -106,6 +110,11 @@ Include attributable initial architecture and discovery, implementation,
 review, integration, repair, failed attempts and model calls for compaction.
 An explicitly linked earlier planning session is included once. Retain phase
 and role breakdowns without letting transfers between roles change the total.
+
+Retain context-limit occurrences beside token cost: context budget returns,
+threshold-triggered compactions, overflow-triggered compactions and explicit
+compactions. They explain process behavior but do not alter `T`, `C`, `S0`, `U`
+or `K`. Do not call a proactive budget return a provider overflow.
 
 Retain provider-reported input, cache-read, cache-write and output categories
 with their definitions. Derive `T` only from compatible, non-overlapping counts;

@@ -3,10 +3,15 @@
 This directory establishes a shared language for ramify-agent metrics: the
 concepts being discussed, the metrics used to represent them and the evidence
 behind individual measurements. Token efficiency is its first selected policy.
+It also distinguishes context budget returns, compaction and exact
+overflow-triggered compactions so operational counts do not collapse different
+mechanisms into one ambiguous “context overflow” label.
 
-**Status:** agreed initial measurement policy; implementation and empirical
-validation are separate work. The proxies are deliberately simple. They do not
-establish the intrinsic difficulty of a plan or the efficiency of its solution.
+**Status:** agreed initial measurement policy. Implementation is planned by
+[Plan 4](../plans/04-token-efficiency/main-plan.md), which remains blocked until
+Plan 3 is complete and merged. Empirical validation remains separate from the
+policy definition. The proxies are deliberately simple. They do not establish
+the intrinsic difficulty of a plan or the efficiency of its solution.
 
 | Document | Purpose |
 | --- | --- |
