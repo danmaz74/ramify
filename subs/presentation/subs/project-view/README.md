@@ -11,6 +11,19 @@ edges, collapse controls, keyboard input, the minimap and fitting. The canvas
 imports no stylesheet: its rules are in `module-tree-canvas.css`, which the
 module tree imports beside its own.
 
+Keyboard focus is navigation. A keyboard-focused element outside the viewport,
+whether a node shell, a body control or a collapse control, is centred at the
+current zoom, so a fitted tree keeps its zoom while the viewer moves through
+it; the canvas centres on the focused element rather than on its node, because
+a tall node's lower rows would stay out of view. Centering on the caller's
+requested node sets zoom 1 instead, because that is the viewer's choice of one
+node. A focus pan counts as a viewer move and ends auto-fitting. A body
+control's key press does not reach the shell, and Space on a body control
+activates that control alone: it does not reach React Flow's pan-activation
+key, which the shell and the pane keep. Below 480 px of canvas width the
+canvas hides the minimap, whose fixed 200 by 150 box otherwise covers much of
+the view.
+
 The diagram draws only links from a supplied dependency model
 (`ramify.explorer-dependencies/1`), declared here in the same serialized shape
 the explorer server produces. It draws the model's original-owner collection,

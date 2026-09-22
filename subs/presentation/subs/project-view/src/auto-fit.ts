@@ -11,6 +11,8 @@ export interface AutoFit<Instance> {
   readonly onInit: (instance: Instance) => void;
   /** Stops fitting once the viewer pans or zooms; programmatic moves carry no event. */
   readonly onMoveStart: (event: MouseEvent | TouchEvent | null) => void;
+  /** Stops fitting for a move the canvas makes on the viewer's behalf, such as a focus pan. */
+  readonly markMoved: () => void;
 }
 
 /**
@@ -50,9 +52,11 @@ export function useAutoFit<Instance extends FitTarget = FitTarget>(
     return () => { cancelAnimationFrame(frame); observer.disconnect(); };
   }, [fit]);
 
-  const onMoveStart = useCallback((event: MouseEvent | TouchEvent | null) => {
-    if (event) moved.current = true;
-  }, []);
+  const markMoved = useCallback(() => { moved.current = true; }, []);
 
-  return { flow, containerRef, onInit: setFlow, onMoveStart };
+  const onMoveStart = useCallback((event: MouseEvent | TouchEvent | null) => {
+    if (event) markMoved();
+  }, [markMoved]);
+
+  return { flow, containerRef, onInit: setFlow, onMoveStart, markMoved };
 }
