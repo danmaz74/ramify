@@ -1,23 +1,154 @@
 import type { AccessResult, AnalysisReport } from '../../analysis/src/interfaces/analysis.js';
 import type {
+  BindingRequest,
   Destination,
   ImportReason,
   Model,
   ModuleId,
   OriginalId,
+  ResolvedTagRegistry,
   SourceLocation,
+  SourceOrigin,
 } from '../../analysis/subs/model/src/interfaces/model.js';
-import type { InventoryFile, ProjectInventory } from '../../analysis/subs/project/src/interfaces/project.js';
+import type {
+  InventoryFile,
+  ModulePurpose,
+  ProjectInventory,
+} from '../../analysis/subs/project/src/interfaces/project.js';
 import type {
   CatalogExport,
   SourceAccess,
   SourceLimit,
   SourceTarget,
   SymbolDetailRequest,
+  WrittenForm,
 } from '../../analysis/subs/typescript/src/interfaces/source.js';
+import type { ContextRevision } from '../../daemon/subs/contexts/src/interfaces/contexts.js';
 import type { ExplorerProjectionInput } from './interfaces/explorer-service.js';
 
 export const maximumProjectViewBytes = 16 * 1024 * 1024;
+
+/**
+ * What the projection answers with: the model of one revision, or the reason it
+ * is unavailable. Written out so `createProjectExplorerModel` declares its
+ * result instead of leaving it to inference; every member states exactly the
+ * type the projection already produced.
+ */
+export type ExplorerProjectionResult =
+  | {
+    status: 'unavailable';
+    reason: string;
+    limit?: { readonly maximumBytes: number; readonly observedBytes: number } | undefined;
+  }
+  | {
+    status: 'ready';
+    revision: ContextRevision;
+    view: {
+      revision: string;
+      rootModuleId: string;
+      state: 'complete' | 'partial';
+      registry: ResolvedTagRegistry;
+      modules: {
+        id: string;
+        name: string;
+        directory: string;
+        parent: string | null;
+        children: string[];
+        tags: string[];
+        presentationClass: string;
+        purpose: ModulePurpose;
+        files: {
+          path: string;
+          area: 'ordinary' | 'tests';
+          kind: 'resource' | 'source';
+        }[];
+        exports: {
+          id: string;
+          name: string;
+          aliases: string[];
+          original: OriginalId | null;
+          file: string;
+          locations: SourceLocation[];
+          capability: 'resource' | 'type' | 'unknown' | 'value' | 'value-and-type';
+          tags: string[];
+          forwarded: boolean;
+          exposures: {
+            module: string;
+            names: string[];
+            destinations: Destination[];
+            provider: string | null;
+            effective: boolean;
+            evidence: SourceLocation[];
+          }[];
+          signature:
+            | { state: 'loadable'; request: SymbolDetailRequest; reason?: undefined }
+            | { request?: undefined; state: 'unavailable'; reason: 'missing-original' };
+        }[];
+        metrics: {
+          ownedFiles: number;
+          subtreeFiles: number;
+          dependencies: number;
+          dependents: number;
+          accessOccurrences: number;
+          selectedSymbols: number;
+          deniedAccesses: number;
+          limitedAccesses: number;
+          approximateIcs: number;
+        };
+      }[];
+      edges: {
+        id: string;
+        consumer: string;
+        provider: string;
+        consumerFiles: string[];
+        providerFiles: string[];
+        accessCount: number;
+        symbolCount: number;
+        accesses: {
+          id: string;
+          importerFile: string;
+          targetFile: string | null;
+          specifier: string | null;
+          writtenForm: WrittenForm;
+          selectionForm: 'default' | 'destructure' | 'direct-member' | 'literal-key' | 'named' | 'none'
+            | 'qualified-type' | 'then-destructure' | 'then-member' | 'unknown' | 'whole-namespace' | 'whole-star';
+          runtimeLoad: boolean;
+          selections: {
+            exportedName: string;
+            localName: string | null;
+            original: OriginalId | null;
+            request: BindingRequest;
+            explicitType: boolean;
+            forwarding: readonly SourceOrigin[];
+            status: 'missing-export' | 'resolved' | 'unresolved';
+            location: SourceLocation;
+          }[];
+          status: 'allowed' | 'denied' | 'limited';
+          reasons: ImportReason[];
+          coverageIds: string[];
+          location: SourceLocation;
+        }[];
+        status: 'allowed' | 'denied' | 'limited';
+        reasons: ImportReason[];
+        coverageIds: string[];
+      }[];
+      coverage: {
+        limit: SourceLimit;
+        moduleIds: readonly string[];
+        edgeIds: string[];
+      }[];
+      summary: {
+        owners: number;
+        ownedFiles: number;
+        edges: number;
+        accessOccurrences: number;
+        selectedSymbols: number;
+        deniedAccesses: number;
+        limitedAccesses: number;
+        coverageNotes: number;
+      };
+    };
+  };
 
 const utf8Order = (left: string, right: string): number => Buffer.compare(Buffer.from(left), Buffer.from(right));
 const ordered = (values: Iterable<string>): string[] => [...new Set(values)].sort(utf8Order);
@@ -172,7 +303,7 @@ function exportGroups(
  * its matching detached report. This module deliberately imports no filesystem,
  * compiler, session, context-manager or daemon-host implementation.
  */
-export function createProjectExplorerModel(input: ExplorerProjectionInput) {
+export function createProjectExplorerModel(input: ExplorerProjectionInput): ExplorerProjectionResult {
   const { revision, report } = input;
   if (!completeReport(report)) return unavailable('The report is not a completed structural analysis');
   if (report.inputId !== revision.fingerprints.inputId) return unavailable('The report does not match the requested revision');

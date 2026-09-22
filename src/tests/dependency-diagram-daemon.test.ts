@@ -81,22 +81,7 @@ describe('dependency diagram in the built daemon', () => {
           const checked = unwrap(await connection.check({ token, requestId: 'bd24-open', freshness: { mode: 'synchronized', expect: [] } }));
           if (checked.status !== 'reported' || !checked.published) throw new Error(JSON.stringify(checked).slice(0, 2000));
           const revision = checked.revision;
-          // Plan 8's exposed-signature analysis makes the current toolkit source report partial for its
-          // known inferred public signatures. Those nonblocking source limits are distinct from the
-          // dependency behavior coverage this test requires below.
-          expect(revision.outcome).toEqual({ execution: 'completed', check: 'passed', coverage: 'partial' });
-          if (!checked.report) throw new Error('BD24 requires the synchronized report');
-          const sourceCoverage = checked.report.coverage;
-          expect(sourceCoverage).toHaveLength(10);
-          expect(new Set(sourceCoverage.map(item => item.code))).toEqual(new Set(['signature-inferred']));
-          expect(new Set(sourceCoverage.map(item => item.location.file))).toEqual(new Set([
-            'subs/daemon/subs/contexts/src/tests/controlled-ports.ts',
-            'subs/presentation/subs/layout/src/geometry.ts',
-            'subs/presentation/subs/layout/src/viewport.ts',
-            'subs/service-api/src/project-view.ts',
-            'subs/service-api/src/router.ts',
-            'subs/service-api/src/web-discovery.ts',
-          ]));
+          expect(revision.outcome).toEqual({ execution: 'completed', check: 'passed', coverage: 'complete' });
           expect(capabilities).not.toContain('dependency-behavior');
 
           // The job starts in the daemon; its analyzer child appears in the trace.
@@ -128,12 +113,7 @@ describe('dependency diagram in the built daemon', () => {
           if (ready.status !== 'ready') throw new Error(JSON.stringify(ready));
           expect(ready.revision.revision).toBe(revision.revision);
           expect(ready.diagram.inputId).toBe(revision.fingerprints.inputId);
-          // Production metrics retain the nine limits outside the one controlled-port test source,
-          // but the classifier itself resolves every dependency.
-          const productionLimitIds = sourceCoverage
-            .filter(item => item.location.file !== 'subs/daemon/subs/contexts/src/tests/controlled-ports.ts')
-            .map(item => item.id).sort((left, right) => Buffer.compare(Buffer.from(left), Buffer.from(right)));
-          expect(ready.diagram.coverage).toEqual({ state: 'partial', unknownDependencies: 0, limitIds: productionLimitIds });
+          expect(ready.diagram.coverage).toEqual({ state: 'complete', unknownDependencies: 0, limitIds: [] });
           expect(ready.diagram.headline.behavioralDependencies).toBeGreaterThan(0);
           const diagramBytes = Buffer.byteLength(JSON.stringify(ready.diagram));
           const afterReady = await status();

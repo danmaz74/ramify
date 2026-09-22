@@ -77,7 +77,7 @@ export function explorerProcessAlive(pid: number): boolean {
 }
 
 /** Readiness repeats every compatibility field and is accepted only from the recorded Host. */
-export function probeExplorerReadiness(record: ExplorerProcessRecord, timeoutMs = 250,
+export function probeExplorerReadiness(record: ExplorerProcessRecord, timeoutMs: number = 250,
   signal?: AbortSignal): Promise<boolean> {
   if (record.state !== 'running' || timeoutMs <= 0 || !Number.isFinite(timeoutMs)) return Promise.resolve(false);
   return new Promise(resolve => {
