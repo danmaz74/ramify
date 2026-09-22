@@ -33,6 +33,14 @@ export const addedDeclarationLines = [
   ['subs/analysis/module.ramify', 'expose-src openRetainedSession from "retained-session.ts" to parent'],
 ] as const;
 
+// The reviewed eight package entries, and the recorded additions beside them:
+// the module-tree canvas entry and its stylesheet. The stylesheet is a string
+// export target, resolved and read but never imported, as `relocation.ts`
+// separates entry imports from stylesheet files.
+const reviewedEntryMap: readonly string[] = ['.', './analysis', './analysis/inventory', './model', './presentation', './cli', './layout', './client'];
+const recordedEntryAdditions: readonly string[] = ['./module-tree'];
+const recordedStylesheetAdditions: readonly string[] = ['./module-tree.css'];
+
 // A module the CLI or client closure must never load: the retained session,
 // its worker and supervisor, the compiler adapters and the compiler package.
 export const sessionModulePattern = /(?:subs\/analysis\/src\/(?:retained-session|session-[\w-]+)|subs\/analysis\/subs\/typescript\/src\/(?:retained-source-analysis|compiler-helper|source-analysis)|node_modules\/typescript\/)/;
@@ -133,10 +141,17 @@ async function packedEntries(context: ProjectContext): Promise<void> {
   const expected = reviewedPackage(
     await readFile(join(context.root, 'docs/plans/done/iteration-1-project-verifier/contracts.md'), 'utf8'),
     await readFile(join(context.root, 'docs/plans/done/iteration-2-resident-verification/contracts.md'), 'utf8'));
-  assertions.equal('all eight packed entries resolve with their import and type conditions', await validatePackageEntries(installed, expected), 8);
+  assertions.equal('all eight reviewed packed entries resolve with their import and type conditions', await validatePackageEntries(installed, expected), 8);
   const manifest = JSON.parse(await readFile(join(installed, 'package.json'), 'utf8')) as { bin: unknown; exports: Record<string, unknown> };
-  assertions.equal('the entry map is Plan 2\'s eight entries', Object.keys(manifest.exports),
-    ['.', './analysis', './analysis/inventory', './model', './presentation', './cli', './layout', './client']);
+  const packedKeys = Object.keys(manifest.exports);
+  assertions.equal('the reviewed entry map is still Plan 2\'s eight entries',
+    packedKeys.filter(key => reviewedEntryMap.includes(key)), reviewedEntryMap);
+  assertions.equal('the only other packed entries are the recorded additions',
+    packedKeys.filter(key => !reviewedEntryMap.includes(key)), [...recordedEntryAdditions, ...recordedStylesheetAdditions]);
+  // A stylesheet entry is a string target: the packed manifest names one file,
+  // which is resolved and read, never imported.
+  assertions.equal('every recorded stylesheet addition is a string file target',
+    recordedStylesheetAdditions.map(key => typeof manifest.exports[key]), recordedStylesheetAdditions.map(() => 'string'));
   assertions.equal('bin.ramify is the reviewed launcher', manifest.bin, { ramify: 'dist/src/ramify' });
   const preload = await realpath(join(context.root, 'src/tests/process-probe.mjs'));
   await withSequenceProcess(async processes => {
@@ -180,7 +195,9 @@ export const plan5CompletionHandlers: ReadonlyMap<string, InstanceHandler> = new
     recordObservation('plan5-final-contracts-process', result);
     assertions.equal('strict final-contract process accepts owners.md and the package', [result.code, result.signal, result.error], [0, null, null]);
     const value = object(JSON.parse(result.stdout));
-    assertions.equal('eleven declarations and eight package entries validated', [value.owners, value.packageEntries], [11, 8]);
+    // The eleven archived declarations and the four owners Plan 6 added as a
+    // named layer, beside the eight reviewed package entries.
+    assertions.equal('fifteen layered declarations and eight reviewed package entries validated', [value.owners, value.packageEntries], [15, 8]);
     assertions.ok('real exposures were linked', Number(value.expandedStatements) > 0);
     const validator = await readFile(join(repositoryRoot, 'scripts/validate-final-contracts.ts'), 'utf8');
     assertions.ok('the validator reads Plan 5 owners.md as its third reviewed layer',

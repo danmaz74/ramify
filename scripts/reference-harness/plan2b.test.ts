@@ -150,12 +150,18 @@ describe('Plan 2B regressions (AV34)', () => {
   }, 600_000);
 
 
-  it('keeps the eight entries and the lightweight ./cli and ./client closures', async () => {
+  it('keeps the eight reviewed entries beside the recorded additions and the lightweight ./cli and ./client closures', async () => {
     const entries: EntryEvidence = await entryClosures();
     evidence.entries = entries;
     expect(entries.packageEntries).toBe(8);
     expect(entries.manifest.equalToBaseline).toBe(true);
-    expect(entries.manifest.exports).toEqual(['.', './analysis', './analysis/inventory', './model', './presentation', './cli', './layout', './client']);
+    expect(entries.manifest.baselineExports).toEqual(['.', './analysis', './analysis/inventory', './model', './presentation', './cli', './layout', './client']);
+    // The recorded additions are named, not a bare superset, and the stylesheet
+    // entry is a string target that the gate reads as a file and never imports.
+    expect(entries.manifest.additions).toEqual(['./module-tree', './module-tree.css']);
+    expect(entries.manifest.stylesheetAdditions).toEqual(['./module-tree.css']);
+    expect(entries.manifest.exports.filter(key => !entries.manifest.additions.includes(key)))
+      .toEqual(['.', './analysis', './analysis/inventory', './model', './presentation', './cli', './layout', './client']);
     expect(entries.client.code).toBe(0);
     expect(entries.client.closure.length).toBeGreaterThan(1);
     expect(entries.cli.code).toBe(0);

@@ -2,7 +2,7 @@ import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { assertOwner, reviewedOwners, reviewedPackage, validatePackageEntries } from '../validate-final-contracts.js';
+import { assertOwner, layeredOwners, reviewedOwners, reviewedPackage, validatePackageEntries } from '../validate-final-contracts.js';
 import { repositoryRoot } from './plan.js';
 
 const archive = 'docs/plans/done/iteration-1-project-verifier';
@@ -20,6 +20,19 @@ describe('Plan 2 final contract validator', () => {
     expect(owners.get('analysis')!.document.statements.some(statement => statement.from.value === 'increment.ts')).toBe(true);
     const [baseline, plan2] = await reviews('owners.md');
     expect(() => reviewedOwners(baseline.replace('TextSpan, DescriptionToken', 'ChangedSpan, DescriptionToken'), plan2)).toThrow('Abbreviation must match');
+  });
+
+  it('layers the owners and selections later plans added over the untouched archived eleven', async () => {
+    const archived = reviewedOwners(...await reviews('owners.md'));
+    const layered = layeredOwners(archived);
+    expect([...layered.keys()].sort()).toEqual(['analysis', 'cli', 'contexts', 'daemon', 'descriptions', 'explorer',
+      'integration-tests', 'layout', 'model', 'presentation', 'project', 'project-view', 'ramify', 'service-api', 'typescript']);
+    // Each archived declaration is carried through unchanged; every later
+    // selection arrives as a layer that names the plan which reviewed it.
+    for (const [name, owner] of archived) expect(layered.get(name)!.document).toBe(owner.document);
+    expect(layered.get('daemon')!.layers!.map(layer => layer.plan))
+      .toEqual(['Plan 6 (project explorer)', 'Plan 6D (behavioral dependency diagram)', 'Plan 8 (signature companions)']);
+    for (const owner of layered.values()) for (const layer of owner.layers ?? []) expect(layer.plan.trim()).not.toBe('');
   });
 
   it('accepts reviewed exposures and purpose while rejecting independent declaration and prose drift', async () => {
@@ -64,14 +77,21 @@ describe('Plan 2 final contract validator', () => {
     expect(() => assertOwner(declaration, `# Daemon\n\nWrong first purpose.\n\n${owner.purpose}\n`, owner)).toThrow('Final README purpose differs');
   });
 
-  it('resolves all eight runtime and type targets from the supplied package and rejects missing or broken entries', async () => {
+  it('resolves all eight reviewed targets, reads the added stylesheet without importing it, and rejects missing or broken entries', async () => {
     const metadata = reviewedPackage(...await reviews('contracts.md'));
     expect(Object.keys(metadata.exports).sort()).toEqual(['.', './analysis', './analysis/inventory', './cli', './client', './layout', './model', './presentation']);
     // The reviewed bin target remains the Node entry beside the installed launcher.
     expect([metadata.bin, metadata.nodeEntry]).toEqual([{ ramify: 'dist/src/ramify' }, 'dist/src/cli-entry.js']);
     const root = await mkdtemp(join(tmpdir(), 'ramify-final-entries-'));
     const { nodeEntry, ...reviewed } = metadata;
-    const manifest = { name: 'ramify.ts', ...reviewed };
+    // The recorded additions, restated here rather than read from the gate: the
+    // canvas entry, and a stylesheet whose string target is read but never
+    // imported. Its bytes would throw if anything did import it.
+    const canvas = { types: './dist/subs/presentation/src/module-tree-entry.d.ts', import: './dist/subs/presentation/src/module-tree-entry.js' };
+    const stylesheet = './dist/subs/presentation/src/module-tree-entry.css';
+    const allExports: Record<string, { readonly types: string; readonly import: string } | string> =
+      { ...reviewed.exports, './module-tree': canvas, './module-tree.css': stylesheet };
+    const manifest = { name: 'ramify.ts', ...reviewed, exports: allExports };
     const put = async (path: string, text: string) => { await mkdir(dirname(join(root, path)), { recursive: true }); await writeFile(join(root, path), text); };
     // Independent fixtures contain callable bindings, not an empty module
     // that could mask a missing public entry re-export.
@@ -89,6 +109,9 @@ describe('Plan 2 final contract validator', () => {
         await put(entry.types, functions[name].map(name => `export declare function ${name}(): void;`).join('\n'));
         await put(entry.import, source(functions[name]));
       }
+      await put(canvas.types, 'export declare function ModuleTreeCanvas(): void;');
+      await put(canvas.import, source(['ModuleTreeCanvas']));
+      await put(stylesheet, 'throw new Error("stylesheet was imported");\n');
       await put(metadata.bin.ramify, '#!/bin/sh\n'); await put(nodeEntry, '#!/usr/bin/env node\n');
       for (const file of [metadata.bin.ramify, nodeEntry]) await chmod(join(root, file), 0o755);
       expect(await validatePackageEntries(root, metadata)).toBe(8);
@@ -112,11 +135,11 @@ describe('Plan 2 final contract validator', () => {
         await expect(validatePackageEntries(root, metadata)).rejects.toThrow(`Missing callable export: ramify.ts#${missing}`);
       }
       await put(metadata.exports['.'].import, source(functions['.']));
-      const { './client': _client, ...seven } = metadata.exports;
+      const { './client': _client, ...seven } = manifest.exports;
       await put('package.json', JSON.stringify({ ...manifest, exports: seven }));
       await expect(validatePackageEntries(root, metadata)).rejects.toThrow('Final package exports');
       await put('package.json', JSON.stringify(manifest));
-      const misordered = { ...manifest, exports: { ...metadata.exports, './client': { import: client.import, types: client.types } } };
+      const misordered = { ...manifest, exports: { ...manifest.exports, './client': { import: client.import, types: client.types } } };
       await put('package.json', JSON.stringify(misordered));
       await expect(validatePackageEntries(root, metadata)).rejects.toThrow('ramify.ts/client types target');
       await put('package.json', JSON.stringify(manifest));
@@ -132,6 +155,17 @@ describe('Plan 2 final contract validator', () => {
       await chmod(join(root, nodeEntry), 0o755);
       await put('package.json', JSON.stringify({ ...manifest, bin: { ramify: nodeEntry } }));
       await expect(validatePackageEntries(root, metadata)).rejects.toThrow('Final package bin');
+      // The stylesheet target is probed as a file, never imported: removing it
+      // fails, and restoring it passes although its bytes would throw on import.
+      await put('package.json', JSON.stringify(manifest));
+      await rm(join(root, stylesheet));
+      await expect(validatePackageEntries(root, metadata)).rejects.toThrow('ENOENT');
+      await put(stylesheet, 'throw new Error("stylesheet was imported");\n');
+      expect(await validatePackageEntries(root, metadata)).toBe(8);
+      // An entry beyond the reviewed eight is accepted only as a recorded addition.
+      await put('package.json', JSON.stringify({ ...manifest, exports: { ...manifest.exports, './surprise': canvas } }));
+      await expect(validatePackageEntries(root, metadata)).rejects.toThrow('Final package exports beyond the reviewed entries');
+      await put('package.json', JSON.stringify(manifest));
     } finally { await rm(root, { recursive: true, force: true }); }
   }, 30_000);
 });

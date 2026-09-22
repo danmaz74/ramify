@@ -14,15 +14,26 @@ it('composes only the reviewed repaired cases while preserving all original evid
   const archived = JSON.parse(gunzipSync(await readFile(join(repositoryRoot, 'scripts/reference-harness/evidence/plan1-complete.json.gz'))).toString('utf8')) as Plan1GateArtifact;
   const before = { ...archived.evidence.identity, sourceSha256: 'before', buildSha256: 'same-build' };
   const current = { ...before, sourceSha256: 'current' };
+  // The owners Plan 6 added and the entries the canvas entry added, restated
+  // here as the fixture's own literals rather than read from the checker.
   const owners = ['ramify', 'ramify/analysis', 'ramify/analysis/descriptions', 'ramify/analysis/model', 'ramify/analysis/project',
-    'ramify/analysis/typescript', 'ramify/cli', 'ramify/daemon', 'ramify/daemon/contexts', 'ramify/presentation', 'ramify/presentation/layout'];
+    'ramify/analysis/typescript', 'ramify/cli', 'ramify/daemon', 'ramify/daemon/contexts', 'ramify/explorer',
+    'ramify/integration-tests', 'ramify/presentation', 'ramify/presentation/layout', 'ramify/presentation/project-view', 'ramify/service-api'];
+  const currentName = (name: string) => name.replace('exact nine implemented owners', 'exact fifteen implemented owners')
+    .replace('all seven actual package entry imports executed', 'every actual package entry import executed');
   const passed = archived.instances.map(item => ({ ...item,
-    baselineAssertions: item.baselineAssertions.map(a => ({ ...a, name: a.name.replace('exact nine implemented owners', 'exact eleven implemented owners')
-      .replace('all seven actual package entry imports executed', 'all eight actual package entry imports executed') })),
-    assertions: item.assertions.map(a => ({ ...a, name: a.name.replace('exact nine implemented owners', 'exact eleven implemented owners')
-      .replace('all seven actual package entry imports executed', 'all eight actual package entry imports executed') })),
-    observations: item.observations?.map(o => o.kind === 'toolkit-scope' ? { ...o, data: { ...o.data as object, owners } }
-      : o.kind === 'relocation-installed-entries' ? { ...o, data: [...o.data as unknown[], { entry: 'ramify.ts/client', callable: 'connectDaemon' }] } : o),
+    baselineAssertions: item.baselineAssertions.map(a => ({ ...a, name: currentName(a.name) })),
+    assertions: [...item.assertions.map(a => ({ ...a, name: currentName(a.name) })),
+      ...item.id === 'I1-28:relocated-package' ? [{ name: 'every stylesheet entry resolves to its packed file', status: 'passed' as const }] : []],
+    observations: item.observations && [...item.observations.map(o => {
+      if (o.kind === 'toolkit-scope') return { ...o, data: { ...o.data as object, owners } };
+      if (o.kind !== 'relocation-installed-entries') return o;
+      const archivedEntries = o.data as Array<{ entry: string }>;
+      const after = archivedEntries.findIndex(entry => entry.entry === 'ramify.ts/presentation');
+      return { ...o, data: [...archivedEntries.slice(0, after + 1), { entry: 'ramify.ts/module-tree', callable: 'ModuleTreeCanvas' },
+        ...archivedEntries.slice(after + 1), { entry: 'ramify.ts/client', callable: 'connectDaemon' }] };
+    }), ...item.observations.some(o => o.kind === 'relocation-installed-entries')
+      ? [{ kind: 'relocation-installed-stylesheets', data: [{ entry: 'ramify.ts/module-tree.css' }] }] : []],
   }));
   const baseline: Plan1GateArtifact = { ...archived, passed: false, planComplete: false,
     evidence: { ...archived.evidence, identity: before }, summary: { required: 308, passed: 300, failed: 8, notExecuted: 0 },

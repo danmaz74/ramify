@@ -157,7 +157,9 @@ export const completionHandlers: ReadonlyMap<string, InstanceHandler> = new Map<
     recordObservation('final-contracts-process', result);
     assertions.equal('strict final-contract process accepts the real package', [result.code, result.signal, result.error], [0, null, null]);
     const value = object(JSON.parse(result.stdout));
-    assertions.equal('eleven declarations and eight package entries validated', [value.owners, value.packageEntries], [11, 8]);
+    // The eleven archived declarations and the four owners Plan 6 added as a
+    // named layer, beside the eight reviewed package entries.
+    assertions.equal('fifteen layered declarations and eight reviewed package entries validated', [value.owners, value.packageEntries], [15, 8]);
     assertions.ok('real exposures were linked', Number(value.expandedStatements) > 0);
   } }],
   ...(['package-entries', 'relocated-resident'] as const).map(name => [`I2-30:${name}`, {

@@ -10,8 +10,9 @@ import type { DescriptionDocument } from '../subs/analysis/subs/descriptions/src
 import { readPurpose } from '../subs/analysis/subs/project/src/purpose.js';
 import { validationInputs } from './reference-harness/linking-expectations.js';
 
+interface SelectionManifest { readonly name: string; readonly tags: readonly string[]; readonly selections: readonly string[] }
 /** Compare atomic selections so grouping named statements creates no false drift. */
-function manifest(document: DescriptionDocument): unknown {
+function manifest(document: DescriptionDocument): SelectionManifest {
   return { name: document.module.name, tags: [...document.module.tags].sort(),
     selections: document.statements.flatMap(statement => statement.destinations.flatMap(destination =>
       (statement.selection.kind === 'wildcard' ? [{ name: '*', alias: '*', wildcard: true }]
@@ -23,14 +24,25 @@ function manifest(document: DescriptionDocument): unknown {
 const plan1 = 'docs/plans/done/iteration-1-project-verifier';
 const plan2 = 'docs/plans/done/iteration-2-resident-verification';
 const plan2a = 'docs/plans/iteration-2a-materialized-api-view';
-interface ReviewedOwner { readonly directory: string; readonly purpose: string; readonly document: DescriptionDocument }
+/** One named layer over an archived declaration: the plan that reviewed it,
+ * and the selections it added or withdrew. Layers are applied in the order
+ * their plans landed, and never edit an archived list. */
+interface ReviewedLayer { readonly plan: string; readonly added?: DescriptionDocument; readonly withdrawn?: DescriptionDocument }
+interface ReviewedOwner { readonly directory: string; readonly purpose: string; readonly document: DescriptionDocument;
+  readonly layers?: readonly ReviewedLayer[] }
+/** An entry target is a runtime and type pair, or a string naming one packed
+ * file, such as a stylesheet, that is resolved and read but never imported. */
+type EntryPair = { readonly types: string; readonly import: string };
+type EntryTarget = EntryPair | string;
 interface PackageMetadata {
   readonly type: string; readonly main: string; readonly types: string;
   readonly bin: { readonly ramify: string };
-  readonly exports: Readonly<Record<string, { readonly types: string; readonly import: string }>>;
+  readonly exports: Readonly<Record<string, EntryTarget>>;
 }
-/** Reviewed metadata after the compiled-client packaging: `nodeEntry` is the reviewed bin target. */
-interface ExpectedPackage extends PackageMetadata { readonly nodeEntry: string }
+/** Reviewed metadata after the compiled-client packaging: `nodeEntry` is the reviewed bin target.
+ * Its `exports` are the reviewed eight only; later entries arrive as `reviewedAdditions`. */
+interface ExpectedPackage extends PackageMetadata { readonly nodeEntry: string;
+  readonly exports: Readonly<Record<string, EntryPair>> }
 
 // The reviewed bin target stays the Node entry. The installed `ramify` became a POSIX sh
 // launcher beside it, which execs the host compiled client when present, else that entry.
@@ -46,6 +58,18 @@ const entryFunctions = {
   './presentation': ['ModelDiagram'], './layout': ['placeNodes'], './cli': ['runCli'],
   './client': ['connectDaemon', 'selectEndpoint', 'readDaemonRecord', 'encodeMessage', 'decodeMessage'],
 };
+
+// A named, reviewed layer over the reviewed eight: the module-tree canvas entry
+// and its stylesheet, reviewed with the package surface that
+// `scripts/reference-harness/module-tree-consumer.ts` records and that
+// `scripts/reference-harness/README.md` documents. Nothing else may appear.
+const reviewedAdditions: Readonly<Record<string, EntryTarget>> = {
+  './module-tree': { types: './dist/subs/presentation/src/module-tree-entry.d.ts',
+    import: './dist/subs/presentation/src/module-tree-entry.js' },
+  './module-tree.css': './dist/subs/presentation/src/module-tree-entry.css',
+};
+/** Witnesses for the added runtime entries. The stylesheet has none: it is read, never imported. */
+const additionFunctions = { './module-tree': ['ModuleTreeCanvas'] };
 
 function description(text: string): DescriptionDocument {
   const parsed = parseDescription('reviewed module.ramify', text);
@@ -104,11 +128,272 @@ export function reviewedOwners(baseline: string, resident: string, retained?: st
   return owners;
 }
 
+/** A named layer over the archived declarations: the Ramify plan that reviewed
+ * the selections, keyed by owner directory. Nothing here is a blanket
+ * allowance, and no archived list is rewritten. */
+interface DeclarationLayer {
+  readonly plan: string;
+  readonly added?: Readonly<Record<string, string>>;
+  readonly withdrawn?: Readonly<Record<string, string>>;
+}
+
+/** Owners added below the archived eleven, with the reviewed header and README
+ * purpose each arrived with. The selections they hold arrive through the named
+ * layers below, one per plan. */
+const addedOwners = [
+  { plan: 'Plan 6 (project explorer)', name: 'project-view', directory: 'subs/presentation/subs/project-view/', tags: ['ui', 'browser'],
+    purpose: "Project view renders Ramify's revision-bound explorer compatibility model as a pure browser-facing behavioral dependency diagram with a detail panel, and as a collapsible module tree with a module detail panel." },
+  { plan: 'Plan 6 (project explorer)', name: 'explorer', directory: 'subs/explorer/', tags: ['ui', 'browser', 'dispatch'],
+    purpose: "Provides the resident explorer server's browser pages: a home page, the project explorer view and the module tree, all served through the token-free browser service." },
+  { plan: 'Plan 6 (project explorer)', name: 'service-api', directory: 'subs/service-api/', tags: ['dispatch'],
+    purpose: 'Projects retained analysis reports into the bounded project-explorer service model and hosts a resident, token-free local web server for one project: its four tRPC procedures read the project binding for each request. The dependencyView procedure relays an on-demand dependency diagram request to the daemon and maps the ready result into the browser dependency model. The binding opens one project\'s resident context through an injected daemon connector, subscribes to it and keeps it current across evictions, daemon failures and explicit stops. The owner does not scan files or run an analyzer.' },
+  { plan: 'Plan 6 (project explorer)', name: 'integration-tests', directory: 'subs/integration-tests/', tags: ['testing', 'ui', 'dispatch'],
+    purpose: "Verifies contracts that cross Ramify's presentation and dispatch owners." },
+] as const;
+
+const declarationLayers: readonly DeclarationLayer[] = [
+  { plan: 'Plan 6 (project explorer)',
+    added: {
+      './': [
+        'expose-sub SessionExplorerDetailsOutcome from analysis to descendants',
+        'expose-sub ContextExplorerDetailsOutcome, ExplorerDetailsRequest, connectDaemon, selectEndpoint from daemon to descendants',
+        'expose-sub ProjectExplorerPage, createProjectExplorerBrowserApp from explorer to descendants',
+        'expose-sub ExplorerAccess, ExplorerCoverage, ExplorerDiscussionProps, ExplorerDiscussionSelection, ExplorerEdge, ExplorerExport, ExplorerExposure, ExplorerFile, ExplorerMetrics, ExplorerModule, ExplorerSelection, ExplorerSummary, ExportDetailState, GraphSelection, ModuleGraphProps, ModuleGraphRadial, ProjectExplorerModel, ProjectExplorerView, ProjectExplorerViewProps from presentation to descendants',
+        'expose-sub ExplorerDetailsInput, ExplorerDetailsResult, ExplorerEndpointSelection, ExplorerLaunchOptions, ExplorerProcessLaunch, ExplorerProcessRecord, ExplorerProjectionInput, ExplorerRouter, ProjectViewInput, createExplorerRouter, createProjectExplorerModel, ensureExplorerWebProcess, explorerProjectUrl, probeExplorerReadiness, readExplorerProcessRecord, reusableExplorerProcess, selectExplorerEndpoint, startExplorerWebProcess from service-api to descendants',
+      ].join('\n'),
+      'subs/presentation/': [
+        'expose-sub ExplorerAccess, ExplorerCoverage, ExplorerDiscussionProps, ExplorerDiscussionSelection, ExplorerEdge, ExplorerExport, ExplorerExposure, ExplorerFile, ExplorerMetrics, ExplorerModule, ExplorerSelection, ExplorerSummary, ExportDetailState, GraphSelection, ModuleGraphProps, ModuleGraphRadial, ProjectExplorerModel, ProjectExplorerView, ProjectExplorerViewProps from project-view to parent',
+      ].join('\n'),
+      'subs/daemon/': [
+        'expose-sub ContextExplorerDetailsOutcome, ExplorerDetailsRequest from contexts to parent',
+      ].join('\n'),
+      'subs/explorer/': [
+        'expose-src ProjectExplorerPage from "ProjectExplorerPage.tsx" tagged [browser, dispatch, ui] to parent',
+        'expose-src createProjectExplorerBrowserApp from "browser-app.tsx" tagged [browser, dispatch, ui] to parent',
+      ].join('\n'),
+      'subs/service-api/': [
+        'expose-src * from "interfaces/explorer-service.ts" to parent',
+        'expose-src createProjectExplorerModel from "project-view.ts" to parent',
+        'expose-src ExplorerRouter, createExplorerRouter from "router.ts" to parent',
+        'expose-src ExplorerEndpointSelection, explorerProjectUrl, probeExplorerReadiness, readExplorerProcessRecord, reusableExplorerProcess, selectExplorerEndpoint from "web-discovery.ts" to parent',
+        'expose-src ExplorerLaunchOptions, ExplorerProcessLaunch, ensureExplorerWebProcess from "web-launcher.ts" to parent',
+        'expose-src ExplorerWebProcess, startExplorerWebProcess from "web-process.ts" to parent',
+      ].join('\n'),
+      'subs/presentation/subs/project-view/': [
+        'expose-src ExportDetailState from "ExportList.tsx" to parent',
+        'expose-src ModuleGraphRadial from "ModuleGraphRadial.tsx" tagged [browser, ui] to parent',
+        'expose-src ProjectExplorerView from "ProjectExplorerView.tsx" tagged [browser, ui] to parent',
+        'expose-src ExplorerDiscussionProps, ExplorerDiscussionSelection, ProjectExplorerViewProps from "ProjectExplorerView.tsx" to parent',
+        'expose-src * from "interfaces/project-view.ts" to parent',
+        'expose-src GraphSelection, ModuleGraphProps from "moduleGraphShared.ts" to parent',
+      ].join('\n'),
+    },
+  },
+  { plan: 'Plan 6B (resident explorer server)',
+    added: {
+      './': [
+        'expose-sub readDaemonRecord from daemon to descendants',
+        'expose-sub BindingState, ProjectBinding, ServerBindingKind, ServerStatusResult, createProjectBinding, explorerProjectKey from service-api to descendants',
+      ].join('\n'),
+      'subs/cli/': [
+        'expose-src capabilities from "command-support.ts" to parent',
+      ].join('\n'),
+      'subs/service-api/': [
+        'expose-src BindingState, ProjectBinding, createProjectBinding from "project-binding.ts" to parent',
+        'expose-src explorerProjectKey from "web-discovery.ts" to parent',
+      ].join('\n'),
+    },
+  },
+  { plan: 'Plan 6C (module tree view)',
+    added: {
+      './': [
+        'expose-sub ModuleTreeView, ModuleTreeViewProps, ancestorsOf, collapsibleAtDepth, indexModuleTree from presentation to descendants',
+      ].join('\n'),
+      'subs/presentation/': [
+        'expose-sub Point, placeTree from layout to descendants',
+        'expose-sub ModuleTreeView, ModuleTreeViewProps, ancestorsOf, collapsibleAtDepth, indexModuleTree from project-view to parent',
+      ].join('\n'),
+      'subs/presentation/subs/project-view/': [
+        'expose-src ModuleTreeView from "ModuleTreeView.tsx" tagged [browser, ui] to parent',
+        'expose-src ModuleTreeViewProps from "ModuleTreeView.tsx" to parent',
+        'expose-src ancestorsOf, collapsibleAtDepth, indexModuleTree from "module-tree.ts" tagged [browser, ui] to parent',
+      ].join('\n'),
+    },
+  },
+  { plan: 'Plan 6D (behavioral dependency diagram)',
+    added: {
+      './': [
+        'expose-sub BehavioralDependencyMetrics, DependencyAnalyzerOutcome, DependencyBoundaryFact, DependencyDiagramFacts, DependencyDiagramOutcome, DependencyDiagramRunner from analysis to descendants',
+        'expose-sub ContextDependencyDiagramOutcome, DependencyDiagramRequest from daemon to descendants',
+        'expose-sub ActiveDependencyEdge, DependencyDepthMode, DependencyGraphCount, DependencyGraphEdge, DependencyGraphEvidence, DependencyGraphImportedCount, DependencyGraphImportedEdge, DependencyGraphModel, DependencyGraphModule, DependencyGraphOriginalEdge, DependencyGraphState, DependencyPhase, DependencySettings, ScopeNodeId, defaultDependencySettings, ownSourceNodeId, ownSourceNodeModule from presentation to descendants',
+        'expose-sub DependencyViewInput, DependencyViewResult, ExplorerDependencyCount, ExplorerDependencyEvidence, ExplorerDependencyModel, ExplorerDependencyModelInput, ExplorerDependencyModelOutcome, ExplorerDependencyModule, ExplorerImportedCount, ExplorerImportedDependencyEdge, ExplorerOriginalDependencyEdge from service-api to descendants',
+      ].join('\n'),
+      'subs/analysis/': [
+        'expose-src analyzeDependencyDiagram from "dependency-analyzer.ts" to parent',
+        'expose-src * from "interfaces/dependency-analyzer.ts" to parent',
+        'expose-src DependencyBoundaryFact, DependencyDiagramFacts, DependencyDiagramOutcome from "interfaces/dependency-diagram.ts" to parent',
+        'expose-src BehavioralDependencyMetrics from "interfaces/modularity.ts" to parent',
+      ].join('\n'),
+      'subs/analysis/subs/typescript/': [
+        'expose-src * from "interfaces/dependency-behavior.ts" to parent',
+      ].join('\n'),
+      'subs/presentation/': [
+        'expose-sub ActiveDependencyEdge, DependencyDepthMode, DependencyGraphCount, DependencyGraphEdge, DependencyGraphEvidence, DependencyGraphImportedCount, DependencyGraphImportedEdge, DependencyGraphModel, DependencyGraphModule, DependencyGraphOriginalEdge, DependencyGraphState, DependencyPhase, DependencySettings, ScopeNodeId, defaultDependencySettings, ownSourceNodeId, ownSourceNodeModule from project-view to parent',
+      ].join('\n'),
+      'subs/daemon/': [
+        'expose-sub ContextDependencyDiagramOutcome, DependencyDiagramRequest from contexts to parent',
+      ].join('\n'),
+      'subs/service-api/': [
+        'expose-src * from "interfaces/explorer-dependencies.ts" to parent',
+      ].join('\n'),
+      'subs/presentation/subs/project-view/': [
+        'expose-src defaultDependencySettings, ownSourceNodeId, ownSourceNodeModule from "dependency-graph.ts" tagged [browser, ui] to parent',
+        'expose-src ActiveDependencyEdge, ScopeNodeId from "dependency-graph.ts" to parent',
+        'expose-src * from "interfaces/dependency-view.ts" to parent',
+      ].join('\n'),
+    },
+  },
+  { plan: 'Plan 2B (generated views)',
+    added: {
+      './': [
+        'expose-sub ArchitectDependencies, ArchitectDependencyReason, ArchitectModuleFacts, ArchitectSymbol, ArchitectTestRecord, ArchitectViewCounts, ArchitectViewFile, ArchitectViewProjection, ArchitectViewQuery, ArchitectViewQueryOutcome, ExportBehavior, ExportKind, RenderedArchitectView, TestFileReferences, TestReferenceFacts, TestTitleLimits, renderArchitectView from analysis to descendants',
+      ].join('\n'),
+      'subs/analysis/': [
+        'expose-src renderArchitectView from "architect-render.ts" to parent',
+        'expose-src * from "interfaces/architect-view.ts" to parent',
+        'expose-src TestFileReferences, TestReferenceFacts, TestReferenceOutcome from "interfaces/dependency-diagram.ts" to parent',
+        'expose-sub ExportBehavior, ExportKind, TestTitleLimits from typescript to parent',
+      ].join('\n'),
+    },
+  },
+  { plan: 'Plan 2C (module measurements)',
+    added: {
+      './': [
+        'expose-sub ArchitectMeasurements, InventoryMeasurementBuckets, InventoryModuleMeasurement, MeasurementBuckets, MeasurementDocumentationSize, MeasurementFileRecord, MeasurementFileSize, MeasurementViewSize, MeasurementViewUnavailableReason, MeasurementViews, ModuleMeasurement, SessionMeasurements, SessionMeasurementsOutcome from analysis to descendants',
+      ].join('\n'),
+      'subs/analysis/': [
+        'expose-src * from "interfaces/measurements.ts" to parent',
+      ].join('\n'),
+    },
+  },
+  { plan: 'Plan 8 (signature companions)',
+    added: {
+      './': [
+        'expose-sub BehaviorClassification, BehaviorEvidence, BehaviorLimit, DependencyAnalyzerTimings, DependencyBehaviorAccessFact, DependencyBehaviorFact, DependencyBehaviorFacts, ObservationRetirement, ObservationSink, SignatureCompanions, SuppliedAccesses from analysis to descendants',
+        'expose-sub AnalysisDriver, ApiViewPublisher, CaptureTimings, CaptureWork, DaemonService, MaterializedViewId, PublishApiViewOutcome, PublishInput, RenderedApiViewArea, RenderedApiViewDocument, ServiceLease, WatchBatch from daemon to descendants',
+        'expose-sub BrowserPage, ExplorerClient, ProjectExplorerBrowserApp, ProjectExplorerPageProps, ProjectViewResult from explorer to descendants',
+        'expose-sub ChordSpec, DecisionPolicy, LegendEntry, LegendGroup, ModuleTreeIndex, NodeContentOptions, SymbolName, Theme, TracedColorKey, TracedSymbol, TreeFocus, ViewRect, WhatIfNote from presentation to descendants',
+        'expose-sub DependencyViewCounters, DependencyViews, DependencyViewsStatus, ExplorerRouterOptions, ExplorerWebProcess, ExplorerWebProcessOptions, ProjectBindingConnector, ProjectBindingLogEntry, ProjectBindingOptions from service-api to descendants',
+      ].join('\n'),
+      'subs/analysis/': [
+        'expose-sub ObservationRetirement from project to parent, descendants',
+        'expose-sub BehaviorClassification, BehaviorEvidence, BehaviorLimit, DependencyBehaviorAccessFact, DependencyBehaviorFact, DependencyBehaviorFacts, SuppliedAccesses from typescript to parent, descendants',
+      ].join('\n'),
+      'subs/analysis/subs/model/': [
+        'expose-src listCompanionViolations from "companions.ts" tagged [browser] to parent',
+      ].join('\n'),
+      'subs/analysis/subs/typescript/': [
+        'expose-src DeclarationInputs from "symbol-details.ts" to parent',
+      ].join('\n'),
+      'subs/presentation/': [
+        'expose-src ChordSpec, DecisionPolicy, LegendEntry, LegendGroup, NodeContentOptions, TracedColorKey, TracedSymbol, WhatIfNote from "diagram-definition.ts" to parent',
+        'expose-src SymbolName from "model-access.ts" to parent',
+        'expose-src Theme from "theme.ts" to parent',
+        'expose-src TreeFocus from "tree-diagram.ts" to parent',
+        'expose-sub Box, LayoutEdge, LayoutEdgeInput, LayoutGraphInput, LayoutNode, LayoutNodeInput, LayoutOptions, LayoutResult from layout to descendants',
+        'expose-sub ViewRect from layout to parent',
+        'expose-sub ModuleTreeIndex from project-view to parent',
+      ].join('\n'),
+      'subs/daemon/': [
+        'expose-sub ApiViewQueryLimits, ApiViewRequest, CaptureTimings, CaptureWork, ContextApiViewOutcome, ContextDependencyFactsOutcome, WatchBatch from contexts to parent',
+      ].join('\n'),
+      'subs/explorer/': [
+        'expose-src ProjectExplorerPageProps from "ProjectExplorerPage.tsx" to parent',
+        'expose-src BrowserPage, ProjectExplorerBrowserApp from "browser-app.tsx" to parent',
+        'expose-src ExplorerClient, ProjectViewResult from "published-project-view.ts" to parent',
+      ].join('\n'),
+      'subs/service-api/': [
+        'expose-src DependencyViewCounters, DependencyViews, DependencyViewsStatus from "dependency-view.ts" to parent',
+        'expose-src ProjectBindingConnector, ProjectBindingLogEntry, ProjectBindingOptions from "project-binding.ts" to parent',
+        'expose-src ExplorerRouterOptions from "router.ts" to parent',
+        'expose-src ExplorerWebProcessOptions from "web-process.ts" to parent',
+      ].join('\n'),
+      'subs/presentation/subs/project-view/': [
+        'expose-src ModuleTreeIndex from "module-tree.ts" to parent',
+      ].join('\n'),
+    },
+    withdrawn: {
+      'subs/analysis/': [
+        'expose-src planApiViewRequests from "api-view.ts" to parent',
+        'expose-src projectApiView from "api-view.ts" to parent',
+      ].join('\n'),
+    },
+  },
+  { plan: 'the module-tree canvas entry',
+    added: {
+      'subs/presentation/': [
+        'expose-sub ModuleTreeCanvas, ModuleTreeCanvasEmphasis, ModuleTreeCanvasNode, ModuleTreeCanvasProps from project-view to parent',
+      ].join('\n'),
+      'subs/presentation/subs/project-view/': [
+        'expose-src ModuleTreeCanvas from "ModuleTreeCanvas.tsx" tagged [browser, ui] to parent',
+        'expose-src ModuleTreeCanvasEmphasis, ModuleTreeCanvasNode, ModuleTreeCanvasProps from "ModuleTreeCanvas.tsx" to parent',
+      ].join('\n'),
+    },
+  },
+];
+
+/** The expected selections: the archived list, then each named layer in turn.
+ * A layer that restates or withdraws a selection the reviewed declaration does
+ * not hold is itself an error, so a layer cannot hide archived drift. */
+function expectedManifest(owner: ReviewedOwner): SelectionManifest {
+  const base = manifest(owner.document);
+  const selections = [...base.selections];
+  for (const layer of owner.layers ?? []) {
+    for (const selection of layer.withdrawn ? manifest(layer.withdrawn).selections : []) {
+      const at = selections.indexOf(selection);
+      assert.ok(at >= 0, `${layer.plan} withdraws a selection the reviewed declaration does not hold: ${selection}`);
+      selections.splice(at, 1);
+    }
+    for (const selection of layer.added ? manifest(layer.added).selections : []) {
+      assert.ok(!selections.includes(selection), `${layer.plan} restates a reviewed selection: ${selection}`);
+      selections.push(selection);
+    }
+  }
+  return { ...base, selections: selections.sort() };
+}
+
+/** Apply the named layers to the archived owners. The archived documents stay
+ * as their plans reviewed them; every later change is attached as a layer that
+ * names its plan. */
+export function layeredOwners(archived: ReadonlyMap<string, ReviewedOwner>): ReadonlyMap<string, ReviewedOwner> {
+  const header = (name: string, tags: readonly string[]) =>
+    `ramify 1\nmodule "${name}"${tags.length ? ` tagged [${[...tags].join(', ')}]` : ''}\n`;
+  const owners = new Map(archived);
+  for (const owner of addedOwners) {
+    assert.ok(!owners.has(owner.name), `${owner.plan} adds an owner the archived review already holds: ${owner.name}`);
+    owners.set(owner.name, { directory: owner.directory, purpose: owner.purpose, document: description(header(owner.name, owner.tags)) });
+  }
+  const byDirectory = new Map([...owners].map(([name, owner]) => [owner.directory, name]));
+  for (const layer of declarationLayers) {
+    for (const directory of new Set([...Object.keys(layer.added ?? {}), ...Object.keys(layer.withdrawn ?? {})])) {
+      const name = byDirectory.get(directory);
+      assert.ok(name, `${layer.plan} layers onto an owner no review declares: ${directory}`);
+      const owner = owners.get(name)!;
+      const statements = (text: string | undefined) => text === undefined ? undefined
+        : description(header(owner.document.module.name, [...owner.document.module.tags]) + '\n' + text + '\n');
+      owners.set(name, { ...owner, layers: [...owner.layers ?? [],
+        { plan: layer.plan, added: statements(layer.added?.[directory]), withdrawn: statements(layer.withdrawn?.[directory]) }] });
+    }
+  }
+  assert.equal(owners.size, 15, 'All fifteen final owners must be present');
+  return owners;
+}
+
 export function reviewedPackage(baseline: string, resident: string): ExpectedPackage {
-  const metadata = (text: string): PackageMetadata => {
+  const metadata = (text: string): PackageMetadata & { readonly exports: Readonly<Record<string, EntryPair>> } => {
     const block = [...text.matchAll(/```json\n([\s\S]*?)\n```/g)].map(match => match[1]).find(value => value.includes('"bin"'));
     assert.ok(block, 'Reviewed package metadata must be present');
-    return JSON.parse(block) as PackageMetadata;
+    return JSON.parse(block) as PackageMetadata & { readonly exports: Readonly<Record<string, EntryPair>> };
   };
   const original = metadata(baseline), addition = metadata(resident);
   assert.deepEqual(addition.bin, original.bin, 'Plan 2 keeps the bin target');
@@ -123,7 +408,7 @@ export function reviewedPackage(baseline: string, resident: string): ExpectedPac
 export function assertOwner(actual: string, readme: string, expected: ReviewedOwner): void {
   // Comments, line wrapping and grouping of equivalent selections are prose;
   // names, paths, tags, destinations and wildcard/named spelling are contracts.
-  assert.deepEqual(manifest(description(actual)), manifest(expected.document), `Final selections differ: ${expected.directory}module.ramify`);
+  assert.deepEqual(manifest(description(actual)), expectedManifest(expected), `Final selections differ: ${expected.directory}module.ramify`);
   const purpose = readPurpose(`${expected.directory}README.md`, readme);
   assert.equal(purpose.state, 'present', `Missing README prose paragraph: ${expected.directory}`);
   if (purpose.state === 'present') assert.equal(purpose.paragraph, expected.purpose, `Final README purpose differs: ${expected.directory}`);
@@ -131,13 +416,26 @@ export function assertOwner(actual: string, readme: string, expected: ReviewedOw
 
 export async function validatePackageEntries(root: string, expected: ExpectedPackage): Promise<number> {
   const actual = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'));
-  for (const key of ['type', 'main', 'types', 'bin', 'exports'] as const) assert.deepEqual(actual[key], expected[key], `Final package ${key}`);
-  for (const entry of Object.values(expected.exports)) {
-    for (const target of [entry.types, entry.import]) assert.ok((await stat(resolve(root, target))).isFile(), `Entry target is not a file: ${target}`);
+  for (const key of ['type', 'main', 'types', 'bin'] as const) assert.deepEqual(actual[key], expected[key], `Final package ${key}`);
+  // The reviewed eight stay present and unchanged; every remaining key must be
+  // one of the recorded additions, so a new entry is accepted only as the named
+  // layer above, never as a bare superset. Key order was never a contract.
+  const entries = (actual.exports ?? {}) as Readonly<Record<string, EntryTarget>>;
+  const keys = Object.keys(entries);
+  assert.deepEqual(keys.filter(key => key in expected.exports).sort(), Object.keys(expected.exports).sort(), 'Final package exports');
+  for (const [key, entry] of Object.entries(expected.exports)) assert.deepEqual(entries[key], entry, `Final package exports ${key}`);
+  assert.deepEqual(keys.filter(key => !(key in expected.exports)).sort(), Object.keys(reviewedAdditions).sort(), 'Final package exports beyond the reviewed entries');
+  for (const [key, entry] of Object.entries(reviewedAdditions)) assert.deepEqual(entries[key], entry, `Reviewed package entry addition ${key}`);
+  for (const entry of Object.values(entries)) {
+    // A string target names one packed file: it is read, never imported.
+    for (const target of typeof entry === 'string' ? [entry] : [entry.types, entry.import]) {
+      assert.ok((await stat(resolve(root, target))).isFile(), `Entry target is not a file: ${target}`);
+    }
   }
   // Resolve from the supplied package, including relocated packages. Resolving
   // from this script would accidentally validate this checkout instead.
   const probe = `import assert from 'node:assert/strict';
+import { statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 const metadata = JSON.parse(process.argv[1]);
@@ -146,6 +444,13 @@ const required = JSON.parse(process.argv[3]);
 for (const [name, entry] of Object.entries(metadata.exports)) {
   const specifier = name === '.' ? metadata.name : metadata.name + name.slice(1);
   const url = import.meta.resolve(specifier);
+  if (typeof entry === 'string') {
+    // A string target resolves to one packed file under both conditions. It is
+    // read here and never imported, because Node cannot evaluate it.
+    assert.equal(fileURLToPath(url), resolve(entry), specifier + ' file target');
+    assert.ok(statSync(fileURLToPath(url)).isFile(), 'Entry target is not a file: ' + specifier);
+    continue;
+  }
   assert.equal(fileURLToPath(url), resolve(entry[condition]), specifier + ' ' + condition + ' target');
   if (condition === 'import') {
     const values = await import(url);
@@ -156,7 +461,7 @@ for (const [name, entry] of Object.entries(metadata.exports)) {
     // Type targets are resolved, never executed. In particular, putting an
     // import condition before types must not silently select the JS target.
     await promisify(execFile)(process.execPath, [...condition === 'types' ? ['--conditions=types'] : [],
-      '--input-type=module', '--eval', probe, JSON.stringify(actual), condition, JSON.stringify(entryFunctions)],
+      '--input-type=module', '--eval', probe, JSON.stringify(actual), condition, JSON.stringify({ ...entryFunctions, ...additionFunctions })],
     { cwd: root, timeout: 30_000, maxBuffer: 1024 * 1024 });
   }
   for (const [file, shebang] of [[actual.bin.ramify, '#!/bin/sh\n'], [expected.nodeEntry, '#!/usr/bin/env node\n']]) {
@@ -171,8 +476,8 @@ export async function validateFinalContracts(root: string) {
   // Plan 5's own completion gate (I5-14:declarations-final) greps this file
   // for the literal path below to confirm it reads Plan 5's owners.md as its
   // third reviewed layer; keep this exact literal, not the `plan5` constant.
-  const expected = reviewedOwners(await read(`${plan1}/owners.md`), await read(`${plan2}/owners.md`),
-    await read('docs/plans/iteration-5-fast-incremental-checks/owners.md'), 10, await read(`${plan2a}/owners.md`));
+  const expected = layeredOwners(reviewedOwners(await read(`${plan1}/owners.md`), await read(`${plan2}/owners.md`),
+    await read('docs/plans/iteration-5-fast-incremental-checks/owners.md'), 10, await read(`${plan2a}/owners.md`)));
   const metadata = reviewedPackage(await read(`${plan1}/contracts.md`), await read(`${plan2}/contracts.md`));
   const errors: Error[] = [];
   for (const owner of expected.values()) {
@@ -188,8 +493,8 @@ export async function validateFinalContracts(root: string) {
   if (result.status !== 'valid') errors.push(new Error(`Final declarations do not link: ${JSON.stringify(result)}`));
   else {
     const actual = result.input.inventory.modules.map(module => module.description.status === 'valid' ? module.description.document.module.name : '').sort();
-    try { assert.deepEqual(actual, [...expected.keys()].sort(), 'Exact eleven final owners'); }
-    catch { errors.push(new Error('Exact eleven final owners differ')); }
+    try { assert.deepEqual(actual, [...expected.keys()].sort(), 'Exact fifteen final owners'); }
+    catch { errors.push(new Error('Exact fifteen final owners differ')); }
   }
   if (errors.length) throw new AggregateError(errors, 'Plan 2 final contracts are incomplete');
   assert.equal(result.status, 'valid');
