@@ -3,9 +3,43 @@ import { mkdtemp, readFile, rm, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { gunzipSync } from 'node:zlib';
+import { plan1Instances } from './cases.js';
 import { assertPlan1Regression, readPlan1Regression } from './completion-regression.js';
 import type { Plan1GateArtifact } from './completion-regression.js';
 import { repositoryRoot } from './plan.js';
+
+/** The archived names the later plans revised, and the owners and entries they
+ * added. The control fixture restates them independently of the checker, so a
+ * silent change on either side still fails. */
+const currentName = (name: string) => name
+  .replace('exact nine implemented owners', 'exact fifteen implemented owners')
+  .replace('all seven actual package entry imports executed', 'every actual package entry import executed');
+const currentOwners = ['ramify', 'ramify/analysis', 'ramify/analysis/descriptions', 'ramify/analysis/model',
+  'ramify/analysis/project', 'ramify/analysis/typescript', 'ramify/cli', 'ramify/daemon', 'ramify/daemon/contexts',
+  'ramify/explorer', 'ramify/integration-tests', 'ramify/presentation', 'ramify/presentation/layout',
+  'ramify/presentation/project-view', 'ramify/service-api'];
+const canvasEntry = { entry: 'ramify.ts/module-tree', callable: 'ModuleTreeCanvas',
+  resolved: 'node_modules/ramify.ts/dist/subs/presentation/src/module-tree-entry.js' };
+const clientEntry = { entry: 'ramify.ts/client', callable: 'connectDaemon',
+  resolved: 'node_modules/ramify.ts/dist/subs/daemon/src/client-entry.js' };
+const stylesheetEntry = { entry: 'ramify.ts/module-tree.css',
+  resolved: 'node_modules/ramify.ts/dist/subs/presentation/src/module-tree-entry.css' };
+function rewriteObservations(observations: Plan1GateArtifact['instances'][number]['observations']) {
+  if (!observations) return observations;
+  const rewritten = observations.map(o => {
+    if (o.kind === 'toolkit-scope') return { ...o, data: { ...(o.data as object), owners: currentOwners } };
+    if (o.kind === 'relocation-installed-entries') {
+      const archivedEntries = o.data as Array<{ entry: string }>;
+      const after = archivedEntries.findIndex(entry => entry.entry === 'ramify.ts/presentation');
+      return { ...o, data: [...archivedEntries.slice(0, after + 1), canvasEntry, ...archivedEntries.slice(after + 1), clientEntry] };
+    }
+    return o;
+  });
+  // The stylesheet observation is new: the relocation gate records it beside
+  // the entry imports, and a string target is read there, never imported.
+  return observations.some(o => o.kind === 'relocation-installed-entries')
+    ? [...rewritten, { kind: 'relocation-installed-stylesheets', data: [stylesheetEntry] }] : rewritten;
+}
 
 /** Schema/control fixtures only. They live outside the real report directory
  * and never supply an I2 instance with purported process evidence. */
@@ -13,20 +47,14 @@ export async function completionRegressionControls(): Promise<string[]> {
   const archived = JSON.parse(gunzipSync(await readFile(join(repositoryRoot,
     'scripts/reference-harness/evidence/plan1-complete.json.gz'))).toString('utf8')) as Plan1GateArtifact;
   const identity = { ...archived.evidence.identity, sourceSha256: 'fixture-source', buildSha256: 'fixture-build' };
-  const qualified: Plan1GateArtifact = { ...archived, evidence: { ...archived.evidence, identity },
+  // A current run records the current inventory, not the archived definitions.
+  // The one record Plan 8 restated is named in the checker's revision set.
+  const qualified: Plan1GateArtifact = { ...archived, evidence: { ...archived.evidence, identity, instances: plan1Instances },
     instances: archived.instances.map(item => ({ ...item,
-      baselineAssertions: item.baselineAssertions.map(a => ({ ...a, name: a.name.replace('exact nine implemented owners', 'exact eleven implemented owners')
-        .replace('all seven actual package entry imports executed', 'all eight actual package entry imports executed') })),
-      assertions: item.assertions.map(a => ({ ...a, name: a.name.replace('exact nine implemented owners', 'exact eleven implemented owners')
-        .replace('all seven actual package entry imports executed', 'all eight actual package entry imports executed') })),
-      observations: item.observations?.map(o => {
-        if (o.kind === 'toolkit-scope') return { ...o, data: { ...(o.data as object), owners: ['ramify', 'ramify/analysis',
-          'ramify/analysis/descriptions', 'ramify/analysis/model', 'ramify/analysis/project', 'ramify/analysis/typescript',
-          'ramify/cli', 'ramify/daemon', 'ramify/daemon/contexts', 'ramify/presentation', 'ramify/presentation/layout'] } };
-        if (o.kind === 'relocation-installed-entries') return { ...o, data: [...o.data as unknown[],
-          { entry: 'ramify.ts/client', callable: 'connectDaemon', resolved: 'node_modules/ramify.ts/dist/subs/daemon/src/client-entry.js' }] };
-        return o;
-      }),
+      baselineAssertions: item.baselineAssertions.map(a => ({ ...a, name: currentName(a.name) })),
+      assertions: [...item.assertions.map(a => ({ ...a, name: currentName(a.name) })),
+        ...item.id === 'I1-28:relocated-package' ? [{ name: 'every stylesheet entry resolves to its packed file', status: 'passed' as const }] : []],
+      observations: rewriteObservations(item.observations),
     })) };
   const recorded: string[] = [];
   const accepts = (report: Plan1GateArtifact) => assertPlan1Regression(report, identity, archived.evidence.instances);
@@ -51,7 +79,7 @@ export async function completionRegressionControls(): Promise<string[]> {
   reject('missing actual owner observations', missing('toolkit-scope'));
   reject('missing actual installed entries', missing('relocation-installed-entries'));
   const alteredArchive = archived.evidence.instances.map((item, index) => index ? item : { ...item, capabilityScope: 'changed' });
-  assert.throws(() => assertPlan1Regression(qualified, identity, alteredArchive)); recorded.push('305 frozen definitions');
+  assert.throws(() => assertPlan1Regression(qualified, identity, alteredArchive)); recorded.push('304 frozen definitions');
   const directory = await mkdtemp(join(tmpdir(), 'ri14-regression-control-'));
   const save = async (name: string, value: unknown, seconds: number) => {
     const path = join(directory, name); await writeFile(path, JSON.stringify(value)); await utimes(path, seconds, seconds);

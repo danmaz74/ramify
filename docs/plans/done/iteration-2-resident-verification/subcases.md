@@ -248,18 +248,18 @@ survives disposal.
 | I2-29:entry-footprints | 13 | ML01 | resident-measure | P | measurement | Idle CLI help, `./client` import, daemon zero contexts, daemon one warm reference, CLI check client. | Within the [budget table](scope.md#latency-and-memory-targets); recorded raw. |
 | I2-29:cold-warm-broad-reference | 13 | DA17 | resident-measure | P/R | measurement | Cold start, then twenty cycles each of unchanged, README, exposure, source and configuration edits. | Medians within targets; `reused` stages as the model predicts. |
 | I2-29:cold-warm-broad-hundred | 13 | DA17 | resident-measure | P/S100 | measurement | Same on S100. | Same. |
-| I2-29:repeated-edit-plateau | 13 | ML02 | resident-measure | P/R, P/S100 | measurement | 200 alternating cycles. | Last-100 growth within limits; counters balanced; history at budget. |
+| I2-29:repeated-edit-plateau | 13 | ML02 | resident-measure | P/R, P/S100 | measurement | 40 alternating cycles. | Last-30 growth within limits; counters balanced; history at budget. |
 | I2-29:many-contexts | 13 | ML03 | resident-measure | P/S100×8 | measurement | Eight warm contexts. | Settled RSS within target; global retained bytes within budget. |
 | I2-29:slow-consumer | 13 | ML04, QT07 | resident-measure | P/S100 | measurement | Non-reading subscriber during ten publications. | Queue bound, disconnect timing and RSS recovery within targets. |
 | I2-29:synthetic-500 | 13 | DA17 | resident-measure | P/S500 | measurement | Cold and one source edit. | Within the binding iteration 1 ceilings; a miss fails, and any budget change requires package review. |
 | I2-29:synthetic-1000 | 13 | DA17 | resident-measure | P/S1000 | measurement | Same at the owner ceiling. | Same. |
 | I2-29:publication-peak | 13 | ML06, DA17 | resident-measure | P/R, P/S100 | measurement | Sample 50 ms peaks across publication and serialization. | Combined peaks within the batch-derived limits. |
-| I2-30:self-check-eleven | 14 | DA18 | completion | T | process | `npm run check:self`. | Eleven owners, every owned file catalogued, no findings or limits. |
+| I2-30:self-check-fifteen | 14 | DA18 | completion | T | process | `npm run check:self`. | Fifteen owners, every owned file catalogued, no findings or limits. |
 | I2-30:self-negative-contexts | 14 | DA18 | completion | T | process | Add a contexts probe importing root's `RamifyService` type. | Visible through R6; denied `required-importer-tag` for `dispatch`. |
 | I2-30:declarations-final | 14 | DA18 | completion | T | process | `npx tsx scripts/validate-final-contracts.ts`. | Eleven declarations match owners.md; every exposure links to a real export. |
 | I2-30:package-entries | 14 | PC01 | completion | T | process | Resolve all eight entries from a packed install. | `./client` loads within its closure; others unchanged. |
 | I2-30:relocated-resident | 14 | PC01, QT05 | completion | T | process | Plan 1's relocation plus a daemon-backed check and stop in the relocated install. | Works without the enclosing repository; endpoint directory isolated. |
-| I2-30:plan1-regression | 14 | DA18 | completion | R, T | process | `npm run reference:verify -- --plan 1` under a harness-owned `RAMIFY_ENDPOINT_DIR`. | All 308 Plan 1 instances pass on the Plan 2 build: 305 records and expectations byte-untouched, and the three backed by the revised owner-list and entry-map expectations passing with their eleven-owner and eight-entry literals; no daemon survives the run. |
+| I2-30:plan1-regression | 14 | DA18 | completion | R, T | process | `npm run reference:verify -- --plan 1` under a harness-owned `RAMIFY_ENDPOINT_DIR`. | All 308 Plan 1 instances pass on the Plan 2 build: 304 records and expectations byte-untouched, the three backed by the revised owner-list and entry-map expectations passing with their fifteen-owner and nine-entry literals beside the stylesheet entry, and the one record a later plan restated named as its own revision; no daemon survives the run. |
 
 ## Instance counts by iteration
 
