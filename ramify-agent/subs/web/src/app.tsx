@@ -17,7 +17,12 @@ function useHash(): string {
   return hash;
 }
 
-/** The web client: a header with the project and the connection, and the current page. */
+/**
+ * The web client: a header with the project and the connection, and the current page.
+ *
+ * `<main>` carries the current route as a class, so a route whose page draws a canvas
+ * can lift the shell's reading-measure width cap for itself.
+ */
 export function App({ client }: { readonly client: ProtocolClient }) {
   const route = parseRoute(useHash());
   const { state: project } = useQuery('project', () => client.getProject());
@@ -32,7 +37,7 @@ export function App({ client }: { readonly client: ProtocolClient }) {
         <span className="project" title={projectInfo?.root}>{projectInfo?.name ?? ''}</span>
         <ConnectionStatus client={client} />
       </header>
-      <main>
+      <main className={`route-${route.page}`}>
         {route.page === 'plans' && <PlansPage client={client} project={projectInfo} />}
         {route.page === 'plan' && <PlanPage client={client} planId={route.planId} />}
         {route.page === 'run' && <RunPage key={`${route.planId}/${route.runId}`} client={client} planId={route.planId} runId={route.runId} />}

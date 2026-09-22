@@ -323,6 +323,28 @@ describe('ModuleTreeCanvas interaction', () => {
     expect(instance.setCenter).toHaveBeenCalledTimes(2);
   });
 
+  // Found by the browser evidence of Plan 8 iteration 5: Chromium scrolls React Flow's own
+  // element to reveal the focused row, and React Flow resets that scroll a moment later. The
+  // canvas read the revealed box, decided the row was already in view, and never panned.
+  it('undoes the scroll a browser applies to reveal the focused element, then pans to it', () => {
+    render(<ModuleTreeCanvas {...props({ nodes: mixedNodes(), renderNodeBody: controlBody })} />);
+    stubRect(screen.getByRole('tree', { name: 'Test tree' }), { left: 0, top: 0, width: 400, height: 300 });
+    const row = within(screen.getByTestId('node-b1')).getByRole('button', { name: 'row B1' });
+    // The browser has scrolled an ancestor between the row and the canvas viewport, as
+    // Chromium scrolls React Flow's own element.
+    const scrolled = screen.getByTestId('mock-reactflow');
+    stubScroll(scrolled, { top: 800, left: 60 });
+    // Where the row is drawn once that scroll is undone, and where the browser briefly put it.
+    stubRect(row, () => scrolled.scrollTop === 0 && scrolled.scrollLeft === 0
+      ? { left: 120, top: 900, width: 160, height: 20 }
+      : { left: 60, top: 100, width: 160, height: 20 });
+    stubFocusRing(row, true);
+    row.focus();
+    expect([scrolled.scrollTop, scrolled.scrollLeft]).toEqual([0, 0]);
+    expect(instance.setCenter).toHaveBeenCalledTimes(1);
+    expect(instance.setCenter).toHaveBeenCalledWith(200 * 2, 910 * 3, { zoom: 0.25 });
+  });
+
   it('keeps Space on a body control off React Flow\'s pan-activation key, and leaves the shell\'s Space alone', () => {
     const panKey = vi.fn();
     document.addEventListener('keydown', panKey);
@@ -448,13 +470,24 @@ function stubFocusRing(element: HTMLElement, visible: boolean): void {
     : matches(selectors)) as Element['matches'];
 }
 
-/** Fixes an element's box, which jsdom otherwise reports as empty. */
-function stubRect(element: Element, box: { left: number; top: number; width: number; height: number }): void {
-  element.getBoundingClientRect = () => ({
-    x: box.left, y: box.top, left: box.left, top: box.top,
-    right: box.left + box.width, bottom: box.top + box.height, width: box.width, height: box.height,
-    toJSON: () => ({}),
-  });
+interface Box { left: number; top: number; width: number; height: number }
+
+/** Fixes an element's box, which jsdom otherwise reports as empty; a function follows the layout. */
+function stubRect(element: Element, box: Box | (() => Box)): void {
+  element.getBoundingClientRect = () => {
+    const at = typeof box === 'function' ? box() : box;
+    return {
+      x: at.left, y: at.top, left: at.left, top: at.top,
+      right: at.left + at.width, bottom: at.top + at.height, width: at.width, height: at.height,
+      toJSON: () => ({}),
+    };
+  };
+}
+
+/** Gives an element scroll offsets, which jsdom keeps at zero for want of a layout. */
+function stubScroll(element: Element, at: { top: number; left: number }): void {
+  Object.defineProperty(element, 'scrollTop', { value: at.top, writable: true, configurable: true });
+  Object.defineProperty(element, 'scrollLeft', { value: at.left, writable: true, configurable: true });
 }
 
 function rule(css: string, selector: string): string {
