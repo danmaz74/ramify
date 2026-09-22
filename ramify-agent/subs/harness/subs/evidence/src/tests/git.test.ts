@@ -1,137 +1,119 @@
 import { chmod, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import {
-  GitError, changedPaths, commitAccepted, createRunBranch, diffNumstat,
-  findCommitByTrailer, isCleanRepository,
-} from '../git.js';
+import { describe, expect, it } from 'vitest';
+import { GitError, gitService as git } from '../git.js';
 import { testRepository, withoutGitConfiguration } from './helpers/git.js';
 import type { TestRepository } from './helpers/git.js';
 import { temporaryDirectory } from './helpers/temporary.js';
 
-/**
- * The run branch and the commit made after a gate passes. Neither the
- * project's hooks nor the person's configuration can fail that commit, and no
- * identity of the working tree is taken or compared anywhere.
- */
-describe('the git service', () => {
-  let repository: TestRepository;
-  let restoreConfiguration: () => void;
-
-  beforeEach(async () => {
-    restoreConfiguration = withoutGitConfiguration();
+// These tests verify our adapter against Git. Consumer tests inject a
+// scripted GitService instead. Related assertions share one repository and
+// its cleanup; independent scenarios never share mutable fixtures.
+async function withRepository(check: (repository: TestRepository) => Promise<void>): Promise<void> {
+  const restoreConfiguration = withoutGitConfiguration();
+  let repository: TestRepository | undefined;
+  try {
     repository = await testRepository();
+    await check(repository);
+  } finally {
+    try { await repository?.remove(); } finally { restoreConfiguration(); }
+  }
+}
+
+describe('the real Git adapter', { timeout: 30_000 }, () => {
+  it('creates and resumes a run branch, commits with its own policy, and recovers exact commit identities', async () => {
+    await withRepository(async repository => {
+      const root = repository.root;
+      const base = await git.currentHead(root);
+      expect(base).toMatch(/^[0-9a-f]{40}$/);
+      expect(await git.isCleanRepository(root)).toBe(true);
+      expect(await git.createRunBranch(root, 'run-identity'))
+        .toEqual({ branch: 'ramify-agent/run-run-identity', created: true });
+      expect(await git.commitAccepted(root, 'nothing changed')).toBeNull();
+      expect(await git.currentHead(root)).toBe(base);
+
+      await repository.git('switch', 'main');
+      await repository.write('src/one.ts', 'export const one = 1;\n');
+      expect(await git.isCleanRepository(root)).toBe(false);
+      await expect(git.commitAccepted(root, 'on main')).rejects.toBeInstanceOf(GitError);
+      expect((await repository.git('log', '--format=%s')).trim()).toBe('first');
+      expect(await git.createRunBranch(root, 'run-identity'))
+        .toEqual({ branch: 'ramify-agent/run-run-identity', created: false });
+
+      const hook = join(root, '.git', 'hooks', 'pre-commit');
+      await writeFile(hook, '#!/usr/bin/env bash\necho "the project hook refuses" >&2\nexit 1\n');
+      await chmod(hook, 0o755);
+      await repository.write('plans/p1/.harness/.gitignore', '*\n');
+      await repository.write('plans/p1/.harness/jobs/run-identity/events.jsonl', '{"sequence":1}\n');
+      await expect(repository.git('commit', '--all', '--message', 'by hand')).rejects.toThrow();
+      const first = await git.commitAccepted(root, 'first run\n\nRamify-Run: run-a\nRamify-Gate: ga-0001\n');
+      expect(first).toMatch(/^[0-9a-f]{40}$/);
+      expect(await repository.git('log', '-1', '--format=%an <%ae>%n%s'))
+        .toBe('ramify-agent <ramify-agent@localhost>\nfirst run\n');
+      expect(await git.isCleanRepository(root)).toBe(true);
+      expect(await git.commitNameStatus(root, first!)).toEqual([{ status: 'A', path: 'src/one.ts' }]);
+      expect(await git.findCommitByTrailer(root, 'Ramify-Gate', 'ga-0001')).toBe(first);
+      expect(await git.findCommitByTrailer(root, 'Ramify-Gate', 'ga-0002')).toBeNull();
+
+      await repository.write('src/two.ts', 'export const two = 2;\n');
+      const second = await git.commitAccepted(root, 'second run\n\nRamify-Run: run-b\nRamify-Gate: ga-0001\n');
+      for (const [run, expected] of [['run-a', first], ['run-b', second], ['run-c', null]] as const) {
+        expect(await git.findCommitByTrailers(root, [
+          { key: 'Ramify-Run', value: run }, { key: 'Ramify-Gate', value: 'ga-0001' },
+        ])).toBe(expected);
+      }
+      await repository.git('switch', 'main');
+      expect(await git.createRunBranch(root, 'run-identity'))
+        .toEqual({ branch: 'ramify-agent/run-run-identity', created: false });
+      expect(await git.currentHead(root)).toBe(second);
+    });
   });
-  afterEach(async () => {
-    restoreConfiguration();
-    await repository.remove();
+
+  it('reports staged, untracked and renamed paths through the adapter', async () => {
+    await withRepository(async repository => {
+      await repository.write('src/one.ts', 'export const one = 1;\n');
+      await repository.write('src/untracked.ts', 'export const two = 2;\n');
+      await repository.git('add', 'src/one.ts');
+      expect(await git.changedPaths(repository.root)).toEqual(['src/one.ts', 'src/untracked.ts']);
+      await repository.git('mv', 'README.md', 'READ.md');
+      expect(await git.changedPaths(repository.root)).toEqual(['READ.md', 'README.md', 'src/one.ts', 'src/untracked.ts']);
+    });
   });
 
-  it('answers whether the repository has anything to commit', async () => {
-    expect(await isCleanRepository(repository.root)).toBe(true);
-
-    await repository.write('src/added.ts', 'export const added = 1;\n');
-
-    expect(await isCleanRepository(repository.root)).toBe(false);
+  it('reads path and line changes relative to the accepted revision even after a failed attempt commits', async () => {
+    await withRepository(async repository => {
+      const root = repository.root;
+      await git.createRunBranch(root, 'run-boundary');
+      const base = await git.currentHead(root);
+      await repository.write('subs/notes/module.ramify', 'ramify 1\nmodule notes\n');
+      await repository.write('subs/notes/src/notes.ts', 'export const limit = 400;\n');
+      const failed = await git.commitAccepted(root, 'failed attempt');
+      await repository.write('subs/notes/src/notes.ts', 'export const limit = 500;\n');
+      expect(await git.changedPaths(root, base)).toEqual(['subs/notes/module.ramify', 'subs/notes/src/notes.ts']);
+      const entries = [
+        { status: 'A', path: 'subs/notes/module.ramify' },
+        { status: 'A', path: 'subs/notes/src/notes.ts' },
+      ];
+      expect(await git.changedEntries(root, base)).toEqual(entries);
+      expect(await git.diffNameStatus(root, base, failed!)).toEqual(entries);
+      expect(await git.diffNumstat(root, base, failed!)).toEqual([
+        { path: 'subs/notes/module.ramify', added: 2, deleted: 0, binary: false },
+        { path: 'subs/notes/src/notes.ts', added: 1, deleted: 0, binary: false },
+      ]);
+      expect(await git.worktreeLineChanges(root, base)).toEqual([
+        { path: 'subs/notes/module.ramify', added: 2, deleted: 0, binary: false, bytes: null },
+        { path: 'subs/notes/src/notes.ts', added: 1, deleted: 0, binary: false, bytes: null },
+      ]);
+    });
   });
 
-  it('refuses a directory that is no repository', async () => {
+  it('reports an unavailable head and a typed status error outside a repository', async () => {
     const directory = await temporaryDirectory();
     try {
-      await expect(isCleanRepository(directory.path)).rejects.toBeInstanceOf(GitError);
+      expect(await git.currentHead(directory.path)).toBe('');
+      await expect(git.isCleanRepository(directory.path)).rejects.toBeInstanceOf(GitError);
     } finally {
       await directory.remove();
     }
-  });
-
-  it('creates the run branch and finds it again, keeping what it already holds', async () => {
-    const first = await createRunBranch(repository.root, '20260920T101500Z-3f9a1c');
-    expect(first).toEqual({ branch: 'ramify-agent/run-20260920T101500Z-3f9a1c', created: true });
-
-    await repository.write('src/one.ts', 'export const one = 1;\n');
-    const commit = await commitAccepted(repository.root, 'first iteration');
-    await repository.git('switch', 'main');
-
-    const again = await createRunBranch(repository.root, '20260920T101500Z-3f9a1c');
-
-    expect(again).toEqual({ branch: 'ramify-agent/run-20260920T101500Z-3f9a1c', created: false });
-    expect((await repository.git('rev-parse', 'HEAD')).trim()).toBe(commit);
-  });
-
-  it('commits where a project hook fails and where no identity is configured', async () => {
-    const hook = join(repository.root, '.git', 'hooks', 'pre-commit');
-    await writeFile(hook, '#!/usr/bin/env bash\necho "the project hook refuses" >&2\nexit 1\n');
-    await chmod(hook, 0o755);
-    await createRunBranch(repository.root, 'run-1');
-    await repository.write('src/one.ts', 'export const one = 1;\n');
-
-    // Without the harness's own flags and identity, this project cannot commit at all.
-    await expect(repository.git('commit', '--all', '--message', 'by hand')).rejects.toThrow();
-
-    const commit = await commitAccepted(repository.root, 'the harness commits');
-
-    expect(commit).toMatch(/^[0-9a-f]{40}$/);
-    expect(await repository.git('log', '-1', '--format=%an <%ae>%n%s')).toBe('ramify-agent <ramify-agent@localhost>\nthe harness commits\n');
-    expect(await isCleanRepository(repository.root)).toBe(true);
-  });
-
-  it('refuses a branch that is not a run branch', async () => {
-    await repository.write('src/one.ts', 'export const one = 1;\n');
-
-    await expect(commitAccepted(repository.root, 'on main')).rejects.toBeInstanceOf(GitError);
-    expect(await isCleanRepository(repository.root)).toBe(false);
-    expect((await repository.git('log', '--format=%s')).trim()).toBe('first');
-  });
-
-  it('makes no commit when a passing gate changed nothing', async () => {
-    await createRunBranch(repository.root, 'run-2');
-
-    expect(await commitAccepted(repository.root, 'nothing changed')).toBeNull();
-    expect((await repository.git('log', '--format=%s')).trim()).toBe('first');
-  });
-
-  it('never commits a plan\'s .harness/', async () => {
-    await createRunBranch(repository.root, 'run-3');
-    await repository.write('plans/p1/.harness/.gitignore', '*\n');
-    await repository.write('plans/p1/.harness/jobs/run-3/events.jsonl', '{"sequence":1}\n');
-    await repository.write('src/one.ts', 'export const one = 1;\n');
-
-    const commit = await commitAccepted(repository.root, 'with records beside it');
-
-    expect(commit).not.toBeNull();
-    const committed = (await repository.git('show', '--name-only', '--format=', commit ?? '')).trim().split('\n');
-    expect(committed).toEqual(['src/one.ts']);
-  });
-
-  it('finds an earlier commit by its trailer, so a repeat makes no second one', async () => {
-    await createRunBranch(repository.root, 'run-4');
-    await repository.write('src/one.ts', 'export const one = 1;\n');
-    const commit = await commitAccepted(repository.root, 'wi-001.i02: the work\n\nChecks: passed\n\nRamify-Gate: ga-0012\n');
-
-    expect(await findCommitByTrailer(repository.root, 'Ramify-Gate', 'ga-0012')).toBe(commit);
-    expect(await findCommitByTrailer(repository.root, 'Ramify-Gate', 'ga-0013')).toBeNull();
-  });
-
-  it('reads what changed from git and nowhere else', async () => {
-    await repository.write('src/one.ts', 'export const one = 1;\n');
-    await repository.write('src/untracked.ts', 'export const two = 2;\n');
-    await repository.git('add', 'src/one.ts');
-
-    expect(await changedPaths(repository.root)).toEqual(['src/one.ts', 'src/untracked.ts']);
-
-    await repository.git('mv', 'README.md', 'READ.md');
-
-    expect(await changedPaths(repository.root)).toEqual(['READ.md', 'README.md', 'src/one.ts', 'src/untracked.ts']);
-  });
-
-  it('counts the lines between two accepted commits', async () => {
-    await createRunBranch(repository.root, 'run-5');
-    const base = (await repository.git('rev-parse', 'HEAD')).trim();
-    await repository.write('src/one.ts', 'export const one = 1;\nexport const two = 2;\n');
-    const head = await commitAccepted(repository.root, 'two lines');
-
-    expect(await diffNumstat(repository.root, base, head ?? '')).toEqual([
-      { path: 'src/one.ts', added: 2, deleted: 0, binary: false },
-    ]);
   });
 });

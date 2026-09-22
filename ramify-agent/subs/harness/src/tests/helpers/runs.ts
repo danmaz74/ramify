@@ -17,17 +17,21 @@ import type { RunPolicy } from '../../run/records.js';
 import type { RunInputs } from '../../run/inputs.js';
 import { RunService, type RunServiceOptions } from '../../run/service.js';
 import { acquireProjectLock, lockPath } from '../../store/lock.js';
+import { FakeRamifyCli } from './fake-ramify.js';
+import {
+  createDirectCheckExecution, createMappedCheckExecution, createPassingCheckExecution,
+  type DirectCheckScript, type DirectCheckStep,
+} from './direct-check-execution.js';
 
 const exec = promisify(execFile);
 
 /*
  * What a test needs to drive an implementation run: a target project that is
- * a git repository, a policy whose commands are real but cheap, inputs that
- * need no materialized view, and the scripted fake.
+ * a git repository, a policy whose commands are valid but cheap, inputs that
+ * need no materialized view, and the scripted agent fake.
  *
- * Nothing here simulates a command. Every command a policy below names is
- * spawned and its exit code read; what the tests substitute is which
- * command, not whether it ran.
+ * `openRuns` uses a direct check-execution fake by default. Tests of actual
+ * command execution or audit publication opt into those executors explicitly.
  */
 
 const identity = ['-c', 'user.name=fixture', '-c', 'user.email=fixture@localhost'];
@@ -217,24 +221,39 @@ export async function realRamify(): Promise<Awaited<ReturnType<typeof privateRam
 }
 
 export interface OpenRunsOptions extends Partial<RunServiceOptions> {
+  /** Every test chooses its Git boundary explicitly; this helper has no production fallback. */
+  readonly git: NonNullable<RunServiceOptions['git']>;
   readonly script?: Script | undefined;
+  /** Script for the direct test executor. Ignored when `checkExecution` is supplied. */
+  readonly checkScript?: readonly DirectCheckStep[] | DirectCheckScript | undefined;
 }
 
 /** The scripted fake a test drove the run with, where it gave a script. */
 export type TestAgent = ScriptedAgent | undefined;
 
-/** Opens a run service on `root` with the lock, the scripted fake and the shape-only inputs. */
-export async function openRuns(root: string, options: OpenRunsOptions = {}) {
+/**
+ * Opens a run service with direct, deterministic gate execution.
+ *
+ * Synthetic evidence from this helper exercises harness policy only. It is
+ * not a published audit and cannot establish MCP acceptance evidence.
+ */
+export async function openRuns(root: string, options: OpenRunsOptions) {
   const lock = await acquireProjectLock(root);
   const scripted = options.script === undefined ? undefined : createScriptedAgent(options.script);
   const agent = scripted ?? options.agent;
   const warnings: string[] = [];
-  const { script: _script, ...rest } = options;
+  const { script: _script, checkScript, ...rest } = options;
+  const checkExecution = checkScript === undefined
+    ? createPassingCheckExecution()
+    : typeof checkScript === 'function'
+      ? createMappedCheckExecution({ script: checkScript })
+      : createDirectCheckExecution({ script: checkScript });
   const { service, recovery } = await RunService.open({
     projectRoot: root,
     lock,
     inputs: shapeOnlyInputs,
-    ramify: await stubRamify(),
+    ramify: options.ramify ?? new FakeRamifyCli(),
+    checkExecution,
     stopGraceMs: 500,
     policy: projectRoot => testPolicy(projectRoot),
     warn: message => warnings.push(message),
@@ -301,6 +320,17 @@ export function deadPid(): Promise<number> {
  */
 export async function crashLock(root: string): Promise<void> {
   const record = { pid: await deadPid(), startedAt: new Date().toISOString(), processStart: null, token: 'crashed' };
+  await writeFile(join(root, lockPath), `${JSON.stringify(record)}\n`);
+}
+
+/**
+ * What an ordinary recovery fixture leaves without starting a helper
+ * process: a valid lock record whose PID is outside Linux's PID range, so
+ * the real liveness check deterministically classifies it as stale.
+ * Real stale-process integration tests retain {@link crashLock}.
+ */
+export async function staleCrashLock(root: string): Promise<void> {
+  const record = { pid: 2_147_483_647, startedAt: new Date().toISOString(), processStart: null, token: 'crashed' };
   await writeFile(join(root, lockPath), `${JSON.stringify(record)}\n`);
 }
 

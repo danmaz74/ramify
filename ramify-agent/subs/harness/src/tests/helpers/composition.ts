@@ -1,10 +1,12 @@
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { readdir, readFile, rm, stat } from 'node:fs/promises';
+import { readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { expect } from 'vitest';
 import { createScriptedAgent, type Script, type ScriptedAgent } from '../../../subs/agent/src/scripted.js';
 import type { RunEvent } from '../../run/log.js';
 import type { RunService, RunWrite } from '../../run/service.js';
+import type { CommandRunner } from '../../../subs/evidence/src/run-command.js';
 import type { RunInputs } from '../../run/inputs.js';
 import { analysis, entry, hypothesis, requestCompletion } from './analysis.js';
 import {
@@ -17,8 +19,11 @@ import {
   write, type Turn,
 } from './iterations.js';
 import { decision as decisionBody, forkDecision, forkPartial, localDecision, registryChange, requestPlacement } from './placement.js';
+import { commandResult } from './command-result.js';
+import { directReadinessExecution } from './external-tools.js';
+import { deleted, modified, scenarioGit, untracked, type GitResponses, type ScenarioGit } from './recovery-git.js';
 import {
-  crashLock, freeze, git, initRepository, installTestRunner, openRuns, shapeOnlyInputs, startRun, stopRun, testPolicy,
+  staleCrashLock, freeze, installTestRunner, openRuns, shapeOnlyInputs, startRun, stopRun, testPolicy,
   type OpenRunsOptions,
 } from './runs.js';
 
@@ -32,6 +37,12 @@ import {
  * driving the real run service over a real copy of the fixture, and a crash
  * is what it is on disk: the service is abandoned at the boundary and the
  * lock is left held by a process that is gone.
+ *
+ * Git and the commands readiness would run are external, and are answered
+ * rather than run: each scenario states, as fixture data, what its commits
+ * answer and what the tree holds against the accepted boundary when each one
+ * is made. One `ScenarioGit` outlives the crashed service, because the commit
+ * an interrupted run made is one its restart finds again.
  */
 
 export const plan = 'review-notes';
@@ -95,6 +106,70 @@ const budgetTurn: Turn = [
   { kind: 'message', text: 'I have read the module and have not changed anything yet.' },
 ];
 
+/**
+ * One command a scenario's engineer runs, and what it is stated to leave
+ * behind. The command line is external, like Git: what the harness does with
+ * the result is the run's own, and a command no scenario states is a
+ * failure rather than a silent success. A shell command's side effect is
+ * performed directly, from what the scenario states it leaves; nothing here
+ * interprets or runs a shell.
+ */
+export interface StatedCommand {
+  /** The exact process arguments, with the fixture root resolved for this scenario. */
+  readonly argv: (root: string) => readonly string[];
+  /** The exact working directory; the project root where omitted. */
+  readonly cwd?: ((root: string) => string) | undefined;
+  readonly exitCode?: number | undefined;
+  readonly stdout?: string | undefined;
+  /** What the command is stated to leave in the project. */
+  readonly leaves?: ((root: string) => Promise<void>) | undefined;
+}
+
+/**
+ * The command runner of one scenario: every command its engineer runs is
+ * answered from what the scenario states, and no process is started for it.
+ */
+export interface ScenarioCommands extends CommandRunner {
+  /** Fails for a request that did not match the next exact fixture response. */
+  assertAnswered(): void;
+  /** Fails unless every stated response was consumed exactly once. */
+  assertComplete(): void;
+}
+
+export function statedCommands(root: string, commands: readonly StatedCommand[]): ScenarioCommands {
+  let cursor = 0;
+  const failures: string[] = [];
+  const runner: CommandRunner = async request => {
+    const stated = commands[cursor];
+    const expectedArgv = stated?.argv(root);
+    const expectedCwd = stated?.cwd?.(root) ?? root;
+    if (stated === undefined || expectedArgv === undefined
+      || JSON.stringify(request.argv) !== JSON.stringify(expectedArgv) || request.cwd !== expectedCwd) {
+      const expected = stated === undefined
+        ? `only ${commands.length} command response(s) were stated`
+        : `expected \`${expectedArgv.join(' ')}\` in ${expectedCwd}`;
+      const detail = `command ${cursor + 1}: ${expected}; received \`${request.argv.join(' ')}\` in ${request.cwd}`;
+      failures.push(detail);
+      throw new Error(detail);
+    }
+    cursor += 1;
+    await stated.leaves?.(root);
+    return commandResult(request, {
+      outcome: { kind: 'completed', exitCode: stated.exitCode ?? 0 },
+      ...(stated.stdout === undefined ? {} : { stdout: stated.stdout }),
+    });
+  };
+  return Object.assign(runner, {
+    assertAnswered() {
+      expect(failures, 'command responses this scenario was asked for wrongly').toEqual([]);
+    },
+    assertComplete() {
+      expect(failures, 'command responses this scenario was asked for wrongly').toEqual([]);
+      expect(cursor, 'stated command responses consumed').toBe(commands.length);
+    },
+  });
+}
+
 /** One scenario of the composition: a target, the script that drives it, and the inputs its run reads. */
 export interface Scenario {
   readonly name: ScenarioName;
@@ -105,6 +180,10 @@ export interface Scenario {
   target(): Promise<{ root: string; remove: () => Promise<void> }>;
   script(): Script;
   inputs(): RunInputs;
+  /** What Git answers this scenario, in the order its commits are made. */
+  readonly git: GitResponses;
+  /** The commands this scenario's engineer runs, and what each one answers. */
+  readonly commands?: readonly StatedCommand[] | undefined;
   /** A command the scenario sends while it runs, such as a stop. */
   readonly during?: ((write: RunWrite, context: DuringContext) => void) | undefined;
   /** The policy the run captures, where the scenario needs other limits than the tests' own. */
@@ -126,9 +205,33 @@ async function fixtureWith(modules: ReadonlyArray<{ directory: string; name: str
   for (const module of modules) await addModule(fixture.root, module.directory, module.name, module.files);
   if (runner === 'mini') await installMiniRunner(fixture.root);
   else await installTestRunner(fixture.root);
-  await initRepository(fixture.root);
   return fixture;
 }
+
+/**
+ * The revisions a scenario's commits answer with. A scenario states one
+ * response per commit it makes: a revision where the tree changed, and null
+ * where the checkpoint found nothing to commit.
+ */
+export const source = (n: number) => `source-${String(n).padStart(2, '0')}`;
+
+/** The revision every scenario's fixture is on before its run commits anything. */
+const base = source(0);
+
+/** A checkpoint over a tree with nothing to commit. */
+const unchanged = (against: string) => ({ commit: null, against });
+
+/**
+ * The engineer's own test run. The policy these scenarios capture answers it
+ * with a cheap command of the run's own, and the scenarios stating it here
+ * run no process for it.
+ */
+const scopeTestRun = (...files: string[]): StatedCommand => ({
+  argv: root => [join(root, 'node_modules', '.bin', 'vitest'), 'run', ...files],
+});
+
+/** The command the iteration's engineer runs through the unguarded shell. */
+const shellCommand = `rm -r ${draftsDirectory} && printf "left by the shell\\n" > shell-note.txt`;
 
 const notesModule = { directory: notesDirectory, name: 'notes', files: { 'src/notes.ts': consumerStub, 'src/tests/notes.test.ts': consumerTest('notes.ts') } };
 const limitsModule = { directory: limitsDirectory, name: 'limits', files: {} };
@@ -143,6 +246,42 @@ const limitsModule = { directory: limitsDirectory, name: 'limits', files: {} };
  */
 const iteration: Scenario = {
   name: 'iteration',
+  commands: [
+    { ...scopeTestRun(`${notesDirectory}/src/tests/notes.test.ts`), exitCode: 1 },
+    scopeTestRun(`${notesDirectory}/src/tests/notes.test.ts`),
+    {
+      // What the shell leaves: the child module gone, and a note outside
+      // every module. It is stated here and written directly; no shell runs.
+      argv: () => ['bash', '-c', shellCommand],
+      async leaves(root) {
+        await rm(join(root, draftsDirectory), { recursive: true });
+        await writeFile(join(root, 'shell-note.txt'), 'left by the shell\n');
+      },
+    },
+  ],
+  git: {
+    head: base,
+    after: source(1),
+    recovered: [{ gate: 'ga-0002', answers: [null, source(1)] }],
+    commits: [
+      // The one committing iteration: the limit the engineer raised, the
+      // child module its shell removed, and the note that shell left outside
+      // every module.
+      {
+        commit: source(1),
+        against: base,
+        changes: [
+          ...modified(`${notesDirectory}/src/notes.ts`),
+          ...deleted(`${draftsDirectory}/README.md`, `${draftsDirectory}/module.ramify`),
+          ...untracked('shell-note.txt'),
+        ],
+      },
+      // The repair iteration reports partial work and reaches no checkpoint;
+      // the work-item and final checkpoints find the committed tree unchanged.
+      unchanged(source(1)),
+      unchanged(source(1)),
+    ],
+  },
   exercises: 'the run, the analysis, readiness, one work item worked by an ordinary and a repair iteration, a budget return, the shell, a module removed, the gates and their commits',
   ends: 'completed',
   target: () => fixtureWith([
@@ -203,7 +342,7 @@ const iteration: Scenario = {
         write(`${notesDirectory}/src/notes.ts/inside-a-file.ts`, 'export {};\n'),
         write(`${notesDirectory}/src/notes.ts`, 'export const noteLimit = 500;\n'),
         runScopeTests(),
-        shell(`rm -r ${draftsDirectory} && printf "left by the shell\\n" > shell-note.txt`),
+        shell(shellCommand),
         { kind: 'submit', input: completionProposed('Raised the note limit to the 500 characters the plan asks for.') },
       ],
       submit({ kind: 'partial', done: ['Read the limit\'s wording.'], unfinished: ['The wording is the plan\'s, not this module\'s, to change.'], findings: [] }),
@@ -219,6 +358,31 @@ const iteration: Scenario = {
  */
 const delegation: Scenario = {
   name: 'delegation',
+  git: {
+    head: base,
+    after: source(3),
+    commits: [
+      // The contract iteration: the agreement's artifacts and the consumer
+      // against its fake.
+      { commit: source(1), against: base, changes: [...modified(paths(noteLimit).consumer), ...untracked(paths(noteLimit).fake, paths(noteLimit).contract, paths(noteLimit).conformance, paths(noteLimit).subjects)] },
+      // The provider's own iteration, and the work-item checkpoint over the
+      // tree it left.
+      { commit: source(2), against: source(1), changes: [...modified(paths(noteLimit).subjects), ...untracked(paths(noteLimit).real)] },
+      unchanged(source(2)),
+      // The consumer's verification against the real provider, and the two
+      // checkpoints that follow it.
+      { commit: source(3), against: source(2), changes: modified(paths(noteLimit).consumer) },
+      unchanged(source(3)),
+      unchanged(source(3)),
+    ],
+    // The one scenario whose line measurements Git answers. Every other
+    // scenario leaves them unavailable, which is what a run records when the
+    // measurement cannot be had, and the two are the states a line event has.
+    lines: [
+      { path: paths(noteLimit).consumer, added: 8, deleted: 3, binary: false, bytes: null },
+      { path: paths(noteLimit).real, added: 12, deleted: 0, binary: false, bytes: null },
+    ],
+  },
   exercises: 'a contract sub-session, registration, a yield, the provider, conformance, resumption and verification',
   ends: 'completed',
   target: () => fixtureWith([notesModule, limitsModule]),
@@ -253,6 +417,9 @@ const delegation: Scenario = {
  */
 const placement: Scenario = {
   name: 'placement',
+  // Every iteration of this scenario is a placement request: nothing is
+  // written, so both checkpoints find nothing to commit.
+  git: { head: base, after: base, commits: [unchanged(base), unchanged(base)] },
   exercises: 'placement requests, the view refresh, a partial fork, the decisions, the parent appends and the deliveries',
   ends: 'completed',
   target: () => fixtureWith([], 'exit-0'),
@@ -313,6 +480,17 @@ const placement: Scenario = {
  */
 const access: Scenario = {
   name: 'access',
+  git: {
+    head: base,
+    after: source(2),
+    commits: [
+      // Each access-only agreement is an exposure the provider declares.
+      { commit: source(1), against: base, changes: modified(`${limitsDirectory}/module.ramify`, `${notesDirectory}/src/notes.ts`) },
+      { commit: source(2), against: source(1), changes: modified(`${limitsDirectory}/module.ramify`) },
+      unchanged(source(2)),
+      unchanged(source(2)),
+    ],
+  },
   exercises: 'two access-only agreements, under the consumer\'s and an independent authority, and the work that uses them',
   ends: 'completed',
   target: () => fixtureWith([
@@ -379,6 +557,22 @@ const lines = (...parts: string[]) => `${parts.join('\n')}\n`;
  */
 const breaking: Scenario = {
   name: 'breaking',
+  git: {
+    head: base,
+    after: source(2),
+    commits: [
+      // The compatible stage, then the breaking one, which moves the reader
+      // in the same commit.
+      { commit: source(1), against: base, changes: modified(`${notesDirectory}/src/notes.ts`) },
+      {
+        commit: source(2),
+        against: source(1),
+        changes: modified(`${notesDirectory}/src/notes.ts`, `${notesDirectory}/src/tests/notes.test.ts`, `${panelDirectory}/src/panel.ts`),
+      },
+      unchanged(source(2)),
+      unchanged(source(2)),
+    ],
+  },
   exercises: 'a staged outline with a breaking change, a compatible stage, and a breaking iteration with a broad scope and an all-project gate',
   ends: 'completed',
   target: () => fixtureWith([
@@ -469,6 +663,9 @@ const failingNotes = {
  */
 const repair: Scenario = {
   name: 'repair',
+  // The engineer changes nothing, so the one checkpoint it reaches finds
+  // nothing to commit.
+  git: { head: base, after: base, commits: [unchanged(base)] },
   exercises: 'a failing gate, its repair rounds, exhaustion, and an architect that reports the request unresolved',
   ends: 'failed',
   target: () => fixtureWith([failingNotes]),
@@ -490,6 +687,10 @@ const repair: Scenario = {
  */
 const testless: Scenario = {
   name: 'testless',
+  // The owner has no test of its own: its iteration checkpoint is not
+  // verified and commits nothing, and neither checkpoint that follows has
+  // anything to commit.
+  git: { head: base, after: base, commits: [unchanged(base), unchanged(base)] },
   exercises: 'an engineer that reports the goal outside its scope, and an empty required selection: not verified, never a pass, and back to the architect',
   ends: 'completed',
   target: () => fixtureWith([{ directory: limitsDirectory, name: 'limits', files: { 'src/limits.ts': 'export const limits = [];\n' } }]),
@@ -511,6 +712,23 @@ const testless: Scenario = {
 /** A provider that cannot conform, the revision its consumer assigns, and the reopening that follows. */
 const revision: Scenario = {
   name: 'revision',
+  git: {
+    head: base,
+    after: source(4),
+    commits: [
+      // The agreement at its first revision, and the consumer against its fake.
+      { commit: source(1), against: base, changes: [...modified(paths(noteLimit).consumer), ...untracked(paths(noteLimit).fake, paths(noteLimit).contract, paths(noteLimit).conformance, paths(noteLimit).subjects)] },
+      // The revised agreement.
+      { commit: source(2), against: source(1), changes: modified(paths(relaxed).fake, paths(relaxed).contract) },
+      // The provider implements the revised length.
+      { commit: source(3), against: source(2), changes: [...modified(paths(relaxed).subjects), ...untracked(paths(relaxed).real)] },
+      unchanged(source(3)),
+      // The consumer verifies against it, and the two checkpoints that follow.
+      { commit: source(4), against: source(3), changes: modified(paths(relaxed).consumer) },
+      unchanged(source(4)),
+      unchanged(source(4)),
+    ],
+  },
   exercises: 'a provider that cannot conform, the revision its consumer assigns, and the evidence it reopens',
   ends: 'completed',
   target: () => fixtureWith([notesModule, limitsModule]),
@@ -558,6 +776,16 @@ const revision: Scenario = {
 /** A capability that comes to depend on itself, twice: a notice, then a failed run. */
 const cycle: Scenario = {
   name: 'cycle',
+  git: {
+    head: base,
+    after: source(2),
+    commits: [
+      // The first agreement, and then the one that closes the cycle.
+      { commit: source(1), against: base, changes: [...modified(paths(noteLimit).consumer), ...untracked(paths(noteLimit).fake, paths(noteLimit).contract, paths(noteLimit).conformance, paths(noteLimit).subjects)] },
+      { commit: source(2), against: source(1), changes: [...modified(paths(backToNotes).consumer), ...untracked(paths(backToNotes).fake, paths(backToNotes).contract, paths(backToNotes).conformance, paths(backToNotes).subjects)] },
+      unchanged(source(2)),
+    ],
+  },
   exercises: 'a capability cycle, the return to its architect, and the same cycle again',
   ends: 'failed',
   target: () => fixtureWith([
@@ -589,6 +817,8 @@ const cycle: Scenario = {
 /** A stop that arrives while an engineer holds the writer. */
 const stopping: Scenario = {
   name: 'stop',
+  // The stop arrives while the writer is held: no checkpoint is reached.
+  git: { head: base, after: base, commits: [] },
   exercises: 'a stop while a writer is in flight: the invocation is superseded and the run stops',
   ends: 'stopped',
   target: () => fixtureWith([notesModule]),
@@ -609,6 +839,8 @@ function failingAnalysis(name: ScenarioName, exercises: string, turn: Turn, poli
     name,
     exercises,
     ends: 'failed',
+    // The run fails before any work item is assigned, so it commits nothing.
+    git: { head: base, after: base, commits: [] },
     target: () => fixtureWith([notesModule], 'exit-0'),
     script: () => byRole({ 'initial-architect': [turn], 'local-architect': [submit(requestCompletion())] }),
     inputs: treeInputs,
@@ -641,10 +873,15 @@ export const scenarios: Readonly<Record<ScenarioName, Scenario>> = {
 export async function runToEnd(scenario: Scenario, watch?: (service: RunService, runId: string) => Promise<void>) {
   const target = await scenario.target();
   const agent = createScriptedAgent(scenario.script());
+  const git = scenarioGit(target.root, scenario.git);
+  const commands = statedCommands(target.root, scenario.commands ?? []);
   let runId = '';
   let stopped = false;
   const opened = await openRuns(target.root, {
     agent,
+    git,
+    readinessExecution: directReadinessExecution(),
+    commandExecution: commands,
     inputs: scenario.inputs(),
     ...(scenario.policy === undefined ? {} : { policy: scenario.policy }),
     afterWrite: async (write, id) => {
@@ -655,12 +892,15 @@ export async function runToEnd(scenario: Scenario, watch?: (service: RunService,
   });
   const receipt = await opened.service.execute(startRun(plan));
   await opened.service.settled(plan, receipt.jobId);
+  commands.assertComplete();
+  git.assertComplete();
   void runId;
   return {
     root: target.root,
     runId: receipt.jobId,
     service: opened.service,
     agent,
+    git,
     async dispose() {
       await opened.service.close();
       await target.remove();
@@ -693,12 +933,17 @@ export interface CrashPoint {
 export async function crashAt(scenario: Scenario, point: CrashPoint) {
   const target = await scenario.target();
   const agent = createScriptedAgent(scenario.script());
+  const git = scenarioGit(target.root, scenario.git);
+  const commands = statedCommands(target.root, scenario.commands ?? []);
   let resolveFrozen: (runId: string) => void = () => undefined;
   const frozen = new Promise<string>(resolve => { resolveFrozen = resolve; });
   let crashed = false;
   let stopped = false;
   const opened = await openRuns(target.root, {
     agent,
+    git,
+    readinessExecution: directReadinessExecution(),
+    commandExecution: commands,
     inputs: scenario.inputs(),
     // A stop waits for the invocation the driver has open before it writes
     // the run's terminal event. A crashed driver never closes it, and a
@@ -719,13 +964,20 @@ export async function crashAt(scenario: Scenario, point: CrashPoint) {
       await freeze();
     },
   });
-  await opened.service.execute(startRun(plan));
+  const receipt = await opened.service.execute(startRun(plan));
+  const endedBeforeBoundary = opened.service.settled(plan, receipt.jobId).then(() => {
+    commands.assertAnswered();
+    throw new Error(`${scenario.name} ended before it reached ${point.write}`);
+  });
   const runId = await Promise.race([
     frozen,
+    endedBeforeBoundary,
     new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`${scenario.name} never reached ${point.write}`)), 240_000)),
   ]);
-  await crashLock(target.root);
-  return { root: target.root, runId, agent, remove: target.remove };
+  await staleCrashLock(target.root);
+  // The Git of the crashed run is the Git of the restarts that follow it:
+  // the commit it made is the one they find again.
+  return { root: target.root, runId, agent, git, remove: target.remove };
 }
 
 /** The directory of the run beneath the project. */
@@ -807,10 +1059,14 @@ export async function fileHashes(directory: string): Promise<Record<string, stri
   return hashes;
 }
 
-/** The `Ramify-Gate` trailers of the run branch's commits, one per commit that carries one. */
-export async function gateTrailers(root: string, runId: string): Promise<string[]> {
-  const log = await git(root, 'log', '--format=%B%x1e', `ramify-agent/run-${runId}`).catch(() => '');
-  return log.split('\u001e').flatMap(message => /^Ramify-Gate: (\S+)$/m.exec(message)?.[1] ?? []);
+/**
+ * The gates the run branch holds a commit for: one entry per commit Git
+ * answered with a revision, named by the gate whose identity trailers the
+ * harness looked the commit up by. A commit a restart found again rather
+ * than made is already here, from the attempt that made it.
+ */
+export function committedGates(git: ScenarioGit): string[] {
+  return git.commits().flatMap(call => (call.commit === null ? [] : [call.gate ?? 'without a gate']));
 }
 
 /**
@@ -831,7 +1087,7 @@ export function identityOf(event: RunEvent): string | null {
     case 'iteration-assigned': case 'iteration-closed': return `${event.type}:${String(data.iteration)}`;
     case 'contract-requested': return `${event.type}:${String(data.iteration)}`;
     case 'outline-revised': return `${event.type}:${String(data.workItem)}@${String(data.revision)}`;
-    case 'gate-attempted': case 'gate-committed': return `${event.type}:${String(data.gate)}`;
+    case 'gate-committing': case 'gate-attempted': return `${event.type}:${String(data.gate)}`;
     case 'placement-requested': return `${event.type}:${String(data.request)}`;
     case 'decision-accepted': case 'brief-appended': return `${event.type}:${String(data.decision)}`;
     case 'decision-delivered': return `${event.type}:${String(data.decision)}->${String(data.workItem)}`;
@@ -853,7 +1109,6 @@ export function identityOf(event: RunEvent): string | null {
  * would be new work.
  */
 export const recoveryCompletions: ReadonlySet<RunEvent['type']> = new Set([
-  'invocation-ended', 'writer-released', 'gate-committed', 'brief-appended', 'global-context-rebuilt',
+  'invocation-ended', 'writer-released', 'gate-attempted', 'brief-appended', 'global-context-rebuilt',
   'decision-delivered', 'job-interrupted',
 ]);
-

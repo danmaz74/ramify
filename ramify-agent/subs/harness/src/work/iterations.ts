@@ -155,7 +155,7 @@ export const iterationResultSchema = z.object({
   invocations: z.array(text),
   /** The passing attempt, for `accepted`. */
   gate: text.nullable(),
-  /** The commit the harness made after the gate passed; null when nothing changed. */
+  /** The passing gate's audited commit: the accepted boundary, including an unchanged retry. */
   commit: text.nullable(),
   findings: z.array(z.string()),
   changedAssumptions: z.array(z.string()),

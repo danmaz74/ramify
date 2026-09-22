@@ -1,29 +1,32 @@
-import { allProjectChecks, checkpointPolicies, scopedChecks, type CheckpointPolicy, type ResolvedTests } from '../checks/checkpoint.js';
-import { runGate } from '../checks/gate.js';
+import { allProjectChecks, checkpointPolicies, scopedChecks, type ResolvedTests } from '../checks/checkpoint.js';
+import type { CheckExecutionPort } from '../checks/execution.js';
+import { executePreparedGate, prepareGate } from '../checks/gate.js';
+import type { PreparedGate } from '../checks/gate.js';
 import type { Checkpoint, GateAttempt, GateRuleRecord, RecordReference } from '../checks/records.js';
-import { commitAccepted, findCommitByTrailer } from '../../subs/evidence/src/git.js';
-import { childEnvironment, runCommand } from '../../subs/evidence/src/run-command.js';
+import { gitService, type GitService } from '../../subs/evidence/src/git.js';
 import type { RunPolicy } from './records.js';
 
 /*
- * A checkpoint of a run: run the checks, then commit.
+ * A checkpoint of a run: verify, commit, then audit.
  *
- * The gate's commands run in the working directory while the one writer is
- * idle. On a pass the harness commits the working directory on the run
- * branch; on a failure nothing is committed and the diagnostics return. No
- * tree identity is taken or compared, so no change to the working directory
- * blocks anything: it is content for the next commit.
+ * Committing run checkpoints settle the writer and verify every plan before
+ * an effect is recorded. That effect makes or finds its commit and audits the
+ * exact revision. Standalone sessions keep their in-place execution.
  *
  * The commit is an external effect of the ledger, keyed by the gate attempt.
- * A repeat after a crash finds the commit by its `Ramify-Gate` trailer and
- * makes no second one.
+ * A repeat after a crash finds the commit by its `Ramify-Run` and
+ * `Ramify-Gate` trailers and makes no second one.
  */
 
 /** The trailer that identifies the commit one gate attempt made. */
 export const gateTrailer = 'Ramify-Gate';
+/** The trailer that scopes gate attempt identifiers to their durable run. */
+export const runTrailer = 'Ramify-Run';
 
 export interface CheckpointRequest {
   readonly id: string;
+  /** The durable run that owns this attempt. Standalone session gates omit it. */
+  readonly runId?: string | undefined;
   readonly checkpoint: Checkpoint;
   readonly projectRoot: string;
   /** Where the attempt's output files go, beside its record. */
@@ -57,12 +60,21 @@ export interface CheckpointRequest {
 }
 
 /**
- * Runs one checkpoint's checks and answers the attempt. The attempt is
- * returned, not written: the harness commits it with the event that closes
- * the checkpoint, and its `commit` is filled by the effect that follows a
- * pass.
+ * Runs one checkpoint in place and answers its attempt. Durable run
+ * checkpoints split preparation from execution around their commit effect.
  */
-export async function runCheckpoint(request: CheckpointRequest): Promise<GateAttempt> {
+export async function runCheckpoint(execution: CheckExecutionPort, request: CheckpointRequest): Promise<GateAttempt> {
+  const prepared = await prepareCheckpoint(request);
+  if ('schema' in prepared) return prepared;
+  return executePreparedGate(execution, prepared, request.head, null);
+}
+
+/** Verify a committing checkpoint before its commit effect is allowed to begin. */
+export async function prepareCheckpoint(request: CheckpointRequest): Promise<PreparedGate | GateAttempt> {
+  return prepareGate(request.checkpoint, gateRequest(request));
+}
+
+function gateRequest(request: CheckpointRequest) {
   const policy = checkpointPolicies[request.checkpoint];
   if (policy.selection !== 'all-project' && request.tests === undefined) {
     throw new Error(`The ${request.checkpoint} checkpoint requires an ${policy.selection} selection, and none was resolved`);
@@ -70,12 +82,19 @@ export async function runCheckpoint(request: CheckpointRequest): Promise<GateAtt
   const checks = request.tests === undefined
     ? allProjectChecks(request.policy.commands, policy, request.scopeProbe)
     : scopedChecks(request.policy.commands, request.tests);
-  return runGate(request.checkpoint, {
+  return {
     id: request.id,
+    ...(request.runId === undefined ? {} : { runId: request.runId }),
     projectRoot: request.projectRoot,
     directory: request.directory,
     head: request.head,
     checks,
+    selection: {
+      policy: policy.selection,
+      exactOwners: policy.selection === 'owned-by-scope' ? [...(request.tests?.selection.exactOwners ?? [])] : [],
+      subtrees: policy.selection === 'owned-by-scope' ? [...(request.tests?.selection.subtrees ?? [])] : [],
+    },
+    dependencyDirectories: request.policy.commands.nestedPackages.map(nested => nested.directory),
     ...(request.subject === undefined ? {} : { subject: request.subject }),
     ...(request.proposedBy === undefined ? {} : { proposedBy: request.proposedBy }),
     ...(request.repairRound === undefined ? {} : { repairRound: request.repairRound }),
@@ -91,30 +110,36 @@ export async function runCheckpoint(request: CheckpointRequest): Promise<GateAtt
       infrastructureRetries: request.policy.limits.infrastructureRetriesPerGate,
     },
     ...(request.signal === undefined ? {} : { signal: request.signal }),
-  });
-}
-
-/** Whether a pass at this checkpoint is followed by the harness's commit. */
-export function commitsOnPass(checkpoint: Checkpoint): boolean {
-  return (checkpointPolicies[checkpoint] satisfies CheckpointPolicy).commitOnPass;
+  };
 }
 
 /**
- * The commit one passing gate makes, or the one it already made. The gate
- * attempt is the idempotency key: a repeat after a crash finds the commit by
- * its trailer and makes no second one. Nothing to commit is `null`, which is
- * what a passing gate over an unchanged tree records.
+ * The commit one verified attempt makes, or the one it already made. The gate
+ * attempt is the idempotency key within its run: a repeat after a crash finds
+ * the commit by both identity trailers and makes no second one. Nothing to
+ * commit is `null`, which is what a passing gate over an unchanged tree
+ * records.
  */
-export async function commitForGate(projectRoot: string, gate: GateAttempt, message: string, signal?: AbortSignal): Promise<string | null> {
-  const existing = await findCommitByTrailer(projectRoot, gateTrailer, gate.id, signal);
+export async function commitForGate(
+  projectRoot: string,
+  runId: string,
+  gateId: string,
+  message: string,
+  signal?: AbortSignal,
+  git: Pick<GitService, 'findCommitByTrailers' | 'commitAccepted'> = gitService,
+): Promise<string | null> {
+  const existing = await git.findCommitByTrailers(projectRoot, [
+    { key: runTrailer, value: runId },
+    { key: gateTrailer, value: gateId },
+  ], signal);
   if (existing !== null) return existing;
-  return commitAccepted(projectRoot, message, signal);
+  return git.commitAccepted(projectRoot, message, signal);
 }
 
 export interface CommitMessageParts {
   readonly runId: string;
   readonly planId: string;
-  readonly gate: GateAttempt;
+  readonly gate: Pick<GateAttempt, 'id' | 'checkpoint' | 'subject' | 'repairRound'>;
   /** The assignment's goal, which is the subject line beside the iteration. */
   readonly goal?: string | undefined;
   /** The engineer's own words, from its validated submission; the harness writes everything else. */
@@ -129,9 +154,9 @@ export interface CommitMessageParts {
 }
 
 /**
- * The message the harness writes, mechanically, from records. The verdict on
- * the checks is the harness's, so their summary is too; an agent's words
- * enter only as the `summary` of its validated submission.
+ * The message the harness writes, mechanically, from records. The audit
+ * verdict postdates the commit and is retrieved from its note; an agent's
+ * words enter only as the `summary` of its validated submission.
  */
 export function commitMessage(parts: CommitMessageParts): string {
   const { gate } = parts;
@@ -140,13 +165,6 @@ export function commitMessage(parts: CommitMessageParts): string {
   const lines: string[] = [`${subject}${goal}`, ''];
   if (parts.summary !== undefined && parts.summary.trim() !== '') lines.push(parts.summary.trim(), '');
 
-  const rounds = gate.repairRound > 0 ? `, repair round ${gate.repairRound}` : '';
-  lines.push(`Checks: ${gate.verdict} (gate ${gate.id}, checkpoint ${gate.checkpoint}${rounds})`);
-  for (const command of gate.commands) {
-    const seconds = (command.elapsedMs / 1000).toFixed(1);
-    const outcome = command.outcome === 'not-verified' ? `not verified (${command.notVerified ?? 'unknown'})` : command.outcome;
-    lines.push(`  ${command.kind.padEnd(14)}${outcome.padEnd(10)}${seconds.padStart(6)} s${selectionOf(command)}`);
-  }
   if (parts.modules !== undefined && parts.modules.length > 0) {
     const created = parts.modules.filter(notice => notice.kind === 'module-created');
     const removed = parts.modules.filter(notice => notice.kind === 'module-removed');
@@ -160,32 +178,16 @@ export function commitMessage(parts: CommitMessageParts): string {
     lines.push(`Not covered: ${parts.notCovered.join(', ')}`);
   }
   lines.push('');
-  lines.push(`Ramify-Run: ${parts.runId}`);
+  lines.push(`${runTrailer}: ${parts.runId}`);
   if (gate.subject.workItem !== undefined) lines.push(`Ramify-Work-Item: ${gate.subject.workItem}`);
   if (gate.subject.iteration !== undefined) lines.push(`Ramify-Iteration: ${gate.subject.iteration}`);
   lines.push(`${gateTrailer}: ${gate.id}`);
+  lines.push('Audit-Note: git notes --ref=audit show <commit>');
   if (parts.invocations !== undefined && parts.invocations.length > 0) {
     lines.push(`Ramify-Invocations: ${parts.invocations.join(', ')}`);
   }
   return `${lines.join('\n')}\n`;
 }
 
-/** What one command's resolved selection contributes to its line: the file count and the owners it came from. */
-function selectionOf(command: GateAttempt['commands'][number]): string {
-  const selection = command.selection;
-  if (selection === undefined) return '';
-  const owners = [...selection.exactOwners, ...selection.subtrees.map(subtree => `${subtree} (subtree)`)];
-  const files = `${selection.resolved.length} file${selection.resolved.length === 1 ? '' : 's'}`;
-  return owners.length === 0 ? `   ${files}` : `   ${files}; owners ${owners.join(', ')}`;
-}
-
-/** The same attempt, naming the commit the effect made. Records are immutable: this one is written once, here. */
-export function withCommit(gate: GateAttempt, commit: string | null): GateAttempt {
-  return { ...gate, commit };
-}
-
-/** The commit the working directory is on, or `''` where git cannot say. */
-export async function currentHead(projectRoot: string): Promise<string> {
-  const run = await runCommand({ argv: ['git', 'rev-parse', 'HEAD'], cwd: projectRoot, env: childEnvironment(), timeoutMs: 30_000 });
-  return run.outcome.kind === 'completed' && run.outcome.exitCode === 0 ? run.stdout.trim() : '';
-}
+// Retained for callers of the former gate-local helper. Git execution belongs to evidence.
+export { currentHead } from '../../subs/evidence/src/git.js';

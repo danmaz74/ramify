@@ -1,10 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ProjectRootError, startServer } from '../subs/harness/src/http/server.js';
+import { ProjectRootError, startCliServer } from '../subs/harness/src/http/server.js';
 import { runSessionCommand } from '../subs/harness/src/sessions/command.js';
 import type { SessionProgress, SessionSummary } from '../subs/harness/src/sessions/single.js';
-import { ProjectLockError } from '../subs/harness/src/store/lock.js';
+import { isProjectLockError } from '../subs/harness/src/store/lock.js';
 import { parseCommandLine, usage, UsageError, type CommandLine } from './cli.js';
 
 // The web module builds into dist/web beside this package's root; the root
@@ -18,7 +18,7 @@ async function main(argv: readonly string[]): Promise<number> {
     return 0;
   }
   if (commandLine.command === 'session') return session(commandLine);
-  const server = await startServer({
+  const server = await startCliServer({
     projectRoot: commandLine.projectRoot, port: commandLine.port, assetsDirectory, agent: commandLine.agent, piModel: commandLine.model,
   });
   console.log(`Serving ${server.projectRoot}`);
@@ -158,7 +158,7 @@ main(process.argv.slice(2)).then(code => {
   if (code >= 0) process.exitCode = code;
 }, (error: unknown) => {
   if (error instanceof UsageError) console.error(`${error.message}\n${usage}`);
-  else if (error instanceof ProjectRootError || error instanceof ProjectLockError) console.error(error.message);
+  else if (error instanceof ProjectRootError || (error instanceof Error && isProjectLockError(error))) console.error(error.message);
   else console.error(error);
   process.exitCode = 2;
 });

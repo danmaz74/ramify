@@ -12,6 +12,7 @@ import {
   addModule, assign, byRole, completionProposed, edit, installMiniRunner, outline, read, shell, submit, treeInputs,
 } from './helpers/iterations.js';
 import { git, initRepository, onlyRun, openRuns, runPath, startRun } from './helpers/runs.js';
+import { gitService } from '../../subs/evidence/src/git.js';
 
 /*
  * The guard this plan names: a write the guard cannot see appears in
@@ -60,6 +61,7 @@ describe('X6: an unguarded shell mutation and an outside read make the MVP\'s li
   test('the write is reported and not blocked: it is in git status, in outsideScope and in the coverage gap', async () => {
     const root = await target();
     const { service } = await openRuns(root, {
+      git: gitService,
       inputs: treeInputs(),
       script: byRole({
         'initial-architect': [submit(analysis([entry('review-note', notes)]))],

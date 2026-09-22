@@ -1,11 +1,13 @@
+import { openUnchangedRuns as openRuns, assertUnchangedGit } from './helpers/unchanged-run.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { readFile } from 'node:fs/promises';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { SessionSpec } from '../../subs/agent/src/interfaces/port.js';
 import { runLayout } from '../run/records.js';
 import { defaultRunPolicy } from '../run/policy.js';
 import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
-import { initRepository, installTestRunner, onlyRun, openRuns, runPath, startRun } from './helpers/runs.js';
+import { installTestRunner, onlyRun, runPath, startRun } from './helpers/runs.js';
 
 /*
  * Compaction is allowed for an architect and forbidden for a writer, and it
@@ -14,9 +16,13 @@ import { initRepository, installTestRunner, onlyRun, openRuns, runPath, startRun
  * after where the implementation reports them.
  */
 
+vi.mock('node:child_process', async original =>
+  (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
+
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
+  try { assertUnchangedGit(); expectNoProcesses(); } finally { forgetExternalTools(); }
 });
 
 const reviews = 'collection-review/workspace/reviews';
@@ -33,10 +39,10 @@ describe('compaction during a run', () => {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
     await installTestRunner(fixture.root);
-    await initRepository(fixture.root);
-    const submitted = analysis([entry('reviewer-note', reviews)]);
+      const submitted = analysis([entry('reviewer-note', reviews)]);
 
     const { service } = await openRuns(fixture.root, {
+      unchangedCheckpoints: ['wi-001', 'final verification of plan "review-notes"'],
       script: (spec: SessionSpec) => (spec.role === 'initial-architect'
         ? [
           { kind: 'context' as const, tokens: 90_000, window: 200_000 },
@@ -87,9 +93,9 @@ describe('compaction during a run', () => {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
     await installTestRunner(fixture.root);
-    await initRepository(fixture.root);
-    const submitted = analysis([]);
+      const submitted = analysis([]);
     const { service, agent } = await openRuns(fixture.root, {
+      unchangedCheckpoints: ['final verification of plan "review-notes"'],
       script: (spec: SessionSpec) => {
         // The run's own policy for this role is what decides; the harness
         // never says so in the prompt.

@@ -1,9 +1,12 @@
+import { openUnchangedRuns as openRuns, assertUnchangedGit } from './helpers/unchanged-run.js';
+import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { FakeRamifyCli } from './helpers/fake-ramify.js';
+import { scriptedGit } from './helpers/scripted-git.js';
+import { commandResult } from './helpers/command-result.js';
 import { existsSync } from 'node:fs';
-import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { engineerJsonSchema, engineerToolName, scopeTestsJsonSchema, scopeTestsToolName, validateEngineer } from '../work/engineer.js';
 import type { HookFinding } from '../hooks/post-write.js';
 import { iterationLayout } from '../work/iterations.js';
@@ -11,7 +14,7 @@ import { runLayout, type InvocationOutcome } from '../run/records.js';
 import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { addModule, assign, byRole, completionProposed, edit, installMiniRunner, outline, runScopeTests, submit, treeInputs } from './helpers/iterations.js';
-import { initRepository, onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
+import { openRuns as openRunsWithGit, onlyRun, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 
 /*
  * Everything an engineer tells the harness is validated JSON: the strict
@@ -24,9 +27,13 @@ import { initRepository, onlyRun, openRuns, runEventsOnDisk, runPath, startRun }
  * reaching it ends the invocation just the same.
  */
 
+vi.mock('node:child_process', async original =>
+  (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
+
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
+  try { assertUnchangedGit(); expectNoProcesses(); } finally { forgetExternalTools(); }
 });
 
 const notes = 'collection-review/workspace/reviews/notes';
@@ -163,7 +170,17 @@ describe('break-discovered', () => {
 });
 
 describe('a rejected submission in a run', () => {
-  async function run(inputs: readonly unknown[], toolCalls: readonly unknown[] = []) {
+  const completedCheckpoints = [
+    'wi-001.i01: Carry out the work in collection-review/workspace/reviews/notes.',
+    'wi-001',
+    'final verification of plan "review-notes"',
+  ] as const;
+
+  async function run(
+    inputs: readonly unknown[],
+    toolCalls: readonly unknown[] = [],
+    unchangedCheckpoints: readonly string[] = [],
+  ) {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
     await addModule(fixture.root, notesDirectory, 'notes', {
@@ -177,8 +194,11 @@ describe('a rejected submission in a run', () => {
       ].join('\n'),
     });
     await installMiniRunner(fixture.root);
-    await initRepository(fixture.root);
     const { service, agent } = await openRuns(fixture.root, {
+      commandExecution: request => {
+        expect(request.argv).toContain(`${notesDirectory}/src/tests/notes.test.ts`);
+        return commandResult(request, { outcome: { kind: 'completed', exitCode: 0 } });
+      },
       script: byRole({
         'initial-architect': [submit(analysis([entry('review-note', notes)]))],
         'local-architect': [submit(assign(notes, {}, outline())), submit(requestCompletion())],
@@ -188,6 +208,7 @@ describe('a rejected submission in a run', () => {
         ]],
       }),
       inputs: treeInputs(),
+      unchangedCheckpoints,
     });
     cleanups.push(() => service.close());
     const receipt = await service.execute(startRun('review-notes'));
@@ -199,7 +220,7 @@ describe('a rejected submission in a run', () => {
     const { root, runId, service, agent } = await run([
       { kind: 'completion-proposed', summary: 'done' },
       completionProposed('Left the limit as the plan asks.'),
-    ]);
+    ], [], completedCheckpoints);
 
     expect(onlyRun(service, 'review-notes').state).toBe('completed');
     const engineer = agent!.sessions.find(session => session.spec.role === 'engineer')!;
@@ -284,7 +305,11 @@ describe('a rejected submission in a run', () => {
   }, 300_000);
 
   test('the tool that takes nothing runs the selection the assignment fixed, and records what it ran', async () => {
-    const { root, runId, service, agent } = await run([completionProposed('Left the limit as the plan asks.')], [{}]);
+    const { root, runId, service, agent } = await run(
+      [completionProposed('Left the limit as the plan asks.')],
+      [{}],
+      completedCheckpoints,
+    );
     expect(onlyRun(service, 'review-notes').state).toBe('completed');
 
     const engineer = agent!.sessions.find(session => session.spec.role === 'engineer')!;
@@ -303,38 +328,6 @@ describe('a rejected submission in a run', () => {
   }, 300_000);
 });
 
-/**
- * A `ramify` that reports a `not-visible` finding, shaped as the CLI prints
- * one, for every changed file holding the marker, and checks clean
- * otherwise. Everything else it answers as the run tests' stub does.
- */
-async function markerRamify(marker: string): Promise<RamifyCli> {
-  const directory = await mkdtemp(join(tmpdir(), 'ramify-agent-marker-'));
-  cleanups.push(() => rm(directory, { recursive: true, force: true }));
-  const executable = join(directory, 'ramify');
-  await writeFile(executable, `#!/usr/bin/env node
-const { readFileSync } = require('node:fs');
-const args = process.argv.slice(2);
-if (args[0] === '--version') { console.log('ramify 0.0.0 (marker stub)'); process.exit(0); }
-if (args[0] !== 'check' || args[1] !== '--changed') {
-  console.log(JSON.stringify({ schemaVersion: 'ramify.cli/1', status: 'unavailable', reason: 'stub', exitCode: 2 }));
-  process.exit(2);
-}
-const paths = [];
-for (const arg of args.slice(2)) { if (arg.startsWith('--')) break; paths.push(arg); }
-const findings = paths.filter(path => { try { return readFileSync(path, 'utf8').includes(${JSON.stringify(marker)}); } catch { return false; } }).map(path => ({
-  id: 'source-diagnostic/1:' + path, category: 'import', code: 'not-visible', message: 'collection-review:interfaces/protocol.ts#ToolResult: not-visible',
-  location: { file: path, start: 0, end: 1, line: 1, column: 1 },
-  importer: { owner: 'collection-review/workspace/reviews/notes', kind: 'ordinary' },
-  original: { kind: 'code', owner: 'collection-review', file: 'interfaces/protocol.ts', binding: 'ToolResult' }, new: true,
-}));
-console.log(JSON.stringify({ schemaVersion: 'ramify.check/1', outcome: findings.length === 0 ? 'checked' : 'findings', findings }));
-process.exit(findings.length === 0 ? 0 : 1);
-`);
-  await chmod(executable, 0o755);
-  return new RamifyCli({ executable, timeoutMs: 30_000 });
-}
-
 describe('a Ramify module violation in a run', () => {
   test('the edit that introduces it is told, a completion is refused while it stands, and the fixed work completes', async () => {
     const fixture = await copyFixture();
@@ -351,13 +344,33 @@ describe('a Ramify module violation in a run', () => {
       ].join('\n'),
     });
     await installMiniRunner(root);
-    await initRepository(root);
 
     const marker = '/* NOT-EXPOSED-IMPORT */';
     const file = `${notesDirectory}/src/notes.ts`;
-    const { service, agent } = await openRuns(root, {
-      inputs: treeInputs(),
-      ramify: await markerRamify(marker),
+    const git = scriptedGit(root, { head: 'base', checkpoints: [
+      { subject: 'wi-001.i01', commit: 'fixed-source', changes: [{ status: 'M', path: file }] },
+      { subject: 'wi-001', commit: null, changes: [] },
+      { subject: 'final verification of plan "review-notes"', commit: null, changes: [] },
+    ] });
+    git.givenWrites();
+    const ramify = new FakeRamifyCli();
+    const finding = {
+      id: `source-diagnostic/1:${file}`, category: 'import', code: 'not-visible',
+      message: 'collection-review:interfaces/protocol.ts#ToolResult: not-visible',
+      location: { file, start: 0, end: 1, line: 1, column: 1 },
+      importer: { owner: 'collection-review/workspace/reviews/notes', kind: 'ordinary' },
+      original: { kind: 'code', owner: 'collection-review', file: 'interfaces/protocol.ts', binding: 'ToolResult' }, new: true,
+    };
+    const answer = (findings: unknown[]) => ({
+      form: 'changed' as const, exitCode: findings.length ? 1 : 0,
+      outcome: findings.length ? 'findings' as const : 'checked' as const, reason: null,
+      report: { schemaVersion: 'ramify.check/1', outcome: findings.length ? 'findings' : 'checked', findings }, stdout: '', stderr: '',
+    });
+    const checked = vi.spyOn(ramify, 'checkChanged')
+      .mockResolvedValueOnce(answer([finding])).mockResolvedValueOnce(answer([finding]))
+      .mockResolvedValue(answer([]));
+    const { service, agent } = await openRunsWithGit(root, {
+      inputs: treeInputs(), git, ramify, readinessExecution: directReadinessExecution(),
       script: byRole({
         'initial-architect': [submit(analysis([entry('review-note', notes)]))],
         'local-architect': [submit(assign(notes, {}, outline())), submit(requestCompletion())],
@@ -387,5 +400,7 @@ describe('a Ramify module violation in a run', () => {
     expect(engineer.verdicts[1]).toMatchObject({ accepted: true });
     // The edit that fixed it checked clean, so it told the engineer nothing about Ramify.
     expect(fixed!.text).not.toContain('RAMIFY');
+    expect(checked).toHaveBeenCalledTimes(4);
+    git.assertComplete();
   }, 300_000);
 });

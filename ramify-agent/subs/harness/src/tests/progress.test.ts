@@ -1,6 +1,6 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { SessionSpec } from '../../subs/agent/src/interfaces/port.js';
 import { analysisLayout, hypothesisSchema } from '../analysis/records.js';
 import type { ModuleTree, ViewIdentity } from '../interfaces/protocol/evidence.js';
@@ -12,11 +12,13 @@ import { entryAssignmentsSchema } from '../run/records.js';
 import { RunQueries } from '../projections/queries.js';
 import { workLayout } from '../work/records.js';
 import { copyFixture } from './helpers/fixture.js';
+import { expectNoProcesses, forgetExternalTools, openRunsWithoutProcesses } from './helpers/external-tools.js';
 import { analysis, entry, hypothesis, requestCompletion } from './helpers/analysis.js';
 import {
   at, constructedRun, forecast, hash, item, obligation, registered, requirement, reviews, type Line,
 } from './helpers/constructed.js';
-import { initRepository, installTestRunner, openRuns, runPath, startRun } from './helpers/runs.js';
+import { installTestRunner, runPath, startRun } from './helpers/runs.js';
+import { scriptedGit } from './helpers/scripted-git.js';
 
 /*
  * Hypothesis, decision, work and progress records stay visibly distinct: each
@@ -27,9 +29,13 @@ import { initRepository, installTestRunner, openRuns, runPath, startRun } from '
  * reopened evidence and superseded hypotheses correctly.
  */
 
+vi.mock('node:child_process', async original =>
+  (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
+
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
+  try { expectNoProcesses(); } finally { forgetExternalTools(); }
 });
 
 const root = 'collection-review';
@@ -266,17 +272,22 @@ describe('over a real run', () => {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
     await installTestRunner(fixture.root);
-    await initRepository(fixture.root);
     const submitted = analysis(
       [entry('reviewer-note', reviews), entry('note-in-panel', root)],
       [hypothesis('note-storage', { involvedModules: [reviews] })],
     );
-    const { service } = await openRuns(fixture.root, {
+    const git = scriptedGit(fixture.root, { head: 'progress-base', checkpoints: [
+      { subject: 'wi-001', commit: null, changes: [] },
+      { subject: 'wi-002', commit: null, changes: [] },
+      { subject: 'final verification of plan "review-notes"', commit: null, changes: [] },
+    ] });
+    const { service } = await openRunsWithoutProcesses(fixture.root, git, {
       script: (spec: SessionSpec) => [{ kind: 'submit' as const, input: spec.role === 'initial-architect' ? submitted : requestCompletion() }],
     });
     cleanups.push(() => service.close());
     const receipt = await service.execute(startRun('review-notes'));
     await service.settled('review-notes', receipt.jobId);
+    git.assertComplete();
 
     const directory = runPath(fixture.root, 'review-notes', receipt.jobId);
     // Each kind of record is in its own directory, with no other kind in it.
@@ -297,11 +308,13 @@ describe('over a real run', () => {
     // twice it answers the same thing, and the run's files are what they
     // were before it was asked.
     const before = await inventory(directory);
+    const gitOperations = git.operations();
     const queries = new RunQueries(service);
     const first = (await queries.capabilities('review-notes', receipt.jobId)).capabilities;
     const second = (await queries.capabilities('review-notes', receipt.jobId)).capabilities;
     expect(second).toEqual(first);
     expect(await inventory(directory)).toEqual(before);
+    expect(git.operations()).toEqual(gitOperations);
 
     expect(first.map(row => [row.capability, row.owner, row.state, row.tentative, row.workItems])).toEqual([
       ['reviewer-note', reviews, 'completed', false, ['wi-001']],

@@ -7,4 +7,4 @@ module core
 expose-src getRecord, inspect, CatalogSummary from "catalog.ts" to parent
 
 // Test data built from those private records, for other owners' tests.
-expose-test makeCatalogFixture from "fixture.ts" to parent
+expose-test makeCatalogFixture, CatalogFixtureRecord from "fixture.ts" to parent

@@ -1,13 +1,16 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import { afterEach, describe, expect, test } from 'vitest';
+import { mockGit } from './helpers/mock-git.js';
+import { scriptedGit } from './helpers/scripted-git.js';
+import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import type { LineChange } from '../kpi/lines.js';
+import { readFile } from 'node:fs/promises';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { lineEvents, ownerOf, takeLineSnapshot } from '../kpi/lines.js';
 import { sessionMetrics, type SessionEntry } from '../kpi/sessions.js';
 import { runLayout, type LineEventSummary } from '../run/records.js';
 import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { addModule, assign, byRole, completionProposed, edit, installMiniRunner, outline, submit, treeInputs, write } from './helpers/iterations.js';
-import { git, initRepository, onlyRun, openRuns, runPath, startRun } from './helpers/runs.js';
+import { onlyRun, openRuns, runPath, startRun } from './helpers/runs.js';
 import { architectIndex, moduleEntry } from './helpers/views.js';
 
 /*
@@ -21,9 +24,22 @@ import { architectIndex, moduleEntry } from './helpers/views.js';
  * after a trial.
  */
 
+vi.mock('node:child_process', async original =>
+  (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
+
+async function snapshot(changes: LineChange[] = []) {
+  const git = mockGit({ worktreeLineChanges: async () => changes });
+  const result = await takeLineSnapshot('/scenario', 'accepted', git);
+  expect(git.worktreeLineChanges).toHaveBeenCalledWith('/scenario', 'accepted');
+  expect(git.unexpected).toEqual([]);
+  return result;
+}
+const lines = (path: string, added: number, deleted = 0): LineChange => ({ path, added, deleted, binary: false, bytes: null });
+
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
+  try { expectNoProcesses(); } finally { forgetExternalTools(); }
 });
 
 const notes = 'collection-review/workspace/reviews/notes';
@@ -45,22 +61,18 @@ async function target() {
     'src/tests/notes.test.ts': noteTest,
   });
   await installMiniRunner(fixture.root);
-  await initRepository(fixture.root);
   return fixture.root;
 }
 
 describe('what one writer invocation changed', () => {
   test('the two snapshots around a session give its own lines, and the view gives each path its owner', async () => {
-    const root = await target();
     const index = architectIndex([
       moduleEntry('collection-review', '', null),
       moduleEntry(notes, notesDirectory, 'collection-review'),
     ]);
 
-    const before = await takeLineSnapshot(root);
-    await writeFile(join(root, notesDirectory, 'src', 'store.ts'), 'export const store = new Map();\nexport const kept = true;\n');
-    await writeFile(join(root, notesDirectory, 'src', 'notes.ts'), 'export const noteLimit = 500;\n');
-    const after = await takeLineSnapshot(root);
+    const before = await snapshot();
+    const after = await snapshot([lines(`${notesDirectory}/src/notes.ts`, 1, 1), lines(`${notesDirectory}/src/store.ts`, 2)]);
 
     const summary = lineEvents({ invocation: 'inv-0003', before, after, index });
     expect(summary.coverage).toBe('complete');
@@ -73,32 +85,32 @@ describe('what one writer invocation changed', () => {
 
     // A second session over the same tree is charged only with what it
     // changed, not with what it found.
-    const third = await takeLineSnapshot(root);
-    await writeFile(join(root, notesDirectory, 'src', 'store.ts'), 'export const store = new Map();\nexport const kept = true;\nexport const added = 1;\n');
-    const fourth = await takeLineSnapshot(root);
+    const third = await snapshot([lines(`${notesDirectory}/src/notes.ts`, 1, 1), lines(`${notesDirectory}/src/store.ts`, 2)]);
+    const fourth = await snapshot([lines(`${notesDirectory}/src/notes.ts`, 1, 1), lines(`${notesDirectory}/src/store.ts`, 3)]);
     const second = lineEvents({ invocation: 'inv-0004', before: third, after: fourth, index });
     expect(second.paths).toEqual([{ path: `${notesDirectory}/src/store.ts`, owner: notes, added: 1, deleted: 0, binary: false, bytes: null }]);
   });
 
   test('a session that changed nothing has an empty summary; a path with no owner is counted as unmapped', async () => {
-    const root = await target();
     const index = architectIndex([moduleEntry(notes, notesDirectory, null)]);
-    const before = await takeLineSnapshot(root);
-    const unchanged = lineEvents({ invocation: 'inv-0005', before, after: await takeLineSnapshot(root), index });
+    const before = await snapshot();
+    const unchanged = lineEvents({ invocation: 'inv-0005', before, after: await snapshot(), index });
     expect(unchanged.paths).toEqual([]);
     expect(unchanged.coverage).toBe('complete');
 
-    await writeFile(join(root, 'src', 'loose.ts'), 'export const loose = true;\n');
-    const summary = lineEvents({ invocation: 'inv-0006', before, after: await takeLineSnapshot(root), index });
+    const summary = lineEvents({ invocation: 'inv-0006', before, after: await snapshot([lines('src/loose.ts', 1)]), index });
     expect(summary.paths).toEqual([{ path: 'src/loose.ts', owner: null, added: 1, deleted: 0, binary: false, bytes: null }]);
     expect(summary.unmapped).toEqual({ paths: 1, added: 1, deleted: 0 });
   });
 
   test('a snapshot that could not be taken is a coverage gap, never a zero', async () => {
+    const git = mockGit({ worktreeLineChanges: async () => { throw new Error('the directory is no repository'); } });
+    const unavailable = await takeLineSnapshot('/scenario', 'accepted', git);
+    expect(unavailable).toEqual({ available: false, reason: 'the directory is no repository' });
     const summary = lineEvents({
       invocation: 'inv-0007',
-      before: { available: false, reason: 'the directory is no repository' },
-      after: { available: false, reason: 'the directory is no repository' },
+      before: unavailable,
+      after: unavailable,
       index: null,
     });
     expect(summary.coverage).toBe('partial');
@@ -107,21 +119,17 @@ describe('what one writer invocation changed', () => {
   });
 
   test('a path no module\'s contents hold is unmapped, and is never attributed to the root', async () => {
-    const root = await target();
     const index = architectIndex([
       moduleEntry('collection-review', '', null),
       moduleEntry(notes, notesDirectory, 'collection-review'),
     ]);
 
-    const before = await takeLineSnapshot(root);
+    const before = await snapshot();
     // Two paths the project holds and no module's own contents do: a
     // document beside the root and the project's own manifest.
-    await mkdir(join(root, 'docs'), { recursive: true });
-    await writeFile(join(root, 'docs', 'decision.md'), '# A decision\n\nWritten beside the modules, owned by none of them.\n');
-    await writeFile(join(root, 'notes.txt'), 'one\ntwo\n');
-    // And one the root's own source area does hold.
-    await writeFile(join(root, 'src', 'added.ts'), 'export const added = true;\n');
-    const summary = lineEvents({ invocation: 'inv-0008', before, after: await takeLineSnapshot(root), index });
+    const summary = lineEvents({ invocation: 'inv-0008', before, after: await snapshot([
+      lines('docs/decision.md', 3), lines('notes.txt', 2), lines('src/added.ts', 1),
+    ]), index });
 
     expect(summary.paths.map(path => [path.path, path.owner])).toEqual([
       ['docs/decision.md', null],
@@ -132,12 +140,12 @@ describe('what one writer invocation changed', () => {
   });
 
   test('a binary file carries its byte count and no invented line count', async () => {
-    const root = await target();
     const index = architectIndex([moduleEntry(notes, notesDirectory, null)]);
-    const before = await takeLineSnapshot(root);
+    const before = await snapshot();
 
-    await writeFile(join(root, notesDirectory, 'src', 'logo.bin'), Buffer.from([0x89, 0x50, 0x00, 0x01, 0x02, 0x03]));
-    const summary = lineEvents({ invocation: 'inv-0009', before, after: await takeLineSnapshot(root), index });
+    const summary = lineEvents({ invocation: 'inv-0009', before, after: await snapshot([
+      { path: `${notesDirectory}/src/logo.bin`, added: 0, deleted: 0, binary: true, bytes: 6 },
+    ]), index });
 
     expect(summary.paths).toEqual([
       { path: `${notesDirectory}/src/logo.bin`, owner: notes, added: 0, deleted: 0, binary: true, bytes: 6 },
@@ -146,18 +154,15 @@ describe('what one writer invocation changed', () => {
   });
 
   test('an invocation that used the unguarded shell says so rather than reporting a complete count', async () => {
-    const root = await target();
     const index = architectIndex([moduleEntry(notes, notesDirectory, null)]);
-    const before = await takeLineSnapshot(root);
+    const before = await snapshot();
     // A command that changed a file and put it back leaves the two
     // snapshots identical; what the invocation did is not in them.
-    await writeFile(join(root, notesDirectory, 'src', 'notes.ts'), 'export const noteLimit = 1;\n');
-    await writeFile(join(root, notesDirectory, 'src', 'notes.ts'), 'export const noteLimit = 400;\n');
 
     const summary = lineEvents({
       invocation: 'inv-0010',
       before,
-      after: await takeLineSnapshot(root),
+      after: await snapshot(),
       index,
       gaps: ['unguarded-shell: this invocation ran unguarded commands'],
     });
@@ -189,7 +194,20 @@ describe('what one writer invocation changed', () => {
 describe('a run captures each writer\'s line events when the observation happens', () => {
   test('the summary beside the invocation names what that invocation wrote', async () => {
     const root = await target();
+    const git = scriptedGit(root, { head: 'base', checkpoints: [
+      { subject: 'wi-001.i01', commit: 'source-revision', changes: [
+        { status: 'M', path: `${notesDirectory}/src/notes.ts` }, { status: 'A', path: `${notesDirectory}/src/store.ts` },
+      ] },
+      { subject: 'wi-001', commit: null, changes: [] },
+      { subject: 'final verification of plan "review-notes"', commit: null, changes: [] },
+    ] });
+    git.givenWrites();
+    const counts = vi.spyOn(git, 'worktreeLineChanges')
+      .mockResolvedValueOnce([]).mockResolvedValueOnce([
+        lines(`${notesDirectory}/src/notes.ts`, 1, 1), lines(`${notesDirectory}/src/store.ts`, 1),
+      ]);
     const { service } = await openRuns(root, {
+      git, readinessExecution: directReadinessExecution(),
       script: byRole({
         'initial-architect': [submit(analysis([entry('review-note', notes)]))],
         'local-architect': [submit(assign(notes, {}, outline())), submit(requestCompletion())],
@@ -213,9 +231,10 @@ describe('a run captures each writer\'s line events when the observation happens
       `${notesDirectory}/src/store.ts`,
     ]);
     expect(summary.paths.every(path => path.owner === notes)).toBe(true);
-    // The figures are git's, taken around the session, not afterwards.
-    const numstat = await git(root, 'diff', '--numstat', 'HEAD~1', 'HEAD');
-    expect(numstat).toContain(`${notesDirectory}/src/notes.ts`);
+    // The service requested both snapshots against the accepted boundary.
+    expect(counts.mock.calls).toEqual([[root, 'base'], [root, 'base']]);
+    expect(summary.paths.map(path => [path.added, path.deleted])).toEqual([[1, 1], [1, 0]]);
+    git.assertComplete();
   }, 300_000);
 });
 

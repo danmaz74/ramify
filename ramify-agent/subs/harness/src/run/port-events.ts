@@ -23,7 +23,7 @@ export interface PortEventRecorderOptions {
   readonly projectRoot: string;
   readonly observations: ObservationLog;
   /** Counts an input the implementation rejected before the tool ran toward the submission bound. */
-  readonly judge: { countImplementationRejection(callId: string, tool: string, reason: string): Promise<void> };
+  readonly judge: { countImplementationRejection(callId: string, tool: string, reason: string): () => Promise<void> };
   readonly excursions: ExcursionWatcher;
   readonly context: ContextPolicy;
 }
@@ -38,6 +38,8 @@ export class PortEventRecorder {
   readonly usage: UsageTotals = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 };
   private usageObserved = false;
   private contextObserved = false;
+  /** Port callbacks are synchronous, so their durable writes run on this ordered tail. */
+  private pending: Promise<void> = Promise.resolve();
 
   constructor(private readonly options: PortEventRecorderOptions) {}
 
@@ -50,16 +52,33 @@ export class PortEventRecorder {
     return this.usageObserved;
   }
 
-  /** Records one event. What is counted is counted before the first write, in the order the events came. */
-  async record(event: AgentEvent): Promise<void> {
-    const { observations } = this.options;
+  /** Records one event. What is counted is counted before its ordered durable write. */
+  record(event: AgentEvent): Promise<void> {
     if (event.type === 'message' && event.usage) {
       this.usageObserved = true;
       for (const part of ['input', 'output', 'cacheRead', 'cacheWrite', 'total'] as const) this.usage[part] += event.usage[part];
     }
     if (event.type === 'tool-started') this.calls.set(event.tool, event.callId);
+    if (event.type === 'context-observed') this.contextObserved = true;
+    const recordRejection = event.type === 'tool-finished' && !event.reachedTool
+      ? this.options.judge.countImplementationRejection(event.callId, event.tool, event.errorText ?? 'the input was rejected before the tool ran')
+      : undefined;
+
+    const recording = this.pending.then(() => this.persist(event, recordRejection));
+    // One failed observation is reported by the caller but does not prevent
+    // later observations, or the drain, from reaching the end of the queue.
+    this.pending = recording.catch(() => undefined);
+    return recording;
+  }
+
+  /** Waits until every port event received so far has finished recording. */
+  async drain(): Promise<void> {
+    await this.pending;
+  }
+
+  private async persist(event: AgentEvent, recordRejection?: (() => Promise<void>) | undefined): Promise<void> {
+    const { observations } = this.options;
     if (event.type === 'context-observed') {
-      this.contextObserved = true;
       await observations.record({
         type: 'context',
         data: { tokens: event.tokens, window: event.window, threshold: this.options.context.budgetTokens },
@@ -77,7 +96,7 @@ export class PortEventRecorder {
     } else if (event.type === 'tool-finished' && !event.reachedTool) {
       // The implementation rejected the input before the tool ran. It
       // counts toward the same bound, and no message text is read.
-      await this.options.judge.countImplementationRejection(event.callId, event.tool, event.errorText ?? 'the input was rejected before the tool ran');
+      await recordRejection?.();
     }
     const activity = activityOf(event, this.options.projectRoot, this.options.projectRoot);
     if (activity) await observations.record({ type: 'activity', data: { activity } });

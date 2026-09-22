@@ -1,7 +1,9 @@
+import { openUnchangedRuns as openRuns, assertUnchangedGit } from './helpers/unchanged-run.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { readFile } from 'node:fs/promises';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { copyFixture } from './helpers/fixture.js';
-import { emptyAnalysis, initRepository, installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRun, stopRun, until } from './helpers/runs.js';
+import { emptyAnalysis, installTestRunner, onlyRun, runEventsOnDisk, runPath, startRun, stopRun, until } from './helpers/runs.js';
 import { runLayout, type InvocationOutcome } from '../run/records.js';
 
 /*
@@ -13,9 +15,13 @@ import { runLayout, type InvocationOutcome } from '../run/records.js';
  * is a record, and no session ever runs for it.
  */
 
+vi.mock('node:child_process', async original =>
+  (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
+
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
+  try { assertUnchangedGit(); expectNoProcesses(); } finally { forgetExternalTools(); }
 });
 
 describe('a stop between the invocation and its session', () => {
@@ -23,7 +29,6 @@ describe('a stop between the invocation and its session', () => {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
     await installTestRunner(fixture.root);
-    await initRepository(fixture.root);
 
     let stopped: Promise<unknown> = Promise.resolve();
     const { service, agent } = await openRuns(fixture.root, {
@@ -66,7 +71,6 @@ describe('a stop between the invocation and its session', () => {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
     await installTestRunner(fixture.root);
-    await initRepository(fixture.root);
 
     let stopped: Promise<unknown> = Promise.resolve();
     const { service, agent } = await openRuns(fixture.root, {

@@ -1,3 +1,4 @@
+import type { CommandRunner } from '../../subs/evidence/src/run-command.js';
 import { z } from 'zod';
 import type { JsonSchema, ToolDefinition, ToolResult } from '../../subs/agent/src/interfaces/port.js';
 import { childEnvironment, runCommand, type CommandOutcome } from '../../subs/evidence/src/run-command.js';
@@ -69,6 +70,8 @@ export interface ShellResult {
 }
 
 export interface ShellOptions {
+  /** External command execution. Tests script outcomes; actual process tests use the default. */
+  readonly commandExecution?: CommandRunner | undefined;
   /** Where the command runs: the invocation's working directory. */
   readonly workingDirectory: string;
   /**
@@ -135,7 +138,7 @@ export function createShellTool(options: ShellOptions): ShellTool {
       await options.starting(call);
 
       const controller = new AbortController();
-      const done = runCommand({
+      const done = (options.commandExecution ?? runCommand)({
         argv: ['bash', '-c', request.command],
         cwd: options.workingDirectory,
         env: childEnvironment(),

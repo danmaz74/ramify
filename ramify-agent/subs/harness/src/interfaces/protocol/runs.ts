@@ -720,6 +720,8 @@ export const gateViewSchema = z.object({
   infrastructureAttempt: count,
   head: z.string(),
   commit: text.nullable(),
+  audited: text.nullable(),
+  evidence: z.object({ runRef: text, reportCommit: text, treeRef: text }).strict().nullable(),
   verdict: gateVerdictSchema,
   cause: gateCauseSchema.nullable(),
   next: gateNextSchema,

@@ -1,7 +1,9 @@
+import { mockGit } from './helpers/mock-git.js';
+import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { gateDiagnostics } from '../checks/diagnostics.js';
 import { runGate } from '../checks/gate.js';
 import { checkCommand, type GateAttempt } from '../checks/records.js';
@@ -11,7 +13,8 @@ import { iterationLayout, type IterationResult } from '../work/iterations.js';
 import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { addModule, assign, byRole, completionProposed, edit, installMiniRunner, outline, submit, treeInputs } from './helpers/iterations.js';
-import { initRepository, onlyRun, openRuns, runEventsOnDisk, runPath, startRun, testPolicy } from './helpers/runs.js';
+import { onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
+import { createMappedCheckExecution, type DirectCheckStep } from './helpers/direct-check-execution.js';
 
 /*
  * What a failing gate says, and who answers it.
@@ -24,9 +27,13 @@ import { initRepository, onlyRun, openRuns, runEventsOnDisk, runPath, startRun, 
  * architect whatever scope it lies in.
  */
 
+vi.mock('node:child_process', async original =>
+  (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
+
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
+  try { expectNoProcesses(); } finally { forgetExternalTools(); }
 });
 
 const scope = 'subs/workspace/subs/reviews/subs/notes/src';
@@ -49,17 +56,23 @@ function checkReport(findings: readonly Record<string, unknown>[]): string {
   return JSON.stringify({ schemaVersion: 'ramify.check/1', outcome: findings.length === 0 ? 'checked' : 'findings', findings });
 }
 
-/** A command that really runs, prints what it is given and answers `code`. */
+const responses = new Map<string, DirectCheckStep>();
+/** A declared external command response, without an executable stub. */
 function prints(text: string, code: number, cwd: string) {
-  const program = `process.stdout.write(${JSON.stringify(text)});process.exit(${code});`;
-  return checkCommand({ argv: [process.execPath, '-e', program], cwd, timeoutMs: 30_000 });
+  const id = String(responses.size);
+  responses.set(id, { stdout: text, outcome: { kind: 'completed', exitCode: code } });
+  return checkCommand({ argv: [process.execPath, '-e', id], cwd, timeoutMs: 30_000 });
 }
 
 /** One attempt over a temporary directory, with the checks a test names. */
 async function attempt(checks: readonly PlannedCheck[], writeScope?: readonly string[]): Promise<GateAttempt> {
   const directory = await mkdtemp(join(tmpdir(), 'ramify-agent-gate-'));
   cleanups.push(() => rm(directory, { recursive: true, force: true }));
-  return runGate('iteration', {
+  return runGate(createMappedCheckExecution({ script: ({ check }) => {
+    const response = responses.get(check.command.argv[2]!);
+    expect(response).toBeDefined();
+    return response!;
+  } }), 'iteration', {
     id: 'ga-0001',
     projectRoot: directory,
     directory: join(directory, 'gate'),
@@ -151,30 +164,11 @@ describe('a Ramify check that failed at a gate', () => {
 const notes = 'collection-review/workspace/reviews/notes';
 const notesDirectory = 'subs/workspace/subs/reviews/subs/notes';
 
-/**
- * A complete Ramify check that passes at readiness and reports one module
- * violation at the iteration gate that follows, in the engineer's own file.
- */
-function failingRamifyCheck(projectRoot: string, counter: string, failOn: number) {
-  const report = checkReport([notVisible(`${notesDirectory}/src/notes.ts`, 13)]);
-  const program = [
-    'const fs = require("fs");',
-    `const p = ${JSON.stringify(counter)};`,
-    'const n = (fs.existsSync(p) ? Number(fs.readFileSync(p, "utf8")) : 0) + 1;',
-    'fs.writeFileSync(p, String(n));',
-    `if (n === ${failOn}) { process.stdout.write(${JSON.stringify(report)}); process.exit(1); }`,
-    `process.stdout.write(${JSON.stringify(checkReport([]))}); process.exit(0);`,
-  ].join('');
-  return checkCommand({ argv: [process.execPath, '-e', program], cwd: projectRoot, timeoutMs: 30_000 });
-}
-
 describe('a module violation at the iteration gate, over a run', () => {
   test('the iteration returns to the local architect, whose briefing carries the finding itself', async () => {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
     const root = fixture.root;
-    const counter = join(await mkdtemp(join(tmpdir(), 'ramify-agent-count-')), 'runs');
-    cleanups.push(() => rm(counter, { force: true }));
     await addModule(root, notesDirectory, 'notes', {
       'src/notes.ts': 'export const noteLimit = 400;\n',
       'src/tests/notes.test.ts': [
@@ -186,16 +180,27 @@ describe('a module violation at the iteration gate, over a run', () => {
       ].join('\n'),
     });
     await installMiniRunner(root);
-    await initRepository(root);
 
-    const opened = await openRuns(root, {
-      inputs: treeInputs(),
-      // Readiness runs the complete check first; the iteration gate's run is
-      // the one that reports the violation.
-      policy: projectRoot => {
-        const base = testPolicy(projectRoot);
-        return { ...base, commands: { ...base.commands, ramifyCheck: failingRamifyCheck(projectRoot, counter, 2) } };
+    let head = 'base';
+    const git = mockGit({
+      currentHead: async () => head,
+      isCleanRepository: async () => true,
+      createRunBranch: async (_root, runId) => ({ branch: `ramify-agent/run-${runId}`, created: true }),
+      findCommitByTrailers: async () => null,
+      changedPaths: async (_root, accepted) => accepted === 'base' ? [source] : [],
+      changedEntries: async (_root, accepted) => accepted === 'base' ? [{ status: 'M', path: source }] : [],
+      diffNameStatus: async (_root, from, to) => {
+        expect([from, to]).toEqual(['base', 'repaired-source']);
+        return [{ status: 'M', path: source }];
       },
+      worktreeLineChanges: async () => { throw new Error('Line metrics not scripted in diagnostic scenario'); },
+    });
+    git.commitAccepted.mockImplementationOnce(async () => { head = 'repaired-source'; return head; }).mockResolvedValue(null);
+    const opened = await openRuns(root, {
+      inputs: treeInputs(), git, readinessExecution: directReadinessExecution(),
+      checkScript: ({ check, context }) => check.kind === 'ramify-check' && context.attemptId === 'ga-0002'
+        ? { stdout: checkReport([notVisible(source, 13)]), outcome: { kind: 'completed', exitCode: 1 } }
+        : {},
       script: byRole({
         'initial-architect': [submit(analysis([entry('review-note', notes)]))],
         'local-architect': [
@@ -245,5 +250,7 @@ describe('a module violation at the iteration gate, over a run', () => {
     expect(briefing).toContain('- `ramify-check`: failed, exit 1, 1 finding:');
     expect(briefing).toContain(`${notesDirectory}/src/notes.ts:13 imports \`ToolResult\` from src/interfaces/protocol.ts (module \`collection-review\`)`);
     expect(briefing).toContain('submit `request-placement` where another owner would have to expose a symbol');
+    expect(git.commitAccepted).toHaveBeenCalledTimes(4);
+    expect(git.unexpected).toEqual([]);
   }, 300_000);
 });

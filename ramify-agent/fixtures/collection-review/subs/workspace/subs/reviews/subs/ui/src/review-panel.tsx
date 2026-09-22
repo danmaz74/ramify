@@ -41,7 +41,7 @@ export async function loadReview(
   };
 }
 
-interface ReviewPanelProps {
+export interface ReviewPanelProps {
   client: TRPCClient<AppRouter>;
   recordId: string;
 }

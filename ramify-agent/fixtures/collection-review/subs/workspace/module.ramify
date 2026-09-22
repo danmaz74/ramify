@@ -4,6 +4,7 @@ ramify 1
 module workspace tagged [ui, browser, dispatch]
 
 expose-sub * from contracts to descendants
+expose-sub RecordId, recordIdSchema, InspectionReport, inspectionReportSchema, RevisionScope, revisionScopeSchema, ObservationCallback, Observation, observationSchema from contracts to parent
 
 // The catalog's finished API surfaces, on their way to the root that mounts
 // them. This shell cannot value-import them itself; relaying is a declaration,
@@ -17,7 +18,7 @@ expose-sub createReviewsRouter, createReviewsTools, InspectionPort from reviews 
 // The catalog's test fixture, for the tests of every other owner beneath this
 // one. Their ordinary source cannot import it: the fixture is tagged
 // `testing`.
-expose-sub makeCatalogFixture from catalog to descendants
+expose-sub makeCatalogFixture, CatalogFixtureRecord from catalog to descendants
 
 // The shared presentation primitives, down to every descendant. Both feature
 // views take them; their core siblings see them and cannot import them,

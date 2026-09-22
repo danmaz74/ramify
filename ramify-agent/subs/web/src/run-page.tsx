@@ -476,7 +476,17 @@ function GateDetail({ client, planId, runId, version, gate }: AreaProps & { read
         {(data: GateView) => (
           <>
             <h2>{data.id}: {data.checkpoint}, {data.verdict}</h2>
-            <p className="muted">Cause {data.cause ?? 'none'}, next {data.next}, repair round {data.repairRound}, infrastructure attempt {data.infrastructureAttempt}{data.commit ? `, commit ${data.commit.slice(0, 12)}` : ''}.</p>
+            <p className="muted">Cause {data.cause ?? 'none'}, next {data.next}, repair round {data.repairRound}, infrastructure attempt {data.infrastructureAttempt}.</p>
+            <dl className="facts">
+              <div><dt>Attempt commit</dt><dd>{data.commit === null ? 'none (this attempt made no commit)' : <code>{data.commit}</code>}</dd></div>
+              <div><dt>Audited commit</dt><dd>{data.audited === null ? 'not audited' : <code>{data.audited}</code>}</dd></div>
+              <div>
+                <dt>Audit evidence</dt>
+                <dd>{data.evidence === null
+                  ? 'not published'
+                  : <><span>run ref <code>{data.evidence.runRef}</code></span>; <span>report commit <code>{data.evidence.reportCommit}</code></span>; <span>tree ref <code>{data.evidence.treeRef}</code></span></>}</dd>
+              </div>
+            </dl>
             {data.guardedChanges.length > 0 && (
               <ul>{data.guardedChanges.map(change => <li key={change.path}>Guarded change <code>{change.path}</code>{change.after === null ? ' (deleted)' : ''}: {change.authorizedBy ? `authorized by ${change.authorizedBy.id}@${change.authorizedBy.revision}` : 'not authorized'}</li>)}</ul>
             )}

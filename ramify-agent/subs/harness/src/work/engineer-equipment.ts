@@ -1,3 +1,4 @@
+import type { CommandRunner } from '../../subs/evidence/src/run-command.js';
 import { readdir } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 import type {
@@ -57,6 +58,8 @@ export interface Equipment {
 
 /** Everything the engineer equipment is built from; none of it names a run. */
 export interface EngineerEquipmentInputs {
+  /** External command execution. Tests script outcomes; actual process tests use the default. */
+  readonly commandExecution?: CommandRunner | undefined;
   readonly projectRoot: string;
   /** The Ramify command line the hook check runs. */
   readonly ramify: RamifyCli;
@@ -148,6 +151,7 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
       observations: session.observations,
     });
     shell = createShellTool({
+      commandExecution: inputs.commandExecution,
       workingDirectory: projectRoot,
       judge: input => shellJudge!.judge(input, session.callId(shellToolName)),
       outputFile: call => inputs.outputPath('shell', session.invocation, call),
@@ -180,6 +184,7 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
       builtinTools: ['read', 'grep', 'ls', 'edit', 'write'],
       settle: () => shell!.settle(),
       tools: [shell.definition, createScopeTestsTool({
+        commandExecution: inputs.commandExecution,
         projectRoot,
         commands: inputs.commands,
         policy: inputs.tests,

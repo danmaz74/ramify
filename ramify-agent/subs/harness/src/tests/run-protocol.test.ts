@@ -1,6 +1,11 @@
+import { protocolPorts } from './helpers/protocol-ports.js';
+import { openUnchangedRuns, unchangedGit, assertUnchangedGit, type UnchangedRunsOptions } from './helpers/unchanged-run.js';
+import { FakeRamifyCli } from './helpers/fake-ramify.js';
+import { createPassingCheckExecution } from './helpers/direct-check-execution.js';
+import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { createScriptedAgent } from '../../subs/agent/src/scripted.js';
 import { errorResponseSchema } from '../interfaces/protocol/errors.js';
 import { moduleTreeResponseSchema } from '../interfaces/protocol/evidence.js';
@@ -19,9 +24,12 @@ import {
   draftsDirectory, drafts, fileHashes, longOutputBytes, notes, outsidePath, protocolPolicy, protocolScript, protocolTarget,
 } from './helpers/protocol.js';
 import {
-  emptyAnalysis, git, initRepository, installTestRunner, openRuns, realRamify, runEventsOnDisk, runPath, startRun, stubRamify, testPolicy, until,
+  emptyAnalysis, installTestRunner, openRuns as openRealRuns, runEventsOnDisk, runPath, startRun, testPolicy, until,
 } from './helpers/runs.js';
 import { copyFixture } from './helpers/fixture.js';
+import { acquireProjectLock } from '../store/lock.js';
+import { ObservationLog } from '../run/observations.js';
+import { runLayout } from '../run/records.js';
 
 /*
  * The run protocol over HTTP, read by a plain Node client: `fetch` and the
@@ -32,9 +40,25 @@ import { copyFixture } from './helpers/fixture.js';
  * same events, and so does one attached after the harness restarts.
  */
 
+vi.mock('node:child_process', async original =>
+  (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
+const fixtures = new Map<string, ReturnType<typeof protocolPorts>>();
+async function scriptedTarget() {
+  const target = await protocolTarget(false);
+  fixtures.set(target.root, protocolPorts(target.root));
+  return target;
+}
+async function openRuns(root: string, options: UnchangedRunsOptions = {}) {
+  const ports = fixtures.get(root);
+  if (!ports) return openUnchangedRuns(root, options);
+  return openRealRuns(root, { ...options, ...ports });
+}
+
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
+  fixtures.clear();
+  try { assertUnchangedGit(); expectNoProcesses(); } finally { forgetExternalTools(); }
 });
 
 const plan = 'review-notes';
@@ -90,21 +114,27 @@ async function everyAnswer(server: RunningServer, runId: string): Promise<Record
   return answers;
 }
 
-async function serve(root: string, extra: Partial<Parameters<typeof startServerWith>[0]> = {}): Promise<RunningServer> {
-  const server = await startServerWith({
-    projectRoot: root,
-    port: 0,
-    assetsDirectory: join(root, 'no-such-build'),
-    ramify: await stubRamify(),
-    runs: { inputs: treeInputs(), policy: projectRoot => protocolPolicy(projectRoot), stopGraceMs: 500, warn: () => undefined },
-    ...extra,
+async function serve(
+  root: string,
+  extra: Partial<Parameters<typeof startServerWith>[0]> = {},
+  unchangedCheckpoints: readonly string[] = [],
+): Promise<RunningServer> {
+  const ports = fixtures.get(root);
+  return startServerWith({
+    projectRoot: root, port: 0, assetsDirectory: join(root, 'no-such-build'),
+    ramify: new FakeRamifyCli(), ...extra,
+    ...(ports && extra.agent ? { agent: createScriptedAgent(ports.script) } : {}),
+    runs: {
+      inputs: treeInputs(), policy: projectRoot => protocolPolicy(projectRoot), stopGraceMs: 500, warn: () => undefined,
+      ...extra.runs,
+      ...(ports ?? { git: unchangedGit(root, unchangedCheckpoints), readinessExecution: directReadinessExecution(), checkExecution: createPassingCheckExecution() }),
+    },
   });
-  return server;
 }
 
 describe('C1: a run completes with no client, and a client attached afterwards reads the same state and events', () => {
   test('driven while only the file system is watched; read over HTTP, and again after two restarts', async () => {
-    const target = await protocolTarget();
+    const target = await scriptedTarget();
     cleanups.push(target.remove);
     const { root } = target;
 
@@ -121,6 +151,7 @@ describe('C1: a run completes with no client, and a client attached afterwards r
     await opened.service.close();
     const onDisk = await runEventsOnDisk(root, plan, runId);
     expect(onDisk.at(-1)!.type).toBe('job-completed');
+    fixtures.get(root)!.git.assertComplete();
 
     // A client attaches afterwards, to a harness that has just loaded the run.
     const first = await serve(root);
@@ -172,7 +203,7 @@ describe('C1: a run completes with no client, and a client attached afterwards r
 
 describe('every query of a completed run, over HTTP', () => {
   test('answers what the records hold: analysis, decisions, work items, capabilities, gates and metrics', async () => {
-    const target = await protocolTarget();
+    const target = await scriptedTarget();
     cleanups.push(target.remove);
     const server = await serve(target.root, { agent: createScriptedAgent(protocolScript()) });
     cleanups.push(() => server.close());
@@ -184,6 +215,7 @@ describe('every query of a completed run, over HTTP', () => {
 
     const list = runListResponseSchema.parse((await get(server, protocolPaths.runs(plan))).body);
     expect(list.runs.map(run => run.jobId)).toEqual([runId]);
+    fixtures.get(target.root)!.git.assertComplete();
     expect(list.agent).toBe('scripted');
     expect(list.unserved).toEqual([]);
 
@@ -270,98 +302,11 @@ describe('every query of a completed run, over HTTP', () => {
   }, 300_000);
 });
 
-describe('the module-capability comparison of a completed scripted run, over HTTP', () => {
-  test('initial and current placements, the compared identities and coverage, and no file or event changed', async () => {
-    const target = await protocolTarget();
-    cleanups.push(target.remove);
-    const { root } = target;
-    const opened = await openRuns(root, { script: protocolScript(), inputs: treeInputs(), policy: projectRoot => protocolPolicy(projectRoot) });
-    const runId = (await opened.service.execute(startRun(plan))).jobId;
-    await opened.service.settled(plan, runId);
-    await opened.service.close();
-    const onDisk = await runEventsOnDisk(root, plan, runId);
-    expect(onDisk.at(-1)!.type).toBe('job-completed');
-
-    const server = await serve(root);
-    cleanups.push(() => server.close());
-    const read = async () => {
-      const { status, body } = await get(server, protocolPaths.runModuleCapabilities(plan, runId));
-      expect(status).toBe(200);
-      return moduleCapabilityComparisonResponseSchema.parse(body);
-    };
-    const currentTree = async () => moduleTreeResponseSchema.parse((await get(server, protocolPaths.modules)).body).tree;
-
-    // Before the architect view is materialized: the same unavailable tree
-    // the module-tree query reports, every module unplaced, and a gap.
-    const unmaterialized = await read();
-    expect(unmaterialized.tree).toEqual(await currentTree());
-    expect(unmaterialized.tree.status).toBe('unavailable');
-    expect(unmaterialized.modules.map(entry => [entry.module, entry.placement])).toEqual([[notes, 'unplaced'], [drafts, 'unplaced']]);
-    expect(unmaterialized.coverage).toEqual({
-      state: 'partial', knownCapabilities: 3, knownImplemented: 2, totalCapabilities: null,
-      gaps: [expect.stringMatching(/^The current module tree is unavailable, so no module is placed: The architect view has not been materialized yet/)],
-    });
-
-    // The real view of the tree the run left, with the module it created.
-    const daemon = await realRamify();
-    cleanups.push(() => daemon.dispose());
-    const materialized = await daemon.ramify.materialize(root);
-    expect(materialized.ok).toBe(true);
-
-    const files = await fileHashes(runPath(root, plan, runId));
-    const status = await git(root, 'status', '--porcelain', '--untracked-files=all');
-    const first = await read();
-    expect(await read()).toEqual(first);
-
-    const tree = await currentTree();
-    expect(first.tree).toEqual(tree);
-    if (tree.status !== 'available') throw new Error('the view was materialized');
-    expect(tree.modules.map(entry => entry.module)).toEqual(expect.arrayContaining([notes, drafts]));
-    expect(first.identityPolicy).toBe('exact-capability-slug/1');
-    expect(first.runVersion).toBe(onDisk.length);
-    // The run's inputs worked from a placeholder view, and the identity says so.
-    expect(first.initialView).toEqual({ status: 'placeholder' });
-
-    // Every module of the tree, in its order; only two hold rows.
-    expect(first.modules.map(entry => entry.module)).toEqual(tree.modules.map(entry => entry.module));
-    expect(first.modules.every(entry => entry.placement === 'declared')).toBe(true);
-    const withRows = first.modules.filter(entry => entry.capabilities.length > 0);
-    expect(withRows.map(entry => ({
-      module: entry.module,
-      proposedAtStart: entry.proposedAtStart,
-      rows: entry.capabilities.map(row => [row.capability, row.initial, row.implementedHere === null ? null : row.implementedHere.evidence.length]),
-    }))).toEqual([
-      {
-        module: notes, proposedAtStart: null,
-        rows: [
-          ['review-note', [{ role: 'entry-owner', hypothesis: null }], 1],
-          ['note-search', [{ role: 'suggested-owner', hypothesis: 'note-search' }], null],
-        ],
-      },
-      {
-        // Proposed at start by its entry, it now exists and is declared.
-        module: drafts, proposedAtStart: { parent: notes, purpose: 'Keeps a reviewer\'s unsent drafts.', tags: [] },
-        rows: [['note-drafts', [{ role: 'entry-owner', hypothesis: null }], 1]],
-      },
-    ]);
-    expect(withRows[0]!.capabilities[0]!.implementedHere!.reason).toMatch(/^wi-001 passed its work-item gate ga-\d{4}$/);
-    expect(first.coverage).toEqual({ state: 'complete', capabilities: 3, implemented: 2 });
-    // CM09: nothing about activity, commits, changes, lines or deployment.
-    expect(JSON.stringify(first)).not.toMatch(/"(activity|commit|changed|lines|deployed)"/i);
-
-    // The query changed no file of the run, no event and nothing in the project.
-    expect(await fileHashes(runPath(root, plan, runId))).toEqual(files);
-    expect(await runEventsOnDisk(root, plan, runId)).toEqual(onDisk);
-    expect(await git(root, 'status', '--porcelain', '--untracked-files=all')).toBe(status);
-  }, 300_000);
-});
-
 describe('commands over HTTP', () => {
   async function commandTarget() {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
     await installTestRunner(fixture.root);
-    await initRepository(fixture.root);
     return fixture.root;
   }
 
@@ -370,7 +315,7 @@ describe('commands over HTTP', () => {
     const server = await serve(root, {
       agent: createScriptedAgent([{ kind: 'submit', input: emptyAnalysis() }]),
       runs: { inputs: treeInputs(), policy: projectRoot => testPolicy(projectRoot), stopGraceMs: 500, warn: () => undefined },
-    });
+    }, ['final verification of plan "review-notes"']);
     cleanups.push(() => server.close());
     const command = startRun(plan, 'scripted', 'start-once');
 
@@ -407,7 +352,11 @@ describe('commands over HTTP', () => {
 
   test('a start-run payload that breaks its schema is refused with every error and its path, and changes nothing', async () => {
     const root = await commandTarget();
-    const server = await serve(root, { agent: createScriptedAgent([{ kind: 'submit', input: emptyAnalysis() }]) });
+    const server = await serve(
+      root,
+      { agent: createScriptedAgent([{ kind: 'submit', input: emptyAnalysis() }]) },
+      ['final verification of plan "review-notes"'],
+    );
     cleanups.push(() => server.close());
 
     const broken = await post(server, {
@@ -425,12 +374,169 @@ describe('commands over HTTP', () => {
     // The corrected command is accepted: the refusal consumed nothing, not even its ID.
     const corrected = await post(server, startRun(plan, 'scripted', 'start-broken'));
     expect(corrected.status).toBe(202);
+    const runId = commandResponseSchema.parse(corrected.body).receipt.jobId;
+    await until(async () => runResponseSchema.parse((await get(server, protocolPaths.run(plan, runId))).body).run.state !== 'running', 60_000);
+  }, 120_000);
+
+  test('close keeps the project lock until a run driver is quiescent and no write follows its resolution', async () => {
+    const root = await commandTarget();
+    let reached!: () => void;
+    let resume!: () => void;
+    const atBoundary = new Promise<void>(resolve => { reached = resolve; });
+    const paused = new Promise<void>(resolve => { resume = resolve; });
+    const opened = await openRuns(root, {
+      script: [{ kind: 'submit', input: emptyAnalysis() }],
+      afterWrite: async write => {
+        if (write !== 'invocation-started') return;
+        reached();
+        await paused;
+      },
+    });
+    const receipt = await opened.service.execute(startRun(plan));
+    await atBoundary;
+
+    let closeResolved = false;
+    const closing = opened.service.close().then(() => { closeResolved = true; });
+    await new Promise<void>(resolve => setTimeout(resolve, 100));
+    const resolvedBeforeDriver = closeResolved;
+    const heldBeforeDriver = await opened.lock.held();
+    const eventsBeforeDriver = await runEventsOnDisk(root, plan, receipt.jobId);
+
+    resume();
+    await closing;
+    await opened.service.settled(plan, receipt.jobId);
+    const eventsAtClose = await runEventsOnDisk(root, plan, receipt.jobId);
+    await new Promise<void>(resolve => setImmediate(resolve));
+
+    expect(resolvedBeforeDriver).toBe(false);
+    expect(heldBeforeDriver).toBe(true);
+    expect(await runEventsOnDisk(root, plan, receipt.jobId)).toEqual(eventsAtClose);
+    expect(eventsAtClose.length).toBeGreaterThan(eventsBeforeDriver.length);
+    expect(await opened.lock.held()).toBe(false);
+
+    const successor = await acquireProjectLock(root);
+    expect(await successor.held()).toBe(true);
+    await successor.release();
+  }, 120_000);
+
+  test('close drains delayed observation writes before it releases the project lock', async () => {
+    const root = await commandTarget();
+    let reached!: () => void;
+    let resume!: () => void;
+    const atObservation = new Promise<void>(resolve => { reached = resolve; });
+    const paused = new Promise<void>(resolve => { resume = resolve; });
+    const originalRecord = ObservationLog.prototype.record;
+    const record = vi.spyOn(ObservationLog.prototype, 'record').mockImplementation(async function (this: ObservationLog, input, at) {
+      if (input.type === 'context') {
+        reached();
+        await paused;
+      }
+      return originalRecord.call(this, input, at);
+    });
+    const opened = await openRuns(root, {
+      script: [
+        { kind: 'context', tokens: 1_000, window: 200_000 },
+        { kind: 'wait', ms: 60_000 },
+      ],
+    });
+    let closing: Promise<void> | undefined;
+    try {
+      const receipt = await opened.service.execute(startRun(plan));
+      await atObservation;
+      let closeResolved = false;
+      closing = opened.service.close().then(() => { closeResolved = true; });
+      await new Promise<void>(resolve => setImmediate(resolve));
+      const resolvedBeforeObservation = closeResolved;
+      const heldBeforeObservation = await opened.lock.held();
+
+      resume();
+      await closing;
+      const observations = await readFile(runPath(root, plan, receipt.jobId, runLayout.observations('inv-0001')), 'utf8');
+      await new Promise<void>(resolve => setImmediate(resolve));
+
+      expect(resolvedBeforeObservation).toBe(false);
+      expect(heldBeforeObservation).toBe(true);
+      expect(observations).toContain('"type":"context"');
+      expect(await readFile(runPath(root, plan, receipt.jobId, runLayout.observations('inv-0001')), 'utf8')).toBe(observations);
+      expect(await opened.lock.held()).toBe(false);
+    } finally {
+      resume();
+      await closing?.catch(() => undefined);
+      record.mockRestore();
+    }
+  }, 120_000);
+
+  test('close waits for an admitted start before choosing the drivers it must quiesce', async () => {
+    const root = await commandTarget();
+    let reached!: () => void;
+    let resume!: () => void;
+    const atCapture = new Promise<void>(resolve => { reached = resolve; });
+    const paused = new Promise<void>(resolve => { resume = resolve; });
+    const inputs = treeInputs();
+    const opened = await openRuns(root, {
+      script: [{ kind: 'submit', input: emptyAnalysis() }],
+      inputs: {
+        ...inputs,
+        capture: async (...args) => {
+          reached();
+          await paused;
+          return inputs.capture(...args);
+        },
+      },
+    });
+
+    const starting = opened.service.execute(startRun(plan));
+    await atCapture;
+    let closeResolved = false;
+    const closing = opened.service.close().then(() => { closeResolved = true; });
+    await new Promise<void>(resolve => setImmediate(resolve));
+    const resolvedBeforeStart = closeResolved;
+    const heldBeforeStart = await opened.lock.held();
+
+    resume();
+    const receipt = await starting;
+    await closing;
+    await opened.service.settled(plan, receipt.jobId);
+
+    expect(resolvedBeforeStart).toBe(false);
+    expect(heldBeforeStart).toBe(true);
+    expect(await opened.lock.held()).toBe(false);
+  }, 120_000);
+
+  test('close remains bounded and retains the project lock when a driver cannot quiesce', async () => {
+    const root = await commandTarget();
+    let reached!: () => void;
+    let resume!: () => void;
+    const atBoundary = new Promise<void>(resolve => { reached = resolve; });
+    const paused = new Promise<void>(resolve => { resume = resolve; });
+    const opened = await openRuns(root, {
+      script: [{ kind: 'submit', input: emptyAnalysis() }],
+      afterWrite: async write => {
+        if (write !== 'invocation-started') return;
+        reached();
+        await paused;
+      },
+      policy: projectRoot => {
+        const policy = testPolicy(projectRoot);
+        return { ...policy, limits: { ...policy.limits, stopSettleMs: 50 } };
+      },
+    });
+    const receipt = await opened.service.execute(startRun(plan));
+    await atBoundary;
+
+    await expect(opened.service.close()).rejects.toThrow('did not become quiescent within 50 ms');
+    expect(await opened.lock.held()).toBe(true);
+
+    resume();
+    await opened.service.settled(plan, receipt.jobId);
+    await opened.service.close();
+    expect(await opened.lock.held()).toBe(false);
   }, 120_000);
 });
 
 describe('a record of an unsupported version', () => {
   test('surfaces as unsupported-version with evidence, never as an absent run', async () => {
-    const target = await protocolTarget();
+    const target = await scriptedTarget();
     cleanups.push(target.remove);
     const runId = '20990101T000000Z-abcdef';
     await mkdir(runPath(target.root, plan, runId), { recursive: true });

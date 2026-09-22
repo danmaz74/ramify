@@ -267,3 +267,6 @@ async function finish(
     stderr,
   };
 }
+
+/** External command boundary; lifecycle tests supply scripted outcomes. */
+export type CommandRunner = typeof runCommand;

@@ -2,17 +2,19 @@ import { randomBytes } from 'node:crypto';
 import { mkdir, realpath, stat, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, relative, sep } from 'node:path';
 import type { AgentPort, AgentSession, SessionSpec } from '../../subs/agent/src/interfaces/port.js';
-import { changedPaths } from '../../subs/evidence/src/git.js';
+import { gitService, type GitService } from '../../subs/evidence/src/git.js';
+import type { CommandRunner } from '../../subs/evidence/src/run-command.js';
 import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import { findModule, type ArchitectIndex } from '../../subs/evidence/src/views.js';
 import { writeFileAtomic } from '../../subs/ledger/src/atomic.js';
 import { resolveTestSelection } from '../checks/selection.js';
+import { inPlaceCheckExecution, type CheckExecutionPort } from '../checks/execution.js';
 import { isContained, resolveRealTarget } from '../guard/resolve-contained-path.js';
 import type { GuardedScope } from '../guard/write-guard.js';
 import type { HookFinding } from '../hooks/post-write.js';
 import { inputsHash, loadPromptPackages, renderEngineerPrompt, sha256 } from '../prompts/packages.js';
 import { ExcursionWatcher } from '../run/excursions.js';
-import { currentHead, runCheckpoint } from '../run/gates.js';
+import { runCheckpoint } from '../run/gates.js';
 import { architectRunInputs } from '../run/inputs.js';
 import { recordSettledSnapshot } from '../run/mutations.js';
 import { ObservationLog } from '../run/observations.js';
@@ -60,6 +62,12 @@ export interface SingleSessionOptions {
   readonly agent: AgentPort;
   /** The Ramify command line the hook check and the API views use. */
   readonly ramify: RamifyCli;
+  /** Git observations. Tests inject scenario answers; production uses Git. */
+  readonly git?: GitService | undefined;
+  /** Gate command execution. Tests inject direct results; production runs commands. */
+  readonly checkExecution?: CheckExecutionPort | undefined;
+  /** Shell and scoped-test command execution. Tests inject results; production runs commands. */
+  readonly commandExecution?: CommandRunner | undefined;
   /** Project-relative paths the session may write beside the module's own contents. */
   readonly write?: readonly string[] | undefined;
   /** Runs the iteration checkpoint over the module after the session. It never commits. */
@@ -197,6 +205,7 @@ function notStarted(reason: string, records: string | null = null): SingleSessio
 
 async function runLocked(options: SingleSessionOptions): Promise<SingleSessionResult> {
   const { projectRoot, agent, ramify } = options;
+  const git = options.git ?? gitService;
   const progress = (event: SessionProgress) => {
     try {
       options.onProgress?.(event);
@@ -255,9 +264,9 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
   if (loaded === undefined) return notStarted('No prompt package is loaded for the engineer.');
 
   const views = await iterationApiViews(ramify, projectRoot, initial, [entry.module]);
-  const head = await currentHead(projectRoot);
+  const head = await git.currentHead(projectRoot);
   const guardedFiles = await captureGuardedFiles(projectRoot);
-  const alreadyChanged = await changedPaths(projectRoot).catch(() => [] as string[]);
+  const alreadyChanged = await git.changedPaths(projectRoot).catch(() => [] as string[]);
 
   const id = sessionId();
   const records = join(projectRoot, sessionsDirectory, id);
@@ -309,6 +318,7 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
 
   const observations = await ObservationLog.open(at(sessionLayout.observations));
   const tools = engineerEquipment({
+    commandExecution: options.commandExecution,
     projectRoot,
     ramify,
     commands: policy.commands,
@@ -410,7 +420,7 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
 
   // The session writes, so it holds the writer, and its settlement is the
   // harness's own observation: the session idle and the tree read around it.
-  const writer = new WriterOwnership({ settleMs: limits.writerSettleMs, tree: { changed: () => changedPaths(projectRoot).catch(() => []) } });
+  const writer = new WriterOwnership({ settleMs: limits.writerSettleMs, tree: { changed: () => git.changedPaths(projectRoot).catch(() => []) } });
   writer.acquire(id);
   const started = Date.now();
   let agentSession: AgentSession;
@@ -444,7 +454,7 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
   await recorder.recordGaps(agent);
   await equipment.settle?.().catch(() => undefined);
   const settled = await writer.release(id, agentSession);
-  const snapshot = await recordSettledSnapshot({ projectRoot, changed: () => changedPaths(projectRoot), scope: guarded }, observations);
+  const snapshot = await recordSettledSnapshot({ projectRoot, changed: () => git.changedPaths(projectRoot), scope: guarded }, observations);
 
   const interruption = bounds.interruption ?? (stoppedByCaller ? 'stopped-by-caller' as const : undefined);
   const ended: InvocationOutcome['ended'] = bounds.interruption !== undefined
@@ -465,12 +475,12 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
     } else {
       progress({ type: 'gate-started' });
       const selection = await resolveTestSelection({ projectRoot, index: await refresh(), policy: tests });
-      const attempt = await runCheckpoint({
+      const attempt = await runCheckpoint(options.checkExecution ?? inPlaceCheckExecution, {
         id: gateAttemptId(1),
         checkpoint: 'iteration',
         projectRoot,
         directory: at(sessionLayout.gateOutput),
-        head: await currentHead(projectRoot),
+        head: await git.currentHead(projectRoot),
         policy,
         proposedBy: id,
         subject: {},

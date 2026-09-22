@@ -1,10 +1,15 @@
 import { readFile } from 'node:fs/promises';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { copyFixture } from './helpers/fixture.js';
 import { localDecision, registryChange } from './helpers/placement.js';
 import { addModule, assign, byWork, completionProposed, installMiniRunner, outline, submit, treeInputs, write } from './helpers/iterations.js';
-import { initRepository, onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
+import { onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
+import { accepted, added, answeredGit, modified, unchanged, type CommitResponse } from './helpers/contracts-git.js';
+import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+
+vi.mock('node:child_process', async original =>
+  (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
 import {
   consumerAgainstFake, consumerAgainstReal, consumerStub, consumerTest, contractNeeded, contractWrites,
   established, paths, providerWrites, type Seam,
@@ -25,22 +30,24 @@ import type { RunEvent } from '../run/log.js';
  * keeps its identity and receives the current evidence at its next turn.
  *
  * Nothing here simulates a transition. Every submission goes through the
- * same judge an agent's would, every file is written through the port's own
- * built-ins behind the write guard, and every gate spawns its commands and
- * reads their exit codes.
+ * same judge an agent's would, and every file is written through the port's
+ * own built-ins behind the write guard. Git and the gate's commands are
+ * external: each scenario states the revision Git reports for every commit
+ * the harness attempts, or that the tree was unchanged, and the run's own
+ * records are then read for what it did with those answers.
  */
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
-  for (const cleanup of cleanups.splice(0)) await cleanup();
+  try {
+    for (const cleanup of cleanups.splice(0)) await cleanup();
+    expectNoProcesses();
+  } finally { forgetExternalTools(); }
 });
 
 const notes = 'collection-review/workspace/reviews/notes';
 const notesDirectory = 'subs/workspace/subs/reviews/subs/notes';
 const tags = 'collection-review/workspace/reviews/tags';
-const tagsDirectory = 'subs/workspace/subs/reviews/subs/tags';
-const marks = 'collection-review/workspace/reviews/marks';
-const marksDirectory = 'subs/workspace/subs/reviews/subs/marks';
 const limits = 'collection-review/workspace/reviews/limits';
 const limitsDirectory = 'subs/workspace/subs/reviews/subs/limits';
 
@@ -55,22 +62,11 @@ const forNotes: Seam = {
   reach: '../../limits',
   behavior: 'A note of at most 500 characters is within the limit; a longer one is not.',
 };
-const forTags: Seam = { ...forNotes, consumerDirectory: tagsDirectory, consumerFile: 'tags.ts' };
-const forMarks: Seam = { ...forNotes, consumerDirectory: marksDirectory, consumerFile: 'marks.ts' };
-
-/** Revision 2: the agreement also states that a note is trimmed before the limit applies. */
-const trimming: Seam = {
-  ...forMarks,
-  trims: true,
-  behavior: 'A note is trimmed, and the trimmed note of at most 500 characters is within the limit.',
-};
-
 async function fixtureWith(modules: ReadonlyArray<{ directory: string; name: string; files: Record<string, string> }>) {
   const fixture = await copyFixture();
   cleanups.push(fixture.remove);
   for (const module of modules) await addModule(fixture.root, module.directory, module.name, module.files);
   await installMiniRunner(fixture.root);
-  await initRepository(fixture.root);
   return fixture.root;
 }
 
@@ -82,12 +78,20 @@ function consumerModule(directory: string, name: string, file: string) {
   };
 }
 
-async function run(root: string, plan: Parameters<typeof byWork>[0]) {
-  const opened = await openRuns(root, { script: byWork(plan), inputs: treeInputs() });
+/**
+ * A run whose Git answers are this scenario's own fixture data: the revision
+ * it reports for each commit the harness attempts, or that the tree was
+ * unchanged.
+ */
+async function run(root: string, plan: Parameters<typeof byWork>[0], commits: readonly CommitResponse[]) {
+  const git = answeredGit(root, { head: 'revision-00', commits });
+  const opened = await openRuns(root, {
+    script: byWork(plan), inputs: treeInputs(), git, readinessExecution: directReadinessExecution(),
+  });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('review-notes'));
   await opened.service.settled('review-notes', receipt.jobId);
-  return { ...opened, runId: receipt.jobId };
+  return { ...opened, git, runId: receipt.jobId };
 }
 
 function place(capability: string, owner: string) {
@@ -128,216 +132,7 @@ async function readJson<T>(root: string, runId: string, path: string): Promise<T
   return JSON.parse(await readFile(runPath(root, 'review-notes', runId, path), 'utf8')) as T;
 }
 
-describe('P3: a contract revision reschedules current evidence without resetting completed work', () => {
-  test('two consumers complete revision 1, a third revises it, and the follow-ups finish the run', async () => {
-    const root = await fixtureWith([
-      consumerModule(notesDirectory, 'notes', 'notes.ts'),
-      consumerModule(tagsDirectory, 'tags', 'tags.ts'),
-      consumerModule(marksDirectory, 'marks', 'marks.ts'),
-      { directory: limitsDirectory, name: 'limits', files: {} },
-    ]);
-
-    const { service, runId } = await run(root, {
-      'initial-architect': [submit(analysis([
-        entry('review-notes', notes),
-        entry('review-tags', tags),
-        entry('review-marks', marks),
-      ]))],
-
-      // wi-001, the first consumer: it places the capability, delegates,
-      // waits for the provider and verifies against it.
-      'local-architect:wi-001': [
-        submit({ ...assign(notes, {}, outline()), localDecisions: [place('note-limit', limits)] }),
-        submit(yieldFor(['rq-001'])),
-        submit(assign(notes, { kind: 'verification', goal: 'Replace the fake with the real limit.' })),
-        submit(requestCompletion()),
-      ],
-      'engineer:wi-001': [
-        submit(contractNeeded(forNotes)),
-        submit(completionProposed('The notes now use the real limit.'), write(paths(forNotes).consumer, consumerAgainstReal(forNotes))),
-      ],
-      'contract-engineer:wi-001': [submit(established(forNotes), ...contractWrites(forNotes))],
-
-      // wi-002, the second consumer: it attaches to the agreement in force
-      // and verifies without a provider execution of its own.
-      'local-architect:wi-002': [
-        submit(assign(tags, {}, outline())),
-        submit(assign(tags, { kind: 'verification', goal: 'Replace the fake with the real limit.' })),
-        submit(requestCompletion()),
-      ],
-      'engineer:wi-002': [
-        submit(contractNeeded(forTags)),
-        submit(completionProposed('The tags now use the real limit.'), write(paths(forTags).consumer, consumerAgainstReal(forTags))),
-      ],
-      'contract-engineer:wi-002': [submit(established(forTags), write(paths(forTags).consumer, consumerAgainstFake(forTags)))],
-
-      // wi-003, the third consumer: it attaches, finds that the agreement
-      // does not state what it needs, and revises it.
-      'local-architect:wi-003': [
-        submit(assign(marks, {}, outline())),
-        submit(reviseContract(marks, 'ct-001', 'The agreement says nothing about surrounding space, and this module needs the note trimmed before the limit applies.')),
-        submit(yieldFor(['rq-003'])),
-        submit(assign(marks, { kind: 'verification', goal: 'Replace the fake with the revised real limit.' })),
-        submit(requestCompletion()),
-      ],
-      'engineer:wi-003': [
-        submit(contractNeeded(forMarks)),
-        submit(completionProposed('The marks now use the revised real limit.'), write(paths(trimming).consumer, consumerAgainstReal(trimming))),
-      ],
-      'contract-engineer:wi-003': [
-        submit(established(forMarks), write(paths(forMarks).consumer, consumerAgainstFake(forMarks))),
-        submit(established(trimming), ...contractWrites(trimming)),
-      ],
-
-      // wi-004, the provider of revision 1.
-      'local-architect:wi-004': [
-        submit(assign(limits, {}, outline({ changes: 'Implement the agreed limit.' }))),
-        submit(requestCompletion()),
-      ],
-      'engineer:wi-004': [submit(completionProposed('The real limit is implemented.'), ...providerWrites(forNotes))],
-
-      // wi-005, the provider follow-up of revision 2.
-      'local-architect:wi-005': [
-        submit(assign(limits, {}, outline({ changes: 'Implement the trimming the revised agreement states.' }))),
-        submit(requestCompletion()),
-      ],
-      'engineer:wi-005': [submit(completionProposed('The real limit trims before it measures.'), ...providerWrites(trimming))],
-
-      // wi-006 and wi-007, the consumer follow-ups of the two completed items.
-      'local-architect:wi-006': [
-        submit(assign(notes, { kind: 'verification', goal: 'Verify the notes against the revised limit.' }, outline({ changes: 'The revised limit trims first.' }))),
-        submit(requestCompletion()),
-      ],
-      'engineer:wi-006': [submit(
-        completionProposed('The notes follow the revised limit.'),
-        write(paths(forNotes).consumer, consumerAgainstReal({ ...forNotes, trims: true })),
-      )],
-      'local-architect:wi-007': [
-        submit(assign(tags, { kind: 'verification', goal: 'Verify the tags against the revised limit.' }, outline({ changes: 'The revised limit trims first.' }))),
-        submit(requestCompletion()),
-      ],
-      'engineer:wi-007': [submit(
-        completionProposed('The tags follow the revised limit.'),
-        write(paths(forTags).consumer, consumerAgainstReal({ ...forTags, trims: true })),
-      )],
-    });
-
-    expect(onlyRun(service, 'review-notes').failure).toBeNull();
-    expect(onlyRun(service, 'review-notes').state).toBe('completed');
-    const log = await events(root, runId);
-    const types = log.map(event => event.type);
-
-    // One agreement, registered three times at revision 1 — once
-    // established and twice attached — and reopened once.
-    expect(log.filter(event => event.type === 'contract-registered')).toHaveLength(3);
-    const reopenings = log.filter(event => event.type === 'evidence-reopened');
-    expect(reopenings).toHaveLength(1);
-    const reopened = reopenings[0]!;
-    expect(reopened.data).toMatchObject({
-      contract: 'ct-001',
-      revision: 2,
-      obligation: 'ob-ct-001',
-      requirements: ['rq-001', 'rq-002', 'rq-003'],
-      iteration: 'wi-003.i03',
-      superseded: [],
-    });
-
-    // Every new subject revision is bound to the work item responsible for
-    // it: the three that had completed are followed, and the one that has
-    // not finished keeps its identity.
-    expect(reopened.data.bindings.map(binding => [binding.subject.id, binding.subject.revision, binding.workItem])).toEqual([
-      ['ob-ct-001', 2, 'wi-005'],
-      ['rq-001', 2, 'wi-006'],
-      ['rq-002', 2, 'wi-007'],
-      ['rq-003', 2, 'wi-003'],
-    ]);
-    expect(reopened.data.followUps).toEqual([
-      { workItem: 'wi-005', follows: 'wi-004' },
-      { workItem: 'wi-006', follows: 'wi-001' },
-      { workItem: 'wi-007', follows: 'wi-002' },
-    ]);
-
-    // The prior records stay as they are: revision 1 is still revision 1,
-    // and revision 2 is a file of its own.
-    const first = await readJson<ContractRecord>(root, runId, contractsLayout.contract('ct-001', 1));
-    const second = await readJson<ContractRecord>(root, runId, contractsLayout.contract('ct-001', 2));
-    expect(first.revision).toBe(1);
-    expect(first.behavior).toBe(forNotes.behavior);
-    expect(first.establishedBy.iteration).toBe('wi-001.i02');
-    expect(second.revision).toBe(2);
-    expect(second.behavior).toBe(trimming.behavior);
-    expect(second.establishedBy.iteration).toBe('wi-003.i03');
-    expect(second.artifacts.interface[0]!.exports).toContain('NoteLimitTrimCases');
-    expect(second.artifacts.fake[0]!.hash).not.toBe(first.artifacts.fake[0]!.hash);
-
-    const obligation = await readJson<ProviderObligation>(root, runId, contractsLayout.obligation('ob-ct-001', 2));
-    expect(obligation.revision).toBe(2);
-    const carried = await readJson<ConsumerRequirement>(root, runId, contractsLayout.requirement('rq-001', 2));
-    // The requirement keeps its identity and its original consumer item
-    // across the revision; the binding is what moved.
-    expect(carried).toMatchObject({ id: 'rq-001', revision: 2, workItem: 'wi-001', consumer: notes, contractRevision: 2 });
-
-    // Earlier completions stay historical: each of the three items that
-    // completed at revision 1 completed once, before the reopening.
-    const completions = log.filter(event => event.type === 'work-item-completed').map(event => event.data.workItem);
-    // The provider follow-up runs before any consumer verification, so the
-    // consumer that was yielded across the revision completes after it.
-    expect(completions).toEqual(['wi-004', 'wi-001', 'wi-002', 'wi-005', 'wi-003', 'wi-006', 'wi-007']);
-    expect(types.indexOf('evidence-reopened')).toBeGreaterThan(
-      log.findIndex(event => event.type === 'work-item-completed' && event.data.workItem === 'wi-002'));
-
-    // Old evidence cannot satisfy revision 2: every requirement is verified
-    // once at each revision, and the run did not complete on the first.
-    const verified = log.filter(event => event.type === 'requirement-verified')
-      .map(event => `${event.data.requirement}@${event.data.revision}`);
-    expect(verified).toEqual(['rq-001@1', 'rq-002@1', 'rq-003@2', 'rq-001@2', 'rq-002@2']);
-
-    // Provider work precedes consumer verification, including when every
-    // previous item had completed.
-    const conformed = log.filter(event => event.type === 'provider-conformed')
-      .map(event => `${event.data.obligation}@${event.data.revision}`);
-    expect(conformed).toEqual(['ob-ct-001@1', 'ob-ct-001@2']);
-    const providerDone = log.findIndex(event => event.type === 'work-item-completed' && event.data.workItem === 'wi-005');
-    for (const follower of ['wi-006', 'wi-007']) {
-      expect(log.findIndex(event => event.type === 'work-item-started' && event.data.workItem === follower))
-        .toBeGreaterThan(providerDone);
-    }
-
-    // The follow-ups are work items of their own, following the items that
-    // completed, and they carry those items' plan references.
-    const followUp = await readJson<WorkItem>(root, runId, workLayout.item('wi-006'));
-    expect(followUp).toMatchObject({ module: notes, follows: 'wi-001', startedFor: 'wi-003' });
-    expect(followUp.origin).toEqual({ verification: { id: 'rq-001', revision: 2, hash: expect.any(String) } });
-    expect(followUp.requirementRefs).toEqual([{ anchor: 'Request' }]);
-    const providerFollowUp = await readJson<WorkItem>(root, runId, workLayout.item('wi-005'));
-    expect(providerFollowUp).toMatchObject({ module: limits, follows: 'wi-004' });
-
-    // The follow-up's own assignment carries the current evidence, and the
-    // completion check reads the binding rather than the requirement's
-    // original work item.
-    const followUpAssignment = await readJson<IterationAssignment>(root, runId, iterationLayout.assignment('wi-006', 1));
-    expect(followUpAssignment.kind).toBe('verification');
-    expect(followUpAssignment.evidenceObligations).toEqual([{
-      requirement: { id: 'rq-001', revision: 2, hash: expect.any(String) },
-      suite: [paths(trimming).conformance],
-      against: 'real',
-    }]);
-
-    // Nothing is duplicated: seven work items, one obligation revision per
-    // contract revision, and one registration per attachment.
-    expect(log.filter(event => event.type === 'work-item-started')).toHaveLength(7);
-    expect(onlyRun(service, 'review-notes').counts.openRequirements).toBe(0);
-    expect(onlyRun(service, 'review-notes').notices).toEqual([]);
-
-    // The tree the run left: every consumer on the real provider, which
-    // trims before it measures.
-    for (const seam of [forNotes, forTags, forMarks]) {
-      const source = await readFile(`${root}/${paths(seam).consumer}`, 'utf8');
-      expect(source).not.toContain('Fake');
-      expect(source).toContain('rule.trim(note)');
-    }
-  }, 900_000);
-});
+// P3 is exercised with scripted external tools in contract-revision-scripted.test.ts.
 
 describe('P4: an ordinary provider engineer reports inability to conform through its own submission union', () => {
   const agreed: Seam = { ...forNotes, behavior: 'A note of at most 500 characters is within the limit.' };
@@ -353,7 +148,8 @@ describe('P4: an ordinary provider engineer reports inability to conform through
       { directory: limitsDirectory, name: 'limits', files: {} },
     ]);
 
-    const { service, runId } = await run(root, {
+    const seam = paths(agreed);
+    const { service, runId, git } = await run(root, {
       'initial-architect': [submit(analysis([entry('review-notes', notes)]))],
       'local-architect:wi-001': [
         submit({ ...assign(notes, {}, outline()), localDecisions: [place('note-limit', limits)] }),
@@ -385,7 +181,18 @@ describe('P4: an ordinary provider engineer reports inability to conform through
         }),
         submit(completionProposed('The real limit is implemented at the revised length.'), ...providerWrites(relaxed)),
       ],
-    });
+    }, [
+      // The agreement's files when it is established, the same files again
+      // when it is revised, the provider's when it implements the revision,
+      // and the consumer's when it moves off the fake.
+      accepted('wi-001.i02', 'revision-01', [...added(seam.contract, seam.fake, seam.subjects, seam.conformance), ...modified(seam.consumer)]),
+      accepted('wi-001.i03', 'revision-02', modified(seam.contract, seam.fake, seam.subjects, seam.conformance, seam.consumer)),
+      accepted('wi-002.i02', 'revision-03', [...added(seam.real), ...modified(seam.subjects)]),
+      unchanged('wi-002'),
+      accepted('wi-001.i04', 'revision-04', modified(seam.consumer)),
+      unchanged('wi-001'),
+      unchanged('final verification of plan "review-notes"'),
+    ]);
 
     expect(onlyRun(service, 'review-notes').failure).toBeNull();
     expect(onlyRun(service, 'review-notes').state).toBe('completed');
@@ -462,7 +269,20 @@ describe('P4: an ordinary provider engineer reports inability to conform through
     expect(log.filter(event => event.type === 'provider-conformed').map(event => event.data.revision)).toEqual([2]);
     expect(log.filter(event => event.type === 'requirement-verified').map(event => event.data.revision)).toEqual([2]);
     expect(onlyRun(service, 'review-notes').counts.openRequirements).toBe(0);
-  }, 900_000);
+
+    // The revision was committed as a change of its own, after the agreement
+    // it revises: the run made four commits on its own branch, and the gates
+    // that followed them without a write of their own changed nothing.
+    expect(git.branch()).toBe(`ramify-agent/run-${runId}`);
+    expect(git.minted()).toEqual(['revision-01', 'revision-02', 'revision-03', 'revision-04']);
+    expect(git.subjects().slice(0, 2).map(subject => subject.split(':')[0])).toEqual(['wi-001.i02', 'wi-001.i03']);
+    // Each commit was made over the revision the one before it was accepted
+    // at: the boundary the run observed against advanced once per accepted
+    // attempt, and the revision never reset it.
+    expect(git.bases('changedEntries')).toEqual(['revision-00', 'revision-01', 'revision-02', 'revision-03']);
+    expect(git.bases('diffNameStatus')).toEqual(['revision-00', 'revision-01', 'revision-02', 'revision-03']);
+    git.assertAnswered();
+  }, 60_000);
 
   test('a second report at the same obligation revision fails the run rather than asking again', async () => {
     const root = await fixtureWith([
@@ -470,7 +290,8 @@ describe('P4: an ordinary provider engineer reports inability to conform through
       { directory: limitsDirectory, name: 'limits', files: {} },
     ]);
 
-    const { service, runId } = await run(root, {
+    const seam = paths(agreed);
+    const { service, runId, git } = await run(root, {
       'initial-architect': [submit(analysis([entry('review-notes', notes)]))],
       'local-architect:wi-001': [
         submit({ ...assign(notes, {}, outline()), localDecisions: [place('note-limit', limits)] }),
@@ -489,7 +310,12 @@ describe('P4: an ordinary provider engineer reports inability to conform through
         reason: 'provider-cannot-conform',
         detail: 'The agreed suite requires a length the store cannot index.',
       })],
-    });
+    }, [
+      // Only the agreement was ever committed. The provider reported that it
+      // could not conform and wrote nothing, and the run failed before any
+      // further gate.
+      accepted('wi-001.i02', 'revision-01', [...added(seam.contract, seam.fake, seam.subjects, seam.conformance), ...modified(seam.consumer)]),
+    ]);
 
     const snapshot = onlyRun(service, 'review-notes');
     expect(snapshot.state).toBe('failed');
@@ -502,7 +328,12 @@ describe('P4: an ordinary provider engineer reports inability to conform through
     expect(log.filter(event => event.type === 'revision-needed')).toHaveLength(1);
     expect(log.map(event => event.type)).not.toContain('evidence-reopened');
     expect(log.at(-1)!.type).toBe('job-failed');
-  }, 900_000);
+
+    // The failing run committed the agreement it did establish, and nothing
+    // after it: a failure is not a rewind.
+    expect(git.minted()).toEqual(['revision-01']);
+    git.assertAnswered();
+  }, 60_000);
 });
 
 describe('the reopening is derived, and it supersedes what the previous revision assigned', () => {

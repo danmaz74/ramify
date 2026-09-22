@@ -3,7 +3,7 @@ module ledger
 
 // One flushed append is one transaction; record files are materialized copies
 // of the log; an external effect goes from intent to completion under a key.
-expose-src Ledger, openLedger, OpenLedgerOptions, LedgerEntry, RecordSchema, Transaction, RecordBody, RecordRead, LedgerCorruptError from "ledger.ts" to parent
+expose-src Ledger, LedgerEntry, RecordSchema, openLedger, OpenLedgerOptions, Transaction, RecordBody, RecordRead, LedgerCorruptError from "ledger.ts" to parent
 expose-src EffectSpec, PendingEffect from "effects.ts" to parent
 expose-src LedgerFileSystem, LedgerFileHandle, LedgerOpenFlags from "fs.ts" to parent
 expose-src writeFileAtomic, writeFileExclusive, syncDirectory, ExclusiveWrite from "atomic.ts" to parent

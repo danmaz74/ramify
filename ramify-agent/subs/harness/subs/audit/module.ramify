@@ -1,0 +1,7 @@
+ramify 1
+module audit
+
+// The audit library and its evidence model stay behind this boundary. The
+// parent receives only its own check-execution implementation and the durable
+// workspace-ownership callback contract. No ramify-audit type crosses.
+expose-src createAuditCheckExecution, AuditCheckExecutionOptions, AuditWorkspaceOwnershipRecorder, IntendedAuditWorkspace from "check-execution.ts" to parent

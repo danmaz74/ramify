@@ -1,5 +1,7 @@
+import { openUnchangedRuns as openRuns, assertUnchangedGit } from './helpers/unchanged-run.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { readFile } from 'node:fs/promises';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { ArchitectIndex } from '../../subs/evidence/src/views.js';
 import { architectIndex, moduleEntry } from './helpers/views.js';
 import { describePlan, initialAnalysisJsonSchema, initialAnalysisToolName, validateInitialAnalysis } from '../analysis/submission.js';
@@ -7,7 +9,7 @@ import { extensionIsANewForecast } from '../analysis/records.js';
 import { runLayout, type InvocationOutcome } from '../run/records.js';
 import { loadPromptPackages } from '../prompts/packages.js';
 import { copyFixture } from './helpers/fixture.js';
-import { emptyAnalysis, initRepository, installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
+import { emptyAnalysis, installTestRunner, onlyRun, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 
 /*
  * Everything the initial architect tells the harness is validated JSON: the
@@ -16,9 +18,13 @@ import { emptyAnalysis, initRepository, installTestRunner, onlyRun, openRuns, ru
  * the bound ends the invocation as `invalid-submission`.
  */
 
+vi.mock('node:child_process', async original =>
+  (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
+
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
+  try { assertUnchangedGit(); expectNoProcesses(); } finally { forgetExternalTools(); }
 });
 
 /** A small project, as the architect view records it. */
@@ -244,12 +250,14 @@ describe('the rules the schema cannot hold', () => {
 });
 
 describe('a rejected submission in a run', () => {
-  async function run(inputs: unknown[]) {
+  async function run(inputs: unknown[], unchangedCheckpoints: readonly string[] = []) {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
     await installTestRunner(fixture.root);
-    await initRepository(fixture.root);
-    const { service, agent } = await openRuns(fixture.root, { script: inputs.map(input => ({ kind: 'submit' as const, input })) });
+      const { service, agent } = await openRuns(fixture.root, {
+        script: inputs.map(input => ({ kind: 'submit' as const, input })),
+        unchangedCheckpoints,
+      });
     cleanups.push(() => service.close());
     const receipt = await service.execute(startRun('review-notes'));
     await service.settled('review-notes', receipt.jobId);
@@ -257,7 +265,10 @@ describe('a rejected submission in a run', () => {
   }
 
   test('every error goes back to the same session, and a corrected input is accepted', async () => {
-    const { root, runId, service, agent } = await run([{ entries: 'none', hypotheses: [], coverageLimits: [] }, emptyAnalysis()]);
+    const { root, runId, service, agent } = await run(
+      [{ entries: 'none', hypotheses: [], coverageLimits: [] }, emptyAnalysis()],
+      ['final verification of plan "review-notes"'],
+    );
 
     expect(onlyRun(service, 'review-notes').state).toBe('completed');
     const verdicts = agent!.sessions[0]!.verdicts;
@@ -333,12 +344,12 @@ describe('a rejected submission in a run', () => {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
     await installTestRunner(fixture.root);
-    await initRepository(fixture.root);
-    const { service, agent } = await openRuns(fixture.root, {
+      const { service, agent } = await openRuns(fixture.root, {
       script: [
         { kind: 'tool', tool: initialAnalysisToolName, input: { entries: 7 }, reachedTool: false },
         { kind: 'submit', input: emptyAnalysis() },
       ],
+      unchangedCheckpoints: ['final verification of plan "review-notes"'],
     });
     cleanups.push(() => service.close());
     const receipt = await service.execute(startRun('review-notes'));

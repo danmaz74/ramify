@@ -1,6 +1,8 @@
+import { openUnchangedRuns as openRuns, assertUnchangedGit } from './helpers/unchanged-run.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { SessionSpec } from '../../subs/agent/src/interfaces/port.js';
 import { analysisLayout } from '../analysis/records.js';
 import { workLayout } from '../work/records.js';
@@ -8,7 +10,7 @@ import { runLayout } from '../run/records.js';
 import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, hypothesis, requestCompletion, unresolved } from './helpers/analysis.js';
 import {
-  initRepository, installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRun, testPolicy,
+  installTestRunner, onlyRun, runEventsOnDisk, runPath, startRun, testPolicy,
 } from './helpers/runs.js';
 
 /*
@@ -22,9 +24,13 @@ import {
  * the gate is what says so. The architect's submission asks; it never states.
  */
 
+vi.mock('node:child_process', async original =>
+  (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
+
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
+  try { assertUnchangedGit(); expectNoProcesses(); } finally { forgetExternalTools(); }
 });
 
 /** A copy of the fixture project, made a git repository with the runner readiness looks for. */
@@ -32,12 +38,13 @@ async function target(): Promise<string> {
   const fixture = await copyFixture();
   cleanups.push(fixture.remove);
   await installTestRunner(fixture.root);
-  await initRepository(fixture.root);
   return fixture.root;
 }
 
 const root = 'collection-review';
 const reviews = 'collection-review/workspace/reviews';
+const twoWorkItemCheckpoints = ['wi-001', 'wi-002', 'final verification of plan "review-notes"'] as const;
+const oneWorkItemCheckpoints = ['wi-001', 'final verification of plan "review-notes"'] as const;
 
 /** The scripted fake, answering each role with its own submission. */
 function script(initial: unknown, local: (spec: SessionSpec) => unknown) {
@@ -59,7 +66,10 @@ describe('a run whose work items need no change', () => {
         hypothesis('note-rendering', { change: 'create', suggestedOwner: root, anticipatedConsumers: ['note-in-panel'] })],
       ['the view reports no dependency facts for this fixture'],
     );
-    const { service } = await openRuns(project, { script: script(submitted, () => requestCompletion()) });
+    const { service } = await openRuns(project, {
+      script: script(submitted, () => requestCompletion()),
+      unchangedCheckpoints: twoWorkItemCheckpoints,
+    });
     cleanups.push(() => service.close());
 
     const receipt = await service.execute(startRun('review-notes'));
@@ -74,10 +84,10 @@ describe('a run whose work items need no change', () => {
       'job-started', 'invocation-started', 'invocation-ended', 'analysis-accepted',
       'readiness-passed',
       'work-item-started', 'hypotheses-delivered', 'invocation-started', 'invocation-ended',
-      'outline-revised', 'gate-attempted', 'gate-committed', 'work-item-completed',
+      'outline-revised', 'gate-committing', 'gate-attempted', 'work-item-completed',
       'work-item-started', 'hypotheses-delivered', 'invocation-started', 'invocation-ended',
-      'outline-revised', 'gate-attempted', 'gate-committed', 'work-item-completed',
-      'gate-attempted', 'gate-committed', 'job-completed',
+      'outline-revised', 'gate-committing', 'gate-attempted', 'work-item-completed',
+      'gate-committing', 'gate-attempted', 'job-completed',
     ]);
 
     // One event holds every record of the analysis phase.
@@ -114,7 +124,10 @@ describe('a run whose work items need no change', () => {
         hypothesis('note-transport', { suggestedOwner: root }),
         hypothesis('note-rendering', { anticipatedConsumers: [root] })],
     );
-    const { service } = await openRuns(project, { script: script(submitted, () => requestCompletion()) });
+    const { service } = await openRuns(project, {
+      script: script(submitted, () => requestCompletion()),
+      unchangedCheckpoints: twoWorkItemCheckpoints,
+    });
     cleanups.push(() => service.close());
     const receipt = await service.execute(startRun('review-notes'));
     await service.settled('review-notes', receipt.jobId);
@@ -176,7 +189,10 @@ describe('a run whose work items need no change', () => {
         hypothesis('elsewhere', { suggestedOwner: root }),
       ],
     );
-    const { service } = await openRuns(project, { script: script(submitted, () => requestCompletion()) });
+    const { service } = await openRuns(project, {
+      script: script(submitted, () => requestCompletion()),
+      unchangedCheckpoints: twoWorkItemCheckpoints,
+    });
     cleanups.push(() => service.close());
     const receipt = await service.execute(startRun('review-notes'));
     await service.settled('review-notes', receipt.jobId);
@@ -204,7 +220,10 @@ describe('a run whose work items need no change', () => {
   test('the delivered hash is the hash of the materialized record file', async () => {
     const project = await target();
     const submitted = analysis([entry('reviewer-note', reviews)], [hypothesis('owned-here', { suggestedOwner: reviews })]);
-    const { service } = await openRuns(project, { script: script(submitted, () => requestCompletion()) });
+    const { service } = await openRuns(project, {
+      script: script(submitted, () => requestCompletion()),
+      unchangedCheckpoints: oneWorkItemCheckpoints,
+    });
     cleanups.push(() => service.close());
     const receipt = await service.execute(startRun('review-notes'));
     await service.settled('review-notes', receipt.jobId);
@@ -220,12 +239,15 @@ describe('a run whose work items need no change', () => {
 describe('a work-item gate that does not pass', () => {
   test('returns to the same local architect, which revises its outline, and exhausts deterministically', async () => {
     const project = await target();
-    const counter = `${project}.tests`;
     const submitted = analysis([entry('reviewer-note', reviews)]);
     let turn = 0;
     const { service, agent } = await openRuns(project, {
-      // The project's tests pass at readiness and fail from the second run on.
-      policy: projectRoot => testPolicy(projectRoot, { testsFailFrom: { run: 2, counter } }),
+      // Readiness passes; every work-item attempt receives the same completed
+      // test failure from the direct executor.
+      checkScript: ({ check, context }) => context.checkpoint === 'work-item' && check.kind === 'tests'
+        ? { outcome: { kind: 'completed', exitCode: 1 } }
+        : {},
+      unchangedCheckpoints: ['wi-001', 'wi-001', 'wi-001', 'wi-001'],
       script: (spec: SessionSpec) => {
         if (spec.role === 'initial-architect') return [{ kind: 'submit' as const, input: submitted }];
         turn += 1;
@@ -247,8 +269,9 @@ describe('a work-item gate that does not pass', () => {
     const gates = events.filter(event => event.type === 'gate-attempted').filter(event => event.data.checkpoint === 'work-item');
     expect(gates).toHaveLength(4);
     expect(gates.every(event => event.data.verdict === 'failed')).toBe(true);
-    // A failing gate commits nothing.
-    expect(events.filter(event => event.type === 'gate-committed')).toHaveLength(0);
+    // Every verified changed attempt is committed before its exact revision is
+    // audited, including a failing attempt that will be repaired next.
+    expect(events.filter(event => event.type === 'gate-committing')).toHaveLength(4);
 
     // Four outline revisions, each from its own invocation of the same session.
     const outlines = events.filter(event => event.type === 'outline-revised');

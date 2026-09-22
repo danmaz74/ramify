@@ -116,8 +116,8 @@ describe('nested-package discovery', () => {
 
 describe('the checkpoint policy', () => {
   test('readiness and the final gate require all project tests; only the final one commits', () => {
-    expect(checkpointPolicies.readiness).toEqual({ selection: 'all-project', nestedTests: true, commitOnPass: false });
-    expect(checkpointPolicies.final).toEqual({ selection: 'all-project', nestedTests: false, commitOnPass: true });
+    expect(checkpointPolicies.readiness).toEqual({ selection: 'all-project', nestedTests: true, committing: false });
+    expect(checkpointPolicies.final).toEqual({ selection: 'all-project', nestedTests: false, committing: true });
     expect(checkpointPolicies.iteration.selection).toBe('owned-by-scope');
   });
 

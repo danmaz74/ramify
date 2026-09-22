@@ -1,6 +1,6 @@
 import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { checkCommand } from '../checks/records.js';
 import type { GateAttempt } from '../checks/records.js';
 import { iterationLayout, type IterationResult } from '../work/iterations.js';
@@ -9,7 +9,13 @@ import { runLayout } from '../run/records.js';
 import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { addModule, assign, byRole, completionProposed, edit, installMiniRunner, outline, submit, treeInputs } from './helpers/iterations.js';
-import { git, initRepository, onlyRun, openRuns, runEventsOnDisk, runPath, startRun, testPolicy } from './helpers/runs.js';
+import { onlyRun, openRuns, runEventsOnDisk, runPath, startRun, testPolicy } from './helpers/runs.js';
+import { createMappedCheckExecution, type DirectCheckInvocation, type DirectCheckStep } from './helpers/direct-check-execution.js';
+import { accepted, answeredGit, modified, unchanged } from './helpers/contracts-git.js';
+import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+
+vi.mock('node:child_process', async original =>
+  (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
 
 /*
  * Nothing already complete is reopened.
@@ -24,11 +30,18 @@ import { git, initRepository, onlyRun, openRuns, runEventsOnDisk, runPath, start
  * the work item's own gate runs the whole project beside that assignment's
  * own selection, and a failure that only the whole project sees returns to
  * the local architect rather than to the engineer.
+ *
+ * Which files each gate selects is the harness's own work over the tree.
+ * What the runner reports for them, and what Git reports for each commit,
+ * are this file's data: an external answer, never a simulated repository.
  */
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
-  for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
+  try {
+    for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
+    expectNoProcesses();
+  } finally { forgetExternalTools(); }
 });
 
 const reviews = 'collection-review/workspace/reviews';
@@ -79,7 +92,6 @@ async function target() {
     'src/tests/alerts.test.ts': alertsTest,
   });
   await installMiniRunner(fixture.root);
-  await initRepository(fixture.root);
   return fixture.root;
 }
 
@@ -97,9 +109,10 @@ const repairTheAlert = submit(
 );
 
 /**
- * A policy whose whole-project test command really runs both modules' tests.
- * The fixture's own suite needs dependencies this copy does not install, so
- * the project's runner is pointed at the files this test wrote.
+ * A policy whose whole-project test command names both modules' tests. The
+ * runner itself is answered rather than run: what each command result is, is
+ * this scenario's own data, and the selection each gate resolves is the
+ * harness's own work over the tree.
  */
 function wholeProject(projectRoot: string) {
   const base = testPolicy(projectRoot);
@@ -116,6 +129,35 @@ function wholeProject(projectRoot: string) {
   };
 }
 
+/** What the project's runner reports where the alerts module's own test fails. */
+const alertsFailed: DirectCheckStep = {
+  outcome: { kind: 'completed', exitCode: 1 },
+  stdout: [
+    `FAIL ${alertsDirectory}/src/tests/alerts.test.ts > an alert covers a hundred characters of a note`,
+    'expected 400 to be 500',
+    '',
+    'Test Files  1 failed | 1 passed (2)',
+    '',
+  ].join('\n'),
+};
+
+/** What it reports where the notes module's own test still states the old limit. */
+const notesFailed: DirectCheckStep = {
+  outcome: { kind: 'completed', exitCode: 1 },
+  stdout: [
+    `FAIL ${notesDirectory}/src/tests/notes.test.ts > a note is as long as the plan allows`,
+    'expected 500 to be 400',
+    '',
+    'Test Files  1 failed (1)',
+    '',
+  ].join('\n'),
+};
+
+/** The whole-project test command, as against the assignment's own selection. */
+function isProjectTests(invocation: DirectCheckInvocation): boolean {
+  return invocation.check.kind === 'tests' && invocation.check.attribution === 'project';
+}
+
 async function readResult(root: string, runId: string, workItem: string, number: number): Promise<IterationResult> {
   return JSON.parse(await readFile(runPath(root, 'review-notes', runId, iterationLayout.result(workItem, number)), 'utf8')) as IterationResult;
 }
@@ -127,6 +169,35 @@ async function readGate(root: string, runId: string, id: string): Promise<GateAt
 describe('K2: a failure outside the last engineer\'s scope', () => {
   test('the work-item gate returns it to the local architect, who assigns the owner that failed', async () => {
     const root = await target();
+
+    /*
+     * The raised note limit breaks the alerts module, which is not the
+     * assignment's own. The project's runner reports that failure until the
+     * repair iteration has run the alerts module's own test, and the
+     * assignment's own selection passes throughout.
+     */
+    let repaired = false;
+    const checkExecution = createMappedCheckExecution({
+      script: invocation => {
+        const selection = invocation.check.selection?.resolved ?? [];
+        if (selection.some(path => path.startsWith(alertsDirectory))) { repaired = true; return {}; }
+        return isProjectTests(invocation) && !repaired ? alertsFailed : {};
+      },
+    });
+    const git = answeredGit(root, {
+      head: 'revision-00',
+      commits: [
+        accepted('wi-001.i01', 'revision-01', modified(`${notesDirectory}/src/notes.ts`, `${notesDirectory}/src/tests/notes.test.ts`)),
+        // The work-item gate that failed outside the assignment wrote
+        // nothing of its own, and neither did the one that passed after the
+        // repair had been committed.
+        unchanged('wi-001'),
+        accepted('wi-001.i02', 'revision-02', modified(`${alertsDirectory}/src/alerts.ts`)),
+        unchanged('wi-001'),
+        unchanged('wi-002'),
+        unchanged('final verification of plan "review-notes"'),
+      ],
+    });
     const opened = await openRuns(root, {
       script: byRole({
         'initial-architect': [submit(analysis([entry('review-note', notes), entry('review-alert', alerts)]))],
@@ -145,6 +216,9 @@ describe('K2: a failure outside the last engineer\'s scope', () => {
       }),
       inputs: treeInputs(),
       policy: wholeProject,
+      checkExecution,
+      readinessExecution: directReadinessExecution(),
+      git,
     });
     cleanups.push(() => opened.service.close());
     const receipt = await opened.service.execute(startRun('review-notes'));
@@ -178,12 +252,54 @@ describe('K2: a failure outside the last engineer\'s scope', () => {
     expect(repair.scope.base.module).toBe(alerts);
     expect(workItemGates.at(-1)!.verdict).toBe('passed');
     expect(await readFile(join(root, alertsDirectory, 'src', 'alerts.ts'), 'utf8')).toBe('export const alertsLimit = 5;\n');
-  }, 300_000);
+
+    // The attempt that failed outside the assignment still committed what
+    // the assignment wrote, and the repair was a commit of its own over it.
+    expect(git.minted()).toEqual(['revision-01', 'revision-02']);
+    expect(returned.commit).toBeNull();
+    expect(returned.head).toBe('revision-01');
+
+    // The boundary the run observed against moved when the iteration was
+    // accepted, and not when the work-item gate failed over it.
+    expect(git.bases('changedEntries')).toEqual(['revision-00', 'revision-01']);
+    expect(git.bases('diffNameStatus')).toEqual(['revision-00', 'revision-01']);
+    expect(git.bases('changedPaths').at(-1)).toBe('revision-01');
+    git.assertAnswered();
+  }, 60_000);
 });
 
 describe('adding work leaves every completed piece completed', () => {
   test('a second iteration, a repair round and a second work item rewrite nothing', async () => {
     const root = await target();
+
+    /*
+     * The first attempt raised the limit in the source and not in the test
+     * that states it, so the assignment's own selection fails once. Every
+     * later command passes: the repair states the new limit in the test, and
+     * the second iteration raises the alert the limit broke.
+     */
+    let firstSelection = true;
+    const checkExecution = createMappedCheckExecution({
+      script: invocation => {
+        if (invocation.check.kind !== 'tests' || invocation.check.attribution !== 'in-scope') return {};
+        if (!firstSelection) return {};
+        firstSelection = false;
+        return notesFailed;
+      },
+    });
+    const git = answeredGit(root, {
+      head: 'revision-00',
+      commits: [
+        // The failed attempt's own commit, the repaired attempt beside it,
+        // and the second iteration after them.
+        accepted('wi-001.i01', 'revision-01', modified(`${notesDirectory}/src/notes.ts`)),
+        accepted('wi-001.i01', 'revision-02', modified(`${notesDirectory}/src/tests/notes.test.ts`)),
+        accepted('wi-001.i02', 'revision-03', modified(`${alertsDirectory}/src/alerts.ts`)),
+        unchanged('wi-001'),
+        unchanged('wi-002'),
+        unchanged('final verification of plan "review-notes"'),
+      ],
+    });
     const opened = await openRuns(root, {
       script: byRole({
         'initial-architect': [submit(analysis([entry('review-note', notes), entry('review-alert', alerts)]))],
@@ -204,6 +320,9 @@ describe('adding work leaves every completed piece completed', () => {
       }),
       inputs: treeInputs(),
       policy: wholeProject,
+      checkExecution,
+      readinessExecution: directReadinessExecution(),
+      git,
       afterWrite: async (write, runId) => {
         // The moment the first iteration closes, the shape of everything it
         // wrote is taken; nothing that follows may change any of it.
@@ -242,18 +361,30 @@ describe('adding work leaves every completed piece completed', () => {
     expect((await readResult(root, runId, 'wi-001', 1)).outcome).toBe('accepted');
     expect((await readResult(root, runId, 'wi-001', 2)).outcome).toBe('accepted');
 
-    // The commit the first iteration made is still on the branch, and the
-    // second iteration added its own beside it.
-    const log = await git(root, 'log', '--format=%H%x1f%B%x1e', `ramify-agent/run-${runId}`);
-    const commits = log.split('\u001e').map(part => part.trim()).filter(Boolean);
-    expect(commits.filter(commit => commit.includes('Ramify-Iteration: wi-001.i01'))).toHaveLength(1);
-    expect(commits.filter(commit => commit.includes('Ramify-Iteration: wi-001.i02'))).toHaveLength(1);
-    expect((await readResult(root, runId, 'wi-001', 1)).commit).not.toBeNull();
+    // The first iteration's failed attempt and repaired attempt were each
+    // committed, and the second iteration added its own beside them: three
+    // revisions, none of them replacing another.
+    expect(git.branch()).toBe(`ramify-agent/run-${runId}`);
+    const committed = git.messages();
+    expect(committed.filter(message => message.includes('Ramify-Iteration: wi-001.i01'))).toHaveLength(2);
+    expect(committed.filter(message => message.includes('Ramify-Iteration: wi-001.i02'))).toHaveLength(1);
+    expect(committed.every(message => message.includes(`Ramify-Run: ${runId}`))).toBe(true);
+    expect(git.minted()).toEqual(['revision-01', 'revision-02', 'revision-03']);
+    expect((await readResult(root, runId, 'wi-001', 1)).commit).toBe('revision-02');
+
+    // The failed attempt's own revision never became the boundary: every
+    // observation was taken against the revision the run started from until
+    // the repaired attempt was accepted, and against that one afterwards.
+    expect(git.bases('changedPaths')).not.toContain('revision-01');
+    expect(git.bases('changedPaths').at(-1)).toBe('revision-02');
+    expect(git.bases('changedEntries')).toEqual(['revision-00', 'revision-00', 'revision-02']);
+    expect(git.bases('diffNameStatus')).toEqual(['revision-00', 'revision-02']);
+    git.assertAnswered();
 
     // The work item that was closed first stays closed while the second runs.
     const closed = events.map((event, index) => ({ event, index })).filter(item => item.event.type === 'work-item-completed');
     const started = events.map((event, index) => ({ event, index })).filter(item => item.event.type === 'work-item-started');
     expect(closed[0]!.index).toBeLessThan(started[1]!.index);
     expect(events.filter(event => event.type === 'work-item-started' && (event.data as { workItem: string }).workItem === 'wi-001')).toHaveLength(1);
-  }, 300_000);
+  }, 60_000);
 });

@@ -8,6 +8,7 @@ import { nodeProcessGroups, WriterBlockedError, WriterOwnership } from '../run/w
 import { runLayout, type InvocationOutcome } from '../run/records.js';
 import { copyFixture, temporaryDirectory } from './helpers/fixture.js';
 import { emptyAnalysis, initRepository, installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
+import { gitService } from '../../subs/evidence/src/git.js';
 
 /*
  * Cancellation is not settlement.
@@ -161,8 +162,8 @@ describe('a run whose invocation is not confirmed settled', () => {
     await installTestRunner(fixture.root);
     await initRepository(fixture.root);
 
-    const { service } = await openRuns(fixture.root, { agent: unsettling([{ kind: 'submit', input: emptyAnalysis() }]) });
-    cleanups.push(() => service.close());
+    const { service } = await openRuns(fixture.root, { git: gitService, agent: unsettling([{ kind: 'submit', input: emptyAnalysis() }]) });
+    cleanups.push(() => service.close().catch(() => undefined));
 
     const receipt = await service.execute(startRun('review-notes'));
     await service.settled('review-notes', receipt.jobId);
@@ -188,11 +189,29 @@ describe('a run whose invocation is not confirmed settled', () => {
     await initRepository(fixture.root);
     await writeFile(join(fixture.root, 'src', 'untouched.ts'), 'export const x = 1;\n');
 
-    const { service } = await openRuns(fixture.root, { agent: unsettling([{ kind: 'submit', input: emptyAnalysis() }]) });
-    cleanups.push(() => service.close());
+    const { service } = await openRuns(fixture.root, { git: gitService, agent: unsettling([{ kind: 'submit', input: emptyAnalysis() }]) });
+    cleanups.push(() => service.close().catch(() => undefined));
     const receipt = await service.execute(startRun('review-notes'));
     await service.settled('review-notes', receipt.jobId);
 
     expect(await readFile(join(fixture.root, 'src', 'untouched.ts'), 'utf8')).toBe('export const x = 1;\n');
+  }, 180_000);
+
+  test('close retains the project lock when session settlement was not confirmed', async () => {
+    const fixture = await copyFixture();
+    cleanups.push(fixture.remove);
+    await installTestRunner(fixture.root);
+    await initRepository(fixture.root);
+
+    const opened = await openRuns(fixture.root, { git: gitService, agent: unsettling([{ kind: 'submit', input: emptyAnalysis() }]) });
+    const receipt = await opened.service.execute(startRun('review-notes'));
+    await opened.service.settled('review-notes', receipt.jobId);
+
+    await expect(opened.service.close()).rejects.toThrow('settlement was not confirmed');
+    expect(await opened.lock.held()).toBe(true);
+    // Settlement is a durable safety result, not transient backpressure: a
+    // retry cannot release ownership without a separate recovery contract.
+    await expect(opened.service.close()).rejects.toThrow('settlement was not confirmed');
+    expect(await opened.lock.held()).toBe(true);
   }, 180_000);
 });

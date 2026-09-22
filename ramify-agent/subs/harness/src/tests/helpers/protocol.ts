@@ -32,7 +32,7 @@ export const outsidePath = 'subs/workspace/subs/reviews/src/outside-the-scope.ts
 export const longOutputBytes = 20_000;
 
 /** A fixture copy with the notes module, the runner that really runs test files, and one commit. */
-export async function protocolTarget(): Promise<{ root: string; remove: () => Promise<void> }> {
+export async function protocolTarget(realGit = true): Promise<{ root: string; remove: () => Promise<void> }> {
   const fixture = await copyFixture();
   await addModule(fixture.root, notesDirectory, 'notes', {
     'src/notes.ts': 'export const noteLimit = 400;\n',
@@ -45,7 +45,7 @@ export async function protocolTarget(): Promise<{ root: string; remove: () => Pr
     ].join('\n'),
   });
   await installMiniRunner(fixture.root);
-  await initRepository(fixture.root);
+  if (realGit) await initRepository(fixture.root);
   return fixture;
 }
 
