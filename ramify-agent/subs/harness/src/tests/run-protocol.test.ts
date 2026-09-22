@@ -3,22 +3,23 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import { createScriptedAgent } from '../../subs/agent/src/scripted.js';
 import { errorResponseSchema } from '../interfaces/protocol/errors.js';
+import { moduleTreeResponseSchema } from '../interfaces/protocol/evidence.js';
 import { commandResponseSchema } from '../interfaces/protocol/jobs.js';
 import { protocolPaths } from '../interfaces/protocol/paths.js';
 import {
   analysisResponseSchema, capabilityListResponseSchema, decisionListResponseSchema, gateResponseSchema,
-  metricsResponseSchema, runEventPageSchema, runListResponseSchema, runQueryLimits, runResponseSchema,
+  metricsResponseSchema, moduleCapabilityComparisonResponseSchema, runEventPageSchema, runListResponseSchema, runQueryLimits, runResponseSchema,
   workItemListResponseSchema, workItemResponseSchema,
   type ProjectedRunEvent, type RunSnapshot,
 } from '../interfaces/protocol/runs.js';
-import { startServer, type RunningServer } from '../http/server.js';
+import { startServerWith, type RunningServer } from '../http/server.js';
 import { terminalRunEvents } from '../run/log.js';
 import { treeInputs } from './helpers/iterations.js';
 import {
-  draftsDirectory, drafts, longOutputBytes, notes, outsidePath, protocolPolicy, protocolScript, protocolTarget,
+  draftsDirectory, drafts, fileHashes, longOutputBytes, notes, outsidePath, protocolPolicy, protocolScript, protocolTarget,
 } from './helpers/protocol.js';
 import {
-  emptyAnalysis, initRepository, installTestRunner, openRuns, runEventsOnDisk, runPath, startRun, stubRamify, testPolicy, until,
+  emptyAnalysis, git, initRepository, installTestRunner, openRuns, realRamify, runEventsOnDisk, runPath, startRun, stubRamify, testPolicy, until,
 } from './helpers/runs.js';
 import { copyFixture } from './helpers/fixture.js';
 
@@ -89,8 +90,8 @@ async function everyAnswer(server: RunningServer, runId: string): Promise<Record
   return answers;
 }
 
-async function serve(root: string, extra: Partial<Parameters<typeof startServer>[0]> = {}): Promise<RunningServer> {
-  const server = await startServer({
+async function serve(root: string, extra: Partial<Parameters<typeof startServerWith>[0]> = {}): Promise<RunningServer> {
+  const server = await startServerWith({
     projectRoot: root,
     port: 0,
     assetsDirectory: join(root, 'no-such-build'),
@@ -266,6 +267,92 @@ describe('every query of a completed run, over HTTP', () => {
     // Settlement's process-group count is not a metric: it is 0 by
     // construction and is never presented as a measurement.
     expect(metrics.metrics.some(metric => /group/i.test(metric.id))).toBe(false);
+  }, 300_000);
+});
+
+describe('the module-capability comparison of a completed scripted run, over HTTP', () => {
+  test('initial and current placements, the compared identities and coverage, and no file or event changed', async () => {
+    const target = await protocolTarget();
+    cleanups.push(target.remove);
+    const { root } = target;
+    const opened = await openRuns(root, { script: protocolScript(), inputs: treeInputs(), policy: projectRoot => protocolPolicy(projectRoot) });
+    const runId = (await opened.service.execute(startRun(plan))).jobId;
+    await opened.service.settled(plan, runId);
+    await opened.service.close();
+    const onDisk = await runEventsOnDisk(root, plan, runId);
+    expect(onDisk.at(-1)!.type).toBe('job-completed');
+
+    const server = await serve(root);
+    cleanups.push(() => server.close());
+    const read = async () => {
+      const { status, body } = await get(server, protocolPaths.runModuleCapabilities(plan, runId));
+      expect(status).toBe(200);
+      return moduleCapabilityComparisonResponseSchema.parse(body);
+    };
+    const currentTree = async () => moduleTreeResponseSchema.parse((await get(server, protocolPaths.modules)).body).tree;
+
+    // Before the architect view is materialized: the same unavailable tree
+    // the module-tree query reports, every module unplaced, and a gap.
+    const unmaterialized = await read();
+    expect(unmaterialized.tree).toEqual(await currentTree());
+    expect(unmaterialized.tree.status).toBe('unavailable');
+    expect(unmaterialized.modules.map(entry => [entry.module, entry.placement])).toEqual([[notes, 'unplaced'], [drafts, 'unplaced']]);
+    expect(unmaterialized.coverage).toEqual({
+      state: 'partial', knownCapabilities: 3, knownImplemented: 2, totalCapabilities: null,
+      gaps: [expect.stringMatching(/^The current module tree is unavailable, so no module is placed: The architect view has not been materialized yet/)],
+    });
+
+    // The real view of the tree the run left, with the module it created.
+    const daemon = await realRamify();
+    cleanups.push(() => daemon.dispose());
+    const materialized = await daemon.ramify.materialize(root);
+    expect(materialized.ok).toBe(true);
+
+    const files = await fileHashes(runPath(root, plan, runId));
+    const status = await git(root, 'status', '--porcelain', '--untracked-files=all');
+    const first = await read();
+    expect(await read()).toEqual(first);
+
+    const tree = await currentTree();
+    expect(first.tree).toEqual(tree);
+    if (tree.status !== 'available') throw new Error('the view was materialized');
+    expect(tree.modules.map(entry => entry.module)).toEqual(expect.arrayContaining([notes, drafts]));
+    expect(first.identityPolicy).toBe('exact-capability-slug/1');
+    expect(first.runVersion).toBe(onDisk.length);
+    // The run's inputs worked from a placeholder view, and the identity says so.
+    expect(first.initialView).toEqual({ status: 'placeholder' });
+
+    // Every module of the tree, in its order; only two hold rows.
+    expect(first.modules.map(entry => entry.module)).toEqual(tree.modules.map(entry => entry.module));
+    expect(first.modules.every(entry => entry.placement === 'declared')).toBe(true);
+    const withRows = first.modules.filter(entry => entry.capabilities.length > 0);
+    expect(withRows.map(entry => ({
+      module: entry.module,
+      proposedAtStart: entry.proposedAtStart,
+      rows: entry.capabilities.map(row => [row.capability, row.initial, row.implementedHere === null ? null : row.implementedHere.evidence.length]),
+    }))).toEqual([
+      {
+        module: notes, proposedAtStart: null,
+        rows: [
+          ['review-note', [{ role: 'entry-owner', hypothesis: null }], 1],
+          ['note-search', [{ role: 'suggested-owner', hypothesis: 'note-search' }], null],
+        ],
+      },
+      {
+        // Proposed at start by its entry, it now exists and is declared.
+        module: drafts, proposedAtStart: { parent: notes, purpose: 'Keeps a reviewer\'s unsent drafts.', tags: [] },
+        rows: [['note-drafts', [{ role: 'entry-owner', hypothesis: null }], 1]],
+      },
+    ]);
+    expect(withRows[0]!.capabilities[0]!.implementedHere!.reason).toMatch(/^wi-001 passed its work-item gate ga-\d{4}$/);
+    expect(first.coverage).toEqual({ state: 'complete', capabilities: 3, implemented: 2 });
+    // CM09: nothing about activity, commits, changes, lines or deployment.
+    expect(JSON.stringify(first)).not.toMatch(/"(activity|commit|changed|lines|deployed)"/i);
+
+    // The query changed no file of the run, no event and nothing in the project.
+    expect(await fileHashes(runPath(root, plan, runId))).toEqual(files);
+    expect(await runEventsOnDisk(root, plan, runId)).toEqual(onDisk);
+    expect(await git(root, 'status', '--porcelain', '--untracked-files=all')).toBe(status);
   }, 300_000);
 });
 

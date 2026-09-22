@@ -39,6 +39,9 @@ expose-sub ProjectExplorerViewProps, ExplorerDiscussionProps, ExplorerDiscussion
 expose-sub ModuleTreeView from project-view to parent
 expose-sub ModuleTreeViewProps from project-view to parent
 expose-sub indexModuleTree, collapsibleAtDepth, ancestorsOf, ModuleTreeIndex from project-view to parent
+// P6: the reusable module-tree canvas and its node contract, forwarded by the module-tree package entry.
+expose-sub ModuleTreeCanvas from project-view to parent
+expose-sub ModuleTreeCanvasProps, ModuleTreeCanvasNode, ModuleTreeCanvasEmphasis from project-view to parent
 
 // P5: behavioral dependency view vocabulary, active link shape and default settings.
 expose-sub DependencyGraphCount, DependencyGraphImportedCount, DependencyGraphModule, DependencyGraphEvidence, DependencyGraphImportedEdge, DependencyGraphOriginalEdge, DependencyGraphEdge, DependencyGraphModel, DependencyDepthMode, DependencySettings, DependencyPhase, DependencyGraphState, ActiveDependencyEdge, ScopeNodeId from project-view to parent

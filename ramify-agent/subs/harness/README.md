@@ -11,8 +11,8 @@ serves.
 ## Layout
 
 `src/interfaces/` holds this module's public contracts, the only source it
-exposes beyond `startServer` and its two errors and the `session` command's
-entry with the types it names:
+exposes beyond `startServer` and its two errors, with the types their
+signatures name, and the `session` command's entry with the types it names:
 
 - `interfaces/protocol/`: the HTTP JSON protocol under `/api/v1` between the
   harness and any client, one file per concern: `ids.ts`, `evidence.ts`,
@@ -468,7 +468,8 @@ hiding or measured complexity justifies it.
   `POST /api/v1/commands`, the one route that changes anything, which acts
   through `RunService.execute` alone. `ProjectLockError` is exposed beside
   it. The agent is pi, the scripted fake chosen explicitly as `fake` (an
-  analysis with no entry capability), or an implementation a test supplies.
+  analysis with no entry capability), or an implementation a test supplies
+  through `startServerWith`, which stays internal with the run settings.
 - `sessions/`: one engineer session on one module, from a prompt a person
   writes, outside any run; the root's `session` command runs it.
   - `single.ts`: `runSingleSession` takes the project lock, resolves the

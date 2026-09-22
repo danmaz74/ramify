@@ -4,6 +4,13 @@ Project view renders Ramify's revision-bound explorer compatibility model as a
 pure browser-facing behavioral dependency diagram with a detail panel, and as a
 collapsible module tree with a module detail panel.
 
+The module tree draws on a reusable hierarchy canvas, `ModuleTreeCanvas`. Its
+caller supplies each node's identity, hierarchy, size, accent, shell emphasis
+and body, and controls selection and collapse; the canvas owns placement,
+edges, collapse controls, keyboard input, the minimap and fitting. The canvas
+imports no stylesheet: its rules are in `module-tree-canvas.css`, which the
+module tree imports beside its own.
+
 The diagram draws only links from a supplied dependency model
 (`ramify.explorer-dependencies/1`), declared here in the same serialized shape
 the explorer server produces. It draws the model's original-owner collection,

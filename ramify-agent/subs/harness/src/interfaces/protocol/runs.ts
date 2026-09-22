@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { viewIdentitySchema } from './evidence.js';
+import { moduleTreeResponseSchema, viewIdentitySchema } from './evidence.js';
 import { jobIdSchema, planIdSchema } from './ids.js';
 import { commandIdSchema, jobStateSchema, jobVersionSchema, stopJobCommandSchema } from './jobs.js';
 
@@ -111,6 +111,8 @@ export const runQueryLimits = {
   decisions: 500,
   workItems: 200,
   capabilities: 500,
+  /** Module-capability rows of one comparison, of the capabilities kept whole within `capabilities`. */
+  moduleCapabilityRows: 2000,
   /** Bytes of a gate command's output a client receives; the complete output stays a file of the run. */
   outputTailBytes: 8 * 1024,
 } as const;
@@ -551,6 +553,161 @@ export const capabilityListResponseSchema = z.object({
   total: count,
 }).strict();
 export type CapabilityListResponse = z.infer<typeof capabilityListResponseSchema>;
+
+// The comparison of the initial analysis's module associations with the
+// capabilities verified at their current owners.
+
+/**
+ * How a comparison identifies one capability across the initial analysis and
+ * the run's registry: identical slugs are one capability. There is no fuzzy
+ * or semantic matching, and a later policy gets a new version.
+ */
+export const comparisonIdentityPolicySchema = z.literal('exact-capability-slug/1');
+export type ComparisonIdentityPolicy = z.infer<typeof comparisonIdentityPolicySchema>;
+
+/**
+ * Where a module is drawn. `declared`: it is in the returned tree. `proposed`:
+ * it is absent from the tree and one recorded proposal supplies its parent,
+ * itself declared or proposed. `unplaced`: anything else, including every
+ * module while the tree is unavailable.
+ */
+export const modulePlacementSchema = z.enum(['declared', 'proposed', 'unplaced']);
+export type ModulePlacement = z.infer<typeof modulePlacementSchema>;
+
+/**
+ * Why revision 1 of the initial analysis associated a capability with a
+ * module: the entry assignment's owner, a hypothesis's suggested owner, or a
+ * module a hypothesis explicitly involves. Anticipated consumers are none of
+ * these.
+ */
+export const initialRoleSchema = z.enum(['entry-owner', 'suggested-owner', 'involved']);
+export type InitialRole = z.infer<typeof initialRoleSchema>;
+
+/** One association of revision 1: its role, and the hypothesis that made it, null for an entry assignment. */
+export const initialAssociationSchema = z.object({
+  role: initialRoleSchema,
+  hypothesis: text.nullable(),
+}).strict();
+export type InitialAssociation = z.infer<typeof initialAssociationSchema>;
+
+/**
+ * One capability in one module. `initial` lists every revision-1 association
+ * with this module, each once; `implementedHere` is set only when the
+ * capability's current progress is registered, `completed` and owned by this
+ * module, with that progress's reason and evidence.
+ */
+export const moduleCapabilityRowSchema = z.object({
+  capability: text,
+  initial: z.array(initialAssociationSchema),
+  implementedHere: z.object({ reason: text, evidence: z.array(text) }).strict().nullable(),
+}).strict().refine(row => row.initial.length > 0 || row.implementedHere !== null, {
+  message: 'A row has an initial association, an implementation here, or both',
+});
+export type ModuleCapabilityRow = z.infer<typeof moduleCapabilityRowSchema>;
+
+/** One module of the comparison, where it is drawn, what an entry proposed for it, and its rows. */
+export const moduleCapabilitiesSchema = z.object({
+  module: text,
+  placement: modulePlacementSchema,
+  /** The module one or more entry assignments proposed, when they agree; null otherwise. */
+  proposedAtStart: z.object({ parent: text, purpose: text, tags: z.array(z.string()) }).strict().nullable(),
+  capabilities: z.array(moduleCapabilityRowSchema),
+}).strict();
+export type ModuleCapabilities = z.infer<typeof moduleCapabilitiesSchema>;
+
+/**
+ * The comparison's only count and coverage statement. `complete` counts every
+ * compared capability and those implemented; `partial` counts only what is
+ * known, names each gap, and carries the total only when a bound dropped
+ * capabilities; `unavailable` says why there is nothing to compare.
+ */
+export const comparisonCoverageSchema = z.discriminatedUnion('state', [
+  z.object({ state: z.literal('complete'), capabilities: count, implemented: count }).strict(),
+  z.object({
+    state: z.literal('partial'),
+    knownCapabilities: count,
+    knownImplemented: count,
+    /** Every capability the comparison would hold, when a bound dropped some; null otherwise. */
+    totalCapabilities: count.nullable(),
+    gaps: z.array(text).min(1),
+  }).strict(),
+  z.object({ state: z.literal('unavailable'), reason: text }).strict(),
+]);
+export type ComparisonCoverage = z.infer<typeof comparisonCoverageSchema>;
+
+/**
+ * `GET /api/v1/plans/:planId/runs/:runId/module-capabilities`: the initial
+ * analysis's module associations beside the capabilities verified at their
+ * current owners, over one current module tree and one committed run
+ * version. At most 500 capabilities and 2,000 rows; a capability is kept
+ * with all of its rows or dropped whole.
+ *
+ * It names the compared states: the initial analysis's view, the tree's
+ * revision and input, and the run version. Verified means verified in this
+ * run; nothing here describes deployment.
+ */
+export const moduleCapabilityComparisonResponseSchema = z.object({
+  identityPolicy: comparisonIdentityPolicySchema,
+  runVersion: jobVersionSchema,
+  initialView: viewIdentitySchema.nullable(),
+  tree: moduleTreeResponseSchema.shape.tree,
+  modules: z.array(moduleCapabilitiesSchema),
+  coverage: comparisonCoverageSchema,
+}).strict().superRefine((response, context) => {
+  const issue = (message: string, path: PropertyKey[] = ['coverage']) => context.addIssue({ code: 'custom', message, path });
+  const { coverage, modules } = response;
+
+  if (coverage.state === 'unavailable') {
+    if (response.initialView !== null) issue('An unavailable comparison has no initial view', ['initialView']);
+    if (modules.length > 0) issue('An unavailable comparison has no modules', ['modules']);
+    return;
+  }
+  if (response.initialView === null) issue('Only an unavailable comparison lacks the initial view', ['initialView']);
+
+  const names = new Set<string>();
+  const capabilities = new Set<string>();
+  const implementedAt = new Map<string, string>();
+  let rows = 0;
+  for (const [index, entry] of modules.entries()) {
+    if (names.has(entry.module)) issue(`Module ${entry.module} is listed twice`, ['modules', index]);
+    names.add(entry.module);
+    if (response.tree.status === 'unavailable' && entry.placement !== 'unplaced') {
+      issue('While the tree is unavailable every module is unplaced', ['modules', index, 'placement']);
+    }
+    if (entry.placement === 'proposed' && entry.proposedAtStart === null) {
+      issue('A proposed module is placed from its recorded proposal', ['modules', index, 'proposedAtStart']);
+    }
+    const seen = new Set<string>();
+    for (const row of entry.capabilities) {
+      rows += 1;
+      if (seen.has(row.capability)) issue(`Capability ${row.capability} has two rows in ${entry.module}`, ['modules', index]);
+      seen.add(row.capability);
+      capabilities.add(row.capability);
+      if (row.implementedHere === null) continue;
+      const other = implementedAt.get(row.capability);
+      if (other !== undefined) issue(`Capability ${row.capability} is implemented in both ${other} and ${entry.module}`, ['modules', index]);
+      implementedAt.set(row.capability, entry.module);
+    }
+  }
+  if (capabilities.size > runQueryLimits.capabilities) issue(`At most ${runQueryLimits.capabilities} capabilities`, ['modules']);
+  if (rows > runQueryLimits.moduleCapabilityRows) issue(`At most ${runQueryLimits.moduleCapabilityRows} rows`, ['modules']);
+
+  if (coverage.state === 'complete') {
+    if (response.tree.status !== 'available') issue('A comparison over an unavailable tree is partial');
+    if (modules.some(entry => entry.placement === 'unplaced')) issue('A complete comparison places every module');
+    const limits = response.initialView?.status === 'materialized' ? response.initialView.coverageLimits : [];
+    if (limits.length > 0) issue('A comparison whose initial view reports coverage limits is partial');
+    if (coverage.capabilities !== capabilities.size) issue('The count is of the capabilities returned', ['coverage', 'capabilities']);
+    if (coverage.implemented !== implementedAt.size) issue('The count is of the capabilities returned as implemented', ['coverage', 'implemented']);
+    return;
+  }
+  if (coverage.knownCapabilities !== capabilities.size) issue('The known count is of the capabilities returned', ['coverage', 'knownCapabilities']);
+  if (coverage.knownImplemented !== implementedAt.size) issue('The known count is of the capabilities returned as implemented', ['coverage', 'knownImplemented']);
+  if (coverage.totalCapabilities !== null && coverage.totalCapabilities <= coverage.knownCapabilities) {
+    issue('A total is given only when a bound dropped capabilities', ['coverage', 'totalCapabilities']);
+  }
+});
+export type ModuleCapabilityComparisonResponse = z.infer<typeof moduleCapabilityComparisonResponseSchema>;
 
 const tailBytes = (tail: string): number => new TextEncoder().encode(tail).byteLength;
 

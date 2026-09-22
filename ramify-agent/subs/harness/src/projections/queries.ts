@@ -1,15 +1,19 @@
 import {
   runAgentSchema, runQueryLimits,
   type AnalysisResponse, type CapabilityListResponse, type DecisionListResponse, type GateResponse,
-  type MetricsResponse, type RunEventPage, type RunListResponse, type RunResponse,
+  type MetricsResponse, type ModuleCapabilityComparisonResponse, type RunEventPage, type RunListResponse, type RunResponse,
   type WorkItemListResponse, type WorkItemResponse,
 } from '../interfaces/protocol/runs.js';
+import type { RunEvent } from '../run/log.js';
+import { runLayout } from '../run/records.js';
 import { analysisOf, decisionsOf } from './analysis.js';
 import { eventPage } from './events.js';
-import { ProjectionError, runView, unservedRun, unservedRuns, type CommittedRun, type RunView } from './inputs.js';
+import { ProjectionError, readRunFile, runView, unservedRun, unservedRuns, type CommittedRun, type RunView } from './inputs.js';
 import { metricsOf } from './metrics.js';
+import { moduleCapabilityComparisonOf, type AnalysisCoverageLimits } from './module-capabilities.js';
 import { capabilityProgressOf } from './progress.js';
 import { snapshotOf } from './snapshot.js';
+import { currentModuleTree } from './tree.js';
 import { gateOf, workItemOf, workItemsOf } from './work.js';
 
 /*
@@ -80,6 +84,18 @@ export class RunQueries {
     return { capabilities: all.slice(0, runQueryLimits.capabilities), total: all.length };
   }
 
+  /**
+   * The initial analysis's module associations beside the capabilities
+   * verified at their current owners. It reads the committed run, the
+   * current module tree and the analysis submission's coverage limits, and
+   * the projection over them is pure.
+   */
+  async moduleCapabilities(planId: string, runId: string): Promise<ModuleCapabilityComparisonResponse> {
+    const view = await this.view(planId, runId);
+    const tree = await currentModuleTree(this.source.projectRoot);
+    return moduleCapabilityComparisonOf(view, tree, await analysisCoverageLimits(view));
+  }
+
   async gate(planId: string, runId: string, gate: string): Promise<GateResponse> {
     return { gate: gateOf(await this.view(planId, runId), gate) };
   }
@@ -95,5 +111,26 @@ export class RunQueries {
     const unserved = await unservedRun(this.source.projectRoot, planId, runId);
     if (unserved !== null) throw unserved;
     throw new ProjectionError('not-found', `No run ${runId} for plan "${planId}"`);
+  }
+}
+
+/** The coverage limits the accepted analysis submission recorded, read from the run's own file. */
+async function analysisCoverageLimits(view: RunView): Promise<AnalysisCoverageLimits> {
+  const accepted = view.events.find((event): event is Extract<RunEvent, { type: 'analysis-accepted' }> => event.type === 'analysis-accepted');
+  if (accepted === undefined) return { limits: [] };
+  const path = runLayout.submission(accepted.data.invocation);
+  let text: string | null;
+  try {
+    text = await readRunFile(view, path);
+  } catch (error) {
+    return { unreadable: `${path}: ${error instanceof Error ? error.message : String(error)}` };
+  }
+  if (text === null) return { unreadable: `${path} is not in the run` };
+  try {
+    const limits = (JSON.parse(text) as { coverageLimits?: unknown }).coverageLimits;
+    if (Array.isArray(limits) && limits.every(limit => typeof limit === 'string')) return { limits };
+    return { unreadable: `${path} records no list of coverage limits` };
+  } catch {
+    return { unreadable: `${path} is not JSON` };
   }
 }

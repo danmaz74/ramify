@@ -15,5 +15,7 @@
     "forceConsistentCasingInFileNames": true,
     "types": ["node"]
   },
-  "include": ["**/*.ts"]
+  "include": ["**/*.ts"],
+  // An independent package consumer with its own manifest and compiler scope.
+  "exclude": ["fixtures/module-tree-consumer"]
 }

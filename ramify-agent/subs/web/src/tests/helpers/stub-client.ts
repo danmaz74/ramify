@@ -2,7 +2,7 @@ import type { ModuleTree } from '../../../../harness/src/interfaces/protocol/evi
 import type { Receipt } from '../../../../harness/src/interfaces/protocol/jobs.js';
 import type { PlanDocument, PlanEntry } from '../../../../harness/src/interfaces/protocol/queries.js';
 import type {
-  AnalysisResponse, CapabilityListResponse, DecisionListResponse, GateView, MetricsResponse, ProjectedRunEvent,
+  AnalysisResponse, CapabilityListResponse, DecisionListResponse, GateView, MetricsResponse, ModuleCapabilityComparisonResponse, ProjectedRunEvent,
   RunCommand, RunEventPage, RunListResponse, RunSnapshot, WorkItemListResponse, WorkItemResponse,
 } from '../../../../harness/src/interfaces/protocol/runs.js';
 import { ClientError, type ConnectionState, type ProjectInfo, type ProtocolClient } from '../../client.js';
@@ -18,6 +18,7 @@ export interface StubRun {
   workItems?: WorkItemListResponse;
   workItem?: Record<string, WorkItemResponse>;
   capabilities?: CapabilityListResponse;
+  moduleCapabilities?: ModuleCapabilityComparisonResponse;
   gates?: Record<string, GateView>;
   metrics?: MetricsResponse;
 }
@@ -96,6 +97,7 @@ export class StubClient implements ProtocolClient {
   async getWorkItems(_planId: string, runId: string) { this.calls.push(`getWorkItems:${runId}`); return this.answer(runId, run => run.workItems, 'work items'); }
   async getWorkItem(_planId: string, runId: string, workItem: string) { this.calls.push(`getWorkItem:${runId}:${workItem}`); return this.answer(runId, run => run.workItem?.[workItem], `work item ${workItem}`); }
   async getCapabilities(_planId: string, runId: string) { this.calls.push(`getCapabilities:${runId}`); return this.answer(runId, run => run.capabilities, 'capabilities'); }
+  async getModuleCapabilities(_planId: string, runId: string) { this.calls.push(`getModuleCapabilities:${runId}`); return this.answer(runId, run => run.moduleCapabilities, 'module capabilities'); }
   async getGate(_planId: string, runId: string, gate: string) { this.calls.push(`getGate:${runId}:${gate}`); return this.answer(runId, run => run.gates?.[gate], `gate ${gate}`); }
   async getMetrics(_planId: string, runId: string) { this.calls.push(`getMetrics:${runId}`); return this.answer(runId, run => run.metrics, 'metrics'); }
 

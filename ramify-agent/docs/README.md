@@ -49,6 +49,10 @@ Design documents for the separate agent harness:
   current progress
 - [Plan 3 core records](plans/03-autonomous-implementation-loop/core-records.proposal.md),
   proposal for the durable records, submissions and identities the plan will reference
+- [Plan 3 capability progress visualizations](plans/03-autonomous-implementation-loop/initial-hypothesis-vs-implemented-module-tree.proposal.md):
+  one implementation plan for the dependency-progress and
+  initial-versus-current module diagrams, including the Ramify canvas
+  extraction they need; proposed
 - [Plan 4: delivered-solution token efficiency](plans/04-token-efficiency/main-plan.md),
   including context-limit and overflow visibility; planned and blocked until
   Plan 3 is complete and merged

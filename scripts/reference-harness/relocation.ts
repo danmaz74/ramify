@@ -19,8 +19,13 @@ const withoutRouter = 'expose-sub CatalogProcedures, createCatalogTools, inspect
 const entryFunctions = {
   'ramify.ts': 'createAnalysisSession', 'ramify.ts/analysis': 'analyzeProject',
   'ramify.ts/analysis/inventory': 'acquireInventory', 'ramify.ts/model': 'createDefaultTagRegistry',
-  'ramify.ts/layout': 'placeNodes', 'ramify.ts/presentation': 'ModelDiagram', 'ramify.ts/cli': 'runCli', 'ramify.ts/client': 'connectDaemon',
+  'ramify.ts/layout': 'placeNodes', 'ramify.ts/presentation': 'ModelDiagram', 'ramify.ts/module-tree': 'ModuleTreeCanvas',
+  'ramify.ts/cli': 'runCli', 'ramify.ts/client': 'connectDaemon',
 } as const;
+/** Stylesheet entries: a string export target, packed and resolvable, but never imported by Node. */
+const stylesheetEntries = ['ramify.ts/module-tree.css'] as const;
+/** UI peers the package declares optional; the consumer installs them so UI entries load. */
+const optionalPeers = ['react', 'react-dom'] as const;
 
 function within(root: string, path: string): boolean {
   const tail = relative(root, path);
@@ -113,7 +118,8 @@ const installedBin = (context: ProjectContext) => join(installedRoot(context), '
 
 /** Independently callable smoke setup; it does not register or pass a matrix instance. */
 export async function prepareRelocatedPackage(context: ProjectContext,
-  requiredEntries: Readonly<Record<string, string>> = entryFunctions): Promise<void> {
+  requiredEntries: Readonly<Record<string, string>> = entryFunctions,
+  requiredStylesheets: readonly string[] = stylesheetEntries): Promise<void> {
   const { root, assertions, runDirectory } = context;
   const canonicalRoot = await realpath(root), canonicalSource = await realpath(repositoryRoot);
   assertions.equal('relocation package is outside the source checkout', within(canonicalSource, canonicalRoot), false);
@@ -155,15 +161,32 @@ export async function prepareRelocatedPackage(context: ProjectContext,
   const packed = await run(context, 'pack built package', root, 'npm', ['pack', '--json', '--pack-destination', consumer]);
   const tarballs = JSON.parse(packed.stdout) as Array<{ filename: string; integrity: string; files: Array<{ path: string }> }>;
   assertions.equal('one real package archive created', tarballs.length, 1);
-  const manifest = JSON.parse(await readFile(join(root, 'package.json'), 'utf8')) as { exports: Record<string, { types: string; import: string }> };
-  assertions.equal('every reviewed portable Node and UI package entry remains declared', Object.keys(manifest.exports).map(key => key === '.' ? 'ramify.ts' : `ramify.ts${key.slice(1)}`).sort(), Object.keys(requiredEntries).sort());
-  for (const [entry, targets] of Object.entries(manifest.exports)) for (const [kind, path] of Object.entries(targets)) {
-    assertions.ok(`${entry} ${kind}: actual tarball contains declared entry`, tarballs[0].files.some(file => file.path === path.replace(/^\.\//, '')));
+  const manifest = JSON.parse(await readFile(join(root, 'package.json'), 'utf8')) as {
+    exports: Record<string, { types: string; import: string } | string>;
+    dependencies?: Record<string, string>; peerDependencies?: Record<string, string>;
+    peerDependenciesMeta?: Record<string, { optional?: boolean }>;
+  };
+  const specifier = (key: string) => key === '.' ? 'ramify.ts' : `ramify.ts${key.slice(1)}`;
+  const declared = Object.entries(manifest.exports);
+  assertions.equal('every reviewed portable Node and UI package entry remains declared',
+    declared.filter(([, targets]) => typeof targets !== 'string').map(([key]) => specifier(key)).sort(), Object.keys(requiredEntries).sort());
+  assertions.equal('every reviewed stylesheet entry is declared with one string target',
+    declared.filter(([, targets]) => typeof targets === 'string').map(([key]) => specifier(key)).sort(), [...requiredStylesheets].sort());
+  for (const [entry, targets] of declared) {
+    for (const [kind, path] of typeof targets === 'string' ? [['style', targets] as const] : Object.entries(targets)) {
+      assertions.ok(`${entry} ${kind}: actual tarball contains declared entry`, tarballs[0].files.some(file => file.path === path.replace(/^\.\//, '')));
+    }
   }
+  const peerRanges = optionalPeers.map(name => manifest.peerDependencies?.[name]);
+  assertions.equal('UI runtimes are optional peers, absent from dependencies',
+    optionalPeers.map(name => [name, manifest.dependencies?.[name] ?? null, typeof manifest.peerDependencies?.[name], manifest.peerDependenciesMeta?.[name]?.optional ?? false]),
+    optionalPeers.map(name => [name, null, 'string', true]));
   observe(context, 'relocation-package', { filename: tarballs[0].filename, integrity: tarballs[0].integrity,
     entries: manifest.exports, files: tarballs[0].files.map(file => file.path) });
-  await run(context, 'install actual tarball without dev dependencies', consumer, 'npm',
-    ['install', '--omit=dev', '--ignore-scripts', '--prefer-offline', '--no-audit', '--no-fund', `./${tarballs[0].filename}`]);
+  // The consumer supplies the optional UI peers itself, as a UI consumer of the presentation entries does.
+  await run(context, 'install actual tarball and the consumer React without dev dependencies', consumer, 'npm',
+    ['install', '--omit=dev', '--ignore-scripts', '--prefer-offline', '--no-audit', '--no-fund', `./${tarballs[0].filename}`,
+      ...optionalPeers.map((name, index) => `${name}@${peerRanges[index]}`)]);
   const installed = join(consumer, 'node_modules/ramify.ts');
   assertions.equal('installed package is an unpacked copy', (await lstat(installed)).isSymbolicLink(), false);
   assertions.equal('installed bin resolves to the unpacked launcher', await realpath(installedBin(context)), join(await realpath(installed), 'dist/src/ramify'));
@@ -177,10 +200,12 @@ export async function prepareRelocatedPackage(context: ProjectContext,
     react: JSON.parse(await readFile(join(consumer, 'node_modules/react/package.json'), 'utf8')).version,
   });
 
-  const probe = `import { relative, isAbsolute } from 'node:path';
+  const probe = `import { statSync } from 'node:fs';
+import { relative, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 const root = process.cwd();
 const entries = ${JSON.stringify(requiredEntries)};
+const stylesheets = ${JSON.stringify(requiredStylesheets)};
 const observed = [];
 for (const [entry, name] of Object.entries(entries)) {
   const resolved = relative(root, fileURLToPath(import.meta.resolve(entry)));
@@ -189,13 +214,24 @@ for (const [entry, name] of Object.entries(entries)) {
   if (typeof value[name] !== 'function') throw new Error('Missing callable export: ' + entry + '#' + name);
   observed.push({ entry, resolved, callable: name });
 }
-console.log(JSON.stringify(observed));
+// A stylesheet is resolved to its packed file; Node never evaluates it.
+const styles = stylesheets.map(entry => {
+  const resolved = relative(root, fileURLToPath(import.meta.resolve(entry)));
+  if (isAbsolute(resolved) || !resolved.startsWith('node_modules/ramify.ts/dist/') || !resolved.endsWith('.css')
+    || !statSync(resolved).isFile()) throw new Error('Nonlocal or missing stylesheet entry: ' + entry);
+  return { entry, resolved };
+});
+console.log(JSON.stringify({ entries: observed, stylesheets: styles }));
 `;
   await writeFile(join(consumer, 'entries.mjs'), probe);
   const imports = await run(context, 'import every installed public entry', consumer, process.execPath, ['entries.mjs']);
-  assertions.equal('all eight actual package entry imports executed',
-    JSON.parse(imports.stdout).map((entry: { entry: string }) => entry.entry), Object.keys(requiredEntries));
-  observe(context, 'relocation-installed-entries', JSON.parse(imports.stdout));
+  const installedEntries = JSON.parse(imports.stdout) as { entries: Array<{ entry: string }>; stylesheets: Array<{ entry: string }> };
+  assertions.equal('every actual package entry import executed',
+    installedEntries.entries.map(entry => entry.entry), Object.keys(requiredEntries));
+  assertions.equal('every stylesheet entry resolves to its packed file',
+    installedEntries.stylesheets.map(entry => entry.entry), [...requiredStylesheets]);
+  observe(context, 'relocation-installed-entries', installedEntries.entries);
+  observe(context, 'relocation-installed-stylesheets', installedEntries.stylesheets);
   const installedCheck = await run(context, 'installed reference JSON', consumer, installedBin(context),
     ['check', '--batch', '--root', join(root, referencePath), '--format', 'json']);
   const installedReport = JSON.parse(installedCheck.stdout) as AnalysisReport;

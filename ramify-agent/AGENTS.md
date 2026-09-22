@@ -15,8 +15,11 @@ repository.
   CLI (`node_modules/.bin/ramify`) and the files it generates. Never import
   toolkit source by relative path or through tsconfig `paths`; that would not
   survive the split.
-- Prefer the CLI and generated files over library imports. Import the library
-  for types and schemas only.
+- Prefer the CLI and generated files over library imports. The harness and
+  every other Node owner import the library for types and schemas only. The
+  web module may also render a presentation component the toolkit exports
+  through a package entry; it never copies or re-implements one. Such a
+  component shares the web module's single React runtime.
 - The toolkit is linked with `"ramify.ts": "file:.."`. Build it from the
   repository root before relying on a changed toolkit surface.
 
