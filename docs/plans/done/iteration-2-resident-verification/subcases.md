@@ -248,7 +248,7 @@ survives disposal.
 | I2-29:entry-footprints | 13 | ML01 | resident-measure | P | measurement | Idle CLI help, `./client` import, daemon zero contexts, daemon one warm reference, CLI check client. | Within the [budget table](scope.md#latency-and-memory-targets); recorded raw. |
 | I2-29:cold-warm-broad-reference | 13 | DA17 | resident-measure | P/R | measurement | Cold start, then twenty cycles each of unchanged, README, exposure, source and configuration edits. | Medians within targets; `reused` stages as the model predicts. |
 | I2-29:cold-warm-broad-hundred | 13 | DA17 | resident-measure | P/S100 | measurement | Same on S100. | Same. |
-| I2-29:repeated-edit-plateau | 13 | ML02 | resident-measure | P/R, P/S100 | measurement | 200 alternating cycles. | Last-100 growth within limits; counters balanced; history at budget. |
+| I2-29:repeated-edit-plateau | 13 | ML02 | resident-measure | P/R, P/S100 | measurement | 40 alternating cycles. | Last-30 growth within limits; counters balanced; history at budget. |
 | I2-29:many-contexts | 13 | ML03 | resident-measure | P/S100×8 | measurement | Eight warm contexts. | Settled RSS within target; global retained bytes within budget. |
 | I2-29:slow-consumer | 13 | ML04, QT07 | resident-measure | P/S100 | measurement | Non-reading subscriber during ten publications. | Queue bound, disconnect timing and RSS recovery within targets. |
 | I2-29:synthetic-500 | 13 | DA17 | resident-measure | P/S500 | measurement | Cold and one source edit. | Within the binding iteration 1 ceilings; a miss fails, and any budget change requires package review. |

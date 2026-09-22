@@ -157,4 +157,4 @@ watcher, worker, compiler, timer and temporary directory is released in
 | I2A-13:predecessor-regressions | 10 | P/R,T, process | Plan 1 passes; Plan 2/5 match their recorded closure baselines with no new failure and no old waiver relabelled. |
 | I2A-13:declarations-package | 10 | P/T, process | Eleven declarations and eight package entries validate; client/CLI remain lightweight and no MCP/new owner appears. |
 | I2A-13:documents-handoff | 10 | T, document | Architecture, roadmap and guides state implemented behavior/limits; completion report gives Plan 3 provider and remaining-scope handoff. |
-| I2A-13:plan3-preserved | 10 | T, unit | The Plan 3 directory tree equals its implementation-base Git tree byte-for-byte; Plan 2A did not replace or edit it. |
+| I2A-13:plan3-preserved | 10 | T, unit | The Plan 3 directory tree at Plan 2A completion equals its implementation-base Git tree byte-for-byte, so Plan 2A did not replace or edit it; every later change to that tree is a recorded approved decision. |

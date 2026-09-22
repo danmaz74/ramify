@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { plan2Directory, plan2InventoryDocument, renamedInstances } from './instances.js';
+import { correctedInstanceRows, plan2Directory, plan2InventoryDocument, renamedInstances } from './instances.js';
 import { readReviewedPlan2, repositoryRoot, requiredIterations, validateInstancePointers, validateInstanceRecords } from './plan.js';
 import { plan2Instances } from './plan2-instances.js';
 import { plan2Runtime } from './plan2-runtime.js';
@@ -23,6 +23,16 @@ describe('Plan 2 inventory and gates', () => {
     expect(plan2Runtime.handlers.has('I2-30:self-check-fifteen')).toBe(true);
     expect(plan2Instances.find(item => item.id === 'I2-30:self-check-fifteen')!.expectation.summary)
       .toBe('Fifteen owners, every owned file catalogued, no findings or limits.');
+  });
+
+  it('carries the corrected plateau row and names the decision that corrected it', () => {
+    // The reviewed row was the stale side. The byte-for-byte comparison above
+    // is what caught it, and it stays exactly as strict.
+    const correction = correctedInstanceRows.find(item => item.instance === 'I2-29:repeated-edit-plateau');
+    expect(correction).toMatchObject({ commit: '14c5c2a' });
+    const record = plan2Instances.find(item => item.id === 'I2-29:repeated-edit-plateau')!;
+    expect([record.mutation.summary, record.expectation.summary])
+      .toEqual(['40 alternating cycles.', 'Last-30 growth within limits; counters balanced; history at budget.']);
   });
 
   it('transcribes every reviewed field, pointer and evidence kind without execution status', () => {

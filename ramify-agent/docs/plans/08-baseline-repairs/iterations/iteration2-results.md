@@ -245,6 +245,78 @@ The Plan 3 documents were left alone. `docs/plans/iteration-3-project-inspection
 carries its own `I3-14:self-check-eleven`, and `I2A-13:plan3-preserved` requires
 that tree to equal Git tree `71643d5` byte for byte.
 
+## The corrected plateau row, and the Plan 3 baseline
+
+Reviewed and approved after the second pass. Both are transcription repairs of
+`14c5c2a` ("chore(measurements): 40-cycle repeated-edit plateau instead of
+200"), whose substance is a recorded project decision: measurement sampling is
+to be decent rather than exaggerated.
+
+### The reviewed row was the stale side
+
+`14c5c2a` took `I2-29:repeated-edit-plateau` to 40 alternating cycles judged
+over the last 30. It corrected the executable record in `plan2-instances.ts`
+and Plan 3's documents, and left Plan 2's reviewed row in `subcases.md` saying
+200 cycles over the last 100. The row is now corrected to match the record.
+
+The byte-for-byte comparison between the two is untouched: it is what caught
+this, and loosening it would have hidden the next such drift. The correction is
+recorded as `correctedInstanceRows` in `scripts/reference-harness/instances.ts`,
+beside `renamedInstances`, naming the instance, the commit and what changed;
+`plan2.test.ts` asserts that the record now reads 40 and last-30 and that the
+table names `14c5c2a`.
+
+Deliberately left at 200 cycles and last-100: Plan 2's `scope.md` budget row,
+its iteration 13 brief and its iteration 14 results, and Plan 5's and Plan 8's
+recorded measurements. `14c5c2a` states that completed plans and archived
+results keep their 200-cycle evidence. The `subcases.md` leaf row is not
+archived evidence: it is the live contract the harness compares against the
+executable record, which is why it had to move and they do not.
+
+### `I2A-13:plan3-preserved`: what the assertion is for
+
+The reading is not balanced; the evidence points one way.
+
+- Its required result names Plan 2A: "Plan 2A did not replace or edit it."
+- Plan 2A's main plan makes it exit criterion 8: "`docs/plans/iteration-3-project-inspection/`
+  is unchanged **from the Plan 2A implementation base**" — a criterion for
+  Plan 2A's own conduct.
+- The same plan says Plan 3's "existing plan is not implicitly approved or
+  changed by Plan 2A". The question is about Plan 2A superseding parts of
+  Plan 3 without rewriting Plan 3's package to suit itself.
+- The assertion was authored in `d5c2498`, Plan 2A's own merge. At that moment
+  the working tree *was* Plan 2A's completion, so `git diff 71643d5 --` and
+  "the tree at Plan 2A completion" were the same test. They have since parted.
+- Plan 2A holds no authority over a later plan. Read as a permanent freeze on
+  Plan 3's package, a completed plan's gate would fail every later approved
+  revision of Plan 3 — and `14c5c2a` is exactly such an approved decision,
+  made five days after Plan 2A merged.
+
+So the assertion guards Plan 2A's conduct, and that question is settled at
+Plan 2A's completion. It is now asked that way, and it is answered:
+
+```console
+$ git diff --quiet 71643d5 d5c2498 -- docs/plans/iteration-3-project-inspection
+$ echo $?
+0
+```
+
+Plan 2A demonstrably did not touch Plan 3's package, and that fact is now
+permanent rather than decaying with every later commit.
+
+Nothing is loosened. The case keeps its working-tree check, and it now also
+requires every commit that touched Plan 3's package after Plan 2A's completion
+to be one of the recorded approved decisions, listed as `reviewedPlan3Changes`
+with the decision behind each. Today that is `14c5c2a` alone. An uncommitted
+edit fails the first assertion; a committed but unrecorded edit fails the
+third. The reviewed row and its executable record were corrected together, to:
+
+> The Plan 3 directory tree at Plan 2A completion equals its implementation-base
+> Git tree byte-for-byte, so Plan 2A did not replace or edit it; every later
+> change to that tree is a recorded approved decision.
+
+Plan 3's own documents were not touched.
+
 ## Verification
 
 Run from `/tmp/ramify-plan8-i2` after `npm install` and `npm run build`, which
@@ -298,17 +370,18 @@ $ npx vitest run --config scripts/reference-harness/vitest.config.ts \
 nothing neutralised.
 
 ```console
-$ npx vitest run --config scripts/reference-harness/vitest.config.ts plan5.test
- Test Files  1 passed (1)
-      Tests  10 passed (10)
-
-$ npx vitest run --config scripts/reference-harness/vitest.config.ts plan2.test
- Test Files  1 failed (1)
-      Tests  3 failed | 8 passed (11)
+$ npx vitest run --config scripts/reference-harness/vitest.config.ts \
+    plan2.test plan5.test plan2a.test instances.test completion.test \
+    plan5-completion.test completion-regression.test completion-composition.test \
+    final-contracts.test verify.test
+ Test Files  10 passed (10)
+      Tests  77 passed (77)
+   Duration  47.99s
 ```
 
-The three `plan2.test.ts` failures are pre-existing and are described below.
-The rename test added in the same file passes.
+`plan2.test.ts` is green, including its three earlier failures. The
+`I2A-13:plan3-preserved` handler was also run directly, outside the completion
+suite, and all three of its assertions pass.
 
 `plan2b.test.ts` needs the harness's own Vitest configuration; the repository
 configuration includes only `src/tests/` and `subs/**`.
@@ -326,28 +399,19 @@ failed only on the package entries or the KI-3 drift should now pass:
 | Plan 2A | `I2A-13:declarations-package` passes | Same gate, plus the reviewed entries and the recorded additions. `I2A-13:predecessor-regressions` still depends on the Plan 1 record below. |
 | Plan 5 | `I5-14:declarations-final` and `I5-14:package-entries` pass | Same gate and the relocation form. `I5-14:self-check-eleven` needs iteration 1. |
 
-## Still red, and none of it this plan's doing
+## Still red, and not this plan's doing
 
-Each was confirmed by running the same file on the tree as it stood before
-this iteration's changes.
+**AV29's `metrics` expectation** in `plan2b.test.ts`, and nothing else in
+anything this iteration ran. `entryClosures`, the AV34 case this iteration
+rewrote, passes; the AV29 case materializes the architect view, which reports
+`metrics: measured` while the test still expects `unavailable`. It fails
+identically at the base commit `b77b6f6`, in 72.00 s, on the same two lines,
+which was confirmed by running that test alone on the stashed tree. Restated
+here so iteration 6 does not read it as this plan's doing. It belongs with
+Ramify Plan 2C's measurements.
 
-- **AV29's `metrics` expectation** in `plan2b.test.ts`. The architect view
-  reports `metrics: measured` and the test still expects `unavailable`. It
-  fails identically at the base commit `b77b6f6`, in 72.00 s, on the same two
-  lines. Restated here so iteration 6 does not read it as this plan's doing.
-  It belongs with Ramify Plan 2C's measurements.
-- **Three `plan2.test.ts` failures**, all from `14c5c2a`
-  ("chore(measurements): 40-cycle repeated-edit plateau instead of 200"). That
-  commit changed `I2-29:repeated-edit-plateau` in `plan2-instances.ts` to 40
-  cycles and last-30 growth, and changed Plan 3's documents, but left Plan 2's
-  `subcases.md` row saying 200 cycles and last-100. So
-  `validateInstanceRecords` reports `Instance differs from reviewed metadata:
-  I2-29:repeated-edit-plateau`, and the two Plan 2 iteration-2 execution tests
-  fail behind it. The same commit is also why
-  `git diff --quiet 71643d5 -- docs/plans/iteration-3-project-inspection` exits
-  1, which is what `I2A-13:plan3-preserved` asserts. One reviewed-row
-  correction repairs all four, but it is a measurement decision, not a frozen
-  gate, so iteration 2 leaves it and names it here.
+The three `plan2.test.ts` failures and `I2A-13:plan3-preserved`, both from
+`14c5c2a`, are repaired in the section above and are no longer red.
 
 ## A note on attribution
 
@@ -365,5 +429,7 @@ with Plan 6 in `d5c2498`, which is why the gate has reported them since
 | BR04 | Met. A string export target is resolved under both conditions, read as a file and never imported, proved by a fixture whose stylesheet would throw on import. |
 
 Beyond BR03 and BR04, and reviewed separately: the Plan 1 regression record now
-passes with nothing neutralised, and the two `self-check-eleven` instances are
-renamed with their mapping recorded.
+passes with nothing neutralised, the two `self-check-eleven` instances are
+renamed with their mapping recorded, the stale plateau row is corrected with
+its decision named, and `I2A-13:plan3-preserved` asks its question at
+Plan 2A's completion, where the answer is settled.

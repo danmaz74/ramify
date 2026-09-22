@@ -60,6 +60,29 @@ export const renamedInstances: Readonly<Record<string, string>> = {
   'I5-14:self-check-eleven': 'I5-14:self-check-fifteen',
 };
 
+/**
+ * Reviewed rows a later decision corrected, with the commit that decided it.
+ *
+ * An executable record and its reviewed row are compared byte for byte, so a
+ * decision that changes one must change the other. This names the rows where
+ * the reviewed row was the stale side, so a correction is not mistaken for
+ * drift and the comparison itself is never loosened.
+ *
+ * `14c5c2a` took the repeated-edit plateau to 40 alternating cycles judged
+ * over the last 30, because measurement sampling is to be decent rather than
+ * exaggerated. It corrected `plan2-instances.ts` and Plan 3's documents and
+ * left Plan 2's reviewed row saying 200 cycles over the last 100. Plan 8's
+ * baseline repairs corrected that row. The completed plan's scope budgets and
+ * its archived iteration results keep their 200-cycle figures, as that commit
+ * recorded.
+ */
+export const correctedInstanceRows: readonly {
+  readonly instance: string; readonly commit: string; readonly correction: string;
+}[] = [
+  { instance: 'I2-29:repeated-edit-plateau', commit: '14c5c2a',
+    correction: '40 alternating cycles, judged over the last 30, instead of 200 over the last 100' },
+];
+
 export interface ReferenceInstance {
   readonly id: string;
   readonly matrixId: string;
