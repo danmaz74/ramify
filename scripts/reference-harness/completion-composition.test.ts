@@ -4,6 +4,7 @@ import { gunzipSync } from 'node:zlib';
 import { expect, it } from 'vitest';
 import { affectedPlan1Ids, assertPlan1Composition, focusedPlan1Ids, reviewedPlan1Baselines, readPlan1Composition } from './completion-composition.js';
 import type { FocusedPlan1Evidence, Plan1Composition } from './completion-composition.js';
+import { plan1Instances } from './cases.js';
 import type { Plan1GateArtifact } from './completion-regression.js';
 import { reusePolicy, reviewedSemanticFixes } from './evidence-reuse.js';
 import type { SourceTransition } from './evidence-reuse.js';
@@ -35,8 +36,11 @@ it('composes only the reviewed repaired cases while preserving all original evid
     }), ...item.observations.some(o => o.kind === 'relocation-installed-entries')
       ? [{ kind: 'relocation-installed-stylesheets', data: [{ entry: 'ramify.ts/module-tree.css' }] }] : []],
   }));
+  // A current run records the current inventory; the archived definitions stay
+  // the comparison basis, with Plan 8's one restated record named in the checker.
   const baseline: Plan1GateArtifact = { ...archived, passed: false, planComplete: false,
-    evidence: { ...archived.evidence, identity: before }, summary: { required: 308, passed: 300, failed: 8, notExecuted: 0 },
+    evidence: { ...archived.evidence, identity: before, instances: plan1Instances },
+    summary: { required: 308, passed: 300, failed: 8, notExecuted: 0 },
     instances: passed.map(item => (affectedPlan1Ids as readonly string[]).includes(item.id) ? { ...item, status: 'failed', reason: 'assertion-failed', error: 'original failure' } : item) };
   const focused: FocusedPlan1Evidence = { kind: 'plan1-focused-evidence', identity: current, platform: process.platform,
     startedAt: '2026-09-11T00:00:00Z', completedAt: '2026-09-11T00:00:01Z', durationMs: 1000,

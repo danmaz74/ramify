@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { plan5Directory, plan5InventoryDocument } from './instances.js';
+import { plan5Directory, plan5InventoryDocument, renamedInstances } from './instances.js';
 import { readReviewedPlan5, repositoryRoot, requiredIterations, validateInstancePointers, validateInstanceRecords } from './plan.js';
 import { plan5Instances } from './plan5-instances.js';
 import { plan5Runtime } from './plan5-runtime.js';
@@ -12,6 +12,16 @@ import { formatVerification, parseVerifyArguments } from './verify.js';
 
 const plan = readReviewedPlan5();
 describe('Plan 5 inventory and gates', () => {
+  it('carries the renamed self-check instance and maps its archived id', () => {
+    expect(renamedInstances['I5-14:self-check-eleven']).toBe('I5-14:self-check-fifteen');
+    const ids = plan5Instances.map(item => item.id);
+    expect(ids).toContain('I5-14:self-check-fifteen');
+    expect(ids).not.toContain('I5-14:self-check-eleven');
+    expect(plan5Runtime.handlers.has('I5-14:self-check-fifteen')).toBe(true);
+    expect(plan5Instances.find(item => item.id === 'I5-14:self-check-fifteen')!.expectation.summary)
+      .toBe('Fifteen owners, every owned file catalogued, no finding and no analysis limit.');
+  });
+
   it('transcribes all 103 reviewed leaves with exact pointers, fixtures and evidence', () => {
     expect(plan5Instances).toHaveLength(103);
     expect(validateInstanceRecords(plan5Instances, plan)).toEqual([]);

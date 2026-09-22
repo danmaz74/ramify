@@ -57,9 +57,9 @@ with process cleanup. Failed or missing executions receive no matrix credit.
 
 The Plan 1 regression handler reads the complete report produced by the preceding
 `reference:verify -- --plan 1` command. Source, build and runtime identities must
-match, all 308 instances must carry passing assertions, the 305 unaffected record
+match, all 308 instances must carry passing assertions, the 304 unaffected record
 definitions must match the frozen archive, and the toolkit/package observations
-must show eleven owners and eight entries. It never starts another regression
+must show fifteen owners and nine entries beside the stylesheet entry. It never starts another regression
 run. A newer failure for the same inputs blocks an older pass.
 
 Plan 5's `scripts/reference-harness/plan5-completion-cases.ts` supplies the six

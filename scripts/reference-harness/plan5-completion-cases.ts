@@ -180,10 +180,10 @@ async function packedEntries(context: ProjectContext): Promise<void> {
 }
 
 export const plan5CompletionHandlers: ReadonlyMap<string, InstanceHandler> = new Map<string, InstanceHandler>([
-  ['I5-14:self-check-eleven', { kind: 'memory', run: async ({ assertions }) => {
+  ['I5-14:self-check-fifteen', { kind: 'memory', run: async ({ assertions }) => {
     // The resident check of a toolkit copy, under a harness-owned endpoint the
     // sequence process stops and removes; every owned file must be catalogued.
-    const result = await runIsolatedProject({ workRoot: join(repositoryRoot, '.reference-work'), instanceId: 'I5-14:self-check-eleven',
+    const result = await runIsolatedProject({ workRoot: join(repositoryRoot, '.reference-work'), instanceId: 'I5-14:self-check-fifteen',
       fixture: { kind: 'copy', sourceRoot: repositoryRoot } }, async ({ root }) => {
       await symlink(join(repositoryRoot, 'node_modules'), join(root, 'node_modules'));
       await toolkit(root, assertions, false);

@@ -411,8 +411,8 @@ controls; fixture controls earn no product acceptance credit.
 
 `completion-regression.ts` implements `I2-30:plan1-regression` by validating the
 preceding full Plan 1 report from `.reference-work/reports`. It requires the same
-source/build/runtime, all 308 passing assertion records, the frozen 305 unaffected
-definitions and eleven-owner/eight-entry observations. It records the consumed
+source/build/runtime, all 308 passing assertion records, the frozen 304 unaffected
+definitions and fifteen-owner/nine-entry observations beside the stylesheet entry. It records the consumed
 report's hash and rejects missing evidence or a newer failure for those inputs.
 It starts no nested regression runner. The frozen Plan 1 archive supplies only
 definitions; its old build cannot earn current regression credit.

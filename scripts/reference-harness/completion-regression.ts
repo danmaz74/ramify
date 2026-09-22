@@ -16,6 +16,16 @@ export type Plan1GateArtifact = VerificationReport & {
 const identityFields = ['sourceSha256', 'buildSha256', 'packageVersion', 'nodeVersion', 'typescriptVersion'] as const;
 const sameInputs = (a: Identity, b: Identity) => identityFields.every(field => a[field] === b[field]);
 const revised = new Set(['I1-27:self-check', 'I1-27:self-negative', 'I1-28:relocated-package']);
+// Ramify Plan 8's `ff01212` restated this record's text when the reference
+// example declared its signatures, so the archived definition and the current
+// inventory differ for it alone. The archived evidence stays as it is; this
+// names the one record the byte-identity rule no longer covers.
+const restatedByPlan8 = new Set(['I1-09:signature-only-type']);
+/** Records a later plan revised, by expectation or by restated definition. */
+const revisedDefinitions = new Set([...revised, ...restatedByPlan8]);
+/** 308 records, less the three Plan 2 expectation revisions and Plan 8's one restatement. */
+export const unchangedRecordCount = 304;
+export const restatedRecordIds = [...restatedByPlan8];
 const owners = ['ramify', 'ramify/analysis', 'ramify/analysis/descriptions', 'ramify/analysis/model',
   'ramify/analysis/project', 'ramify/analysis/typescript', 'ramify/cli', 'ramify/daemon', 'ramify/daemon/contexts',
   'ramify/presentation', 'ramify/presentation/layout'];
@@ -58,7 +68,7 @@ export function revisedName(archived: string): string {
 }
 
 /** Accept a complete process gate, not its summary counters alone. The frozen
- * archive supplies the 305 unaffected record definitions, never current success. */
+ * archive supplies the 304 unaffected record definitions, never current success. */
 export function assertPlan1Regression(report: Plan1GateArtifact, identity: Identity, archivedRecords: typeof plan1Instances): void {
   assert.ok(sameInputs(report.evidence.identity, identity), 'Plan 1 evidence is for different source, build or runtime inputs');
   assert.deepEqual([report.schemaVersion, report.plan, report.mode, report.iteration, report.passed, report.planComplete],
@@ -67,10 +77,10 @@ export function assertPlan1Regression(report: Plan1GateArtifact, identity: Ident
   assert.deepEqual(report.inventoryIssues, []);
   assert.deepEqual(report.summary, { required: 308, passed: 308, failed: 0, notExecuted: 0 });
   assert.deepEqual(report.evidence.instances, plan1Instances, 'Every execution record must match the current reviewed inventory');
-  const unaffected = (records: typeof plan1Instances) => records.filter(item => !revised.has(item.id));
-  assert.equal(unaffected(archivedRecords).length, 305);
+  const unaffected = (records: typeof plan1Instances) => records.filter(item => !revisedDefinitions.has(item.id));
+  assert.equal(unaffected(archivedRecords).length, unchangedRecordCount);
   assert.equal(JSON.stringify(unaffected(report.evidence.instances)), JSON.stringify(unaffected(archivedRecords)),
-    'The 305 unaffected Plan 1 record definitions must remain byte-identical');
+    `The ${unchangedRecordCount} unaffected Plan 1 record definitions must remain byte-identical`);
   assert.deepEqual(report.instances.map(item => item.id), plan1Instances.map(item => item.id), 'All 308 unique execution slots are required');
   for (const item of report.instances) {
     assert.ok(item.required === true && item.status === 'passed' && item.reason === undefined && item.error === undefined,
@@ -124,7 +134,8 @@ export async function readPlan1Regression(directory: string, identity: Identity,
     if (!sameInputs(report.evidence.identity, identity)) continue;
     assertPlan1Regression(report, identity, archivedRecords);
     return { file: file.name, sha256: createHash('sha256').update(raw).digest('hex'), identity: report.evidence.identity,
-      summary: report.summary, unchangedRecords: 305, revisedExpectationRecords: [...revised] };
+      summary: report.summary, unchangedRecords: unchangedRecordCount,
+      revisedExpectationRecords: [...revised], restatedRecords: restatedRecordIds };
   }
   throw new Error('No full Plan 1 gate for the current source/build/runtime. Run npm run reference:verify -- --plan 1 through the authorized regression runner first.');
 }

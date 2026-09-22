@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { gunzipSync } from 'node:zlib';
+import { plan1Instances } from './cases.js';
 import { assertPlan1Regression, readPlan1Regression } from './completion-regression.js';
 import type { Plan1GateArtifact } from './completion-regression.js';
 import { repositoryRoot } from './plan.js';
@@ -46,7 +47,9 @@ export async function completionRegressionControls(): Promise<string[]> {
   const archived = JSON.parse(gunzipSync(await readFile(join(repositoryRoot,
     'scripts/reference-harness/evidence/plan1-complete.json.gz'))).toString('utf8')) as Plan1GateArtifact;
   const identity = { ...archived.evidence.identity, sourceSha256: 'fixture-source', buildSha256: 'fixture-build' };
-  const qualified: Plan1GateArtifact = { ...archived, evidence: { ...archived.evidence, identity },
+  // A current run records the current inventory, not the archived definitions.
+  // The one record Plan 8 restated is named in the checker's revision set.
+  const qualified: Plan1GateArtifact = { ...archived, evidence: { ...archived.evidence, identity, instances: plan1Instances },
     instances: archived.instances.map(item => ({ ...item,
       baselineAssertions: item.baselineAssertions.map(a => ({ ...a, name: currentName(a.name) })),
       assertions: [...item.assertions.map(a => ({ ...a, name: currentName(a.name) })),
@@ -76,7 +79,7 @@ export async function completionRegressionControls(): Promise<string[]> {
   reject('missing actual owner observations', missing('toolkit-scope'));
   reject('missing actual installed entries', missing('relocation-installed-entries'));
   const alteredArchive = archived.evidence.instances.map((item, index) => index ? item : { ...item, capabilityScope: 'changed' });
-  assert.throws(() => assertPlan1Regression(qualified, identity, alteredArchive)); recorded.push('305 frozen definitions');
+  assert.throws(() => assertPlan1Regression(qualified, identity, alteredArchive)); recorded.push('304 frozen definitions');
   const directory = await mkdtemp(join(tmpdir(), 'ri14-regression-control-'));
   const save = async (name: string, value: unknown, seconds: number) => {
     const path = join(directory, name); await writeFile(path, JSON.stringify(value)); await utimes(path, seconds, seconds);

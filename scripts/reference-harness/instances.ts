@@ -40,6 +40,26 @@ export const plan2aGroupCapabilities: Readonly<Record<string, VerificationCapabi
 export const planDirectory = 'docs/plans/done/iteration-1-project-verifier';
 export const inventoryDocument = `${planDirectory}/subcases.md`;
 
+/**
+ * Instance ids a reviewed plan renamed, old id to new id.
+ *
+ * This is the first rename in this harness: `supersessions` records an
+ * instance another one replaces, which is a different thing, and nothing else
+ * maps ids across a change. Archived evidence recorded under an old id is read
+ * through this table; the reviewed inventories carry only the new id.
+ *
+ * `I2-30:self-check-eleven` and `I5-14:self-check-eleven` ran `check:self` and
+ * required eleven owners. Ramify Plan 6 (project explorer) took the toolkit to
+ * fifteen owners, and `self-cases.ts` has required fifteen since `1bbd588`, so
+ * Plan 8's baseline repairs renamed both instances and their required results.
+ * The archived acceptance artifacts under
+ * `docs/plans/done/iteration-2-resident-verification/evidence/` keep the old id.
+ */
+export const renamedInstances: Readonly<Record<string, string>> = {
+  'I2-30:self-check-eleven': 'I2-30:self-check-fifteen',
+  'I5-14:self-check-eleven': 'I5-14:self-check-fifteen',
+};
+
 export interface ReferenceInstance {
   readonly id: string;
   readonly matrixId: string;
