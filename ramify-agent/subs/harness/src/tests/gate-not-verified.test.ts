@@ -2,6 +2,8 @@ import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { runGate } from '../checks/gate.js';
+import { inPlaceCheckExecution } from '../checks/execution.js';
+import type { CheckExecutionPort } from '../checks/execution.js';
 import type { GateRequest } from '../checks/gate.js';
 import { checkCommand } from '../checks/records.js';
 import type { CheckCommand, TestSelection } from '../checks/records.js';
@@ -33,7 +35,7 @@ describe('a gate that cannot run what its checkpoint requires', () => {
     ({ policy: 'owned-by-scope', exactOwners: ['project/reviews'], subtrees: [], extraSuites, resolved });
 
   const gate = (checks: readonly PlannedCheck[], overrides: Partial<GateRequest> = {}): Promise<ReturnType<typeof runGate> extends Promise<infer T> ? T : never> =>
-    runGate('iteration', {
+    runGate(inPlaceCheckExecution, 'iteration', {
       id: 'ga-0001',
       projectRoot: directory.path,
       directory: join(directory.path, 'gates', 'ga-0001'),
@@ -179,5 +181,51 @@ describe('a gate that cannot run what its checkpoint requires', () => {
     expect(await readFile(attempt.commands[2]?.output.path ?? '', 'utf8')).toBe('tested\n');
     expect(attempt.commands[2]?.output.tail).toBe('tested\n');
     expect(attempt.commands[2]?.selection?.resolved).toEqual(['src/tests/one.test.ts']);
+  });
+
+  it('delegates every verified plan to the execution port and requires one record for each', async () => {
+    const checks: PlannedCheck[] = [
+      { kind: 'type-check', command: command('true') },
+      { kind: 'tests', command: command('true'), selection: selection(['src/tests/one.test.ts']), requiresTests: true },
+    ];
+    let received: readonly PlannedCheck[] = [];
+    const execution: CheckExecutionPort = {
+      async run(planned, request) {
+        received = planned;
+        return { commands: planned.map((check, index) => ({
+          kind: check.kind,
+          command: check.command,
+          ...(check.selection === undefined ? {} : { selection: check.selection }),
+          startedAt: '2026-09-21T00:00:00.000Z',
+          elapsedMs: index + 1,
+          exitCode: 0,
+          outcome: 'passed',
+          runnerError: null,
+          output: { path: join(request.directory, `${index + 1}.log`), bytes: 0, truncated: false, tail: '' },
+        })), audited: null, evidence: null };
+      },
+    };
+
+    const attempt = await runGate(execution, 'iteration', {
+      id: 'ga-port',
+      projectRoot: directory.path,
+      directory: join(directory.path, 'gates', 'ga-port'),
+      head: '0'.repeat(40),
+      checks,
+    });
+    expect(received).toBe(checks);
+    expect(attempt.commands.map(entry => [entry.kind, entry.elapsedMs])).toEqual([
+      ['type-check', 1],
+      ['tests', 2],
+    ]);
+    expect(attempt.verdict).toBe('passed');
+
+    await expect(runGate({ run: async () => ({ commands: [], audited: null, evidence: null }) }, 'iteration', {
+      id: 'ga-short',
+      projectRoot: directory.path,
+      directory: join(directory.path, 'gates', 'ga-short'),
+      head: '0'.repeat(40),
+      checks,
+    })).rejects.toThrow('answered 0 command records for 2 planned checks');
   });
 });

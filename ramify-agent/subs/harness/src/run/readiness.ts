@@ -1,5 +1,6 @@
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
+import type { CheckExecutionPort } from '../checks/execution.js';
 import { runGate } from '../checks/gate.js';
 import { allProjectChecks, checkpointPolicies } from '../checks/checkpoint.js';
 import { checkCommandEnvironment } from '../checks/records.js';
@@ -62,7 +63,7 @@ const testFilePattern = /\.(test|spec)\.[cm]?[jt]sx?$/;
 const testDiscoveryDepth = 8;
 
 /** Runs one readiness attempt and answers what it established. */
-export async function runReadiness(request: ReadinessRequest): Promise<ReadinessResult> {
+export async function runReadiness(execution: CheckExecutionPort, request: ReadinessRequest): Promise<ReadinessResult> {
   const { projectRoot, policy } = request;
   const steps: StepResult[] = [];
 
@@ -85,7 +86,7 @@ export async function runReadiness(request: ReadinessRequest): Promise<Readiness
     return { attempt: attemptRecord(request, steps, nested, null), gate: null };
   }
 
-  const gate = await runGate('readiness', {
+  const gate = await runGate(execution, 'readiness', {
     id: request.gateId,
     projectRoot,
     directory: request.gateDirectory,

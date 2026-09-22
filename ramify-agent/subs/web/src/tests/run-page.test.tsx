@@ -12,6 +12,8 @@ afterEach(cleanup);
 
 const runId = '20260921T080000Z-c0ffee';
 const at = '2026-09-21T08:00:00.000Z';
+const baseCommit = 'a'.repeat(40);
+const failedCommit = 'b'.repeat(40);
 
 function snapshot(extra: Partial<RunSnapshot> = {}): RunSnapshot {
   return runSnapshotSchema.parse({
@@ -38,7 +40,8 @@ function stubRun(extra: Partial<RunSnapshot> = {}): StubRun {
     events: [
       { sequence: 1, at, transition: 'job-started', summary: 'The run started', refs: [] },
       { sequence: 2, at, transition: 'readiness-passed', summary: 'Readiness passed at attempt 1', refs: [{ kind: 'gate', id: 'ga-0001' }] },
-      { sequence: 3, at, transition: 'gate-attempted', summary: 'Gate ga-0002 (final): passed, next accept', refs: [{ kind: 'gate', id: 'ga-0002' }] },
+      { sequence: 3, at, transition: 'gate-attempted', summary: 'Gate ga-0002 (iteration wi-002.i01): failed, next repair', refs: [{ kind: 'gate', id: 'ga-0002' }] },
+      { sequence: 4, at, transition: 'gate-attempted', summary: 'Gate ga-0003 (iteration wi-002.i01): passed, next accept', refs: [{ kind: 'gate', id: 'ga-0003' }] },
     ],
     analysis: analysisResponseSchema.parse({
       plan: { markdown: '# Reviewer notes\n\nA plan.', hash: 'a'.repeat(64) },
@@ -71,12 +74,28 @@ function stubRun(extra: Partial<RunSnapshot> = {}): StubRun {
       total: 2,
     }),
     gates: {
+      'ga-0001': gateViewSchema.parse({
+        id: 'ga-0001', checkpoint: 'readiness', subject: {}, repairRound: 0, infrastructureAttempt: 0, head: baseCommit,
+        commit: null, audited: null, evidence: null, verdict: 'passed', cause: null, next: 'accept', guardedChanges: [], rules: [], commands: [],
+      }),
       'ga-0002': gateViewSchema.parse({
-        id: 'ga-0002', checkpoint: 'final', subject: {}, repairRound: 0, infrastructureAttempt: 0, head: 'abc', commit: null,
+        id: 'ga-0002', checkpoint: 'iteration', subject: { workItem: 'wi-002', iteration: 'wi-002.i01' }, repairRound: 0, infrastructureAttempt: 0,
+        head: baseCommit, commit: failedCommit, audited: failedCommit,
+        evidence: { runRef: 'refs/audited/runs/failed', reportCommit: 'c'.repeat(40), treeRef: 'refs/audited/trees/failed' },
+        verdict: 'failed', cause: 'in-scope', next: 'repair', guardedChanges: [], rules: [],
+        commands: [{
+          kind: 'tests', argv: ['npm', 'test'], cwd: '/p', startedAt: at, elapsedMs: 5, exitCode: 1, outcome: 'failed', notVerified: null,
+          runnerError: null, selection: null, output: { path: 'gates/ga-0002/tests.log', bytes: 20000, truncated: false, tail: 'xxxx\none failed\n' },
+        }],
+      }),
+      'ga-0003': gateViewSchema.parse({
+        id: 'ga-0003', checkpoint: 'iteration', subject: { workItem: 'wi-002', iteration: 'wi-002.i01' }, repairRound: 1, infrastructureAttempt: 0,
+        head: failedCommit, commit: null, audited: failedCommit,
+        evidence: { runRef: 'refs/audited/runs/passed', reportCommit: 'd'.repeat(40), treeRef: 'refs/audited/trees/passed' },
         verdict: 'passed', cause: null, next: 'accept', guardedChanges: [], rules: [],
         commands: [{
           kind: 'tests', argv: ['npm', 'test'], cwd: '/p', startedAt: at, elapsedMs: 5, exitCode: 0, outcome: 'passed', notVerified: null,
-          runnerError: null, selection: null, output: { path: 'gates/ga-0002/tests.log', bytes: 20000, truncated: false, tail: 'xxxx\nall passed\n' },
+          runnerError: null, selection: null, output: { path: 'gates/ga-0003/tests.log', bytes: 20000, truncated: false, tail: 'xxxx\nall passed\n' },
         }],
       }),
     },
@@ -179,13 +198,32 @@ test('progress shows todo, working on and completed with reasons, and marks a fo
   expect(within(todo).getByText('forecast')).toBeTruthy();
 });
 
-test('a gate shows its commands and its bounded output tail', async () => {
+test('one iteration shows its failed and passed audits, attempt-local commit, evidence refs and unpublished states', async () => {
   render(<RunPage client={clientWith(stubRun())} planId="review-notes" runId={runId} interval={60_000} />);
   fireEvent.click(await screen.findByRole('tab', { name: 'Checks' }));
+
   fireEvent.click(await screen.findByRole('button', { name: 'ga-0002' }));
-  const tail = await screen.findByLabelText('Output tail of tests');
+  let gate = await screen.findByLabelText('Gate ga-0002');
+  expect(within(gate).getByRole('heading').textContent).toBe('ga-0002: iteration, failed');
+  expect(within(gate).getByText('Attempt commit').nextElementSibling?.textContent).toBe(failedCommit);
+  expect(within(gate).getByText('Audited commit').nextElementSibling?.textContent).toBe(failedCommit);
+  expect(within(gate).getByText('Audit evidence').nextElementSibling?.textContent).toContain('refs/audited/runs/failed');
+
+  fireEvent.click(screen.getByRole('button', { name: 'ga-0003' }));
+  gate = await screen.findByLabelText('Gate ga-0003');
+  expect(within(gate).getByRole('heading').textContent).toBe('ga-0003: iteration, passed');
+  expect(within(gate).getByText('Attempt commit').nextElementSibling?.textContent).toBe('none (this attempt made no commit)');
+  expect(within(gate).getByText('Audited commit').nextElementSibling?.textContent).toBe(failedCommit);
+  expect(within(gate).getByText('Audit evidence').nextElementSibling?.textContent).toContain('refs/audited/trees/passed');
+  const tail = within(gate).getByLabelText('Output tail of tests');
   expect(tail.textContent).toBe('xxxx\nall passed\n');
-  expect(screen.getByText(/20000 bytes in/)).toBeTruthy();
+  expect(within(gate).getByText(/20000 bytes in/)).toBeTruthy();
+
+  fireEvent.click(screen.getByRole('button', { name: 'ga-0001' }));
+  gate = await screen.findByLabelText('Gate ga-0001');
+  expect(within(gate).getByText('Attempt commit').nextElementSibling?.textContent).toBe('none (this attempt made no commit)');
+  expect(within(gate).getByText('Audited commit').nextElementSibling?.textContent).toBe('not audited');
+  expect(within(gate).getByText('Audit evidence').nextElementSibling?.textContent).toBe('not published');
 });
 
 test('an unavailable metric reads unavailable with its known subtotal, never zero; the guarding statement stays', async () => {

@@ -7,6 +7,7 @@ import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import { findModule, type ArchitectIndex } from '../../subs/evidence/src/views.js';
 import { writeFileAtomic } from '../../subs/ledger/src/atomic.js';
 import { resolveTestSelection } from '../checks/selection.js';
+import { inPlaceCheckExecution } from '../checks/execution.js';
 import { isContained, resolveRealTarget } from '../guard/resolve-contained-path.js';
 import type { GuardedScope } from '../guard/write-guard.js';
 import type { HookFinding } from '../hooks/post-write.js';
@@ -465,7 +466,7 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
     } else {
       progress({ type: 'gate-started' });
       const selection = await resolveTestSelection({ projectRoot, index: await refresh(), policy: tests });
-      const attempt = await runCheckpoint({
+      const attempt = await runCheckpoint(inPlaceCheckExecution, {
         id: gateAttemptId(1),
         checkpoint: 'iteration',
         projectRoot,

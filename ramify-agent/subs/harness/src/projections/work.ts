@@ -216,6 +216,8 @@ export function gateOf(view: RunView, id: string): GateView {
     infrastructureAttempt: gate.infrastructureAttempt,
     head: gate.head,
     commit: gate.commit,
+    audited: gate.audited,
+    evidence: gate.evidence === null ? null : { ...gate.evidence },
     verdict: gate.verdict,
     cause: gate.cause,
     next: gate.next,

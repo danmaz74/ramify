@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import { gateDiagnostics } from '../checks/diagnostics.js';
 import { runGate } from '../checks/gate.js';
+import { inPlaceCheckExecution } from '../checks/execution.js';
 import { checkCommand, type GateAttempt } from '../checks/records.js';
 import type { PlannedCheck } from '../checks/verify.js';
 import { runLayout } from '../run/records.js';
@@ -59,7 +60,7 @@ function prints(text: string, code: number, cwd: string) {
 async function attempt(checks: readonly PlannedCheck[], writeScope?: readonly string[]): Promise<GateAttempt> {
   const directory = await mkdtemp(join(tmpdir(), 'ramify-agent-gate-'));
   cleanups.push(() => rm(directory, { recursive: true, force: true }));
-  return runGate('iteration', {
+  return runGate(inPlaceCheckExecution, 'iteration', {
     id: 'ga-0001',
     projectRoot: directory,
     directory: join(directory, 'gate'),

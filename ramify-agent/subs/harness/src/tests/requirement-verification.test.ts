@@ -344,7 +344,9 @@ describe('P2: the contract gate rejects a fake under a production-looking name',
     expect(first.commands.every(command => command.outcome === 'passed')).toBe(true);
     // The rule is the engineer's to repair, so the attempt's cause is in-scope.
     expect(first.cause).toBe('in-scope');
-    expect(first.commit).toBeNull();
+    expect(first.commit).not.toBeNull();
+    expect(first.audited).toBe(first.commit);
+    expect(first.evidence).not.toBeNull();
     const rule = first.rules![0]!;
     expect(rule.rule).toBe('fake-naming');
     expect(rule.outcome).toBe('failed');
@@ -355,11 +357,14 @@ describe('P2: the contract gate rejects a fake under a production-looking name',
     ]));
     expect(rule.violations.find(violation => violation.rule === 'export-name')!.detail).toContain('createNoteLimit');
 
-    // Every attempt of the same agreement fails the same way, and none commits.
+    // Every attempt of the same agreement fails the same way over an exact
+    // audited commit; an unchanged retry may audit its head without making a
+    // second commit.
     for (const attempt of contractGates) {
       expect(attempt.verdict).toBe('failed');
       expect(attempt.rules![0]!.outcome).toBe('failed');
-      expect(attempt.commit).toBeNull();
+      expect(attempt.audited).toBe(attempt.commit ?? attempt.head);
+      expect(attempt.evidence).not.toBeNull();
     }
   }, 300_000);
 });

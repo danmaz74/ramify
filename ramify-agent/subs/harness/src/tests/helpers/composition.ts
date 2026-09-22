@@ -831,7 +831,7 @@ export function identityOf(event: RunEvent): string | null {
     case 'iteration-assigned': case 'iteration-closed': return `${event.type}:${String(data.iteration)}`;
     case 'contract-requested': return `${event.type}:${String(data.iteration)}`;
     case 'outline-revised': return `${event.type}:${String(data.workItem)}@${String(data.revision)}`;
-    case 'gate-attempted': case 'gate-committed': return `${event.type}:${String(data.gate)}`;
+    case 'gate-committing': case 'gate-attempted': return `${event.type}:${String(data.gate)}`;
     case 'placement-requested': return `${event.type}:${String(data.request)}`;
     case 'decision-accepted': case 'brief-appended': return `${event.type}:${String(data.decision)}`;
     case 'decision-delivered': return `${event.type}:${String(data.decision)}->${String(data.workItem)}`;
@@ -853,7 +853,6 @@ export function identityOf(event: RunEvent): string | null {
  * would be new work.
  */
 export const recoveryCompletions: ReadonlySet<RunEvent['type']> = new Set([
-  'invocation-ended', 'writer-released', 'gate-committed', 'brief-appended', 'global-context-rebuilt',
+  'invocation-ended', 'writer-released', 'gate-attempted', 'brief-appended', 'global-context-rebuilt',
   'decision-delivered', 'job-interrupted',
 ]);
-

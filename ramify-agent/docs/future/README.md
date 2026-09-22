@@ -127,21 +127,6 @@ Run automated reviews and present their actionable results. Treat reviews as
 producers of findings once the finding lifecycle exists, so review output does
 not create a separate status and resolution model.
 
-### Standalone commit-audit integration
-
-**Maturity:** Dependency gated.
-
-Integrate the commit-auditing mechanism after it has been extracted from
-cucumber-viz into a standalone CLI tool. The audit should run checks against
-the exact committed source tree and return evidence bound to that tree. Replace
-the harness's gate implementation behind its existing single entry point,
-rather than adding a second checking path.
-
-The current Plan 3 design intentionally prepares this seam and leaves the tool
-out of scope. See the
-[reuse decision](../plans/03-autonomous-implementation-loop/reuse/README.md#not-copied-the-commit-audit)
-and the [core-records decision](../plans/03-autonomous-implementation-loop/core-records.proposal.md#run-the-checks-then-commit).
-
 ## Delivery lifecycle
 
 ### Isolated worktree execution and merge

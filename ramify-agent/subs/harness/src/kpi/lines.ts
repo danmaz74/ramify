@@ -41,9 +41,9 @@ export type LineSnapshot =
   | { readonly available: false; readonly reason: string };
 
 /** Takes one snapshot. A repository that cannot answer leaves its reason, never a zero. */
-export async function takeLineSnapshot(projectRoot: string): Promise<LineSnapshot> {
+export async function takeLineSnapshot(projectRoot: string, accepted: string = 'HEAD'): Promise<LineSnapshot> {
   try {
-    return { available: true, changes: await worktreeLineChanges(projectRoot) };
+    return { available: true, changes: await worktreeLineChanges(projectRoot, accepted) };
   } catch (error) {
     return { available: false, reason: error instanceof Error ? error.message : String(error) };
   }

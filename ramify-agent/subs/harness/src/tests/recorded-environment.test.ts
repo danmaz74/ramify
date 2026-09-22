@@ -2,6 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { runGate } from '../checks/gate.js';
+import { inPlaceCheckExecution } from '../checks/execution.js';
 import { checkCommand, checkCommandEnvironment } from '../checks/records.js';
 import { defaultRunPolicy } from '../run/policy.js';
 import { checkCommandSchema, runPolicySchema } from '../run/records.js';
@@ -77,7 +78,7 @@ describe('a gate attempt', () => {
       });
       expect(checkCommandEnvironment(command)).not.toHaveProperty(secretName);
 
-      const attempt = await runGate('iteration', {
+      const attempt = await runGate(inPlaceCheckExecution, 'iteration', {
         id: 'ga-0001',
         projectRoot: directory.path,
         directory: gates,

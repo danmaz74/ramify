@@ -142,13 +142,10 @@ function describe(event: RunEvent): [string, Ref[]] {
         event.data.confirmed ? `Session ${event.data.invocation} released the writer` : `Session ${event.data.invocation}'s release was not confirmed; no writer or gate may follow`,
         ref('invocation', event.data.invocation),
       ];
+    case 'gate-committing':
+      return [`Gate ${event.data.gate} (${event.data.checkpoint}) is committing before audit`, ref('gate', event.data.gate)];
     case 'gate-attempted':
       return [`Gate ${event.data.gate} (${event.data.checkpoint}): ${event.data.verdict}, next ${event.data.next}`, ref('gate', event.data.gate)];
-    case 'gate-committed':
-      return [
-        event.data.commit === null ? `Gate ${event.data.gate} passed with nothing to commit` : `Gate ${event.data.gate}'s pass was committed`,
-        [...ref('gate', event.data.gate), ...ref('commit', event.data.commit)],
-      ];
     case 'stop-requested':
       return ['A stop was requested', []];
     case 'job-completed':

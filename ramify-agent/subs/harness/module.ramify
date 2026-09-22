@@ -4,8 +4,8 @@ module harness
 // The server for one project, which the root starts with the web client's
 // build output. Runs, their records, plan discovery, the evidence the
 // analysis works from and the HTTP adapter stay internal.
-expose-src startServer, ProjectRootError from "http/server.ts" to parent
-expose-src ProjectLockError from "store/lock.ts" to parent
+expose-src startCliServer, CliServerOptions, CliServer, ProjectRootError from "http/server.ts" to parent
+expose-src isProjectLockError from "store/lock.ts" to parent
 
 // One engineer session on one module, from a prompt, which the root's
 // `session` command runs and prints. The command's entry builds the agent
@@ -34,3 +34,13 @@ expose-src * from "interfaces/protocol/paths.ts" tagged [browser] to parent
 // The run protocol, beside the job protocol this module already owns: the
 // commands, the queries and every projection a client reads of a run.
 expose-src * from "interfaces/protocol/runs.ts" tagged [browser] to parent
+
+// The audit child proves conformance against commits made by the harness and
+// verifies that publication does not disturb repository cleanliness. The git
+// behavior and process execution remain owned by evidence; harness relays the
+// narrow contracts the audit adapter implements rather than duplicating them.
+expose-src CheckExecutionPort, CheckExecutionRequest, CheckExecutionContext, CheckExecutionResult, CheckHarnessGuardedChange, checkOutputPath from "checks/execution.ts" to descendants
+expose-src PlannedCheck from "checks/verify.ts" to descendants
+expose-src Checkpoint, GateCommandRecord, GateEvidence, GateRuleRecord, TestSelectionPolicy, TestSelection, CheckCommand, CheckCommandKind, NotVerified, checkCommandEnvironment from "checks/records.ts" to descendants
+expose-sub commitAccepted, createRunBranch, isCleanRepository from evidence to descendants
+expose-sub runCommand, childEnvironment, outputTailBytes, CommandRequest, CommandRun, CommandOutcome, CommandOutput from evidence to descendants

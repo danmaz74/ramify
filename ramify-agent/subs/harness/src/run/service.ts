@@ -1,10 +1,13 @@
 import { mkdir, readFile, stat } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import type { AgentPort, AgentSession, JsonSchema, SessionSpec, SessionStart } from '../../subs/agent/src/interfaces/port.js';
-import { changedEntries, changedPaths, commitNameStatus, createRunBranch, GitError } from '../../subs/evidence/src/git.js';
+import { changedEntries, changedPaths, createRunBranch, diffNameStatus, GitError } from '../../subs/evidence/src/git.js';
 import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import { coverageLimitsOf, findModule, readArchitectMeta, type ArchitectIndex } from '../../subs/evidence/src/views.js';
 import type { GateAttempt, GateRuleRecord, TestSelectionPolicy } from '../checks/records.js';
+import { acceptedCommit } from '../checks/accepted.js';
+import { inPlaceCheckExecution, type CheckExecutionPort } from '../checks/execution.js';
+import { executePreparedGate, type PreparedGate } from '../checks/gate.js';
 import { resolveTestSelection } from '../checks/selection.js';
 import type { GuardedScope } from '../guard/write-guard.js';
 import { ExcursionWatcher } from './excursions.js';
@@ -79,7 +82,7 @@ import { workLayout, workItemId, workItemOutlineSchema, type WorkItem, type Work
 import { apiViewsOf, iterationApiViews, onboardingOf, workItemMessage, type DelegationBriefing } from '../work/session.js';
 import { localArchitectJsonSchema, localArchitectToolName, validateLocalArchitect, type LocalArchitectSubmission } from '../work/submission.js';
 import { gateDiagnostics, type GateAudience } from '../checks/diagnostics.js';
-import { commitForGate, commitMessage, commitsOnPass, currentHead, runCheckpoint, withCommit } from './gates.js';
+import { commitForGate, commitMessage, currentHead, prepareCheckpoint, type CheckpointRequest } from './gates.js';
 import { capturePlan, EvidenceUnavailableError, type RunInputs } from './inputs.js';
 import { RunLog, type RunEvent, type RunEventInput, type RunEventOf } from './log.js';
 import { ObservationLog } from './observations.js';
@@ -89,7 +92,7 @@ import { failingStep, performRecovery, recoveryFor, runReadiness, withRecovery }
 import {
   gateAttemptId, invocationId, invocationOutcomeSchema, invocationSchema,
   recoveryId, runDirectory, runLayout, runRecordSchema, runSchemas, snapshotId,
-  type Invocation, type InvocationOutcome, type MeasurementSnapshot, type RecordRef, type RunPolicy, type RunRecord,
+  type GateOperation, type Invocation, type InvocationOutcome, type MeasurementSnapshot, type RecordRef, type RunPolicy, type RunRecord,
 } from './records.js';
 import { runSnapshot, type RunSnapshot } from './snapshot.js';
 import { SubmissionJudge, type SubmissionValidation } from './submissions.js';
@@ -158,6 +161,8 @@ export interface RunServiceOptions {
   readonly inputs: RunInputs;
   /** The Ramify command line the run's readiness and measurements use. */
   readonly ramify: RamifyCli;
+  /** How committing checkpoint commands run. Readiness remains in place. */
+  readonly checkExecution: CheckExecutionPort;
   /** The policy the run captures. Without one it is the hardcoded default over this project. */
   readonly policy?: ((projectRoot: string, nested: Awaited<ReturnType<typeof discoverNestedPackages>>) => RunPolicy) | undefined;
   /** The module the baseline is frozen over; the architect view's root by default. */
@@ -291,6 +296,7 @@ class Run {
     readonly record: RunRecord,
     readonly directory: string,
     readonly log: RunLog,
+    readonly base: string,
     writer: WriterOwnership,
   ) {
     this.writer = writer;
@@ -373,7 +379,11 @@ export class RunService {
         if ((parsed as { kind?: unknown } | null)?.kind !== 'implementation') continue;
         const record = runRecordSchema.parse(parsed);
         if (record.jobId !== jobId || record.planId !== planId) throw new Error('job.json names another run');
-        run = new Run(record, directory, await RunLog.open(join(directory, runLayout.events), jobId), this.newWriter(record.policy));
+        const log = await RunLog.open(join(directory, runLayout.events), jobId);
+        const base = await this.runBase(record, log);
+        let loaded!: Run;
+        loaded = new Run(record, directory, log, base, this.newWriter(record.policy, () => this.accepted(loaded)));
+        run = loaded;
       } catch (error) {
         report.skipped.push(key(planId, jobId));
         this.warn(`Skipping ${directory}: ${message(error)}. It declares ${declaredSchemaOf(await readJson(recordPath))}.`);
@@ -432,17 +442,18 @@ export class RunService {
         performed.push(`the parent append of decision ${decision.id}`);
         continue;
       }
-      if (event.type !== 'gate-attempted') {
+      if (event.type !== 'gate-committing') {
         this.warn(`Run ${run.record.jobId}: effect "${pending.key}" has no known completion and was left alone`);
         continue;
       }
-      const attempt = await this.readGate(run, event.data.gate);
-      if (attempt === null) {
-        this.warn(`Run ${run.record.jobId}: the gate attempt of effect "${pending.key}" cannot be read; its commit was left alone`);
+      const read = await readCommitted(run.log.ledger, runLayout.gateOperation(event.data.gate), runSchemas.gateOperation);
+      if (read.kind !== 'valid') {
+        this.warn(`Run ${run.record.jobId}: the gate operation of effect "${pending.key}" cannot be read; its commit was left alone`);
         continue;
       }
-      await this.commitGate(run, attempt);
-      performed.push(`the commit of gate ${event.data.gate}`);
+      const operation = read.value as GateOperation;
+      await this.commitGate(run, preparedGate(operation), undefined, undefined, undefined, operation.message);
+      performed.push(`the commit and audit of gate ${event.data.gate}`);
     }
     return performed;
   }
@@ -488,13 +499,35 @@ export class RunService {
     return closed;
   }
 
-  private newWriter(policy: RunPolicy): WriterOwnership {
-    const tree: TreeObserver = { changed: () => changedPaths(this.projectRoot).catch(() => []) };
+  private newWriter(policy: RunPolicy, boundary: () => string): WriterOwnership {
+    const tree: TreeObserver = { changed: () => changedPaths(this.projectRoot, boundary()).catch(() => []) };
     return new WriterOwnership({
       settleMs: policy.limits.writerSettleMs,
       tree,
       groups: this.options.groups ?? nodeProcessGroups,
     });
+  }
+
+  /** The source boundary accepted by the latest passed committing gate. */
+  private accepted(run: Run): string {
+    return acceptedCommit(run.log.ledger.replay(), run.base);
+  }
+
+  /**
+   * The run's original source boundary. Real inputs record it in the
+   * manifest; older and test inputs can be recovered from the first durable
+   * invocation or gate before consulting the current checkout.
+   */
+  private async runBase(record: RunRecord, log: RunLog): Promise<string> {
+    if (record.manifest.source !== null) return record.manifest.source.commit;
+    for (const entry of log.ledger.replay()) {
+      for (const stored of entry.transaction.records) {
+        const body = stored.body as { readonly schema?: unknown; readonly base?: unknown; readonly head?: unknown } | null;
+        if (body?.schema === 'ramify-agent.invocation/1' && typeof body.base === 'string') return body.base;
+        if (body?.schema === 'ramify-agent.gate-attempt/2' && typeof body.head === 'string') return body.head;
+      }
+    }
+    return currentHead(this.projectRoot);
   }
 
   // Queries
@@ -624,7 +657,10 @@ export class RunService {
     });
     await writeOnce(join(directory, runLayout.record), `${JSON.stringify(record, null, 2)}\n`);
 
-    const run = new Run(record, directory, await RunLog.open(join(directory, runLayout.events), runId), this.newWriter(policy));
+    const log = await RunLog.open(join(directory, runLayout.events), runId);
+    const base = manifest.source?.commit ?? await currentHead(this.projectRoot);
+    let run!: Run;
+    run = new Run(record, directory, log, base, this.newWriter(policy, () => this.accepted(run)));
     run.index = await this.options.inputs.index(this.projectRoot, manifest).catch(() => null);
     const accepted = this.commands.accept(command, contentHash, runId, run.log.nextSequence, now);
     this.runs.set(run.key, run);
@@ -795,7 +831,7 @@ export class RunService {
       prompt: { package: request.loaded.package, hash: request.loaded.hash, inputsHash: inputsHash([request.systemPrompt, request.prompt]) },
       scope: request.scope,
       writer: request.writer === true,
-      base: await currentHead(this.projectRoot),
+      base: this.accepted(run),
       startedAt: new Date().toISOString(),
     } satisfies Invocation);
 
@@ -942,7 +978,7 @@ export class RunService {
     if (request.writer === true) {
       const snapshot = await recordSettledSnapshot({
         projectRoot: this.projectRoot,
-        changed: () => changedPaths(this.projectRoot),
+        changed: () => changedPaths(this.projectRoot, this.accepted(run)),
         scope: request.guarded,
       }, observations);
       outsideScope = [...snapshot.outsideScope];
@@ -2257,7 +2293,7 @@ export class RunService {
       }
 
       attempt += 1;
-      const before = await takeLineSnapshot(this.projectRoot);
+      const before = await takeLineSnapshot(this.projectRoot, this.accepted(run));
       const guarded = guardedScopeOf(assignment.scope);
       const tools = this.implementationTools(run, {
         scopeRevision: assignment.scope.revision,
@@ -2279,7 +2315,7 @@ export class RunService {
         prompt: iterationMessage({
           assignment,
           projectRoot: this.projectRoot,
-          base: await currentHead(this.projectRoot),
+          base: this.accepted(run),
           views: await this.iterationViews(run, assignment),
           ...(failedGate === undefined ? {} : { failedGate }),
           ...(handoff === undefined ? {} : { handoff: { ...handoff, returns: this.budgetReturns(run, assignment.id) } }),
@@ -2319,7 +2355,7 @@ export class RunService {
       // The line events of this writer, from the two snapshots around it.
       // Two snapshots see the tree and not the history between them, so a
       // command that changed a file and put it back is invisible to them.
-      const after = await takeLineSnapshot(this.projectRoot);
+      const after = await takeLineSnapshot(this.projectRoot, this.accepted(run));
       await this.recordLineEvents(run, result.id, before, after, tools.shellCalls() > 0
         ? ['unguarded-shell: this invocation ran unguarded commands, so a change one of them made and reverted is not in these counts']
         : []);
@@ -2399,7 +2435,7 @@ export class RunService {
             invocations,
             findings,
             gate: gate.id,
-            commit: gate.commit,
+            commit: gate.audited,
             ...(proposal.recommendation === undefined ? {} : { recommendation: proposal.recommendation }),
           });
           // The evidence this acceptance discharges: a provider that ran the
@@ -2754,7 +2790,7 @@ export class RunService {
     for (;;) {
       if (this.ignoring(run)) return null;
       attempt += 1;
-      const before = await takeLineSnapshot(this.projectRoot);
+      const before = await takeLineSnapshot(this.projectRoot, this.accepted(run));
       const guarded = guardedScopeOf(assignment.scope);
       const tools = this.implementationTools(run, {
         scopeRevision: assignment.scope.revision,
@@ -2772,7 +2808,7 @@ export class RunService {
         prompt: contractMessage({
           assignment,
           projectRoot: this.projectRoot,
-          base: await currentHead(this.projectRoot),
+          base: this.accepted(run),
           ...(subject.need === undefined ? {} : { need: subject.need }),
           ...(subject.revision === undefined ? {} : { revision: subject.revision }),
           consumer: { module: item.module, iteration: assignment.requestedBy ?? null },
@@ -2802,7 +2838,7 @@ export class RunService {
       invocations.push(result.id);
       sessionRef = result.ref === '' ? undefined : result.ref;
 
-      const after = await takeLineSnapshot(this.projectRoot);
+      const after = await takeLineSnapshot(this.projectRoot, this.accepted(run));
       await this.recordLineEvents(run, result.id, before, after, tools.shellCalls() > 0
         ? ['unguarded-shell: this invocation ran unguarded commands, so a change one of them made and reverted is not in these counts']
         : []);
@@ -2850,7 +2886,7 @@ export class RunService {
         if (registration === null) return null;
         findings.push(...registration.findings);
         const closed = await this.closeIteration(run, item, subject.number, assignment, {
-          outcome: 'accepted', invocations, findings, gate: gate.id, commit: gate.commit,
+          outcome: 'accepted', invocations, findings, gate: gate.id, commit: gate.audited,
         });
         if (this.ignoring(run)) return null;
         return { findings, result: closed, ...(registration.cycle === undefined ? {} : { cycle: registration.cycle }) };
@@ -2908,8 +2944,10 @@ export class RunService {
     await this.recordRunnerGaps(run, invocation);
 
     const rules = [await this.fakeNamingRule(submission)];
-    const attempt = await runCheckpoint({
+    const modules = await this.pendingModules(run, assignment.id);
+    const attempt = await this.committingCheckpoint(run, {
       id: gateId,
+      runId: run.record.jobId,
       checkpoint: 'contract',
       projectRoot: this.projectRoot,
       directory: run.path(runLayout.gateOutput(gateId)),
@@ -2924,22 +2962,14 @@ export class RunService {
       writeScope: writeScopePaths(this.projectRoot, assignment),
       authorizations: assignment.authorizations.map(entry => ({ path: entry.path, by: entry.by })),
       rules,
-    });
+    }, submission.summary, modules, assignment.goal);
 
     if (attempt.verdict !== 'passed') {
-      await this.write(run, {
-        type: 'gate-attempted',
-        data: { gate: gateId, checkpoint: attempt.checkpoint, verdict: attempt.verdict, next: attempt.next, committing: false },
-      }, [{ path: runLayout.gate(gateId), id: gateId, revision: 1, body: attempt }]);
-      await this.afterWrite('gate-committed', run.record.jobId);
       return this.ignoring(run) ? null : attempt;
     }
-
-    const modules = await this.pendingModules(run, assignment.id);
-    const commit = await this.commitGate(run, attempt, submission.summary, modules, assignment.goal);
     await this.afterWrite('gate-committed', run.record.jobId);
     if (this.ignoring(run)) return null;
-    return { ...attempt, commit };
+    return attempt;
   }
 
   /**
@@ -3354,9 +3384,9 @@ export class RunService {
 
   /**
    * The iteration's gate: the tests its scope owns, resolved anew from the
-   * current tree, the project's type check and a complete Ramify check. On a
-   * pass the harness commits the working directory; on a failure nothing is
-   * committed.
+   * current tree, the project's type check and a complete Ramify check. Once
+   * verified, the attempt's tree is committed before either passing or
+   * failing audit evidence is produced.
    */
   private async iterationGate(
     run: Run,
@@ -3378,8 +3408,10 @@ export class RunService {
     const probe = allProject ? await this.resolveProbe(run, assignment) : undefined;
     await this.recordRunnerGaps(run, invocation);
 
-    const attempt = await runCheckpoint({
+    const modules = await this.pendingModules(run, assignment.id);
+    const attempt = await this.committingCheckpoint(run, {
       id: gateId,
+      runId: run.record.jobId,
       checkpoint: assignment.gate.checkpoint,
       projectRoot: this.projectRoot,
       directory: run.path(runLayout.gateOutput(gateId)),
@@ -3394,22 +3426,14 @@ export class RunService {
       guarded: assignment.guarded,
       writeScope: writeScopePaths(this.projectRoot, assignment),
       authorizations: assignment.authorizations.map(entry => ({ path: entry.path, by: entry.by })),
-    });
+    }, summary, modules, assignment.goal);
 
     if (attempt.verdict !== 'passed') {
-      await this.write(run, {
-        type: 'gate-attempted',
-        data: { gate: gateId, checkpoint: attempt.checkpoint, verdict: attempt.verdict, next: attempt.next, committing: false },
-      }, [{ path: runLayout.gate(gateId), id: gateId, revision: 1, body: attempt }]);
-      await this.afterWrite('gate-committed', run.record.jobId);
       return this.ignoring(run) ? null : attempt;
     }
-
-    const modules = await this.pendingModules(run, assignment.id);
-    const commit = await this.commitGate(run, attempt, summary, modules, assignment.goal);
     await this.afterWrite('gate-committed', run.record.jobId);
     if (this.ignoring(run)) return null;
-    return { ...attempt, commit };
+    return attempt;
   }
 
   /** Resolves the assignment's captured policy against the tree as it stands now. */
@@ -3453,7 +3477,7 @@ export class RunService {
   private async pendingModules(run: Run, iteration: string): Promise<ModuleNotice[]> {
     let entries: Array<{ status: string; path: string }>;
     try {
-      entries = await changedEntries(this.projectRoot);
+      entries = await changedEntries(this.projectRoot, this.accepted(run));
     } catch (error) {
       this.warn(`Run ${run.record.jobId}: the pending module declarations could not be read: ${message(error)}`);
       return [];
@@ -3491,12 +3515,17 @@ export class RunService {
     return proposals;
   }
 
-  /** The same notices, read back from the commit that was made, which is what the record carries. */
-  private async committedModules(run: Run, commit: string | null, iteration: string): Promise<ModuleNotice[]> {
-    if (commit === null) return [];
+  /**
+   * The same notices, read between the preceding accepted boundary and the
+   * passing attempt's audited revision. A failed attempt may have committed
+   * the declaration first; acceptance, not that intermediate commit, emits
+   * the notice.
+   */
+  private async committedModules(run: Run, commit: string | null, iteration: string, gate: string | null): Promise<ModuleNotice[]> {
+    if (commit === null || gate === null) return [];
     let changes: Array<{ status: string; path: string }>;
     try {
-      changes = await commitNameStatus(this.projectRoot, commit);
+      changes = await diffNameStatus(this.projectRoot, this.acceptedBefore(run, gate), commit);
     } catch (error) {
       this.warn(`Run ${run.record.jobId}: the commit's module declarations could not be read: ${message(error)}`);
       return [];
@@ -3518,6 +3547,17 @@ export class RunService {
     return notices;
   }
 
+  /** The accepted source boundary immediately before this gate's event. */
+  private acceptedBefore(run: Run, gate: string): string {
+    const entries = run.log.ledger.replay();
+    const index = entries.findIndex(entry => {
+      const event = entry.transaction.event;
+      return event.type === 'gate-attempted' && event.data.gate === gate;
+    });
+    if (index < 0) throw new Error(`Gate ${gate} is not committed in run ${run.record.jobId}`);
+    return acceptedCommit(entries.slice(0, index), run.base);
+  }
+
   /** Commits the `IterationResult` and closes the iteration. It is the last write of that iteration. */
   private async closeIteration(
     run: Run,
@@ -3535,7 +3575,7 @@ export class RunService {
   ): Promise<IterationResult> {
     // The notices are read from the commit itself, never from an agent's
     // words, so a run that repeats the effect derives the same ones.
-    const notices = await this.committedModules(run, body.commit, assignment.id);
+    const notices = await this.committedModules(run, body.commit, assignment.id, body.gate);
     const result = iterationResultSchema.parse({
       schema: 'ramify-agent.iteration-result/1',
       iteration: assignment.id,
@@ -3622,8 +3662,9 @@ export class RunService {
     run.writer.requireSettled(`The ${item.id} gate cannot run`);
     const gateId = gateAttemptId(this.gateCount(run) + 1);
     const probe = lastAssignment === undefined ? undefined : await this.resolveTests(run, lastAssignment);
-    const attempt = await runCheckpoint({
+    const attempt = await this.committingCheckpoint(run, {
       id: gateId,
+      runId: run.record.jobId,
       checkpoint: 'work-item',
       projectRoot: this.projectRoot,
       directory: run.path(runLayout.gateOutput(gateId)),
@@ -3634,18 +3675,12 @@ export class RunService {
       subject: { workItem: item.id },
       ...(probe === undefined || probe.selection.resolved.length === 0 ? {} : { scopeProbe: probe }),
       ...(lastAssignment === undefined ? {} : { writeScope: writeScopePaths(this.projectRoot, lastAssignment) }),
-    });
-    const subject = { ...attempt, subject: { workItem: item.id } } satisfies GateAttempt;
+    }, summary);
+    const subject = attempt;
 
     if (subject.verdict !== 'passed') {
-      await this.write(run, {
-        type: 'gate-attempted',
-        data: { gate: gateId, checkpoint: 'work-item', verdict: subject.verdict, next: subject.next, committing: false },
-      }, [{ path: runLayout.gate(gateId), id: gateId, revision: 1, body: subject }]);
-      await this.afterWrite('gate-committed', run.record.jobId);
       return this.ignoring(run) ? null : subject;
     }
-    await this.commitGate(run, subject, summary);
     await this.afterWrite('gate-committed', run.record.jobId);
     return this.ignoring(run) ? null : subject;
   }
@@ -3703,7 +3738,7 @@ export class RunService {
       // Readiness runs on the branch the project is on. The run branch is
       // created only once a clean repository has been established.
       const head = await currentHead(this.projectRoot);
-      const result = await runReadiness({
+      const result = await runReadiness(inPlaceCheckExecution, {
         attempt: attemptNumber,
         projectRoot: this.projectRoot,
         gateDirectory: run.path(runLayout.gateOutput(gateId)),
@@ -3785,8 +3820,9 @@ export class RunService {
     }
     const gateId = gateAttemptId(this.gateCount(run) + 1);
     const head = await currentHead(this.projectRoot);
-    const attempt = await runCheckpoint({
+    const attempt = await this.committingCheckpoint(run, {
       id: gateId,
+      runId: run.record.jobId,
       checkpoint: 'final',
       projectRoot: this.projectRoot,
       directory: run.path(runLayout.gateOutput(gateId)),
@@ -3796,74 +3832,93 @@ export class RunService {
     });
 
     if (attempt.verdict !== 'passed') {
-      await this.write(run, {
-        type: 'gate-attempted',
-        data: { gate: gateId, checkpoint: 'final', verdict: attempt.verdict, next: attempt.next, committing: false },
-      }, [{ path: runLayout.gate(gateId), id: gateId, revision: 1, body: attempt }]);
-      await this.afterWrite('gate-committed', run.record.jobId);
       await this.fail(run, attempt.verdict === 'not-verified' ? 'recovery-exhausted' : 'repair-exhausted',
         `The final gate did not pass: ${attempt.verdict}${attempt.cause === null ? '' : ` (${attempt.cause})`}`, [runLayout.gate(gateId)]);
       return;
     }
 
-    const commit = await this.commitGate(run, attempt);
     await this.afterWrite('gate-committed', run.record.jobId);
     if (this.ignoring(run)) return;
     const workItems = run.log.count('work-item-completed');
-    await this.write(run, { type: 'job-completed', data: { gate: gateId, commit, workItems } });
+    await this.write(run, { type: 'job-completed', data: { gate: gateId, commit: attempt.audited, workItems } });
     await this.afterWrite('job-completed', run.record.jobId);
   }
 
-  /**
-   * The commit a passing gate makes, as the ledger's external effect: the
-   * intent is `gate-attempted`, the effect is the commit under the attempt's
-   * own key, and the completion commits the attempt record with the commit
-   * it made. A repeat after a crash finds the commit by its trailer and
-   * makes no second one.
-   */
-  private async commitGate(
+  /** Verify before effects, then commit and audit before writing the complete attempt once. */
+  private async committingCheckpoint(
     run: Run,
-    attempt: GateAttempt,
+    request: CheckpointRequest,
     summary?: string,
     modules?: readonly ModuleNotice[],
     goal?: string,
-  ): Promise<string | null> {
-    if (!commitsOnPass(attempt.checkpoint)) {
-      await this.write(run, { type: 'gate-attempted', data: { gate: attempt.id, checkpoint: attempt.checkpoint, verdict: attempt.verdict, next: attempt.next, committing: false } }, [
-        { path: runLayout.gate(attempt.id), id: attempt.id, revision: 1, body: attempt },
-      ]);
-      return null;
+  ): Promise<GateAttempt> {
+    const prepared = await prepareCheckpoint(request);
+    if ('schema' in prepared) {
+      await this.write(run, {
+        type: 'gate-attempted',
+        data: { gate: prepared.id, checkpoint: prepared.checkpoint, verdict: prepared.verdict, next: prepared.next },
+      }, [{ path: runLayout.gate(prepared.id), id: prepared.id, revision: 1, body: prepared }]);
+      await this.afterWrite('gate-committed', run.record.jobId);
+      return prepared;
     }
+    return this.commitGate(run, prepared, summary, modules, goal);
+  }
+
+  /**
+   * The commit-and-audit external effect. Its intent holds the verified
+   * operation, not a partial attempt. Recovery finds the commit by its run
+   * and gate trailers and re-audits it; completion writes the immutable
+   * attempt exactly once.
+   */
+  private async commitGate(
+    run: Run,
+    prepared: PreparedGate,
+    summary?: string,
+    modules?: readonly ModuleNotice[],
+    goal?: string,
+    recordedMessage?: string,
+  ): Promise<GateAttempt> {
+    const identity = prepared.request;
     const invocations = run.log.all('invocation-started').map(event => event.data.invocation);
-    const message = commitMessage({
-      runId: run.record.jobId, planId: run.record.planId, gate: attempt, invocations,
+    const message = recordedMessage ?? commitMessage({
+      runId: run.record.jobId, planId: run.record.planId,
+      gate: {
+        id: identity.id, checkpoint: prepared.checkpoint, subject: identity.subject ?? {},
+        repairRound: identity.repairRound ?? 0,
+      },
+      invocations,
       ...(goal === undefined ? {} : { goal }),
       ...(summary === undefined ? {} : { summary }),
       ...(modules === undefined || modules.length === 0 ? {} : { modules }),
-      ...(earlierAttempts(run, attempt).length === 0 ? {} : { earlier: earlierAttempts(run, attempt) }),
+      ...(earlierAttempts(run, identity.id, identity.subject ?? {}).length === 0 ? {} : { earlier: earlierAttempts(run, identity.id, identity.subject ?? {}) }),
     });
-    // The intent commits the attempt with `commit: null`, as the record says
-    // it stands until the effect completes; the completion commits its
-    // second revision, naming the commit the effect made. A restart between
-    // them reads the attempt from its file and performs the effect again.
-    return run.mutex.run(() => run.log.ledger.effect<string | null>({
-      key: `gate:${attempt.id}`,
+    const operation = gateOperation(prepared, message);
+    return run.mutex.run(() => run.log.ledger.effect<GateAttempt>({
+      key: `gate-commit:${identity.id}`,
       intent: {
-        event: run.log.next({ type: 'gate-attempted', data: { gate: attempt.id, checkpoint: attempt.checkpoint, verdict: attempt.verdict, next: attempt.next, committing: true } }),
-        records: [{ path: runLayout.gate(attempt.id), id: attempt.id, revision: 1, body: attempt }],
+        event: run.log.next({ type: 'gate-committing', data: { gate: identity.id, checkpoint: prepared.checkpoint } }),
+        records: [{ path: runLayout.gateOperation(identity.id), id: identity.id, revision: 1, body: operation }],
       },
       perform: async () => {
-        // The intent is in the log and the commit is not yet made: a run
-        // frozen here is one that crashed between them.
         await this.afterWrite('gate-attempted', run.record.jobId);
-        const commit = await commitForGate(this.projectRoot, attempt, message);
-        // The commit is made and its completion is not yet in the log.
+        const commit = await commitForGate(this.projectRoot, run.record.jobId, identity.id, message);
         await this.afterWrite('gate-committing', run.record.jobId);
-        return commit;
+        const sourceCommit = commit ?? identity.head;
+        const attempt = await executePreparedGate(this.options.checkExecution, prepared, sourceCommit, commit);
+        if (attempt.audited !== null && attempt.audited !== sourceCommit) {
+          throw new Error(`Gate ${attempt.id} audited ${attempt.audited}, expected ${sourceCommit}`);
+        }
+        if (attempt.evidence !== null && attempt.audited !== sourceCommit) {
+          throw new Error(`Gate ${attempt.id} published evidence without the expected audited commit ${sourceCommit}`);
+        }
+        if (attempt.verdict === 'passed' && (attempt.audited !== sourceCommit || attempt.evidence === null)) {
+          throw new Error(`Gate ${attempt.id} passed without published evidence for ${sourceCommit}`);
+        }
+        return attempt;
       },
-      complete: commit => ({
-        event: run.log.next({ type: 'gate-committed', data: { gate: attempt.id, commit } }),
-        records: [{ path: runLayout.gate(attempt.id), id: attempt.id, revision: 2, body: withCommit(attempt, commit) }],
+      complete: attempt => ({
+        event: run.log.next({ type: 'gate-attempted', data: { gate: attempt.id, checkpoint: attempt.checkpoint, verdict: attempt.verdict, next: attempt.next } }),
+        records: [{ path: runLayout.gate(attempt.id), id: attempt.id, revision: 1, body: attempt }],
       }),
     }));
   }
@@ -4001,11 +4056,11 @@ function moduleNameOf(index: ArchitectIndex | null, declaration: string): string
  * The earlier attempts at the same subject, newest last, as the accepted
  * commit's message states them. It reads the log and nothing else.
  */
-function earlierAttempts(run: Run, attempt: GateAttempt): Array<{ id: string; verdict: string; cause: string | null }> {
-  const subject = attempt.subject.iteration ?? attempt.subject.workItem;
+function earlierAttempts(run: Run, attemptId: string, attemptSubject: GateAttempt['subject']): Array<{ id: string; verdict: string; cause: string | null }> {
+  const subject = attemptSubject.iteration ?? attemptSubject.workItem;
   if (subject === undefined) return [];
   return run.log.all('gate-attempted')
-    .filter(event => event.data.gate !== attempt.id && event.data.verdict !== 'passed')
+    .filter(event => event.data.gate !== attemptId && event.data.verdict !== 'passed')
     .flatMap(event => {
       const body = gateBodyOf(run, event.data.gate);
       if (body === undefined) return [];
@@ -4019,10 +4074,72 @@ function gateBodyOf(run: Run, id: string): GateAttempt | undefined {
   for (const entry of run.log.ledger.replay()) {
     for (const record of entry.transaction.records) {
       const body = record.body as { schema?: unknown; id?: unknown };
-      if (body?.schema === 'ramify-agent.gate-attempt/1' && body.id === id) return record.body as GateAttempt;
+      if (body?.schema === 'ramify-agent.gate-attempt/2' && body.id === id) return record.body as GateAttempt;
     }
   }
   return undefined;
+}
+
+function gateOperation(prepared: PreparedGate, message: string): GateOperation {
+  const request = prepared.request;
+  if (request.runId === undefined) throw new Error('A committing gate requires its durable run ID');
+  if (prepared.decisive.length > 0 || request.checks.some(check => check.discovery !== undefined || check.kind === 'conformance')) {
+    throw new Error(`Gate ${request.id} was not completely verified before its operation was recorded`);
+  }
+  return {
+    schema: 'ramify-agent.gate-operation/1',
+    checkpoint: prepared.checkpoint as GateOperation['checkpoint'],
+    request: {
+      id: request.id,
+      runId: request.runId,
+      projectRoot: request.projectRoot,
+      directory: request.directory,
+      head: request.head,
+      checks: request.checks.map(({ discovery: _discovery, ...check }) => ({
+        ...check,
+        kind: check.kind as 'ramify-check' | 'type-check' | 'tests',
+      })),
+      selection: {
+        policy: request.selection?.policy ?? 'all-project',
+        exactOwners: [...(request.selection?.exactOwners ?? [])],
+        subtrees: [...(request.selection?.subtrees ?? [])],
+      },
+      dependencyDirectories: [...(request.dependencyDirectories ?? [])],
+      subject: request.subject ?? {},
+      proposedBy: request.proposedBy ?? null,
+      repairRound: request.repairRound ?? 0,
+      infrastructureAttempt: request.infrastructureAttempt ?? 0,
+      writeScope: [...(request.writeScope ?? [])],
+      limits: {
+        repairRounds: request.limits?.repairRounds ?? 1,
+        infrastructureRetries: request.limits?.infrastructureRetries ?? 1,
+      },
+    },
+    guardedChanges: [...prepared.guardedChanges],
+    rules: prepared.rules.map(rule => ({ ...rule, violations: rule.violations.map(violation => ({ ...violation })) })),
+    unauthorized: prepared.unauthorized,
+    ruleFailed: prepared.ruleFailed,
+    timeoutMs: prepared.timeoutMs,
+    message,
+  };
+}
+
+function preparedGate(operation: GateOperation): PreparedGate {
+  return {
+    checkpoint: operation.checkpoint,
+    request: {
+      ...operation.request,
+      checks: operation.request.checks,
+      dependencyDirectories: operation.request.dependencyDirectories,
+      writeScope: operation.request.writeScope,
+    },
+    guardedChanges: [...operation.guardedChanges],
+    rules: [...operation.rules],
+    unauthorized: operation.unauthorized,
+    ruleFailed: operation.ruleFailed,
+    decisive: [],
+    timeoutMs: operation.timeoutMs,
+  };
 }
 
 /**

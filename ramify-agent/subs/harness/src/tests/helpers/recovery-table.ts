@@ -105,18 +105,18 @@ export const recoveryTable = {
     stated: 'Keeps what the writer left in the tree, closes the invocation, releases no second writer',
   },
   'gate-attempted': {
-    machines: ['SM7', 'SM5'], scenario: 'iteration', appended: ['gate-committed', 'job-interrupted'],
-    effect: /the commit of gate ga-\d+/, commits: { before: 0, after: 1 },
-    stated: 'The commit intent is in the log and the commit is not made: the effect is performed again and makes one commit',
+    machines: ['SM7', 'SM5'], scenario: 'iteration', appended: ['gate-attempted', 'job-interrupted'],
+    effect: /the commit and audit of gate ga-\d+/, commits: { before: 0, after: 1 },
+    stated: 'The verified operation is durable and the commit is not made: recovery makes and audits one commit, then writes the complete attempt once',
   },
   'gate-committing': {
-    machines: ['SM7', 'SM5'], scenario: 'iteration', appended: ['gate-committed', 'job-interrupted'],
-    effect: /the commit of gate ga-\d+/, commits: { before: 1, after: 1 },
-    stated: 'The commit is made and its completion is not: the commit is found by its trailer and no second one is made',
+    machines: ['SM7', 'SM5'], scenario: 'iteration', appended: ['gate-attempted', 'job-interrupted'],
+    effect: /the commit and audit of gate ga-\d+/, commits: { before: 1, after: 1 },
+    stated: 'The commit is made and the audit is not complete: recovery finds and re-audits that commit, then writes one complete attempt',
   },
   'gate-committed': {
     machines: ['SM7'], scenario: 'iteration', appended: interrupted, commits: { before: 1, after: 1 },
-    stated: 'Leaves the commit alone and appends the interruption only',
+    stated: 'Leaves the complete attempt and its one commit alone and appends the interruption only',
   },
   'iteration-closed': {
     machines: ['SM5'], scenario: 'iteration', appended: interrupted,
@@ -226,7 +226,9 @@ const lastLineOf: Readonly<Record<RunWrite, RunEvent['type']>> = {
   ...Object.fromEntries(Object.keys(recoveryTable).map(write => [write, write])) as Record<RunWrite, RunEvent['type']>,
   'job-created': 'job-started',
   'readiness-attempted': 'readiness-passed',
-  'gate-committing': 'gate-attempted',
+  'gate-attempted': 'gate-committing',
+  'gate-committing': 'gate-committing',
+  'gate-committed': 'gate-attempted',
   'brief-appending': 'decision-accepted',
 };
 
@@ -284,8 +286,8 @@ export async function verifyRow(row: RecoveryRow & { readonly name: string; read
         case 'invocation-ended':
           expect(frozenEvents.some(e => e.type === 'invocation-started' && (e.data as { invocation: string }).invocation === data.invocation)).toBe(true);
           break;
-        case 'gate-committed':
-          expect(frozenEvents.some(e => e.type === 'gate-attempted' && (e.data as { gate: string }).gate === data.gate)).toBe(true);
+        case 'gate-attempted':
+          expect(frozenEvents.some(e => e.type === 'gate-committing' && e.data.gate === data.gate)).toBe(true);
           break;
         case 'brief-appended': case 'global-context-rebuilt':
           expect(frozenEvents.some(e => e.type === 'decision-accepted')).toBe(true);
@@ -299,15 +301,19 @@ export async function verifyRow(row: RecoveryRow & { readonly name: string; read
     const identities = recovered.map(line => identityOf(line.event)).filter((identity): identity is string => identity !== null);
     expect(identities.filter((identity, index) => identities.indexOf(identity) !== index), 'duplicated in the log').toEqual([]);
 
-    // One commit per gate, whatever recovery did.
+    // One commit per changed attempt, and no gate trailer twice.
     const trailers = await gateTrailers(root, runId);
     expect(trailers.filter((trailer, index) => trailers.indexOf(trailer) !== index), 'a gate committed twice').toEqual([]);
     if (row.commits !== undefined) {
       expect(trailersBefore.length).toBe(row.commits.before);
       expect(trailers.length).toBe(row.commits.after);
     }
-    const committedGates = recovered.filter(line => line.event.type === 'gate-committed' && (line.event.data as { commit: string | null }).commit !== null);
+    const committedGates = recovered.filter(line => line.records.some(record => {
+      const body = record.body as { schema?: unknown; commit?: unknown } | null;
+      return body?.schema === 'ramify-agent.gate-attempt/2' && typeof body.commit === 'string';
+    }));
     expect(trailers.length).toBe(committedGates.length);
+    expect(new Set(trailers).size).toBe(trailers.length);
 
     // Every record file the log commits is there again, byte for byte, and
     // the run's own record was never touched.

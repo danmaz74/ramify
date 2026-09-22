@@ -206,8 +206,13 @@ export async function metricsOf(view: RunView): Promise<MetricsResponse> {
       : run.statement;
   const guarding = { guarded: [...run.guarded], unguarded: [...run.unguarded], verdicts: { ...run.verdicts }, complete, statement };
 
-  const gateAttempts = [...view.gates.keys()];
   const acceptedIterations = [...view.records.results.values()].filter(result => result.outcome === 'accepted').map(result => result.iteration);
+  const accepted = new Set(acceptedIterations);
+  // The ratio is attempts over accepted iterations, not every readiness,
+  // work-item and final gate that happened elsewhere in the run.
+  const gateAttempts = [...view.gates.values()]
+    .filter(gate => gate.body.subject.iteration !== undefined && accepted.has(gate.body.subject.iteration))
+    .map(gate => gate.body.id);
   const metrics = kpiMetrics({
     baseline: baseline.state === 'measured' ? { bytes: baseline.bytes, snapshot: baseline.snapshot } : { unavailable: baseline.reason },
     invocations: facts,

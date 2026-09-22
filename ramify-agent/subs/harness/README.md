@@ -117,10 +117,12 @@ hiding or measured complexity justifies it.
     mapping comes from the refreshed architect view and from nothing else; a
     discovery that fails is not verified and never falls back to an earlier
     list.
-  - `gate.ts`: `runGate`, the one function that runs a gate, with one
-    caller. It runs the verified commands in the working directory while the
-    writer is settled, compares the captured guarded hashes with the tree,
-    and answers one attempt. The guarded set is the configuration, the
+  - `gate.ts`: the policy half of a gate. It verifies the command plan,
+    compares the captured guarded hashes with the tree, classifies the
+    executor's command records and answers one attempt. Committing checkpoints
+    use the audit executor in `subs/audit`; readiness and the standalone
+    session's optional gate use the in-place executor because they do not
+    commit. The guarded set is the configuration, the
     manifests and the contract artifacts in force; a change no record the
     assignment names authorized is `guarded-change`, never a pass, and a
     deletion is `after: null`. An outcome comes from how the command ended and
@@ -137,9 +139,11 @@ hiding or measured complexity justifies it.
     what a module may import is the architect's to arrange with the owner,
     and an engineer given the same brief again cannot widen it. No test
     output is parsed for any of this. The attempt is returned, not written:
-    the harness commits it with the event that closes the checkpoint. A
-    standalone commit-audit tool, extracted from cucumber-viz, will replace
-    this body later, which is why it has one caller.
+    the harness commits it with the event that closes the checkpoint. The
+    audit executor runs each planned command
+    through the harness's own command runner in a temporary worktree of the
+    exact commit, then returns the published run, report and tree refs with
+    the harness command records.
   - `diagnostics.ts`: what a failing attempt says to the agent that receives
     it. Each command that did not pass is named with what it reported: a
     Ramify check's findings, worded by the one function that words a finding

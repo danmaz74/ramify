@@ -138,14 +138,13 @@ a crash derives the same ID. Agents propose only the two semantic slugs.
 /** A committed record at one revision. `hash` is the SHA-256 of the file's bytes. */
 interface RecordRef { readonly id: string; readonly revision: number; readonly hash: string }
 
-/** A commit of the run branch, made by the harness after a gate passed. */
+/** A commit accepted by a passed committing gate's audit. */
 type AcceptedCommit = string;
 ```
 
-Decided 2026-09-20: a gate runs the checks and, when they pass, the harness
-commits. That is all. No tree identity is compared and nothing is invalidated,
-so no change to the working directory blocks anything; it is content for the
-next commit. See [Run the checks, then commit](#run-the-checks-then-commit).
+The 2026-09-20 checks-then-commit decision was the MVP stand-in. Plan 7
+superseded it with evidence bound to the exact committed tree. See
+[Commit, then audit](#commit-then-audit).
 
 ## Layout of a run
 
@@ -634,14 +633,18 @@ local architect, bounded by the work item's limits.
 
 ```ts
 interface GateAttempt {                     // gates/<gate-attempt-id>/attempt.json
-  schema: 'ramify-agent.gate-attempt/1';
+  schema: 'ramify-agent.gate-attempt/2';
   id: GateAttemptId; checkpoint: Checkpoint;
   subject: { workItem?: WorkItemId; iteration?: IterationId };   // neither for readiness and final
   proposedBy: InvocationId | null;
   repairRound: number; infrastructureAttempt: number;
-  head: AcceptedCommit;                     // the run branch's head when the commands ran, in the working directory
-  /** The commit made after a pass; null for a failure, for no change, and until that effect completes. */
+  head: AcceptedCommit;                     // the run branch's head before this attempt made any commit
+  /** The commit this attempt made, whatever its verdict; null when the tree was unchanged. */
   commit: AcceptedCommit | null;
+  /** The commit the checks ran over; null when execution never began or ran in place. */
+  audited: AcceptedCommit | null;
+  /** Published run, report and tree refs bound to `audited`; null when nothing was published. */
+  evidence: { runRef: string; reportCommit: string; treeRef: string } | null;
   /** `after: null` is a deletion, which is a change like any other. */
   guardedChanges: Array<{ path: string; before: string; after: string | null; authorizedBy: RecordRef | null }>;
   commands: Array<{
@@ -920,47 +923,55 @@ will be `GPL-3.0`; both have one author, who licenses the copied parts under
 ramify-agent's license. Each copy carries a provenance comment. None of it
 goes into the Ramify toolkit, which will be `MIT`.
 
-## Run the checks, then commit
+<a id="run-the-checks-then-commit"></a>
 
-Decided 2026-09-20. The target project is a git repository with a clean tree
+## Commit, then audit
+
+Decided 2026-09-21, superseding the 2026-09-20 checks-then-commit stand-in.
+The target project is a git repository with a clean tree
 at `start-run`; readiness refuses anything else. The harness creates the branch
 `ramify-agent/run-<run-id>` and works on it. Agents never commit, and the
 harness never resets or reverts.
 
 ```text
 engineer proposes completion, and is idle
-  -> the gate's commands run in the working directory
-  -> passed: the harness commits the working directory on the run branch
-  -> failed: nothing is committed; diagnostics return for repair
+  -> the harness verifies the command plan and guarded files
+  -> the harness commits the working directory on the run branch
+  -> ramify-audit checks that commit in an isolated temporary worktree,
+     using registered executors that call the harness's command runner
+  -> the audit publishes refs bound to the commit
+  -> passed: that audited commit becomes the accepted boundary
+  -> failed: the commit remains on the run branch and diagnostics return for repair
 ```
 
-That is the whole mechanism. No tree identity is taken or compared, no pass is
-invalidated by a later change, and nothing blocks because a file changed. One
-writer works at a time and it is idle while its gate runs, which is all the
-consistency the MVP needs.
+Readiness and the single engineer session's optional gate do not commit and
+continue to run in place. A committing gate whose plan cannot be verified
+makes no commit and starts no audit. A changed failing attempt remains in the
+branch history; its repair is a later attempt and, when the repair changes the
+tree, a later commit. An unchanged retry audits the current head without making
+a second commit. The latest passed committing attempt's `audited` hash is the
+accepted boundary, whether that attempt made the commit or accepted an existing
+head.
 
 The commit is `git add -A` and `git commit` with `--no-verify`,
 `--no-gpg-sign` and the harness's own identity, so the project's hooks and the
 person's configuration cannot fail it. `git add -A` is safe here: the harness
 is the only committer, the branch is its own and the tree was clean at the
-start. The commit is the fourth external effect of rule 4: its key is the gate
-attempt, a repeat finds the commit by its `Ramify-Gate` trailer and makes no
-second one, and the line that closes the iteration carries its hash. A gate
-that passes with nothing changed makes no commit.
+start. Commit and audit are one recoverable external effect keyed by the gate
+attempt: a repeat finds the commit by its `Ramify-Gate` trailer, cleans up any
+inactive owned audit worktree and re-audits the same commit instead of making a
+second one. The complete `GateAttempt` is written once after the audit returns.
 
-The harness writes the message, mechanically, from records. The verdict on the
-checks is the harness's, so their summary is too; the engineer's words enter
-only as the `summary` of its validated submission.
+The harness writes the message mechanically from records. The verdict does not
+appear because it postdates the commit; `Audit-Note` gives the retrieval
+command. The engineer's words enter only as the `summary` of its validated
+submission.
 
 ```text
 wi-001.i02: send the customer email from the page
 
 <the engineer's `summary` from its accepted submission>
 
-Checks: passed (gate ga-0012, checkpoint iteration, repair round 1 of 3)
-  ramify check   passed    1.2 s   complete coverage, 0 findings
-  type-check     passed    8.4 s
-  tests          passed   21.0 s   14 files; owners workspace/reviews, reviews/core
 Earlier attempts: ga-0011 failed (in-scope: 2 tests)
 Not covered: test:cucumber (one supported runner)
 
@@ -968,24 +979,25 @@ Ramify-Run: 20260920T101500Z-3f9a1c
 Ramify-Work-Item: wi-001
 Ramify-Iteration: wi-001.i02
 Ramify-Gate: ga-0012
+Audit-Note: git notes --ref=audit show <commit>
 Ramify-Invocations: inv-0012, inv-0014
 ```
 
-Uncommitted changes are exactly the work since the last accepted boundary,
-which is what an engineer reads with `git diff` after a failed gate, a budget
-return or a crash. What changed is read from git and nowhere else:
-`git status` gives the changed paths, compared with the write scope for
-`outsideScope`, and `git diff --numstat` between two accepted commits gives the
-line counts of the KPIs. The run's state directory,
+`GateAttempt.commit` names only the commit made by that attempt;
+`GateAttempt.audited` names the tree the checks actually ran over, and its
+evidence names the published run, report and by-tree refs. A failed audit may
+therefore move branch head without moving the accepted boundary. Uncommitted
+changes are the work after branch head, while accepted change accounting uses
+the preceding and current accepted `audited` hashes. `git status` gives the
+changed paths compared with the write scope for `outsideScope`, and
+`git diff --numstat` between accepted boundaries gives the line counts of the
+KPIs. The run's state directory,
 `plans/<plan-id>/.harness/`, carries a `.gitignore` ignoring everything in it,
 so the run's own log is never committed.
 
-**Later, not now.** cucumber-viz's commit audit, which commits, runs the checks
-in a worktree of that commit and certifies the commit afterwards, will be
-extracted into a standalone command-line tool, and ramify-agent will integrate
-it. Running a gate is therefore one function of the harness with one caller,
-taking a checkpoint and returning a `GateAttempt`, so that the tool replaces
-its body and nothing else. Nothing of that tool is built or copied here.
+[Plan 7](../07-commit-audit-integration/main-plan.md) records the adapter,
+publication, recovery and conformance decisions. It does not merge the run
+branch or otherwise deliver it outside the harness-owned run.
 
 ## A created module is always reported
 

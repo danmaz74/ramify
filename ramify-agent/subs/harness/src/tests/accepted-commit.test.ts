@@ -1,7 +1,9 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import { commitMessage } from '../run/gates.js';
+import { acceptedCommit } from '../checks/accepted.js';
+import { checkOutputPath, type CheckExecutionPort } from '../checks/execution.js';
 import type { GateAttempt } from '../checks/records.js';
 import { iterationLayout, type IterationResult } from '../work/iterations.js';
 import { runLayout } from '../run/records.js';
@@ -9,6 +11,10 @@ import type { RunWrite } from '../run/service.js';
 import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { addModule, assign, byRole, completionProposed, installMiniRunner, outline, submit, treeInputs, write } from './helpers/iterations.js';
+import { createAuditCheckExecution } from '../../subs/audit/src/check-execution.js';
+import { createAuditWorkspaceOwnership } from '../run/audit-workspaces.js';
+import { changedPaths, worktreeLineChanges } from '../../subs/evidence/src/git.js';
+import { RunQueries } from '../projections/queries.js';
 import {
   crashLock, freeze, git, initRepository, onlyRun, openRuns,
   runEventsOnDisk, runPath, startRun, until,
@@ -17,10 +23,10 @@ import {
 /*
  * The commit at an accepted boundary.
  *
- * A change to the working directory blocks nothing: the gate runs the checks
- * in the working directory and, on a pass, the harness commits. A crash
- * between the pass and the commit's completion makes one commit, because the
- * effect is keyed by the gate attempt and a repeat finds it by its trailer.
+ * A change to the working directory blocks nothing: once the gate plan is
+ * verified, the harness commits and audits that exact revision. A crash after
+ * the commit re-audits one commit, because the effect is keyed by the gate
+ * attempt and a repeat finds it by its trailer.
  *
  * What the commit added or removed is read from the commit, never from what
  * an agent said.
@@ -78,14 +84,14 @@ function onePass(steps: Parameters<typeof submit>[1][] = []) {
 }
 
 describe('a change to the working directory blocks nothing', () => {
-  test('a gate that passes is followed by one commit, and a file changed while it ran is in that commit', async () => {
+  test('a verified gate makes one commit before audit, including a late change before that commit', async () => {
     const root = await target();
     const opened = await openRuns(root, {
       script: byRole(onePass([write(`${notesDirectory}/src/store.ts`, 'export const store = new Map();\n')])),
       inputs: treeInputs(),
       afterWrite: async current => {
-        // A late write lands between the gate's pass and its commit. It
-        // blocks nothing and joins the commit that follows.
+        // A late write lands after verification and before the commit. It
+        // blocks nothing and joins the revision the audit checks.
         if (current === 'gate-attempted') {
           await writeFile(join(root, notesDirectory, 'src', 'late.ts'), 'export const late = true;\n');
         }
@@ -106,7 +112,7 @@ describe('a change to the working directory blocks nothing', () => {
     expect(files).toContain(`${notesDirectory}/src/late.ts`);
   }, 300_000);
 
-  test('a crash between the gate\'s pass and the commit\'s completion makes exactly one commit', async () => {
+  test('a crash between the gate\'s verification and audit completion makes exactly one commit', async () => {
     for (const boundary of ['gate-attempted', 'gate-committing'] as const satisfies readonly RunWrite[]) {
       const root = await target();
       const crashed = await openRuns(root, {
@@ -122,7 +128,7 @@ describe('a change to the working directory blocks nothing', () => {
       // is the intent plus the number of commits the branch holds there.
       await until(async () => {
         const text = await readFile(events, 'utf8').catch(() => '');
-        if (!text.includes('"gate-attempted"')) return false;
+        if (!text.includes('"gate-committing"')) return false;
         const made = (await commits(root, receipt.jobId)).filter(commit => commit.includes('Ramify-Run:')).length;
         return boundary === 'gate-attempted' ? made === 0 : made === 1;
       }, 120_000);
@@ -136,11 +142,11 @@ describe('a change to the working directory blocks nothing', () => {
       // finds the commit by its trailer where it was already made, and makes
       // no second one.
       const log = await runEventsOnDisk(root, 'review-notes', receipt.jobId);
-      const attempted = log.filter(event => event.type === 'gate-attempted' && (event.data as { committing: boolean }).committing);
+      const committing = log.filter(event => event.type === 'gate-committing');
+      expect(committing).toHaveLength(1);
+      const gate = committing[0]!.data.gate;
+      const attempted = log.filter(event => event.type === 'gate-attempted' && event.data.gate === gate);
       expect(attempted).toHaveLength(1);
-      const gate = (attempted[0]!.data as { gate: string }).gate;
-      const committed = log.filter(event => event.type === 'gate-committed' && (event.data as { gate: string }).gate === gate);
-      expect(committed).toHaveLength(1);
       const made = (await commits(root, receipt.jobId)).filter(commit => commit.includes(`Ramify-Gate: ${gate}`));
       expect(`${boundary}: ${made.length}`).toBe(`${boundary}: 1`);
 
@@ -149,6 +155,49 @@ describe('a change to the working directory blocks nothing', () => {
       expect(attempt.commit).not.toBeNull();
     }
   }, 600_000);
+
+  test('recovery does not reuse an ancestor commit with another run\'s same gate id', async () => {
+    const root = await target();
+    await git(root, 'switch', '--create', 'ramify-agent/run-other');
+    await writeFile(join(root, 'other-run.txt'), 'belongs to the earlier run\n');
+    await git(root, 'add', 'other-run.txt');
+    await git(
+      root,
+      '-c', 'user.name=fixture', '-c', 'user.email=fixture@localhost',
+      'commit', '--message', 'earlier run\n\nRamify-Run: other-run\nRamify-Gate: ga-0002\n',
+    );
+    const foreignCommit = (await git(root, 'rev-parse', 'HEAD')).trim();
+
+    const crashed = await openRuns(root, {
+      script: byRole(onePass([write(`${notesDirectory}/src/store.ts`, 'export const store = new Map();\n')])),
+      inputs: treeInputs(),
+      afterWrite: async current => {
+        if (current === 'gate-attempted') await freeze();
+      },
+    });
+    const receipt = await crashed.service.execute(startRun('review-notes'));
+    const events = runPath(root, 'review-notes', receipt.jobId, runLayout.events);
+    await until(async () => {
+      const text = await readFile(events, 'utf8').catch(() => '');
+      if (!text.includes('"gate-committing"')) return false;
+      const own = (await commits(root, receipt.jobId)).filter(commit => commit.includes(`Ramify-Run: ${receipt.jobId}`));
+      return own.length === 0;
+    }, 120_000);
+    await crashLock(root);
+
+    const reopened = await openRuns(root, { inputs: treeInputs() });
+    cleanups.push(() => reopened.service.close());
+    const log = await runEventsOnDisk(root, 'review-notes', receipt.jobId);
+    const gate = log.find(event => event.type === 'gate-committing')!.data.gate;
+    expect(gate).toBe('ga-0002');
+    const attempt = JSON.parse(await readFile(runPath(root, 'review-notes', receipt.jobId, runLayout.gate(gate)), 'utf8')) as GateAttempt;
+
+    expect(attempt.commit).not.toBe(foreignCommit);
+    expect(attempt.commit).not.toBeNull();
+    expect(attempt.audited).toBe(attempt.commit);
+    const own = (await commits(root, receipt.jobId)).filter(commit => commit.includes(`Ramify-Run: ${receipt.jobId}`) && commit.includes(`Ramify-Gate: ${gate}`));
+    expect(own).toHaveLength(1);
+  }, 300_000);
 
   test('a later source change invalidates nothing: the accepted commit stays as it is', async () => {
     const root = await target();
@@ -174,14 +223,118 @@ describe('a change to the working directory blocks nothing', () => {
   }, 300_000);
 });
 
+describe('the accepted boundary after an audit infrastructure retry', () => {
+  test('an unchanged retry accepts the earlier commit, and later unchanged checkpoints retain it without repeating notices', async () => {
+    const root = await target({ withNotes: false });
+    const audit = createAuditCheckExecution({ workspaceOwnership: createAuditWorkspaceOwnership(root) });
+    let failedOnce = false;
+    const checkExecution: CheckExecutionPort = {
+      async run(checks, request) {
+        if (!failedOnce && request.context.checkpoint === 'iteration') {
+          failedOnce = true;
+          await mkdir(request.directory, { recursive: true });
+          const commands = await Promise.all(checks.map(async (check, index) => {
+            const path = checkOutputPath(request.directory, index, check);
+            await writeFile(path, 'the audit service was unavailable\n');
+            return {
+              kind: check.kind,
+              command: check.command,
+              ...(check.selection === undefined ? {} : { selection: check.selection }),
+              startedAt: new Date().toISOString(),
+              elapsedMs: 0,
+              exitCode: null,
+              outcome: 'not-verified' as const,
+              notVerified: 'runner-error' as const,
+              runnerError: { kind: 'audit-infrastructure', message: 'the audit service was unavailable' },
+              output: { path, bytes: 34, truncated: false, tail: 'the audit service was unavailable\n' },
+            };
+          }));
+          return { commands, audited: null, evidence: null };
+        }
+        return audit.run(checks, request);
+      },
+    };
+    const opened = await openRuns(root, {
+      script: byRole({
+        'initial-architect': [submit(analysis([entry('review-note', notes, 'A reviewer note.', {
+          parent: 'collection-review/workspace/reviews', directory: notesDirectory,
+          purpose: 'Holds reviewer notes.', tags: [],
+        })]))],
+        'local-architect': [submit(assign(notes, {}, outline())), submit(requestCompletion())],
+        engineer: [submit(
+          completionProposed('Created the notes module.'),
+          write(`${notesDirectory}/module.ramify`, 'ramify 1\nmodule notes\n'),
+          write(`${notesDirectory}/README.md`, '# notes\n\nHolds reviewer notes.\n'),
+          write(`${notesDirectory}/src/notes.ts`, 'export const noteLimit = 500;\n'),
+          write(`${notesDirectory}/src/tests/notes.test.ts`, firstTest),
+        )],
+      }),
+      inputs: treeInputs(),
+      checkExecution,
+    });
+    cleanups.push(() => opened.service.close());
+    const receipt = await opened.service.execute(startRun('review-notes'));
+    await opened.service.settled('review-notes', receipt.jobId);
+
+    expect(onlyRun(opened.service, 'review-notes').state).toBe('completed');
+    const committed = opened.service.committed('review-notes', receipt.jobId)!;
+    const attempts = committed.entries.flatMap(line => line.transaction.records)
+      .map(record => record.body as Partial<GateAttempt>)
+      .filter((body): body is GateAttempt => body.schema === 'ramify-agent.gate-attempt/2');
+    const [failed, retry] = attempts.filter(attempt => attempt.checkpoint === 'iteration');
+    expect(failed).toMatchObject({ verdict: 'not-verified', cause: 'infrastructure' });
+    expect(failed!.commit).not.toBeNull();
+    expect(failed!.audited).toBeNull();
+    expect(retry).toMatchObject({ verdict: 'passed', commit: null, audited: failed!.commit });
+
+    const accepted = failed!.commit!;
+    expect(acceptedCommit(committed.entries, committed.record.manifest.source?.commit ?? attempts[0]!.head)).toBe(accepted);
+    const result = await readResult(root, receipt.jobId, 1);
+    expect(result).toMatchObject({ outcome: 'accepted', gate: retry!.id, commit: accepted });
+
+    const later = attempts.filter(attempt => attempt.checkpoint === 'work-item' || attempt.checkpoint === 'final');
+    expect(later.map(attempt => ({ checkpoint: attempt.checkpoint, commit: attempt.commit, audited: attempt.audited, verdict: attempt.verdict }))).toEqual([
+      { checkpoint: 'work-item', commit: null, audited: accepted, verdict: 'passed' },
+      { checkpoint: 'final', commit: null, audited: accepted, verdict: 'passed' },
+    ]);
+    const closed = committed.entries.filter(line => line.transaction.event.type === 'iteration-closed');
+    expect(closed).toHaveLength(1);
+    expect(closed[0]!.transaction.event.type === 'iteration-closed' && closed[0]!.transaction.event.data.notices).toEqual([{
+      kind: 'module-created', module: notes, declaration: `${notesDirectory}/module.ramify`,
+      commit: accepted, iteration: 'wi-001.i01', decision: null,
+    }]);
+    expect(await changedPaths(root, accepted)).toEqual([]);
+    expect(await worktreeLineChanges(root, accepted)).toEqual([]);
+
+    const queries = new RunQueries(opened.service);
+    const metrics = await queries.metrics('review-notes', receipt.jobId);
+    expect(metrics.metrics.find(metric => metric.id === 'gate-attempts-per-accepted-iteration')).toMatchObject({
+      state: 'measured', numerator: 2, denominator: 1, value: 2,
+      evidence: [failed!.id, retry!.id],
+    });
+    const projected = await queries.workItem('review-notes', receipt.jobId, 'wi-001');
+    expect(projected.iterations[0]!.result?.commit).toBe(accepted);
+    const events = await queries.events('review-notes', receipt.jobId, 0);
+    expect(events.events.find(event => event.transition === 'iteration-closed')?.refs).toContainEqual({ kind: 'commit', id: accepted });
+    expect(events.events.find(event => event.transition === 'job-completed')?.refs).toContainEqual({ kind: 'commit', id: accepted });
+
+    const invocations = committed.entries.flatMap(line => line.transaction.records)
+      .map(record => record.body as { schema?: string; role?: string; base?: string })
+      .filter(body => body.schema === 'ramify-agent.invocation/1');
+    expect(invocations.filter(invocation => invocation.role === 'local-architect').at(-1)?.base).toBe(accepted);
+    const architect = opened.agent!.sessions.filter(session => session.spec.role === 'local-architect').at(-1)!;
+    expect(architect.spec.prompt).toContain(`committed as ${accepted}`);
+  }, 300_000);
+});
+
 describe('the message the harness writes', () => {
   test('it is a pure function of the records, and an agent\'s words reach it only as the summary', () => {
     const gate: GateAttempt = {
-      schema: 'ramify-agent.gate-attempt/1',
+      schema: 'ramify-agent.gate-attempt/2',
       id: 'ga-0012', checkpoint: 'iteration',
       subject: { workItem: 'wi-001', iteration: 'wi-001.i02' },
       proposedBy: 'inv-0014', repairRound: 1, infrastructureAttempt: 0,
-      head: 'abc', commit: null, guardedChanges: [],
+      head: 'abc', commit: null, audited: 'abc', evidence: null, guardedChanges: [],
       commands: [
         { kind: 'ramify-check', command: { argv: ['ramify'], cwd: '/p', env: [], envAdditions: {}, timeoutMs: 1 }, startedAt: 'now', elapsedMs: 1200, exitCode: 0, outcome: 'passed', runnerError: null, output: { path: 'a', bytes: 0, truncated: false, tail: '' } },
         { kind: 'type-check', command: { argv: ['npm'], cwd: '/p', env: [], envAdditions: {}, timeoutMs: 1 }, startedAt: 'now', elapsedMs: 8400, exitCode: 0, outcome: 'passed', runnerError: null, output: { path: 'b', bytes: 0, truncated: false, tail: '' } },
@@ -207,13 +360,13 @@ describe('the message the harness writes', () => {
     expect(commitMessage(parts)).toBe(message);
     expect(message).toContain('wi-001.i02: send the customer email from the page');
     expect(message).toContain('Send the customer email from the page.');
-    expect(message).toContain('Checks: passed (gate ga-0012, checkpoint iteration, repair round 1)');
-    expect(message).toContain('2 files; owners workspace/reviews, reviews/core (subtree)');
+    expect(message).not.toContain('Checks:');
     expect(message).toContain('Earlier attempts: ga-0011 failed (in-scope)');
     expect(message).toContain('Not covered: test:cucumber (one supported runner)');
     expect(message).toContain('Modules created: workspace/reviews/notes (subs/workspace/subs/reviews/subs/notes/module.ramify)');
     expect(message).toContain('Ramify-Run: 20260920T101500Z-3f9a1c');
     expect(message).toContain('Ramify-Gate: ga-0012');
+    expect(message).toContain('Audit-Note: git notes --ref=audit show <commit>');
     expect(message).toContain('Ramify-Invocations: inv-0012, inv-0014');
   });
 });

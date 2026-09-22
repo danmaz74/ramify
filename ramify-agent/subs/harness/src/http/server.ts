@@ -6,6 +6,8 @@ import { createScriptedAgent, type ScriptStep } from '../../subs/agent/src/scrip
 import { createPiAgent, piReadiness } from '../../subs/agent/subs/pi/src/pi-agent.js';
 import { privateRamify, type RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import { architectRunInputs } from '../run/inputs.js';
+import { createAuditCheckExecution } from '../../subs/audit/src/check-execution.js';
+import { createAuditWorkspaceOwnership } from '../run/audit-workspaces.js';
 import { RunService, type RunRecoveryReport, type RunServiceOptions } from '../run/service.js';
 import { acquireProjectLock } from '../store/lock.js';
 import { createApp } from './app.js';
@@ -38,7 +40,7 @@ export interface ServerOptions {
    */
   readonly ramify?: RamifyCli | undefined;
   /** Run settings for tests: the inputs, the policy, the stop bound and the write hook. */
-  readonly runs?: Partial<Omit<RunServiceOptions, 'projectRoot' | 'lock' | 'agent' | 'ramify'>> | undefined;
+  readonly runs?: Partial<Omit<RunServiceOptions, 'projectRoot' | 'lock' | 'agent' | 'ramify' | 'checkExecution'>> | undefined;
 }
 
 export interface RunningServer {
@@ -54,6 +56,32 @@ export interface RunningServer {
   /** What the start-up recovery did with runs left without a terminal event. */
   readonly recovery: RunRecoveryReport;
   /** Stops serving, stops a running run's session, stops the harness's own daemon and releases the project lock. */
+  close(): Promise<void>;
+}
+
+/** The server options the package root's `serve` command owns. */
+export interface CliServerOptions {
+  readonly projectRoot: string;
+  readonly port: number;
+  readonly assetsDirectory?: string | undefined;
+  readonly agent?: 'pi' | 'fake' | undefined;
+  readonly piModel?: string | undefined;
+}
+
+/** What the package root needs to print and stop after starting `serve`. */
+export interface CliServer {
+  readonly url: string;
+  readonly projectRoot: string;
+  readonly servesWebClient: boolean;
+  readonly agent: string | undefined;
+  readonly agentStatus: string | undefined;
+  readonly recovery: {
+    readonly interrupted: string[];
+    readonly rematerialized: string[];
+    readonly effects: string[];
+    readonly invocations: string[];
+    readonly skipped: string[];
+  };
   close(): Promise<void>;
 }
 
@@ -112,6 +140,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
       projectRoot,
       lock,
       ramify,
+      checkExecution: createAuditCheckExecution({ workspaceOwnership: createAuditWorkspaceOwnership(projectRoot) }),
       ...(agent === undefined ? {} : { agent }),
     }));
   } catch (error) {
@@ -155,4 +184,9 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
       await owned?.dispose();
     },
   };
+}
+
+/** Starts the harness with exactly the options exposed by the package CLI. */
+export function startCliServer(options: CliServerOptions): Promise<CliServer> {
+  return startServer(options);
 }

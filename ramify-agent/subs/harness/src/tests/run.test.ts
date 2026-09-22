@@ -51,8 +51,8 @@ describe('an implementation run with no entry capabilities', () => {
       'invocation-ended',
       'analysis-accepted',
       'readiness-passed',
+      'gate-committing',
       'gate-attempted',
-      'gate-committed',
       'job-completed',
     ]);
 
@@ -122,11 +122,12 @@ describe('an implementation run with no entry capabilities', () => {
     const events = await runEventsOnDisk(root, 'review-notes', receipt.jobId);
     expect(events.map(event => event.type)).toEqual([
       'job-started', 'invocation-started', 'invocation-ended', 'analysis-accepted',
-      'readiness-passed', 'gate-attempted', 'job-failed',
+      'readiness-passed', 'gate-committing', 'gate-attempted', 'job-failed',
     ]);
-    // No commit was made, and the failing attempt is a record with its cause.
-    const attempt = JSON.parse(await readFile(runPath(root, 'review-notes', receipt.jobId, runLayout.gate('ga-0002')), 'utf8')) as { verdict: string; cause: string; commit: string | null };
-    expect(attempt).toMatchObject({ verdict: 'failed', cause: 'in-scope', commit: null });
+    // The unchanged tree needs no new commit, but its current revision was
+    // audited and the failing attempt records that identity and evidence.
+    const attempt = JSON.parse(await readFile(runPath(root, 'review-notes', receipt.jobId, runLayout.gate('ga-0002')), 'utf8')) as { verdict: string; cause: string; commit: string | null; audited: string | null; evidence: unknown };
+    expect(attempt).toMatchObject({ verdict: 'failed', cause: 'in-scope', commit: null, audited: expect.any(String), evidence: expect.any(Object) });
   }, 120_000);
 
   test('a passing final gate over a changed tree makes exactly one commit, with the gate as its trailer', async () => {
@@ -134,7 +135,7 @@ describe('an implementation run with no entry capabilities', () => {
     const { service } = await openRuns(root, {
       script: [{ kind: 'submit', input: emptyAnalysis() }],
       // A change that arrives after readiness blocks nothing: a gate runs the
-      // checks in the working directory and, on a pass, the harness commits.
+      // commit, then the gate audits that exact revision.
       afterWrite: async write => {
         if (write === 'readiness-attempted') await writeFile(join(root, 'src', 'late.ts'), 'export const late = true;\n');
       },
@@ -154,7 +155,8 @@ describe('an implementation run with no entry capabilities', () => {
     expect(body).toContain('Ramify-Run: ' + receipt.jobId);
     expect(body).toContain('Ramify-Gate: ga-0002');
     expect(body).toContain('Ramify-Invocations: inv-0001');
-    expect(body).toContain('Checks: passed (gate ga-0002, checkpoint final)');
+    expect(body).not.toContain('Checks:');
+    expect(body).toContain('Audit-Note: git notes --ref=audit show');
 
     // The commit holds the change and none of the run's own records.
     const files = (await git(root, 'show', '--name-only', '--format=', 'HEAD')).trim().split('\n');

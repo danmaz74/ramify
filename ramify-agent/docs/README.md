@@ -58,6 +58,9 @@ Design documents for the separate agent harness:
 - [Plan 6: role-specific prompts](plans/06-role-specific-prompts/main-plan.md),
   self-contained prompts per role in place of the module-architect skill;
   proposed
+- [Plan 7: commit-audit integration](plans/07-commit-audit-integration/main-plan.md),
+  implemented commit-then-audit gates with revision-bound evidence; its
+  completion gate is verified, while run delivery or merge remains out of scope
 - [Module architect skill design](architect-skill-design/README.md)
 - [Metrics](metrics/README.md), glossary, measurement principles and the initial
   delivered-change token-efficiency policy; its glossary names concepts and

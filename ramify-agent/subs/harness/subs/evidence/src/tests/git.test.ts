@@ -2,8 +2,8 @@ import { chmod, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
-  GitError, changedPaths, commitAccepted, createRunBranch, diffNumstat,
-  findCommitByTrailer, isCleanRepository,
+  GitError, changedEntries, changedPaths, commitAccepted, createRunBranch, diffNameStatus, diffNumstat,
+  findCommitByTrailer, findCommitByTrailers, isCleanRepository, worktreeLineChanges,
 } from '../git.js';
 import { testRepository, withoutGitConfiguration } from './helpers/git.js';
 import type { TestRepository } from './helpers/git.js';
@@ -112,6 +112,24 @@ describe('the git service', () => {
     expect(await findCommitByTrailer(repository.root, 'Ramify-Gate', 'ga-0013')).toBeNull();
   });
 
+  it('finds a commit only when its run and gate trailers occur together', async () => {
+    await createRunBranch(repository.root, 'run-identity');
+    await repository.write('src/one.ts', 'export const one = 1;\n');
+    const first = await commitAccepted(repository.root, 'first run\n\nRamify-Run: run-a\nRamify-Gate: ga-0001\n');
+    await repository.write('src/two.ts', 'export const two = 2;\n');
+    const second = await commitAccepted(repository.root, 'second run\n\nRamify-Run: run-b\nRamify-Gate: ga-0001\n');
+
+    expect(await findCommitByTrailers(repository.root, [
+      { key: 'Ramify-Run', value: 'run-a' }, { key: 'Ramify-Gate', value: 'ga-0001' },
+    ])).toBe(first);
+    expect(await findCommitByTrailers(repository.root, [
+      { key: 'Ramify-Run', value: 'run-b' }, { key: 'Ramify-Gate', value: 'ga-0001' },
+    ])).toBe(second);
+    expect(await findCommitByTrailers(repository.root, [
+      { key: 'Ramify-Run', value: 'run-c' }, { key: 'Ramify-Gate', value: 'ga-0001' },
+    ])).toBeNull();
+  });
+
   it('reads what changed from git and nowhere else', async () => {
     await repository.write('src/one.ts', 'export const one = 1;\n');
     await repository.write('src/untracked.ts', 'export const two = 2;\n');
@@ -132,6 +150,31 @@ describe('the git service', () => {
 
     expect(await diffNumstat(repository.root, base, head ?? '')).toEqual([
       { path: 'src/one.ts', added: 2, deleted: 0, binary: false },
+    ]);
+  });
+
+  it('keeps a failed attempt visible relative to the earlier accepted boundary', async () => {
+    await createRunBranch(repository.root, 'run-6');
+    const base = (await repository.git('rev-parse', 'HEAD')).trim();
+    await repository.write('subs/notes/module.ramify', 'ramify 1\nmodule notes\n');
+    await repository.write('subs/notes/src/notes.ts', 'export const limit = 400;\n');
+    const failed = await commitAccepted(repository.root, 'failed attempt');
+    await repository.write('subs/notes/src/notes.ts', 'export const limit = 500;\n');
+
+    expect(await changedPaths(repository.root, base)).toEqual([
+      'subs/notes/module.ramify', 'subs/notes/src/notes.ts',
+    ]);
+    expect(await changedEntries(repository.root, base)).toEqual([
+      { status: 'A', path: 'subs/notes/module.ramify' },
+      { status: 'A', path: 'subs/notes/src/notes.ts' },
+    ]);
+    expect(await worktreeLineChanges(repository.root, base)).toEqual([
+      { path: 'subs/notes/module.ramify', added: 2, deleted: 0, binary: false, bytes: null },
+      { path: 'subs/notes/src/notes.ts', added: 1, deleted: 0, binary: false, bytes: null },
+    ]);
+    expect(await diffNameStatus(repository.root, base, failed!)).toEqual([
+      { status: 'A', path: 'subs/notes/module.ramify' },
+      { status: 'A', path: 'subs/notes/src/notes.ts' },
     ]);
   });
 });

@@ -8,10 +8,9 @@ import type { CommandOutcome } from './run-command.js';
  * no git logic lives here beyond naming the invocation and reading what it
  * printed.
  *
- * What this service deliberately does not do: it takes no identity of the
- * working tree and compares none. A gate runs the checks in the working
- * directory and, on a pass, the harness commits it; a file that changed in
- * between is content for that commit and blocks nothing.
+ * Committing gates make a run-branch commit before the audit executes; this
+ * service owns that commit and the revision queries used by the audit and by
+ * accepted-boundary accounting. It does not decide whether an audit passed.
  */
 
 /** Every branch the harness commits on is named for its run. */
@@ -87,11 +86,11 @@ export async function createRunBranch(root: string, runId: string, signal?: Abor
 }
 
 /**
- * Commit the whole working directory on the run branch, after a gate passed.
+ * Commit the whole working directory on the run branch before its audit.
  *
  * `--no-verify` and `--no-gpg-sign` with the harness's own identity mean that
  * neither the project's hooks nor the person's git configuration can fail a
- * commit the harness has already decided to make. A branch that is not a run
+ * commit the harness has decided to audit. A branch that is not a run
  * branch is refused: the harness commits nowhere else. Nothing to commit is
  * `null`, which is what a passing gate over an unchanged tree records.
  */
@@ -126,66 +125,120 @@ export async function commitAccepted(root: string, message: string, signal?: Abo
   return committed.stdout.trim();
 }
 
+/** One exact trailer a recovered commit must carry. */
+export interface CommitTrailer {
+  readonly key: string;
+  readonly value: string;
+}
+
 /**
- * The newest commit carrying `<key>: <value>` as a trailer, or null. The
- * harness asks this before repeating a commit, so a run resumed after a crash
- * finds what it already committed instead of committing twice.
+ * The newest commit carrying every supplied trailer on that same commit, or
+ * null. The grep narrows the history; the parsed trailer fields establish the
+ * exact key/value conjunction rather than trusting message text.
  */
-export async function findCommitByTrailer(root: string, key: string, value: string, signal?: AbortSignal): Promise<string | null> {
-  const separator = '\u001e';
+export async function findCommitByTrailers(
+  root: string,
+  trailers: readonly CommitTrailer[],
+  signal?: AbortSignal,
+): Promise<string | null> {
+  if (trailers.length === 0) throw new Error('At least one commit trailer is required');
+  for (const trailer of trailers) {
+    if (!/^[A-Za-z0-9][A-Za-z0-9-]*$/u.test(trailer.key)) throw new Error(`Invalid commit trailer key ${trailer.key}`);
+    if (trailer.value === '' || /[\r\n\u001e\u001f]/u.test(trailer.value)) throw new Error(`Invalid value for commit trailer ${trailer.key}`);
+  }
+
+  const fieldSeparator = '\u001f';
+  const valueSeparator = '\u001e';
+  const format = [
+    '%H',
+    ...trailers.map(trailer => `%(trailers:key=${trailer.key},valueonly,separator=${valueSeparator})`),
+  ].join(fieldSeparator);
   const run = await gitOk(root, [
-    'log', `--format=%H\u001f%(trailers:key=${key},valueonly,separator=${separator})`,
-    '--fixed-strings', `--grep=${key}: ${value}`,
+    'log', `--format=${format}`, '--fixed-strings', '--all-match',
+    ...trailers.map(trailer => `--grep=${trailer.key}: ${trailer.value}`),
   ], signal);
   for (const line of run.stdout.split('\n')) {
-    const [commit, trailers] = line.split('\u001f');
-    if (commit === undefined || trailers === undefined) continue;
-    if (trailers.split(separator).some(trailer => trailer.trim() === value)) return commit.trim();
+    const [commit, ...fields] = line.split(fieldSeparator);
+    if (commit === undefined || fields.length !== trailers.length) continue;
+    if (trailers.every((trailer, index) => fields[index]?.split(valueSeparator).some(value => value.trim() === trailer.value))) {
+      return commit.trim();
+    }
   }
   return null;
 }
 
+/** The newest commit carrying one exact trailer, retained for single-key callers. */
+export async function findCommitByTrailer(root: string, key: string, value: string, signal?: AbortSignal): Promise<string | null> {
+  return findCommitByTrailers(root, [{ key, value }], signal);
+}
+
 /**
- * Every path the working directory changed against HEAD, tracked or not, with
- * both names of a rename. This is the only place the harness learns what
- * changed.
+ * Every path the working directory changed against the supplied accepted
+ * boundary, tracked or not, with both names of a rename. This is the only
+ * place the harness learns what changed.
  */
-export async function changedPaths(root: string, signal?: AbortSignal): Promise<string[]> {
+export async function changedPaths(root: string, base: string = 'HEAD', signal?: AbortSignal): Promise<string[]> {
+  const changed = await gitOk(root, ['diff', '--name-only', '-z', '--no-renames', base], signal);
+  const paths = changed.stdout.split('\0').filter(Boolean);
   const run = await gitOk(root, ['status', '--porcelain', '-z', '--untracked-files=all'], signal);
   const fields = run.stdout.split('\0');
-  const paths: string[] = [];
   for (let index = 0; index < fields.length; index += 1) {
     const entry = fields[index];
     if (entry === undefined || entry === '') continue;
     const status = entry.slice(0, 2);
-    paths.push(entry.slice(3));
+    if (status === '??') paths.push(entry.slice(3));
     if (status.startsWith('R') || status.startsWith('C')) {
       const original = fields[index + 1];
       index += 1;
-      if (original !== undefined && original !== '') paths.push(original);
+      if (status === '??' && original !== undefined && original !== '') paths.push(original);
     }
   }
   return [...new Set(paths)].sort();
 }
 
 /**
- * Every changed path with the status git gives it: `??` for a path git has
- * never seen, `A`, `M` or `D` for one it tracks. It is how the harness knows
- * that the commit it is about to make adds or removes a module declaration.
+ * Every changed path since the supplied accepted boundary, with `??` for a
+ * path git has never seen and `A`, `M` or `D` for one Git can diff. It is how
+ * the harness knows that an attempt may add or remove a module declaration.
  */
 export async function changedEntries(
   root: string,
+  base: string = 'HEAD',
   signal?: AbortSignal,
 ): Promise<Array<{ readonly status: string; readonly path: string }>> {
+  const changed = await gitOk(root, ['diff', '--name-status', '-z', '--no-renames', base], signal);
+  const entries = nameStatusEntries(changed.stdout);
   const run = await gitOk(root, ['status', '--porcelain', '-z', '--untracked-files=all'], signal);
   const fields = run.stdout.split('\0');
-  const entries: Array<{ status: string; path: string }> = [];
   for (let index = 0; index < fields.length; index += 1) {
     const entry = fields[index];
     if (entry === undefined || entry === '') continue;
     const status = entry.slice(0, 2);
-    entries.push({ status: status.trim(), path: entry.slice(3) });
+    if (status === '??') entries.push({ status: status.trim(), path: entry.slice(3) });
     if (status.startsWith('R') || status.startsWith('C')) index += 1;
+  }
+  return entries;
+}
+
+/** What changed between two accepted revisions, without folding renames. */
+export async function diffNameStatus(
+  root: string,
+  from: string,
+  to: string,
+  signal?: AbortSignal,
+): Promise<Array<{ readonly status: string; readonly path: string }>> {
+  const run = await gitOk(root, ['diff', '--name-status', '-z', '--no-renames', from, to], signal);
+  return nameStatusEntries(run.stdout);
+}
+
+function nameStatusEntries(output: string): Array<{ status: string; path: string }> {
+  const fields = output.split('\0');
+  const entries: Array<{ status: string; path: string }> = [];
+  for (let index = 0; index < fields.length; index += 2) {
+    const status = fields[index];
+    const path = fields[index + 1];
+    if (status === undefined || status === '' || path === undefined || path === '') continue;
+    entries.push({ status: status.trim(), path });
   }
   return entries;
 }
@@ -242,16 +295,18 @@ export async function commitNameStatus(
 }
 
 /**
- * The lines the working directory has added and deleted against HEAD:
+ * The lines the working directory has added and deleted against the supplied
+ * accepted boundary:
  * `git diff --numstat` for what git tracks, and the lines of each untracked
  * file beside it, because a file git has never seen is work too. The index is
  * not touched.
  */
 export async function worktreeLineChanges(
   root: string,
+  base: string = 'HEAD',
   signal?: AbortSignal,
 ): Promise<Array<{ readonly path: string; readonly added: number; readonly deleted: number; readonly binary: boolean; readonly bytes: number | null }>> {
-  const tracked = await gitOk(root, ['diff', '--numstat', '-z', 'HEAD'], signal);
+  const tracked = await gitOk(root, ['diff', '--numstat', '-z', base], signal);
   const changes = new Map<string, { path: string; added: number; deleted: number; binary: boolean; bytes: number | null }>();
   const fields = tracked.stdout.split('\0');
   for (let index = 0; index < fields.length; index += 1) {

@@ -16,6 +16,8 @@ import { defaultRunPolicy } from '../../run/policy.js';
 import type { RunPolicy } from '../../run/records.js';
 import type { RunInputs } from '../../run/inputs.js';
 import { RunService, type RunServiceOptions } from '../../run/service.js';
+import { createAuditCheckExecution } from '../../../subs/audit/src/check-execution.js';
+import { createAuditWorkspaceOwnership } from '../../run/audit-workspaces.js';
 import { acquireProjectLock, lockPath } from '../../store/lock.js';
 
 const exec = promisify(execFile);
@@ -235,6 +237,7 @@ export async function openRuns(root: string, options: OpenRunsOptions = {}) {
     lock,
     inputs: shapeOnlyInputs,
     ramify: await stubRamify(),
+    checkExecution: createAuditCheckExecution({ workspaceOwnership: createAuditWorkspaceOwnership(root) }),
     stopGraceMs: 500,
     policy: projectRoot => testPolicy(projectRoot),
     warn: message => warnings.push(message),

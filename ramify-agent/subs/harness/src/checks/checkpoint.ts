@@ -18,17 +18,17 @@ export interface CheckpointPolicy {
   readonly selection: TestSelectionPolicy['policy'];
   /** Whether each independent nested package's own tests run too. */
   readonly nestedTests: boolean;
-  /** Whether a pass is followed by the harness's commit on the run branch. */
-  readonly commitOnPass: boolean;
+  /** Whether a verified attempt is committed before its checks run. */
+  readonly committing: boolean;
 }
 
 export const checkpointPolicies: Record<Checkpoint, CheckpointPolicy> = {
-  readiness: { selection: 'all-project', nestedTests: true, commitOnPass: false },
-  iteration: { selection: 'owned-by-scope', nestedTests: false, commitOnPass: true },
-  contract: { selection: 'owned-by-scope', nestedTests: false, commitOnPass: true },
-  'breaking-iteration': { selection: 'all-project', nestedTests: false, commitOnPass: true },
-  'work-item': { selection: 'all-project', nestedTests: false, commitOnPass: true },
-  final: { selection: 'all-project', nestedTests: false, commitOnPass: true },
+  readiness: { selection: 'all-project', nestedTests: true, committing: false },
+  iteration: { selection: 'owned-by-scope', nestedTests: false, committing: true },
+  contract: { selection: 'owned-by-scope', nestedTests: false, committing: true },
+  'breaking-iteration': { selection: 'all-project', nestedTests: false, committing: true },
+  'work-item': { selection: 'all-project', nestedTests: false, committing: true },
+  final: { selection: 'all-project', nestedTests: false, committing: true },
 };
 
 /** The commands of the project a checkpoint reaches through the policy the run captured. */

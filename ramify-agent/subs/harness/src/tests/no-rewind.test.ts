@@ -242,11 +242,11 @@ describe('adding work leaves every completed piece completed', () => {
     expect((await readResult(root, runId, 'wi-001', 1)).outcome).toBe('accepted');
     expect((await readResult(root, runId, 'wi-001', 2)).outcome).toBe('accepted');
 
-    // The commit the first iteration made is still on the branch, and the
-    // second iteration added its own beside it.
+    // The first iteration's failed attempt and repaired attempt both remain
+    // on the branch, and the second iteration added its own beside them.
     const log = await git(root, 'log', '--format=%H%x1f%B%x1e', `ramify-agent/run-${runId}`);
     const commits = log.split('\u001e').map(part => part.trim()).filter(Boolean);
-    expect(commits.filter(commit => commit.includes('Ramify-Iteration: wi-001.i01'))).toHaveLength(1);
+    expect(commits.filter(commit => commit.includes('Ramify-Iteration: wi-001.i01'))).toHaveLength(2);
     expect(commits.filter(commit => commit.includes('Ramify-Iteration: wi-001.i02'))).toHaveLength(1);
     expect((await readResult(root, runId, 'wi-001', 1)).commit).not.toBeNull();
 

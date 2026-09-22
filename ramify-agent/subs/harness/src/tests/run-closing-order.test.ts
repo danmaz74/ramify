@@ -96,7 +96,7 @@ describe('closing is the last write', () => {
     const { events } = await recordedAt('');
     const order = events.map((event: RunEvent) => event.type);
     expect(order.indexOf('analysis-accepted')).toBeGreaterThan(order.indexOf('invocation-ended'));
-    expect(order.indexOf('gate-committed')).toBeGreaterThan(order.indexOf('gate-attempted'));
+    expect(order.indexOf('gate-attempted')).toBeGreaterThan(order.indexOf('gate-committing'));
     expect(order.indexOf('job-completed')).toBe(order.length - 1);
     // One transition per piece of work, never two.
     expect(order.filter(type => type === 'analysis-accepted')).toHaveLength(1);

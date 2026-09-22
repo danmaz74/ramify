@@ -110,11 +110,12 @@ async function reached(root: string, runId: string, events: string, write: RunWr
     case 'writer-released': return types.includes('writer-released');
     case 'iteration-closed': return types.includes('iteration-closed');
     case 'work-item-completed': return types.includes('work-item-completed');
-    // The intent is in the log and the commit is not made yet.
-    case 'gate-attempted': return types.includes('gate-attempted') && (await commitCount(root, runId)) === 1;
-    // The commit is made and its completion line is not in the log yet.
-    case 'gate-committing': return types.includes('gate-attempted') && (await commitCount(root, runId)) === 2;
-    case 'gate-committed': return types.includes('gate-committed');
+    // The operation intent is in the log and the commit is not made yet.
+    case 'gate-attempted': return types.includes('gate-committing') && (await commitCount(root, runId)) === 1;
+    // The commit is made and the exact revision has not completed audit yet.
+    case 'gate-committing': return types.includes('gate-committing') && !types.includes('gate-attempted') && (await commitCount(root, runId)) === 2;
+    // The complete attempt is the effect's completion line.
+    case 'gate-committed': return types.includes('gate-attempted') && (await commitCount(root, runId)) === 2;
     case 'placement-requested': return types.includes('placement-requested');
     case 'view-refreshed': return types.includes('view-refreshed');
     case 'fork-returned-partial': return types.includes('fork-returned-partial');
@@ -389,14 +390,14 @@ describe('the recovery table', () => {
     expect(before).toHaveLength(1);
 
     const { recovery } = await reopen(root);
-    expect(recovery.effects).toEqual([`review-notes/${runId}: the commit of gate ga-0002`]);
+    expect(recovery.effects).toEqual([`review-notes/${runId}: the commit and audit of gate ga-0002`]);
     const after = (await git(root, 'log', '--format=%H', `ramify-agent/run-${runId}`)).trim().split('\n').filter(Boolean);
     expect(after).toHaveLength(2);
 
     const events = await runEventsOnDisk(root, 'review-notes', runId);
     expect(events.map(event => event.type)).toEqual([
       'job-started', 'invocation-started', 'invocation-ended', 'analysis-accepted',
-      'readiness-passed', 'gate-attempted', 'gate-committed', 'job-interrupted',
+      'readiness-passed', 'gate-committing', 'gate-attempted', 'job-interrupted',
     ]);
     const attempt = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.gate('ga-0002')), 'utf8')) as { commit: string | null };
     expect(attempt.commit).toBe(after[0]);
@@ -410,7 +411,7 @@ describe('the recovery table', () => {
     expect(before).toHaveLength(2);
 
     const { recovery } = await reopen(root);
-    expect(recovery.effects).toEqual([`review-notes/${runId}: the commit of gate ga-0002`]);
+    expect(recovery.effects).toEqual([`review-notes/${runId}: the commit and audit of gate ga-0002`]);
     const after = (await git(root, 'log', '--format=%H', `ramify-agent/run-${runId}`)).trim().split('\n').filter(Boolean);
     expect(after).toEqual(before);
 
@@ -418,7 +419,7 @@ describe('the recovery table', () => {
     expect(attempt.commit).toBe(before[0]);
   }, 180_000);
 
-  test('a crash after gate-committed leaves the commit alone and appends the interruption only', async () => {
+  test('a crash after the complete attempt leaves the commit alone and appends the interruption only', async () => {
     const root = await target();
     const { runId } = await crashAfter(root, 'gate-committed', true);
 

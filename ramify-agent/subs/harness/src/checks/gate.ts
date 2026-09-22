@@ -1,32 +1,32 @@
 import { mkdir, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import { guardedFilesHash } from '../../subs/evidence/src/guarded-files.js';
-import { runCommand } from '../../subs/evidence/src/run-command.js';
 import type { CommandRun } from '../../subs/evidence/src/run-command.js';
 import { ramifyAttribution } from './diagnostics.js';
+import { checkOutputPath } from './execution.js';
+import type { CheckExecutionPort, CheckExecutionResult } from './execution.js';
 import type {
   AcceptedCommit, Checkpoint, GateAttempt, GateAttemptId, GateAttribution, GateCause,
   GateCommandRecord, GateNext, GateRuleRecord, NotVerified, RecordReference,
 } from './records.js';
-import { checkCommandEnvironment, gateAttemptSchema } from './records.js';
+import { gateAttemptSchema } from './records.js';
 import { verifyChecks } from './verify.js';
-import type { PlannedCheck } from './verify.js';
+import type { PlannedCheck, VerificationFailure } from './verify.js';
 
 /*
- * One function runs a gate. It verifies every command and every selection,
- * runs what verified in the working directory, compares the guarded files with
- * what was captured, and answers one `GateAttempt`. It knows nothing of runs:
- * its caller supplies the checkpoint, the commands, the captured hashes and
- * the head they describe, and commits afterwards if the attempt passed.
+ * Gate policy verifies every command and selection and compares guarded files
+ * before execution. A committing caller can then create the revision first
+ * and execute the prepared gate over that exact commit; standalone callers
+ * keep using the in-place executor.
  *
- * It has one caller, because a standalone commit-audit tool extracted from
- * cucumber-viz will replace its body later and nothing else should have to
- * change with it.
+ * Command execution is a port: the in-place runner implements today's loop,
+ * and a commit-audit runner can replace it without moving gate policy.
  */
 
 /** Everything a gate needs that is not the checkpoint itself. */
 export interface GateRequest {
   readonly id: GateAttemptId;
+  /** The durable run that owns this attempt; standalone in-place gates omit it. */
+  readonly runId?: string | undefined;
   /** The project the commands run over, and whose guarded files are compared. */
   readonly projectRoot: string;
   /** Where the attempt's output files go, beside the attempt record. */
@@ -34,6 +34,14 @@ export interface GateRequest {
   /** The run branch's head when the commands ran. */
   readonly head: AcceptedCommit;
   readonly checks: readonly PlannedCheck[];
+  /** The checkpoint's selection, kept separate from any all-project scope probe. */
+  readonly selection?: {
+    readonly policy: 'owned-by-scope' | 'all-project';
+    readonly exactOwners: readonly string[];
+    readonly subtrees: readonly string[];
+  } | undefined;
+  /** Project-relative nested packages whose dependencies an isolated runner links. */
+  readonly dependencyDirectories?: readonly string[] | undefined;
   readonly subject?: { readonly workItem?: string; readonly iteration?: string } | undefined;
   readonly proposedBy?: string | null | undefined;
   readonly repairRound?: number | undefined;
@@ -59,13 +67,31 @@ export interface GateRequest {
   readonly signal?: AbortSignal | undefined;
 }
 
+/** A verified gate whose commands may now be executed over a chosen revision. */
+export interface PreparedGate {
+  readonly checkpoint: Checkpoint;
+  readonly request: GateRequest;
+  readonly guardedChanges: GateAttempt['guardedChanges'];
+  readonly rules: GateRuleRecord[];
+  readonly unauthorized: boolean;
+  readonly ruleFailed: boolean;
+  readonly decisive: NotVerified[];
+  readonly timeoutMs: number;
+}
+
 /**
- * Run one checkpoint's checks over the working directory and answer the
- * attempt. The writer is already settled by the caller; nothing here pauses
- * or resumes one. The attempt is returned, not written: the harness commits it
- * with the event that closes the checkpoint.
+ * Run one checkpoint in place and answer the attempt. The writer is already
+ * settled by the caller; nothing here pauses or resumes one. Committing run
+ * checkpoints use prepareGate and executePreparedGate separately.
  */
-export async function runGate(checkpoint: Checkpoint, request: GateRequest): Promise<GateAttempt> {
+export async function runGate(execution: CheckExecutionPort, checkpoint: Checkpoint, request: GateRequest): Promise<GateAttempt> {
+  const prepared = await prepareGate(checkpoint, request);
+  if ('schema' in prepared) return prepared;
+  return executePreparedGate(execution, prepared, request.head, null);
+}
+
+/** Verify the plans and harness-owned rules before any external effect is allowed. */
+export async function prepareGate(checkpoint: Checkpoint, request: GateRequest): Promise<PreparedGate | GateAttempt> {
   await mkdir(request.directory, { recursive: true });
 
   const guardedChanges = await compareGuardedFiles(request);
@@ -76,45 +102,52 @@ export async function runGate(checkpoint: Checkpoint, request: GateRequest): Pro
   const failures = await verifyChecks(request.checks);
   const verified = failures.every(failure => failure === null);
 
-  const commands: GateCommandRecord[] = [];
-  /**
-   * The reasons a verdict is attributed to. A command that never ran because
-   * another command of the same attempt failed verification is recorded as
-   * `interrupted`, but it is not why the attempt did not run, so it is not
-   * one of these.
-   */
-  const decisive: NotVerified[] = [];
-  const startedAt = new Date().toISOString();
-  let interrupted = false;
-  for (const [index, check] of request.checks.entries()) {
-    const outputFile = join(request.directory, `${String(index + 1).padStart(2, '0')}-${check.kind}.log`);
-    const failure = failures[index] ?? null;
-    if (!verified || interrupted) {
-      // Nothing ran: the attempt could not run what the checkpoint requires.
-      await writeFile(outputFile, '');
-      commands.push({
-        kind: check.kind, command: check.command, ...(check.selection === undefined ? {} : { selection: check.selection }),
-        startedAt, elapsedMs: 0, exitCode: null,
-        outcome: 'not-verified', notVerified: failure?.notVerified ?? 'interrupted',
-        runnerError: null,
-        output: { path: outputFile, bytes: 0, truncated: false, tail: failure?.detail ?? '' },
-      });
-      if (failure !== null) decisive.push(failure.notVerified);
-      continue;
-    }
+  const decisive: NotVerified[] = failures.flatMap(failure => failure === null ? [] : [failure.notVerified]);
+  // The sum is the time the commands may legitimately consume in sequence;
+  // the small allowance covers lease, worktree and publication operations.
+  const timeoutMs = request.checks.reduce((total, check) => total + check.command.timeoutMs, 0) + 30_000;
+  if (!verified) {
+    return finishGate({ checkpoint, request, guardedChanges, rules, unauthorized, ruleFailed, decisive, timeoutMs }, {
+      commands: await notVerifiedRecords(request, failures), audited: null, evidence: null,
+    }, null);
+  }
+  return { checkpoint, request, guardedChanges, rules, unauthorized, ruleFailed, decisive, timeoutMs };
+}
 
-    const run = await runCommand({
-      argv: check.command.argv,
-      cwd: check.command.cwd,
-      env: checkCommandEnvironment(check.command),
-      timeoutMs: check.command.timeoutMs,
-      outputFile,
-      ...(request.signal === undefined ? {} : { signal: request.signal }),
+/** Execute one already verified gate over `sourceCommit` and finish its immutable attempt. */
+export async function executePreparedGate(
+  execution: CheckExecutionPort,
+  prepared: PreparedGate,
+  sourceCommit: string,
+  commit: string | null,
+): Promise<GateAttempt> {
+  const { request, checkpoint } = prepared;
+  const bound = AbortSignal.timeout(prepared.timeoutMs);
+  const signal = request.signal === undefined ? bound : AbortSignal.any([request.signal, bound]);
+  const executionResult = await execution.run(request.checks, {
+      directory: request.directory,
+      classify,
+      context: {
+        ...(request.runId === undefined ? {} : { runId: request.runId }),
+        attemptId: request.id,
+        checkpoint,
+        projectRoot: request.projectRoot,
+        sourceCommit,
+        selection: request.selection ?? { policy: 'all-project', exactOwners: [], subtrees: [] },
+        dependencyDirectories: request.dependencyDirectories ?? [],
+        harness: { guardedChanges: prepared.guardedChanges, rules: prepared.rules },
+        timeoutMs: prepared.timeoutMs,
+      },
+      signal,
     });
-    const record = classify(check, run, outputFile);
-    commands.push(record);
-    if (record.notVerified !== undefined) decisive.push(record.notVerified);
-    if (record.notVerified === 'interrupted') interrupted = true;
+  return finishGate(prepared, executionResult, commit);
+}
+
+async function finishGate(prepared: PreparedGate, executionResult: CheckExecutionResult, commit: string | null): Promise<GateAttempt> {
+  const { request, checkpoint, guardedChanges, rules, unauthorized, ruleFailed, decisive } = prepared;
+  const commands = [...executionResult.commands];
+  if (commands.length !== request.checks.length) {
+    throw new Error(`Check execution answered ${commands.length} command records for ${request.checks.length} planned checks`);
   }
 
   const verdict = verdictOf(commands, unauthorized || ruleFailed);
@@ -132,7 +165,9 @@ export async function runGate(checkpoint: Checkpoint, request: GateRequest): Pro
     repairRound: request.repairRound ?? 0,
     infrastructureAttempt: request.infrastructureAttempt ?? 0,
     head: request.head,
-    commit: null,
+    commit,
+    audited: executionResult.audited,
+    evidence: executionResult.evidence,
     guardedChanges,
     ...(rules.length === 0 ? {} : { rules }),
     commands,
@@ -141,6 +176,31 @@ export async function runGate(checkpoint: Checkpoint, request: GateRequest): Pro
     ...(attribution === null ? {} : { attribution }),
     next: nextOf(request, verdict, cause, commands),
   };
+}
+
+/** Every command is recorded, but none runs when any plan failed verification. */
+async function notVerifiedRecords(
+  request: GateRequest,
+  failures: readonly (VerificationFailure | null)[],
+): Promise<GateCommandRecord[]> {
+  const startedAt = new Date().toISOString();
+  return Promise.all(request.checks.map(async (check, index) => {
+    const outputFile = checkOutputPath(request.directory, index, check);
+    const failure = failures[index] ?? null;
+    await writeFile(outputFile, '');
+    return {
+      kind: check.kind,
+      command: check.command,
+      ...(check.selection === undefined ? {} : { selection: check.selection }),
+      startedAt,
+      elapsedMs: 0,
+      exitCode: null,
+      outcome: 'not-verified' as const,
+      notVerified: failure?.notVerified ?? 'interrupted',
+      runnerError: null,
+      output: { path: outputFile, bytes: 0, truncated: false, tail: failure?.detail ?? '' },
+    };
+  }));
 }
 
 /** What each captured guarded file hashes to now. A deletion is `after: null`, a change like any other. */

@@ -27,6 +27,11 @@ export class ProjectLockError extends Error {
   }
 }
 
+/** Whether an unknown failure is the harness's project-lock refusal. */
+export function isProjectLockError(error: unknown): boolean {
+  return error instanceof ProjectLockError;
+}
+
 export interface ProjectLock {
   readonly path: string;
   readonly record: LockRecord;

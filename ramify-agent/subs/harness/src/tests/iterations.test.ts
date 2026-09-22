@@ -151,7 +151,8 @@ describe('G8: one small work item completes in one iteration', () => {
     const accepted = commits.find(commit => commit.includes('Ramify-Iteration: wi-001.i01'));
     expect(accepted).toBeDefined();
     expect(accepted).toContain('Raised the note limit to the 500 characters the plan asks for.');
-    expect(accepted).toContain('Checks: passed');
+    expect(accepted).not.toContain('Checks:');
+    expect(accepted).toContain('Audit-Note: git notes --ref=audit show');
     expect(accepted).toContain(`Ramify-Gate: ${result.gate}`);
     expect(accepted).toContain('1 file; owners collection-review/workspace/reviews/notes');
 

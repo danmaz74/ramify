@@ -572,11 +572,13 @@ describe('the breaking-iteration boundary is not green by default', () => {
     const breaking = (await gates(root, runId)).filter(attempt => attempt.checkpoint === 'breaking-iteration');
     expect(breaking.map(attempt => attempt.verdict)).toEqual(['failed', 'passed']);
     // The failure is the probe's: the consumers' own tests really ran over
-    // the unadapted tree and failed, and nothing was committed for it.
+    // the committed unadapted tree and failed with evidence bound to it.
     const refused = breaking[0]!;
     expect(refused.cause).toBe('in-scope');
     expect(refused.next).toBe('repair');
-    expect(refused.commit).toBeNull();
+    expect(refused.commit).not.toBeNull();
+    expect(refused.audited).toBe(refused.commit);
+    expect(refused.evidence).not.toBeNull();
     expect(refused.commands.at(-1)!.outcome).toBe('failed');
     expect(refused.commands.at(-1)!.output.tail).toContain('not ok');
     // Only the adapted state is accepted, after one repair round.
@@ -679,7 +681,9 @@ describe('K6: the gate is not satisfied by weakening what it checks', () => {
     expect(refused.guardedChanges[0]!.path).toBe('vitest.config.ts');
     expect(refused.guardedChanges[0]!.authorizedBy).toBeNull();
     expect(refused.guardedChanges[0]!.after).not.toBeNull();
-    expect(refused.commit).toBeNull();
+    expect(refused.commit).not.toBeNull();
+    expect(refused.audited).toBe(refused.commit);
+    expect(refused.evidence).not.toBeNull();
     // Every command of it passed: the verdict is the harness's finding, not
     // a failing command.
     expect(refused.commands.every(command => command.outcome === 'passed')).toBe(true);

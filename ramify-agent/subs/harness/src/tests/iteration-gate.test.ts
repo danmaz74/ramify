@@ -1,9 +1,13 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, test } from 'vitest';
 import type { GateAttempt } from '../checks/records.js';
 import { iterationLayout, type IterationResult } from '../work/iterations.js';
 import { runLayout } from '../run/records.js';
+import type { LineEventSummary } from '../run/records.js';
+import { changedPaths, diffNumstat } from '../../subs/evidence/src/git.js';
+import { childEnvironment, runCommand } from '../../subs/evidence/src/run-command.js';
 import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { addModule, assign, byRole, completionProposed, edit, installMiniRunner, outline, submit, treeInputs, write } from './helpers/iterations.js';
@@ -28,6 +32,7 @@ afterEach(async () => {
 
 const notes = 'collection-review/workspace/reviews/notes';
 const notesDirectory = 'subs/workspace/subs/reviews/subs/notes';
+const auditCli = fileURLToPath(new URL('../../../../node_modules/ramify-audit/dist/cli.js', import.meta.url));
 
 const limitTest = [
   'import { test, expect } from \'vitest\';',
@@ -99,7 +104,9 @@ describe('K1: a module gate fails, is repaired and reruns the complete gate', ()
     expect(failed.cause).toBe('in-scope');
     expect(failed.next).toBe('repair');
     expect(failed.repairRound).toBe(0);
-    expect(failed.commit).toBeNull();
+    expect(failed.commit).not.toBeNull();
+    expect(failed.audited).toBe(failed.commit);
+    expect(failed.evidence).not.toBeNull();
     expect(failed.commands[0]!.exitCode).toBe(1);
     expect(failed.commands[0]!.output.tail).toContain('not ok');
 
@@ -107,20 +114,46 @@ describe('K1: a module gate fails, is repaired and reruns the complete gate', ()
     // not only the command that failed.
     expect(repaired.repairRound).toBe(1);
     expect(repaired.verdict).toBe('passed');
+    expect(repaired.commit).not.toBeNull();
+    expect(repaired.audited).toBe(repaired.commit);
+    expect(repaired.evidence).not.toBeNull();
     expect(repaired.commands.map(command => command.kind)).toEqual(failed.commands.map(command => command.kind));
     expect(repaired.commands.every(command => command.outcome === 'passed')).toBe(true);
 
     const result = await readResult(root, runId, 'wi-001', 1);
     expect(result.outcome).toBe('accepted');
     expect(result.gate).toBe(repaired.id);
+    expect(result.commit).toBe(repaired.audited);
     expect(result.invocations).toHaveLength(2);
 
-    // Exactly one commit followed the passing attempt, and the failing one
-    // committed nothing.
+    // The two attempts report the delivered change once: their line events
+    // and paths equal the final accepted diff from the preceding boundary,
+    // just as if that final tree had been committed in one attempt.
+    const lines = await Promise.all(result.invocations.map(async invocation =>
+      JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.lineEvents(invocation)), 'utf8')) as LineEventSummary));
+    const delivered = await diffNumstat(root, failed.head, result.commit!);
+    expect(lines.flatMap(summary => summary.paths).map(path => [path.path, path.added, path.deleted] as const).sort()).toEqual(
+      delivered.map(path => [path.path, path.added, path.deleted] as const).sort(),
+    );
+    expect(await changedPaths(root, result.commit!)).toEqual([]);
+    const closed = (await runEventsOnDisk(root, 'review-notes', runId)).find(event => event.type === 'iteration-closed' && event.data.iteration === result.iteration);
+    expect(closed?.type === 'iteration-closed' && closed.data.notices).toEqual([]);
+
+    // Each changed attempt made one commit before its audit: fail, then pass.
     const log = await git(root, 'log', '--format=%H%x1f%B%x1e', `ramify-agent/run-${runId}`);
     const commits = log.split('\u001e').map(part => part.trim()).filter(Boolean);
-    expect(commits.filter(commit => commit.includes('Ramify-Iteration: wi-001.i01'))).toHaveLength(1);
-    expect(commits.some(commit => commit.includes(`Ramify-Gate: ${failed.id}`))).toBe(false);
+    expect(commits.filter(commit => commit.includes('Ramify-Iteration: wi-001.i01'))).toHaveLength(2);
+    expect(commits.some(commit => commit.includes(`Ramify-Gate: ${failed.id}`))).toBe(true);
+    expect(await git(root, 'notes', '--ref=audit', 'show', failed.audited!)).toContain('Audited-Overall: fail');
+    expect(await git(root, 'notes', '--ref=audit', 'show', repaired.audited!)).toContain('Audited-Overall: pass');
+    const branchAudit = await runCommand({
+      argv: [process.execPath, auditCli, 'check-branch', `ramify-agent/run-${runId}`, '--cwd', root, '--json'],
+      cwd: root,
+      env: childEnvironment({ GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' }),
+      timeoutMs: 30_000,
+    });
+    expect(branchAudit.outcome).toEqual({ kind: 'completed', exitCode: 0 });
+    expect(JSON.parse(branchAudit.stdout) as unknown).toMatchObject({ auditStillApplies: true, auditPassed: true });
     expect(await readFile(join(root, notesDirectory, 'src', 'notes.ts'), 'utf8')).toBe('export const noteLimit = 500;\n');
   }, 300_000);
 
@@ -256,6 +289,9 @@ describe('K8: every gate resolves the current tests under the captured policy', 
     const failedDiscovery = iterationGates.find(gate => gate.commands[0]!.notVerified === 'discovery-error');
     expect(failedDiscovery).toBeDefined();
     expect(failedDiscovery!.verdict).toBe('not-verified');
+    expect(failedDiscovery).toMatchObject({ commit: null, audited: null, evidence: null });
+    const events = await runEventsOnDisk(root, 'review-notes', runId);
+    expect(events.some(event => event.type === 'gate-committing' && event.data.gate === failedDiscovery!.id)).toBe(false);
     // The selection is empty rather than the list the earlier attempt used.
     expect(failedDiscovery!.commands[0]!.selection!.resolved).toEqual([]);
   }, 300_000);

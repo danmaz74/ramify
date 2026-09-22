@@ -5,6 +5,7 @@ import { jobIdSchema, planIdSchema } from '../interfaces/protocol/ids.js';
 import { roleSchema, runAgentSchema, type Role } from '../interfaces/protocol/runs.js';
 import { jobSchemaVersion, jobsDirectory } from '../jobs/records.js';
 import type { GateAttempt } from '../checks/records.js';
+import type { PlannedCheck } from '../checks/verify.js';
 
 /*
  * The durable records of one implementation run, and where each of them is
@@ -353,7 +354,7 @@ export const invocationSchema = z.object({
   }).strict(),
   writer: z.boolean(),
   supersedes: text.optional(),
-  /** The run branch's head when it started: the last accepted commit. */
+  /** The latest passed committing checkpoint's audited hash when it started, or the run base before one exists. */
   base: z.string(),
   startedAt: timestamp,
 }).strict();
@@ -411,6 +412,23 @@ const testSelectionSchema = z.object({
   resolved: z.array(z.string()),
 }).strict();
 
+const plannedCheckSchema = z.object({
+  kind: z.enum(['ramify-check', 'type-check', 'tests', 'conformance']),
+  command: checkCommandSchema,
+  selection: testSelectionSchema.optional(),
+  requiresTests: z.boolean().optional(),
+  discovery: z.object({
+    failed: z.enum(['discovery-error', 'required-suite-missing']),
+    detail: z.string(),
+  }).strict().optional(),
+  attribution: z.enum(['in-scope', 'project']).optional(),
+}).strict();
+
+/** A durable gate operation exists only after every plan verified. */
+const verifiedPlannedCheckSchema = plannedCheckSchema
+  .omit({ discovery: true })
+  .extend({ kind: z.enum(['ramify-check', 'type-check', 'tests']) });
+
 /** A rule the harness verified itself over the tree, beside the commands it ran. */
 export const gateRuleSchema = z.object({
   rule: z.literal('fake-naming'),
@@ -419,7 +437,7 @@ export const gateRuleSchema = z.object({
 }).strict();
 
 export const gateAttemptSchema = z.object({
-  schema: z.literal('ramify-agent.gate-attempt/1'),
+  schema: z.literal('ramify-agent.gate-attempt/2'),
   id: text,
   checkpoint: z.enum(['readiness', 'iteration', 'contract', 'breaking-iteration', 'work-item', 'final']),
   subject: z.object({ workItem: text.optional(), iteration: text.optional() }).strict(),
@@ -428,6 +446,8 @@ export const gateAttemptSchema = z.object({
   infrastructureAttempt: z.int().nonnegative(),
   head: z.string(),
   commit: z.string().nullable(),
+  audited: z.string().nullable(),
+  evidence: z.object({ runRef: text, reportCommit: text, treeRef: text }).strict().nullable(),
   guardedChanges: z.array(z.object({
     path: text,
     before: z.string(),
@@ -466,6 +486,44 @@ export const gateAttemptSchema = z.object({
 const _gateAttemptsAgree: GateAttempt = undefined as unknown as z.infer<typeof gateAttemptSchema>;
 void _gateAttemptsAgree;
 
+/** Durable input for a committing gate, written before its commit and audit effect. */
+export const gateOperationSchema = z.object({
+  schema: z.literal('ramify-agent.gate-operation/1'),
+  checkpoint: z.enum(['iteration', 'contract', 'breaking-iteration', 'work-item', 'final']),
+  request: z.object({
+    id: text,
+    runId: text,
+    projectRoot: text,
+    directory: text,
+    head: z.string(),
+    checks: z.array(verifiedPlannedCheckSchema),
+    selection: z.object({
+      policy: z.enum(['owned-by-scope', 'all-project']),
+      exactOwners: z.array(z.string()),
+      subtrees: z.array(z.string()),
+    }).strict(),
+    dependencyDirectories: z.array(z.string()),
+    subject: z.object({ workItem: text.optional(), iteration: text.optional() }).strict(),
+    proposedBy: z.string().nullable(),
+    repairRound: z.int().nonnegative(),
+    infrastructureAttempt: z.int().nonnegative(),
+    writeScope: z.array(z.string()),
+    limits: z.object({ repairRounds: z.int().positive(), infrastructureRetries: z.int().positive() }).strict(),
+  }).strict(),
+  guardedChanges: z.array(z.object({
+    path: text, before: z.string(), after: z.string().nullable(), authorizedBy: recordRefSchema.nullable(),
+  }).strict()),
+  rules: z.array(gateRuleSchema),
+  unauthorized: z.boolean(),
+  ruleFailed: z.boolean(),
+  timeoutMs: z.int().positive(),
+  message: z.string(),
+}).strict();
+export type GateOperation = z.infer<typeof gateOperationSchema>;
+
+const _plannedChecksAgree: readonly PlannedCheck[] = undefined as unknown as GateOperation['request']['checks'];
+void _plannedChecksAgree;
+
 // Where each record lives beneath the run's directory.
 
 /** The absolute directory of one run, `plans/<plan-id>/.harness/jobs/<run-id>/`. */
@@ -489,6 +547,7 @@ export const runLayout = {
   recovery: (id: RecoveryId): string => join('recoveries', `${id}.json`),
   measurement: (id: SnapshotId): string => join('measurements', `${id}.json`),
   gate: (id: string): string => join('gates', id, 'attempt.json'),
+  gateOperation: (id: string): string => join('gates', id, 'operation.json'),
   gateOutput: (id: string): string => join('gates', id),
   invocation: (id: InvocationId): string => join('invocations', id, 'invocation.json'),
   submission: (id: InvocationId): string => join('invocations', id, 'submission.json'),
@@ -513,7 +572,8 @@ export const runSchemas = {
   lineEvents: { schema: 'ramify-agent.line-events/1', body: lineEventSummarySchema },
   invocation: { schema: 'ramify-agent.invocation/1', body: invocationSchema },
   outcome: { schema: 'ramify-agent.invocation-outcome/1', body: invocationOutcomeSchema },
-  gate: { schema: 'ramify-agent.gate-attempt/1', body: gateAttemptSchema },
+  gate: { schema: 'ramify-agent.gate-attempt/2', body: gateAttemptSchema },
+  gateOperation: { schema: 'ramify-agent.gate-operation/1', body: gateOperationSchema },
 } as const;
 
 /** Every role a run's policy and prompt manifest must carry an entry for. */

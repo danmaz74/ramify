@@ -160,8 +160,8 @@ export const runEventSchema = z.discriminatedUnion('type', [
   }).strict()),
   /**
    * Commits the `IterationResult`. For `accepted` it names the passing gate
-   * and the commit the harness made, and carries a notice for every module
-   * that commit added or removed, read from the commit itself.
+   * and its audited commit, and carries a notice for every module added or
+   * removed since the preceding accepted boundary.
    */
   event('iteration-closed', z.object({
     workItem: text,
@@ -290,20 +290,16 @@ export const runEventSchema = z.discriminatedUnion('type', [
   event('writer-acquired', z.object({ invocation: text, scopeRevision: z.int().nonnegative().nullable() }).strict()),
   /** `confirmed: false` blocks every writer and every gate that follows. */
   event('writer-released', z.object({ invocation: text, confirmed: z.boolean(), groupsKilled: z.int().nonnegative() }).strict()),
-  /**
-   * A gate ran. On a failure it commits the `GateAttempt`; on a pass it is
-   * the intent of the commit effect, and `gate-committed` commits the record
-   * with the commit the effect made.
-   */
+  /** The durable intent of a verified committing gate's commit-and-audit effect. */
+  event('gate-committing', z.object({ gate: text, checkpoint: text }).strict()),
+  /** A gate finished and commits its one complete `GateAttempt`. */
   event('gate-attempted', z.object({
     gate: text,
     checkpoint: text,
     verdict: z.enum(['passed', 'failed', 'not-verified']),
     next: text,
-    committing: z.boolean(),
+    committing: z.boolean().optional(),
   }).strict()),
-  /** The completion of the commit effect, keyed by the gate attempt. Commits the `GateAttempt`. */
-  event('gate-committed', z.object({ gate: text, commit: z.string().nullable() }).strict()),
   event('stop-requested', z.object({ command: acceptedCommandSchema }).strict()),
   /** Requires a passing `final` gate on the current tree; an empty queue alone never satisfies it. */
   event('job-completed', z.object({ gate: text, commit: z.string().nullable(), workItems: z.int().nonnegative() }).strict()),

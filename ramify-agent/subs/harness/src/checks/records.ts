@@ -15,7 +15,7 @@ import { childEnvironment, environmentNames } from '../../subs/evidence/src/run-
 /** A gate attempt's identifier, `ga-0012`, counted over committed attempts. */
 export type GateAttemptId = string;
 
-/** A commit of the run branch, made by the harness after a gate passed. */
+/** A commit of the run branch. */
 export type AcceptedCommit = string;
 
 /**
@@ -170,9 +170,16 @@ export interface GateCommandRecord {
   readonly output: { readonly path: string; readonly bytes: number; readonly truncated: boolean; readonly tail: string };
 }
 
+/** Published evidence that certifies the exact commit named by `audited`. */
+export interface GateEvidence {
+  readonly runRef: string;
+  readonly reportCommit: string;
+  readonly treeRef: string;
+}
+
 /** One run of a checkpoint's commands over the working directory. */
 export interface GateAttempt {
-  readonly schema: 'ramify-agent.gate-attempt/1';
+  readonly schema: 'ramify-agent.gate-attempt/2';
   readonly id: GateAttemptId;
   readonly checkpoint: Checkpoint;
   /** Neither for readiness and final. */
@@ -180,10 +187,14 @@ export interface GateAttempt {
   readonly proposedBy: string | null;
   readonly repairRound: number;
   readonly infrastructureAttempt: number;
-  /** The run branch's head when the commands ran, in the working directory. */
+  /** The run branch's head observed before this attempt made any commit. */
   readonly head: AcceptedCommit;
-  /** The commit made after a pass; null for a failure, for no change, and until that effect completes. */
+  /** The commit this attempt made, whatever its verdict; null when the tree was unchanged. */
   readonly commit: AcceptedCommit | null;
+  /** The commit the checks ran over; null when execution never began or ran in place. */
+  readonly audited: AcceptedCommit | null;
+  /** The audit publication bound to `audited`; null when no evidence was published. */
+  readonly evidence: GateEvidence | null;
   /** `after: null` is a deletion, which is a change like any other. */
   readonly guardedChanges: Array<{ readonly path: string; readonly before: string; readonly after: string | null; readonly authorizedBy: RecordReference | null }>;
   /** Rules the harness verified itself. A checkpoint with none records none. */
@@ -197,4 +208,4 @@ export interface GateAttempt {
 }
 
 /** The version this harness writes and reads. */
-export const gateAttemptSchema = 'ramify-agent.gate-attempt/1';
+export const gateAttemptSchema = 'ramify-agent.gate-attempt/2';

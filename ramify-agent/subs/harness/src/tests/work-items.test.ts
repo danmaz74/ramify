@@ -74,10 +74,10 @@ describe('a run whose work items need no change', () => {
       'job-started', 'invocation-started', 'invocation-ended', 'analysis-accepted',
       'readiness-passed',
       'work-item-started', 'hypotheses-delivered', 'invocation-started', 'invocation-ended',
-      'outline-revised', 'gate-attempted', 'gate-committed', 'work-item-completed',
+      'outline-revised', 'gate-committing', 'gate-attempted', 'work-item-completed',
       'work-item-started', 'hypotheses-delivered', 'invocation-started', 'invocation-ended',
-      'outline-revised', 'gate-attempted', 'gate-committed', 'work-item-completed',
-      'gate-attempted', 'gate-committed', 'job-completed',
+      'outline-revised', 'gate-committing', 'gate-attempted', 'work-item-completed',
+      'gate-committing', 'gate-attempted', 'job-completed',
     ]);
 
     // One event holds every record of the analysis phase.
@@ -247,8 +247,9 @@ describe('a work-item gate that does not pass', () => {
     const gates = events.filter(event => event.type === 'gate-attempted').filter(event => event.data.checkpoint === 'work-item');
     expect(gates).toHaveLength(4);
     expect(gates.every(event => event.data.verdict === 'failed')).toBe(true);
-    // A failing gate commits nothing.
-    expect(events.filter(event => event.type === 'gate-committed')).toHaveLength(0);
+    // Every verified changed attempt is committed before its exact revision is
+    // audited, including a failing attempt that will be repaired next.
+    expect(events.filter(event => event.type === 'gate-committing')).toHaveLength(4);
 
     // Four outline revisions, each from its own invocation of the same session.
     const outlines = events.filter(event => event.type === 'outline-revised');
