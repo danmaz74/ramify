@@ -105,6 +105,19 @@ function isFocusVisible(target: Element): boolean {
   }
 }
 
+/**
+ * Undoes the scroll a browser applies to a scrollable ancestor to reveal a focused element.
+ * React Flow resets that scroll itself a moment later, so without this the element would be
+ * measured where it is not drawn and the canvas would read it as already in view.
+ */
+function unscroll(target: Element, viewport: Element): void {
+  for (let element: Element | null = target; element !== null; element = element.parentElement) {
+    if (element.scrollTop !== 0) element.scrollTop = 0;
+    if (element.scrollLeft !== 0) element.scrollLeft = 0;
+    if (element === viewport) return;
+  }
+}
+
 /** Whether the element's box lies wholly within the canvas viewport. */
 function isWithin(element: Element, viewport: Element): boolean {
   const box = element.getBoundingClientRect();
@@ -227,6 +240,8 @@ const PROJECT_COLOR = '#94a3b8';
  * control or a collapse control — is centred at the current zoom, so the fitted zoom survives
  * navigation; centering on the caller's `centerNodeId` sets zoom 1 instead, because that is the
  * viewer's choice of one node. A focus pan counts as a viewer move, and ends auto-fitting.
+ * A browser scrolls a scrollable ancestor to reveal the focused element and React Flow resets
+ * that scroll again, so the canvas undoes it before it measures where the element is drawn.
  *
  * A body control's key press does not reach the shell, and Space on one does not reach React
  * Flow's pan-activation key on the document; the shell and the pane keep their Space behavior.
@@ -292,7 +307,9 @@ export function ModuleTreeCanvas({
   // Focus is navigation: it keeps the current zoom, where centering on a selected node sets 1.
   const focusIntoView = useCallback((target: Element) => {
     const viewport = autoFit.containerRef.current;
-    if (!flow || !viewport || !isFocusVisible(target) || isWithin(target, viewport)) return;
+    if (!flow || !viewport || !isFocusVisible(target)) return;
+    unscroll(target, viewport);
+    if (isWithin(target, viewport)) return;
     // The focused element, not its node: a tall node's lower rows would stay out of view.
     const box = target.getBoundingClientRect();
     const centre = flow.screenToFlowPosition({ x: box.left + box.width / 2, y: box.top + box.height / 2 });

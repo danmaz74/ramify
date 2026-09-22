@@ -527,7 +527,7 @@ function Progress({ onOpenWorkItem, moduleSelection, onSelectModule, ...props }:
 }) {
   const [view, setView] = useState<ProgressView>('module');
   return (
-    <div className="area" aria-label="Progress">
+    <div className="area area-wide" aria-label="Progress">
       <nav className="tabs progress-views" aria-label="Progress views">
         {progressViews.map(([id, label]) => (
           <button key={id} type="button" role="tab" aria-selected={view === id} className={view === id ? 'tab tab-selected' : 'tab'} onClick={() => setView(id)}>{label}</button>

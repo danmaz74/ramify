@@ -20,6 +20,20 @@ test('the connection is shown apart from the page content', async () => {
   expect(screen.getByRole('status', { name: 'Connection' }).textContent).toBe('Connected to the harness');
 });
 
+// KI-8: `.run-page main` matched nothing, because <main> is the Run page's parent. The route
+// class on <main> is what a route-specific width rule can name.
+test('main carries the current route, so a route can widen the shell', async () => {
+  const client = new StubClient();
+  render(<App client={client} />);
+  expect(document.querySelector('main')?.className).toBe('route-plans');
+  act(() => {
+    window.location.hash = '#/plans/review-notes/runs/20260921T080000Z-c0ffee';
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+  });
+  expect(document.querySelector('main')?.className).toBe('route-run');
+  await screen.findByRole('heading', { name: /^Run/ });
+});
+
 test('the fragment selects the page', async () => {
   const client = new StubClient();
   client.documents.set('review-notes', {
