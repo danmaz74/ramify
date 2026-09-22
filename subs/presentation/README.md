@@ -9,6 +9,12 @@ and projects their evidence into rows and labels. Fixture labels can preserve
 camel-case teaching names while the model retains valid declared owner paths.
 Labels never replace original identity or decide permission.
 
+The `src/module-tree-entry.ts` package entry forwards the module-tree canvas
+and its node contract, which `project-view` exposes to this owner. Its
+stylesheet, `src/module-tree-entry.css`, imports React Flow's base rules and
+the canvas rules, so a consumer imports one stylesheet. Neither entry is part
+of `src/index.ts`, which never evaluates React Flow or a stylesheet.
+
 The model's values reach this owner through analysis and root declarations,
 with explicit browser promises. Root relays presentation declarations without
 importing UI values. The layout child owns numerical placement and viewport

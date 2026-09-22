@@ -1,0 +1,194 @@
+{
+  "schemaVersion": "ramify.resident-explorer-acceptance/1",
+  "measuredAt": "2026-09-21T20:08:34.105Z",
+  "status": "passed",
+  "passed": true,
+  "command": [
+    "npm",
+    "run",
+    "measure:project-explorer",
+    "--",
+    "--only",
+    "tree",
+    "--output",
+    "ramify-agent/docs/plans/03-autonomous-implementation-loop/capability-progress-results/iteration2-artifacts/tree-browser-acceptance.json"
+  ],
+  "environment": {
+    "node": "v22.23.2",
+    "versions": {
+      "node": "22.23.2",
+      "acorn": "8.16.0",
+      "ada": "2.9.2",
+      "amaro": "1.1.8",
+      "ares": "1.34.6",
+      "brotli": "1.1.0",
+      "cjs_module_lexer": "2.2.0",
+      "cldr": "48.0",
+      "icu": "78.2",
+      "llhttp": "9.4.3",
+      "modules": "127",
+      "napi": "10",
+      "nbytes": "0.1.3",
+      "ncrypto": "0.0.1",
+      "nghttp2": "1.69.0",
+      "openssl": "3.5.7",
+      "simdjson": "4.5.0",
+      "simdutf": "6.4.2",
+      "sqlite": "3.51.3",
+      "tz": "2026a",
+      "undici": "6.28.0",
+      "unicode": "17.0",
+      "uv": "1.51.0",
+      "uvwasi": "0.0.23",
+      "v8": "12.4.254.21-node.56",
+      "zlib": "1.3.1-e00f703",
+      "zstd": "1.5.7"
+    },
+    "platform": "linux",
+    "release": "6.8.0-85-generic",
+    "cpuCount": 12,
+    "cpuModel": "Intel(R) Xeon(R) E-2176G CPU @ 3.70GHz",
+    "totalMemoryBytes": 67274752000,
+    "chromiumPath": "/usr/bin/chromium",
+    "dependencies": {
+      "playwrightCore": "1.63.0",
+      "xyflow": "^12.10.0",
+      "vite": "^8.3.0"
+    },
+    "chromiumVersion": "151.0.7922.173"
+  },
+  "inputs": {
+    "buildIdentity": "12af8c0575535d73b0c926d4fec2707e5c59c236f72aa7b9765292b6ebaf87b3"
+  },
+  "workloads": {
+    "tree": {
+      "toolkit": {
+        "kind": "toolkit",
+        "root": "/tmp/ramify-explorer-acceptance-Kk0nEv/toolkit-tDoIQr",
+        "revision": "rev/1:11a303c5-342b-4952-84ce-2d87c1dbc0ed:1",
+        "modules": 15,
+        "encodedBytes": 3151688,
+        "firstRender": {
+          "projectViewResponseEnd": 2839.300003051758,
+          "treeRenderedAt": 2908.7000007629395,
+          "firstRenderMs": 69.39999771118164
+        },
+        "mt14": {
+          "treeUrl": "http://127.0.0.1:34391/modules/latest",
+          "initialNodes": 15,
+          "collapsed": {
+            "parent": "ramify/analysis",
+            "label": "+4",
+            "nodes": 11
+          },
+          "selected": "ramify/analysis/model",
+          "purpose": "The model defines canonical module and original identities, validates the shared tag registry, derives source profiles, and explains visibility and importability from grounded exposure evidence without filesystem, compiler or UI dependencies.",
+          "explorerUrl": "http://127.0.0.1:34391/analysis/latest?module=ramify%2Fanalysis%2Fmodel",
+          "breadcrumb": "All Modules\n/\nramify\n/\nanalysis",
+          "backUrl": "http://127.0.0.1:34391/modules/latest?module=ramify%2Fanalysis%2Fmodel"
+        },
+        "fullHeight": {
+          "tree": {
+            "viewport": {
+              "width": 1440,
+              "height": 1000
+            },
+            "canvasTop": 101,
+            "canvasBottom": 979,
+            "canvasHeight": 878,
+            "canvasWidth": 1031,
+            "nodes": 15,
+            "outside": 0,
+            "minimapNodes": 15,
+            "documentHeight": 1000
+          },
+          "treeAfterResize": {
+            "viewport": {
+              "width": 1100,
+              "height": 700
+            },
+            "canvasTop": 101,
+            "canvasBottom": 679,
+            "canvasHeight": 578,
+            "canvasWidth": 691,
+            "nodes": 15,
+            "outside": 0,
+            "minimapNodes": 15,
+            "documentHeight": 700
+          },
+          "explorer": {
+            "viewport": {
+              "width": 1440,
+              "height": 1000
+            },
+            "canvasTop": 321,
+            "canvasBottom": 979,
+            "canvasHeight": 658,
+            "canvasWidth": 1031,
+            "nodes": 4,
+            "outside": 0,
+            "minimapNodes": 4,
+            "documentHeight": 1000
+          }
+        },
+        "consoleErrors": []
+      },
+      "mutations": {
+        "kind": "mutations",
+        "root": "/tmp/ramify-explorer-acceptance-Kk0nEv/mutations-DrrNw2",
+        "revision": "rev/1:d9672270-2ffa-4ecc-97ca-fb697bab7721:1",
+        "modules": 3,
+        "encodedBytes": 5869,
+        "firstRender": {
+          "projectViewResponseEnd": 177.5,
+          "treeRenderedAt": 221.79999923706055,
+          "firstRenderMs": 44.29999923706055
+        },
+        "mt15": {
+          "treeUrl": "http://127.0.0.1:45987/modules/latest",
+          "finalUrl": "http://127.0.0.1:45987/modules/latest",
+          "selected": "fixture/provider",
+          "added": "fixture/extra",
+          "before": 3,
+          "after": 4,
+          "refreshedRevision": "rev/1:d9672270-2ffa-4ecc-97ca-fb697bab7721:2"
+        },
+        "consoleErrors": []
+      },
+      "reference": {
+        "kind": "reference",
+        "root": "/tmp/ramify-explorer-acceptance-Kk0nEv/reference-l4l35x",
+        "revision": "rev/1:75a86881-e93f-4a2a-bb4c-58c5aa0cba65:1",
+        "modules": 15,
+        "mt16": {
+          "firstRender": {
+            "projectViewResponseEnd": 360.5,
+            "treeRenderedAt": 403.5999984741211,
+            "firstRenderMs": 43.099998474121094
+          },
+          "collapse": {
+            "module": "collection-review/workspace",
+            "descendants": 12,
+            "collapseMs": 29.099998474121094,
+            "expandMs": 33.19999694824219,
+            "collapsedNodes": 3,
+            "expandedNodes": 15
+          },
+          "bundle": {
+            "files": {
+              "index-CAiLSvLx.js": 207018
+            },
+            "gzipBytes": 207018
+          },
+          "baselineGzipBytes": 193873,
+          "addedGzipBytes": 13145,
+          "budgetBytes": 25600,
+          "encodedBytes": 248543
+        },
+        "consoleErrors": []
+      }
+    }
+  },
+  "failures": [],
+  "completedAt": "2026-09-21T20:09:02.220Z"
+}

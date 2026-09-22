@@ -1,3 +1,7 @@
+/* The packaged Ramify module-tree canvas, with the React Flow base rules it
+ * needs: imported once, here, and never copied. */
+@import 'ramify.ts/module-tree.css';
+
 :root {
   --ink: #1d232b;
   --muted: #5d6874;
@@ -53,7 +57,7 @@ h1 { font-size: 1.5rem; margin: 0.5rem 0; }
 .plan-entry-error { border-color: #e7c2bf; }
 
 .plan-header h1 { margin-bottom: 0; }
-.tabs { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--line); margin: 1rem 0; }
+.tabs { display: flex; flex-wrap: wrap; gap: 0.25rem; border-bottom: 1px solid var(--line); margin: 1rem 0; }
 .tabs a { padding: 0.4rem 0.9rem; text-decoration: none; border-bottom: 2px solid transparent; color: var(--muted); }
 .tabs a[aria-current='page'] { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
 .markdown pre { background: #f1f3f5; padding: 0.75rem; border-radius: 6px; overflow-x: auto; }
@@ -178,3 +182,138 @@ h1 { font-size: 1.5rem; margin: 0.5rem 0; }
 .tail { background: #f1f3f5; padding: 0.6rem; border-radius: 6px; max-height: 18rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.8rem; }
 button.link { border: none; background: none; padding: 0; color: var(--accent); text-decoration: underline; }
 button.link[aria-pressed='true'] { font-weight: 700; }
+
+/* Progress → By module. The packaged Ramify canvas owns the node shells,
+ * edges and controls; these rules style only the node bodies and the page
+ * around the canvas. */
+.capability-module-tree { display: grid; gap: 0.75rem; }
+.capability-module-header { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 0.6rem 1.25rem 0.75rem; }
+.capability-module-header h2 { font-size: 1.15rem; margin: 0.3rem 0; }
+.capability-module-header p { margin: 0.3rem 0; }
+.capability-coverage { margin: 0.4rem 0; font-weight: 600; }
+.capability-coverage-partial { font-weight: normal; color: var(--warn); }
+.capability-coverage-partial ul { margin: 0.2rem 0; }
+.capability-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.6rem; color: var(--muted); font-size: 0.82rem; }
+.capability-module-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem); gap: 1rem; align-items: start; }
+.capability-module-canvas { height: 38rem; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.capability-module-canvas-empty { border: 1px dashed var(--line); border-radius: 8px; padding: 0.75rem 1rem; }
+.capability-module-side { display: grid; gap: 1rem; }
+.capability-module-side > section { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 0.5rem 1rem 0.75rem; overflow-wrap: anywhere; }
+.capability-module-detail h3 { margin: 0.3rem 0; font-size: 1rem; }
+.capability-module-detail h4 { margin: 0.6rem 0 0.2rem; font-size: 0.85rem; color: var(--muted); }
+.capability-module-detail ul { margin: 0.2rem 0; padding-left: 1.1rem; }
+.capability-module-detail li .capability-mark { margin-left: 0.4rem; }
+.capability-unplaced h3 { margin: 0.3rem 0; font-size: 1rem; }
+.capability-unplaced ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6rem; }
+.capability-module { display: flex; flex-direction: column; min-width: 0; }
+.capability-module-name { display: block; font-weight: 700; font-size: 12px; line-height: 18px; white-space: nowrap; }
+.capability-module-proposed { display: block; color: var(--warn); font-size: 10px; font-weight: 700; line-height: 16px; }
+.capability-rows { display: flex; flex-direction: column; }
+.capability-row {
+  display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 1px;
+  box-sizing: border-box; width: 100%; padding: 2px 6px; border: 1px solid var(--line); border-radius: 5px;
+  background: #fff; text-align: left; font-size: 11px; line-height: 15px; white-space: nowrap;
+}
+.capability-row:hover { border-color: #9facba; }
+.capability-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.capability-row-selected { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.capability-row-id { font-size: 11px; }
+.capability-row-marks { display: flex; gap: 0.3rem; }
+.capability-mark { display: inline-block; padding: 0 0.35rem; border-radius: 4px; font-size: 10px; font-weight: 700; line-height: 14px; }
+.capability-mark-initial { color: var(--accent); background: #fff; border: 1px solid var(--accent); }
+.capability-mark-implemented { color: #fff; background: var(--good); border: 1px solid var(--good); }
+.preview-kicker { margin: 0.25rem 0 0.8rem; color: var(--muted); }
+.preview-source { font-size: 0.82rem; }
+
+@media (max-width: 760px) {
+  .capability-module-layout { grid-template-columns: 1fr; }
+  .capability-module-canvas { height: 30rem; }
+}
+
+/* Capability dependency progress. The harness owns every displayed fact; the
+ * browser owns only deterministic placement and selection. */
+.capability-graph { padding: 0; overflow: hidden; }
+.capability-graph-header {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem;
+  padding: 1.15rem 1.35rem 0.9rem; background: linear-gradient(135deg, #f7f9fc 0%, #fff 65%);
+  border-bottom: 1px solid var(--line);
+}
+.capability-graph-header h2 { margin: 0 0 0.2rem; font-size: 1.25rem; }
+.capability-graph-header p { margin: 0; max-width: 46rem; }
+.capability-counts { display: flex; gap: 1.15rem; margin: 0; flex: 0 0 auto; }
+.capability-counts div { min-width: 4.2rem; text-align: center; }
+.capability-counts dt { color: var(--muted); font-size: 0.78rem; font-family: ui-monospace, monospace; }
+.capability-counts dd { margin: 0; font-size: 1.3rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.capability-counts-block { flex: 0 0 auto; }
+.capability-counts-label { margin: 0 0 0.3rem; color: var(--muted); font-size: 0.74rem; text-align: right; }
+.graph-coverage { margin: 0; padding: 0.55rem 1.35rem; border-bottom: 1px solid #ead7ad; background: #fff8e8; }
+.graph-legend {
+  display: flex; flex-wrap: wrap; gap: 0.65rem 1rem; align-items: center;
+  padding: 0.65rem 1.35rem; color: var(--muted); border-bottom: 1px solid var(--line); font-size: 0.8rem;
+}
+.graph-legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
+.legend-line { width: 1.7rem; border-top: 2px solid #708195; display: inline-block; }
+.legend-line::after { content: '›'; position: relative; left: -0.1rem; top: -0.02rem; font-size: 1rem; }
+.legend-line.legend-tentative { border-top-style: dashed; border-top-color: var(--warn); }
+.legend-node { width: 0.8rem; height: 0.8rem; border: 2px solid var(--line); border-radius: 3px; display: inline-block; background: #fff; }
+.legend-node.legend-entry { border-left: 4px solid var(--accent); }
+.legend-node.legend-forecast { border-style: dashed; border-color: var(--warn); background: #fffaf0; }
+.legend-cycle { width: 0.8rem; height: 0.8rem; border: 1px dashed var(--bad); border-radius: 4px; display: inline-block; background: rgb(163 49 43 / 4%); }
+.capability-graph-scroll {
+  overflow: auto; max-height: 42rem; background-color: #fafbfc;
+  background-image: radial-gradient(#d9dee4 0.75px, transparent 0.75px); background-size: 16px 16px;
+  scrollbar-gutter: stable;
+}
+.capability-graph-scroll:focus-visible { outline: 3px solid rgb(47 95 167 / 28%); outline-offset: -3px; }
+.capability-graph-surface { position: relative; margin: 0 auto; }
+.graph-column-label {
+  position: absolute; top: 17px; color: var(--muted); font-size: 0.72rem; font-weight: 700;
+  letter-spacing: 0.055em; text-align: center; text-transform: uppercase;
+}
+.capability-edges { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
+.capability-edge { fill: none; stroke: #708195; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.capability-edge-tentative { stroke: var(--warn); stroke-dasharray: 7 5; }
+.capability-arrow path { fill: #708195; }
+.capability-arrow-tentative path { fill: var(--warn); }
+.capability-cycle { fill: rgb(163 49 43 / 4%); stroke: var(--bad); stroke-width: 1.5; stroke-dasharray: 4 4; }
+.capability-node {
+  position: absolute; display: flex; flex-direction: column; align-items: stretch; gap: 0.27rem;
+  padding: 0.7rem 0.78rem; text-align: left; background: #fff; border: 1px solid #cfd6de;
+  border-left-width: 4px; border-radius: 8px; box-shadow: 0 2px 7px rgb(29 35 43 / 8%); overflow: hidden;
+}
+.capability-node:hover { border-color: #9facba; box-shadow: 0 3px 11px rgb(29 35 43 / 12%); }
+.capability-node:focus-visible, .capability-node-selected { outline: 3px solid rgb(47 95 167 / 25%); outline-offset: 2px; }
+.capability-node-todo { border-left-color: #8a949f; }
+.capability-node-working { border-left-color: var(--accent); }
+.capability-node-completed { border-left-color: var(--good); }
+.capability-node-tentative { border-top-style: dashed; border-right-style: dashed; border-bottom-style: dashed; border-color: var(--warn); background: #fffdf7; }
+.capability-node-title { display: block; font-weight: 750; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.capability-node-owner { color: var(--muted); font-size: 0.76rem; line-height: 1.35; overflow-wrap: break-word; white-space: normal; }
+.capability-node-owner-label { color: var(--muted); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.capability-cycle-label { position: absolute; color: var(--bad); font-size: 0.72rem; font-weight: 700; }
+.capability-node-badges { display: flex; flex-wrap: wrap; gap: 0.25rem; min-height: 1.2rem; }
+.capability-node-badges .badge { margin-left: 0; }
+.capability-node-meta { margin-top: auto; color: var(--muted); font-size: 0.74rem; }
+.capability-detail { padding: 0.8rem 1.35rem 0.95rem; border-top: 1px solid var(--line); background: #fff; }
+.capability-detail h3 { margin: 0 0 0.25rem; color: var(--ink); }
+.capability-detail > p { margin: 0.2rem 0 0.55rem; }
+.capability-detail .facts { margin: 0; }
+.capability-dependency-list { padding: 0.65rem 1.35rem 0.85rem; border-top: 1px solid var(--line); color: var(--muted); }
+.capability-dependency-list summary { cursor: pointer; }
+.capability-dependency-list ul { margin-bottom: 0; }
+.capability-preview-shell main { max-width: none; }
+.capability-preview-case { margin-bottom: 1.5rem; }
+.capability-preview-case > h2 { font-size: 1rem; margin: 0 0 0.4rem; }
+.progress-views { margin-top: 0; }
+.inline-list { display: inline; margin: 0; padding: 0; list-style: none; }
+.inline-list li { display: inline; }
+.inline-list li + li::before { content: ', '; }
+.graph-coverage p { margin: 0.2rem 0; }
+.graph-coverage ul { margin: 0.2rem 0 0.3rem; }
+
+@media (max-width: 760px) {
+  .capability-graph-header { display: block; }
+  .capability-counts { margin-top: 0.8rem; justify-content: flex-start; }
+  .capability-counts-label { text-align: left; }
+  .capability-graph-scroll { max-height: 34rem; }
+}

@@ -3,8 +3,12 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import type { SessionSpec } from '../../subs/agent/src/interfaces/port.js';
 import { analysisLayout, hypothesisSchema } from '../analysis/records.js';
+import type { ModuleTree, ViewIdentity } from '../interfaces/protocol/evidence.js';
+import { moduleCapabilityComparisonResponseSchema, runQueryLimits, type ModuleCapabilityComparisonResponse } from '../interfaces/protocol/runs.js';
 import { runView } from '../projections/inputs.js';
+import { moduleCapabilityComparisonOf, type AnalysisCoverageLimits } from '../projections/module-capabilities.js';
 import { capabilityProgressOf } from '../projections/progress.js';
+import { entryAssignmentsSchema } from '../run/records.js';
 import { RunQueries } from '../projections/queries.js';
 import { workLayout } from '../work/records.js';
 import { copyFixture } from './helpers/fixture.js';
@@ -199,6 +203,48 @@ describe('M2: provider waits, verified reuse, reopened evidence and superseded h
     expect(provider.evidence).toContain('ga-0007');
   });
 
+  test('a reopened capability is not implemented now, though its earlier evidence remains', () => {
+    const entries = {
+      path: 'analysis/entries.json',
+      body: entryAssignmentsSchema.parse({
+        schema: 'ramify-agent.entry-assignments/1', view: { status: 'placeholder' },
+        entries: [{ capability: 'send-button', description: 'A send button.', owner: reviews, requirementRefs: [], acceptanceRefs: [], citations: [] }],
+      }),
+    };
+    const completed: Line[] = [
+      { type: 'analysis-accepted', data: {}, records: [entries] },
+      ...delegation,
+      { type: 'work-item-started', data: { workItem: 'wi-002', module: reviews } },
+      { type: 'provider-conformed', data: { obligation: 'ob-ct-001', revision: 1, workItem: 'wi-002', iteration: 'wi-002.i01', gate: 'ga-0006' } },
+      { type: 'work-item-completed', data: { workItem: 'wi-002', gate: 'ga-0007' } },
+    ];
+    const tree = { status: 'unavailable' as const, message: 'not materialized' };
+    const rows = (lines: readonly Line[]) => moduleCapabilityComparisonOf(runView(constructedRun(lines)), tree, { limits: [] })
+      .modules.flatMap(entry => entry.capabilities.map(row => [entry.module, row.capability, row.initial.map(association => association.role), row.implementedHere?.evidence ?? null]));
+    // Completed and first registered during the run: Implemented only.
+    expect(rows(completed)).toEqual([
+      [reviews, 'send-button', ['entry-owner'], null],
+      [reviews, 'send-email', [], ['ga-0007', 'ga-0006']],
+    ]);
+    const reopened: Line[] = [
+      ...completed,
+      {
+        type: 'evidence-reopened',
+        data: {
+          cause: 'contract-revision', contract: 'ct-001', revision: 2, iteration: 'wi-001.i03', obligation: 'ob-ct-001', requirements: ['rq-001'],
+          bindings: [], followUps: [{ workItem: 'wi-003', follows: 'wi-002' }], superseded: [],
+        },
+        records: [
+          { path: at('obligations', 'ob-ct-001', 2), body: obligation('ct-001', 'send-email', 2) },
+          { path: at('requirements', 'rq-001', 2), body: requirement('rq-001', 'wi-001', 'send-button', 'ct-001', 2) },
+          { path: 'work-items/wi-003/item.json', body: item('wi-003', { obligation: { id: 'ob-ct-001', revision: 2, hash } }, { follows: 'wi-002', startedFor: null }) },
+        ],
+      },
+    ];
+    // Reopened, it is working: no row, since it was neither forecast nor is it implemented now.
+    expect(rows(reopened)).toEqual([[reviews, 'send-button', ['entry-owner'], null]]);
+  });
+
   test('a superseded hypothesis leaves the list without becoming completed', () => {
     const progress = progressOf([{
       type: 'analysis-accepted', data: {},
@@ -284,3 +330,261 @@ async function inventory(directory: string): Promise<Array<[string, number, numb
   await walk(directory);
   return found.sort();
 }
+
+describe('the module-capability comparison', () => {
+  const R = root;
+  const notes = `${reviews}/notes`;
+  const drafts = `${notes}/drafts`;
+  const archive = `${drafts}/archive`;
+  const panel = `${R}/panel`;
+  const tree: ModuleTree = {
+    status: 'available',
+    revision: 'rev/7:tree:1',
+    input: 'input/7:tree',
+    modules: [
+      { module: R, dir: '', parent: null },
+      { module: panel, dir: 'subs/panel', parent: R },
+      { module: `${R}/workspace`, dir: 'subs/workspace', parent: R },
+      { module: reviews, dir: 'subs/workspace/subs/reviews', parent: `${R}/workspace` },
+      { module: notes, dir: 'subs/workspace/subs/reviews/subs/notes', parent: reviews },
+    ],
+  };
+  const proposal = (parent: string, name: string, purpose = `Holds ${name}.`) => ({ parent, directory: `subs/${name}`, purpose, tags: [] as string[] });
+
+  function assignments(list: ReadonlyArray<{ capability: string; owner: string; proposed?: ReturnType<typeof proposal> }>, view: ViewIdentity = { status: 'placeholder' }) {
+    return entryAssignmentsSchema.parse({
+      schema: 'ramify-agent.entry-assignments/1',
+      view,
+      entries: list.map(entry => ({
+        capability: entry.capability, description: `The run delivers ${entry.capability}.`, owner: entry.owner,
+        ...(entry.proposed === undefined ? {} : { proposed: entry.proposed }),
+        requirementRefs: [], acceptanceRefs: [], citations: [],
+      })),
+    });
+  }
+
+  function compare(lines: readonly Line[], current: ModuleTree = tree, limits: AnalysisCoverageLimits = { limits: [] }) {
+    const response = moduleCapabilityComparisonOf(runView(constructedRun(lines)), current, limits);
+    // Every answer satisfies the protocol schema and its coverage refinement.
+    expect(moduleCapabilityComparisonResponseSchema.parse(response)).toEqual(response);
+    return response;
+  }
+
+  const rowsOf = (response: ModuleCapabilityComparisonResponse) => response.modules.flatMap(entry => entry.capabilities.map(row => ({
+    module: entry.module,
+    capability: row.capability,
+    initial: row.initial.map(association => `${association.role}${association.hypothesis === null ? '' : `:${association.hypothesis}`}`),
+    implemented: row.implementedHere !== null,
+  })));
+
+  // Entries: one owned by an existing module, one whose owner moves, and two
+  // proposed modules, the second beneath the first. Hypotheses: an exact
+  // slug join with an entry, a forecast that involves modules and names an
+  // anticipated consumer, and one revised after revision 1. A capability
+  // first registered during the run is verified by reuse.
+  const main: Line[] = [
+    { type: 'job-started', data: {} },
+    {
+      type: 'analysis-accepted', data: { invocation: 'inv-0001' },
+      records: [
+        {
+          path: 'analysis/entries.json', body: assignments([
+            { capability: 'review-note', owner: notes },
+            { capability: 'moved-thing', owner: reviews },
+            { capability: 'note-drafts', owner: drafts, proposed: proposal(notes, 'drafts') },
+            { capability: 'draft-archive', owner: archive, proposed: proposal(drafts, 'archive') },
+          ]),
+        },
+        ...['review-note', 'moved-thing', 'note-drafts', 'draft-archive'].map(capability => ({
+          path: at('registry', capability),
+          body: registered(capability, { owner: capability === 'review-note' ? notes : capability === 'moved-thing' ? reviews : capability === 'note-drafts' ? drafts : archive }),
+        })),
+        { path: at('hypotheses', 'h-join'), body: forecast('h-join', 'review-note', { suggestedOwner: notes }) },
+        {
+          path: at('hypotheses', 'note-search'),
+          body: forecast('note-search', 'note-search', { suggestedOwner: notes, involvedModules: [reviews, notes, reviews], anticipatedConsumers: [panel] }),
+        },
+        { path: at('hypotheses', 'h-revised'), body: forecast('h-revised', 'revised-later', { suggestedOwner: reviews }) },
+        { path: 'work-items/wi-001/item.json', body: item('wi-001', { entry: 'review-note' }, { module: notes }) },
+        { path: 'work-items/wi-002/item.json', body: item('wi-002', { entry: 'moved-thing' }) },
+        { path: 'work-items/wi-003/item.json', body: item('wi-003', { entry: 'note-drafts' }, { module: drafts }) },
+        { path: 'work-items/wi-004/item.json', body: item('wi-004', { entry: 'draft-archive' }, { module: archive }) },
+      ],
+    },
+    { type: 'work-item-started', data: { workItem: 'wi-001', module: notes } },
+    { type: 'work-item-completed', data: { workItem: 'wi-001', gate: 'ga-0002' } },
+    {
+      // A later decision moves moved-thing, revises a hypothesis and registers
+      // format-date for reuse by wi-002; none of it rewrites revision 1.
+      type: 'decision-accepted', data: {},
+      records: [
+        { path: at('registry', 'moved-thing', 2), body: registered('moved-thing', { revision: 2, owner: panel, origin: 'global-decision', decision: 'gd-001', previousOwner: reviews }) },
+        { path: at('hypotheses', 'h-revised', 2), body: forecast('h-revised', 'revised-later', { revision: 2, suggestedOwner: panel, cause: { decision: 'gd-001', reason: 'moved' } }) },
+        { path: at('registry', 'format-date'), body: registered('format-date', { origin: 'global-decision', decision: 'gd-001', owner: R, consumers: [{ capability: 'moved-thing', workItem: 'wi-002' }] }) },
+      ],
+    },
+    { type: 'work-item-started', data: { workItem: 'wi-002', module: panel } },
+    { type: 'work-item-completed', data: { workItem: 'wi-002', gate: 'ga-0003' } },
+    { type: 'work-item-started', data: { workItem: 'wi-003', module: drafts } },
+  ];
+
+  test('both layers, exact-slug joins, every role once, changed placement and unforecast implementation', () => {
+    const response = compare(main);
+    expect(response.identityPolicy).toBe('exact-capability-slug/1');
+    expect(response.runVersion).toBe(main.length);
+    expect(response.initialView).toEqual({ status: 'placeholder' });
+    expect(response.tree).toEqual(tree);
+
+    expect(rowsOf(response)).toEqual([
+      // Unforecast: registered during the run and verified, Implemented only.
+      { module: R, capability: 'format-date', initial: [], implemented: true },
+      // Changed placement: Initial in one module, Implemented in the other, with no mismatch status.
+      { module: panel, capability: 'moved-thing', initial: [], implemented: true },
+      { module: reviews, capability: 'moved-thing', initial: ['entry-owner'], implemented: false },
+      // Involved twice by one hypothesis: once.
+      { module: reviews, capability: 'note-search', initial: ['involved:note-search'], implemented: false },
+      // The revised hypothesis keeps its revision-1 owner.
+      { module: reviews, capability: 'revised-later', initial: ['suggested-owner:h-revised'], implemented: false },
+      // An entry and a hypothesis of the same slug are one capability, one row, both roles.
+      { module: notes, capability: 'review-note', initial: ['entry-owner', 'suggested-owner:h-join'], implemented: true },
+      // Suggested owner and involved module are distinct roles of one row.
+      { module: notes, capability: 'note-search', initial: ['suggested-owner:note-search', 'involved:note-search'], implemented: false },
+      // Working is not implemented.
+      { module: drafts, capability: 'note-drafts', initial: ['entry-owner'], implemented: false },
+      { module: archive, capability: 'draft-archive', initial: ['entry-owner'], implemented: false },
+    ]);
+    // The anticipated consumer is no association.
+    expect(response.modules.find(entry => entry.module === panel)!.capabilities.map(row => row.capability)).toEqual(['moved-thing']);
+
+    // Completed rows keep their progress's reason and evidence.
+    const reviewNote = response.modules.find(entry => entry.module === notes)!.capabilities[0]!;
+    expect(reviewNote.implementedHere).toEqual({ reason: 'wi-001 passed its work-item gate ga-0002', evidence: ['ga-0002'] });
+
+    // Placement: the tree's modules, the proposed ones after their parent's subtree.
+    expect(response.modules.map(entry => [entry.module, entry.placement])).toEqual([
+      [R, 'declared'], [panel, 'declared'], [`${R}/workspace`, 'declared'], [reviews, 'declared'], [notes, 'declared'],
+      [drafts, 'proposed'], [archive, 'proposed'],
+    ]);
+    expect(response.modules.find(entry => entry.module === drafts)!.proposedAtStart).toEqual({ parent: notes, purpose: 'Holds drafts.', tags: [] });
+    expect(response.modules.find(entry => entry.module === `${R}/workspace`)!.capabilities).toEqual([]);
+
+    // Capability order: entries, revision-1 hypotheses, then the registry's discoveries.
+    expect(response.coverage).toEqual({ state: 'complete', capabilities: 7, implemented: 3 });
+  });
+
+  test('a declared module keeps what was proposed for it at start', () => {
+    const grown: ModuleTree = { ...tree, modules: [...tree.modules, { module: drafts, dir: 'subs/drafts', parent: notes }] };
+    const response = compare(main, grown);
+    expect(response.modules.filter(entry => [drafts, archive].includes(entry.module)).map(entry => [entry.module, entry.placement, entry.proposedAtStart?.parent]))
+      .toEqual([[drafts, 'declared', notes], [archive, 'proposed', drafts]]);
+    expect(response.coverage.state).toBe('complete');
+  });
+
+  test('the answer is deterministic', () => {
+    expect(JSON.stringify(compare(main))).toBe(JSON.stringify(compare(main)));
+  });
+
+  test('a pending analysis is unavailable, with no view and no modules', () => {
+    const response = compare([{ type: 'job-started', data: {} }]);
+    expect(response).toMatchObject({ initialView: null, modules: [], coverage: { state: 'unavailable', reason: expect.stringContaining('pending') } });
+  });
+
+  test('an unavailable tree is partial: every module unplaced, with the tree\'s message', () => {
+    const message = 'The architect view has not been materialized yet; a run materializes it before its initial analysis.';
+    const response = compare(main, { status: 'unavailable', message });
+    expect(new Set(response.modules.map(entry => entry.placement))).toEqual(new Set(['unplaced']));
+    expect(response.modules.map(entry => entry.module)).toEqual([R, panel, reviews, notes, drafts, archive].sort());
+    expect(response.modules.find(entry => entry.module === drafts)!.proposedAtStart).not.toBeNull();
+    expect(response.coverage).toEqual({
+      state: 'partial', knownCapabilities: 7, knownImplemented: 3, totalCapabilities: null,
+      gaps: [`The current module tree is unavailable, so no module is placed: ${message}`],
+    });
+  });
+
+  test('recorded coverage limits of the view and of the analysis are one gap each', () => {
+    const view: ViewIdentity = { status: 'materialized', revision: 'r', input: 'i', coverageLimits: ['dependencies unavailable (stub)'] };
+    const response = compare([{ type: 'analysis-accepted', data: {}, records: [{ path: 'analysis/entries.json', body: assignments([{ capability: 'review-note', owner: notes }], view) }] }],
+      tree, { limits: ['The panel was not read.'] });
+    expect(response.initialView).toEqual(view);
+    expect(response.coverage).toMatchObject({
+      state: 'partial',
+      gaps: ['The architect view the initial analysis worked from reports: dependencies unavailable (stub)', 'The initial analysis reports: The panel was not read.'],
+    });
+    const unreadable = compare([{ type: 'analysis-accepted', data: {}, records: [{ path: 'analysis/entries.json', body: assignments([{ capability: 'review-note', owner: notes }]) }] }],
+      tree, { unreadable: 'invocations/inv-0001/submission.json is not in the run' });
+    expect(unreadable.coverage).toMatchObject({ state: 'partial', gaps: [expect.stringContaining('cannot be read')] });
+  });
+
+  test('an absent module without a proposal, and conflicting proposals, are unplaced with a gap', () => {
+    const response = compare([{
+      type: 'analysis-accepted', data: {},
+      records: [
+        {
+          path: 'analysis/entries.json', body: assignments([
+            { capability: 'first-draft', owner: drafts, proposed: proposal(notes, 'drafts') },
+            { capability: 'second-draft', owner: drafts, proposed: proposal(reviews, 'drafts') },
+          ]),
+        },
+        { path: at('hypotheses', 'far-away'), body: forecast('far-away', 'far-away', { suggestedOwner: `${R}/nowhere` }) },
+      ],
+    }]);
+    expect(response.modules.slice(-2)).toEqual([
+      { module: `${R}/nowhere`, placement: 'unplaced', proposedAtStart: null, capabilities: [{ capability: 'far-away', initial: [{ role: 'suggested-owner', hypothesis: 'far-away' }], implementedHere: null }] },
+      {
+        module: drafts, placement: 'unplaced', proposedAtStart: null, capabilities: [
+          { capability: 'first-draft', initial: [{ role: 'entry-owner', hypothesis: null }], implementedHere: null },
+          { capability: 'second-draft', initial: [{ role: 'entry-owner', hypothesis: null }], implementedHere: null },
+        ],
+      },
+    ]);
+    expect(response.coverage).toMatchObject({
+      state: 'partial', knownCapabilities: 3, knownImplemented: 0, totalCapabilities: null,
+      gaps: [
+        `Module ${R}/nowhere is absent from the current tree and has no recorded proposed parent.`,
+        `Module ${drafts} is absent from the current tree, and the entries that propose it disagree, so it has no provisional place.`,
+      ],
+    });
+  });
+
+  test('the capability bound drops whole capabilities from the end, the run\'s discoveries first', () => {
+    const many = Array.from({ length: 501 }, (_, index) => `entry-${String(index).padStart(3, '0')}`);
+    const response = compare([
+      {
+        type: 'analysis-accepted', data: {},
+        records: [
+          { path: 'analysis/entries.json', body: assignments(many.map(capability => ({ capability, owner: reviews }))) },
+          { path: at('registry', 'discovered'), body: registered('discovered', { origin: 'local-decision', decision: 'ld-001', owner: notes, consumers: [{ capability: 'entry-000', workItem: 'wi-001' }] }) },
+          { path: 'work-items/wi-001/item.json', body: item('wi-001', { entry: 'entry-000' }) },
+        ],
+      },
+      { type: 'work-item-completed', data: { workItem: 'wi-001', gate: 'ga-0002' } },
+    ]);
+    const returned = new Set(response.modules.flatMap(entry => entry.capabilities.map(row => row.capability)));
+    expect(returned.size).toBe(runQueryLimits.capabilities);
+    expect(returned.has('entry-500')).toBe(false);
+    expect(returned.has('discovered')).toBe(false);
+    expect(response.coverage).toMatchObject({ state: 'partial', knownCapabilities: 500, knownImplemented: 0, totalCapabilities: 502 });
+    if (response.coverage.state !== 'partial') throw new Error('partial');
+    expect(response.coverage.gaps).toEqual([expect.stringMatching(/^The capabilities \(500\) bound returned 500 of 502 capabilities.*knownImplemented is a lower bound/)]);
+  });
+
+  test('the row bound keeps a capability with all of its rows or drops it whole', () => {
+    const modules = Array.from({ length: 5 }, (_, index) => `${reviews}/m${index}`);
+    const wide: ModuleTree = { ...tree, modules: [...tree.modules, ...modules.map(module => ({ module, dir: module, parent: reviews }))] };
+    const hypotheses = Array.from({ length: 401 }, (_, index) => {
+      const id = `forecast-${String(index).padStart(3, '0')}`;
+      return { path: at('hypotheses', id), body: forecast(id, id, { suggestedOwner: modules[0]!, involvedModules: modules.slice(1) }) };
+    });
+    const response = compare([{
+      type: 'analysis-accepted', data: {},
+      records: [{ path: 'analysis/entries.json', body: assignments([{ capability: 'first', owner: notes }]) }, ...hypotheses],
+    }], wide);
+    const rows = response.modules.reduce((sum, entry) => sum + entry.capabilities.length, 0);
+    // One entry row, then 399 forecasts of five rows each: 1,996 rows; the next would exceed 2,000.
+    expect(rows).toBe(1 + 399 * 5);
+    for (const module of modules) expect(response.modules.find(entry => entry.module === module)!.capabilities).toHaveLength(399);
+    expect(response.coverage).toMatchObject({ state: 'partial', knownCapabilities: 400, totalCapabilities: 402 });
+    if (response.coverage.state !== 'partial') throw new Error('partial');
+    expect(response.coverage.gaps[0]).toMatch(/^The moduleCapabilityRows \(2000\) bound returned 400 of 402 capabilities and 1996 of 2006 rows.*lower bound/);
+  });
+});

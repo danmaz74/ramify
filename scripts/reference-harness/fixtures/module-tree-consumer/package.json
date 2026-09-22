@@ -1,0 +1,25 @@
+{
+  "name": "module-tree-consumer",
+  "private": true,
+  "type": "module",
+  "description": "Package consumer of ramify.ts/module-tree, installed from the packed tarball by module-tree-consumer.ts.",
+  "scripts": {
+    "type-check": "tsc -p tsconfig.json",
+    "build": "vite build",
+    "render-check": "node --import ./jsdom-globals.mjs --import tsx src/render-check.tsx"
+  },
+  "dependencies": {
+    "ramify.ts": "file:ramify.ts.tgz",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "26.4.0",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.5",
+    "jsdom": "30.0.1",
+    "tsx": "4.23.13",
+    "typescript": "7.0.2",
+    "vite": "8.3.0"
+  }
+}

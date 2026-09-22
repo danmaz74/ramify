@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { errorResponseSchema } from '../interfaces/protocol/errors.js';
 import { protocolPaths } from '../interfaces/protocol/paths.js';
+import { moduleTreeResponseSchema } from '../interfaces/protocol/evidence.js';
 import { planListResponseSchema, planResponseSchema, projectResponseSchema } from '../interfaces/protocol/queries.js';
 import { ProjectRootError, startServer, type RunningServer } from '../http/server.js';
 import { copyFixture, temporaryDirectory } from './helpers/fixture.js';
@@ -76,6 +77,46 @@ describe('the protocol over HTTP, with the web assets absent', () => {
     const { status, body } = await query(server, '/');
     expect(status).toBe(404);
     expect(body).toMatch(/npm run build:web/);
+  });
+});
+
+describe('the module tree, through the one load the comparison shares', () => {
+  test('unavailable before the view is materialized, unreadable when it is broken, and available with each module\'s name, directory and parent', async () => {
+    const fixture = await copyFixture();
+    const server = await startServer({ projectRoot: fixture.root, port: 0, assetsDirectory: join(fixture.root, 'no-such-build') });
+    try {
+      const tree = async () => {
+        const { status, body } = await query(server, protocolPaths.modules);
+        expect(status).toBe(200);
+        return moduleTreeResponseSchema.parse(body).tree;
+      };
+      expect(await tree()).toEqual({
+        status: 'unavailable',
+        message: 'The architect view has not been materialized yet; a run materializes it before its initial analysis.',
+      });
+
+      const view = join(fixture.root, '.ramify-architect');
+      await mkdir(view);
+      await writeFile(join(view, '_meta.json'), '{"schema":"ramify.architect-view/0"}');
+      expect(await tree()).toEqual({ status: 'unavailable', message: expect.stringMatching(/^The architect view cannot be read: .*not a ramify\.architect-view\/1 document/) });
+
+      // The view's module.json carries more than the protocol's module: the
+      // children, tags and areas stay behind.
+      await writeFile(join(view, '_meta.json'), JSON.stringify({ schema: 'ramify.architect-view/1', revision: 'rev/3:x:1', input: 'input/3:abc', modules: 2, dependencies: 'measured' }));
+      await writeFile(join(view, 'module.json'), JSON.stringify({ module: 'collection-review', dir: '', parent: null, children: ['collection-review/workspace'], tags: [], areas: ['src'] }));
+      await mkdir(join(view, 'workspace'));
+      await writeFile(join(view, 'workspace', 'module.json'), JSON.stringify({ module: 'collection-review/workspace', dir: 'subs/workspace', parent: 'collection-review', children: [], tags: ['ui'], areas: ['src', 'src/tests'] }));
+      expect(await tree()).toEqual({
+        status: 'available', revision: 'rev/3:x:1', input: 'input/3:abc',
+        modules: [
+          { module: 'collection-review', dir: '', parent: null },
+          { module: 'collection-review/workspace', dir: 'subs/workspace', parent: 'collection-review' },
+        ],
+      });
+    } finally {
+      await server.close();
+      await fixture.remove();
+    }
   });
 });
 

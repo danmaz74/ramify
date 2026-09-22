@@ -1,0 +1,4 @@
+/* Supported module-tree canvas stylesheet: React Flow's base rules, then the
+ * canvas rules. A consumer's CSS bundler inlines both imports. */
+@import '@xyflow/react/dist/style.css';
+@import '../subs/project-view/src/module-tree-canvas.css';
